@@ -1,0 +1,56 @@
+import { eq } from "drizzle-orm";
+import { NextResponse } from "next/server";
+import { z } from "zod";
+
+import { getDb, schema } from "@/lib/db";
+import { withSession, issueCsrfCookie } from "@/lib/auth";
+import { verifyPassword, needsRehash, hashPassword } from "@/lib/security/password";
+import { limiters, bucketKey, clientIp } from "@/lib/security/rate-limit";
+
+const bodySchema = z.object({
+  email: z.string().trim().toLowerCase().email(),
+  password: z.string().min(1),
+});
+
+export async function POST(req: Request) {
+  const ip = clientIp(req.headers);
+  if (!limiters.login.take(bucketKey(ip))) {
+    return NextResponse.json({ error: "Too many attempts" }, { status: 429 });
+  }
+
+  const parsed = bodySchema.safeParse(await req.json().catch(() => null));
+  if (!parsed.success) {
+    return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+  }
+
+  const db = getDb();
+  const [user] = await db
+    .select()
+    .from(schema.users)
+    .where(eq(schema.users.email, parsed.data.email))
+    .limit(1);
+
+  if (!user || !(await verifyPassword(parsed.data.password, user.password))) {
+    return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
+  }
+  if (!user.emailVerified) {
+    return NextResponse.json({ error: "Email not verified" }, { status: 403 });
+  }
+  if (!user.isActive) {
+    return NextResponse.json({ error: "Account deactivated" }, { status: 403 });
+  }
+
+  if (needsRehash(user.password)) {
+    const upgraded = await hashPassword(parsed.data.password);
+    await db
+      .update(schema.users)
+      .set({ password: upgraded })
+      .where(eq(schema.users.id, user.id));
+  }
+
+  const res = NextResponse.json({
+    user: { id: user.id, email: user.email, firstName: user.firstName, lastName: user.lastName },
+  });
+  await issueCsrfCookie(res);
+  return withSession(res, { uid: user.id, role: "intern", email: user.email });
+}

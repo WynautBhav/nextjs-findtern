@@ -1,0 +1,182 @@
+/**
+ * Formatting helpers.
+ *
+ * Money arrives in minor units (paise, cents) from the CMS and is divided and
+ * formatted here, once. The legacy site inlined this arithmetic in four
+ * separate components, which is how the Home pricing section and the Pricing
+ * page ended up showing different fallback prices for the same plans.
+ */
+
+export function formatMoney(
+  minor: number,
+  currency: "INR" | "USD" = "INR",
+  opts: { compact?: boolean } = {},
+): string {
+  const value = minor / 100;
+  if (value === 0) return currency === "INR" ? "Free" : "$0";
+
+  return new Intl.NumberFormat(currency === "INR" ? "en-IN" : "en-US", {
+    style: "currency",
+    currency,
+    maximumFractionDigits: opts.compact || Number.isInteger(value) ? 0 : 2,
+    minimumFractionDigits: 0,
+  }).format(value);
+}
+
+/** "INR 100/hr" — used in plan column headers. */
+export function formatRate(
+  minor: number,
+  currency: "INR" | "USD" = "INR",
+): string {
+  return minor <= 0 ? formatMoney(0, currency) : `${formatMoney(minor, currency)}/hr`;
+}
+
+/** "INR 5,000 per hire", or a flat zero when there is no per-hire charge. */
+export function formatPerHire(
+  minor: number,
+  currency: "INR" | "USD" = "INR",
+): string {
+  if (minor <= 0) return formatMoney(0, currency);
+  return `${formatMoney(minor, currency)} per hire`;
+}
+
+export const formatCurrency = formatMoney;
+
+export function formatDate(iso: string | Date | null | undefined): string {
+  if (!iso) return "—";
+  const date = typeof iso === "string" ? new Date(iso) : iso;
+  if (isNaN(date.getTime())) return "—";
+  return date.toLocaleDateString("en-IN", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+/** Reading time at 200 wpm, rounded up, floored at 1. */
+export function readingTimeMinutes(text: string): number {
+  const words = text.trim().split(/\s+/).filter(Boolean).length;
+  return Math.max(1, Math.ceil(words / 200));
+}
+
+/**
+ * Best-effort region detection.
+ *
+ * The legacy Pricing page inferred INR vs USD from
+ * `Intl.DateTimeFormat().resolvedOptions().timeZone`, `navigator.language`, and
+ * a hardcoded `getTimeZoneOffset() === -330` check, inlined three times. This
+ * is the same logic in one function, and it defaults to INR — the wrong
+ * default for a majority-Indian product is a worse failure than showing
+ * prices in a currency the visitor can still read.
+ */
+export function detectIsIndia(): boolean {
+  if (typeof window === "undefined") return true;
+  try {
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone ?? "";
+    if (/Kolkata|Calcutta/i.test(tz)) return true;
+    if (tz && !/Kolkata|Calcutta/i.test(tz)) return false;
+    return /^en-IN/i.test(navigator.language ?? "");
+  } catch {
+    return true;
+  }
+}
+
+/* ── Candidate facing dates ──────────────────────────────────────────────
+ * The intern screens were rendering `new Date(x).toLocaleDateString()` with no
+ * options at all, so times vanished entirely and interviews showed a timezone
+ * where a date should have been. Interview times are agreed across people in
+ * two countries, so the zone is part of the value, not a footnote: every
+ * helper here takes the zone the row carried and prints it in that zone with
+ * an abbreviation the reader can see. */
+
+function zoneAbbrev(tz: string | null | undefined, date: Date): string {
+  if (!tz) return "";
+  try {
+    const parts = new Intl.DateTimeFormat("en-IN", {
+      timeZone: tz,
+      timeZoneName: "short",
+    }).formatToParts(date);
+    return parts.find((p) => p.type === "timeZoneName")?.value ?? "";
+  } catch {
+    return "";
+  }
+}
+
+/** "Thu 9 Oct, 10:00 AM IST" */
+export function formatSlotTime(value: Date | string | null, tz?: string | null): string {
+  if (!value) return "Time to be confirmed";
+  const date = typeof value === "string" ? new Date(value) : value;
+  if (Number.isNaN(date.getTime())) return "Time to be confirmed";
+  const core = new Intl.DateTimeFormat("en-IN", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+    timeZone: tz || undefined,
+  }).format(date);
+  const abbrev = zoneAbbrev(tz, date);
+  return abbrev ? `${core} ${abbrev}` : core;
+}
+
+/** Day only, no clock: "Thu 9 Oct" */
+export function formatSlotDay(value: Date | string | null, tz?: string | null): string {
+  if (!value) return "To be confirmed";
+  const date = typeof value === "string" ? new Date(value) : value;
+  if (Number.isNaN(date.getTime())) return "To be confirmed";
+  return new Intl.DateTimeFormat("en-IN", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    timeZone: tz || undefined,
+  }).format(date);
+}
+
+/**
+ * "Today", "Yesterday", "3 days ago", then an absolute date.
+ *
+ * Relative wording only for the last week. Past that, an absolute date is more
+ * useful and more honest than "47 days ago", which reads as neglect when it is
+ * just a fact about a stipend.
+ */
+export function formatDayLabel(value: Date | string | null, now: Date = new Date()): string {
+  if (!value) return "Unknown";
+  const date = typeof value === "string" ? new Date(value) : value;
+  if (Number.isNaN(date.getTime())) return "Unknown";
+  const days = Math.floor((now.getTime() - date.getTime()) / 86_400_000);
+  if (days <= 0) return "Today";
+  if (days === 1) return "Yesterday";
+  if (days < 7) return `${days} days ago`;
+  return date.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+}
+
+/** "September 2026" */
+export function formatMonth(value: Date | string | null): string {
+  if (!value) return "";
+  const date = typeof value === "string" ? new Date(value) : value;
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleDateString("en-IN", { month: "long", year: "numeric" });
+}
+
+/** "1 Sep to 30 Sep 2026" without repeating a shared month. */
+export function formatRange(start: Date | string | null, end: Date | string | null): string {
+  if (!start) return "Dates to be confirmed";
+  const a = typeof start === "string" ? new Date(start) : start;
+  if (!end) return a.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+  const b = typeof end === "string" ? new Date(end) : end;
+  const sameMonth = a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth();
+  const left = a.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+  const right = sameMonth
+    ? b.toLocaleDateString("en-IN", { day: "numeric", year: "numeric" })
+    : b.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+  return `${left} to ${right}`;
+}
+
+/** "1.2 MB" */
+export function formatBytes(bytes: number | null | undefined): string {
+  if (!bytes || bytes <= 0) return "";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}

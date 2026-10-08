@@ -1,0 +1,151 @@
+"use client";
+
+/**
+ * Edit the skills an admin can vouch for.
+ *
+ * The legacy admin edited skills from the intern's 360 page, and employers
+ * filter and sort candidates on skills, so an admin-curated list is the input
+ * that actually decides who gets shortlisted. This build has
+ * `PUT /api/admin/interns/:id/skills` and nothing that calls it.
+ *
+ * Four to seven, matching the legacy rule: a longer list stops being a signal,
+ * and employers read the top of it.
+ */
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { Loader2, X } from "lucide-react";
+
+import { csrfFetch } from "@/lib/client-fetch";
+
+const MIN = 4;
+const MAX = 7;
+
+export function InternSkillsEditor({
+  internId,
+  skills,
+}: {
+  internId: string;
+  skills: string[];
+}) {
+  const router = useRouter();
+  const [value, setValue] = useState("");
+  const [list, setList] = useState<string[]>(skills);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+
+  function add() {
+    const skill = value.trim();
+    if (!skill) return;
+    if (list.length >= MAX) {
+      setError(`At most ${MAX} skills.`);
+      return;
+    }
+    if (list.some((s) => s.toLowerCase() === skill.toLowerCase())) {
+      setError("Already on the list.");
+      return;
+    }
+    setList([...list, skill]);
+    setValue("");
+    setError(null);
+    setSaved(false);
+  }
+
+  async function save() {
+    if (list.length < MIN) {
+      setError(`At least ${MIN} skills, or remove this editor.`);
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await csrfFetch(`/api/admin/interns/${encodeURIComponent(internId)}/skills`, {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ skills: list }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error ?? "Could not save the skills.");
+      setSaved(true);
+      router.refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not save the skills.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="border-t border-ink-100 pt-3">
+      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-text-subtle">
+        Vouched skills ({list.length}/{MAX})
+      </p>
+
+      {list.length > 0 ? (
+        <ul className="mt-2 flex flex-wrap gap-1.5">
+          {list.map((skill) => (
+            <li
+              key={skill}
+              className="inline-flex items-center gap-1 rounded-full bg-ink-100 px-2.5 py-1 text-xs font-medium text-ink-700"
+            >
+              {skill}
+              <button
+                type="button"
+                onClick={() => {
+                  setList(list.filter((s) => s !== skill));
+                  setSaved(false);
+                }}
+                aria-label={`Remove ${skill}`}
+                className="text-ink-400 transition-colors hover:text-danger"
+              >
+                <X className="size-3" aria-hidden />
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="mt-2 text-xs text-ink-500">
+          None recorded. Employers filtering on skills will not find this candidate.
+        </p>
+      )}
+
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <input
+          value={value}
+          onChange={(e) => {
+            setValue(e.target.value);
+            setError(null);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              add();
+            }
+          }}
+          placeholder="Add a skill"
+          className="h-9 min-w-0 flex-1 rounded-lg border border-ink-200 bg-white px-3 text-sm text-ink-900 outline-none placeholder:text-ink-400 focus-visible:border-brand-600"
+        />
+        <button
+          type="button"
+          onClick={add}
+          className="h-9 rounded-lg border border-ink-200 bg-white px-3.5 text-sm font-medium text-ink-800 transition-colors hover:bg-ink-50"
+        >
+          Add
+        </button>
+        <button
+          type="button"
+          onClick={save}
+          disabled={busy || list.length === skills.length}
+          className="inline-flex h-9 items-center gap-2 rounded-lg bg-brand-700 px-4 text-sm font-semibold text-white transition-colors hover:bg-brand-600 disabled:opacity-60"
+        >
+          {busy ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : null}
+          Save
+        </button>
+      </div>
+
+      {error ? <p className="mt-2 text-xs text-danger">{error}</p> : null}
+      {saved ? <p className="mt-2 text-xs text-brand-700">Skills saved.</p> : null}
+    </div>
+  );
+}

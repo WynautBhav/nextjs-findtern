@@ -1,0 +1,78 @@
+import { redirect } from "next/navigation";
+import { eq } from "drizzle-orm";
+import {
+  LayoutDashboard,
+  FolderKanban,
+  FileText,
+  ShoppingCart,
+  CalendarDays,
+  Bell,
+  Building2,
+  Users,
+  GitCompare,
+  ShoppingBag,
+  Clock,
+  Send,
+} from "lucide-react";
+
+import { AppShell, type NavGroup } from "@/components/layout/app-shell";
+import { getSession } from "@/lib/auth";
+import { getDb, schema } from "@/lib/db";
+
+const NAV_GROUPS: NavGroup[] = [
+  {
+    title: "Talent & Pipeline",
+    items: [
+      { href: "/employer/dashboard", label: "Dashboard", icon: <LayoutDashboard className="size-4" /> },
+      { href: "/employer/candidates", label: "Candidates", icon: <Users className="size-4" /> },
+      { href: "/employer/compare", label: "Compare", icon: <GitCompare className="size-4" /> },
+      { href: "/employer/projects", label: "Projects", icon: <FolderKanban className="size-4" /> },
+    ],
+  },
+  {
+    title: "Proposals & Hiring",
+    items: [
+      { href: "/employer/proposals", label: "Proposals", icon: <FileText className="size-4" /> },
+      { href: "/employer/send-proposal", label: "Send proposal", icon: <Send className="size-4" /> },
+      { href: "/employer/schedule", label: "Schedule", icon: <CalendarDays className="size-4" /> },
+      { href: "/employer/timesheets", label: "Timesheets", icon: <Clock className="size-4" /> },
+    ],
+  },
+  {
+    title: "Billing & Account",
+    items: [
+      { href: "/employer/cart", label: "Cart", icon: <ShoppingBag className="size-4" /> },
+      { href: "/employer/orders", label: "Orders", icon: <ShoppingCart className="size-4" /> },
+      { href: "/employer/alerts", label: "Alerts", icon: <Bell className="size-4" /> },
+      { href: "/employer/account", label: "Company Profile", icon: <Building2 className="size-4" /> },
+    ],
+  },
+];
+
+export default async function EmployerLayout({ children }: { children: React.ReactNode }) {
+  const session = await getSession();
+  if (!session || session.role !== "employer") redirect("/employer/login");
+
+  let companyName = "Company Account";
+  try {
+    const [emp] = await getDb()
+      .select({ companyName: schema.employers.companyName })
+      .from(schema.employers)
+      .where(eq(schema.employers.id, session.uid))
+      .limit(1);
+    if (emp?.companyName) companyName = emp.companyName;
+  } catch {
+    // Keep fallback
+  }
+
+  return (
+    <AppShell
+      brand="Employer"
+      groups={NAV_GROUPS}
+      companyName={companyName}
+      email={session.email}
+    >
+      {children}
+    </AppShell>
+  );
+}

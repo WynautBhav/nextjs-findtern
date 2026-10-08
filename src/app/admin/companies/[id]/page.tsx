@@ -1,0 +1,137 @@
+import type { Metadata } from "next";
+import { notFound } from "next/navigation";
+import { desc, eq, inArray } from "drizzle-orm";
+
+import { getDb, schema } from "@/lib/db";
+import { Company360View } from "@/components/admin/company-360-view";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}): Promise<Metadata> {
+  const { id } = await params;
+  const db = getDb();
+  const [company] = await db
+    .select({ companyName: schema.employers.companyName })
+    .from(schema.employers)
+    .where(eq(schema.employers.id, id))
+    .limit(1);
+
+  return {
+    title: company ? `${company.companyName} · Company 360` : "Company Not Found",
+  };
+}
+
+export default async function AdminCompanyDetailPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+  const db = getDb();
+
+  const [company] = await db
+    .select()
+    .from(schema.employers)
+    .where(eq(schema.employers.id, id))
+    .limit(1);
+
+  if (!company) {
+    notFound();
+  }
+
+  // Fetch projects, proposals, interviews, payments in parallel
+  const [projects, rawProposals, rawInterviews, payments] = await Promise.all([
+    db
+      .select()
+      .from(schema.projects)
+      .where(eq(schema.projects.employerId, id))
+      .orderBy(desc(schema.projects.createdAt)),
+    db
+      .select()
+      .from(schema.proposals)
+      .where(eq(schema.proposals.employerId, id))
+      .orderBy(desc(schema.proposals.createdAt)),
+    db
+      .select()
+      .from(schema.interviews)
+      .where(eq(schema.interviews.employerId, id))
+      .orderBy(desc(schema.interviews.createdAt)),
+    db
+      .select()
+      .from(schema.employerPayments)
+      .where(eq(schema.employerPayments.employerId, id))
+      .orderBy(desc(schema.employerPayments.createdAt)),
+  ]);
+
+  // Collect intern IDs across proposals and interviews
+  const internIds = Array.from(
+    new Set([
+      ...rawProposals.map((p) => p.internId),
+      ...rawInterviews.map((i) => i.internId),
+    ].filter(Boolean))
+  );
+
+  const internMap = new Map<string, typeof schema.users.$inferSelect>();
+  if (internIds.length > 0) {
+    const users = await db
+      .select()
+      .from(schema.users)
+      .where(inArray(schema.users.id, internIds));
+    for (const u of users) {
+      internMap.set(u.id, u);
+    }
+  }
+
+  // Map project names
+  const projectMap = new Map<string, string>();
+  for (const p of projects) {
+    projectMap.set(p.id, p.projectName);
+  }
+
+  // Augment proposals with intern info
+  const proposals = rawProposals.map((prop) => {
+    const intern = internMap.get(prop.internId);
+    return {
+      ...prop,
+      internName: intern ? `${intern.firstName} ${intern.lastName}`.trim() : undefined,
+      internEmail: intern?.email || undefined,
+    };
+  });
+
+  // Augment interviews with intern info
+  const interviews = rawInterviews.map((intv) => {
+    const intern = internMap.get(intv.internId);
+    return {
+      ...intv,
+      internName: intern ? `${intern.firstName} ${intern.lastName}`.trim() : undefined,
+      internEmail: intern?.email || undefined,
+    };
+  });
+
+  // Hired interns (accepted proposals or marked hired)
+  const hiredProposals = rawProposals.filter(
+    (p) => p.status === "accepted" || p.hiredAt !== null
+  );
+
+  const hiredInterns = hiredProposals.map((prop) => {
+    const intern = internMap.get(prop.internId) || null;
+    return {
+      proposal: prop,
+      intern,
+      projectName: projectMap.get(prop.projectId) || "Assigned Project",
+    };
+  });
+
+  return (
+    <Company360View
+      company={company}
+      projects={projects}
+      proposals={proposals}
+      interviews={interviews}
+      payments={payments}
+      hiredInterns={hiredInterns}
+    />
+  );
+}

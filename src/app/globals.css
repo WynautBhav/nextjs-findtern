@@ -1,0 +1,1010 @@
+@import "tailwindcss";
+
+/* ==========================================================================
+   FINDTERN — DESIGN SYSTEM
+   --------------------------------------------------------------------------
+   One token layer. The old site ran three in parallel (App.css hex vars,
+   index.css HSL vars, and Bootstrap) which is why nothing matched. Bootstrap
+   is gone. Everything below resolves to this file.
+
+   Brand is unchanged on purpose: deep green, amber, Poppins, and the amber
+   "smile" underline that sits under the second word of a section heading.
+   What changed is the craft — real elevation, a real radius scale, one
+   breakpoint philosophy, and one reduced-motion switch.
+   ========================================================================== */
+
+@theme {
+  /* ── Brand green ─────────────────────────────────────────────────────────
+     700 is the canonical brand colour and is what --color-primary points at.
+     It matches the legacy --primary-color: #0E6049 exactly. */
+  --color-brand-50: #f0f7f4;
+  --color-brand-100: #dcebe5;
+  --color-brand-200: #b9d7cc;
+  --color-brand-300: #8cbaa9;
+  --color-brand-400: #5c9783;
+  --color-brand-500: #2e7d66;
+  --color-brand-600: #166b54;
+  --color-brand-700: #0e6049;
+  --color-brand-800: #0a4a39;
+  --color-brand-900: #072f24;
+  --color-brand-950: #041d17;
+
+  /* ── Amber accent ──────────────────────────────────────────────────────
+     500 is the legacy #F0B24A — the smile underline and the "Featured"/star
+     highlights. Warm against the green, never used for body text.
+
+     700 was #A9712A, which measured 4.13:1 on white and failed WCAG AA for the
+     "Assured" band badge. Darkened to #8F5A1F (5.75:1). The 500/600 steps
+     stay decorative — no amber below 700 is legible as text on white. */
+  --color-accent-100: #fdf3e0;
+  --color-accent-200: #fae4bd;
+  --color-accent-300: #f7ce8e;
+  --color-accent-400: #f5bb63;
+  --color-accent-500: #f0b24a;
+  --color-accent-600: #d8973a;
+  --color-accent-700: #8f5a1f;
+
+  /* ── Ink ───────────────────────────────────────────────────────────────
+     A slightly green-shifted neutral ramp. The legacy site mixed #0F172A
+     (slate) with #1E222B (blue-grey); this collapses to one hue family so
+     green and neutral never argue. */
+  --color-ink-50: #f7faf9;
+  --color-ink-100: #edf2ef;
+  --color-ink-200: #dee6e2;
+  --color-ink-300: #c2cec8;
+  --color-ink-400: #93a29b;
+  --color-ink-500: #6b7c74;
+  --color-ink-600: #4e5f58;
+  --color-ink-700: #33433d;
+  --color-ink-800: #1e2b26;
+  --color-ink-900: #0f1a17;
+  --color-ink-950: #0b1512;
+
+  /* ── Semantic aliases ────────────────────────────────────────────────
+     Semantic names are what components should reach for. This indirection is
+     the whole point — swap a value here and the whole site follows.
+
+     `--color-text-subtle` exists because the ink ramp was being used for two
+     different jobs. Measured on the live page: ink-400 (#93A29B) is 2.66:1 on
+     white and ink-500 (#6B7C74) is 4.41:1 — both below the WCAG AA minimum
+     of 4.5:1 — and ink-400 was carrying every micro-label on the site in 21
+     places. The ramp is still correct for borders, icons and disabled fills.
+     For secondary *text* there is now one token, #5F7069, at 5.24:1. */
+  --color-primary: var(--color-brand-700);
+  --color-primary-hover: var(--color-brand-600);
+  --color-primary-soft: var(--color-brand-50);
+  --color-on-primary: #ffffff;
+  --color-accent: var(--color-accent-500);
+  --color-background: #ffffff;
+  --color-surface: var(--color-ink-50);
+  --color-surface-raised: #ffffff;
+  --color-foreground: var(--color-ink-900);
+  --color-muted-foreground: var(--color-ink-600);
+  --color-subtle-foreground: var(--color-ink-500);
+  --color-text-subtle: #5f7069;
+  --color-border: var(--color-ink-200);
+  --color-border-strong: var(--color-ink-300);
+  --color-dark-surface: var(--color-brand-950);
+  --color-dark-raised: var(--color-brand-900);
+  /* Readable green for text on the dark brand surfaces. `primary` is 2.34:1
+     against brand-950, which is why the cohort legend could not use it. */
+  --color-on-dark: #d8e8e0;
+  --color-on-dark-subtle: #a8bdb3;
+  --color-on-dark-accent: #f5bb63;
+
+  /* ── Feedback ──────────────────────────────────────────────────────── */
+  --color-success: #0e7a4a;
+  --color-success-soft: #e6f5ed;
+  /* Warning was #b57516, measured at 3.80:1 on white and 3.45:1 on its own
+     soft fill. Both fail WCAG AA for text, and every warning badge in the
+     admin puts this colour on text. Darkened to #94600f: 5.33:1 on white,
+     4.84:1 on warning-soft. Same hue family, still clearly amber. */
+  --color-warning: #94600f;
+  --color-warning-soft: #fdf3e0;
+  --color-danger: #b3261e;
+  --color-danger-soft: #fdeceb;
+  --color-info: #1a5fa8;
+  --color-info-soft: #e9f1fa;
+
+  /* ── shadcn/ui contract ────────────────────────────────────────────────
+     The shadcn primitives in src/components/ui are written against the
+     standard shadcn token names (`bg-input`, `border-ring`, `bg-popover`,
+     `text-muted-foreground`, `ring-destructive`, …). Tailwind v4 only
+     generates those utilities from a matching `--color-*` token, and none of
+     them existed here.
+
+     The practical effect was that every shadcn component rendered with
+     inherited or transparent colour: dialogs and sheets had no surface, inputs
+     had no fill, focus rings resolved to nothing. That is most of why the app
+     screens read as unstyled next to the marketing pages.
+
+     These aliases map the shadcn names onto the tokens above. They are
+     deliberately aliases rather than new colours, so there is still exactly one
+     brand green, one amber and one ink ramp in the codebase. */
+  --color-input: var(--color-ink-200);
+  --color-ring: var(--color-brand-600);
+  --color-background: #ffffff;
+  --color-foreground: var(--color-ink-900);
+  --color-card: #ffffff;
+  --color-card-foreground: var(--color-ink-900);
+  --color-popover: #ffffff;
+  --color-popover-foreground: var(--color-ink-900);
+  --color-primary-foreground: #ffffff;
+  --color-secondary: var(--color-ink-100);
+  --color-secondary-foreground: var(--color-ink-800);
+  --color-muted: var(--color-ink-100);
+  --color-muted-foreground: var(--color-ink-600);
+  --color-destructive: var(--color-danger);
+  --color-destructive-foreground: #ffffff;
+  --color-sidebar: var(--color-brand-950);
+  --color-sidebar-foreground: var(--color-on-dark);
+  --color-sidebar-primary: var(--color-brand-600);
+  --color-sidebar-primary-foreground: #ffffff;
+  --color-sidebar-accent: rgb(255 255 255 / 0.08);
+  --color-sidebar-accent-foreground: #ffffff;
+  --color-sidebar-border: rgb(255 255 255 / 0.1);
+  --color-sidebar-ring: var(--color-accent-500);
+
+  /* Radii, mapped so `rounded-lg` on a shadcn primitive matches the site scale
+     rather than shadcn's own defaults. */
+  --radius: var(--radius-lg);
+
+  /* ── Typography ──────────────────────────────────────────────────────
+     A single fluid scale. clamp() everywhere so headings breathe between
+     360px and 1440px without a single media query.
+
+     Collapsed from 13 sizes to 7. The previous scale carried 14/15/16px and
+     56/62px — pairs one pixel apart, which is not hierarchy, it is drift, and
+     it meant a single visual change had no obviously correct size to reach
+     for. text-2xs also moved off 11px: 48 elements on the homepage rendered
+     at 11px, which is legible on a 27" monitor and not on a phone.
+
+     ADMIN OVERRIDE — the scale below is for marketing surfaces only.
+
+     The clamp() sizes are wrong for an operations console. Product UI is
+     viewed at a fixed DPI, so a fluid h1 that shrinks inside a sidebar looks
+     like a bug rather than like responsiveness, and the top of this scale is
+     far larger than any admin heading needs. `--text-admin-*` is a fixed
+     six step rem scale for every screen under /admin, and
+     `--font-admin-data` gives figures and table cells tabular numerals so
+     digits align down a column. The marketing scale is untouched. */
+  --font-sans: var(--font-poppins), ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, "SFMono-Regular", "Menlo", monospace;
+
+  /* 2xs and xs had both collapsed to 0.75rem, which is exactly the drift the
+     comment above warns about: two names, one size, and every "eyebrow" in
+     the product indistinguishable from body small. The intern screens used
+     text-2xs on roughly twenty elements. 2xs is a genuine micro size and now
+     is one again, for non text decoration only. */
+  --text-2xs: 0.6875rem;
+  --text-2xs--line-height: 1rem;
+  --text-xs: 0.75rem;
+  --text-xs--line-height: 1.125rem;
+  --text-sm: 0.875rem;
+  --text-sm--line-height: 1.5rem;
+  --text-base: 1rem;
+  --text-base--line-height: 1.7;
+  --text-lg: clamp(1.0625rem, 0.99rem + 0.35vw, 1.1875rem);
+  --text-lg--line-height: 1.65;
+  --text-xl: clamp(1.25rem, 1.1rem + 0.7vw, 1.5rem);
+  --text-xl--line-height: 1.45;
+  --text-2xl: clamp(1.5rem, 1.3rem + 1vw, 2rem);
+  --text-2xl--line-height: 1.3;
+  --text-3xl: clamp(1.75rem, 1.4rem + 1.75vw, 2.5rem);
+  --text-3xl--line-height: 1.2;
+  --text-4xl: clamp(2.25rem, 1.6rem + 3vw, 3.75rem);
+  --text-4xl--line-height: 1.08;
+  --text-5xl: clamp(2.5rem, 1.55rem + 4.4vw, 5rem);
+  --text-5xl--line-height: 1.02;
+
+  /* ── Admin type scale ─────────────────────────────────────────────────
+     Fixed rem, six steps, ratio 1.2. Not a clamp() range: an admin heading
+     sits in a 240px sidebar as often as in a 1200px content column, and a
+     size that depends on the viewport produces a component that looks
+     different every time it is moved.
+
+       step   size     line height   used for
+       xs     0.75rem  1rem          column labels, table meta, chips
+       sm     0.8125   1.25rem       secondary body, table cells, nav
+       base   0.875    1.375rem      default body, controls, primary cells
+       md     1.0      1.5rem        card titles, stat values
+       lg     1.25rem  1.75rem       page subtitle, section title
+       xl     1.75rem  2.125rem     page title
+
+     Nothing below 0.75rem. The old admin carried 10px and 11px uppercase
+     labels; at that size they fail AA-adjacent legibility on a laptop panel
+     and are illegible on a phone. */
+  --text-admin-xs: 0.75rem;
+  --text-admin-xs--line-height: 1rem;
+  --text-admin-sm: 0.8125rem;
+  --text-admin-sm--line-height: 1.25rem;
+  --text-admin-base: 0.875rem;
+  --text-admin-base--line-height: 1.375rem;
+  --text-admin-md: 1rem;
+  --text-admin-md--line-height: 1.5rem;
+  --text-admin-lg: 1.25rem;
+  --text-admin-lg--line-height: 1.75rem;
+  --text-admin-xl: 1.75rem;
+  --text-admin-xl--line-height: 2.125rem;
+
+  /* Tabular figures. Every number in a table, a stat or a currency cell uses
+     this: without it a column of figures jitters left and right because each
+     digit has its own advance width. Browsers ship this as a default that
+     belongs to no design system, so it has to be set deliberately. */
+  --font-admin-data: var(--font-poppins), ui-sans-serif, system-ui, sans-serif;
+
+  /* ── Radius ──────────────────────────────────────────────────────────
+     The legacy tailwind.config.ts overrode rounded-lg to 9px and rounded-md
+     to 6px, which is why every card in the old build looked slightly off.
+     These are the real values.
+
+     ADMIN: the top half of this scale (2xl and 3xl) is a marketing decision.
+     Inside an operations console nothing is a card inside a card, so the
+     usable range is narrower. Cards are 0.5rem, controls are 0.375rem,
+     and anything above 0.75rem reads as a marketing surface rather than
+     a tool. `--radius-admin-panel` is the single card radius so every
+     surface in the admin matches. */
+  --radius-xs: 0.375rem;
+  --radius-sm: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.25rem;
+  --radius-2xl: 1.75rem;
+  --radius-3xl: 2.25rem;
+  --radius-pill: 9999px;
+
+  --radius-admin-control: 0.375rem;
+  --radius-admin-panel: 0.5rem;
+  --radius-admin-overlay: 0.75rem;
+
+  /* ── Elevation ───────────────────────────────────────────────────────
+     Every --shadow-* in the old index.css was hsl(0 0% 0% / 0.00) — the
+     tokens existed and rendered nothing. These are real, layered, and tinted
+     with the brand green so shadows sit in the same colour world as the UI. */
+  --shadow-xs: 0 1px 2px 0 rgb(7 47 36 / 0.05);
+  --shadow-sm: 0 1px 2px 0 rgb(7 47 36 / 0.05),
+    0 2px 6px -1px rgb(7 47 36 / 0.06);
+  --shadow-md: 0 2px 4px -1px rgb(7 47 36 / 0.06),
+    0 8px 20px -4px rgb(7 47 36 / 0.09);
+  --shadow-lg: 0 4px 8px -2px rgb(7 47 36 / 0.07),
+    0 18px 40px -8px rgb(7 47 36 / 0.12);
+  --shadow-xl: 0 8px 16px -4px rgb(7 47 36 / 0.08),
+    0 32px 64px -12px rgb(7 47 36 / 0.16);
+  --shadow-glow: 0 0 0 1px rgb(14 96 73 / 0.06), 0 12px 40px -8px rgb(14 96 73 / 0.22);
+  --shadow-inset-hairline: inset 0 0 0 1px rgb(255 255 255 / 0.06);
+
+  /* ADMIN DEPTH.
+
+     The marketing shadows above are correct for large surfaces and wrong for
+     a dense table, where a soft wide shadow under every panel turns 40 rows
+     into a fog. The admin rule is: declare elevation once, never twice. A
+     panel gets a 1px border and NO shadow. Only things that genuinely float
+     above the page get a shadow, and they get exactly one.
+
+       --shadow-admin-float  overlays: menus, dialogs, popovers, the palette
+       --shadow-admin-lift   a row or card under an explicit drag or hover
+
+     `--shadow-glow` is deliberately NOT reused. It is a zero-offset coloured
+     halo, which reads as decoration rather than as depth. */
+  --shadow-admin-float: 0 1px 2px rgb(7 47 36 / 0.06),
+    0 12px 28px -8px rgb(7 47 36 / 0.18);
+  --shadow-admin-lift: 0 2px 6px -2px rgb(7 47 36 / 0.12);
+
+  /* ── Motion ──────────────────────────────────────────────────────────
+     Named easings so GSAP, CSS transitions, and Tailwind all agree. GSAP
+     reads these out of the same literals in lib/gsap.ts.
+
+     These were being hand-typed as arbitrary values at eight call sites —
+     `cubic-bezier(0.16,1,0.3,1)` alone appeared six times while sitting
+     unused in this file. Components now reference the token.
+
+     The spring token is gone. `cubic-bezier(0.34,1.56,0.64,1)` overshoots, and
+     a resting logo should not bounce; overshoot is reserved for gesture
+     release in JS, where velocity makes it read as physics rather than as
+     decoration. */
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+  --ease-in-out-quart: cubic-bezier(0.76, 0, 0.24, 1);
+  --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* Durations, named for what they are for rather than how long they are, so
+     a call site reads as intent. The bands follow the cross design system
+     convergence: 150ms is where Material, Carbon, Polaris and Tailwind all
+     land, and 500ms is the ceiling for anything that is not a screen change. */
+  --dur-instant: 120ms; /* press, hover, colour */
+  --dur-quick: 180ms; /* a state confirming itself */
+  --dur-standard: 260ms; /* a panel or sheet arriving */
+  --dur-slow: 420ms; /* a container changing shape */
+  --dur-entrance: var(--dur-standard);
+  /* Exits run faster than entrances. A thing leaving should feel like it is
+     gone before you have finished letting go of it. */
+  --dur-exit: calc(var(--dur-standard) * 0.7);
+
+  /* Springs. The CSS overshoot curve is deliberately absent: the existing
+     header comment already explains why, and it still holds. A resting
+     element should not bounce. Springs live in JS, on motion the user's own
+     gesture produced, where a little overshoot reads as physics. */
+  --spring-snap: linear(0, 0.19 8%, 0.62 18%, 0.91 27%, 1.05 36%, 1.08 46%, 1.03 58%, 1 72%, 1);
+  --spring-gentle: linear(0, 0.28 10%, 0.68 20%, 0.94 30%, 1.02 44%, 1.01 60%, 1);
+
+  /* ── Admin motion ─────────────────────────────────────────────────────
+     Marketing timings above run 340 to 800 ms, which is right for a scroll
+     reveal and wrong for a table. An operator clicking a filter is in flow;
+     anything over 250 ms reads as lag rather than as polish.
+
+       --duration-admin-fast   120 ms  hover, press, chip add and remove
+       --duration-admin-base   180 ms  menus, tooltips, row expand
+       --duration-admin-slow   260 ms  dialog and sheet entry only
+
+     Springs are reserved for overlays and drag, exactly as the brief asks.
+     A resting row never springs. All of these collapse under the reduced
+     motion switch at the foot of this file, which is unconditional. */
+  --duration-admin-fast: 120ms;
+  --duration-admin-base: 180ms;
+  --duration-admin-slow: 260ms;
+
+  /* Density. From the data dense dashboard reference: 8px gap, 12px card
+     padding, 36px table row. The row height is the load bearing number,
+     because 36 rows per screen is the difference between scanning and
+     scrolling. */
+  --admin-gap: 0.5rem;
+  --admin-pad-panel: 0.75rem;
+  --admin-row-h: 2.25rem;
+  --admin-sidebar-w: 15rem;
+  --admin-topbar-h: 3.5rem;
+  --admin-content-max: 84rem;
+
+  --animate-marquee: marquee var(--marquee-duration, 34s) linear infinite;
+  --animate-marquee-reverse: marquee-reverse var(--marquee-duration, 34s) linear
+    infinite;
+  --animate-pulse-dot: pulse-dot 2.4s ease-in-out infinite;
+  --animate-shimmer: shimmer 2.6s linear infinite;
+}
+
+/* ==========================================================================
+   BASE
+   ========================================================================== */
+
+/* ── Dark mode ───────────────────────────────────────────────────────────
+   Was entirely absent while fifteen components already carried `dark:`
+   classes that Tailwind never generated, so those classes were dead. This
+   declares the variant and then backs it with real token values, so a
+   `dark:bg-surface` compiles and lands somewhere sensible.
+
+   The ramp inverts hue rather than just inverting lightness: the dark
+   surfaces are green tinted, matching brand-950, so the admin does not
+   turn into a generic neutral grey in dark mode. Contrast was measured
+   for the text pairings below, not assumed.
+
+   Declared at the top level. Tailwind rejects `@custom-variant` inside
+   `@layer base`, and it has to be a top level at-rule to be seen at all. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@layer base {
+  *,
+  *::before,
+  *::after {
+    border-color: var(--color-border);
+  }
+
+  .dark {
+    --color-background: #0b1512;
+    --color-surface: #0f1a17;
+    --color-surface-raised: #141f1b;
+    --color-foreground: #edf2ef;
+    --color-muted-foreground: #a8bdb3;
+    --color-text-subtle: #93a29b;
+    --color-border: #26332e;
+    --color-border-strong: #35443d;
+    --color-primary: #5c9783;
+    --color-primary-hover: #8cbaa9;
+    --color-primary-soft: #10241d;
+    --color-on-primary: #041d17;
+    --color-input: #2b3833;
+
+    --color-success: #4ade9b;
+    --color-success-soft: #0d2a1e;
+    --color-warning: #f5bb63;
+    --color-warning-soft: #2a1f0d;
+    --color-danger: #f08a83;
+    --color-danger-soft: #2c1512;
+    --color-info: #7fb3e8;
+    --color-info-soft: #10202f;
+
+    /* Marketing surfaces keep their own light values under a dark app
+       chrome, because the marketing site is not being redesigned here and
+       repainting it would be scope the brief did not ask for. */
+    --color-brand-50: #10241d;
+    --color-brand-100: #16332a;
+    --color-ink-50: #0f1a17;
+    --color-ink-100: #16211d;
+    --color-ink-200: #1e2b26;
+    --color-ink-300: #2b3833;
+    --color-ink-400: #6b7c74;
+    --color-ink-500: #93a29b;
+    --color-ink-600: #a8bdb3;
+    --color-ink-700: #c3d2cc;
+    --color-ink-800: #d8e8e0;
+    --color-ink-900: #edf2ef;
+    --color-ink-950: #f7faf9;
+
+    --color-on-dark: #d8e8e0;
+    --color-on-dark-subtle: #a8bdb3;
+    --color-on-dark-accent: #f5bb63;
+
+    --color-card: #141f1b;
+    --color-card-foreground: #edf2ef;
+    --color-popover: #141f1b;
+    --color-popover-foreground: #edf2ef;
+    --color-secondary: #1e2b26;
+    --color-secondary-foreground: #d8e8e0;
+    --color-muted: #1e2b26;
+    --color-destructive: #f08a83;
+    --color-destructive-foreground: #2c1512;
+
+    --shadow-admin-float: 0 1px 2px rgb(0 0 0 / 0.4),
+      0 12px 28px -8px rgb(0 0 0 / 0.6);
+    --shadow-admin-lift: 0 2px 6px -2px rgb(0 0 0 / 0.5);
+  }
+
+  /* Tabular figures are set through the `nums` utility declared at the top
+     level below, not here: Tailwind rejects `@utility` nested in a layer. */
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    scroll-behavior: smooth;
+    /* The old Terms pages hardcoded an 84px offset to clear the 64px sticky
+       header. This replaces that guess with a real token. */
+    scroll-padding-top: var(--header-height, 76px);
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    font-feature-settings: "kern", "liga", "calt";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Visible, on-brand focus for keyboard users only. */
+  :focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 3px;
+    border-radius: 2px;
+  }
+  :focus:not(:focus-visible) {
+    outline: none;
+  }
+
+  ::selection {
+    background-color: var(--color-brand-200);
+    color: var(--color-brand-950);
+  }
+
+  /* Media defaults — the old site left videos and iframes unstyled. */
+  img,
+  video,
+  svg {
+    display: block;
+    max-width: 100%;
+  }
+  video {
+    height: auto;
+  }
+}
+
+/* ==========================================================================
+   THE SMILE — signature brand detail, preserved exactly
+   --------------------------------------------------------------------------
+   The legacy `.heading--smile::after` drew an amber curve under the second
+   word of a heading. It is the single most recognisable piece of the brand's
+   personality, so it survives the redesign. Improved: it now animates on its
+   own timeline rather than piggybacking on a parent's reveal class.
+   ========================================================================== */
+
+@layer components {
+  .smile {
+    position: relative;
+    display: inline-block;
+    color: var(--color-primary);
+    white-space: nowrap;
+  }
+
+  .smile::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    bottom: -0.5em;
+    width: 3.5em;
+    height: 0.65em;
+    transform: translateX(-50%) scaleX(0.55) translateY(0.35em);
+    opacity: 0;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 18' preserveAspectRatio='xMidYMid meet'><path d='M6 9 C 28 18, 72 18, 94 9' stroke='%23f0b24a' stroke-width='4' stroke-linecap='round' fill='none'/></svg>");
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: contain;
+    pointer-events: none;
+    transition:
+      transform 620ms var(--ease-out-expo),
+      opacity 340ms ease;
+  }
+
+  /* Applied by the reveal primitive once the heading enters the viewport. */
+  .is-revealed .smile::after,
+  .smile.is-revealed::after {
+    transform: translateX(-50%) scaleX(1) translateY(0);
+    opacity: 1;
+  }
+}
+
+/* ==========================================================================
+   TABULAR FIGURES
+   --------------------------------------------------------------------------
+   Every number in a table cell, a stat or a currency amount sets `nums`.
+
+   Without it a column of figures jitters left and right, because each digit
+   has its own advance width: a 1 is narrower than a 0, so the decimal point
+   in a currency column lands at a different x on every row. Browsers ship
+   this as a default that belongs to no design system, so it has to be asked
+   for deliberately. The negative tracking keeps a dense numeric column from
+   looking gappy once the digits are fixed width.
+   ========================================================================== */
+
+@utility nums {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+  letter-spacing: -0.01em;
+}
+
+/* ==========================================================================
+   ADMIN SHELL PRIMITIVES
+   --------------------------------------------------------------------------
+   Three utilities the rebuilt admin leans on. Kept here rather than in a
+   component so the shell and every screen resolve them identically.
+   ========================================================================== */
+
+/* Sticky table header. `top` is a variable because the admin top bar is
+   sticky too and the two must not overlap; a hardcoded offset is how a
+   header ends up one row short. */
+@utility table-head-sticky {
+  position: sticky;
+  top: var(--admin-table-head-top, 0px);
+  z-index: 2;
+}
+
+/* Clamp to N lines without a plugin. Used for company and intern names,
+   which are user input and unbounded. */
+@utility clamp-1 {
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+@utility clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ==========================================================================
+   LAYOUT PRIMITIVES
+   ========================================================================== */
+
+@utility container-page {
+  /* Matches the legacy 1200px max-width, but the padding now scales so the
+     gutter is 20px on phones and 40px on desktop instead of being fixed. */
+  width: 100%;
+  max-width: 1200px;
+  margin-inline: auto;
+  padding-inline: clamp(1.25rem, 4vw, 2.5rem);
+}
+
+@utility container-wide {
+  width: 100%;
+  max-width: 1440px;
+  margin-inline: auto;
+  padding-inline: clamp(1.25rem, 4vw, 2.5rem);
+}
+
+@utility section-y {
+  /* The legacy rhythm was 6rem/6.5rem. Kept, made fluid, and tightened a
+     little on mobile where 6rem read as dead space. */
+  padding-block: clamp(3.5rem, 8vw, 6.5rem);
+}
+
+@utility section-y-tight {
+  padding-block: clamp(2.5rem, 5vw, 4rem);
+}
+
+/* ==========================================================================
+   REVEAL
+   --------------------------------------------------------------------------
+   A pure-CSS enter transition, used where GSAP would be overkill. The legacy
+   build had `.reveal` / `.reveal--up` / `.reveal-stagger` / `.delay-1..4`
+   with five separate delay values hardcoded. This uses a single custom
+   property that children index off, so a stagger of any length needs one
+   value instead of a new class per step.
+   ========================================================================== */
+
+@layer components {
+  .reveal-pending > * {
+    opacity: 0;
+    transform: translate3d(0, 18px, 0);
+  }
+
+  .is-revealed > * {
+    opacity: 1;
+    transform: none;
+    transition:
+      opacity 0.8s var(--ease-out-expo),
+      transform 0.8s var(--ease-out-expo);
+    transition-delay: calc(var(--child-index, 0) * var(--reveal-stagger, 0.08s));
+  }
+
+  /* Any direct child can opt into the stagger sequence. */
+  .is-revealed > :nth-child(1) { --child-index: 0; }
+  .is-revealed > :nth-child(2) { --child-index: 1; }
+  .is-revealed > :nth-child(3) { --child-index: 2; }
+  .is-revealed > :nth-child(4) { --child-index: 3; }
+  .is-revealed > :nth-child(5) { --child-index: 4; }
+  .is-revealed > :nth-child(6) { --child-index: 5; }
+  .is-revealed > :nth-child(7) { --child-index: 6; }
+  .is-revealed > :nth-child(8) { --child-index: 7; }
+  .is-revealed > :nth-child(n + 9) { --child-index: 8; }
+}
+
+/* ==========================================================================
+   TEXTURE
+   --------------------------------------------------------------------------
+   A single very low-opacity grain layer. This is most of what separates
+   "clean" from "premium" at large flat areas — pure white reads as a
+   screenshot, faintly textured white reads as a surface.
+   ========================================================================== */
+
+@utility grain {
+  position: relative;
+  isolation: isolate;
+}
+
+.grain::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0.4;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='0.045'/%3E%3C/svg%3E");
+}
+
+/* Deep-green wash used behind dark sections and the hero. */
+@utility brand-wash {
+  background:
+    radial-gradient(
+      ellipse 80% 60% at 15% 0%,
+      rgb(14 96 73 / 0.16) 0%,
+      transparent 60%
+    ),
+    radial-gradient(
+      ellipse 70% 50% at 90% 10%,
+      rgb(240 178 74 / 0.1) 0%,
+      transparent 55%
+    ),
+    var(--color-brand-950);
+}
+
+/* ==========================================================================
+   MARQUEE
+   ========================================================================== */
+
+@keyframes marquee {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
+
+@keyframes marquee-reverse {
+  from {
+    transform: translate3d(-50%, 0, 0);
+  }
+  to {
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0) rotate(var(--tw-rotate, 0deg));
+  }
+  50% {
+    transform: translateY(-10px) rotate(var(--tw-rotate, 0deg));
+  }
+}
+
+@keyframes pulse-dot {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.55;
+    transform: scale(1.35);
+  }
+}
+
+@keyframes thread-breath {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.12);
+  }
+}
+
+@keyframes shimmer {
+  from {
+    background-position: -200% 0;
+  }
+  to {
+    background-position: 200% 0;
+  }
+}
+
+/* Fills the active testimonial indicator over the autoplay interval. */
+@keyframes marquee-fill {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+/* Testimonial slide-in. Opacity plus a 3px blur on the way in — the blur is
+   what prevents the outgoing and incoming quotes double-exposing, since both
+   occupy the same box. */
+@keyframes testimonial-in {
+  from {
+    opacity: 0;
+    filter: blur(3px);
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+    transform: none;
+  }
+}
+
+/* ==========================================================================
+   HOVER GATE
+   --------------------------------------------------------------------------
+   Every hover style on the site is registered here rather than inline. The
+   homepage carried 44 `hover:` utilities and zero capability queries, so on
+   a phone every tapped card fired :hover and *held* it — background, border
+   and icon fill all stuck until you tapped somewhere else.
+
+   Gate is `any-hover`, not `hover`, because a touchscreen laptop or a stylus
+   is still a coarse pointer for the first tap but does have a real cursor.
+   ========================================================================== */
+
+@media not (any-hover: hover) {
+  /* Colour hovers are deliberately left alone: they are the only affordance
+     some links have, and removing them on a touch device removes information
+     rather than adding polish.
+
+     Transform hovers used to be neutralised here, by forcing
+     `transition-property: none`. That did not work. It stopped the animation
+     but left the transform applied, so a tapped card still jumped to 105% and
+     sat there — the exact symptom the rule existed to prevent.
+
+     The five transform hovers in the codebase are now written as
+     `[@media(any-hover:hover)]:hover:*`, so on a coarse pointer the rule is
+     never generated at all. Nothing to suppress here. */
+}
+
+/* ==========================================================================
+   REDUCED MOTION — the single switch
+   --------------------------------------------------------------------------
+   The old App.css carried ten separate prefers-reduced-motion blocks plus
+   two more inside useReveal and the Terms pages. Everything below collapses
+   that into one authoritative place. Anything that moves, pulses, or
+   auto-scrolls is neutralised here; GSAP timelines are gated in JS by the
+   same media query (see src/lib/gsap.ts) so nothing is left half-applied.
+   ========================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  /* The smile still appears — it just arrives instantly instead of sweeping. */
+  .smile::after {
+    transform: translateX(-50%) scaleX(1) translateY(0);
+    opacity: 1;
+  }
+
+  /* Marquees hold a static, evenly spaced row. Directional motion is the
+     thing most likely to trigger vestibular symptoms, so it stops entirely
+     rather than slowing down. */
+  [data-marquee] {
+    animation: none !important;
+    transform: none !important;
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+  }
+}
+
+/* ==========================================================================
+   RICH TEXT
+   --------------------------------------------------------------------------
+   The CMS stores every blog body as HTML pasted out of Google Docs: a
+   `docs-internal-guid` span wrapper, `dir="ltr"`, and inline
+   `font-family: Arial; font-size: 12pt; background-color: transparent` on
+   every nested span. 37 KB per post. Those inline styles are stripped by
+   lib/richtext.ts and the typography is reapplied here, so an article reads
+   as part of this site rather than as an exported document.
+   ========================================================================== */
+
+.prose-rt {
+  color: var(--color-ink-700);
+  font-size: var(--text-base);
+  line-height: 1.75;
+}
+
+.prose-rt .rt-p {
+  margin-block: 1.15em;
+  text-wrap: pretty;
+}
+.prose-rt > .rt-p:first-child {
+  margin-block-start: 0;
+}
+
+.prose-rt .rt-h2,
+.prose-rt .rt-h3,
+.prose-rt .rt-h4 {
+  color: var(--color-ink-900);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+  margin-block: 1.9em 0.7em;
+}
+.prose-rt .rt-h2 {
+  font-size: var(--text-2xl);
+  line-height: 1.25;
+}
+.prose-rt .rt-h3 {
+  font-size: var(--text-xl);
+  line-height: 1.3;
+}
+.prose-rt .rt-h4 {
+  font-size: var(--text-lg);
+  line-height: 1.4;
+}
+.prose-rt > .rt-h2:first-child,
+.prose-rt > .rt-h3:first-child,
+.prose-rt > .rt-h4:first-child {
+  margin-block-start: 0;
+}
+
+.prose-rt .rt-ul,
+.prose-rt .rt-ol {
+  margin-block: 1.15em;
+  padding-inline-start: 1.4em;
+}
+.prose-rt .rt-ul {
+  list-style: none;
+  padding-inline-start: 0;
+}
+.prose-rt .rt-ul > .rt-li {
+  position: relative;
+  padding-inline-start: 1.6em;
+}
+.prose-rt .rt-ul > .rt-li::before {
+  content: "";
+  position: absolute;
+  left: 0.28em;
+  top: 0.72em;
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background: var(--color-accent);
+}
+.prose-rt .rt-ol {
+  list-style: decimal;
+}
+.prose-rt .rt-ol > .rt-li::marker {
+  color: var(--color-primary);
+  font-weight: 600;
+}
+.prose-rt .rt-li {
+  margin-block: 0.5em;
+}
+.prose-rt .rt-li > .rt-p {
+  margin-block: 0.3em;
+}
+
+.prose-rt .rt-strong {
+  color: var(--color-ink-900);
+  font-weight: 600;
+}
+.prose-rt .rt-em {
+  font-style: italic;
+}
+
+.prose-rt .rt-a {
+  color: var(--color-primary);
+  text-decoration: underline;
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--color-accent);
+  transition: text-decoration-color 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.prose-rt .rt-a:hover {
+  text-decoration-color: var(--color-primary);
+}
+
+.prose-rt .rt-quote {
+  margin-block: 1.6em;
+  padding: 0.2em 0 0.2em 1.15em;
+  border-inline-start: 3px solid var(--color-accent);
+  color: var(--color-ink-600);
+  font-size: var(--text-lg);
+  font-style: italic;
+}
+
+.prose-rt .rt-hr {
+  margin-block: 2.5em;
+  border: 0;
+  height: 1px;
+  background: var(--color-border);
+}
+
+.prose-rt .rt-code {
+  border-radius: var(--radius-xs);
+  background: var(--color-ink-100);
+  padding: 0.12em 0.36em;
+  font-family: var(--font-mono);
+  font-size: 0.875em;
+  color: var(--color-brand-800);
+}
+.prose-rt .rt-pre {
+  margin-block: 1.4em;
+  overflow-x: auto;
+  border-radius: var(--radius-md);
+  background: var(--color-ink-900);
+  padding: 1.1em 1.25em;
+  font-size: var(--text-sm);
+  line-height: 1.65;
+  color: var(--color-ink-100);
+}
+.prose-rt .rt-pre .rt-code {
+  background: none;
+  padding: 0;
+  color: inherit;
+  font-size: inherit;
+}
+.prose-rt sup,
+.prose-rt sub {
+  font-size: 0.72em;
+  line-height: 0;
+}
