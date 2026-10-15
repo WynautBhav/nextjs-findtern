@@ -1,6 +1,6 @@
 import { and, desc, eq, inArray } from "drizzle-orm";
 
-import { getDb, schema } from "@/lib/db";
+import { getDb, hasDb, schema } from "@/lib/db";
 import {
   activeEngagement,
   buildThread,
@@ -85,22 +85,35 @@ export async function loadInternData(uid: string) {
 /** Names of the projects behind this candidate's proposals, resolved once. */
 export async function projectNames(ids: string[]): Promise<Record<string, string>> {
   const unique = [...new Set(ids.filter(Boolean))];
-  if (unique.length === 0) return {};
-  const db = getDb();
-  const rows = await db
-    .select({ id: schema.projects.id, projectName: schema.projects.projectName })
-    .from(schema.projects)
-    .where(inArray(schema.projects.id, unique));
-  const out: Record<string, string> = {};
-  for (const row of rows) out[row.id] = row.projectName;
-  return out;
+  if (unique.length === 0 || !hasDb()) return {};
+  try {
+    const db = getDb();
+    const rows = await db
+      .select({ id: schema.projects.id, projectName: schema.projects.projectName })
+      .from(schema.projects)
+      .where(inArray(schema.projects.id, unique));
+    const out: Record<string, string> = {};
+    for (const row of rows) out[row.id] = row.projectName;
+    return out;
+  } catch {
+    return {};
+  }
 }
 
-/** Open roles with their company, for the opportunities screen. */
+/**
+ * Open roles with their company, for the opportunities screen.
+ *
+ * Degrades to an empty list without a database (prerender on hosts with no
+ * DATABASE_URL, e.g. Vercel preview builds). The page already renders a
+ * "no roles open" state, so an empty list is a complete answer, not an
+ * error masquerading as one.
+ */
 export async function openProjects(limit = 60) {
-  const db = getDb();
-  return db
-    .select({
+  if (!hasDb()) return [];
+  try {
+    const db = getDb();
+    return await db
+      .select({
       id: schema.projects.id,
       projectName: schema.projects.projectName,
       scopeOfWork: schema.projects.scopeOfWork,
@@ -119,11 +132,16 @@ export async function openProjects(limit = 60) {
     .where(and(eq(schema.projects.status, "active"), eq(schema.projects.employerId, schema.projects.employerId)))
     .orderBy(desc(schema.projects.createdAt))
     .limit(limit);
+  } catch {
+    return [];
+  }
 }
 
 export async function projectById(id: string) {
-  const db = getDb();
-  const [row] = await db
+  if (!hasDb()) return null;
+  try {
+    const db = getDb();
+    const [row] = await db
     .select({
       id: schema.projects.id,
       projectName: schema.projects.projectName,
@@ -142,7 +160,10 @@ export async function projectById(id: string) {
     .innerJoin(schema.employers, eq(schema.projects.employerId, schema.employers.id))
     .where(eq(schema.projects.id, id))
     .limit(1);
-  return row ?? null;
+    return row ?? null;
+  } catch {
+    return null;
+  }
 }
 
 export async function notificationsFor(uid: string, limit = 60) {
