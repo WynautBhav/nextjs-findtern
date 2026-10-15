@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Poppins } from "next/font/google";
 import { SmoothScroll } from "@/components/motion/smooth-scroll";
 import { Analytics } from "@/components/marketing/analytics";
+import { ChatWidget } from "@/components/chat/chat-widget";
 import "./globals.css";
 
 /**
@@ -81,6 +82,7 @@ export default function RootLayout({
         </noscript>
         <SmoothScroll>{children}</SmoothScroll>
         <Analytics />
+        <ChatWidget />
       </body>
     </html>
   );
