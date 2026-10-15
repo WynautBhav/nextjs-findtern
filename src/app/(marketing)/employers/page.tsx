@@ -6,7 +6,6 @@ import {
   CircleHelp,
   Clock,
   Coins,
-  Gift,
   Search,
   ShieldCheck,
   Users,
@@ -16,13 +15,12 @@ import {
 import { PageHero, PageSection } from "@/components/marketing/page-hero";
 import { ButtonLink } from "@/components/ui/button";
 import { SectionHeading } from "@/components/ui/section-heading";
+import { EmployerPlanCards } from "@/components/marketing/employer-plan-cards";
 import { TiltCard } from "@/components/motion/tilt-card";
 import { CountUp } from "@/components/motion/count-up";
 import { FaqExplorer } from "@/components/marketing/faq-explorer";
 import { HAPPY_FACES } from "@/lib/content/proof";
 import { TestimonialCarousel } from "@/components/marketing/testimonial-carousel";
-import { formatMoney, formatRate } from "@/lib/format";
-import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = {
   title: "For employers",
@@ -72,37 +70,6 @@ const STEPS = [
     Icon: Zap,
     title: "Shortlist and interview",
     body: "Schedule against their availability, agree a scope, and send a proposal.",
-  },
-];
-
-const PLANS = [
-  {
-    name: "Free",
-    rateMinor: 0,
-    perHireMinor: 500000,
-    Icon: Gift,
-    blurb: "Budget-friendly hiring",
-    band: "Under 6/10",
-    cta: "Start hiring",
-  },
-  {
-    name: "Skilled",
-    rateMinor: 10000,
-    perHireMinor: 0,
-    Icon: Zap,
-    blurb: "Skilled interns",
-    band: "6–8/10",
-    cta: "Start hiring",
-    featured: true,
-  },
-  {
-    name: "Top-rated",
-    rateMinor: 20000,
-    perHireMinor: 0,
-    Icon: Briefcase,
-    blurb: "Top-rated talent",
-    band: "8+/10",
-    cta: "Start hiring",
   },
 ];
 
@@ -248,52 +215,7 @@ export default function EmployersPage() {
             </ButtonLink>
           }
         />
-        <div className="mt-14 grid gap-5 md:grid-cols-3">
-          {PLANS.map((p) => (
-            <TiltCard key={p.name} max={5} className="rounded-2xl">
-              <article
-                className={cn(
-                  "relative flex h-full flex-col rounded-2xl border bg-white p-6 sm:p-7",
-                  p.featured ? "border-2 border-primary shadow-lg lg:-my-3 lg:py-9" : "border-ink-200",
-                )}
-              >
-                {p.featured ? (
-                  <span className="absolute -top-3 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-primary px-3 py-1 text-2xs font-semibold uppercase tracking-[0.1em] text-white">
-                    Most popular
-                  </span>
-                ) : null}
-                <span className="inline-flex size-10 items-center justify-center rounded-lg bg-brand-50 text-primary">
-                  <p.Icon className="size-5" aria-hidden />
-                </span>
-                <h3 className="mt-5 text-lg font-semibold tracking-tight text-ink-900">
-                  {p.name}
-                </h3>
-                <p className="mt-3 text-3xl font-semibold tracking-tight text-ink-900">
-                  {formatRate(p.rateMinor)}
-                </p>
-                <p className="mt-1.5 text-sm text-ink-500">{p.blurb}</p>
-                <p className="mt-4 text-sm font-medium text-primary">Score {p.band}</p>
-                <p className="mt-2 text-sm text-ink-500">
-                  {p.perHireMinor > 0
-                    ? `${formatMoney(p.perHireMinor)} per hire`
-                    : "No per-hire charge"}
-                </p>
-                <div className="flex-1" />
-                <ButtonLink
-                  href="/employer/signup"
-                  variant={p.featured ? "primary" : "outline"}
-                  block
-                  className="mt-6"
-                >
-                  {p.cta}
-                </ButtonLink>
-              </article>
-            </TiltCard>
-          ))}
-        </div>
-        <p className="mt-8 text-center text-sm text-ink-500">
-          Placeholder amounts — the `pricing_plans` table is empty upstream.
-        </p>
+        <EmployerPlanCards />
       </PageSection>
 
       {/* ── Numbers ────────────────────────────────────────────────── */}
@@ -345,14 +267,14 @@ export default function EmployersPage() {
                 category: "Hiring",
                 question: "What is actually verified before I see a profile?",
                 answer:
-                  "Academic records, identity documents and the assessment. We do not verify employment history, and we do not claim to — check references yourself for anything that matters to the role.",
+                  "Academic records, identity documents and the assessment. We do not verify employment history, and we do not claim to - check references yourself for anything that matters to the role.",
               },
               {
                 id: "e2",
                 category: "Hiring",
                 question: "How is the Findtern Score calculated?",
                 answer:
-                  "Five dimensions — communication, aptitude, role depth, coding and academics — each weighted for the track. The candidate sees the same dimensions and weights you do.",
+                  "Five dimensions - communication, aptitude, role depth, coding and academics - each weighted for the track. The candidate sees the same dimensions and weights you do.",
               },
               {
                 id: "e3",
@@ -366,7 +288,7 @@ export default function EmployersPage() {
                 category: "Hiring",
                 question: "What if an intern does not work out?",
                 answer:
-                  "Rejections inside the first engagement are not billed. Tell us what happened and the hours stop counting — the timesheet is the contract, and we review disagreements rather than auto-charging.",
+                  "Rejections inside the first engagement are not billed. Tell us what happened and the hours stop counting - the timesheet is the contract, and we review disagreements rather than auto-charging.",
               },
               {
                 id: "e5",

@@ -10,7 +10,7 @@ import { requireMutation } from "@/lib/guards-mutation";
  * This is not a call to an external service. The legacy build created an
  * interview row against a synthetic employer (`ai-interview@findtern.ai`) with
  * status "waiting", and the actual interview happened over a link an admin sent
- * afterwards. That queue is the whole mechanism, and it needs no vendor — which
+ * afterwards. That queue is the whole mechanism, and it needs no vendor - which
  * is why the feature can come back without waiting on anyone.
  *
  * Two gates, both from the legacy behaviour and both load-bearing:
@@ -71,7 +71,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   const db = getDb();
 
-  // Gate 1 — has the activation payment landed?
+  // Gate 1 - has the activation payment landed?
   const [payment] = await db
     .select({ id: schema.internPayments.id })
     .from(schema.internPayments)
@@ -107,7 +107,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     aiEmployer = created;
   }
 
-  // Gate 2 — one application in flight.
+  // Gate 2 - one application in flight.
   const [existing] = await db
     .select({ id: schema.interviews.id, status: schema.interviews.status })
     .from(schema.interviews)
@@ -135,7 +135,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       projectId: null,
       status: "waiting",
       timezone: "Asia/Kolkata",
-      notes: "AI interview — awaiting scheduling",
+      notes: "AI interview - awaiting scheduling",
     })
     .returning({ id: schema.interviews.id });
 

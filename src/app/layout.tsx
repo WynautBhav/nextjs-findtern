@@ -30,7 +30,7 @@ export const metadata: Metadata = {
     template: "%s | Findtern",
   },
   description:
-    "Hire a verified intern for the price of a coffee, or get placed in a paid internship in 18 months — or your deposit back.",
+    "Hire a verified intern for the price of a coffee, or get placed in a paid internship in 18 months - or your deposit back.",
   applicationName: "Findtern",
   authors: [{ name: "Findtern" }],
   creator: "Findtern",
@@ -75,7 +75,7 @@ export default function RootLayout({
           {/*
             Scroll reveals set opacity:0 on the server-rendered markup and let
             an IntersectionObserver clear it. Without JS that would leave the
-            entire page invisible — content would be present in the DOM, in
+            entire page invisible - content would be present in the DOM, in
             crawlers' indexes, and unreadable to anyone. Force it visible.
           */}
           <style>{`.reveal-pending > * { opacity: 1 !important; transform: none !important; }`}</style>

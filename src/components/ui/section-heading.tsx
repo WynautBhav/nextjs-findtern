@@ -6,8 +6,8 @@ import { useRevealFlag } from "@/lib/motion";
 /**
  * Section heading with the brand's amber "smile" underline.
  *
- * The legacy site wrote these as raw markup — `<h2>Why We are Most <span
- * class="heading--smile">Popular</span></h2>` — repeated across nine sections
+ * The legacy site wrote these as raw markup - `<h2>Why We are Most <span
+ * class="heading--smile">Popular</span></h2>` - repeated across nine sections
  * and twelve pages, and the smile only animated because the parent happened
  * to carry a `.reveal.is-visible` class. Splitting it into a component means
  * the two-part structure is expressed once, the smile animation is triggered

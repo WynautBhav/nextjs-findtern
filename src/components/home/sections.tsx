@@ -58,8 +58,8 @@ export function PartnersMarquee({ partners }: { partners: CmsPartner[] }) {
 /**
  * Partner logo.
  *
- * No card chrome. The uploaded assets are inconsistent — Stagelife's is a
- * solid black rectangle, the rest are transparent PNGs — and putting each one
+ * No card chrome. The uploaded assets are inconsistent - Stagelife's is a
+ * solid black rectangle, the rest are transparent PNGs - and putting each one
  * in its own white bordered box made that inconsistency read as a set of
  * mismatched tiles. Dropping the chrome and fixing a single height lets them
  * sit as a logo wall, which is what this is, and the odd asset stops looking
@@ -242,7 +242,7 @@ export function HappyFaces({ faces }: { faces: CmsHappyFace[] }) {
 }
 
 /* ==========================================================================
-   About — exported from here so the collage can reuse the masking helper
+   About - exported from here so the collage can reuse the masking helper
    ========================================================================== */
 
 export function CirclePhoto({

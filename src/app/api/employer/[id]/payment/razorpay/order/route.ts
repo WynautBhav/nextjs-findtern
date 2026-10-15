@@ -16,7 +16,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const parsed = bodySchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Invalid input" }, { status: 400 });
 
-  // The amount is recomputed here from accepted proposals — the client asks
+  // The amount is recomputed here from accepted proposals - the client asks
   // for "the <currency> total" and nothing more. If a posted amountMinor were
   // trusted, an employer could pay less by editing the request.
   const { totals } = await payableCheckout(id);

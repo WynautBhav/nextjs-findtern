@@ -2,7 +2,7 @@
  * DeepSeek server client for the Fintern chatbot.
  *
  * OpenAI-compatible chat endpoint. Key lives server-side only
- * (DEEPSEEK_API_KEY) — never exposed to the browser.
+ * (DEEPSEEK_API_KEY) - never exposed to the browser.
  */
 
 export type ChatMessage = {

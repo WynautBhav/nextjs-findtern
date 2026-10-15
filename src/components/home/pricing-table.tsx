@@ -4,19 +4,19 @@ import { useState } from "react";
 import { Check, Coffee } from "lucide-react";
 
 import { ButtonLink } from "@/components/ui/button";
-import { Magnetic } from "@/components/motion/magnetic";
 import { PER_HIRE_CUTOFF } from "@/lib/score";
 import { formatMoney, formatRate } from "@/lib/format";
+import { useIsIndia } from "@/components/marketing/region-rates";
 import type { CmsPlan } from "@/lib/content/types";
 import { cn } from "@/lib/utils";
 
 /* ==========================================================================
-   Pricing — cards + matrix
+   Pricing - cards + matrix
    --------------------------------------------------------------------------
    The coffee metaphor is preserved: Espresso / Cappuccino / Latte, mapped onto
    the Findtern Score bands.
 
-   Structure follows what 15 measured pricing pages actually do — 15 of 17
+   Structure follows what 15 measured pricing pages actually do - 15 of 17
    ship a card row AND a comparison matrix, because they answer two different
    questions. "Which one do I want?" is a card decision. "What exactly is in
    it?" is a table lookup. The legacy build answered both with a table, which
@@ -26,7 +26,7 @@ import { cn } from "@/lib/utils";
 
    - Label column is 2x a plan column. Linear `2fr repeat(4,1fr)`, Notion
      `minmax(0,2fr) repeat(4,minmax(0,1fr))`, Clay
-     `minmax(120px,260px) 1fr 1fr 1fr` — three sites, same ratio,
+     `minmax(120px,260px) 1fr 1fr 1fr` - three sites, same ratio,
      independently.
 
    - No zebra striping. Zero instances across all 15 pages. Row hover is a
@@ -34,12 +34,12 @@ import { cn } from "@/lib/utils";
 
    - Recommended tier: a badge straddling the top edge at top:-12px, mono,
      uppercase, plus a 2px accent border. This is the loudest treatment found
-     anywhere in the set — and it is still quieter than a filled background,
+     anywhere in the set - and it is still quieter than a filled background,
      which is what the previous version used and why the column read as a
      rendering artefact rather than as an emphasis.
 
    - Mobile hides the non-selected plan columns. No measured pricing page uses
-     horizontal scroll — all 15 use a select-to-filter or a breakpoint hide.
+     horizontal scroll - all 15 use a select-to-filter or a breakpoint hide.
      The previous version used overflow-x-auto with a sticky label column,
      which is the one pattern none of them use.
 
@@ -48,34 +48,53 @@ import { cn } from "@/lib/utils";
    constants in lib/content/home.ts are only a fallback.
    ========================================================================== */
 
-const FEATURED = 1; // Cappuccino — the ₹100/hr tier, marked "Popular" on the
-                    // legacy Employers page.
+const FEATURED_SLUG = "cappuccino"; // the mid tier - matched by slug, never
+// by index, so a reordered CMS can never crown the wrong card "popular".
 
-const ROWS: {
+type PlanRow = {
   label: string;
   value: (plan: CmsPlan) => string;
   strong?: boolean;
-}[] = [
-  { label: "Who is it for", value: (p) => p.features[0] ?? "—" },
-  { label: "Findtern Score", value: (p) => p.features[1] ?? "—", strong: true },
-  {
-    label: "Per hiring charge",
-    value: (p) => (p.perHireChargeMinor > 0 ? formatMoney(p.perHireChargeMinor) : "Waived"),
-    strong: true,
-  },
-  { label: "Price", value: (p) => formatRate(p.priceHourlyMinor), strong: true },
-  { label: "Duration", value: (p) => p.internshipDuration },
-  { label: "What you get", value: (p) => p.features[2] ?? "—" },
-];
+};
+
+function rowsFor(currency: CmsPlan["currency"]): PlanRow[] {
+  return [
+    { label: "Who is it for", value: (p) => p.features[0] ?? "-" },
+    { label: "Findtern Score", value: (p) => p.features[1] ?? "-", strong: true },
+    {
+      label: "Per hiring charge",
+      value: (p) => (p.perHireChargeMinor > 0 ? formatMoney(p.perHireChargeMinor, currency) : "Waived"),
+      strong: true,
+    },
+    { label: "Price", value: (p) => formatRate(p.priceHourlyMinor, currency), strong: true },
+    { label: "Duration", value: (p) => p.internshipDuration },
+    { label: "What you get", value: (p) => p.features[2] ?? "-" },
+  ];
+}
 
 export function PricingTable({
-  plans,
-  isIndia,
+  plansInr,
+  plansUsd,
 }: {
-  plans: CmsPlan[];
-  isIndia: boolean;
+  /** Server-rendered INR default; USD swaps in on mount for visitors abroad. */
+  plansInr: CmsPlan[];
+  plansUsd: CmsPlan[];
 }) {
-  const [active, setActive] = useState<string>(plans[FEATURED]?.id ?? plans[0]?.id);
+  const isIndia = useIsIndia();
+  const plans = isIndia ? plansInr : plansUsd;
+  const currency = plans[0]?.currency ?? (isIndia ? "INR" : "USD");
+  const ROWS = rowsFor(currency);
+  const featuredIdx = Math.max(
+    0,
+    plans.findIndex((p) => p.slug === FEATURED_SLUG),
+  );
+  const [active, setActive] = useState<string>(
+    plans[featuredIdx]?.id ?? plans[0]?.id,
+  );
+  // Plan ids differ per currency set - after a region swap the stored id may
+  // not exist, which would blank the mobile matrix. Fall back to featured.
+  const safeActive =
+    plans.some((p) => p.id === active) ? active : (plans[featuredIdx]?.id ?? plans[0]?.id);
 
   if (!plans.length) return null;
 
@@ -113,11 +132,11 @@ export function PricingTable({
                 key={p.id}
                 role="tab"
                 type="button"
-                aria-selected={active === p.id}
+                aria-selected={safeActive === p.id}
                 onClick={() => setActive(p.id)}
                 className={cn(
                   "relative min-w-24 rounded-full px-4 py-2 text-sm font-medium transition-colors duration-200 ease-ease-out",
-                  active === p.id ? "text-white" : "text-on-dark-subtle",
+                  safeActive === p.id ? "text-white" : "text-on-dark-subtle",
                 )}
               >
                 <span className="relative">{p.displayName}</span>
@@ -129,7 +148,7 @@ export function PricingTable({
               className="absolute top-1 bottom-1 left-1 w-[calc((100%-0.5rem)/var(--plan-count))] rounded-full bg-white/12 transition-transform duration-300 ease-ease-out-expo"
               style={{
                 transform: `translateX(calc(${
-                  plans.findIndex((p) => p.id === active) * 100
+                  plans.findIndex((p) => p.id === safeActive) * 100
                 }% * var(--plan-count)))`,
               }}
             />
@@ -139,7 +158,7 @@ export function PricingTable({
         {/* ── Card row ─────────────────────────────────────────────── */}
         <div className="mt-12 grid gap-5 lg:grid-cols-3">
           {plans.map((plan, i) => {
-            const featured = i === FEATURED;
+            const featured = i === featuredIdx;
             return (
               <div
                 key={plan.id}
@@ -150,7 +169,7 @@ export function PricingTable({
                     : "border-ink-200",
                 )}
               >
-                {/* Straddling badge — the loudest treatment in the reference
+                {/* Straddling badge - the loudest treatment in the reference
                     set, and the only one that changes geometry. */}
                 {featured ? (
                   <span className="absolute -top-3 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-primary px-3 py-1 text-2xs font-semibold uppercase tracking-[0.1em] text-white">
@@ -167,7 +186,7 @@ export function PricingTable({
                   {plan.displayName}
                 </p>
                 <p className="mt-1.5 text-3xl font-semibold tracking-[-0.02em] text-ink-900">
-                  {formatRate(plan.priceHourlyMinor)}
+                  {formatRate(plan.priceHourlyMinor, currency)}
                 </p>
                 <p className="mt-1.5 text-sm text-on-dark-subtle">
                   {plan.internshipDuration}
@@ -226,7 +245,7 @@ export function PricingTable({
                       scope="col"
                       className={cn(
                         "border-l border-white/10 pb-4 pl-6 text-lg font-semibold tracking-tight",
-                        i === FEATURED ? "text-accent-300" : "text-white",
+                        i === featuredIdx ? "text-accent-300" : "text-white",
                       )}
                     >
                       {p.displayName}
@@ -250,7 +269,7 @@ export function PricingTable({
                         className={cn(
                           "border-t border-l border-white/10 py-4 pl-6 text-base",
                           row.strong ? "font-semibold text-white" : "text-on-dark",
-                          i === FEATURED && row.strong && "text-accent-300",
+                          i === featuredIdx && row.strong && "text-accent-300",
                         )}
                       >
                         {row.value(p)}
@@ -265,7 +284,7 @@ export function PricingTable({
           {/* Mobile matrix: the selected plan only. */}
           <div className="mt-8 lg:hidden">
             {plans
-              .filter((p) => p.id === active)
+              .filter((p) => p.id === safeActive)
               .map((p) => (
                 <dl
                   key={p.id}
@@ -303,11 +322,9 @@ export function PricingTable({
           ) : null}
 
           <div className="mt-2 flex flex-col items-center gap-3 sm:flex-row">
-            <Magnetic strength={0.28}>
-              <ButtonLink href="/pricing" variant="accent" size="lg">
-                See full pricing
-              </ButtonLink>
-            </Magnetic>
+            <ButtonLink href="/pricing" variant="accent" size="lg">
+              See full pricing
+            </ButtonLink>
             <ButtonLink href="/employers" variant="outlineLight" size="lg">
               Talk to us
             </ButtonLink>

@@ -4,7 +4,7 @@
  * These mirror the shapes the legacy Express API returned from
  * /api/website/* (see server/routes.ts ~17692-17900), minus the fields the old
  * client never read. Keeping the wire format means the Phase 3 data swap is a
- * change of function, not a change of types — every page keeps rendering
+ * change of function, not a change of types - every page keeps rendering
  * whatever `getHomeContent()` hands it, whether that is a Postgres row, a
  * Supabase select, or this file.
  */
@@ -77,7 +77,7 @@ export type CmsBlogPost = {
 
 /**
  * Pricing plan. Money is in minor units (paise / cents) exactly as the legacy
- * `pricing_plans` table stored it — the old client divided by 100 inline in
+ * `pricing_plans` table stored it - the old client divided by 100 inline in
  * four separate places, which is how the Pricing page and the Home pricing
  * section drifted to different fallback prices ($1/$2 vs $5/$10). Minor units
  * move the arithmetic into one formatter.

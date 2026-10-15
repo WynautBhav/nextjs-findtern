@@ -8,7 +8,7 @@ import { requireMutation } from "@/lib/guards-mutation";
 /**
  * The four axes the product actually reads.
  *
- * This used to accept `overall` — a key nothing downstream reads — while
+ * This used to accept `overall` - a key nothing downstream reads - while
  * `interview`, which `RATING_META` and every candidate card do read, was not
  * accepted at all. An admin could therefore never record the AI interview
  * score, and any `overall` they saved was invisible to employers. The four keys

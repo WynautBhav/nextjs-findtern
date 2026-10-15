@@ -14,7 +14,7 @@ export default function SignupPage() {
     <AuthShell
       eyebrow="For candidates"
       title="One assessment. A published score. A rate you can see before anyone negotiates."
-      subtitle="Create an account, verify your email, and finish your profile — employers see the same profile you do."
+      subtitle="Create an account, verify your email, and finish your profile - employers see the same profile you do."
       footer={
         <p className="text-sm text-text-subtle">
           Hiring for interns instead?{" "}

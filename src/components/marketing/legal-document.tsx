@@ -10,8 +10,8 @@ import { cn } from "@/lib/utils";
 /**
  * Legal document renderer.
  *
- * The terms are stored as HTML in the CMS — 46 KB for the platform terms, 95 KB
- * for the employer terms — with 19 and 18 headings respectively. Rendering that
+ * The terms are stored as HTML in the CMS - 46 KB for the platform terms, 95 KB
+ * for the employer terms - with 19 and 18 headings respectively. Rendering that
  * as an undifferentiated wall of text is why nobody reads it, so the heading
  * structure is extracted and turned into a sticky table of contents.
  *

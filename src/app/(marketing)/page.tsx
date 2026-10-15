@@ -23,52 +23,54 @@ import {
 export const metadata: Metadata = {
   title: "Findtern | Internship Simplified",
   description:
-    "Hire a verified intern for the price of a coffee, or get placed in a paid internship in 18 months — or your deposit back. Structured screening, published rates, contracted work.",
+    "Hire a verified intern for the price of a coffee, or get placed in a paid internship in 18 months - or your deposit back. Structured screening, published rates, contracted work.",
   alternates: { canonical: "/" },
 };
 
 export default async function HomePage() {
-  const [partners, skills, faces, steps, plans] = await Promise.all([
+  const [partners, skills, faces, steps, plansInr, plansUsd] = await Promise.all([
     getPartners(),
     getFeaturedSkills(),
     getHappyFaces(),
     getPopularSteps(),
-    // Region-aware currency. This is a server component so it renders INR;
-    // the client corrects it on mount for non-India visitors. Defaulting to
-    // INR is the right failure mode for a majority-Indian product.
+    // Region-aware currency. Server components cannot know the visitor's
+    // region, so both rate cards render here and the client picks: INR by
+    // default (the right failure mode for a majority-Indian product), USD
+    // for visitors abroad. Exactly three plans per set - never six.
     getPlans(true),
+    getPlans(false),
   ]);
 
   return (
     <>
-      {/* 1 — Hero: copy, cinematic video band, two audience paths */}
+      {/* 1 - Hero: copy, cinematic video band, two audience paths */}
       <HeroSplit />
 
-      {/* 2 — Partner marquee */}
+      {/* 2 - Partner marquee */}
       <PartnersMarquee partners={partners} />
 
-      {/* 3 — About us */}
+      {/* 3 - About us */}
       <AboutSection />
 
-      {/* 3b — Proof metrics band */}
+      {/* 3b - Proof metrics band */}
       <StatsBand />
 
-      {/* 4 — Featured skills marquee */}
+      {/* 4 - Featured skills marquee */}
       <SkillsMarquee skills={skills} />
 
-      {/* 5 — Happy Faces testimonials */}
+      {/* 5 - Happy Faces testimonials */}
       <HappyFaces faces={faces} />
 
-      {/* 6 — Why we are most popular, seven-step timeline */}
+      {/* 6 - Why we are most popular, seven-step timeline */}
       <PopularTimeline steps={steps} />
 
-      {/* 7 — Pricing, the coffee comparison table */}
-      <PricingTable plans={plans} isIndia />
+      {/* 7 - Pricing, the coffee comparison table */}
+      <PricingTable plansInr={plansInr} plansUsd={plansUsd} />
 
-      {/* 8 — Contact CTA */}
+      {/* 8 - Contact CTA */}
       <ContactCta />
 
-      {/* 9 — Dark closing CTA */}
+      {/* 9 - Dark closing CTA */}
       <ClosingCta />
     </>
   );

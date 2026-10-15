@@ -18,7 +18,7 @@ export const metadata: Metadata = {
  * plain list, because it spends the reader's attention and gives nothing back.
  *
  * Every card is a link, and the cards themselves are the shared `RoleCard` the
- * public browser at /opportunities uses — the only difference a signed-in
+ * public browser at /opportunities uses - the only difference a signed-in
  * candidate sees is which roles they have already been considered for. The
  * list is newest-first, because a role posted eight weeks ago is a weaker
  * offer than the same role posted yesterday.

@@ -13,7 +13,7 @@ export const metadata: Metadata = {
  * Privacy policy.
  *
  * This page did not exist. The legacy build linked to /privacy from the auth
- * pages and the footer, and it 404'd — which on a page collecting Aadhaar and
+ * pages and the footer, and it 404'd - which on a page collecting Aadhaar and
  * PAN numbers is not a cosmetic problem.
  *
  * There is no CMS row behind it (the `website_terms` family covers only the
@@ -21,7 +21,7 @@ export const metadata: Metadata = {
  * the codebase actually uses. Two things must be confirmed before launch:
  *
  *  1. Retention periods. The draft states 24 months after the last engagement.
- *     Nothing in the schema enforces that — there is no purge job, and the
+ *     Nothing in the schema enforces that - there is no purge job, and the
  *     149 files sitting in the legacy `uploads/` directory are the visible
  *     consequence of that gap.
  *  2. The data-subject request route. It says email, and there is no automated
@@ -73,7 +73,7 @@ const PRIVACY = `
 <p>We do not sell your data. We do not use it for third-party advertising. We do not share it with employers beyond the fields listed above.</p>
 
 <h2>How long we keep it</h2>
-<p>Engagement records — proposals, timesheets, invoices, payment records — are kept for the period required by tax law.</p>
+<p>Engagement records - proposals, timesheets, invoices, payment records - are kept for the period required by tax law.</p>
 <p>Everything else is deleted 24 months after the last engagement ends. <em>[Status: not yet enforced. There is no automated purge job in the current build, and this paragraph is a statement of intent rather than of current behaviour.]</em></p>
 <p>Backups roll off on their own schedule and may retain deleted data for up to 90 days.</p>
 
@@ -94,7 +94,7 @@ const PRIVACY = `
   <li>Withdraw a consent you previously gave.</li>
   <li>Port your data to another provider.</li>
 </ul>
-<p>Email <a href="mailto:${SITE.email}">${SITE.email}</a> with the subject "Data request". We respond within 30 days. There is no automated portal for this yet, so it is handled by email — <em>[Status: accurate as written.]</em></p>
+<p>Email <a href="mailto:${SITE.email}">${SITE.email}</a> with the subject "Data request". We respond within 30 days. There is no automated portal for this yet, so it is handled by email - <em>[Status: accurate as written.]</em></p>
 
 <h2>Cookies</h2>
 <p>We set a session cookie to keep you signed in, and analytics cookies to understand which pages are used. The session cookie is required; the analytics cookies are not, and can be declined without losing functionality.</p>

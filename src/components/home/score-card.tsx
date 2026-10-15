@@ -3,18 +3,19 @@
 import { useEffect, useRef, useState } from "react";
 
 import { formatMoney, formatRate } from "@/lib/format";
+import { useRegionBands } from "@/components/marketing/region-rates";
 import { BANDS, DISTRIBUTION, bandFor } from "@/lib/score";
 import { gsap, prefersReducedMotion } from "@/lib/gsap";
 import { cn } from "@/lib/utils";
 
 /**
- * The Findtern Score card — the hero's proof artifact.
+ * The Findtern Score card - the hero's proof artifact.
  *
  * Replaces the background video that used to sit behind the headline. A video
  * of a graduation ceremony says "we are about education"; this says what
  * Findtern actually does and how it prices it, which is the thing a visitor
  * is trying to find out. Across 28 measured premium sites, every strong hero
- * leads with a real artifact — a product frame, a live data card — and not one
+ * leads with a real artifact - a product frame, a live data card - and not one
  * ships an autoplaying background video.
  *
  * The score is draggable and keyboard-operable, and the rate is derived from
@@ -30,6 +31,9 @@ export function ScoreCard() {
   const thumbRef = useRef<HTMLDivElement>(null);
 
   const band = bandFor(score);
+  // Money follows the visitor's region; geometry (band id) does not.
+  const { bands: regionBands, currency } = useRegionBands();
+  const money = regionBands.find((b) => b.id === band.id) ?? band;
 
   // Tween the thumb and the fill to the new score. A range input cannot be
   // styled into this shape cross-browser, so the control is a custom
@@ -96,7 +100,7 @@ export function ScoreCard() {
                 Your rate
               </p>
               <p className="mt-0.5 text-xl font-bold text-primary tabular-nums">
-                {formatRate(band.rateMinor)}
+                {formatRate(money.rateMinor, currency)}
               </p>
             </div>
           </div>
@@ -179,22 +183,22 @@ export function ScoreCard() {
           <Cell
             label="Per hire"
             value={
-              band.perHireMinor > 0
-                ? formatMoney(band.perHireMinor)
+              money.perHireMinor > 0
+                ? formatMoney(money.perHireMinor, currency)
                 : "Waived"
             }
-            muted={band.perHireMinor === 0}
+            muted={money.perHireMinor === 0}
           />
           <Cell label="Band" value={`${band.min}–${band.max}/10`} />
         </dl>
 
         <p className="border-t border-ink-100 px-5 py-4 text-sm text-text-subtle">
-          {band.blurb} Move the slider — the rate is not negotiated, it is
+          {band.blurb} Move the slider - the rate is not negotiated, it is
           arithmetic.
         </p>
       </div>
 
-      {/* Cohort distribution — the same histogram the rate card publishes. */}
+      {/* Cohort distribution - the same histogram the rate card publishes. */}
       <div className="mt-4 rounded-2xl border border-ink-200 bg-white/70 px-5 py-4 backdrop-blur-sm">
         <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-text-subtle">
           Where the cohort sits

@@ -100,7 +100,7 @@ const manifest = {
 const out = "/tmp/opencode/findtern-upload-manifest.json";
 await writeFile(out, JSON.stringify(manifest, null, 2));
 
-console.log(`\nUpload audit — ${ROOT}\n${"─".repeat(52)}`);
+console.log(`\nUpload audit - ${ROOT}\n${"─".repeat(52)}`);
 console.log(`${rows.length} files · ${bytes(manifest.totalBytes)}\n`);
 
 const label: Record<Sensitivity, string> = {
@@ -121,5 +121,5 @@ console.log(`Manifest → ${out}`);
 console.log(
   "\nEvery row above except PUBLIC is reachable today by anyone holding its URL,",
 );
-console.log("and intern_document.user_id already records who owns each file — the");
+console.log("and intern_document.user_id already records who owns each file - the");
 console.log("static mount simply never consults it.");

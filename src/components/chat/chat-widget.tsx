@@ -18,7 +18,7 @@ const QUICK_PROMPTS = [
 const GREETING: Msg = {
   role: "assistant",
   content:
-    "Hi, I'm Fintern — Findtern's assistant. Ask me anything about Findtern, or tell me where you're stuck and I'll walk you through the platform step by step.",
+    "Hi, I'm Fintern - Findtern's assistant. Ask me anything about Findtern, or tell me where you're stuck and I'll walk you through the platform step by step.",
 };
 
 /* ── Tiny safe markdown for bot replies ────────────────────────────────
@@ -165,7 +165,7 @@ function BotText({ content }: { content: string }) {
 }
 
 /**
- * Fintern — always-visible chatbot.
+ * Fintern - always-visible chatbot.
  *
  * Fixed bottom-right launcher + panel, rendered from the root layout so it
  * survives every navigation. Brand green header, theme tokens only, keyboard
@@ -263,7 +263,7 @@ export function ChatWidget() {
           </button>
         </div>
 
-        {/* Messages — data-lenis-prevent keeps the page's smooth-scroll
+        {/* Messages - data-lenis-prevent keeps the page's smooth-scroll
             (Lenis hijacks wheel at window level) from stealing wheel/touch
             gestures over this nested scroller. */}
         <div

@@ -4,7 +4,7 @@
  * 750 rows carried over from the legacy `cityStatePincode.json`. That file was
  * 151KB because it also carried population, area, density and two codes no
  * screen read; this keeps the district, its state and the state code, which is
- * everything the picker and the auto-filled state field need — 47KB instead.
+ * everything the picker and the auto-filled state field need - 47KB instead.
  *
  * Why it matters: a free-text city field means "Bengaluru", "Bangalore" and
  * "bangalore" are three locations, and an employer filtering by city misses
@@ -38,7 +38,7 @@ export function suggestDistricts(query: string, limit = 8): District[] {
   return [...districtHits, ...stateHits].slice(0, limit);
 }
 
-/** The state a named district belongs to — used to auto-fill the state field. */
+/** The state a named district belongs to - used to auto-fill the state field. */
 export function stateForDistrict(name: string): string | null {
   const q = name.trim().toLowerCase();
   return DISTRICTS.find((d) => d.district.toLowerCase() === q)?.state ?? null;

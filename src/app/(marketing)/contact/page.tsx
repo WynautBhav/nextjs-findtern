@@ -8,7 +8,7 @@ import { SITE } from "@/lib/content/site";
 export const metadata: Metadata = {
   title: "Contact",
   description:
-    "Ask Findtern anything — hiring, interning, or a question about the rate card. Every message is read by a person.",
+    "Ask Findtern anything - hiring, interning, or a question about the rate card. Every message is read by a person.",
   alternates: { canonical: "/contact" },
 };
 
@@ -22,7 +22,7 @@ export default function ContactPage() {
             Ask us <span className="text-primary">anything</span>.
           </>
         }
-        lead="Hiring, interning, or a question about how the rate card works — all three reach the same inbox and all three get a human answer."
+        lead="Hiring, interning, or a question about how the rate card works - all three reach the same inbox and all three get a human answer."
       />
 
       <PageSection>

@@ -18,12 +18,12 @@ import { TiltCard } from "@/components/motion/tilt-card";
 import { CountUp } from "@/components/motion/count-up";
 import { FaqExplorer } from "@/components/marketing/faq-explorer";
 import { BANDS } from "@/lib/score";
-import { formatRate } from "@/lib/format";
+import { BandRate } from "@/components/marketing/region-rates";
 
 export const metadata: Metadata = {
   title: "For interns",
   description:
-    "One assessment produces a Findtern Score you can see the working for. That score sets the rate employers pay — and if we do not place you in 18 months, your deposit comes back.",
+    "One assessment produces a Findtern Score you can see the working for. That score sets the rate employers pay - and if we do not place you in 18 months, your deposit comes back.",
   alternates: { canonical: "/interns" },
 };
 
@@ -37,7 +37,7 @@ const STEPS = [
   {
     Icon: UserCheck,
     title: "Get assessed",
-    body: "A structured interview and aptitude test, generated for the field you picked — not one generic test for everyone.",
+    body: "A structured interview and aptitude test, generated for the field you picked - not one generic test for everyone.",
     time: "25 min",
   },
   {
@@ -134,7 +134,7 @@ export default function InternsPage() {
                 </div>
                 <div className="text-right">
                   <p className="text-2xl font-semibold tracking-tight text-primary">
-                    {formatRate(b.rateMinor)}
+                    <BandRate bandId={b.id} />
                   </p>
                   <p className="text-xs text-ink-500">
                     {b.perHireMinor > 0 ? "employer pays per hire" : "no per-hire fee"}
@@ -256,7 +256,7 @@ export default function InternsPage() {
                 category: "Guarantee",
                 question: "What are the three refund conditions?",
                 answer:
-                  "One: your assessment is scored. Two: you stay reachable and respond to employer requests. Three: you do not decline an offer you asked for. Failing any one ends the obligation — in your favour, not the platform's.",
+                  "One: your assessment is scored. Two: you stay reachable and respond to employer requests. Three: you do not decline an offer you asked for. Failing any one ends the obligation - in your favour, not the platform's.",
               },
               {
                 id: "i4",
@@ -270,7 +270,7 @@ export default function InternsPage() {
                 category: "Privacy",
                 question: "Who can see my contact details?",
                 answer:
-                  "Nobody, until you respond to them. Employers see your score, skills, availability and work samples — not your phone number or email.",
+                  "Nobody, until you respond to them. Employers see your score, skills, availability and work samples - not your phone number or email.",
               },
             ]}
           />

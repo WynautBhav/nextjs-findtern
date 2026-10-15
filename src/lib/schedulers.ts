@@ -33,7 +33,7 @@ export function startSchedulers() {
     }
   }, 5 * 60 * 1000);
 
-  // Notification scheduler: every 6 hours — profile completion nudges, cart inactivity.
+  // Notification scheduler: every 6 hours - profile completion nudges, cart inactivity.
   setInterval(async () => {
     try {
       const db = getDb();

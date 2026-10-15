@@ -9,7 +9,7 @@ import { toArray } from "@/lib/journey";
  * One open role, as a card.
  *
  * Shared by the public browse page and the signed-in list so the two cannot
- * drift apart — a role that looks one way to a guest and another way to a
+ * drift apart - a role that looks one way to a guest and another way to a
  * candidate is the sort of inconsistency nobody notices until it costs a
  * signup.
  *

@@ -17,7 +17,7 @@ import {
  * Single entry point for both unauthenticated audiences.
  *
  * The header previously carried "Log in" and "Get Started" side by side. Both
- * were making the same argument — come in — and the pair competed for
+ * were making the same argument - come in - and the pair competed for
  * attention without telling anyone which one to pick. One control that says
  * "Get started" and then asks which door you are walking through is the same
  * intent stated once, with the choice made explicit.
@@ -48,7 +48,7 @@ export function GetStartedMenu({ className = "" }: { className?: string }) {
       <DropdownMenuContent align="end" className="w-72">
         <DropdownMenuLabel>I&apos;m looking for</DropdownMenuLabel>
 
-        {/* asChild so each item is a real <a> — middle-click, open-in-new-tab
+        {/* asChild so each item is a real <a> - middle-click, open-in-new-tab
             and "copy link" all work, and Radix still closes the menu. */}
         <DropdownMenuItem asChild>
           <Link href="/signup">

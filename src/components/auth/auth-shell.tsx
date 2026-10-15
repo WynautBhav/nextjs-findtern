@@ -25,7 +25,7 @@ export function AuthShell({
   subtitle: string;
   children: React.ReactNode;
   footer?: React.ReactNode;
-  /** Employer and admin are internal surfaces — they do not get the pitch. */
+  /** Employer and admin are internal surfaces - they do not get the pitch. */
   compact?: boolean;
 }) {
   return (
@@ -59,7 +59,7 @@ export function AuthShell({
 
           {/* Artifact, not decoration. This is the same score card the hero
               shows, so the promise in the pitch is the thing they will see in
-              the product. Suppressed on internal surfaces — an admin signing in
+              the product. Suppressed on internal surfaces - an admin signing in
               does not need the sales pitch, and repeating it there would be
               noise on a screen people open forty times a day. */}
           {compact ? null : (

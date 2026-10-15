@@ -6,7 +6,7 @@
  * One message, an explicit recipient list, one POST per recipient type. The
  * endpoint takes `recipientIds` rather than "everyone", which means the
  * composer shows you exactly who is about to be messaged before anything is
- * sent — a broadcast nobody can preview is how a platform loses its users.
+ * sent - a broadcast nobody can preview is how a platform loses its users.
  */
 
 import { useMemo, useState } from "react";

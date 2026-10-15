@@ -5,15 +5,19 @@
  * formatted here, once. The legacy site inlined this arithmetic in four
  * separate components, which is how the Home pricing section and the Pricing
  * page ended up showing different fallback prices for the same plans.
+ *
+ * NOTE: this module is imported by server components, so it must stay free
+ * of client-only React APIs. The region hook lives in
+ * components/marketing/region-rates.tsx instead.
  */
 
 export function formatMoney(
   minor: number,
   currency: "INR" | "USD" = "INR",
-  opts: { compact?: boolean } = {},
+  opts: { compact?: boolean; zeroLabel?: string } = {},
 ): string {
   const value = minor / 100;
-  if (value === 0) return currency === "INR" ? "Free" : "$0";
+  if (value === 0) return opts.zeroLabel ?? (currency === "INR" ? "Free" : "$0");
 
   return new Intl.NumberFormat(currency === "INR" ? "en-IN" : "en-US", {
     style: "currency",
@@ -23,7 +27,7 @@ export function formatMoney(
   }).format(value);
 }
 
-/** "INR 100/hr" — used in plan column headers. */
+/** "INR 100/hr" - used in plan column headers. */
 export function formatRate(
   minor: number,
   currency: "INR" | "USD" = "INR",
@@ -43,9 +47,9 @@ export function formatPerHire(
 export const formatCurrency = formatMoney;
 
 export function formatDate(iso: string | Date | null | undefined): string {
-  if (!iso) return "—";
+  if (!iso) return "-";
   const date = typeof iso === "string" ? new Date(iso) : iso;
-  if (isNaN(date.getTime())) return "—";
+  if (isNaN(date.getTime())) return "-";
   return date.toLocaleDateString("en-IN", {
     day: "numeric",
     month: "short",
@@ -65,7 +69,7 @@ export function readingTimeMinutes(text: string): number {
  * The legacy Pricing page inferred INR vs USD from
  * `Intl.DateTimeFormat().resolvedOptions().timeZone`, `navigator.language`, and
  * a hardcoded `getTimeZoneOffset() === -330` check, inlined three times. This
- * is the same logic in one function, and it defaults to INR — the wrong
+ * is the same logic in one function, and it defaults to INR - the wrong
  * default for a majority-Indian product is a worse failure than showing
  * prices in a currency the visitor can still read.
  */

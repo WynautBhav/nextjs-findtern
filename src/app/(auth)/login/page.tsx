@@ -36,7 +36,7 @@ export default function LoginPage() {
       </div>
 
       {/* Reciprocal link, not a dead end. Someone who landed here without an
-          account needs one click to the other door — the header now sends both
+          account needs one click to the other door - the header now sends both
           audiences to one menu, so these two pages have to carry the routing
           between them themselves. */}
       <p className="mt-7 text-center text-sm text-text-subtle">

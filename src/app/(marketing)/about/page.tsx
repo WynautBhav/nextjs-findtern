@@ -50,7 +50,7 @@ export default function AboutPage() {
             <span className="text-primary">effortless</span>, not exhausting.
           </>
         }
-        lead="Findtern is a platform that connects companies with pre-vetted, skilled interns in a few clicks — and holds both sides to a published standard."
+        lead="Findtern is a platform that connects companies with pre-vetted, skilled interns in a few clicks - and holds both sides to a published standard."
       >
         <ButtonLink href="/employers" variant="primary" size="lg">
           Hire an intern
@@ -82,7 +82,7 @@ export default function AboutPage() {
                 <li key={p.title} className="flex gap-3">
                   <BadgeCheck className="mt-0.5 size-5 shrink-0 text-primary" aria-hidden />
                   <span className="text-base leading-relaxed text-ink-600">
-                    <strong className="font-semibold text-ink-900">{p.title}</strong> — {p.body}
+                    <strong className="font-semibold text-ink-900">{p.title}</strong> - {p.body}
                   </span>
                 </li>
               ))}

@@ -28,7 +28,7 @@ export async function generateMetadata({
  * Public role detail.
  *
  * The signed-in version at /intern/opportunities/[id] adds the candidate's own
- * state — which offers they already hold, and what to do next for them. A
+ * state - which offers they already hold, and what to do next for them. A
  * guest has none of that, so this is the brief, the skills, the facts, and an
  * honest account of what creating a profile would do. No apply button, because
  * there is no application to submit: companies search candidates, they do not
@@ -161,7 +161,7 @@ export default async function PublicRoleDetail({ params }: { params: Promise<{ i
                 Get considered for this
               </h2>
               <p className="mt-2 text-pretty text-sm leading-relaxed text-brand-800">
-                There is no apply button because there is no application to submit — companies here
+                There is no apply button because there is no application to submit - companies here
                 search candidates. A free profile plus the AI interview is what puts you in front of
                 them.
               </p>

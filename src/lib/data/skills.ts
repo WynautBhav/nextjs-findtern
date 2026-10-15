@@ -3,7 +3,7 @@
  *
  * 2,482 entries carried over from the legacy `client/src/data/skills.json`,
  * which every combobox on that site was seeded from. This build had no
- * vocabulary at all, so candidates typed free text — which means "React",
+ * vocabulary at all, so candidates typed free text - which means "React",
  * "react", "React.js" and "ReactJS" all become four different skills in the
  * database, and an employer filtering on "React" misses three candidates. The
  * matching that the product sells depends on this list existing.

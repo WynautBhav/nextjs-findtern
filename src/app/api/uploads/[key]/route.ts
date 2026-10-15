@@ -41,7 +41,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ key: string }> 
   } catch (e) {
     const expired = e instanceof TokenError && e.reason === "expired";
     return NextResponse.json(
-      { error: expired ? "Link expired — request a new one" : "Invalid link" },
+      { error: expired ? "Link expired - request a new one" : "Invalid link" },
       // An expired link is a 410: the client can tell it apart from a forged
       // one and re-request. A forged link is a flat 401.
       { status: expired ? 410 : 401, headers: noStore },
@@ -66,7 +66,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ key: string }> 
   // 3. Single use.
   if (!replayGuard.check(payload.n)) {
     return NextResponse.json(
-      { error: "Link already used — request a new one" },
+      { error: "Link already used - request a new one" },
       { status: 410, headers: noStore },
     );
   }

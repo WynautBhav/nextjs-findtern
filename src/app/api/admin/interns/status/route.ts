@@ -11,7 +11,7 @@ import { requireMutation } from "@/lib/guards-mutation";
  * Deactivating blocks sign-in (`is_active` is checked by the session/login
  * path) but leaves the profile and history intact, so it is reversible. This
  * is deliberately separate from directory visibility, which only affects
- * discovery — mixing the two is how a platform ends up with active accounts
+ * discovery - mixing the two is how a platform ends up with active accounts
  * missing from search for no traceable reason.
  */
 

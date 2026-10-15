@@ -15,7 +15,7 @@ import { getDb, schema, hasDb } from "@/lib/db";
 import { eq, desc, asc } from "drizzle-orm";
 
 /* ==========================================================================
-   Content accessors — the seam for the data layer
+   Content accessors - the seam for the data layer
    --------------------------------------------------------------------------
    Every page reads content through these functions and never imports the data
    files directly. They are async even though they resolve immediately, so
@@ -100,14 +100,21 @@ export async function getPopularSteps() {
  * exactly the figures the legacy site hardcoded in the client
  * (₹100/hr Cappuccino, ₹200/hr Latte, ₹5,000 per-hire Espresso) and which an
  * admin can edit from /admin/cms. The PRICING_PLANS constants below are the
- * fallback for when the database is unreachable — they are no longer what the
+ * fallback for when the database is unreachable - they are no longer what the
  * public sees.
+ *
+ * Filtered by currency, always: the table holds both the INR and the USD rate
+ * cards, and returning both is what rendered Espresso/Cappuccino/Latte twice
+ * (with the USD rows mislabelled ₹1/hr and ₹2/hr). Exactly three plans come
+ * back, one currency.
  */
 export async function getPlans(isIndia: boolean): Promise<CmsPlan[]> {
+  const currency = isIndia ? "INR" : "USD";
   return tryDb(async () => {
     const db = getDb();
     const rows = await db.select().from(schema.pricingPlans).where(eq(schema.pricingPlans.isActive, true)).orderBy(asc(schema.pricingPlans.sortOrder));
-    return rows.length ? (rows as unknown as CmsPlan[]) : (isIndia ? PRICING_PLANS : PRICING_PLANS_USD);
+    const mine = rows.filter((r) => String(r.currency).toUpperCase() === currency);
+    return mine.length ? (mine as unknown as CmsPlan[]) : (isIndia ? PRICING_PLANS : PRICING_PLANS_USD);
   }, isIndia ? PRICING_PLANS : PRICING_PLANS_USD);
 }
 

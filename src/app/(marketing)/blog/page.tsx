@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
 export const metadata: Metadata = {
   title: "Blog",
   description:
-    "How scoring, rate cards, timesheets and the guarantee actually work — written by the team that builds them.",
+    "How scoring, rate cards, timesheets and the guarantee actually work - written by the team that builds them.",
   alternates: { canonical: "/blog" },
 };
 
@@ -31,7 +31,7 @@ export default async function BlogPage() {
             <span className="text-primary">actually works</span>.
           </>
         }
-        lead="Scoring, rate cards, timesheets and the guarantee — the parts most platforms leave vague."
+        lead="Scoring, rate cards, timesheets and the guarantee - the parts most platforms leave vague."
       />
 
       <PageSection>
@@ -143,7 +143,7 @@ export default async function BlogPage() {
  * The CMS has no cover images for any of the 23 posts, so the alternative is
  * either a stock photo that says nothing or a flat grey. A gradient keyed to
  * the slug gives each post a stable, distinct identity that survives without
- * an asset pipeline — and it is deterministic, so the same post is always the
+ * an asset pipeline - and it is deterministic, so the same post is always the
  * same colour.
  */
 function gradientFor(slug: string): string {

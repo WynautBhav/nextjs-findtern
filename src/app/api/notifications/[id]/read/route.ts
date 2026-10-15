@@ -7,7 +7,7 @@ import { requireMutation } from "@/lib/guards-mutation";
 /**
  * Mark one notification read.
  *
- * Ownership is checked against `recipientId`, not just "is there a session" —
+ * Ownership is checked against `recipientId`, not just "is there a session" -
  * the legacy `/api/notifications/:id/read` read the id straight off the URL
  * with no check at all, so any authenticated user could mark anyone's
  * notification read by guessing a uuid.

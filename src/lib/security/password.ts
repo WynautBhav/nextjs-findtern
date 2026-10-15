@@ -26,7 +26,7 @@ import { promisify } from "node:util";
  * no native compilation step in CI.
  *
  * A scrypt fallback is included for platforms where the prebuilt binary cannot
- * run. It is a genuine fallback, not a stub — scrypt is the second choice in
+ * run. It is a genuine fallback, not a stub - scrypt is the second choice in
  * the same OWASP table, and a build that cannot install a native module is a
  * build that should not silently ship plaintext.
  */
@@ -95,7 +95,7 @@ export async function hashPassword(plain: string): Promise<string> {
  *   anything else        a raw string, compared in constant time
  *
  * The last case is the important one. It means the day this module is switched
- * on, every existing account still logs in — and `needsRehash` reports true
+ * on, every existing account still logs in - and `needsRehash` reports true
  * so the caller re-hashes it on the way through, upgrading the row in place.
  */
 export async function verifyPassword(

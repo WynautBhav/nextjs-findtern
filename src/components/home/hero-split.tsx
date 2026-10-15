@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from "react";
 import { ArrowRight, Building2, GraduationCap, Play } from "lucide-react";
 
 import { ButtonLink } from "@/components/ui/button";
-import { Magnetic } from "@/components/motion/magnetic";
 import { TextReveal } from "@/components/motion/text-reveal";
 import { CountUp } from "@/components/motion/count-up";
 import { ScoreCard } from "@/components/home/score-card";
@@ -40,8 +39,8 @@ import { cn } from "@/lib/utils";
  *    and Supabase all do this.
  *
  *  - The employer/candidate split lives here as two cards, not in the navbar.
- *    Wellfound is the closest analogue in the whole set — a job marketplace with
- *    the same two-sided problem — and it puts the split under the headline for
+ *    Wellfound is the closest analogue in the whole set - a job marketplace with
+ *    the same two-sided problem - and it puts the split under the headline for
  *    exactly this reason: it gives each audience its own argument instead of
  *    two nav buttons arguing over the same bar.
  */
@@ -162,13 +161,11 @@ export function HeroSplit() {
             />
 
             <div className="mt-9 flex flex-col gap-3 sm:flex-row">
-              <Magnetic strength={0.28}>
-                <ButtonLink href="/employers" variant="accent" size="lg">
-                  <Building2 className="size-4" aria-hidden />
-                  Hire an intern
-                  <ArrowRight className="size-4" aria-hidden />
-                </ButtonLink>
-              </Magnetic>
+              <ButtonLink href="/employers" variant="accent" size="lg">
+                <Building2 className="size-4" aria-hidden />
+                Hire an intern
+                <ArrowRight className="size-4" aria-hidden />
+              </ButtonLink>
               <ButtonLink href="/interns" variant="outlineLight" size="lg">
                 <GraduationCap className="size-4" aria-hidden />
                 Find my internship
@@ -214,8 +211,8 @@ export function HeroSplit() {
           the emotional image, but it no longer has to do the job of
           explaining the product.
 
-          Lazy-loaded. This is 1.5 MB of the page's 1.9 MB — 88% of total
-          weight — and it sits entirely below the fold. `preload="none"` plus
+          Lazy-loaded. This is 1.5 MB of the page's 1.9 MB - 88% of total
+          weight - and it sits entirely below the fold. `preload="none"` plus
           an IntersectionObserver means a first-time visitor on the homepage
           downloads ~140 KB of media instead of 1.6 MB, and the video only
           arrives once they scroll toward it. A poster frame is shown until

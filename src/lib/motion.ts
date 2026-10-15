@@ -7,9 +7,9 @@
  * components can import the easing constants without pulling hooks into their
  * module graph.
  *
- * The legacy build reached for three different reveal mechanisms — a
+ * The legacy build reached for three different reveal mechanisms - a
  * `useReveal` hook, a second `useReveal.js`/`.d.ts` pair that shadowed it, and
- * hand-rolled IntersectionObservers inside five page components — with ten
+ * hand-rolled IntersectionObservers inside five page components - with ten
  * separate `prefers-reduced-motion` blocks in the stylesheet. This is the
  * single entry point now.
  */
@@ -20,7 +20,7 @@ import { EASE, gsap, prefersReducedMotion } from "./gsap";
 
 /**
  * Reveal-on-scroll via GSAP, for elements that need a transform rather than a
- * class — the seven-step timeline, mostly.
+ * class - the seven-step timeline, mostly.
  *
  * Animates the container and its `[data-reveal-item]` descendants with a
  * stagger. Under reduced motion nothing animates and the content is simply
@@ -74,8 +74,8 @@ export function useReveal<T extends HTMLElement = HTMLDivElement>(options?: {
 
 /**
  * Adds an `is-revealed` class once the element is on screen, for the
- * CSS-driven reveal in globals.css. The cheap path — no GSAP, no layout
- * thrash — and what most sections use.
+ * CSS-driven reveal in globals.css. The cheap path - no GSAP, no layout
+ * thrash - and what most sections use.
  */
 export function useRevealFlag<T extends HTMLElement = HTMLElement>(options?: {
   threshold?: number;

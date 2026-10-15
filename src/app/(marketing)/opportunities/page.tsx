@@ -16,7 +16,7 @@ export const metadata: Metadata = {
 /**
  * Public role browser.
  *
- * The legacy site let anyone browse `/opportunities` — that was the top of the
+ * The legacy site let anyone browse `/opportunities` - that was the top of the
  * funnel, and a cold visitor from a search result or an ad lands here before
  * they have any reason to make an account. The rewrite put this list inside the
  * signed-in intern area, where a guest got a redirect to sign in, so the
@@ -25,7 +25,7 @@ export const metadata: Metadata = {
  * Nothing here needs an account: `openProjects()` reads project rows and the
  * company name, both of which the marketing site already publishes. What a
  * guest cannot do is register interest, so the page says so rather than
- * pretending — the same rule the whole redesign follows.
+ * pretending - the same rule the whole redesign follows.
  */
 export default async function PublicOpportunities() {
   const rows = await openProjects(60);
@@ -43,7 +43,7 @@ export default async function PublicOpportunities() {
           <div className="mx-auto max-w-xl text-center">
             <p className="text-pretty text-base leading-relaxed text-ink-600">
               No roles are open at the moment. Companies post projects as they open them, and this
-              list fills up regularly — creating a profile first is what puts you in front of the
+              list fills up regularly - creating a profile first is what puts you in front of the
               ones that appear next week.
             </p>
             <div className="mt-6 flex flex-wrap justify-center gap-3">
@@ -72,7 +72,7 @@ export default async function PublicOpportunities() {
               <div className="grid gap-6 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
                 <div>
                   <h2 className="text-pretty text-lg font-semibold tracking-[-0.015em] text-ink-900">
-                    Companies here search for candidates — they do not collect applications.
+                    Companies here search for candidates - they do not collect applications.
                   </h2>
                   <p className="mt-2 max-w-prose text-pretty text-sm leading-relaxed text-ink-600">
                     What gets you seen is a complete profile and a Findtern Score from the AI

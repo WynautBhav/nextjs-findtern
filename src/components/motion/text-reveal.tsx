@@ -15,7 +15,7 @@ import { cn } from "@/lib/utils";
  *
  * Words are re-measured on resize and the tween is rebuilt, because a split
  * computed at 1440px leaves ragged masks at 390px. Under reduced motion the
- * text is left completely untouched — no split, no transform, no initial
+ * text is left completely untouched - no split, no transform, no initial
  * state to flash.
  */
 export function TextReveal({
@@ -137,7 +137,7 @@ export function TextReveal({
           This used to be `aria-label={text}` on the host with every split word
           marked aria-hidden. That combination is broken for a role-less
           element: aria-label is not reliably exposed on a plain <p>, so with
-          the children all hidden the accessible name came through *empty* —
+          the children all hidden the accessible name came through *empty* -
           the single call site renders as="p", so this was the live case, not a
           hypothetical.
 

@@ -5,7 +5,7 @@
  *
  * Employers see these on the candidate card, in compare, and on the intern's
  * detail page, and the mean of the four is the Findtern Score that the pricing
- * bands are built on — so an admin typing these numbers is setting a price, not
+ * bands are built on - so an admin typing these numbers is setting a price, not
  * writing a note. The endpoint recomputes the score server-side; this shows what
  * it came out as so the number is never a surprise on the employer's screen.
  */
@@ -89,7 +89,7 @@ export function RatingsEditor({
         <p className="text-2xs text-ink-500">
           Findtern Score{" "}
           <span className="font-semibold tabular-nums text-ink-800">
-            {saved !== null ? saved.toFixed(1) : score !== null ? score.toFixed(1) : "—"}
+            {saved !== null ? saved.toFixed(1) : score !== null ? score.toFixed(1) : "-"}
           </span>
           {saved !== null ? " (just recalculated)" : ""}
         </p>

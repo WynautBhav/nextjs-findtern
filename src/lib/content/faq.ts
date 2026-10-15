@@ -1,12 +1,12 @@
 /**
- * FAQ — real CMS content.
+ * FAQ - real CMS content.
  *
  * Pulled from GET https://findtern.in/api/website/faq on 2026-10-02:
  * 89 rows, split Intern 49 / Employer 40.
  *
  * Two data problems handled here rather than by editing the CMS:
  *
- *  1. The employer rows are stored with the category string "Employer " —
+ *  1. The employer rows are stored with the category string "Employer " -
  *     a trailing space. Left alone it becomes a second chip that looks
  *     identical to the first. The legacy Faq.tsx also derived its chips from
  *     these raw values, so the live site currently shows three chips where
@@ -30,7 +30,7 @@ export const FAQ_INTERN: CmsFaqItem[] = [
   {
     "id": "d06fb59b-93fb-49d2-8883-63ac4cba45f8",
     "category": "Intern",
-    "question": "My AI interview isn’t loading—how can I fix it?",
+    "question": "My AI interview isn’t loading-how can I fix it?",
     "answer": "If your AI interview on Findtern isn’t loading, check your internet connection, browser settings, and device compatibility. We recommend using the latest version of Chrome or Edge with a working webcam and microphone. Clear cache/cookies and try again. If the issue persists, contact Findtern support via the Help section (https://findtern.in/contact.) or email.",
     "sortOrder": 0,
     "isActive": true
@@ -63,7 +63,7 @@ export const FAQ_INTERN: CmsFaqItem[] = [
     "id": "94140c2c-4f9b-4e37-aa5a-d561f7e115bb",
     "category": "Intern",
     "question": "Can I improve my Findtern Score? If yes, how?",
-    "answer": "Yes, you can improve your Findtern Score.\n Once your score is generated after the AI interview, it becomes your official rating. If you wish to improve it, you can retake the AI interview, but please note that the AI interview fee must be paid again for each retake.\nTo schedule a new attempt, you can contact the Findtern team. Preparing well—by practicing interview questions, strengthening your technical knowledge, and improving your communication skills—will help you perform better in the next round and achieve a higher score.",
+    "answer": "Yes, you can improve your Findtern Score.\n Once your score is generated after the AI interview, it becomes your official rating. If you wish to improve it, you can retake the AI interview, but please note that the AI interview fee must be paid again for each retake.\nTo schedule a new attempt, you can contact the Findtern team. Preparing well-by practicing interview questions, strengthening your technical knowledge, and improving your communication skills-will help you perform better in the next round and achieve a higher score.",
     "sortOrder": 0,
     "isActive": true
   },
@@ -71,7 +71,7 @@ export const FAQ_INTERN: CmsFaqItem[] = [
     "id": "62bb4f40-b68f-4f72-b29d-dc5b845bae2d",
     "category": "Intern",
     "question": " Does Findtern guarantee internship placement?",
-    "answer": "Yes, Findtern provides an internship guarantee.\nIf you do not secure an internship through the Findtern platform within 18 months, you will receive a full refund of your registration and AI interview fee.\n\nFindtern offers a verified and transparent platform where students connect with genuine companies. Your internship opportunities depend on your Findtern Score, skills, and company requirements. Candidates with a profile score above 6 are eligible for paid internship opportunities.\n\nThink of Findtern as your career launchpad—we actively bridge the gap between students and employers, and we stand by our commitment with a 100% refund guarantee if you don’t get placed within 18 months.",
+    "answer": "Yes, Findtern provides an internship guarantee.\nIf you do not secure an internship through the Findtern platform within 18 months, you will receive a full refund of your registration and AI interview fee.\n\nFindtern offers a verified and transparent platform where students connect with genuine companies. Your internship opportunities depend on your Findtern Score, skills, and company requirements. Candidates with a profile score above 6 are eligible for paid internship opportunities.\n\nThink of Findtern as your career launchpad-we actively bridge the gap between students and employers, and we stand by our commitment with a 100% refund guarantee if you don’t get placed within 18 months.",
     "sortOrder": 0,
     "isActive": true
   },
@@ -102,7 +102,7 @@ export const FAQ_INTERN: CmsFaqItem[] = [
   {
     "id": "d84e0a25-449f-462f-8217-dc794a4588ff",
     "category": "Intern",
-    "question": "What if I don’t have a resume — does Findtern help me create one? Or Do I need to upload my resume to apply for internships on Findtern?",
+    "question": "What if I don’t have a resume - does Findtern help me create one? Or Do I need to upload my resume to apply for internships on Findtern?",
     "answer": "You don’t need to worry if you don’t already have a resume. Findtern automatically creates a professional resume for you based on the details you provide in your profile. Once your profile is complete, you can download your ready-to-use resume anytime from your dashboard. This saves you the effort of formatting and ensures your resume highlights your skills and achievements effectively.",
     "sortOrder": 0,
     "isActive": true
@@ -167,7 +167,7 @@ export const FAQ_INTERN: CmsFaqItem[] = [
     "id": "23942c9c-6e3a-4b69-8324-2e088fa6b351",
     "category": "Intern",
     "question": "Do I need prior experience to apply for internships through Findtern?",
-    "answer": "Not at all. Findtern is built for freshers and students without prior work experience. The AI interview helps highlight your skills, personality, and potential—not just your past experience.",
+    "answer": "Not at all. Findtern is built for freshers and students without prior work experience. The AI interview helps highlight your skills, personality, and potential-not just your past experience.",
     "sortOrder": 0,
     "isActive": true
   },
@@ -207,7 +207,7 @@ export const FAQ_INTERN: CmsFaqItem[] = [
     "id": "a3558a69-7d26-4d57-8935-2d672541ae5f",
     "category": "Intern",
     "question": "I have completed my internship but have not received the stipend and certificate. ",
-    "answer": "If you haven’t received your stipend or internship certificate after completing your internship with Findtern, don’t worry. Sometimes there may be a delay in processing. In such cases, you need to raise a request directly with Findtern support through your dashboard or by contacting our help team. Once your request is verified, our team will release your stipend and certificate. Remember, both are issued only by Findtern — not the company — so always follow up with us if there’s a delay.",
+    "answer": "If you haven’t received your stipend or internship certificate after completing your internship with Findtern, don’t worry. Sometimes there may be a delay in processing. In such cases, you need to raise a request directly with Findtern support through your dashboard or by contacting our help team. Once your request is verified, our team will release your stipend and certificate. Remember, both are issued only by Findtern - not the company - so always follow up with us if there’s a delay.",
     "sortOrder": 0,
     "isActive": true
   },
@@ -458,7 +458,7 @@ export const FAQ_EMPLOYER: CmsFaqItem[] = [
     "id": "0ebdae99-ba8d-4e39-b484-c461f2eac1f4",
     "category": "Employer",
     "question": " How user-friendly is the platform?",
-    "answer": "Findtern offers an easy-to-use interface where employers can post roles, manage applicants, and hire efficiently—all within a few clicks.\n",
+    "answer": "Findtern offers an easy-to-use interface where employers can post roles, manage applicants, and hire efficiently-all within a few clicks.\n",
     "sortOrder": 0,
     "isActive": true
   },
@@ -490,7 +490,7 @@ export const FAQ_EMPLOYER: CmsFaqItem[] = [
     "id": "119d8388-fece-4143-8c87-8386b37de567",
     "category": "Employer",
     "question": "Are there any hidden fees or long-term commitments?",
-    "answer": "No. Findtern offers transparent pricing—no hidden costs, commissions, or forced contracts.\n",
+    "answer": "No. Findtern offers transparent pricing-no hidden costs, commissions, or forced contracts.\n",
     "sortOrder": 0,
     "isActive": true
   },
@@ -586,7 +586,7 @@ export const FAQ_EMPLOYER: CmsFaqItem[] = [
     "id": "86a00cf4-4928-463a-9ddf-b1e784e4bf4d",
     "category": "Employer",
     "question": "Does Findtern provide hiring support?",
-    "answer": "Yes. Our team supports you at all stages—shortlisting, communication, dispute resolution, and onboarding assistance.\n",
+    "answer": "Yes. Our team supports you at all stages-shortlisting, communication, dispute resolution, and onboarding assistance.\n",
     "sortOrder": 0,
     "isActive": true
   },
@@ -714,7 +714,7 @@ export const FAQ_EMPLOYER: CmsFaqItem[] = [
     "id": "55d4cae6-3f67-4c8f-b1b2-58aa231c6513",
     "category": "Employer",
     "question": "How do I shortlist and hire candidates on Findtern?",
-    "answer": "On Findtern.in, employers can shortlist and hire interns using the platform’s smart matchmaking system, which suggests pre-vetted candidates based on your required skills and criteria.\nEmployers can filter, review profiles, scores, and qualifications, then connect via built-in messaging or schedule interviews.\nThe hiring process, along with onboarding support and documentation, is finalized on the platform—ensuring a smooth intern hiring experience.\n",
+    "answer": "On Findtern.in, employers can shortlist and hire interns using the platform’s smart matchmaking system, which suggests pre-vetted candidates based on your required skills and criteria.\nEmployers can filter, review profiles, scores, and qualifications, then connect via built-in messaging or schedule interviews.\nThe hiring process, along with onboarding support and documentation, is finalized on the platform-ensuring a smooth intern hiring experience.\n",
     "sortOrder": 0,
     "isActive": true
   },

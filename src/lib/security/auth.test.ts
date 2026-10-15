@@ -169,7 +169,7 @@ describe("sessions", () => {
 });
 
 describe("guards", () => {
-  // A real Cookie header, not a bare token — the guards take the header.
+  // A real Cookie header, not a bare token - the guards take the header.
   const cookieFor = (uid: string, role: "intern" | "employer" | "admin") =>
     createSession({ uid, role, email: `${uid}@x.y` }).cookie;
 

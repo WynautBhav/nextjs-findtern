@@ -8,7 +8,7 @@ import { requireMutation } from "@/lib/guards-mutation";
 /**
  * Mark a payout paid.
  *
- * `referenceId` — the bank reference — is required here rather than being a
+ * `referenceId` - the bank reference - is required here rather than being a
  * separate write. A payout row that says "paid" with no reference cannot be
  * reconciled against a bank statement later, and the whole point of recording
  * the payout at all is that reconciliation. One call, one row, no intermediate

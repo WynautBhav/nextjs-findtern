@@ -5,11 +5,11 @@ import { useId, useState } from "react";
 import { cn } from "@/lib/utils";
 
 /**
- * Trend chart — six months, two series, hand-built SVG.
+ * Trend chart - six months, two series, hand-built SVG.
  *
  * **Why no chart library:** the dashboard needs exactly one line chart.
  * Recharts/Chart.js would add ~90KB to a page whose entire job is to load fast.
- * The project's own UX skill agrees — under 1000 points, SVG is the
+ * The project's own UX skill agrees - under 1000 points, SVG is the
  * recommended tier, and this is 12 numbers.
  *
  * **Why a line chart and not bars:** the skill's chart guidance maps
@@ -18,7 +18,7 @@ import { cn } from "@/lib/utils";
  *
  * **Why the two series are not distinguished by colour alone:** the skill
  * requires a second, non-colour channel. Proposals are a solid 2px stroke,
- * interviews are dashed — which stays readable in greyscale, in forced-colours
+ * interviews are dashed - which stays readable in greyscale, in forced-colours
  * mode, and for a colour-blind reader. Direct end-labels mean neither series
  * needs to be looked up in a legend.
  *
@@ -39,14 +39,14 @@ const SERIES = [
   {
     key: "proposals" as const,
     label: "Proposals",
-    /** Solid — the non-colour channel for series one. */
+    /** Solid - the non-colour channel for series one. */
     stroke: "var(--color-brand-600)",
     dash: undefined as string | undefined,
   },
   {
     key: "interviews" as const,
     label: "Interviews",
-    /** Dashed — readable without relying on amber. */
+    /** Dashed - readable without relying on amber. */
     stroke: "var(--color-accent-700)",
     dash: "5 4",
   },
@@ -67,7 +67,7 @@ export function TrendChart({
   if (data.length < 2) {
     return (
       <p className="py-12 text-center text-sm text-text-subtle">
-        Not enough activity to chart yet — at least two months are needed.
+        Not enough activity to chart yet - at least two months are needed.
       </p>
     );
   }
@@ -94,7 +94,7 @@ export function TrendChart({
 
   return (
     <figure className={cn("w-full", className)}>
-      {/* Legend — direct series labels, doubling as the key ---------------- */}
+      {/* Legend - direct series labels, doubling as the key ---------------- */}
       <figcaption className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1.5">
         {SERIES.map((series) => (
           <span
@@ -182,7 +182,7 @@ export function TrendChart({
             </g>
 
             {/* Points. `r` in a non-uniform viewBox would distort, so circles
-                are drawn in HTML overlay instead — see below. */}
+                are drawn in HTML overlay instead - see below. */}
           </svg>
 
           {/* Hover / focus targets ---------------------------------------- */}
@@ -318,7 +318,7 @@ function niceCeil(value: number): number {
 }
 
 /**
- * Pipeline bars — one horizontal bar per status, in a fixed declared order.
+ * Pipeline bars - one horizontal bar per status, in a fixed declared order.
  *
  * Not sorted by count: "sent" is always first and "withdrawn" always last, so
  * the widget does not reshuffle itself every time a proposal changes state.

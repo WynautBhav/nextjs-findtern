@@ -13,7 +13,7 @@
  *
  * The legacy build dealt with this in BlogDetail.tsx with a hand-rolled
  * regex that removed `<script>`, `<style>`, `on*=` handlers and
- * `javascript:` URLs. That is not a sanitiser — it is a list of four things
+ * `javascript:` URLs. That is not a sanitiser - it is a list of four things
  * to remove, and anything not on the list (svg, iframe, srcset, formaction,
  * `<base>`, `data:` URLs, CSS `expression()`) passes straight through into
  * `dangerouslySetInnerHTML`. This replaces it.
@@ -107,8 +107,8 @@ export function sanitizeRichText(input: string): string {
   out = out.replace(/<span[^>]*id="docs-internal-guid-[^"]*"[^>]*>/gi, "");
   out = out.replace(/<!--[\s\S]*?-->/g, "");
 
-  // 3. Walk every remaining tag. Anything unrecognised is unwrapped — its
-  //    children are kept, the tag itself is discarded — so content survives
+  // 3. Walk every remaining tag. Anything unrecognised is unwrapped - its
+  //    children are kept, the tag itself is discarded - so content survives
   //    even when its wrapper does not.
   out = out.replace(
     /<\/?([a-zA-Z][a-zA-Z0-9]*)\b([^>]*)>/g,
@@ -141,7 +141,7 @@ export function sanitizeRichText(input: string): string {
   //
   //    Google Docs "Heading 3" is the default style a writer applies to
   //    emphasised body copy, and every one of these posts was pasted from a
-  //    Doc. Intern-10 arrives with 42 <h3> and 6 <h4> — the h3s are ordinary
+  //    Doc. Intern-10 arrives with 42 <h3> and 6 <h4> - the h3s are ordinary
   //    paragraphs, the h4s are the real sections, so the hierarchy is not just
   //    flat but inverted. Left alone it renders 42 bold 20px lines of running
   //    text and produces a 48-entry table of contents.

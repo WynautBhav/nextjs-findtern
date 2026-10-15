@@ -2,14 +2,13 @@
 
 import { ButtonLink } from "@/components/ui/button";
 import { Reveal } from "@/components/ui/section-heading";
-import { Magnetic } from "@/components/motion/magnetic";
 
 /**
  * Inline contact band.
  *
  * Sits between the pricing table and the dark closing CTA. The legacy build
- * had this as `components/ui/ContactCTA.tsx` — a hand-rolled component living
- * in the shadcn folder — and it was the only non-shadcn file in there that the
+ * had this as `components/ui/ContactCTA.tsx` - a hand-rolled component living
+ * in the shadcn folder - and it was the only non-shadcn file in there that the
  * public site actually used.
  */
 export function ContactCta({
@@ -40,11 +39,9 @@ export function ContactCta({
               </p>
             </div>
 
-            <Magnetic strength={0.3} className="shrink-0">
-              <ButtonLink href={topHref} variant="primary" size="lg" block>
-                {topLabel}
-              </ButtonLink>
-            </Magnetic>
+            <ButtonLink href={topHref} variant="primary" size="lg" block className="shrink-0">
+              {topLabel}
+            </ButtonLink>
           </div>
         </div>
       </Reveal>

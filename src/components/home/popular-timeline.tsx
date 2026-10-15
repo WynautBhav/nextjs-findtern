@@ -44,7 +44,7 @@ const STEP_ICONS: Record<string, typeof UserPlus> = {
  * driven directly by the section's scroll progress, so it is exact rather than
  * threshold-quantised, and each card fades and rises in its own tween. Under
  * reduced motion the whole thing degrades to a static, fully visible timeline
- * with the spine drawn at 100% — which is the correct resting state, and the
+ * with the spine drawn at 100% - which is the correct resting state, and the
  * original had to fake it with a class.
  */
 export function PopularTimeline({ steps }: { steps: PopularStep[] }) {
@@ -138,8 +138,8 @@ export function PopularTimeline({ steps }: { steps: PopularStep[] }) {
           {/* ── The spine ────────────────────────────────────────────
               Masked at both ends so it fades in level with the first node
               and out level with the last, whatever the card heights turn
-              out to be. The alternative — hard-coding a top and bottom
-              offset — drifts as soon as one card's copy wraps differently. */}
+              out to be. The alternative - hard-coding a top and bottom
+              offset - drifts as soon as one card's copy wraps differently. */}
           <div
             aria-hidden
             className="absolute left-[1.375rem] top-6 bottom-6 w-px bg-ink-200 lg:left-1/2 lg:-translate-x-1/2 [mask-image:linear-gradient(to_bottom,transparent,black_7%,black_93%,transparent)]"
@@ -161,7 +161,7 @@ export function PopularTimeline({ steps }: { steps: PopularStep[] }) {
                 data-side={isLeft ? "left" : "right"}
                 className="relative pb-12 pl-14 last:pb-0 lg:grid lg:grid-cols-2 lg:gap-16 lg:pb-20 lg:pl-0"
               >
-                {/* Card — occupies one half, alternating. */}
+                {/* Card - occupies one half, alternating. */}
                 <div
                   className={cn(
                     "lg:col-start-1 lg:row-start-1",
@@ -200,7 +200,7 @@ export function PopularTimeline({ steps }: { steps: PopularStep[] }) {
                   </article>
                 </div>
 
-                {/* Node — sits on the spine, centred on desktop.
+                {/* Node - sits on the spine, centred on desktop.
                     Centred with a negative margin rather than
                     `translate-x-[-50%]` on purpose: GSAP animates `scale` on
                     this element below, and any transform it sets replaces the

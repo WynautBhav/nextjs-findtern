@@ -40,7 +40,7 @@ export async function POST(req: Request) {
   const updated = await db
     .update(schema.users)
     .set({ profileVisibility: visibility })
-    // `inArray` on a validated, length-capped id list — no interpolation of
+    // `inArray` on a validated, length-capped id list - no interpolation of
     // user input into SQL.
     .where(inArray(schema.users.id, ids))
     .returning({ id: schema.users.id });

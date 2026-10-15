@@ -1,10 +1,10 @@
 /**
- * LEGAL DOCUMENTS — real CMS content.
+ * LEGAL DOCUMENTS - real CMS content.
  *
  * Pulled from the live API on 2026-10-02:
  *   GET /api/website/terms            → Terms and Conditions (46159 bytes, 19 headings)
  *   GET /api/website/employer-terms  → Company Terms and Conditions (94879 bytes, 18 headings)
- *   GET /api/website/intern-terms     → { terms: null } — EMPTY upstream
+ *   GET /api/website/intern-terms     → { terms: null } - EMPTY upstream
  *
  * The intern terms being empty is a live bug, not a mirror problem: the
  * legacy InternTerms.tsx calls the admin-gated /api/admin/intern/terms, which

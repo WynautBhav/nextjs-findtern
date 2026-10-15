@@ -1,7 +1,7 @@
 /**
  * Strips emoji from displayed text.
  *
- * Applied at the render layer only — the stored value is never mutated, so the
+ * Applied at the render layer only - the stored value is never mutated, so the
  * CMS record and every URL are untouched. Several of the live blog titles and
  * one FAQ answer carry emoji, which reads as unpolished next to the typographic
  * treatment on the same page.

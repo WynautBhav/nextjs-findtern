@@ -20,8 +20,8 @@ import { cn } from "@/lib/utils";
  * about why, because the previous version of this file did not work:
  *
  *  - It rebuilt the tween to change speed. But the rebuild condition only
- *    compared *direction*, so during a long downward scroll — the exact moment
- *    the effect is meant to show — the speed never changed at all. The
+ *    compared *direction*, so during a long downward scroll - the exact moment
+ *    the effect is meant to show - the speed never changed at all. The
  *    advertised 0.25x–3x range did not exist.
  *
  *  - Its `lastDirection` was module-level, shared by every marquee on the
@@ -70,7 +70,7 @@ function tick() {
   //
   // This was 0.25 at rest, which was wrong by a factor of four: `duration` is
   // the time for one pass at 1x, so a 0.25 resting timeScale stretched a 38s
-  // pass to 152s — about 10px/second, which reads as completely frozen. The
+  // pass to 152s - about 10px/second, which reads as completely frozen. The
   // floor has to be 1 so the marquee keeps the pace it was designed with, and
   // scroll velocity is what adds on top of it, from 1x up to 3x.
   const magnitude = Math.abs(smoothed);
@@ -91,7 +91,7 @@ function tick() {
     // the full viewport width that was effectively always.
     //
     // Hover-pausing is also off by default now. Nothing inside either marquee
-    // is interactive — no links, no buttons — so pausing bought nothing and
+    // is interactive - no links, no buttons - so pausing bought nothing and
     // only made the page look broken.
     if (h.canPauseOnHover) {
       h.setPaused(h.el.matches(":hover"), reverse);
@@ -126,7 +126,7 @@ export function VelocityMarquee({
   children: ReactNode;
   /**
    * The duplicate half. Supply it explicitly rather than letting the marquee
-   * clone `children`, because a caller may need the twin to differ — the
+   * clone `children`, because a caller may need the twin to differ - the
    * skills row renders the copy's titles as <p> instead of <h3> so the
    * document outline carries eleven headings rather than twenty-two.
    *
@@ -158,7 +158,7 @@ export function VelocityMarquee({
 
     // Only the first track is animated. The DOM is [A][B] where B is a
     // duplicate of A, so translating A left by exactly one A-width puts B
-    // precisely where A was — the seam is invisible and the cycle repeats
+    // precisely where A was - the seam is invisible and the cycle repeats
     // forever. xPercent is relative to the animated element's own width, so
     // one loop unit is 100, not 50.
     const trackWidth = handle.offsetWidth || (el.clientWidth || 800) / 2;
@@ -222,7 +222,7 @@ export function VelocityMarquee({
       <Track>{children}</Track>
       {/* The duplicate half of the loop. aria-hidden so the content is not
           announced twice by a screen reader, and `copy` is true so the child
-          can render a non-heading twin — the aria-hidden attribute stops a
+          can render a non-heading twin - the aria-hidden attribute stops a
           screen reader but not the document outline, and search engines index
           headings regardless of it. */}
       <Track aria-hidden copy>

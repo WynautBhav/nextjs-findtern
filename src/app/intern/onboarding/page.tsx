@@ -13,7 +13,7 @@ export const metadata: Metadata = {
 };
 
 /* Thin server shell. It reads what is already saved, hands the client form a
- * plain object, and gets out of the way — the 5,900-line legacy page was mostly
+ * plain object, and gets out of the way - the 5,900-line legacy page was mostly
  * step state, and step state belongs on the client.
  *
  * There is no `POST /api/intern/onboarding` in this build, so nothing here
@@ -51,7 +51,7 @@ export default async function InternOnboarding() {
       ].filter((doc) => doc.fileName.length > 0);
     }
   } catch {
-    // DB unavailable — render the blank form rather than crashing the page.
+    // DB unavailable - render the blank form rather than crashing the page.
   }
 
   return (

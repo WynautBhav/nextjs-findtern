@@ -77,7 +77,7 @@ export const LOCATION_TYPES = [
 /**
  * Personal-mail domains.
  *
- * A Findtern employer account has to be reachable at a work address — the
+ * A Findtern employer account has to be reachable at a work address - the
  * legacy rule is the mirror image of the intern rule (`insertUserSchema`
  * *requires* a personal domain; `insertEmployerSchema` requires a non-personal
  * one). Same list, inverted, kept in sync by hand with `schema.ts`.
@@ -163,7 +163,7 @@ export function companyFromRecord(row: EmployerRow): CompanyDraft {
     city: row.city ?? "",
     primaryContactName: row.primaryContactName ?? row.name ?? "",
     primaryContactRole: row.primaryContactRole ?? "",
-    // The table has no `primary_contact_*` columns of its own — the primary
+    // The table has no `primary_contact_*` columns of its own - the primary
     // contact's number is the account's `country_code` + `phone_number`, which
     // is how the legacy handler stored it (routes.ts:4113).
     primaryContactCountryCode: row.countryCode ?? "+91",

@@ -84,7 +84,7 @@ function secret(): string {
   const s = process.env.SIGNING_SECRET;
   if (!s || s.length < 32) {
     // A build that boots without a signing secret must not silently fall back
-    // to a constant — that is the "Using unsafe secret" failure every auth
+    // to a constant - that is the "Using unsafe secret" failure every auth
     // library warns about, and it would make every issued token forgeable.
     throw new Error(
       "SIGNING_SECRET is not set. It must be at least 32 characters of entropy.",

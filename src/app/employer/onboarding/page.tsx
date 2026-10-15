@@ -18,7 +18,7 @@ export const metadata: Metadata = {
 };
 
 /**
- * Two stages — company, then project.
+ * Two stages - company, then project.
  *
  * Collapses the legacy `company-setup.tsx` (1,247 lines) and
  * `employer-onboarding.tsx` (1,329 lines) into one page whose entire cost is the
@@ -56,7 +56,7 @@ export default async function EmployerOnboarding() {
 
     if (p) { project = p; draft.project = projectFromRecord(p); }
   } catch {
-    // DB unavailable — render the blank two-stage form rather than crashing.
+    // DB unavailable - render the blank two-stage form rather than crashing.
   }
 
   return (

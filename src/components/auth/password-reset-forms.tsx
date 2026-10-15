@@ -7,8 +7,8 @@ import { TriangleAlert } from "lucide-react";
 /**
  * Password reset forms.
  *
- * Both POST to real endpoints — `/api/auth/forgot-password` and
- * `/api/auth/reset-password` — which write `password_reset_tokens`, mail a
+ * Both POST to real endpoints - `/api/auth/forgot-password` and
+ * `/api/auth/reset-password` - which write `password_reset_tokens`, mail a
  * single-use link through `sendSmtpMail`, and hash the new password with the
  * same `hashPassword` the login routes verify against.
  *
@@ -16,7 +16,7 @@ import { TriangleAlert } from "lucide-react";
  * in `users`, employers in `employers`) and which reset page the emailed link
  * points back to. It defaults to intern so the existing pages are unchanged.
  * Note: neither endpoint is session-guarded, so these forms use plain `fetch`
- * rather than `csrfFetch` — there is no session cookie to protect and no
+ * rather than `csrfFetch` - there is no session cookie to protect and no
  * double-submit to satisfy.
  */
 

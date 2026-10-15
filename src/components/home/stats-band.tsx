@@ -12,8 +12,8 @@ import { CountUp } from "@/components/motion/count-up";
  *     charge.
  *
  * The previous band here read "1,200+ interns placed", "340+ hiring
- * companies" and "4.8/5 average rating". None of those were sourced — the live
- * site publishes no placement counts — and publishing an invented placement
+ * companies" and "4.8/5 average rating". None of those were sourced - the live
+ * site publishes no placement counts - and publishing an invented placement
  * number is the kind of claim that does not survive a journalist or a large
  * employer's due diligence. If real figures exist, they belong in the CMS
  * (stats are content, like every other number on this site) and this band

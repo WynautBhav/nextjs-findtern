@@ -96,7 +96,7 @@ export function expandPermissions(
  *
  * Those ids are sequential integers. So `GET /api/interns/2` returns intern 2's
  * Aadhaar front image, name, email, phone and college to anyone who asks. The
- * routes are not "missing auth" — they have an auth check, `requireInternAuth`
+ * routes are not "missing auth" - they have an auth check, `requireInternAuth`
  * (routes.ts:4441). It just verifies that *a* session exists and then reads
  * whatever id the URL names. The gap is between the two.
  *

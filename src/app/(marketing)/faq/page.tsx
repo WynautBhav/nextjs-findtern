@@ -10,7 +10,7 @@ import { SITE } from "@/lib/content/site";
 export const metadata: Metadata = {
   title: "Frequently asked questions",
   description:
-    `${FAQ_INTERN.length + FAQ_EMPLOYER.length} answers on screening, scoring, the rate card, the guarantee, timesheets and payment — split by whether you are hiring or looking.`,
+    `${FAQ_INTERN.length + FAQ_EMPLOYER.length} answers on screening, scoring, the rate card, the guarantee, timesheets and payment - split by whether you are hiring or looking.`,
   alternates: { canonical: "/faq" },
 };
 

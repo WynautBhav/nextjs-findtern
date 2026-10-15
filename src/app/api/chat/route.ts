@@ -10,7 +10,7 @@ import {
 import { deepseekChat, type ChatMessage } from "@/lib/chatbot/deepseek";
 
 /**
- * POST /api/chat — Fintern chatbot.
+ * POST /api/chat - Fintern chatbot.
  *
  * Public route (no session): like /api/website/contact, it is anonymous by
  * design, so `requireMutation` does not apply. Abuse is handled with a tight
@@ -32,7 +32,7 @@ export async function POST(req: Request) {
   const ip = clientIp(req.headers);
   if (!limiter.take(bucketKey(ip, "chat"))) {
     return NextResponse.json(
-      { error: "Too many messages — please wait a bit and try again." },
+      { error: "Too many messages - please wait a bit and try again." },
       { status: 429 },
     );
   }

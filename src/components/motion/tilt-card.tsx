@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
  * Mouse-tracked 3D tilt.
  *
  * The legacy `.tilt-3d` class was applied to more than twenty cards across six
- * pages and its entire CSS body was `transform: none; transition: none` — it
+ * pages and its entire CSS body was `transform: none; transition: none` - it
  * did nothing at all. This is the version that works: the card rotates toward
  * the cursor with a spring, and a specular highlight tracks the pointer.
  *

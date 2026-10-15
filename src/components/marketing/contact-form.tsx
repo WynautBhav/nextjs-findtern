@@ -353,7 +353,7 @@ function Field({
 }
 
 function mailto(v: Values) {
-  const subject = v.subject || `Findtern enquiry — ${v.queryType}`;
+  const subject = v.subject || `Findtern enquiry - ${v.queryType}`;
   const body = [
     `Name: ${v.firstName} ${v.lastName}`,
     `Email: ${v.email}`,

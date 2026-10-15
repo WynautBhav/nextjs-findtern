@@ -55,7 +55,7 @@ export function parsePageRequest(params: Record<string, string>): {
     search,
     /**
      * Returns a new param bag with one key changed, for building links.
-     * Setting a value resets to page 1 — otherwise editing a filter while on
+     * Setting a value resets to page 1 - otherwise editing a filter while on
      * page 7 leaves you staring at an empty result set.
      */
     set: (key, value) => {
@@ -82,7 +82,7 @@ export function toQueryString(params: Record<string, string>): string {
  * A case-insensitive "contains" predicate across the given columns.
  *
  * `%` and `_` are escaped so that searching for a literal `_` does not turn
- * into a single-character wildcard — otherwise a search for `a_b` matches
+ * into a single-character wildcard - otherwise a search for `a_b` matches
  * `aXb` and the result count quietly disagrees with what the user sees.
  * Returns `undefined` for an empty needle so callers can spread it safely.
  */
@@ -122,7 +122,7 @@ export function toPage<T>(
   return { rows, total, page: Math.min(requestedPage, pages), perPage, pages };
 }
 
-/** "1-25 of 438" — the footer line above the pager. */
+/** "1-25 of 438" - the footer line above the pager. */
 export function rangeLabel(page: Page<unknown>): string {
   if (page.total === 0) return "0 results";
   const start = (page.page - 1) * page.perPage + 1;

@@ -39,7 +39,7 @@ function createDb() {
 /**
  * Returns the Drizzle client.
  *
- * A missing DATABASE_URL no longer returns `null` — it throws. Callers that
+ * A missing DATABASE_URL no longer returns `null` - it throws. Callers that
  * want to degrade gracefully (the marketing pages, the dashboard read paths)
  * already wrap their queries in try/catch and fall back to an empty state, so
  * a silent null here would only hide the real reason the query failed.

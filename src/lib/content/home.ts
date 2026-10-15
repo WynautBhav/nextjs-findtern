@@ -1,7 +1,7 @@
 import type { CmsPlan } from "./types";
 
 /* ==========================================================================
-   SAMPLE DATA — flagged on purpose
+   SAMPLE DATA - flagged on purpose
    --------------------------------------------------------------------------
    The legacy Home page fetched partners and testimonials from
    /api/website/partners and /api/website/faces, and shipped an *empty*
@@ -82,7 +82,7 @@ export const POPULAR_STEPS: PopularStep[] = [
    The coffee metaphor is the brand's hook, so it is preserved exactly:
    Espresso / Cappuccino / Latte, mapped onto the Findtern Score bands.
    Amounts are minor units. The legacy code carried two different fallback
-   price sets — the Home section used $5/$10, the Pricing page used $1/$2 —
+   price sets - the Home section used $5/$10, the Pricing page used $1/$2 -
    and both disagreed with the Employers page. One table now, one source. */
 
 export const PRICING_PLANS: CmsPlan[] = [

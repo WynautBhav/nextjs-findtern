@@ -6,8 +6,8 @@ import { suggestDistricts, stateForDistrict, DISTRICTS, STATES } from "./distric
 
 /**
  * The vocabulary is what candidate matching stands on. If these lists are
- * missing or malformed the failure is silent — a picker that offers nothing
- * still looks like a picker — so the shape of the data is asserted here.
+ * missing or malformed the failure is silent - a picker that offers nothing
+ * still looks like a picker - so the shape of the data is asserted here.
  */
 
 describe("skills vocabulary", () => {

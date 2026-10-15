@@ -1,5 +1,5 @@
 /**
- * GSAP core — safe to import from both server and client components.
+ * GSAP core - safe to import from both server and client components.
  *
  * Split from ./motion.ts because that file also defines React hooks, and a
  * module exporting `useState` cannot be pulled into a Server Component graph

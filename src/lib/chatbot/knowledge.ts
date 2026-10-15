@@ -14,7 +14,7 @@ import { ABOUT_COPY, HOME_COPY, SITE } from "@/lib/content/site";
  * against the user's question with a token-overlap ranker, and injects the
  * winners into the DeepSeek system prompt as ground truth.
  *
- * No new data files, no direct imports of `src/lib/content/*.ts` data —
+ * No new data files, no direct imports of `src/lib/content/*.ts` data -
  * pages and the bot share the accessor seam per project rules.
  */
 
@@ -73,18 +73,18 @@ export function rankFaq(
     .map((r) => r.faq);
 }
 
-/** Static brand facts — always in the prompt, ~400 tokens. */
+/** Static brand facts - always in the prompt, ~400 tokens. */
 export function brandContext(): string {
   return [
-    `Findtern (${SITE.url}) — "${SITE.tagline}".`,
+    `Findtern (${SITE.url}) - "${SITE.tagline}".`,
     SITE.description,
     `Headline: "${HOME_COPY.headlineLead} ${HOME_COPY.headlineAccent}" ${HOME_COPY.subhead}`,
     `About: ${ABOUT_COPY.lead} Mission: ${ABOUT_COPY.mission.body}`,
-    `Points: ${ABOUT_COPY.points.map((p) => `${p.title} — ${p.body}`).join("; ")}.`,
+    `Points: ${ABOUT_COPY.points.map((p) => `${p.title} - ${p.body}`).join("; ")}.`,
     `Contact: ${SITE.email}, ${SITE.city}. Support: ${SITE.email} or ${SITE.url}/contact.`,
     "Intern path: free profile → ₹2500 one-time AI interview (30–60 min, laptop + webcam + mic required, English compulsory, one sitting) → Findtern Score (technical + soft skills, 0–10; 6+ unlocks paid roles) → companies discover you (interns cannot apply directly) → stipend + certificate issued by Findtern, not the company.",
     "Placement promise: paid internship within 18 months or full refund of registration + AI interview fee. Age 18+. No practice test currently. Retakes only for genuine technical issues via support.",
-    "Employer path: sign up as employer → verified → define project (name, scope, location, skills) → AI-matched pre-vetted interns → shortlist via dashboard → hire in hours. Durations fixed: 1, 2, 3 or 6 months. Remote/hybrid/on-site supported. No direct contact details exchange — all comms on platform. Conversion to full-time allowed (8.33% of annual CTC).",
+    "Employer path: sign up as employer → verified → define project (name, scope, location, skills) → AI-matched pre-vetted interns → shortlist via dashboard → hire in hours. Durations fixed: 1, 2, 3 or 6 months. Remote/hybrid/on-site supported. No direct contact details exchange - all comms on platform. Conversion to full-time allowed (8.33% of annual CTC).",
     "Employer pricing (India): Espresso free (score <6, short ≤60-day roles, ₹5,000 per-hire charge) / Cappuccino ₹100/hr (score 6–8) / Latte ₹200/hr (score 8+). USD mirrors: $0 + $50 per-hire / $1/hr / $2/hr equivalents via CMS (check live /pricing). No hidden fees. GST applies in India.",
   ].join("\n");
 }
@@ -149,16 +149,16 @@ export async function retrieveContext(query: string): Promise<string> {
     .join("\n\n");
 }
 
-/** Step-by-step platform help — how to actually use findtern.in. */
+/** Step-by-step platform help - how to actually use findtern.in. */
 export function platformHelpContext(): string {
   return [
     "PLATFORM HELP (walk users through these flows step by step, link the pages):",
-    "Accounts: interns sign up at /signup and log in at /login; employers use /employer/signup and /employer/login. Forgot password: /forgot-password (interns) or /employer/forgot-password (employers) — a reset link goes to the registered email. Google login is also offered. To change a registered email or phone number, raise a request with Findtern Support (emails/phones can't be self-edited, for authenticity).",
-    "INTERN journey: (1) Sign up at /signup. (2) Complete the 8-step onboarding at /intern/onboarding: About Me (photo, bio, location, contacts) → Academics (degree, institution, CGPA) → Experience → Skills with self-ratings (Beginner/Intermediate/Advanced — these SET your interview difficulty, so rate honestly) → Languages → Extracurriculars → Location preferences + laptop availability → live profile preview. (3) Pay the ₹2500 AI interview fee (UPI, cards, netbanking, wallets). (4) The interview link arrives within 24–48 business hours — take it in ONE sitting on a laptop with webcam + mic, stable internet, quiet room, 30–60 min, in English. (5) Your Findtern Score (0–10) is published; 6+ unlocks paid roles. Findtern auto-builds a resume you can download from your dashboard.",
-    "INTERN dashboard map: /intern/dashboard (today's status + next action) → /intern/proposals (offers sent to you — accept or reject here; nothing happens until you respond) → /intern/interviews (pick 1 of the 3 offered time slots; the join link appears once confirmed) → /intern/timesheets (log hours as draft, then submit; manager approves in ~2 working days) → /intern/earnings (paid vs incoming stipend, paid to your bank by Findtern) → /intern/record (exportable proof of score, offers, hours, stipends) → /intern/documents (photo, Aadhaar, PAN — required before any payout) → /intern/profile & /intern/settings. track company interest via dashboard + email notifications and the 'My Feedback' section (feedback, if shared, lands within 15 days).",
-    "INTERN rules to state clearly: interns cannot apply to roles directly and cannot message companies — companies discover YOU via profile + score. Keep the profile complete and the score high to get noticed. Score improvement needs a paid AI interview retake (contact support to schedule).",
-    "EMPLOYER journey: (1) Sign up at /employer/signup, get verified. (2) Finish /employer/onboarding (company details). (3) Create a project at /employer/projects (name, scope, location, required skills). (4) Browse AI-matched pre-vetted interns at /employer/candidates — use the Skill Filter Toggler ON to rank by skill match, OFF to rank by Findtern Score. Compare shortlists at /employer/compare. (5) Send an offer at /employer/send-proposal, track at /employer/proposals. (6) Schedule interviews at /employer/schedule (offer 3 slots; the intern picks one). (7) Approve hours at /employer/timesheets, pay via /employer/cart → /employer/checkout, receipts at /employer/orders. Durations are fixed: 1, 2, 3 or 6 months. Convert a great intern to full-time (8.33% of annual CTC).",
-    "EMPLOYER rules to state clearly: no requesting personal contact details (phone/email) — all communication stays on the platform. False info by a candidate can be reported (account may be deactivated). Violating terms can deactivate the company account.",
+    "Accounts: interns sign up at /signup and log in at /login; employers use /employer/signup and /employer/login. Forgot password: /forgot-password (interns) or /employer/forgot-password (employers) - a reset link goes to the registered email. Google login is also offered. To change a registered email or phone number, raise a request with Findtern Support (emails/phones can't be self-edited, for authenticity).",
+    "INTERN journey: (1) Sign up at /signup. (2) Complete the 8-step onboarding at /intern/onboarding: About Me (photo, bio, location, contacts) → Academics (degree, institution, CGPA) → Experience → Skills with self-ratings (Beginner/Intermediate/Advanced - these SET your interview difficulty, so rate honestly) → Languages → Extracurriculars → Location preferences + laptop availability → live profile preview. (3) Pay the ₹2500 AI interview fee (UPI, cards, netbanking, wallets). (4) The interview link arrives within 24–48 business hours - take it in ONE sitting on a laptop with webcam + mic, stable internet, quiet room, 30–60 min, in English. (5) Your Findtern Score (0–10) is published; 6+ unlocks paid roles. Findtern auto-builds a resume you can download from your dashboard.",
+    "INTERN dashboard map: /intern/dashboard (today's status + next action) → /intern/proposals (offers sent to you - accept or reject here; nothing happens until you respond) → /intern/interviews (pick 1 of the 3 offered time slots; the join link appears once confirmed) → /intern/timesheets (log hours as draft, then submit; manager approves in ~2 working days) → /intern/earnings (paid vs incoming stipend, paid to your bank by Findtern) → /intern/record (exportable proof of score, offers, hours, stipends) → /intern/documents (photo, Aadhaar, PAN - required before any payout) → /intern/profile & /intern/settings. track company interest via dashboard + email notifications and the 'My Feedback' section (feedback, if shared, lands within 15 days).",
+    "INTERN rules to state clearly: interns cannot apply to roles directly and cannot message companies - companies discover YOU via profile + score. Keep the profile complete and the score high to get noticed. Score improvement needs a paid AI interview retake (contact support to schedule).",
+    "EMPLOYER journey: (1) Sign up at /employer/signup, get verified. (2) Finish /employer/onboarding (company details). (3) Create a project at /employer/projects (name, scope, location, required skills). (4) Browse AI-matched pre-vetted interns at /employer/candidates - use the Skill Filter Toggler ON to rank by skill match, OFF to rank by Findtern Score. Compare shortlists at /employer/compare. (5) Send an offer at /employer/send-proposal, track at /employer/proposals. (6) Schedule interviews at /employer/schedule (offer 3 slots; the intern picks one). (7) Approve hours at /employer/timesheets, pay via /employer/cart → /employer/checkout, receipts at /employer/orders. Durations are fixed: 1, 2, 3 or 6 months. Convert a great intern to full-time (8.33% of annual CTC).",
+    "EMPLOYER rules to state clearly: no requesting personal contact details (phone/email) - all communication stays on the platform. False info by a candidate can be reported (account may be deactivated). Violating terms can deactivate the company account.",
     "TROUBLESHOOTING: AI interview won't load → latest Chrome/Edge, webcam+mic permissions, clear cache/cookies, stable internet; still stuck → support for a rescheduled attempt. Payment failed but money deducted → banks auto-refund in 5–7 working days; else contact support with transaction ID. Internet dropped mid-interview → contact support to reschedule. No notifications → check spam/junk, verify email+phone in Edit Profile. No stipend/certificate after finishing → raise a request with Findtern support (both are issued by Findtern, not the company). Support: admin@findtern.in or /contact; in-app: dashboard Help & Support.",
   ].join("\n");
 }
@@ -189,10 +189,10 @@ export async function localAnswer(query: string): Promise<string> {
           .map((h) => `"${h.question}"`)
           .join(" · ")}`
       : "";
-  return `${top.answer.trim()}${more}\n\n(Source: Findtern FAQ — ${top.category}. Ask me anything else!)`;
+  return `${top.answer.trim()}${more}\n\n(Source: Findtern FAQ - ${top.category}. Ask me anything else!)`;
 }
 
-export const SYSTEM_PROMPT = `You are Fintern, Findtern's friendly support chatbot (findtern.in — "Internship Simplified").
+export const SYSTEM_PROMPT = `You are Fintern, Findtern's friendly support chatbot (findtern.in - "Internship Simplified").
 
 You do two jobs:
 1. Answer questions about Findtern (pricing, AI interview, Findtern Score, placement promise, policies).

@@ -9,7 +9,7 @@ import { requireMutation } from "@/lib/guards-mutation";
  * Employer cart.
  *
  * `employer_cart_items` is keyed on (employer, project, intern, list_type), so
- * the same candidate can sit against two projects at once — the unique index
+ * the same candidate can sit against two projects at once - the unique index
  * makes that explicit rather than accidental, and this route honours it with an
  * upsert so double-adding is a no-op instead of a 500.
  *
@@ -88,7 +88,7 @@ export async function POST(req: Request) {
     }
 
     // stage / stage_all: promote shortlisted rows into the checkout set.
-    // Shortlisted rows stay put — a shortlist is a browsing aid, the staged set
+    // Shortlisted rows stay put - a shortlist is a browsing aid, the staged set
     // is the billable one, and conflating them makes "remove" ambiguous.
     const stageAll = parsed.data.action === "stage_all";
     const single = parsed.data.action === "stage" ? parsed.data : null;

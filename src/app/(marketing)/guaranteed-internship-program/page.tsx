@@ -17,7 +17,7 @@ export const metadata: Metadata = {
 
 /* Terms of record, transcribed from the guarantee as published in the Terms
    and Conditions and on the live site. These are the same numbers that appear
-   on the terms page — kept in one place so they cannot drift apart. */
+   on the terms page - kept in one place so they cannot drift apart. */
 
 const DEPOSIT = 2499;
 
@@ -25,7 +25,7 @@ const CONDITIONS = [
   {
     n: "01",
     title: "Your assessment is scored",
-    body: "You complete the full rubric. A low score is not a disqualifier — it changes your rate, not your eligibility.",
+    body: "You complete the full rubric. A low score is not a disqualifier - it changes your rate, not your eligibility.",
   },
   {
     n: "02",
@@ -96,7 +96,7 @@ export default function GuaranteePage() {
             <span className="text-primary">₹{DEPOSIT.toLocaleString("en-IN")} back</span>.
           </>
         }
-        lead="A refundable deposit held until we place you. It is not a fee for a job and not a fee for an assessment — assessments are free everywhere else in this market, and pretending otherwise would be a strange way to earn your trust."
+        lead="A refundable deposit held until we place you. It is not a fee for a job and not a fee for an assessment - assessments are free everywhere else in this market, and pretending otherwise would be a strange way to earn your trust."
       >
         <ButtonLink href="/signup" variant="primary" size="lg">
           Get assessed

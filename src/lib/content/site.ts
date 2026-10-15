@@ -10,7 +10,7 @@ export const SITE = {
   name: "Findtern",
   tagline: "Internship Simplified",
   description:
-    "Hire a verified intern for the price of a coffee, or get placed in a paid internship in 18 months — or your deposit back.",
+    "Hire a verified intern for the price of a coffee, or get placed in a paid internship in 18 months - or your deposit back.",
   url: "https://findtern.in",
   email: "admin@findtern.in",
   phone: "",
@@ -34,7 +34,7 @@ export const SITE = {
 
    The headline is two-tone on purpose. Across 28 measured premium sites the
    accent phrase is consistently the *last clause* of the sentence, not a
-   random word — Wellfound does `Where great companies <em>meet great
+   random word - Wellfound does `Where great companies <em>meet great
    people.</em>` and reuses that exact pattern at four other heading levels.
    Splitting mid-sentence is what makes a two-tone headline read as arbitrary.
    ========================================================================== */
@@ -42,7 +42,7 @@ export const SITE = {
 export const HOME_COPY = {
   /** Lead clause. */
   headlineLead: "Hire an intern for",
-  /** Accent clause — the last words, set in the accent colour. */
+  /** Accent clause - the last words, set in the accent colour. */
   headlineAccent: "the price of a coffee.",
   subhead:
     "Verified candidates, a published rate, and a payment that actually arrives. If we do not place you in 18 months, your deposit comes back.",

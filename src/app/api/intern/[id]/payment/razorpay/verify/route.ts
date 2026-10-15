@@ -37,7 +37,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     .set({ paymentId: parsed.data.paymentId, signature: parsed.data.signature, status: "paid", paidAt: new Date(), updatedAt: new Date() })
     .where(eq(schema.internPayments.id, payment.id));
 
-  // A promo used on this order is recorded now that the money is real —
+  // A promo used on this order is recorded now that the money is real -
   // recording at order-creation would burn the code on abandoned checkouts.
   const promoCode = (payment.raw as { promoCode?: string } | null)?.promoCode;
   if (promoCode) {

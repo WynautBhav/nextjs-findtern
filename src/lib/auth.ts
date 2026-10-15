@@ -60,7 +60,7 @@ export async function withLogout(res: NextResponse): Promise<NextResponse> {
  * upload and every future POST was blocked: the cookie half of the
  * double-submit pair simply did not exist.
  *
- * The cookie is deliberately readable by script (`HttpOnly` omitted) — that is
+ * The cookie is deliberately readable by script (`HttpOnly` omitted) - that is
  * the entire point of a double-submit token. The attack it blocks is a
  * cross-origin POST, where the attacker's page cannot read the value to echo it
  * back.

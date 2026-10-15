@@ -7,7 +7,7 @@
  *     a mysteriously empty dashboard.
  *  2. An actual login against the real route handlers, following the session
  *     cookie the way a browser would. This is the only way to know the
- *     credentials work — a row existing in the table does not prove the hash
+ *     credentials work - a row existing in the table does not prove the hash
  *     verifies or that the cookie is accepted.
  *
  * Also reports whether the `Secure` cookie flag will block plain-HTTP local
@@ -72,7 +72,7 @@ const EXPECTED: Record<string, number> = {
 
 async function main() {
   const url = process.env.DATABASE_URL;
-  if (!url) throw new Error("DATABASE_URL is not set — run via `npm run db:verify`");
+  if (!url) throw new Error("DATABASE_URL is not set - run via `npm run db:verify`");
 
   const db = getDb();
   let failed = false;
@@ -148,7 +148,7 @@ async function main() {
 
     if (res.status !== 200 || !signed) {
       failed = true;
-      console.log(`  FAIL  ${c.label} — status ${res.status}, cookie signed: ${signed}`);
+      console.log(`  FAIL  ${c.label} - status ${res.status}, cookie signed: ${signed}`);
       console.log(`        body: ${await res.text()}`);
       continue;
     }
@@ -160,7 +160,7 @@ async function main() {
     const roleOk = session?.role === c.expectRole;
     if (!roleOk) failed = true;
     console.log(
-      `  ${roleOk ? "PASS" : "FAIL"}  ${c.label} — ${res.status}, role=${session?.role ?? "none"}`,
+      `  ${roleOk ? "PASS" : "FAIL"}  ${c.label} - ${res.status}, role=${session?.role ?? "none"}`,
     );
     console.log(`        ${cookie.slice(0, 46)}…`);
   }
@@ -186,7 +186,7 @@ async function main() {
   console.log(
     failed
       ? "\nsome checks failed"
-      : "\nall checks passed — credentials work",
+      : "\nall checks passed - credentials work",
   );
   process.exit(failed ? 1 : 0);
 }

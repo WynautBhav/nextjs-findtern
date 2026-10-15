@@ -376,7 +376,7 @@ export function CmsStudio({
                       {item.logoUrl}
                     </TableCell>
                     <TableCell className="px-5 py-3.5 text-xs text-brand-700 truncate max-w-xs">
-                      {item.href || "—"}
+                      {item.href || "-"}
                     </TableCell>
                     <TableCell className="px-5 py-3.5">
                       <StatusBadge value={item.isActive ? "active" : "inactive"} />

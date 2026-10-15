@@ -1,18 +1,18 @@
 import type { pricingPlans } from "@/lib/db/schema";
-import { BANDS, bandFor } from "@/lib/score";
+import { BANDS, bandFor, bandsForRegion } from "@/lib/score";
 
 /**
  * What a candidate costs, derived from their Findtern Score.
  *
- * One place, because four screens need the same answer — the proposal composer,
+ * One place, because four screens need the same answer - the proposal composer,
  * the cart, the checkout summary, and the candidate browser. The legacy build
  * recomputed it inline in each (the `getCandidateHourlyRate` /
  * `getCandidatePerHireChargeAmount` pair appears three times in
  * `employer-send-proposal.tsx` alone) and they drifted.
  *
  * Source of truth, in order:
- *   1. `pricing_plans` — the admin-editable CMS rate card.
- *   2. `BANDS` in `lib/score.ts` — the published rate, when no CMS row matches.
+ *   1. `pricing_plans` - the admin-editable CMS rate card.
+ *   2. `BANDS` in `lib/score.ts` - the published rate, when no CMS row matches.
  *
  * The result reports which one it used, so a CMS price is never mistaken for a
  * hard-coded constant.
@@ -21,6 +21,8 @@ import { BANDS, bandFor } from "@/lib/score";
 type PlanRow = typeof pricingPlans.$inferSelect;
 
 export type Currency = "INR" | "USD";
+
+export { employerRegion, type Region } from "./region";
 
 export type Pricing = {
   bandName: string;
@@ -50,11 +52,15 @@ export function resolvePricing(
   region: "IN" | null,
 ): Pricing {
   const band = bandFor(score);
+  // The CMS fallback must be in the employer's currency: INR band minors
+  // formatted as USD once quoted a $100/hr rate that should have been $1.
+  const fallbackBand =
+    bandsForRegion(currency === "INR").find((b) => b.id === band.id) ?? band;
   const fallback: Pricing = {
-    bandName: band.name,
-    bandBlurb: band.blurb,
-    hourlyRateMinor: band.rateMinor,
-    perHireMinor: band.perHireMinor,
+    bandName: fallbackBand.name,
+    bandBlurb: fallbackBand.blurb,
+    hourlyRateMinor: fallbackBand.rateMinor,
+    perHireMinor: fallbackBand.perHireMinor,
     source: "default",
   };
 

@@ -15,7 +15,7 @@ import { FOOTER_SECTIONS, SITE } from "@/lib/content/site";
 /**
  * Site footer.
  *
- * Same four-column shape as the original — brand, then three link columns —
+ * Same four-column shape as the original - brand, then three link columns -
  * with three fixes:
  *  - the copyright year was hardcoded to "2026" in the legacy Footer.tsx and
  *    would silently go stale; it is now derived;
@@ -38,7 +38,7 @@ export function SiteFooter() {
         <div className="grid gap-12 lg:grid-cols-[1.5fr_repeat(3,1fr)] lg:gap-10">
           {/* Brand */}
           <div className="max-w-sm">
-            <Link href="/" aria-label="Findtern — home" className="inline-block">
+            <Link href="/" aria-label="Findtern - home" className="inline-block">
               <img
                 src="/media/logo-remove.png"
                 alt="Findtern"
@@ -73,7 +73,7 @@ export function SiteFooter() {
               redundant and put the footer's column titles at the same outline
               level as the page's own sections. Demoted to <p>.
 
-              Each link is a 44px-tall row rather than bare text — the previous
+              Each link is a 44px-tall row rather than bare text - the previous
               inline links measured 21px and failed WCAG 2.5.8. Negative margin
               pulls the visual rhythm back to the original 12px pitch without
               shrinking the target. */}

@@ -14,8 +14,8 @@ import { cn } from "@/lib/utils";
 /**
  * Filterable FAQ.
  *
- * Built on the shadcn accordion, so the keyboard contract — Enter/Space to
- * toggle, arrow keys to move between headers, Home/End to jump — is Radix's
+ * Built on the shadcn accordion, so the keyboard contract - Enter/Space to
+ * toggle, arrow keys to move between headers, Home/End to jump - is Radix's
  * rather than reimplemented here.
  *
  * Two behaviours worth naming, both fixes:

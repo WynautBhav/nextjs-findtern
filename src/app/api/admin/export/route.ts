@@ -14,7 +14,7 @@ import { requireRole } from "@/lib/security/guards";
  * different population than the person who set the filters, and neither can
  * tell from the file itself.
  *
- * This is a **read**, so it uses `requireRole` rather than `requireMutation` —
+ * This is a **read**, so it uses `requireRole` rather than `requireMutation` -
  * it issues no state change and therefore needs no CSRF token. That also keeps
  * it usable as a plain `<a download>`, which is what makes the browser's own
  * "download" affordance work.

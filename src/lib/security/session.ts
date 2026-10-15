@@ -16,7 +16,7 @@ import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
  * secret per process, so every deploy silently invalidates every session, and
  * a multi-instance deployment cannot share sessions at all.
  *
- * The cookie itself is also weak — it is not `secure` in production and the
+ * The cookie itself is also weak - it is not `secure` in production and the
  * defaults leave `sameSite` unset.
  *
  * ── What this module does ─────────────────────────────────────────────
@@ -31,7 +31,7 @@ import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 export type Role = "intern" | "employer" | "admin";
 
 export type SessionData = {
-  /** Subject id — the user row's id, never a client-supplied string. */
+  /** Subject id - the user row's id, never a client-supplied string. */
   uid: string;
   role: Role;
   /** Email, so the UI can greet without a second round trip. */
@@ -164,7 +164,7 @@ function serializeCookie(token: string, exp: number, secure: boolean | undefined
     "HttpOnly",
     // `Secure` is required over TLS and *must* be omitted over plain HTTP.
     //
-    // Setting it unconditionally — which this module did — means that on
+    // Setting it unconditionally - which this module did - means that on
     // `http://localhost` the browser accepts the response and then silently
     // discards the cookie. Sign-in appears to succeed (200, correct body) and
     // the very next request is unauthenticated, so the user is bounced back to
@@ -234,7 +234,7 @@ export interface SessionStore {
  * Double-submit CSRF token.
  *
  * Returned in a readable cookie and required in a header on every mutating
- * request. Unlike the session token this is not a secret from the page — the
+ * request. Unlike the session token this is not a secret from the page - the
  * point is only that an attacker's origin cannot read the value to echo it
  * back.
  */

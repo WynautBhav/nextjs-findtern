@@ -120,7 +120,7 @@ export default async function AdminNotifications({
                             hour: "2-digit",
                             minute: "2-digit",
                           })
-                        : "—"}
+                        : "-"}
                     </p>
                   </div>
                   <p className="mt-1 line-clamp-2 text-sm leading-relaxed text-ink-600">{n.message}</p>

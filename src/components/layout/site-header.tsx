@@ -21,8 +21,8 @@ import { cn } from "@/lib/utils";
  * The employer/candidate split is the specific thing that was costing the most
  * space, because it was two more buttons competing with the primary action.
  * It now lives in the hero, where each audience gets its own argument instead
- * of two nav buttons arguing over the same strip. Wellfound — the closest
- * analogue in the whole set, and also a two-sided job marketplace — does
+ * of two nav buttons arguing over the same strip. Wellfound - the closest
+ * analogue in the whole set, and also a two-sided job marketplace - does
  * exactly this.
  *
  * Retained from the legacy build: the six primary links, a single prominent
@@ -44,7 +44,7 @@ export function SiteHeader() {
   useEffect(() => {
     // A scroll-position check. Not a scroll listener: `addEventListener("scroll")`
     // fires on every frame the user scrolls, and each call here would queue a
-    // React state update — the jank-prone pattern this project bans everywhere
+    // React state update - the jank-prone pattern this project bans everywhere
     // else. An IntersectionObserver on a sentinel at the top of the document
     // asks the same question once per crossing instead of 60 times a second.
     const sentinel = document.createElement("div");
@@ -98,7 +98,7 @@ export function SiteHeader() {
         {/* ── Wordmark ─────────────────────────────────────────────── */}
         <Link
           href="/"
-          aria-label="Findtern — home"
+          aria-label="Findtern - home"
           className="group flex shrink-0 items-center gap-2.5"
         >
           <span className="relative flex size-8 items-center justify-center overflow-hidden rounded-lg bg-gradient-to-br from-primary to-brand-900 shadow-sm transition-transform duration-200 ease-ease-out-expo [@media(any-hover:hover)]:group-hover:scale-105">

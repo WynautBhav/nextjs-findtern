@@ -15,7 +15,7 @@ import { createHash, randomBytes, randomInt, timingSafeEqual } from "node:crypto
  * ── OTP ───────────────────────────────────────────────────────────────
  *
  * `Math.random().toString().slice(2, 8)` in routes.ts for the email OTP.
- * `Math.random` is a xorshift PRNG — given six consecutive outputs its
+ * `Math.random` is a xorshift PRNG - given six consecutive outputs its
  * internal state is recoverable, so the OTP stream is predictable rather than
  * merely weak. Swapped for `randomInt` from `node:crypto`, a CSPRNG.
  *
@@ -34,7 +34,7 @@ export type Bucket = {
  *
  * In-memory is a deliberate limitation, stated rather than hidden: it is
  * correct for a single process and wrong for a multi-instance deploy, where
- * each instance would keep its own count. The interface is the seam — swap the
+ * each instance would keep its own count. The interface is the seam - swap the
  * two methods for Redis INCR/EXPIRE and no caller changes.
  */
 export class RateLimiter {
@@ -100,7 +100,7 @@ export const limiters = {
  * Bucket a request by IP and, when known, by identity.
  *
  * Keying on the identifier alone lets one attacker lock a known user out by
- * repeatedly failing their login — a denial-of-service, and often the reason a
+ * repeatedly failing their login - a denial-of-service, and often the reason a
  * limiter gets disabled. Keying on the IP alone lets a botnet spread an
  * attempt. Keying on both lets a single IP exhaust only its own budget for
  * that user.
@@ -145,7 +145,7 @@ export function verifyOtp(otp: string, salt: string, storedHash: string): boolea
 }
 
 /**
- * Generic purpose email token — password reset, email verification.
+ * Generic purpose email token - password reset, email verification.
  *
  * 32 bytes of CSPRNG, base64url. Long-lived (1h) and single-use: the store
  * deletes it on redemption, which is enforced by the route, not here.

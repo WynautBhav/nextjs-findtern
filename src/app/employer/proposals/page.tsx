@@ -51,7 +51,7 @@ export default async function EmployerProposalsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Proposals"
-        subtitle="Track and manage hiring proposals sent to candidates — review statuses, withdraw active offers, or proceed to onboarding."
+        subtitle="Track and manage hiring proposals sent to candidates - review statuses, withdraw active offers, or proceed to onboarding."
       />
 
       <ProposalsManager

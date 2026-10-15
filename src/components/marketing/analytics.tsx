@@ -8,7 +8,7 @@ import Script from "next/script";
  *   GTM   GTM-M7TCRBCR
  *   Pixel 1401151568247955
  *
- * The rewrite shipped none, which is not a neutral omission — GA4 and the Meta
+ * The rewrite shipped none, which is not a neutral omission - GA4 and the Meta
  * pixel are how remarketing audiences are built, and abandoning them silently
  * resets the history on a site that has been collecting it. So the same three
  * IDs come across, overridable by env for when they are replaced.

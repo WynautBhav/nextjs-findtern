@@ -13,7 +13,7 @@ const bodySchema = z.object({
 /**
  * Employer approves or rejects a submitted timesheet.
  *
- * Only the employer on the proposal may do this — not the intern who wrote it,
+ * Only the employer on the proposal may do this - not the intern who wrote it,
  * and not the other party on an unrelated proposal. A rejection requires a
  * reason, because a bare "rejected" gives the intern nothing to act on.
  */

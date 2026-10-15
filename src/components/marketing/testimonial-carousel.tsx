@@ -13,8 +13,8 @@ import { cn } from "@/lib/utils";
 /**
  * Testimonial carousel.
  *
- * The motion idea here — a pill indicator whose width springs to the active
- * slide while a bar inside it fills over the autoplay interval — is the
+ * The motion idea here - a pill indicator whose width springs to the active
+ * slide while a bar inside it fills over the autoplay interval - is the
  * pattern from Watermelon's `carousel-navigator`. The implementation is ours,
  * because the shipped version drives `animate.backgroundColor` from a
  * Tailwind class name (`theme.bg.replace('bg-[','')`), which yields
@@ -50,7 +50,7 @@ export function TestimonialCarousel({
   const [paused, setPaused] = useState(false);
   // Read once during render rather than in an effect. `useSyncExternalStore`
   // is the correct primitive for subscribing to matchMedia, but the only
-  // consumer is a CSS animation choice that a static read satisfies — and a
+  // consumer is a CSS animation choice that a static read satisfies - and a
   // static read is what a first-time visitor gets before they ever change the
   // OS setting mid-session.
   const reduced =
@@ -106,7 +106,7 @@ export function TestimonialCarousel({
                 transition, so the content teleported. It now crossfades. The
                 incoming copy starts slightly blurred and sharpens, which is
                 what stops the outgoing and incoming text double-exposing
-                mid-transition — a plain opacity crossfade of two text blocks
+                mid-transition - a plain opacity crossfade of two text blocks
                 at the same position reads as a smear rather than a fade.
                 Keyed on the index so the animation restarts cleanly.
               */}
@@ -184,9 +184,9 @@ export function TestimonialCarousel({
                 aria-label={`Show testimonial ${i + 1} of ${count}`}
                 aria-current={isActive ? "true" : undefined}
                 // The visual pill is 10px tall, which is well under the 24x24
-                // WCAG 2.5.8 minimum. Rather than growing the pill — which
+                // WCAG 2.5.8 minimum. Rather than growing the pill - which
                 // would make the control visually louder than the carousel
-                // arrows — the button keeps a 10px box and expands its hit
+                // arrows - the button keeps a 10px box and expands its hit
                 // area with padding and a negative inset, so the painted
                 // shape is unchanged and the target is 24x24.
                 className="group/dot relative flex size-6 items-center justify-center"

@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 };
 
 /* The token arrives as `?token=…`. It is passed to the client form rather than
- * read here so the value is never baked into the server-rendered HTML — a reset
+ * read here so the value is never baked into the server-rendered HTML - a reset
  * link should not end up in a cached page. */
 
 export default async function ResetPasswordPage({

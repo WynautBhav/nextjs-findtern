@@ -3,7 +3,6 @@
 import { Briefcase, UserPlus } from "lucide-react";
 
 import { ButtonLink } from "@/components/ui/button";
-import { Magnetic } from "@/components/motion/magnetic";
 import { cn } from "@/lib/utils";
 
 /**
@@ -11,7 +10,7 @@ import { cn } from "@/lib/utils";
  *
  * Preserved from the legacy `.about-cta-v2`, which appeared identically at the
  * bottom of Home, About, Employers, and Interns: dark green panel, a
- * two-word heading, and a pair of buttons — one to the employer flow, one to
+ * two-word heading, and a pair of buttons - one to the employer flow, one to
  * the intern flow.
  *
  * The decoration is now generated rather than hand-authored SVG: the legacy
@@ -61,12 +60,16 @@ export function ClosingCta({
           <p className="mx-auto mt-4 max-w-lg text-lg text-on-dark-subtle">{sub}</p>
 
           <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
-            <Magnetic strength={0.32} className="w-full sm:w-auto">
-              <ButtonLink href={primary.href} variant="accent" size="lg" block>
-                <Briefcase className="size-4" aria-hidden />
-                {primary.label}
-              </ButtonLink>
-            </Magnetic>
+            <ButtonLink
+              href={primary.href}
+              variant="accent"
+              size="lg"
+              block
+              className="w-full sm:w-auto"
+            >
+              <Briefcase className="size-4" aria-hidden />
+              {primary.label}
+            </ButtonLink>
             <ButtonLink
               href={secondary.href}
               variant="outlineLight"

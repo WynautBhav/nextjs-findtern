@@ -6,7 +6,7 @@
  *
  * Destructive by design: it drops the public schema first, so the result is
  * always exactly what the current `schema.ts` describes. Correct for a
- * throwaway dev cluster, wrong for anything you care about — which is why it
+ * throwaway dev cluster, wrong for anything you care about - which is why it
  * refuses to run against a non-local host without an explicit --force.
  *
  * Usage: npm run db:push
@@ -22,7 +22,7 @@ async function main() {
   if (!existsSync(MIGRATIONS)) throw new Error(`No migrations at ${MIGRATIONS}. Run: npm run db:generate`);
 
   const url = process.env.DATABASE_URL;
-  if (!url) throw new Error("DATABASE_URL is not set — run via `npm run db:push`");
+  if (!url) throw new Error("DATABASE_URL is not set - run via `npm run db:push`");
 
   // Dropping the public schema is irreversible, so it is gated on the target
   // actually being a local dev cluster unless the caller insists.

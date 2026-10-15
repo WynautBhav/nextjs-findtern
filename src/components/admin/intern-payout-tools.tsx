@@ -10,7 +10,7 @@
  *
  * `referenceId` is required before a payout can be marked paid, not because the
  * form likes being awkward but because the reference is what ties this row to a
- * bank statement three months from now. The API does not enforce it — the UI
+ * bank statement three months from now. The API does not enforce it - the UI
  * does, and says why.
  */
 

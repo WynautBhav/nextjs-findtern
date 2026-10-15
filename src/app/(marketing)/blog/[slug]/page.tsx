@@ -9,7 +9,7 @@ import { getBlogPost, getBlogPosts } from "@/lib/content";
 import { plainTextExcerpt, readingMinutes, sanitizeRichText } from "@/lib/richtext";
 import { tidyText } from "@/lib/text";
 
-/* Slugs are the published, indexed ones — `Intern-10`, `Employer-12` and so on.
+/* Slugs are the published, indexed ones - `Intern-10`, `Employer-12` and so on.
    Renaming them would break every existing link, so they are preserved exactly
    as the CMS has them. */
 
