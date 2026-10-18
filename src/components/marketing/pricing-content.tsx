@@ -7,12 +7,12 @@ import { ButtonLink } from "@/components/ui/button";
 import { TiltCard } from "@/components/motion/tilt-card";
 import { CountUp } from "@/components/motion/count-up";
 import { FaqExplorer } from "@/components/marketing/faq-explorer";
-import { formatMoney, formatRate } from "@/lib/format";
+import { formatMoney } from "@/lib/format";
 import { useRegionBands } from "@/components/marketing/region-rates";
 import { MonthlyRate } from "@/components/marketing/monthly-rate";
 import { PilotNote, PlanPrice } from "@/components/marketing/plan-price";
 import { PricingCalculator } from "@/components/marketing/pricing-calculator";
-import { inrToUsd } from "@/lib/currency";
+import { CostComparison } from "@/components/marketing/cost-comparison";
 import { pricingFaq } from "@/lib/content/pricing-faq";
 import type { CmsPlan } from "@/lib/content/types";
 import { planHasOffer } from "@/lib/plan-offer";
@@ -22,51 +22,6 @@ import { cn } from "@/lib/utils";
  * table (admin-editable); the band geometry comes from lib/score. Exactly
  * three plans per region - the table holds both rate cards, and returning
  * both is what once rendered every plan twice. */
-
-type AltCard = {
-  label: string;
-  price: string;
-  example: string;
-  note: string;
-};
-
-/** Hours in the worked example: the 160-hour minimum on paid bands. */
-const EXAMPLE_HOURS = 160;
-
-/* Authored in rupees; USD derives at ₹100 = $1 like every other price. The
- * Findtern card is computed from the live plan rows, so it moves when an
- * admin edits a price. */
-function alternatives(isIndia: boolean, plans: CmsPlan[]): AltCard[] {
-  const money = (rupees: number) =>
-    formatMoney((isIndia ? rupees : inrToUsd(rupees)) * 100, isIndia ? "INR" : "USD");
-  const currency = isIndia ? "INR" : "USD";
-  const mid = plans.find((p) => p.isFeatured) ?? plans[1] ?? plans[0];
-  const hourly = plans.map((p) => p.priceHourlyMinor);
-  const findternTotal = mid ? mid.priceHourlyMinor * EXAMPLE_HOURS + mid.perHireChargeMinor : 0;
-
-  return [
-    {
-      label: "Agency or job board",
-      price: "8.33% of CTC",
-      example: money(50000),
-      note: `On a ${money(600000)} CTC hire, at an assisted-hire rate.`,
-    },
-    {
-      label: "Hiring in-house",
-      price: `${money(18000)} – ${money(40000)}`,
-      example: money(29000),
-      note: "Recruiter time and three screening rounds, with no comparable signal.",
-    },
-    {
-      label: "Findtern",
-      price: `${formatRate(Math.min(...hourly), currency)} – ${formatRate(Math.max(...hourly), currency)}`,
-      example: formatMoney(findternTotal, currency),
-      note: mid
-        ? `${EXAMPLE_HOURS} hours on ${mid.displayName} at ${formatRate(mid.priceHourlyMinor, currency)}, plus the ${formatMoney(mid.perHireChargeMinor, currency)} per-hire fee.`
-        : "",
-    },
-  ];
-}
 
 export function PricingContent({
   plansInr,
@@ -81,7 +36,6 @@ export function PricingContent({
     0,
     plans.findIndex((p) => p.isFeatured),
   );
-  const altCards = alternatives(isIndia, plans);
   const perHireMinor = plans[0]?.perHireChargeMinor ?? bands[0]?.perHireMinor ?? 0;
 
   const MATRIX = [
@@ -348,28 +302,7 @@ export function PricingContent({
           </p>
         </div>
 
-        <div className="mt-12 grid gap-5 md:grid-cols-3">
-          {altCards.map((card) => (
-            <CostCard
-              key={card.label}
-              label={card.label}
-              price={card.price}
-              example={card.example}
-              note={card.note}
-              featured={card.label === "Findtern"}
-              points={
-                card.label === "Findtern"
-                  ? [
-                      "Stipend routed through Findtern",
-                      "Score-based rate, no negotiation",
-                      "One flat per-hire fee on every plan",
-                      "8.33% of CTC only on full-time conversion",
-                    ]
-                  : undefined
-              }
-            />
-          ))}
-        </div>
+        <CostComparison isIndia={isIndia} plans={plans} />
       </PageSection>
 
       {/* ── FAQ ────────────────────────────────────────────────────── */}
@@ -407,52 +340,6 @@ export function PricingContent({
         </div>
       </PageSection>
     </>
-  );
-}
-
-function CostCard({
-  label,
-  price,
-  example,
-  note,
-  featured,
-  points,
-}: {
-  label: string;
-  price: string;
-  example: string;
-  note: string;
-  featured?: boolean;
-  points?: string[];
-}) {
-  return (
-    <TiltCard max={4} className="rounded-2xl">
-      <article
-        className={cn(
-          "flex h-full flex-col rounded-2xl border p-6 sm:p-7",
-          featured
-            ? "border-2 border-accent bg-white/10 backdrop-blur-sm"
-            : "border-white/12 bg-white/[0.04]",
-        )}
-      >
-        <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-accent-300">
-          {label}
-        </p>
-        <p className="mt-3 text-2xl font-semibold tracking-tight text-white">{price}</p>
-        <p className="mt-1 text-3xl font-bold tracking-tight text-white">{example}</p>
-        <p className="mt-3 text-sm leading-relaxed text-on-dark-subtle">{note}</p>
-        {points ? (
-          <ul className="mt-5 space-y-2 border-t border-white/10 pt-5">
-            {points.map((p) => (
-              <li key={p} className="flex gap-2.5 text-sm text-ink-200">
-                <Check className="mt-0.5 size-4 shrink-0 text-accent" aria-hidden />
-                {p}
-              </li>
-            ))}
-          </ul>
-        ) : null}
-      </article>
-    </TiltCard>
   );
 }
 
