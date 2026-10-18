@@ -1,7 +1,14 @@
 "use client";
 
 import { useId, useState } from "react";
-import { ChevronDown } from "lucide-react";
+import { Check, ChevronDown } from "lucide-react";
+
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 import { ButtonLink } from "@/components/ui/button";
 import { useIsIndia } from "@/components/marketing/region-rates";
@@ -70,7 +77,7 @@ export function PricingCalculator({
             label="Plan"
             value={String(planIdx)}
             onChange={(v) => setPlanIdx(Number(v))}
-            options={plans.map((p, i) => ({ value: String(i), label: p.displayName }))}
+            options={plans.map((p, i) => ({ value: String(i), label: p.displayName, hint: formatRate(p.priceHourlyMinor, currency) }))}
           />{" "}
           intern working{" "}
           <InlineSelect
@@ -143,9 +150,11 @@ export function PricingCalculator({
 }
 
 /**
- * A native select drawn as a word in the sentence. It keeps the sentence's
- * size and line-height, sits on the brand colour with an underline that
- * reads as "changeable", and opens the platform picker on touch.
+ * A word in the sentence that opens a menu. The trigger keeps the sentence's
+ * size and line-height and sits on the brand colour with an underline that
+ * reads as "changeable". The menu is the site's own dropdown primitive, so
+ * it matches the header's "Get started" menu instead of the browser's
+ * native list, and Radix gives it keyboard navigation and focus return.
  */
 function InlineSelect({
   id,
@@ -158,34 +167,50 @@ function InlineSelect({
   label: string;
   value: string;
   onChange: (value: string) => void;
-  options: { value: string; label: string }[];
+  options: { value: string; label: string; hint?: string }[];
 }) {
+  const current = options.find((o) => o.value === value) ?? options[0];
   return (
-    <span className="relative inline-flex items-baseline whitespace-nowrap align-baseline">
-      <label htmlFor={id} className="sr-only">
-        {label}
-      </label>
-      <select
-        id={id}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className={cn(
-          "peer cursor-pointer appearance-none rounded-sm border-0 bg-transparent p-0 pr-5 text-[length:inherit] font-semibold leading-[inherit] tracking-[inherit] text-primary",
-          "underline decoration-brand-300 decoration-2 underline-offset-[6px] transition-colors duration-150 hover:decoration-primary",
-          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 focus-visible:ring-offset-2",
-        )}
-      >
-        {options.map((o) => (
-          <option key={o.value} value={o.value}>
-            {o.label}
-          </option>
-        ))}
-      </select>
-      <ChevronDown
-        aria-hidden
-        className="pointer-events-none absolute right-0 top-1/2 size-[0.6em] -translate-y-1/2 text-primary transition-transform duration-150 peer-focus-visible:rotate-180"
-      />
-    </span>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          id={id}
+          aria-label={`${label}: ${current?.label}`}
+          className={cn(
+            "group/word inline-flex cursor-pointer items-baseline gap-1 rounded-sm align-baseline font-semibold text-primary",
+            "underline decoration-brand-300 decoration-2 underline-offset-[6px] transition-colors duration-150 hover:decoration-primary data-[state=open]:decoration-primary",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 focus-visible:ring-offset-2",
+          )}
+        >
+          {current?.label}
+          <ChevronDown
+            aria-hidden
+            className="size-[0.55em] self-center text-primary transition-transform duration-150 group-data-[state=open]/word:rotate-180"
+          />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" sideOffset={10} className="min-w-44">
+        {options.map((o) => {
+          const selected = o.value === value;
+          return (
+            <DropdownMenuItem
+              key={o.value}
+              onSelect={() => onChange(o.value)}
+              aria-checked={selected}
+              role="menuitemradio"
+              className="justify-between gap-4"
+            >
+              <span className={cn(selected && "text-primary")}>{o.label}</span>
+              <span className="flex items-center gap-2">
+                {o.hint ? <span className="text-xs font-normal tabular-nums text-ink-500">{o.hint}</span> : null}
+                <Check className={cn("size-4 text-primary transition-opacity", selected ? "opacity-100" : "opacity-0")} aria-hidden />
+              </span>
+            </DropdownMenuItem>
+          );
+        })}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
