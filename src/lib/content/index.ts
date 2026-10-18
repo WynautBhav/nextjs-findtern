@@ -16,6 +16,7 @@ import { INTERN_NDA, INTERN_TERMS } from "./legal-intern";
 import { getDb, schema, hasDb } from "@/lib/db";
 import { eq, desc, asc, sql } from "drizzle-orm";
 import { inrMinorToUsdMinor } from "@/lib/currency";
+import { cmsImageSrc } from "./image-response";
 
 /* ==========================================================================
    Content accessors - the seam for the data layer
@@ -64,7 +65,8 @@ export async function getPartners() {
   return tryDb(async () => {
     const db = getDb();
     const rows = await db.select().from(schema.websitePartners).where(eq(schema.websitePartners.isActive, true)).orderBy(asc(schema.websitePartners.sortOrder));
-    return rows.length ? (rows as unknown as typeof PARTNERS) : PARTNERS;
+    if (!rows.length) return PARTNERS;
+    return rows.map((r) => ({ ...r, logoUrl: cmsImageSrc(r.logoUrl, `/api/cms-image/partner/${r.id}`) ?? "" })) as unknown as typeof PARTNERS;
   }, PARTNERS);
 }
 
@@ -80,7 +82,8 @@ export async function getHappyFaces() {
   return tryDb(async () => {
     const db = getDb();
     const rows = await db.select().from(schema.websiteHappyFaces).where(eq(schema.websiteHappyFaces.isActive, true)).orderBy(asc(schema.websiteHappyFaces.sortOrder));
-    return rows.length ? (rows as unknown as typeof HAPPY_FACES) : HAPPY_FACES;
+    if (!rows.length) return HAPPY_FACES;
+    return rows.map((r) => ({ ...r, avatarUrl: cmsImageSrc(r.avatarUrl, `/api/cms-image/face/${r.id}`) })) as unknown as typeof HAPPY_FACES;
   }, HAPPY_FACES);
 }
 
@@ -208,6 +211,21 @@ export async function getBlogPost(slug: string): Promise<CmsBlogPost | null> {
     const [row] = await db.select(blogColumns).from(t).where(eq(t.slug, slug)).limit(1);
     return row ? withImageRoutes(row) : (BLOG_POSTS.find((p) => p.slug === slug) ?? null);
   }, BLOG_POSTS.find((p) => p.slug === slug) ?? null);
+}
+
+/** Raw stored value of a partner logo or happy-face avatar. */
+export async function getCmsImage(kind: "partner" | "face", id: string): Promise<string | null> {
+  return tryDb(async () => {
+    const db = getDb();
+    if (kind === "partner") {
+      const p = schema.websitePartners;
+      const [row] = await db.select({ v: p.logoUrl }).from(p).where(eq(p.id, id)).limit(1);
+      return row?.v ?? null;
+    }
+    const f = schema.websiteHappyFaces;
+    const [row] = await db.select({ v: f.avatarUrl }).from(f).where(eq(f.id, id)).limit(1);
+    return row?.v ?? null;
+  }, null);
 }
 
 /** Raw stored value of a post's cover or banner (a data: or http(s) URL). */
