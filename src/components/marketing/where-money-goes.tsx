@@ -20,8 +20,8 @@ import { cn } from "@/lib/utils";
  * what you pay splits into the two places it goes. The two destinations are
  * not drawn as a bar with a legend: they ARE the bar. Two panels share one
  * row, their widths proportional to the money in them, so the intern's
- * panel grows as the score climbs and shrinks to its floor on a free pilot
- * hire. Area is the argument.
+ * panel grows as the score climbs and shrinks to its floor on a free 2026
+ * Espresso hire. Area is the argument.
  *
  * Motion: one authored entrance (the score rising from 0 to the default when
  * the instrument scrolls in); after that everything follows the hand, with
@@ -190,7 +190,7 @@ export function WhereMoneyGoes({ plansInr, plansUsd }: { plansInr: CmsPlan[]; pl
           body={
             rateMinor > 0
               ? `Their stipend: ${formatRate(rateMinor, currency)} × ${HOURS_PER_MONTH} approved hours, paid out by Findtern.`
-              : `Free for the pilot batch. No hourly charge on an Espresso hire while the pilot runs.`
+              : `Free through 2026: no hourly charge on an Espresso hire this year. From 2027, ${formatRate(wasMinor ?? 0, currency)} × ${HOURS_PER_MONTH} approved hours.`
           }
           share={share}
         />

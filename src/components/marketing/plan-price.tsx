@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
  * so a reader scanning three cards sees three prices, not three badges.
  *
  * A percentage tag appears only for a partial discount. A price struck to
- * zero is the pilot offer, and the card says so in a sentence (PilotNote)
+ * zero is the 2026 offer, and the card says so in a sentence (OfferNote)
  * rather than with a "Save 100%" sticker.
  */
 export function PlanPrice({
@@ -84,11 +84,11 @@ export function PlanPrice({
 }
 
 /**
- * One sentence under a pilot-priced plan. Plain text in the card's secondary
+ * One sentence under a plan on the 2026 offer. Plain text in the card's secondary
  * colour: the strikethrough above already shows the discount, so this only
  * has to say why and for how long.
  */
-export function PilotNote({
+export function OfferNote({
   wasMinor,
   currency,
   tone = "light",
@@ -101,7 +101,7 @@ export function PilotNote({
 }) {
   return (
     <p className={cn("text-[13px] leading-relaxed", tone === "dark" ? "text-on-dark-subtle" : "text-ink-500", className)}>
-      Pilot pricing for the first batch. Back to {formatRate(wasMinor, currency)} once the pilot closes.
+      Free through 2026. {formatRate(wasMinor, currency)} from January 2027.
     </p>
   );
 }

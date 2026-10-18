@@ -40,7 +40,7 @@ export async function GET() {
   ];
 
   for (const p of plans) {
-    const was = p.compareAtHourlyMinor && p.compareAtHourlyMinor > p.priceHourlyMinor ? ` (pilot offer; normally ${formatRate(p.compareAtHourlyMinor, "INR")})` : "";
+    const was = p.compareAtHourlyMinor && p.compareAtHourlyMinor > p.priceHourlyMinor ? ` (2026 offer; from 2027 ${formatRate(p.compareAtHourlyMinor, "INR")})` : "";
     lines.push(
       `- **${p.displayName}** - ${p.features[1] ?? ""}: ${formatRate(p.priceHourlyMinor, "INR")}${was}, ${formatMoney(p.perHireChargeMinor, "INR")} per hire, ${p.internshipDuration}. ${p.features[0] ?? ""}.`,
     );

@@ -7,7 +7,7 @@ truth is in PRODUCT.md; visual tokens in DESIGN.md and docs/design_system.md.
 
 THESIS: three prices a reader can compare in one glance. The surface refuses
 the category default of badge soup — "Save N%", sparkles, dashed offer boxes —
-and lets the struck-through price and one sentence carry the pilot offer.
+and lets the struck-through price and one sentence carry the 2026 offer.
 
 OWN-WORLD: white cards on the brand wash, Poppins medium for numbers with
 tabular figures, `brand-700` for the one changeable word in a sentence,
@@ -15,7 +15,7 @@ tabular figures, `brand-700` for the one changeable word in a sentence,
 not boxes, separate ledger rows.
 
 STORY: an employer sees ₹5,000 per hire on every plan, sees that Espresso is
-free for the pilot and why, reads what a month costs at a real schedule, and
+free through 2026 and why, reads what a month costs at a real schedule, and
 either starts hiring or asks a person.
 
 FIRST VIEWPORT (pricing page): hero title, then the three band cards with the

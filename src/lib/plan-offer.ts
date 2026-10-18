@@ -1,7 +1,7 @@
 import type { CmsPlan } from "@/lib/content/types";
 
 /**
- * The pilot offer and the monthly arithmetic, in one place.
+ * The 2026 offer and the monthly arithmetic, in one place.
  *
  * A plan is "on offer" when the admin has set a compare-at price above the
  * current one. Every surface derives the same answer from this, so the home

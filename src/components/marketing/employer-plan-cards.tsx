@@ -6,7 +6,7 @@ import { ButtonLink } from "@/components/ui/button";
 import { TiltCard } from "@/components/motion/tilt-card";
 import { useRegionBands } from "@/components/marketing/region-rates";
 import { MonthlyRate } from "@/components/marketing/monthly-rate";
-import { PilotNote, PlanPrice } from "@/components/marketing/plan-price";
+import { OfferNote, PlanPrice } from "@/components/marketing/plan-price";
 import type { CmsPlan } from "@/lib/content/types";
 import { planHasOffer } from "@/lib/plan-offer";
 import { cn } from "@/lib/utils";
@@ -64,7 +64,7 @@ export function EmployerPlanCards({
                 currency={currency}
               />
               {plan && planHasOffer(plan) && plan.compareAtHourlyMinor ? (
-                <PilotNote wasMinor={plan.compareAtHourlyMinor} currency={currency} className="mt-2" />
+                <OfferNote wasMinor={plan.compareAtHourlyMinor} currency={currency} className="mt-2" />
               ) : (
                 <MonthlyRate hourlyMinor={plan?.priceHourlyMinor ?? b.rateMinor} currency={currency} className="mt-2" />
               )}

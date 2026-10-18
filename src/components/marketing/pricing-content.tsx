@@ -10,7 +10,7 @@ import { FaqExplorer } from "@/components/marketing/faq-explorer";
 import { formatMoney } from "@/lib/format";
 import { useRegionBands } from "@/components/marketing/region-rates";
 import { MonthlyRate } from "@/components/marketing/monthly-rate";
-import { PilotNote, PlanPrice } from "@/components/marketing/plan-price";
+import { OfferNote, PlanPrice } from "@/components/marketing/plan-price";
 import { PricingCalculator } from "@/components/marketing/pricing-calculator";
 import { WhereMoneyGoes } from "@/components/marketing/where-money-goes";
 import { pricingFaq } from "@/lib/content/pricing-faq";
@@ -112,7 +112,7 @@ export function PricingContent({
                     currency={currency}
                   />
                   {plan && planHasOffer(plan) && plan.compareAtHourlyMinor ? (
-                    <PilotNote wasMinor={plan.compareAtHourlyMinor} currency={currency} className="mt-2" />
+                    <OfferNote wasMinor={plan.compareAtHourlyMinor} currency={currency} className="mt-2" />
                   ) : (
                     <MonthlyRate hourlyMinor={plan?.priceHourlyMinor ?? band.rateMinor} currency={currency} className="mt-2" />
                   )}

@@ -170,7 +170,7 @@ export function HeroSplit() {
             kicker="Priced by score"
             Icon={Coffee}
             title="Pay for approved hours, plus one flat per-hire fee"
-            body="Three plans named after coffee, each tied to a score band. The rate card is published, and the pilot-batch discount is on right now."
+            body="Three plans named after coffee, each tied to a score band. The rate card is published, and the 2026 discount is on now."
             cta={{ label: "See pricing", href: "/pricing" }}
           />
         </div>

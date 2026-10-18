@@ -7,7 +7,7 @@ import { ButtonLink } from "@/components/ui/button";
 import { formatMoney } from "@/lib/format";
 import { useIsIndia } from "@/components/marketing/region-rates";
 import { MonthlyRate } from "@/components/marketing/monthly-rate";
-import { PilotNote, PlanPrice } from "@/components/marketing/plan-price";
+import { OfferNote, PlanPrice } from "@/components/marketing/plan-price";
 import type { CmsPlan } from "@/lib/content/types";
 import { planHasOffer } from "@/lib/plan-offer";
 import { cn } from "@/lib/utils";
@@ -206,7 +206,7 @@ export function PricingTable({
                   currency={currency}
                 />
                 {planHasOffer(plan) && plan.compareAtHourlyMinor ? (
-                  <PilotNote wasMinor={plan.compareAtHourlyMinor} currency={currency} className="mt-2" />
+                  <OfferNote wasMinor={plan.compareAtHourlyMinor} currency={currency} className="mt-2" />
                 ) : (
                   <MonthlyRate hourlyMinor={plan.priceHourlyMinor} currency={currency} className="mt-2" />
                 )}
