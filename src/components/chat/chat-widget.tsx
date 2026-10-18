@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { usePathname } from "next/navigation";
 import { MessageCircle, Send, X } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -173,6 +174,7 @@ function BotText({ content }: { content: string }) {
  * reduced-motion via the global switch.
  */
 export function ChatWidget() {
+  const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<Msg[]>([GREETING]);
   const [input, setInput] = useState("");
@@ -226,8 +228,27 @@ export function ChatWidget() {
     }
   }
 
+  // Do not render marketing/support Fintern chat in the admin workspace
+  if (pathname?.startsWith("/admin")) {
+    return null;
+  }
+
+  // Intern portal on mobile renders a fixed bottom navigation bar (min-h-16).
+  // Position chat cleanly above the tab bar so the 5th tab is never blocked.
+  const hasBottomNav = pathname?.startsWith("/intern");
+  // Inside the signed-in app the launcher is a small icon, not a marketing
+  // pill sitting on top of tables and buttons.
+  const inApp = Boolean(pathname?.startsWith("/intern") || pathname?.startsWith("/employer"));
+
   return (
-    <div className="fixed bottom-5 right-5 z-[80] flex flex-col items-end gap-3">
+    <div
+      className={cn(
+        "pointer-events-none fixed z-[80] flex flex-col items-end gap-3",
+        hasBottomNav
+          ? "bottom-20 right-4 lg:bottom-6 lg:right-6"
+          : "bottom-5 right-4 lg:bottom-6 lg:right-6"
+      )}
+    >
       {/* ── Panel ─────────────────────────────────────────── */}
       <div
         role="dialog"
@@ -235,10 +256,10 @@ export function ChatWidget() {
         aria-hidden={!open}
         inert={!open}
         className={cn(
-          "flex w-[min(92vw,380px)] flex-col overflow-hidden rounded-2xl border border-ink-200 bg-white shadow-xl transition-all duration-[260ms] ease-out-expo",
+          "flex w-[min(92vw,380px)] max-h-[calc(100dvh-5.5rem)] flex-col overflow-hidden rounded-2xl border border-ink-200 bg-white shadow-xl transition-all duration-[260ms] ease-out-expo",
           open
             ? "pointer-events-auto translate-y-0 opacity-100"
-            : "pointer-events-none translate-y-4 opacity-0",
+            : "pointer-events-none translate-y-4 opacity-0 hidden",
         )}
       >
         {/* Header */}
@@ -362,22 +383,29 @@ export function ChatWidget() {
         aria-expanded={open}
         aria-label={open ? "Hide Fintern chat" : "Chat with Fintern"}
         className={cn(
-          "group flex h-14 items-center gap-2.5 rounded-full pl-4 pr-5 text-sm font-semibold text-white shadow-lg transition-all duration-[180ms] ease-out-expo",
+          "relative pointer-events-auto group flex items-center justify-center rounded-full text-sm font-semibold text-white shadow-lg transition-all duration-[180ms] ease-out-expo",
           "bg-gradient-to-br from-primary to-brand-900 hover:shadow-glow",
-          open && "pr-4",
+          inApp
+            ? "size-11 shadow-md"
+            : open
+              ? "size-14"
+              : "size-14 sm:h-14 sm:w-auto sm:px-5 sm:gap-2.5",
         )}
       >
         {open ? (
-          <X className="size-5" aria-hidden />
+          <X className="size-5 shrink-0" aria-hidden />
         ) : (
-          <MessageCircle className="size-5" aria-hidden />
+          <div className="relative flex shrink-0 items-center justify-center">
+            <MessageCircle className="size-6 shrink-0" aria-hidden />
+            <span
+              className="absolute -top-0.5 -right-0.5 size-2.5 rounded-full border-2 border-brand-900 bg-emerald-400"
+              aria-hidden
+            />
+          </div>
         )}
-        <span className={cn(!open && "hidden sm:inline")}>
-          {open ? "" : "Chat with Fintern"}
+        <span className={cn(open || inApp ? "hidden" : "hidden sm:inline font-medium")}>
+          Chat with Fintern
         </span>
-        {!open && (
-          <span className="absolute -right-0.5 -top-0.5 size-3 rounded-full border-2 border-white bg-emerald-400" aria-hidden />
-        )}
       </button>
     </div>
   );

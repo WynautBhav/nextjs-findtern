@@ -1,24 +1,17 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { eq, desc, and, count, sql } from "drizzle-orm";
-import {
-  ArrowRight,
-  Briefcase,
-  CheckCircle2,
-  FileText,
-  FolderKanban,
-  FolderPlus,
-  Plus,
-  ShoppingBag,
-  Sparkles,
-  Star,
-  Users,
-} from "lucide-react";
+import { and, desc, eq, sql } from "drizzle-orm";
+import { ArrowRight, CalendarClock, ClipboardCheck, CreditCard, FolderPlus, Send, ShoppingBag } from "lucide-react";
 
 import { getDb, schema } from "@/lib/db";
-import { getSession } from "@/lib/auth";
-import { toCandidateProfile, type CandidateProfile } from "@/lib/employer-candidates";
-import { bandFor } from "@/lib/score";
+import { ButtonLink } from "@/components/ui/button";
+import { EmptyScene, SectionHead, Surface } from "@/components/app/primitives";
+import { requireRole } from "@/lib/auth";
+import { displayNameOf, toCandidateProfile, type CandidateProfile } from "@/lib/employer-candidates";
+import { hiredInternIds } from "@/lib/employer-visibility";
+import { proposalOutcome } from "@/lib/proposals";
+import { PLAN_NAME, bandFor } from "@/lib/score";
+import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = {
   title: "Employer Dashboard · Findtern",
@@ -27,397 +20,383 @@ export const metadata: Metadata = {
 
 type ProjectRow = typeof schema.projects.$inferSelect;
 
-export default async function EmployerDashboard() {
-  const session = await getSession();
-  const employerId = session!.uid;
+type Task = {
+  count: number;
+  label: string;
+  detail: string;
+  href: string;
+  cta: string;
+  Icon: typeof Send;
+};
 
+/**
+ * Employer home.
+ *
+ * Built around one question: what is waiting on me? The top of the page is a
+ * short list of real pending actions (pay for accepted offers, approve hours,
+ * confirm interviews, send proposals to the shortlist), each with its own
+ * button. Below it, the pipeline as four numbers that add up, then projects
+ * and candidates who match those projects. One primary action in the header;
+ * nothing else repeats it.
+ */
+export default async function EmployerDashboard() {
+  const session = await requireRole("employer");
+  const employerId = session.uid;
+
+  let companyName = "";
   let projects: ProjectRow[] = [];
-  let projectCount = 0;
-  let activeProjectCount = 0;
-  let proposalCount = 0;
-  let acceptedCount = 0;
-  let cartCount = 0;
-  let recommendedCandidates: CandidateProfile[] = [];
+  let proposals: { status: string; projectId: string }[] = [];
+  let submittedSheets = 0;
+  let pendingInterviews = 0;
+  let upcomingInterviews = 0;
+  let shortlisted = 0;
+  let candidates: CandidateProfile[] = [];
+  let nameUnlocked = new Set<string>();
+  let loadFailed = false;
 
   try {
     const db = getDb();
+    nameUnlocked = await hiredInternIds(db, employerId).catch(() => new Set<string>());
 
-    // 1. Metrics & projects
-    const [recentProjects, pCount, propCount, accCount, cCount] = await Promise.all([
+    const [employerRow, projectRows, proposalRows, sheetRows, interviewRows, cartRows] = await Promise.all([
+      db
+        .select({ companyName: schema.employers.companyName })
+        .from(schema.employers)
+        .where(eq(schema.employers.id, employerId))
+        .limit(1),
       db
         .select()
         .from(schema.projects)
         .where(eq(schema.projects.employerId, employerId))
-        .orderBy(desc(schema.projects.createdAt))
-        .limit(4),
-      db.$count(schema.projects, eq(schema.projects.employerId, employerId)),
-      db.$count(schema.proposals, eq(schema.proposals.employerId, employerId)),
+        .orderBy(desc(schema.projects.createdAt)),
       db
-        .select({ value: count() })
+        .select({ status: schema.proposals.status, projectId: schema.proposals.projectId })
         .from(schema.proposals)
-        .where(
-          and(
-            eq(schema.proposals.employerId, employerId),
-            eq(schema.proposals.status, "accepted"),
-          ),
-        )
-        .then((rows) => rows[0]?.value ?? 0),
+        .where(eq(schema.proposals.employerId, employerId)),
       db
-        .select({ value: count() })
+        .select({ id: schema.timesheets.id })
+        .from(schema.timesheets)
+        .where(and(eq(schema.timesheets.employerId, employerId), eq(schema.timesheets.status, "submitted"))),
+      db
+        .select({ status: schema.interviews.status, selectedSlot: schema.interviews.selectedSlot })
+        .from(schema.interviews)
+        .where(eq(schema.interviews.employerId, employerId)),
+      db
+        .select({ internId: schema.employerCartItems.internId })
         .from(schema.employerCartItems)
-        .where(eq(schema.employerCartItems.employerId, employerId))
-        .then((rows) => rows[0]?.value ?? 0),
+        .where(eq(schema.employerCartItems.employerId, employerId)),
     ]);
 
-    projects = recentProjects;
-    projectCount = pCount;
-    proposalCount = propCount;
-    acceptedCount = accCount;
-    cartCount = cCount;
-    activeProjectCount = projects.filter((p) => p.status === "active").length;
+    companyName = employerRow[0]?.companyName ?? "";
+    projects = projectRows;
+    proposals = proposalRows;
+    submittedSheets = sheetRows.length;
+    pendingInterviews = interviewRows.filter((i) => i.status === "pending" || i.status === "proposed").length;
+    upcomingInterviews = interviewRows.filter((i) => i.status === "scheduled").length;
+    shortlisted = new Set(cartRows.map((c) => c.internId)).size;
 
-    // 2. Fetch top-scored recommended candidates
-    const candidateRows = await db
-      .select({
-        user: schema.users,
-        onboarding: schema.internOnboarding,
-      })
+    // Candidates who match the skills this employer is hiring for, best score
+    // first. Falls back to the top of the pool when no project lists skills.
+    const wanted = Array.from(
+      new Set(projectRows.filter((p) => p.status === "active").flatMap((p) => (p.skills as string[]) ?? [])),
+    ).map((s) => s.toLowerCase());
+    const pool = await db
+      .select({ user: schema.users, onboarding: schema.internOnboarding })
       .from(schema.users)
       .innerJoin(schema.internOnboarding, eq(schema.users.id, schema.internOnboarding.userId))
       .where(eq(schema.users.isActive, true))
-      .orderBy(
-        desc(
-          sql`COALESCE((${schema.internOnboarding.extraData}->>'findternScore')::float8, 0)`,
-        ),
-      )
-      .limit(4);
-
-    recommendedCandidates = candidateRows.map((r) =>
-      toCandidateProfile(r.user, r.onboarding),
-    );
+      .orderBy(desc(sql`COALESCE((${schema.internOnboarding.extraData}->>'findternScore')::float8, 0)`))
+      .limit(40);
+    const profiles = pool.map((r) => toCandidateProfile(r.user, r.onboarding));
+    const matching = wanted.length
+      ? profiles.filter((c) => c.skills.some((s) => wanted.includes(s.toLowerCase())))
+      : profiles;
+    candidates = (matching.length ? matching : profiles).slice(0, 5);
   } catch (err) {
     console.error("Failed to load employer dashboard:", err);
+    loadFailed = true;
   }
 
+  if (loadFailed) {
+    return (
+      <EmptyScene
+        art
+        title="Couldn't load your dashboard"
+        body="We couldn't load your dashboard right now. Nothing is wrong with your account - try again in a moment."
+        who="Us - connection issue"
+      />
+    );
+  }
+
+  const awaiting = proposals.filter((p) => p.status === "sent" || p.status === "interview_scheduled").length;
+  const accepted = proposals.filter((p) => p.status === "accepted").length;
+  const hired = proposals.filter((p) => p.status === "hired").length;
+  const declined = proposals.filter((p) => proposalOutcome(p.status) === "lost").length;
+
+  const tasks: Task[] = [
+    {
+      count: accepted,
+      label: accepted === 1 ? "offer accepted, payment due" : "offers accepted, payment due",
+      detail: "The hire completes once you pay. Names unlock after payment.",
+      href: "/employer/checkout",
+      cta: "Go to checkout",
+      Icon: CreditCard,
+    },
+    {
+      count: submittedSheets,
+      label: submittedSheets === 1 ? "timesheet to approve" : "timesheets to approve",
+      detail: "Interns are paid on approved hours only.",
+      href: "/employer/timesheets",
+      cta: "Review hours",
+      Icon: ClipboardCheck,
+    },
+    {
+      count: pendingInterviews,
+      label: pendingInterviews === 1 ? "interview waiting on a slot" : "interviews waiting on a slot",
+      detail: "Pick or confirm a time so the candidate can prepare.",
+      href: "/employer/schedule",
+      cta: "Open schedule",
+      Icon: CalendarClock,
+    },
+    {
+      count: upcomingInterviews,
+      label: upcomingInterviews === 1 ? "interview coming up" : "interviews coming up",
+      detail: "The meeting link is on each slot in your schedule.",
+      href: "/employer/schedule#upcoming",
+      cta: "See times",
+      Icon: CalendarClock,
+    },
+    {
+      count: shortlisted,
+      label: shortlisted === 1 ? "shortlisted candidate, no proposal yet" : "shortlisted candidates, no proposal yet",
+      detail: "They are in your cart. Send a proposal before someone else does.",
+      href: "/employer/cart",
+      cta: "Open cart",
+      Icon: ShoppingBag,
+    },
+  ].filter((t) => t.count > 0);
+
+  const proposalsByProject = new Map<string, { total: number; won: number }>();
+  for (const p of proposals) {
+    const row = proposalsByProject.get(p.projectId) ?? { total: 0, won: 0 };
+    row.total += 1;
+    if (proposalOutcome(p.status) === "won") row.won += 1;
+    proposalsByProject.set(p.projectId, row);
+  }
+  const activeProjects = projects.filter((p) => p.status === "active");
+  const shownProjects = [...activeProjects, ...projects.filter((p) => p.status !== "active")].slice(0, 5);
+
   return (
-    <div className="space-y-8">
-      {/* Premium Hero Command Card */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-brand-950 via-brand-900 to-teal-950 p-7 text-white shadow-sm border border-brand-800/60">
-        <div className="relative z-10 flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
-          <div className="space-y-2 max-w-xl">
-            <div className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-2xs font-semibold text-accent-300 border border-white/15 backdrop-blur-xs">
-              <Sparkles className="size-3 text-accent-400" />
-              <span>AI-Vetted Talent Marketplace</span>
-            </div>
-            <h1 className="text-2xl font-bold tracking-tight text-white md:text-3xl">
-              Hiring Command Center
-            </h1>
-            <p className="text-xs text-on-dark-subtle leading-relaxed">
-              Findtern candidates are pre-assessed across technical coding, communication, and problem-solving aptitude before reaching your interview desk.
-            </p>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-3">
-            <Link
-              href="/employer/candidates"
-              className="inline-flex items-center gap-2 rounded-xl bg-accent-500 px-4 py-2.5 text-xs font-semibold text-brand-950 hover:bg-accent-400 transition-all shadow-xs active:scale-[0.99]"
-            >
-              <Users className="size-4" />
-              <span>Explore Candidates</span>
-            </Link>
-            <Link
-              href="/employer/projects"
-              className="inline-flex items-center gap-2 rounded-xl bg-white/10 px-4 py-2.5 text-xs font-semibold text-white hover:bg-white/20 transition-all border border-white/15 backdrop-blur-xs"
-            >
-              <FolderPlus className="size-4" />
-              <span>Create Project</span>
-            </Link>
-          </div>
+    <div className="space-y-10">
+      <header className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="text-sm text-ink-500">{companyName || "Your company"}</p>
+          <h1 className="mt-1 text-2xl font-semibold tracking-[-0.02em] text-ink-900 md:text-[28px]">
+            {tasks.length
+              ? `${tasks.reduce((n, t) => n + t.count, 0)} things need you`
+              : proposals.length
+                ? "You're all caught up"
+                : "Let's make your first hire"}
+          </h1>
         </div>
+        <div className="flex gap-2">
+          <ButtonLink href="/employer/projects" variant="outline" size="sm" className="min-h-10">
+            <FolderPlus className="size-4" aria-hidden />
+            New project
+          </ButtonLink>
+          <ButtonLink href="/employer/candidates" variant="primary" size="sm" className="min-h-10">
+            Find candidates
+            <ArrowRight className="size-4" aria-hidden />
+          </ButtonLink>
+        </div>
+      </header>
 
-        {/* Subtle mesh background glows */}
-        <div className="pointer-events-none absolute -bottom-16 -right-16 size-72 rounded-full bg-emerald-500/15 blur-3xl" />
-        <div className="pointer-events-none absolute -top-16 left-1/3 size-64 rounded-full bg-brand-500/10 blur-3xl" />
-      </div>
-
-      {/* Watermelon UI-grade 4 KPI Stat Cards Grid */}
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        {/* Active Projects */}
-        <Link
-          href="/employer/projects"
-          className="group relative overflow-hidden rounded-2xl border border-sand-300 bg-white p-5 shadow-2xs transition-all hover:border-brand-400 hover:shadow-md hover:-translate-y-0.5"
-        >
-          <div className="absolute top-0 left-0 right-0 h-1 bg-brand-600 opacity-90" />
-          <div className="flex items-center justify-between">
-            <span className="text-2xs font-bold uppercase tracking-wider text-text-subtle">
-              Active Projects
-            </span>
-            <span className="grid size-9 place-items-center rounded-xl bg-brand-50 text-brand-700 transition-colors group-hover:bg-brand-100 border border-brand-200/50">
-              <FolderKanban className="size-4" />
-            </span>
-          </div>
-          <p className="mt-3 text-3xl font-bold tracking-tight text-ink-900 tabular-nums">
-            {projectCount}
-          </p>
-          <div className="mt-2 flex items-center justify-between text-2xs">
-            <span className="font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200/60">
-              {activeProjectCount} accepting
-            </span>
-            <span className="text-text-subtle flex items-center gap-0.5 group-hover:text-brand-700 transition-colors">
-              Manage
-              <ArrowRight className="size-3 transition-transform group-hover:translate-x-0.5" />
-            </span>
-          </div>
-        </Link>
-
-        {/* Shortlisted */}
-        <Link
-          href="/employer/cart"
-          className="group relative overflow-hidden rounded-2xl border border-sand-300 bg-white p-5 shadow-2xs transition-all hover:border-amber-400 hover:shadow-md hover:-translate-y-0.5"
-        >
-          <div className="absolute top-0 left-0 right-0 h-1 bg-amber-500 opacity-90" />
-          <div className="flex items-center justify-between">
-            <span className="text-2xs font-bold uppercase tracking-wider text-text-subtle">
-              Shortlisted
-            </span>
-            <span className="grid size-9 place-items-center rounded-xl bg-amber-50 text-amber-700 transition-colors group-hover:bg-amber-100 border border-amber-200/50">
-              <ShoppingBag className="size-4" />
-            </span>
-          </div>
-          <p className="mt-3 text-3xl font-bold tracking-tight text-ink-900 tabular-nums">
-            {cartCount}
-          </p>
-          <div className="mt-2 flex items-center justify-between text-2xs">
-            <span className="font-medium text-amber-800 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200/60">
-              In Candidate Cart
-            </span>
-            <span className="text-text-subtle flex items-center gap-0.5 group-hover:text-amber-700 transition-colors">
-              View
-              <ArrowRight className="size-3 transition-transform group-hover:translate-x-0.5" />
-            </span>
-          </div>
-        </Link>
-
-        {/* Proposals Sent */}
-        <Link
-          href="/employer/proposals"
-          className="group relative overflow-hidden rounded-2xl border border-sand-300 bg-white p-5 shadow-2xs transition-all hover:border-blue-400 hover:shadow-md hover:-translate-y-0.5"
-        >
-          <div className="absolute top-0 left-0 right-0 h-1 bg-blue-600 opacity-90" />
-          <div className="flex items-center justify-between">
-            <span className="text-2xs font-bold uppercase tracking-wider text-text-subtle">
-              Proposals Sent
-            </span>
-            <span className="grid size-9 place-items-center rounded-xl bg-blue-50 text-blue-700 transition-colors group-hover:bg-blue-100 border border-blue-200/50">
-              <FileText className="size-4" />
-            </span>
-          </div>
-          <p className="mt-3 text-3xl font-bold tracking-tight text-ink-900 tabular-nums">
-            {proposalCount}
-          </p>
-          <div className="mt-2 flex items-center justify-between text-2xs">
-            <span className="font-medium text-blue-800 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200/60">
-              Offers In Flight
-            </span>
-            <span className="text-text-subtle flex items-center gap-0.5 group-hover:text-blue-700 transition-colors">
-              Track
-              <ArrowRight className="size-3 transition-transform group-hover:translate-x-0.5" />
-            </span>
-          </div>
-        </Link>
-
-        {/* Accepted Hires */}
-        <Link
-          href="/employer/orders"
-          className="group relative overflow-hidden rounded-2xl border border-sand-300 bg-white p-5 shadow-2xs transition-all hover:border-emerald-400 hover:shadow-md hover:-translate-y-0.5"
-        >
-          <div className="absolute top-0 left-0 right-0 h-1 bg-emerald-600 opacity-90" />
-          <div className="flex items-center justify-between">
-            <span className="text-2xs font-bold uppercase tracking-wider text-text-subtle">
-              Accepted Hires
-            </span>
-            <span className="grid size-9 place-items-center rounded-xl bg-emerald-50 text-emerald-700 transition-colors group-hover:bg-emerald-100 border border-emerald-200/50">
-              <CheckCircle2 className="size-4" />
-            </span>
-          </div>
-          <p className="mt-3 text-3xl font-bold tracking-tight text-ink-900 tabular-nums">
-            {acceptedCount}
-          </p>
-          <div className="mt-2 flex items-center justify-between text-2xs">
-            <span className="font-medium text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200/60">
-              Active Placements
-            </span>
-            <span className="text-text-subtle flex items-center gap-0.5 group-hover:text-emerald-700 transition-colors">
-              Orders
-              <ArrowRight className="size-3 transition-transform group-hover:translate-x-0.5" />
-            </span>
-          </div>
-        </Link>
-      </div>
-
-      {/* Main Content Grid: Projects & Featured Talent */}
-      <div className="grid gap-8 lg:grid-cols-3">
-        {/* Left 2 Cols: Active Hiring Projects */}
-        <div className="space-y-4 lg:col-span-2">
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <h2 className="text-base font-semibold text-ink-900">Active Hiring Projects</h2>
-              <p className="text-xs text-text-subtle">Your open roles and matching candidate pipelines.</p>
-            </div>
-            <Link
-              href="/employer/projects"
-              className="inline-flex items-center gap-1 text-xs font-semibold text-brand-700 hover:text-brand-800"
-            >
-              <span>Manage all</span>
-              <ArrowRight className="size-3" />
-            </Link>
-          </div>
-
-          {projects.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-sand-300 bg-sand-50/50 p-8 text-center">
-              <Briefcase className="mx-auto size-8 text-ink-400" />
-              <h3 className="mt-3 text-sm font-semibold text-ink-900">No projects created</h3>
-              <p className="mt-1 text-xs text-text-subtle">
-                Post an internship project to match with pre-vetted students automatically.
-              </p>
+      {/* What is waiting on you */}
+      {tasks.length ? (
+        <Surface as="ul" className="divide-y divide-ink-100 overflow-hidden">
+          {tasks.map((t) => (
+            <li key={t.href} className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:gap-5">
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-accent-100 text-accent-700">
+                <t.Icon className="size-4" aria-hidden />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-[15px] font-medium text-ink-900">
+                  <span className="tabular-nums">{t.count}</span> {t.label}
+                </p>
+                <p className="mt-0.5 text-sm text-ink-500">{t.detail}</p>
+              </div>
               <Link
-                href="/employer/projects"
-                className="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-brand-700 px-4 py-2 text-xs font-semibold text-white hover:bg-brand-800 shadow-sm"
+                href={t.href}
+                className="inline-flex min-h-10 shrink-0 items-center gap-1.5 self-start rounded-[10px] border border-ink-200 bg-white px-3.5 text-sm font-medium text-ink-800 transition-colors hover:border-ink-300 hover:bg-ink-50 sm:self-auto"
               >
-                <Plus className="size-3.5" />
-                <span>Create First Project</span>
+                {t.cta}
+                <ArrowRight className="size-3.5" aria-hidden />
               </Link>
+            </li>
+          ))}
+        </Surface>
+      ) : null}
+
+      {/* Pipeline: four numbers that add up */}
+      <section>
+        <SectionHead
+          title="Proposal pipeline"
+          action={
+            <Link href="/employer/proposals" className="text-sm font-medium text-brand-700 hover:underline">
+              All proposals
+            </Link>
+          }
+        />
+        <Surface className="grid grid-cols-2 overflow-hidden sm:grid-cols-4">
+          {[
+            { label: "Awaiting reply", value: awaiting, note: "sent, no answer yet" },
+            { label: "Accepted", value: accepted, note: "payment due", warn: accepted > 0 },
+            { label: "Hired", value: hired, note: "paid and placed" },
+            { label: "Declined or expired", value: declined, note: "closed" },
+          ].map((s, i) => (
+            <div
+              key={s.label}
+              className={cn(
+                "px-5 py-4",
+                i % 2 === 1 && "border-l border-ink-100",
+                i >= 2 && "border-t border-ink-100 sm:border-t-0",
+                i === 2 && "sm:border-l",
+              )}
+            >
+              <p className="text-[13px] text-ink-500">{s.label}</p>
+              <p
+                className={cn(
+                  "mt-1 text-2xl font-semibold tabular-nums tracking-tight",
+                  s.warn ? "text-accent-700" : "text-ink-900",
+                )}
+              >
+                {s.value}
+              </p>
+              <p className="mt-0.5 text-xs text-ink-400">{s.note}</p>
             </div>
+          ))}
+        </Surface>
+      </section>
+
+      <div className="grid min-w-0 gap-10 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
+        {/* Projects */}
+        <section className="min-w-0">
+          <SectionHead
+            title="Projects"
+            hint={`${activeProjects.length} open of ${projects.length}`}
+            action={
+              projects.length ? (
+                <Link href="/employer/projects" className="text-sm font-medium text-brand-700 hover:underline">
+                  Manage
+                </Link>
+              ) : null
+            }
+          />
+          {projects.length === 0 ? (
+            <EmptyScene
+              title="No projects yet"
+              body="A project tells us the skills you need, so candidates are matched to it. It takes about five minutes."
+              next={{ label: "Create a project", href: "/employer/projects" }}
+              who="You - about five minutes"
+            />
           ) : (
-            <div className="space-y-3">
-              {projects.map((p) => {
-                const projectSkills = (p.skills as string[]) ?? [];
-                const skillsHref =
-                  projectSkills.length > 0
-                    ? `/employer/candidates?skills=${encodeURIComponent(projectSkills.join(","))}`
-                    : "/employer/candidates";
-
+            <Surface as="ul" className="divide-y divide-ink-100 overflow-hidden">
+              {shownProjects.map((p) => {
+                const stats = proposalsByProject.get(p.id) ?? { total: 0, won: 0 };
+                const skills = ((p.skills as string[]) ?? []).slice(0, 3);
+                const open = p.status === "active";
                 return (
-                  <div
-                    key={p.id}
-                    className="flex flex-col gap-3 rounded-2xl border border-sand-300 bg-white p-5 shadow-2xs transition-all hover:border-brand-300 hover:shadow-xs sm:flex-row sm:items-center sm:justify-between"
-                  >
-                    <div className="space-y-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <h3 className="text-sm font-semibold text-ink-900 truncate">{p.projectName}</h3>
-                        <span
-                          className={`rounded-full px-2 py-0.5 text-2xs font-semibold ${
-                            p.status === "active"
-                              ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                              : "bg-sand-100 text-ink-600 border border-sand-200"
-                          }`}
-                        >
-                          {p.status === "active" ? "Active" : "Closed"}
-                        </span>
-                      </div>
-                      <p className="text-xs text-text-subtle truncate">
-                        {p.scopeOfWork || "Standard Scope"} · <span className="capitalize">{p.locationType || "Remote"}</span>
-                      </p>
-                      {projectSkills.length > 0 ? (
-                        <div className="flex flex-wrap gap-1 pt-1">
-                          {projectSkills.slice(0, 4).map((s) => (
-                            <span
-                              key={s}
-                              className="rounded-md bg-sand-100 px-2 py-0.5 text-2xs font-medium text-ink-700 border border-sand-200"
-                            >
-                              {s}
-                            </span>
-                          ))}
-                          {projectSkills.length > 4 ? (
-                            <span className="text-2xs text-text-subtle font-medium">
-                              +{projectSkills.length - 4} more
-                            </span>
-                          ) : null}
-                        </div>
-                      ) : null}
-                    </div>
-
-                    <div className="flex items-center gap-2 shrink-0">
-                      <Link
-                        href={skillsHref}
-                        className="inline-flex items-center gap-1.5 rounded-xl bg-brand-50 border border-brand-200 px-3 py-1.5 text-xs font-semibold text-brand-700 hover:bg-brand-100 transition"
-                      >
-                        <Users className="size-3.5" />
-                        <span>Find Candidates</span>
-                      </Link>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* Right Col: Featured Candidates Rail */}
-        <div className="space-y-4">
-          <div className="space-y-0.5">
-            <h2 className="text-base font-semibold text-ink-900">Featured Candidates</h2>
-            <p className="text-xs text-text-subtle">Top Findtern Score candidates ready for interview.</p>
-          </div>
-
-          <div className="space-y-3">
-            {recommendedCandidates.map((c) => {
-              const band = bandFor(c.score);
-              return (
-                <Link
-                  key={c.id}
-                  href={`/employer/intern/${encodeURIComponent(c.id)}`}
-                  className="group block rounded-2xl border border-sand-300 bg-white p-4 shadow-2xs transition-all hover:border-brand-400 hover:shadow-xs"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-brand-50 to-brand-100 text-xs font-bold text-brand-800 border border-brand-200">
-                        {c.initials}
-                      </span>
+                  <li key={p.id}>
+                    <Link
+                      href={
+                        skills.length
+                          ? `/employer/candidates?skills=${encodeURIComponent(((p.skills as string[]) ?? []).join(","))}`
+                          : "/employer/candidates"
+                      }
+                      className="group grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4 px-5 py-3.5 transition-colors hover:bg-ink-50/70"
+                    >
                       <div className="min-w-0">
-                        <h4 className="truncate text-xs font-semibold text-ink-900 group-hover:text-brand-700 transition-colors">
-                          {c.fullName}
-                        </h4>
-                        <p className="truncate text-2xs text-text-subtle">
-                          {c.location || "Remote candidate"}
+                        <p className="flex items-center gap-2">
+                          <span
+                            aria-hidden
+                            className={cn("size-1.5 shrink-0 rounded-full", open ? "bg-success" : "bg-ink-300")}
+                          />
+                          <span className="truncate text-sm font-medium text-ink-900 group-hover:text-brand-700">
+                            {p.projectName}
+                          </span>
+                          <span className="sr-only">{open ? "(open)" : "(closed)"}</span>
+                        </p>
+                        <p className="mt-0.5 truncate pl-3.5 text-[13px] text-ink-500">
+                          {skills.join(" · ") || "No skills listed"}
                         </p>
                       </div>
-                    </div>
+                      <p className="text-right text-[13px] tabular-nums text-ink-500">
+                        <span className="font-medium text-ink-800">{stats.total}</span> sent
+                        {stats.won ? (
+                          <>
+                            {" "}· <span className="font-medium text-success">{stats.won}</span> accepted
+                          </>
+                        ) : null}
+                      </p>
+                    </Link>
+                  </li>
+                );
+              })}
+            </Surface>
+          )}
+        </section>
 
-                    <div className="text-right shrink-0">
-                      <div className="inline-flex items-center gap-1 rounded-full bg-brand-50 px-2.5 py-0.5 text-2xs font-bold text-brand-800 border border-brand-200" title={band.name}>
-                        <Star className="size-3 fill-amber-500 text-amber-500" />
-                        <span className="tabular-nums">{c.score.toFixed(1)}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {c.skills.length > 0 ? (
-                    <div className="mt-3 flex flex-wrap gap-1">
-                      {c.skills.slice(0, 3).map((s) => (
-                        <span
-                          key={s}
-                          className="rounded-md bg-sand-100 px-2 py-0.5 text-2xs text-ink-700 font-medium border border-sand-200/60"
-                        >
-                          {s}
+        {/* Candidates matching the open projects */}
+        <section className="min-w-0">
+          <SectionHead
+            title="Matches for your projects"
+            action={
+              <Link href="/employer/candidates" className="text-sm font-medium text-brand-700 hover:underline">
+                Browse all
+              </Link>
+            }
+          />
+          {candidates.length === 0 ? (
+            <p className="text-sm text-ink-500">No scored candidates yet.</p>
+          ) : (
+            <Surface as="ul" className="divide-y divide-ink-100 overflow-hidden">
+              {candidates.map((c) => {
+                const band = bandFor(c.score);
+                return (
+                  <li key={c.id}>
+                    <Link
+                      href={`/employer/intern/${encodeURIComponent(c.id)}`}
+                      className="group grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 px-4 py-3 transition-colors hover:bg-ink-50/70"
+                    >
+                      <span
+                        aria-hidden
+                        className="flex size-9 items-center justify-center rounded-full bg-brand-50 text-xs font-semibold text-brand-800"
+                      >
+                        {c.initials}
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-medium text-ink-900 group-hover:text-brand-700">
+                          {displayNameOf(c, nameUnlocked.has(c.id))}
                         </span>
-                      ))}
-                    </div>
-                  ) : null}
-                </Link>
-              );
-            })}
-
-            <Link
-              href="/employer/candidates"
-              className="flex items-center justify-center gap-2 rounded-xl border border-dashed border-sand-300 bg-sand-50/60 p-3 text-xs font-semibold text-brand-700 hover:bg-brand-50 transition"
-            >
-              <span>Browse All Verified Candidates</span>
-              <ArrowRight className="size-3.5" />
-            </Link>
-          </div>
-        </div>
+                        <span className="block truncate text-[13px] text-ink-500">
+                          {c.skills.slice(0, 3).join(" · ") || c.location || "Profile in progress"}
+                        </span>
+                      </span>
+                      <span className="text-right">
+                        <span className="block text-sm font-semibold tabular-nums text-ink-900">
+                          {c.score.toFixed(1)}
+                        </span>
+                        <span className="block text-[11px] text-ink-400">{PLAN_NAME[band.id]}</span>
+                      </span>
+                    </Link>
+                  </li>
+                );
+              })}
+            </Surface>
+          )}
+        </section>
       </div>
+
     </div>
   );
 }

@@ -81,13 +81,13 @@ function fromB64url(input: string): Buffer {
 }
 
 function secret(): string {
-  const s = process.env.SIGNING_SECRET;
+  const s = process.env.SIGNING_SECRET ?? process.env.SESSION_SECRET;
   if (!s || s.length < 32) {
     // A build that boots without a signing secret must not silently fall back
     // to a constant - that is the "Using unsafe secret" failure every auth
     // library warns about, and it would make every issued token forgeable.
     throw new Error(
-      "SIGNING_SECRET is not set. It must be at least 32 characters of entropy.",
+      "SIGNING_SECRET (or SESSION_SECRET) is not set. It must be at least 32 characters of entropy.",
     );
   }
   return s;
@@ -166,7 +166,7 @@ export function signedUrl(
   payload: { k: string; s: string; d: string; e?: number },
   ttl = 300,
 ): string {
-  const base = process.env.PUBLIC_ORIGIN ?? "http://localhost:3100";
+  const base = process.env.PUBLIC_ORIGIN ?? "http://localhost:3000";
   return `${base.replace(/\/$/, "")}${path}?t=${sign(payload, ttl)}`;
 }
 

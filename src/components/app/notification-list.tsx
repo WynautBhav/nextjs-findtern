@@ -65,7 +65,7 @@ export function NotificationList({
           }
         }}
         className={cn(
-          "inline-flex min-h-11 items-center gap-2 rounded-lg border border-ink-200 bg-white px-4 text-sm font-medium text-ink-700 transition-[border-color,background-color] duration-[var(--dur-instant)] hover:border-ink-300 hover:bg-ink-50 disabled:opacity-45",
+          "apple-spring apple-pressable inline-flex min-h-11 items-center gap-2 rounded-[10px] border border-ink-200 bg-white px-4 text-sm font-medium text-ink-700 hover:border-ink-300 hover:bg-ink-50 disabled:opacity-45",
           error && "text-danger",
         )}
       >
@@ -95,13 +95,13 @@ export function NotificationList({
   return (
     <div>
       {error ? (
-        <p role="alert" className="mb-3 flex items-center gap-2 rounded-xl bg-danger-soft px-4 py-2.5 text-sm text-danger">
+        <p role="alert" className="mb-3 flex items-center gap-2 rounded-[10px] bg-danger-soft px-4 py-2.5 text-sm text-danger">
           <AlertCircle className="size-4 shrink-0" aria-hidden />
           {error}
         </p>
       ) : null}
 
-      <ul className="divide-y divide-ink-100 overflow-hidden rounded-2xl border border-ink-100 bg-white">
+      <ul className="divide-y divide-ink-100 overflow-hidden rounded-[20px] border border-ink-200/70 bg-white shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)]">
         {(rows ?? []).map((n) => {
           const isRead = n.isRead || read.has(n.id);
           return (
@@ -131,7 +131,7 @@ export function NotificationList({
                   {n.title}
                 </p>
                 <p className="mt-1 text-pretty text-sm leading-relaxed text-ink-600">{n.message}</p>
-                <p className="mt-1.5 text-xs text-ink-400">
+                <p className="mt-1.5 text-xs tabular-nums text-ink-400">
                   {n.createdAt
                     ? n.createdAt.toLocaleDateString("en-IN", {
                         day: "numeric",
@@ -148,7 +148,7 @@ export function NotificationList({
                 <button
                   type="button"
                   onClick={() => markOne(n.id)}
-                  className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-sm font-medium text-ink-600 transition-colors duration-[var(--dur-instant)] hover:bg-ink-100 hover:text-ink-900"
+                  className="apple-spring apple-pressable inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-[10px] px-2.5 text-sm font-medium text-ink-600 hover:bg-ink-100 hover:text-ink-900"
                 >
                   <Check className="size-3.5" aria-hidden />
                   <span className="sr-only sm:not-sr-only">Read</span>

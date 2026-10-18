@@ -37,15 +37,17 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AlertCircle, Check, CloudUpload, Loader2 } from "lucide-react";
+import { AlertCircle, Check, CloudUpload, Loader2, Minus, Plus } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 
 import { csrfFetch } from "@/lib/client-fetch";
+import { DAY_STATUSES } from "@/lib/employer-timesheets";
+import { defaultDayStatus, holidayName } from "@/lib/holidays";
 import { Textarea } from "@/components/ui/textarea";
 import { Surface } from "@/components/app/primitives";
 import { cn } from "@/lib/utils";
 
-export type Entry = { date: string; hours: number; note: string };
+export type Entry = { date: string; hours: number; note: string; status: string };
 
 type SaveState = "idle" | "saving" | "saved" | "error";
 
@@ -73,18 +75,55 @@ export function TimesheetGrid({
   const router = useRouter();
   const reduce = useReducedMotion();
 
-  const readOnly = status !== "draft";
-  const [entries, setEntries] = useState<Entry[]>(initialEntries);
+  // A sheet the manager sent back can be fixed and resent.
+  const readOnly = status !== "draft" && status !== "rejected";
+  const [entries, setEntries] = useState<Entry[]>(() =>
+    withDayDefaults(buildDays(periodStart, periodEnd), initialEntries),
+  );
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [note, setNote] = useState(internNote ?? "");
   const [submitState, setSubmitState] = useState<SaveState>("idle");
+  const [submitError, setSubmitError] = useState("");
   const timer = useRef<number | null>(null);
+  const inFlight = useRef<Promise<boolean> | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
 
   const days = useMemo(() => buildDays(periodStart, periodEnd), [periodStart, periodEnd]);
+
+  // The daily habit: today's ISO in local time, matching buildDays exactly.
+  const todayIso = useMemo(() => {
+    const now = new Date();
+    now.setHours(12, 0, 0, 0);
+    return toIso(now);
+  }, []);
+  const todayInPeriod = days.some((d) => d.date === todayIso);
+  const todayEntry = entries.find((e) => e.date === todayIso);
+  const todayHours = todayEntry?.hours ?? 0;
+  const todayLabel = new Date(`${todayIso}T12:00:00`).toLocaleDateString("en-IN", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  });
+
+  function bumpToday(delta: number) {
+    const next = Math.max(0, Math.min(MAX_DAILY, Math.round((todayHours + delta) * 2) / 2));
+    setSaveState("saving");
+    setHours(todayIso, String(next));
+  }
 
   const total = useMemo(
     () => entries.reduce((sum, e) => sum + (Number.isFinite(e.hours) ? e.hours : 0), 0),
     [entries],
+  );
+
+  const knownStatuses = useMemo(() => new Set<string>(DAY_STATUSES), []);
+  /** Days still without a status - sending is blocked until this is zero. */
+  const missingStatus = useMemo(
+    () =>
+      days.filter((day) => !knownStatuses.has(entries.find((e) => e.date === day.date)?.status ?? ""))
+        .length,
+    [days, entries, knownStatuses],
   );
 
   const getEntry = (date: string) => entries.find((e) => e.date === date);
@@ -93,8 +132,8 @@ export function TimesheetGrid({
     const value = raw === "" ? 0 : Math.max(0, Math.min(MAX_DAILY, Number(raw) || 0));
     setEntries((prev) => {
       const found = prev.find((e) => e.date === date);
-      if (!value && !found) return prev;
-      if (!found) return [...prev, { date, hours: value, note: "" }];
+      if (!value && !found) return [...prev, { date, hours: value, note: "", status: defaultDayStatus(date) }];
+      if (!found) return [...prev, { date, hours: value, note: "", status: defaultDayStatus(date) }];
       return prev.map((e) => (e.date === date ? { ...e, hours: value } : e));
     });
   }
@@ -102,8 +141,17 @@ export function TimesheetGrid({
   function setDayNote(date: string, text: string) {
     setEntries((prev) => {
       const found = prev.find((e) => e.date === date);
-      if (!found) return [...prev, { date, hours: 0, note: text }];
+      if (!found) return [...prev, { date, hours: 0, note: text, status: defaultDayStatus(date) }];
       return prev.map((e) => (e.date === date ? { ...e, note: text } : e));
+    });
+  }
+
+  function setDayStatus(date: string, dayStatus: string) {
+    setSaveState("saving");
+    setEntries((prev) => {
+      const found = prev.find((e) => e.date === date);
+      if (!found) return [...prev, { date, hours: 0, note: "", status: dayStatus }];
+      return prev.map((e) => (e.date === date ? { ...e, status: dayStatus } : e));
     });
   }
 
@@ -114,17 +162,9 @@ export function TimesheetGrid({
     if (readOnly) return;
     if (saveState === "idle") return;
     if (timer.current) window.clearTimeout(timer.current);
-    timer.current = window.setTimeout(async () => {
-      try {
-        const res = await csrfFetch(`/api/intern/timesheets/${timesheetId}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ entries, note }),
-        });
-        setSaveState(res.ok ? "saved" : "error");
-      } catch {
-        setSaveState("error");
-      }
+    timer.current = window.setTimeout(() => {
+      timer.current = null;
+      void persist();
     }, 700);
     return () => {
       if (timer.current) window.clearTimeout(timer.current);
@@ -132,13 +172,43 @@ export function TimesheetGrid({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [entries, note, readOnly, timesheetId]);
 
+  async function persist(): Promise<boolean> {
+    const request = csrfFetch(`/api/intern/timesheets/${timesheetId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ entries, note }),
+    })
+      .then((res) => res.ok)
+      .catch(() => false);
+    inFlight.current = request;
+    const ok = await request;
+    if (inFlight.current === request) inFlight.current = null;
+    setSaveState(ok ? "saved" : "error");
+    return ok;
+  }
+
   async function submit() {
     setSubmitState("saving");
+    setSubmitError("");
     try {
+      // Send exactly what is on screen: flush the pending autosave first.
+      const pendingEdit = timer.current !== null || saveState === "saving" || saveState === "error";
+      if (timer.current) {
+        window.clearTimeout(timer.current);
+        timer.current = null;
+      }
+      if (inFlight.current) await inFlight.current;
+      if (pendingEdit && !(await persist())) {
+        setSubmitError("Your latest changes did not save, so nothing was sent.");
+        setSubmitState("error");
+        return;
+      }
       const res = await csrfFetch(`/api/intern/timesheets/${timesheetId}/submit`, {
         method: "POST",
       });
       if (!res.ok) {
+        const json = (await res.json().catch(() => null)) as { error?: string } | null;
+        setSubmitError(json?.error || "That did not send.");
         setSubmitState("error");
         setSaveState("error");
         return;
@@ -146,6 +216,7 @@ export function TimesheetGrid({
       setSubmitState("saved");
       router.refresh();
     } catch {
+      setSubmitError("That did not send.");
       setSubmitState("error");
     }
   }
@@ -160,11 +231,63 @@ export function TimesheetGrid({
           <p className="mt-0.5 text-sm text-ink-500">
             {readOnly
               ? "These hours have already been sent, so they are read only."
-              : "Every change saves on its own. Nothing to remember before you close this."}
+              : "Every change saves on its own. Mon–Fri are working days - weekends start as Fixed off and gazetted holidays come pre-marked. Pick a status for every day before sending."}
           </p>
         </div>
         <SaveIndicator state={saveState} readOnly={readOnly} />
       </div>
+
+      {/* ── Today ────────────────────────────────────────────────────
+          The daily entry point. Same entries state and autosave as the month
+          rows below, so logging today never touches a second code path. */}
+      {!readOnly && todayInPeriod ? (
+        <div className="border-b border-ink-100 bg-brand-50/40 px-5 py-5">
+          <div className="flex flex-wrap items-end justify-between gap-2">
+            <div>
+              <p className="text-[12px] font-semibold tracking-[0.02em] text-brand-700">
+                Today · {todayLabel}
+              </p>
+              <p className="mt-1 text-[17px] font-semibold tracking-[-0.02em] tabular-nums text-ink-900">
+                {todayHours > 0 ? `${todayHours}h logged` : "Log today's hours"}
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => bumpToday(-0.5)}
+                disabled={todayHours <= 0}
+                aria-label="Log half an hour less for today"
+                className="apple-spring apple-pressable grid size-11 place-items-center rounded-[10px] border border-ink-200 bg-white text-ink-700 hover:bg-ink-50 disabled:opacity-40"
+              >
+                <Minus className="size-4" aria-hidden />
+              </button>
+              <button
+                type="button"
+                onClick={() => bumpToday(0.5)}
+                disabled={todayHours >= MAX_DAILY}
+                aria-label="Log half an hour more for today"
+                className="apple-spring apple-pressable grid size-11 place-items-center rounded-[10px] border border-ink-200 bg-white text-ink-700 hover:bg-ink-50 disabled:opacity-40"
+              >
+                <Plus className="size-4" aria-hidden />
+              </button>
+            </div>
+          </div>
+          <label className="sr-only" htmlFor={`n-today-${timesheetId}`}>
+            What you worked on today
+          </label>
+          <input
+            id={`n-today-${timesheetId}`}
+            type="text"
+            value={todayEntry?.note ?? ""}
+            placeholder="What did you work on today?"
+            onChange={(e) => {
+              setSaveState("saving");
+              setDayNote(todayIso, e.target.value);
+            }}
+            className="apple-spring mt-3 h-11 w-full rounded-[10px] border border-ink-200 bg-white px-3 text-sm text-ink-900 placeholder:text-ink-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-200 focus:outline-none"
+          />
+        </div>
+      ) : null}
 
       {managerNote ? (
         <div className="border-b border-ink-100 bg-accent-100/40 px-5 py-4">
@@ -180,6 +303,8 @@ export function TimesheetGrid({
         {days.map((day) => {
           const entry = getEntry(day.date);
           const hours = entry?.hours ?? 0;
+          const dayStatus = entry?.status ?? "";
+          const govtHoliday = holidayName(day.date);
           const isWeekend = day.weekend;
           return (
             <li key={day.date} className={cn("px-5 py-3", isWeekend && "bg-ink-50/60")}>
@@ -187,6 +312,9 @@ export function TimesheetGrid({
                 <div className="w-16 shrink-0">
                   <p className="text-sm font-semibold text-ink-900">{day.weekday}</p>
                   <p className="text-xs tabular-nums text-ink-500">{day.label}</p>
+                  {govtHoliday ? (
+                    <p className="mt-0.5 text-2xs font-medium text-sky-700">{govtHoliday}</p>
+                  ) : null}
                 </div>
 
                 <div className="w-24 shrink-0">
@@ -209,7 +337,7 @@ export function TimesheetGrid({
                         setHours(day.date, e.target.value);
                       }}
                       className={cn(
-                        "h-11 w-full rounded-lg border bg-white pr-8 pl-3 text-sm tabular-nums text-ink-900 transition-[border-color,box-shadow] duration-[var(--dur-instant)]",
+                        "apple-spring h-11 w-full rounded-[10px] border bg-white pr-8 pl-3 text-sm tabular-nums text-ink-900",
                         "placeholder:text-ink-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-200 focus:outline-none",
                         readOnly && "cursor-not-allowed border-ink-200 bg-ink-50 text-ink-600",
                       )}
@@ -218,6 +346,31 @@ export function TimesheetGrid({
                       h
                     </span>
                   </div>
+                </div>
+
+                <div className="w-32 shrink-0">
+                  <label className="sr-only" htmlFor={`s-${day.date}`}>
+                    Day status for {day.weekday} {day.label}
+                  </label>
+                  <select
+                    id={`s-${day.date}`}
+                    disabled={readOnly}
+                    value={dayStatus}
+                    onChange={(e) => setDayStatus(day.date, e.target.value)}
+                    className={cn(
+                      "apple-spring h-11 w-full rounded-[10px] border bg-white px-2 text-xs font-medium text-ink-900",
+                      "focus:border-brand-500 focus:ring-2 focus:ring-brand-200 focus:outline-none",
+                      !dayStatus && "text-ink-400",
+                      readOnly && "cursor-not-allowed border-ink-200 bg-ink-50 text-ink-600",
+                    )}
+                  >
+                    <option value="">Status…</option>
+                    {DAY_STATUSES.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <div className="min-w-0 flex-1">
@@ -235,7 +388,7 @@ export function TimesheetGrid({
                       setDayNote(day.date, e.target.value);
                     }}
                     className={cn(
-                      "h-11 w-full rounded-lg border bg-white px-3 text-sm text-ink-900 transition-[border-color,box-shadow] duration-[var(--dur-instant)]",
+                      "apple-spring h-11 w-full rounded-[10px] border bg-white px-3 text-sm text-ink-900",
                       "placeholder:text-ink-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-200 focus:outline-none",
                       readOnly && "cursor-not-allowed border-ink-200 bg-ink-50 text-ink-600",
                     )}
@@ -267,11 +420,44 @@ export function TimesheetGrid({
 
         {!readOnly ? (
           <div className="flex items-center gap-3">
+            {status === "draft" ? (
+              <button
+                type="button"
+                disabled={deleting}
+                onClick={async () => {
+                  if (!window.confirm("Delete this draft timesheet?")) return;
+                  setDeleting(true);
+                  setDeleteError("");
+                  try {
+                    const res = await csrfFetch(`/api/intern/timesheets/${timesheetId}`, { method: "DELETE" });
+                    if (res.ok) {
+                      router.refresh();
+                    } else {
+                      const json = (await res.json().catch(() => null)) as { error?: string } | null;
+                      setDeleteError(json?.error || "Could not delete this draft. Try again.");
+                    }
+                  } catch {
+                    setDeleteError("Could not delete this draft. Check your connection and try again.");
+                  } finally {
+                    setDeleting(false);
+                  }
+                }}
+                className="inline-flex min-h-11 items-center rounded-[10px] px-3 text-sm font-medium text-danger hover:bg-danger-soft disabled:opacity-55"
+              >
+                {deleting ? "Deleting…" : "Delete draft"}
+              </button>
+            ) : null}
+            {missingStatus > 0 ? (
+              <span className="text-xs font-medium text-amber-700">
+                {missingStatus} day{missingStatus === 1 ? "" : "s"} still need{missingStatus === 1 ? "s" : ""} a status
+              </span>
+            ) : null}
             <button
               type="button"
               onClick={submit}
-              disabled={submitState === "saving" || total === 0}
-              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-primary px-5 text-sm font-semibold text-white shadow-sm transition-[background-color,box-shadow,transform] duration-[var(--dur-instant)] hover:bg-primary-hover hover:shadow-md active:scale-[0.98] disabled:pointer-events-none disabled:opacity-55"
+              disabled={submitState === "saving" || total === 0 || missingStatus > 0}
+              title={missingStatus > 0 ? "Pick a status for every day first" : undefined}
+              className="apple-spring apple-pressable inline-flex min-h-11 items-center justify-center gap-2 rounded-[10px] bg-primary px-5 text-sm font-semibold text-white shadow-sm hover:bg-primary-hover disabled:pointer-events-none disabled:opacity-55"
             >
               {submitState === "saving" ? (
                 <Loader2 className="size-4 animate-spin" aria-hidden />
@@ -310,10 +496,17 @@ export function TimesheetGrid({
         </div>
       )}
 
+      {deleteError ? (
+        <p role="alert" className="flex items-start gap-2 border-t border-ink-100 bg-danger-soft px-5 py-3 text-sm text-danger">
+          <AlertCircle className="mt-px size-4 shrink-0" aria-hidden />
+          {deleteError}
+        </p>
+      ) : null}
+
       {submitState === "error" ? (
         <p role="alert" className="flex items-start gap-2 border-t border-ink-100 bg-danger-soft px-5 py-3 text-sm text-danger">
           <AlertCircle className="mt-px size-4 shrink-0" aria-hidden />
-          That did not send. Your hours are still saved on this device. Press send again when you are ready.
+          {submitError || "That did not send."} Press send again when you are ready.
         </p>
       ) : null}
     </Surface>
@@ -363,6 +556,25 @@ function SaveIndicator({ state, readOnly }: { state: SaveState; readOnly: boolea
 }
 
 type Day = { date: string; weekday: string; label: string; weekend: boolean };
+
+/**
+ * Prefills statuses for days the intern never touched: gazetted holidays and
+ * weekends get their default, weekdays stay blank to fill in. Runs once for
+ * the initial state - it never overwrites a saved status, and nothing is
+ * persisted until the next edit or submit.
+ */
+function withDayDefaults(days: Day[], saved: Entry[]): Entry[] {
+  const byDate = new Map(saved.map((e) => [e.date, e]));
+  return days.map((day) => {
+    const existing = byDate.get(day.date);
+    if (existing) {
+      return { ...existing, status: existing.status ?? "" };
+    }
+    const preset = defaultDayStatus(day.date);
+    if (!preset) return { date: day.date, hours: 0, note: "", status: "" };
+    return { date: day.date, hours: 0, note: "", status: preset };
+  });
+}
 
 /**
  * Weekdays between two dates, inclusive.

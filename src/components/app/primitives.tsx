@@ -36,7 +36,7 @@ export function PageHead({
         </h1>
         {lede ? <p className="mt-2 text-pretty text-[0.9375rem] leading-relaxed text-ink-600">{lede}</p> : null}
       </div>
-      {action ? <div className="shrink-0">{action}</div> : null}
+      {action ? <div className="w-full sm:w-auto shrink-0">{action}</div> : null}
     </header>
   );
 }
@@ -78,12 +78,13 @@ export function Surface({
 }: {
   children: React.ReactNode;
   className?: string;
-  as?: "div" | "section" | "article" | "li";
+  as?: "div" | "section" | "article" | "li" | "ul";
 } & React.HTMLAttributes<HTMLElement>) {
   return (
     <As
       className={cn(
-        "min-w-0 rounded-2xl border border-ink-100 bg-white shadow-[0_1px_2px_rgb(7_47_36/0.04)]",
+        "min-w-0 rounded-[14px] border border-ink-200/80 bg-white",
+        "shadow-[0_1px_2px_rgb(7_47_36/0.04)]",
         className,
       )}
       {...rest}
@@ -163,7 +164,7 @@ export function EmptyScene({
   return (
     <div
       className={cn(
-        "flex flex-col items-center rounded-2xl border border-dashed border-ink-200 bg-white/60 px-6 py-12 text-center",
+        "flex flex-col items-center rounded-[20px] border border-dashed border-ink-200 bg-white/60 px-6 py-12 text-center",
         className,
       )}
     >
@@ -178,7 +179,7 @@ export function EmptyScene({
       {next ? (
         <Link
           href={next.href}
-          className="mt-6 inline-flex min-h-11 items-center gap-2 rounded-lg bg-primary px-5 text-sm font-semibold text-white shadow-sm transition-[background-color,box-shadow,transform] duration-[var(--dur-instant)] hover:bg-primary-hover hover:shadow-md active:scale-[0.98]"
+          className="apple-spring apple-pressable mt-6 inline-flex min-h-11 items-center gap-2 rounded-[10px] bg-primary px-5 text-sm font-semibold text-white shadow-sm hover:bg-primary-hover hover:shadow-md"
         >
           {next.label}
           <ArrowRight className="size-4" aria-hidden />

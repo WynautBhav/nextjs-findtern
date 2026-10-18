@@ -1,16 +1,18 @@
 {
   "mcpServers": {
-    "shadcn": {
+    "chrome-devtools": {
       "command": "npx",
       "args": [
         "-y",
-        "shadcn@latest",
-        "mcp"
+        "chrome-devtools-mcp@latest",
+        "-e",
+        "/usr/bin/chromium",
+        "--isolated",
+        "--viewport=1440x900",
+        "--screenshotFormat=jpeg",
+        "--screenshotMaxWidth=1440",
+        "--chromeArg=no-sandbox"
       ]
-    },
-    "watermelon": {
-      "url": "https://mcp.watermelon.sh/mcp",
-      "serverUrl": "https://mcp.watermelon.sh/mcp"
     }
   }
 }

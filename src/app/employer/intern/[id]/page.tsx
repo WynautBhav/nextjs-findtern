@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import {
   ArrowLeft,
   Award,
@@ -15,14 +15,17 @@ import {
 } from "lucide-react";
 
 import { getDb, schema } from "@/lib/db";
-import { getSession } from "@/lib/auth";
+import { requireRole } from "@/lib/auth";
+import { isAdminViewing } from "@/lib/employer-visibility";
+import { ShortlistToggle } from "@/components/employer/shortlist-toggle";
 import { bandFor } from "@/lib/score";
 import { formatRate } from "@/lib/format";
 import {
+  displayNameOf,
   toCandidateProfile,
   type CandidateProfile,
 } from "@/lib/employer-candidates";
-import { resolvePricing } from "@/lib/employer-pricing";
+import { employerRegion, resolvePricing } from "@/lib/employer-pricing";
 import { PageHeader, EmptyState } from "@/components/layout/page-header";
 import { AiFeedbackReport } from "@/components/employer/ai-feedback-report";
 
@@ -36,13 +39,16 @@ export const metadata: Metadata = {
  *
  * `canAccess(session, internId)` is the *wrong* check here and would be a bug:
  * it answers "is this user the intern", which is false for every employer, and
- * true for an admin. Visibility is a query instead — this employer sent them a
+ * true for an admin. Visibility is a query instead - this employer sent them a
  * proposal and they responded. That is `requireVisibleToEmployer`'s
  * `isVisible` callback, expressed as a page.
  *
  * The candidate pool screen (`/employer/candidates`) is deliberately more
- * permissive — it shows name, score and skills for browsing. This page is the
+ * permissive - it shows initials, score and skills for browsing. This page is the
  * one that opens up academics and courses, so it holds the stricter bar.
+ *
+ * Names (and LinkedIn, which leaks the name) stay redacted until this employer
+ * hires the intern - see `displayNameOf` in `lib/employer-candidates`.
  */
 
 export default async function EmployerInternDetail({
@@ -51,16 +57,22 @@ export default async function EmployerInternDetail({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const session = await getSession();
-  const employerId = session!.uid;
+  const session = await requireRole("employer");
+  const employerId = session.uid;
 
   let profile: CandidateProfile | null = null;
   let appliedProjects: { id: string; projectName: string | null; status: string }[] = [];
   let currency: "INR" | "USD" = "INR";
+  /** Full name + LinkedIn show only after this employer hired the intern. */
+  let nameUnlocked = false;
+  /** Admin "View as" only: the candidate's own contact details. */
+  let adminContact: { email: string; phone: string } | null = null;
   /** Set only when the check ran and passed. Distinct from a failed lookup. */
   let visible = false;
   /** True when a query could not run. Rendered, not hidden. */
   let lookupFailed = false;
+  /** The employer's newest active project and whether this candidate is on its shortlist. */
+  let shortlist: { projectId: string; on: boolean } | null = null;
 
   try {
     const db = getDb();
@@ -72,10 +84,46 @@ export default async function EmployerInternDetail({
       .limit(1);
 
     if (user) {
-      // ── The cross-tenant check ────────────────────────────────────────────────
-      // One query answers it: this employer's own proposals, addressed to this
-      // intern. `canAccess` cannot — it compares the session uid against an
-      // intern id, which is false for every employer and true for every admin.
+      visible = true;
+      const adminViewing = await isAdminViewing();
+      const [project] = await db
+        .select({ id: schema.projects.id })
+        .from(schema.projects)
+        .where(and(eq(schema.projects.employerId, employerId), eq(schema.projects.status, "active")))
+        .orderBy(desc(schema.projects.createdAt))
+        .limit(1);
+      if (project) {
+        const [item] = await db
+          .select({ id: schema.employerCartItems.id })
+          .from(schema.employerCartItems)
+          .where(
+            and(
+              eq(schema.employerCartItems.employerId, employerId),
+              eq(schema.employerCartItems.internId, id),
+              eq(schema.employerCartItems.projectId, project.id),
+            ),
+          )
+          .limit(1);
+        shortlist = { projectId: project.id, on: Boolean(item) };
+      }
+      // One view per employer per day feeds the intern's monthly views summary.
+      if (!adminViewing) {
+        await db.execute(sql`
+          INSERT INTO profile_views (employer_id, intern_id)
+          SELECT ${employerId}, ${id}
+          WHERE NOT EXISTS (
+            SELECT 1 FROM profile_views WHERE employer_id = ${employerId} AND intern_id = ${id}
+              AND created_at > now() - interval '1 day'
+          )`);
+      }
+      if (adminViewing) {
+        nameUnlocked = true;
+        adminContact = {
+          email: user.email,
+          phone: `${user.countryCode ?? ""} ${user.phoneNumber ?? ""}`.trim(),
+        };
+      }
+
       const proposals = await db
         .select({ projectId: schema.proposals.projectId, status: schema.proposals.status })
         .from(schema.proposals)
@@ -88,7 +136,8 @@ export default async function EmployerInternDetail({
         .orderBy(desc(schema.proposals.createdAt));
 
       if (proposals.length > 0) {
-        visible = true;
+        // Redaction lifts only on hire - sent / accepted / in-cart stays initials.
+        nameUnlocked = nameUnlocked || proposals.some((proposal) => proposal.status === "hired");
 
         // Collapse to one row per project, keeping the most recent status.
         const latest = new Map<string, string>();
@@ -100,8 +149,6 @@ export default async function EmployerInternDetail({
         const projectRows = await db
           .select({ id: schema.projects.id, projectName: schema.projects.projectName })
           .from(schema.projects)
-          // Scoped to this employer too: a `project_id` on a proposal row is not
-          // by itself proof the project belongs to them.
           .where(
             and(
               eq(schema.projects.employerId, employerId),
@@ -115,29 +162,32 @@ export default async function EmployerInternDetail({
           projectName: projectNameById.get(projectId) ?? null,
           status: latest.get(projectId) ?? "sent",
         }));
-
-        const [onboarding] = await db
-          .select()
-          .from(schema.internOnboarding)
-          .where(eq(schema.internOnboarding.userId, user.id))
-          .limit(1);
-
-        profile = toCandidateProfile(user, onboarding);
-
-        const [employer] = await db
-          .select({ phoneNumber: schema.employers.phoneNumber })
-          .from(schema.employers)
-          .where(eq(schema.employers.id, employerId))
-          .limit(1);
-        currency = employer?.phoneNumber?.startsWith("91") ? "INR" : "USD";
       }
+
+      const [onboarding] = await db
+        .select()
+        .from(schema.internOnboarding)
+        .where(eq(schema.internOnboarding.userId, user.id))
+        .limit(1);
+
+      profile = toCandidateProfile(user, onboarding);
+
+      const [employer] = await db
+        .select({
+          country: schema.employers.country,
+          countryCode: schema.employers.countryCode,
+          phoneNumber: schema.employers.phoneNumber,
+        })
+        .from(schema.employers)
+        .where(eq(schema.employers.id, employerId))
+        .limit(1);
+      currency = employerRegion(employer ?? {}) === "IN" ? "INR" : "USD";
     }
   } catch {
     lookupFailed = true;
   }
 
-  // A checked-and-denied intern gets the same 404 as an intern who does not
-  // exist, so a valid id does not confirm the intern exists.
+  // A candidate who does not exist gets a 404.
   if (!lookupFailed && !visible) notFound();
 
   // Reachable only when a query threw: a successful run either 404s above or
@@ -150,7 +200,7 @@ export default async function EmployerInternDetail({
           title="Could not load this profile"
           body={
             lookupFailed
-              ? "The database is not reachable from this page right now. Nothing is wrong with the link — try again once the connection is back."
+              ? "We couldn't load this profile right now. Nothing is wrong with the link - try again in a moment."
               : "That profile could not be assembled."
           }
         />
@@ -161,26 +211,36 @@ export default async function EmployerInternDetail({
   const band = bandFor(profile.score);
   const pricing = resolvePricing(profile.score, [], currency, null);
   const academics = profile.academics;
+  const displayName = displayNameOf(profile, nameUnlocked);
 
   return (
     <div>
       <Link
         href="/employer/candidates"
-        className="inline-flex items-center gap-1.5 text-sm font-medium text-brand-700 transition-colors hover:underline"
+        className="apple-spring inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-brand-700 hover:underline"
       >
         <ArrowLeft className="size-4" aria-hidden />
         Back to candidates
       </Link>
 
-      <PageHeader title={profile.fullName} subtitle={profile.location || "Location not stated"} />
+      <PageHeader title={displayName} subtitle={profile.location || "Location not stated"} />
+      {adminContact ? (
+        <p className="mb-4 rounded-[10px] border border-accent-300 bg-accent-100/60 px-4 py-2.5 text-sm text-ink-800">
+          <span className="font-semibold">Admin view:</span>{" "}
+          <a href={`mailto:${adminContact.email}`} className="underline underline-offset-4">
+            {adminContact.email}
+          </a>
+          {adminContact.phone ? <> · {adminContact.phone}</> : null}
+        </p>
+      ) : null}
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_19rem]">
-        <div className="space-y-4">
-          <section className="rounded-xl border border-ink-100 bg-white p-6">
+        <div className="min-w-0 space-y-4">
+          <section className="rounded-[20px] border border-ink-200/70 bg-white p-6 shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)]">
             <div className="flex flex-wrap items-start gap-5">
               <span
                 aria-hidden
-                className="grid size-16 shrink-0 place-items-center rounded-full bg-brand-100 text-xl font-semibold text-brand-700"
+                className="grid size-16 shrink-0 place-items-center rounded-[10px] bg-brand-100 text-xl font-semibold tabular-nums text-brand-700"
               >
                 {profile.initials}
               </span>
@@ -189,10 +249,10 @@ export default async function EmployerInternDetail({
                   Findtern Score
                 </p>
                 <p className="mt-1 flex items-baseline gap-1.5">
-                  <span className="text-4xl font-semibold tracking-tight text-ink-900">
-                    {profile.scored ? profile.score.toFixed(1) : "—"}
+                  <span className="text-4xl font-semibold tabular-nums tracking-tight text-ink-900">
+                    {profile.scored ? profile.score.toFixed(1) : "-"}
                   </span>
-                  <span className="text-sm text-text-subtle">/10</span>
+                  <span className="text-sm tabular-nums text-text-subtle">/10</span>
                   <span className="ml-2 inline-flex rounded-full bg-brand-50 px-2.5 py-0.5 text-xs font-medium text-brand-700">
                     {band.name}
                   </span>
@@ -201,12 +261,20 @@ export default async function EmployerInternDetail({
               </div>
               <Link
                 href={`/employer/send-proposal?intern=${encodeURIComponent(profile.id)}`}
-                className="inline-flex h-10 items-center gap-2 rounded-lg bg-brand-700 px-4 text-sm font-semibold text-white transition-colors hover:bg-brand-600"
+                className="apple-spring apple-pressable inline-flex min-h-11 items-center justify-center gap-2 rounded-[10px] bg-brand-700 px-4 text-sm font-semibold text-white hover:bg-brand-600"
               >
                 <Send className="size-4" aria-hidden />
                 Send proposal
               </Link>
             </div>
+            {shortlist ? (
+              <div className="mt-4 flex flex-wrap items-center gap-3">
+                <ShortlistToggle internId={profile.id} projectId={shortlist.projectId} shortlisted={shortlist.on} />
+                <Link href="/employer/cart" className="text-sm font-medium text-brand-700 underline-offset-4 hover:underline">
+                  Book an interview from your shortlist
+                </Link>
+              </div>
+            ) : null}
 
             {profile.skills.length > 0 ? (
               <div className="mt-6 border-t border-ink-100 pt-5">
@@ -215,7 +283,7 @@ export default async function EmployerInternDetail({
                   {profile.skills.map((skill) => (
                     <li
                       key={skill}
-                      className="rounded-full bg-brand-50 px-2.5 py-1 text-2xs font-medium text-brand-700"
+                      className="rounded-full bg-brand-50 px-2.5 py-1 text-xs font-medium text-brand-700"
                     >
                       {skill}
                     </li>
@@ -226,7 +294,7 @@ export default async function EmployerInternDetail({
           </section>
 
           {profile.bio ? (
-            <section className="rounded-xl border border-ink-100 bg-white p-6">
+            <section className="rounded-[20px] border border-ink-200/70 bg-white p-6 shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)]">
               <h2 className="flex items-center gap-2 text-sm font-semibold text-ink-900">
                 <UserRound className="size-4 text-ink-400" aria-hidden />
                 About
@@ -238,15 +306,17 @@ export default async function EmployerInternDetail({
           ) : null}
 
           <AiFeedbackReport
-            candidateName={profile.fullName}
+            candidateName={displayName}
             findternScore={profile.score}
             ratings={profile.ratings}
             skills={profile.skills}
             bio={profile.bio}
+            aiFeedbackLink={profile.aiFeedbackLink}
+            aiRecordingLink={profile.aiRecordingLink}
           />
 
           {academics ? (
-            <section className="rounded-xl border border-ink-100 bg-white p-6">
+            <section className="rounded-[20px] border border-ink-200/70 bg-white p-6 shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)]">
               <h2 className="flex items-center gap-2 text-sm font-semibold text-ink-900">
                 <GraduationCap className="size-4 text-ink-400" aria-hidden />
                 Academics
@@ -269,22 +339,22 @@ export default async function EmployerInternDetail({
                     ? `${academics.score}${academics.scoreType ? ` ${academics.scoreType}` : ""}`
                     : "Not stated"}
                 </Detail>
-                <Detail label="Status">{academics.status || "Not stated"}</Detail>
+                <Detail label="Status">{academics.status ? humanise(academics.status) : "Not stated"}</Detail>
               </dl>
             </section>
           ) : null}
 
           {academics && academics.courses.length > 0 ? (
-            <section className="rounded-xl border border-ink-100 bg-white p-6">
+            <section className="rounded-[20px] border border-ink-200/70 bg-white p-6 shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)]">
               <h2 className="flex items-center gap-2 text-sm font-semibold text-ink-900">
                 <BookOpen className="size-4 text-ink-400" aria-hidden />
                 Professional courses
               </h2>
-              <ul className="mt-4 divide-y divide-ink-100">
+                <ul className="mt-4 divide-y divide-ink-100">
                 {academics.courses.map((course, i) => (
                   <li key={`${course.name}-${i}`} className="py-3 first:pt-0 last:pb-0">
                     <p className="text-sm font-medium text-ink-900">{course.name}</p>
-                    <p className="mt-0.5 text-xs text-text-subtle">
+                    <p className="mt-0.5 text-xs tabular-nums text-text-subtle">
                       {[course.institution, course.level, course.completed, course.score]
                         .filter(Boolean)
                         .join(" · ") || "No further detail recorded"}
@@ -296,19 +366,17 @@ export default async function EmployerInternDetail({
           ) : null}
         </div>
 
-        <aside className="space-y-4">
-          <section className="rounded-xl border border-ink-100 bg-white p-5">
+        <aside className="min-w-0 space-y-4">
+          <section className="rounded-[20px] border border-ink-200/70 bg-white p-5 shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)]">
             <p className="flex items-center gap-1.5 text-2xs font-semibold uppercase tracking-[0.14em] text-text-subtle">
               <Award className="size-3.5" aria-hidden />
               What hiring them costs
             </p>
-            <p className="mt-3 text-lg font-semibold tracking-tight text-ink-900">
+            <p className="mt-3 text-lg font-semibold tabular-nums tracking-tight text-ink-900">
               {formatRate(pricing.hourlyRateMinor, currency)}
             </p>
-            <p className="mt-1 text-xs text-text-subtle">
-              {pricing.perHireMinor > 0
-                ? `plus ${formatRate(pricing.perHireMinor, currency)} per hire`
-                : "no per-hire charge at this score"}
+            <p className="mt-1 text-xs tabular-nums text-text-subtle">
+              plus {formatRate(pricing.perHireMinor, currency)} per hire
             </p>
             <p className="mt-4 text-xs leading-relaxed text-ink-600">
               Fixed by the band, not negotiable in the composer. You set hours and can pay above
@@ -316,7 +384,7 @@ export default async function EmployerInternDetail({
             </p>
           </section>
 
-          <section className="rounded-xl border border-ink-100 bg-white p-5">
+          <section className="rounded-[20px] border border-ink-200/70 bg-white p-5 shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)]">
             <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-text-subtle">
               Practicalities
             </p>
@@ -349,12 +417,14 @@ export default async function EmployerInternDetail({
                 Prefers: {profile.preferredLocations.join(", ")}
               </p>
             ) : null}
-            {profile.linkedinUrl ? (
+            {/* LinkedIn URLs usually contain the real name, so the link stays
+                hidden until the hire unmasks the candidate. */}
+            {nameUnlocked && profile.linkedinUrl ? (
               <a
                 href={profile.linkedinUrl}
                 target="_blank"
                 rel="noreferrer noopener"
-                className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-brand-700 underline-offset-4 hover:underline"
+                className="apple-spring mt-3 inline-flex min-h-11 items-center gap-1.5 text-[13px] font-medium text-brand-700 underline-offset-4 hover:underline"
               >
                 <Link2 className="size-3.5" aria-hidden />
                 LinkedIn profile
@@ -362,18 +432,18 @@ export default async function EmployerInternDetail({
             ) : null}
           </section>
 
-          <section className="rounded-xl border border-ink-100 bg-white p-5">
+          <section className="rounded-[20px] border border-ink-200/70 bg-white p-5 shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)]">
             <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-text-subtle">
               Your proposals to them
             </p>
             <ul className="mt-3 space-y-2.5">
               {appliedProjects.map((entry) => (
-                <li key={entry.id} className="text-sm">
+                <li key={entry.id} className="min-w-0 text-sm">
                   <p className="font-medium text-ink-900">
                     {entry.projectName ?? "Project no longer listed"}
                   </p>
-                  <p className="mt-0.5 text-xs text-text-subtle capitalize">
-                    {entry.status.replace(/_/g, " ")}
+                  <p className="mt-0.5 text-xs tabular-nums text-text-subtle">
+                    {humanise(entry.status)}
                   </p>
                 </li>
               ))}
@@ -391,9 +461,9 @@ export default async function EmployerInternDetail({
 
 function Detail({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div>
-      <dt className="text-xs text-text-subtle">{label}</dt>
-      <dd className="mt-1 text-sm font-medium text-ink-900">{children}</dd>
+    <div className="min-w-0">
+      <dt className="text-xs tabular-nums text-text-subtle">{label}</dt>
+      <dd className="mt-1 text-sm font-medium tabular-nums text-ink-900">{children}</dd>
     </div>
   );
 }

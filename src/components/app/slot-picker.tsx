@@ -55,6 +55,23 @@ export function SlotPicker({
   const [picked, setPicked] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const [asked, setAsked] = useState(false);
+
+  async function askForNewTimes() {
+    setError(null);
+    const res = await csrfFetch(`/api/interviews/${interviewId}/reschedule`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{}",
+    });
+    if (res.ok) {
+      setAsked(true);
+      startTransition(() => router.refresh());
+    } else {
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      setError(data.error ?? "Couldn't send that. Try again.");
+    }
+  }
   const [pending, startTransition] = useTransition();
 
   async function confirm(slot: number) {
@@ -98,7 +115,7 @@ export function SlotPicker({
             href={meetUrl}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-white shadow-sm transition-[background-color,transform] duration-[var(--dur-instant)] hover:bg-primary-hover active:scale-[0.98]"
+            className="apple-spring apple-pressable inline-flex min-h-11 items-center gap-2 rounded-[10px] bg-primary px-4 text-sm font-semibold text-white shadow-sm hover:bg-primary-hover"
           >
             <CalendarCheck className="size-4" aria-hidden />
             Join link
@@ -109,7 +126,7 @@ export function SlotPicker({
       {error ? (
         <p
           role="alert"
-          className="mt-4 flex items-start gap-2 rounded-xl bg-danger-soft px-3.5 py-3 text-sm text-danger"
+          className="mt-4 flex items-start gap-2 rounded-[10px] bg-danger-soft px-3.5 py-3 text-sm text-danger"
         >
           <AlertCircle className="mt-px size-4 shrink-0" aria-hidden />
           {error}
@@ -128,10 +145,10 @@ export function SlotPicker({
                 disabled={pending || isPendingChoice || Boolean(chosen)}
                 aria-pressed={isActive}
                 className={cn(
-                  "flex min-h-24 w-full flex-col items-start rounded-xl border p-4 text-left transition-[border-color,background-color,box-shadow,transform] duration-[var(--dur-quick)]",
+                  "apple-spring apple-pressable flex min-h-24 w-full flex-col items-start rounded-[10px] border p-4 text-left",
                   isActive
                     ? "border-brand-600 bg-brand-50 shadow-[0_0_0_1px_var(--color-brand-600)]"
-                    : "border-ink-200 bg-white hover:border-ink-300 hover:bg-ink-50 active:scale-[0.99]",
+                    : "border-ink-200 bg-white hover:border-ink-300 hover:bg-ink-50",
                   (chosen && !isActive) || pending
                     ? "cursor-default opacity-45"
                     : "cursor-pointer",
@@ -139,14 +156,14 @@ export function SlotPicker({
               >
                 <span
                   className={cn(
-                    "text-sm font-semibold tracking-[-0.01em]",
+                    "text-sm font-semibold tracking-[-0.01em] tabular-nums",
                     isActive ? "text-brand-800" : "text-ink-900",
                   )}
                 >
                   {formatSlotDay(slot.iso, timezone)}
                 </span>
                 <span
-                  className={cn("mt-0.5 text-sm", isActive ? "text-brand-700" : "text-ink-600")}
+                  className={cn("mt-0.5 text-sm tabular-nums", isActive ? "text-brand-700" : "text-ink-600")}
                 >
                   {formatSlotTime(slot.iso, timezone).split(", ").slice(-1)[0]}
                 </span>
@@ -165,6 +182,18 @@ export function SlotPicker({
         })}
       </ul>
 
+      {!chosen && !saved ? (
+        <p className="mt-4 text-sm text-text-subtle">
+          {asked ? (
+            "We've asked the company for new times."
+          ) : (
+            <button type="button" onClick={askForNewTimes} className="font-medium text-brand-700 underline underline-offset-4">
+              None of these work? Ask for new times
+            </button>
+          )}
+        </p>
+      ) : null}
+
       <AnimatePresence>
         {saved ? (
           <motion.p
@@ -173,7 +202,7 @@ export function SlotPicker({
             exit={{ opacity: 0 }}
             transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
             role="status"
-            className="mt-4 flex items-center gap-2 rounded-xl bg-success-soft px-3.5 py-3 text-sm font-medium text-success"
+            className="mt-4 flex items-center gap-2 rounded-[10px] bg-success-soft px-3.5 py-3 text-sm font-medium text-success"
           >
             <Check className="size-4 shrink-0" strokeWidth={2.5} aria-hidden />
             Sent. The company has your chosen time and a calendar invite is on its way.

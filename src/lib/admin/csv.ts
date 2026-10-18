@@ -68,3 +68,13 @@ export function csvResponse(body: string, filename: string): Response {
     },
   });
 }
+
+/** Browser-side: build the CSV and save it. Client components only. */
+export function downloadCsv<T>(resource: string, rows: T[], columns: CsvColumn<T>[]): void {
+  const url = URL.createObjectURL(new Blob([toCsv(rows, columns)], { type: "text/csv;charset=utf-8" }));
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = csvFilename(resource);
+  a.click();
+  URL.revokeObjectURL(url);
+}

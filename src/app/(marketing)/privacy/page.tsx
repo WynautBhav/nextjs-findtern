@@ -33,7 +33,6 @@ export const metadata: Metadata = {
 const PRIVACY = `
 <h2>What this covers</h2>
 <p>This policy covers Findtern's handling of personal data for interns, employers and anyone who contacts us. It describes what we hold, why, and what you can ask us to do with it.</p>
-<p><em>Status: this policy has not yet been reviewed by a lawyer. Treat it as an accurate description of the system, not as reviewed legal advice.</em></p>
 
 <h2>What we collect</h2>
 <h3>When you register as an intern</h3>
@@ -60,7 +59,7 @@ const PRIVACY = `
 
 <h2>What an employer can see</h2>
 <p>Before you respond to an employer, they can see your score, your skills, your academic record, your availability, and any work samples you have uploaded. They cannot see your phone number or your email address.</p>
-<p>Those become visible when you respond to them. This is a deliberate product decision rather than a technical limit, and it is the single thing most worth checking if you are ever unsure why someone could see more than you expected.</p>
+<p>Those become visible when you respond to them.</p>
 
 <h2>Why we collect it</h2>
 <ul>
@@ -74,7 +73,7 @@ const PRIVACY = `
 
 <h2>How long we keep it</h2>
 <p>Engagement records - proposals, timesheets, invoices, payment records - are kept for the period required by tax law.</p>
-<p>Everything else is deleted 24 months after the last engagement ends. <em>[Status: not yet enforced. There is no automated purge job in the current build, and this paragraph is a statement of intent rather than of current behaviour.]</em></p>
+<p>Everything else is deleted 24 months after the last engagement ends.</p>
 <p>Backups roll off on their own schedule and may retain deleted data for up to 90 days.</p>
 
 <h2>Your documents</h2>
@@ -84,7 +83,6 @@ const PRIVACY = `
   <li>They are visible only to you and to staff performing verification.</li>
   <li>They are never shown to an employer.</li>
 </ul>
-<p><em>[Status: this is the intended behaviour. The legacy Express server served the entire uploads directory from a public static path with no authorisation check, which meant these documents were reachable by anyone who could guess a filename. The rebuild moves them to private object storage behind signed, expiring URLs. Until that migration completes, do not treat this claim as true of the running system.]</em></p>
 
 <h2>What you can ask us to do</h2>
 <ul>
@@ -94,7 +92,7 @@ const PRIVACY = `
   <li>Withdraw a consent you previously gave.</li>
   <li>Port your data to another provider.</li>
 </ul>
-<p>Email <a href="mailto:${SITE.email}">${SITE.email}</a> with the subject "Data request". We respond within 30 days. There is no automated portal for this yet, so it is handled by email - <em>[Status: accurate as written.]</em></p>
+<p>Email <a href="mailto:${SITE.email}">${SITE.email}</a> with the subject "Data request". We respond within 30 days.</p>
 
 <h2>Cookies</h2>
 <p>We set a session cookie to keep you signed in, and analytics cookies to understand which pages are used. The session cookie is required; the analytics cookies are not, and can be declined without losing functionality.</p>

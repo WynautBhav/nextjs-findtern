@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, Check, Coffee, Minus } from "lucide-react";
+import { ArrowRight, Check, Coffee, X } from "lucide-react";
 
 import { PageSection } from "@/components/marketing/page-hero";
 import { ButtonLink } from "@/components/ui/button";
@@ -9,7 +9,8 @@ import { CountUp } from "@/components/motion/count-up";
 import { FaqExplorer } from "@/components/marketing/faq-explorer";
 import { formatMoney, formatRate } from "@/lib/format";
 import { useRegionBands } from "@/components/marketing/region-rates";
-import { PER_HIRE_CUTOFF } from "@/lib/score";
+import { PlanPrice } from "@/components/marketing/plan-price";
+import { inrToUsd } from "@/lib/currency";
 import type { CmsPlan } from "@/lib/content/types";
 import { cn } from "@/lib/utils";
 
@@ -18,8 +19,6 @@ import { cn } from "@/lib/utils";
  * three plans per region - the table holds both rate cards, and returning
  * both is what once rendered every plan twice. */
 
-const FEATURED_SLUG = "cappuccino";
-
 type AltCard = {
   label: string;
   price: string;
@@ -27,50 +26,43 @@ type AltCard = {
   note: string;
 };
 
-/* INR figures are authored. USD mirrors are converted once, rounded UP to
- * clean whole numbers ("next big number" - a $444 upper bound invites the
- * negotiation this page refuses), at an assumed ≈₹90/$. */
-const ALTERNATIVES_INR: AltCard[] = [
-  {
-    label: "Agency or job board",
-    price: "8.33% of CTC",
-    example: "₹50,000",
-    note: "On a ₹6,00,000 CTC hire, at an assisted-hire rate.",
-  },
-  {
-    label: "Hiring in-house",
-    price: "₹18,000 – ₹40,000",
-    example: "₹29,000",
-    note: "Recruiter time and three screening rounds, with no comparable signal.",
-  },
-  {
-    label: "Findtern",
-    price: "₹0 – ₹200/hr",
-    example: "₹16,000",
-    note: "160 hours at a mid-band rate, plus a flat fee only below 6/10.",
-  },
-];
+/** Hours in the worked example: the 160-hour minimum on paid bands. */
+const EXAMPLE_HOURS = 160;
 
-const ALTERNATIVES_USD: AltCard[] = [
-  {
-    label: "Agency or job board",
-    price: "8.33% of CTC",
-    example: "$600",
-    note: "On a $7,000 CTC hire, at an assisted-hire rate.",
-  },
-  {
-    label: "Hiring in-house",
-    price: "$200 – $500",
-    example: "$350",
-    note: "Recruiter time and three screening rounds, with no comparable signal.",
-  },
-  {
-    label: "Findtern",
-    price: "$0 – $2/hr",
-    example: "$160",
-    note: "160 hours at a mid-band rate, plus a flat fee only below 6/10.",
-  },
-];
+/* Authored in rupees; USD derives at ₹100 = $1 like every other price. The
+ * Findtern card is computed from the live plan rows, so it moves when an
+ * admin edits a price. */
+function alternatives(isIndia: boolean, plans: CmsPlan[]): AltCard[] {
+  const money = (rupees: number) =>
+    formatMoney((isIndia ? rupees : inrToUsd(rupees)) * 100, isIndia ? "INR" : "USD");
+  const currency = isIndia ? "INR" : "USD";
+  const mid = plans.find((p) => p.isFeatured) ?? plans[1] ?? plans[0];
+  const hourly = plans.map((p) => p.priceHourlyMinor);
+  const findternTotal = mid ? mid.priceHourlyMinor * EXAMPLE_HOURS + mid.perHireChargeMinor : 0;
+
+  return [
+    {
+      label: "Agency or job board",
+      price: "8.33% of CTC",
+      example: money(50000),
+      note: `On a ${money(600000)} CTC hire, at an assisted-hire rate.`,
+    },
+    {
+      label: "Hiring in-house",
+      price: `${money(18000)} – ${money(40000)}`,
+      example: money(29000),
+      note: "Recruiter time and three screening rounds, with no comparable signal.",
+    },
+    {
+      label: "Findtern",
+      price: `${formatRate(Math.min(...hourly), currency)} – ${formatRate(Math.max(...hourly), currency)}`,
+      example: formatMoney(findternTotal, currency),
+      note: mid
+        ? `${EXAMPLE_HOURS} hours on ${mid.displayName} at ${formatRate(mid.priceHourlyMinor, currency)}, plus the ${formatMoney(mid.perHireChargeMinor, currency)} per-hire fee.`
+        : "",
+    },
+  ];
+}
 
 export function PricingContent({
   plansInr,
@@ -83,21 +75,30 @@ export function PricingContent({
   const plans = isIndia ? plansInr : plansUsd;
   const featuredIdx = Math.max(
     0,
-    plans.findIndex((p) => p.slug === FEATURED_SLUG),
+    plans.findIndex((p) => p.isFeatured),
   );
-  const alternatives = isIndia ? ALTERNATIVES_INR : ALTERNATIVES_USD;
+  const altCards = alternatives(isIndia, plans);
+  const perHireMinor = plans[0]?.perHireChargeMinor ?? bands[0]?.perHireMinor ?? 0;
 
   const MATRIX = [
     { label: "Who is it for", get: (p: CmsPlan) => p.features[0] ?? "-" },
     { label: "Findtern Score", get: (p: CmsPlan) => p.features[1] ?? "-" },
     {
       label: "Per hiring charge",
-      get: (p: CmsPlan) =>
-        p.perHireChargeMinor > 0 ? formatMoney(p.perHireChargeMinor, currency) : "Waived",
+      get: (p: CmsPlan) => (
+        <PlanPrice
+          nowMinor={p.perHireChargeMinor}
+          wasMinor={p.compareAtPerHireMinor}
+          currency={currency}
+          kind="money"
+        />
+      ),
     },
     {
       label: "Price",
-      get: (p: CmsPlan) => formatRate(p.priceHourlyMinor, currency),
+      get: (p: CmsPlan) => (
+        <PlanPrice nowMinor={p.priceHourlyMinor} wasMinor={p.compareAtHourlyMinor} currency={currency} />
+      ),
     },
     { label: "Duration", get: (p: CmsPlan) => p.internshipDuration },
     { label: "What you get", get: (p: CmsPlan) => p.features[2] ?? "-" },
@@ -119,45 +120,76 @@ export function PricingContent({
         </div>
 
         <div className="mt-12 grid gap-5 md:grid-cols-3">
-          {bands.map((band, i) => (
-            <TiltCard key={band.id} max={5} className="rounded-2xl">
-              <article
-                className={cn(
-                  "flex h-full flex-col rounded-2xl border bg-white p-6 sm:p-7",
-                  i === featuredIdx ? "border-2 border-primary shadow-lg" : "border-ink-200",
-                )}
-              >
-                <span className="inline-flex size-10 items-center justify-center rounded-lg bg-brand-50 text-primary">
-                  <Coffee className="size-5" aria-hidden />
-                </span>
-                <h3 className="mt-5 text-lg font-semibold tracking-tight text-ink-900">
-                  {plans[i]?.displayName ?? band.name}
-                </h3>
-                <p className="mt-1 text-sm text-ink-500">
-                  {band.min}–{band.max}/10
-                </p>
-                <p className="mt-4 text-2xl font-semibold tracking-tight text-ink-900">
-                  {formatRate(band.rateMinor, currency)}
-                </p>
-                <p className="mt-1.5 text-sm text-ink-500">{band.blurb}</p>
-                <p
+          {bands.map((band, i) => {
+            const plan = plans[i];
+            const featured = i === featuredIdx;
+            return (
+              <TiltCard key={band.id} max={5} className="rounded-2xl">
+                <article
                   className={cn(
-                    "mt-5 flex items-center gap-2 border-t pt-4 text-sm",
-                    band.perHireMinor > 0 ? "text-ink-600" : "text-primary",
+                    "relative flex h-full flex-col rounded-2xl border bg-white p-6 sm:p-7",
+                    featured ? "border-2 border-primary shadow-lg" : "border-ink-200",
                   )}
                 >
-                  {band.perHireMinor > 0 ? (
-                    <Minus className="size-4" aria-hidden />
-                  ) : (
-                    <Check className="size-4" aria-hidden />
-                  )}
-                  {band.perHireMinor > 0
-                    ? `${formatMoney(band.perHireMinor, currency)} per hire`
-                    : "No per-hire charge"}
-                </p>
-              </article>
-            </TiltCard>
-          ))}
+                  {featured ? (
+                    <span className="absolute -top-3 left-6 rounded-full bg-primary px-3 py-1 text-2xs font-semibold uppercase tracking-[0.12em] text-white">
+                      Most popular
+                    </span>
+                  ) : null}
+                  <span className="inline-flex size-10 items-center justify-center rounded-lg bg-brand-50 text-primary">
+                    <Coffee className="size-5" aria-hidden />
+                  </span>
+                  <h3 className="mt-5 text-lg font-semibold tracking-tight text-ink-900">
+                    {plan?.displayName ?? band.name}
+                  </h3>
+                  <p className="mt-1 text-sm text-ink-500">
+                    {band.min}–{band.max}/10
+                  </p>
+                  <PlanPrice
+                    className="mt-4"
+                    priceClassName="text-2xl font-semibold tracking-tight text-ink-900"
+                    nowMinor={plan?.priceHourlyMinor ?? band.rateMinor}
+                    wasMinor={plan?.compareAtHourlyMinor}
+                    currency={currency}
+                  />
+                  <p className="mt-1.5 text-sm text-ink-500">{band.blurb}</p>
+                  <p className="mt-5 flex items-center gap-2 border-t pt-4 text-sm text-ink-700">
+                    <Check className="size-4 shrink-0 text-primary" aria-hidden />
+                    <PlanPrice
+                      nowMinor={plan?.perHireChargeMinor ?? band.perHireMinor}
+                      wasMinor={plan?.compareAtPerHireMinor}
+                      currency={currency}
+                      kind="money"
+                    />
+                    <span>per hire</span>
+                  </p>
+                  {plan?.featureList.length ? (
+                    <ul className="mt-4 space-y-2.5" aria-label={`${plan.displayName} includes`}>
+                      {plan.featureList.map((f) => (
+                        <li
+                          key={f.label}
+                          className={cn(
+                            "flex gap-2.5 text-sm",
+                            f.included ? "text-ink-700" : "text-ink-400",
+                          )}
+                        >
+                          {f.included ? (
+                            <Check className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
+                          ) : (
+                            <X className="mt-0.5 size-4 shrink-0 text-ink-300" aria-hidden />
+                          )}
+                          <span>
+                            <span className="sr-only">{f.included ? "Included: " : "Not included: "}</span>
+                            {f.label}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </article>
+              </TiltCard>
+            );
+          })}
         </div>
       </PageSection>
 
@@ -176,10 +208,8 @@ export function PricingContent({
           <div className="overflow-x-auto">
             <table className="w-full min-w-[42rem] border-collapse text-left">
               <caption className="sr-only">
-                Findtern hiring plans compared across six attributes. Espresso is
-                free with a per-hire charge and covers interns scoring under{" "}
-                {PER_HIRE_CUTOFF} out of 10. Cappuccino and Latte are billed
-                hourly with no per-hire charge.
+                Findtern hiring plans compared across six attributes. Every plan carries
+                a fixed per-hiring charge to cover verified screening and talent matching.
               </caption>
               <thead>
                 <tr className="border-b border-ink-200">
@@ -212,9 +242,12 @@ export function PricingContent({
                       >
                         {p.displayName}
                       </span>
-                      <span className="mt-1 block text-sm font-medium text-ink-500">
-                        {formatRate(p.priceHourlyMinor, currency)}
-                      </span>
+                      <PlanPrice
+                        className="mt-1 text-sm font-medium text-ink-500"
+                        nowMinor={p.priceHourlyMinor}
+                        wasMinor={p.compareAtHourlyMinor}
+                        currency={currency}
+                      />
                     </th>
                   ))}
                 </tr>
@@ -291,7 +324,7 @@ export function PricingContent({
         </div>
 
         <div className="mt-12 grid gap-5 md:grid-cols-3">
-          {alternatives.map((card) => (
+          {altCards.map((card) => (
             <CostCard
               key={card.label}
               label={card.label}
@@ -304,7 +337,7 @@ export function PricingContent({
                   ? [
                       "Stipend routed through Findtern",
                       "Score-based rate, no negotiation",
-                      "No fee at all above 6/10",
+                      "One flat per-hire fee on every plan",
                       "8.33% of CTC only on full-time conversion",
                     ]
                   : undefined
@@ -330,14 +363,14 @@ export function PricingContent({
                     a prefix change must remount rather than update in place. */}
                 <CountUp
                   key={currency}
-                  value={0}
+                  value={perHireMinor / 100}
                   prefix={currency === "INR" ? "₹" : "$"}
                 />
               </p>
               <p className="text-sm text-ink-500">
-                per-hire fee once a candidate
+                fixed per-hire fee
                 <br />
-                scores {PER_HIRE_CUTOFF} or above
+                on every plan
               </p>
             </div>
           </div>
@@ -348,9 +381,8 @@ export function PricingContent({
               {
                 id: "p1",
                 category: "Pricing",
-                question: "Why is there a per-hire fee at all?",
-                answer:
-                  "It covers our screening cost on candidates you go on to hire. Above a 6 out of 10 those candidates are rare enough that charging a flat fee on top of an hourly rate reads as charging twice for the same thing, so we drop it.",
+                question: "What is the per-hire fee?",
+                answer: `Every plan carries a fixed ${formatMoney(perHireMinor, currency)} per-hire charge that covers candidate screening, testing, rubric scoring, and ongoing placement management.`,
               },
               {
                 id: "p2",

@@ -6,3 +6,29 @@ out/
 .env
 .env.local
 .env*.local
+
+# Local data and uploads (never commit)
+.env.local.db
+.private-uploads/
+.legacy-uploads/
+logs/
+
+# Tool output and scratch
+graphify-out/
+src/graphify-out/
+docs/screenshots/
+PARITY_AUDIT.md
+*.zip
+*.ods
+opencode.json
+skills-lock.json
+scripts/audit-uploads.ts
+scripts/capture-redesign-screenshots.mjs
+scripts/deep-audit.ts
+scripts/ft-discover.mjs
+scripts/seed-category-students.ts
+
+# Local AI tooling
+.opencode/
+.claude/
+.impeccable/build/

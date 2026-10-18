@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { eq } from "drizzle-orm";
+import { and, count, eq } from "drizzle-orm";
 import {
   LayoutDashboard,
   FolderKanban,
@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 
 import { AppShell, type NavGroup } from "@/components/layout/app-shell";
+import { ViewAsBanner } from "@/components/admin/view-as-banner";
 import { getSession } from "@/lib/auth";
 import { getDb, schema } from "@/lib/db";
 
@@ -54,13 +55,27 @@ export default async function EmployerLayout({ children }: { children: React.Rea
   if (!session || session.role !== "employer") redirect("/employer/login");
 
   let companyName = "Company Account";
+  let unreadAlerts = 0;
   try {
-    const [emp] = await getDb()
+    const db = getDb();
+    const [emp] = await db
       .select({ companyName: schema.employers.companyName })
       .from(schema.employers)
       .where(eq(schema.employers.id, session.uid))
       .limit(1);
     if (emp?.companyName) companyName = emp.companyName;
+
+    const [unread] = await db
+      .select({ value: count() })
+      .from(schema.notifications)
+      .where(
+        and(
+          eq(schema.notifications.recipientType, "employer"),
+          eq(schema.notifications.recipientId, session.uid),
+          eq(schema.notifications.isRead, false),
+        ),
+      );
+    unreadAlerts = Number(unread?.value ?? 0);
   } catch {
     // Keep fallback
   }
@@ -71,8 +86,12 @@ export default async function EmployerLayout({ children }: { children: React.Rea
       groups={NAV_GROUPS}
       companyName={companyName}
       email={session.email}
+      unreadAlerts={unreadAlerts}
     >
       {children}
+      {session.impersonator ? (
+        <ViewAsBanner viewing={companyName} admin={session.impersonator.email} />
+      ) : null}
     </AppShell>
   );
 }

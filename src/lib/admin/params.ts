@@ -135,3 +135,16 @@ export function compactNumber(value: number): string {
   if (Math.abs(value) < 1000) return String(value);
   return new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(value);
 }
+
+/** "Period" filter shared by finance tables and exports. */
+export const PERIOD_OPTIONS = [
+  { value: "7d", label: "Last 7 days" },
+  { value: "30d", label: "Last 30 days" },
+  { value: "90d", label: "Last 90 days" },
+  { value: "365d", label: "Last 12 months" },
+];
+
+export function periodStart(period: string | undefined): Date | undefined {
+  const m = /^(\d{1,3})d$/.exec(period ?? "");
+  return m ? new Date(Date.now() - Number(m[1]) * 86_400_000) : undefined;
+}

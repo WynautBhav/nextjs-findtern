@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AlertCircle, ArrowLeft, ArrowRight, Loader2, MailCheck } from "lucide-react";
 
+import { isValidPhone, phoneError, phoneHint } from "@/lib/phone";
+
 /**
  * Intern signup: three real API calls, in order.
  *
@@ -12,14 +14,9 @@ import { AlertCircle, ArrowLeft, ArrowRight, Loader2, MailCheck } from "lucide-r
  *   2. POST /api/auth/signup/verify-otp   → consumes it
  *   3. POST /api/auth/signup              → creates the user and sets the session
  *
- * The OTP is required, not decorative: step 3 is only reachable once step 2 has
- * returned `{ ok: true }`, so a client that skips verification cannot reach it.
- * The server re-checks the code's hash itself — `emailVerified: true` in the
- * insert is earned, not assumed.
- *
- * `countryCode` is collected because the account form has always asked for it.
- * The current handler does not read it — `users.country_code` defaults to `+91`
- * — so it is sent but not yet persisted.
+ * The OTP is required, not decorative: step 3 refuses any email without a
+ * verified code from step 2 (`hasVerifiedSignupOtp`), so calling it directly
+ * does not skip verification. `countryCode` is persisted with the number.
  */
 
 type Stage = "details" | "otp" | "creating";
@@ -60,7 +57,7 @@ export function SignupForm() {
     firstName.trim().length >= 2 &&
     lastName.trim().length >= 2 &&
     /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()) &&
-    /^\d{10}$/.test(phoneNumber.trim()) &&
+    isValidPhone(countryCode, phoneNumber) &&
     !phoneTaken &&
     passwordOk &&
     agreedToTerms;
@@ -218,16 +215,16 @@ export function SignupForm() {
               <input
                 id="phoneNumber"
                 inputMode="numeric"
-                maxLength={10}
+                maxLength={countryCode === "+91" ? 10 : 15}
                 value={phoneNumber}
                 onChange={(e) => {
                   const digits = e.target.value.replace(/\D/g, "");
                   setPhoneNumber(digits);
-                  // Duplicate check, 400ms after they stop typing — the legacy
+                  // Duplicate check, 400ms after they stop typing - the legacy
                   // behaviour. Without it a candidate fills the form, hits
                   // create, and is told the number is taken with no idea which
                   // field was the problem.
-                  if (digits.length !== 10) {
+                  if (!isValidPhone(countryCode, digits)) {
                     setPhoneTaken(false);
                     return;
                   }
@@ -254,7 +251,11 @@ export function SignupForm() {
               <p className="mt-1.5 text-xs text-danger">
                 That number is already registered. Use another, or sign in instead.
               </p>
-            ) : null}
+            ) : phoneNumber && !isValidPhone(countryCode, phoneNumber) ? (
+              <p className="mt-1.5 text-xs text-danger">{phoneError(countryCode, phoneNumber)}</p>
+            ) : (
+              <p className="mt-1.5 text-xs text-text-subtle">{phoneHint(countryCode)}</p>
+            )}
           </div>
 
           <div>

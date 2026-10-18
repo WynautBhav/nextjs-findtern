@@ -4,6 +4,7 @@ import { checkCsrf } from "@/lib/security/session";
 import { getSession } from "@/lib/auth";
 import type { SessionData } from "@/lib/security/session";
 import { canAccess } from "@/lib/security/guards";
+import { allows, requiredPermissions } from "@/lib/admin/permissions";
 
 /**
  * The guard every mutating route handler should run first.
@@ -25,11 +26,14 @@ export async function requireMutation(input: {
   roles: SessionData["role"][];
   /** When present, the caller must own this record. */
   ownerId?: string | null;
+  /** Only the "exit View as" route sets this. Every other write is refused
+   *  while an admin is viewing as someone else. */
+  allowImpersonated?: boolean;
 }): Promise<
   | { ok: true; session: SessionData }
   | { ok: false; response: NextResponse }
 > {
-  const { req, roles, ownerId } = input;
+  const { req, roles, ownerId, allowImpersonated } = input;
 
   if (!checkCsrf(req.headers.get("x-csrf-token"), req.headers.get("cookie"))) {
     return {
@@ -46,6 +50,23 @@ export async function requireMutation(input: {
     return {
       ok: false,
       response: NextResponse.json({ error: "Unauthenticated" }, { status: 401 }),
+    };
+  }
+
+  if (session.role === "admin" && !allows(session.permissions, requiredPermissions(new URL(req.url).pathname, req.method))) {
+    return {
+      ok: false,
+      response: NextResponse.json({ error: "Your role doesn't allow this" }, { status: 403 }),
+    };
+  }
+
+  if (session.impersonator && !allowImpersonated) {
+    return {
+      ok: false,
+      response: NextResponse.json(
+        { error: "Read-only: you are viewing as this user. Exit View as to make changes." },
+        { status: 403 },
+      ),
     };
   }
 

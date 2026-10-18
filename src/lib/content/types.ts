@@ -91,10 +91,18 @@ export type CmsPlan = {
   perHireChargeMinor: number;
   internshipDuration: string;
   features: string[];
+  /** ✓ / ✗ rows on the plan card. */
+  featureList: CmsPlanFeature[];
+  /** Struck-through "was" prices; null hides the strikethrough. */
+  compareAtHourlyMinor: number | null;
+  compareAtPerHireMinor: number | null;
+  isFeatured: boolean;
   gstApplicable: boolean;
   sortOrder: number;
   isActive: boolean;
 };
+
+export type CmsPlanFeature = { label: string; included: boolean };
 
 export type CmsHome = {
   slider: CmsSliderItem[];

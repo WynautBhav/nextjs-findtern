@@ -3,12 +3,14 @@
  *
  * This is the artifact the hero is built around, so the numbers have to be
  * the real ones. They are the same constants the legacy Terms page publishes:
- * a score out of 10, and a per-hire charge that applies only below 6.
+ * a score out of 10, and a fixed per-hire charge across all tiers.
  *
  * Boundaries are half-open - a score of exactly 6.0 is Skilled, exactly 8.0 is
  * Assured - which is how the rate card states it and how the "what you get"
  * copy in the pricing table describes it.
  */
+
+import { inrMinorToUsdMinor } from "./currency.ts";
 
 export type BandId = "standard" | "skilled" | "assured";
 
@@ -21,13 +23,15 @@ export type Band = {
   max: number;
   /** Hourly rate in minor units (paise). */
   rateMinor: number;
-  /** Flat per-hire charge in minor units. Zero above the cutoff. */
+  /** Flat per-hire charge in minor units across all tiers. */
   perHireMinor: number;
   /** One line on what this band means, used in the card. */
   blurb: string;
 };
 
-/** Score at or above which the per-hire charge is waived. */
+/** Fixed per-hire charge across all tiers (₹5,000 INR / $50 USD). */
+export const PER_HIRE_CHARGE_INR = 500000;
+export const PER_HIRE_CHARGE_USD = inrMinorToUsdMinor(PER_HIRE_CHARGE_INR);
 export const PER_HIRE_CUTOFF = 6;
 export const BANDS: Band[] = [
   {
@@ -45,7 +49,7 @@ export const BANDS: Band[] = [
     min: 6,
     max: 8,
     rateMinor: 10000,
-    perHireMinor: 0,
+    perHireMinor: 500000,
     blurb: "Above the cohort median.",
   },
   {
@@ -54,10 +58,17 @@ export const BANDS: Band[] = [
     min: 8,
     max: 10,
     rateMinor: 20000,
-    perHireMinor: 0,
+    perHireMinor: 500000,
     blurb: "Top decile of the cohort.",
   },
 ];
+
+/** The plan name employers see for each band (pricing page, invoices). */
+export const PLAN_NAME: Record<BandId, string> = {
+  standard: "Espresso",
+  skilled: "Cappuccino",
+  assured: "Latte",
+};
 
 /** Which band a score falls in. */
 export function bandFor(score: number): Band {
@@ -66,19 +77,15 @@ export function bandFor(score: number): Band {
 }
 
 /* ── Regional rates ────────────────────────────────────────────────────
- * INR is the authored rate card (paise). USD mirrors it in whole dollars -
- * $0 / $1 / $2 hourly and a $50 per-hire charge - matching the USD rows of
- * the `pricing_plans` seed. Figures are always rounded UP to whole major
- * units ("next big number"): a rate card that reads $1.20/hr invites
- * negotiation, which the product explicitly refuses. Geometry (min/max) is
- * identical across regions; only money moves. */
+ * INR is the authored rate card (paise). USD is derived at ₹100 = $1 -
+ * $0 / $1 / $2 hourly and a $50 fixed per-hire charge. Geometry (min/max)
+ * is identical across regions; only money moves. */
 
-/** Same bands, USD money. Authored, not converted at render time, so the
- *  card can never show $1.13/hr because someone edited the INR seed. */
+/** Same bands, USD money, at the fixed ₹100 = $1 rule (lib/currency). */
 export const BANDS_USD: Band[] = BANDS.map((b) => ({
   ...b,
-  rateMinor: { standard: 0, skilled: 100, assured: 200 }[b.id] ?? 0,
-  perHireMinor: b.perHireMinor > 0 ? 5000 : 0,
+  rateMinor: inrMinorToUsdMinor(b.rateMinor),
+  perHireMinor: inrMinorToUsdMinor(b.perHireMinor),
 }));
 
 /** The published bands for a visitor region. */

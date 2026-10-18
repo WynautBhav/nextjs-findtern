@@ -28,7 +28,9 @@ test("USD card reads $0 / $1 / $2 with a $50 per-hire charge", () => {
   assert.equal(byId.standard.rateMinor, 0);
   assert.equal(byId.standard.perHireMinor, 5000);
   assert.equal(byId.skilled.rateMinor, 100);
+  assert.equal(byId.skilled.perHireMinor, 5000);
   assert.equal(byId.assured.rateMinor, 200);
+  assert.equal(byId.assured.perHireMinor, 5000);
 });
 
 test("bandsForRegion picks the right card", () => {

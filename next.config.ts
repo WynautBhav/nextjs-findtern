@@ -31,30 +31,44 @@ const LEGACY_REDIRECTS: { from: string; to: string }[] = [
   { from: "/edit-profile", to: "/intern/onboarding" },
   { from: "/onboarding", to: "/intern/onboarding" },
   { from: "/onboarding-loading", to: "/intern/onboarding" },
-  { from: "/verify-email", to: "/signup" },
 
   // ── Employer: mostly the same paths, different account type ──────────────
   { from: "/employer", to: "/employer/dashboard" },
   { from: "/employer/setup", to: "/employer/onboarding" },
   { from: "/employer/profile", to: "/employer/account" },
+  { from: "/employer/account/change-password", to: "/employer/account" },
+  { from: "/employer/notifications", to: "/employer/alerts" },
+  { from: "/employer/intern/:id/proposal", to: "/employer/send-proposal?intern=:id" },
   // The legacy typo alias, which was live long enough to be linked.
   { from: "/employer/shedule", to: "/employer/schedule" },
   { from: "/employer/proposals/:id/edit", to: "/employer/proposal/:id" },
   { from: "/employer/timesheet", to: "/employer/timesheets" },
   { from: "/employer/interns", to: "/employer/candidates" },
+  { from: "/guaranteed-program", to: "/guaranteed-internship-program" },
+  { from: "/intern/onboarding-loading", to: "/intern/onboarding" },
+
+  { from: "/employer/proposals/:id", to: "/employer/proposal/:id" },
+  { from: "/intern/login", to: "/login" },
+  { from: "/intern/signup", to: "/signup" },
+  { from: "/intern/edit-profile", to: "/intern/onboarding" },
+  { from: "/intern/dashboard/documents", to: "/intern/documents" },
+
+  // ── Admin: legacy aliases ────────────────────────────────────────────────
+  { from: "/admin", to: "/admin/dashboard" },
+  { from: "/admin/contact", to: "/admin/messages" },
+  { from: "/admin/website", to: "/admin/cms" },
 ];
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
+  devIndicators: false,
   async redirects() {
     return [
       // OAuth bridges were client-side redirects into API routes on the legacy
       // site; the equivalents are real pages here.
-      { source: "/auth/google/callback", destination: "/login", permanent: false },
       { source: "/auth/google/callback/auth", destination: "/login", permanent: false },
       { source: "/google/auth", destination: "/login", permanent: false },
-      { source: "/google/callback", destination: "/login", permanent: false },
       // `/opportunities` is deliberately absent: it is a real route now (the
       // public browser), and it keeps the one legacy URL that should survive.
       ...LEGACY_REDIRECTS.map((r) => ({
@@ -62,6 +76,16 @@ const nextConfig: NextConfig = {
         destination: r.to,
         permanent: true,
       })),
+    ];
+  },
+  async rewrites() {
+    return [
+      // Files the legacy app stored as /uploads/...; served with access checks.
+      { source: "/uploads/:path*", destination: "/api/files/legacy/:path*" },
+      // The Google redirect URI already registered for the live site.
+      { source: "/auth/google/callback", destination: "/api/auth/google/callback" },
+      // Findtern calendar connect (Meet links), the legacy registered URI.
+      { source: "/google/callback", destination: "/api/admin/google/callback" },
     ];
   },
   async headers() {
@@ -72,7 +96,7 @@ const nextConfig: NextConfig = {
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "X-Frame-Options", value: "DENY" },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-          { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+          { key: "Permissions-Policy", value: "camera=*, microphone=*, geolocation=()" },
         ],
       },
     ];

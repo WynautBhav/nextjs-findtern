@@ -15,6 +15,7 @@ import {
   ShoppingBag,
   X,
 } from "lucide-react";
+import { FeedbackFab } from "@/components/app/feedback-fab";
 
 import {
   Sheet,
@@ -32,6 +33,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { csrfFetch } from "@/lib/client-fetch";
+import { Logo } from "@/components/brand/logo";
 
 export type NavItem = {
   href: string;
@@ -51,6 +53,7 @@ export interface AppShellProps {
   groups?: NavGroup[];
   companyName?: string;
   email?: string;
+  unreadAlerts?: number;
   children: React.ReactNode;
 }
 
@@ -65,6 +68,7 @@ export function AppShell({
   groups,
   companyName = "Employer Console",
   email,
+  unreadAlerts = 0,
   children,
 }: AppShellProps) {
   const pathname = usePathname();
@@ -110,7 +114,7 @@ export function AppShell({
                   href={item.href}
                   onClick={() => setOpen(false)}
                   aria-current={active ? "page" : undefined}
-                  className={`group flex items-center justify-between rounded-xl px-3 py-2.5 text-sm font-medium transition-all ${
+                  className={`apple-spring apple-pressable group flex min-h-11 items-center justify-between rounded-[10px] px-3 py-2 text-[14px] font-medium tracking-[-0.01em] ${
                     active
                       ? "bg-brand-700/80 text-white shadow-2xs font-semibold"
                       : "text-on-dark-subtle hover:bg-white/8 hover:text-white"
@@ -118,7 +122,7 @@ export function AppShell({
                 >
                   <div className="flex items-center gap-3">
                     <span
-                      className={`transition-colors ${
+                      className={`apple-spring ${
                         active ? "text-accent-400" : "text-on-dark-subtle group-hover:text-white"
                       }`}
                     >
@@ -141,20 +145,18 @@ export function AppShell({
   );
 
   return (
-    <div className="flex min-h-[100dvh] bg-ink-50">
+    <div className="apple-admin flex min-h-[100dvh] overflow-x-clip bg-ink-50">
       {/* Desktop sticky sidebar */}
-      <aside className="sticky top-0 hidden h-[100dvh] w-64 shrink-0 flex-col bg-brand-950 px-4 py-6 md:flex border-r border-white/5">
-        <Link href="/employer/dashboard" className="px-3 flex items-center gap-2.5">
-          <span className="grid size-7 place-items-center rounded-lg bg-brand-700 text-white font-bold text-sm">
-            F
-          </span>
-          <span className="text-base font-semibold tracking-tight text-white">
-            Findtern <span className="text-accent-400 font-bold">{brand}</span>
+      <aside className="sticky top-0 hidden h-[100dvh] w-64 shrink-0 flex-col bg-brand-950 px-4 py-6 lg:flex border-r border-white/5">
+        <Link href="/employer/dashboard" className="px-3 flex items-center justify-between gap-2.5">
+          <Logo variant="white" priority className="h-7" />
+          <span className="text-2xs font-bold uppercase tracking-wider text-accent-400 bg-accent-500/15 border border-accent-400/30 px-2 py-0.5 rounded-full">
+            {brand}
           </span>
         </Link>
 
         {/* Scrollable nav items */}
-        <div className="mt-8 flex-1 overflow-y-auto pr-1 [scrollbar-width:thin] [scrollbar-color:var(--color-brand-800)_transparent] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-brand-800 [&::-webkit-scrollbar-track]:bg-transparent">
+        <div className="mt-8 min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1 [scrollbar-width:thin] [scrollbar-color:var(--color-brand-800)_transparent] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-brand-800 [&::-webkit-scrollbar-track]:bg-transparent">
           {navContent}
         </div>
 
@@ -172,7 +174,7 @@ export function AppShell({
               onClick={handleSignOut}
               title="Sign out"
               aria-label="Sign out"
-              className="rounded-lg p-2 text-on-dark-subtle hover:bg-white/10 hover:text-white transition-colors"
+              className="apple-spring apple-pressable grid size-11 shrink-0 place-items-center rounded-[10px] text-on-dark-subtle hover:bg-white/10 hover:text-white"
             >
               <LogOut className="size-4" />
             </button>
@@ -183,20 +185,21 @@ export function AppShell({
       {/* Main content container */}
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Mobile top bar */}
-        <header className="sticky top-0 z-30 flex items-center justify-between border-b border-ink-200/80 bg-white/95 px-4 py-3 backdrop-blur-md md:hidden">
+        <header className="sticky top-0 z-30 flex items-center justify-between border-b border-ink-200/80 bg-white/95 px-4 py-3 backdrop-blur-md lg:hidden">
           <div className="flex items-center gap-3">
             <Sheet open={open} onOpenChange={setOpen}>
               <SheetTrigger asChild>
                 <button
                   type="button"
                   aria-label="Open navigation menu"
-                  className="rounded-lg p-2 text-ink-700 hover:bg-ink-100 min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors"
+                  className="apple-spring flex min-h-[44px] min-w-[44px] items-center justify-center rounded-[10px] text-ink-700 hover:bg-ink-100"
                 >
                   <Menu className="size-5" />
                 </button>
               </SheetTrigger>
               <SheetContent
                 side="left"
+                showCloseButton={false}
                 className="flex w-72 flex-col bg-brand-950 p-5 text-white border-r border-white/10"
               >
                 <SheetHeader className="flex flex-row items-center justify-between">
@@ -211,19 +214,21 @@ export function AppShell({
                   <button
                     type="button"
                     onClick={() => setOpen(false)}
-                    className="rounded-lg p-1 text-on-dark-subtle hover:bg-white/10 hover:text-white"
+                    aria-label="Close navigation"
+                    className="apple-spring grid size-11 shrink-0 place-items-center rounded-[10px] text-on-dark-subtle hover:bg-white/10 hover:text-white"
                   >
                     <X className="size-5" />
                   </button>
                 </SheetHeader>
-                <div className="mt-6 flex-1 overflow-y-auto pr-1">
+                <div className="mt-6 min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1">
                   {navContent}
                 </div>
                 <div className="pt-4 border-t border-white/10">
+                  <FeedbackFab variant="link" />
                   <button
                     type="button"
                     onClick={handleSignOut}
-                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-on-dark-subtle hover:bg-white/10 hover:text-white"
+                    className="apple-spring flex min-h-11 w-full items-center gap-2 rounded-[10px] px-3 py-2 text-[13px] font-medium text-on-dark-subtle hover:bg-white/10 hover:text-white"
                   >
                     <LogOut className="size-4" />
                     Sign out
@@ -241,26 +246,31 @@ export function AppShell({
             <Link
               href="/employer/cart"
               aria-label="View Cart"
-              className="rounded-lg p-2 text-ink-600 hover:bg-ink-100 relative transition-colors"
+              className="apple-spring relative grid size-11 shrink-0 place-items-center rounded-[10px] text-ink-600 hover:bg-ink-100"
             >
               <ShoppingBag className="size-5" />
             </Link>
             <Link
               href="/employer/alerts"
               aria-label="View Alerts"
-              className="rounded-lg p-2 text-ink-600 hover:bg-ink-100 relative transition-colors"
+              className="apple-spring relative grid size-11 shrink-0 place-items-center rounded-[10px] text-ink-600 hover:bg-ink-100"
             >
               <Bell className="size-5" />
+              {unreadAlerts > 0 ? (
+                <span className="absolute right-1.5 top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-accent-500 px-1 text-[10px] font-bold text-brand-950 ring-2 ring-white">
+                  {unreadAlerts > 99 ? "99+" : unreadAlerts}
+                </span>
+              ) : null}
             </Link>
           </div>
         </header>
 
         {/* Desktop top bar with breadcrumbs and user shortcuts */}
-        <header className="sticky top-0 z-20 hidden items-center justify-between border-b border-ink-200/80 bg-white/95 px-8 py-3.5 backdrop-blur-md md:flex shadow-2xs">
-          <nav aria-label="Breadcrumb navigation" className="flex items-center gap-1.5 text-xs text-text-subtle">
+        <header className="sticky top-0 z-20 hidden items-center justify-between border-b border-ink-200/80 bg-white/95 px-8 py-3.5 backdrop-blur-md lg:flex shadow-2xs">
+          <nav aria-label="Breadcrumb navigation" className="flex items-center gap-1.5 text-[13px] text-text-subtle">
             <Link
               href="/employer/dashboard"
-              className="font-medium text-ink-600 hover:text-brand-700 transition-colors"
+              className="apple-spring inline-flex min-h-7 items-center font-medium text-ink-600 hover:text-brand-700"
             >
               Console
             </Link>
@@ -285,7 +295,7 @@ export function AppShell({
           <div className="flex items-center gap-3">
             <Link
               href="/employer/cart"
-              className="inline-flex items-center gap-1.5 rounded-lg border border-ink-200 bg-white px-3 py-1.5 text-xs font-medium text-ink-700 hover:border-ink-300 hover:bg-ink-50 transition-colors shadow-2xs"
+              className="apple-spring apple-pressable inline-flex min-h-11 items-center gap-1.5 rounded-[10px] border border-ink-200 bg-white px-3 text-[13px] font-medium text-ink-700 shadow-2xs hover:border-ink-300 hover:bg-ink-50"
             >
               <ShoppingBag className="size-3.5 text-brand-700" />
               <span>Cart</span>
@@ -293,17 +303,22 @@ export function AppShell({
 
             <Link
               href="/employer/alerts"
-              className="inline-flex items-center justify-center rounded-lg border border-ink-200 bg-white p-2 text-ink-700 hover:border-ink-300 hover:bg-ink-50 transition-colors shadow-2xs"
+              className="apple-spring apple-pressable relative inline-flex min-h-11 min-w-11 items-center justify-center rounded-[10px] border border-ink-200 bg-white text-ink-700 shadow-2xs hover:border-ink-300 hover:bg-ink-50"
               title="Notifications & Alerts"
             >
               <Bell className="size-3.5 text-ink-600" />
+              {unreadAlerts > 0 ? (
+                <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-accent-500 px-1 text-[10px] font-bold text-brand-950 shadow-xs">
+                  {unreadAlerts > 99 ? "99+" : unreadAlerts}
+                </span>
+              ) : null}
             </Link>
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
                   type="button"
-                  className="flex items-center gap-2 rounded-xl border border-ink-200 bg-white px-3 py-1.5 text-xs font-medium text-ink-800 hover:bg-ink-50 transition-colors shadow-2xs outline-none"
+                  className="apple-spring flex min-h-11 items-center gap-2 rounded-[10px] border border-ink-200 bg-white px-3 text-[13px] font-medium text-ink-800 shadow-2xs outline-none hover:bg-ink-50"
                 >
                   <Building2 className="size-3.5 text-brand-700" />
                   <span className="max-w-[140px] truncate">{companyName}</span>
@@ -360,7 +375,7 @@ export function AppShell({
         </header>
 
         {/* Content body */}
-        <main className="min-w-0 flex-1 px-4 py-6 md:px-8 md:py-8 max-w-7xl mx-auto w-full">
+        <main className="mx-auto min-w-0 w-full max-w-[84rem] flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
           {children}
         </main>
       </div>

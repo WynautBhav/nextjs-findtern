@@ -97,7 +97,7 @@ export function DecisionButton({
         type="button"
         onClick={handleClick}
         disabled={loading}
-        className={`flex w-full items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-xs font-semibold transition-all shadow-2xs ${
+        className={`apple-spring apple-pressable flex min-h-11 w-full items-center justify-center gap-2 rounded-[10px] px-4 text-xs font-semibold shadow-2xs ${
           isReject
             ? "border border-red-200 bg-red-50/50 text-red-700 hover:bg-red-100/70"
             : "bg-brand-700 text-white hover:bg-brand-800"
@@ -108,7 +108,7 @@ export function DecisionButton({
       </button>
 
       {errorMsg && !rejectModalOpen && (
-        <p className="mt-1.5 flex items-center gap-1 text-2xs text-red-600">
+        <p className="mt-1.5 flex items-center gap-1 text-xs text-red-600">
           <AlertCircle className="size-3 shrink-0" />
           <span>{errorMsg}</span>
         </p>
@@ -125,7 +125,7 @@ export function DecisionButton({
 
           <form onSubmit={handleRejectSubmit} className="space-y-4 pt-2">
             {errorMsg && (
-              <div className="flex items-center gap-2 rounded-xl bg-red-50 p-3 text-xs text-red-700 border border-red-200">
+              <div className="flex items-center gap-2 rounded-[10px] bg-red-50 p-3 text-xs text-red-700 border border-red-200">
                 <AlertCircle className="size-4 shrink-0" />
                 <span>{errorMsg}</span>
               </div>
@@ -141,8 +141,8 @@ export function DecisionButton({
                 required
                 value={rejectReason}
                 onChange={(e) => setRejectReason(e.target.value)}
-                placeholder="e.g. Please correct the hours for Wednesday 12th — total should be 4 hours instead of 8."
-                className="mt-1.5 w-full rounded-xl border border-ink-200 p-3 text-xs text-ink-900 outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
+                placeholder="e.g. Please correct the hours for Wednesday 12th - total should be 4 hours instead of 8."
+                className="apple-spring mt-1.5 min-h-11 w-full rounded-[10px] border border-ink-200 p-3 text-[14px] text-ink-900 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
               />
             </div>
 
@@ -150,14 +150,14 @@ export function DecisionButton({
               <button
                 type="button"
                 onClick={() => setRejectModalOpen(false)}
-                className="rounded-xl border border-ink-200 bg-white px-4 py-2 text-xs font-medium text-ink-700 hover:bg-ink-50"
+                className="apple-spring apple-pressable min-h-11 rounded-[10px] border border-ink-200 bg-white px-4 text-xs font-medium text-ink-700 hover:border-ink-300 hover:bg-ink-50"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={loading || !rejectReason.trim()}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-red-600 px-4 py-2 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+                className="apple-spring apple-pressable inline-flex min-h-11 items-center justify-center gap-1.5 rounded-[10px] bg-red-600 px-4 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-50"
               >
                 {loading && <Loader2 className="size-3.5 animate-spin" />}
                 <span>Confirm Rejection</span>

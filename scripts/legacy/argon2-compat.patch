@@ -1,0 +1,118 @@
+diff -ruN a/package.json b/package.json
+--- a/package.json	2026-10-18 14:41:57.611424707 +0530
++++ b/package.json	2026-10-18 14:41:57.634443489 +0530
+@@ -42,6 +42,7 @@
+     "@radix-ui/react-toggle-group": "^1.1.3",
+     "@radix-ui/react-tooltip": "^1.2.0",
+     "@tanstack/react-query": "^5.60.5",
++    "@node-rs/argon2": "^2.2.1",
+     "bcrypt": "^6.0.0",
+     "bootstrap": "^5.3.3",
+     "class-variance-authority": "^0.7.1",
+diff -ruN a/server/password.ts b/server/password.ts
+--- a/server/password.ts	1970-01-01 05:30:00.000000000 +0530
++++ b/server/password.ts	2026-10-18 14:41:57.613170705 +0530
+@@ -0,0 +1,41 @@
++import { verify as argonVerify } from "@node-rs/argon2";
++import { scrypt as scryptCb, timingSafeEqual } from "node:crypto";
++import { promisify } from "node:util";
++
++const scrypt = promisify(scryptCb) as (
++  password: string,
++  salt: Buffer,
++  keylen: number,
++  options: { N: number; r: number; p: number; maxmem: number },
++) => Promise<Buffer>;
++
++/**
++ * Accepts the hashes the new Next.js app writes (argon2id, scrypt fallback)
++ * as well as the legacy plaintext values, so both apps can share one
++ * database during the cutover.
++ */
++export async function checkPassword(plain: unknown, stored: unknown): Promise<boolean> {
++  if (typeof plain !== "string" || typeof stored !== "string" || !plain || !stored) return false;
++  if (stored.startsWith("$argon2")) {
++    try {
++      return await argonVerify(stored, plain);
++    } catch {
++      return false;
++    }
++  }
++  if (stored.startsWith("scrypt$")) {
++    const [, N, r, p, salt, hash] = stored.split("$");
++    if (!salt || !hash) return false;
++    const expected = Buffer.from(hash, "base64url");
++    const actual = await scrypt(plain.normalize("NFKC"), Buffer.from(salt, "base64url"), expected.length, {
++      N: Number(N),
++      r: Number(r),
++      p: Number(p),
++      maxmem: 64 * 1024 * 1024,
++    });
++    return actual.length === expected.length && timingSafeEqual(actual, expected);
++  }
++  const a = Buffer.from(plain);
++  const b = Buffer.from(stored);
++  return a.length === b.length && timingSafeEqual(a, b);
++}
+diff -ruN a/server/routes.ts b/server/routes.ts
+--- a/server/routes.ts	2026-10-18 14:41:57.610452406 +0530
++++ b/server/routes.ts	2026-10-18 14:41:57.634117186 +0530
+@@ -1,3 +1,4 @@
++import { checkPassword } from "./password";
+ import type { Express } from "express";
+ import { type Server } from "http";
+ import { storage } from "./storage";
+@@ -3947,7 +3948,7 @@
+       const validatedData = loginSchema.parse(req.body);
+ 
+       const employer = await storage.getEmployerByEmail(validatedData.email);
+-      if (!employer || employer.password !== validatedData.password) {
++      if (!employer || !(await checkPassword(validatedData.password, employer.password))) {
+         return res
+           .status(401)
+           .json({ message: "Invalid email or password" });
+@@ -4257,7 +4258,7 @@
+       const validatedData = loginSchema.parse(req.body);
+ 
+       const user = await storage.getUserByEmail(validatedData.email);
+-      if (!user || user.password !== validatedData.password) {
++      if (!user || !(await checkPassword(validatedData.password, user.password))) {
+         return res
+           .status(401)
+           .json({ message: "Invalid email or password" });
+@@ -4297,7 +4298,7 @@
+       const validatedData = loginSchema.parse(req.body);
+ 
+       const admin = await storage.getAdminByEmail(validatedData.email);
+-      if (!admin || admin.password !== validatedData.password) {
++      if (!admin || !(await checkPassword(validatedData.password, admin.password))) {
+         return res.status(401).json({ message: "Invalid admin credentials" });
+       }
+ 
+@@ -4439,7 +4440,7 @@
+         return res.status(400).json({ message: "Password not set for this account. Please contact super admin." });
+       }
+ 
+-      const passwordMatch = adminRecord.password === currentPassword;
++      const passwordMatch = await checkPassword(currentPassword, adminRecord.password);
+       if (!passwordMatch) {
+         return res.status(400).json({ message: "Current password is incorrect" });
+       }
+@@ -10466,7 +10467,7 @@
+         return res.status(404).json({ message: "Employer not found" });
+       }
+ 
+-      if (employer.password !== body.currentPassword) {
++      if (!(await checkPassword(body.currentPassword, employer.password))) {
+         return res.status(400).json({ message: "Current password is incorrect" });
+       }
+ 
+@@ -10549,7 +10550,7 @@
+         return res.status(404).json({ message: "User not found" });
+       }
+ 
+-      if (user.password !== body.currentPassword) {
++      if (!(await checkPassword(body.currentPassword, user.password))) {
+         return res.status(400).json({ message: "Current password is incorrect" });
+       }
+ 

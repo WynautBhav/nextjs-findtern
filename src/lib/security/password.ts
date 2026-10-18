@@ -161,6 +161,9 @@ async function verifyScrypt(plain: string, stored: string): Promise<boolean> {
  * one login at a time with no forced reset and no downtime.
  */
 export function needsRehash(stored: string): boolean {
+  // Off while the legacy site shares this database: it can only read
+  // plaintext until scripts/legacy/argon2-compat.patch is deployed there.
+  if (process.env.PASSWORD_UPGRADE !== "on") return false;
   if (!stored) return true;
   if (!stored.startsWith("$argon2")) return true;
   // Rehash if the parameters have been raised since this row was written.

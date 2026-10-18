@@ -1,11 +1,10 @@
-import { count, desc } from "drizzle-orm";
-import { MessageSquare, Handshake, HelpCircle, Layers } from "lucide-react";
+import { asc, desc } from "drizzle-orm";
 
-import { getDb, schema } from "@/lib/db";
-import { flattenParams } from "@/lib/admin/params";
 import { AdminPageHeader } from "@/components/admin/panel";
-import { StatCard, StatGrid } from "@/components/admin/stat-card";
-import { CmsStudio } from "@/components/admin/cms-studio";
+import { CmsEditor } from "@/components/admin/cms-editor";
+import { CMS_TYPES, type CmsType } from "@/lib/admin/cms-collections";
+import { flattenParams } from "@/lib/admin/params";
+import { getDb, schema } from "@/lib/db";
 
 export default async function AdminCmsPage({
   searchParams,
@@ -13,81 +12,24 @@ export default async function AdminCmsPage({
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const params = flattenParams(await searchParams);
-  const activeTab = params.tab || "testimonials";
+  const active = (CMS_TYPES as string[]).includes(params.tab ?? "") ? (params.tab as CmsType) : "testimonial";
 
   const db = getDb();
-
-  const [
-    testimonials,
-    partners,
-    faqs,
-    pricing,
-    [testimonialsCount],
-    [partnersCount],
-    [faqsCount],
-    [pricingCount],
-  ] = await Promise.all([
-    db.select().from(schema.websiteHappyFaces).orderBy(desc(schema.websiteHappyFaces.createdAt)),
-    db.select().from(schema.websitePartners).orderBy(desc(schema.websitePartners.createdAt)),
-    db.select().from(schema.websiteFaqs).orderBy(desc(schema.websiteFaqs.createdAt)),
-    db.select().from(schema.pricingPlans).orderBy(desc(schema.pricingPlans.createdAt)),
-    db.select({ c: count() }).from(schema.websiteHappyFaces),
-    db.select({ c: count() }).from(schema.websitePartners),
-    db.select({ c: count() }).from(schema.websiteFaqs),
-    db.select({ c: count() }).from(schema.pricingPlans),
+  const [testimonial, partner, faq, blog, skill] = await Promise.all([
+    db.select().from(schema.websiteHappyFaces).orderBy(asc(schema.websiteHappyFaces.sortOrder), desc(schema.websiteHappyFaces.createdAt)),
+    db.select().from(schema.websitePartners).orderBy(asc(schema.websitePartners.sortOrder), desc(schema.websitePartners.createdAt)),
+    db.select().from(schema.websiteFaqs).orderBy(asc(schema.websiteFaqs.category), asc(schema.websiteFaqs.sortOrder)),
+    db.select().from(schema.websiteBlogPosts).orderBy(desc(schema.websiteBlogPosts.createdAt)),
+    db.select().from(schema.websiteFeaturedSkills).orderBy(asc(schema.websiteFeaturedSkills.sortOrder)),
   ]);
-
-  const num = (n: number) => n.toLocaleString("en-IN");
 
   return (
     <div className="space-y-6">
       <AdminPageHeader
-        title="Website CMS"
-        subtitle="Public marketing editorial content, testimonials, corporate partners and FAQs."
+        title="Website content"
+        subtitle="Testimonials, partners, FAQs, blog posts and featured skills on the public site. Prices live under Pricing & Fees."
       />
-
-      <StatGrid cols={4}>
-        <StatCard
-          label="Testimonials"
-          value={num(Number(testimonialsCount?.c ?? 0))}
-          hint="Candidate testimonials"
-          icon={MessageSquare}
-          tone="brand"
-          href="/admin/cms?tab=testimonials"
-        />
-        <StatCard
-          label="Corporate partners"
-          value={num(Number(partnersCount?.c ?? 0))}
-          hint="Verified brand logos"
-          icon={Handshake}
-          tone="info"
-          href="/admin/cms?tab=partners"
-        />
-        <StatCard
-          label="FAQ articles"
-          value={num(Number(faqsCount?.c ?? 0))}
-          hint="Knowledge base entries"
-          icon={HelpCircle}
-          tone="accent"
-          href="/admin/cms?tab=faqs"
-        />
-        <StatCard
-          label="Pricing tiers"
-          value={num(Number(pricingCount?.c ?? 0))}
-          hint="Configured rate plans"
-          icon={Layers}
-          tone="success"
-          href="/admin/cms?tab=pricing"
-        />
-      </StatGrid>
-
-      <CmsStudio
-        initialTestimonials={testimonials}
-        initialPartners={partners}
-        initialFaqs={faqs}
-        initialPricing={pricing}
-        defaultTab={activeTab}
-      />
+      <CmsEditor active={active} items={{ testimonial, partner, faq, blog, skill }} />
     </div>
   );
 }

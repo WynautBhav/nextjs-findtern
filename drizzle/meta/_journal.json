@@ -15,6 +15,20 @@
       "when": 1791457872151,
       "tag": "0001_amusing_beyonder",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1792310314296,
+      "tag": "0002_light_living_mummy",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1792315842852,
+      "tag": "0003_reflective_bucky",
+      "breakpoints": true
     }
   ]
 }

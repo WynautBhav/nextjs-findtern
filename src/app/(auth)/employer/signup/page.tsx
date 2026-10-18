@@ -14,7 +14,7 @@ export default function EmployerSignupPage() {
     <AuthShell
       eyebrow="For employers"
       title="Register the company, not a person."
-      subtitle="One company account, one billing identity. Add colleagues from the account page once the employer API lands."
+      subtitle="One company account, one billing identity for all your hiring."
       footer={
         <p className="text-sm text-text-subtle">
           Already registered?{" "}

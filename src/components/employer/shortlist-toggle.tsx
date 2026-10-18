@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Shortlist toggle — the "add to cart" button, and its removal.
+ * Shortlist toggle - the "add to cart" button, and its removal.
  *
  * The legacy employer flow was browse → shortlist → compare → checkout, and the
  * shortlist was the hinge: nothing else in that chain means anything without it.
@@ -59,10 +59,10 @@ export function ShortlistToggle({
     }
   }
 
-  const pad = size === "sm" ? "h-8 px-3 text-xs" : "h-10 px-4 text-sm";
+  const pad = size === "sm" ? "min-h-11 px-3 text-[13px]" : "min-h-11 px-4 text-sm";
 
   return (
-    <span className="inline-flex flex-col items-start gap-1">
+    <span className="inline-flex min-w-0 flex-col items-start gap-1">
       <button
         type="button"
         onClick={toggle}
@@ -70,8 +70,8 @@ export function ShortlistToggle({
         aria-pressed={state}
         className={
           state
-            ? `inline-flex ${pad} items-center gap-1.5 rounded-lg border border-brand-300 bg-brand-50 font-medium text-brand-800 transition-colors disabled:opacity-60`
-            : `inline-flex ${pad} items-center gap-1.5 rounded-lg border border-ink-200 bg-white font-medium text-ink-800 transition-colors hover:bg-ink-50 disabled:opacity-60`
+            ? `apple-spring apple-pressable inline-flex ${pad} items-center justify-center gap-1.5 rounded-[10px] border border-brand-300 bg-brand-50 font-medium text-brand-800 disabled:opacity-60`
+            : `apple-spring apple-pressable inline-flex ${pad} items-center justify-center gap-1.5 rounded-[10px] border border-ink-200 bg-white font-medium text-ink-800 hover:bg-ink-50 disabled:opacity-60`
         }
       >
         {busy ? (
@@ -83,7 +83,7 @@ export function ShortlistToggle({
         )}
         {state ? "Shortlisted" : "Shortlist"}
       </button>
-      {error ? <span className="text-2xs text-danger">{error}</span> : null}
+      {error ? <span className="text-xs text-danger">{error}</span> : null}
     </span>
   );
 }

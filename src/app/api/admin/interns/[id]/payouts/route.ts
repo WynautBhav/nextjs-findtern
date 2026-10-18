@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
+import { notifyStipendPaid } from "@/lib/payments";
 
 const bodySchema = z.object({
   amountMinor: z.number().int().positive(),
@@ -12,6 +13,9 @@ const bodySchema = z.object({
   method: z.string().default("bank"),
   referenceId: z.string().optional(),
   notes: z.string().optional(),
+  /** Which placement and month this pays; legacy groups payouts by these. */
+  proposalId: z.string().optional(),
+  scheduledFor: z.string().optional(),
 });
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -32,6 +36,16 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!parsed.success) return NextResponse.json({ error: "Invalid input" }, { status: 400 });
 
   const db = getDb();
-  const [payout] = await db.insert(schema.internPayouts).values({ internId: id, ...parsed.data }).returning();
+  const { proposalId, scheduledFor, ...row } = parsed.data;
+  const [payout] = await db
+    .insert(schema.internPayouts)
+    .values({
+      internId: id,
+      ...row,
+      paidAt: row.status === "paid" ? new Date() : null,
+      raw: proposalId || scheduledFor ? { proposalId, scheduledFor } : {},
+    })
+    .returning();
+  await notifyStipendPaid(payout.id);
   return NextResponse.json({ payout }, { status: 201 });
 }

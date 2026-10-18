@@ -3,8 +3,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, ArrowRight, Check, MapPin } from "lucide-react";
 
-import { PageHead, Pill, Surface } from "@/components/app/primitives";
-import { getSession } from "@/lib/auth";
+import { DetailRow, PageHead, Pill, SectionHead, Surface } from "@/components/app/primitives";
+import { requireRole } from "@/lib/auth";
 import { loadInternData, projectById } from "@/lib/intern-data";
 import { formatDayLabel } from "@/lib/format";
 import { toArray } from "@/lib/journey";
@@ -31,8 +31,7 @@ export const metadata: Metadata = {
  */
 export default async function RoleDetail({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const session = await getSession();
-  if (!session) return null;
+  const session = await requireRole("intern");
 
   const role = await projectById(id);
   if (!role) notFound();
@@ -46,7 +45,7 @@ export default async function RoleDetail({ params }: { params: Promise<{ id: str
     <div>
       <Link
         href="/intern/opportunities"
-        className="mb-6 inline-flex min-h-9 items-center gap-1.5 text-sm font-medium text-ink-600 transition-colors duration-[var(--dur-instant)] hover:text-ink-900"
+        className="apple-spring apple-pressable mb-6 inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-ink-600 hover:text-ink-900"
       >
         <ArrowLeft className="size-4" aria-hidden />
         All open roles
@@ -76,9 +75,7 @@ export default async function RoleDetail({ params }: { params: Promise<{ id: str
         <div>
           {role.scopeOfWork ? (
             <Surface className="p-6">
-              <h2 className="text-base font-semibold tracking-[-0.01em] text-ink-900">
-                What you would be doing
-              </h2>
+              <SectionHead title="What you would be doing" className="mb-0" />
               <p className="mt-3 text-pretty leading-relaxed whitespace-pre-line text-ink-700">
                 {role.scopeOfWork}
               </p>
@@ -87,9 +84,7 @@ export default async function RoleDetail({ params }: { params: Promise<{ id: str
 
           {skills.length > 0 ? (
             <Surface className="mt-4 p-6">
-              <h2 className="text-base font-semibold tracking-[-0.01em] text-ink-900">
-                What they are looking for
-              </h2>
+              <SectionHead title="What they are looking for" className="mb-0" />
               <ul className="mt-3 flex flex-wrap gap-1.5">
                 {skills.map((skill) => (
                   <li key={skill}>
@@ -103,10 +98,8 @@ export default async function RoleDetail({ params }: { params: Promise<{ id: str
           {/* ── The honest next step ──────────────────────────────────
               No button that pretends. What actually happens is written
               out, which is the thing a candidate is actually missing. */}
-          <Surface className="mt-4 p-6">
-            <h2 className="text-base font-semibold tracking-[-0.01em] text-ink-900">
-              What happens next
-            </h2>
+            <Surface className="mt-4 p-6">
+              <SectionHead title="What happens next" className="mb-0" />
             <ol className="mt-4 space-y-4">
               {[
                 {
@@ -132,7 +125,7 @@ export default async function RoleDetail({ params }: { params: Promise<{ id: str
                     className={
                       step.done
                         ? "mt-0.5 grid size-5 shrink-0 place-items-center rounded-full bg-brand-600 text-white"
-                        : "mt-0.5 grid size-5 shrink-0 place-items-center rounded-full border-2 border-ink-200 text-2xs font-bold text-ink-400"
+                        : "mt-0.5 grid size-5 shrink-0 place-items-center rounded-full border-2 border-ink-200 text-xs font-bold text-ink-400"
                     }
                   >
                     {step.done ? <Check className="size-3" strokeWidth={3.5} /> : i + 1}
@@ -146,7 +139,7 @@ export default async function RoleDetail({ params }: { params: Promise<{ id: str
               {existing ? (
                 <Link
                   href={`/intern/proposals/${existing.id}`}
-                  className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-primary px-5 text-sm font-semibold text-white shadow-sm transition-[background-color,transform] duration-[var(--dur-instant)] hover:bg-primary-hover active:scale-[0.98]"
+                  className="apple-spring apple-pressable inline-flex min-h-11 items-center gap-2 rounded-[10px] bg-primary px-5 text-sm font-semibold text-white shadow-sm hover:bg-primary-hover active:scale-[0.98]"
                 >
                   Open your offer
                   <ArrowRight className="size-4" aria-hidden />
@@ -160,7 +153,7 @@ export default async function RoleDetail({ params }: { params: Promise<{ id: str
                   </p>
                   <Link
                     href="/intern/profile"
-                    className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-lg bg-primary px-5 text-sm font-semibold text-white shadow-sm transition-[background-color,transform] duration-[var(--dur-instant)] hover:bg-primary-hover active:scale-[0.98]"
+                    className="apple-spring apple-pressable mt-4 inline-flex min-h-11 items-center gap-2 rounded-[10px] bg-primary px-5 text-sm font-semibold text-white shadow-sm hover:bg-primary-hover active:scale-[0.98]"
                   >
                     See what employers can see
                     <ArrowRight className="size-4" aria-hidden />
@@ -173,46 +166,29 @@ export default async function RoleDetail({ params }: { params: Promise<{ id: str
 
         <aside className="space-y-4">
           <Surface className="p-5">
-            <h2 className="text-sm font-semibold tracking-[-0.01em] text-ink-900">At a glance</h2>
-            <dl className="mt-3 divide-y divide-ink-100">
-              <div className="flex items-start justify-between gap-4 py-2.5">
-                <dt className="text-sm text-ink-500">Company</dt>
-                <dd className="text-right text-sm font-medium text-ink-900">
-                  {role.companyName}
-                </dd>
-              </div>
-              <div className="flex items-start justify-between gap-4 py-2.5">
-                <dt className="text-sm text-ink-500">Where</dt>
-                <dd className="flex items-center gap-1.5 text-right text-sm font-medium text-ink-900">
-                  {role.locationType ? (
-                    <>
+            <SectionHead title="At a glance" className="mb-0" />
+            <dl className="divide-y divide-ink-100">
+              <DetailRow label="Company" value={role.companyName} />
+              <DetailRow
+                label="Where"
+                value={
+                  role.locationType ? (
+                    <span className="inline-flex items-center gap-1.5">
                       <MapPin className="size-3.5 shrink-0 text-ink-400" aria-hidden />
-                      {role.locationType}
-                    </>
+                      {role.locationType.charAt(0).toUpperCase() + role.locationType.slice(1)}
+                    </span>
                   ) : (
                     "Not stated"
-                  )}
-                </dd>
-              </div>
-              <div className="flex items-start justify-between gap-4 py-2.5">
-                <dt className="text-sm text-ink-500">City</dt>
-                <dd className="text-right text-sm font-medium text-ink-900">
-                  {place || "Not stated"}
-                </dd>
-              </div>
-              <div className="flex items-start justify-between gap-4 py-2.5">
-                <dt className="text-sm text-ink-500">Posted</dt>
-                <dd className="text-right text-sm font-medium text-ink-900">
-                  {formatDayLabel(role.createdAt)}
-                </dd>
-              </div>
+                  )
+                }
+              />
+              <DetailRow label="City" value={place || "Not stated"} />
+              <DetailRow label="Posted" value={formatDayLabel(role.createdAt)} />
             </dl>
           </Surface>
 
           <Surface className="p-5">
-            <h2 className="text-sm font-semibold tracking-[-0.01em] text-ink-900">
-              How you are paid
-            </h2>
+            <SectionHead title="How you are paid" className="mb-0" />
             <p className="mt-2 text-pretty text-sm leading-relaxed text-ink-600">
               Stipend is agreed in the offer and shown to you before you accept. Nothing is
               negotiated behind your back and there is no rate you cannot see.

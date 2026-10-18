@@ -1,7 +1,3 @@
-/* eslint-disable @next/next/no-img-element -- already-optimised WebP served
-   from /public. next/image would re-encode per requested width for no gain
-   on files that are already 8-30 KB, and would drop the intrinsic sizing
-   these fixed-height logo rows rely on. */
 import Link from "next/link";
 
 import {
@@ -11,6 +7,7 @@ import {
   XIcon,
 } from "@/components/ui/social-icons";
 import { FOOTER_SECTIONS, SITE } from "@/lib/content/site";
+import { Logo } from "@/components/brand/logo";
 
 /**
  * Site footer.
@@ -39,13 +36,7 @@ export function SiteFooter() {
           {/* Brand */}
           <div className="max-w-sm">
             <Link href="/" aria-label="Findtern - home" className="inline-block">
-              <img
-                src="/media/logo-remove.png"
-                alt="Findtern"
-                width={200}
-                height={56}
-                className="h-11 w-auto brightness-0 invert"
-              />
+              <Logo variant="white" className="h-11" />
             </Link>
             <p className="mt-5 text-base leading-relaxed text-on-dark-subtle">
               Your gateway to skilled interns, effortlessly. Verified

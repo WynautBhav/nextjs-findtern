@@ -1,10 +1,13 @@
+"use client";
+
 /* eslint-disable @next/next/no-img-element -- already-optimised WebP served
    from /public. next/image would re-encode per requested width for no gain
    on files that are already 8-30 KB, and would drop the intrinsic sizing
    these fixed-height logo rows rely on. */
+import { useState } from "react";
 import Image from "next/image";
 import {
-  BadgeCheck,
+  ArrowRight,
   Briefcase,
   ChartLine,
   CircleDot,
@@ -23,6 +26,7 @@ import { SectionHeading } from "@/components/ui/section-heading";
 import { TiltCard } from "@/components/motion/tilt-card";
 import { VelocityMarquee } from "@/components/motion/velocity-marquee";
 import { TestimonialCarousel } from "@/components/marketing/testimonial-carousel";
+import { SkillStudentsDialog } from "./skill-students-dialog";
 import type {
   CmsPartner,
   CmsFeaturedSkill,
@@ -142,6 +146,8 @@ const SKILL_ICONS: Record<string, typeof PenTool> = {
  * eleven silent twins.
  */
 export function SkillsMarquee({ skills }: { skills: CmsFeaturedSkill[] }) {
+  const [selectedSkill, setSelectedSkill] = useState<CmsFeaturedSkill | null>(null);
+
   if (!skills.length) return null;
 
   return (
@@ -150,7 +156,7 @@ export function SkillsMarquee({ skills }: { skills: CmsFeaturedSkill[] }) {
         <SectionHeading
           lead="Featured"
           accent="Skills"
-          sub="Every category carries a resource library, so you can prepare before you apply."
+          sub="Explore pre-interviewed student candidates and verified talent ready for immediate hire."
         />
       </div>
 
@@ -159,31 +165,58 @@ export function SkillsMarquee({ skills }: { skills: CmsFeaturedSkill[] }) {
         reverse
         className="mt-12"
         loopCopy={skills.map((s) => (
-          <SkillCard key={s.id} skill={s} isLoopCopy />
+          <SkillCard
+            key={`copy-${s.id}`}
+            skill={s}
+            isLoopCopy
+            onSelect={setSelectedSkill}
+          />
         ))}
       >
         {skills.map((s) => (
-          <SkillCard key={s.id} skill={s} />
+          <SkillCard
+            key={s.id}
+            skill={s}
+            onSelect={setSelectedSkill}
+          />
         ))}
       </VelocityMarquee>
+
+      <SkillStudentsDialog
+        skill={selectedSkill}
+        isOpen={Boolean(selectedSkill)}
+        onClose={() => setSelectedSkill(null)}
+      />
     </section>
   );
 }
 
-function SkillCard({ skill, isLoopCopy = false }: { skill: CmsFeaturedSkill; isLoopCopy?: boolean }) {
+function SkillCard({
+  skill,
+  isLoopCopy = false,
+  onSelect,
+}: {
+  skill: CmsFeaturedSkill;
+  isLoopCopy?: boolean;
+  onSelect: (skill: CmsFeaturedSkill) => void;
+}) {
   const Icon = SKILL_ICONS[skill.iconClass] ?? CircleDot;
   const Heading = isLoopCopy ? "p" : "h3";
 
   return (
-    <TiltCard max={7} className="w-56 shrink-0">
-      <div className="group/skill flex h-full flex-col gap-3.5 rounded-2xl border border-ink-200 bg-white p-5 transition-colors duration-200 ease-ease-out hover:border-brand-300">
+    <TiltCard max={7} className="w-60 shrink-0 px-2 py-1">
+      <button
+        type="button"
+        onClick={() => onSelect(skill)}
+        className="group/skill flex h-full w-full flex-col text-left gap-3.5 rounded-2xl border border-ink-200 bg-white p-5 transition-[border-color,box-shadow] duration-200 ease-ease-out hover:border-primary hover:shadow-md cursor-pointer focus-visible:outline-2 focus-visible:outline-primary"
+      >
         <span className="inline-flex size-11 items-center justify-center rounded-xl bg-gradient-to-br from-brand-50 to-brand-100 text-primary transition-colors duration-200 ease-ease-out group-hover/skill:from-primary group-hover/skill:to-brand-800 group-hover/skill:text-white">
           <Icon className="size-5" aria-hidden />
         </span>
 
         <Heading
           className={cn(
-            "text-base font-semibold leading-snug text-ink-900",
+            "text-base font-semibold leading-snug text-ink-900 group-hover/skill:text-primary transition-colors",
             !isLoopCopy && "tracking-tight",
           )}
         >
@@ -193,19 +226,17 @@ function SkillCard({ skill, isLoopCopy = false }: { skill: CmsFeaturedSkill; isL
           <p className="mt-1 text-xs text-text-subtle">{skill.metaText}</p>
         ) : null}
 
-        {/* resourceCount of 0 is real data and renders as such. */}
-        <p className="mt-auto flex items-center gap-1.5 text-2xs font-medium uppercase tracking-[0.1em] text-text-subtle">
-          <BadgeCheck
-            className={cn(
-              "size-3.5",
-              skill.resourceCount > 0 ? "text-primary" : "text-ink-400",
-            )}
-            aria-hidden
-          />
-          {skill.resourceCount}{" "}
-          {skill.resourceCount === 1 ? "Resource" : "Resources"}
-        </p>
-      </div>
+        <div className="mt-auto flex w-full items-center justify-between border-t border-ink-100 pt-3">
+          <span className="flex items-center gap-1.5 text-xs font-semibold text-primary">
+            <Users className="size-3.5" aria-hidden />
+            <span>{skill.resourceCount} {skill.resourceCount === 1 ? "student" : "students"}</span>
+          </span>
+          <span className="flex items-center gap-1 text-[11px] font-medium text-ink-500 transition-colors group-hover/skill:text-primary">
+            <span>View bench</span>
+            <ArrowRight className="size-3 transition-transform duration-200 group-hover/skill:translate-x-0.5" aria-hidden />
+          </span>
+        </div>
+      </button>
     </TiltCard>
   );
 }

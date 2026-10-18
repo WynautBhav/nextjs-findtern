@@ -3,25 +3,23 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { AlertCircle, ArrowRight, Loader2, TriangleAlert } from "lucide-react";
+import { AlertCircle, ArrowLeft, ArrowRight, Loader2, MailCheck } from "lucide-react";
 
 import { COUNTRY_CODE_OPTIONS, isPersonalEmail } from "@/lib/employer-onboarding";
+import { isValidPhone, phoneError, phoneHint } from "@/lib/phone";
 
 /**
  * Employer registration.
  *
  * The one rule that earns its own treatment: a company email address. The
- * mirror image of the intern rule lives in `schema.ts` — `insertUserSchema`
+ * mirror image of the intern rule lives in `schema.ts` - `insertUserSchema`
  * *requires* a personal domain, `insertEmployerSchema` requires a non-personal
- * one — and this form enforces the same list client-side so the employer finds
+ * one - and this form enforces the same list client-side so the employer finds
  * out before the round trip instead of after it.
  *
- * ── What is missing ───────────────────────────────────────────────────────
- * There is no `POST /api/auth/employer/signup` in this build. `/api/auth/signup`
- * exists but hardcodes `role: "intern"` and `subjectType: "intern"`, so it
- * cannot be pointed at this form without changing intern behaviour. There is
- * also no employer-scoped OTP route. So the button below reports exactly what
- * it would have sent rather than posting into a 404.
+ * Same three calls as the intern form: send-otp → verify-otp → create, with
+ * `subjectType: "employer"`. The create route refuses an email that has not
+ * been verified, so the OTP step cannot be skipped by calling it directly.
  */
 
 const PASSWORD_RULES = [
@@ -41,8 +39,9 @@ export function EmployerSignupForm() {
   const [password, setPassword] = useState("");
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [stage, setStage] = useState<"details" | "otp">("details");
+  const [otp, setOtp] = useState("");
 
   const trimmedEmail = companyEmail.trim().toLowerCase();
   const personal = trimmedEmail.length > 0 && isPersonalEmail(trimmedEmail);
@@ -54,45 +53,82 @@ export function EmployerSignupForm() {
     companyName.trim().length >= 2 &&
     /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail) &&
     !personal &&
-    /^\d{6,15}$/.test(phoneNumber) &&
+    isValidPhone(countryCode, phoneNumber) &&
     passwordOk &&
     agreedToTerms;
 
+  async function post(url: string, body: unknown): Promise<string | null> {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (res.ok) return null;
+    const data = (await res.json().catch(() => ({}))) as { error?: string };
+    return data.error ?? "Something went wrong";
+  }
+
+  async function sendOtp() {
+    setError(null);
+    setLoading(true);
+    try {
+      const problem = await post("/api/auth/signup/send-otp", {
+        email: trimmedEmail,
+        subjectType: "employer",
+      });
+      if (problem) setError(problem);
+      else setStage("otp");
+    } catch {
+      setError("Network error");
+    }
+    setLoading(false);
+  }
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setNotice(null);
 
-    const problems = validate({
-      name,
-      companyName,
-      email: trimmedEmail,
-      phoneNumber,
-      password,
-      agreedToTerms,
-    });
-    if (Object.keys(problems).length > 0) {
-      setError(Object.values(problems)[0]);
+    if (stage === "details") {
+      const problems = validate({
+        name,
+        companyName,
+        email: trimmedEmail,
+        countryCode,
+        phoneNumber,
+        password,
+        agreedToTerms,
+      });
+      if (Object.keys(problems).length > 0) {
+        setError(Object.values(problems)[0]);
+        return;
+      }
+      await sendOtp();
       return;
     }
 
     setError(null);
     setLoading(true);
     try {
-      const res = await fetch("/api/auth/employer/signup", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: name.trim(),
-          companyName: companyName.trim(),
-          companyEmail: trimmedEmail,
-          phoneNumber,
-          password,
-          agreedToTerms: true,
-        }),
+      const otpProblem = await post("/api/auth/signup/verify-otp", {
+        email: trimmedEmail,
+        otp,
+        subjectType: "employer",
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setError(data.error ?? "Signup failed");
+      if (otpProblem) {
+        setError(otpProblem);
+        setLoading(false);
+        return;
+      }
+      const problem = await post("/api/auth/employer/signup", {
+        name: name.trim(),
+        companyName: companyName.trim(),
+        companyEmail: trimmedEmail,
+        countryCode,
+        phoneNumber,
+        password,
+        agreedToTerms: true,
+      });
+      if (problem) {
+        setError(problem);
         setLoading(false);
         return;
       }
@@ -108,22 +144,76 @@ export function EmployerSignupForm() {
       {error ? (
         <div
           role="alert"
-          className="flex items-start gap-2.5 rounded-lg border border-danger/25 bg-danger-soft px-3.5 py-3 text-sm text-danger"
+          className="flex items-start gap-2.5 rounded-[10px] border border-danger/25 bg-danger-soft px-3.5 py-3 text-sm text-danger"
         >
           <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden />
           <span>{error}</span>
         </div>
       ) : null}
 
-      {notice ? (
-        <p
-          role="status"
-          className="flex items-start gap-2.5 rounded-lg border border-warning/25 bg-warning-soft px-3.5 py-3 text-sm leading-relaxed text-ink-700"
-        >
-          <TriangleAlert className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden />
-          <span>{notice}</span>
-        </p>
-      ) : null}
+      {stage === "otp" ? (
+        <div className="space-y-5">
+          <p className="flex items-start gap-2.5 rounded-[10px] border border-brand-200 bg-brand-50 px-3.5 py-3 text-sm text-ink-700">
+            <MailCheck className="mt-0.5 size-4 shrink-0 text-brand-700" aria-hidden />
+            <span>
+              We sent a 6-digit code to <strong className="font-semibold">{trimmedEmail}</strong>. It
+              expires in 10 minutes.
+            </span>
+          </p>
+          <div>
+            <label htmlFor="otp" className="block text-sm font-medium text-ink-800">
+              Verification code
+            </label>
+            <input
+              id="otp"
+              inputMode="numeric"
+              maxLength={6}
+              value={otp}
+              onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
+              autoComplete="one-time-code"
+              placeholder="000000"
+              className="apple-spring mt-2 min-h-12 w-full rounded-[10px] border border-ink-200 bg-white px-3.5 text-center font-mono text-lg tracking-[0.5em] text-ink-900 outline-none placeholder:text-ink-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={otp.length !== 6 || loading}
+            className="apple-spring apple-pressable flex min-h-11 w-full items-center justify-center gap-2 rounded-[10px] bg-brand-700 px-4 text-sm font-semibold text-white hover:bg-brand-600 disabled:pointer-events-none disabled:opacity-60"
+          >
+            {loading ? (
+              <>
+                <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden />
+                Working…
+              </>
+            ) : (
+              "Verify and create account"
+            )}
+          </button>
+          <div className="flex items-center justify-between text-xs">
+            <button
+              type="button"
+              onClick={() => {
+                setStage("details");
+                setOtp("");
+                setError(null);
+              }}
+              className="inline-flex items-center gap-1.5 font-medium text-ink-600 hover:text-ink-900"
+            >
+              <ArrowLeft className="size-3.5" aria-hidden />
+              Change details
+            </button>
+            <button
+              type="button"
+              onClick={() => void sendOtp()}
+              disabled={loading}
+              className="font-medium text-brand-700 underline-offset-4 hover:underline disabled:opacity-60"
+            >
+              Resend code
+            </button>
+          </div>
+        </div>
+      ) : (
+      <>
 
       <TextInput
         id="name"
@@ -161,10 +251,10 @@ export function EmployerSignupForm() {
           placeholder="hiring@acme.com"
           aria-invalid={personal ? true : undefined}
           aria-describedby="companyEmail-note"
-          className={`mt-2 h-11 w-full rounded-lg border bg-white px-3.5 text-sm text-ink-900 outline-none transition-[border-color,box-shadow] placeholder:text-ink-400 focus-visible:ring-[3px] ${
+          className={`apple-spring mt-2 min-h-11 w-full rounded-[10px] border bg-white px-3.5 text-[14px] text-ink-900 outline-none placeholder:text-ink-400 focus:ring-2 ${
             personal
-              ? "border-danger focus-visible:border-danger focus-visible:ring-danger/20"
-              : "border-ink-200 focus-visible:border-brand-600 focus-visible:ring-brand-600/20"
+              ? "border-danger focus:border-danger focus:ring-danger/20"
+              : "border-ink-200 focus:border-brand-500 focus:ring-brand-500/20"
           }`}
         />
         <p
@@ -172,7 +262,7 @@ export function EmployerSignupForm() {
           className={`mt-1.5 text-xs ${personal ? "text-danger" : "text-text-subtle"}`}
         >
           {personal
-            ? "That is a personal mailbox. Employers need an address at the company domain — the server rejects Gmail, Yahoo, Outlook and the rest."
+            ? "That is a personal mailbox. Employers need an address at the company domain - the server rejects Gmail, Yahoo, Outlook and the rest."
             : "Must be at your company domain. Personal mailboxes are rejected."}
         </p>
       </div>
@@ -186,7 +276,7 @@ export function EmployerSignupForm() {
             value={countryCode}
             onChange={(e) => setCountryCode(e.target.value)}
             aria-label="Country code"
-            className="h-11 shrink-0 rounded-lg border border-ink-200 bg-white px-2.5 text-sm text-ink-800 outline-none focus-visible:border-brand-600 focus-visible:ring-[3px] focus-visible:ring-brand-600/20"
+            className="apple-spring min-h-11 shrink-0 rounded-[10px] border border-ink-200 bg-white px-2.5 text-[14px] tabular-nums text-ink-800 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
           >
             {COUNTRY_CODE_OPTIONS.map((option) => (
               <option key={option.code} value={option.code}>
@@ -203,13 +293,13 @@ export function EmployerSignupForm() {
             onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, ""))}
             autoComplete="tel-national"
             placeholder={countryCode === "+91" ? "9876543210" : "2015550123"}
-            className="h-11 w-full rounded-lg border border-ink-200 bg-white px-3.5 text-sm text-ink-900 outline-none transition-[border-color,box-shadow] placeholder:text-ink-400 focus-visible:border-brand-600 focus-visible:ring-[3px] focus-visible:ring-brand-600/20"
+            className="apple-spring min-h-11 w-full rounded-[10px] border border-ink-200 bg-white px-3.5 text-[14px] tabular-nums text-ink-900 outline-none placeholder:text-ink-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
           />
         </div>
         <p className="mt-1.5 text-xs text-text-subtle">
-          {countryCode === "+91"
-            ? "10 digits, no country code."
-            : "6 to 15 digits, no country code."}
+          {phoneNumber && !isValidPhone(countryCode, phoneNumber)
+            ? phoneError(countryCode, phoneNumber)
+            : phoneHint(countryCode)}
         </p>
       </div>
 
@@ -226,7 +316,7 @@ export function EmployerSignupForm() {
           autoComplete="new-password"
           placeholder="••••••••"
           aria-describedby="password-rules"
-          className="mt-2 h-11 w-full rounded-lg border border-ink-200 bg-white px-3.5 text-sm text-ink-900 outline-none transition-[border-color,box-shadow] placeholder:text-ink-400 focus-visible:border-brand-600 focus-visible:ring-[3px] focus-visible:ring-brand-600/20"
+          className="apple-spring mt-2 min-h-11 w-full rounded-[10px] border border-ink-200 bg-white px-3.5 text-[14px] text-ink-900 outline-none placeholder:text-ink-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
         />
         <ul id="password-rules" className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
           {PASSWORD_RULES.map((rule) => {
@@ -251,12 +341,12 @@ export function EmployerSignupForm() {
           I agree to the{" "}
           <Link
             href="/employer-terms-and-conditions"
-            className="font-medium text-brand-700 underline-offset-4 hover:underline"
+            className="apple-spring font-medium text-brand-700 underline-offset-4 hover:underline"
           >
             employer terms
           </Link>{" "}
           and the{" "}
-          <Link href="/privacy" className="font-medium text-brand-700 underline-offset-4 hover:underline">
+          <Link href="/privacy" className="apple-spring font-medium text-brand-700 underline-offset-4 hover:underline">
             privacy policy
           </Link>
           .
@@ -266,7 +356,7 @@ export function EmployerSignupForm() {
       <button
         type="submit"
         disabled={!detailsOk || loading}
-        className="group flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-brand-700 px-4 text-sm font-semibold text-white transition-colors hover:bg-brand-600 disabled:pointer-events-none disabled:opacity-60"
+        className="apple-spring apple-pressable group flex min-h-11 w-full items-center justify-center gap-2 rounded-[10px] bg-brand-700 px-4 text-sm font-semibold text-white hover:bg-brand-600 disabled:pointer-events-none disabled:opacity-60"
       >
         {loading ? (
           <>
@@ -275,7 +365,7 @@ export function EmployerSignupForm() {
           </>
         ) : (
           <>
-            Create company account
+            Send verification code
             <ArrowRight
               className="size-4 transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none"
               aria-hidden
@@ -288,6 +378,8 @@ export function EmployerSignupForm() {
         Creating the account does not start hiring. You will be taken to the two-stage company
         setup, and nothing is charged until a candidate accepts.
       </p>
+      </>
+      )}
     </form>
   );
 }
@@ -320,7 +412,7 @@ function TextInput({
         placeholder={placeholder}
         autoComplete={autoComplete}
         onChange={(e) => onChange(e.target.value)}
-        className="mt-2 h-11 w-full rounded-lg border border-ink-200 bg-white px-3.5 text-sm text-ink-900 outline-none transition-[border-color,box-shadow] placeholder:text-ink-400 focus-visible:border-brand-600 focus-visible:ring-[3px] focus-visible:ring-brand-600/20"
+        className="apple-spring mt-2 min-h-11 w-full rounded-[10px] border border-ink-200 bg-white px-3.5 text-[14px] text-ink-900 outline-none placeholder:text-ink-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
       />
     </div>
   );
@@ -338,6 +430,7 @@ function validate(draft: {
   name: string;
   companyName: string;
   email: string;
+  countryCode: string;
   phoneNumber: string;
   password: string;
   agreedToTerms: boolean;
@@ -352,12 +445,11 @@ function validate(draft: {
   } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draft.email)) {
     errors.email = "Enter a valid email address.";
   } else if (isPersonalEmail(draft.email)) {
-    errors.email = "Use your company domain — personal mailboxes cannot register a company.";
+    errors.email = "Use your company domain - personal mailboxes cannot register a company.";
   }
 
-  if (!/^\d{6,15}$/.test(draft.phoneNumber)) {
-    errors.phoneNumber = "Enter 6 to 15 digits, no country code.";
-  }
+  const phoneProblem = phoneError(draft.countryCode, draft.phoneNumber);
+  if (phoneProblem) errors.phoneNumber = phoneProblem;
   if (!PASSWORD_RULES.every((rule) => rule.test(draft.password))) {
     errors.password = "The password does not meet every rule listed above.";
   }

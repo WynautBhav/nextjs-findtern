@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { getDb, schema } from "@/lib/db";
+import { forgetAccountStatus } from "@/lib/account-status";
 import { requireMutation } from "@/lib/guards-mutation";
 
 /**
@@ -27,7 +28,7 @@ export async function POST(req: Request) {
   const parsed = bodySchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) {
     return NextResponse.json(
-      { error: "Expected { ids: string[], isActive: boolean }" },
+      { error: "Select at least one intern and choose a status." },
       { status: 400 },
     );
   }
@@ -40,10 +41,11 @@ export async function POST(req: Request) {
     .set({ isActive })
     .where(inArray(schema.users.id, ids))
     .returning({ id: schema.users.id });
+  ids.forEach((uid) => forgetAccountStatus("intern", uid));
 
   if (updated.length !== ids.length) {
     return NextResponse.json({
-      error: `Updated ${updated.length} of ${ids.length}. Some ids did not match an intern.`,
+      error: `Updated ${updated.length} of ${ids.length}. Some selected interns could not be found.`,
       updated: updated.length,
       requested: ids.length,
     });

@@ -1,7 +1,8 @@
 import { redirect } from "next/navigation";
-import { eq } from "drizzle-orm";
+import { and, count, eq } from "drizzle-orm";
 
 import { AppShell } from "@/components/app/shell";
+import { ViewAsBanner } from "@/components/admin/view-as-banner";
 import { getSession } from "@/lib/auth";
 import { getDb, schema } from "@/lib/db";
 import { loadInternData } from "@/lib/intern-data";
@@ -32,15 +33,40 @@ export default async function InternLayout({ children }: { children: React.React
 
   const name = await fullName(session.uid);
 
+  const db = getDb();
+  const [doc] = await db
+    .select({ profilePhotoName: schema.internDocuments.profilePhotoName })
+    .from(schema.internDocuments)
+    .where(eq(schema.internDocuments.userId, session.uid))
+    .limit(1);
+
+  const extra = data.onboarding?.extraData as Record<string, unknown> | undefined;
+  const externalPhoto = typeof extra?.photoUrl === "string" ? extra.photoUrl : null;
+  const photoUrl = doc?.profilePhotoName ? "/api/intern/avatar" : externalPhoto;
+
+  const [unread] = await db
+    .select({ value: count() })
+    .from(schema.notifications)
+    .where(
+      and(
+        eq(schema.notifications.recipientType, "intern"),
+        eq(schema.notifications.recipientId, session.uid),
+        eq(schema.notifications.isRead, false),
+      ),
+    );
+  const unreadAlerts = Number(unread?.value ?? 0);
+
   return (
     <AppShell
       stage={data.stage}
       attentionHrefs={attentionHrefs}
       name={name}
       email={session.email}
-      photoUrl={null}
+      photoUrl={photoUrl}
+      unreadAlerts={unreadAlerts}
     >
       {children}
+      {session.impersonator ? <ViewAsBanner viewing={name} admin={session.impersonator.email} /> : null}
     </AppShell>
   );
 }

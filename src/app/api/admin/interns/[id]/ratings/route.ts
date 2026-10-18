@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { getDb, schema } from "@/lib/db";
+import { applyRatings } from "@/lib/admin/ratings";
 import { requireMutation } from "@/lib/guards-mutation";
 
 /**
@@ -22,6 +23,8 @@ const bodySchema = z.object({
   coding: AXIS.optional(),
   aptitude: AXIS.optional(),
   interview: AXIS.optional(),
+  aiFeedbackLink: z.string().optional().nullable(),
+  aiRecordingLink: z.string().optional().nullable(),
 });
 
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -36,11 +39,16 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   const [row] = await db.select().from(schema.internOnboarding).where(eq(schema.internOnboarding.userId, id)).limit(1);
   if (!row) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  const extra = (row.extraData as Record<string, unknown>) ?? {};
-  const ratings = { ...(extra.ratings as object), ...parsed.data };
-  const scores = Object.values(ratings).filter((v): v is number => typeof v === "number");
-  const findternScore = scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : null;
+  const { communication, coding, aptitude, interview } = parsed.data;
+  const updatedExtra = applyRatings((row.extraData as Record<string, unknown>) ?? {}, { communication, coding, aptitude, interview });
 
-  await db.update(schema.internOnboarding).set({ extraData: { ...extra, ratings, findternScore } }).where(eq(schema.internOnboarding.id, row.id));
-  return NextResponse.json({ ok: true, findternScore });
+  if (parsed.data.aiFeedbackLink !== undefined) {
+    updatedExtra.aiFeedbackLink = parsed.data.aiFeedbackLink ? parsed.data.aiFeedbackLink.trim() : null;
+  }
+  if (parsed.data.aiRecordingLink !== undefined) {
+    updatedExtra.aiRecordingLink = parsed.data.aiRecordingLink ? parsed.data.aiRecordingLink.trim() : null;
+  }
+
+  await db.update(schema.internOnboarding).set({ extraData: updatedExtra }).where(eq(schema.internOnboarding.id, row.id));
+  return NextResponse.json({ ok: true, findternScore: updatedExtra.findternScore });
 }

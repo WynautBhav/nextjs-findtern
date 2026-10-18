@@ -5,7 +5,8 @@ import { z } from "zod";
 import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
 
-const bodySchema = z.object({ approval: z.enum(["pending", "approved", "rejected"]) });
+/** Legacy key and values (admin-interns.tsx): extraData.approvalStatus. */
+const bodySchema = z.object({ approvalStatus: z.enum(["Pending", "Approved", "Rejected"]) });
 
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -20,6 +21,6 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   if (!row) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const extra = (row.extraData as Record<string, unknown>) ?? {};
-  await db.update(schema.internOnboarding).set({ extraData: { ...extra, approval: parsed.data.approval } }).where(eq(schema.internOnboarding.id, row.id));
+  await db.update(schema.internOnboarding).set({ extraData: { ...extra, approvalStatus: parsed.data.approvalStatus } }).where(eq(schema.internOnboarding.id, row.id));
   return NextResponse.json({ ok: true });
 }

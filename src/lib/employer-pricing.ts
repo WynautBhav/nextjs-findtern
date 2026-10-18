@@ -1,4 +1,5 @@
 import type { pricingPlans } from "@/lib/db/schema";
+import { inrMinorToUsdMinor } from "@/lib/currency";
 import { BANDS, bandFor, bandsForRegion } from "@/lib/score";
 
 /**
@@ -36,14 +37,14 @@ export type Pricing = {
  * admin-authored and has no enum behind it, so match loosely and fall back to
  * price ordering when nothing matches. */
 const SLUG_HINTS: Record<string, string[]> = {
-  standard: ["standard", "basic", "starter", "low", "tier1", "tier-1"],
-  skilled: ["skilled", "intermediate", "mid", "plus", "tier2", "tier-2"],
-  assured: ["assured", "premium", "pro", "high", "tier3", "tier-3"],
+  standard: ["espresso", "standard", "basic", "starter", "low", "tier1", "tier-1"],
+  skilled: ["cappuccino", "skilled", "intermediate", "mid", "plus", "tier2", "tier-2"],
+  assured: ["latte", "assured", "premium", "pro", "high", "tier3", "tier-3"],
 };
 
 /**
- * @param region  "IN" for an India-based employer, otherwise null. A
- *   region-scoped plan wins over a global one; a global plan is the fallback.
+ * @param region  Kept for callers; pricing no longer varies by region beyond
+ *   currency, which `currency` already carries.
  */
 export function resolvePricing(
   score: number,
@@ -64,18 +65,16 @@ export function resolvePricing(
     source: "default",
   };
 
-  const currencyMatches = plans.filter(
-    (plan) =>
-      plan.isActive && plan.currency.toUpperCase() === currency,
+  // Only INR rows are authored; USD is derived at ₹100 = $1 (lib/currency),
+  // so the two regions can never quote different prices for the same band.
+  const inrPlans = plans.filter(
+    (plan) => plan.isActive && plan.currency.toUpperCase() === "INR",
   );
-  if (currencyMatches.length === 0) return fallback;
+  if (inrPlans.length === 0) return fallback;
 
-  const scoped = currencyMatches.filter((plan) => (plan.region ?? null) === region);
-  const pool =
-    scoped.length > 0
-      ? scoped
-      : currencyMatches.filter((plan) => plan.region === null || plan.region === undefined);
-  if (pool.length === 0) return fallback;
+  const scoped = inrPlans.filter((plan) => (plan.region ?? null) === "IN");
+  const pool = scoped.length > 0 ? scoped : inrPlans;
+  void region;
 
   const bandIndex = BANDS.findIndex((entry) => entry.id === band.id);
   const hints = SLUG_HINTS[band.id] ?? [];
@@ -92,11 +91,12 @@ export function resolvePricing(
 
   if (!plan) return fallback;
 
+  const convert = currency === "USD" ? inrMinorToUsdMinor : (minor: number) => minor;
   return {
     bandName: plan.displayName || band.name,
     bandBlurb: band.blurb,
-    hourlyRateMinor: plan.priceHourlyMinor,
-    perHireMinor: plan.perHireChargeMinor,
+    hourlyRateMinor: convert(plan.priceHourlyMinor),
+    perHireMinor: convert(plan.perHireChargeMinor),
     source: "plan",
   };
 }

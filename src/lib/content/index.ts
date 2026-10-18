@@ -10,9 +10,12 @@ import {
   PRICING_PLANS_USD,
 } from "./home";
 import { BLOG_POSTS } from "./blog";
-import type { CmsBlogPost, CmsHome, CmsPlan } from "./types";
+import type { CmsBlogPost, CmsHome, CmsLegalDoc, CmsPlan } from "./types";
+import { EMPLOYER_TERMS, PLATFORM_TERMS } from "./legal";
+import { INTERN_NDA, INTERN_TERMS } from "./legal-intern";
 import { getDb, schema, hasDb } from "@/lib/db";
 import { eq, desc, asc } from "drizzle-orm";
+import { inrMinorToUsdMinor } from "@/lib/currency";
 
 /* ==========================================================================
    Content accessors - the seam for the data layer
@@ -103,19 +106,67 @@ export async function getPopularSteps() {
  * fallback for when the database is unreachable - they are no longer what the
  * public sees.
  *
- * Filtered by currency, always: the table holds both the INR and the USD rate
- * cards, and returning both is what rendered Espresso/Cappuccino/Latte twice
- * (with the USD rows mislabelled ₹1/hr and ₹2/hr). Exactly three plans come
- * back, one currency.
+ * Only the INR rows are read. The USD card is derived from them at the fixed
+ * ₹100 = $1 rule (lib/currency), so an admin edits one price and both
+ * regions follow; legacy USD rows in the table are ignored.
  */
 export async function getPlans(isIndia: boolean): Promise<CmsPlan[]> {
-  const currency = isIndia ? "INR" : "USD";
   return tryDb(async () => {
     const db = getDb();
     const rows = await db.select().from(schema.pricingPlans).where(eq(schema.pricingPlans.isActive, true)).orderBy(asc(schema.pricingPlans.sortOrder));
-    const mine = rows.filter((r) => String(r.currency).toUpperCase() === currency);
-    return mine.length ? (mine as unknown as CmsPlan[]) : (isIndia ? PRICING_PLANS : PRICING_PLANS_USD);
+    const inr = rows.filter((r) => String(r.currency).toUpperCase() === "INR");
+    if (!inr.length) return isIndia ? PRICING_PLANS : PRICING_PLANS_USD;
+    const plans = withPlanDefaults(inr.map(rowToPlan));
+    return isIndia ? plans : plans.map(planToUsd);
   }, isIndia ? PRICING_PLANS : PRICING_PLANS_USD);
+}
+
+function rowToPlan(r: typeof schema.pricingPlans.$inferSelect): CmsPlan {
+  return {
+    id: r.id,
+    slug: r.slug,
+    displayName: r.displayName,
+    currency: "INR",
+    priceHourlyMinor: r.priceHourlyMinor,
+    perHireChargeMinor: r.perHireChargeMinor,
+    internshipDuration: r.internshipDuration ?? "",
+    features: r.features ?? [],
+    featureList: r.featureList ?? [],
+    compareAtHourlyMinor: r.compareAtHourlyMinor,
+    compareAtPerHireMinor: r.compareAtPerHireMinor,
+    isFeatured: r.isFeatured,
+    gstApplicable: r.gstApplicable,
+    sortOrder: r.sortOrder,
+    isActive: r.isActive,
+  };
+}
+
+/** Rows saved before the ✓/✗ list and featured flag existed get the
+ *  authored defaults for their slug, so no card renders empty. */
+function withPlanDefaults(plans: CmsPlan[]): CmsPlan[] {
+  const anyFeatured = plans.some((p) => p.isFeatured);
+  return plans.map((p) => {
+    const authored = PRICING_PLANS.find((a) => a.slug === p.slug);
+    return {
+      ...p,
+      featureList: p.featureList.length ? p.featureList : (authored?.featureList ?? []),
+      isFeatured: anyFeatured ? p.isFeatured : Boolean(authored?.isFeatured),
+    };
+  });
+}
+
+/** USD is never stored separately: ₹100 = $1, applied to the INR row. */
+function planToUsd(p: CmsPlan): CmsPlan {
+  const usd = (minor: number | null) => (minor == null ? null : inrMinorToUsdMinor(minor));
+  return {
+    ...p,
+    currency: "USD",
+    priceHourlyMinor: inrMinorToUsdMinor(p.priceHourlyMinor),
+    perHireChargeMinor: inrMinorToUsdMinor(p.perHireChargeMinor),
+    compareAtHourlyMinor: usd(p.compareAtHourlyMinor),
+    compareAtPerHireMinor: usd(p.compareAtPerHireMinor),
+    gstApplicable: false,
+  };
 }
 
 export async function getBlogPosts(): Promise<CmsBlogPost[]> {
@@ -132,6 +183,66 @@ export async function getBlogPost(slug: string): Promise<CmsBlogPost | null> {
     const [row] = await db.select().from(schema.websiteBlogPosts).where(eq(schema.websiteBlogPosts.slug, slug)).limit(1);
     return row ? (row as unknown as CmsBlogPost) : (BLOG_POSTS.find((p) => p.slug === slug) ?? null);
   }, BLOG_POSTS.find((p) => p.slug === slug) ?? null);
+}
+
+/* --------------------------------------------------------------------------
+   Legal documents. One row per table, written by the admin editors
+   (/admin/cms/terms, /admin/companies/terms, /admin/interns/terms). An empty
+   table or an unreachable DB serves the TS copy, so the pages never go blank.
+   -------------------------------------------------------------------------- */
+
+type LegalTable =
+  | typeof schema.websiteTerms
+  | typeof schema.employerTerms
+  | typeof schema.internTerms;
+
+async function getLegalDoc(table: LegalTable, fallback: CmsLegalDoc): Promise<CmsLegalDoc> {
+  return tryDb(async () => {
+    const db = getDb();
+    const [row] = await db.select().from(table).limit(1);
+    if (!row?.bodyHtml?.trim()) return fallback;
+    return {
+      ...fallback,
+      title: row.title || fallback.title,
+      html: row.bodyHtml,
+      updated: (row.updatedAt ?? row.createdAt)?.toISOString().slice(0, 10) ?? fallback.updated,
+    };
+  }, fallback);
+}
+
+export function getPlatformTerms() {
+  return getLegalDoc(schema.websiteTerms, PLATFORM_TERMS);
+}
+
+export function getEmployerTerms() {
+  return getLegalDoc(schema.employerTerms, EMPLOYER_TERMS);
+}
+
+export function getInternTerms() {
+  return getLegalDoc(schema.internTerms, INTERN_TERMS);
+}
+
+/** Active NDA clauses in order, joined into one document. */
+export async function getInternNda(): Promise<CmsLegalDoc> {
+  return tryDb(async () => {
+    const db = getDb();
+    const rows = await db
+      .select()
+      .from(schema.internNonDisclosureClauses)
+      .where(eq(schema.internNonDisclosureClauses.isActive, true))
+      .orderBy(asc(schema.internNonDisclosureClauses.sortOrder));
+    if (!rows.length) return INTERN_NDA;
+    const latest = rows.reduce<Date | null>((acc, r) => {
+      const t = r.updatedAt ?? r.createdAt;
+      return t && (!acc || t > acc) ? t : acc;
+    }, null);
+    return {
+      ...INTERN_NDA,
+      title: rows.length === 1 ? rows[0].title || INTERN_NDA.title : INTERN_NDA.title,
+      html: rows.length === 1 ? rows[0].bodyHtml : rows.map((r) => `<h2>${r.title}</h2>${r.bodyHtml}`).join("\n"),
+      updated: latest?.toISOString().slice(0, 10) ?? INTERN_NDA.updated,
+    };
+  }, INTERN_NDA);
 }
 
 export { BLOG_POSTS, FAQ_ITEMS, POPULAR_STEPS, PRICING_PLANS };

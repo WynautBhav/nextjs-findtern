@@ -30,7 +30,7 @@ export const metadata: Metadata = {
     template: "%s | Findtern",
   },
   description:
-    "Hire a verified intern for the price of a coffee, or get placed in a paid internship in 18 months - or your deposit back.",
+    "Hire a verified intern for the price of a coffee, or get placed in a paid internship - or your deposit back.",
   applicationName: "Findtern",
   authors: [{ name: "Findtern" }],
   creator: "Findtern",

@@ -1,20 +1,20 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, Building2 } from "lucide-react";
+import { ArrowRight, Building2, Video } from "lucide-react";
 
 import { EmptyScene, PageHead, SectionHead, Surface } from "@/components/app/primitives";
 import { ReadinessStrip } from "@/components/app/readiness";
 import { StatusStrip, Thread } from "@/components/app/thread";
-import { ProfileCard } from "@/components/app/profile-card";
 import { ActivationCard } from "@/components/intern/activation-card";
-import { InternRetentionHub } from "@/components/intern/intern-retention-hub";
-import { getSession } from "@/lib/auth";
+import { OpenToWorkToggle } from "@/components/intern/open-to-work-toggle";
+import { requireRole } from "@/lib/auth";
 import { getDb, schema } from "@/lib/db";
-import { desc, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { loadInternData, openProjects } from "@/lib/intern-data";
-import { nextAction } from "@/lib/journey";
+import { isPast, nextAction, slotOf } from "@/lib/journey";
 import { formatMoney } from "@/lib/format";
-import { moneyPlain } from "@/lib/journey";
+import { isInternPaid } from "@/lib/payments";
+import { getInternActivationFeeMinor } from "@/lib/platform-settings";
 
 export const metadata: Metadata = {
   title: "Home",
@@ -24,46 +24,47 @@ export const metadata: Metadata = {
 /**
  * Home.
  *
- * The old dashboard was three identical cards holding 2, 2 and 1, and a list
- * whose primary label was the literal string `interview_first`. It answered
- * "how many" three times and nothing about what to do.
- *
- * ── Why this layout and not the previous one ───────────────────────────
- *
- * An earlier pass put the thread in a narrow column and stacked the readiness
- * meter, the stipend and two proof cards down a 20rem rail. It looked like a
- * sidebar full of widgets and the proof cards were unreadable in it. A card
- * carrying facts is a document, and documents do not belong in a rail.
- *
- * So the composition is one main column with a genuine reading measure, and
- * the rail carries only things that are glanceable: what is waiting, what is
- * visible, what is owed. The profile card gets its own full width band below,
- * because that is what an employer would see.
+ * One main column for what is happening (the pending action once, then the
+ * activity thread, then open roles while searching) and a narrow rail of
+ * glanceable facts: next interview, score, profile completeness, visibility,
+ * money. Nothing appears twice, and nothing shows a number it does not have:
+ * no score before the interview, no "₹0 on its way".
  */
-function toInitials(first?: string | null, last?: string | null): string {
-  const a = (first ?? "").trim().charAt(0);
-  const b = (last ?? "").trim().charAt(0);
-  return `${a}${b}`.toUpperCase() || "?";
+function extraBag(onboarding: { extraData?: Record<string, unknown> | null } | null) {
+  const extra = onboarding?.extraData;
+  return extra && typeof extra === "object" ? (extra as Record<string, unknown>) : {};
 }
 
-function toStringList(value: unknown): string[] {
-  if (!Array.isArray(value)) return [];
-  return value.filter((v): v is string => typeof v === "string");
+/** Assigned assessment score, if any - null when unscored (never a fake number). */
+function scoreOf(onboarding: { extraData?: Record<string, unknown> | null } | null): number | null {
+  const raw = extraBag(onboarding).findternScore;
+  return typeof raw === "number" && Number.isFinite(raw) ? raw : null;
 }
 
-function academicField(
+/** Per-axis scores backing the dashboard breakdown. Null when never assessed. */
+function ratingsOf(
   onboarding: { extraData?: Record<string, unknown> | null } | null,
-  key: string,
-): string | null {
-  const academics = onboarding?.extraData?.academics;
-  if (!academics || typeof academics !== "object") return null;
-  const v = (academics as Record<string, unknown>)[key];
-  return typeof v === "string" && v.trim() ? v : null;
+): { communication: number; coding: number; aptitude: number; interview: number } | null {
+  const raw = extraBag(onboarding).ratings;
+  if (!raw || typeof raw !== "object") return null;
+  const record = raw as Record<string, unknown>;
+  const num = (key: string) => {
+    const value = Number(record[key]);
+    return Number.isFinite(value) ? value : 0;
+  };
+  const ratings = {
+    communication: num("communication"),
+    coding: num("coding"),
+    aptitude: num("aptitude"),
+    interview: num("interview"),
+  };
+  return ratings.communication + ratings.coding + ratings.aptitude + ratings.interview > 0
+    ? ratings
+    : null;
 }
 
 export default async function InternHome() {
-  const session = await getSession();
-  if (!session) return null;
+  const session = await requireRole("intern");
 
   const data = await loadInternData(session.uid);
   const action = nextAction(data.thread);
@@ -84,15 +85,31 @@ export default async function InternHome() {
 
   // Activation: the one-time ₹2,499 that takes a profile live. Once any paid
   // row exists the card leaves the dashboard for good.
-  const [latestPayment] = await getDb()
-    .select({ status: schema.internPayments.status })
-    .from(schema.internPayments)
-    .where(eq(schema.internPayments.internId, session.uid))
-    .orderBy(desc(schema.internPayments.createdAt))
-    .limit(1);
-  const activated = latestPayment?.status === "paid";
+  const activated = await isInternPaid(session.uid);
+  const activationFeeMinor = await getInternActivationFeeMinor();
 
   const openRoles = open.filter((p) => !data.proposals.some((mine) => mine.projectId === p.id));
+
+  const extra = data.onboarding?.extraData;
+  const openToWork =
+    !extra || typeof extra !== "object" || (extra as Record<string, unknown>).openToWork !== false;
+
+  // Scheduled company or AI assessment interview
+  const scheduledInterviews = data.interviews.filter(
+    (i) => String(i.status ?? "").toLowerCase() === "scheduled" && (i.selectedSlot || i.meetingLink),
+  );
+  const upcomingInterviewItem = scheduledInterviews
+    .map((i) => ({ interview: i, when: slotOf(i) ?? (i.createdAt || new Date()) }))
+    .filter((x): x is { interview: (typeof scheduledInterviews)[0]; when: Date } =>
+      Boolean(x.when && (!slotOf(x.interview) || !isPast(x.when))),
+    )
+    .sort((a, b) => a.when.getTime() - b.when.getTime())[0] ?? null;
+
+  const fullName = `${user?.first ?? ""} ${user?.last ?? ""}`.trim() || "Candidate";
+  const score = scoreOf(data.onboarding);
+  const ratings = ratingsOf(data.onboarding);
+  // The pending action is shown once, in the strip; the thread skips it.
+  const history = action ? data.thread.filter((n) => n !== action) : data.thread;
 
   return (
     <div>
@@ -100,214 +117,201 @@ export default async function InternHome() {
         title={`Hello, ${user?.first ?? "there"}`}
         lede={
           working
-            ? "Here is where your internship stands today, and the one thing waiting on you."
-            : "Here is where your applications stand today, and the one thing waiting on you."
+            ? "Your internship, and anything waiting on you."
+            : action
+              ? "One thing is waiting on you."
+              : "Nothing is waiting on you. Employers can find your profile."
         }
       />
 
-      <StatusStrip node={action} stage={data.stage} className="mb-6" />
+      <div className="grid gap-x-10 gap-y-8 lg:grid-cols-[minmax(0,1fr)_20rem]">
+        {/* ── Main column ─────────────────────────────────────────── */}
+        <div className="min-w-0 space-y-8">
+          <StatusStrip node={action} stage={data.stage} />
 
-      <div className="mb-8">
-        <InternRetentionHub
-          candidateName={`${user?.first ?? ""} ${user?.last ?? ""}`.trim() || "Candidate"}
-          findternScore={Number(data.onboarding?.extraData && typeof data.onboarding.extraData === "object" ? (data.onboarding.extraData as Record<string, unknown>).findternScore : null) || 8.3}
-          completionPct={Math.round(data.readiness.visible * 100) || 85}
-        />
-      </div>
-
-      {!working ? (
-        <div className="mb-8">
-          <ActivationCard
-            alreadyPaid={activated}
-            internId={session.uid}
-            prefill={{
-              name: `${user?.first ?? ""} ${user?.last ?? ""}`.trim() || undefined,
-              email: user?.email,
-              contact: user ? `${user.countryCode}${user.phoneNumber}` : undefined,
-            }}
-          />
-        </div>
-      ) : null}
-
-      {/* ── Main column, real reading measure ─────────────────────── */}
-      <div className="grid gap-x-8 gap-y-8 lg:grid-cols-[minmax(0,1fr)_19rem]">
-        <section className="min-w-0">
-          <SectionHead
-            title="Your thread"
-            hint="Everything that has happened, newest first."
-            action={
-              data.thread.length > 4 ? (
-                <Link
-                  href="/intern/record"
-                  className="inline-flex min-h-9 items-center gap-1 text-sm font-medium text-primary underline-offset-4 hover:underline"
-                >
-                  Full record
-                  <ArrowRight className="size-3.5" aria-hidden />
-                </Link>
-              ) : null
-            }
-          />
-
-          {data.thread.length === 0 ? (
-            <EmptyScene
-              art
-              title="Your thread starts with your profile"
-              body="Once your profile is filled in, every application, interview, timesheet and payment lands here in order. You will always be able to see what is happening and who it is with."
-              next={{ label: "Fill in your profile", href: "/intern/onboarding" }}
-              who="About four minutes"
+          {!working && !activated ? (
+            <ActivationCard
+              alreadyPaid={activated}
+              feeMinor={activationFeeMinor}
+              internId={session.uid}
+              prefill={{
+                name: fullName,
+                email: user?.email,
+                contact: user ? `${user.countryCode}${user.phoneNumber}` : undefined,
+              }}
             />
-          ) : (
-            <Thread nodes={data.thread} compact />
-          )}
-        </section>
+          ) : null}
 
-        {/* ── The rail: glanceable facts only ───────────────────────
-            Three numbers, each answering a question a candidate actually
-            has. No cards in here, because nothing in here is worth
-            reading at length. */}
-        <aside className="space-y-3 lg:pt-8">
-          <ReadinessStrip readiness={data.readiness} />
+          <section>
+            <SectionHead
+              title="Activity"
+              action={
+                history.length > 4 ? (
+                  <Link href="/intern/record" className="text-sm font-medium text-primary hover:underline">
+                    Full record
+                  </Link>
+                ) : null
+              }
+            />
+            {data.thread.length === 0 ? (
+              <EmptyScene
+                title="Your activity starts with your profile"
+                body="Once your profile is filled in, every application, interview, timesheet and payment lands here in order."
+                next={{ label: "Fill in your profile", href: "/intern/onboarding" }}
+                who="About four minutes"
+              />
+            ) : history.length === 0 ? (
+              <p className="text-sm text-ink-500">Nothing else yet.</p>
+            ) : (
+              <Thread nodes={history.slice(0, 6)} compact />
+            )}
+          </section>
 
-          {working ? (
+          {!working && openRoles.length > 0 ? (
+            <section>
+              <SectionHead
+                title="Open roles"
+                hint="Companies hiring now."
+                action={
+                  <Link href="/intern/opportunities" className="text-sm font-medium text-primary hover:underline">
+                    See all
+                  </Link>
+                }
+              />
+              <Surface as="ul" className="divide-y divide-ink-100 overflow-hidden">
+                {openRoles.slice(0, 5).map((p) => (
+                  <li key={p.id}>
+                    <Link
+                      href={`/intern/opportunities/${p.id}`}
+                      className="group grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 px-4 py-3.5 transition-colors hover:bg-ink-50/70"
+                    >
+                      <span
+                        aria-hidden
+                        className="grid size-9 place-items-center rounded-full bg-brand-50 text-xs font-semibold text-brand-800"
+                      >
+                        {p.companyName ? p.companyName.charAt(0).toUpperCase() : <Building2 className="size-4" />}
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-medium text-ink-900 group-hover:text-brand-700">
+                          {p.projectName}
+                        </span>
+                        <span className="block truncate text-[13px] text-ink-500">
+                          {[p.companyName, p.scopeOfWork].filter(Boolean).join(" · ")}
+                        </span>
+                      </span>
+                      <ArrowRight className="size-4 text-ink-300 group-hover:text-brand-700" aria-hidden />
+                    </Link>
+                  </li>
+                ))}
+              </Surface>
+            </section>
+          ) : null}
+        </div>
+
+        {/* ── Rail: glanceable facts ─────────────────────────────────── */}
+        <aside className="space-y-4">
+          {upcomingInterviewItem ? (
             <Surface className="p-5">
-              <h2 className="text-sm font-semibold tracking-[-0.01em] text-ink-900">
-                Stipend on its way
-              </h2>
-              <p className="mt-2 text-2xl font-semibold tabular-nums tracking-[-0.02em] text-ink-900">
-                {moneyPlain(data.money.incomingMinor, data.money.currency)}
+              <p className="text-[13px] font-medium text-ink-500">Next interview</p>
+              <p className="mt-1 text-[15px] font-semibold text-ink-900">
+                {data.names[upcomingInterviewItem.interview.employerId] ?? "Employer interview"}
               </p>
-              <p className="mt-1 text-pretty text-sm leading-relaxed text-ink-600">
-                {data.money.nextExpectedAt
-                  ? `Scheduled for ${data.money.nextExpectedAt.toLocaleDateString("en-IN", { day: "numeric", month: "long" })}.`
-                  : "The date appears here as soon as it is set."}
+              <p className="mt-0.5 text-sm text-ink-600">
+                {upcomingInterviewItem.when.toLocaleString("en-IN", {
+                  weekday: "short",
+                  day: "numeric",
+                  month: "short",
+                  hour: "numeric",
+                  minute: "2-digit",
+                })}
               </p>
-              <Link
-                href="/intern/earnings"
-                className="mt-3 inline-flex min-h-9 items-center gap-1 text-sm font-medium text-primary underline-offset-4 hover:underline"
-              >
-                See the breakdown
-                <ArrowRight className="size-3.5" aria-hidden />
-              </Link>
+              {upcomingInterviewItem.interview.meetingLink ? (
+                <a
+                  href={upcomingInterviewItem.interview.meetingLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-3 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-[10px] bg-primary px-4 text-sm font-medium text-white hover:bg-primary-hover"
+                >
+                  <Video className="size-4" aria-hidden />
+                  Join meeting
+                </a>
+              ) : null}
             </Surface>
           ) : null}
 
           <Surface className="p-5">
-            <h2 className="text-sm font-semibold tracking-[-0.01em] text-ink-900">At a glance</h2>
-            <dl className="mt-3 divide-y divide-ink-100">
-              <Row label="Offers received" value={String(data.proposals.length)} />
-              <Row
-                label="Hours approved"
-                value={`${data.proofs.filter((p) => p.kind === "hours").length}`}
-              />
-              <Row label="Records" value={String(data.proofs.length)} />
-              <Row
-                label="Paid to you"
-                value={formatMoney(data.money.paidMinor, "INR")}
-              />
-            </dl>
-            <p className="mt-3 text-pretty text-xs leading-relaxed text-ink-500">
-              Counts, not scores. Nothing here ranks you against anyone else.
-            </p>
+            <div className="flex items-baseline justify-between">
+              <p className="text-[13px] font-medium text-ink-500">Findtern Score</p>
+              <Link href="/intern/record" className="text-xs font-medium text-primary hover:underline">
+                Details
+              </Link>
+            </div>
+            {score === null ? (
+              <p className="mt-2 text-sm text-ink-600">Your score appears after the AI interview.</p>
+            ) : (
+              <>
+                <p className="mt-1 text-3xl font-semibold tabular-nums tracking-tight text-ink-900">
+                  {score.toFixed(1)}
+                  <span className="ml-0.5 text-sm font-normal text-ink-400">/10</span>
+                </p>
+                {ratings ? (
+                  <dl className="mt-4 space-y-1.5 border-t border-ink-100 pt-4 text-[13px]">
+                    {(
+                      [
+                        ["Coding", ratings.coding],
+                        ["Aptitude", ratings.aptitude],
+                        ["Interview", ratings.interview],
+                        ["Communication", ratings.communication],
+                      ] as const
+                    )
+                      .filter(([, v]) => v > 0)
+                      .map(([label, v]) => (
+                        <div key={label} className="flex justify-between gap-2">
+                          <dt className="text-ink-500">{label}</dt>
+                          <dd className="font-medium tabular-nums text-ink-900">{v.toFixed(1)}</dd>
+                        </div>
+                      ))}
+                  </dl>
+                ) : null}
+              </>
+            )}
           </Surface>
+
+          <ReadinessStrip readiness={data.readiness} />
+
+          <Surface className="p-5">
+            <OpenToWorkToggle initial={openToWork} />
+          </Surface>
+
+          {working || data.money.paidMinor > 0 ? (
+            <Surface className="p-5">
+              <p className="text-[13px] font-medium text-ink-500">Paid to you</p>
+              <p className="mt-1 text-2xl font-semibold tabular-nums tracking-tight text-ink-900">
+                {formatMoney(data.money.paidMinor, "INR")}
+              </p>
+              {data.money.incomingMinor > 0 ? (
+                <p className="mt-1 text-sm text-ink-600">
+                  {formatMoney(data.money.incomingMinor, data.money.currency, { zeroLabel: false })} on its way
+                  {data.money.nextExpectedAt
+                    ? `, due ${data.money.nextExpectedAt.toLocaleDateString("en-IN", { day: "numeric", month: "short" })}`
+                    : ""}
+                </p>
+              ) : null}
+              <Link href="/intern/earnings" className="mt-3 inline-flex text-sm font-medium text-primary hover:underline">
+                Stipend breakdown
+              </Link>
+            </Surface>
+          ) : null}
+
+          <Link
+            href="/intern/profile"
+            className="flex items-center justify-between rounded-[14px] border border-dashed border-ink-200 px-5 py-3.5 text-sm text-ink-700 transition-colors hover:border-ink-300 hover:bg-white"
+          >
+            See your profile as employers do
+            <ArrowRight className="size-4 text-ink-400" aria-hidden />
+          </Link>
         </aside>
       </div>
-
-      {/* ── Your profile card ───────────────────────────────────────
-          The summary an employer would see, built on the Watermelon
-          expandable-profile-card: hero tile, identity line, and an expanded
-          view of skills, academics and where to go next. */}
-      <section className="mt-12 border-t border-ink-100 pt-8">
-        <SectionHead
-          title="Your profile"
-          hint="This is what an employer sees when they find you."
-        />
-        <div className="max-w-2xl">
-          <ProfileCard
-            name={`${user?.first ?? ""} ${user?.last ?? ""}`.trim() || "Candidate"}
-            initials={toInitials(user?.first, user?.last)}
-            stage={data.stage}
-            city={data.onboarding?.city}
-            state={data.onboarding?.state}
-            bio={data.onboarding?.bio}
-            skills={toStringList(data.onboarding?.skills)}
-            degree={academicField(data.onboarding, "degree")}
-            institution={academicField(data.onboarding, "institution")}
-            yearOfGraduation={academicField(data.onboarding, "yearOfGraduation")}
-            cgpa={academicField(data.onboarding, "cgpa")}
-          />
-        </div>
-      </section>
-
-      {/* ── Open roles, only while searching ─────────────────────── */}
-      {!working && openRoles.length > 0 ? (
-        <section className="mt-12 border-t border-ink-100 pt-8">
-          <SectionHead
-            title="Open roles"
-            hint="Companies are hiring for these right now."
-            action={
-              <Link
-                href="/intern/opportunities"
-                className="inline-flex min-h-9 items-center gap-1 text-sm font-medium text-primary underline-offset-4 hover:underline"
-              >
-                See all
-                <ArrowRight className="size-3.5" aria-hidden />
-              </Link>
-            }
-          />
-          <ul className="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(min(100%,20rem),1fr))]">
-            {openRoles.map((p) => (
-              <li key={p.id}>
-                <Link
-                  href={`/intern/opportunities/${p.id}`}
-                  className="group relative flex h-full flex-col overflow-hidden rounded-2xl border border-ink-200/80 bg-white/95 p-5 shadow-xs transition-all duration-[var(--dur-standard)] hover:-translate-y-1 hover:border-brand-300 hover:shadow-lg"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-center gap-2.5">
-                      <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-700 font-bold text-xs ring-1 ring-brand-600/20">
-                        {p.companyName ? p.companyName.charAt(0).toUpperCase() : <Building2 className="size-4" />}
-                      </span>
-                      <div className="min-w-0">
-                        <p className="text-pretty text-base font-semibold tracking-tight text-ink-900 group-hover:text-brand-800 transition-colors">
-                          {p.projectName}
-                        </p>
-                        <p className="text-xs font-medium text-ink-500">{p.companyName}</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {p.scopeOfWork ? (
-                    <p className="mt-3.5 line-clamp-2 text-pretty text-xs leading-relaxed text-ink-600">
-                      {p.scopeOfWork}
-                    </p>
-                  ) : null}
-
-                  <div className="mt-auto flex items-center justify-between pt-4 border-t border-ink-100/70">
-                    <span className="inline-flex items-center gap-1 text-2xs font-semibold text-brand-700 bg-brand-50 px-2 py-0.5 rounded-full ring-1 ring-brand-600/15">
-                      Actively Hiring
-                    </span>
-                    <span className="flex items-center gap-1 text-xs font-semibold text-brand-700 group-hover:text-brand-800">
-                      Read brief
-                      <ArrowRight
-                        className="size-3.5 transition-transform duration-[var(--dur-instant)] group-hover:translate-x-1"
-                        aria-hidden
-                      />
-                    </span>
-                  </div>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
-    </div>
-  );
-}
-
-function Row({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-baseline justify-between gap-4 py-2.5">
-      <dt className="text-sm text-ink-500">{label}</dt>
-      <dd className="text-sm font-semibold tabular-nums text-ink-900">{value}</dd>
     </div>
   );
 }

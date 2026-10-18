@@ -2,9 +2,10 @@ import type { Metadata } from "next";
 import { and, asc, eq, inArray } from "drizzle-orm";
 
 import { getDb, schema } from "@/lib/db";
-import { getSession } from "@/lib/auth";
+import { requireRole } from "@/lib/auth";
 import { toCandidateProfile } from "@/lib/employer-candidates";
-import { resolvePricing, type Currency } from "@/lib/employer-pricing";
+import { hiredInternIds, isAdminViewing } from "@/lib/employer-visibility";
+import { employerRegion, resolvePricing, type Currency } from "@/lib/employer-pricing";
 import { PageHeader } from "@/components/layout/page-header";
 import { CartManager, type CartLineItem } from "@/components/employer/cart-manager";
 
@@ -14,24 +15,36 @@ export const metadata: Metadata = {
 };
 
 export default async function EmployerCartPage() {
-  const session = await getSession();
-  const uid = session!.uid;
+  const session = await requireRole("employer");
+  const uid = session.uid;
 
   let cartLines: CartLineItem[] = [];
   let stagedLines: CartLineItem[] = [];
   let currency: Currency = "INR";
   let region: "IN" | null = null;
   let plans: (typeof schema.pricingPlans.$inferSelect)[] = [];
+  let nameUnlockedIds: string[] = [];
+  const unlockAll = await isAdminViewing();
 
   try {
     const db = getDb();
 
+    try {
+      nameUnlockedIds = Array.from(await hiredInternIds(db, uid));
+    } catch {
+      nameUnlockedIds = [];
+    }
+
     const [employer] = await db
-      .select({ phoneNumber: schema.employers.phoneNumber })
+      .select({
+        country: schema.employers.country,
+        countryCode: schema.employers.countryCode,
+        phoneNumber: schema.employers.phoneNumber,
+      })
       .from(schema.employers)
       .where(eq(schema.employers.id, uid))
       .limit(1);
-    region = employer?.phoneNumber?.startsWith("91") ? "IN" : null;
+    region = employerRegion(employer ?? {});
     currency = region === "IN" ? "INR" : "USD";
 
     const items = await db
@@ -120,6 +133,8 @@ export default async function EmployerCartPage() {
         initialCartLines={cartLines}
         initialStagedLines={stagedLines}
         currency={currency}
+        nameUnlockedIds={nameUnlockedIds}
+        unlockAll={unlockAll}
       />
     </div>
   );

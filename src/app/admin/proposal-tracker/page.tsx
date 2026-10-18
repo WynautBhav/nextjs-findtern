@@ -1,13 +1,26 @@
-import { count, desc, eq, sql, type SQL } from "drizzle-orm";
-import { Send, CheckCircle2, Clock, Sparkles, Download } from "lucide-react";
+import { desc, eq } from "drizzle-orm";
+import { Send, CheckCircle2, Clock, Download, Sparkles } from "lucide-react";
 
 import { getDb, schema } from "@/lib/db";
-import { formatDate } from "@/lib/format";
-import { flattenParams, parsePageRequest, searchAny, toPage } from "@/lib/admin/params";
+import { flattenParams } from "@/lib/admin/params";
+import { acceptanceRate, proposalOutcome } from "@/lib/proposals";
 import { AdminPageHeader } from "@/components/admin/panel";
 import { StatCard, StatGrid } from "@/components/admin/stat-card";
-import { DataTable } from "@/components/admin/data-table";
-import { StatusBadge } from "@/components/admin/status-badge";
+import {
+  ProposalTrackerView,
+  type TrackerCompany,
+  type TrackerProposal,
+  type TrackerInterview,
+  type TrackerCandidate,
+} from "@/components/admin/proposal-tracker-view";
+import { formatNumber } from "@/lib/format";
+
+/** `YYYY-MM-DD` → Date, or null. `endOfDay` makes the "to" bound inclusive. */
+function parseDay(value: string | undefined, endOfDay = false): Date | null {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const d = new Date(`${value}T${endOfDay ? "23:59:59.999" : "00:00:00"}+05:30`);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
 
 export default async function AdminProposalTrackerPage({
   searchParams,
@@ -15,78 +28,192 @@ export default async function AdminProposalTrackerPage({
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const params = flattenParams(await searchParams);
-  const req = parsePageRequest(params);
+  const initialTab =
+    params.tab === "proposals" ||
+    params.tab === "interviews" ||
+    params.tab === "companies" ||
+    params.tab === "candidates"
+      ? (params.tab as "companies" | "proposals" | "interviews" | "candidates")
+      : "companies";
+  const from = parseDay(params.from);
+  const to = parseDay(params.to, true);
+  const inRange = (d: Date | null) => (!from || (d !== null && d >= from)) && (!to || (d !== null && d <= to));
 
   const db = getDb();
 
-  const conditions: (SQL | undefined)[] = [
-    searchAny(
-      [
-        sql`${schema.users.firstName}`,
-        sql`${schema.users.lastName}`,
-        sql`${schema.employers.companyName}`,
-        sql`${schema.projects.projectName}`,
-      ],
-      req.search,
-    ),
-    params.status ? eq(schema.proposals.status, params.status) : undefined,
-    params.flow ? eq(schema.proposals.flowType, params.flow) : undefined,
-  ].filter(Boolean) as SQL[];
-
-  const where = conditions.length
-    ? sql`${conditions.reduce((acc, c) => sql`${acc} and ${c}`)}`
-    : undefined;
-
-  const [
-    rows,
-    [totalRow],
-    [totalProposalsCount],
-    [acceptedCount],
-    [directFlowCount],
-    [interviewFlowCount],
-  ] = await Promise.all([
+  const [employersList, allProposals, allInterviews] = await Promise.all([
+    db.select().from(schema.employers).orderBy(desc(schema.employers.createdAt)),
     db
       .select({
         id: schema.proposals.id,
         status: schema.proposals.status,
         flowType: schema.proposals.flowType,
+        currency: schema.proposals.currency,
+        offerDetails: schema.proposals.offerDetails,
         createdAt: schema.proposals.createdAt,
         hiredAt: schema.proposals.hiredAt,
+        internId: schema.proposals.internId,
         internFirstName: schema.users.firstName,
         internLastName: schema.users.lastName,
         internEmail: schema.users.email,
+        internPhone: schema.users.phoneNumber,
+        employerId: schema.proposals.employerId,
         companyName: schema.employers.companyName,
+        projectId: schema.proposals.projectId,
         projectName: schema.projects.projectName,
       })
       .from(schema.proposals)
-      .innerJoin(schema.users, eq(schema.users.id, schema.proposals.internId))
-      .innerJoin(schema.employers, eq(schema.employers.id, schema.proposals.employerId))
-      .innerJoin(schema.projects, eq(schema.projects.id, schema.proposals.projectId))
-      .where(where)
-      .orderBy(desc(schema.proposals.createdAt))
-      .limit(req.perPage)
-      .offset(req.offset),
+      .leftJoin(schema.users, eq(schema.users.id, schema.proposals.internId))
+      .leftJoin(schema.employers, eq(schema.employers.id, schema.proposals.employerId))
+      .leftJoin(schema.projects, eq(schema.projects.id, schema.proposals.projectId))
+      .orderBy(desc(schema.proposals.createdAt)),
     db
-      .select({ c: count() })
-      .from(schema.proposals)
-      .innerJoin(schema.users, eq(schema.users.id, schema.proposals.internId))
-      .innerJoin(schema.employers, eq(schema.employers.id, schema.proposals.employerId))
-      .innerJoin(schema.projects, eq(schema.projects.id, schema.proposals.projectId))
-      .where(where),
-    db.select({ c: count() }).from(schema.proposals),
-    db.select({ c: count() }).from(schema.proposals).where(eq(schema.proposals.status, "accepted")),
-    db.select({ c: count() }).from(schema.proposals).where(eq(schema.proposals.flowType, "direct")),
-    db.select({ c: count() }).from(schema.proposals).where(eq(schema.proposals.flowType, "interview_first")),
+      .select({
+        id: schema.interviews.id,
+        status: schema.interviews.status,
+        slot1: schema.interviews.slot1,
+        slot2: schema.interviews.slot2,
+        slot3: schema.interviews.slot3,
+        selectedSlot: schema.interviews.selectedSlot,
+        timezone: schema.interviews.timezone,
+        meetingLink: schema.interviews.meetingLink,
+        notes: schema.interviews.notes,
+        createdAt: schema.interviews.createdAt,
+        internId: schema.interviews.internId,
+        internFirstName: schema.users.firstName,
+        internLastName: schema.users.lastName,
+        internEmail: schema.users.email,
+        employerId: schema.interviews.employerId,
+        companyName: schema.employers.companyName,
+        projectId: schema.interviews.projectId,
+        projectName: schema.projects.projectName,
+      })
+      .from(schema.interviews)
+      .leftJoin(schema.users, eq(schema.users.id, schema.interviews.internId))
+      .leftJoin(schema.employers, eq(schema.employers.id, schema.interviews.employerId))
+      .leftJoin(schema.projects, eq(schema.projects.id, schema.interviews.projectId))
+      .orderBy(desc(schema.interviews.createdAt)),
   ]);
 
-  const page = toPage(rows, Number(totalRow?.c ?? 0), req.page, req.perPage);
-  const totalCount = Number(totalProposalsCount?.c ?? 0);
-  const acceptedTotal = Number(acceptedCount?.c ?? 0);
-  const directTotal = Number(directFlowCount?.c ?? 0);
-  const interviewTotal = Number(interviewFlowCount?.c ?? 0);
+  // Every figure below is computed from the same date-filtered rows, so the
+  // stat cards, company cards and tables always agree with each other.
+  const rawProposals = allProposals.filter((p) => inRange(p.createdAt));
+  const rawInterviews = allInterviews.filter((i) => inRange(i.createdAt));
 
-  const num = (n: number) => n.toLocaleString("en-IN");
-  const exportHref = `/api/admin/export?type=proposals&${new URLSearchParams(params).toString()}`;
+  const totalCount = rawProposals.length;
+  const wonTotal = rawProposals.filter((p) => proposalOutcome(p.status) === "won").length;
+  const lostTotal = rawProposals.filter((p) => proposalOutcome(p.status) === "lost").length;
+  const directTotal = rawProposals.filter((p) => p.flowType === "direct").length;
+  const interviewTotal = rawProposals.filter((p) => p.flowType === "interview_first").length;
+  const overallRate = acceptanceRate(wonTotal, lostTotal);
+
+  // Group metrics per employer
+  const proposalsByEmployer = new Map<string, number>();
+  const hiredByEmployer = new Map<string, number>();
+  const lostByEmployer = new Map<string, number>();
+  const bump = (m: Map<string, number>, k: string) => m.set(k, (m.get(k) ?? 0) + 1);
+  for (const p of rawProposals) {
+    if (p.employerId) {
+      bump(proposalsByEmployer, p.employerId);
+      const outcome = proposalOutcome(p.status);
+      if (outcome === "won") bump(hiredByEmployer, p.employerId);
+      if (outcome === "lost") bump(lostByEmployer, p.employerId);
+    }
+  }
+
+  // Per candidate: who received proposals, from whom, and what they decided.
+  const byIntern = new Map<string, TrackerCandidate>();
+  for (const p of rawProposals) {
+    const row =
+      byIntern.get(p.internId) ??
+      ({
+        internId: p.internId,
+        name: `${p.internFirstName ?? ""} ${p.internLastName ?? ""}`.trim() || "Candidate",
+        email: p.internEmail,
+        phone: p.internPhone,
+        received: 0,
+        won: 0,
+        lost: 0,
+        open: 0,
+        companies: [],
+        lastReceivedAt: null,
+      } satisfies TrackerCandidate);
+    row.received += 1;
+    row[proposalOutcome(p.status)] += 1;
+    const company = p.companyName ?? "Unknown Company";
+    if (!row.companies.includes(company)) row.companies.push(company);
+    const at = p.createdAt?.toISOString() ?? null;
+    if (at && (!row.lastReceivedAt || at > row.lastReceivedAt)) row.lastReceivedAt = at;
+    byIntern.set(p.internId, row);
+  }
+  const trackerCandidates = Array.from(byIntern.values()).sort((a, b) => b.received - a.received);
+
+  const interviewsByEmployer = new Map<string, number>();
+  for (const i of rawInterviews) {
+    if (i.employerId) {
+      interviewsByEmployer.set(i.employerId, (interviewsByEmployer.get(i.employerId) ?? 0) + 1);
+    }
+  }
+
+  const trackerCompanies: TrackerCompany[] = employersList.map((emp) => ({
+    id: emp.id,
+    companyName: emp.companyName,
+    companyEmail: emp.companyEmail,
+    city: emp.city,
+    state: emp.state,
+    isActive: emp.isActive,
+    proposalsCount: proposalsByEmployer.get(emp.id) ?? 0,
+    interviewsCount: interviewsByEmployer.get(emp.id) ?? 0,
+    hiredCount: hiredByEmployer.get(emp.id) ?? 0,
+    rejectedCount: lostByEmployer.get(emp.id) ?? 0,
+    acceptanceRate: acceptanceRate(hiredByEmployer.get(emp.id) ?? 0, lostByEmployer.get(emp.id) ?? 0),
+  }));
+
+  const trackerProposals: TrackerProposal[] = rawProposals.map((p) => ({
+    id: p.id,
+    status: p.status,
+    flowType: p.flowType,
+    currency: p.currency,
+    offerDetails: (p.offerDetails as Record<string, unknown>) || null,
+    createdAt: p.createdAt ? p.createdAt.toISOString() : null,
+    hiredAt: p.hiredAt ? p.hiredAt.toISOString() : null,
+    internId: p.internId,
+    internFirstName: p.internFirstName,
+    internLastName: p.internLastName,
+    internEmail: p.internEmail,
+    internPhone: p.internPhone,
+    employerId: p.employerId ?? "",
+    companyName: p.companyName ?? "Unknown Company",
+    projectId: p.projectId,
+    projectName: p.projectName ?? "Project",
+  }));
+
+  const trackerInterviews: TrackerInterview[] = rawInterviews.map((i) => ({
+    id: i.id,
+    status: i.status,
+    slot1: i.slot1 ? i.slot1.toISOString() : null,
+    slot2: i.slot2 ? i.slot2.toISOString() : null,
+    slot3: i.slot3 ? i.slot3.toISOString() : null,
+    selectedSlot: i.selectedSlot,
+    timezone: i.timezone,
+    meetingLink: i.meetingLink,
+    notes: i.notes,
+    createdAt: i.createdAt ? i.createdAt.toISOString() : null,
+    internId: i.internId,
+    internFirstName: i.internFirstName,
+    internLastName: i.internLastName,
+    internEmail: i.internEmail,
+    employerId: i.employerId,
+    companyName: i.companyName ?? "Unknown Company",
+    projectId: i.projectId,
+    projectName: i.projectName,
+  }));
+
+  const exportHref = `/api/admin/export?type=proposals`;
+  const rangeLabel =
+    from || to
+      ? `${params.from ?? "start"} to ${params.to ?? "today"}`
+      : "All time";
 
   return (
     <div className="space-y-6">
@@ -94,119 +221,87 @@ export default async function AdminProposalTrackerPage({
         title="Proposal tracker"
         subtitle="End to end proposal pipeline between employers and student candidates."
         action={
+          <div className="flex flex-wrap items-end gap-2">
+          <form method="get" className="flex flex-wrap items-end gap-2" aria-label="Date range">
+            <input type="hidden" name="tab" value={initialTab} />
+            <label className="text-2xs font-medium text-ink-600">
+              From
+              <input
+                type="date"
+                name="from"
+                defaultValue={params.from ?? ""}
+                className="mt-1 block min-h-11 rounded-[10px] border border-ink-200 bg-white px-2.5 text-[13px] text-ink-800"
+              />
+            </label>
+            <label className="text-2xs font-medium text-ink-600">
+              To
+              <input
+                type="date"
+                name="to"
+                defaultValue={params.to ?? ""}
+                className="mt-1 block min-h-11 rounded-[10px] border border-ink-200 bg-white px-2.5 text-[13px] text-ink-800"
+              />
+            </label>
+            <button
+              type="submit"
+              className="min-h-11 rounded-[10px] bg-brand-700 px-3.5 text-[14px] font-medium text-white hover:bg-brand-600"
+            >
+              Apply
+            </button>
+          </form>
           <a
             href={exportHref}
-            className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-ink-200 bg-white px-3.5 text-sm font-medium text-ink-700 transition-colors hover:bg-ink-50"
+            className="apple-spring apple-pressable inline-flex min-h-11 cursor-pointer items-center gap-1.5 rounded-[10px] border border-ink-200 bg-white px-3.5 text-[14px] font-medium text-ink-700 hover:bg-ink-50"
           >
             <Download className="size-4" aria-hidden />
             Export CSV
           </a>
+          </div>
         }
       />
 
       <StatGrid cols={4}>
         <StatCard
           label="Total proposals"
-          value={num(totalCount)}
-          hint="All submissions recorded"
+          value={formatNumber(totalCount)}
+          hint={rangeLabel}
           icon={Send}
           tone="brand"
         />
         <StatCard
-          label="Accepted offers"
-          value={num(acceptedTotal)}
-          hint={`${totalCount > 0 ? Math.round((acceptedTotal / totalCount) * 100) : 0}% acceptance rate`}
+          label="Accepted or hired"
+          value={formatNumber(wonTotal)}
+          hint={
+            overallRate === null
+              ? `${rangeLabel} · nothing decided yet`
+              : `${rangeLabel} · ${overallRate}% of decided (${formatNumber(lostTotal)} rejected)`
+          }
           icon={CheckCircle2}
           tone="success"
         />
         <StatCard
           label="Direct hiring path"
-          value={num(directTotal)}
+          value={formatNumber(directTotal)}
           hint="Instant project offers"
           icon={Sparkles}
           tone="accent"
         />
         <StatCard
           label="Interview first path"
-          value={num(interviewTotal)}
+          value={formatNumber(interviewTotal)}
           hint="Evaluated via interview"
           icon={Clock}
           tone="info"
         />
       </StatGrid>
 
-      <DataTable
-        basePath="/admin/proposal-tracker"
-        params={params}
-        page={page.page}
-        pages={page.pages}
-        total={page.total}
-        perPage={page.perPage}
-        rows={rows}
-        noun="proposals"
-        caption="Proposals activity list"
-        searchPlaceholder="Search candidate, employer, or project…"
-        filters={[
-          {
-            key: "status",
-            label: "Status",
-            options: [
-              { value: "sent", label: "Sent" },
-              { value: "accepted", label: "Accepted" },
-              { value: "rejected", label: "Rejected" },
-              { value: "interview_scheduled", label: "Interview scheduled" },
-            ],
-          },
-          {
-            key: "flow",
-            label: "Flow type",
-            options: [
-              { value: "direct", label: "Direct offer" },
-              { value: "interview_first", label: "Interview first" },
-            ],
-          },
-        ]}
-        columns={[
-          {
-            header: "Candidate",
-            cell: (row) => (
-              <div className="min-w-0">
-                <p className="truncate font-medium text-ink-900">
-                  {row.internFirstName} {row.internLastName}
-                </p>
-                <p className="truncate text-xs text-text-subtle">{row.internEmail}</p>
-              </div>
-            ),
-          },
-          {
-            header: "Employer",
-            cell: (row) => <span className="font-medium text-ink-800">{row.companyName}</span>,
-          },
-          {
-            header: "Project",
-            cell: (row) => <span className="text-ink-700">{row.projectName}</span>,
-          },
-          {
-            header: "Hiring path",
-            cell: (row) => (
-              <span className="font-mono text-2xs uppercase tracking-wider text-ink-700 bg-ink-100 rounded px-2 py-0.5">
-                {row.flowType === "direct" ? "Direct offer" : "Interview first"}
-              </span>
-            ),
-          },
-          {
-            header: "Status",
-            cell: (row) => <StatusBadge value={row.status} />,
-          },
-          {
-            header: "Sent date",
-            cell: (row) => (
-              <span className="text-xs text-text-subtle">
-                {row.createdAt ? formatDate(row.createdAt.toISOString()) : "None"}
-              </span>
-            ),
-          },
-        ]}
+      {/* 3 Tabs + Interactive Modals */}
+      <ProposalTrackerView
+        companies={trackerCompanies}
+        proposals={trackerProposals}
+        interviews={trackerInterviews}
+        candidates={trackerCandidates}
+        initialTab={initialTab}
       />
     </div>
   );

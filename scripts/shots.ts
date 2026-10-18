@@ -18,7 +18,7 @@ import { eq } from "drizzle-orm";
 
 import * as schema from "../src/lib/db/schema.ts";
 
-const WIDTHS = [1440, 1024, 390];
+const WIDTHS = [1440, 390];
 const DEFAULT_PORT = process.env.PORT || "3100";
 const BASE_URL = `http://localhost:${DEFAULT_PORT}`;
 const PASSWORD = "Findtern@2026";
@@ -227,6 +227,20 @@ async function main() {
       "/intern/notifications",
       "/intern/settings",
     ],
+    public: [
+      "/",
+      "/pricing",
+      "/about",
+      "/contact",
+      "/faq",
+      "/opportunities",
+      "/login",
+      "/signup",
+      "/employer/login",
+      "/employer/signup",
+      "/terms-and-conditions",
+      "/privacy",
+    ],
   };
 
   const executablePath =
@@ -241,25 +255,27 @@ async function main() {
   const results: RouteResult[] = [];
 
   try {
-    for (const [role, routes] of Object.entries(routesByRole) as [("admin" | "employer" | "intern"), string[]][]) {
+    for (const [role, routes] of Object.entries(routesByRole) as [("admin" | "employer" | "intern" | "public"), string[]][]) {
       console.log(`\nCapturing screenshots for ${role.toUpperCase()} routes…`);
-      const sid = await loginAndGetCookie(url, role);
+      const sid = role !== "public" ? await loginAndGetCookie(url, role) : null;
 
       const parsedUrl = new URL(url);
       const context = await browser.newContext({
         storageState: undefined,
       });
 
-      await context.addCookies([
-        {
-          name: "ft_sid",
-          value: sid,
-          domain: parsedUrl.hostname,
-          path: "/",
-          httpOnly: true,
-          sameSite: "Lax",
-        },
-      ]);
+      if (sid) {
+        await context.addCookies([
+          {
+            name: "ft_sid",
+            value: sid,
+            domain: parsedUrl.hostname,
+            path: "/",
+            httpOnly: true,
+            sameSite: "Lax",
+          },
+        ]);
+      }
 
       const page = await context.newPage();
 

@@ -30,12 +30,23 @@
  * fill is noise wearing the costume of motivation.
  */
 
+import { useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import { Check, Eye, EyeOff } from "lucide-react";
+import Link from "next/link";
 
-import { Surface } from "@/components/app/primitives";
+import { Pill, Surface } from "@/components/app/primitives";
 import type { Readiness } from "@/lib/journey";
 import { cn } from "@/lib/utils";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { ButtonLink } from "@/components/ui/button";
 
 export function ReadinessMeter({
   readiness,
@@ -97,7 +108,7 @@ export function ReadinessMeter({
               ease: [0.16, 1, 0.3, 1],
             }}
             className={cn(
-              "h-2 flex-1 origin-left rounded-full transition-colors",
+              "apple-spring h-2 flex-1 origin-left rounded-full",
               item.done ? "bg-gradient-to-r from-brand-600 to-teal-600 shadow-2xs" : "bg-ink-200",
             )}
           />
@@ -109,7 +120,7 @@ export function ReadinessMeter({
           <li key={item.id}>
             <a
               href={item.href}
-              className="group flex min-h-14 items-center gap-3 py-2.5 transition-colors duration-[var(--dur-instant)]"
+              className="apple-spring group flex min-h-14 items-center gap-3 py-2.5"
             >
               <span
                 aria-hidden
@@ -138,9 +149,7 @@ export function ReadinessMeter({
                     {item.label}
                   </span>
                   {item.blocking && !item.done ? (
-                    <span className="rounded-full bg-accent-100 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-accent-700">
-                      Needed for pay
-                    </span>
+                    <Pill tone="waiting" className="shrink-0 whitespace-nowrap">Needed for pay</Pill>
                   ) : null}
                 </span>
                 {!item.done && item.unlocks ? (
@@ -187,49 +196,137 @@ export function ReadinessStrip({
   readiness: Readiness;
   className?: string;
 }) {
+  const [open, setOpen] = useState(false);
   const reduce = useReducedMotion();
   const pct = Math.round(readiness.visible * 100);
   const nextHidden = readiness.items.find((i) => !i.done);
+  const missingItems = readiness.items.filter((i) => !i.done);
 
   return (
-    <Surface className={cn("relative overflow-hidden p-5 border-ink-200/80 shadow-xs", className)}>
-      <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-brand-600 via-teal-500 to-emerald-400" />
-      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        <h2 className="text-sm font-semibold tracking-tight text-ink-900">
-          Profile Visibility
-        </h2>
-        <span className="inline-flex items-center gap-1 rounded-full bg-brand-50 px-2 py-0.5 text-xs font-semibold tabular-nums text-brand-700 ring-1 ring-brand-600/20">
-          {pct}% ready
-        </span>
-      </div>
-
-      <div className="mt-3.5 h-2 w-full overflow-hidden rounded-full bg-ink-100 ring-1 ring-ink-200/50">
-        <motion.div
-          initial={reduce ? false : { width: 0 }}
-          animate={{ width: `${pct}%` }}
-          transition={{ duration: 0.8, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
-          className="h-full rounded-full bg-gradient-to-r from-brand-700 via-teal-600 to-emerald-500"
-        />
-      </div>
-
-      {nextHidden ? (
-        <div className="mt-3.5 flex items-start justify-between gap-3">
-          <p className="text-pretty text-xs leading-relaxed text-ink-600">
-            <span className="font-semibold text-ink-900">{nextHidden.label}</span> is still missing.{" "}
-            {nextHidden.unlocks}
-          </p>
-          <a
-            href={nextHidden.href}
-            className="shrink-0 rounded-md bg-brand-50 px-2 py-1 text-2xs font-semibold text-brand-700 transition-colors hover:bg-brand-100"
+    <>
+      <Surface className={cn("p-5", className)}>
+        <div className="flex items-baseline justify-between gap-4">
+          <h2 className="text-[13px] font-medium text-ink-500">Profile completeness</h2>
+          <button
+            type="button"
+            onClick={() => setOpen(true)}
+            className="text-xs font-medium text-primary hover:underline"
           >
-            Add Now
-          </a>
+            Checklist
+          </button>
         </div>
-      ) : (
-        <p className="mt-3 text-pretty text-xs leading-relaxed text-emerald-700 font-medium">
-          ✓ Profile is 100% visible and actively searchable by verified employers.
-        </p>
-      )}
-    </Surface>
+        <p className="mt-1 text-2xl font-semibold tabular-nums tracking-tight text-ink-900">{pct}%</p>
+        <div
+          role="progressbar"
+          aria-valuenow={pct}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-label="Profile completeness"
+          className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-ink-100"
+        >
+          <motion.div
+            initial={reduce ? false : { width: 0 }}
+            animate={{ width: `${pct}%` }}
+            transition={{ duration: 0.8, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
+            className="h-full rounded-full bg-primary"
+          />
+        </div>
+
+        {nextHidden ? (
+          <p className="mt-3 text-pretty text-[13px] leading-relaxed text-ink-600">
+            Next: <span className="font-medium text-ink-900">{nextHidden.label}</span>.{" "}
+            {nextHidden.unlocks}{" "}
+            <a href={nextHidden.href} className="font-medium text-primary hover:underline">
+              Add it
+            </a>
+          </p>
+        ) : (
+          <p className="mt-3 text-[13px] text-ink-600">Complete. Every employer search can find you.</p>
+        )}
+      </Surface>
+
+      {/* Profile completion full checklist dialog */}
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-md p-6">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-bold text-ink-950">
+              Profile Completion Checklist
+            </DialogTitle>
+            <DialogDescription className="text-xs text-text-subtle">
+              Your profile is <strong className="text-ink-900">{pct}% complete</strong>.
+              {missingItems.length > 0
+                ? ` It’s not 100% yet because ${missingItems.length} requirement${missingItems.length === 1 ? " is" : "s are"} missing.`
+                : " All requirements are complete!"}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="my-4 max-h-[50vh] overflow-y-auto space-y-2 pr-1 [scrollbar-width:thin]">
+            {readiness.items.map((item) => (
+              <div
+                key={item.id}
+                className={cn(
+                  "flex items-center justify-between gap-3 rounded-[10px] p-2.5 text-xs transition-colors",
+                  item.done ? "bg-ink-50/60" : "bg-accent-50/40 border border-accent-200/50"
+                )}
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <span
+                    className={cn(
+                      "grid size-5 shrink-0 place-items-center rounded-full text-white text-xs",
+                      item.done ? "bg-brand-600" : "bg-ink-300"
+                    )}
+                  >
+                    {item.done ? <Check className="size-3" strokeWidth={3} /> : <EyeOff className="size-3 text-ink-600" />}
+                  </span>
+                  <div className="min-w-0">
+                    <p className={cn("font-medium truncate", item.done ? "text-ink-700" : "text-ink-900 font-semibold")}>
+                      {item.label}
+                    </p>
+                    {!item.done && item.unlocks ? (
+                      <p className="text-2xs text-text-subtle">{item.unlocks}</p>
+                    ) : null}
+                  </div>
+                </div>
+
+                {item.done ? (
+                  <span className="shrink-0 text-2xs font-semibold text-brand-700 flex items-center gap-1">
+                    <Eye className="size-3" /> Visible
+                  </span>
+                ) : (
+                  <Link
+                    href={item.href}
+                    onClick={() => setOpen(false)}
+                    className="apple-spring shrink-0 rounded-[8px] bg-brand-700 px-2.5 py-1 text-2xs font-semibold text-white hover:bg-brand-800"
+                  >
+                    Complete
+                  </Link>
+                )}
+              </div>
+            ))}
+          </div>
+
+          <DialogFooter className="flex flex-row items-center justify-between sm:justify-between gap-2 border-t border-ink-100 pt-4">
+            <button
+              type="button"
+              onClick={() => setOpen(false)}
+              className="apple-spring rounded-lg border border-ink-200 px-3.5 py-1.5 text-xs font-medium text-ink-700 hover:bg-ink-100"
+            >
+              Close
+            </button>
+            {pct < 100 ? (
+              <ButtonLink
+                href="/intern/onboarding"
+                size="sm"
+                variant="primary"
+                onClick={() => setOpen(false)}
+                className="text-xs"
+              >
+                Complete Now
+              </ButtonLink>
+            ) : null}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

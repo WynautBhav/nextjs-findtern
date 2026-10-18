@@ -77,7 +77,7 @@ export function InterviewActions({
   async function reschedule() {
     const payload: Record<string, string> = {};
     slots.forEach((v, i) => {
-      if (v) payload[`slot${i + 1}`] = new Date(v).toISOString();
+      if (v) payload[`slot${i + 1}`] = v; // wall-clock; the server applies the interview's timezone
     });
     if (Object.keys(payload).length === 0) {
       setError("Offer at least one time.");
@@ -143,7 +143,7 @@ export function InterviewActions({
       </div>
 
       {panel === "reschedule" ? (
-        <div className="mt-4 rounded-xl border border-ink-100 bg-ink-50 p-4">
+        <div className="mt-4 rounded-[10px] border border-ink-200/70 bg-ink-50 p-4">
           <p className="text-sm font-medium text-ink-800">Offer three new times</p>
           <p className="mt-1 text-xs leading-relaxed text-ink-600">
             The candidate picks one. Blank fields are ignored. Times are read in the interview&apos;s
@@ -161,7 +161,7 @@ export function InterviewActions({
                   setSlots(next);
                 }}
                 aria-label={`Slot ${idx + 1}`}
-                className="h-10 rounded-lg border border-ink-200 bg-white px-3 text-sm text-ink-900 outline-none focus-visible:border-brand-600 focus-visible:ring-[3px] focus-visible:ring-brand-600/20"
+                className="apple-spring min-h-11 rounded-[10px] border border-ink-200 bg-white px-3 text-[14px] tabular-nums text-ink-900 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
               />
             ))}
           </div>
@@ -170,7 +170,7 @@ export function InterviewActions({
               type="button"
               onClick={reschedule}
               disabled={busy !== null}
-              className="inline-flex h-9 items-center gap-2 rounded-lg bg-brand-700 px-4 text-sm font-semibold text-white transition-colors hover:bg-brand-600 disabled:opacity-60"
+              className="apple-spring apple-pressable inline-flex min-h-11 items-center justify-center gap-2 rounded-[10px] bg-brand-700 px-4 text-sm font-semibold text-white hover:bg-brand-600 disabled:opacity-60"
             >
               {busy === "reschedule" ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : null}
               Offer these times
@@ -178,7 +178,7 @@ export function InterviewActions({
             <button
               type="button"
               onClick={() => setPanel("none")}
-              className="text-xs font-medium text-ink-600 underline-offset-4 hover:underline"
+              className="apple-spring inline-flex min-h-11 items-center text-xs font-medium text-ink-600 underline-offset-4 hover:underline"
             >
               Cancel
             </button>
@@ -187,7 +187,7 @@ export function InterviewActions({
       ) : null}
 
       {panel === "feedback" ? (
-        <div className="mt-4 rounded-xl border border-ink-100 bg-ink-50 p-4">
+        <div className="mt-4 rounded-[10px] border border-ink-200/70 bg-ink-50 p-4">
           <label htmlFor={`feedback-${interviewId}`} className="text-sm font-medium text-ink-800">
             Feedback for the candidate
           </label>
@@ -198,14 +198,14 @@ export function InterviewActions({
             rows={4}
             maxLength={2000}
             placeholder="What went well, what was missing, and what happens next."
-            className="mt-2 w-full rounded-lg border border-ink-200 bg-white px-3.5 py-2.5 text-sm text-ink-900 outline-none focus-visible:border-brand-600 focus-visible:ring-[3px] focus-visible:ring-brand-600/20"
+            className="apple-spring mt-2 min-h-11 w-full rounded-[10px] border border-ink-200 bg-white px-3.5 py-2.5 text-[14px] text-ink-900 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
           />
           <div className="mt-3 flex items-center gap-3">
             <button
               type="button"
               onClick={sendFeedback}
               disabled={busy !== null}
-              className="inline-flex h-9 items-center gap-2 rounded-lg bg-brand-700 px-4 text-sm font-semibold text-white transition-colors hover:bg-brand-600 disabled:opacity-60"
+              className="apple-spring apple-pressable inline-flex min-h-11 items-center justify-center gap-2 rounded-[10px] bg-brand-700 px-4 text-sm font-semibold text-white hover:bg-brand-600 disabled:opacity-60"
             >
               {busy === "save the feedback" ? (
                 <Loader2 className="size-3.5 animate-spin" aria-hidden />
@@ -215,11 +215,11 @@ export function InterviewActions({
             <button
               type="button"
               onClick={() => setPanel("none")}
-              className="text-xs font-medium text-ink-600 underline-offset-4 hover:underline"
+              className="apple-spring inline-flex min-h-11 items-center text-xs font-medium text-ink-600 underline-offset-4 hover:underline"
             >
               Cancel
             </button>
-            <span className="ml-auto text-2xs text-ink-400">{feedback.length}/2000</span>
+            <span className="ml-auto text-xs tabular-nums text-ink-400">{feedback.length}/2000</span>
           </div>
         </div>
       ) : null}
@@ -264,8 +264,8 @@ function Action({
       title={title}
       className={
         active
-          ? "inline-flex h-9 items-center gap-1.5 rounded-lg border border-brand-300 bg-brand-50 px-3.5 text-sm font-medium text-brand-800 transition-colors"
-          : "inline-flex h-9 items-center gap-1.5 rounded-lg border border-ink-200 bg-white px-3.5 text-sm font-medium text-ink-800 transition-colors hover:bg-ink-50 disabled:cursor-not-allowed disabled:opacity-50"
+          ? "apple-spring apple-pressable inline-flex min-h-11 items-center justify-center gap-1.5 rounded-[10px] border border-brand-300 bg-brand-50 px-3.5 text-sm font-medium text-brand-800"
+          : "apple-spring apple-pressable inline-flex min-h-11 items-center justify-center gap-1.5 rounded-[10px] border border-ink-200 bg-white px-3.5 text-sm font-medium text-ink-800 hover:bg-ink-50 disabled:cursor-not-allowed disabled:opacity-50"
       }
     >
       {busy ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : icon}

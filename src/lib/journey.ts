@@ -1,3 +1,5 @@
+import { formatMoney } from "./format.ts";
+import { draftFromRecord } from "./onboarding.ts";
 /**
  * The journey derivation.
  *
@@ -487,7 +489,7 @@ export function deriveProofs(src: ProofSource): Proof[] {
       title: "Stipend paid",
       line: "This reached your bank account.",
       facts: [
-        { label: "Amount", value: moneyPlain(r.amountMinor ?? 0, r.currency ?? "INR") },
+        { label: "Amount", value: formatMoney(r.amountMinor ?? 0, r.currency ?? "INR", { zeroLabel: false }) },
         ...(r.referenceId ? [{ label: "Reference", value: r.referenceId }] : []),
       ],
       at: r.paidAt,
@@ -552,10 +554,10 @@ export function deriveReadiness(
   doc: DocumentRow | null,
   proposals: ProposalRow[],
 ): ReadinessItem[] {
-  const extra = onboarding?.extraData ?? {};
-  const academics = (extra.academics ?? {}) as Record<string, unknown>;
-  const bank = (extra.bankDetails ?? {}) as Record<string, unknown>;
-  const skills = toArray(onboarding?.skills);
+  const draft = onboarding ? draftFromRecord(onboarding) : null;
+  const academics = draft?.academics ?? { institution: "", degree: "" };
+  const bank = draft?.bank ?? { accountNumber: "", ifscCode: "", upiId: "" };
+  const skills = draft?.skills ?? [];
   const live = proposals.some((p) => {
     const s = (p.status ?? "").toLowerCase();
     return s === "accepted" || s === "hired";
@@ -631,7 +633,7 @@ export function deriveReadiness(
       id: "bank",
       label: "Bank account for your stipend",
       unlocks: "Your stipend cannot be sent anywhere else.",
-      done: Boolean(bank.accountNumber && bank.ifsc),
+      done: Boolean((bank.accountNumber && bank.ifscCode) || bank.upiId),
       href: "/intern/onboarding",
       blocking: live,
     },
@@ -798,17 +800,6 @@ function readScheduledForDate(r: PayoutRow): Date | null {
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
-/** Plain money for the intern screens, where the shared helper's "Free" for
- *  zero would be nonsense next to a real balance. */
-export function moneyPlain(minor: number, currency: string): string {
-  const value = minor / 100;
-  return new Intl.NumberFormat(currency === "USD" ? "en-US" : "en-IN", {
-    style: "currency",
-    currency,
-    maximumFractionDigits: value % 1 === 0 ? 0 : 2,
-    minimumFractionDigits: 0,
-  }).format(value);
-}
 
 function num(v: unknown): number | null {
   return typeof v === "number" && Number.isFinite(v) ? v : null;

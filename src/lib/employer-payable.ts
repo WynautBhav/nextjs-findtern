@@ -5,30 +5,20 @@
  * editing the request. Both sides call this one function so the number on
  * screen and the number charged cannot drift apart.
  *
- * The payable set is *accepted* proposals — a cart row is an intention, an
+ * The payable set is *accepted* proposals - a cart row is an intention, an
  * accepted proposal is a commitment, and only the second is worth billing.
  */
 
 import { and, desc, eq, inArray } from "drizzle-orm";
 
+import { lineCharge, type LineCharge, type PayMode } from "@/lib/checkout";
 import { getDb, schema } from "@/lib/db";
-import { scoreOf } from "@/lib/employer-candidates";
-import {
-  durationMonths,
-  normaliseCurrency,
-  resolvePricing,
-  type Currency,
-} from "@/lib/employer-pricing";
+import { monthlyDues } from "@/lib/dues";
+import { parseOffer } from "@/lib/offer";
+import { initialsOf, scoreOf } from "@/lib/employer-candidates";
+import { hiredInternIds, isAdminViewing } from "@/lib/employer-visibility";
+import { employerRegion, type Currency } from "@/lib/employer-pricing";
 
-export type OfferDetails = {
-  roleTitle?: string;
-  duration?: string;
-  monthlyAmount?: number;
-  totalPrice?: number;
-  hourlyRate?: number;
-  perHireCharge?: number;
-  laptop?: string;
-};
 
 export const DURATION_LABEL: Record<string, string> = {
   "1m": "1 month",
@@ -39,36 +29,47 @@ export const DURATION_LABEL: Record<string, string> = {
 
 export type PayableLine = {
   id: string;
+  /** Full name - render through `displayNameOf`, never raw. */
   internName: string;
+  internInitials: string;
+  /** True only once the intern is hired; checkout is pre-payment, so usually false. */
+  nameUnlocked: boolean;
   internId: string;
   projectName: string | null;
   roleTitle: string;
   durationLabel: string;
   months: number;
-  monthly: number;
-  internshipTotal: number;
-  perHire: number;
+  /** Offer's monthly amount, minor units; null when the offer has none. */
+  monthlyMinor: number | null;
+  score: number;
+  charge: LineCharge;
+  /** Same line billed as one month (score 6+ only; see charge.monthlyBlocked). */
+  monthlyCharge: LineCharge;
+  /** Set for a hired monthly-plan placement: the next month is due. */
+  due: { monthsPaid: number; months: number } | null;
   currency: Currency;
-  source: "offer" | "band";
 };
 
 export type PayableCheckout = {
   lines: PayableLine[];
-  /** Per-currency order total in MAJOR units (internship + per-hire). */
+  /** Per-currency order total, minor units, after the upfront discount. */
   totals: Map<Currency, number>;
   region: "IN" | null;
   defaultCurrency: Currency;
-  hasPlans: boolean;
   prefill: { name?: string; email?: string; contact?: string };
 };
 
-export async function payableCheckout(employerId: string): Promise<PayableCheckout> {
+export async function payableCheckout(
+  employerId: string,
+  opts: { proposalIds?: string[]; mode?: PayMode } = {},
+): Promise<PayableCheckout> {
   const db = getDb();
 
   const [employer] = await db
     .select({
       name: schema.employers.name,
       companyEmail: schema.employers.companyEmail,
+      country: schema.employers.country,
       countryCode: schema.employers.countryCode,
       phoneNumber: schema.employers.phoneNumber,
     })
@@ -76,7 +77,7 @@ export async function payableCheckout(employerId: string): Promise<PayableChecko
     .where(eq(schema.employers.id, employerId))
     .limit(1);
 
-  const region: "IN" | null = employer?.phoneNumber?.startsWith("91") ? "IN" : null;
+  const region = employerRegion(employer ?? {});
   const defaultCurrency: Currency = region === "IN" ? "INR" : "USD";
   const prefill = {
     name: employer?.name,
@@ -84,23 +85,25 @@ export async function payableCheckout(employerId: string): Promise<PayableChecko
     contact: employer ? `${employer.countryCode}${employer.phoneNumber}` : undefined,
   };
 
-  let hasPlans = false;
-  let plans: (typeof schema.pricingPlans.$inferSelect)[] = [];
-  try {
-    plans = await db
-      .select()
-      .from(schema.pricingPlans)
-      .where(eq(schema.pricingPlans.isActive, true));
-    hasPlans = plans.length > 0;
-  } catch {
-    // Not fatal: the score-band fallback in lib/score covers pricing.
-  }
 
-  const proposals = await db
-    .select()
-    .from(schema.proposals)
-    .where(and(eq(schema.proposals.employerId, employerId), eq(schema.proposals.status, "accepted")))
-    .orderBy(desc(schema.proposals.updatedAt));
+  // Accepted offers awaiting payment, plus hired monthly-plan placements
+  // whose next month is due.
+  const [open, payments] = await Promise.all([
+    db
+      .select()
+      .from(schema.proposals)
+      .where(and(eq(schema.proposals.employerId, employerId), inArray(schema.proposals.status, ["accepted", "hired"])))
+      .orderBy(desc(schema.proposals.updatedAt)),
+    db
+      .select({ status: schema.employerPayments.status, raw: schema.employerPayments.raw })
+      .from(schema.employerPayments)
+      .where(eq(schema.employerPayments.employerId, employerId)),
+  ]);
+  const dues = new Map(monthlyDues(open, payments).map((d) => [d.proposalId, d]));
+  const proposals = open.filter(
+    (p) =>
+      (p.status === "accepted" || dues.has(p.id)) && (!opts.proposalIds?.length || opts.proposalIds.includes(p.id)),
+  );
 
   let lines: PayableLine[] = [];
 
@@ -113,8 +116,28 @@ export async function payableCheckout(employerId: string): Promise<PayableChecko
       .from(schema.users)
       .where(inArray(schema.users.id, internIds));
     const namesById = new Map(
-      userRows.map((row) => [row.id, `${row.firstName} ${row.lastName}`.trim()] as const),
+      userRows.map((row) => {
+        const first = (row.firstName || "").trim();
+        const last = (row.lastName || "").trim();
+        return [
+          row.id,
+          {
+            full: `${first} ${last}`.trim() || "Intern",
+            initials: initialsOf(first, last),
+          },
+        ] as const;
+      }),
     );
+
+    // Names unmask only on hire. Checkout lines are accepted (pre-payment),
+    // so almost every line here renders initials.
+    const hiredRows = await db
+      .select({ internId: schema.proposals.internId })
+      .from(schema.proposals)
+      .where(and(eq(schema.proposals.employerId, employerId), eq(schema.proposals.status, "hired")));
+    const hiredIds = (await isAdminViewing())
+      ? await hiredInternIds(db, employerId)
+      : new Set(hiredRows.map((row) => row.internId));
 
     const onboardingRows = await db
       .select()
@@ -129,51 +152,34 @@ export async function payableCheckout(employerId: string): Promise<PayableChecko
     const projectsById = new Map(projectRows.map((row) => [row.id, row.projectName]));
 
     lines = proposals.map((proposal) => {
-      const offer = (proposal.offerDetails ?? {}) as OfferDetails;
-      const currency = normaliseCurrency(proposal.currency);
-      const months = durationMonths(offer.duration);
-      const band = resolvePricing(
-        scoreOf(onboardingByUser.get(proposal.internId)),
-        plans,
-        currency,
-        region,
-      );
-
-      const monthly =
-        typeof offer.monthlyAmount === "number" && offer.monthlyAmount > 0
-          ? offer.monthlyAmount
-          : typeof offer.hourlyRate === "number"
-            ? offer.hourlyRate * 120
-            : 0;
-      const perHire =
-        typeof offer.perHireCharge === "number" ? offer.perHireCharge : band.perHireMinor / 100;
-      const internshipTotal =
-        typeof offer.totalPrice === "number" && offer.totalPrice > 0
-          ? offer.totalPrice
-          : monthly * months;
-
+      const offer = parseOffer(proposal.offerDetails, proposal.currency);
+      const score = scoreOf(onboardingByUser.get(proposal.internId));
       return {
         id: proposal.id,
-        internName: namesById.get(proposal.internId) ?? "Intern",
+        internName: namesById.get(proposal.internId)?.full ?? "Intern",
+        internInitials: namesById.get(proposal.internId)?.initials ?? "?",
+        nameUnlocked: hiredIds.has(proposal.internId),
         internId: proposal.internId,
         projectName: projectsById.get(proposal.projectId) ?? null,
         roleTitle: offer.roleTitle || projectsById.get(proposal.projectId) || "Internship",
-        durationLabel:
-          DURATION_LABEL[offer.duration ?? ""] ?? `${months} month${months === 1 ? "" : "s"}`,
-        months,
-        monthly,
-        internshipTotal,
-        perHire,
-        currency,
-        source: typeof offer.totalPrice === "number" && offer.totalPrice > 0 ? "offer" : "band",
+        durationLabel: dues.has(proposal.id)
+          ? `Month ${dues.get(proposal.id)!.monthsPaid + 1} of ${offer.months}`
+          : (DURATION_LABEL[offer.duration] ?? `${offer.months} month${offer.months === 1 ? "" : "s"}`),
+        months: offer.months,
+        monthlyMinor: offer.monthlyMinor,
+        score,
+        charge: dues.has(proposal.id) ? lineCharge(offer, score, "monthly") : lineCharge(offer, score, opts.mode),
+        monthlyCharge: lineCharge(offer, score, "monthly"),
+        due: dues.get(proposal.id) ?? null,
+        currency: offer.currency,
       };
     });
   }
 
   const totals = new Map<Currency, number>();
   for (const line of lines) {
-    totals.set(line.currency, (totals.get(line.currency) ?? 0) + line.internshipTotal + line.perHire);
+    totals.set(line.currency, (totals.get(line.currency) ?? 0) + line.charge.totalMinor);
   }
 
-  return { lines, totals, region, defaultCurrency, hasPlans, prefill };
+  return { lines, totals, region, defaultCurrency, prefill };
 }

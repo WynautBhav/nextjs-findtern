@@ -1,4 +1,7 @@
 import { cn } from "@/lib/utils";
+import { humanizeStatus } from "@/components/app/status";
+
+export { humanizeStatus };
 
 export type StatusTone = "success" | "warning" | "danger" | "info" | "neutral";
 
@@ -79,12 +82,7 @@ const TONE_BY_STATUS: Record<string, StatusTone> = {
   setup_incomplete: "warning",
 };
 
-/** "interview_scheduled" → "Interview scheduled" */
-export function humanizeStatus(value: string): string {
-  const spaced = value.replace(/[_-]+/g, " ").trim();
-  if (!spaced) return "None";
-  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
-}
+/** "interview_scheduled" → "Interview scheduled" - shared copy in app/status. */
 
 export function toneForStatus(value: string | null | undefined): StatusTone {
   if (!value) return "neutral";
@@ -115,7 +113,7 @@ export function StatusBadge({
   return (
     <span
       className={cn(
-        "inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-0.5 text-2xs font-semibold ring-1 ring-inset shadow-2xs",
+        "apple-admin inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] font-semibold ring-1 ring-inset shadow-2xs",
         style.pill,
         className
       )}
@@ -136,7 +134,7 @@ export function StatusBadge({
   );
 }
 
-/** Boolean as a badge — used for visibility and setup-state columns. */
+/** Boolean as a badge - used for visibility and setup-state columns. */
 export function BooleanBadge({
   value,
   trueLabel = "Yes",
@@ -151,7 +149,7 @@ export function BooleanBadge({
   falseTone?: StatusTone;
 }) {
   if (value === null || value === undefined) {
-    return <StatusBadge tone="neutral" label="—" />;
+    return <StatusBadge tone="neutral" label="-" />;
   }
   return (
     <StatusBadge

@@ -28,7 +28,7 @@ export function ContactCta({
             className="pointer-events-none absolute -right-20 -top-24 size-72 rounded-full bg-accent/12 blur-3xl"
           />
 
-          <div className="relative flex flex-col items-center gap-7 text-center lg:flex-row lg:justify-between lg:text-left">
+          <div className="relative z-10 flex flex-col items-center gap-7 text-center lg:flex-row lg:justify-between lg:text-left">
             <div>
               <h2 className="text-balance text-2xl font-bold tracking-[-0.02em] text-ink-900 sm:text-3xl">
                 Not sure which plan fits?
@@ -39,7 +39,12 @@ export function ContactCta({
               </p>
             </div>
 
-            <ButtonLink href={topHref} variant="primary" size="lg" block className="shrink-0">
+            <ButtonLink
+              href={topHref}
+              variant="primary"
+              size="lg"
+              className="relative z-10 shrink-0 cursor-pointer shadow-sm hover:shadow-md transition-all active:scale-95"
+            >
               {topLabel}
             </ButtonLink>
           </div>

@@ -1,12 +1,9 @@
 import type { Metadata } from "next";
-import Link from "next/link";
-import { ArrowRight, TrendingUp } from "lucide-react";
-
-import { PageHead, Pill, SectionHead } from "@/components/app/primitives";
+import { EmptyScene, PageHead, Pill, SectionHead, Surface } from "@/components/app/primitives";
 import { FreshProofGrid, RecordCount, RecordExport } from "@/components/app/proof";
 import { Thread } from "@/components/app/thread";
 import { CountUp } from "@/components/app/count-up";
-import { getSession } from "@/lib/auth";
+import { requireRole } from "@/lib/auth";
 import { loadInternData } from "@/lib/intern-data";
 import { recordAsText } from "@/lib/journey";
 
@@ -46,8 +43,7 @@ export const metadata: Metadata = {
  * a record rather than as a product screenshot, and it opens anywhere.
  */
 export default async function InternRecord() {
-  const session = await getSession();
-  if (!session) return null;
+  const session = await requireRole("intern");
 
   const data = await loadInternData(session.uid);
   const { getDb, schema } = await import("@/lib/db");
@@ -89,31 +85,19 @@ export default async function InternRecord() {
           Not four identical stat cards. Each one answers a question a
           candidate actually has: how much work, how much money, how many
           people vouch for me. */}
-      <div className="mb-8 grid gap-3 sm:grid-cols-3">
+      <div className="mb-6 grid grid-cols-3 gap-2 sm:gap-3">
         <Figure label="Hours a manager approved" value={hoursTotal} unit="hours" />
         <Figure label="Stipend paid to you" value={paidTotal} unit="rupees" money />
         <Figure label="Times someone vouched" value={data.proofs.length} unit="records" />
       </div>
 
       {data.proofs.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-ink-200 bg-white/60 px-6 py-12 text-center">
-          <TrendingUp className="mx-auto size-6 text-ink-400" aria-hidden />
-          <h2 className="mt-4 text-lg font-semibold tracking-[-0.01em] text-ink-900">
-            Nothing on your record yet
-          </h2>
-          <p className="mx-auto mt-2 max-w-md text-pretty text-sm leading-relaxed text-ink-600">
-            The first item appears the moment something real happens to you here: an interview you
-            complete, hours a manager approves, or a stipend that reaches your account. Nothing is
-            added for logging in.
-          </p>
-          <Link
-            href="/intern/dashboard"
-            className="mt-6 inline-flex min-h-11 items-center gap-2 rounded-lg bg-primary px-5 text-sm font-semibold text-white shadow-sm transition-[background-color,transform] duration-[var(--dur-instant)] hover:bg-primary-hover active:scale-[0.98]"
-          >
-            See what is waiting
-            <ArrowRight className="size-4" aria-hidden />
-          </Link>
-        </div>
+        <EmptyScene
+          art
+          title="Nothing on your record yet"
+          body="The first item appears the moment something real happens to you here: an interview you complete, hours a manager approves, or a stipend that reaches your account. Nothing is added for logging in."
+          next={{ label: "See what is waiting", href: "/intern/dashboard" }}
+        />
       ) : (
         <>
           <RecordCount proofs={data.proofs} />
@@ -178,15 +162,15 @@ function Figure({
   money?: boolean;
 }) {
   return (
-    <div className="rounded-2xl border border-ink-100 bg-white px-5 py-5 shadow-[0_1px_2px_rgb(7_47_36/0.04)]">
-      <p className="text-balance text-sm leading-snug text-ink-500">{label}</p>
-      <p className="mt-2 flex items-baseline gap-1.5">
-        <span className="text-3xl font-semibold tabular-nums tracking-[-0.025em] text-ink-900">
+    <Surface className="p-3 sm:px-5 sm:py-5">
+      <p className="line-clamp-2 text-balance text-[11px] leading-tight text-ink-500 sm:text-sm sm:leading-snug">{label}</p>
+      <p className="mt-1 sm:mt-2 flex items-baseline gap-1 sm:gap-1.5">
+        <span className="text-lg font-semibold tabular-nums tracking-[-0.025em] text-ink-900 sm:text-3xl">
           <CountUp value={value} currency={money ? "INR" : undefined} />
         </span>
-        <span className="text-sm text-ink-500">{unit}</span>
+        <span className="text-[10px] text-ink-500 sm:text-sm">{unit}</span>
       </p>
-    </div>
+    </Surface>
   );
 }
 

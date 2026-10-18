@@ -4,7 +4,15 @@
  * These replace the bare `<h1>` stubs that shipped with the legacy pages.
  * Using a real header component here means every employer page has the same
  * structure, and a style change in one place lands everywhere.
+ *
+ * `PageHeader` intentionally mirrors `PageHead` in app/primitives so the
+ * employer console and the intern console never disagree about what a
+ * heading looks like. `EmptyState` is a thin adapter over `EmptyScene` -
+ * same premium empty taxonomy (art + next-step CTA), legacy prop names kept
+ * so existing pages keep working.
  */
+
+import { EmptyScene } from "@/components/app/primitives";
 
 export function PageHeader({
   title,
@@ -32,11 +40,26 @@ export function PageHeader({
   );
 }
 
-export function EmptyState({ title, body }: { title: string; body: string }) {
+export function EmptyState({
+  title,
+  body,
+  action,
+  who,
+}: {
+  title: string;
+  body: string;
+  /** Optional next step - renders a 44px primary CTA under the copy. */
+  action?: { label: string; href: string };
+  /** Who acts next. Shown as a quiet pill under the copy. */
+  who?: string;
+}) {
   return (
-    <div className="rounded-2xl border border-dashed border-ink-200 bg-white/60 px-6 py-14 text-center">
-      <p className="text-base font-semibold text-ink-900">{title}</p>
-      <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-ink-600">{body}</p>
-    </div>
+    <EmptyScene
+      art
+      title={title}
+      body={body}
+      next={action ? { label: action.label, href: action.href } : undefined}
+      who={who}
+    />
   );
 }

@@ -5,10 +5,10 @@ import type { internOnboarding, users } from "@/lib/db/schema";
  *
  * The profile is split across two tables, and most of the interesting parts
  * live in the free-form `extra_data` bag because `intern_onboarding` has no
- * columns for them — that is where the legacy server read them too
+ * columns for them - that is where the legacy server read them too
  * (`extra.findternScore`, `extra.ratings`, `extra.academics`). Every employer
- * screen needs the same handful of things — name, score, skills, academics,
- * ratings, courses — so the assembly happens here once instead of being
+ * screen needs the same handful of things - name, score, skills, academics,
+ * ratings, courses - so the assembly happens here once instead of being
  * re-derived, slightly differently, on each page.
  *
  * Nothing here is defensive for its own sake: `extra_data` is `jsonb` written
@@ -64,14 +64,14 @@ export type CandidateProfile = {
   email: string;
   city: string;
   state: string;
-  /** "Bengaluru, Karnataka" — or just whichever half is filled in. */
+  /** "Bengaluru, Karnataka" - or just whichever half is filled in. */
   location: string;
   bio: string;
   linkedinUrl: string;
   skills: string[];
   /** Findtern Score, out of 10. Zero when the intern has not been scored. */
   score: number;
-  /** False when `extra_data.findternScore` was absent — zero is a real score. */
+  /** False when `extra_data.findternScore` was absent - zero is a real score. */
   scored: boolean;
   ratings: Ratings;
   academics: Academics | null;
@@ -79,6 +79,8 @@ export type CandidateProfile = {
   preferredLocations: string[];
   hasLaptop: boolean | null;
   updatedAt: Date | null;
+  aiFeedbackLink?: string | null;
+  aiRecordingLink?: string | null;
 };
 
 export const MODE_LABEL: Record<string, string> = {
@@ -90,8 +92,9 @@ export const MODE_LABEL: Record<string, string> = {
 /**
  * The slice of a candidate that is safe to show any signed-in employer.
  *
- * Name, location, score, skills and AI ratings. Deliberately excludes Aadhaar,
- * PAN, bank details and the uploaded documents — see `guards.ts` for why those
+ * `name` is the redacted display name (initials until hire - see
+ * `displayNameOf`). Deliberately excludes Aadhaar,
+ * PAN, bank details and the uploaded documents - see `guards.ts` for why those
  * needed a cross-tenant check in the first place.
  */
 export type CandidateSummary = {
@@ -106,12 +109,41 @@ export type CandidateSummary = {
 };
 
 export function initialsOf(first: string, last: string): string {
-  const a = first.trim().charAt(0);
-  const b = last.trim().charAt(0);
+  // Port of the legacy `getInitialsFromName`: first letter of first and last
+  // name, falling back to the first two letters of a single name ("Aarav" →
+  // "AA") so the avatar code is always two characters like production (HP, AK).
+  const f = first.trim();
+  const l = last.trim();
+  const a = f.charAt(0);
+  const b = l ? l.charAt(0) : f.length > 1 ? f.charAt(1) : "";
   return `${a}${b}`.toUpperCase() || "?";
 }
 
-/** Build a display profile. `onboarding` may be undefined — the row is optional. */
+/**
+ * What one employer is allowed to call a candidate.
+ *
+ * Initials everywhere, full name only after that employer hired them
+ * (proposal status `hired`) - the port of the legacy
+ * `getCandidateDisplayName` rule. Accepted / sent / in-cart candidates stay
+ * redacted until the hire (and the payment behind it) is done.
+ */
+export function displayNameOf(
+  profile: Pick<CandidateProfile, "fullName" | "initials">,
+  nameUnlocked: boolean,
+): string {
+  if (nameUnlocked) return profile.fullName || "Intern";
+  const initials = profile.initials && profile.initials !== "?" ? profile.initials : "";
+  return initials || "Candidate";
+}
+
+/**
+ * Intern ids this employer has hired (any project). Lives in
+ * `lib/employer-visibility` (not here) so this module stays import-free and
+ * unit-testable under plain node. Feed the result into `displayNameOf` so
+ * every employer screen unmasks the same people.
+ */
+
+/** Build a display profile. `onboarding` may be undefined - the row is optional. */
 export function toCandidateProfile(
   user: UserRow,
   onboarding?: OnboardingRow | null,
@@ -145,6 +177,8 @@ export function toCandidateProfile(
     preferredLocations: stringArray(onboarding?.preferredLocations),
     hasLaptop: typeof onboarding?.hasLaptop === "boolean" ? onboarding.hasLaptop : null,
     updatedAt: onboarding?.updatedAt ?? null,
+    aiFeedbackLink: (typeof extra?.aiFeedbackLink === "string" && extra.aiFeedbackLink.trim()) || null,
+    aiRecordingLink: (typeof extra?.aiRecordingLink === "string" && extra.aiRecordingLink.trim()) || null,
   };
 }
 

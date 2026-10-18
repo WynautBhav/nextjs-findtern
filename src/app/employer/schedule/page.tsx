@@ -1,8 +1,14 @@
+import Link from "next/link";
 import { desc, eq, inArray } from "drizzle-orm";
 
 import { getDb, schema } from "@/lib/db";
-import { getSession } from "@/lib/auth";
+import { requireRole } from "@/lib/auth";
 import { PageHeader, EmptyState } from "@/components/layout/page-header";
+import { Pill } from "@/components/app/primitives";
+import { ButtonLink } from "@/components/ui/button";
+import { interviewPill } from "@/components/app/status";
+import { displayNameOf, initialsOf } from "@/lib/employer-candidates";
+import { hiredInternIds } from "@/lib/employer-visibility";
 import { isPast } from "@/lib/journey";
 import { InterviewActions } from "@/components/employer/interview-actions";
 
@@ -11,8 +17,8 @@ import { InterviewActions } from "@/components/employer/interview-actions";
  *
  * The previous version printed the literal status string in a list and showed
  * a Join link if one happened to exist. The legacy page carried the actual
- * job: which candidate, which project, the three offered slots, and — the part
- * that matters day to day — the four actions an interviewer needs before and
+ * job: which candidate, which project, the three offered slots, and - the part
+ * that matters day to day - the four actions an interviewer needs before and
  * after the call: send a reminder, reschedule with new slots, leave feedback,
  * mark it missed.
  *
@@ -21,8 +27,8 @@ import { InterviewActions } from "@/components/employer/interview-actions";
  * What was missing was the buttons.
  */
 export default async function EmployerSchedule() {
-  const session = await getSession();
-  const uid = session!.uid;
+  const session = await requireRole("employer");
+  const uid = session.uid;
 
   let rows: (typeof schema.interviews.$inferSelect)[] = [];
   try {
@@ -32,7 +38,7 @@ export default async function EmployerSchedule() {
       .where(eq(schema.interviews.employerId, uid))
       .orderBy(desc(schema.interviews.createdAt));
   } catch {
-    // DB unavailable — say so with an empty list rather than a stack trace.
+    // DB unavailable - say so with an empty list rather than a stack trace.
   }
 
   const internIds = Array.from(new Set(rows.map((r) => r.internId)));
@@ -42,12 +48,28 @@ export default async function EmployerSchedule() {
   const projectNames = new Map<string, string>();
   try {
     const db = getDb();
+    let unlocked = new Set<string>();
+    try {
+      unlocked = await hiredInternIds(db, uid);
+    } catch {
+      unlocked = new Set<string>();
+    }
     if (internIds.length > 0) {
       const users = await db
         .select({ id: schema.users.id, firstName: schema.users.firstName, lastName: schema.users.lastName })
         .from(schema.users)
         .where(inArray(schema.users.id, internIds));
-      for (const u of users) names.set(u.id, `${u.firstName} ${u.lastName}`.trim() || "Candidate");
+      for (const u of users) {
+        const first = (u.firstName || "").trim();
+        const last = (u.lastName || "").trim();
+        names.set(
+          u.id,
+          displayNameOf(
+            { fullName: `${first} ${last}`.trim() || "Candidate", initials: initialsOf(first, last) },
+            unlocked.has(u.id),
+          ),
+        );
+      }
     }
     if (projectIds.length > 0) {
       const projects = await db
@@ -68,7 +90,12 @@ export default async function EmployerSchedule() {
       />
 
       {rows.length === 0 ? (
-        <EmptyState title="No interviews" body="Scheduled interviews will appear here." />
+        <EmptyState
+          title="No interviews"
+          body="Scheduled interviews will appear here. Browse candidates and send a proposal to get the first one booked."
+          action={{ label: "Browse candidates", href: "/employer/candidates" }}
+          who="You - send the first proposal"
+        />
       ) : (
         <ul className="space-y-3">
           {rows.map((i) => {
@@ -76,11 +103,16 @@ export default async function EmployerSchedule() {
             const chosen = i.selectedSlot && i.selectedSlot >= 1 ? i.selectedSlot : null;
             const past = slots.length > 0 && isPast(slots[0]);
             return (
-              <li key={i.id} className="rounded-xl border border-ink-100 bg-white p-5">
+              <li key={i.id} className="apple-spring rounded-[20px] border border-ink-200/70 bg-white p-5 shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)]">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div className="min-w-0">
                     <p className="font-semibold text-ink-900">
-                      {names.get(i.internId) ?? "Candidate"}
+                      <Link
+                        href={`/employer/intern/${encodeURIComponent(i.internId)}`}
+                        className="hover:text-brand-700 hover:underline"
+                      >
+                        {names.get(i.internId) ?? "Candidate"}
+                      </Link>
                     </p>
                     <p className="mt-0.5 text-sm text-text-subtle">
                       {i.projectId ? (projectNames.get(i.projectId) ?? "Project") : "No project"}
@@ -95,8 +127,8 @@ export default async function EmployerSchedule() {
                               key={slot.toISOString()}
                               className={
                                 selected
-                                  ? "rounded-lg bg-brand-50 px-2.5 py-1.5 text-xs font-semibold text-brand-800"
-                                  : "rounded-lg bg-ink-50 px-2.5 py-1.5 text-xs text-ink-600"
+                                  ? "rounded-[10px] bg-brand-50 px-2.5 py-1.5 text-xs font-semibold tabular-nums text-brand-800"
+                                  : "rounded-[10px] bg-ink-50 px-2.5 py-1.5 text-xs tabular-nums text-ink-600"
                               }
                             >
                               {slot.toLocaleString("en-IN", {
@@ -120,14 +152,26 @@ export default async function EmployerSchedule() {
 
                   <div className="flex shrink-0 flex-col items-end gap-3">
                     <StatusPill status={i.status} />
-                    {i.meetingLink ? (
-                      <a
-                        href={i.meetingLink}
-                        className="inline-flex h-9 items-center rounded-lg border border-ink-200 bg-white px-3.5 text-sm font-medium text-ink-800 transition-colors hover:bg-ink-50"
+                    <div className="flex items-center gap-2">
+                      <ButtonLink
+                        href={`/employer/intern/${encodeURIComponent(i.internId)}`}
+                        variant="outline"
+                        size="sm"
+                        className="min-h-9 px-3 text-xs font-medium"
                       >
-                        Join meeting
-                      </a>
-                    ) : null}
+                        Profile
+                      </ButtonLink>
+                      {i.meetingLink ? (
+                        <ButtonLink
+                          href={i.meetingLink}
+                          variant="outline"
+                          size="sm"
+                          className="min-h-9 px-3 text-xs font-medium"
+                        >
+                          Join meeting
+                        </ButtonLink>
+                      ) : null}
+                    </div>
                   </div>
                 </div>
 
@@ -141,21 +185,7 @@ export default async function EmployerSchedule() {
   );
 }
 
-const STATUS_TONE: Record<string, string> = {
-  pending: "bg-ink-100 text-ink-700",
-  scheduled: "bg-brand-100 text-brand-800",
-  sent: "bg-brand-100 text-brand-800",
-  completed: "bg-brand-100 text-brand-800",
-  expired: "bg-ink-100 text-ink-500",
-  missed: "bg-danger-soft text-danger",
-  cancelled: "bg-ink-100 text-ink-500",
-};
-
 function StatusPill({ status }: { status: string }) {
-  const tone = STATUS_TONE[status.toLowerCase()] ?? "bg-ink-100 text-ink-700";
-  return (
-    <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-2xs font-semibold uppercase tracking-[0.08em] ${tone}`}>
-      {status}
-    </span>
-  );
+  const s = interviewPill(status);
+  return <Pill tone={s.tone}>{s.label}</Pill>;
 }

@@ -33,26 +33,28 @@ export function CountUp({
     const el = ref.current;
     if (!el) return;
 
-    if (prefersReducedMotion()) {
-      el.textContent = prefix + format(value, decimals) + suffix;
-      return;
-    }
+    if (prefersReducedMotion()) return;
 
-    const obj = { n: 0 };
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry.isIntersecting) return;
+        observer.disconnect();
 
-    const ctx = gsap.context(() => {
-      gsap.to(obj, {
-        n: value,
-        duration,
-        ease: EASE.outExpo,
-        scrollTrigger: { trigger: el, start: "top 90%", once: true },
-        onUpdate: () => {
-          el.textContent = prefix + format(obj.n, decimals) + suffix;
-        },
-      });
-    }, el);
+        const obj = { n: 0 };
+        gsap.to(obj, {
+          n: value,
+          duration,
+          ease: EASE.outExpo,
+          onUpdate: () => {
+            if (el) el.textContent = prefix + format(obj.n, decimals) + suffix;
+          },
+        });
+      },
+      { threshold: 0.1, rootMargin: "0px 0px -50px 0px" },
+    );
 
-    return () => ctx.revert();
+    observer.observe(el);
+    return () => observer.disconnect();
   }, [value, decimals, prefix, suffix, duration]);
 
   return (

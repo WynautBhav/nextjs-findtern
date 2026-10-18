@@ -1,14 +1,16 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { and, eq } from "drizzle-orm";
-import { ArrowLeft, UserRound } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 
 import { getDb, schema } from "@/lib/db";
-import { getSession } from "@/lib/auth";
-import { toCandidateProfile, type CandidateSummary } from "@/lib/employer-candidates";
-import { resolvePricing, type Currency, type Pricing } from "@/lib/employer-pricing";
+import { requireRole } from "@/lib/auth";
+import { displayNameOf, toCandidateProfile, type CandidateSummary } from "@/lib/employer-candidates";
+import { hiredInternIds } from "@/lib/employer-visibility";
+import { employerRegion, resolvePricing, type Currency, type Pricing } from "@/lib/employer-pricing";
 import { PageHeader, EmptyState } from "@/components/layout/page-header";
 import { SendProposalForm } from "@/components/employer/send-proposal-form";
+import { ButtonLink } from "@/components/ui/button";
 
 export const metadata: Metadata = {
   title: "Send a proposal",
@@ -34,7 +36,7 @@ type ProjectOption = {
  * The candidate arrives as `?intern=<id>`. Without one the page says so instead
  * of rendering a form that cannot be filled in.
  *
- * There is no `POST /api/employer/:id/proposals` in this build — the form says
+ * There is no `POST /api/employer/:id/proposals` in this build - the form says
  * so on submit rather than posting into the void.
  */
 
@@ -43,8 +45,8 @@ export default async function SendProposal({
 }: {
   searchParams: Promise<{ intern?: string | string[] }>;
 }) {
-  const session = await getSession();
-  const uid = session!.uid;
+  const session = await requireRole("employer");
+  const uid = session.uid;
   const { intern: internParam } = await searchParams;
   const internId = (Array.isArray(internParam) ? internParam[0] : internParam)?.trim() ?? "";
 
@@ -73,14 +75,18 @@ export default async function SendProposal({
     }));
 
     const [employer] = await db
-      .select({ country: schema.employers.country, phoneNumber: schema.employers.phoneNumber })
+      .select({
+        country: schema.employers.country,
+        countryCode: schema.employers.countryCode,
+        phoneNumber: schema.employers.phoneNumber,
+      })
       .from(schema.employers)
       .where(eq(schema.employers.id, uid))
       .limit(1);
 
     // A +91 country code is the legacy signal for an India-based employer; the
     // legacy client used the same inference (inferEmployerIsIndia).
-    const region: "IN" | null = employer?.phoneNumber?.startsWith("91") ? "IN" : null;
+    const region: "IN" | null = employerRegion(employer ?? {});
     currency = region === "IN" ? "INR" : "USD";
 
     let score = 0;
@@ -99,9 +105,15 @@ export default async function SendProposal({
           .limit(1);
 
         const profile = toCandidateProfile(user, onboarding);
+        let unlocked = false;
+        try {
+          unlocked = (await hiredInternIds(db, uid)).has(user.id);
+        } catch {
+          unlocked = false;
+        }
         candidate = {
           id: profile.id,
-          name: profile.fullName,
+          name: displayNameOf(profile, unlocked),
           initials: profile.initials,
           location: profile.location,
           score: profile.score,
@@ -130,7 +142,7 @@ export default async function SendProposal({
       USD: resolvePricing(score, plans, "USD", region),
     };
   } catch {
-    // DB unavailable — the page still explains itself and links to the browser.
+    // DB unavailable - the page still explains itself and links to the browser.
     pricing = {
       INR: resolvePricing(0, [], "INR", null),
       USD: resolvePricing(0, [], "USD", null),
@@ -142,27 +154,24 @@ export default async function SendProposal({
       <div>
         <PageHeader
           title="Send a proposal"
-          subtitle="Pick a candidate first — the offer is built around their Findtern Score."
+          subtitle="Pick a candidate first - the offer is built around their Findtern Score."
         />
         <EmptyState
           title="No candidate selected"
-          body="Open a candidate from the browser and use Send proposal on their row. This URL needs an ?intern=<id> query to render the form."
+          body="Open a candidate from the browser and use Send proposal on their row to start an offer."
+          action={{ label: "Browse candidates", href: "/employer/candidates" }}
+          who="You - pick a candidate first"
         />
         <div className="mt-6 flex flex-wrap gap-3">
-          <Link
-            href="/employer/candidates"
-            className="inline-flex h-11 items-center gap-2 rounded-lg bg-brand-700 px-5 text-sm font-semibold text-white transition-colors hover:bg-brand-600"
-          >
-            <UserRound className="size-4" aria-hidden />
-            Browse candidates
-          </Link>
-          <Link
+          <ButtonLink
             href="/employer/projects"
-            className="inline-flex h-11 items-center gap-2 rounded-lg border border-ink-200 bg-white px-4 text-sm font-medium text-ink-800 transition-colors hover:bg-ink-50"
+            variant="outline"
+            size="sm"
+            className="min-h-11 px-4 text-sm font-medium"
           >
             <ArrowLeft className="size-4" aria-hidden />
             Your projects
-          </Link>
+          </ButtonLink>
         </div>
       </div>
     );
@@ -172,7 +181,7 @@ export default async function SendProposal({
     <div>
       <Link
         href={`/employer/intern/${encodeURIComponent(candidate.id)}`}
-        className="inline-flex items-center gap-1.5 text-sm font-medium text-brand-700 transition-colors hover:underline"
+        className="apple-spring inline-flex min-h-11 items-center gap-1.5 rounded-[10px] text-sm font-medium text-brand-700 hover:underline"
       >
         <ArrowLeft className="size-4" aria-hidden />
         {candidate.name}

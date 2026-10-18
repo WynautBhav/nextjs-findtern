@@ -1,12 +1,12 @@
 "use client";
 
-import { useState } from "react";
-import { Check, Coffee } from "lucide-react";
+import { useState, type ReactNode } from "react";
+import { Check, X } from "lucide-react";
 
 import { ButtonLink } from "@/components/ui/button";
-import { PER_HIRE_CUTOFF } from "@/lib/score";
-import { formatMoney, formatRate } from "@/lib/format";
+import { formatMoney } from "@/lib/format";
 import { useIsIndia } from "@/components/marketing/region-rates";
+import { PlanPrice } from "@/components/marketing/plan-price";
 import type { CmsPlan } from "@/lib/content/types";
 import { cn } from "@/lib/utils";
 
@@ -48,12 +48,9 @@ import { cn } from "@/lib/utils";
    constants in lib/content/home.ts are only a fallback.
    ========================================================================== */
 
-const FEATURED_SLUG = "cappuccino"; // the mid tier - matched by slug, never
-// by index, so a reordered CMS can never crown the wrong card "popular".
-
 type PlanRow = {
   label: string;
-  value: (plan: CmsPlan) => string;
+  value: (plan: CmsPlan) => ReactNode;
   strong?: boolean;
 };
 
@@ -63,10 +60,24 @@ function rowsFor(currency: CmsPlan["currency"]): PlanRow[] {
     { label: "Findtern Score", value: (p) => p.features[1] ?? "-", strong: true },
     {
       label: "Per hiring charge",
-      value: (p) => (p.perHireChargeMinor > 0 ? formatMoney(p.perHireChargeMinor, currency) : "Waived"),
+      value: (p) => (
+        <PlanPrice
+          nowMinor={p.perHireChargeMinor}
+          wasMinor={p.compareAtPerHireMinor}
+          currency={currency}
+          kind="money"
+          tone="dark"
+        />
+      ),
       strong: true,
     },
-    { label: "Price", value: (p) => formatRate(p.priceHourlyMinor, currency), strong: true },
+    {
+      label: "Price",
+      value: (p) => (
+        <PlanPrice nowMinor={p.priceHourlyMinor} wasMinor={p.compareAtHourlyMinor} currency={currency} tone="dark" />
+      ),
+      strong: true,
+    },
     { label: "Duration", value: (p) => p.internshipDuration },
     { label: "What you get", value: (p) => p.features[2] ?? "-" },
   ];
@@ -86,7 +97,7 @@ export function PricingTable({
   const ROWS = rowsFor(currency);
   const featuredIdx = Math.max(
     0,
-    plans.findIndex((p) => p.slug === FEATURED_SLUG),
+    plans.findIndex((p) => p.isFeatured),
   );
   const [active, setActive] = useState<string>(
     plans[featuredIdx]?.id ?? plans[0]?.id,
@@ -124,8 +135,7 @@ export function PricingTable({
           <div
             role="tablist"
             aria-label="Choose a plan to compare"
-            className="relative inline-flex rounded-full border border-white/12 bg-white/5 p-1"
-            style={{ ["--plan-count" as string]: String(plans.length) }}
+            className="relative grid grid-cols-3 rounded-full border border-white/12 bg-white/5 p-1 w-full max-w-xs sm:max-w-sm"
           >
             {plans.map((p) => (
               <button
@@ -135,21 +145,19 @@ export function PricingTable({
                 aria-selected={safeActive === p.id}
                 onClick={() => setActive(p.id)}
                 className={cn(
-                  "relative min-w-24 rounded-full px-4 py-2 text-sm font-medium transition-colors duration-200 ease-ease-out",
-                  safeActive === p.id ? "text-white" : "text-on-dark-subtle",
+                  "relative z-10 rounded-full px-3 py-2 text-center text-xs sm:text-sm font-medium transition-colors duration-200 ease-out",
+                  safeActive === p.id ? "text-white font-semibold" : "text-on-dark-subtle hover:text-white",
                 )}
               >
                 <span className="relative">{p.displayName}</span>
               </button>
             ))}
-            {/* One track wide, translated to the active index. */}
+            {/* One track wide, translated to the active index */}
             <span
               aria-hidden
-              className="absolute top-1 bottom-1 left-1 w-[calc((100%-0.5rem)/var(--plan-count))] rounded-full bg-white/12 transition-transform duration-300 ease-ease-out-expo"
+              className="absolute top-1 bottom-1 left-1 w-[calc((100%-0.5rem)/3)] rounded-full bg-white/12 transition-transform duration-300 ease-out"
               style={{
-                transform: `translateX(calc(${
-                  plans.findIndex((p) => p.id === safeActive) * 100
-                }% * var(--plan-count)))`,
+                transform: `translateX(${plans.findIndex((p) => p.id === safeActive) * 100}%)`,
               }}
             />
           </div>
@@ -159,11 +167,13 @@ export function PricingTable({
         <div className="mt-12 grid gap-5 lg:grid-cols-3">
           {plans.map((plan, i) => {
             const featured = i === featuredIdx;
+            const isSelected = plan.id === safeActive;
             return (
               <div
                 key={plan.id}
                 className={cn(
-                  "relative flex flex-col rounded-2xl border bg-white p-6 sm:p-7",
+                  "relative flex-col rounded-2xl border bg-white p-6 sm:p-7",
+                  isSelected ? "flex" : "hidden lg:flex",
                   featured
                     ? "border-2 border-primary shadow-xl lg:-my-3 lg:py-9"
                     : "border-ink-200",
@@ -185,17 +195,38 @@ export function PricingTable({
                 >
                   {plan.displayName}
                 </p>
-                <p className="mt-1.5 text-3xl font-semibold tracking-[-0.02em] text-ink-900">
-                  {formatRate(plan.priceHourlyMinor, currency)}
-                </p>
-                <p className="mt-1.5 text-sm text-on-dark-subtle">
-                  {plan.internshipDuration}
+                <PlanPrice
+                  className="mt-1.5"
+                  priceClassName="text-3xl font-semibold tracking-[-0.02em] text-ink-900"
+                  nowMinor={plan.priceHourlyMinor}
+                  wasMinor={plan.compareAtHourlyMinor}
+                  currency={currency}
+                />
+                <p className="mt-1.5 text-sm text-ink-500">
+                  {plan.features[0]} · {plan.internshipDuration}
                 </p>
 
-                <p className="mt-5 flex items-center gap-2 border-t border-ink-100 pt-5 text-sm text-ink-600">
-                  <Coffee className="size-4 shrink-0 text-primary" aria-hidden />
-                  {plan.features[0]}
-                </p>
+                <ul
+                  className="mt-5 space-y-2.5 border-t border-ink-100 pt-5"
+                  aria-label={`${plan.displayName} includes`}
+                >
+                  {plan.featureList.map((f) => (
+                    <li
+                      key={f.label}
+                      className={cn("flex gap-2.5 text-sm", f.included ? "text-ink-700" : "text-ink-400")}
+                    >
+                      {f.included ? (
+                        <Check className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
+                      ) : (
+                        <X className="mt-0.5 size-4 shrink-0 text-ink-300" aria-hidden />
+                      )}
+                      <span>
+                        <span className="sr-only">{f.included ? "Included: " : "Not included: "}</span>
+                        {f.label}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
 
                 {/* flex-1 so every card's CTA lands on the same baseline
                     regardless of how much copy sits above it. */}
@@ -226,10 +257,8 @@ export function PricingTable({
           <div className="mt-8 hidden lg:block">
             <table className="w-full border-collapse text-left">
               <caption className="sr-only">
-                Findtern hiring plans compared across six attributes. Espresso
-                covers interns scoring under {PER_HIRE_CUTOFF} out of 10 and
-                charges per hire. Cappuccino and Latte are billed hourly with
-                no per-hire charge.
+                Findtern hiring plans compared across six attributes. Every plan carries
+                a fixed per-hiring charge to cover verified screening and talent matching.
               </caption>
               <thead>
                 <tr>
@@ -315,7 +344,7 @@ export function PricingTable({
         <div className="mt-10 flex flex-col items-center gap-5">
           <p className="flex items-center gap-2 text-sm text-on-dark-subtle">
             <Check className="size-4 text-accent" aria-hidden />
-            No per-hire charge on Cappuccino and Latte
+            Fixed {formatMoney(plans[0].perHireChargeMinor, currency)} per hiring on every placement
           </p>
           {isIndia ? (
             <p className="text-xs text-on-dark-subtle">Prices include GST</p>

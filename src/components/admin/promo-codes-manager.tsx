@@ -15,9 +15,9 @@ import {
 } from "lucide-react";
 
 import { csrfFetch } from "@/lib/client-fetch";
-import { formatDate, formatMoney } from "@/lib/format";
+import { formatDate } from "@/lib/format";
 import type { PromoCode } from "@/lib/db/schema";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { AdminEmpty } from "@/components/admin/panel";
 import {
   Dialog,
   DialogContent,
@@ -27,6 +27,17 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
+import { cn } from "@/lib/utils";
+
+const inputClass =
+  "apple-spring mt-1.5 min-h-11 w-full rounded-[10px] border border-ink-200 bg-white px-3 text-[14px] text-ink-900 outline-none placeholder:text-ink-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20";
+
+/** Fixed amounts are stored as major rupees (the form takes "₹"), not minor units. */
+function benefitLabel(promo: PromoCode): string {
+  return promo.discountType === "percentage"
+    ? `${promo.discountValue}% off`
+    : `₹${(Number(promo.discountValue) / 100).toLocaleString("en-IN")} off`;
+}
 
 export function PromoCodesManager({
   initialPromoCodes,
@@ -85,7 +96,7 @@ export function PromoCodesManager({
     setCode(promo.code);
     setDescription(promo.description || "");
     setDiscountType(promo.discountType === "fixed" ? "fixed" : "percentage");
-    setDiscountValue(promo.discountValue);
+    setDiscountValue(promo.discountType === "fixed" ? promo.discountValue / 100 : promo.discountValue);
     setMaxUsages(promo.maxUsages ?? "");
     setMinOrderAmountRupees(
       promo.minOrderAmountMinor ? Math.round(promo.minOrderAmountMinor / 100) : ""
@@ -111,6 +122,8 @@ export function PromoCodesManager({
       return;
     }
     const valNum = Number(discountValue);
+    // Fixed amounts are typed in rupees and stored in paise.
+    const stored = discountType === "fixed" ? Math.round(valNum * 100) : valNum;
     if (isNaN(valNum) || valNum <= 0) {
       setErrorMsg("Please provide a valid discount value greater than 0.");
       return;
@@ -124,14 +137,15 @@ export function PromoCodesManager({
     try {
       const payload: Record<string, unknown> = {
         code: trimmedCode,
-        description: description.trim() || undefined,
+        // null clears a field that was set before.
+        description: description.trim() || null,
         discountType,
-        discountValue: valNum,
-        maxUsages: maxUsages !== "" ? Number(maxUsages) : undefined,
+        discountValue: stored,
+        maxUsages: maxUsages !== "" ? Number(maxUsages) : null,
         minOrderAmountMinor:
-          minOrderAmountRupees !== "" ? Math.round(Number(minOrderAmountRupees) * 100) : undefined,
-        validFrom: validFrom ? new Date(validFrom).toISOString() : undefined,
-        validUntil: validUntil ? new Date(validUntil).toISOString() : undefined,
+          minOrderAmountRupees !== "" ? Math.round(Number(minOrderAmountRupees) * 100) : null,
+        validFrom: validFrom ? new Date(validFrom).toISOString() : null,
+        validUntil: validUntil ? new Date(validUntil).toISOString() : null,
         isActive,
       };
 
@@ -156,7 +170,7 @@ export function PromoCodesManager({
                   code: trimmedCode,
                   description: description.trim() || null,
                   discountType,
-                  discountValue: valNum,
+                  discountValue: stored,
                   maxUsages: maxUsages !== "" ? Number(maxUsages) : null,
                   minOrderAmountMinor:
                     minOrderAmountRupees !== "" ? Math.round(Number(minOrderAmountRupees) * 100) : null,
@@ -275,398 +289,344 @@ export function PromoCodesManager({
   });
 
   return (
-    <div className="space-y-4">
-      {/* Controls Bar: Search, Filters, and Add Button */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-1 flex-wrap items-center gap-2">
-          {/* Search box */}
-          <div className="relative min-w-[240px] flex-1 max-w-sm">
-            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-400" />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search code or description…"
-              className="w-full rounded-lg border border-sand-300 bg-sand-50/60 py-2 pl-9 pr-3 text-sm text-ink-900 placeholder:text-text-subtle focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-1 focus:ring-brand-500"
-            />
-            {search && (
-              <button
-                type="button"
-                onClick={() => setSearch("")}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-ink-400 hover:text-ink-700"
-              >
-                <X className="size-3.5" />
-              </button>
-            )}
-          </div>
+    <div className="apple-admin space-y-4">
+      {/* Toolbar */}
+      <div className="apple-panel flex flex-col gap-3 bg-white p-4 lg:flex-row lg:items-center">
+        <div className="relative min-w-0 flex-1 lg:max-w-sm">
+          <Search
+            aria-hidden
+            className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-ink-400"
+          />
+          <input
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search codes…"
+            aria-label="Search promo codes"
+            className="apple-spring min-h-11 w-full rounded-[10px] border border-ink-200 bg-ink-50 pr-10 pl-9 text-[15px] tracking-[-0.01em] text-ink-900 placeholder:text-ink-400 focus:border-brand-500 focus:bg-white focus:ring-2 focus:ring-brand-500/20 focus:outline-none [&::-webkit-search-cancel-button]:hidden"
+          />
+          {search ? (
+            <button
+              type="button"
+              onClick={() => setSearch("")}
+              aria-label="Clear search"
+              className="apple-spring absolute top-1/2 right-2 flex min-h-11 min-w-11 -translate-y-1/2 items-center justify-center rounded-[10px] text-ink-400 hover:text-ink-700"
+            >
+              <X className="size-4" />
+            </button>
+          ) : null}
+        </div>
 
-          {/* Status selector */}
+        <div className="flex flex-wrap items-center gap-2">
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value as "all" | "active" | "inactive")}
-            className="rounded-lg border border-sand-300 bg-sand-50/60 px-3 py-2 text-sm text-ink-800 focus:border-brand-500 focus:outline-none"
+            aria-label="Filter by status"
+            className="apple-spring min-h-11 cursor-pointer rounded-[10px] border border-ink-200 bg-white px-3 text-[14px] text-ink-700 focus:border-brand-500 focus:outline-none"
           >
             <option value="all">All statuses</option>
             <option value="active">Active only</option>
             <option value="inactive">Inactive only</option>
           </select>
-
-          {/* Type selector */}
           <select
             value={typeFilter}
             onChange={(e) => setTypeFilter(e.target.value as "all" | "percentage" | "fixed")}
-            className="rounded-lg border border-sand-300 bg-sand-50/60 px-3 py-2 text-sm text-ink-800 focus:border-brand-500 focus:outline-none"
+            aria-label="Filter by discount type"
+            className="apple-spring min-h-11 cursor-pointer rounded-[10px] border border-ink-200 bg-white px-3 text-[14px] text-ink-700 focus:border-brand-500 focus:outline-none"
           >
-            <option value="all">All discount types</option>
-            <option value="percentage">Percentage (%)</option>
-            <option value="fixed">Fixed amount (₹)</option>
+            <option value="all">All types</option>
+            <option value="percentage">Percentage</option>
+            <option value="fixed">Fixed amount</option>
           </select>
         </div>
 
-        {/* Add Promo Code Button */}
         <button
           type="button"
           onClick={openCreateModal}
-          className="inline-flex items-center justify-center gap-2 rounded-lg bg-brand-700 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-800 active:scale-[0.99]"
+          className="apple-spring apple-pressable inline-flex min-h-11 items-center justify-center gap-1.5 rounded-[10px] bg-brand-700 px-4 text-[14px] font-semibold text-white hover:bg-brand-600 lg:ml-auto"
         >
           <Plus className="size-4" />
-          Add Promo Code
+          New code
         </button>
       </div>
 
-      {/* Promo Codes Table */}
-      <div className="overflow-hidden rounded-xl border border-sand-200 bg-white shadow-xs">
-        <Table>
-          <TableHeader>
-            <TableRow className="border-b border-sand-200 bg-sand-50/70 hover:bg-sand-50/70">
-              <TableHead className="w-[180px] font-semibold text-ink-700">Coupon Code</TableHead>
-              <TableHead className="font-semibold text-ink-700">Benefit</TableHead>
-              <TableHead className="font-semibold text-ink-700">Redemptions</TableHead>
-              <TableHead className="font-semibold text-ink-700">Min Purchase</TableHead>
-              <TableHead className="font-semibold text-ink-700">Validity</TableHead>
-              <TableHead className="w-[110px] text-center font-semibold text-ink-700">Active</TableHead>
-              <TableHead className="w-[120px] text-right font-semibold text-ink-700">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredPromos.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={7} className="py-12 text-center">
-                  <div className="mx-auto flex max-w-sm flex-col items-center justify-center text-center">
-                    <div className="mb-3 grid size-12 place-items-center rounded-full bg-sand-100 text-ink-400">
-                      <Tag className="size-6" />
+      {/* Ticket grid */}
+      {filteredPromos.length === 0 ? (
+        <div className="apple-panel bg-white">
+          <AdminEmpty
+            title="No promo codes found"
+            body={
+              search || statusFilter !== "all" || typeFilter !== "all"
+                ? "Nothing matches these filters. Clear them to see everything."
+                : "Create discount vouchers to incentivize hires."
+            }
+            action={undefined}
+            icon={Tag}
+          />
+        </div>
+      ) : (
+        <ul className="grid gap-4 md:grid-cols-2">
+          {filteredPromos.map((promo) => {
+            const max = promo.maxUsages;
+            const used = promo.usedCount;
+            const pct = max ? Math.min(100, Math.round((used / max) * 100)) : 0;
+            const isCopied = copiedCode === promo.code;
+            return (
+              <li
+                key={promo.id}
+                className={cn(
+                  "apple-panel apple-spring bg-white p-5",
+                  !promo.isActive && "opacity-70",
+                )}
+              >
+                <div className="flex items-center gap-2">
+                  <span className="min-w-0 flex-1 truncate font-mono text-[17px] font-bold tracking-[0.04em] text-ink-900">
+                    {promo.code}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => copyToClipboard(promo.code)}
+                    title="Copy code"
+                    aria-label={`Copy code ${promo.code}`}
+                    className="apple-spring apple-pressable inline-flex min-h-11 min-w-11 items-center justify-center rounded-[10px] text-ink-400 hover:bg-ink-100 hover:text-ink-700"
+                  >
+                    {isCopied ? (
+                      <Check className="size-4 text-emerald-600" />
+                    ) : (
+                      <Copy className="size-4" />
+                    )}
+                  </button>
+                  <Switch
+                    checked={promo.isActive}
+                    onCheckedChange={() => handleToggleActive(promo)}
+                    aria-label={`Toggle ${promo.code} active status`}
+                  />
+                </div>
+
+                <p className="mt-2 text-[28px] font-bold leading-[34px] tracking-[-0.02em] tabular-nums text-brand-800">
+                  {benefitLabel(promo)}
+                </p>
+                {promo.description ? (
+                  <p className="mt-1 truncate text-[13px] text-text-subtle">
+                    {promo.description}
+                  </p>
+                ) : null}
+
+                <div className="mt-4 border-t border-dashed border-ink-200 pt-4">
+                  <div className="flex items-baseline justify-between gap-3">
+                    <span className="text-[13px] tabular-nums text-text-subtle">
+                      {used.toLocaleString("en-IN")}
+                      {max ? ` of ${max.toLocaleString("en-IN")} used` : " used · unlimited"}
+                    </span>
+                    <span className="shrink-0 text-[12px] text-text-subtle">
+                      {promo.validUntil
+                        ? `Until ${formatDate(new Date(promo.validUntil).toISOString())}`
+                        : "No expiry"}
+                      {promo.minOrderAmountMinor
+                        ? ` · min ₹${Math.round(promo.minOrderAmountMinor / 100).toLocaleString("en-IN")}`
+                        : ""}
+                    </span>
+                  </div>
+                  {max ? (
+                    <div aria-hidden className="mt-2 h-1.5 overflow-hidden rounded-full bg-ink-100">
+                      <div
+                        className="h-full rounded-full bg-brand-600"
+                        style={{ width: `${pct}%` }}
+                      />
                     </div>
-                    <p className="text-sm font-semibold text-ink-900">No promo codes found</p>
-                    <p className="mt-1 text-xs text-text-subtle">
-                      {search || statusFilter !== "all" || typeFilter !== "all"
-                        ? "No promo codes match your active filters. Try clearing them."
-                        : "Create discount vouchers and coupon codes to incentivize hires."}
-                    </p>
+                  ) : null}
+                  <div className="mt-3 flex items-center gap-2">
                     <button
                       type="button"
-                      onClick={openCreateModal}
-                      className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-brand-300 bg-brand-50 px-3 py-1.5 text-xs font-semibold text-brand-700 hover:bg-brand-100"
+                      onClick={() => openEditModal(promo)}
+                      className="apple-spring apple-pressable inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-[10px] border border-ink-200 bg-white px-3 text-[13px] font-semibold text-ink-700 hover:bg-ink-50"
                     >
-                      <Plus className="size-3.5" />
-                      Create First Promo Code
+                      <Edit2 className="size-4" />
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDeleteTarget(promo)}
+                      aria-label={`Delete ${promo.code}`}
+                      className="apple-spring apple-pressable inline-flex min-h-11 min-w-11 items-center justify-center rounded-[10px] text-ink-400 hover:bg-danger-soft hover:text-danger"
+                    >
+                      <Trash2 className="size-4" />
                     </button>
                   </div>
-                </TableCell>
-              </TableRow>
-            ) : (
-              filteredPromos.map((promo) => {
-                const max = promo.maxUsages;
-                const used = promo.usedCount;
-                const pct = max ? Math.min(100, Math.round((used / max) * 100)) : 0;
-                const isCopied = copiedCode === promo.code;
-
-                return (
-                  <TableRow
-                    key={promo.id}
-                    className="border-b border-sand-100 transition-colors hover:bg-sand-50/50"
-                  >
-                    {/* Code & Copy */}
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono text-xs font-bold uppercase tracking-wider text-brand-800 bg-brand-50 border border-brand-200 px-2.5 py-1 rounded-md">
-                          {promo.code}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => copyToClipboard(promo.code)}
-                          title="Copy code"
-                          className="rounded p-1 text-ink-400 hover:bg-sand-100 hover:text-ink-700"
-                        >
-                          {isCopied ? (
-                            <Check className="size-3.5 text-emerald-600" />
-                          ) : (
-                            <Copy className="size-3.5" />
-                          )}
-                        </button>
-                      </div>
-                      {promo.description && (
-                        <p className="mt-1 max-w-xs truncate text-xs text-text-subtle">
-                          {promo.description}
-                        </p>
-                      )}
-                    </TableCell>
-
-                    {/* Benefit */}
-                    <TableCell>
-                      <span className="font-semibold text-ink-900">
-                        {promo.discountType === "percentage"
-                          ? `${promo.discountValue}% reduction`
-                          : `${formatMoney(promo.discountValue, "INR")} reduction`}
-                      </span>
-                    </TableCell>
-
-                    {/* Redemptions & Progress */}
-                    <TableCell>
-                      <div className="min-w-[7rem] space-y-1">
-                        <p className="text-xs font-medium tabular-nums text-ink-800">
-                          {used.toLocaleString("en-IN")}{" "}
-                          {max ? `of ${max.toLocaleString("en-IN")}` : "used (unlimited)"}
-                        </p>
-                        {max ? (
-                          <div className="h-1.5 w-full overflow-hidden rounded-full bg-sand-200">
-                            <div
-                              className="h-full rounded-full bg-brand-600 transition-all"
-                              style={{ width: `${pct}%` }}
-                            />
-                          </div>
-                        ) : null}
-                      </div>
-                    </TableCell>
-
-                    {/* Min purchase */}
-                    <TableCell>
-                      <span className="text-xs font-medium tabular-nums text-text-subtle">
-                        {promo.minOrderAmountMinor
-                          ? formatMoney(promo.minOrderAmountMinor, "INR")
-                          : "Zero minimum"}
-                      </span>
-                    </TableCell>
-
-                    {/* Validity */}
-                    <TableCell>
-                      <div className="text-xs text-text-subtle">
-                        {promo.validUntil ? (
-                          <span>Until {formatDate(new Date(promo.validUntil).toISOString())}</span>
-                        ) : (
-                          <span className="text-emerald-700">Permanent / No expiry</span>
-                        )}
-                      </div>
-                    </TableCell>
-
-                    {/* Active Toggle Switch */}
-                    <TableCell className="text-center">
-                      <div className="flex justify-center items-center">
-                        <Switch
-                          checked={promo.isActive}
-                          onCheckedChange={() => handleToggleActive(promo)}
-                          aria-label="Toggle promo code status"
-                        />
-                      </div>
-                    </TableCell>
-
-                    {/* Actions: Edit & Delete */}
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => openEditModal(promo)}
-                          className="rounded-md border border-sand-300 p-1.5 text-ink-600 hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700 transition"
-                          title="Edit promo code"
-                        >
-                          <Edit2 className="size-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setDeleteTarget(promo)}
-                          className="rounded-md border border-sand-300 p-1.5 text-ink-600 hover:border-rose-300 hover:bg-rose-50 hover:text-rose-600 transition"
-                          title="Delete promo code"
-                        >
-                          <Trash2 className="size-3.5" />
-                        </button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                );
-              })
-            )}
-          </TableBody>
-        </Table>
-      </div>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
 
       {/* Add / Edit Dialog */}
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
-        <DialogContent className="max-w-md sm:max-w-lg">
+        <DialogContent className="apple-admin max-w-md sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
+            <DialogTitle className="flex items-center gap-2 text-[17px] font-semibold tracking-[-0.02em]">
               <Tag className="size-5 text-brand-600" />
-              {editingPromo ? "Edit Promo Code" : "Create New Promo Code"}
+              {editingPromo ? "Edit code" : "New code"}
             </DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="text-[13px]">
               {editingPromo
-                ? "Update promotional voucher terms, usages, or discount amounts."
-                : "Configure a promotional discount coupon for employer or intern orders."}
+                ? "Update terms, limits or discount."
+                : "A voucher employers or interns apply at checkout."}
             </DialogDescription>
           </DialogHeader>
 
           <form onSubmit={handleSavePromo} className="space-y-4 pt-2">
             {errorMsg && (
-              <div className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs font-medium text-rose-700">
+              <div role="alert" className="rounded-[10px] border border-danger/30 bg-danger-soft p-3 text-[13px] font-medium text-danger">
                 {errorMsg}
               </div>
             )}
 
-            {/* Code & Active status */}
-            <div className="grid grid-cols-3 gap-3">
-              <div className="col-span-2 space-y-1.5">
-                <label className="text-xs font-semibold text-ink-800">
-                  Promo Code <span className="text-rose-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={code}
-                  onChange={(e) => setCode(e.target.value.toUpperCase())}
-                  placeholder="e.g. WELCOME20"
-                  className="w-full font-mono uppercase tracking-wider rounded-lg border border-sand-300 px-3 py-2 text-sm text-ink-900 focus:border-brand-500 focus:outline-none"
-                />
-              </div>
-
-              <div className="space-y-1.5 flex flex-col justify-end">
-                <label className="text-xs font-semibold text-ink-800">Active status</label>
-                <div className="flex items-center gap-2 h-9">
-                  <Switch
-                    checked={isActive}
-                    onCheckedChange={setIsActive}
-                    aria-label="Active status switch"
-                  />
-                  <span className="text-xs font-medium text-ink-700">
-                    {isActive ? "Active" : "Disabled"}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Description */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-ink-800">Description</label>
+            <div>
+              <label htmlFor="promo-code" className="block text-[13px] font-semibold text-ink-800">
+                Code
+              </label>
               <input
+                id="promo-code"
                 type="text"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="e.g. Early adopter 20% discount on initial candidate match"
-                className="w-full rounded-lg border border-sand-300 px-3 py-2 text-sm text-ink-900 focus:border-brand-500 focus:outline-none"
+                required
+                value={code}
+                onChange={(e) => setCode(e.target.value.toUpperCase())}
+                placeholder="WELCOME20"
+                className={`${inputClass} font-mono uppercase tracking-[0.08em]`}
               />
             </div>
 
-            {/* Discount Type & Value */}
+            <div>
+              <label htmlFor="promo-desc" className="block text-[13px] font-semibold text-ink-800">
+                Description <span className="font-normal text-text-subtle">(optional)</span>
+              </label>
+              <input
+                id="promo-desc"
+                type="text"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Early adopter discount"
+                className={inputClass}
+              />
+            </div>
+
             <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-ink-800">Discount Type</label>
+              <div>
+                <label htmlFor="promo-type" className="block text-[13px] font-semibold text-ink-800">
+                  Type
+                </label>
                 <select
+                  id="promo-type"
                   value={discountType}
                   onChange={(e) => setDiscountType(e.target.value as "percentage" | "fixed")}
-                  className="w-full rounded-lg border border-sand-300 bg-white px-3 py-2 text-sm text-ink-900 focus:border-brand-500 focus:outline-none"
+                  className={inputClass}
                 >
-                  <option value="percentage">Percentage (%)</option>
-                  <option value="fixed">Fixed Amount (₹)</option>
+                  <option value="percentage">Percentage</option>
+                  <option value="fixed">Fixed ₹</option>
                 </select>
               </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-ink-800">
-                  {discountType === "percentage" ? "Percentage Value (%)" : "Flat Value (₹)"}{" "}
-                  <span className="text-rose-500">*</span>
+              <div>
+                <label htmlFor="promo-value" className="block text-[13px] font-semibold text-ink-800">
+                  {discountType === "percentage" ? "Percent" : "Rupees"}
                 </label>
                 <input
+                  id="promo-value"
                   type="number"
                   min="1"
                   max={discountType === "percentage" ? "100" : undefined}
                   required
                   value={discountValue}
                   onChange={(e) => setDiscountValue(e.target.value)}
-                  className="w-full rounded-lg border border-sand-300 px-3 py-2 text-sm text-ink-900 focus:border-brand-500 focus:outline-none"
+                  className={`${inputClass} tabular-nums`}
                 />
               </div>
             </div>
 
-            {/* Max Usages & Min Order */}
             <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-ink-800">
-                  Usage Limit <span className="text-text-subtle font-normal">(empty = unlimited)</span>
+              <div>
+                <label htmlFor="promo-max" className="block text-[13px] font-semibold text-ink-800">
+                  Max uses <span className="font-normal text-text-subtle">(blank ∞)</span>
                 </label>
                 <input
+                  id="promo-max"
                   type="number"
                   min="1"
                   value={maxUsages}
                   onChange={(e) => setMaxUsages(e.target.value)}
-                  placeholder="e.g. 50"
-                  className="w-full rounded-lg border border-sand-300 px-3 py-2 text-sm text-ink-900 focus:border-brand-500 focus:outline-none"
+                  placeholder="50"
+                  className={`${inputClass} tabular-nums`}
                 />
               </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-ink-800">
-                  Min Purchase (₹) <span className="text-text-subtle font-normal">(optional)</span>
+              <div>
+                <label htmlFor="promo-min" className="block text-[13px] font-semibold text-ink-800">
+                  Min order ₹ <span className="font-normal text-text-subtle">(optional)</span>
                 </label>
                 <input
+                  id="promo-min"
                   type="number"
                   min="0"
                   value={minOrderAmountRupees}
                   onChange={(e) => setMinOrderAmountRupees(e.target.value)}
-                  placeholder="e.g. 2499"
-                  className="w-full rounded-lg border border-sand-300 px-3 py-2 text-sm text-ink-900 focus:border-brand-500 focus:outline-none"
+                  placeholder="2499"
+                  className={`${inputClass} tabular-nums`}
                 />
               </div>
             </div>
 
-            {/* Validity Dates */}
             <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-ink-800">
-                  Valid From <span className="text-text-subtle font-normal">(optional)</span>
+              <div>
+                <label htmlFor="promo-from" className="block text-[13px] font-semibold text-ink-800">
+                  From <span className="font-normal text-text-subtle">(optional)</span>
                 </label>
                 <input
+                  id="promo-from"
                   type="datetime-local"
                   value={validFrom}
                   onChange={(e) => setValidFrom(e.target.value)}
-                  className="w-full rounded-lg border border-sand-300 px-3 py-2 text-xs text-ink-900 focus:border-brand-500 focus:outline-none"
+                  className={`${inputClass} text-[13px]`}
                 />
               </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-ink-800">
-                  Valid Until <span className="text-text-subtle font-normal">(optional)</span>
+              <div>
+                <label htmlFor="promo-until" className="block text-[13px] font-semibold text-ink-800">
+                  Until <span className="font-normal text-text-subtle">(optional)</span>
                 </label>
                 <input
+                  id="promo-until"
                   type="datetime-local"
                   value={validUntil}
                   onChange={(e) => setValidUntil(e.target.value)}
-                  className="w-full rounded-lg border border-sand-300 px-3 py-2 text-xs text-ink-900 focus:border-brand-500 focus:outline-none"
+                  className={`${inputClass} text-[13px]`}
                 />
               </div>
+            </div>
+
+            <div className="flex items-center justify-between rounded-[10px] bg-ink-50 px-3 py-2">
+              <span className="text-[14px] font-medium text-ink-800">
+                Active{isActive ? "" : " · disabled"}
+              </span>
+              <Switch
+                checked={isActive}
+                onCheckedChange={setIsActive}
+                aria-label="Active status"
+              />
             </div>
 
             <DialogFooter className="pt-2">
               <button
                 type="button"
                 onClick={() => setModalOpen(false)}
-                className="rounded-lg border border-sand-300 px-4 py-2 text-xs font-medium text-ink-700 hover:bg-sand-100"
+                className="apple-spring apple-pressable inline-flex min-h-11 items-center rounded-[10px] px-4 text-[14px] font-medium text-ink-700 hover:bg-ink-100"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={saving}
-                className="inline-flex items-center gap-2 rounded-lg bg-brand-700 px-4 py-2 text-xs font-semibold text-white hover:bg-brand-800 disabled:opacity-50"
+                className="apple-spring apple-pressable inline-flex min-h-11 items-center gap-1.5 rounded-[10px] bg-brand-700 px-5 text-[14px] font-semibold text-white hover:bg-brand-600 disabled:opacity-50"
               >
-                {saving && <Loader2 className="size-3.5 animate-spin" />}
-                {editingPromo ? "Save Changes" : "Create Code"}
+                {saving && <Loader2 className="size-4 animate-spin" />}
+                {editingPromo ? "Save changes" : "Create code"}
               </button>
             </DialogFooter>
           </form>
@@ -675,13 +635,13 @@ export function PromoCodesManager({
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={deleteTarget !== null} onOpenChange={(open) => !open && setDeleteTarget(null)}>
-        <DialogContent className="max-w-sm">
+        <DialogContent className="apple-admin max-w-sm">
           <DialogHeader>
-            <DialogTitle className="text-rose-600">Delete Promo Code?</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to permanently delete coupon code{" "}
-              <strong className="font-mono text-ink-900">{deleteTarget?.code}</strong>? This action
-              cannot be undone.
+            <DialogTitle className="text-[17px] font-semibold tracking-[-0.02em] text-danger">
+              Delete {deleteTarget?.code}?
+            </DialogTitle>
+            <DialogDescription className="text-[13px]">
+              This removes the voucher permanently. Orders already placed keep their discount.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="pt-2">
@@ -689,18 +649,18 @@ export function PromoCodesManager({
               type="button"
               disabled={deleting}
               onClick={() => setDeleteTarget(null)}
-              className="rounded-lg border border-sand-300 px-3 py-1.5 text-xs font-medium text-ink-700 hover:bg-sand-100"
+              className="apple-spring apple-pressable inline-flex min-h-11 items-center rounded-[10px] px-4 text-[14px] font-medium text-ink-700 hover:bg-ink-100"
             >
-              Cancel
+              Keep
             </button>
             <button
               type="button"
               disabled={deleting}
               onClick={handleDeleteConfirm}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-rose-700 disabled:opacity-50"
+              className="apple-spring apple-pressable inline-flex min-h-11 items-center gap-1.5 rounded-[10px] bg-danger px-4 text-[14px] font-semibold text-white disabled:opacity-50"
             >
-              {deleting && <Loader2 className="size-3.5 animate-spin" />}
-              Delete Code
+              {deleting && <Loader2 className="size-4 animate-spin" />}
+              Delete
             </button>
           </DialogFooter>
         </DialogContent>

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { eq, desc } from "drizzle-orm";
 
 import { getDb, schema } from "@/lib/db";
-import { getSession } from "@/lib/auth";
+import { requireRole } from "@/lib/auth";
 import { PageHeader } from "@/components/layout/page-header";
 import {
   ProposalsManager,
@@ -15,8 +15,8 @@ export const metadata: Metadata = {
 };
 
 export default async function EmployerProposalsPage() {
-  const session = await getSession();
-  const employerId = session!.uid;
+  const session = await requireRole("employer");
+  const employerId = session.uid;
 
   let proposals: ProposalItem[] = [];
 

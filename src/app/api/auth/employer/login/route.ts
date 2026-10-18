@@ -37,6 +37,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Email not verified" }, { status: 403 });
   }
 
+  if (!employer.isActive) {
+    return NextResponse.json({ error: "This account has been deactivated. Contact support@findtern.in." }, { status: 403 });
+  }
+
   if (needsRehash(employer.password)) {
     const upgraded = await hashPassword(parsed.data.password);
     await db

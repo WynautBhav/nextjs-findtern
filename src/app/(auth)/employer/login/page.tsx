@@ -33,6 +33,7 @@ export default function EmployerLoginPage() {
           redirectTo="/employer/dashboard"
           forgotHref="/employer/forgot-password"
           googleHref="/api/auth/google/start?role=employer"
+          verifyHref="/employer/verify-email"
         />
       </div>
     </AuthShell>

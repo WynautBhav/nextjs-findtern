@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
+import { notifyStipendPaid } from "@/lib/payments";
 
 /**
  * Mark a payout paid.
@@ -44,5 +45,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     .returning({ id: schema.internPayouts.id });
 
   if (updated.length === 0) return NextResponse.json({ error: "Unknown payout" }, { status: 404 });
+  await notifyStipendPaid(payoutId);
   return NextResponse.json({ ok: true });
 }

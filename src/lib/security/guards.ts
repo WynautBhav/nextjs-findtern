@@ -1,3 +1,4 @@
+import { PERMISSIONS, type Permission } from "../admin/permissions.ts";
 import { readCookie, readSession, type Role, type SessionData } from "./session.ts";
 
 /**
@@ -12,27 +13,9 @@ import { readCookie, readSession, type Role, type SessionData } from "./session.
  * checkbox grid never listed it. It is kept as a valid key here, so a role
  * that has it does not lose it.
  */
-export const ADMIN_PERMISSIONS = [
-  "dashboard:read",
-  "users:read",
-  "reports:read",
-  "transactions:read",
-  "interns:read",
-  "interns:write",
-  "companies:read",
-  "companies:write",
-  "cms:read",
-  "cms:write",
-  "contact:intern:read",
-  "contact:intern:write",
-  "contact:employer:read",
-  "contact:employer:write",
-  "notifications:read",
-  "notifications:write",
-  "roles:write",
-] as const;
+export const ADMIN_PERMISSIONS = PERMISSIONS.map((p) => p.key);
 
-export type AdminPermission = (typeof ADMIN_PERMISSIONS)[number];
+export type AdminPermission = Permission;
 
 /** Grants every permission. How `super_admin` is stored. */
 export const WILDCARD = "*";

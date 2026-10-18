@@ -9,9 +9,11 @@ import {
 
 import { getDb, schema } from "@/lib/db";
 import { formatMoney, formatDate } from "@/lib/format";
-import { AdminPageHeader, AdminEmpty, Panel, PanelHeader, PanelBody } from "@/components/admin/panel";
+import { AdminPageHeader, AdminEmpty, Panel } from "@/components/admin/panel";
 import { StatCard, StatGrid } from "@/components/admin/stat-card";
 import { StatusBadge } from "@/components/admin/status-badge";
+import { cn } from "@/lib/utils";
+import { parseOffer } from "@/lib/offer";
 
 export const metadata: Metadata = { title: "Payouts & Financial Dues" };
 
@@ -67,197 +69,160 @@ export default async function AdminPayouts({
   const pendingMinor = pending.reduce((sum, p) => sum + (p.amountMinor ?? 0), 0);
 
   return (
-    <div className="space-y-6">
+    <div className="apple-admin space-y-4">
       <AdminPageHeader
-        title="Payouts & Financial Dues"
-        subtitle="Operational ledger for intern stipend disbursements and employer receivable dues."
-        action={
-          <div className="flex items-center gap-2">
-            <span className="text-2xs font-medium text-ink-500">Live Dues Engine</span>
-          </div>
-        }
+        title="Payouts"
+        subtitle="Money out to interns, money in from employers."
       />
 
       <StatGrid cols={3}>
         <StatCard
-          label="Total Payouts Logged"
-          value={payouts.length}
-          hint="All recorded candidate disbursement rows"
+          label="Payouts logged"
+          value={payouts.length.toLocaleString("en-IN")}
+          hint="All recorded disbursement rows"
           icon={CreditCard}
           tone="brand"
         />
         <StatCard
-          label="Disbursed to Interns"
-          value={formatMoney(paidMinor, "INR")}
-          hint="Total cleared via bank reference"
+          label="Disbursed"
+          value={formatMoney(paidMinor, "INR", { zeroLabel: "₹0" })}
+          hint="Cleared via bank reference"
           icon={CheckCircle2}
           tone="success"
         />
         <StatCard
-          label="Pending Disbursements"
-          value={formatMoney(pendingMinor, "INR")}
-          hint={`${pending.length} pending candidate transfers`}
+          label="Pending"
+          value={formatMoney(pendingMinor, "INR", { zeroLabel: "₹0" })}
+          hint={`${pending.length} transfers waiting`}
           icon={AlertCircle}
           tone={pendingMinor > 0 ? "warning" : "neutral"}
         />
       </StatGrid>
 
-      {/* Tabs */}
-      <div className="inline-flex rounded-xl border border-ink-200/80 bg-white p-1 shadow-2xs">
-        <Link
-          href="/admin/payouts?tab=payouts"
-          className={`rounded-lg px-3.5 py-1.5 text-xs font-medium transition-colors ${
-            currentTab === "payouts"
-              ? "bg-brand-700 text-white font-semibold shadow-2xs"
-              : "text-ink-600 hover:text-ink-900"
-          }`}
-        >
-          Intern Disbursements ({payouts.length})
-        </Link>
-        <Link
-          href="/admin/payouts?tab=dues"
-          className={`rounded-lg px-3.5 py-1.5 text-xs font-medium transition-colors ${
-            currentTab === "dues"
-              ? "bg-brand-700 text-white font-semibold shadow-2xs"
-              : "text-ink-600 hover:text-ink-900"
-          }`}
-        >
-          Employer Dues Ledger ({acceptedProposals.length})
-        </Link>
+      <div
+        role="tablist"
+        aria-label="Ledger view"
+        className="grid grid-cols-2 gap-0.5 self-start rounded-[10px] bg-ink-100 p-1 sm:inline-grid sm:grid-cols-2"
+      >
+        {(
+          [
+            { key: "payouts", label: `Disbursements · ${payouts.length}` },
+            { key: "dues", label: `Employer dues · ${acceptedProposals.length}` },
+          ] as const
+        ).map((tab) => (
+          <Link
+            key={tab.key}
+            role="tab"
+            aria-selected={currentTab === tab.key}
+            href={`/admin/payouts?tab=${tab.key}`}
+            className={cn(
+              "apple-spring apple-pressable inline-flex min-h-11 items-center justify-center rounded-[8px] px-4 text-[14px] font-medium tracking-[-0.01em] tabular-nums",
+              currentTab === tab.key
+                ? "bg-white text-ink-900 shadow-xs"
+                : "text-ink-500 hover:text-ink-800",
+            )}
+          >
+            {tab.label}
+          </Link>
+        ))}
       </div>
 
       {currentTab === "payouts" ? (
-        <Panel>
-          <PanelHeader
-            title="Intern Disbursements"
-            description="Recent candidate stipend payouts. Transfer validation is completed on the intern's dossier."
-          />
-          <PanelBody className="p-0">
-            {payouts.length === 0 ? (
-              <AdminEmpty
-                title="No disbursements recorded"
-                body="Disbursements will appear here once candidates complete verified monthly timesheets."
-              />
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead className="border-b border-ink-100 bg-ink-50/70 text-ink-600 uppercase tracking-wider font-semibold">
-                    <tr>
-                      <th className="px-5 py-3">Candidate</th>
-                      <th className="px-5 py-3">Amount</th>
-                      <th className="px-5 py-3">Method</th>
-                      <th className="px-5 py-3">Reference ID</th>
-                      <th className="px-5 py-3">Date</th>
-                      <th className="px-5 py-3">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-ink-100">
-                    {payouts.map((p) => (
-                      <tr key={p.id} className="hover:bg-ink-50/60 transition-colors">
-                        <td className="px-5 py-3.5">
-                          <Link
-                            href={`/admin/interns/${p.internId}`}
-                            className="font-medium text-ink-900 underline-offset-4 hover:underline"
-                          >
-                            {internNames.get(p.internId) ?? "Candidate"}
-                          </Link>
-                          {p.notes ? (
-                            <p className="mt-0.5 text-2xs text-ink-500 truncate max-w-xs">{p.notes}</p>
-                          ) : null}
-                        </td>
-                        <td className="px-5 py-3.5 font-semibold tabular-nums text-ink-900">
-                          {formatMoney(p.amountMinor, (p.currency ?? "INR") as "INR" | "USD")}
-                        </td>
-                        <td className="px-5 py-3.5 text-ink-600 uppercase text-2xs">
-                          {p.method}
-                        </td>
-                        <td className="px-5 py-3.5 font-mono text-2xs text-ink-600">
-                          {p.referenceId ?? "—"}
-                        </td>
-                        <td className="px-5 py-3.5 text-text-subtle">
-                          {p.createdAt ? formatDate(p.createdAt) : "—"}
-                        </td>
-                        <td className="px-5 py-3.5">
-                          <StatusBadge status={p.status} />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </PanelBody>
+        <Panel className="overflow-hidden bg-white">
+          {payouts.length === 0 ? (
+            <AdminEmpty
+              title="No disbursements yet"
+              body="Payouts appear here once candidates complete verified monthly timesheets."
+            />
+          ) : (
+            <ul className="divide-y divide-ink-100">
+              {payouts.map((p) => {
+                const name = internNames.get(p.internId) ?? "Candidate";
+                return (
+                  <li
+                    key={p.id}
+                    className="apple-spring flex items-center gap-3 px-4 py-3.5 hover:bg-ink-50/70 sm:px-5"
+                  >
+                    <span
+                      aria-hidden
+                      className="grid size-10 shrink-0 place-items-center rounded-full bg-brand-100 text-[13px] font-semibold text-brand-800"
+                    >
+                      {name.charAt(0).toUpperCase()}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <Link
+                        href={`/admin/interns/${p.internId}`}
+                        className="block truncate text-[15px] font-semibold tracking-[-0.01em] text-ink-900 underline-offset-4 hover:underline"
+                      >
+                        {name}
+                      </Link>
+                      <span className="mt-0.5 block truncate text-[13px] tabular-nums text-text-subtle">
+                        {p.method}
+                        {p.referenceId ? ` · ${p.referenceId}` : ""}
+                        {p.createdAt ? ` · ${formatDate(p.createdAt)}` : ""}
+                        {p.notes ? ` · ${p.notes}` : ""}
+                      </span>
+                    </span>
+                    <span className="flex shrink-0 flex-col items-end gap-1.5">
+                      <span className="text-[17px] font-semibold tabular-nums text-ink-900">
+                        {formatMoney(p.amountMinor, (p.currency ?? "INR") as "INR" | "USD", { zeroLabel: "₹0" })}
+                      </span>
+                      <StatusBadge status={p.status} />
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </Panel>
       ) : (
-        <Panel>
-          <PanelHeader
-            title="Employer Dues Ledger"
-            description="Active hired candidate placements and monthly recurring employer stipend obligations."
-          />
-          <PanelBody className="p-0">
-            {acceptedProposals.length === 0 ? (
-              <AdminEmpty
-                title="No active employer obligations"
-                body="Hired proposals ready for installment billing will be tracked in this ledger."
-              />
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead className="border-b border-ink-100 bg-ink-50/70 text-ink-600 uppercase tracking-wider font-semibold">
-                    <tr>
-                      <th className="px-5 py-3">Company</th>
-                      <th className="px-5 py-3">Project</th>
-                      <th className="px-5 py-3">Start Date</th>
-                      <th className="px-5 py-3">Monthly Obligation</th>
-                      <th className="px-5 py-3">Hired Status</th>
-                      <th className="px-5 py-3 text-right">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-ink-100">
-                    {acceptedProposals.map((row) => {
-                      const offer = (row.proposal.offerDetails ?? {}) as Record<string, unknown>;
-                      const monthly =
-                        typeof offer.monthlyAmount === "number"
-                          ? offer.monthlyAmount
-                          : typeof offer.hourlyRate === "number" && typeof offer.monthlyHours === "number"
-                          ? offer.hourlyRate * offer.monthlyHours
-                          : 15000;
+        <Panel className="overflow-hidden bg-white">
+          {acceptedProposals.length === 0 ? (
+            <AdminEmpty
+              title="No employer dues"
+              body="Hired placements ready for installment billing will appear here."
+            />
+          ) : (
+            <ul className="divide-y divide-ink-100">
+              {acceptedProposals.map((row) => {
+                const offer = parseOffer(row.proposal.offerDetails, row.proposal.currency);
 
-                      return (
-                        <tr key={row.proposal.id} className="hover:bg-ink-50/60 transition-colors">
-                          <td className="px-5 py-3.5 font-semibold text-ink-900">
-                            {row.companyName}
-                          </td>
-                          <td className="px-5 py-3.5 text-text-subtle">
-                            {row.projectName ?? "General Project"}
-                          </td>
-                          <td className="px-5 py-3.5 text-text-subtle">
-                            {typeof offer.startDate === "string" ? offer.startDate : "Immediate"}
-                          </td>
-                          <td className="px-5 py-3.5 font-semibold text-ink-900 tabular-nums">
-                            ₹{monthly.toLocaleString("en-IN")}/mo
-                          </td>
-                          <td className="px-5 py-3.5">
-                            <span className="inline-flex items-center rounded-full bg-brand-50 border border-brand-200/60 px-2.5 py-0.5 text-2xs font-semibold text-brand-700">
-                              Active Placement
-                            </span>
-                          </td>
-                          <td className="px-5 py-3.5 text-right">
-                            <Link
-                              href={`/admin/transactions`}
-                              className="rounded-lg border border-ink-200 bg-white px-2.5 py-1 text-2xs font-medium text-ink-700 hover:bg-ink-50"
-                            >
-                              View Transactions
-                            </Link>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </PanelBody>
+                return (
+                  <li
+                    key={row.proposal.id}
+                    className="apple-spring flex items-center gap-3 px-4 py-3.5 hover:bg-ink-50/70 sm:px-5"
+                  >
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[15px] font-semibold tracking-[-0.01em] text-ink-900">
+                        {row.companyName}
+                        <span aria-hidden className="mx-1.5 text-ink-300">→</span>
+                        <span className="font-medium text-ink-700">
+                          {row.projectName ?? "General project"}
+                        </span>
+                      </span>
+                      <span className="mt-0.5 block text-[13px] text-text-subtle">
+                        Starts {offer.startDate ?? "immediately"} · Active placement
+                      </span>
+                    </span>
+                    <span className="flex shrink-0 items-center gap-3">
+                      <span className="text-right">
+                        <span className="block text-[17px] font-semibold tabular-nums text-ink-900">
+                          {offer.monthlyMinor != null ? formatMoney(offer.monthlyMinor, offer.currency) : "—"}
+                          <span className="text-[13px] font-normal text-text-subtle">/mo</span>
+                        </span>
+                      </span>
+                      <Link
+                        href="/admin/transactions"
+                        className="apple-spring apple-pressable hidden min-h-11 items-center rounded-[10px] border border-ink-200 bg-white px-3 text-[13px] font-medium text-ink-700 hover:bg-ink-50 sm:inline-flex"
+                      >
+                        Transactions
+                      </Link>
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </Panel>
       )}
     </div>

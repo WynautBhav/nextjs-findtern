@@ -13,26 +13,42 @@ import {
   Search,
   Users,
 } from "lucide-react";
+import { FullTimeOfferButton } from "@/components/employer/full-time-offer-button";
 
-import { formatCurrency, formatDate } from "@/lib/format";
+import { formatCurrency, formatDate, formatMoney } from "@/lib/format";
 import type { EmployerPayment, Proposal } from "@/lib/db/schema";
+import { placeOfSupply, type InvoiceBuyerProfile } from "@/lib/gst";
+import { downloadInvoice, taxInvoiceHtml, type InvoiceSeller } from "@/lib/invoice";
+import { downloadCsv } from "@/lib/admin/csv";
 
 export type HiredInternItem = {
   proposal: Proposal;
   candidateName: string;
   candidateEmail?: string;
   projectName: string;
-  monthlyStipend: number;
+  /** Minor units of `currency`; null when the offer has none. */
+  monthlyStipend: number | null;
+  currency: "INR" | "USD";
   durationMonths: number;
   startDate?: string;
+  /** True for a paid placement that can still get a full-time offer. */
+  canOfferFullTime?: boolean;
 };
 
 export function OrdersManager({
   hiredCandidates,
   paymentHistory,
+  seller,
+  buyer,
+  employerId,
+  fteStatus,
 }: {
+  employerId: string;
+  fteStatus: string;
   hiredCandidates: HiredInternItem[];
   paymentHistory: EmployerPayment[];
+  seller: InvoiceSeller;
+  buyer: InvoiceBuyerProfile;
 }) {
   const [activeTab, setActiveTab] = useState<"hired" | "history" | "upcoming">("hired");
   const [search, setSearch] = useState("");
@@ -55,26 +71,33 @@ export function OrdersManager({
     );
   });
 
-  function downloadReceipt(payment: EmployerPayment) {
-    const text = `FINDTERN PAYMENT RECEIPT
-=======================
-Receipt ID: REC-${payment.id.slice(0, 8).toUpperCase()}
-Razorpay Order ID: ${payment.orderId}
-Payment ID: ${payment.paymentId || "N/A"}
-Amount: ₹${(payment.amountMinor / 100).toLocaleString("en-IN")}
-Status: ${payment.status.toUpperCase()}
-Date: ${payment.paidAt ? new Date(payment.paidAt).toLocaleDateString("en-IN") : "N/A"}
-=======================
-Findtern Private Limited
-https://findtern.in`;
+  async function downloadTaxInvoice(payment: EmployerPayment) {
+    const currency = payment.currency || "INR";
+    const html = taxInvoiceHtml({
+      invoiceNo: `INV-${payment.id.slice(0, 8).toUpperCase()}`,
+      date: payment.paidAt ? new Date(payment.paidAt) : new Date(),
+      orderId: payment.orderId,
+      paymentId: payment.paymentId,
+      currency,
+      amountMinor: payment.amountMinor,
+      description: "Intern hiring services (per-hire charge and hourly engagement)",
+      seller,
+      buyer: { ...buyer, place: placeOfSupply({ ...buyer, currency }) },
+    });
+    await downloadInvoice(html, `Invoice-${payment.orderId.slice(-8).toUpperCase()}.pdf`);
+  }
 
-    const blob = new Blob([text], { type: "text/plain" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `receipt-${payment.orderId}.txt`;
-    a.click();
-    URL.revokeObjectURL(url);
+  function exportTimesheetsCsv() {
+    downloadCsv("hired-candidates", filteredHired, [
+      { header: "Candidate Name", value: (h) => h.candidateName },
+      { header: "Candidate Email", value: (h) => h.candidateEmail },
+      { header: "Project Name", value: (h) => h.projectName },
+      { header: "Monthly Stipend", value: (h) => (h.monthlyStipend != null ? h.monthlyStipend / 100 : "") },
+      { header: "Currency", value: (h) => h.currency },
+      { header: "Duration (Months)", value: (h) => h.durationMonths },
+      { header: "Start Date", value: (h) => h.startDate || "Immediate" },
+      { header: "Status", value: () => "Hired" },
+    ]);
   }
 
   return (
@@ -92,7 +115,7 @@ https://findtern.in`;
 
         <Link
           href="/employer/cart"
-          className="inline-flex items-center gap-2 rounded-xl bg-brand-700 px-4 py-2.5 text-xs font-semibold text-white shadow-xs hover:bg-brand-600 transition-colors"
+          className="apple-spring apple-pressable inline-flex min-h-11 items-center gap-2 rounded-[10px] bg-brand-700 px-4 text-xs font-semibold text-white shadow-xs hover:bg-brand-600"
         >
           <CreditCard className="size-4" />
           <span>Checkout Active Hires</span>
@@ -101,11 +124,11 @@ https://findtern.in`;
 
       {/* Tabs strip */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="inline-flex rounded-xl border border-ink-200/80 bg-white p-1 shadow-2xs">
+        <div className="inline-flex rounded-[10px] border border-ink-200/80 bg-white p-1 shadow-2xs">
           <button
             type="button"
             onClick={() => setActiveTab("hired")}
-            className={`rounded-lg px-3.5 py-1.5 text-xs font-medium transition-colors ${
+            className={`apple-spring apple-pressable min-h-11 rounded-[10px] px-3.5 text-xs font-medium ${
               activeTab === "hired"
                 ? "bg-brand-700 text-white shadow-2xs font-semibold"
                 : "text-ink-600 hover:text-ink-900"
@@ -116,7 +139,7 @@ https://findtern.in`;
           <button
             type="button"
             onClick={() => setActiveTab("history")}
-            className={`rounded-lg px-3.5 py-1.5 text-xs font-medium transition-colors ${
+            className={`apple-spring apple-pressable min-h-11 rounded-[10px] px-3.5 text-xs font-medium ${
               activeTab === "history"
                 ? "bg-brand-700 text-white shadow-2xs font-semibold"
                 : "text-ink-600 hover:text-ink-900"
@@ -127,7 +150,7 @@ https://findtern.in`;
           <button
             type="button"
             onClick={() => setActiveTab("upcoming")}
-            className={`rounded-lg px-3.5 py-1.5 text-xs font-medium transition-colors ${
+            className={`apple-spring apple-pressable min-h-11 rounded-[10px] px-3.5 text-xs font-medium ${
               activeTab === "upcoming"
                 ? "bg-brand-700 text-white shadow-2xs font-semibold"
                 : "text-ink-600 hover:text-ink-900"
@@ -144,7 +167,7 @@ https://findtern.in`;
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by name, project, or ID..."
-            className="h-9 w-full rounded-xl border border-ink-200 bg-white pl-9 pr-3 text-xs text-ink-900 outline-none transition-colors placeholder:text-ink-400 focus:border-brand-600"
+            className="apple-spring min-h-11 w-full rounded-[10px] border border-ink-200 bg-white pl-9 pr-3 text-[14px] text-ink-900 outline-none placeholder:text-ink-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
           />
         </div>
       </div>
@@ -153,8 +176,8 @@ https://findtern.in`;
       {activeTab === "hired" && (
         <div>
           {filteredHired.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-ink-200 bg-white/60 p-12 text-center">
-              <div className="mx-auto grid size-12 place-items-center rounded-2xl bg-brand-50 text-brand-700">
+            <div className="rounded-[20px] border border-dashed border-ink-200/70 bg-white/60 p-12 text-center">
+              <div className="mx-auto grid size-12 place-items-center rounded-[10px] bg-brand-50 text-brand-700">
                 <Users className="size-6" />
               </div>
               <h3 className="mt-4 text-base font-semibold text-ink-900">
@@ -166,17 +189,31 @@ https://findtern.in`;
               </p>
               <Link
                 href="/employer/candidates"
-                className="mt-5 inline-flex items-center gap-1.5 rounded-xl bg-brand-700 px-4 py-2 text-xs font-semibold text-white hover:bg-brand-600"
+                className="apple-spring apple-pressable mt-5 inline-flex min-h-11 items-center justify-center gap-1.5 rounded-[10px] bg-brand-700 px-4 text-xs font-semibold text-white hover:bg-brand-600"
               >
                 <span>Browse Candidates</span>
               </Link>
             </div>
           ) : (
-            <div className="grid gap-4 md:grid-cols-2">
-              {filteredHired.map((item) => (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-text-subtle">
+                  Showing {filteredHired.length} hired talent engagement{filteredHired.length === 1 ? "" : "s"}.
+                </p>
+                <button
+                  type="button"
+                  onClick={exportTimesheetsCsv}
+                  className="apple-spring apple-pressable inline-flex min-h-9 items-center justify-center gap-1.5 rounded-[10px] border border-ink-200 bg-white px-3 text-xs font-semibold text-ink-700 shadow-2xs hover:border-brand-400 hover:text-brand-800"
+                >
+                  <Download className="size-3.5" />
+                  <span>Export Timesheet CSV</span>
+                </button>
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                {filteredHired.map((item) => (
                 <div
                   key={item.proposal.id}
-                  className="rounded-2xl border border-ink-200/80 bg-white p-5 shadow-2xs transition-all hover:shadow-xs space-y-4"
+                  className="apple-spring rounded-[20px] border border-ink-200/70 bg-white p-5 shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)] space-y-4"
                 >
                   <div className="flex items-start justify-between">
                     <div>
@@ -187,26 +224,26 @@ https://findtern.in`;
                         Role on {item.projectName}
                       </p>
                     </div>
-                    <span className="inline-flex items-center gap-1 rounded-full bg-brand-50 border border-brand-200/60 px-2.5 py-0.5 text-2xs font-semibold text-brand-700">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-brand-50 border border-brand-200/60 px-2.5 py-0.5 text-xs font-semibold text-brand-700">
                       <CheckCircle2 className="size-3" />
                       <span>Hired</span>
                     </span>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3 rounded-xl bg-ink-50/60 p-3.5 text-xs">
+                  <div className="grid grid-cols-2 gap-3 rounded-[10px] bg-ink-50/60 p-3.5 text-xs">
                     <div>
                       <p className="text-2xs uppercase tracking-wider text-ink-400 font-semibold">
                         Monthly Stipend
                       </p>
                       <p className="mt-0.5 font-semibold text-ink-900 tabular-nums">
-                        ₹{item.monthlyStipend.toLocaleString("en-IN")}/mo
+                        {item.monthlyStipend != null ? `${formatMoney(item.monthlyStipend, item.currency)}/mo` : "—"}
                       </p>
                     </div>
                     <div>
                       <p className="text-2xs uppercase tracking-wider text-ink-400 font-semibold">
                         Duration
                       </p>
-                      <p className="mt-0.5 font-semibold text-ink-900">
+                      <p className="mt-0.5 font-semibold tabular-nums text-ink-900">
                         {item.durationMonths} Months
                       </p>
                     </div>
@@ -215,21 +252,32 @@ https://findtern.in`;
                   <div className="flex items-center justify-between pt-1">
                     <Link
                       href={`/employer/timesheets`}
-                      className="inline-flex items-center gap-1 text-xs font-semibold text-brand-700 hover:text-brand-800"
+                      className="apple-spring inline-flex min-h-11 items-center gap-1 rounded-[10px] text-xs font-semibold text-brand-700 hover:text-brand-800"
                     >
                       <span>Review Timesheets</span>
                       <ArrowUpRight className="size-3.5" />
                     </Link>
 
-                    <Link
-                      href={`/employer/proposal/${item.proposal.id}`}
-                      className="rounded-lg border border-ink-200 bg-white px-3 py-1.5 text-2xs font-medium text-ink-700 hover:bg-ink-50"
-                    >
-                      View Contract
-                    </Link>
+                    <span className="flex items-center gap-2">
+                      {item.canOfferFullTime ? (
+                        <FullTimeOfferButton
+                          employerId={employerId}
+                          proposalId={item.proposal.id}
+                          candidate={item.candidateName}
+                          fteStatus={fteStatus}
+                        />
+                      ) : null}
+                      <Link
+                        href={`/employer/proposal/${item.proposal.id}`}
+                        className="apple-spring apple-pressable inline-flex min-h-11 items-center justify-center rounded-[10px] border border-ink-200 bg-white px-3 text-xs font-medium text-ink-700 hover:border-ink-300 hover:bg-ink-50"
+                      >
+                        View contract
+                      </Link>
+                    </span>
                   </div>
                 </div>
               ))}
+              </div>
             </div>
           )}
         </div>
@@ -239,8 +287,8 @@ https://findtern.in`;
       {activeTab === "history" && (
         <div>
           {filteredHistory.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-ink-200 bg-white/60 p-12 text-center">
-              <div className="mx-auto grid size-12 place-items-center rounded-2xl bg-brand-50 text-brand-700">
+            <div className="rounded-[20px] border border-dashed border-ink-200/70 bg-white/60 p-12 text-center">
+              <div className="mx-auto grid size-12 place-items-center rounded-[10px] bg-brand-50 text-brand-700">
                 <Receipt className="size-6" />
               </div>
               <h3 className="mt-4 text-base font-semibold text-ink-900">No payment orders recorded</h3>
@@ -249,7 +297,7 @@ https://findtern.in`;
               </p>
             </div>
           ) : (
-            <div className="overflow-hidden rounded-2xl border border-ink-200/80 bg-white shadow-2xs">
+            <div className="overflow-x-auto rounded-[20px] border border-ink-200/70 bg-white shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)]">
               <table className="w-full text-left text-xs">
                 <thead className="border-b border-ink-100 bg-ink-50/70 font-semibold text-ink-700">
                   <tr>
@@ -265,22 +313,22 @@ https://findtern.in`;
                   {filteredHistory.map((p) => {
                     const isPaid = p.status === "paid" || p.status === "captured";
                     return (
-                      <tr key={p.id} className="hover:bg-ink-50/40 transition-colors">
-                        <td className="px-5 py-3.5 font-mono text-2xs text-ink-800">
+                      <tr key={p.id} className="apple-spring hover:bg-ink-50/40">
+                        <td className="px-5 py-3.5 font-mono text-xs tabular-nums text-ink-800">
                           {p.orderId}
                         </td>
-                        <td className="px-5 py-3.5 font-mono text-2xs text-text-subtle">
-                          {p.paymentId || "—"}
+                        <td className="px-5 py-3.5 font-mono text-xs text-text-subtle">
+                          {p.paymentId || "-"}
                         </td>
                         <td className="px-5 py-3.5 font-semibold text-ink-900 tabular-nums">
                           {formatCurrency(p.amountMinor, (p.currency as "INR" | "USD") || "INR")}
                         </td>
-                        <td className="px-5 py-3.5 text-text-subtle">
+                        <td className="px-5 py-3.5 tabular-nums text-text-subtle">
                           {p.paidAt ? formatDate(p.paidAt) : "Pending"}
                         </td>
                         <td className="px-5 py-3.5">
                           <span
-                            className={`inline-flex items-center rounded-full px-2 py-0.5 text-2xs font-semibold ${
+                            className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${
                               isPaid
                                 ? "bg-brand-50 text-brand-700 border border-brand-200/60"
                                 : "bg-ink-100 text-ink-600 border border-ink-200"
@@ -292,11 +340,11 @@ https://findtern.in`;
                         <td className="px-5 py-3.5 text-right">
                           <button
                             type="button"
-                            onClick={() => downloadReceipt(p)}
-                            className="inline-flex items-center gap-1 rounded-lg border border-ink-200 bg-white px-2.5 py-1 text-2xs font-medium text-ink-700 hover:bg-ink-50"
+                            onClick={() => downloadTaxInvoice(p)}
+                            className="apple-spring apple-pressable inline-flex min-h-11 items-center justify-center gap-1 rounded-[10px] border border-ink-200 bg-white px-2.5 text-xs font-medium text-ink-700 hover:border-ink-300 hover:bg-ink-50"
                           >
                             <Download className="size-3" />
-                            <span>Receipt</span>
+                            <span>Tax Invoice</span>
                           </button>
                         </td>
                       </tr>
@@ -312,14 +360,14 @@ https://findtern.in`;
       {/* Tab 3: Upcoming Payments Schedule */}
       {activeTab === "upcoming" && (
         <div className="space-y-4">
-          <div className="rounded-xl border border-brand-200/70 bg-brand-50/50 p-4">
+          <div className="rounded-[10px] border border-brand-200/70 bg-brand-50/50 p-4">
             <div className="flex items-start gap-3">
               <Calendar className="size-5 text-brand-700 shrink-0 mt-0.5" />
               <div>
                 <h4 className="text-xs font-semibold text-brand-900">
                   Monthly Intern Stipend Settlement Schedule
                 </h4>
-                <p className="mt-0.5 text-2xs text-brand-800/80 leading-relaxed">
+                <p className="mt-0.5 text-xs text-brand-800/80 leading-relaxed">
                   Findtern handles automatic escrow and verified monthly timesheet payouts. Dues
                   become payable each calendar cycle following timesheet approval.
                 </p>
@@ -328,7 +376,7 @@ https://findtern.in`;
           </div>
 
           {hiredCandidates.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-ink-200 bg-white/60 p-12 text-center">
+            <div className="rounded-[20px] border border-dashed border-ink-200/70 bg-white/60 p-12 text-center">
               <Clock className="mx-auto size-8 text-ink-400" />
               <h3 className="mt-3 text-sm font-semibold text-ink-900">
                 No active billing schedules
@@ -339,7 +387,7 @@ https://findtern.in`;
               </p>
             </div>
           ) : (
-            <div className="overflow-hidden rounded-2xl border border-ink-200/80 bg-white shadow-2xs">
+            <div className="overflow-x-auto rounded-[20px] border border-ink-200/70 bg-white shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)]">
               <table className="w-full text-left text-xs">
                 <thead className="border-b border-ink-100 bg-ink-50/70 font-semibold text-ink-700">
                   <tr>
@@ -353,28 +401,28 @@ https://findtern.in`;
                 </thead>
                 <tbody className="divide-y divide-ink-100">
                   {hiredCandidates.map((item) => (
-                    <tr key={item.proposal.id} className="hover:bg-ink-50/40">
+                    <tr key={item.proposal.id} className="apple-spring hover:bg-ink-50/40">
                       <td className="px-5 py-3.5 font-medium text-ink-900">
                         {item.candidateName}
                       </td>
                       <td className="px-5 py-3.5 text-text-subtle">
                         {item.projectName}
                       </td>
-                      <td className="px-5 py-3.5 text-text-subtle">
+                      <td className="px-5 py-3.5 tabular-nums text-text-subtle">
                         1st of Next Month
                       </td>
                       <td className="px-5 py-3.5 font-semibold text-ink-900 tabular-nums">
-                        ₹{item.monthlyStipend.toLocaleString("en-IN")}
+                        {item.monthlyStipend != null ? formatMoney(item.monthlyStipend, item.currency) : "—"}
                       </td>
                       <td className="px-5 py-3.5">
-                        <span className="inline-flex items-center rounded-full bg-accent-100/60 px-2 py-0.5 text-2xs font-semibold text-accent-700 border border-accent-300/50">
+                        <span className="inline-flex items-center rounded-full bg-accent-100/60 px-2 py-0.5 text-xs font-semibold text-accent-700 border border-accent-300/50">
                           Upcoming
                         </span>
                       </td>
                       <td className="px-5 py-3.5 text-right">
                         <Link
                           href="/employer/cart"
-                          className="inline-flex items-center gap-1 rounded-lg bg-brand-700 px-3 py-1 text-2xs font-semibold text-white hover:bg-brand-600 transition-colors"
+                          className="apple-spring apple-pressable inline-flex min-h-11 items-center justify-center gap-1 rounded-[10px] bg-brand-700 px-3 text-xs font-semibold text-white hover:bg-brand-600"
                         >
                           <span>Pay Installment</span>
                         </Link>

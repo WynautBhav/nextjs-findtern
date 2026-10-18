@@ -1,27 +1,5 @@
 import { sql } from "drizzle-orm";
 import { pgTable, text, varchar, boolean, integer, timestamp, jsonb, uniqueIndex, index } from "drizzle-orm/pg-core";
-import { createInsertSchema } from "drizzle-zod";
-import { z } from "zod";
-
-// Interviews & proposals share timezone list
-
-const personalEmailDomains = new Set([
-  "gmail.com",
-  "yahoo.com",
-  "yahoo.in",
-  "outlook.com",
-  "hotmail.com",
-  "icloud.com",
-  "aol.com",
-  "proton.me",
-  "protonmail.com",
-  "zoho.com",
-  "yandex.com",
-  "gmx.com",
-  "live.com",
-  "rediffmail.com",
-]);
-
 // --------------------------------------------------
 // User (Intern) Schema
 // --------------------------------------------------
@@ -69,53 +47,6 @@ export const emailOtps = pgTable("email_otps", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const insertUserSchema = createInsertSchema(users).omit({
-  id: true,
-  role: true, // role backend se default "intern" set karega
-  emailVerified: true,
-}).extend({
-  firstName: z.string().min(2, "First name must be at least 2 characters"),
-  lastName: z.string().min(2, "Last name must be at least 2 characters"),
-  email: z
-    .string()
-    .trim()
-    .toLowerCase()
-    .email("Please enter a valid email address")
-    .refine(
-      (email) => {
-        const domain = email.split("@").pop();
-        return !!domain && personalEmailDomains.has(domain);
-      },
-      {
-        message: "Please use a personal email address (Gmail, Yahoo, Outlook, etc.)",
-      },
-    ),
-  countryCode: z
-    .string()
-    .min(1, "Country code is required")
-    .regex(/^\+\d+$/, "Invalid country code"),
-  phoneNumber: z
-    .string()
-    .regex(/^\d{10}$/, "Phone number must be 10 digits")
-    .refine(
-      (v) => {
-        const d = String(v ?? "");
-        if (d.length !== 10) return false;
-        if (/^(\d)\1{9}$/.test(d)) return false;
-        const asc = "01234567890123456789";
-        const desc = "98765432109876543210";
-        if (asc.includes(d) || desc.includes(d)) return false;
-        return true;
-      },
-      { message: "Please enter a valid phone number" },
-    ),
-  password: z.string().min(8, "Password must be at least 8 characters"),
-  agreedToTerms: z.boolean().refine(val => val === true, {
-    message: "You must agree to the Terms & Conditions",
-  }),
-});
-
-export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 
 export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;
@@ -144,6 +75,8 @@ export const employers = pgTable("employers", {
   country: text("country"),
   city: text("city"),
   state: text("state"),
+  /** Billing PIN code; decides the GST place of supply (CGST+SGST vs IGST). */
+  billingPincode: text("billing_pincode"),
   primaryContactName: text("primary_contact_name"),
   primaryContactRole: text("primary_contact_role"),
   escalationContactName: text("escalation_contact_name"),
@@ -168,64 +101,6 @@ export const employers = pgTable("employers", {
   employersCountryPhoneUnique: uniqueIndex("employers_country_phone_unique").on(t.countryCode, t.phoneNumber),
 }));
 
-export const insertEmployerSchema = createInsertSchema(employers).omit({
-  id: true,
-  passwordChangedAt: true,
-  createdAt: true,
-  emailVerified: true,
-  isActive: true,
-}).extend({
-  name: z.string().min(2, "Name must be at least 2 characters"),
-  companyName: z.string().min(2, "Company name must be at least 2 characters"),
-  companyEmail: z
-    .string()
-    .trim()
-    .toLowerCase()
-    .email("Please enter a valid email address")
-    .refine(
-      (email) => {
-        const domain = email.split("@").pop();
-        return !!domain && !personalEmailDomains.has(domain);
-      },
-      {
-        message: "Please use a company/work email address (not Gmail, Yahoo, Outlook, etc.)",
-      },
-    ),
-  countryCode: z
-    .string()
-    .min(1, "Country code is required")
-    .regex(/^\+\d+$/, "Invalid country code"),
-  phoneNumber: z
-    .string()
-    .min(6, "Phone number must be at least 6 digits")
-    .max(15, "Phone number too long")
-    .regex(/^\d+$/, "Phone number must be digits only"),
-  password: z.string().min(8, "Password must be at least 8 characters"),
-  agreedToTerms: z.boolean().refine(val => val === true, {
-    message: "You must agree to the Terms & Conditions",
-  }),
-}).superRefine((data, ctx) => {
-  const code = String((data as Record<string, unknown>)?.countryCode ?? "").trim();
-  const digits = String((data as Record<string, unknown>)?.phoneNumber ?? "").replace(/\D/g, "");
-
-  if (code === "+91" && digits.length !== 10) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ["phoneNumber"],
-      message: "Phone number must be 10 digits for Indian numbers",
-    });
-  }
-
-  if (code !== "+91" && digits.length !== 11) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ["phoneNumber"],
-      message: "Phone number must be 11 digits",
-    });
-  }
-});
-
-export type InsertEmployer = z.infer<typeof insertEmployerSchema>;
 export type Employer = typeof employers.$inferSelect;
 
 // --------------------------------------------------
@@ -256,15 +131,6 @@ export const admins = pgTable("admins", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const insertAdminSchema = createInsertSchema(admins).omit({
-  id: true,
-  createdAt: true,
-}).extend({
-  email: z.string().email("Please enter a valid email address"),
-  password: z.string().min(8, "Password must be at least 8 characters"),
-});
-
-export type InsertAdmin = z.infer<typeof insertAdminSchema>;
 export type Admin = typeof admins.$inferSelect;
 
 // --------------------------------------------------
@@ -378,6 +244,13 @@ export const pricingPlans = pgTable("pricing_plans", {
   perHireChargeMinor: integer("per_hire_charge_minor").notNull().default(0),
   internshipDuration: text("internship_duration"),
   features: jsonb("features").$type<string[]>().default([]),
+  /** The ✓ / ✗ list shown on the plan card. Separate from `features`, whose
+   *  three positional entries drive the comparison table rows. */
+  featureList: jsonb("feature_list").$type<{ label: string; included: boolean }[]>().notNull().default([]),
+  /** Struck-through "was" prices. Null means no strikethrough is shown. */
+  compareAtHourlyMinor: integer("compare_at_hourly_minor"),
+  compareAtPerHireMinor: integer("compare_at_per_hire_minor"),
+  isFeatured: boolean("is_featured").notNull().default(false),
   gstApplicable: boolean("gst_applicable").notNull().default(false),
   isActive: boolean("is_active").notNull().default(true),
   sortOrder: integer("sort_order").notNull().default(0),
@@ -387,6 +260,31 @@ export const pricingPlans = pgTable("pricing_plans", {
 
 export type PricingPlan = typeof pricingPlans.$inferSelect;
 export type InsertPricingPlan = typeof pricingPlans.$inferInsert;
+
+/** Admin-editable platform values (fees, toggles). One row per key. */
+export const platformSettings = pgTable("platform_settings", {
+  key: text("key").primaryKey(),
+  value: jsonb("value").$type<unknown>().notNull(),
+  updatedBy: varchar("updated_by"),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type PlatformSetting = typeof platformSettings.$inferSelect;
+
+/** Sensitive admin actions (impersonation, contact edits), append-only. */
+export const adminAuditLog = pgTable("admin_audit_log", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  adminId: varchar("admin_id").notNull(),
+  action: text("action").notNull(),
+  targetType: text("target_type"),
+  targetId: varchar("target_id"),
+  meta: jsonb("meta").$type<Record<string, unknown>>().default({}),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (t) => ({
+  adminAuditLogCreatedIdx: index("admin_audit_log_created_idx").on(t.createdAt),
+}));
+
+export type AdminAuditLog = typeof adminAuditLog.$inferSelect;
 
 export const websiteFaqs = pgTable("website_faqs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -501,15 +399,6 @@ export const projects = pgTable("projects", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-export const insertProjectSchema = createInsertSchema(projects).omit({
-  id: true,
-  createdAt: true,
-}).extend({
-  projectName: z.string().min(2, "Project name must be at least 2 characters"),
-  skills: z.array(z.string()).min(1, "Select at least one skill"),
-});
-
-export type InsertProject = z.infer<typeof insertProjectSchema>;
 export type Project = typeof projects.$inferSelect;
 
 export const countryCodes = [
@@ -701,13 +590,6 @@ export const internOnboarding = pgTable("intern_onboarding", {
   internOnboardingPanUnique: uniqueIndex("intern_onboarding_pan_unique").on(t.panNumber),
 }));
 
-export const insertInternOnboardingSchema = createInsertSchema(internOnboarding).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-export type InsertInternOnboarding = z.infer<typeof insertInternOnboardingSchema>;
 export type InternOnboarding = typeof internOnboarding.$inferSelect;
 
 export const internPayments = pgTable("intern_payments", {
@@ -793,13 +675,6 @@ export const internDocuments = pgTable("intern_document", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-export const insertInternDocumentsSchema = createInsertSchema(internDocuments).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-export type InsertInternDocuments = z.infer<typeof insertInternDocumentsSchema>;
 export type InternDocuments = typeof internDocuments.$inferSelect;
 // --------------------------------------------------
 // Proposals (Employer -> Intern offers)
@@ -811,7 +686,7 @@ export const proposals = pgTable("proposals", {
   projectId: varchar("project_id").notNull(),
   interviewId: varchar("interview_id"),
   flowType: text("flow_type").notNull(), // direct | interview_first
-  status: text("status").notNull().default("sent"), // draft | sent | accepted | rejected | interview_scheduled
+  status: text("status").notNull().default("sent"), // PROPOSAL_STATUSES in lib/proposals.ts
   currency: text("currency").notNull().default("INR"),
   offerDetails: jsonb("offer_details").$type<Record<string, unknown>>().default({}),
   aiRatings: jsonb("ai_ratings").$type<{
@@ -827,14 +702,6 @@ export const proposals = pgTable("proposals", {
   hiredAt: timestamp("hired_at"),
 });
 
-export const insertProposalSchema = createInsertSchema(proposals).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-  hiredAt: true,
-});
-
-export type InsertProposal = z.infer<typeof insertProposalSchema>;
 export type Proposal = typeof proposals.$inferSelect;
 
 export const timesheets = pgTable("timesheets", {
@@ -855,16 +722,6 @@ export const timesheets = pgTable("timesheets", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-export const insertTimesheetSchema = createInsertSchema(timesheets).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-  submittedAt: true,
-  approvedAt: true,
-  rejectedAt: true,
-});
-
-export type InsertTimesheet = z.infer<typeof insertTimesheetSchema>;
 export type Timesheet = typeof timesheets.$inferSelect;
 
 export const notifications = pgTable("notifications", {
@@ -879,15 +736,14 @@ export const notifications = pgTable("notifications", {
   isRead: boolean("is_read").notNull().default(false),
   readAt: timestamp("read_at"),
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (t) => ({
+  // Lets scheduled jobs insert with onConflictDoNothing() and send each
+  // reminder once.
+  notificationsDedupeUniq: uniqueIndex("notifications_dedupe_uniq")
+    .on(t.recipientType, t.recipientId, t.dedupeKey)
+    .where(sql`${t.dedupeKey} is not null`),
+}));
 
-export const insertNotificationSchema = createInsertSchema(notifications).omit({
-  id: true,
-  createdAt: true,
-  readAt: true,
-});
-
-export type InsertNotification = z.infer<typeof insertNotificationSchema>;
 export type Notification = typeof notifications.$inferSelect;
 
 export const profileViews = pgTable("profile_views", {
@@ -897,12 +753,6 @@ export const profileViews = pgTable("profile_views", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const insertProfileViewSchema = createInsertSchema(profileViews).omit({
-  id: true,
-  createdAt: true,
-});
-
-export type InsertProfileView = z.infer<typeof insertProfileViewSchema>;
 export type ProfileView = typeof profileViews.$inferSelect;
 
 export const employerSavedSearches = pgTable("employer_saved_searches", {
@@ -946,12 +796,6 @@ export const employerCartItems = pgTable(
 export type EmployerCartItem = typeof employerCartItems.$inferSelect;
 export type InsertEmployerCartItem = typeof employerCartItems.$inferInsert;
 
-export const insertEmployerSavedSearchSchema = createInsertSchema(employerSavedSearches).omit({
-  id: true,
-  createdAt: true,
-});
-
-export type InsertEmployerSavedSearch = z.infer<typeof insertEmployerSavedSearchSchema>;
 export type EmployerSavedSearch = typeof employerSavedSearches.$inferSelect;
 
 // --------------------------------------------------
@@ -962,7 +806,7 @@ export const promoCodes = pgTable("promo_codes", {
   code: text("code").notNull().unique(),
   description: text("description"),
   discountType: text("discount_type").notNull(), // "percentage" | "fixed"
-  discountValue: integer("discount_value").notNull(), // percentage (e.g., 10 for 10%) or fixed amount in minor units
+  discountValue: integer("discount_value").notNull(), // percentage (e.g., 10 for 10%) or fixed amount in paise (legacy convention)
   maxUsages: integer("max_usages"), // null = unlimited
   usedCount: integer("used_count").notNull().default(0),
   minOrderAmountMinor: integer("min_order_amount_minor"), // minimum order amount to apply
@@ -980,7 +824,7 @@ export type InsertPromoCode = typeof promoCodes.$inferInsert;
 export const promoCodeUsages = pgTable("promo_code_usages", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   promoCodeId: varchar("promo_code_id").notNull(),
-  userId: varchar("user_id").notNull(), // intern who used the code
+  userId: varchar("user_id").notNull(), // intern or employer id that used the code
   orderId: varchar("order_id"), // payment/order that used this code
   discountAppliedMinor: integer("discount_applied_minor").notNull().default(0),
   createdAt: timestamp("created_at").defaultNow(),

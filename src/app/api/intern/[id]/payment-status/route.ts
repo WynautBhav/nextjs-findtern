@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 
 import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
+import { isInternPaid } from "@/lib/payments";
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -16,5 +17,5 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     .where(eq(schema.internPayments.internId, id))
     .orderBy(desc(schema.internPayments.createdAt))
     .limit(1);
-  return NextResponse.json({ paid: payment?.status === "paid", payment });
+  return NextResponse.json({ paid: await isInternPaid(id), payment });
 }

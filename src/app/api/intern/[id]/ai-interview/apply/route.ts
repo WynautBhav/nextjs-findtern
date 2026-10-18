@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 
 import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
+import { isInternPaid } from "@/lib/payments";
 
 /**
  * Apply for the AI interview.
@@ -72,12 +73,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const db = getDb();
 
   // Gate 1 - has the activation payment landed?
-  const [payment] = await db
-    .select({ id: schema.internPayments.id })
-    .from(schema.internPayments)
-    .where(and(eq(schema.internPayments.internId, id), eq(schema.internPayments.status, "paid")))
-    .limit(1);
-  if (!payment) {
+  if (!(await isInternPaid(id))) {
     return NextResponse.json({ error: "Activate your profile before applying" }, { status: 402 });
   }
 

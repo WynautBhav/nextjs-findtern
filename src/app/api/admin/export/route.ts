@@ -1,9 +1,10 @@
-import { desc, eq, sql, type SQL } from "drizzle-orm";
+import { desc, eq, gte, sql, type SQL } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
 import { getDb, schema } from "@/lib/db";
 import { csvFilename, csvResponse, toCsv, type CsvColumn } from "@/lib/admin/csv";
-import { flattenParams, parsePageRequest, searchAny } from "@/lib/admin/params";
+import { flattenParams, parsePageRequest, periodStart, searchAny } from "@/lib/admin/params";
+import { allows, EXPORT_PERMISSIONS } from "@/lib/admin/permissions";
 import { requireRole } from "@/lib/security/guards";
 
 /**
@@ -36,8 +37,12 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const type = url.searchParams.get("type") ?? "interns";
 
-  if (!readSession(req)) {
+  const session = readSession(req);
+  if (!session) {
     return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
+  }
+  if (!allows(session.permissions, EXPORT_PERMISSIONS[type] ?? null)) {
+    return new NextResponse("Your role doesn't include this export. Ask a super admin for access.", { status: 403 });
   }
 
   const params = flattenParams(Object.fromEntries(url.searchParams.entries()));
@@ -283,11 +288,14 @@ async function exportPayments(search: string, params: Record<string, string>) {
     search,
   );
 
-  const statusFilter = params.status ? eq(schema.employerPayments.status, params.status) : undefined;
-  const combined =
-    where && statusFilter
-      ? sql`${where} and ${statusFilter}`
-      : (where ?? statusFilter);
+  const since = periodStart(params.period);
+  const parts = [
+    where,
+    params.status ? eq(schema.employerPayments.status, params.status) : undefined,
+    params.currency ? eq(schema.employerPayments.currency, params.currency) : undefined,
+    since ? gte(schema.employerPayments.createdAt, since) : undefined,
+  ].filter(Boolean) as SQL[];
+  const combined = parts.length ? sql`${parts.reduce((acc, c) => sql`${acc} and ${c}`)}` : undefined;
 
   const rows = await db
     .select({

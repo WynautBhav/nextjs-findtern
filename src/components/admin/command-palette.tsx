@@ -81,7 +81,7 @@ export function CommandPalette() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="flex items-center gap-2.5 rounded-lg border border-ink-200 bg-white px-3 py-1.5 text-xs text-ink-500 shadow-xs transition-colors hover:border-brand-500 hover:text-ink-800"
+        className="apple-spring flex min-h-11 items-center gap-2.5 rounded-[10px] border border-ink-200 bg-white px-3 py-1.5 text-[13px] text-ink-500 shadow-xs hover:border-brand-500 hover:text-ink-800"
         aria-label="Search navigation"
       >
         <Search className="size-3.5" aria-hidden />
@@ -95,7 +95,7 @@ export function CommandPalette() {
       {open ? (
         <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 bg-black/40 backdrop-blur-xs p-4">
           <div
-            className="w-full max-w-lg overflow-hidden rounded-xl border border-ink-200 bg-white shadow-xl animate-in fade-in-0 zoom-in-95 duration-150"
+            className="apple-panel w-full max-w-lg overflow-hidden bg-white animate-in fade-in-0 zoom-in-95 duration-150"
             role="dialog"
             aria-modal="true"
             aria-label="Command Menu"
@@ -132,9 +132,9 @@ export function CommandPalette() {
                       key={item.href}
                       type="button"
                       onClick={() => navigateTo(item.href)}
-                      className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-xs font-medium text-ink-700 transition-colors hover:bg-brand-50 hover:text-brand-800"
+                      className="apple-spring apple-pressable flex min-h-11 w-full items-center gap-3 rounded-[10px] px-3 py-2 text-left text-[13px] font-medium text-ink-700 hover:bg-brand-50 hover:text-brand-800"
                     >
-                      <span className="grid size-6 place-items-center rounded-md bg-ink-100 text-ink-600">
+                      <span className="grid size-6 place-items-center rounded-[8px] bg-ink-100 text-ink-600">
                         <Icon className="size-3.5" />
                       </span>
                       <span className="flex-1 truncate text-ink-900">{item.title}</span>

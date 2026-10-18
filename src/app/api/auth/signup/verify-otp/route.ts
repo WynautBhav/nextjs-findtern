@@ -4,10 +4,12 @@ import { z } from "zod";
 
 import { getDb, schema } from "@/lib/db";
 import { verifyOtp, limiters, bucketKey, clientIp } from "@/lib/security/rate-limit";
+import { SIGNUP_OTP_SUBJECTS } from "@/lib/signup-otp";
 
 const bodySchema = z.object({
   email: z.string().trim().toLowerCase().email(),
   otp: z.string().length(6),
+  subjectType: z.enum(SIGNUP_OTP_SUBJECTS).default("intern"),
 });
 
 export async function POST(req: Request) {
@@ -21,14 +23,14 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid input" }, { status: 400 });
   }
 
-  const { email, otp } = parsed.data;
+  const { email, otp, subjectType } = parsed.data;
   const db = getDb();
   const [row] = await db
     .select()
     .from(schema.emailOtps)
     .where(
       and(
-        eq(schema.emailOtps.subjectType, "intern"),
+        eq(schema.emailOtps.subjectType, subjectType),
         eq(schema.emailOtps.subjectId, email),
         isNull(schema.emailOtps.usedAt),
       ),

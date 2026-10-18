@@ -127,7 +127,7 @@ export function Thread({
               {node.action && node.href ? (
                 <Link
                   href={node.href}
-                  className="mt-3 inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-primary px-4 text-sm font-semibold text-white shadow-sm transition-[background-color,box-shadow,transform] duration-[var(--dur-instant)] hover:bg-primary-hover hover:shadow-md active:scale-[0.98]"
+                  className="apple-spring apple-pressable mt-3 inline-flex min-h-11 items-center gap-1.5 rounded-[10px] bg-primary px-4 text-sm font-semibold text-white shadow-sm hover:bg-primary-hover"
                 >
                   {node.action}
                   <ArrowRight className="size-4" aria-hidden />
@@ -135,7 +135,7 @@ export function Thread({
               ) : node.href ? (
                 <Link
                   href={node.href}
-                  className="mt-2 inline-flex min-h-9 items-center gap-1 text-sm font-medium text-primary underline-offset-4 hover:underline"
+                  className="apple-spring apple-pressable mt-2 inline-flex min-h-11 items-center gap-1 text-sm font-medium text-primary underline-offset-4 hover:underline"
                 >
                   Open
                   <ArrowRight className="size-3.5" aria-hidden />
@@ -208,7 +208,7 @@ export function StatusStrip({
     return (
       <div
         className={cn(
-          "flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl border border-accent-300/50 bg-accent-100/50 px-4 py-3",
+          "flex flex-wrap items-center gap-x-3 gap-y-2 rounded-[20px] border border-accent-300/50 bg-accent-100/50 px-4 py-3",
           className,
         )}
       >
@@ -222,7 +222,7 @@ export function StatusStrip({
         {node.href ? (
           <Link
             href={node.href}
-            className="inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-lg bg-ink-900 px-4 text-sm font-semibold text-white transition-[transform,opacity] duration-[var(--dur-instant)] hover:opacity-90 active:scale-[0.98]"
+            className="apple-spring apple-pressable inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-[10px] bg-ink-900 px-4 text-sm font-semibold text-white hover:opacity-90"
           >
             {node.action ?? "Open"}
             <ArrowRight className="size-4" aria-hidden />
@@ -235,7 +235,7 @@ export function StatusStrip({
   return (
     <div
       className={cn(
-        "flex items-center gap-2.5 rounded-2xl border border-brand-200/60 bg-brand-50/60 px-4 py-3",
+        "flex items-center gap-2.5 rounded-[20px] border border-brand-200/60 bg-brand-50/60 px-4 py-3",
         className,
       )}
     >

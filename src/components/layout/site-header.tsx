@@ -5,10 +5,12 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ChevronRight, X } from "lucide-react";
 
+
 import { ButtonLink } from "@/components/ui/button";
 import { GetStartedMenu } from "@/components/layout/get-started-menu";
 import { NAV_LINKS, SITE } from "@/lib/content/site";
 import { cn } from "@/lib/utils";
+import { Logo } from "@/components/brand/logo";
 
 /**
  * Site header.
@@ -95,25 +97,17 @@ export function SiteHeader() {
           scrolled ? "h-16" : "h-20",
         )}
       >
-        {/* ── Wordmark ─────────────────────────────────────────────── */}
+        {/* ── Wordmark / Official Logo ─────────────────────────────── */}
         <Link
           href="/"
           aria-label="Findtern - home"
-          className="group flex shrink-0 items-center gap-2.5"
+          className="group flex shrink-0 items-center transition-opacity duration-200 hover:opacity-90"
         >
-          <span className="relative flex size-8 items-center justify-center overflow-hidden rounded-lg bg-gradient-to-br from-primary to-brand-900 shadow-sm transition-transform duration-200 ease-ease-out-expo [@media(any-hover:hover)]:group-hover:scale-105">
-            <svg viewBox="0 0 24 24" className="size-4.5 text-white" aria-hidden>
-              <path d="M12 3 2 8l10 5 8-4v6h2V8L12 3Z" fill="currentColor" />
-              <path
-                d="M6 11.5V16c0 1.7 2.7 3 6 3s6-1.3 6-3v-4.5l-6 3-6-3Z"
-                fill="currentColor"
-                opacity="0.6"
-              />
-            </svg>
-          </span>
-          <span className="text-lg font-semibold tracking-tight text-ink-900 transition-colors group-hover:text-primary">
-            Findtern
-          </span>
+          <Logo
+            alt="Findtern - Internship Simplified"
+            priority
+            className={cn("transition-all duration-200", scrolled ? "h-8" : "h-9.5")}
+          />
         </Link>
 
         {/* ── Primary nav ──────────────────────────────────────────── */}

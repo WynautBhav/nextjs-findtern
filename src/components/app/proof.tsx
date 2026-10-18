@@ -71,7 +71,7 @@ export function ProofCard({
         ease: [0.16, 1, 0.3, 1],
       }}
       className={cn(
-        "group relative overflow-hidden rounded-2xl border border-ink-100 bg-white shadow-[0_1px_2px_rgb(7_47_36/0.05)] transition-[box-shadow,border-color] duration-[var(--dur-standard)] hover:border-ink-200 hover:shadow-[0_10px_28px_-14px_rgb(7_47_36/0.28)]",
+        "apple-spring group relative overflow-hidden rounded-[20px] border border-ink-200/70 bg-white shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)] hover:border-ink-200",
         className,
       )}
     >
@@ -123,7 +123,7 @@ export function ProofCard({
             {proof.href ? (
               <Link
                 href={proof.href}
-                className="inline-flex min-h-9 items-center gap-1 text-sm font-medium text-primary underline-offset-4 hover:underline"
+                className="apple-spring apple-pressable inline-flex min-h-11 items-center gap-1 text-sm font-medium text-primary underline-offset-4 hover:underline"
               >
                 Open
                 <ArrowUpRight className="size-3.5" aria-hidden />
@@ -152,7 +152,7 @@ function CopyFact({ text, label }: { text: string; label: string }) {
           setCopied(false);
         }
       }}
-      className="inline-flex min-h-9 items-center gap-1.5 rounded-lg px-2.5 text-sm font-medium text-ink-600 transition-colors duration-[var(--dur-instant)] hover:bg-ink-100 hover:text-ink-900"
+      className="apple-spring apple-pressable inline-flex min-h-11 items-center gap-1.5 rounded-[10px] px-2.5 text-sm font-medium text-ink-600 hover:bg-ink-100 hover:text-ink-900"
     >
       {copied ? <Check className="size-3.5 text-success" aria-hidden /> : <Copy className="size-3.5" aria-hidden />}
       <span className="sr-only">{copied ? "Copied" : label}</span>
@@ -206,7 +206,7 @@ export function RecordExport({
       <button
         type="button"
         onClick={download}
-        className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-primary px-5 text-sm font-semibold text-white shadow-sm transition-[background-color,box-shadow,transform] duration-[var(--dur-instant)] hover:bg-primary-hover hover:shadow-md active:scale-[0.98]"
+        className="apple-spring apple-pressable inline-flex min-h-11 items-center gap-2 rounded-[10px] bg-primary px-5 text-sm font-semibold text-white shadow-sm hover:bg-primary-hover"
       >
         {done ? <Check className="size-4" aria-hidden /> : <Download className="size-4" aria-hidden />}
         {done ? "Downloaded" : "Download your record"}

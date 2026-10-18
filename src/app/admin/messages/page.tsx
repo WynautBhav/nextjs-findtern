@@ -6,6 +6,7 @@ import { flattenParams, parsePageRequest, searchAny } from "@/lib/admin/params";
 import { AdminPageHeader } from "@/components/admin/panel";
 import { StatCard, StatGrid } from "@/components/admin/stat-card";
 import { MessagesInbox } from "@/components/admin/messages-inbox";
+import { formatNumber } from "@/lib/format";
 
 export default async function AdminMessagesPage({
   searchParams,
@@ -56,7 +57,6 @@ export default async function AdminMessagesPage({
   const unreadCount = Number(unreadCountRow?.c ?? 0);
   const readCount = Math.max(0, totalInbound - unreadCount);
 
-  const num = (n: number) => n.toLocaleString("en-IN");
 
   return (
     <div className="space-y-6">
@@ -68,21 +68,21 @@ export default async function AdminMessagesPage({
       <StatGrid cols={4}>
         <StatCard
           label="Total received"
-          value={num(totalInbound)}
+          value={formatNumber(totalInbound)}
           hint="All time customer messages"
           icon={Inbox}
           tone="brand"
         />
         <StatCard
           label="Unread inquiries"
-          value={num(unreadCount)}
+          value={formatNumber(unreadCount)}
           hint="Requires team response"
           icon={Mail}
           tone="accent"
         />
         <StatCard
           label="Addressed tickets"
-          value={num(readCount)}
+          value={formatNumber(readCount)}
           hint="Marked as reviewed"
           icon={MailOpen}
           tone="success"

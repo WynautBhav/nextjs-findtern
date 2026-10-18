@@ -2,7 +2,7 @@ import { count, desc, eq, sql, type SQL } from "drizzle-orm";
 import { Briefcase, Sparkles, CheckCircle2, Send, Download } from "lucide-react";
 
 import { getDb, schema } from "@/lib/db";
-import { formatDate } from "@/lib/format";
+import { formatDate, formatNumber } from "@/lib/format";
 import { flattenParams, parsePageRequest, searchAny, toPage } from "@/lib/admin/params";
 import { AdminPageHeader } from "@/components/admin/panel";
 import { StatCard, StatGrid } from "@/components/admin/stat-card";
@@ -85,18 +85,18 @@ export default async function AdminProjectsPage({
   const fullTimeTotal = Number(fullTimeCount?.c ?? 0);
   const proposalsTotal = Number(proposalsCount?.c ?? 0);
 
-  const num = (n: number) => n.toLocaleString("en-IN");
   const exportHref = `/api/admin/export?type=projects&${new URLSearchParams(params).toString()}`;
+  const maxDemand = Math.max(1, ...rows.map((r) => Number(r.proposalCount ?? 0)));
 
   return (
-    <div className="space-y-6">
+    <div className="apple-admin space-y-4">
       <AdminPageHeader
         title="Projects"
-        subtitle="Catalog of employer project listings, candidate requirements and full time offers."
+        subtitle="Listings, demand and full-time potential."
         action={
           <a
             href={exportHref}
-            className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-ink-200 bg-white px-3.5 text-sm font-medium text-ink-700 transition-colors hover:bg-ink-50"
+            className="apple-spring apple-pressable inline-flex min-h-11 cursor-pointer items-center gap-1.5 rounded-[10px] border border-ink-200 bg-white px-3.5 text-[14px] font-medium text-ink-700 hover:bg-ink-50"
           >
             <Download className="size-4" aria-hidden />
             Export CSV
@@ -107,28 +107,28 @@ export default async function AdminProjectsPage({
       <StatGrid cols={4}>
         <StatCard
           label="Total projects"
-          value={num(totalProjects)}
+          value={formatNumber(totalProjects)}
           hint="All posted listings"
           icon={Briefcase}
           tone="brand"
         />
         <StatCard
           label="Active listings"
-          value={num(activeTotal)}
+          value={formatNumber(activeTotal)}
           hint="Accepting applications"
           icon={CheckCircle2}
           tone="success"
         />
         <StatCard
           label="Full time potential"
-          value={num(fullTimeTotal)}
+          value={formatNumber(fullTimeTotal)}
           hint={`${totalProjects > 0 ? Math.round((fullTimeTotal / totalProjects) * 100) : 0}% of all listings`}
           icon={Sparkles}
           tone="accent"
         />
         <StatCard
           label="Proposals sent"
-          value={num(proposalsTotal)}
+          value={formatNumber(proposalsTotal)}
           hint="Candidate submissions"
           icon={Send}
           tone="info"
@@ -167,43 +167,59 @@ export default async function AdminProjectsPage({
         ]}
         columns={[
           {
-            header: "Project",
+            header: "Listing",
             cell: (row) => (
               <div className="min-w-0 max-w-sm">
-                <p className="truncate font-medium text-ink-900">{row.projectName}</p>
-                <p className="truncate text-xs text-text-subtle">
-                  {row.locationType || "Anywhere"} ·{" "}
-                  {row.skills?.length ? row.skills.slice(0, 3).join(", ") : "No skills specified"}
+                <p className="truncate text-[15px] font-semibold tracking-[-0.01em] text-ink-900">{row.projectName}</p>
+                <p className="mt-0.5 truncate text-[13px] text-text-subtle">
+                  {row.employerName} · {row.locationType || "Anywhere"} ·{" "}
+                  {row.skills?.length ? row.skills.slice(0, 3).join(", ") : "No skills listed"}
                 </p>
-              </div>
-            ),
-          },
-          {
-            header: "Employer",
-            cell: (row) => (
-              <div className="min-w-0">
-                <p className="truncate font-medium text-ink-800">{row.employerName}</p>
-                <p className="truncate text-xs text-text-subtle">{row.employerEmail}</p>
               </div>
             ),
           },
           {
             header: "Type",
             cell: (row) => (
-              <StatusBadge
-                tone={row.fullTimeOffer ? "success" : "info"}
-                label={row.fullTimeOffer ? "Full time" : "Internship"}
-              />
+              <span className="inline-flex items-center gap-1.5 text-[13px] font-medium text-ink-700">
+                <span
+                  aria-hidden
+                  className={
+                    row.fullTimeOffer
+                      ? "size-1.5 rounded-full bg-emerald-600"
+                      : "size-1.5 rounded-full bg-blue-600"
+                  }
+                />
+                {row.fullTimeOffer ? "Full-time track" : "Internship"}
+              </span>
             ),
           },
           {
-            header: "Proposals",
-            align: "right",
-            cell: (row) => (
-              <span className="font-semibold text-ink-800 tabular-nums">
-                {row.proposalCount}
-              </span>
-            ),
+            header: "Demand",
+            cell: (row) => {
+              const demand = Number(row.proposalCount ?? 0);
+              return (
+                <span className="block min-w-28">
+                  <span className="flex items-baseline justify-between gap-2">
+                    <span className="text-[15px] font-semibold tabular-nums text-ink-900">
+                      {demand}
+                    </span>
+                    <span className="text-[12px] text-text-subtle">proposals</span>
+                  </span>
+                  <span
+                    role="img"
+                    aria-label={`${demand} proposals`}
+                    className="mt-1 block h-1 overflow-hidden rounded-full bg-ink-100"
+                  >
+                    <span
+                      aria-hidden
+                      className="block h-full rounded-full bg-brand-600"
+                      style={{ width: `${(demand / maxDemand) * 100}%` }}
+                    />
+                  </span>
+                </span>
+              );
+            },
           },
           {
             header: "Status",
@@ -212,8 +228,8 @@ export default async function AdminProjectsPage({
           {
             header: "Posted",
             cell: (row) => (
-              <span className="text-xs text-text-subtle">
-                {row.createdAt ? formatDate(row.createdAt.toISOString()) : "None"}
+              <span className="text-[13px] tabular-nums text-text-subtle">
+                {row.createdAt ? formatDate(row.createdAt.toISOString()) : "-"}
               </span>
             ),
           },

@@ -42,6 +42,8 @@ export type CompanyDraft = {
   escalationContactCountryCode: string;
   escalationContactPhone: string;
   gstNumber: string;
+  /** Decides CGST+SGST vs IGST on invoices (lib/gst). */
+  billingPincode: string;
 };
 
 export type ProjectDraft = {
@@ -125,6 +127,7 @@ export function emptyCompany(): CompanyDraft {
     escalationContactCountryCode: "+91",
     escalationContactPhone: "",
     gstNumber: "",
+    billingPincode: "",
   };
 }
 
@@ -174,6 +177,7 @@ export function companyFromRecord(row: EmployerRow): CompanyDraft {
     escalationContactCountryCode: row.escalationContactCountryCode ?? "+91",
     escalationContactPhone: row.escalationContactPhone ?? "",
     gstNumber: row.gstNumber ?? "",
+    billingPincode: row.billingPincode ?? "",
   };
 }
 

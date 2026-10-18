@@ -30,6 +30,7 @@ const entrySchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   hours: z.number().min(0).max(24),
   note: z.string().max(400).optional().default(""),
+  status: z.enum(["Present", "Leave", "Absent", "Fixed off", "Holiday", ""]).optional().default(""),
 });
 
 const bodySchema = z.object({
@@ -55,7 +56,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     .limit(1);
 
   if (!sheet) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  if (sheet.status !== "draft") {
+  // Drafts, and sheets the manager sent back, can be edited.
+  if (sheet.status !== "draft" && sheet.status !== "rejected") {
     return NextResponse.json(
       { error: "This period has already been sent, so it can no longer be edited" },
       { status: 409 },
@@ -73,4 +75,17 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     .returning();
 
   return NextResponse.json({ ok: true, totalHours: updated.entries });
+}
+
+/** Delete a draft timesheet (legacy feature). Sent sheets stay on record. */
+export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const guard = await requireMutation({ req, roles: ["intern"] });
+  if (!guard.ok) return guard.response;
+  const deleted = await getDb()
+    .delete(schema.timesheets)
+    .where(and(eq(schema.timesheets.id, id), eq(schema.timesheets.internId, guard.session.uid), eq(schema.timesheets.status, "draft")))
+    .returning({ id: schema.timesheets.id });
+  if (deleted.length === 0) return NextResponse.json({ error: "Only drafts can be deleted" }, { status: 409 });
+  return NextResponse.json({ ok: true });
 }

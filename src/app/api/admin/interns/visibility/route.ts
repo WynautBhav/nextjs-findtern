@@ -29,7 +29,7 @@ export async function POST(req: Request) {
   const parsed = bodySchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) {
     return NextResponse.json(
-      { error: "Expected { ids: string[], visibility: 'live' | 'hidden' }" },
+      { error: "Select at least one intern and choose live or hidden." },
       { status: 400 },
     );
   }
@@ -49,7 +49,7 @@ export async function POST(req: Request) {
   // rather than assuming success lets the UI tell the truth.
   if (updated.length !== ids.length) {
     return NextResponse.json({
-      error: `Updated ${updated.length} of ${ids.length}. Some ids did not match an intern.`,
+      error: `Updated ${updated.length} of ${ids.length}. Some selected interns could not be found.`,
       updated: updated.length,
       requested: ids.length,
     });

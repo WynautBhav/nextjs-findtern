@@ -1,11 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 
 import { formatMoney, formatRate } from "@/lib/format";
 import { useRegionBands } from "@/components/marketing/region-rates";
 import { BANDS, DISTRIBUTION, bandFor } from "@/lib/score";
-import { gsap, prefersReducedMotion } from "@/lib/gsap";
 import { cn } from "@/lib/utils";
 
 /**
@@ -20,48 +19,20 @@ import { cn } from "@/lib/utils";
  *
  * The score is draggable and keyboard-operable, and the rate is derived from
  * the same constants the pricing table uses, so moving it cannot disagree with
- * the table. Under reduced motion the value snaps instead of tweening, and the
- * control is still fully operable.
+ * the table.
  */
 export function ScoreCard() {
   const [score, setScore] = useState(8.4);
   const [dragging, setDragging] = useState(false);
   const trackRef = useRef<HTMLDivElement>(null);
-  const fillRef = useRef<HTMLDivElement>(null);
-  const thumbRef = useRef<HTMLDivElement>(null);
 
   const band = bandFor(score);
   // Money follows the visitor's region; geometry (band id) does not.
   const { bands: regionBands, currency } = useRegionBands();
   const money = regionBands.find((b) => b.id === band.id) ?? band;
 
-  // Tween the thumb and the fill to the new score. A range input cannot be
-  // styled into this shape cross-browser, so the control is a custom
-  // slider over a real <input type="range"> kept invisible but focusable for
-  // keyboard and assistive tech.
-  useEffect(() => {
-    const pct = (score / 10) * 100;
-    if (prefersReducedMotion()) {
-      if (fillRef.current) fillRef.current.style.width = `${pct}%`;
-      if (thumbRef.current) thumbRef.current.style.left = `${pct}%`;
-      return;
-    }
-    if (fillRef.current) {
-      gsap.to(fillRef.current, { width: `${pct}%`, duration: 0.5, ease: "power3.out" });
-    }
-    if (thumbRef.current) {
-      gsap.to(thumbRef.current, { left: `${pct}%`, duration: 0.5, ease: "power3.out" });
-    }
-  }, [score]);
+  const pct = Math.max(0, Math.min(100, (score / 10) * 100));
 
-  const fromPointer = (clientX: number) => {
-    const el = trackRef.current;
-    if (!el) return;
-    const r = el.getBoundingClientRect();
-    const ratio = Math.max(0, Math.min(1, (clientX - r.left) / r.width));
-    // Snap to 0.1 so the number never shows a floating-point artefact.
-    setScore(Math.round(ratio * 10 * 10) / 10);
-  };
 
   return (
     <div className="w-full max-w-md">
@@ -105,11 +76,42 @@ export function ScoreCard() {
             </div>
           </div>
 
-          {/* ── The control ──────────────────────────────────────── */}
-          <div className="relative mt-6">
-            {/* Band track: three segments, so the control shows where the
-                price steps are rather than being an abstract 0–10 line. */}
-            <div className="absolute inset-x-0 top-1/2 flex -translate-y-1/2 gap-1">
+          {/* ── The interactive control track ─────────────────────── */}
+          <div
+            ref={trackRef}
+            className="group relative mt-6 h-10 w-full cursor-pointer select-none rounded-lg"
+          >
+            {/* Native range input overlay: 100% reliable clicks anywhere on the track & smooth sliding */}
+            <input
+              type="range"
+              min="0"
+              max="10"
+              step="0.1"
+              value={score}
+              onChange={(e) => {
+                const val = parseFloat(e.target.value);
+                if (!isNaN(val)) setScore(Math.round(val * 10) / 10);
+              }}
+              onInput={(e) => {
+                const val = parseFloat((e.target as HTMLInputElement).value);
+                if (!isNaN(val)) setScore(Math.round(val * 10) / 10);
+              }}
+              onPointerDown={() => setDragging(true)}
+              onPointerUp={() => setDragging(false)}
+              onPointerCancel={() => setDragging(false)}
+              aria-label="Findtern Score out of 10"
+              aria-valuenow={score}
+              aria-valuemin={0}
+              aria-valuemax={10}
+              aria-valuetext={`${score.toFixed(1)} out of 10, ${band.name} band`}
+              className="absolute inset-0 z-20 h-full w-full cursor-pointer opacity-0"
+            />
+
+            {/* Band track: three segments */}
+            <div
+              className="pointer-events-none absolute inset-x-0 top-1/2 flex -translate-y-1/2 gap-1"
+              aria-hidden
+            >
               {BANDS.map((b) => (
                 <div
                   key={b.id}
@@ -122,59 +124,60 @@ export function ScoreCard() {
               ))}
             </div>
 
-            {/* Progress overlay, clipped to the active band. */}
+            {/* Progress overlay */}
             <div
               className="pointer-events-none absolute inset-x-0 top-1/2 h-2 -translate-y-1/2 overflow-hidden rounded-full"
               aria-hidden
             >
               <div
-                ref={fillRef}
-                className="h-full rounded-full bg-primary/25"
-                style={{ width: `${(score / 10) * 100}%` }}
+                className={cn(
+                  "h-full rounded-full bg-primary/25",
+                  dragging
+                    ? "transition-none"
+                    : "transition-[width] duration-150 ease-out",
+                )}
+                style={{ width: `${pct}%` }}
               />
             </div>
 
             {/* Thumb */}
             <div
-              ref={thumbRef}
               aria-hidden
-              className="pointer-events-none absolute top-1/2 size-5 -translate-x-1/2 -translate-y-1/2 rounded-full border-[3px] border-white bg-primary shadow-lg transition-transform duration-150"
-              style={{ left: `${(score / 10) * 100}%`, transform: `translate(-50%, -50%) scale(${dragging ? 1.15 : 1})` }}
+              className={cn(
+                "pointer-events-none absolute top-1/2 size-5 -translate-x-1/2 -translate-y-1/2 rounded-full border-[3px] border-white bg-primary shadow-lg",
+                dragging
+                  ? "scale-125 transition-none"
+                  : "transition-[left,transform] duration-150 ease-out group-hover:scale-110",
+              )}
+              style={{ left: `${pct}%` }}
             />
-
-            {/* The real control, transparent, on top. Kept as a native
-                range input so keyboard, touch, and screen readers all work
-                without reimplementation. */}
-            <div
-              ref={trackRef}
-              onPointerDown={(e) => {
-                setDragging(true);
-                (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
-                fromPointer(e.clientX);
-              }}
-              onPointerMove={(e) => dragging && fromPointer(e.clientX)}
-              onPointerUp={() => setDragging(false)}
-              onPointerCancel={() => setDragging(false)}
-              className="relative h-8 cursor-grab active:cursor-grabbing"
-            >
-              <input
-                type="range"
-                min={0}
-                max={10}
-                step={0.1}
-                value={score}
-                onChange={(e) => setScore(Number(e.target.value))}
-                aria-label="Findtern Score out of 10"
-                aria-valuetext={`${score.toFixed(1)} out of 10, ${band.name} band`}
-                className="absolute inset-0 h-full w-full cursor-grab appearance-none bg-transparent opacity-0 active:cursor-grabbing"
-              />
-            </div>
           </div>
 
-          <div className="mt-1 flex justify-between text-2xs text-text-subtle">
-            <span>0</span>
-            <span>6</span>
-            <span>10</span>
+          <div className="mt-1 flex justify-between text-2xs text-text-subtle select-none">
+            <button
+              type="button"
+              onClick={() => setScore(0)}
+              className="cursor-pointer py-1 px-2.5 -mx-1 rounded-md transition-colors hover:bg-ink-100 hover:text-ink-900"
+              aria-label="Set score to 0"
+            >
+              0
+            </button>
+            <button
+              type="button"
+              onClick={() => setScore(6.0)}
+              className="cursor-pointer py-1 px-2.5 -mx-1 rounded-md transition-colors hover:bg-ink-100 hover:text-ink-900"
+              aria-label="Set score to 6.0 (Skilled threshold)"
+            >
+              6
+            </button>
+            <button
+              type="button"
+              onClick={() => setScore(10.0)}
+              className="cursor-pointer py-1 px-2.5 -mx-1 rounded-md transition-colors hover:bg-ink-100 hover:text-ink-900"
+              aria-label="Set score to 10.0"
+            >
+              10
+            </button>
           </div>
         </div>
 
@@ -182,12 +185,7 @@ export function ScoreCard() {
         <dl className="grid grid-cols-2 gap-px border-t border-ink-100 bg-ink-100">
           <Cell
             label="Per hire"
-            value={
-              money.perHireMinor > 0
-                ? formatMoney(money.perHireMinor, currency)
-                : "Waived"
-            }
-            muted={money.perHireMinor === 0}
+            value={formatMoney(money.perHireMinor, currency)}
           />
           <Cell label="Band" value={`${band.min}–${band.max}/10`} />
         </dl>
@@ -203,31 +201,43 @@ export function ScoreCard() {
         <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-text-subtle">
           Where the cohort sits
         </p>
-        {/* Cohort distribution. Fixed-width bars, not flex-grow: at ten bins
-            across a full-width flex row each bin becomes ~55px wide and as
-            tall as the container, which renders as a row of white blobs
-            rather than a histogram. */}
-        <div className="mt-3 flex h-14 items-end gap-[3px]" aria-hidden>
+        <div className="mt-3 flex h-14 items-stretch gap-[3px]" aria-label="Cohort score distribution">
           {DISTRIBUTION.map((n, i) => {
             const lo = (i / DISTRIBUTION.length) * 10;
+            const mid = Math.round((lo + 0.5) * 10) / 10;
             const inBand = lo >= band.min && lo < band.max;
             return (
-              <div
+              <button
+                type="button"
                 key={i}
-                style={{ height: `${Math.max(8, (n / 388) * 100)}%` }}
-                className={cn(
-                  "w-full rounded-[2px] transition-colors duration-300",
-                  inBand ? "bg-primary" : "bg-ink-200",
-                )}
-              />
+                onClick={() => setScore(mid)}
+                aria-label={`Jump to score ${mid}`}
+                className="group flex h-full w-full cursor-pointer flex-col justify-end rounded-[2px] focus:outline-hidden"
+              >
+                <div
+                  style={{ height: `${Math.max(8, (n / 388) * 100)}%` }}
+                  className={cn(
+                    "w-full rounded-[2px] transition-colors duration-200 group-hover:opacity-80",
+                    inBand ? "bg-primary" : "bg-ink-200 group-hover:bg-ink-300",
+                  )}
+                />
+              </button>
             );
           })}
         </div>
         <div className="mt-2 flex justify-between text-2xs text-text-subtle">
           {BANDS.map((b) => (
-            <span key={b.id} className={cn(b.id === band.id && "font-semibold text-on-dark-accent")}>
+            <button
+              type="button"
+              key={b.id}
+              onClick={() => setScore(b.min === 0 ? 3.0 : b.min === 6 ? 7.0 : 9.0)}
+              className={cn(
+                "cursor-pointer py-1 px-2 -mx-1 rounded-md transition-colors hover:bg-ink-100 hover:text-ink-900",
+                b.id === band.id ? "font-semibold text-on-dark-accent" : "text-text-subtle",
+              )}
+            >
               {b.name}
-            </span>
+            </button>
           ))}
         </div>
       </div>

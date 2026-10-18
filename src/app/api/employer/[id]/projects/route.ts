@@ -12,8 +12,8 @@ const bodySchema = z.object({
   locationType: z.string().optional(),
   preferredLocations: z.array(z.string()).optional(),
   pincode: z.string().optional(),
-  city: z.string().optional(),
-  state: z.string().optional(),
+  city: z.string().nullable().optional(),
+  state: z.string().nullable().optional(),
   timezone: z.string().optional(),
 });
 

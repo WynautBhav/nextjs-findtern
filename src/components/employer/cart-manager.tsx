@@ -18,7 +18,8 @@ import {
 
 import { csrfFetch } from "@/lib/client-fetch";
 import { formatCurrency, formatPerHire, formatRate } from "@/lib/format";
-import type { CandidateProfile } from "@/lib/employer-candidates";
+import { displayNameOf, type CandidateProfile } from "@/lib/employer-candidates";
+import { TIMEZONES } from "@/lib/timezones";
 import type { Currency } from "@/lib/employer-pricing";
 import {
   Dialog,
@@ -43,13 +44,22 @@ export function CartManager({
   initialCartLines,
   initialStagedLines,
   currency = "INR",
+  nameUnlockedIds = [],
+  unlockAll = false,
 }: {
   employerId: string;
   initialCartLines: CartLineItem[];
   initialStagedLines: CartLineItem[];
   currency?: Currency;
+  /** Intern ids this employer hired - the only ones whose full name shows. */
+  nameUnlockedIds?: string[];
+  /** Admin "View as": every name shows. */
+  unlockAll?: boolean;
 }) {
   const router = useRouter();
+  const unlocked = new Set(nameUnlockedIds);
+  const nameOf = (line: CartLineItem) =>
+    displayNameOf(line.candidate, unlockAll || unlocked.has(line.candidate.id));
   const [activeTab, setActiveTab] = useState<"cart" | "checkout">("cart");
   const [cartLines, setCartLines] = useState<CartLineItem[]>(initialCartLines);
   const [stagedLines, setStagedLines] = useState<CartLineItem[]>(initialStagedLines);
@@ -95,6 +105,7 @@ export function CartManager({
           action: "remove",
           internId: item.candidate.id,
           projectId: item.projectId,
+          listType: fromTab,
         }),
       });
 
@@ -193,9 +204,10 @@ export function CartManager({
         body: JSON.stringify({
           internId: meetingCandidate.candidate.id,
           projectId: meetingCandidate.projectId,
-          slot1: new Date(slot1).toISOString(),
-          slot2: slot2 ? new Date(slot2).toISOString() : undefined,
-          slot3: slot3 ? new Date(slot3).toISOString() : undefined,
+          // Wall-clock times in the chosen zone; the server converts them.
+          slot1,
+          slot2: slot2 || undefined,
+          slot3: slot3 || undefined,
           timezone,
         }),
       });
@@ -223,7 +235,7 @@ export function CartManager({
   return (
     <div className="space-y-6">
       {errorMsg && (
-        <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-700">
+        <div className="flex items-center gap-2 rounded-[10px] border border-red-200 bg-red-50 p-3 text-xs text-red-700">
           <AlertCircle className="size-4 shrink-0" />
           <span>{errorMsg}</span>
         </div>
@@ -235,10 +247,10 @@ export function CartManager({
           <button
             type="button"
             onClick={() => setActiveTab("cart")}
-            className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition-colors ${
+            className={`apple-spring apple-pressable inline-flex min-h-11 items-center gap-2 rounded-[10px] px-4 text-xs font-semibold ${
               activeTab === "cart"
                 ? "bg-brand-700 text-white shadow-2xs"
-                : "border border-ink-200 bg-white text-ink-700 hover:bg-ink-50"
+                : "border border-ink-200 bg-white text-ink-700 hover:border-ink-300 hover:bg-ink-50"
             }`}
           >
             <ShoppingCart className="size-3.5" />
@@ -248,10 +260,10 @@ export function CartManager({
           <button
             type="button"
             onClick={() => setActiveTab("checkout")}
-            className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition-colors ${
+            className={`apple-spring apple-pressable inline-flex min-h-11 items-center gap-2 rounded-[10px] px-4 text-xs font-semibold ${
               activeTab === "checkout"
                 ? "bg-brand-700 text-white shadow-2xs"
-                : "border border-ink-200 bg-white text-ink-700 hover:bg-ink-50"
+                : "border border-ink-200 bg-white text-ink-700 hover:border-ink-300 hover:bg-ink-50"
             }`}
           >
             <CreditCard className="size-3.5" />
@@ -267,7 +279,7 @@ export function CartManager({
             <select
               value={selectedProject}
               onChange={(e) => setSelectedProject(e.target.value)}
-              className="h-9 rounded-xl border border-ink-200 bg-white px-3 text-xs font-medium text-ink-800 outline-none focus:border-brand-600"
+              className="apple-spring min-h-11 rounded-[10px] border border-ink-200 bg-white px-3 text-[14px] font-medium text-ink-800 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
             >
               <option value="all">All Projects</option>
               {projectOptions.map(([id, name]) => (
@@ -283,8 +295,8 @@ export function CartManager({
       {/* Main Content Area */}
       {activeTab === "cart" ? (
         displayedCartLines.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-ink-200 bg-white p-12 text-center">
-            <div className="mx-auto grid size-12 place-items-center rounded-2xl bg-ink-50 text-ink-400">
+          <div className="rounded-[20px] border border-dashed border-ink-200/70 bg-white p-12 text-center">
+            <div className="mx-auto grid size-12 place-items-center rounded-[10px] bg-ink-50 text-ink-400">
               <ShoppingCart className="size-6" />
             </div>
             <h3 className="mt-3 text-sm font-semibold text-ink-900">Your cart is empty</h3>
@@ -294,7 +306,7 @@ export function CartManager({
             <div className="mt-5">
               <Link
                 href="/employer/candidates"
-                className="inline-flex items-center gap-1.5 rounded-xl bg-brand-700 px-4 py-2 text-xs font-semibold text-white hover:bg-brand-800"
+                className="apple-spring apple-pressable inline-flex min-h-11 items-center justify-center gap-1.5 rounded-[10px] bg-brand-700 px-4 text-xs font-semibold text-white hover:bg-brand-800"
               >
                 Browse Candidates
               </Link>
@@ -306,17 +318,17 @@ export function CartManager({
               {displayedCartLines.map((line) => (
                 <div
                   key={line.id}
-                  className="rounded-2xl border border-ink-100 bg-white p-5 shadow-2xs transition-all hover:border-brand-200 hover:shadow-xs"
+                  className="apple-spring rounded-[20px] border border-ink-200/70 bg-white p-5 shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)] hover:border-brand-200"
                 >
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                     <div className="flex items-start gap-3.5">
-                      <span className="grid size-11 place-items-center rounded-xl bg-brand-100 text-sm font-bold text-brand-800 shrink-0">
-                        {line.candidate.fullName.charAt(0).toUpperCase()}
+                      <span className="grid size-11 place-items-center rounded-[10px] bg-brand-100 text-sm font-bold text-brand-800 shrink-0">
+                        {line.candidate.initials}
                       </span>
 
                       <div className="min-w-0">
                         <h4 className="text-sm font-bold text-ink-900">
-                          {line.candidate.fullName}
+                          {nameOf(line)}
                         </h4>
 
                         <p className="mt-0.5 text-xs text-text-subtle">
@@ -328,7 +340,7 @@ export function CartManager({
                           {line.candidate.skills.slice(0, 5).map((s) => (
                             <span
                               key={s}
-                              className="rounded-md bg-ink-100 px-2 py-0.5 text-2xs font-medium text-ink-700"
+                              className="rounded-md bg-ink-100 px-2 py-0.5 text-xs font-medium text-ink-700"
                             >
                               {s}
                             </span>
@@ -338,14 +350,14 @@ export function CartManager({
                     </div>
 
                     <div className="text-right sm:self-start shrink-0">
-                      <div className="inline-flex items-center gap-1 rounded-full bg-brand-50 px-2.5 py-0.5 text-2xs font-bold text-brand-800 border border-brand-200/60">
+                      <div className="inline-flex items-center gap-1 rounded-full bg-brand-50 px-2.5 py-0.5 text-xs font-bold tabular-nums text-brand-800 border border-brand-200/60">
                         <Sparkles className="size-3 fill-brand-600 text-brand-600" />
                         <span>Score: {line.candidate.score.toFixed(1)}</span>
                       </div>
-                      <p className="mt-1 text-xs font-semibold text-ink-900">
+                      <p className="mt-1 text-xs font-semibold tabular-nums text-ink-900">
                         {formatRate(line.hourlyRateMinor, currency)}
                       </p>
-                      <p className="text-2xs text-text-subtle">
+                      <p className="text-xs tabular-nums text-text-subtle">
                         {formatPerHire(line.perHireMinor, currency)}
                       </p>
                     </div>
@@ -361,7 +373,7 @@ export function CartManager({
                           setErrorMsg("");
                           setMeetingSuccess(false);
                         }}
-                        className="inline-flex items-center gap-1.5 rounded-xl bg-brand-50 border border-brand-200/80 px-3.5 py-1.5 text-xs font-semibold text-brand-800 transition-colors hover:bg-brand-100"
+                        className="apple-spring apple-pressable inline-flex min-h-11 items-center justify-center gap-1.5 rounded-[10px] bg-brand-50 border border-brand-200/80 px-3.5 text-xs font-semibold text-brand-800 hover:bg-brand-100"
                       >
                         <Video className="size-3.5" />
                         <span>Book Meeting</span>
@@ -369,7 +381,7 @@ export function CartManager({
 
                       <Link
                         href={`/employer/send-proposal?intern=${encodeURIComponent(line.candidate.id)}&project=${encodeURIComponent(line.projectId)}`}
-                        className="inline-flex items-center gap-1.5 rounded-xl border border-ink-200 bg-white px-3.5 py-1.5 text-xs font-semibold text-ink-800 transition-colors hover:bg-ink-50"
+                        className="apple-spring apple-pressable inline-flex min-h-11 items-center justify-center gap-1.5 rounded-[10px] border border-ink-200 bg-white px-3.5 text-xs font-semibold text-ink-800 hover:border-ink-300 hover:bg-ink-50"
                       >
                         <Send className="size-3.5" />
                         <span>Send Proposal</span>
@@ -381,7 +393,7 @@ export function CartManager({
                         type="button"
                         onClick={() => handleStage(line)}
                         disabled={busyId === line.id}
-                        className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-2xs hover:bg-emerald-700 disabled:opacity-60"
+                        className="apple-spring apple-pressable inline-flex min-h-11 items-center justify-center gap-1.5 rounded-[10px] bg-emerald-600 px-3.5 text-xs font-semibold text-white shadow-2xs hover:bg-emerald-700 disabled:opacity-60"
                       >
                         {busyId === line.id ? (
                           <Loader2 className="size-3.5 animate-spin" />
@@ -395,7 +407,7 @@ export function CartManager({
                         type="button"
                         onClick={() => handleRemove(line, "cart")}
                         disabled={busyId === line.id}
-                        className="grid size-8 place-items-center rounded-xl border border-ink-200 text-ink-400 hover:text-rose-600 hover:border-rose-200 hover:bg-rose-50"
+                        className="apple-spring apple-pressable grid size-11 place-items-center rounded-[10px] border border-ink-200 text-ink-400 hover:text-rose-600 hover:border-rose-200 hover:bg-rose-50"
                         title="Remove from Cart"
                       >
                         <Trash2 className="size-3.5" />
@@ -410,7 +422,7 @@ export function CartManager({
                   type="button"
                   onClick={handleStageAll}
                   disabled={busyId === "stage-all" || cartLines.length === 0}
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-brand-700 py-3 text-xs font-semibold text-white shadow-2xs hover:bg-brand-800 disabled:opacity-60"
+                  className="apple-spring apple-pressable inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[10px] bg-brand-700 px-4 text-xs font-semibold text-white shadow-2xs hover:bg-brand-800 disabled:opacity-60"
                 >
                   {busyId === "stage-all" ? (
                     <Loader2 className="size-4 animate-spin" />
@@ -423,7 +435,7 @@ export function CartManager({
             </div>
 
             {/* Sidebar Summary */}
-            <aside className="rounded-2xl border border-ink-100 bg-white p-5 shadow-2xs space-y-4 lg:sticky lg:top-8 lg:self-start">
+            <aside className="rounded-[20px] border border-ink-200/70 bg-white p-5 shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)] space-y-4 lg:sticky lg:top-8 lg:self-start">
               <h3 className="text-xs font-bold uppercase tracking-wider text-ink-800">
                 Cart Summary
               </h3>
@@ -431,16 +443,16 @@ export function CartManager({
               <div className="space-y-2 text-xs">
                 <div className="flex justify-between text-ink-600">
                   <span>Candidates Shortlisted</span>
-                  <span className="font-semibold text-ink-900">{cartLines.length}</span>
+                  <span className="font-semibold tabular-nums text-ink-900">{cartLines.length}</span>
                 </div>
                 <div className="flex justify-between text-ink-600">
                   <span>Staged for Hire</span>
-                  <span className="font-semibold text-emerald-700">{stagedLines.length}</span>
+                  <span className="font-semibold tabular-nums text-emerald-700">{stagedLines.length}</span>
                 </div>
               </div>
 
               <div className="border-t border-ink-100 pt-3">
-                <p className="text-2xs text-text-subtle leading-relaxed">
+                <p className="text-xs text-text-subtle leading-relaxed">
                   Booking an interview or sending a proposal incurs ₹0 charge. Platform and per-hire fees are only charged upon confirming candidate hire.
                 </p>
               </div>
@@ -449,7 +461,7 @@ export function CartManager({
                 <button
                   type="button"
                   onClick={() => setActiveTab("checkout")}
-                  className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-emerald-600 py-2.5 text-xs font-semibold text-white hover:bg-emerald-700"
+                  className="apple-spring apple-pressable inline-flex min-h-11 w-full items-center justify-center gap-1.5 rounded-[10px] bg-emerald-600 px-4 text-xs font-semibold text-white hover:bg-emerald-700"
                 >
                   <span>Go to Checkout ({stagedLines.length})</span>
                   <ArrowRight className="size-3.5" />
@@ -461,8 +473,8 @@ export function CartManager({
       ) : (
         /* Checkout Step */
         displayedStagedLines.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-ink-200 bg-white p-12 text-center">
-            <div className="mx-auto grid size-12 place-items-center rounded-2xl bg-ink-50 text-ink-400">
+          <div className="rounded-[20px] border border-dashed border-ink-200/70 bg-white p-12 text-center">
+            <div className="mx-auto grid size-12 place-items-center rounded-[10px] bg-ink-50 text-ink-400">
               <CreditCard className="size-6" />
             </div>
             <h3 className="mt-3 text-sm font-semibold text-ink-900">No candidates in checkout</h3>
@@ -473,7 +485,7 @@ export function CartManager({
               <button
                 type="button"
                 onClick={() => setActiveTab("cart")}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-brand-700 px-4 py-2 text-xs font-semibold text-white hover:bg-brand-800"
+                className="apple-spring apple-pressable inline-flex min-h-11 items-center justify-center gap-1.5 rounded-[10px] bg-brand-700 px-4 text-xs font-semibold text-white hover:bg-brand-800"
               >
                 Back to Shortlist
               </button>
@@ -482,12 +494,12 @@ export function CartManager({
         ) : (
           <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
             <div className="space-y-4">
-              <div className="rounded-2xl border border-brand-200 bg-brand-50/50 p-4">
+              <div className="rounded-[20px] border border-brand-200 bg-brand-50/50 p-4">
                 <div className="flex items-center gap-2 text-xs font-bold text-brand-900">
                   <Sparkles className="size-4 text-brand-700" />
                   <span>Staged Candidates Ready for Hire Confirmation</span>
                 </div>
-                <p className="mt-1 text-2xs text-brand-800 leading-relaxed">
+                <p className="mt-1 text-xs text-brand-800 leading-relaxed">
                   Review candidates below. Clicking proceed to payment launches Razorpay secure checkout for invoice activation.
                 </p>
               </div>
@@ -495,28 +507,28 @@ export function CartManager({
               {displayedStagedLines.map((line) => (
                 <div
                   key={line.id}
-                  className="rounded-2xl border border-ink-100 bg-white p-4.5 shadow-2xs"
+                  className="rounded-[20px] border border-ink-200/70 bg-white p-4.5 shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)]"
                 >
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
-                      <span className="grid size-10 place-items-center rounded-xl bg-brand-100 text-xs font-bold text-brand-800">
-                        {line.candidate.fullName.charAt(0).toUpperCase()}
+                      <span className="grid size-10 place-items-center rounded-[10px] bg-brand-100 text-xs font-bold text-brand-800">
+                        {line.candidate.initials}
                       </span>
                       <div>
-                        <h4 className="text-xs font-bold text-ink-900">{line.candidate.fullName}</h4>
-                        <p className="text-2xs text-text-subtle">Project: {line.projectName}</p>
+                        <h4 className="text-xs font-bold text-ink-900">{nameOf(line)}</h4>
+                        <p className="text-xs text-text-subtle">Project: {line.projectName}</p>
                       </div>
                     </div>
 
                     <div className="text-right">
-                      <p className="text-xs font-bold text-brand-800">
+                      <p className="text-xs font-bold tabular-nums text-brand-800">
                         {formatPerHire(line.perHireMinor, currency)}
                       </p>
                       <button
                         type="button"
                         onClick={() => handleRemove(line, "checkout")}
                         disabled={busyId === line.id}
-                        className="text-2xs text-rose-600 hover:underline pt-0.5"
+                        className="apple-spring inline-flex min-h-11 items-center text-xs text-rose-600 hover:underline pt-0.5"
                       >
                         Remove
                       </button>
@@ -527,7 +539,7 @@ export function CartManager({
             </div>
 
             {/* Checkout Pricing Sidebar */}
-            <aside className="rounded-2xl border border-ink-100 bg-white p-5 shadow-2xs space-y-4 lg:sticky lg:top-8 lg:self-start">
+            <aside className="rounded-[20px] border border-ink-200/70 bg-white p-5 shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)] space-y-4 lg:sticky lg:top-8 lg:self-start">
               <h3 className="text-xs font-bold uppercase tracking-wider text-ink-800">
                 Order Summary
               </h3>
@@ -535,11 +547,11 @@ export function CartManager({
               <div className="space-y-2 text-xs border-b border-ink-100 pb-3">
                 <div className="flex justify-between text-ink-600">
                   <span>Hires Staged</span>
-                  <span className="font-semibold text-ink-900">{stagedLines.length}</span>
+                  <span className="font-semibold tabular-nums text-ink-900">{stagedLines.length}</span>
                 </div>
                 <div className="flex justify-between text-ink-600">
                   <span>Per-Hire Placement</span>
-                  <span className="font-semibold text-ink-900">
+                  <span className="font-semibold tabular-nums text-ink-900">
                     {formatCurrency(totalPerHireMinor, currency)}
                   </span>
                 </div>
@@ -547,14 +559,14 @@ export function CartManager({
 
               <div className="flex justify-between items-baseline text-sm font-bold text-ink-900">
                 <span>Total Payable</span>
-                <span className="text-brand-800 text-base">
+                <span className="text-brand-800 text-base tabular-nums">
                   {formatCurrency(totalPerHireMinor, currency)}
                 </span>
               </div>
 
               <Link
                 href="/employer/checkout"
-                className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3 text-xs font-semibold text-white shadow-2xs hover:bg-emerald-700 transition-colors"
+                className="apple-spring apple-pressable inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[10px] bg-emerald-600 px-4 text-xs font-semibold text-white shadow-2xs hover:bg-emerald-700"
               >
                 <CreditCard className="size-4" />
                 <span>Proceed to Payment</span>
@@ -573,7 +585,7 @@ export function CartManager({
           <DialogHeader>
             <DialogTitle>
               {meetingCandidate
-                ? `Book Meeting with ${meetingCandidate.candidate.fullName}`
+                ? `Book Meeting with ${nameOf(meetingCandidate)}`
                 : "Schedule Interview"}
             </DialogTitle>
             <DialogDescription>
@@ -582,7 +594,7 @@ export function CartManager({
           </DialogHeader>
 
           {meetingSuccess ? (
-            <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-6 text-center space-y-2">
+            <div className="rounded-[10px] border border-emerald-200 bg-emerald-50 p-6 text-center space-y-2">
               <CheckCircle2 className="size-8 text-emerald-600 mx-auto" />
               <h4 className="text-sm font-bold text-emerald-900">Interview Request Sent!</h4>
               <p className="text-xs text-emerald-800">
@@ -600,7 +612,7 @@ export function CartManager({
                   required
                   value={slot1}
                   onChange={(e) => setSlot1(e.target.value)}
-                  className="mt-1 h-10 w-full rounded-xl border border-ink-200 px-3 text-xs text-ink-900 outline-none focus:border-brand-600"
+                  className="apple-spring mt-1 min-h-11 w-full rounded-[10px] border border-ink-200 px-3 text-[14px] text-ink-900 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
                 />
               </div>
 
@@ -612,7 +624,7 @@ export function CartManager({
                   type="datetime-local"
                   value={slot2}
                   onChange={(e) => setSlot2(e.target.value)}
-                  className="mt-1 h-10 w-full rounded-xl border border-ink-200 px-3 text-xs text-ink-900 outline-none focus:border-brand-600"
+                  className="apple-spring mt-1 min-h-11 w-full rounded-[10px] border border-ink-200 px-3 text-[14px] text-ink-900 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
                 />
               </div>
 
@@ -624,7 +636,7 @@ export function CartManager({
                   type="datetime-local"
                   value={slot3}
                   onChange={(e) => setSlot3(e.target.value)}
-                  className="mt-1 h-10 w-full rounded-xl border border-ink-200 px-3 text-xs text-ink-900 outline-none focus:border-brand-600"
+                  className="apple-spring mt-1 min-h-11 w-full rounded-[10px] border border-ink-200 px-3 text-[14px] text-ink-900 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
                 />
               </div>
 
@@ -635,12 +647,19 @@ export function CartManager({
                 <select
                   value={timezone}
                   onChange={(e) => setTimezone(e.target.value)}
-                  className="mt-1 h-10 w-full rounded-xl border border-ink-200 bg-white px-3 text-xs text-ink-900 outline-none focus:border-brand-600"
+                  className="apple-spring mt-1 min-h-11 w-full rounded-[10px] border border-ink-200 bg-white px-3 text-[14px] text-ink-900 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
                 >
-                  <option value="Asia/Kolkata">Asia/Kolkata (IST - UTC+5:30)</option>
-                  <option value="UTC">UTC (Universal Coordinated Time)</option>
-                  <option value="America/New_York">America/New_York (EST)</option>
-                  <option value="Europe/London">Europe/London (GMT)</option>
+                  {TIMEZONES.map((option) =>
+                    option.group ? (
+                      <option key={option.id} value={option.id} disabled>
+                        ── {option.label} ──
+                      </option>
+                    ) : (
+                      <option key={option.id} value={option.id}>
+                        {option.label}
+                      </option>
+                    ),
+                  )}
                 </select>
               </div>
 
@@ -648,14 +667,14 @@ export function CartManager({
                 <button
                   type="button"
                   onClick={() => setMeetingCandidate(null)}
-                  className="rounded-xl border border-ink-200 bg-white px-4 py-2 text-xs font-medium text-ink-700 hover:bg-ink-50"
+                  className="apple-spring apple-pressable min-h-11 rounded-[10px] border border-ink-200 bg-white px-4 text-xs font-medium text-ink-700 hover:border-ink-300 hover:bg-ink-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={busyId === "booking-meeting" || !slot1}
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-brand-700 px-4 py-2 text-xs font-semibold text-white hover:bg-brand-800 disabled:opacity-50"
+                  className="apple-spring apple-pressable inline-flex min-h-11 items-center justify-center gap-1.5 rounded-[10px] bg-brand-700 px-4 text-xs font-semibold text-white hover:bg-brand-800 disabled:opacity-50"
                 >
                   {busyId === "booking-meeting" && <Loader2 className="size-3.5 animate-spin" />}
                   <span>Send Interview Request</span>

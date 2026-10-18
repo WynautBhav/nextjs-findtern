@@ -71,7 +71,7 @@ export const FAQ_INTERN: CmsFaqItem[] = [
     "id": "62bb4f40-b68f-4f72-b29d-dc5b845bae2d",
     "category": "Intern",
     "question": " Does Findtern guarantee internship placement?",
-    "answer": "Yes, Findtern provides an internship guarantee.\nIf you do not secure an internship through the Findtern platform within 18 months, you will receive a full refund of your registration and AI interview fee.\n\nFindtern offers a verified and transparent platform where students connect with genuine companies. Your internship opportunities depend on your Findtern Score, skills, and company requirements. Candidates with a profile score above 6 are eligible for paid internship opportunities.\n\nThink of Findtern as your career launchpad-we actively bridge the gap between students and employers, and we stand by our commitment with a 100% refund guarantee if you don’t get placed within 18 months.",
+    "answer": "Yes, Findtern provides an internship guarantee.\nIf you do not secure an internship through the Findtern platform within the guarantee window set out in the intern terms, you will receive a full refund of your registration and AI interview fee.\n\nFindtern offers a verified and transparent platform where students connect with genuine companies. Your internship opportunities depend on your Findtern Score, skills, and company requirements. Candidates with a profile score above 6 are eligible for paid internship opportunities.\n\nThink of Findtern as your career launchpad-we actively bridge the gap between students and employers, and we stand by our commitment with a 100% refund guarantee if you don’t get placed within the guarantee window.",
     "sortOrder": 0,
     "isActive": true
   },
@@ -95,7 +95,7 @@ export const FAQ_INTERN: CmsFaqItem[] = [
     "id": "02fff963-6383-4428-a564-df455fbdbe99",
     "category": "Intern",
     "question": "Is the ₹2500 AI interview fee refundable if I don’t get internships?",
-    "answer": "The AI interview fee is refundable. If you do not secure an internship within 18 months of completing the AI interview, you will receive a full refund.\n",
+    "answer": "The AI interview fee is refundable. If you do not secure an internship within the guarantee window set out in the intern terms, you will receive a full refund.\n",
     "sortOrder": 0,
     "isActive": true
   },

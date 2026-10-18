@@ -26,6 +26,7 @@ import {
   BadgeCheck,
   Bell,
   BriefcaseBusiness,
+  Building,
   CalendarCheck2,
   CircleUserRound,
   Compass,
@@ -35,12 +36,15 @@ import {
   ReceiptIndianRupee,
   ScrollText,
   Settings2,
+  X,
 } from "lucide-react";
+import { FeedbackFab } from "@/components/app/feedback-fab";
 
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { csrfFetch } from "@/lib/client-fetch";
 import { cn } from "@/lib/utils";
 import type { Stage } from "@/lib/journey";
+import { Logo } from "@/components/brand/logo";
 
 export type NavItem = {
   href: string;
@@ -75,6 +79,7 @@ export const SECONDARY_NAV: NavItem[] = [
   { href: "/intern/interviews", label: "Interviews", icon: <CalendarCheck2 className="size-4" /> },
   { href: "/intern/timesheets", label: "Timesheets", icon: <LayoutList className="size-4" /> },
   { href: "/intern/earnings", label: "Stipend", icon: <ReceiptIndianRupee className="size-4" /> },
+  { href: "/intern/bank-details", label: "Bank Details", icon: <Building className="size-4" /> },
   { href: "/intern/documents", label: "Documents", icon: <BadgeCheck className="size-4" /> },
   { href: "/intern/profile", label: "Your profile", icon: <CircleUserRound className="size-4" /> },
   { href: "/intern/notifications", label: "Notifications", icon: <Bell className="size-4" /> },
@@ -91,6 +96,7 @@ export function AppShell({
   name,
   email,
   photoUrl,
+  unreadAlerts = 0,
   children,
 }: {
   stage: Stage;
@@ -98,6 +104,7 @@ export function AppShell({
   name: string;
   email: string;
   photoUrl?: string | null;
+  unreadAlerts?: number;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -126,6 +133,7 @@ export function AppShell({
     <ul className="flex flex-col gap-1">
       {items.map((item) => {
         const active = isActive(pathname, item.href);
+        const isNotif = item.href === "/intern/notifications";
         return (
           <li key={item.href}>
             <Link
@@ -133,7 +141,7 @@ export function AppShell({
               onClick={() => setOpen(false)}
               aria-current={active ? "page" : undefined}
               className={cn(
-                "flex min-h-11 items-center gap-3 rounded-xl px-3 py-2 text-sm transition-colors duration-[var(--dur-instant)]",
+                "apple-spring apple-pressable flex min-h-11 items-center gap-3 rounded-[10px] px-3 py-2 text-[14px] tracking-[-0.01em]",
                 active
                   ? "bg-white/12 font-semibold text-white"
                   : "text-on-dark-subtle hover:bg-white/6 hover:text-white",
@@ -143,7 +151,11 @@ export function AppShell({
                 {item.icon}
               </span>
               <span className="min-w-0 flex-1 truncate">{item.label}</span>
-              {item.attention ? (
+              {isNotif && unreadAlerts > 0 ? (
+                <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-accent-500/20 px-1.5 text-2xs font-bold text-accent-300">
+                  {unreadAlerts > 99 ? "99+" : unreadAlerts}
+                </span>
+              ) : item.attention ? (
                 <span className="size-1.5 shrink-0 rounded-full bg-accent-400" aria-label="Needs you" />
               ) : null}
             </Link>
@@ -154,17 +166,14 @@ export function AppShell({
   );
 
   return (
-    <div className="min-h-[100dvh] bg-surface lg:flex">
+    <div className="apple-admin min-h-[100dvh] overflow-x-clip bg-surface lg:flex">
       {/* ── Desktop rail ────────────────────────────────────────────── */}
       <aside className="sticky top-0 hidden h-[100dvh] w-64 shrink-0 flex-col bg-brand-950 px-4 py-6 lg:flex">
         <Link href="/intern/dashboard" className="flex items-center gap-2.5 px-2">
-          <span className="grid size-8 place-items-center rounded-full bg-white/10">
-            <BadgeCheck className="size-4 text-accent-300" aria-hidden />
-          </span>
-          <span className="text-base font-semibold tracking-tight text-white">Findtern</span>
+          <Logo variant="white" priority className="h-7" />
         </Link>
 
-        <nav className="mt-8 flex-1">
+        <nav className="mt-8 min-h-0 flex-1 overflow-y-auto overscroll-contain [scrollbar-width:thin]">
           {navList(nav)}
           <p className="mb-2 mt-7 px-3 text-2xs font-semibold uppercase tracking-[0.14em] text-on-dark-subtle/55">
             More
@@ -175,7 +184,7 @@ export function AppShell({
         <div className="mt-4 shrink-0 border-t border-white/10 pt-3">
           <Link
             href="/intern/profile"
-            className="flex items-center gap-3 rounded-xl px-2 py-2 transition-colors duration-[var(--dur-instant)] hover:bg-white/6"
+            className="apple-spring flex items-center gap-3 rounded-[10px] px-2 py-2 hover:bg-white/6"
           >
             <Avatar name={name} initials={initials} photoUrl={photoUrl} />
             <span className="min-w-0 flex-1">
@@ -183,10 +192,11 @@ export function AppShell({
               <span className="block truncate text-xs text-on-dark-subtle">{email}</span>
             </span>
           </Link>
+          <FeedbackFab variant="link" className="mt-0.5" />
           <button
             type="button"
             onClick={signOut}
-            className="mt-0.5 flex min-h-10 w-full items-center gap-2.5 rounded-lg px-3 text-sm text-on-dark-subtle transition-colors duration-[var(--dur-instant)] hover:bg-white/6 hover:text-white"
+            className="apple-spring mt-0.5 flex min-h-11 w-full items-center gap-2.5 rounded-[10px] px-3 text-sm text-on-dark-subtle hover:bg-white/6 hover:text-white"
           >
             <LogOut className="size-4" aria-hidden />
             Sign out
@@ -202,22 +212,30 @@ export function AppShell({
               <button
                 type="button"
                 aria-label="Open navigation"
-                className="-ml-1 grid size-11 place-items-center rounded-xl text-ink-700 transition-colors duration-[var(--dur-instant)] hover:bg-ink-100"
+                className="apple-spring -ml-1 grid size-11 place-items-center rounded-[10px] text-ink-700 hover:bg-ink-100"
               >
                 <svg viewBox="0 0 20 20" className="size-5" aria-hidden fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
                   <path d="M3 6h14M3 10h14M3 14h14" />
                 </svg>
               </button>
             </SheetTrigger>
-            <SheetContent side="left" className="w-[19rem] border-r-0 bg-brand-950 p-4 text-white">
+            <SheetContent side="left" showCloseButton={false} className="w-[19rem] border-r-0 bg-brand-950 p-4 text-white">
               <SheetTitle className="sr-only">Navigation</SheetTitle>
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                aria-label="Close navigation"
+                className="apple-spring absolute top-4 right-4 grid size-11 place-items-center rounded-[10px] text-on-dark-subtle hover:bg-white/10 hover:text-white"
+              >
+                <X className="size-5" aria-hidden />
+              </button>
               <div className="flex items-center gap-2.5 px-2 py-2">
                 <span className="grid size-8 place-items-center rounded-full bg-white/10">
                   <BadgeCheck className="size-4 text-accent-300" aria-hidden />
                 </span>
                 <span className="text-base font-semibold tracking-tight text-white">Findtern</span>
               </div>
-              <nav className="mt-6 max-h-[calc(100dvh-14rem)] overflow-y-auto pb-4">
+              <nav className="mt-6 max-h-[calc(100dvh-14rem)] overflow-y-auto overscroll-contain pb-4">
                 {navList(nav)}
                 <p className="mb-2 mt-7 px-3 text-2xs font-semibold uppercase tracking-[0.14em] text-on-dark-subtle/70">
                   Also here
@@ -236,6 +254,18 @@ export function AppShell({
           </Sheet>
           <Link href="/intern/dashboard" className="min-w-0 flex-1 truncate text-base font-semibold tracking-tight text-ink-900">
             Findtern
+          </Link>
+          <Link
+            href="/intern/notifications"
+            aria-label="Notifications"
+            className="apple-spring relative grid size-11 shrink-0 place-items-center rounded-[10px] text-ink-600 hover:bg-ink-100"
+          >
+            <Bell className="size-5" />
+            {unreadAlerts > 0 ? (
+              <span className="absolute right-1.5 top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-accent-500 px-1 text-[10px] font-bold text-brand-950 ring-2 ring-white">
+                {unreadAlerts > 99 ? "99+" : unreadAlerts}
+              </span>
+            ) : null}
           </Link>
           <Link href="/intern/profile" aria-label="Your profile" className="grid size-11 shrink-0 place-items-center">
             <Avatar name={name} initials={initials} photoUrl={photoUrl} />
@@ -260,7 +290,7 @@ export function AppShell({
                     href={item.href}
                     aria-current={active ? "page" : undefined}
                     className={cn(
-                      "relative flex min-h-16 flex-col items-center justify-center gap-1 px-1 py-2 text-[0.6875rem] font-medium transition-colors duration-[var(--dur-instant)]",
+                      "apple-spring relative flex min-h-16 flex-col items-center justify-center gap-1 px-1 py-2 text-[0.6875rem] font-medium",
                       active ? "text-brand-700" : "text-ink-500 hover:text-ink-800",
                     )}
                   >

@@ -1,13 +1,15 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { and, desc, eq, inArray } from "drizzle-orm";
-import { ArrowRight, ClipboardCheck } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 
 import { getDb, schema } from "@/lib/db";
-import { getSession } from "@/lib/auth";
-import { toCandidateProfile, type CandidateProfile } from "@/lib/employer-candidates";
+import { requireRole } from "@/lib/auth";
+import { displayNameOf, toCandidateProfile, type CandidateProfile } from "@/lib/employer-candidates";
+import { hiredInternIds } from "@/lib/employer-visibility";
 import { formatPeriod, normaliseEntries } from "@/lib/employer-timesheets";
 import { StatusPill } from "@/components/employer/timesheet-parts";
+import { EmptyScene } from "@/components/app/primitives";
 
 export const metadata: Metadata = {
   title: "Timesheets",
@@ -23,7 +25,7 @@ const CLOSED = new Set(["approved", "rejected"]);
  *
  * `timesheets.employer_id` is the scoping column. `intern_id` identifies whose
  * hours these are, but the review is the employer's, so the list is built from
- * `employer_id` — the same filter the legacy list used.
+ * `employer_id` - the same filter the legacy list used.
  */
 
 type Row = {
@@ -40,15 +42,22 @@ type Row = {
 };
 
 export default async function EmployerTimesheets() {
-  const session = await getSession();
-  const uid = session!.uid;
+  const session = await requireRole("employer");
+  const uid = session.uid;
 
   let rows: Row[] = [];
   let awaitingReview = 0;
   let internCount = 0;
+  let nameUnlocked = new Set<string>();
 
   try {
     const db = getDb();
+
+    try {
+      nameUnlocked = await hiredInternIds(db, uid);
+    } catch {
+      nameUnlocked = new Set<string>();
+    }
 
     const timesheets = await db
       .select()
@@ -96,7 +105,7 @@ export default async function EmployerTimesheets() {
       awaitingReview = rows.filter((row) => PENDING.has(row.status)).length;
     }
   } catch {
-    // DB unavailable — render the empty queue rather than crashing.
+    // DB unavailable - render the empty queue rather than crashing.
   }
 
   return (
@@ -112,7 +121,7 @@ export default async function EmployerTimesheets() {
         </div>
       </header>
 
-      <div className="mb-6 grid gap-4 sm:grid-cols-3">
+      <div className="mb-6 grid grid-cols-3 gap-2 sm:gap-4">
         <Stat label="Awaiting review" value={awaitingReview} tone="warning" />
         <Stat label="Total timesheets" value={rows.length} />
         <Stat
@@ -123,29 +132,29 @@ export default async function EmployerTimesheets() {
       </div>
 
       {rows.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-ink-200 bg-white/60 px-6 py-14 text-center">
-          <ClipboardCheck className="mx-auto size-8 text-ink-400" aria-hidden />
-          <h2 className="mt-4 text-base font-semibold text-ink-900">No timesheets yet</h2>
-          <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-ink-600">
-            Once an intern accepts an offer and starts work, they can submit timesheets here for your approval.
-          </p>
-          {internCount > 0 ? (
-            <p className="mt-3 rounded-full bg-ink-100 px-4 py-1 text-xs font-medium text-ink-600 inline-block">
-              {internCount} intern{internCount === 1 ? "" : "s"} on your account — none have submitted yet
-            </p>
-          ) : null}
-        </div>
+        <EmptyScene
+          art
+          title="No timesheets yet"
+          body="Once an intern accepts an offer and starts work, they can submit timesheets here for your approval."
+          who={
+            internCount > 0
+              ? `${internCount} ${internCount === 1 ? "intern" : "interns"} on your account - none have submitted yet`
+              : "Your interns - nothing submitted yet"
+          }
+        />
       ) : (
-        <ul className="divide-y divide-ink-100 rounded-2xl border border-ink-100 bg-white">
+        <ul className="divide-y divide-ink-100 rounded-[20px] border border-ink-200/70 bg-white shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)]">
           {rows.map((row) => (
             <li key={row.id}>
               <Link
                 href={`/employer/timesheets/${encodeURIComponent(row.id)}`}
-                className="flex flex-wrap items-center gap-4 px-5 py-4 transition-colors hover:bg-ink-50"
+                className="apple-spring apple-pressable flex flex-wrap items-center gap-4 px-5 py-4 hover:bg-ink-50"
               >
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-medium text-ink-900">
-                    {row.candidate?.fullName ?? "Intern"}
+                    {row.candidate
+                      ? displayNameOf(row.candidate, nameUnlocked.has(row.candidate.id))
+                      : "Intern"}
                   </p>
                   <p className="mt-0.5 text-xs text-text-subtle">
                     {formatPeriod(row.periodStart, row.periodEnd)}
@@ -187,9 +196,9 @@ function Stat({
         ? "text-success"
         : "text-ink-900";
   return (
-    <div className="rounded-xl border border-ink-100 bg-white p-5">
-      <p className="text-sm text-text-subtle">{label}</p>
-      <p className={`mt-1 text-3xl font-semibold tracking-tight ${valueTone}`}>{value}</p>
+    <div className="apple-spring rounded-[16px] border border-ink-200/70 bg-white p-3 shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)] sm:rounded-[20px] sm:p-5">
+      <p className="truncate text-[11px] text-text-subtle sm:text-sm">{label}</p>
+      <p className={`mt-0.5 text-lg font-semibold tabular-nums tracking-tight sm:mt-1 sm:text-3xl ${valueTone}`}>{value}</p>
     </div>
   );
 }

@@ -3,10 +3,8 @@
 /**
  * Broadcast composer.
  *
- * One message, an explicit recipient list, one POST per recipient type. The
- * endpoint takes `recipientIds` rather than "everyone", which means the
- * composer shows you exactly who is about to be messaged before anything is
- * sent - a broadcast nobody can preview is how a platform loses its users.
+ * One message to picked people, or to every active account of one type
+ * (the count is shown before sending).
  */
 
 import { useMemo, useState } from "react";
@@ -20,14 +18,18 @@ type Person = { id: string; label: string; email: string };
 export function NotificationComposer({
   interns,
   employers,
+  totals,
 }: {
   interns: Person[];
   employers: Person[];
+  /** Active accounts per audience, for "send to everyone". */
+  totals: { intern: number; employer: number };
 }) {
   const router = useRouter();
   const [audience, setAudience] = useState<"intern" | "employer">("intern");
   const [query, setQuery] = useState("");
   const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [everyone, setEveryone] = useState(false);
   const [title, setTitle] = useState("");
   const [message, setMessage] = useState("");
   const [type, setType] = useState("custom");
@@ -56,7 +58,7 @@ export function NotificationComposer({
   }
 
   async function send() {
-    if (picked.size === 0) {
+    if (picked.size === 0 && !everyone) {
       setError("Pick at least one recipient.");
       return;
     }
@@ -72,7 +74,8 @@ export function NotificationComposer({
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           recipientType: audience,
-          recipientIds: Array.from(picked),
+          recipientIds: everyone ? [] : Array.from(picked),
+          all: everyone,
           title: title.trim(),
           message: message.trim(),
           type,
@@ -81,7 +84,9 @@ export function NotificationComposer({
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error ?? "Could not send the notification.");
       const noun = audience === "intern" ? "candidate" : "company";
-      setSent(`Sent to ${picked.size} ${noun}${picked.size === 1 ? "" : "s"}.`);
+      const n = Number(data.count ?? picked.size);
+      setSent(`Sent to ${n} ${noun}${n === 1 ? "" : "s"}.`);
+      setEveryone(false);
       setPicked(new Set());
       setTitle("");
       setMessage("");
@@ -132,8 +137,13 @@ export function NotificationComposer({
           <span className="text-ink-500">
             {picked.size} of {roster.length} selected
           </span>
+          <label className="flex items-center gap-1.5 font-medium text-ink-800">
+            <input type="checkbox" className="size-4 accent-brand-700" checked={everyone} onChange={(e) => setEveryone(e.target.checked)} />
+            Everyone ({totals[audience]})
+          </label>
           <button
             type="button"
+            disabled={everyone}
             onClick={() =>
               setPicked(picked.size === filtered.length ? new Set() : new Set(filtered.map((p) => p.id)))
             }

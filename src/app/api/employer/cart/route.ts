@@ -124,8 +124,9 @@ export async function POST(req: Request) {
     }
     return NextResponse.json({ ok: true, staged: rows.length });
   } catch (e: unknown) {
+    console.error("[employer/cart]", e);
     return NextResponse.json(
-      { error: e instanceof Error ? e.message : "Could not update the cart" },
+      { error: "Could not update your shortlist. Try again shortly." },
       { status: 500 },
     );
   }

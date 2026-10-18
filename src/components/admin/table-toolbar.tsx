@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
  *
  * All state lives in the URL, never in React state that a refresh discards. An
  * admin who filters to "live interns in Pune", copies the link to a colleague,
- * and both of them see the same rows — which is also what makes the CSV export
+ * and both of them see the same rows - which is also what makes the CSV export
  * honest, since the download reads the same query string the table does.
  *
  * Search is debounced at 300ms and always resets to page 1. Paging to page 6
@@ -53,7 +53,7 @@ export function TableToolbar({
 
   // The search box is the one piece of state that has to follow an external
   // change (a chip removal, "clear all", the back button). Adjusting it during
-  // render — the documented React pattern for "state derived from props" —
+  // render - the documented React pattern for "state derived from props" -
   // avoids a `useEffect` + `setState`, which cascades a second render pass on
   // every keystroke and is what `react-hooks/set-state-in-effect` rejects.
   const urlTerm = searchParams.get(searchKey) ?? "";
@@ -109,7 +109,7 @@ export function TableToolbar({
 
   function clearAll() {
     const next = new URLSearchParams();
-    // Per-page is a display preference, not a filter — keep it.
+    // Per-page is a display preference, not a filter - keep it.
     const per = searchParams.get("per");
     if (per) next.set("per", per);
     const qs = next.toString();
@@ -141,7 +141,7 @@ export function TableToolbar({
             }}
             placeholder={searchPlaceholder}
             aria-label={searchPlaceholder}
-            className="h-9 w-full rounded-lg border border-ink-200 bg-white pr-8 pl-9 text-sm text-ink-900 placeholder:text-ink-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 focus:outline-none [&::-webkit-search-cancel-button]:hidden"
+            className="h-9 w-full rounded-[10px] border border-ink-200 bg-white pr-8 pl-9 text-sm text-ink-900 placeholder:text-ink-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 focus:outline-none [&::-webkit-search-cancel-button]:hidden"
           />
           {term ? (
             <button
@@ -151,7 +151,7 @@ export function TableToolbar({
                 inputRef.current?.focus();
               }}
               aria-label="Clear search"
-              className="absolute top-1/2 right-2 -translate-y-1/2 rounded p-1 text-ink-400 transition-colors hover:text-ink-700"
+              className="apple-spring absolute top-1/2 right-2 flex min-h-11 min-w-11 -translate-y-1/2 items-center justify-center rounded-[10px] p-1 text-ink-400 hover:text-ink-700"
             >
               <X className="size-3.5" />
             </button>
@@ -175,7 +175,7 @@ export function TableToolbar({
                 value={value}
                 onChange={(e) => setParam(filter.key, e.target.value || null)}
                 className={cn(
-                  "h-9 cursor-pointer rounded-lg border bg-white px-2.5 pr-7 text-sm focus:ring-2 focus:ring-brand-500/20 focus:outline-none",
+                  "apple-spring h-9 cursor-pointer rounded-[10px] border bg-white px-2.5 pr-7 text-sm focus:ring-2 focus:ring-brand-500/20 focus:outline-none",
                   value
                     ? "border-brand-300 font-medium text-brand-800"
                     : "border-ink-200 text-ink-700",
@@ -197,7 +197,7 @@ export function TableToolbar({
         {exportHref ? (
           <a
             href={exportHref}
-            className="ml-auto inline-flex h-9 items-center gap-1.5 rounded-lg border border-ink-200 bg-white px-3 text-sm font-medium text-ink-700 transition-colors hover:bg-ink-50"
+            className="apple-spring apple-pressable ml-auto inline-flex h-9 items-center gap-1.5 rounded-[10px] border border-ink-200 bg-white px-3 text-sm font-medium text-ink-700 hover:bg-ink-50"
           >
             CSV
           </a>
@@ -213,13 +213,13 @@ export function TableToolbar({
               key={chip.key}
               type="button"
               onClick={() => setParam(chip.key, null)}
-              className="group inline-flex items-center gap-1 rounded-full border border-brand-200 bg-brand-50 py-0.5 pr-1.5 pl-2.5 text-xs font-medium text-brand-800 transition-colors hover:border-brand-300 hover:bg-brand-100"
+              className="apple-spring group inline-flex min-h-11 items-center gap-1 rounded-full border border-brand-200 bg-brand-50 py-0.5 pr-1.5 pl-2.5 text-xs font-medium text-brand-800 hover:border-brand-300 hover:bg-brand-100"
             >
               <span className="text-brand-600">{chip.label}:</span>
               {chip.value}
               <X
                 aria-hidden
-                className="size-3 text-brand-500 transition-colors group-hover:text-brand-800"
+                className="size-3 text-brand-500 apple-spring group-hover:text-brand-800"
               />
               <span className="sr-only">Remove filter</span>
             </button>
@@ -227,7 +227,7 @@ export function TableToolbar({
           <button
             type="button"
             onClick={clearAll}
-            className="ml-1 text-xs font-medium text-ink-500 underline underline-offset-2 transition-colors hover:text-ink-800"
+            className="apple-spring ml-1 inline-flex min-h-11 items-center text-xs font-medium text-ink-500 underline underline-offset-2 hover:text-ink-800"
           >
             Clear all
           </button>

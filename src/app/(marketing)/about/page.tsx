@@ -127,13 +127,13 @@ export default function AboutPage() {
       </PageSection>
 
       {/* ── Numbers ─────────────────────────────────────────────────── */}
-      <PageSection>
-        <div className="grid gap-10 sm:grid-cols-3">
-          <Figure value={18} suffix="mo" label="Guarantee window" />
+      <PageSection className="py-8 sm:py-14 md:py-20">
+        <div className="grid grid-cols-3 divide-x divide-ink-200/80 rounded-2xl border border-ink-200/80 bg-white/70 py-5 shadow-xs backdrop-blur-xs sm:divide-x-0 sm:border-0 sm:bg-transparent sm:py-0 sm:shadow-none sm:gap-10">
+          <Figure value={100} suffix="%" label="Refund if not placed" />
           <Figure value={3} label="Plans, no lock-in" />
-          <Figure value={0} prefix="₹" label="Fee above a 6/10 score" />
+          <Figure value={5000} prefix="₹" label="Fixed per-hire fee" />
         </div>
-        <p className="mt-8 text-center text-sm text-ink-500">
+        <p className="mt-6 text-center text-xs sm:mt-8 sm:text-sm text-ink-500">
           Product terms, not performance claims. Placement figures are published on
           the <a href="/terms-and-conditions" className="text-primary underline underline-offset-4">terms page</a> once
           they reach a threshold we are willing to stand behind.
@@ -217,12 +217,12 @@ function Figure({
   label: string;
 }) {
   return (
-    <div className="text-center">
-      <p className="text-4xl font-bold tracking-tight text-ink-900 sm:text-5xl">
+    <div className="px-1 text-center sm:px-0">
+      <p className="text-2xl font-bold tracking-tight text-ink-900 sm:text-4xl md:text-5xl">
         <CountUp value={value} prefix={prefix} />
-        {suffix ? <span className="text-xl font-medium text-ink-400">{suffix}</span> : null}
+        {suffix ? <span className="text-xs font-semibold text-ink-400 sm:text-xl sm:font-medium">{suffix}</span> : null}
       </p>
-      <p className="mt-2 text-base text-ink-500">{label}</p>
+      <p className="mt-1 text-[11px] leading-tight text-ink-500 sm:mt-2 sm:text-base">{label}</p>
     </div>
   );
 }

@@ -2,7 +2,10 @@ import { eq, and } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
 import { getDb, schema } from "@/lib/db";
+import { emails } from "@/lib/emails";
+import { formatDate } from "@/lib/format";
 import { requireMutation } from "@/lib/guards-mutation";
+import { employerNames, notify } from "@/lib/notify";
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -19,9 +22,57 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (sheet.status !== "draft" && sheet.status !== "rejected") {
     return NextResponse.json({ error: "Only draft or rejected timesheets can be submitted" }, { status: 400 });
   }
+
+  // Every day in the period needs a status (Present / Leave / Absent /
+  // Fixed off / Holiday) before the manager sees it - an unmarked day is
+  // neither work nor leave, and approving it would bill thin air.
+  const known = new Set(["Present", "Leave", "Absent", "Fixed off", "Holiday"]);
+  const byDate = new Map(
+    (Array.isArray(sheet.entries) ? sheet.entries : []).map((e) => [
+      (e as { date?: unknown })?.date,
+      (e as { status?: unknown })?.status,
+    ]),
+  );
+  if (sheet.periodStart && sheet.periodEnd) {
+    const missing: string[] = [];
+    const cursor = new Date(sheet.periodStart);
+    const end = new Date(sheet.periodEnd);
+    cursor.setHours(12, 0, 0, 0);
+    end.setHours(12, 0, 0, 0);
+    while (cursor <= end) {
+      const iso = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, "0")}-${String(cursor.getDate()).padStart(2, "0")}`;
+      if (!known.has(String(byDate.get(iso) ?? ""))) missing.push(iso);
+      cursor.setDate(cursor.getDate() + 1);
+    }
+    if (missing.length > 0) {
+      return NextResponse.json(
+        {
+          error: `${missing.length} day${missing.length === 1 ? "" : "s"} still need${missing.length === 1 ? "s" : ""} a status - pick Present, Leave, Absent, Fixed off or Holiday for each.`,
+        },
+        { status: 400 },
+      );
+    }
+  }
   await db
     .update(schema.timesheets)
     .set({ status: "submitted", submittedAt: new Date() })
     .where(eq(schema.timesheets.id, id));
+
+  const [u] = await db
+    .select({ f: schema.users.firstName, l: schema.users.lastName })
+    .from(schema.users)
+    .where(eq(schema.users.id, sheet.internId))
+    .limit(1);
+  const candidate = `${u?.f ?? ""} ${u?.l ?? ""}`.trim() || "Your intern"; // hired, so the name is unmasked
+  const period = `${formatDate(sheet.periodStart)} – ${formatDate(sheet.periodEnd)}`;
+  await notify({
+    to: { type: "employer", id: sheet.employerId },
+    type: "timesheet_submitted",
+    title: "Timesheet submitted",
+    message: `${candidate} submitted a timesheet for ${period}.`,
+    data: { timesheetId: id },
+    dedupeKey: `timesheet_submitted_${id}_${Date.now()}`,
+    email: emails.timesheetSubmitted({ employerName: (await employerNames(sheet.employerId)).contact, candidate, period, timesheetId: id }),
+  });
   return NextResponse.json({ ok: true });
 }

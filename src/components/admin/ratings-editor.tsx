@@ -29,10 +29,14 @@ export function RatingsEditor({
   internId,
   ratings,
   score,
+  initialFeedbackLink,
+  initialRecordingLink,
 }: {
   internId: string;
   ratings: Partial<Record<Axis, number>>;
   score: number | null;
+  initialFeedbackLink?: string | null;
+  initialRecordingLink?: string | null;
 }) {
   const router = useRouter();
   const [values, setValues] = useState<Record<Axis, string>>(() => ({
@@ -41,12 +45,14 @@ export function RatingsEditor({
     aptitude: ratings.aptitude?.toString() ?? "",
     interview: ratings.interview?.toString() ?? "",
   }));
+  const [feedbackLink, setFeedbackLink] = useState(initialFeedbackLink ?? "");
+  const [recordingLink, setRecordingLink] = useState(initialRecordingLink ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState<number | null>(null);
 
   async function save() {
-    const payload: Partial<Record<Axis, number>> = {};
+    const payload: Record<string, unknown> = {};
     for (const axis of AXES) {
       const raw = values[axis.key].trim();
       if (!raw) continue;
@@ -57,10 +63,9 @@ export function RatingsEditor({
       }
       payload[axis.key] = n;
     }
-    if (Object.keys(payload).length === 0) {
-      setError("Enter at least one rating.");
-      return;
-    }
+    payload.aiFeedbackLink = feedbackLink.trim() || null;
+    payload.aiRecordingLink = recordingLink.trim() || null;
+
     setBusy(true);
     setError(null);
     try {
@@ -84,7 +89,7 @@ export function RatingsEditor({
     <div className="border-t border-ink-100 pt-3">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <p className="text-xs font-semibold uppercase tracking-[0.14em] text-text-subtle">
-          AI interview ratings
+          AI interview ratings & Incruiter reports
         </p>
         <p className="text-2xs text-ink-500">
           Findtern Score{" "}
@@ -117,6 +122,41 @@ export function RatingsEditor({
         ))}
       </div>
 
+      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        <div>
+          <label htmlFor="ai-feedback-link" className="block text-xs font-medium text-ink-700">
+            Incruiter Report Link / PDF URL
+          </label>
+          <input
+            id="ai-feedback-link"
+            value={feedbackLink}
+            onChange={(e) => {
+              setFeedbackLink(e.target.value);
+              setError(null);
+              setSaved(null);
+            }}
+            placeholder="https://incruiter.com/reports/... or PDF URL"
+            className="mt-1 h-9 w-full rounded-lg border border-ink-200 bg-white px-3 text-xs text-ink-900 outline-none placeholder:text-ink-400 focus-visible:border-brand-600"
+          />
+        </div>
+        <div>
+          <label htmlFor="ai-recording-link" className="block text-xs font-medium text-ink-700">
+            Incruiter Interview Recording URL
+          </label>
+          <input
+            id="ai-recording-link"
+            value={recordingLink}
+            onChange={(e) => {
+              setRecordingLink(e.target.value);
+              setError(null);
+              setSaved(null);
+            }}
+            placeholder="https://incruiter.com/recording/..."
+            className="mt-1 h-9 w-full rounded-lg border border-ink-200 bg-white px-3 text-xs text-ink-900 outline-none placeholder:text-ink-400 focus-visible:border-brand-600"
+          />
+        </div>
+      </div>
+
       <button
         type="button"
         onClick={save}
@@ -124,13 +164,13 @@ export function RatingsEditor({
         className="mt-3 inline-flex h-9 items-center gap-2 rounded-lg bg-brand-700 px-4 text-sm font-semibold text-white transition-colors hover:bg-brand-600 disabled:opacity-60"
       >
         {busy ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : null}
-        Save ratings
+        Save ratings & links
       </button>
 
       {error ? <p className="mt-2 text-xs text-danger">{error}</p> : null}
       {saved !== null ? (
         <p className="mt-2 text-xs text-brand-700">
-          Saved. Employers filtering by score will see the new figure.
+          Saved. Employers filtering by score and viewing dossier will see the updated report.
         </p>
       ) : null}
     </div>

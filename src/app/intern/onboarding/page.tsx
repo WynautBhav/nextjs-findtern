@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { eq, desc } from "drizzle-orm";
 
 import { getDb, schema } from "@/lib/db";
-import { getSession } from "@/lib/auth";
+import { requireRole } from "@/lib/auth";
 import { emptyDraft, draftFromRecord, type OnboardingDraft, type StoredDocument } from "@/lib/onboarding";
 import { PageHead } from "@/components/app/primitives";
 import { OnboardingForm } from "@/components/intern/onboarding-form";
@@ -16,29 +16,32 @@ export const metadata: Metadata = {
  * plain object, and gets out of the way - the 5,900-line legacy page was mostly
  * step state, and step state belongs on the client.
  *
- * There is no `POST /api/intern/onboarding` in this build, so nothing here
- * writes. The form says so on save rather than pretending otherwise. */
+ * The form saves through `POST /api/intern/onboarding`. */
 
 export default async function InternOnboarding() {
-  const session = await getSession();
+  const session = await requireRole("intern");
   const draft: OnboardingDraft = emptyDraft();
   let documents: StoredDocument[] = [];
+  let serverUpdatedAt: string | null = null;
 
   try {
     const db = getDb();
     const [row] = await db
       .select()
       .from(schema.internOnboarding)
-      .where(eq(schema.internOnboarding.userId, session!.uid))
+      .where(eq(schema.internOnboarding.userId, session.uid))
       .orderBy(desc(schema.internOnboarding.createdAt))
       .limit(1);
 
-    if (row) Object.assign(draft, draftFromRecord(row));
+    if (row) {
+      Object.assign(draft, draftFromRecord(row));
+      serverUpdatedAt = (row.updatedAt ?? row.createdAt)?.toISOString() ?? null;
+    }
 
     const [record] = await db
       .select()
       .from(schema.internDocuments)
-      .where(eq(schema.internDocuments.userId, session!.uid))
+      .where(eq(schema.internDocuments.userId, session.uid))
       .orderBy(desc(schema.internDocuments.createdAt))
       .limit(1);
 
@@ -63,7 +66,8 @@ export default async function InternOnboarding() {
       <OnboardingForm
         initial={draft}
         documents={documents}
-        email={session!.email ?? "your account"}
+        email={session.email ?? "your account"}
+        serverUpdatedAt={serverUpdatedAt}
       />
     </div>
   );

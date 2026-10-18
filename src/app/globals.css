@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 /* ==========================================================================
-   FINDTERN — DESIGN SYSTEM
+   FINDTERN - DESIGN SYSTEM
    --------------------------------------------------------------------------
    One token layer. The old site ran three in parallel (App.css hex vars,
    index.css HSL vars, and Bootstrap) which is why nothing matched. Bootstrap
@@ -9,7 +9,7 @@
 
    Brand is unchanged on purpose: deep green, amber, Poppins, and the amber
    "smile" underline that sits under the second word of a section heading.
-   What changed is the craft — real elevation, a real radius scale, one
+   What changed is the craft - real elevation, a real radius scale, one
    breakpoint philosophy, and one reduced-motion switch.
    ========================================================================== */
 
@@ -30,12 +30,12 @@
   --color-brand-950: #041d17;
 
   /* ── Amber accent ──────────────────────────────────────────────────────
-     500 is the legacy #F0B24A — the smile underline and the "Featured"/star
+     500 is the legacy #F0B24A - the smile underline and the "Featured"/star
      highlights. Warm against the green, never used for body text.
 
      700 was #A9712A, which measured 4.13:1 on white and failed WCAG AA for the
      "Assured" band badge. Darkened to #8F5A1F (5.75:1). The 500/600 steps
-     stay decorative — no amber below 700 is legible as text on white. */
+     stay decorative - no amber below 700 is legible as text on white. */
   --color-accent-100: #fdf3e0;
   --color-accent-200: #fae4bd;
   --color-accent-300: #f7ce8e;
@@ -62,12 +62,12 @@
 
   /* ── Semantic aliases ────────────────────────────────────────────────
      Semantic names are what components should reach for. This indirection is
-     the whole point — swap a value here and the whole site follows.
+     the whole point - swap a value here and the whole site follows.
 
      `--color-text-subtle` exists because the ink ramp was being used for two
      different jobs. Measured on the live page: ink-400 (#93A29B) is 2.66:1 on
-     white and ink-500 (#6B7C74) is 4.41:1 — both below the WCAG AA minimum
-     of 4.5:1 — and ink-400 was carrying every micro-label on the site in 21
+     white and ink-500 (#6B7C74) is 4.41:1 - both below the WCAG AA minimum
+     of 4.5:1 - and ink-400 was carrying every micro-label on the site in 21
      places. The ramp is still correct for borders, icons and disabled fills.
      For secondary *text* there is now one token, #5F7069, at 5.24:1. */
   --color-primary: var(--color-brand-700);
@@ -154,12 +154,12 @@
      360px and 1440px without a single media query.
 
      Collapsed from 13 sizes to 7. The previous scale carried 14/15/16px and
-     56/62px — pairs one pixel apart, which is not hierarchy, it is drift, and
+     56/62px - pairs one pixel apart, which is not hierarchy, it is drift, and
      it meant a single visual change had no obviously correct size to reach
      for. text-2xs also moved off 11px: 48 elements on the homepage rendered
      at 11px, which is legible on a 27" monitor and not on a phone.
 
-     ADMIN OVERRIDE — the scale below is for marketing surfaces only.
+     ADMIN OVERRIDE - the scale below is for marketing surfaces only.
 
      The clamp() sizes are wrong for an operations console. Product UI is
      viewed at a fixed DPI, so a fluid h1 that shrinks inside a sidebar looks
@@ -259,7 +259,7 @@
   --radius-admin-overlay: 0.75rem;
 
   /* ── Elevation ───────────────────────────────────────────────────────
-     Every --shadow-* in the old index.css was hsl(0 0% 0% / 0.00) — the
+     Every --shadow-* in the old index.css was hsl(0 0% 0% / 0.00) - the
      tokens existed and rendered nothing. These are real, layered, and tinted
      with the brand green so shadows sit in the same colour world as the UI. */
   --shadow-xs: 0 1px 2px 0 rgb(7 47 36 / 0.05);
@@ -295,7 +295,7 @@
      Named easings so GSAP, CSS transitions, and Tailwind all agree. GSAP
      reads these out of the same literals in lib/gsap.ts.
 
-     These were being hand-typed as arbitrary values at eight call sites —
+     These were being hand-typed as arbitrary values at eight call sites -
      `cubic-bezier(0.16,1,0.3,1)` alone appeared six times while sitting
      unused in this file. Components now reference the token.
 
@@ -354,6 +354,21 @@
   --admin-sidebar-w: 15rem;
   --admin-topbar-h: 3.5rem;
   --admin-content-max: 84rem;
+
+  /* ── Apple HIG foundation (admin console) ─────────────────────────────
+     SF stack + spring curves + squircle radii. Brand tokens above stay the
+     single source of colour; these are shape, type and motion only, so the
+     Findtern green/amber/ink ramp is untouched. */
+  --font-apple: -apple-system, BlinkMacSystemFont, "SF Pro Display",
+    "SF Pro Text", "Helvetica Neue", "Segoe UI", system-ui, sans-serif;
+  --font-apple-mono: ui-monospace, "SF Mono", "SFMono-Regular", Menlo,
+    monospace;
+  --ease-apple-spring: cubic-bezier(0.25, 1, 0.5, 1);
+  --ease-apple-sheet: cubic-bezier(0.32, 0.72, 0, 1);
+  --radius-apple-sm: 10px;
+  --radius-apple-md: 12px;
+  --radius-apple-lg: 14px;
+  --radius-apple-xl: 20px;
 
   --animate-marquee: marquee var(--marquee-duration, 34s) linear infinite;
   --animate-marquee-reverse: marquee-reverse var(--marquee-duration, 34s) linear
@@ -484,7 +499,7 @@
     color: var(--color-brand-950);
   }
 
-  /* Media defaults — the old site left videos and iframes unstyled. */
+  /* Media defaults - the old site left videos and iframes unstyled. */
   img,
   video,
   svg {
@@ -497,7 +512,7 @@
 }
 
 /* ==========================================================================
-   THE SMILE — signature brand detail, preserved exactly
+   THE SMILE - signature brand detail, preserved exactly
    --------------------------------------------------------------------------
    The legacy `.heading--smile::after` drew an amber curve under the second
    word of a heading. It is the single most recognisable piece of the brand's
@@ -662,7 +677,7 @@
    TEXTURE
    --------------------------------------------------------------------------
    A single very low-opacity grain layer. This is most of what separates
-   "clean" from "premium" at large flat areas — pure white reads as a
+   "clean" from "premium" at large flat areas - pure white reads as a
    screenshot, faintly textured white reads as a surface.
    ========================================================================== */
 
@@ -770,7 +785,7 @@
   }
 }
 
-/* Testimonial slide-in. Opacity plus a 3px blur on the way in — the blur is
+/* Testimonial slide-in. Opacity plus a 3px blur on the way in - the blur is
    what prevents the outgoing and incoming quotes double-exposing, since both
    occupy the same box. */
 @keyframes testimonial-in {
@@ -791,7 +806,7 @@
    --------------------------------------------------------------------------
    Every hover style on the site is registered here rather than inline. The
    homepage carried 44 `hover:` utilities and zero capability queries, so on
-   a phone every tapped card fired :hover and *held* it — background, border
+   a phone every tapped card fired :hover and *held* it - background, border
    and icon fill all stuck until you tapped somewhere else.
 
    Gate is `any-hover`, not `hover`, because a touchscreen laptop or a stylus
@@ -806,7 +821,7 @@
      Transform hovers used to be neutralised here, by forcing
      `transition-property: none`. That did not work. It stopped the animation
      but left the transform applied, so a tapped card still jumped to 105% and
-     sat there — the exact symptom the rule existed to prevent.
+     sat there - the exact symptom the rule existed to prevent.
 
      The five transform hovers in the codebase are now written as
      `[@media(any-hover:hover)]:hover:*`, so on a coarse pointer the rule is
@@ -814,7 +829,7 @@
 }
 
 /* ==========================================================================
-   REDUCED MOTION — the single switch
+   REDUCED MOTION - the single switch
    --------------------------------------------------------------------------
    The old App.css carried ten separate prefers-reduced-motion blocks plus
    two more inside useReveal and the Terms pages. Everything below collapses
@@ -837,7 +852,7 @@
     scroll-behavior: auto !important;
   }
 
-  /* The smile still appears — it just arrives instantly instead of sweeping. */
+  /* The smile still appears - it just arrives instantly instead of sweeping. */
   .smile::after {
     transform: translateX(-50%) scaleX(1) translateY(0);
     opacity: 1;
@@ -1007,4 +1022,132 @@
 .prose-rt sub {
   font-size: 0.72em;
   line-height: 0;
+}
+
+/* ==========================================================================
+   APPLE HIG - ADMIN CONSOLE
+   --------------------------------------------------------------------------
+   Sidebar paradigm (macOS/iPad), SF type, frosted materials, spring motion.
+   Colour still resolves to the brand/ink tokens above; this layer is shape,
+   material and physics only. No new rhythm classes: spacing continues to use
+   the --admin-* density tokens and existing layout utilities.
+   ========================================================================== */
+
+@layer components {
+  /* Same typeface as marketing. The SF stack this used to name only exists on
+     Apple devices; on Windows and Linux (most of our users) it fell through
+     to whatever the OS had, so the app looked like a different product. */
+  .apple-admin {
+    font-family: var(--font-sans);
+    font-feature-settings: "kern", "liga", "calt", "tnum";
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  .apple-title {
+    letter-spacing: -0.022em;
+    text-wrap: balance;
+  }
+
+  /* Frosted sidebar + top bars. Ultra-thin material, saturate boost. */
+  .apple-material-sidebar {
+    background: rgb(255 255 255 / 0.72);
+    backdrop-filter: blur(20px) saturate(190%);
+    -webkit-backdrop-filter: blur(20px) saturate(190%);
+    border-right: 1px solid rgb(7 47 36 / 0.08);
+  }
+
+  .dark .apple-material-sidebar {
+    background: rgb(20 31 27 / 0.75);
+    backdrop-filter: blur(25px) saturate(190%);
+    -webkit-backdrop-filter: blur(25px) saturate(190%);
+    border-right: 1px solid rgb(255 255 255 / 0.1);
+  }
+
+  .apple-material-bar {
+    background: rgb(255 255 255 / 0.72);
+    backdrop-filter: blur(20px) saturate(190%);
+    -webkit-backdrop-filter: blur(20px) saturate(190%);
+  }
+
+  .dark .apple-material-bar {
+    background: rgb(15 26 23 / 0.72);
+    backdrop-filter: blur(25px) saturate(190%);
+    -webkit-backdrop-filter: blur(25px) saturate(190%);
+  }
+
+  /* Apple card: squircle, hairline, ambient diffusion. No harsh shadows. */
+  .apple-panel {
+    border-radius: var(--radius-apple-lg);
+    border: 1px solid rgb(7 47 36 / 0.08);
+    background: #ffffff;
+    box-shadow:
+      0 1px 2px rgb(7 47 36 / 0.04),
+      0 8px 24px rgb(7 47 36 / 0.06);
+  }
+
+  .dark .apple-panel {
+    border-color: rgb(255 255 255 / 0.1);
+    background: var(--color-surface-raised);
+    box-shadow:
+      0 1px 2px rgb(0 0 0 / 0.4),
+      0 12px 32px rgb(0 0 0 / 0.35);
+  }
+
+  /* Spring motion + tactile press. Resting rows never bounce. */
+  .apple-spring {
+    transition:
+      transform 0.35s var(--ease-apple-spring),
+      background-color 0.18s ease,
+      border-color 0.18s ease,
+      box-shadow 0.25s ease,
+      opacity 0.2s ease;
+  }
+
+  .apple-pressable:active {
+    transform: scale(0.97);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .apple-spring {
+      transition: none;
+    }
+    .apple-pressable:active {
+      transform: none;
+    }
+  }
+
+  /* ── Clean PDF & Print Rules ────────────────────────────────────────── */
+  @media print {
+    nav,
+    header,
+    footer,
+    aside,
+    .no-print,
+    button:not(.print-show),
+    [role="dialog"] button {
+      display: none !important;
+    }
+
+    body {
+      background: #ffffff !important;
+      color: #0f172a !important;
+      font-size: 11pt !important;
+    }
+
+    .container-page {
+      max-width: 100% !important;
+      padding: 0 !important;
+      margin: 0 !important;
+    }
+
+    .rounded-2xl,
+    .rounded-xl,
+    .rounded-\[20px\],
+    .apple-panel {
+      border: 1px solid #cbd5e1 !important;
+      box-shadow: none !important;
+      break-inside: avoid;
+    }
+  }
 }

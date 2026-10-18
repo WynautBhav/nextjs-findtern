@@ -9,7 +9,6 @@ import {
   Briefcase,
   Check,
   CheckCircle2,
-  FileUp,
   GraduationCap,
   Languages,
   Loader2,
@@ -22,6 +21,7 @@ import {
   User,
   X,
 } from "lucide-react";
+import { FileUpload } from "@/components/app/file-upload";
 
 import { suggestSkills } from "@/lib/data/skills";
 import { suggestDistricts } from "@/lib/data/districts";
@@ -36,13 +36,14 @@ import type {
 } from "@/lib/onboarding";
 
 const DRAFT_KEY = "findtern:intern-onboarding:v2";
+const SAVED_AT = "__savedAt";
 const WORK_MODES = ["remote", "hybrid", "onsite"] as const;
 
 export const STEPS = [
   { id: "personal", title: "About Me", blurb: "Basic details, passport photo, and contact information." },
   { id: "academics", title: "Academics", blurb: "Degree, institution, specialization, and academic marks." },
   { id: "experience", title: "Experience", blurb: "Internships, freelance work, side projects, and roles." },
-  { id: "skills", title: "Skills", blurb: "Select up to 7 skills and rate your proficiency level." },
+  { id: "skills", title: "Skills", blurb: "Select 4 to 7 skills and rate your proficiency level." },
   { id: "languages", title: "Languages", blurb: "Languages you are comfortable with for work and communication." },
   { id: "extracurricular", title: "Extra-Curricular", blurb: "Activities outside academics highlighting leadership and teamwork." },
   { id: "preferences", title: "Location & Setup", blurb: "Internship work modes, preferred cities, and hardware status." },
@@ -66,10 +67,13 @@ export function OnboardingForm({
   initial,
   documents,
   email,
+  serverUpdatedAt = null,
 }: {
   initial: OnboardingDraft;
   documents: StoredDocument[];
   email: string;
+  /** When the saved profile last changed (ISO). A local draft older than this is stale. */
+  serverUpdatedAt?: string | null;
 }) {
   const router = useRouter();
   const [step, setStep] = useState(0);
@@ -80,20 +84,22 @@ export function OnboardingForm({
   const [saving, setSaving] = useState(false);
   const blurbRef = useRef<HTMLParagraphElement>(null);
 
-  const stored = useSyncExternalStore(subscribeToNothing, readDraft, () => null);
+  // One draft per account, so two people on one browser never see each other's.
+  const draftKey = `${DRAFT_KEY}:${email}`;
+  const stored = useSyncExternalStore(subscribeToNothing, () => readDraft(draftKey), () => null);
 
   const values = useMemo<OnboardingDraft>(() => {
-    return { ...initial, ...parseDraft(stored), ...edits };
-  }, [initial, stored, edits]);
+    return { ...initial, ...parseDraft(stored, serverUpdatedAt), ...edits };
+  }, [initial, stored, serverUpdatedAt, edits]);
 
   useEffect(() => {
     if (!dirty) return;
     try {
-      window.localStorage.setItem(DRAFT_KEY, JSON.stringify(values));
+      window.localStorage.setItem(draftKey, JSON.stringify({ ...values, [SAVED_AT]: Date.now() }));
     } catch {
       // Quota errors in private mode are non-fatal
     }
-  }, [values, dirty]);
+  }, [values, dirty, draftKey]);
 
   const update: Update = (key, value) => {
     setEdits((prev) => ({ ...prev, [key]: value }));
@@ -114,6 +120,13 @@ export function OnboardingForm({
     goTo(Math.min(step + 1, STEPS.length - 1));
   }
 
+  function onSubmit() {
+    const problems = validate(values, STEPS.length - 1);
+    setErrors(problems);
+    if (Object.keys(problems).length > 0) return;
+    void onSave();
+  }
+
   async function onSave() {
     setSaving(true);
     setNotice(null);
@@ -121,22 +134,24 @@ export function OnboardingForm({
       const res = await csrfFetch("/api/intern/onboarding", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(values),
+        // Bank details are edited in Settings; sending them from here would
+        // overwrite a newer copy saved there.
+        body: JSON.stringify({ ...values, bank: undefined }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         setNotice({ text: data.error ?? "Failed to save profile. Please try again.", ok: false });
         return;
       }
-      setNotice({ text: "Profile successfully saved and synchronized!", ok: true });
+      setNotice({ text: "Profile saved.", ok: true });
       try {
-        window.localStorage.removeItem(DRAFT_KEY);
+        window.localStorage.removeItem(draftKey);
       } catch {
         // no-op
       }
       router.refresh();
     } catch {
-      setNotice({ text: "Network error — your draft is preserved locally.", ok: false });
+      setNotice({ text: "Network error - your draft is preserved locally.", ok: false });
     } finally {
       setSaving(false);
     }
@@ -148,7 +163,7 @@ export function OnboardingForm({
     if (values.bio?.length >= 20) score += 15;
     if (values.city) score += 10;
     if (values.academics.institution && values.academics.degree) score += 20;
-    if (values.skills.length >= 3) score += 20;
+    if (values.skills.length >= 4) score += 20;
     if (values.languages.length >= 1) score += 10;
     if (values.locationTypes.length >= 1) score += 10;
     if (values.experiences.length >= 1) score += 10;
@@ -162,7 +177,7 @@ export function OnboardingForm({
     <div className="grid gap-6 lg:grid-cols-[16rem_minmax(0,1fr)]">
       {/* Sidebar Rail */}
       <div className="space-y-4">
-        <div className="rounded-2xl border border-ink-100 bg-white p-4 shadow-2xs">
+        <div className="rounded-[20px] border border-ink-200/70 bg-white p-4 shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)]">
           <div className="flex items-center justify-between">
             <span className="text-2xs font-semibold uppercase tracking-wider text-text-subtle">
               Readiness Index
@@ -184,7 +199,7 @@ export function OnboardingForm({
 
       {/* Main Content Area */}
       <div className="min-w-0">
-        <div className="rounded-2xl border border-ink-100 bg-white p-6 shadow-2xs sm:p-8">
+        <div className="rounded-[20px] border border-ink-200/70 bg-white p-6 shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)] sm:p-8">
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-ink-100 pb-4">
             <div>
               <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-brand-700">
@@ -242,7 +257,7 @@ export function OnboardingForm({
               <button
                 type="button"
                 onClick={() => goTo(step - 1)}
-                className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-ink-200 bg-white px-4 text-xs font-medium text-ink-800 shadow-2xs transition-colors hover:bg-ink-50"
+                className="apple-spring apple-pressable inline-flex min-h-11 items-center gap-1.5 rounded-[10px] border border-ink-200 bg-white px-4 text-xs font-medium text-ink-800 shadow-2xs hover:bg-ink-50"
               >
                 <ArrowLeft className="size-3.5" aria-hidden />
                 Back
@@ -253,7 +268,7 @@ export function OnboardingForm({
               type="button"
               onClick={onSave}
               disabled={saving}
-              className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-ink-200 bg-white px-4 text-xs font-medium text-ink-700 shadow-2xs transition-colors hover:bg-ink-50 disabled:opacity-60"
+              className="apple-spring apple-pressable inline-flex min-h-11 items-center gap-1.5 rounded-[10px] border border-ink-200 bg-white px-4 text-xs font-medium text-ink-700 shadow-2xs hover:bg-ink-50 disabled:opacity-60"
             >
               {saving ? <Loader2 className="size-3.5 animate-spin" /> : <Save className="size-3.5 text-ink-500" />}
               Save Draft
@@ -261,12 +276,12 @@ export function OnboardingForm({
           </div>
 
           <div className="flex items-center gap-3">
-            <span className="text-2xs text-text-subtle hidden sm:inline">Signed in as {email}</span>
+            <span className="text-xs text-text-subtle hidden sm:inline">Signed in as {email}</span>
             {step < STEPS.length - 1 ? (
               <button
                 type="button"
                 onClick={onContinue}
-                className="group inline-flex h-10 items-center gap-1.5 rounded-xl bg-brand-700 px-5 text-xs font-semibold text-white shadow-2xs transition-colors hover:bg-brand-600"
+                className="apple-spring apple-pressable group inline-flex min-h-11 items-center gap-1.5 rounded-[10px] bg-brand-700 px-5 text-xs font-semibold text-white shadow-2xs hover:bg-brand-600"
               >
                 Continue
                 <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden />
@@ -274,9 +289,9 @@ export function OnboardingForm({
             ) : (
               <button
                 type="button"
-                onClick={onSave}
+                onClick={onSubmit}
                 disabled={saving}
-                className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-brand-700 px-6 text-xs font-semibold text-white shadow-2xs transition-colors hover:bg-brand-600 disabled:opacity-60"
+                className="apple-spring apple-pressable inline-flex min-h-11 items-center gap-1.5 rounded-[10px] bg-brand-700 px-6 text-xs font-semibold text-white shadow-2xs hover:bg-brand-600 disabled:opacity-60"
               >
                 {saving ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />}
                 Complete & Submit Profile
@@ -293,7 +308,7 @@ export function OnboardingForm({
 
 function StepRail({ step, onSelect }: { step: number; onSelect: (next: number) => void }) {
   return (
-    <nav aria-label="Onboarding steps" className="rounded-2xl border border-ink-100 bg-white p-2 shadow-2xs">
+    <nav aria-label="Onboarding steps" className="rounded-[20px] border border-ink-200/70 bg-white p-2 shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)]">
       <ol className="flex gap-1 overflow-x-auto lg:flex-col lg:overflow-visible">
         {STEPS.map((s, i) => {
           const state = i === step ? "current" : i < step ? "done" : "todo";
@@ -304,7 +319,7 @@ function StepRail({ step, onSelect }: { step: number; onSelect: (next: number) =
                 onClick={() => onSelect(i)}
                 aria-current={state === "current" ? "step" : undefined}
                 className={[
-                  "flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-xs transition-colors",
+                  "apple-spring flex w-full items-center gap-2.5 rounded-[10px] px-3 py-2 text-left text-xs",
                   state === "current"
                     ? "bg-brand-50 font-semibold text-brand-800"
                     : "text-ink-600 hover:bg-ink-50",
@@ -312,7 +327,7 @@ function StepRail({ step, onSelect }: { step: number; onSelect: (next: number) =
               >
                 <span
                   className={[
-                    "grid size-6 shrink-0 place-items-center rounded-full text-2xs font-semibold transition-colors",
+                    "apple-spring grid size-6 shrink-0 place-items-center rounded-full text-xs font-semibold",
                     state === "current"
                       ? "bg-brand-700 text-white"
                       : state === "done"
@@ -334,7 +349,8 @@ function StepRail({ step, onSelect }: { step: number; onSelect: (next: number) =
 
 /* ── Step 1: About Me (Personal + Passport Photo) ────────────────────────── */
 
-function PersonalStep({ values, update, errors }: StepProps) {
+function PersonalStep({ values, update, errors, documents }: StepProps) {
+  const onFile = (label: string) => (documents.find((d) => d.label === label) ? `${label} on file` : null);
   return (
     <div className="space-y-5">
       {/* Passport Photo Upload Slot */}
@@ -352,36 +368,17 @@ function PersonalStep({ values, update, errors }: StepProps) {
             <h4 className="text-xs font-semibold text-ink-900">
               Profile Photo (Passport Size 2x2&quot;)
             </h4>
-            <p className="mt-0.5 text-2xs text-text-subtle">
-              JPG or PNG, maximum 2MB. Clear front-facing professional photo recommended.
+            <p className="mt-0.5 text-xs text-text-subtle">
+              JPG, PNG or WebP, up to 5 MB. A clear, front-facing photo.
             </p>
-            <div className="mt-2.5 flex items-center gap-2">
-              <label className="cursor-pointer inline-flex items-center gap-1.5 rounded-lg border border-ink-200 bg-white px-3 py-1.5 text-2xs font-semibold text-ink-800 shadow-2xs hover:bg-ink-50 transition-colors">
-                <FileUp className="size-3 text-brand-600" />
-                <span>Upload Photo</span>
-                <input
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp"
-                  className="sr-only"
-                  onChange={(e) => {
-                    const f = e.target.files?.[0];
-                    if (f) {
-                      const url = URL.createObjectURL(f);
-                      update("photoUrl", url);
-                    }
-                  }}
-                />
-              </label>
-              {values.photoUrl ? (
-                <button
-                  type="button"
-                  onClick={() => update("photoUrl", "")}
-                  className="text-2xs font-medium text-danger hover:underline"
-                >
-                  Remove
-                </button>
-              ) : null}
-            </div>
+            <FileUpload
+              className="mt-2.5"
+              kind="profile_photo"
+              accept="image/jpeg,image/png,image/webp"
+              label="Photo"
+              current={documents.find((d) => d.label === "Profile photo") ? "Photo on file" : null}
+              onUploaded={() => update("photoUrl", `/api/intern/avatar?v=${Date.now()}`)}
+            />
           </div>
         </div>
       </div>
@@ -415,6 +412,22 @@ function PersonalStep({ values, update, errors }: StepProps) {
           error={errors.aadhaarNumber}
           onChange={(v) => update("aadhaarNumber", v.replace(/\D/g, "").slice(0, 12))}
         />
+        <Field
+          id="panNumber"
+          label="PAN *"
+          hint="Required for stipend payouts. Format ABCDE1234F."
+          placeholder="ABCDE1234F"
+          maxLength={10}
+          value={values.panNumber || ""}
+          error={errors.panNumber}
+          onChange={(v) => update("panNumber", v.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 10))}
+        />
+      </div>
+
+      <div className="grid gap-4 rounded-xl border border-ink-200/70 p-4 sm:grid-cols-3">
+        <FileUpload kind="aadhaar" accept="image/jpeg,image/png,image/webp,application/pdf" label="Aadhaar" hint="Image or PDF, up to 10 MB." current={onFile("Aadhaar")} />
+        <FileUpload kind="pan" accept="image/jpeg,image/png,image/webp,application/pdf" label="PAN" hint="Image or PDF, up to 10 MB." current={onFile("PAN")} />
+        <FileUpload kind="intro_video" accept="video/mp4,video/webm,video/quicktime" label="Intro video" hint="Optional. Up to 50 MB." current={onFile("Intro video")} />
       </div>
 
       <div className="grid gap-4 sm:grid-cols-3">
@@ -478,7 +491,7 @@ function AcademicsStep({ values, update, errors }: StepProps) {
             id="qualificationLevel"
             value={academics.qualificationLevel || "Bachelor's"}
             onChange={(e) => set({ qualificationLevel: e.target.value })}
-            className="mt-2 h-10 w-full rounded-xl border border-ink-200 bg-white px-3 text-xs font-medium text-ink-900 shadow-2xs outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
+            className="apple-spring mt-2 h-10 w-full rounded-[10px] border border-ink-200 bg-white px-3 text-[14px] font-medium text-ink-900 shadow-2xs outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
           >
             <option value="Bachelor's">Bachelor&apos;s Degree</option>
             <option value="Master's">Master&apos;s Degree</option>
@@ -495,7 +508,7 @@ function AcademicsStep({ values, update, errors }: StepProps) {
             id="academicStatus"
             value={academics.status || "Pursuing"}
             onChange={(e) => set({ status: e.target.value })}
-            className="mt-2 h-10 w-full rounded-xl border border-ink-200 bg-white px-3 text-xs font-medium text-ink-900 shadow-2xs outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
+            className="apple-spring mt-2 h-10 w-full rounded-[10px] border border-ink-200 bg-white px-3 text-[14px] font-medium text-ink-900 shadow-2xs outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
           >
             <option value="Pursuing">Currently Pursuing / Enrolled</option>
             <option value="Completed">Graduated / Completed</option>
@@ -549,6 +562,12 @@ function AcademicsStep({ values, update, errors }: StepProps) {
           onChange={(v) => set({ cgpa: v })}
         />
       </div>
+      <FileUpload
+        kind="marksheet"
+        accept="image/jpeg,image/png,image/webp,application/pdf"
+        label="Marksheet"
+        hint="Latest semester or final marksheet. Image or PDF, up to 25 MB. You can upload more than one."
+      />
     </div>
   );
 }
@@ -595,7 +614,7 @@ function ExperienceStep({ values, update }: StepProps) {
         <button
           type="button"
           onClick={addExperience}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-brand-50 px-3 py-1.5 text-xs font-semibold text-brand-700 hover:bg-brand-100 transition-colors border border-brand-200"
+          className="apple-spring apple-pressable inline-flex min-h-11 items-center gap-1.5 rounded-[10px] bg-brand-50 px-3 py-1.5 text-xs font-semibold text-brand-700 hover:bg-brand-100 border border-brand-200"
         >
           <Plus className="size-3.5" />
           <span>Add Experience</span>
@@ -606,13 +625,13 @@ function ExperienceStep({ values, update }: StepProps) {
         <div className="rounded-xl border border-dashed border-ink-200 p-8 text-center bg-ink-50/50">
           <Briefcase className="mx-auto size-8 text-ink-400" />
           <h4 className="mt-2 text-xs font-semibold text-ink-800">No experience records yet</h4>
-          <p className="mt-1 text-2xs text-text-subtle">
+          <p className="mt-1 text-xs text-text-subtle">
             Freshers can add academic capstone projects, open-source work, or freelance contracts.
           </p>
           <button
             type="button"
             onClick={addExperience}
-            className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-white border border-ink-200 px-3 py-1.5 text-xs font-medium text-ink-700 shadow-2xs hover:bg-ink-50"
+            className="apple-spring apple-pressable mt-3 inline-flex min-h-11 items-center gap-1.5 rounded-[10px] bg-white border border-ink-200 px-3 py-1.5 text-xs font-medium text-ink-700 shadow-2xs hover:bg-ink-50"
           >
             <Plus className="size-3.5 text-brand-600" />
             <span>Add First Project / Role</span>
@@ -623,7 +642,7 @@ function ExperienceStep({ values, update }: StepProps) {
           {experiences.map((exp, idx) => (
             <div
               key={exp.id}
-              className="rounded-xl border border-ink-100 bg-surface-alt p-4.5 shadow-2xs space-y-3"
+              className="rounded-xl border border-ink-100 bg-ink-50 p-4.5 shadow-2xs space-y-3"
             >
               <div className="flex items-center justify-between">
                 <span className="text-2xs font-semibold uppercase tracking-wider text-brand-700">
@@ -632,7 +651,7 @@ function ExperienceStep({ values, update }: StepProps) {
                 <button
                   type="button"
                   onClick={() => removeExperience(exp.id)}
-                  className="rounded-md p-1 text-ink-400 hover:bg-ink-100 hover:text-danger transition-colors"
+                  className="apple-spring rounded-md p-1 text-ink-400 hover:bg-ink-100 hover:text-danger"
                 >
                   <Trash2 className="size-3.5" />
                 </button>
@@ -640,11 +659,11 @@ function ExperienceStep({ values, update }: StepProps) {
 
               <div className="grid gap-3 sm:grid-cols-3">
                 <div>
-                  <label className="block text-2xs font-semibold text-ink-700">Type</label>
+                  <label className="block text-xs font-semibold text-ink-700">Type</label>
                   <select
                     value={exp.type}
                     onChange={(e) => updateExperience(exp.id, { type: e.target.value })}
-                    className="mt-1 h-9 w-full rounded-lg border border-ink-200 bg-white px-2.5 text-xs text-ink-900"
+                    className="apple-spring mt-1 h-9 w-full rounded-[10px] border border-ink-200 bg-white px-2.5 text-[14px] text-ink-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
                   >
                     <option value="Internship">Internship</option>
                     <option value="Project">Personal / Academic Project</option>
@@ -654,37 +673,37 @@ function ExperienceStep({ values, update }: StepProps) {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-2xs font-semibold text-ink-700">Company / Organization</label>
+                  <label className="block text-xs font-semibold text-ink-700">Company / Organization</label>
                   <input
                     type="text"
                     value={exp.company}
                     placeholder="e.g. Findtern or Stealth Startup"
                     onChange={(e) => updateExperience(exp.id, { company: e.target.value })}
-                    className="mt-1 h-9 w-full rounded-lg border border-ink-200 bg-white px-2.5 text-xs text-ink-900"
+                    className="apple-spring mt-1 h-9 w-full rounded-[10px] border border-ink-200 bg-white px-2.5 text-[14px] text-ink-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
                   />
                 </div>
                 <div>
-                  <label className="block text-2xs font-semibold text-ink-700">Role / Title</label>
+                  <label className="block text-xs font-semibold text-ink-700">Role / Title</label>
                   <input
                     type="text"
                     value={exp.role}
                     placeholder="e.g. React Frontend Intern"
                     onChange={(e) => updateExperience(exp.id, { role: e.target.value })}
-                    className="mt-1 h-9 w-full rounded-lg border border-ink-200 bg-white px-2.5 text-xs text-ink-900"
+                    className="apple-spring mt-1 h-9 w-full rounded-[10px] border border-ink-200 bg-white px-2.5 text-[14px] text-ink-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
                   />
                 </div>
               </div>
 
               <div className="grid gap-3 sm:grid-cols-2">
                 <div>
-                  <label className="block text-2xs font-semibold text-ink-700">Timeline (From - To)</label>
+                  <label className="block text-xs font-semibold text-ink-700">Timeline (From - To)</label>
                   <div className="flex items-center gap-2 mt-1">
                     <input
                       type="text"
                       placeholder="e.g. Jan 2025"
                       value={exp.from}
                       onChange={(e) => updateExperience(exp.id, { from: e.target.value })}
-                      className="h-9 flex-1 rounded-lg border border-ink-200 bg-white px-2.5 text-xs"
+                      className="apple-spring h-9 flex-1 rounded-[10px] border border-ink-200 bg-white px-2.5 text-[14px] focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
                     />
                     <span className="text-xs text-ink-400">to</span>
                     <input
@@ -693,7 +712,7 @@ function ExperienceStep({ values, update }: StepProps) {
                       disabled={exp.current}
                       value={exp.current ? "Present" : exp.to}
                       onChange={(e) => updateExperience(exp.id, { to: e.target.value })}
-                      className="h-9 flex-1 rounded-lg border border-ink-200 bg-white px-2.5 text-xs disabled:bg-ink-100"
+                      className="apple-spring h-9 flex-1 rounded-[10px] border border-ink-200 bg-white px-2.5 text-[14px] disabled:bg-ink-100 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
                     />
                   </div>
                 </div>
@@ -711,13 +730,13 @@ function ExperienceStep({ values, update }: StepProps) {
               </div>
 
               <div>
-                <label className="block text-2xs font-semibold text-ink-700">Key Deliverables & Stack</label>
+                <label className="block text-xs font-semibold text-ink-700">Key Deliverables & Stack</label>
                 <textarea
                   rows={2}
                   value={exp.description}
                   placeholder="Built customer analytics dashboard in Next.js, optimized SQL queries by 40%..."
                   onChange={(e) => updateExperience(exp.id, { description: e.target.value })}
-                  className="mt-1 w-full rounded-lg border border-ink-200 bg-white p-2.5 text-xs leading-relaxed"
+                  className="apple-spring mt-1 w-full rounded-[10px] border border-ink-200 bg-white p-2.5 text-[14px] leading-relaxed focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
                 />
               </div>
             </div>
@@ -770,9 +789,9 @@ function SkillsStep({ values, update, errors }: StepProps) {
     <div className="space-y-5">
       <div>
         <label className="block text-xs font-semibold text-ink-800">
-          Select Key Skills (Up to 7) *
+          Select Key Skills (4–7) *
         </label>
-        <p className="mt-0.5 text-2xs text-text-subtle">
+        <p className="mt-0.5 text-xs text-text-subtle">
           Rank skills in order of strength. Rate each skill to help employers match project requirements.
         </p>
 
@@ -787,13 +806,13 @@ function SkillsStep({ values, update, errors }: StepProps) {
                 addSkill(draft);
               }
             }}
-            className="h-10 flex-1 rounded-xl border border-ink-200 bg-white px-3 text-xs text-ink-900 shadow-2xs outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
+            className="apple-spring h-10 flex-1 rounded-[10px] border border-ink-200 bg-white px-3 text-[14px] text-ink-900 shadow-2xs outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
           />
           <button
             type="button"
             disabled={!draft.trim() || skills.length >= 7}
             onClick={() => addSkill(draft)}
-            className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-brand-700 px-4 text-xs font-semibold text-white shadow-2xs hover:bg-brand-600 transition-colors disabled:opacity-50"
+            className="apple-spring apple-pressable inline-flex min-h-11 items-center gap-1.5 rounded-[10px] bg-brand-700 px-4 text-xs font-semibold text-white shadow-2xs hover:bg-brand-600 disabled:opacity-50"
           >
             <Plus className="size-3.5" />
             <span>Add</span>
@@ -812,7 +831,7 @@ function SkillsStep({ values, update, errors }: StepProps) {
                   key={suggestion}
                   type="button"
                   onClick={() => addSkill(suggestion)}
-                  className="rounded-lg bg-ink-100 px-2.5 py-1 text-2xs font-medium text-ink-700 hover:bg-brand-50 hover:text-brand-700 transition-colors"
+                  className="apple-spring rounded-[10px] bg-ink-100 px-2.5 py-1 text-xs font-medium text-ink-700 hover:bg-brand-50 hover:text-brand-700"
                 >
                   + {suggestion}
                 </button>
@@ -848,7 +867,7 @@ function SkillsStep({ values, update, errors }: StepProps) {
                     updateRating(skill, e.target.value as "Beginner" | "Intermediate" | "Advanced")
                   }
                   aria-label={`Proficiency rating for ${skill}`}
-                  className="h-8 rounded-lg border border-ink-200 bg-surface-alt px-2 text-2xs font-semibold text-ink-800"
+                  className="apple-spring h-8 rounded-[10px] border border-ink-200 bg-ink-50 px-2 text-xs font-semibold text-ink-800 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
                 >
                   <option value="Beginner">Beginner</option>
                   <option value="Intermediate">Intermediate</option>
@@ -859,7 +878,7 @@ function SkillsStep({ values, update, errors }: StepProps) {
                   type="button"
                   onClick={() => removeSkill(skill)}
                   aria-label={`Remove skill ${skill}`}
-                  className="rounded-md p-1.5 text-ink-400 hover:bg-ink-100 hover:text-danger transition-colors"
+                  className="apple-spring rounded-md p-1.5 text-ink-400 hover:bg-ink-100 hover:text-danger"
                 >
                   <X className="size-3.5" />
                 </button>
@@ -912,7 +931,7 @@ function LanguagesStep({ values, update }: StepProps) {
         <button
           type="button"
           onClick={addLanguage}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-brand-50 px-3 py-1.5 text-xs font-semibold text-brand-700 hover:bg-brand-100 transition-colors border border-brand-200"
+          className="apple-spring apple-pressable inline-flex min-h-11 items-center gap-1.5 rounded-[10px] bg-brand-50 px-3 py-1.5 text-xs font-semibold text-brand-700 hover:bg-brand-100 border border-brand-200"
         >
           <Plus className="size-3.5" />
           <span>Add Language</span>
@@ -932,7 +951,7 @@ function LanguagesStep({ values, update }: StepProps) {
                 value={lang.language}
                 placeholder="e.g. English, Hindi, Tamil, German"
                 onChange={(e) => updateLang(lang.id, { language: e.target.value })}
-                className="h-8.5 w-full rounded-lg border border-ink-200 bg-surface-alt px-2.5 text-xs font-medium text-ink-900"
+                className="apple-spring h-8.5 w-full rounded-[10px] border border-ink-200 bg-ink-50 px-2.5 text-[14px] font-medium text-ink-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
               />
             </div>
 
@@ -944,7 +963,7 @@ function LanguagesStep({ values, update }: StepProps) {
                     level: e.target.value as LanguageEntry["level"],
                   })
                 }
-                className="h-8.5 rounded-lg border border-ink-200 bg-surface-alt px-2.5 text-2xs font-semibold text-ink-800"
+                className="apple-spring h-8.5 rounded-[10px] border border-ink-200 bg-ink-50 px-2.5 text-xs font-semibold text-ink-800 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
               >
                 <option value="Native">Native / Bilingual</option>
                 <option value="Professional">Professional Working</option>
@@ -952,7 +971,7 @@ function LanguagesStep({ values, update }: StepProps) {
                 <option value="Basic">Basic</option>
               </select>
 
-              <div className="flex items-center gap-2 text-2xs text-ink-600 font-medium">
+              <div className="flex items-center gap-2 text-xs text-ink-600 font-medium">
                 <label className="flex items-center gap-1 cursor-pointer">
                   <input
                     type="checkbox"
@@ -977,7 +996,7 @@ function LanguagesStep({ values, update }: StepProps) {
                 <button
                   type="button"
                   onClick={() => removeLang(lang.id)}
-                  className="rounded-md p-1.5 text-ink-400 hover:text-danger hover:bg-ink-100 transition-colors"
+                  className="apple-spring rounded-md p-1.5 text-ink-400 hover:text-danger hover:bg-ink-100"
                 >
                   <Trash2 className="size-3.5" />
                 </button>
@@ -1029,7 +1048,7 @@ function ExtracurricularStep({ values, update }: StepProps) {
         <button
           type="button"
           onClick={addActivity}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-brand-50 px-3 py-1.5 text-xs font-semibold text-brand-700 hover:bg-brand-100 transition-colors border border-brand-200"
+          className="apple-spring apple-pressable inline-flex min-h-11 items-center gap-1.5 rounded-[10px] bg-brand-50 px-3 py-1.5 text-xs font-semibold text-brand-700 hover:bg-brand-100 border border-brand-200"
         >
           <Plus className="size-3.5" />
           <span>Add Activity</span>
@@ -1040,13 +1059,13 @@ function ExtracurricularStep({ values, update }: StepProps) {
         <div className="rounded-xl border border-dashed border-ink-200 p-8 text-center bg-ink-50/50">
           <Award className="mx-auto size-8 text-ink-400" />
           <h4 className="mt-2 text-xs font-semibold text-ink-800">No extracurriculars listed yet</h4>
-          <p className="mt-1 text-2xs text-text-subtle">
-            Optional but highly recommended — highlights your teamwork, initiative, and drive beyond marks.
+          <p className="mt-1 text-xs text-text-subtle">
+            Optional but highly recommended - highlights your teamwork, initiative, and drive beyond marks.
           </p>
           <button
             type="button"
             onClick={addActivity}
-            className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-white border border-ink-200 px-3 py-1.5 text-xs font-medium text-ink-700 shadow-2xs hover:bg-ink-50"
+            className="apple-spring apple-pressable mt-3 inline-flex min-h-11 items-center gap-1.5 rounded-[10px] bg-white border border-ink-200 px-3 py-1.5 text-xs font-medium text-ink-700 shadow-2xs hover:bg-ink-50"
           >
             <Plus className="size-3.5 text-brand-600" />
             <span>Add Extracurricular</span>
@@ -1057,7 +1076,7 @@ function ExtracurricularStep({ values, update }: StepProps) {
           {extracurriculars.map((act) => (
             <div
               key={act.id}
-              className="rounded-xl border border-ink-100 bg-surface-alt p-3.5 shadow-2xs space-y-2.5"
+              className="rounded-xl border border-ink-100 bg-ink-50 p-3.5 shadow-2xs space-y-2.5"
             >
               <div className="flex items-center justify-between gap-3">
                 <input
@@ -1065,7 +1084,7 @@ function ExtracurricularStep({ values, update }: StepProps) {
                   placeholder="e.g. Hackathon Finalist, NSS Volunteer, Coding Club Lead"
                   value={act.activity}
                   onChange={(e) => updateActivity(act.id, { activity: e.target.value })}
-                  className="h-9 flex-1 rounded-lg border border-ink-200 bg-white px-3 text-xs font-semibold text-ink-900"
+                  className="apple-spring h-9 flex-1 rounded-[10px] border border-ink-200 bg-white px-3 text-[14px] font-semibold text-ink-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
                 />
 
                 <select
@@ -1075,7 +1094,7 @@ function ExtracurricularStep({ values, update }: StepProps) {
                       level: e.target.value as ExtracurricularEntry["level"],
                     })
                   }
-                  className="h-9 rounded-lg border border-ink-200 bg-white px-2.5 text-2xs font-semibold text-ink-800"
+                  className="apple-spring h-9 rounded-[10px] border border-ink-200 bg-white px-2.5 text-xs font-semibold text-ink-800 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
                 >
                   <option value="Beginner">Participant</option>
                   <option value="Intermediate">Lead / Core Team</option>
@@ -1085,7 +1104,7 @@ function ExtracurricularStep({ values, update }: StepProps) {
                 <button
                   type="button"
                   onClick={() => removeActivity(act.id)}
-                  className="rounded-md p-1.5 text-ink-400 hover:text-danger hover:bg-ink-100 transition-colors"
+                  className="apple-spring rounded-md p-1.5 text-ink-400 hover:text-danger hover:bg-ink-100"
                 >
                   <Trash2 className="size-3.5" />
                 </button>
@@ -1096,7 +1115,7 @@ function ExtracurricularStep({ values, update }: StepProps) {
                 placeholder="Brief achievement notes e.g. Managed 200 participants, won 2nd place out of 50 teams"
                 value={act.description || ""}
                 onChange={(e) => updateActivity(act.id, { description: e.target.value })}
-                className="h-8.5 w-full rounded-lg border border-ink-200 bg-white px-3 text-2xs text-ink-700"
+                className="apple-spring h-8.5 w-full rounded-[10px] border border-ink-200 bg-white px-3 text-xs text-ink-700 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
               />
             </div>
           ))}
@@ -1149,7 +1168,7 @@ function LocationPreferencesStep({ values, update, errors }: StepProps) {
                 key={mode}
                 type="button"
                 onClick={() => toggleMode(mode)}
-                className={`inline-flex items-center gap-2 rounded-xl border px-4 py-2.5 text-xs font-semibold capitalize transition-all ${
+                className={`apple-spring apple-pressable inline-flex min-h-11 items-center gap-2 rounded-[10px] border px-4 py-2.5 text-xs font-semibold capitalize ${
                   active
                     ? "border-brand-600 bg-brand-50 text-brand-800 shadow-2xs ring-1 ring-brand-600/30"
                     : "border-ink-200 bg-white text-ink-700 hover:bg-ink-50"
@@ -1173,7 +1192,7 @@ function LocationPreferencesStep({ values, update, errors }: StepProps) {
         <label className="block text-xs font-semibold text-ink-800">
           Preferred Work Cities (Up to 5)
         </label>
-        <p className="mt-0.5 text-2xs text-text-subtle">
+        <p className="mt-0.5 text-xs text-text-subtle">
           Where you are open to relocating or working on-site/hybrid.
         </p>
 
@@ -1188,13 +1207,13 @@ function LocationPreferencesStep({ values, update, errors }: StepProps) {
                 addCity(cityDraft);
               }
             }}
-            className="h-10 flex-1 rounded-xl border border-ink-200 bg-white px-3 text-xs text-ink-900 shadow-2xs outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
+            className="apple-spring h-10 flex-1 rounded-[10px] border border-ink-200 bg-white px-3 text-[14px] text-ink-900 shadow-2xs outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
           />
           <button
             type="button"
             disabled={!cityDraft.trim() || preferredLocations.length >= 5}
             onClick={() => addCity(cityDraft)}
-            className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-brand-700 px-4 text-xs font-semibold text-white shadow-2xs hover:bg-brand-600 transition-colors disabled:opacity-50"
+            className="apple-spring apple-pressable inline-flex min-h-11 items-center gap-1.5 rounded-[10px] bg-brand-700 px-4 text-xs font-semibold text-white shadow-2xs hover:bg-brand-600 disabled:opacity-50"
           >
             <Plus className="size-3.5" />
             <span>Add</span>
@@ -1212,7 +1231,7 @@ function LocationPreferencesStep({ values, update, errors }: StepProps) {
                   key={suggestion}
                   type="button"
                   onClick={() => addCity(suggestion)}
-                  className="rounded-lg bg-ink-100 px-2.5 py-1 text-2xs font-medium text-ink-700 hover:bg-brand-50 hover:text-brand-700 transition-colors"
+                  className="apple-spring rounded-[10px] bg-ink-100 px-2.5 py-1 text-xs font-medium text-ink-700 hover:bg-brand-50 hover:text-brand-700"
                 >
                   + {suggestion}
                 </button>
@@ -1249,7 +1268,7 @@ function LocationPreferencesStep({ values, update, errors }: StepProps) {
         </label>
         <div className="mt-2.5 grid gap-3 sm:grid-cols-2">
           <label
-            className={`flex items-start gap-3 rounded-xl border p-3.5 cursor-pointer transition-all ${
+            className={`apple-spring flex items-start gap-3 rounded-[10px] border p-3.5 cursor-pointer ${
               values.hasLaptop === true
                 ? "border-brand-600 bg-brand-50/60 ring-1 ring-brand-600/30"
                 : "border-ink-200 bg-white hover:bg-ink-50"
@@ -1266,14 +1285,14 @@ function LocationPreferencesStep({ values, update, errors }: StepProps) {
               <span className="block text-xs font-semibold text-ink-900">
                 Yes, I have a dedicated work laptop
               </span>
-              <span className="mt-0.5 block text-2xs text-text-subtle">
+              <span className="mt-0.5 block text-xs text-text-subtle">
                 Ready for remote software development or work immediately.
               </span>
             </div>
           </label>
 
           <label
-            className={`flex items-start gap-3 rounded-xl border p-3.5 cursor-pointer transition-all ${
+            className={`apple-spring flex items-start gap-3 rounded-[10px] border p-3.5 cursor-pointer ${
               values.hasLaptop === false
                 ? "border-brand-600 bg-brand-50/60 ring-1 ring-brand-600/30"
                 : "border-ink-200 bg-white hover:bg-ink-50"
@@ -1290,7 +1309,7 @@ function LocationPreferencesStep({ values, update, errors }: StepProps) {
               <span className="block text-xs font-semibold text-ink-900">
                 No, I will require company laptop provisioning
               </span>
-              <span className="mt-0.5 block text-2xs text-text-subtle">
+              <span className="mt-0.5 block text-xs text-text-subtle">
                 Companies can provide a system or on-site desktop workstation.
               </span>
             </div>
@@ -1303,7 +1322,7 @@ function LocationPreferencesStep({ values, update, errors }: StepProps) {
 
 /* ── Step 8: Live WYSIWYG Profile Preview ────────────────────────────────── */
 
-function ProfilePreviewStep({ values, email, onJumpStep }: StepProps) {
+function ProfilePreviewStep({ values, update, errors, email, onJumpStep }: StepProps) {
   return (
     <div className="space-y-6">
       <div className="rounded-xl border border-brand-200 bg-brand-50/50 p-4">
@@ -1311,7 +1330,7 @@ function ProfilePreviewStep({ values, email, onJumpStep }: StepProps) {
           <Sparkles className="size-4 text-brand-600" />
           <span>Live Candidate Profile Preview</span>
         </div>
-        <p className="mt-1 text-2xs text-brand-700/90 leading-relaxed">
+        <p className="mt-1 text-xs text-brand-700/90 leading-relaxed">
           This is exactly how your verified dossier appears in employer search results and candidate comparison matrices.
         </p>
       </div>
@@ -1337,7 +1356,7 @@ function ProfilePreviewStep({ values, email, onJumpStep }: StepProps) {
               <p className="text-xs text-white/80">
                 {values.academics.degree || "Student"} {values.academics.branch ? `· ${values.academics.branch}` : ""}{email ? ` · ${email}` : ""}
               </p>
-              <p className="mt-1 flex items-center gap-1 text-2xs text-white/70">
+              <p className="mt-1 flex items-center gap-1 text-xs text-white/70">
                 <MapPin className="size-3" />
                 <span>{values.city || "Location not stated"}</span>
                 {values.locationTypes.length > 0 ? (
@@ -1366,7 +1385,7 @@ function ProfilePreviewStep({ values, email, onJumpStep }: StepProps) {
           ) : null}
 
           {/* Academics Tile */}
-          <div className="rounded-xl border border-ink-100 bg-surface-alt p-4">
+          <div className="rounded-xl border border-ink-100 bg-ink-50 p-4">
             <div className="flex items-center justify-between">
               <span className="flex items-center gap-1.5 text-xs font-semibold text-ink-900">
                 <GraduationCap className="size-4 text-brand-600" />
@@ -1376,7 +1395,7 @@ function ProfilePreviewStep({ values, email, onJumpStep }: StepProps) {
                 <button
                   type="button"
                   onClick={() => onJumpStep(1)}
-                  className="text-2xs font-medium text-brand-700 hover:underline"
+                  className="apple-spring text-xs font-medium text-brand-700 hover:underline"
                 >
                   Edit
                 </button>
@@ -1384,27 +1403,27 @@ function ProfilePreviewStep({ values, email, onJumpStep }: StepProps) {
             </div>
             <div className="mt-2 grid gap-2 sm:grid-cols-2 text-xs">
               <div>
-                <span className="text-2xs text-text-subtle block">Institution</span>
+                <span className="text-xs text-text-subtle block">Institution</span>
                 <span className="font-semibold text-ink-900">
                   {values.academics.institution || "Not specified"}
                 </span>
               </div>
               <div>
-                <span className="text-2xs text-text-subtle block">Degree & Major</span>
+                <span className="text-xs text-text-subtle block">Degree & Major</span>
                 <span className="font-semibold text-ink-900">
-                  {[values.academics.degree, values.academics.branch].filter(Boolean).join(" - ") || "—"}
+                  {[values.academics.degree, values.academics.branch].filter(Boolean).join(" - ") || "-"}
                 </span>
               </div>
               <div>
-                <span className="text-2xs text-text-subtle block">Graduation</span>
+                <span className="text-xs text-text-subtle block">Graduation</span>
                 <span className="font-semibold text-ink-900">
-                  {values.academics.yearOfGraduation || "—"} ({values.academics.status || "Pursuing"})
+                  {values.academics.yearOfGraduation || "-"} ({values.academics.status || "Pursuing"})
                 </span>
               </div>
               <div>
-                <span className="text-2xs text-text-subtle block">CGPA / Marks</span>
+                <span className="text-xs text-text-subtle block">CGPA / Marks</span>
                 <span className="font-semibold tabular-nums text-ink-900">
-                  {values.academics.cgpa || "—"}
+                  {values.academics.cgpa || "-"}
                 </span>
               </div>
             </div>
@@ -1421,7 +1440,7 @@ function ProfilePreviewStep({ values, email, onJumpStep }: StepProps) {
                   <button
                     type="button"
                     onClick={() => onJumpStep(3)}
-                    className="text-2xs font-medium text-brand-700 hover:underline"
+                    className="apple-spring text-xs font-medium text-brand-700 hover:underline"
                   >
                     Edit
                   </button>
@@ -1436,10 +1455,10 @@ function ProfilePreviewStep({ values, email, onJumpStep }: StepProps) {
                   return (
                     <li
                       key={s}
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-ink-200 bg-white px-2.5 py-1 text-2xs font-semibold text-ink-800"
+                      className="inline-flex items-center gap-1.5 rounded-[10px] border border-ink-200 bg-white px-2.5 py-1 text-xs font-semibold text-ink-800"
                     >
                       <span>{s}</span>
-                      <span className="rounded-xs bg-ink-100 px-1 py-0.5 text-3xs font-normal text-ink-600">
+                      <span className="rounded-xs bg-ink-100 px-1 py-0.5 text-xs font-normal text-ink-600">
                         {rating}
                       </span>
                     </li>
@@ -1460,7 +1479,7 @@ function ProfilePreviewStep({ values, email, onJumpStep }: StepProps) {
                   <button
                     type="button"
                     onClick={() => onJumpStep(2)}
-                    className="text-2xs font-medium text-brand-700 hover:underline"
+                    className="apple-spring text-xs font-medium text-brand-700 hover:underline"
                   >
                     Edit
                   </button>
@@ -1468,18 +1487,18 @@ function ProfilePreviewStep({ values, email, onJumpStep }: StepProps) {
               </div>
               <div className="mt-2 space-y-2">
                 {values.experiences.map((exp) => (
-                  <div key={exp.id} className="rounded-lg border border-ink-100 p-3 text-xs">
+                  <div key={exp.id} className="rounded-[10px] border border-ink-100 p-3 text-xs">
                     <div className="flex items-start justify-between">
                       <div>
                         <span className="font-semibold text-ink-900">{exp.role || "Role"}</span>
                         <span className="text-text-subtle"> at {exp.company || "Project"}</span>
                       </div>
-                      <span className="text-2xs font-medium text-text-subtle">
+                      <span className="text-xs font-medium text-text-subtle">
                         {exp.from} – {exp.current ? "Present" : exp.to}
                       </span>
                     </div>
                     {exp.description ? (
-                      <p className="mt-1 text-2xs text-ink-600 line-clamp-2">{exp.description}</p>
+                      <p className="mt-1 text-xs text-ink-600 line-clamp-2">{exp.description}</p>
                     ) : null}
                   </div>
                 ))}
@@ -1508,6 +1527,37 @@ function ProfilePreviewStep({ values, email, onJumpStep }: StepProps) {
           </div>
         </div>
       </div>
+
+      <div
+        className={`rounded-xl border p-4 ${errors.ndaAccepted ? "border-danger/40 bg-danger-soft" : "border-ink-200 bg-white"}`}
+      >
+        <label className="flex items-start gap-2.5 text-sm text-ink-700">
+          <input
+            type="checkbox"
+            checked={Boolean(values.ndaAccepted)}
+            onChange={(e) => update("ndaAccepted", e.target.checked)}
+            aria-describedby={errors.ndaAccepted ? "nda-error" : undefined}
+            className="mt-0.5 size-4 shrink-0 rounded border-ink-300 accent-brand-700"
+          />
+          <span>
+            I have read and accept the{" "}
+            <a
+              href="/intern-nda"
+              target="_blank"
+              rel="noopener"
+              className="font-medium text-brand-700 underline-offset-4 hover:underline"
+            >
+              Internship Acceptance &amp; Non-Bypass Agreement
+            </a>
+            . Accepting a proposal is binding, and contact details stay on Findtern.
+          </span>
+        </label>
+        {errors.ndaAccepted ? (
+          <p id="nda-error" className="mt-2 text-xs text-danger">
+            {errors.ndaAccepted}
+          </p>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -1526,7 +1576,7 @@ const STEP_VIEWS = [
 /* ── Form primitives ────────────────────────────────────────────────────── */
 
 const FIELD_BASE =
-  "mt-2 h-10 w-full rounded-xl border bg-white px-3.5 text-xs text-ink-900 outline-none transition-[border-color,box-shadow] placeholder:text-ink-400 focus-visible:ring-[3px]";
+  "apple-spring mt-2 h-10 w-full rounded-[10px] border bg-white px-3.5 text-[14px] text-ink-900 outline-none placeholder:text-ink-400 focus-visible:ring-[3px]";
 const FIELD_OK = "border-ink-200 focus-visible:border-brand-600 focus-visible:ring-brand-600/20";
 const FIELD_BAD = "border-danger focus-visible:border-danger focus-visible:ring-danger/20";
 
@@ -1558,7 +1608,7 @@ function Field({
       <label htmlFor={id} className="block text-xs font-semibold text-ink-800">
         {label}
       </label>
-      {hint ? <p className="mt-0.5 text-2xs text-text-subtle">{hint}</p> : null}
+      {hint ? <p className="mt-0.5 text-xs text-text-subtle">{hint}</p> : null}
       <input
         id={id}
         name={id}
@@ -1573,7 +1623,7 @@ function Field({
         className={`${FIELD_BASE} ${error ? FIELD_BAD : FIELD_OK}`}
       />
       {error ? (
-        <p id={`${id}-error`} className="mt-1 text-2xs text-danger">
+        <p id={`${id}-error`} className="mt-1 text-xs text-danger">
           {error}
         </p>
       ) : null}
@@ -1601,7 +1651,7 @@ function TextArea({
       <label htmlFor={id} className="block text-xs font-semibold text-ink-800">
         {label}
       </label>
-      {hint ? <p className="mt-0.5 text-2xs text-text-subtle">{hint}</p> : null}
+      {hint ? <p className="mt-0.5 text-xs text-text-subtle">{hint}</p> : null}
       <textarea
         id={id}
         name={id}
@@ -1610,12 +1660,12 @@ function TextArea({
         onChange={(e) => onChange(e.target.value)}
         aria-invalid={error ? true : undefined}
         aria-describedby={error ? `${id}-error` : undefined}
-        className={`mt-2 w-full rounded-xl border bg-white px-3.5 py-2.5 text-xs leading-relaxed text-ink-900 outline-none transition-[border-color,box-shadow] focus-visible:ring-[3px] ${
+        className={`apple-spring mt-2 w-full rounded-[10px] border bg-white px-3.5 py-2.5 text-[14px] leading-relaxed text-ink-900 outline-none focus-visible:ring-[3px] ${
           error ? FIELD_BAD : FIELD_OK
         }`}
       />
       {error ? (
-        <p id={`${id}-error`} className="mt-1 text-2xs text-danger">
+        <p id={`${id}-error`} className="mt-1 text-xs text-danger">
           {error}
         </p>
       ) : null}
@@ -1630,7 +1680,7 @@ function validate(values: OnboardingDraft, step: number): Record<string, string>
 
   if (step === 0) {
     if (values.bio.trim().length < 20) {
-      errors.bio = "Write at least a sentence or two — 20 characters minimum.";
+      errors.bio = "Write at least a sentence or two - 20 characters minimum.";
     }
     if (values.linkedinUrl?.trim() && !/^https?:\/\/\S+\.\S+/.test(values.linkedinUrl.trim())) {
       errors.linkedinUrl = "That does not look like a valid URL.";
@@ -1641,6 +1691,11 @@ function validate(values: OnboardingDraft, step: number): Record<string, string>
     }
     if (values.aadhaarNumber && !/^\d{12}$/.test(values.aadhaarNumber.replace(/\s/g, ""))) {
       errors.aadhaarNumber = "Aadhaar number must be exactly 12 digits.";
+    }
+    if (!values.panNumber?.trim()) {
+      errors.panNumber = "PAN is required for stipend payouts.";
+    } else if (!/^[A-Z]{5}[0-9]{4}[A-Z]$/.test(values.panNumber.trim())) {
+      errors.panNumber = "PAN must look like ABCDE1234F - 5 letters, 4 digits, 1 letter.";
     }
   }
 
@@ -1653,11 +1708,15 @@ function validate(values: OnboardingDraft, step: number): Record<string, string>
   }
 
   if (step === 3) {
-    if (values.skills.length === 0) errors.skills = "Add at least one key skill.";
+    if (values.skills.length < 4) errors.skills = "Add at least 4 key skills (up to 7).";
   }
 
   if (step === 6) {
     if (values.locationTypes.length === 0) errors.locationTypes = "Pick at least one work mode.";
+  }
+
+  if (step === 7 && !values.ndaAccepted) {
+    errors.ndaAccepted = "Accept the Non-Bypass Agreement to submit your profile.";
   }
 
   return errors;
@@ -1667,18 +1726,27 @@ function subscribeToNothing() {
   return () => {};
 }
 
-function readDraft(): string | null {
+function readDraft(key: string): string | null {
   try {
-    return window.localStorage.getItem(DRAFT_KEY);
+    return window.localStorage.getItem(key);
   } catch {
     return null;
   }
 }
 
-function parseDraft(raw: string | null): Partial<OnboardingDraft> {
+/** A local draft only wins over the server when it was written after the last save. */
+function parseDraft(raw: string | null, serverUpdatedAt: string | null): Partial<OnboardingDraft> {
   if (!raw) return {};
   try {
-    return JSON.parse(raw) as Partial<OnboardingDraft>;
+    const { [SAVED_AT]: savedAt, bank: _bank, ...draft } = JSON.parse(raw) as Partial<OnboardingDraft> & {
+      [SAVED_AT]?: number;
+    };
+    void _bank;
+    if (serverUpdatedAt) {
+      const serverAt = Date.parse(serverUpdatedAt);
+      if (typeof savedAt !== "number" || (Number.isFinite(serverAt) && savedAt < serverAt)) return {};
+    }
+    return draft;
   } catch {
     return {};
   }

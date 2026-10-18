@@ -1,62 +1,63 @@
 import { eq } from "drizzle-orm";
+import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-import { google } from "googleapis";
 
 import { getDb, schema } from "@/lib/db";
 import { withSession, issueCsrfCookie } from "@/lib/auth";
+import { exchangeCode, fetchProfile, googleConfig, NONCE_COOKIE, safeNext } from "@/lib/google";
+
+function fail(req: Request, path: string, code: string) {
+  const res = NextResponse.redirect(new URL(`${path}?oauthError=${code}`, req.url));
+  res.cookies.delete(NONCE_COOKIE);
+  return res;
+}
 
 export async function GET(req: Request) {
   const url = new URL(req.url);
   const code = url.searchParams.get("code");
   const stateRaw = url.searchParams.get("state");
-  if (!code || !stateRaw) {
-    return NextResponse.redirect(new URL("/login?oauthError=missing_code", req.url));
-  }
+  if (!code || !stateRaw) return fail(req, "/login", "missing_code");
 
-  let state: { role: string; next: string };
+  let state: { role?: string; next?: string; nonce?: string };
   try {
     state = JSON.parse(Buffer.from(stateRaw, "base64url").toString());
   } catch {
-    return NextResponse.redirect(new URL("/login?oauthError=bad_state", req.url));
+    return fail(req, "/login", "bad_state");
   }
+  const nonce = (await cookies()).get(NONCE_COOKIE)?.value;
+  if (!nonce || nonce !== state.nonce) return fail(req, "/login", "bad_state");
 
-  const clientId = process.env.GOOGLE_CLIENT_ID;
-  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-  const redirectUri = process.env.GOOGID_OAUTH_REDIRECT_URI ?? process.env.GOOGLE_OAUTH_REDIRECT_URI ?? "http://localhost:3100/api/auth/google/callback";
-  if (!clientId || !clientSecret) {
-    return NextResponse.redirect(new URL("/login?oauthError=not_configured", req.url));
-  }
+  const cfg = googleConfig();
+  if (!cfg) return fail(req, "/login", "not_configured");
 
-  const oauth2 = new google.auth.OAuth2(clientId, clientSecret, redirectUri);
-  const { tokens } = await oauth2.getToken(code);
-  oauth2.setCredentials(tokens);
-  const oauth2Client = google.oauth2({ version: "v2", auth: oauth2 });
-  const { data } = await oauth2Client.userinfo.get();
-  const email = data.email?.toLowerCase();
-  if (!email) {
-    return NextResponse.redirect(new URL("/login?oauthError=no_email", req.url));
+  let email: string | undefined;
+  try {
+    const tokens = await exchangeCode(cfg, code);
+    const profile = await fetchProfile(tokens.access_token);
+    if (profile.email_verified) email = profile.email?.toLowerCase();
+  } catch {
+    return fail(req, "/login", "google_failed");
   }
+  if (!email) return fail(req, "/login", "no_email");
 
   const db = getDb();
   if (state.role === "employer") {
     const [employer] = await db.select().from(schema.employers).where(eq(schema.employers.companyEmail, email)).limit(1);
-    if (!employer) {
-      return NextResponse.redirect(new URL("/employer/signup?oauthError=no_account", req.url));
-    }
-    const res = NextResponse.redirect(new URL(state.next || "/employer/dashboard", req.url));
+    if (!employer) return fail(req, "/employer/signup", "no_account");
+    if (!employer.isActive) return fail(req, "/employer/login", "inactive");
+    const res = NextResponse.redirect(new URL(safeNext(state.next, "/employer/dashboard"), req.url));
+    res.cookies.delete(NONCE_COOKIE);
     await issueCsrfCookie(res);
     return withSession(res, { uid: employer.id, role: "employer", email: employer.companyEmail });
   }
 
-  // intern: Gmail-only
-  if (!email.endsWith("@gmail.com")) {
-    return NextResponse.redirect(new URL("/login?oauthError=gmail_only", req.url));
-  }
+  // Interns sign in with Gmail only (legacy rule).
+  if (!email.endsWith("@gmail.com")) return fail(req, "/login", "gmail_only");
   const [user] = await db.select().from(schema.users).where(eq(schema.users.email, email)).limit(1);
-  if (!user) {
-    return NextResponse.redirect(new URL("/signup?oauthError=no_account", req.url));
-  }
-  const res = NextResponse.redirect(new URL(state.next || "/intern/dashboard", req.url));
+  if (!user) return fail(req, "/signup", "no_account");
+  if (!user.isActive) return fail(req, "/login", "inactive");
+  const res = NextResponse.redirect(new URL(safeNext(state.next, "/intern/dashboard"), req.url));
+  res.cookies.delete(NONCE_COOKIE);
   await issueCsrfCookie(res);
   return withSession(res, { uid: user.id, role: "intern", email: user.email });
 }

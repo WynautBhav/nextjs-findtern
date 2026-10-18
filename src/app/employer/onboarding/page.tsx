@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { eq, desc } from "drizzle-orm";
 
 import { getDb, schema } from "@/lib/db";
-import { getSession } from "@/lib/auth";
+import { requireRole } from "@/lib/auth";
 import {
   companyFromRecord,
   emptyDraft,
@@ -29,8 +29,8 @@ export const metadata: Metadata = {
  */
 
 export default async function EmployerOnboarding() {
-  const session = await getSession();
-  const uid = session!.uid;
+  const session = await requireRole("employer");
+  const uid = session.uid;
 
   const draft: OnboardingDraft = emptyDraft();
   let project: typeof schema.projects.$inferSelect | undefined;

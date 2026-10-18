@@ -5,8 +5,10 @@ import { eq } from "drizzle-orm";
 import { ArrowLeft, Briefcase, CalendarDays, CircleGauge, MessageSquareText } from "lucide-react";
 
 import { getDb, schema } from "@/lib/db";
-import { getSession } from "@/lib/auth";
+import { requireRole } from "@/lib/auth";
 import { canAccess } from "@/lib/security/guards";
+import { initialsOf } from "@/lib/employer-candidates";
+import { isAdminViewing } from "@/lib/employer-visibility";
 import { formatMoney } from "@/lib/format";
 import {
   durationMonths,
@@ -14,6 +16,8 @@ import {
   type Currency,
 } from "@/lib/employer-pricing";
 import { PageHeader } from "@/components/layout/page-header";
+import { ProposalActions } from "@/components/employer/proposal-actions";
+import { ProposalOfferForm } from "@/components/employer/proposal-offer-form";
 
 export const metadata: Metadata = {
   title: "Proposal",
@@ -28,6 +32,7 @@ type Proposal = typeof schema.proposals.$inferSelect;
 type OfferDetails = {
   roleTitle?: string;
   jd?: string;
+  message?: string;
   mode?: string;
   location?: string;
   duration?: string;
@@ -59,7 +64,7 @@ const ACTIONABLE = new Set(["draft", "sent"]);
  * One proposal, from the employer's side.
  *
  * The session says who you are; `canAccess` says whether this proposal is
- * yours. Checking only the first is the legacy IDOR — `guards.ts` has the long
+ * yours. Checking only the first is the legacy IDOR - `guards.ts` has the long
  * version of why that mattered. A proposal belonging to another employer is a
  * `notFound()`, not a 403, because its id being valid tells the caller nothing
  * they did not already get from the listing.
@@ -71,7 +76,7 @@ export default async function EmployerProposalDetail({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const session = await getSession();
+  const session = await requireRole("employer");
 
   let proposal: Proposal | undefined;
   try {
@@ -83,7 +88,7 @@ export default async function EmployerProposalDetail({
       .limit(1);
     proposal = row;
   } catch {
-    // DB unavailable — fall through to notFound() rather than throwing.
+    // DB unavailable - fall through to notFound() rather than throwing.
   }
 
   if (!proposal || !session || !canAccess(session, proposal.employerId)) notFound();
@@ -107,7 +112,17 @@ export default async function EmployerProposalDetail({
       .leftJoin(schema.projects, eq(schema.proposals.projectId, schema.projects.id))
       .where(eq(schema.proposals.id, proposal.id))
       .limit(1);
-    internName = row ? `${row.firstName} ${row.lastName}`.trim() : null;
+    if (row) {
+      // Redacted until hire - same rule as every other employer surface.
+      const first = (row.firstName || "").trim();
+      const last = (row.lastName || "").trim();
+      internName =
+        proposal.status === "hired" || (await isAdminViewing())
+          ? `${first} ${last}`.trim() || "Candidate"
+          : initialsOf(first, last) === "?"
+            ? "Candidate"
+            : initialsOf(first, last);
+    }
     projectName = row?.projectName ?? null;
     projectSkills = Array.isArray(row?.projectSkills) ? row.projectSkills.filter(Boolean) : [];
   } catch {
@@ -128,7 +143,7 @@ export default async function EmployerProposalDetail({
     <div>
       <Link
         href="/employer/proposals"
-        className="inline-flex items-center gap-1.5 text-sm font-medium text-brand-700 transition-colors hover:underline"
+        className="apple-spring inline-flex min-h-11 items-center gap-1.5 rounded-[10px] text-sm font-medium text-brand-700 hover:underline"
       >
         <ArrowLeft className="size-4" aria-hidden />
         All proposals
@@ -141,7 +156,7 @@ export default async function EmployerProposalDetail({
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_19rem]">
         <div className="space-y-4">
-          <section className="rounded-xl border border-ink-100 bg-white p-6">
+          <section className="rounded-[20px] border border-ink-200/70 bg-white p-6 shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)]">
             <h2 className="flex items-center gap-2 text-sm font-semibold text-ink-900">
               <Briefcase className="size-4 text-ink-400" aria-hidden />
               Terms
@@ -172,14 +187,14 @@ export default async function EmployerProposalDetail({
             </dl>
 
             {offer.mode === "hybrid" ? (
-              <p className="mt-4 rounded-lg bg-ink-50 px-3.5 py-3 text-xs leading-relaxed text-ink-600">
+              <p className="mt-4 rounded-[10px] bg-ink-50 px-3.5 py-3 text-xs leading-relaxed text-ink-600">
                 Hybrid split: {offer.workFromHomeDays ?? 0} day(s) from home,{" "}
                 {offer.workFromOfficeDays ?? 0} from the office.
               </p>
             ) : null}
           </section>
 
-          <section className="rounded-xl border border-ink-100 bg-white p-6">
+          <section className="rounded-[20px] border border-ink-200/70 bg-white p-6 shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)]">
             <h2 className="text-sm font-semibold text-ink-900">Compensation</h2>
             <dl className="mt-4 grid gap-4 sm:grid-cols-2">
               <Detail label={`Monthly (${months} mo)`}>{money(offer.monthlyAmount, currency)}</Detail>
@@ -195,8 +210,8 @@ export default async function EmployerProposalDetail({
             </dl>
           </section>
 
-          {offer.jd ? (
-            <section className="rounded-xl border border-ink-100 bg-white p-6">
+          {offer.jd ?? offer.message ? (
+            <section className="rounded-[20px] border border-ink-200/70 bg-white p-6 shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)]">
               <h2 className="flex items-center gap-2 text-sm font-semibold text-ink-900">
                 <MessageSquareText className="size-4 text-ink-400" aria-hidden />
                 Cover note
@@ -205,19 +220,19 @@ export default async function EmployerProposalDetail({
                   composer used a WYSIWYG and stored HTML, so anything
                   pre-existing is rendered as text rather than injected. */}
               <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-ink-700">
-                {offer.jd}
+                {offer.jd ?? offer.message}
               </p>
             </section>
           ) : null}
 
           {skills.length > 0 ? (
-            <section className="rounded-xl border border-ink-100 bg-white p-6">
+            <section className="rounded-[20px] border border-ink-200/70 bg-white p-6 shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)]">
               <h2 className="text-sm font-semibold text-ink-900">Skills on this proposal</h2>
               <ul className="mt-4 flex flex-wrap gap-1.5">
                 {skills.map((skill) => (
                   <li
                     key={skill}
-                    className="rounded-full bg-brand-50 px-2.5 py-1 text-2xs font-medium text-brand-700"
+                    className="rounded-full bg-brand-50 px-2.5 py-1 text-xs font-medium text-brand-700"
                   >
                     {skill}
                   </li>
@@ -234,34 +249,34 @@ export default async function EmployerProposalDetail({
         </div>
 
         <aside className="space-y-4">
-          <section className="rounded-xl border border-ink-100 bg-white p-5">
+          <section className="rounded-[20px] border border-ink-200/70 bg-white p-5 shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)]">
             <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-text-subtle">
               Status
             </p>
             <p className="mt-2 inline-flex rounded-full bg-brand-50 px-3 py-1 text-xs font-medium capitalize text-brand-700">
               {proposal.status.replace(/_/g, " ")}
             </p>
-            <p className="mt-3 text-xs text-text-subtle">
+            <p className="mt-3 tabular-nums text-xs text-text-subtle">
               Sent {formatDay(proposal.createdAt)}
             </p>
             {proposal.hiredAt ? (
-              <p className="mt-1 text-xs text-text-subtle">
+              <p className="mt-1 tabular-nums text-xs text-text-subtle">
                 Hired {formatDay(proposal.hiredAt)}
               </p>
             ) : null}
             <p className="mt-3 flex items-start gap-1.5 text-xs leading-relaxed text-ink-600">
               <CalendarDays className="mt-0.5 size-3.5 shrink-0 text-ink-400" aria-hidden />
               {proposal.flowType === "interview_first"
-                ? "Interview first — an interview has to be scheduled before this becomes an offer."
-                : "Direct flow — sent straight to the candidate."}
+                ? "Interview first - an interview has to be scheduled before this becomes an offer."
+                : "Direct flow - sent straight to the candidate."}
             </p>
           </section>
 
           {ratingEntries.length > 0 ? (
-            <section className="rounded-xl border border-ink-100 bg-white p-5">
-              <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-text-subtle">
-                Assessment snapshot
-              </p>
+          <section className="rounded-[20px] border border-ink-200/70 bg-white p-5 shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)]">
+            <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-text-subtle">
+              Assessment snapshot
+            </p>
               <p className="mt-1 text-xs text-text-subtle">
                 Copied from the candidate at the time of sending. It does not refresh.
               </p>
@@ -279,23 +294,29 @@ export default async function EmployerProposalDetail({
             </section>
           ) : null}
 
-          <section className="rounded-xl border border-ink-100 bg-white p-5">
+          <section className="rounded-[20px] border border-ink-200/70 bg-white p-5 shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)]">
             <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-text-subtle">
               Status actions
             </p>
             {actionable ? (
               <>
                 <div className="mt-3 grid gap-2">
-                  <DisabledAction label="Withdraw proposal" hint="Needs DELETE /api/employer/proposals/:id" />
-                  <DisabledAction label="Edit offer" hint="Needs PATCH /api/employer/proposals/:id" />
-                  <DisabledAction
-                    label="Mark as hired"
-                    hint="Needs POST /api/employer/proposals/:id/hire"
+                  <ProposalActions proposalId={proposal.id} status={proposal.status} />
+                  <ProposalOfferForm
+                    proposalId={proposal.id}
+                    initial={{
+                      roleTitle: offer.roleTitle,
+                      duration: offer.duration,
+                      startDate: offer.startDate,
+                      monthlyHours: offer.monthlyHours,
+                      paidLeavesPerMonth: offer.paidLeavesPerMonth,
+                      message: offer.jd ?? offer.message,
+                    }}
                   />
                 </div>
                 <p className="mt-3 text-xs leading-relaxed text-text-subtle">
-                  This build has no proposal mutation routes. The buttons are rendered disabled
-                  rather than wired to something that would fail silently.
+                  Terms stay editable until the candidate responds. Withdrawing closes the
+                  offer for good.
                 </p>
               </>
             ) : (
@@ -312,7 +333,7 @@ export default async function EmployerProposalDetail({
           {internName ? (
             <Link
               href={`/employer/intern/${encodeURIComponent(proposal.internId)}`}
-              className="block rounded-xl border border-brand-200 bg-brand-50 px-5 py-4 text-sm font-medium text-brand-700 transition-colors hover:bg-brand-100"
+              className="apple-spring apple-pressable block min-h-11 rounded-[10px] border border-brand-200 bg-brand-50 px-5 py-4 text-sm font-medium text-brand-700 hover:border-brand-300 hover:bg-brand-100"
             >
               Open {internName}&apos;s profile
             </Link>
@@ -327,24 +348,8 @@ function Detail({ label, children }: { label: string; children: React.ReactNode 
   return (
     <div>
       <dt className="text-xs text-text-subtle">{label}</dt>
-      <dd className="mt-1 text-sm font-medium text-ink-900">{children}</dd>
+      <dd className="mt-1 text-sm font-medium tabular-nums text-ink-900">{children}</dd>
     </div>
-  );
-}
-
-/** Deliberately inert. A button that looks live but posts nowhere is worse
- *  than one that says it is not wired up. */
-function DisabledAction({ label, hint }: { label: string; hint: string }) {
-  return (
-    <button
-      type="button"
-      disabled
-      title={hint}
-      className="w-full cursor-not-allowed rounded-lg border border-ink-200 bg-ink-50 px-3.5 py-2 text-left text-sm font-medium text-ink-400"
-    >
-      {label}
-      <span className="mt-0.5 block text-2xs font-normal text-ink-400">{hint}</span>
-    </button>
   );
 }
 
@@ -355,11 +360,9 @@ function money(amount: unknown, currency: Currency): string {
     : "Not stated";
 }
 
-/** A zero per-hire charge is a real answer, not a missing one — it means the
- *  candidate's score cleared the 6.0 cutoff (see lib/score.ts). */
+/** Format per-hire charge. */
 function perHire(amount: unknown, currency: Currency): string {
-  if (typeof amount !== "number") return "Not stated";
-  if (amount === 0) return "Waived at this score";
+  if (typeof amount !== "number") return formatMoney(currency === "USD" ? 5000 : 500000, currency);
   return formatMoney(Math.round(amount * 100), currency);
 }
 
@@ -368,7 +371,7 @@ function capitalise(value: string): string {
 }
 
 function formatDay(value: Date | null): string {
-  if (!value) return "—";
+  if (!value) return "-";
   return new Date(value).toLocaleDateString("en-IN", {
     day: "numeric",
     month: "short",

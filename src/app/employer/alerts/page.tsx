@@ -2,12 +2,12 @@ import { eq, desc, and } from "drizzle-orm";
 import { Bell } from "lucide-react";
 
 import { getDb, schema } from "@/lib/db";
-import { getSession } from "@/lib/auth";
+import { requireRole } from "@/lib/auth";
 import { formatDate } from "@/lib/format";
 import { PageHeader, EmptyState } from "@/components/layout/page-header";
 
 export default async function EmployerAlerts() {
-  const session = await getSession();
+  const session = await requireRole("employer");
   let rows: (typeof schema.notifications.$inferSelect)[] = [];
   try {
     const db = getDb();
@@ -17,7 +17,7 @@ export default async function EmployerAlerts() {
       .where(
         and(
           eq(schema.notifications.recipientType, "employer"),
-          eq(schema.notifications.recipientId, session!.uid),
+          eq(schema.notifications.recipientId, session.uid),
         ),
       )
       .orderBy(desc(schema.notifications.createdAt))
@@ -36,18 +36,18 @@ export default async function EmployerAlerts() {
           body="You have no unread notifications or alerts right now."
         />
       ) : (
-        <div className="overflow-hidden rounded-2xl border border-ink-100 bg-white shadow-sm">
+        <div className="overflow-hidden rounded-[20px] border border-ink-200/70 bg-white shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)]">
           <ul className="divide-y divide-ink-100">
             {rows.map((n) => (
-              <li key={n.id} className="flex items-start gap-4 p-5 transition-colors hover:bg-canvas-subtle/60">
-                <div className="mt-0.5 grid size-9 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-700">
+              <li key={n.id} className="apple-spring flex items-start gap-4 p-5 hover:bg-ink-50">
+                <div className="mt-0.5 grid size-11 shrink-0 place-items-center rounded-[10px] bg-brand-50 text-brand-700">
                   <Bell className="size-4" aria-hidden />
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-baseline justify-between gap-2">
                     <p className="text-sm font-semibold text-ink-900">{n.title}</p>
                     {n.createdAt ? (
-                      <span className="text-xs text-text-subtle">
+                      <span className="text-xs tabular-nums text-text-subtle">
                         {formatDate(n.createdAt)}
                       </span>
                     ) : null}

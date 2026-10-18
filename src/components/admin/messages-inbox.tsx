@@ -23,6 +23,20 @@ import {
   SheetTitle,
   SheetDescription,
 } from "@/components/ui/sheet";
+import { cn } from "@/lib/utils";
+
+/** "INTERN_HELP" → "Intern help" */
+function prettyType(value: string | null): string | null {
+  if (!value) return null;
+  return value
+    .split(/[_-]+/)
+    .map((w) => (w ? w.charAt(0).toUpperCase() + w.slice(1).toLowerCase() : w))
+    .join(" ");
+}
+
+function initials(m: ContactMessage): string {
+  return `${m.firstName.charAt(0).toUpperCase()}${m.lastName.charAt(0).toUpperCase()}`;
+}
 
 export function MessagesInbox({
   initialMessages,
@@ -34,6 +48,7 @@ export function MessagesInbox({
   const [filter, setFilter] = useState<"all" | "unread" | "read">("all");
   const [search, setSearch] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const filtered = messages.filter((m) => {
     if (filter === "unread" && m.isRead) return false;
@@ -52,6 +67,7 @@ export function MessagesInbox({
 
   async function toggleReadStatus(id: string, currentRead: boolean) {
     setBusyId(id);
+    setActionError(null);
     try {
       const nextRead = !currentRead;
       const res = await csrfFetch("/api/admin/messages", {
@@ -66,7 +82,11 @@ export function MessagesInbox({
         if (selectedMessage?.id === id) {
           setSelectedMessage((prev) => (prev ? { ...prev, isRead: nextRead } : null));
         }
+      } else {
+        setActionError("Couldn't update this message. Try again.");
       }
+    } catch {
+      setActionError("Couldn't reach the server. Check your connection and try again.");
     } finally {
       setBusyId(null);
     }
@@ -75,6 +95,7 @@ export function MessagesInbox({
   async function deleteMessage(id: string) {
     if (!confirm("Are you sure you want to delete this message?")) return;
     setBusyId(id);
+    setActionError(null);
     try {
       const res = await csrfFetch("/api/admin/messages", {
         method: "DELETE",
@@ -84,38 +105,59 @@ export function MessagesInbox({
       if (res.ok) {
         setMessages((prev) => prev.filter((m) => m.id !== id));
         if (selectedMessage?.id === id) setSelectedMessage(null);
+      } else {
+        setActionError("Couldn't delete this message. Try again.");
       }
+    } catch {
+      setActionError("Couldn't reach the server. Check your connection and try again.");
     } finally {
       setBusyId(null);
     }
   }
 
   return (
-    <div className="space-y-4">
-      {/* Controls & Filter Bar */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 rounded-2xl border border-ink-100 bg-white p-3.5 shadow-2xs">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-ink-400" />
+    <div className="apple-admin space-y-4">
+      {actionError && !selectedMessage ? (
+        <p role="alert" className="rounded-[10px] bg-danger-soft px-4 py-3 text-sm text-danger">
+          {actionError}
+        </p>
+      ) : null}
+
+      {/* Frosted toolbar: search + segmented triage */}
+      <div className="apple-panel flex flex-col gap-3 bg-white p-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="relative min-w-0 flex-1 lg:max-w-sm">
+          <Search
+            aria-hidden
+            className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-ink-400"
+          />
           <input
             type="search"
             value={search}
-            placeholder="Filter by sender, email, subject, or message content..."
+            placeholder="Search senders, subjects, messages…"
+            aria-label="Search messages"
             onChange={(e) => setSearch(e.target.value)}
-            className="h-9.5 w-full rounded-xl border border-ink-200 bg-surface-alt pl-9.5 pr-3 text-xs text-ink-900 shadow-2xs outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
+            className="apple-spring min-h-11 w-full rounded-[10px] border border-ink-200 bg-ink-50 pr-3 pl-9 text-[15px] tracking-[-0.01em] text-ink-900 placeholder:text-ink-400 focus:border-brand-500 focus:bg-white focus:ring-2 focus:ring-brand-500/20 focus:outline-none [&::-webkit-search-cancel-button]:hidden"
           />
         </div>
 
-        <div className="flex items-center gap-1.5 self-end sm:self-auto">
+        <div
+          role="tablist"
+          aria-label="Read status"
+          className="grid grid-cols-3 gap-0.5 self-start rounded-[10px] bg-ink-100 p-1 lg:self-auto"
+        >
           {(["all", "unread", "read"] as const).map((tab) => (
             <button
               key={tab}
+              role="tab"
+              aria-selected={filter === tab}
               type="button"
               onClick={() => setFilter(tab)}
-              className={`rounded-lg px-3 py-1.5 text-xs font-semibold capitalize transition-colors ${
+              className={cn(
+                "apple-spring inline-flex min-h-11 items-center justify-center rounded-[8px] px-4 text-[14px] font-medium tracking-[-0.01em] capitalize",
                 filter === tab
-                  ? "bg-brand-700 text-white shadow-2xs"
-                  : "bg-surface-alt text-ink-600 hover:bg-ink-100 hover:text-ink-900"
-              }`}
+                  ? "bg-white text-ink-900 shadow-xs"
+                  : "text-ink-500 hover:text-ink-800",
+              )}
             >
               {tab}
             </button>
@@ -123,123 +165,173 @@ export function MessagesInbox({
         </div>
       </div>
 
-      {/* Messages List / Table */}
-      <div className="overflow-hidden rounded-2xl border border-ink-100 bg-white shadow-2xs">
+      {/* Mail rows */}
+      <div className="apple-panel overflow-hidden bg-white">
         {filtered.length === 0 ? (
-          <div className="p-12 text-center">
-            <Inbox className="mx-auto size-8 text-ink-300" />
-            <h4 className="mt-2 text-sm font-semibold text-ink-800">No messages found</h4>
-            <p className="mt-1 text-xs text-text-subtle">
-              {search ? "Try widening your search terms." : "The triage inbox is all caught up."}
+          <div className="flex flex-col items-center px-6 py-16 text-center">
+            <span
+              aria-hidden
+              className="mb-3 grid size-12 place-items-center rounded-full bg-ink-100 text-ink-400"
+            >
+              <Inbox className="size-5" />
+            </span>
+            <p className="text-[15px] font-semibold tracking-[-0.01em] text-ink-800">
+              {search ? "No matching messages" : "Inbox zero"}
+            </p>
+            <p className="mt-1 max-w-sm text-[14px] text-text-subtle">
+              {search
+                ? "Try widening your search terms."
+                : "Every inquiry is reviewed. Nothing waiting."}
             </p>
           </div>
         ) : (
-          <div className="divide-y divide-ink-100">
-            {filtered.map((msg) => (
-              <div
-                key={msg.id}
-                onClick={() => setSelectedMessage(msg)}
-                className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 transition-colors cursor-pointer hover:bg-surface-alt ${
-                  !msg.isRead ? "bg-brand-50/20 font-medium" : ""
-                }`}
-              >
-                <div className="flex items-start gap-3 min-w-0 flex-1">
-                  <span
-                    aria-hidden
-                    className={`grid size-9 shrink-0 place-items-center rounded-xl text-xs font-bold ${
-                      !msg.isRead
-                        ? "bg-brand-100 text-brand-800 border border-brand-200"
-                        : "bg-ink-100 text-ink-600"
-                    }`}
+          <ul className="divide-y divide-ink-100">
+            {filtered.map((msg) => {
+              const type = prettyType(msg.queryType);
+              return (
+                <li key={msg.id}>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedMessage(msg)}
+                    aria-label={`${msg.isRead ? "" : "Unread: "}${msg.subject || "No subject"} from ${msg.firstName} ${msg.lastName}`}
+                    className="apple-spring group flex w-full items-center gap-3 px-4 py-3.5 text-left hover:bg-ink-50/70 sm:px-5"
                   >
-                    {msg.firstName.charAt(0).toUpperCase()}
-                    {msg.lastName.charAt(0).toUpperCase()}
-                  </span>
+                    {/* Unread dot, Apple Mail language */}
+                    <span aria-hidden className="w-2 shrink-0">
+                      {msg.isRead ? null : (
+                        <span className="block size-2 rounded-full bg-info" />
+                      )}
+                    </span>
 
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold text-ink-900 truncate">
-                        {msg.firstName} {msg.lastName}
-                      </span>
-                      <span className="text-2xs text-text-subtle truncate">
-                        &lt;{msg.email}&gt;
-                      </span>
-                      {msg.queryType ? (
-                        <span className="rounded-md bg-ink-100 px-2 py-0.5 text-3xs font-medium uppercase tracking-wider text-ink-700">
-                          {msg.queryType}
+                    <span
+                      aria-hidden
+                      className={cn(
+                        "grid size-10 shrink-0 place-items-center rounded-full text-[13px] font-semibold",
+                        msg.isRead
+                          ? "bg-ink-100 text-ink-500"
+                          : "bg-brand-100 text-brand-800",
+                      )}
+                    >
+                      {initials(msg)}
+                    </span>
+
+                    <span className="min-w-0 flex-1">
+                      <span className="flex items-baseline justify-between gap-3">
+                        <span
+                          className={cn(
+                            "truncate text-[15px] tracking-[-0.01em] text-ink-900",
+                            msg.isRead ? "font-medium" : "font-semibold",
+                          )}
+                        >
+                          {msg.firstName} {msg.lastName}
                         </span>
-                      ) : null}
-                    </div>
+                        <span className="shrink-0 text-[12px] tabular-nums text-text-subtle">
+                          {msg.createdAt ? formatDate(msg.createdAt) : "-"}
+                        </span>
+                      </span>
+                      <span
+                        className={cn(
+                          "mt-0.5 block truncate text-[14px] tracking-[-0.01em]",
+                          msg.isRead
+                            ? "font-normal text-ink-600"
+                            : "font-medium text-ink-900",
+                        )}
+                      >
+                        {msg.subject || "No subject"}
+                      </span>
+                      <span className="mt-0.5 flex items-center gap-2">
+                        <span className="min-w-0 flex-1 truncate text-[13px] text-text-subtle">
+                          {msg.message}
+                        </span>
+                        {type ? (
+                          <span className="shrink-0 text-[12px] text-text-subtle">
+                            {type}
+                          </span>
+                        ) : null}
+                      </span>
+                    </span>
 
-                    <p className="mt-0.5 text-xs text-ink-800 truncate">
-                      {msg.subject || "(No subject provided)"}
-                    </p>
-                    <p className="mt-0.5 text-2xs text-text-subtle line-clamp-1">
-                      {msg.message}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0">
-                  <span className="text-2xs text-text-subtle tabular-nums">
-                    {msg.createdAt ? formatDate(msg.createdAt) : "—"}
-                  </span>
-
-                  <StatusBadge
-                    tone={msg.isRead ? "neutral" : "warning"}
-                    label={msg.isRead ? "Reviewed" : "Unread"}
-                  />
-
-                  <div
-                    onClick={(e) => e.stopPropagation()}
-                    className="flex items-center gap-1"
-                  >
-                    <button
-                      type="button"
-                      title={msg.isRead ? "Mark unread" : "Mark reviewed"}
-                      disabled={busyId === msg.id}
-                      onClick={() => toggleReadStatus(msg.id, msg.isRead)}
-                      className="rounded-lg p-1.5 text-ink-500 hover:bg-ink-100 hover:text-ink-900 transition-colors"
+                    <span
+                      className="flex shrink-0 items-center gap-1"
+                      onClick={(e) => e.stopPropagation()}
+                      onKeyDown={(e) => e.stopPropagation()}
+                      role="group"
+                      aria-label="Message actions"
                     >
-                      {msg.isRead ? <Mail className="size-3.5" /> : <MailOpen className="size-3.5 text-brand-600" />}
-                    </button>
-                    <button
-                      type="button"
-                      title="Delete inquiry"
-                      disabled={busyId === msg.id}
-                      onClick={() => deleteMessage(msg.id)}
-                      className="rounded-lg p-1.5 text-ink-400 hover:bg-ink-100 hover:text-danger transition-colors"
-                    >
-                      <Trash2 className="size-3.5" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
+                      <span
+                        role="button"
+                        tabIndex={0}
+                        title={msg.isRead ? "Mark unread" : "Mark reviewed"}
+                        aria-label={msg.isRead ? "Mark unread" : "Mark reviewed"}
+                        aria-disabled={busyId === msg.id}
+                        onClick={() => toggleReadStatus(msg.id, msg.isRead)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            toggleReadStatus(msg.id, msg.isRead);
+                          }
+                        }}
+                        className="apple-spring apple-pressable hidden min-h-11 min-w-11 items-center justify-center rounded-[10px] text-ink-400 group-hover:inline-flex hover:bg-ink-100 hover:text-ink-800 focus-visible:inline-flex"
+                      >
+                        {msg.isRead ? (
+                          <Mail className="size-4" />
+                        ) : (
+                          <MailOpen className="size-4 text-brand-600" />
+                        )}
+                      </span>
+                      <span
+                        role="button"
+                        tabIndex={0}
+                        title="Delete inquiry"
+                        aria-label="Delete inquiry"
+                        aria-disabled={busyId === msg.id}
+                        onClick={() => deleteMessage(msg.id)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            deleteMessage(msg.id);
+                          }
+                        }}
+                        className="apple-spring apple-pressable hidden min-h-11 min-w-11 items-center justify-center rounded-[10px] text-ink-400 group-hover:inline-flex hover:bg-danger-soft hover:text-danger focus-visible:inline-flex"
+                      >
+                        <Trash2 className="size-4" />
+                      </span>
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
         )}
       </div>
 
-      {/* Message Inspection Sheet Drawer */}
-      <Sheet open={Boolean(selectedMessage)} onOpenChange={(open) => !open && setSelectedMessage(null)}>
-        <SheetContent side="right" className="w-full sm:max-w-lg md:max-w-xl overflow-y-auto p-0 bg-surface-alt">
+      {/* Inspection sheet */}
+      <Sheet
+        open={Boolean(selectedMessage)}
+        onOpenChange={(open) => !open && setSelectedMessage(null)}
+      >
+        <SheetContent
+          side="right"
+          className="apple-admin w-full overflow-y-auto bg-ink-50 p-0 sm:max-w-lg"
+        >
           {selectedMessage ? (
-            <div className="p-6 space-y-6">
-              <SheetHeader className="text-left pb-4 border-b border-ink-100">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <span className="grid size-12 shrink-0 place-items-center rounded-xl bg-brand-100 text-sm font-bold text-brand-800 border border-brand-200">
-                      {selectedMessage.firstName.charAt(0).toUpperCase()}
-                      {selectedMessage.lastName.charAt(0).toUpperCase()}
-                    </span>
-                    <div>
-                      <SheetTitle className="text-lg font-bold text-ink-900">
-                        {selectedMessage.firstName} {selectedMessage.lastName}
-                      </SheetTitle>
-                      <SheetDescription className="text-xs text-text-subtle">
-                        {selectedMessage.email} {selectedMessage.phone ? `· ${selectedMessage.phone}` : ""}
-                      </SheetDescription>
-                    </div>
+            <div className="space-y-4 p-4 sm:p-6">
+              <SheetHeader className="apple-panel bg-white p-5 text-left">
+                <div className="flex items-center gap-3">
+                  <span
+                    aria-hidden
+                    className="grid size-12 shrink-0 place-items-center rounded-full bg-brand-100 text-[15px] font-semibold text-brand-800"
+                  >
+                    {initials(selectedMessage)}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <SheetTitle className="truncate text-[17px] font-semibold tracking-[-0.02em] text-ink-900">
+                      {selectedMessage.firstName} {selectedMessage.lastName}
+                    </SheetTitle>
+                    <SheetDescription className="truncate text-[13px] text-text-subtle">
+                      {selectedMessage.email}
+                      {selectedMessage.phone ? ` · ${selectedMessage.phone}` : ""}
+                    </SheetDescription>
                   </div>
                   <StatusBadge
                     tone={selectedMessage.isRead ? "neutral" : "warning"}
@@ -248,63 +340,68 @@ export function MessagesInbox({
                 </div>
               </SheetHeader>
 
-              {/* Action Toolbar */}
-              <div className="flex flex-wrap items-center gap-2 rounded-xl bg-white p-3 border border-ink-100 shadow-2xs">
+              <div className="apple-panel flex flex-wrap items-center gap-2 bg-white p-3">
                 <a
-                  href={`mailto:${selectedMessage.email}?subject=Re: ${encodeURIComponent(selectedMessage.subject || "Findtern Inquiry")}`}
-                  className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-brand-700 px-3.5 text-xs font-semibold text-white shadow-2xs hover:bg-brand-600 transition-colors"
+                  href={`mailto:${selectedMessage.email}?subject=Re: ${encodeURIComponent(selectedMessage.subject || "Findtern inquiry")}`}
+                  className="apple-spring apple-pressable inline-flex min-h-11 items-center gap-1.5 rounded-[10px] bg-brand-700 px-4 text-[14px] font-semibold text-white hover:bg-brand-600"
                 >
-                  <Reply className="size-3.5" />
-                  <span>Reply via Email</span>
+                  <Reply className="size-4" />
+                  Reply
                 </a>
                 <button
                   type="button"
-                  onClick={() => toggleReadStatus(selectedMessage.id, selectedMessage.isRead)}
-                  className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-ink-200 bg-white px-3 text-xs font-medium text-ink-800 hover:bg-ink-50 transition-colors"
+                  onClick={() =>
+                    toggleReadStatus(selectedMessage.id, selectedMessage.isRead)
+                  }
+                  className="apple-spring apple-pressable inline-flex min-h-11 items-center gap-1.5 rounded-[10px] border border-ink-200 bg-white px-3 text-[14px] font-medium text-ink-800 hover:bg-ink-50"
                 >
-                  {selectedMessage.isRead ? <Mail className="size-3.5 text-ink-500" /> : <CheckCircle2 className="size-3.5 text-brand-600" />}
-                  <span>{selectedMessage.isRead ? "Mark Unread" : "Mark as Reviewed"}</span>
+                  {selectedMessage.isRead ? (
+                    <Mail className="size-4 text-ink-400" />
+                  ) : (
+                    <CheckCircle2 className="size-4 text-brand-600" />
+                  )}
+                  {selectedMessage.isRead ? "Mark unread" : "Mark reviewed"}
                 </button>
                 <button
                   type="button"
                   onClick={() => deleteMessage(selectedMessage.id)}
-                  className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-ink-200 bg-white px-3 text-xs font-medium text-danger hover:bg-danger-soft transition-colors ml-auto"
+                  className="apple-spring apple-pressable ml-auto inline-flex min-h-11 items-center gap-1.5 rounded-[10px] px-3 text-[14px] font-medium text-danger hover:bg-danger-soft"
                 >
-                  <Trash2 className="size-3.5" />
-                  <span>Delete</span>
+                  <Trash2 className="size-4" />
+                  Delete
                 </button>
+                {actionError ? (
+                  <p role="alert" className="w-full text-sm text-danger">
+                    {actionError}
+                  </p>
+                ) : null}
               </div>
 
-              {/* Inquiry Details Card */}
-              <div className="rounded-xl border border-ink-100 bg-white p-5 shadow-2xs space-y-4">
-                <div>
-                  <span className="text-2xs font-semibold uppercase tracking-wider text-text-subtle block">
+              <div className="apple-panel overflow-hidden bg-white">
+                <div className="border-b border-ink-100 px-5 py-4">
+                  <p className="text-[12px] font-semibold tracking-[0.02em] text-text-subtle">
                     Subject
-                  </span>
-                  <h3 className="mt-1 text-sm font-bold text-ink-900">
-                    {selectedMessage.subject || "No subject provided"}
-                  </h3>
-                </div>
-
-                <div className="flex items-center gap-4 text-xs text-text-subtle pt-2 border-t border-ink-100">
-                  <span className="inline-flex items-center gap-1">
+                  </p>
+                  <p className="mt-1 text-[15px] font-semibold tracking-[-0.01em] text-ink-900">
+                    {selectedMessage.subject || "No subject"}
+                  </p>
+                  <p className="mt-2 flex items-center gap-1.5 text-[13px] text-text-subtle">
                     <Clock className="size-3.5 text-ink-400" />
-                    {selectedMessage.createdAt ? formatDate(selectedMessage.createdAt) : "—"}
-                  </span>
-                  {selectedMessage.queryType ? (
-                    <span className="rounded-md bg-ink-100 px-2 py-0.5 text-3xs font-medium uppercase tracking-wider text-ink-700">
-                      {selectedMessage.queryType}
-                    </span>
-                  ) : null}
+                    {selectedMessage.createdAt
+                      ? formatDate(selectedMessage.createdAt)
+                      : "-"}
+                    {prettyType(selectedMessage.queryType)
+                      ? ` · ${prettyType(selectedMessage.queryType)}`
+                      : ""}
+                  </p>
                 </div>
-
-                <div className="pt-2 border-t border-ink-100">
-                  <span className="text-2xs font-semibold uppercase tracking-wider text-text-subtle block">
-                    Message Body
-                  </span>
-                  <div className="mt-2 text-xs leading-relaxed text-ink-800 whitespace-pre-wrap rounded-lg bg-surface-alt p-4 border border-ink-100/80">
+                <div className="px-5 py-4">
+                  <p className="text-[12px] font-semibold tracking-[0.02em] text-text-subtle">
+                    Message
+                  </p>
+                  <p className="mt-2 text-[14px] leading-relaxed whitespace-pre-wrap text-ink-800">
                     {selectedMessage.message}
-                  </div>
+                  </p>
                 </div>
               </div>
             </div>

@@ -2,12 +2,13 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 
-import { EmptyScene, PageHead } from "@/components/app/primitives";
+import { EmptyScene, PageHead, SectionHead } from "@/components/app/primitives";
 import { StatusPill, proposalStatus } from "@/components/app/proposal-status";
-import { getSession } from "@/lib/auth";
+import { requireRole } from "@/lib/auth";
 import { loadInternData, projectNames } from "@/lib/intern-data";
 import { formatDayLabel, formatMoney } from "@/lib/format";
 import type { ProposalRow } from "@/lib/journey";
+import { parseOffer, internStipendInrMinor } from "@/lib/offer";
 
 export const metadata: Metadata = {
   title: "Offers",
@@ -28,8 +29,7 @@ export const metadata: Metadata = {
  * buries the one that needs an answer.
  */
 export default async function InternProposals() {
-  const session = await getSession();
-  if (!session) return null;
+  const session = await requireRole("intern");
 
   const data = await loadInternData(session.uid);
   const projects = await projectNames(data.proposals.map((p) => p.projectId ?? ""));
@@ -44,10 +44,10 @@ export default async function InternProposals() {
         p,
         role: typeof offer.roleTitle === "string" ? offer.roleTitle : "Internship",
         company: data.names[p.employerId] ?? "A company on Findtern",
-        stipend:
-          typeof offer.monthlyAmountMinor === "number"
-            ? formatMoney(offer.monthlyAmountMinor, "INR")
-            : "Stipend to be confirmed",
+        stipend: (() => {
+          const minor = internStipendInrMinor(parseOffer(p.offerDetails, p.currency));
+          return minor != null ? `${formatMoney(minor, "INR")}/month` : "Stipend to be confirmed";
+        })(),
         start: typeof offer.startDate === "string" ? offer.startDate : null,
         project: p.projectId ? projects[p.projectId] : null,
       };
@@ -72,11 +72,7 @@ export default async function InternProposals() {
         <div className="space-y-10">
           {open.length > 0 ? (
             <section>
-              <div className="mb-3 flex items-baseline justify-between gap-4">
-                <h2 className="text-base font-semibold tracking-[-0.01em] text-ink-900">
-                  Waiting on you
-                </h2>
-              </div>
+              <SectionHead title="Waiting on you" />
               <ul className="grid gap-3 lg:grid-cols-2">
                 {rows(open).map((row) => (
                   <li key={row.p.id}>
@@ -89,11 +85,7 @@ export default async function InternProposals() {
 
           {closed.length > 0 ? (
             <section>
-              <div className="mb-3 flex items-baseline justify-between gap-4">
-                <h2 className="text-base font-semibold tracking-[-0.01em] text-ink-900">
-                  Decided
-                </h2>
-              </div>
+              <SectionHead title="Decided" />
               <ul className="grid gap-3 opacity-90 lg:grid-cols-2">
                 {rows(closed).map((row) => (
                   <li key={row.p.id}>
@@ -129,7 +121,7 @@ function OfferCard({
   return (
     <Link
       href={`/intern/proposals/${p.id}`}
-      className="group flex h-full flex-col rounded-2xl border border-ink-100 bg-white p-5 transition-[border-color,box-shadow,transform] duration-[var(--dur-standard)] hover:-translate-y-0.5 hover:border-ink-200 hover:shadow-[0_14px_34px_-18px_rgb(7_47_36/0.32)]"
+      className="apple-spring apple-pressable group flex h-full flex-col rounded-[20px] border border-ink-200/70 bg-white p-5 shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)] hover:border-ink-200"
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
@@ -159,7 +151,7 @@ function OfferCard({
       <span className="mt-auto flex items-center gap-1.5 pt-4 text-sm font-medium text-primary">
         {decisionPending ? "Read and decide" : "See the details"}
         <ArrowRight
-          className="size-4 transition-transform duration-[var(--dur-instant)] group-hover:translate-x-0.5"
+          className="size-4 apple-spring group-hover:translate-x-0.5"
           aria-hidden
         />
       </span>

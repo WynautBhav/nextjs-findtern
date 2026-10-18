@@ -6,7 +6,7 @@
  * Both roles have a working endpoint (`/api/users/:id/change-password` and
  * `/api/employer/:id/change-password`) that verifies the current password
  * before hashing the new one, so this form only has to gather three fields and
- * report the server's answer honestly — including "wrong current password",
+ * report the server's answer honestly - including "wrong current password",
  * which is the one most implementations swallow.
  */
 
@@ -110,7 +110,7 @@ export function ChangePasswordForm({
         <button
           type="submit"
           disabled={busy || !current || !next || mismatched}
-          className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-brand-700 px-5 text-sm font-semibold text-white transition-colors hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-60"
+          className="apple-spring apple-pressable inline-flex min-h-11 items-center justify-center gap-2 rounded-[10px] bg-brand-700 px-5 text-sm font-semibold text-white hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {busy ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
           Change password
@@ -118,7 +118,7 @@ export function ChangePasswordForm({
         <button
           type="button"
           onClick={() => setShow((v) => !v)}
-          className="inline-flex items-center gap-1.5 text-xs font-medium text-text-subtle underline-offset-4 hover:underline"
+          className="apple-spring inline-flex min-h-11 items-center gap-1.5 px-2 text-xs font-medium text-text-subtle underline-offset-4 hover:underline"
         >
           {show ? <EyeOff className="size-3.5" aria-hidden /> : <Eye className="size-3.5" aria-hidden />}
           {show ? "Hide" : "Show"} passwords
@@ -160,7 +160,7 @@ function Field({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         aria-invalid={invalid || undefined}
-        className="mt-1.5 h-10 w-full rounded-lg border border-ink-200 bg-white px-3.5 text-sm text-ink-900 outline-none transition-[border-color,box-shadow] focus-visible:border-brand-600 focus-visible:ring-[3px] focus-visible:ring-brand-600/20 aria-invalid:border-danger"
+        className="apple-spring mt-1.5 min-h-11 w-full rounded-[10px] border border-ink-200 bg-white px-3.5 text-[14px] text-ink-900 outline-none focus-visible:border-brand-600 focus-visible:ring-[3px] focus-visible:ring-brand-600/20 aria-invalid:border-danger"
       />
       {hint ? <p className="mt-1.5 text-xs text-text-subtle">{hint}</p> : null}
       {invalid ? <p className="mt-1.5 text-xs text-danger">The two passwords differ.</p> : null}

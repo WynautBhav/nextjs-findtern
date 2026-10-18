@@ -4,14 +4,14 @@
  * `timesheets.entries` is a jsonb bag the intern form writes, and the legacy
  * shapes in the wild are inconsistent: dates arrive as a full ISO timestamp in
  * some rows and a bare `YYYY-MM-DD` in others, and `status` is free text that
- * the form constrains to four values but a migration never did.
+ * the form constrains to five values but a migration never did.
  *
  * Pure functions, no React and no database, so `node --test src/lib/**` can
  * cover them (see the `test` script in package.json).
  */
 
-/** The four values the intern form writes into each `entries` row. */
-export const DAY_STATUSES = ["Present", "Absent", "Fixed off", "Holiday"] as const;
+/** The five values the intern form writes into each `entries` row. */
+export const DAY_STATUSES = ["Present", "Leave", "Absent", "Fixed off", "Holiday"] as const;
 
 export type DayStatus = (typeof DAY_STATUSES)[number];
 
@@ -19,12 +19,12 @@ export type DayEntry = { date: string; status: string };
 
 export function formatPeriod(start: Date | null, end: Date | null): string {
   const fmt = (value: Date | null) =>
-    value ? new Date(value).toLocaleDateString("en-IN", { day: "numeric", month: "short" }) : "—";
+    value ? new Date(value).toLocaleDateString("en-IN", { day: "numeric", month: "short" }) : "-";
   return `${fmt(start)} – ${fmt(end)}`;
 }
 
 export function formatDay(value: Date | null): string {
-  if (!value) return "—";
+  if (!value) return "-";
   return new Date(value).toLocaleDateString("en-IN", {
     day: "numeric",
     month: "short",
@@ -41,7 +41,7 @@ export function formatDay(value: Date | null): string {
  * timesheet look complete. The legacy detail page did the same
  * (employer-timesheet-detail.tsx:170).
  *
- * `status` is passed through verbatim — `countStatuses` is what tallies it, so
+ * `status` is passed through verbatim - `countStatuses` is what tallies it, so
  * an unexpected value shows up as its own bucket instead of being silently
  * coerced into "Present".
  */

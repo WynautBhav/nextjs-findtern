@@ -36,18 +36,17 @@ export function OfferDecision({
   proposalId,
   roleTitle,
   company,
-  stipend,
   startDate,
 }: {
   proposalId: string;
   roleTitle: string;
   company: string;
-  stipend: string;
   startDate: string | null;
 }) {
   const router = useRouter();
   const reduce = useReducedMotion();
   const [confirming, setConfirming] = useState(false);
+  const [agreed, setAgreed] = useState(false);
   const [outcome, setOutcome] = useState<Outcome | null>(null);
   const [busy, setBusy] = useState<"accept" | "decline" | null>(null);
   const [, startTransition] = useTransition();
@@ -58,7 +57,8 @@ export function OfferDecision({
       const res = await csrfFetch(`/api/proposals/${proposalId}/status`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: kind }),
+        // The API speaks "rejected"; "declined" is only this screen's wording.
+        body: JSON.stringify({ status: kind === "declined" ? "rejected" : kind, agreedToTerms: kind === "accepted" && agreed }),
       });
       if (!res.ok) {
         const body = (await res.json().catch(() => ({}))) as { error?: string };
@@ -92,8 +92,8 @@ export function OfferDecision({
         transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
         className={
           outcome.kind === "accepted"
-            ? "flex items-start gap-3 rounded-2xl bg-success-soft px-4 py-4"
-            : "flex items-start gap-3 rounded-2xl bg-ink-100 px-4 py-4"
+            ? "flex items-start gap-3 rounded-[20px] bg-success-soft px-4 py-4"
+            : "flex items-start gap-3 rounded-[20px] bg-ink-100 px-4 py-4"
         }
         role="status"
       >
@@ -137,23 +137,40 @@ export function OfferDecision({
             animate={{ opacity: 1, y: 0 }}
             exit={reduce ? { opacity: 0 } : { opacity: 0, y: -6 }}
             transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
-            className="mb-4 rounded-2xl border border-brand-200 bg-brand-50/70 p-5"
+            className="mb-4 rounded-[20px] border border-brand-200 bg-brand-50/70 p-5"
           >
             <p className="text-sm font-semibold text-ink-900">
               Accept {roleTitle} at {company}?
             </p>
             <p className="mt-1.5 text-pretty text-sm leading-relaxed text-ink-700">
-              {startDate
-                ? `This tells ${company} yes, starts your timesheet on ${startDate}, and puts ${stipend} a month on your record.`
-                : `This tells ${company} yes, starts your timesheet, and puts ${stipend} a month on your record.`}{" "}
-              They will book an interview with you next.
+              This tells {company} yes{startDate ? ` for a start on ${startDate}` : ""}. Once they complete the payment
+              you&apos;re hired and your timesheets open. Your other open offers from {company} close.
             </p>
+            <label className="mt-3 flex items-start gap-2.5 text-sm text-ink-700">
+              <input
+                type="checkbox"
+                className="mt-0.5 size-4 accent-brand-700"
+                checked={agreed}
+                onChange={(e) => setAgreed(e.target.checked)}
+              />
+              <span>
+                I agree to the{" "}
+                <a href="/intern-terms-and-conditions" target="_blank" className="font-medium text-brand-700 underline underline-offset-4">
+                  intern terms
+                </a>{" "}
+                and the{" "}
+                <a href="/intern-nda" target="_blank" className="font-medium text-brand-700 underline underline-offset-4">
+                  non-disclosure agreement
+                </a>
+                .
+              </span>
+            </label>
             <div className="mt-4 flex flex-wrap gap-3">
               <button
                 type="button"
                 onClick={() => decide("accepted")}
-                disabled={busy !== null}
-                className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-primary px-5 text-sm font-semibold text-white shadow-sm transition-[background-color,transform] duration-[var(--dur-instant)] hover:bg-primary-hover active:scale-[0.98] disabled:opacity-55"
+                disabled={busy !== null || !agreed}
+                className="apple-spring apple-pressable inline-flex min-h-11 items-center gap-2 rounded-[10px] bg-primary px-5 text-sm font-semibold text-white shadow-sm hover:bg-primary-hover disabled:opacity-55"
               >
                 {busy === "accept" ? (
                   <Loader2 className="size-4 animate-spin" aria-hidden />
@@ -165,7 +182,7 @@ export function OfferDecision({
               <button
                 type="button"
                 onClick={() => setConfirming(false)}
-                className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-ink-200 bg-white px-5 text-sm font-medium text-ink-700 transition-colors duration-[var(--dur-instant)] hover:bg-ink-50"
+                className="apple-spring apple-pressable inline-flex min-h-11 items-center gap-2 rounded-[10px] border border-ink-200 bg-white px-5 text-sm font-medium text-ink-700 hover:bg-ink-50"
               >
                 Not yet
               </button>
@@ -177,7 +194,7 @@ export function OfferDecision({
       {outcome?.error ? (
         <p
           role="alert"
-          className="mb-4 flex items-start gap-2 rounded-xl bg-danger-soft px-4 py-3 text-sm text-danger"
+          className="mb-4 flex items-start gap-2 rounded-[10px] bg-danger-soft px-4 py-3 text-sm text-danger"
         >
           <AlertCircle className="mt-px size-4 shrink-0" aria-hidden />
           {outcome.error}
@@ -189,7 +206,7 @@ export function OfferDecision({
           type="button"
           onClick={() => setConfirming(true)}
           disabled={busy !== null || confirming}
-          className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-lg bg-primary px-5 text-sm font-semibold text-white shadow-sm transition-[background-color,box-shadow,transform] duration-[var(--dur-instant)] hover:bg-primary-hover hover:shadow-md active:scale-[0.98] disabled:opacity-55 sm:flex-none"
+          className="apple-spring apple-pressable inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-[10px] bg-primary px-5 text-sm font-semibold text-white shadow-sm hover:bg-primary-hover disabled:opacity-55 sm:flex-none"
         >
           {busy === "accept" ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
           Accept this offer
@@ -198,7 +215,7 @@ export function OfferDecision({
           type="button"
           onClick={() => decide("declined")}
           disabled={busy !== null || confirming}
-          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-ink-200 bg-white px-5 text-sm font-medium text-ink-700 transition-[border-color,background-color,transform] duration-[var(--dur-instant)] hover:border-ink-300 hover:bg-ink-50 active:scale-[0.98] disabled:opacity-55"
+          className="apple-spring apple-pressable inline-flex min-h-11 items-center justify-center gap-2 rounded-[10px] border border-ink-200 bg-white px-5 text-sm font-medium text-ink-700 hover:border-ink-300 hover:bg-ink-50 disabled:opacity-55"
         >
           {busy === "decline" ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
           Turn this down

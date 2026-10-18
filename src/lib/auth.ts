@@ -1,5 +1,8 @@
 import { cookies, headers } from "next/headers";
 import { randomBytes } from "node:crypto";
+import { redirect } from "next/navigation";
+
+import { currentAdminPermissions, isAccountActive } from "@/lib/account-status";
 import { NextResponse } from "next/server";
 
 import {
@@ -15,7 +18,27 @@ import {
  */
 export async function getSession(): Promise<SessionData | null> {
   const store = await cookies();
-  return readSession(store.get("ft_sid")?.value);
+  const session = readSession(store.get("ft_sid")?.value);
+  if (!session) return null;
+  if (!(await isAccountActive(session.role, session.uid))) return null;
+  if (session.role === "admin" && !session.impersonator) {
+    const perms = await currentAdminPermissions(session.uid);
+    if (perms === null) return null; // admin removed
+    if (perms) return { ...session, permissions: perms };
+  }
+  return session;
+}
+
+/**
+ * Page guard for role areas: the session, or a redirect to that role's login.
+ * The role layouts already guard, so this mostly removes `session!` from pages.
+ */
+export async function requireRole(role: "intern" | "employer" | "admin"): Promise<SessionData> {
+  const session = await getSession();
+  if (!session || session.role !== role) {
+    redirect(role === "intern" ? "/login" : `/${role}/login`);
+  }
+  return session;
 }
 
 /**
@@ -40,7 +63,13 @@ export async function isHttps(): Promise<boolean> {
 /** Attach a fresh session cookie to a response. */
 export async function withSession(
   res: NextResponse,
-  input: { uid: string; role: Role; email: string; permissions?: string[] },
+  input: {
+    uid: string;
+    role: Role;
+    email: string;
+    permissions?: string[];
+    impersonator?: { uid: string; email: string };
+  },
 ): Promise<NextResponse> {
   const { cookie } = createSession({ ...input, secure: await isHttps() });
   res.headers.append("Set-Cookie", cookie);

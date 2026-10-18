@@ -59,7 +59,10 @@ export type OnboardingDraft = {
   state: string;
   pinCode: string;
   aadhaarNumber?: string;
+  panNumber?: string;
   photoUrl?: string;
+  /** Accepted the Internship Acceptance & Non-Bypass Agreement (/intern-nda). */
+  ndaAccepted?: boolean;
 
   // Step 2: Academics
   academics: {
@@ -118,7 +121,9 @@ const BLANK: OnboardingDraft = {
   state: "",
   pinCode: "",
   aadhaarNumber: "",
+  panNumber: "",
   photoUrl: "",
+  ndaAccepted: false,
   academics: {
     qualificationLevel: "Bachelor's",
     institution: "",
@@ -161,80 +166,110 @@ type OnboardingRow = typeof internOnboarding.$inferSelect;
 /**
  * `intern_onboarding` → form state.
  */
-export function draftFromRecord(row: OnboardingRow): Partial<OnboardingDraft> {
-  const extra = (row.extraData ?? {}) as Record<string, unknown>;
-  const academics = (extra.academics ?? {}) as Record<string, unknown>;
-  const bank = (extra.bankDetails ?? {}) as Record<string, unknown>;
+/* ── Legacy storage shape ───────────────────────────────────────────────
+ * The legacy app owns `intern_onboarding` and both apps share the database:
+ *   skills            [{ id, name, rating: 1 | 2 | 3 }]
+ *   extra.academics   { level: "bachelors"…, degree, specialization, status,
+ *                       institution, startYear, endYear, scoreType, score, … }
+ *   extra.languages   [{ id, language, level: "native"…, read/write/speak: "yes" | "no" }]
+ *   extra.extracurricular [{ id, activity, level }]
+ *   extra.bankDetails { accountHolderName, bankName, accountNumber, ifscCode, upiId }
+ * `draftFromRecord` reads it (and the shapes early builds of this app wrote);
+ * `storedFromDraft` always writes it. */
 
-  const text = (value: unknown): string => (typeof value === "string" ? value : "");
-  const list = (value: unknown): string[] =>
-    Array.isArray(value) ? value.filter((v): v is string => typeof v === "string") : [];
+const LEVELS: [string, string][] = [
+  ["bachelors", "Bachelor's"],
+  ["masters", "Master's"],
+  ["diploma", "Diploma"],
+  ["phd", "Ph.D"],
+  ["12th", "High School"],
+];
+const RATING_LABEL = ["Beginner", "Intermediate", "Advanced"] as const;
 
-  // Parse experiences
-  const rawExp = Array.isArray(row.experienceJson)
-    ? row.experienceJson
-    : Array.isArray(extra.experiences)
-    ? extra.experiences
-    : [];
-  const experiences: ExperienceEntry[] = rawExp.map((item, i) => {
-    const exp = typeof item === "object" && item !== null ? (item as Record<string, unknown>) : {};
-    return {
-      id: text(exp.id) || `exp-${i}`,
-      type: text(exp.type) || "Internship",
-      company: text(exp.company),
-      role: text(exp.role),
-      from: text(exp.from),
-      to: text(exp.to),
-      current: Boolean(exp.current),
-      description: text(exp.description),
-    };
-  });
+const text = (value: unknown): string => (typeof value === "string" ? value : typeof value === "number" ? String(value) : "");
+const obj = (value: unknown): Record<string, unknown> =>
+  value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+const arr = (value: unknown): unknown[] => (Array.isArray(value) ? value : []);
+const cap = (v: string) => (v ? v.charAt(0).toUpperCase() + v.slice(1).toLowerCase() : v);
+const yes = (v: unknown) => v === true || v === "yes" || v === undefined;
 
-  // Parse languages
-  const rawLang = Array.isArray(extra.languages) ? extra.languages : [];
-  const languages: LanguageEntry[] = rawLang.length > 0
+function ratingLabel(v: unknown): SkillWithRating["rating"] {
+  if (typeof v === "string" && (RATING_LABEL as readonly string[]).includes(v)) return v as SkillWithRating["rating"];
+  const n = Math.round(Number(v));
+  return RATING_LABEL[Math.min(3, Math.max(1, Number.isFinite(n) ? n : 1)) - 1];
+}
+
+export function readSkillRatings(raw: unknown, extra: Record<string, unknown> = {}): SkillWithRating[] {
+  const legacy = arr(extra.skillsWithRatings).map(obj);
+  return arr(raw)
+    .map((item) => {
+      if (typeof item === "string") {
+        const r = legacy.find((x) => text(x.name).toLowerCase() === item.toLowerCase());
+        return { name: item, rating: ratingLabel(r?.rating ?? 2) };
+      }
+      const o = obj(item);
+      return { name: text(o.name).trim(), rating: ratingLabel(o.rating) };
+    })
+    .filter((s) => s.name);
+}
+
+/** Any onboarding row (or a projection of one); JSON columns are read defensively. */
+export type OnboardingLike = Partial<Omit<OnboardingRow, "skills" | "experienceJson" | "extraData">> & {
+  skills?: unknown;
+  experienceJson?: unknown;
+  extraData?: unknown;
+};
+
+export function draftFromRecord(row: OnboardingLike): Partial<OnboardingDraft> {
+  const extra = obj(row.extraData);
+  const academics = obj(extra.academics);
+  const bank = obj(extra.bankDetails ?? extra.bank);
+  const list = (value: unknown): string[] => arr(value).filter((v): v is string => typeof v === "string");
+
+  const experiences: ExperienceEntry[] = arr(Array.isArray(row.experienceJson) ? row.experienceJson : extra.experiences).map(
+    (item, i) => {
+      const exp = obj(item);
+      return {
+        id: text(exp.id) || `exp-${i}`,
+        type: text(exp.type) || "Internship",
+        company: text(exp.company),
+        role: text(exp.role),
+        from: text(exp.from),
+        to: text(exp.to),
+        current: Boolean(exp.current) || (!text(exp.to) && Boolean(text(exp.from))),
+        description: text(exp.description),
+      };
+    },
+  );
+
+  const rawLang = arr(extra.languages);
+  const languages: LanguageEntry[] = rawLang.length
     ? rawLang.map((item, i) => {
-        const l = typeof item === "object" && item !== null ? (item as Record<string, unknown>) : {};
+        const l = obj(item);
         return {
           id: text(l.id) || `lang-${i}`,
           language: text(l.language),
-          level: (typeof l.level === "string" ? l.level : "Professional") as LanguageEntry["level"],
-          read: l.read !== false,
-          write: l.write !== false,
-          speak: l.speak !== false,
+          level: (cap(text(l.level)) || "Professional") as LanguageEntry["level"],
+          read: yes(l.read),
+          write: yes(l.write),
+          speak: yes(l.speak),
         };
       })
     : BLANK.languages;
 
-  // Parse extracurriculars
-  const rawExtra = Array.isArray(extra.extracurriculars) ? extra.extracurriculars : [];
-  const extracurriculars: ExtracurricularEntry[] = rawExtra.map((item, i) => {
-    const e = typeof item === "object" && item !== null ? (item as Record<string, unknown>) : {};
+  const extracurriculars: ExtracurricularEntry[] = arr(extra.extracurricular ?? extra.extracurriculars).map((item, i) => {
+    const e = obj(item);
     return {
       id: text(e.id) || `extra-${i}`,
-      activity: text(e.activity),
-      level: (typeof e.level === "string" ? e.level : "Intermediate") as ExtracurricularEntry["level"],
+      activity: text(e.activity) || text(e.title) || text(e.name),
+      level: (cap(text(e.level)) || "Intermediate") as ExtracurricularEntry["level"],
       category: text(e.category),
       description: text(e.description),
     };
   });
 
-  // Parse skills with ratings
-  const baseSkills = list(row.skills);
-  const rawSkillRatings = Array.isArray(extra.skillsWithRatings) ? extra.skillsWithRatings : [];
-  const ratingMap = new Map<string, "Beginner" | "Intermediate" | "Advanced">();
-  for (const item of rawSkillRatings) {
-    if (typeof item === "object" && item !== null) {
-      const rec = item as Record<string, unknown>;
-      if (typeof rec.name === "string" && typeof rec.rating === "string") {
-        ratingMap.set(rec.name.toLowerCase(), rec.rating as "Beginner" | "Intermediate" | "Advanced");
-      }
-    }
-  }
-  const skillsWithRatings: SkillWithRating[] = baseSkills.map((name) => ({
-    name,
-    rating: ratingMap.get(name.toLowerCase()) || "Intermediate",
-  }));
+  const skillsWithRatings = readSkillRatings(row.skills, extra);
+  const level = text(academics.level || academics.qualificationLevel);
 
   return {
     bio: text(row.bio),
@@ -243,20 +278,22 @@ export function draftFromRecord(row: OnboardingRow): Partial<OnboardingDraft> {
     state: text(row.state),
     pinCode: text(row.pinCode),
     aadhaarNumber: text(row.aadhaarNumber || extra.aadhaarNumber),
+    panNumber: text(row.panNumber || extra.panNumber),
     photoUrl: text(extra.photoUrl),
     emergencyPhone: text(extra.emergencyPhone),
+    ndaAccepted: Boolean(extra.ndaAcceptedAt),
     previewSummary: text(row.previewSummary),
     academics: {
-      qualificationLevel: text(academics.qualificationLevel) || "Bachelor's",
+      qualificationLevel: LEVELS.find(([k, v]) => k === level.toLowerCase() || v === level)?.[1] ?? (level || "Bachelor's"),
       institution: text(academics.institution),
       degree: text(academics.degree),
-      branch: text(academics.branch),
-      yearOfGraduation: text(academics.yearOfGraduation),
+      branch: text(academics.specialization || academics.branch),
+      yearOfGraduation: text(academics.endYear || academics.yearOfGraduation),
       status: text(academics.status) || "Pursuing",
-      cgpa: text(academics.cgpa),
+      cgpa: text(academics.score || academics.cgpa),
     },
     experiences,
-    skills: baseSkills,
+    skills: skillsWithRatings.map((s) => s.name),
     skillsWithRatings,
     languages,
     extracurriculars,
@@ -271,4 +308,63 @@ export function draftFromRecord(row: OnboardingRow): Partial<OnboardingDraft> {
       upiId: text(bank.upiId),
     },
   };
+}
+
+/** Draft fields → legacy columns. Unknown legacy keys already stored are kept. */
+export function storedFromDraft(
+  draft: Partial<OnboardingDraft>,
+  existing: { skills?: unknown; extraData?: unknown } | null,
+): { skills?: unknown[]; experienceJson?: unknown[]; extraPatch: Record<string, unknown> } {
+  const prevExtra = obj(existing?.extraData);
+  const out: { skills?: unknown[]; experienceJson?: unknown[]; extraPatch: Record<string, unknown> } = { extraPatch: {} };
+
+  if (draft.skillsWithRatings || draft.skills) {
+    const prevIds = new Map(arr(existing?.skills).map(obj).map((s) => [text(s.name).toLowerCase(), text(s.id)]));
+    const rated = draft.skillsWithRatings?.length
+      ? draft.skillsWithRatings
+      : (draft.skills ?? []).map((name) => ({ name, rating: "Beginner" as const }));
+    out.skills = rated
+      .filter((s) => s.name.trim())
+      .map((s, i) => ({
+        id: prevIds.get(s.name.trim().toLowerCase()) || `skill-${Date.now()}-${i}`,
+        name: s.name.trim(),
+        rating: RATING_LABEL.indexOf(s.rating) + 1 || 1,
+      }));
+  }
+  if (draft.experiences) {
+    out.experienceJson = draft.experiences.map(({ id, type, company, role, from, to, description, current }) => ({
+      id, type, company, role, from, to: current ? "" : to, description, current,
+    }));
+  }
+  if (draft.academics) {
+    const a = draft.academics;
+    const prev = obj(prevExtra.academics);
+    const score = a.cgpa?.trim() ?? "";
+    out.extraPatch.academics = {
+      ...prev,
+      level: LEVELS.find(([, v]) => v === a.qualificationLevel)?.[0] ?? a.qualificationLevel ?? "",
+      degree: a.degree,
+      specialization: a.branch,
+      status: a.status ?? "Pursuing",
+      institution: a.institution,
+      endYear: a.yearOfGraduation,
+      score,
+      scoreType: text(prev.scoreType) || (Number(score) > 10 ? "percentage" : "cgpa"),
+    };
+  }
+  if (draft.languages) {
+    out.extraPatch.languages = draft.languages.map((l) => ({
+      id: l.id,
+      language: l.language,
+      level: l.level.toLowerCase(),
+      read: l.read === false ? "no" : "yes",
+      write: l.write === false ? "no" : "yes",
+      speak: l.speak === false ? "no" : "yes",
+    }));
+  }
+  if (draft.extracurriculars) {
+    out.extraPatch.extracurricular = draft.extracurriculars.map((e) => ({ ...e, level: e.level }));
+  }
+  if (draft.bank) out.extraPatch.bankDetails = draft.bank;
+  return out;
 }

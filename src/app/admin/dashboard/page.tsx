@@ -1,654 +1,446 @@
-import { count, desc, eq, sql, type SQL } from "drizzle-orm";
-import {
-  Users,
-  Building2,
-  CalendarCheck,
-  Briefcase,
-  Sparkles,
-  Timer,
-  TrendingUp,
-  Send,
-} from "lucide-react";
+import { and, count, desc, eq, gte, sql } from "drizzle-orm";
 import Link from "next/link";
+import {
+  ArrowRight,
+  ArrowUpRight,
+  CalendarClock,
+  ClipboardCheck,
+  CreditCard,
+  MessageSquare,
+  UserRoundX,
+} from "lucide-react";
 
 import { getDb, schema } from "@/lib/db";
-import { formatDate, formatMoney } from "@/lib/format";
-import { flattenParams, parsePageRequest, searchAny, toPage } from "@/lib/admin/params";
-import {
-  AdminPageHeader,
-  AttentionBanner,
-  Panel,
-  PanelHeader,
-} from "@/components/admin/panel";
-import { StatCard, StatGrid } from "@/components/admin/stat-card";
-import { DataTable } from "@/components/admin/data-table";
-import { PipelineBars, TrendChart } from "@/components/admin/trend-chart";
-import { StatusBadge } from "@/components/admin/status-badge";
+import { getSession } from "@/lib/auth";
+import { formatMoney } from "@/lib/format";
+import { TrendChart, type TrendPoint } from "@/components/admin/trend-chart";
+import { cn } from "@/lib/utils";
 
 /**
- * Admin dashboard.
- *
- * Reads happen inline in this file rather than through a service module: they
- * exist only to render this one screen, and an indirection between a page and
- * the query it needs is a place for the two to disagree.
- *
- * Every figure is wrapped in a try/catch. A partial dashboard is worse than an
- * empty one — it reads as real data — so if the database is unreachable the
- * whole screen degrades to zeros behind an explicit notice rather than showing
- * some numbers and hiding the failure.
+ * Admin home: what needs a person today, four numbers that move, the pipeline
+ * and what just happened. Full lists (candidates, projects, placements) live
+ * on their own pages; repeating them here only made this page five screens
+ * long.
  */
 
-const PIPELINE_LABELS: Record<string, string> = {
-  sent: "Sent",
-  accepted: "Accepted",
-  hired: "Hired",
-  expired: "Expired",
-  rejected: "Rejected",
-  withdrawn: "Withdrawn",
+type Task = {
+  count: number;
+  label: string;
+  detail: string;
+  href: string;
+  cta: string;
+  Icon: typeof MessageSquare;
 };
 
-export default async function AdminDashboard({
-  searchParams,
-}: {
-  searchParams?: Promise<Record<string, string | string[] | undefined>>;
-}) {
-  const params = flattenParams(await searchParams);
+type Event = { label: string; detail: string; href: string; date: Date | null };
 
-  let data: {
-    totalSignups: number;
-    internsWithProfile: number;
-    totalCompanies: number;
-    companiesSetupComplete: number;
-    interviewsTotal: number;
-    interviewsScheduled: number;
-    totalProjects: number;
-    fullTimeProjects: number;
-    totalProposals: number;
-    avgHiringSpeedDays: number | null;
-    revenueMinor: number;
-    revenueCurrency: string;
-    pipeline: { status: string; count: number }[];
-    trend: { label: string; proposals: number; interviews: number }[];
-  };
+const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
-  let failed = false;
-
-  try {
-    const db = getDb();
-
-    const [
-      [signups],
-      [withProfile],
-      [companies],
-      [companiesReady],
-      [interviews],
-      [scheduled],
-      [projectTotal],
-      [fullTime],
-      [proposals],
-      [speed],
-      [revenue],
-      pipelineRaw,
-      trendRaw,
-    ] = await Promise.all([
-      db.select({ c: count() }).from(schema.users),
-      db.select({ c: count() }).from(schema.internOnboarding),
-      db.select({ c: count() }).from(schema.employers),
-      db.select({ c: count() }).from(schema.employers).where(eq(schema.employers.setupCompleted, true)),
-      db.select({ c: count() }).from(schema.interviews),
-      db.select({ c: count() }).from(schema.interviews).where(eq(schema.interviews.status, "scheduled")),
-      db.select({ c: count() }).from(schema.projects),
-      db.select({ c: count() }).from(schema.projects).where(eq(schema.projects.fullTimeOffer, true)),
-      db.select({ c: count() }).from(schema.proposals),
-      db
-        .select({
-          d: sql<string>`avg(extract(epoch from (${schema.proposals.hiredAt} - ${schema.proposals.createdAt})) / 86400.0)`,
-        })
-        .from(schema.proposals)
-        .where(sql`${schema.proposals.hiredAt} is not null`),
-      db
-        .select({
-          total: sql<number>`coalesce(sum(${schema.employerPayments.amountMinor}), 0)::bigint`,
-          currency: sql<string>`coalesce(max(${schema.employerPayments.currency}), 'INR')`,
-        })
-        .from(schema.employerPayments)
-        .where(eq(schema.employerPayments.status, "paid")),
-      db
-        .select({ status: schema.proposals.status, c: count() })
-        .from(schema.proposals)
-        .groupBy(schema.proposals.status),
-      db.execute(sql`
-        with months as (
-          select to_char(date_trunc('month', now()) - (n || ' month')::interval, 'Mon') as label,
-                 n
-          from generate_series(5, 0, -1) as n
-        )
-        select m.label,
-               coalesce(p.c, 0)::int as proposals,
-               coalesce(i.c, 0)::int as interviews
-        from months m
-        left join (
-          select to_char(date_trunc('month', created_at), 'YYYY-MM') as month, count(*) as c
-          from ${schema.proposals} group by 1
-        ) p on p.month = to_char(date_trunc('month', now()) - (m.n || ' month')::interval, 'YYYY-MM')
-        left join (
-          select to_char(date_trunc('month', created_at), 'YYYY-MM') as month, count(*) as c
-          from ${schema.interviews} group by 1
-        ) i on i.month = to_char(date_trunc('month', now()) - (m.n || ' month')::interval, 'YYYY-MM')
-        order by m.n desc
-      `) as unknown as {
-        rows: { label: string; proposals: number; interviews: number }[];
-      },
-    ]);
-
-    const pipelineMap = new Map(pipelineRaw.map((row) => [row.status, Number(row.c)]));
-
-    data = {
-      totalSignups: Number(signups?.c ?? 0),
-      internsWithProfile: Number(withProfile?.c ?? 0),
-      totalCompanies: Number(companies?.c ?? 0),
-      companiesSetupComplete: Number(companiesReady?.c ?? 0),
-      interviewsTotal: Number(interviews?.c ?? 0),
-      interviewsScheduled: Number(scheduled?.c ?? 0),
-      totalProjects: Number(projectTotal?.c ?? 0),
-      fullTimeProjects: Number(fullTime?.c ?? 0),
-      totalProposals: Number(proposals?.c ?? 0),
-      avgHiringSpeedDays: speed?.d ? Math.round(Number(speed.d)) : null,
-      revenueMinor: Number(revenue?.total ?? 0),
-      revenueCurrency: revenue?.currency ?? "INR",
-      pipeline: Object.keys(PIPELINE_LABELS).map((status) => ({
-        status,
-        count: pipelineMap.get(status) ?? 0,
-      })),
-      trend: (trendRaw?.rows ?? []).map((row) => ({
-        label: row.label,
-        proposals: Number(row.proposals),
-        interviews: Number(row.interviews),
-      })),
-    };
-  } catch {
-    failed = true;
-    data = {
-      totalSignups: 0,
-      internsWithProfile: 0,
-      totalCompanies: 0,
-      companiesSetupComplete: 0,
-      interviewsTotal: 0,
-      interviewsScheduled: 0,
-      totalProjects: 0,
-      fullTimeProjects: 0,
-      totalProposals: 0,
-      avgHiringSpeedDays: null,
-      revenueMinor: 0,
-      revenueCurrency: "INR",
-      pipeline: Object.keys(PIPELINE_LABELS).map((status) => ({ status, count: 0 })),
-      trend: [],
-    };
-  }
-
-  const incomplete = Math.max(0, data.totalSignups - data.internsWithProfile);
-  const num = (n: number) => n.toLocaleString("en-IN");
-
-  return (
-    <div>
-      <AdminPageHeader
-        title="Dashboard"
-        subtitle="Everything happening across interns, companies and projects."
-        action={
-          <Link
-            href="/admin/reports"
-            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-ink-200 bg-white px-3.5 text-sm font-medium text-ink-700 transition-colors hover:bg-ink-50"
-          >
-            <TrendingUp className="size-4" aria-hidden />
-            Full reports
-          </Link>
-        }
-      />
-
-      {failed ? (
-        <div
-          role="alert"
-          className="mb-6 rounded-lg border border-danger/25 bg-danger-soft px-4 py-3 text-sm text-danger"
-        >
-          Could not reach the database. Figures below are zero, not real.
-        </div>
-      ) : null}
-
-      <div className="space-y-6">
-        <AttentionBanner
-          count={incomplete}
-          total={data.totalSignups}
-          noun="interns"
-          href="/admin/interns?profile=incomplete"
-        />
-
-        {/* KPI row -------------------------------------------------------- */}
-        <StatGrid cols={6}>
-          <StatCard
-            label="Total interns"
-            value={num(data.internsWithProfile)}
-            hint={`${num(data.totalSignups)} total signups`}
-            icon={Users}
-            tone="brand"
-            href="/admin/interns"
-          />
-          <StatCard
-            label="Companies"
-            value={num(data.totalCompanies)}
-            hint={`${num(data.companiesSetupComplete)} setup completed`}
-            icon={Building2}
-            tone="info"
-            href="/admin/companies"
-          />
-          <StatCard
-            label="Interviews"
-            value={num(data.interviewsTotal)}
-            hint={`${num(data.interviewsScheduled)} scheduled`}
-            icon={CalendarCheck}
-            tone="accent"
-          />
-          <StatCard
-            label="Full time potential"
-            value={num(data.fullTimeProjects)}
-            hint={`of ${num(data.totalProjects)} total projects`}
-            icon={Briefcase}
-            tone="success"
-            href="/admin/projects?ft=yes"
-          />
-          <StatCard
-            label="Avg hiring speed"
-            value={data.avgHiringSpeedDays === null ? "None" : `${data.avgHiringSpeedDays}d`}
-            hint="Proposal to acceptance"
-            icon={Timer}
-            tone="neutral"
-          />
-          <StatCard
-            label="Revenue collected"
-            value={
-              data.revenueMinor > 0
-                ? formatMoney(data.revenueMinor, data.revenueCurrency as "INR", { compact: true })
-                : "Zero"
-            }
-            hint={`${num(data.totalProposals)} proposals sent`}
-            icon={Sparkles}
-            tone="success"
-            href="/admin/transactions"
-          />
-        </StatGrid>
-
-        {/* Charts --------------------------------------------------------- */}
-        <div className="grid gap-6 lg:grid-cols-5">
-          <Panel className="lg:col-span-3">
-            <PanelHeader
-              title="Activity trends"
-              description="Proposals against interviews over the last six months."
-              icon={TrendingUp}
-            />
-            <div className="px-5 py-5">
-              {data.trend.length > 0 ? (
-                <TrendChart data={data.trend} />
-              ) : (
-                <p className="py-10 text-center text-sm text-text-subtle">
-                  Not enough activity to chart yet.
-                </p>
-              )}
-            </div>
-          </Panel>
-
-          <Panel className="lg:col-span-2">
-            <PanelHeader
-              title="Proposal pipeline"
-              description="Where every proposal currently sits."
-              icon={Send}
-              action={
-                <Link
-                  href="/admin/proposal-tracker"
-                  className="text-xs font-medium text-brand-700 hover:underline"
-                >
-                  Tracker
-                </Link>
-              }
-            />
-            <div className="px-5 py-5">
-              <PipelineBars
-                items={data.pipeline.map((item) => ({
-                  status: item.status,
-                  count: item.count,
-                  label: PIPELINE_LABELS[item.status],
-                }))}
-              />
-            </div>
-          </Panel>
-        </div>
-
-        {/* Intern management ---------------------------------------------- */}
-        <InternManagement params={params} />
-
-        {/* Project management --------------------------------------------- */}
-        <ProjectManagement params={params} />
-      </div>
-    </div>
-  );
+function greeting(now: Date): string {
+  // Admins work in IST; the server may not.
+  const hour = Number(new Intl.DateTimeFormat("en-IN", { hour: "numeric", hour12: false, timeZone: "Asia/Kolkata" }).format(now));
+  return hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
 }
 
-// ---------------------------------------------------------------------------
-// Intern management
-// ---------------------------------------------------------------------------
-
-async function InternManagement({ params }: { params: Record<string, string> }) {
-  const req = parsePageRequest(params);
+export default async function AdminDashboard() {
+  const session = await getSession();
   const db = getDb();
+  const now = new Date();
+  const weekAgo = new Date(now.getTime() - WEEK_MS);
+  const trendStart = new Date(now.getTime() - 12 * WEEK_MS);
 
-  const conditions: (SQL | undefined)[] = [
-    searchAny(
-      [
-        sql`${schema.users.firstName}`,
-        sql`${schema.users.lastName}`,
-        sql`${schema.users.email}`,
-        sql`${schema.users.phoneNumber}`,
-      ],
-      req.search,
-    ),
-    params.status ? eq(schema.users.isActive, params.status === "active") : undefined,
-    params.visibility ? eq(schema.users.profileVisibility, params.visibility) : undefined,
-    params.profile === "complete"
-      ? sql`${schema.internOnboarding.id} is not null`
-      : undefined,
-    params.profile === "incomplete" ? sql`${schema.internOnboarding.id} is null` : undefined,
-  ].filter(Boolean) as SQL[];
-
-  const where = conditions.length ? sql`${conditions.reduce((acc, c) => sql`${acc} and ${c}`)}` : undefined;
-
-  const proposalCount = sql<number>`(
-    select count(*)::int from ${schema.proposals} p where p.intern_id = ${schema.users.id}
-  )`;
-
-  const [rows, [totalRow]] = await Promise.all([
+  const [
+    [admin],
+    [candidates],
+    [candidatesNew],
+    [companies],
+    [companiesNew],
+    [revenue],
+    [revenueWeek],
+    [incompleteProfiles],
+    [unreadMessages],
+    [sheetsWaiting],
+    [interviewsUpcoming],
+    proposalStatus,
+    weeklyProposals,
+    weeklyInterviews,
+    recentUsers,
+    recentProjects,
+    recentAccepted,
+    recentPayments,
+  ] = await Promise.all([
+    session
+      ? db.select({ name: schema.admins.name }).from(schema.admins).where(eq(schema.admins.id, session.uid)).limit(1)
+      : Promise.resolve([undefined]),
+    db.select({ value: count() }).from(schema.users).where(eq(schema.users.isActive, true)),
+    db.select({ value: count() }).from(schema.users).where(gte(schema.users.createdAt, weekAgo)),
+    db.select({ value: count() }).from(schema.employers).where(eq(schema.employers.isActive, true)),
+    db.select({ value: count() }).from(schema.employers).where(gte(schema.employers.createdAt, weekAgo)),
+    db
+      .select({ value: sql<number>`coalesce(sum(${schema.employerPayments.amountMinor}), 0)::bigint` })
+      .from(schema.employerPayments)
+      .where(and(eq(schema.employerPayments.status, "paid"), eq(schema.employerPayments.currency, "INR"))),
+    db
+      .select({ value: sql<number>`coalesce(sum(${schema.employerPayments.amountMinor}), 0)::bigint` })
+      .from(schema.employerPayments)
+      .where(
+        and(
+          eq(schema.employerPayments.status, "paid"),
+          eq(schema.employerPayments.currency, "INR"),
+          gte(schema.employerPayments.paidAt, weekAgo),
+        ),
+      ),
+    db
+      .select({ value: count() })
+      .from(schema.users)
+      .leftJoin(schema.internOnboarding, eq(schema.internOnboarding.userId, schema.users.id))
+      .where(sql`${schema.internOnboarding.id} is null`),
+    db.select({ value: count() }).from(schema.contactMessages).where(eq(schema.contactMessages.isRead, false)),
+    db.select({ value: count() }).from(schema.timesheets).where(eq(schema.timesheets.status, "submitted")),
+    db.select({ value: count() }).from(schema.interviews).where(eq(schema.interviews.status, "scheduled")),
+    db.select({ status: schema.proposals.status, value: count() }).from(schema.proposals).groupBy(schema.proposals.status),
+    db
+      .select({ week: sql<string>`to_char(date_trunc('week', ${schema.proposals.createdAt}), 'YYYY-MM-DD')`, c: count() })
+      .from(schema.proposals)
+      .where(gte(schema.proposals.createdAt, trendStart))
+      .groupBy(sql`1`),
+    db
+      .select({ week: sql<string>`to_char(date_trunc('week', ${schema.interviews.createdAt}), 'YYYY-MM-DD')`, c: count() })
+      .from(schema.interviews)
+      .where(gte(schema.interviews.createdAt, trendStart))
+      .groupBy(sql`1`),
     db
       .select({
         id: schema.users.id,
-        firstName: schema.users.firstName,
-        lastName: schema.users.lastName,
-        email: schema.users.email,
-        countryCode: schema.users.countryCode,
-        phoneNumber: schema.users.phoneNumber,
-        isActive: schema.users.isActive,
-        visibility: schema.users.profileVisibility,
-        createdAt: schema.users.createdAt,
-        proposalCount,
-        hasProfile: sql<boolean>`(${schema.internOnboarding.id} is not null)`,
+        name: sql<string>`${schema.users.firstName} || ' ' || ${schema.users.lastName}`,
+        date: schema.users.createdAt,
       })
       .from(schema.users)
-      .leftJoin(schema.internOnboarding, eq(schema.internOnboarding.userId, schema.users.id))
-      .where(where)
       .orderBy(desc(schema.users.createdAt))
-      .limit(req.perPage)
-      .offset(req.offset),
-    db
-      .select({ c: count() })
-      .from(schema.users)
-      .leftJoin(schema.internOnboarding, eq(schema.internOnboarding.userId, schema.users.id))
-      .where(where),
-  ]);
-
-  const page = toPage(rows, Number(totalRow?.c ?? 0), req.page, req.perPage);
-
-  return (
-    <DataTable
-      basePath="/admin/dashboard"
-      params={params}
-      page={page.page}
-      pages={page.pages}
-      total={page.total}
-      perPage={page.perPage}
-      rows={rows}
-      noun="interns"
-      dense
-      caption="Registered interns"
-      searchPlaceholder="Search by name, email, phone…"
-      exportHref={`/api/admin/export?type=interns&${new URLSearchParams(params).toString()}`}
-      filters={[
-        {
-          key: "status",
-          label: "Status",
-          options: [
-            { value: "active", label: "Active" },
-            { value: "inactive", label: "Inactive" },
-          ],
-        },
-        {
-          key: "profile",
-          label: "Profile",
-          options: [
-            { value: "complete", label: "Complete" },
-            { value: "incomplete", label: "Incomplete" },
-          ],
-        },
-        {
-          key: "visibility",
-          label: "Visibility",
-          options: [
-            { value: "live", label: "Live" },
-            { value: "hidden", label: "Hidden" },
-          ],
-        },
-      ]}
-      columns={[
-        {
-          header: "Intern",
-          cell: (row) => (
-            <Link
-              href={`/admin/interns/${row.id}`}
-              className="group flex items-center gap-2.5"
-            >
-              <span
-                aria-hidden
-                className="grid size-8 shrink-0 place-items-center rounded-full bg-brand-50 text-xs font-semibold text-brand-700 transition group-hover:bg-brand-100"
-              >
-                {row.firstName.charAt(0)}
-                {row.lastName.charAt(0)}
-              </span>
-              <div className="min-w-0">
-                <p className="truncate font-medium text-ink-900 group-hover:text-brand-700 group-hover:underline">
-                  {row.firstName} {row.lastName}
-                </p>
-                <p className="truncate text-xs text-text-subtle">
-                  Joined {row.createdAt ? formatDate(row.createdAt.toISOString()) : "None"}
-                </p>
-              </div>
-            </Link>
-          ),
-        },
-        {
-          header: "Contact",
-          cell: (row) => (
-            <div className="min-w-0">
-              <p className="truncate text-ink-700">{row.email}</p>
-              <p className="truncate text-xs text-text-subtle tabular-nums">
-                {row.countryCode} {row.phoneNumber}
-              </p>
-            </div>
-          ),
-        },
-        {
-          header: "Proposals",
-          align: "right",
-          cell: (row) => (
-            <span className="font-medium text-ink-800">{row.proposalCount}</span>
-          ),
-        },
-        {
-          header: "Profile",
-          cell: (row) => (
-            <StatusBadge
-              tone={row.hasProfile ? "success" : "warning"}
-              label={row.hasProfile ? "Complete" : "Incomplete"}
-            />
-          ),
-        },
-        {
-          header: "Account",
-          cell: (row) => <StatusBadge value={row.isActive ? "active" : "inactive"} />,
-        },
-        {
-          header: "Directory",
-          cell: (row) => <StatusBadge value={row.visibility} />,
-        },
-        {
-          header: "Action",
-          align: "right",
-          cell: (row) => (
-            <Link
-              href={`/admin/interns/${row.id}`}
-              className="inline-flex items-center gap-1 rounded-md border border-sand-300 bg-sand-50/80 px-2.5 py-1 text-xs font-medium text-ink-700 transition hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700"
-            >
-              View
-            </Link>
-          ),
-        },
-      ]}
-    />
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Project management
-// ---------------------------------------------------------------------------
-
-async function ProjectManagement({ params }: { params: Record<string, string> }) {
-  // The project table has its own page/per keys. Sharing `page` with the intern
-  // table above would make the two pagers overwrite each other in the URL — the
-  // exact bug that exists on the live dashboard, where filtering the intern list
-  // resets the project list to page 1 and vice versa.
-  const projectParams = { ...params, page: params.pp, per: params.pper };
-  const req = parsePageRequest(projectParams);
-  const db = getDb();
-
-  const conditions: (SQL | undefined)[] = [
-    searchAny(
-      [
-        sql`${schema.projects.projectName}`,
-        sql`${schema.employers.companyName}`,
-        sql`${schema.projects.skills}::text`,
-      ],
-      req.search,
-    ),
-    params.projectStatus ? eq(schema.projects.status, params.projectStatus) : undefined,
-  ].filter(Boolean) as SQL[];
-
-  const where = conditions.length ? sql`${conditions.reduce((acc, c) => sql`${acc} and ${c}`)}` : undefined;
-  const proposalCount = sql<number>`(
-    select count(*)::int from ${schema.proposals} p where p.project_id = ${schema.projects.id}
-  )`;
-
-  const [rows, [totalRow]] = await Promise.all([
+      .limit(5),
     db
       .select({
-        id: schema.projects.id,
+        name: schema.projects.projectName,
+        company: schema.employers.companyName,
+        date: schema.projects.createdAt,
         employerId: schema.projects.employerId,
-        projectName: schema.projects.projectName,
-        status: schema.projects.status,
-        fullTimeOffer: schema.projects.fullTimeOffer,
-        locationType: schema.projects.locationType,
-        skills: schema.projects.skills,
-        createdAt: schema.projects.createdAt,
-        employerName: schema.employers.companyName,
-        proposalCount,
       })
       .from(schema.projects)
-      .innerJoin(schema.employers, eq(schema.employers.id, schema.projects.employerId))
-      .where(where)
+      .leftJoin(schema.employers, eq(schema.employers.id, schema.projects.employerId))
       .orderBy(desc(schema.projects.createdAt))
-      .limit(req.perPage)
-      .offset(req.offset),
+      .limit(5),
     db
-      .select({ c: count() })
-      .from(schema.projects)
-      .innerJoin(schema.employers, eq(schema.employers.id, schema.projects.employerId))
-      .where(where),
+      .select({
+        internId: schema.proposals.internId,
+        first: schema.users.firstName,
+        last: schema.users.lastName,
+        company: schema.employers.companyName,
+        date: schema.proposals.updatedAt,
+      })
+      .from(schema.proposals)
+      .leftJoin(schema.users, eq(schema.users.id, schema.proposals.internId))
+      .leftJoin(schema.employers, eq(schema.employers.id, schema.proposals.employerId))
+      .where(sql`${schema.proposals.status} in ('accepted', 'hired')`)
+      .orderBy(desc(schema.proposals.updatedAt))
+      .limit(5),
+    db
+      .select({
+        amountMinor: schema.employerPayments.amountMinor,
+        currency: schema.employerPayments.currency,
+        company: schema.employers.companyName,
+        date: schema.employerPayments.paidAt,
+      })
+      .from(schema.employerPayments)
+      .leftJoin(schema.employers, eq(schema.employers.id, schema.employerPayments.employerId))
+      .where(eq(schema.employerPayments.status, "paid"))
+      .orderBy(desc(schema.employerPayments.paidAt))
+      .limit(5),
   ]);
 
-  const page = toPage(rows, Number(totalRow?.c ?? 0), req.page, req.perPage);
+  const n = (row: { value: number | string } | undefined) => Number(row?.value ?? 0);
+  const byStatus = new Map(proposalStatus.map((r) => [r.status, Number(r.value)]));
+  const sent = proposalStatus.reduce((sum, r) => sum + Number(r.value), 0);
+  const accepted = byStatus.get("accepted") ?? 0;
+  const hired = byStatus.get("hired") ?? 0;
+  const declined = (byStatus.get("rejected") ?? 0) + (byStatus.get("withdrawn") ?? 0) + (byStatus.get("expired") ?? 0);
+  const open = sent - accepted - hired - declined;
+
+  const tasks: Task[] = [
+    {
+      count: n(unreadMessages),
+      label: "unread contact messages",
+      detail: "From the website contact form.",
+      href: "/admin/messages",
+      cta: "Open inbox",
+      Icon: MessageSquare,
+    },
+    {
+      count: accepted,
+      label: accepted === 1 ? "accepted offer waiting on employer payment" : "accepted offers waiting on employer payment",
+      detail: "The hire only completes once the employer pays. A nudge usually moves these.",
+      href: "/admin/proposal-tracker?tab=proposals",
+      cta: "See offers",
+      Icon: CreditCard,
+    },
+    {
+      count: n(sheetsWaiting),
+      label: n(sheetsWaiting) === 1 ? "timesheet waiting on employer approval" : "timesheets waiting on employer approval",
+      detail: "Interns are not paid until these are approved.",
+      href: "/admin/payouts",
+      cta: "Review",
+      Icon: ClipboardCheck,
+    },
+    {
+      count: n(interviewsUpcoming),
+      label: n(interviewsUpcoming) === 1 ? "interview scheduled" : "interviews scheduled",
+      detail: "Make sure both sides have the meeting link.",
+      href: "/admin/proposal-tracker?tab=interviews",
+      cta: "See schedule",
+      Icon: CalendarClock,
+    },
+    {
+      count: n(incompleteProfiles),
+      label: n(incompleteProfiles) === 1 ? "candidate signed up but never started a profile" : "candidates signed up but never started a profile",
+      detail: "They are invisible to employers until they do.",
+      href: "/admin/interns?profile=incomplete",
+      cta: "See list",
+      Icon: UserRoundX,
+    },
+  ].filter((t) => t.count > 0);
+
+  const kpis = [
+    { label: "Active candidates", value: n(candidates).toLocaleString("en-IN"), delta: n(candidatesNew), href: "/admin/interns" },
+    { label: "Hiring companies", value: n(companies).toLocaleString("en-IN"), delta: n(companiesNew), href: "/admin/companies" },
+    {
+      label: "Placements",
+      value: String(accepted + hired),
+      note: `${hired} paid · ${accepted} awaiting payment`,
+      href: "/admin/proposal-tracker",
+    },
+    {
+      label: "Revenue (INR)",
+      value: formatMoney(n(revenue), "INR", { zeroLabel: "₹0" }),
+      note: n(revenueWeek) ? `${formatMoney(n(revenueWeek), "INR")} this week` : "nothing this week",
+      href: "/admin/transactions",
+    },
+  ];
+
+  // Weekly buckets, Monday-start (Postgres date_trunc('week')).
+  const monday = (d: Date) => {
+    const x = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+    x.setUTCDate(x.getUTCDate() - ((x.getUTCDay() + 6) % 7));
+    return x;
+  };
+  const pMap = new Map(weeklyProposals.map((r) => [r.week, Number(r.c)]));
+  const iMap = new Map(weeklyInterviews.map((r) => [r.week, Number(r.c)]));
+  const trend: TrendPoint[] = [];
+  for (let i = 11; i >= 0; i--) {
+    const wk = monday(new Date(now.getTime() - i * WEEK_MS));
+    const key = wk.toISOString().slice(0, 10);
+    trend.push({
+      label: wk.toLocaleDateString("en-IN", { day: "numeric", month: "short", timeZone: "UTC" }),
+      proposals: pMap.get(key) ?? 0,
+      interviews: iMap.get(key) ?? 0,
+    });
+  }
+  const trendTotal = trend.reduce((s, p) => s + p.proposals + p.interviews, 0);
+
+  const events: Event[] = [
+    ...recentPayments.map((p) => ({
+      label: `Payment received · ${formatMoney(p.amountMinor, p.currency === "USD" ? "USD" : "INR")}`,
+      detail: p.company ?? "Employer",
+      href: "/admin/orders",
+      date: p.date,
+    })),
+    ...recentAccepted.map((p) => ({
+      label: "Offer accepted",
+      detail: `${`${p.first ?? ""} ${p.last ?? ""}`.trim() || "Candidate"} · ${p.company ?? "Employer"}`,
+      href: `/admin/interns/${p.internId}`,
+      date: p.date,
+    })),
+    ...recentProjects.map((p) => ({
+      label: "Project posted",
+      detail: `${p.name}${p.company ? ` · ${p.company}` : ""}`,
+      href: `/admin/companies/${p.employerId}`,
+      date: p.date,
+    })),
+    ...recentUsers.map((u) => ({
+      label: "Candidate signed up",
+      detail: u.name.trim() || "New candidate",
+      href: `/admin/interns/${u.id}`,
+      date: u.date,
+    })),
+  ]
+    .sort((a, b) => (b.date?.getTime() ?? 0) - (a.date?.getTime() ?? 0))
+    .slice(0, 8);
+
+  const firstName = admin?.name?.trim().split(/\s+/)[0];
 
   return (
-    <DataTable
-      basePath="/admin/dashboard"
-      params={projectParams}
-      pageKey="pp"
-      perKey="pper"
-      page={page.page}
-      pages={page.pages}
-      total={page.total}
-      perPage={page.perPage}
-      rows={rows}
-      noun="projects"
-      dense
-      caption="Active projects"
-      searchPlaceholder="Search projects or employers…"
-      filters={[
-        {
-          key: "projectStatus",
-          label: "Status",
-          options: [
-            { value: "active", label: "Active" },
-            { value: "closed", label: "Closed" },
-            { value: "draft", label: "Draft" },
-          ],
-        },
-      ]}
-      columns={[
-        {
-          header: "Project",
-          cell: (row) => (
-            <div className="min-w-0">
-              <p className="truncate font-medium text-ink-900">{row.projectName}</p>
-              <p className="truncate text-xs text-text-subtle">
-                {row.locationType ?? "Anywhere"} ·{" "}
-                {row.skills?.length ? row.skills.slice(0, 3).join(", ") : "No skills listed"}
-              </p>
+    <div className="mx-auto w-full max-w-[84rem] space-y-10">
+      <header className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="text-sm text-text-subtle">
+            {now.toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long", timeZone: "Asia/Kolkata" })}
+          </p>
+          <h1 className="mt-1 text-[26px] font-semibold tracking-[-0.02em] text-ink-950">
+            {greeting(now)}
+            {firstName ? `, ${firstName}` : ""}
+          </h1>
+        </div>
+        <Link
+          href="/admin/reports"
+          className="inline-flex min-h-10 items-center gap-1.5 rounded-[10px] border border-ink-200 bg-white px-3.5 text-sm font-medium text-ink-700 hover:border-ink-300 hover:bg-ink-50"
+        >
+          Reports <ArrowUpRight className="size-4" aria-hidden />
+        </Link>
+      </header>
+
+      {/* Needs a person */}
+      <section>
+        <h2 className="mb-3 text-[15px] font-semibold text-ink-950">Needs attention</h2>
+        {tasks.length ? (
+          <ul className="divide-y divide-ink-100 overflow-hidden rounded-[14px] border border-ink-200/80 bg-white">
+            {tasks.map((t) => (
+              <li key={t.href} className="flex flex-col gap-3 px-5 py-3.5 sm:flex-row sm:items-center sm:gap-4">
+                <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-accent-100 text-accent-700">
+                  <t.Icon className="size-4" aria-hidden />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[14px] font-medium text-ink-900">
+                    <span className="tabular-nums">{t.count}</span> {t.label}
+                  </p>
+                  <p className="text-[13px] text-text-subtle">{t.detail}</p>
+                </div>
+                <Link
+                  href={t.href}
+                  className="inline-flex min-h-9 shrink-0 items-center gap-1.5 self-start rounded-[10px] border border-ink-200 px-3 text-[13px] font-medium text-ink-800 hover:border-ink-300 hover:bg-ink-50 sm:self-auto"
+                >
+                  {t.cta} <ArrowRight className="size-3.5" aria-hidden />
+                </Link>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="rounded-[14px] border border-ink-200/80 bg-white px-5 py-4 text-sm text-text-subtle">
+            Nothing is waiting on the team.
+          </p>
+        )}
+      </section>
+
+      {/* Four numbers */}
+      <section className="grid overflow-hidden rounded-[14px] border border-ink-200/80 bg-white sm:grid-cols-2 lg:grid-cols-4">
+        {kpis.map((k, i) => (
+          <Link
+            key={k.label}
+            href={k.href}
+            className={cn(
+              "group px-5 py-4 transition-colors hover:bg-ink-50/70",
+              i > 0 && "border-t border-ink-100 sm:border-t-0",
+              i % 2 === 1 && "sm:border-l",
+              i === 2 && "sm:border-t lg:border-t-0 lg:border-l",
+              i === 3 && "sm:border-t lg:border-t-0",
+            )}
+          >
+            <p className="text-[13px] text-text-subtle">{k.label}</p>
+            <p className="mt-1 text-2xl font-semibold tabular-nums tracking-tight text-ink-950">{k.value}</p>
+            <p className="mt-0.5 text-xs text-text-subtle">
+              {"delta" in k && typeof k.delta === "number" ? (
+                k.delta > 0 ? (
+                  <span className="font-medium text-success">+{k.delta} this week</span>
+                ) : (
+                  "none new this week"
+                )
+              ) : (
+                k.note
+              )}
+            </p>
+          </Link>
+        ))}
+      </section>
+
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+        {/* Weekly activity */}
+        <section className="min-w-0 rounded-[14px] border border-ink-200/80 bg-white p-5 sm:p-6">
+          <div className="flex items-baseline justify-between gap-4">
+            <h2 className="text-[15px] font-semibold text-ink-950">Proposals and interviews, weekly</h2>
+            <span className="text-xs text-text-subtle">last 12 weeks</span>
+          </div>
+          {trendTotal === 0 ? (
+            <p className="mt-10 mb-10 text-center text-sm text-text-subtle">No proposals or interviews in the last 12 weeks.</p>
+          ) : (
+            <div className="mt-4">
+              <TrendChart data={trend} height={200} />
             </div>
-          ),
-        },
-        {
-          header: "Employer",
-          cell: (row) => (
-            <Link
-              href={`/admin/companies/${row.employerId}`}
-              className="truncate text-ink-700 hover:text-brand-700 hover:underline font-medium"
-            >
-              {row.employerName}
+          )}
+        </section>
+
+        {/* Pipeline */}
+        <section className="min-w-0 rounded-[14px] border border-ink-200/80 bg-white p-5 sm:p-6">
+          <div className="flex items-baseline justify-between gap-4">
+            <h2 className="text-[15px] font-semibold text-ink-950">Proposal pipeline</h2>
+            <Link href="/admin/proposal-tracker" className="text-xs font-medium text-brand-700 hover:underline">
+              Tracker
             </Link>
-          ),
-        },
-        {
-          header: "Posted",
-          cell: (row) => (
-            <span className="text-text-subtle">
-              {row.createdAt ? formatDate(row.createdAt.toISOString()) : "None"}
-            </span>
-          ),
-        },
-        {
-          header: "Type",
-          cell: (row) => (
-            <StatusBadge
-              tone={row.fullTimeOffer ? "success" : "info"}
-              label={row.fullTimeOffer ? "Full time" : "Internship"}
-            />
-          ),
-        },
-        {
-          header: "Proposals",
-          align: "right",
-          cell: (row) => (
-            <span className="font-medium text-ink-800">{row.proposalCount}</span>
-          ),
-        },
-        {
-          header: "Status",
-          cell: (row) => <StatusBadge value={row.status} />,
-        },
-      ]}
-    />
+          </div>
+          <p className="mt-1 text-xs text-text-subtle">{sent} proposals, all time</p>
+          <dl className="mt-5 space-y-3.5">
+            {[
+              { label: "Open", value: open, tone: "bg-ink-300" },
+              { label: "Accepted, awaiting payment", value: accepted, tone: "bg-accent-500" },
+              { label: "Hired (paid)", value: hired, tone: "bg-brand-700" },
+              { label: "Declined or expired", value: declined, tone: "bg-ink-200" },
+            ].map((row) => (
+              <div key={row.label}>
+                <div className="flex items-baseline justify-between gap-3 text-[13px]">
+                  <dt className="text-ink-700">{row.label}</dt>
+                  <dd className="tabular-nums">
+                    <span className="font-semibold text-ink-950">{row.value}</span>
+                    <span className="ml-1.5 text-text-subtle">
+                      {sent ? `${Math.round((row.value / sent) * 100)}%` : "-"}
+                    </span>
+                  </dd>
+                </div>
+                <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-ink-100" aria-hidden>
+                  <div
+                    className={cn("h-full rounded-full", row.tone)}
+                    style={{ width: `${sent ? Math.max((row.value / sent) * 100, row.value ? 2 : 0) : 0}%` }}
+                  />
+                </div>
+              </div>
+            ))}
+          </dl>
+        </section>
+      </div>
+
+      {/* What just happened */}
+      <section>
+        <h2 className="mb-3 text-[15px] font-semibold text-ink-950">Recent activity</h2>
+        {events.length ? (
+          <ul className="divide-y divide-ink-100 overflow-hidden rounded-[14px] border border-ink-200/80 bg-white">
+            {events.map((e, i) => (
+              <li key={`${e.href}-${i}`}>
+                <Link
+                  href={e.href}
+                  className="grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-4 px-5 py-3 transition-colors hover:bg-ink-50/70"
+                >
+                  <span className="min-w-0">
+                    <span className="text-[14px] font-medium text-ink-900">{e.label}</span>
+                    <span className="ml-2 truncate text-[13px] text-text-subtle">{e.detail}</span>
+                  </span>
+                  <span className="text-xs tabular-nums text-text-subtle">
+                    {e.date
+                      ? e.date.toLocaleDateString("en-IN", { day: "numeric", month: "short", timeZone: "Asia/Kolkata" })
+                      : "-"}
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-sm text-text-subtle">Nothing yet.</p>
+        )}
+      </section>
+    </div>
   );
 }

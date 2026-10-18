@@ -1,4 +1,5 @@
-import type { CmsPlan } from "./types";
+import type { CmsPlan, CmsPlanFeature } from "./types";
+import { inrMinorToUsdMinor } from "../currency.ts";
 
 /* ==========================================================================
    SAMPLE DATA - flagged on purpose
@@ -85,6 +86,18 @@ export const POPULAR_STEPS: PopularStep[] = [
    price sets - the Home section used $5/$10, the Pricing page used $1/$2 -
    and both disagreed with the Employers page. One table now, one source. */
 
+/** The same ✓ / ✗ rows on every card, so plans compare line by line. */
+function featureRows(tier: 0 | 1 | 2): CmsPlanFeature[] {
+  return [
+    { label: "AI-interviewed, verified candidates", included: true },
+    { label: "Findtern Score and skill report", included: true },
+    { label: "Side-by-side candidate comparison", included: true },
+    { label: "Timesheets and stipend payouts handled", included: true },
+    { label: "Candidates scoring 6–8/10", included: tier >= 1 },
+    { label: "Top-decile candidates, 8+/10", included: tier >= 2 },
+  ];
+}
+
 export const PRICING_PLANS: CmsPlan[] = [
   {
     id: "espresso",
@@ -99,6 +112,10 @@ export const PRICING_PLANS: CmsPlan[] = [
       "Under 6/10",
       "Access to basic talent",
     ],
+    featureList: featureRows(0),
+    compareAtHourlyMinor: null,
+    compareAtPerHireMinor: 750000,
+    isFeatured: false,
     gstApplicable: true,
     sortOrder: 0,
     isActive: true,
@@ -109,9 +126,13 @@ export const PRICING_PLANS: CmsPlan[] = [
     displayName: "Cappuccino",
     currency: "INR",
     priceHourlyMinor: 10000,
-    perHireChargeMinor: 0,
+    perHireChargeMinor: 500000,
     internshipDuration: "1-6 months",
     features: ["Skilled interns", "6-8/10", "Access to medium skilled talent"],
+    featureList: featureRows(1),
+    compareAtHourlyMinor: 15000,
+    compareAtPerHireMinor: null,
+    isFeatured: true,
     gstApplicable: true,
     sortOrder: 1,
     isActive: true,
@@ -122,21 +143,29 @@ export const PRICING_PLANS: CmsPlan[] = [
     displayName: "Latte",
     currency: "INR",
     priceHourlyMinor: 20000,
-    perHireChargeMinor: 0,
+    perHireChargeMinor: 500000,
     internshipDuration: "1-6 months",
     features: ["Top-rated talent", "8+/10 (Top Rated)", "Top-rated talent"],
+    featureList: featureRows(2),
+    compareAtHourlyMinor: 30000,
+    compareAtPerHireMinor: null,
+    isFeatured: false,
     gstApplicable: true,
     sortOrder: 2,
     isActive: true,
   },
 ];
 
-/** The USD equivalents, selected by region. */
+const toUsd = (minor: number | null) => (minor == null ? null : inrMinorToUsdMinor(minor));
+
+/** The USD card, derived from the INR one at ₹100 = $1 (lib/currency). */
 export const PRICING_PLANS_USD: CmsPlan[] = PRICING_PLANS.map((p) => ({
   ...p,
   currency: "USD",
-  perHireChargeMinor: p.perHireChargeMinor === 500000 ? 5000 : 0,
-  priceHourlyMinor: { espresso: 0, cappuccino: 100, latte: 200 }[p.slug as "espresso" | "cappuccino" | "latte"] ?? 0,
+  priceHourlyMinor: inrMinorToUsdMinor(p.priceHourlyMinor),
+  perHireChargeMinor: inrMinorToUsdMinor(p.perHireChargeMinor),
+  compareAtHourlyMinor: toUsd(p.compareAtHourlyMinor),
+  compareAtPerHireMinor: toUsd(p.compareAtPerHireMinor),
   gstApplicable: false,
 }));
 

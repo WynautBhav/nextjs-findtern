@@ -15,7 +15,7 @@ import { formatMoney, formatPerHire, formatRate } from "@/lib/format";
  *
  * Fields map 1:1 onto the keys the legacy handler persisted in
  * `proposals.offer_details` (routes.ts / employer-send-proposal.tsx:1272), so the
- * shape is already known to the rest of the app — the intern's proposal page
+ * shape is already known to the rest of the app - the intern's proposal page
  * reads the same keys back out.
  *
  * The one thing not typed by hand is compensation: the hourly rate and per-hire
@@ -24,8 +24,8 @@ import { formatMoney, formatPerHire, formatRate } from "@/lib/format";
  * legacy form allowed; they cannot decouple the rate from the score band
  * without editing `offer_details` directly.
  *
- * There is no `POST /api/employer/:id/proposals` in this build, so Submit says
- * so out loud. Motion is CSS-only and nothing listens to scroll.
+ * The server recomputes the rate and totals from the candidate's band; the
+ * figures here are a preview.
  */
 
 type ProjectOption = {
@@ -53,6 +53,13 @@ const LAPTOP_OPTIONS = [
   { value: "company", label: "Company provides" },
   { value: "intern", label: "Intern provides" },
 ] as const;
+
+const SHIFT_HOURS: Record<string, [string, string]> = {
+  "full-day": ["09:00", "18:00"],
+  morning: ["09:00", "13:00"],
+  evening: ["17:00", "21:00"],
+  flexible: ["", ""],
+};
 
 const SHIFT_PRESETS = [
   { value: "full-day", label: "Full day, 9am–6pm" },
@@ -84,7 +91,9 @@ export function SendProposalForm({
   const [currency, setCurrency] = useState<Currency>(defaultCurrency);
   const [projectId, setProjectId] = useState(firstProject?.id ?? "");
   const [roleTitle, setRoleTitle] = useState(firstProject?.projectName ?? "");
-  const [duration, setDuration] = useState("3m");
+  // Below a score of 6 the legacy rule caps offers at two months.
+  const shortOnly = candidate.scored && candidate.score > 0 && candidate.score < 6;
+  const [duration, setDuration] = useState(shortOnly ? "2m" : "3m");
   const [startDate, setStartDate] = useState("");
   const [monthlyHours, setMonthlyHours] = useState("120");
   const [monthlyOverride, setMonthlyOverride] = useState("");
@@ -110,9 +119,10 @@ export function SendProposalForm({
       : derivedMonthly;
     // The per-hire charge applies once, not per month.
     const internship = monthly * months;
-    const perHire = rate.perHireMinor / 100;
+    // Per-hire applies below a score of 6 only.
+    const perHire = candidate.score < 6 ? rate.perHireMinor / 100 : 0;
     return { monthly, internship, perHire, grand: internship + perHire };
-  }, [monthlyHours, monthlyOverride, rate, months]);
+  }, [monthlyHours, monthlyOverride, rate, months, candidate.score]);
 
   async function onSubmit() {
     const problems = validate({ projectId, roleTitle, duration, startDate, monthlyHours, monthlyOverride, mode, city, laptop, message });
@@ -129,17 +139,18 @@ export function SendProposalForm({
           projectId,
           flowType: "direct",
           currency,
-          offerDetails: {
-            roleTitle: roleTitle.trim(),
-            duration,
-            startDate,
-            monthlyHours: Number(monthlyHours) || 0,
-            monthlyAmount: Math.round(totals.monthly * 100),
-            mode,
-            city,
-            laptop,
-            message,
-          },
+          roleTitle: roleTitle.trim(),
+          jd: [message.trim(), restrictions.trim()].filter(Boolean).join("\n\n"),
+          mode,
+          location: [city.trim(), state.trim()].filter(Boolean).join(", "),
+          startDate,
+          duration,
+          monthlyHours: Number(monthlyHours) || 0,
+          ...(monthlyOverride.trim() ? { monthlyAmount: Number(monthlyOverride) } : {}),
+          shiftFrom: SHIFT_HOURS[shift]?.[0] ?? "",
+          shiftTo: SHIFT_HOURS[shift]?.[1] ?? "",
+          laptop,
+          paidLeavesPerMonth: Number(paidLeaves) || 0,
           skills: projects.find((p) => p.id === projectId)?.skills ?? [],
         }),
       });
@@ -161,7 +172,7 @@ export function SendProposalForm({
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
       <div className="min-w-0 space-y-6">
         {/* ── Candidate ─────────────────────────────────────────────── */}
-        <section className="rounded-2xl border border-ink-100 bg-white p-6 shadow-sm">
+        <section className="rounded-[20px] border border-ink-200/70 bg-white p-6 shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)]">
           <h2 className="text-sm font-semibold text-ink-900">Candidate</h2>
           <div className="mt-4 flex flex-wrap items-start gap-5">
             <span
@@ -174,12 +185,12 @@ export function SendProposalForm({
               <p className="font-semibold text-ink-900">{candidate.name}</p>
               <p className="text-sm text-text-subtle">{candidate.location || "Location not stated"}</p>
               <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5">
-                <span className="inline-flex items-center gap-1.5 text-sm font-medium text-ink-800">
+                <span className="inline-flex items-center gap-1.5 text-sm font-medium tabular-nums text-ink-800">
                   <CircleGauge className="size-4 text-ink-400" aria-hidden />
                   {candidate.scored ? `${candidate.score.toFixed(1)}/10` : "Not scored"}
                 </span>
                 {RATING_META.filter((r) => candidate.ratings[r.key] > 0).map((r) => (
-                  <span key={r.key} className="text-xs text-text-subtle">
+                  <span key={r.key} className="text-xs tabular-nums text-text-subtle">
                     {r.label} {candidate.ratings[r.key]}
                   </span>
                 ))}
@@ -189,7 +200,7 @@ export function SendProposalForm({
                   {candidate.skills.map((skill) => (
                     <li
                       key={skill}
-                      className="rounded-full bg-brand-50 px-2.5 py-1 text-2xs font-medium text-brand-700"
+                      className="rounded-full bg-brand-50 px-2.5 py-1 text-xs font-medium text-brand-700"
                     >
                       {skill}
                     </li>
@@ -199,7 +210,7 @@ export function SendProposalForm({
             </div>
             <Link
               href={`/employer/intern/${encodeURIComponent(candidate.id)}`}
-              className="text-sm font-medium text-brand-700 underline-offset-4 hover:underline"
+              className="apple-spring inline-flex min-h-11 items-center rounded-[10px] text-sm font-medium text-brand-700 underline-offset-4 hover:underline"
             >
               Full profile
             </Link>
@@ -207,12 +218,12 @@ export function SendProposalForm({
         </section>
 
         {/* ── Role ──────────────────────────────────────────────────── */}
-        <section className="rounded-2xl border border-ink-100 bg-white p-6 shadow-sm">
+        <section className="rounded-[20px] border border-ink-200/70 bg-white p-6 shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)]">
           <h2 className="text-sm font-semibold text-ink-900">Role</h2>
           <div className="mt-4 space-y-5">
             {projects.length === 0 ? (
-              <p className="rounded-lg border border-warning/25 bg-warning-soft px-3.5 py-3 text-sm text-ink-700">
-                You have no projects yet. A proposal has to attach to one — create it first.
+              <p className="rounded-[10px] border border-warning/25 bg-warning-soft px-3.5 py-3 text-sm text-ink-700">
+                You have no projects yet. A proposal has to attach to one - create it first.
               </p>
             ) : (
               <SelectField
@@ -251,7 +262,7 @@ export function SendProposalForm({
                 id="duration"
                 label="Duration"
                 value={duration}
-                options={DURATIONS.map((d) => ({ value: d.value, label: d.label }))}
+                options={DURATIONS.filter((d) => !shortOnly || d.value === "1m" || d.value === "2m").map((d) => ({ value: d.value, label: d.label }))}
                 error={errors.duration}
                 onChange={setDuration}
               />
@@ -268,13 +279,13 @@ export function SendProposalForm({
         </section>
 
         {/* ── Compensation ───────────────────────────────────────────── */}
-        <section className="rounded-2xl border border-ink-100 bg-white p-6 shadow-sm">
+        <section className="rounded-[20px] border border-ink-200/70 bg-white p-6 shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)]">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-sm font-semibold text-ink-900">Compensation</h2>
             <div
               role="radiogroup"
               aria-label="Currency"
-              className="inline-flex rounded-lg border border-ink-200 p-0.5"
+              className="inline-flex rounded-[10px] border border-ink-200 p-0.5"
             >
               {(["INR", "USD"] as const).map((code) => (
                 <button
@@ -284,7 +295,7 @@ export function SendProposalForm({
                   aria-checked={currency === code}
                   onClick={() => setCurrency(code)}
                   className={[
-                    "rounded-md px-3 py-1 text-xs font-semibold transition-colors",
+                    "apple-spring apple-pressable min-h-11 rounded-md px-3 text-xs font-semibold",
                     currency === code
                       ? "bg-brand-700 text-white"
                       : "text-ink-600 hover:bg-ink-100",
@@ -296,7 +307,7 @@ export function SendProposalForm({
             </div>
           </div>
 
-          <div className="mt-4 rounded-xl border border-brand-200 bg-brand-50 p-4">
+          <div className="mt-4 rounded-[10px] border border-brand-200 bg-brand-50 p-4">
             <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-brand-700">
               {rate.bandName} band
             </p>
@@ -304,13 +315,13 @@ export function SendProposalForm({
             <dl className="mt-3 grid gap-3 sm:grid-cols-2">
               <div>
                 <dt className="text-xs text-text-subtle">Published rate</dt>
-                <dd className="mt-0.5 text-sm font-semibold text-ink-900">
+                <dd className="mt-0.5 text-sm font-semibold tabular-nums text-ink-900">
                   {formatRate(rate.hourlyRateMinor, currency)}
                 </dd>
               </div>
               <div>
                 <dt className="text-xs text-text-subtle">Per-hire charge</dt>
-                <dd className="mt-0.5 text-sm font-semibold text-ink-900">
+                <dd className="mt-0.5 text-sm font-semibold tabular-nums text-ink-900">
                   {formatPerHire(rate.perHireMinor, currency)}
                 </dd>
               </div>
@@ -319,9 +330,9 @@ export function SendProposalForm({
               <Info className="mt-0.5 size-3.5 shrink-0 text-ink-400" aria-hidden />
               <span>
                 {rateCardSource === "plan"
-                  ? "Rate card: pricing_plans."
-                  : "No pricing_plans row matched, so the published band rate in lib/score.ts is used."}{" "}
-                The per-hire charge is waived at a score of 6.0 and above.
+                  ? "Rates come from your plan."
+                  : "Standard published rates apply."}{" "}
+                A fixed ₹5,000 (or $50) per-hire charge applies across all plans.
               </span>
             </p>
           </div>
@@ -350,7 +361,7 @@ export function SendProposalForm({
         </section>
 
         {/* ── Restrictions ───────────────────────────────────────────── */}
-        <section className="rounded-2xl border border-ink-100 bg-white p-6 shadow-sm">
+        <section className="rounded-[20px] border border-ink-200/70 bg-white p-6 shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)]">
           <h2 className="text-sm font-semibold text-ink-900">Restrictions</h2>
           <p className="mt-1 text-sm text-text-subtle">
             The constraints this offer places on the intern. They are shown to the candidate
@@ -368,10 +379,10 @@ export function SendProposalForm({
                     aria-pressed={mode === option.value}
                     onClick={() => setMode(option.value)}
                     className={[
-                      "rounded-full border px-4 py-1.5 text-sm font-medium transition-colors",
+                      "apple-spring apple-pressable min-h-11 rounded-full border px-4 text-sm font-medium",
                       mode === option.value
                         ? "border-brand-700 bg-brand-700 text-white"
-                        : "border-ink-200 bg-white text-ink-700 hover:bg-ink-50",
+                        : "border-ink-200 bg-white text-ink-700 hover:border-ink-300 hover:bg-ink-50",
                     ].join(" ")}
                   >
                     {option.label}
@@ -420,7 +431,7 @@ export function SendProposalForm({
               label="Laptop"
               value={laptop}
               options={LAPTOP_OPTIONS.map((l) => ({ value: l.value, label: l.label }))}
-              hint="Required — the legacy form blocked submission without it."
+              hint="Required."
               error={errors.laptop}
               onChange={setLaptop}
             />
@@ -435,7 +446,7 @@ export function SendProposalForm({
             <TextArea
               id="restrictions"
               label="Anything else"
-              hint="Free text. Be specific — this is the part candidates read to decide."
+              hint="Free text. Be specific - this is the part candidates read to decide."
               rows={3}
               placeholder="No client data on personal devices. Two fixed Saturdays a month for college."
               value={restrictions}
@@ -445,13 +456,13 @@ export function SendProposalForm({
         </section>
 
         {/* ── Message ───────────────────────────────────────────────── */}
-        <section className="rounded-2xl border border-ink-100 bg-white p-6 shadow-sm">
-          <h2 className="text-sm font-semibold text-ink-900">Message to {candidate.name.split(" ")[0]}</h2>
+        <section className="rounded-[20px] border border-ink-200/70 bg-white p-6 shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)]">
+          <h2 className="text-sm font-semibold text-ink-900">Message to candidate</h2>
           <div className="mt-4">
             <TextArea
               id="message"
               label="Cover note"
-              hint="Stored as offer_details.jd. Plain text — the legacy editor was a WYSIWYG, this is not."
+              hint="Plain text. The candidate sees this with your offer."
               rows={6}
               placeholder="What the intern will own, who they will work with, and what success looks like at the end of it."
               value={message}
@@ -464,7 +475,7 @@ export function SendProposalForm({
         {notice ? (
           <p
             role="status"
-            className="flex items-start gap-2.5 rounded-xl border border-warning/25 bg-warning-soft px-4 py-3 text-sm text-ink-700"
+            className="flex items-start gap-2.5 rounded-[10px] border border-warning/25 bg-warning-soft px-4 py-3 text-sm text-ink-700"
           >
             <TriangleAlert className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden />
             <span>{notice}</span>
@@ -475,7 +486,7 @@ export function SendProposalForm({
           <button
             type="button"
             onClick={onSubmit}
-            className="group inline-flex h-11 items-center gap-2 rounded-lg bg-brand-700 px-5 text-sm font-semibold text-white transition-colors hover:bg-brand-600"
+            className="apple-spring apple-pressable group inline-flex min-h-11 items-center gap-2 rounded-[10px] bg-brand-700 px-5 text-sm font-semibold text-white hover:bg-brand-600"
           >
             <Send className="size-4" aria-hidden />
             Send proposal
@@ -488,7 +499,7 @@ export function SendProposalForm({
 
       {/* ── Summary ─────────────────────────────────────────────────── */}
       <aside className="space-y-4 lg:sticky lg:top-8 lg:self-start">
-        <section className="rounded-2xl border border-ink-100 bg-white p-5 shadow-sm">
+        <section className="rounded-[20px] border border-ink-200/70 bg-white p-5 shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)]">
           <p className="flex items-center gap-1.5 text-2xs font-semibold uppercase tracking-[0.14em] text-text-subtle">
             <Sparkles className="size-3.5" aria-hidden />
             Offer total
@@ -515,12 +526,12 @@ export function SendProposalForm({
           </p>
         </section>
 
-        <section className="rounded-2xl border border-brand-200 bg-brand-50 p-5">
+        <section className="rounded-[20px] border border-brand-200 bg-brand-50 p-5">
           <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-brand-700">
             How this offer is priced
           </p>
           <p className="mt-2.5 text-sm leading-relaxed text-ink-700">
-            The hourly rate is fixed by {candidate.name.split(" ")[0]}&apos;s band, not by you.
+            The hourly rate is fixed by their score band, not by you.
             What you can change is the hours, and the monthly figure if you are paying above
             the band.
           </p>
@@ -558,8 +569,8 @@ function Row({
 /* ── Form primitives ────────────────────────────────────────────────────── */
 
 const FIELD_BASE =
-  "mt-2 h-11 w-full rounded-lg border bg-white px-3.5 text-sm text-ink-900 outline-none transition-[border-color,box-shadow] placeholder:text-ink-400 focus-visible:ring-[3px]";
-const FIELD_OK = "border-ink-200 focus-visible:border-brand-600 focus-visible:ring-brand-600/20";
+  "apple-spring mt-2 min-h-11 w-full rounded-[10px] border bg-white px-3.5 text-[14px] text-ink-900 outline-none placeholder:text-ink-400 focus-visible:ring-2";
+const FIELD_OK = "border-ink-200 focus-visible:border-brand-500 focus-visible:ring-brand-500/20";
 const FIELD_BAD = "border-danger focus-visible:border-danger focus-visible:ring-danger/20";
 
 function Field({
@@ -719,7 +730,7 @@ function TextArea({
         onChange={(e) => onChange(e.target.value)}
         aria-invalid={error ? true : undefined}
         aria-describedby={error ? `${id}-error` : undefined}
-        className={`mt-2 w-full rounded-lg border bg-white px-3.5 py-2.5 text-sm leading-relaxed text-ink-900 outline-none transition-[border-color,box-shadow] placeholder:text-ink-400 focus-visible:ring-[3px] ${
+        className={`mt-2 min-h-11 w-full rounded-[10px] border bg-white px-3.5 py-2.5 text-[14px] leading-relaxed text-ink-900 outline-none apple-spring placeholder:text-ink-400 focus-visible:ring-2 ${
           error ? FIELD_BAD : FIELD_OK
         }`}
       />
@@ -779,7 +790,7 @@ function validate(draft: Draft): Record<string, string> {
 
   if (!draft.laptop) errors.laptop = "Say who provides the laptop.";
   if (draft.message.trim().length < 30) {
-    errors.message = "At least a couple of sentences — 30 characters minimum.";
+    errors.message = "At least a couple of sentences - 30 characters minimum.";
   }
 
   return errors;

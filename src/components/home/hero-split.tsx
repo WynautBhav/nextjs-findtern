@@ -1,11 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ArrowRight, Building2, GraduationCap, Play } from "lucide-react";
+import { ArrowRight, Building2, GraduationCap } from "lucide-react";
 
 import { ButtonLink } from "@/components/ui/button";
 import { TextReveal } from "@/components/motion/text-reveal";
-import { CountUp } from "@/components/motion/count-up";
 import { ScoreCard } from "@/components/home/score-card";
 import { HOME_COPY } from "@/lib/content/site";
 import { cn } from "@/lib/utils";
@@ -46,15 +45,12 @@ import { cn } from "@/lib/utils";
  */
 export function HeroSplit() {
   const [ready, setReady] = useState(false);
-  const [playing, setPlaying] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const bandRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const v = videoRef.current;
     if (!v) return;
-    // Assigned from an event, not set synchronously, so this does not force a
-    // second render pass on mount.
     const onCanPlay = () => setReady(true);
     v.addEventListener("canplay", onCanPlay);
     if (v.readyState >= 3) setReady(true);
@@ -70,11 +66,6 @@ export function HeroSplit() {
       (navigator as { connection?: { saveData?: boolean } }).connection?.saveData ??
       false;
 
-    // Lazy + play/pause. The source is not fetched until the band is within
-    // 300px of the viewport; playback is then tied to real visibility, and
-    // suppressed entirely under data saver. Three conditions, because 1.5 MB
-    // of video sitting 88% of the page's weight is not something to spend on a
-    // visitor who will never scroll to it.
     let loaded = false;
     const load = () => {
       if (loaded || saveData) return;
@@ -96,13 +87,9 @@ export function HeroSplit() {
       ([entry]) => {
         if (!loaded) return;
         if (entry.isIntersecting) {
-          void v
-            .play()
-            .then(() => setPlaying(true))
-            .catch(() => setPlaying(false));
+          void v.play().catch(() => {});
         } else {
           v.pause();
-          setPlaying(false);
         }
       },
       { threshold: 0.15 },
@@ -114,21 +101,6 @@ export function HeroSplit() {
       visible.disconnect();
     };
   }, []);
-
-  const togglePlay = () => {
-    const v = videoRef.current;
-    if (!v) return;
-    if (v.paused) {
-      // The observer may not have fired yet if the visitor reached the control
-      // by keyboard without scrolling, so an explicit press loads on demand.
-      if (v.networkState === HTMLMediaElement.NETWORK_EMPTY) v.load();
-      void v.play();
-      setPlaying(true);
-    } else {
-      v.pause();
-      setPlaying(false);
-    }
-  };
 
   return (
     <section className="relative isolate overflow-hidden bg-brand-950">
@@ -142,7 +114,7 @@ export function HeroSplit() {
         very tall display an uncapped 100svh hero pushes every other section
         off the screen entirely.
       */}
-      <div className="container-page relative flex min-h-[calc(100svh-4rem)] max-h-[1100px] flex-col justify-center py-14 lg:min-h-[calc(100svh-5rem)] lg:py-20">
+      <div className="container-page relative flex min-h-[calc(100svh-4rem)] flex-col justify-start pt-6 pb-12 sm:py-14 lg:justify-center lg:py-20 lg:min-h-[calc(100svh-5rem)] lg:max-h-[1100px]">
         <div className="grid items-center gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.9fr)] lg:gap-16">
           {/* ── Copy ────────────────────────────────────────────── */}
           <div>
@@ -172,12 +144,6 @@ export function HeroSplit() {
               </ButtonLink>
             </div>
 
-            {/* Trust numbers. Counted up on scroll into view. */}
-            <dl className="mt-12 grid max-w-lg grid-cols-3 gap-6 border-t border-white/8 pt-8">
-              <Stat value={18} suffix="mo" label="Guarantee window" />
-              <Stat value={3} label="Plans, no lock-in" />
-              <Stat value={0} prefix="₹" label="Fee above 6/10" accent />
-            </dl>
           </div>
 
           {/* ── Proof artifact ───────────────────────────────────── */}
@@ -220,13 +186,14 @@ export function HeroSplit() {
       <div className="container-page pb-14 sm:pb-20">
         <div
           ref={bandRef}
-          className="relative overflow-hidden rounded-2xl border border-white/10 bg-brand-900 bg-[url('/media/hero-poster.jpg')] bg-cover bg-center"
+          className="relative overflow-hidden rounded-3xl border border-white/10 bg-brand-950 bg-[url('/media/hero-poster.jpg')] bg-cover bg-center shadow-2xl"
         >
+          {/* ── Background Video with Reduced Opacity ────────────── */}
           <video
             ref={videoRef}
             className={cn(
               "aspect-16/9 w-full object-cover object-[center_35%] transition-opacity duration-1000 sm:aspect-21/9",
-              ready ? "opacity-100" : "opacity-0",
+              ready ? "opacity-80" : "opacity-0",
             )}
             poster="/media/hero-poster.jpg"
             muted
@@ -245,36 +212,30 @@ export function HeroSplit() {
             <source src="/media/hero-720.mp4" type="video/mp4" />
           </video>
 
+          {/* Bottom-weighted scrim: legible caption, footage left alone above it. */}
           <div
+            className="pointer-events-none absolute inset-0 bg-gradient-to-t from-brand-950/90 via-brand-950/30 to-transparent"
             aria-hidden
-            className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_top,rgb(4_29_23/0.72)_0%,transparent_50%)]"
           />
 
-          <p className="pointer-events-none absolute bottom-4 left-5 max-w-xs text-sm font-medium text-white/90 sm:bottom-5 sm:left-7 sm:text-base">
-            Every engagement is contracted, every hour is logged, and the
-            stipend moves through the platform.
-          </p>
-
-          <button
-            type="button"
-            onClick={togglePlay}
-            aria-label={playing ? "Pause background video" : "Play background video"}
-            className="absolute bottom-4 right-4 inline-flex size-10 items-center justify-center rounded-full border border-white/20 bg-brand-950/45 text-white/85 backdrop-blur-md transition-[transform,border-color,color] duration-200 ease-ease-out [@media(any-hover:hover)]:hover:scale-105 hover:border-white/45 hover:text-white sm:bottom-5 sm:right-6"
-          >
-            {playing ? <PauseGlyph /> : <Play className="size-4" aria-hidden />}
-          </button>
+          {/* A caption, not a second hero: the CTAs already sit above. */}
+          <div className="absolute inset-x-0 bottom-0 z-10 flex flex-col gap-4 p-6 sm:flex-row sm:items-end sm:justify-between sm:p-10">
+            <div className="max-w-xl">
+              <p className="text-2xs font-semibold uppercase tracking-[0.16em] text-white/60">
+                How hiring works here
+              </p>
+              <h2 className="mt-2 text-balance text-xl font-medium leading-snug tracking-tight text-white sm:text-2xl md:text-3xl">
+                Screened before you meet them. Billed only for approved hours.
+              </h2>
+            </div>
+            <ul className="flex shrink-0 flex-wrap gap-x-5 gap-y-1 text-sm text-white/75">
+              <li>Coding, aptitude and interview tested</li>
+              <li>Weekly timesheets</li>
+            </ul>
+          </div>
         </div>
       </div>
     </section>
-  );
-}
-
-function PauseGlyph() {
-  return (
-    <span className="flex gap-1" aria-hidden>
-      <span className="h-3.5 w-1 rounded-sm bg-current" />
-      <span className="h-3.5 w-1 rounded-sm bg-current" />
-    </span>
   );
 }
 
@@ -318,40 +279,6 @@ function AudienceCard({
           aria-hidden
         />
       </ButtonLink>
-    </div>
-  );
-}
-
-function Stat({
-  value,
-  suffix = "",
-  prefix = "",
-  label,
-  accent,
-}: {
-  value: number;
-  suffix?: string;
-  prefix?: string;
-  label: string;
-  accent?: boolean;
-}) {
-  return (
-    <div>
-      <dt className="sr-only">{label}</dt>
-      <dd>
-        <span
-          className={cn(
-            "block text-2xl font-semibold tracking-tight sm:text-3xl",
-            accent ? "text-accent" : "text-white",
-          )}
-        >
-          <CountUp value={value} prefix={prefix} />
-          {suffix ? (
-            <span className="text-base font-medium opacity-70">{suffix}</span>
-          ) : null}
-        </span>
-        <span className="mt-1 block text-xs text-on-dark-subtle">{label}</span>
-      </dd>
     </div>
   );
 }

@@ -4,14 +4,13 @@
  * Company profile editor.
  *
  * Writes to `PATCH /api/employer/:id`, which takes exactly the fields below.
- * The legacy build also had a logo upload endpoint; this covers the text
- * fields, and the logo is left out rather than faked — see the note on the
- * account page.
+ * The logo uploads on its own (FileUpload attaches it server-side).
  */
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
+import { FileUpload } from "@/components/app/file-upload";
 
 import { csrfFetch } from "@/lib/client-fetch";
 
@@ -37,14 +36,18 @@ export type CompanyProfile = {
   gstNumber: string | null;
 };
 
+const REQUIRED_FIELDS = new Set(["companyName", "companyEmail", "countryCode", "phoneNumber"]);
+
 const COMPANY_SIZES = ["1-10", "11-50", "51-200", "201-500", "501-1000", "1000+"];
 
 export function CompanyProfileForm({
   employerId,
   profile,
+  hasLogo = false,
 }: {
   employerId: string;
   profile: CompanyProfile;
+  hasLogo?: boolean;
 }) {
   const router = useRouter();
   const [values, setValues] = useState<Record<string, string>>(() =>
@@ -65,8 +68,12 @@ export function CompanyProfileForm({
     setError(null);
     setState("idle");
     try {
+      // A cleared optional field is sent as null so it actually clears.
+      // Required fields (and the read-only login email) are left out when blank.
       const body = Object.fromEntries(
-        Object.entries(values).filter(([, v]) => v.trim() !== ""),
+        Object.entries(values)
+          .filter(([k, v]) => !(REQUIRED_FIELDS.has(k) && v.trim() === ""))
+          .map(([k, v]) => [k, v.trim() === "" ? null : v]),
       );
       const res = await csrfFetch(`/api/employer/${encodeURIComponent(employerId)}`, {
         method: "PATCH",
@@ -87,18 +94,26 @@ export function CompanyProfileForm({
   return (
     <form className="space-y-6" noValidate onSubmit={submit}>
       {error ? (
-        <p role="alert" className="rounded-lg border border-danger/25 bg-danger-soft px-3.5 py-3 text-sm text-danger">
+        <p role="alert" className="rounded-[10px] border border-danger/25 bg-danger-soft px-3.5 py-3 text-sm text-danger">
           {error}
         </p>
       ) : null}
       {state === "saved" ? (
-        <p role="status" className="rounded-lg border border-brand-200 bg-brand-50 px-3.5 py-3 text-sm text-brand-800">
+        <p role="status" className="rounded-[10px] border border-brand-200 bg-brand-50 px-3.5 py-3 text-sm text-brand-800">
           Company details saved.
         </p>
       ) : null}
 
       <fieldset className="space-y-4">
         <legend className="text-sm font-semibold text-ink-900">Company</legend>
+        <FileUpload
+          kind="employer_logo"
+          accept="image/jpeg,image/png,image/webp"
+          label="Logo"
+          hint="PNG, JPG or WebP up to 2 MB."
+          current={hasLogo ? "Logo on file" : null}
+          onUploaded={() => router.refresh()}
+        />
         <Text id="companyName" label="Company name" value={values.companyName} onChange={set("companyName")} required />
         <Text id="companyEmail" label="Company email" type="email" value={values.companyEmail} onChange={set("companyEmail")} required />
         <Text
@@ -116,7 +131,7 @@ export function CompanyProfileForm({
             id="companySize"
             value={values.companySize}
             onChange={set("companySize")}
-            className="mt-1.5 h-10 w-full rounded-lg border border-ink-200 bg-white px-3 text-sm text-ink-900 outline-none focus-visible:border-brand-600 focus-visible:ring-[3px] focus-visible:ring-brand-600/20"
+            className="apple-spring mt-1.5 min-h-11 w-full rounded-[10px] border border-ink-200 bg-white px-3 text-[14px] text-ink-900 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
           >
             <option value="">Not set</option>
             {COMPANY_SIZES.map((s) => (
@@ -197,7 +212,7 @@ export function CompanyProfileForm({
       <button
         type="submit"
         disabled={busy}
-        className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-brand-700 px-5 text-sm font-semibold text-white transition-colors hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-60"
+        className="apple-spring apple-pressable inline-flex min-h-11 items-center justify-center gap-2 rounded-[10px] bg-brand-700 px-5 text-sm font-semibold text-white hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-60"
       >
         {busy ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
         Save company details
@@ -236,7 +251,7 @@ function Text({
         placeholder={placeholder}
         value={value}
         onChange={onChange}
-        className="mt-1.5 h-10 w-full rounded-lg border border-ink-200 bg-white px-3.5 text-sm text-ink-900 outline-none transition-[border-color,box-shadow] placeholder:text-ink-400 focus-visible:border-brand-600 focus-visible:ring-[3px] focus-visible:ring-brand-600/20"
+        className="apple-spring mt-1.5 min-h-11 w-full rounded-[10px] border border-ink-200 bg-white px-3.5 text-[14px] text-ink-900 outline-none placeholder:text-ink-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
       />
     </div>
   );

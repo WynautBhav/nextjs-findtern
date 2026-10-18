@@ -63,15 +63,9 @@ export function BandRate({ bandId, className }: { bandId: BandId; className?: st
   return <span className={className}>{formatRate(bandById(bands, bandId).rateMinor, currency)}</span>;
 }
 
-/** Formatted per-hire charge (or the waived label) for a band id. */
-export function BandPerHire({
-  bandId,
-  waivedLabel = "Waived",
-}: {
-  bandId: BandId;
-  waivedLabel?: string;
-}) {
+/** Formatted per-hire charge for a band id. */
+export function BandPerHire({ bandId }: { bandId: BandId }) {
   const { bands, currency } = useRegionBands();
   const band = bandById(bands, bandId);
-  return <>{band.perHireMinor > 0 ? formatMoney(band.perHireMinor, currency) : waivedLabel}</>;
+  return <>{formatMoney(band.perHireMinor, currency)}</>;
 }

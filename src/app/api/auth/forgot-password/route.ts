@@ -50,7 +50,7 @@ export async function POST(req: Request) {
     expiresAt: new Date(Date.now() + 60 * 60 * 1000),
   });
 
-  const base = process.env.NEXT_PUBLIC_BASE_URL ?? "http://localhost:3100";
+  const base = process.env.PUBLIC_ORIGIN ?? "http://localhost:3000";
   const resetPath = isEmployer ? "/employer/reset-password" : "/reset-password";
   await sendSmtpMail({
     to: subject.email,

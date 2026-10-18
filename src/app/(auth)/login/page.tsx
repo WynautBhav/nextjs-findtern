@@ -32,6 +32,8 @@ export default function LoginPage() {
           endpoint="/api/auth/login"
           redirectTo="/intern/dashboard"
           forgotHref="/forgot-password"
+          googleHref="/api/auth/google/start?role=intern"
+          verifyHref="/verify-email"
         />
       </div>
 

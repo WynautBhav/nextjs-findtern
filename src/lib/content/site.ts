@@ -10,7 +10,7 @@ export const SITE = {
   name: "Findtern",
   tagline: "Internship Simplified",
   description:
-    "Hire a verified intern for the price of a coffee, or get placed in a paid internship in 18 months - or your deposit back.",
+    "Hire a verified intern for the price of a coffee, or get placed in a paid internship - or your deposit back.",
   url: "https://findtern.in",
   email: "admin@findtern.in",
   phone: "",
@@ -24,6 +24,27 @@ export const SITE = {
     linkedin: "https://www.linkedin.com/company/findtern-in/",
   },
 } as const;
+
+/**
+ * Direct web compose URL for Gmail with pre-filled recipient, subject, and body.
+ * Bypasses system mailto handlers (which often open unwanted web clients like HEY)
+ * and opens Gmail compose directly in a fresh tab.
+ */
+export function getGmailComposeUrl(opts?: {
+  to?: string;
+  subject?: string;
+  body?: string;
+}) {
+  const to = opts?.to ?? SITE.email;
+  const params = new URLSearchParams({
+    view: "cm",
+    fs: "1",
+    to,
+  });
+  if (opts?.subject) params.set("su", opts.subject);
+  if (opts?.body) params.set("body", opts.body);
+  return `https://mail.google.com/mail/?${params.toString()}`;
+}
 
 /* ==========================================================================
    HOME COPY
@@ -45,7 +66,7 @@ export const HOME_COPY = {
   /** Accent clause - the last words, set in the accent colour. */
   headlineAccent: "the price of a coffee.",
   subhead:
-    "Verified candidates, a published rate, and a payment that actually arrives. If we do not place you in 18 months, your deposit comes back.",
+    "Verified candidates, a published rate, and a payment that actually arrives. If we do not place you, your deposit comes back.",
 } as const;
 
 export const ABOUT_COPY = {
@@ -121,6 +142,7 @@ export const FOOTER_SECTIONS: { heading: string; links: NavLink[] }[] = [
     links: [
       { label: "Terms and Conditions", href: "/terms-and-conditions" },
       { label: "Intern Terms", href: "/intern-terms-and-conditions" },
+      { label: "Intern Non-Bypass Agreement", href: "/intern-nda" },
       { label: "Employer Terms", href: "/employer-terms-and-conditions" },
       { label: "Privacy Policy", href: "/privacy" },
     ],
@@ -142,5 +164,6 @@ export const INDEXABLE_ROUTES = [
   "/terms-and-conditions",
   "/intern-terms-and-conditions",
   "/employer-terms-and-conditions",
+  "/intern-nda",
   "/privacy",
 ] as const;

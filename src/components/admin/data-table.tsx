@@ -13,7 +13,7 @@ import { TableToolbar, type ToolbarFilter } from "./table-toolbar.tsx";
 import { cn } from "@/lib/utils";
 
 /**
- * DataTable — the shared shell for every admin list.
+ * DataTable - the shared shell for every admin list.
  *
  * Owns the chrome (toolbar row, sticky header, pager) so each page only
  * declares its columns and how to render a row. That is what stops the three
@@ -30,7 +30,7 @@ import { cn } from "@/lib/utils";
  */
 
 export type Column<T> = {
-  /** Visible header text. Keep it short — the header row is nowrap. */
+  /** Visible header text. Keep it short - the header row is nowrap. */
   header: React.ReactNode;
   /** Renders the cell. */
   cell: (row: T, index: number) => React.ReactNode;
@@ -91,12 +91,12 @@ export function DataTable<T>({
   perKey?: string;
 }) {
   const hasToolbar = Boolean(searchPlaceholder || filters?.length || exportHref || extraControls);
-  const cellPad = dense ? "px-3 py-2" : "px-3 py-2.5";
+  const cellPad = dense ? "px-3 py-2.5" : "px-3 py-3";
 
   return (
     <div
       className={cn(
-        "overflow-hidden rounded-xl border border-ink-200 bg-white shadow-xs",
+        "apple-panel apple-admin overflow-hidden bg-white",
         className,
       )}
     >
@@ -126,14 +126,14 @@ export function DataTable<T>({
       ) : (
         <Table>
           {caption ? <caption className="sr-only">{caption}</caption> : null}
-          <TableHeader className="sticky top-0 z-10 bg-ink-50/95 backdrop-blur-sm">
+          <TableHeader className="apple-material-bar sticky top-0 z-10">
             <TableRow className="hover:bg-transparent">
               {columns.map((column, index) => (
                 <TableHead
                   key={index}
                   scope="col"
                   className={cn(
-                    "px-3 py-2.5 text-xs font-medium tracking-wide text-ink-600 capitalize",
+                    "px-3 py-3 text-[12px] font-semibold tracking-[0.02em] text-ink-600 capitalize",
                     column.align === "right" && "text-right",
                     column.headerClassName,
                   )}
@@ -148,13 +148,13 @@ export function DataTable<T>({
               const tr = renderRow ? (
                 renderRow(row, index)
               ) : (
-                <TableRow key={index} className="hover:bg-ink-50/70 transition-colors">
+                <TableRow key={index} className="apple-spring hover:bg-ink-50/70">
                   {columns.map((column, cellIndex) => (
                     <TableCell
                       key={cellIndex}
                       className={cn(
                         cellPad,
-                        "text-sm text-ink-700",
+                        "text-[14px] tracking-[-0.01em] text-ink-700",
                         column.align === "right" && "text-right tabular-nums",
                         column.className,
                       )}

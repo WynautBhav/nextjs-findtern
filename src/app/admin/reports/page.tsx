@@ -1,10 +1,11 @@
-import { count, sql } from "drizzle-orm";
+import { and, count, gte, sql } from "drizzle-orm";
+import type { AnyPgColumn } from "drizzle-orm/pg-core";
+import Link from "next/link";
 import {
   BarChart3,
   Download,
   Users,
   Building2,
-  Briefcase,
   CalendarCheck,
   CheckCircle2,
   FileSpreadsheet,
@@ -12,10 +13,21 @@ import {
 } from "lucide-react";
 
 import { getDb, schema } from "@/lib/db";
-import { AdminPageHeader, Panel, PanelHeader } from "@/components/admin/panel";
+import { AdminPageHeader, Panel, PanelHeader, PanelBody } from "@/components/admin/panel";
 import { StatCard, StatGrid } from "@/components/admin/stat-card";
+import { TrendChart, PipelineBars, type TrendPoint } from "@/components/admin/trend-chart";
+import { formatNumber } from "@/lib/format";
+import { flattenParams, PERIOD_OPTIONS, periodStart } from "@/lib/admin/params";
 
-export default async function AdminReportsPage() {
+export default async function AdminReportsPage({
+  searchParams,
+}: {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const params = flattenParams(await searchParams);
+  const since = periodStart(params.period);
+  /** Totals respect the chosen period; trend charts always show six months. */
+  const from = (col: AnyPgColumn) => (since ? gte(col, since) : undefined);
   const db = getDb();
 
   const [
@@ -28,14 +40,16 @@ export default async function AdminReportsPage() {
     [projectsTotal],
     topStatesRaw,
     projectTypesRaw,
+    proposalsMonthly,
+    interviewsMonthly,
   ] = await Promise.all([
-    db.select({ c: count() }).from(schema.users),
-    db.select({ c: count() }).from(schema.internOnboarding),
-    db.select({ c: count() }).from(schema.proposals),
-    db.select({ c: count() }).from(schema.interviews),
-    db.select({ c: count() }).from(schema.proposals).where(sql`${schema.proposals.hiredAt} is not null`),
-    db.select({ c: count() }).from(schema.employers),
-    db.select({ c: count() }).from(schema.projects),
+    db.select({ c: count() }).from(schema.users).where(from(schema.users.createdAt)),
+    db.select({ c: count() }).from(schema.internOnboarding).where(from(schema.internOnboarding.createdAt)),
+    db.select({ c: count() }).from(schema.proposals).where(from(schema.proposals.createdAt)),
+    db.select({ c: count() }).from(schema.interviews).where(from(schema.interviews.createdAt)),
+    db.select({ c: count() }).from(schema.proposals).where(and(sql`${schema.proposals.hiredAt} is not null`, from(schema.proposals.hiredAt))),
+    db.select({ c: count() }).from(schema.employers).where(from(schema.employers.createdAt)),
+    db.select({ c: count() }).from(schema.projects).where(from(schema.projects.createdAt)),
     db
       .select({
         state: sql<string>`coalesce(${schema.internOnboarding.state}, 'Unlisted')`,
@@ -53,6 +67,22 @@ export default async function AdminReportsPage() {
       .from(schema.projects)
       .groupBy(sql`coalesce(${schema.projects.locationType}, 'Remote')`)
       .orderBy(sql`count(*) desc`),
+    db
+      .select({
+        month: sql<string>`to_char(date_trunc('month', ${schema.proposals.createdAt}), 'YYYY-MM')`,
+        c: count(),
+      })
+      .from(schema.proposals)
+      .where(sql`${schema.proposals.createdAt} >= date_trunc('month', now()) - interval '5 months'`)
+      .groupBy(sql`1`),
+    db
+      .select({
+        month: sql<string>`to_char(date_trunc('month', ${schema.interviews.createdAt}), 'YYYY-MM')`,
+        c: count(),
+      })
+      .from(schema.interviews)
+      .where(sql`${schema.interviews.createdAt} >= date_trunc('month', now()) - interval '5 months'`)
+      .groupBy(sql`1`),
   ]);
 
   const totalSignups = Number(signupsTotal?.c ?? 0);
@@ -67,206 +97,223 @@ export default async function AdminReportsPage() {
   const interviewRate = totalSignups > 0 ? Math.round((totalInterviews / totalSignups) * 100) : 0;
   const hireRate = totalInterviews > 0 ? Math.round((totalHires / totalInterviews) * 100) : 0;
 
-  const num = (n: number) => n.toLocaleString("en-IN");
+
+  // Six monthly buckets, zero-filled - the trend chart needs continuity,
+  // not just the months that happen to have rows.
+  const now = new Date();
+  const buckets: { key: string; label: string }[] = [];
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    buckets.push({
+      key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`,
+      label: d.toLocaleString("en-IN", { month: "short" }),
+    });
+  }
+  const proposalsByMonth = new Map(proposalsMonthly.map((r) => [r.month, Number(r.c)]));
+  const interviewsByMonth = new Map(interviewsMonthly.map((r) => [r.month, Number(r.c)]));
+  const trend: TrendPoint[] = buckets.map((b) => ({
+    label: b.label,
+    proposals: proposalsByMonth.get(b.key) ?? 0,
+    interviews: interviewsByMonth.get(b.key) ?? 0,
+  }));
 
   const funnelSteps = [
-    { label: "Account registered", count: totalSignups, pct: 100, color: "bg-brand-600" },
-    { label: "Profile completed", count: totalProfiles, pct: profileRate, color: "bg-brand-700" },
+    { status: "registered", label: "Account registered", count: totalSignups },
+    { status: "profiled", label: "Profile completed", count: totalProfiles },
+    { status: "proposed", label: "Proposal submitted", count: totalProposals },
+    { status: "interviewed", label: "Interview scheduled", count: totalInterviews },
+    { status: "hired", label: "Candidate hired", count: totalHires },
+  ];
+
+  const states = topStatesRaw.map((r) => ({ label: r.state, count: Number(r.c) }));
+  const statesMax = Math.max(1, ...states.map((s) => s.count));
+  const formats = projectTypesRaw.map((r) => ({ label: r.locationType, count: Number(r.c) }));
+  const formatsMax = Math.max(1, ...formats.map((f) => f.count));
+
+  const exports = [
     {
-      label: "Proposal submitted",
-      count: totalProposals,
-      pct: totalSignups > 0 ? Math.round((totalProposals / totalSignups) * 100) : 0,
-      color: "bg-emerald-600",
+      title: "Intern master file",
+      body: "Candidates with contact and profile status.",
+      href: "/api/admin/export?type=interns",
     },
     {
-      label: "Interview scheduled",
-      count: totalInterviews,
-      pct: totalSignups > 0 ? Math.round((totalInterviews / totalSignups) * 100) : 0,
-      color: "bg-amber-600",
+      title: "Companies directory",
+      body: "Partners, contacts, GST and setup progress.",
+      href: "/api/admin/export?type=companies",
     },
     {
-      label: "Candidate hired",
-      count: totalHires,
-      pct: totalSignups > 0 ? Math.round((totalHires / totalSignups) * 100) : 0,
-      color: "bg-purple-600",
+      title: "Projects catalog",
+      body: "Listings, skills, offers and statuses.",
+      href: "/api/admin/export?type=projects",
+    },
+    {
+      title: "Payments ledger",
+      body: "Receipts, order IDs and verification.",
+      href: "/api/admin/export?type=payments",
     },
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="apple-admin space-y-4">
       <AdminPageHeader
         title="Reports"
-        subtitle="Platform conversion funnel, geographic spread and automated data exports."
+        subtitle="Conversion, geography and raw exports."
       />
+      <nav aria-label="Period" className="flex flex-wrap gap-1.5">
+        {[{ value: "", label: "All time" }, ...PERIOD_OPTIONS].map((o) => (
+          <Link
+            key={o.value}
+            href={o.value ? `/admin/reports?period=${o.value}` : "/admin/reports"}
+            aria-current={(params.period ?? "") === o.value ? "page" : undefined}
+            className={`inline-flex min-h-9 items-center rounded-full px-3 text-xs font-medium ${
+              (params.period ?? "") === o.value ? "bg-ink-900 text-white" : "bg-white text-ink-700 ring-1 ring-ink-200 hover:bg-ink-50"
+            }`}
+          >
+            {o.label}
+          </Link>
+        ))}
+      </nav>
 
       <StatGrid cols={4}>
         <StatCard
           label="Profile completion"
           value={`${profileRate}%`}
-          hint={`${num(totalProfiles)} of ${num(totalSignups)} signups`}
+          hint={`${formatNumber(totalProfiles)} of ${formatNumber(totalSignups)} signups`}
           icon={Users}
           tone="brand"
         />
         <StatCard
           label="Interview conversion"
           value={`${interviewRate}%`}
-          hint={`${num(totalInterviews)} scheduled sessions`}
+          hint={`${formatNumber(totalInterviews)} scheduled sessions`}
           icon={CalendarCheck}
           tone="info"
         />
         <StatCard
           label="Hire placement rate"
           value={`${hireRate}%`}
-          hint={`${num(totalHires)} finalized hires`}
+          hint={`${formatNumber(totalHires)} finalized hires`}
           icon={CheckCircle2}
           tone="success"
         />
         <StatCard
           label="Active partners"
-          value={num(totalCompanies)}
-          hint={`${num(totalProjects)} listings published`}
+          value={formatNumber(totalCompanies)}
+          hint={`${formatNumber(totalProjects)} listings published`}
           icon={Building2}
           tone="accent"
         />
       </StatGrid>
 
-      {/* Funnel breakdown */}
-      <Panel>
-        <PanelHeader
-          title="Candidate conversion funnel"
-          description="Progression from initial student registration through to placement."
-          icon={TrendingUp}
-        />
-        <div className="space-y-4 px-6 py-5">
-          {funnelSteps.map((step) => (
-            <div key={step.label} className="space-y-1.5">
-              <div className="flex items-center justify-between text-xs">
-                <span className="font-medium text-ink-800">{step.label}</span>
-                <span className="text-text-subtle tabular-nums font-medium">
-                  {num(step.count)} ({step.pct}%)
-                </span>
-              </div>
-              <div className="h-2 w-full overflow-hidden rounded-full bg-ink-100">
-                <div
-                  className={`h-full rounded-full transition-all duration-500 ${step.color}`}
-                  style={{ width: `${Math.max(4, Math.min(100, step.pct))}%` }}
-                />
-              </div>
-            </div>
-          ))}
-        </div>
-      </Panel>
-
-      {/* Geography and Projects split */}
-      <div className="grid gap-6 md:grid-cols-2">
-        <Panel>
+      <div className="grid gap-4 xl:grid-cols-[1.35fr_0.65fr]">
+        <Panel className="bg-white">
           <PanelHeader
-            title="Candidate geography"
-            description="Top regional distribution of verified intern profiles."
-            icon={BarChart3}
+            title="Activity trend"
+            description="Proposals and interviews over the last six months."
+            icon={TrendingUp}
           />
-          <div className="divide-y divide-ink-100 px-6 py-2">
-            {topStatesRaw.map((row) => (
-              <div key={row.state} className="flex items-center justify-between py-2.5 text-sm">
-                <span className="font-medium text-ink-800">{row.state}</span>
-                <span className="text-text-subtle tabular-nums font-semibold">
-                  {num(Number(row.c))}
-                </span>
-              </div>
-            ))}
-          </div>
+          <PanelBody>
+            <TrendChart data={trend} />
+          </PanelBody>
         </Panel>
 
-        <Panel>
+        <Panel className="bg-white">
           <PanelHeader
-            title="Project workplace format"
-            description="Workplace arrangement across posted listings."
-            icon={Briefcase}
+            title="Conversion funnel"
+            description="Registration to placement."
           />
-          <div className="divide-y divide-ink-100 px-6 py-2">
-            {projectTypesRaw.map((row) => (
-              <div key={row.locationType} className="flex items-center justify-between py-2.5 text-sm">
-                <span className="font-medium capitalize text-ink-800">{row.locationType}</span>
-                <span className="text-text-subtle tabular-nums font-semibold">
-                  {num(Number(row.c))} listings
-                </span>
-              </div>
-            ))}
-          </div>
+          <PanelBody>
+            <PipelineBars items={funnelSteps} />
+          </PanelBody>
         </Panel>
       </div>
 
-      {/* Direct Data Exports */}
-      <Panel>
+      <div className="grid gap-4 md:grid-cols-2">
+        <Panel className="bg-white">
+          <PanelHeader
+            title="Candidate geography"
+            description="Top regions by verified profile."
+            icon={BarChart3}
+          />
+          <PanelBody className="space-y-3">
+            {states.map((s) => (
+              <div key={s.label}>
+                <div className="mb-1 flex items-baseline justify-between gap-3">
+                  <span className="truncate text-[14px] font-medium tracking-[-0.01em] text-ink-800">
+                    {s.label}
+                  </span>
+                  <span className="shrink-0 text-[13px] font-semibold tabular-nums text-ink-900">
+                    {formatNumber(s.count)}
+                  </span>
+                </div>
+                <div aria-hidden className="h-1.5 overflow-hidden rounded-full bg-ink-100">
+                  <div
+                    className="h-full rounded-full bg-brand-600"
+                    style={{ width: `${(s.count / statesMax) * 100}%` }}
+                  />
+                </div>
+              </div>
+            ))}
+          </PanelBody>
+        </Panel>
+
+        <Panel className="bg-white">
+          <PanelHeader
+            title="Workplace format"
+            description="Arrangement across listings."
+          />
+          <PanelBody className="space-y-3">
+            {formats.map((f) => (
+              <div key={f.label}>
+                <div className="mb-1 flex items-baseline justify-between gap-3">
+                  <span className="truncate text-[14px] font-medium tracking-[-0.01em] text-ink-800 capitalize">
+                    {f.label}
+                  </span>
+                  <span className="shrink-0 text-[13px] font-semibold tabular-nums text-ink-900">
+                    {formatNumber(f.count)}
+                  </span>
+                </div>
+                <div aria-hidden className="h-1.5 overflow-hidden rounded-full bg-ink-100">
+                  <div
+                    className="h-full rounded-full bg-brand-600"
+                    style={{ width: `${(f.count / formatsMax) * 100}%` }}
+                  />
+                </div>
+              </div>
+            ))}
+          </PanelBody>
+        </Panel>
+      </div>
+
+      <Panel className="bg-white">
         <PanelHeader
           title="Raw data exports"
-          description="Download filtered CSV spreadsheets for offline analysis and auditing."
+          description="CSV for offline analysis and auditing."
           icon={FileSpreadsheet}
         />
-        <div className="grid gap-4 p-6 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="flex flex-col justify-between rounded-xl border border-ink-200 bg-ink-50/50 p-4 transition-all hover:bg-ink-50 hover:border-ink-300">
-            <div>
-              <p className="font-semibold text-ink-900">Intern master file</p>
-              <p className="mt-1 text-xs text-text-subtle">
-                Complete roster of candidates with contact and profile status.
-              </p>
-            </div>
-            <a
-              href="/api/admin/export?type=interns"
-              className="mt-4 inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border border-ink-200 bg-white px-3 text-xs font-medium text-ink-800 shadow-xs transition-colors hover:bg-ink-50"
+        <div className="grid gap-3 p-5 sm:grid-cols-2 lg:grid-cols-4">
+          {exports.map((item) => (
+            <div
+              key={item.title}
+              className="apple-spring flex flex-col justify-between rounded-[10px] border border-ink-200 bg-white p-4 hover:border-brand-300"
             >
-              <Download className="size-3.5" aria-hidden />
-              Download CSV
-            </a>
-          </div>
-
-          <div className="flex flex-col justify-between rounded-xl border border-ink-200 bg-ink-50/50 p-4 transition-all hover:bg-ink-50 hover:border-ink-300">
-            <div>
-              <p className="font-semibold text-ink-900">Companies directory</p>
-              <p className="mt-1 text-xs text-text-subtle">
-                Employer partners, contact information, GST numbers, and setup progress.
-              </p>
+              <div>
+                <p className="text-[15px] font-semibold tracking-[-0.01em] text-ink-900">
+                  {item.title}
+                </p>
+                <p className="mt-1 text-[13px] leading-relaxed text-text-subtle">
+                  {item.body}
+                </p>
+              </div>
+              <a
+                href={item.href}
+                className="apple-spring apple-pressable mt-4 inline-flex min-h-11 items-center justify-center gap-1.5 rounded-[10px] border border-ink-200 bg-white px-3 text-[13px] font-semibold text-ink-800 hover:bg-ink-50"
+              >
+                <Download className="size-4" aria-hidden />
+                Download CSV
+              </a>
             </div>
-            <a
-              href="/api/admin/export?type=companies"
-              className="mt-4 inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border border-ink-200 bg-white px-3 text-xs font-medium text-ink-800 shadow-xs transition-colors hover:bg-ink-50"
-            >
-              <Download className="size-3.5" aria-hidden />
-              Download CSV
-            </a>
-          </div>
-
-          <div className="flex flex-col justify-between rounded-xl border border-ink-200 bg-ink-50/50 p-4 transition-all hover:bg-ink-50 hover:border-ink-300">
-            <div>
-              <p className="font-semibold text-ink-900">Projects catalog</p>
-              <p className="mt-1 text-xs text-text-subtle">
-                All projects, required skills, full time conversion offers, and statuses.
-              </p>
-            </div>
-            <a
-              href="/api/admin/export?type=projects"
-              className="mt-4 inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border border-ink-200 bg-white px-3 text-xs font-medium text-ink-800 shadow-xs transition-colors hover:bg-ink-50"
-            >
-              <Download className="size-3.5" aria-hidden />
-              Download CSV
-            </a>
-          </div>
-
-          <div className="flex flex-col justify-between rounded-xl border border-ink-200 bg-ink-50/50 p-4 transition-all hover:bg-ink-50 hover:border-ink-300">
-            <div>
-              <p className="font-semibold text-ink-900">Payments ledger</p>
-              <p className="mt-1 text-xs text-text-subtle">
-                Financial payment receipts, order IDs, and payment verification records.
-              </p>
-            </div>
-            <a
-              href="/api/admin/export?type=payments"
-              className="mt-4 inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border border-ink-200 bg-white px-3 text-xs font-medium text-ink-800 shadow-xs transition-colors hover:bg-ink-50"
-            >
-              <Download className="size-3.5" aria-hidden />
-              Download CSV
-            </a>
-          </div>
+          ))}
         </div>
       </Panel>
     </div>

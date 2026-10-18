@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Intern activation — the ₹2,499 one-time payment that takes a profile live.
+ * Intern activation - the ₹2,499 one-time payment that takes a profile live.
  *
  * The legacy dashboard owned this flow and it was the only intern-side
  * revenue in the product; the rewrite shipped API routes for it but no page
@@ -22,23 +22,18 @@ import { csrfFetch } from "@/lib/client-fetch";
 import { formatMoney } from "@/lib/format";
 import { loadRazorpay, RAZORPAY_THEME_COLOR } from "@/components/payments/razorpay-client";
 
-const BASE_MINOR = 249900; // ₹2,499 — mirrored server-side; this copy is display only.
-
-type Promo = { code: string; discountType: "percentage" | "fixed"; discountValue: number };
-
-function discountFor(promo: Promo): number {
-  if (promo.discountType === "percentage") {
-    return Math.round((BASE_MINOR * promo.discountValue) / 100);
-  }
-  return Math.min(promo.discountValue, BASE_MINOR);
-}
+/** The server prices the discount (`validate-promo`); this is display only. */
+type Promo = { code: string; discountMinor: number };
 
 export function ActivationCard({
   internId,
+  feeMinor,
   prefill,
   alreadyPaid = false,
 }: {
   internId: string;
+  /** Admin-set activation fee (platform_settings), GST-inclusive. */
+  feeMinor: number;
   prefill: { name?: string; email?: string; contact?: string };
   /** Set when a paid row already exists, so only the interview step is offered. */
   alreadyPaid?: boolean;
@@ -51,8 +46,8 @@ export function ActivationCard({
   const [state, setState] = useState<"idle" | "busy" | "paid">("idle");
   const [error, setError] = useState<string | null>(null);
 
-  const discount = promo ? discountFor(promo) : 0;
-  const payable = BASE_MINOR - discount;
+  const discount = promo ? Math.min(promo.discountMinor, feeMinor) : 0;
+  const payable = feeMinor - discount;
 
   async function applyCode() {
     if (!code.trim()) return;
@@ -70,11 +65,7 @@ export function ActivationCard({
       );
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body.error ?? "That code did not work.");
-      setPromo({
-        code: code.trim().toUpperCase(),
-        discountType: body.discountType,
-        discountValue: body.discountValue,
-      });
+      setPromo({ code: code.trim().toUpperCase(), discountMinor: Number(body.discountMinor) || 0 });
     } catch (e) {
       setPromoError(e instanceof Error ? e.message : "That code did not work.");
     } finally {
@@ -111,7 +102,7 @@ export function ActivationCard({
         amount: order.amount,
         currency: order.currency,
         name: "Findtern",
-        description: "Profile activation — AI interview and Findtern Score",
+        description: "Profile activation - AI interview and Findtern Score",
         prefill,
         theme: { color: RAZORPAY_THEME_COLOR },
         modal: { ondismiss: () => setState("idle") },
@@ -179,7 +170,7 @@ export function ActivationCard({
           Your profile is live
         </h2>
         <p className="mt-1 text-sm leading-relaxed text-brand-800">
-          Payment confirmed. The AI interview is the next step — it produces the Findtern Score
+          Payment confirmed. The AI interview is the next step - it produces the Findtern Score
           companies shortlist on.
         </p>
         <AiInterviewButton internId={internId} />
@@ -190,7 +181,7 @@ export function ActivationCard({
   return (
     <section className="rounded-xl border border-ink-100 bg-white p-6">
       <div className="flex items-start gap-3">
-        <span className="mt-0.5 inline-flex size-9 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-700">
+        <span className="mt-0.5 inline-flex size-9 shrink-0 items-center justify-center rounded-[10px] bg-brand-50 text-brand-700">
           <Sparkles className="size-4" aria-hidden />
         </span>
         <div className="min-w-0">
@@ -198,8 +189,8 @@ export function ActivationCard({
             Take your profile live
           </h2>
           <p className="mt-1 text-pretty text-sm leading-relaxed text-ink-600">
-            One payment of {formatMoney(BASE_MINOR, "INR")} covers the AI interview and your
-            Findtern Score — the two things companies shortlist on. No subscription, nothing
+            One payment of {formatMoney(feeMinor, "INR")} covers the AI interview and your
+            Findtern Score - the two things companies shortlist on. No subscription, nothing
             recurring.
           </p>
         </div>
@@ -216,13 +207,13 @@ export function ActivationCard({
           }}
           placeholder="Promo code (optional)"
           autoComplete="off"
-          className="h-10 min-w-0 flex-1 rounded-lg border border-ink-200 bg-white px-3 text-sm text-ink-900 placeholder:text-ink-400 focus:border-brand-500 focus:outline-none"
+          className="apple-spring h-10 min-w-0 flex-1 rounded-[10px] border border-ink-200 bg-white px-3 text-[14px] text-ink-900 placeholder:text-ink-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
         />
         <button
           type="button"
           onClick={applyCode}
           disabled={checking || !code.trim()}
-          className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-lg border border-ink-200 bg-white px-4 text-sm font-medium text-ink-800 transition-colors hover:bg-ink-50 disabled:cursor-not-allowed disabled:opacity-60"
+          className="apple-spring apple-pressable inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-[10px] border border-ink-200 bg-white px-4 text-[14px] font-medium text-ink-800 hover:bg-ink-50 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {checking ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
           Apply
@@ -234,10 +225,10 @@ export function ActivationCard({
       ) : null}
 
       {promo ? (
-        <dl className="mt-3 space-y-1.5 rounded-lg bg-ink-50 p-3 text-sm">
+        <dl className="mt-3 space-y-1.5 rounded-[10px] bg-ink-50 p-3 text-sm">
           <div className="flex items-baseline justify-between">
             <dt className="text-ink-500">Activation</dt>
-            <dd className="tabular-nums text-ink-800">{formatMoney(BASE_MINOR, "INR")}</dd>
+            <dd className="tabular-nums text-ink-800">{formatMoney(feeMinor, "INR")}</dd>
           </div>
           <div className="flex items-baseline justify-between">
             <dt className="text-ink-500">Code {promo.code}</dt>
@@ -256,7 +247,7 @@ export function ActivationCard({
         type="button"
         onClick={pay}
         disabled={state === "busy"}
-        className="mt-4 inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-brand-700 text-sm font-semibold text-white transition-colors hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-60"
+        className="apple-spring apple-pressable mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[10px] bg-brand-700 text-sm font-semibold text-white hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-60"
       >
         {state === "busy" ? (
           <Loader2 className="size-4 animate-spin" aria-hidden />
@@ -269,7 +260,7 @@ export function ActivationCard({
       {error ? (
         <p className="mt-2 text-pretty text-xs leading-relaxed text-danger">{error}</p>
       ) : (
-        <p className="mt-2 text-2xs leading-relaxed text-text-subtle">
+        <p className="mt-2 text-xs leading-relaxed text-text-subtle">
           Razorpay handles the card details; this site never sees them. The amount is recomputed
           on the server, so a promo edited in the browser cannot change what you are charged.
         </p>
@@ -284,7 +275,7 @@ export function ActivationCard({
  *
  * One click, one POST. The queue is real and the link arrives in the candidate's
  * notifications, so the button reports the truth rather than pretending the
- * interview is scheduled — it is requested, not booked, and the copy says so.
+ * interview is scheduled - it is requested, not booked, and the copy says so.
  */
 function AiInterviewButton({ internId }: { internId: string }) {
   const router = useRouter();
@@ -340,7 +331,7 @@ function AiInterviewButton({ internId }: { internId: string }) {
 
   if (status === "applied" || status === "in-flight") {
     return (
-      <p className="mt-4 inline-flex items-start gap-2 rounded-lg bg-white/70 px-3.5 py-3 text-sm leading-relaxed text-brand-900">
+      <p className="mt-4 inline-flex items-start gap-2 rounded-[10px] bg-white/70 px-3.5 py-3 text-sm leading-relaxed text-brand-900">
         <CalendarCheck className="mt-0.5 size-4 shrink-0" aria-hidden />
         {message}
       </p>
@@ -353,7 +344,7 @@ function AiInterviewButton({ internId }: { internId: string }) {
         type="button"
         onClick={apply}
         disabled={status === "busy"}
-        className="inline-flex h-10 items-center gap-2 rounded-lg bg-brand-700 px-5 text-sm font-semibold text-white transition-colors hover:bg-brand-600 disabled:opacity-60"
+        className="apple-spring apple-pressable inline-flex min-h-11 items-center gap-2 rounded-[10px] bg-brand-700 px-5 text-sm font-semibold text-white hover:bg-brand-600 disabled:opacity-60"
       >
         {status === "busy" ? (
           <Loader2 className="size-4 animate-spin" aria-hidden />

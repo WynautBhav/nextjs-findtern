@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { count, eq } from "drizzle-orm";
 import { AdminShell } from "@/components/admin/admin-shell";
 import type { NavGroup } from "@/components/admin/admin-nav";
+import { allows, requiredPermissions } from "@/lib/admin/permissions";
 import { getSession } from "@/lib/auth";
 import { getDb, schema } from "@/lib/db";
 
@@ -26,6 +27,7 @@ const NAV: NavGroup[] = [
     label: "People",
     items: [
       { href: "/admin/interns", label: "Candidate Directory" },
+      { href: "/admin/users", label: "Registered Users" },
       { href: "/admin/interns/terms", label: "Intern Terms" },
       { href: "/admin/interns/non-disclosure", label: "Intern NDA" },
       { href: "/admin/companies", label: "Hiring Partners" },
@@ -51,10 +53,13 @@ const NAV: NavGroup[] = [
     ],
   },
   {
-    label: "Content",
+    label: "Content & System",
     items: [
       { href: "/admin/cms", label: "Website Content" },
+      { href: "/admin/cms/terms", label: "Platform Terms" },
       { href: "/admin/notifications", label: "Send Notification" },
+      { href: "/admin/settings", label: "Pricing & Fees" },
+      { href: "/admin/account", label: "Your account" },
     ],
   },
 ];
@@ -62,6 +67,12 @@ const NAV: NavGroup[] = [
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const session = await getSession();
   if (!session || session.role !== "admin") redirect("/admin/login");
+
+  // Only links this role can open.
+  const groups = NAV.map((g) => ({
+    ...g,
+    items: g.items.filter((i) => allows(session.permissions, requiredPermissions(i.href))),
+  })).filter((g) => g.items.length > 0);
 
   let unreadMessages = 0;
   try {
@@ -74,7 +85,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   } catch {}
 
   return (
-    <AdminShell groups={NAV} email={session.email} role={session.role} unreadCount={unreadMessages}>
+    <AdminShell groups={groups} email={session.email} role={session.role} unreadCount={unreadMessages}>
       {children}
     </AdminShell>
   );

@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -6,11 +6,15 @@ import { getDb, schema } from "@/lib/db";
 import { hashPassword, isStrongPassword } from "@/lib/security/password";
 import { withSession, issueCsrfCookie } from "@/lib/auth";
 import { limiters, bucketKey, clientIp } from "@/lib/security/rate-limit";
+import { isPersonalEmail } from "@/lib/employer-onboarding";
+import { normalizePhone, phoneError } from "@/lib/phone";
+import { hasVerifiedSignupOtp } from "@/lib/signup-otp";
 
 const bodySchema = z.object({
   name: z.string().min(2),
   companyName: z.string().min(2),
   companyEmail: z.string().trim().toLowerCase().email(),
+  countryCode: z.string().trim().default("+91"),
   phoneNumber: z.string().min(6),
   password: z.string().min(8),
   agreedToTerms: z.literal(true),
@@ -26,10 +30,25 @@ export async function POST(req: Request) {
   if (!isStrongPassword(parsed.data.password)) {
     return NextResponse.json({ error: "Weak password" }, { status: 400 });
   }
+  if (isPersonalEmail(parsed.data.companyEmail)) {
+    return NextResponse.json({ error: "Use your company email address" }, { status: 400 });
+  }
+  const phoneProblem = phoneError(parsed.data.countryCode, parsed.data.phoneNumber);
+  if (phoneProblem) return NextResponse.json({ error: phoneProblem }, { status: 400 });
+  if (!(await hasVerifiedSignupOtp("employer", parsed.data.companyEmail))) {
+    return NextResponse.json({ error: "Verify your email before creating the account" }, { status: 400 });
+  }
 
   const db = getDb();
   const [existing] = await db.select().from(schema.employers).where(eq(schema.employers.companyEmail, parsed.data.companyEmail)).limit(1);
   if (existing) return NextResponse.json({ error: "Email already registered" }, { status: 409 });
+  const phoneNumber = normalizePhone(parsed.data.phoneNumber);
+  const [phoneOwner] = await db
+    .select({ id: schema.employers.id })
+    .from(schema.employers)
+    .where(and(eq(schema.employers.countryCode, parsed.data.countryCode), eq(schema.employers.phoneNumber, phoneNumber)))
+    .limit(1);
+  if (phoneOwner) return NextResponse.json({ error: "Phone number already registered" }, { status: 409 });
 
   const password = await hashPassword(parsed.data.password);
   const [employer] = await db
@@ -38,7 +57,8 @@ export async function POST(req: Request) {
       name: parsed.data.name,
       companyName: parsed.data.companyName,
       companyEmail: parsed.data.companyEmail,
-      phoneNumber: parsed.data.phoneNumber,
+      countryCode: parsed.data.countryCode,
+      phoneNumber,
       password,
       agreedToTerms: true,
       emailVerified: true,

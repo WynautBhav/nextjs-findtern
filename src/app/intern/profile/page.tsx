@@ -5,10 +5,11 @@ import { ArrowRight } from "lucide-react";
 import { PageHead, SectionHead, Surface, WaitingNote } from "@/components/app/primitives";
 import { ReadinessMeter } from "@/components/app/readiness";
 import { ProfileCard } from "@/components/app/profile-card";
-import { getSession } from "@/lib/auth";
+import { requireRole } from "@/lib/auth";
 import { getDb, schema } from "@/lib/db";
 import { eq } from "drizzle-orm";
 import { loadInternData } from "@/lib/intern-data";
+import { draftFromRecord } from "@/lib/onboarding";
 
 export const metadata: Metadata = {
   title: "Your profile",
@@ -25,8 +26,7 @@ export const metadata: Metadata = {
  * the page renders.
  */
 export default async function InternProfile() {
-  const session = await getSession();
-  if (!session) return null;
+  const session = await requireRole("intern");
 
   const data = await loadInternData(session.uid);
   const [user] = await getDb()
@@ -37,9 +37,8 @@ export default async function InternProfile() {
 
   const name = `${user?.first ?? ""} ${user?.last ?? ""}`.trim() || "Candidate";
   const initials = `${(user?.first ?? "").charAt(0)}${(user?.last ?? "").charAt(0)}`.toUpperCase() || "?";
-  const academics = (data.onboarding?.extraData as Record<string, unknown> | null)?.academics as
-    | Record<string, unknown>
-    | undefined;
+  const draft = data.onboarding ? draftFromRecord(data.onboarding) : null;
+  const academics = draft?.academics;
 
   return (
     <div>
@@ -49,7 +48,7 @@ export default async function InternProfile() {
         action={
           <Link
             href="/intern/onboarding"
-            className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-primary px-5 text-sm font-semibold text-white shadow-sm transition-[background-color,transform] duration-[var(--dur-instant)] hover:bg-primary-hover active:scale-[0.98]"
+            className="apple-spring apple-pressable inline-flex min-h-11 items-center gap-2 rounded-[10px] bg-primary px-5 text-sm font-semibold text-white shadow-sm hover:bg-primary-hover"
           >
             Edit profile
             <ArrowRight className="size-4" aria-hidden />
@@ -67,11 +66,11 @@ export default async function InternProfile() {
             city={data.onboarding?.city}
             state={data.onboarding?.state}
             bio={data.onboarding?.bio}
-            skills={Array.isArray(data.onboarding?.skills) ? (data.onboarding.skills as string[]) : []}
-            degree={typeof academics?.degree === "string" ? academics.degree : null}
-            institution={typeof academics?.institution === "string" ? academics.institution : null}
-            yearOfGraduation={typeof academics?.yearOfGraduation === "string" ? academics.yearOfGraduation : null}
-            cgpa={typeof academics?.cgpa === "string" ? academics.cgpa : null}
+            skills={draft?.skills ?? []}
+            degree={academics?.degree || null}
+            institution={academics?.institution || null}
+            yearOfGraduation={academics?.yearOfGraduation || null}
+            cgpa={academics?.cgpa || null}
           />
 
           {data.onboarding?.bio ? (
@@ -88,7 +87,7 @@ export default async function InternProfile() {
                 href={data.onboarding.linkedinUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="text-sm font-medium text-primary underline-offset-4 hover:underline"
+                className="apple-spring apple-pressable inline-flex min-h-11 items-center text-sm font-medium text-primary underline-offset-4 hover:underline"
               >
                 {data.onboarding.linkedinUrl}
               </a>
@@ -102,7 +101,7 @@ export default async function InternProfile() {
             <WaitingNote who="Your record" typical="Dated, named, and exportable." />
             <Link
               href="/intern/record"
-              className="mt-3 inline-flex min-h-9 items-center gap-1 text-sm font-medium text-primary underline-offset-4 hover:underline"
+              className="apple-spring apple-pressable mt-3 inline-flex min-h-11 items-center gap-1 text-sm font-medium text-primary underline-offset-4 hover:underline"
             >
               Open your record
               <ArrowRight className="size-3.5" aria-hidden />

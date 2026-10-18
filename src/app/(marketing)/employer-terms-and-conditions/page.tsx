@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { LegalDocument } from "@/components/marketing/legal-document";
-import { EMPLOYER_TERMS } from "@/lib/content/legal";
+import { getEmployerTerms } from "@/lib/content";
 
 export const metadata: Metadata = {
   title: "Company Terms and Conditions",
@@ -9,12 +9,13 @@ export const metadata: Metadata = {
   alternates: { canonical: "/employer-terms-and-conditions" },
 };
 
-export default function EmployerTermsPage() {
+export default async function EmployerTermsPage() {
+  const doc = await getEmployerTerms();
   return (
     <LegalDocument
-      title={EMPLOYER_TERMS.title}
-      html={EMPLOYER_TERMS.html}
-      updated={EMPLOYER_TERMS.updated}
+      title={doc.title}
+      html={doc.html}
+      updated={doc.updated}
       backHref="/employers"
       backLabel="For employers"
     />

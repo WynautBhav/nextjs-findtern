@@ -13,17 +13,21 @@ import {
 } from "lucide-react";
 
 import { getDb, schema } from "@/lib/db";
-import { getSession } from "@/lib/auth";
+import { requireRole } from "@/lib/auth";
 import { bandFor } from "@/lib/score";
 import { formatRate } from "@/lib/format";
 import {
   RATING_META,
+  displayNameOf,
   toCandidateProfile,
   type CandidateProfile,
 } from "@/lib/employer-candidates";
-import { resolvePricing } from "@/lib/employer-pricing";
+import { hiredInternIds } from "@/lib/employer-visibility";
+import { employerRegion, resolvePricing } from "@/lib/employer-pricing";
 import { ShortlistToggle } from "@/components/employer/shortlist-toggle";
 import { PageHeader, EmptyState } from "@/components/layout/page-header";
+import { ButtonLink } from "@/components/ui/button";
+import { Pill } from "@/components/app/primitives";
 
 export const metadata: Metadata = {
   title: "Compare candidates",
@@ -37,7 +41,7 @@ export default async function CompareCandidates({
 }: {
   searchParams: Promise<{ ids?: string | string[]; project?: string | string[] }>;
 }) {
-  const session = await getSession();
+  const session = await requireRole("employer");
   const { ids: idsParam, project: projectParamRaw } = await searchParams;
   const raw = Array.isArray(idsParam) ? idsParam.join(",") : (idsParam ?? "");
   const projectParam = Array.isArray(projectParamRaw) ? projectParamRaw[0] : projectParamRaw;
@@ -56,10 +60,17 @@ export default async function CompareCandidates({
   let projects: { id: string; projectName: string; skills: unknown }[] = [];
   let activeProject: { id: string; projectName: string; skills: unknown } | null = null;
   let shortlisted = new Set<string>();
+  let nameUnlocked = new Set<string>();
 
-  if (session?.uid) {
+  if (session.uid) {
     try {
       const db = getDb();
+
+      try {
+        nameUnlocked = await hiredInternIds(db, session.uid);
+      } catch {
+        nameUnlocked = new Set<string>();
+      }
 
       // Fetch projects for project requirements comparison
       projects = await db
@@ -115,11 +126,15 @@ export default async function CompareCandidates({
           .map((row) => toCandidateProfile(row, onboardingByUser.get(row.id)));
 
         const [employer] = await db
-          .select({ phoneNumber: schema.employers.phoneNumber })
+          .select({
+            country: schema.employers.country,
+            countryCode: schema.employers.countryCode,
+            phoneNumber: schema.employers.phoneNumber,
+          })
           .from(schema.employers)
           .where(eq(schema.employers.id, session.uid))
           .limit(1);
-        currency = employer?.phoneNumber?.startsWith("91") ? "INR" : "USD";
+        currency = employerRegion(employer ?? {}) === "IN" ? "INR" : "USD";
       }
     } catch {
       // DB fallback
@@ -132,15 +147,10 @@ export default async function CompareCandidates({
         <PageHeader title="Compare candidates" subtitle="Put up to four side by side." />
         <EmptyState
           title="Nothing to compare yet"
-          body="Tick Compare on rows in the candidate browser and the selection arrives here as ?ids=…, so this page is shareable."
+          body="Tick Compare on candidates in the candidate browser to see them side by side here."
+          action={{ label: "Browse candidates", href: "/employer/candidates" }}
+          who="You - pick at least two"
         />
-        <Link
-          href="/employer/candidates"
-          className="inline-flex h-11 items-center gap-2 rounded-xl bg-brand-700 px-5 text-sm font-semibold text-white shadow-2xs transition-colors hover:bg-brand-600"
-        >
-          <ArrowLeft className="size-4" aria-hidden />
-          Browse candidates
-        </Link>
       </div>
     );
   }
@@ -159,13 +169,15 @@ export default async function CompareCandidates({
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <Link
+        <ButtonLink
           href="/employer/candidates"
-          className="inline-flex items-center gap-1.5 text-sm font-medium text-brand-700 transition-colors hover:underline"
+          variant="link"
+          size="sm"
+          className="min-h-11 px-0 text-sm font-medium"
         >
           <ArrowLeft className="size-4" aria-hidden />
           Back to candidates
-        </Link>
+        </ButtonLink>
 
         {/* Project Selector Form */}
         {projects.length > 0 ? (
@@ -179,7 +191,7 @@ export default async function CompareCandidates({
               name="project"
               defaultValue={activeProject?.id ?? ""}
               aria-label="Benchmark project"
-              className="h-9 rounded-lg border border-ink-200 bg-white px-3 text-xs font-medium text-ink-800 shadow-2xs outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
+              className="apple-spring min-h-11 rounded-[10px] border border-ink-200 bg-white px-3 text-[14px] font-medium text-ink-800 shadow-2xs outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
             >
               {projects.map((p) => (
                 <option key={p.id} value={p.id}>
@@ -189,7 +201,7 @@ export default async function CompareCandidates({
             </select>
             <button
               type="submit"
-              className="inline-flex h-9 items-center rounded-lg bg-ink-100 px-3 text-xs font-semibold text-ink-800 transition-colors hover:bg-ink-200"
+              className="apple-spring apple-pressable inline-flex min-h-11 items-center justify-center rounded-[10px] bg-ink-100 px-3 text-[13px] font-semibold text-ink-800 hover:bg-ink-200"
             >
               Apply
             </button>
@@ -203,7 +215,7 @@ export default async function CompareCandidates({
       />
 
       {/* Compare Table */}
-      <div className="overflow-x-auto rounded-2xl border border-ink-100 bg-white shadow-2xs">
+      <div className="overflow-x-auto rounded-[20px] border border-ink-200/70 bg-white shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)]">
         <table className="w-full min-w-[46rem] border-separate border-spacing-0 text-left">
           <caption className="sr-only">
             Candidate attributes compared side by side, with the highest value marked in each row.
@@ -227,7 +239,7 @@ export default async function CompareCandidates({
                       <div className="flex items-start gap-3">
                         <span
                           aria-hidden
-                          className="grid size-11 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-brand-950 via-brand-900 to-teal-950 font-bold text-white shadow-2xs text-sm ring-1 ring-white/10"
+                          className="grid size-11 shrink-0 place-items-center rounded-[10px] bg-brand-100 font-bold text-brand-700 text-sm"
                         >
                           {candidate.initials}
                         </span>
@@ -236,7 +248,7 @@ export default async function CompareCandidates({
                             href={`/employer/intern/${encodeURIComponent(candidate.id)}`}
                             className="font-semibold text-ink-900 underline-offset-4 hover:underline text-sm block truncate"
                           >
-                            {candidate.fullName}
+                            {displayNameOf(candidate, nameUnlocked.has(candidate.id))}
                           </Link>
                           <p className="mt-0.5 text-xs text-text-subtle truncate">
                             {candidate.location || "Location not stated"}
@@ -250,21 +262,24 @@ export default async function CompareCandidates({
                       <Link
                         href={removeCandidateHref(candidate.id)}
                         title="Remove from comparison"
-                        className="rounded-md p-1 text-ink-400 transition-colors hover:bg-ink-100 hover:text-ink-700"
+                        aria-label="Remove from comparison"
+                        className="apple-spring apple-pressable inline-flex min-h-11 min-w-11 items-center justify-center rounded-[10px] text-ink-400 hover:bg-ink-100 hover:text-ink-700"
                       >
                         <X className="size-4" />
                       </Link>
                     </div>
 
                     {/* Quick Action Buttons in Column Header */}
-                    <div className="mt-4 flex flex-wrap items-center gap-2">
-                      <Link
+                    <div className="mt-4 flex min-w-0 flex-wrap items-center gap-2">
+                      <ButtonLink
                         href={`/employer/send-proposal?intern=${encodeURIComponent(candidate.id)}`}
-                        className="inline-flex h-8 items-center gap-1 rounded-lg bg-brand-700 px-3 text-xs font-semibold text-white shadow-xs transition-colors hover:bg-brand-600"
+                        variant="primary"
+                        size="sm"
+                        className="min-h-11 px-3 text-[13px] font-semibold"
                       >
-                        <Send className="size-3" />
-                        <span>Proposal</span>
-                      </Link>
+                        <Send className="size-3" aria-hidden />
+                        <span>Send proposal</span>
+                      </ButtonLink>
                       {activeProject ? (
                         <ShortlistToggle
                           internId={candidate.id}
@@ -306,9 +321,7 @@ export default async function CompareCandidates({
                 const band = bandFor(candidate.score);
                 return (
                   <Cell key={candidate.id}>
-                    <span className="inline-flex items-center rounded-full bg-brand-50 px-2.5 py-0.5 text-2xs font-semibold text-brand-700 border border-brand-200/50">
-                      {band.name}
-                    </span>
+                    <Pill tone="live">{band.name}</Pill>
                     <span className="mt-1 block text-xs text-text-subtle leading-relaxed">
                       {band.blurb}
                     </span>
@@ -357,7 +370,7 @@ export default async function CompareCandidates({
                   {candidate.workModes.length > 0 ? (
                     <span className="capitalize">{candidate.workModes.join(", ")}</span>
                   ) : (
-                    "—"
+                    "-"
                   )}
                 </Cell>
               ))}
@@ -368,7 +381,7 @@ export default async function CompareCandidates({
                 <Cell key={candidate.id}>
                   {candidate.preferredLocations.length > 0
                     ? candidate.preferredLocations.join(", ")
-                    : "—"}
+                    : "-"}
                 </Cell>
               ))}
             </Row>
@@ -389,12 +402,12 @@ export default async function CompareCandidates({
               {candidates.map((candidate) => (
                 <Cell key={candidate.id}>
                   <p className="font-semibold text-ink-900">
-                    {candidate.academics?.institution || "—"}
+                    {candidate.academics?.institution || "-"}
                   </p>
                   <p className="mt-0.5 text-xs text-text-subtle">
                     {[candidate.academics?.degree, candidate.academics?.specialization]
                       .filter(Boolean)
-                      .join(" - ") || "—"}
+                      .join(" - ") || "-"}
                   </p>
                   {candidate.academics?.score ? (
                     <p className="mt-1 text-xs tabular-nums text-ink-700">
@@ -410,6 +423,7 @@ export default async function CompareCandidates({
             <Row label="Profile Last Updated">
               {candidates.map((candidate) => (
                 <Cell key={candidate.id}>
+                  <span className="tabular-nums">
                   {candidate.updatedAt
                     ? new Date(candidate.updatedAt).toLocaleDateString("en-IN", {
                         day: "numeric",
@@ -417,6 +431,7 @@ export default async function CompareCandidates({
                         year: "numeric",
                       })
                     : "Never"}
+                  </span>
                 </Cell>
               ))}
             </Row>
@@ -424,7 +439,7 @@ export default async function CompareCandidates({
         </table>
       </div>
 
-      <p className="flex items-start gap-2 rounded-xl border border-ink-100 bg-ink-50 px-4 py-3 text-xs leading-relaxed text-ink-600">
+      <p className="flex items-start gap-2 rounded-[10px] border border-ink-100 bg-ink-50 px-4 py-3 text-xs leading-relaxed tabular-nums text-ink-600">
         <Scale className="mt-0.5 size-3.5 shrink-0 text-ink-400" aria-hidden />
         <span>
           Candidates ranked with verified Findtern scoring benchmarks. Benchmark rates reflect standard platform tiers; custom proposals may be negotiated per project scope.
@@ -492,7 +507,7 @@ function NumericRow({
         return (
           <td
             key={candidate.id}
-            className={`p-4 align-top transition-colors border-r border-ink-100/60 last:border-r-0 ${
+            className={`p-4 align-top apple-spring border-r border-ink-100/60 last:border-r-0 ${
               leader ? "bg-emerald-50/30" : ""
             }`}
           >
@@ -507,9 +522,9 @@ function NumericRow({
                 {format(value, candidate)}
               </span>
               {leader ? (
-                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-3xs font-semibold text-emerald-700 ring-1 ring-emerald-600/20">
-                  <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  Top
+                <span className="inline-flex items-center gap-1.5 text-xs font-semibold tabular-nums text-emerald-700">
+                  <span className="size-1.5 rounded-full bg-emerald-500" aria-hidden />
+                  Top score
                 </span>
               ) : null}
             </div>
@@ -552,7 +567,7 @@ function ProjectRequirementRow({
           <Briefcase className="size-3.5 text-brand-600 shrink-0" />
           <span>Project Fit</span>
         </span>
-        <span className="mt-1 block text-2xs font-normal text-brand-700">
+        <span className="mt-1 block text-xs font-normal text-brand-700">
           {project.projectName} ({requiredSkills.length} required)
         </span>
       </th>
@@ -565,13 +580,13 @@ function ProjectRequirementRow({
               <span className="text-sm font-bold tabular-nums text-brand-800">
                 {pct}% Match
               </span>
-              <span className="text-2xs font-medium text-text-subtle">
+              <span className="text-xs font-medium tabular-nums text-text-subtle">
                 {matched.length}/{requiredSkills.length} skills
               </span>
             </div>
             <div className="mt-1.5 h-2 w-full rounded-full bg-ink-200 overflow-hidden">
               <div
-                className="h-full rounded-full bg-brand-600 transition-all"
+                className="apple-spring h-full rounded-full bg-brand-600"
                 style={{ width: `${pct}%` }}
               />
             </div>
@@ -580,7 +595,7 @@ function ProjectRequirementRow({
                 {matched.map((skill) => (
                   <li
                     key={skill}
-                    className="rounded-xs bg-brand-100/80 px-1.5 py-0.5 text-3xs font-medium text-brand-800 border border-brand-200/60"
+                    className="rounded-xs bg-brand-100/80 px-1.5 py-0.5 text-xs font-medium tabular-nums text-brand-800 border border-brand-200/60"
                   >
                     ✓ {skill}
                   </li>
@@ -588,7 +603,7 @@ function ProjectRequirementRow({
               </ul>
             ) : null}
             {isBest ? (
-              <span className="mt-1.5 inline-block text-2xs font-semibold text-brand-700">
+              <span className="mt-1.5 inline-block text-xs font-semibold text-brand-700">
                 Best Project Match
               </span>
             ) : null}
@@ -618,7 +633,7 @@ function SkillsMatrix({ candidates }: { candidates: CandidateProfile[] }) {
           Skills
         </th>
         {candidates.map((candidate) => (
-          <Cell key={candidate.id}>—</Cell>
+          <Cell key={candidate.id}>-</Cell>
         ))}
       </tr>
     );
@@ -640,7 +655,7 @@ function SkillsMatrix({ candidates }: { candidates: CandidateProfile[] }) {
         className="sticky left-0 z-10 bg-white/95 backdrop-blur-xs p-4 text-left align-top text-xs font-semibold text-ink-700 border-r border-ink-100"
       >
         <span>All Skills Coverage</span>
-        <span className="mt-1 block text-2xs font-normal text-ink-400">
+        <span className="mt-1 block text-xs font-normal tabular-nums text-ink-400">
           {vocabulary.length} combined
         </span>
       </th>
@@ -673,9 +688,9 @@ function SkillsMatrix({ candidates }: { candidates: CandidateProfile[] }) {
                 );
               })}
             </ul>
-            <span className="mt-2 block text-2xs text-text-subtle">
+            <span className="mt-2 block text-xs tabular-nums text-text-subtle">
               {count} of {vocabulary.length}
-              {leader ? " — widest coverage" : ""}
+              {leader ? " - widest coverage" : ""}
             </span>
           </td>
         );

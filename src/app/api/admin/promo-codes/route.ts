@@ -1,18 +1,20 @@
+import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
+import { DUPLICATE_CODE, isUniqueViolation } from "@/lib/promo";
 
 const bodySchema = z.object({
   code: z.string().min(2),
-  description: z.string().optional(),
+  description: z.string().nullish(),
   discountType: z.enum(["percentage", "fixed"]),
   discountValue: z.number().int().positive(),
-  maxUsages: z.number().int().optional(),
-  minOrderAmountMinor: z.number().int().optional(),
-  validFrom: z.string().datetime().optional(),
-  validUntil: z.string().datetime().optional(),
+  maxUsages: z.number().int().nullish(),
+  minOrderAmountMinor: z.number().int().nullish(),
+  validFrom: z.string().datetime().nullish(),
+  validUntil: z.string().datetime().nullish(),
   isActive: z.boolean().default(true),
 });
 
@@ -24,11 +26,21 @@ export async function POST(req: Request) {
   if (!parsed.success) return NextResponse.json({ error: "Invalid input" }, { status: 400 });
 
   const db = getDb();
-  const [promo] = await db.insert(schema.promoCodes).values({
-    ...parsed.data,
-    code: parsed.data.code.toUpperCase(),
-    validFrom: parsed.data.validFrom ? new Date(parsed.data.validFrom) : null,
-    validUntil: parsed.data.validUntil ? new Date(parsed.data.validUntil) : null,
-  }).returning();
-  return NextResponse.json({ promo }, { status: 201 });
+  const code = parsed.data.code.trim().toUpperCase();
+  const [clash] = await db.select({ id: schema.promoCodes.id }).from(schema.promoCodes).where(eq(schema.promoCodes.code, code)).limit(1);
+  if (clash) return NextResponse.json({ error: DUPLICATE_CODE }, { status: 409 });
+
+  try {
+    const [promo] = await db.insert(schema.promoCodes).values({
+      ...parsed.data,
+      code,
+      validFrom: parsed.data.validFrom ? new Date(parsed.data.validFrom) : null,
+      validUntil: parsed.data.validUntil ? new Date(parsed.data.validUntil) : null,
+    }).returning();
+    return NextResponse.json({ promo }, { status: 201 });
+  } catch (e) {
+    // Two creates racing past the check above.
+    if (isUniqueViolation(e)) return NextResponse.json({ error: DUPLICATE_CODE }, { status: 409 });
+    throw e;
+  }
 }

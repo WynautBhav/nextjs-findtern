@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 
 import { EmptyScene, PageHead } from "@/components/app/primitives";
 import { RoleCard } from "@/components/marketing/role-card";
-import { getSession } from "@/lib/auth";
+import { requireRole } from "@/lib/auth";
 import { loadInternData, openProjects } from "@/lib/intern-data";
 
 export const metadata: Metadata = {
@@ -24,8 +24,7 @@ export const metadata: Metadata = {
  * offer than the same role posted yesterday.
  */
 export default async function InternOpportunities() {
-  const session = await getSession();
-  if (!session) return null;
+  const session = await requireRole("intern");
 
   const data = await loadInternData(session.uid);
   const rows = await openProjects();

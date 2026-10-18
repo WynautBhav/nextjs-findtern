@@ -1,25 +1,27 @@
 import { NextResponse } from "next/server";
-import { google } from "googleapis";
+
+import { isHttps } from "@/lib/auth";
+import { googleAuthUrl, googleConfig, NONCE_COOKIE, safeNext } from "@/lib/google";
 
 export async function GET(req: Request) {
   const url = new URL(req.url);
   const role = url.searchParams.get("role") === "employer" ? "employer" : "intern";
-  const next = url.searchParams.get("next") ?? "";
+  const next = safeNext(url.searchParams.get("next"), "");
 
-  const clientId = process.env.GOOGLE_CLIENT_ID;
-  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-  const redirectUri = process.env.GOOGLE_OAUTH_REDIRECT_URI ?? "http://localhost:3100/api/auth/google/callback";
-  if (!clientId || !clientSecret) {
-    return NextResponse.json({ error: "Google OAuth not configured" }, { status: 503 });
-  }
+  const cfg = googleConfig();
+  if (!cfg) return NextResponse.json({ error: "Google sign-in is not configured" }, { status: 503 });
 
-  const oauth2 = new google.auth.OAuth2(clientId, clientSecret, redirectUri);
-  const state = Buffer.from(JSON.stringify({ role, next, nonce: crypto.randomUUID() })).toString("base64url");
-  const authUrl = oauth2.generateAuthUrl({
-    access_type: "offline",
-    scope: ["openid", "email", "profile"],
-    state,
-    prompt: "consent",
+  // The nonce rides in the state and in an httpOnly cookie; the callback
+  // requires both to match, so a login can't be started from another site.
+  const nonce = crypto.randomUUID();
+  const state = Buffer.from(JSON.stringify({ role, next, nonce })).toString("base64url");
+  const res = NextResponse.redirect(googleAuthUrl(cfg, state));
+  res.cookies.set(NONCE_COOKIE, nonce, {
+    httpOnly: true,
+    secure: await isHttps(),
+    sameSite: "lax",
+    path: "/api/auth/google",
+    maxAge: 600,
   });
-  return NextResponse.redirect(authUrl);
+  return res;
 }

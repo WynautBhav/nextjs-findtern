@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { count, desc, eq, sql, type SQL } from "drizzle-orm";
 import { Download } from "lucide-react";
+import { RatingsImport } from "@/components/admin/ratings-import";
 
 import { getDb, schema } from "@/lib/db";
 import { formatDate } from "@/lib/format";
@@ -24,7 +25,7 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 /**
- * Intern management — the screen an admin actually lives in.
+ * Intern management - the screen an admin actually lives in.
  *
  * Carries more surface than any other admin page: search across four fields,
  * three facets, a profile-completeness signal, admin-controlled directory
@@ -32,8 +33,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
  *
  * **Architecture note.** The table body is a server component; only the
  * checkboxes and the action bar are client components, wired together by
- * `BulkSelectProvider`. The obvious alternative — a client table taking a
- * `columns` array of render functions — cannot work here: React refuses to
+ * `BulkSelectProvider`. The obvious alternative - a client table taking a
+ * `columns` array of render functions - cannot work here: React refuses to
  * serialise a function across the server/client boundary. See bulk-select.tsx.
  */
 
@@ -187,7 +188,7 @@ export default async function AdminInterns({
   ]);
 
   // Dates cross into the client boundary for `SelectAllCheckbox`, which receives
-  // the id list — the ids are strings, and the rows stay on the server.
+  // the id list - the ids are strings, and the rows stay on the server.
   const rows: InternRow[] = rawRows.map((row) => ({
     ...row,
     createdAt: row.createdAt?.toISOString() ?? "",
@@ -202,13 +203,16 @@ export default async function AdminInterns({
         title="Interns"
         subtitle="Every registered intern, their profile state, and directory visibility."
         action={
+          <div className="flex flex-wrap items-center gap-2">
+          <RatingsImport />
           <a
             href={exportHref}
-            className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-ink-200 bg-white px-3.5 text-sm font-medium text-ink-700 transition-colors hover:bg-ink-50"
+            className="apple-spring apple-pressable inline-flex min-h-11 cursor-pointer items-center gap-1.5 rounded-[10px] border border-ink-200 bg-white px-3.5 text-[14px] font-medium text-ink-700 hover:bg-ink-50"
           >
             <Download className="size-4" aria-hidden />
             Export CSV
           </a>
+          </div>
         }
       />
 
@@ -240,49 +244,40 @@ export default async function AdminInterns({
             ) : (
               <>
                 <Table>
-                  <TableHeader className="sticky top-0 z-10 bg-ink-50/95 backdrop-blur-sm">
+                  <TableHeader className="apple-material-bar sticky top-0 z-10">
                     <TableRow className="group/row hover:bg-transparent">
-                      <TableHead scope="col" className="w-10 px-3 py-2">
+                      <TableHead scope="col" className="w-10 px-3 py-3">
                         <SelectAllCheckbox
                           ids={rows.map((row) => row.id)}
                           noun="interns"
                         />
                       </TableHead>
-                      <TableHead scope="col" className="px-3 text-xs font-semibold tracking-wide text-ink-600 uppercase">
-                        Intern
-                      </TableHead>
-                      <TableHead scope="col" className="px-3 text-xs font-semibold tracking-wide text-ink-600 uppercase">
-                        Contact
+                      <TableHead scope="col" className="px-3 py-3 text-[12px] font-semibold tracking-[0.02em] text-ink-600 capitalize">
+                        Candidate
                       </TableHead>
                       <TableHead
                         scope="col"
-                        className="hidden px-3 py-2 text-right text-xs font-semibold tracking-wide text-ink-600 uppercase xl:table-cell"
+                        className="hidden px-3 py-3 text-[12px] font-semibold tracking-[0.02em] text-ink-600 capitalize md:table-cell"
                       >
-                        Activity
+                        Pipeline
                       </TableHead>
-                      <TableHead scope="col" className="px-3 text-xs font-semibold tracking-wide text-ink-600 uppercase">
-                        Profile
-                      </TableHead>
-                      <TableHead scope="col" className="px-3 text-xs font-semibold tracking-wide text-ink-600 uppercase">
-                        Account
-                      </TableHead>
-                      <TableHead scope="col" className="px-3 text-xs font-semibold tracking-wide text-ink-600 uppercase">
-                        Directory
+                      <TableHead scope="col" className="px-3 py-3 text-[12px] font-semibold tracking-[0.02em] text-ink-600 capitalize">
+                        State
                       </TableHead>
                     </TableRow>
                   </TableHeader>
 
                   <TableBody>
                     {rows.map((row) => (
-                      <TableRow key={row.id} className="group/row hover:bg-ink-50/70">
-                        <TableCell className="px-3 py-2">
+                      <TableRow key={row.id} className="apple-spring group/row hover:bg-ink-50/70">
+                        <TableCell className="px-3 py-3">
                           <RowCheckbox id={row.id} />
                         </TableCell>
-                        <TableCell className="px-3 py-2">
-                          <div className="flex items-center gap-2.5">
+                        <TableCell className="px-3 py-3">
+                          <div className="flex items-center gap-3">
                             <span
                               aria-hidden
-                              className="grid size-7 shrink-0 place-items-center rounded-full bg-brand-50 text-2xs font-semibold text-brand-700"
+                              className="grid size-11 shrink-0 place-items-center rounded-full bg-brand-100 text-[13px] font-semibold text-brand-800"
                             >
                               {row.firstName.charAt(0)}
                               {row.lastName.charAt(0)}
@@ -290,47 +285,70 @@ export default async function AdminInterns({
                             <div className="min-w-0">
                               <Link
                                 href={`/admin/interns/${row.id}`}
-                                className="block truncate font-medium text-ink-900 underline-offset-4 hover:underline"
+                                className="apple-spring block truncate text-[15px] font-semibold tracking-[-0.01em] text-ink-900 underline-offset-4 hover:underline"
                               >
                                 {row.firstName} {row.lastName}
                               </Link>
-                              <p className="truncate text-xs text-text-subtle">
-                                Joined {row.createdAt ? formatDate(row.createdAt) : "None"}
+                              <p className="mt-0.5 truncate text-[13px] text-text-subtle">
+                                {row.email} · Joined{" "}
+                                {row.createdAt ? formatDate(row.createdAt) : "-"}
                               </p>
                             </div>
                           </div>
                         </TableCell>
-                        <TableCell className="px-3 py-2">
-                          <div className="min-w-0 max-w-[15rem]">
-                            <p className="truncate text-ink-700">{row.email}</p>
-                            <p className="truncate text-xs text-text-subtle tabular-nums">
-                              {row.countryCode} {row.phoneNumber}
-                            </p>
-                          </div>
-                        </TableCell>
-                        <TableCell className="hidden px-3 py-2 text-right xl:table-cell">
-                          <span className="text-xs whitespace-nowrap text-text-subtle">
-                            <span className="font-semibold text-ink-800 tabular-nums">
-                              {row.proposalCount}
+                        <TableCell className="hidden px-3 py-3 md:table-cell">
+                          <span className="inline-flex items-center gap-4">
+                            <span>
+                              <span className="block text-[17px] font-semibold tabular-nums text-ink-900">
+                                {row.proposalCount}
+                              </span>
+                              <span className="block text-[12px] text-text-subtle">
+                                Proposals
+                              </span>
                             </span>
-                            {" prop · "}
-                            <span className="font-semibold text-ink-800 tabular-nums">
-                              {row.interviewCount}
+                            <span aria-hidden className="text-ink-300">→</span>
+                            <span>
+                              <span className="block text-[17px] font-semibold tabular-nums text-ink-900">
+                                {row.interviewCount}
+                              </span>
+                              <span className="block text-[12px] text-text-subtle">
+                                Interviews
+                              </span>
                             </span>
-                            {" int"}
                           </span>
                         </TableCell>
-                        <TableCell className="px-3 py-2">
-                          <StatusBadge
-                            tone={row.hasProfile ? "success" : "warning"}
-                            label={row.hasProfile ? "Complete" : "Incomplete"}
-                          />
-                        </TableCell>
-                        <TableCell className="hidden px-3 py-2 lg:table-cell">
-                          <StatusBadge value={row.isActive ? "active" : "inactive"} />
-                        </TableCell>
-                        <TableCell className="px-3 py-2">
-                          <StatusBadge value={row.visibility} />
+                        <TableCell className="px-3 py-3">
+                          <span className="flex flex-col items-start gap-1.5">
+                            <StatusBadge
+                              tone={row.hasProfile ? "success" : "warning"}
+                              label={row.hasProfile ? "Complete" : "Incomplete"}
+                            />
+                            <span className="inline-flex items-center gap-2 text-[12px] text-text-subtle">
+                              <span className="inline-flex items-center gap-1">
+                                <span
+                                  aria-hidden
+                                  className={
+                                    row.isActive
+                                      ? "size-1.5 rounded-full bg-emerald-600"
+                                      : "size-1.5 rounded-full bg-ink-300"
+                                  }
+                                />
+                                {row.isActive ? "Active" : "Inactive"}
+                              </span>
+                              <span aria-hidden className="text-ink-300">·</span>
+                              <span className="inline-flex items-center gap-1 capitalize">
+                                <span
+                                  aria-hidden
+                                  className={
+                                    row.visibility === "live"
+                                      ? "size-1.5 rounded-full bg-emerald-600"
+                                      : "size-1.5 rounded-full bg-ink-300"
+                                  }
+                                />
+                                {row.visibility}
+                              </span>
+                            </span>
+                          </span>
                         </TableCell>
                       </TableRow>
                     ))}

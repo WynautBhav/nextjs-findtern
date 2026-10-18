@@ -3,15 +3,16 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Sparkles } from "lucide-react";
 
-import { PageHead, Pill, Surface, WaitingNote } from "@/components/app/primitives";
+import { DetailRow, PageHead, Pill, SectionHead, Surface, WaitingNote } from "@/components/app/primitives";
 import { OfferDecision } from "@/components/app/offer-decision";
 import { proposalStatus } from "@/components/app/proposal-status";
 import { ScoreBar } from "@/components/app/score-bar";
-import { getSession } from "@/lib/auth";
+import { requireRole } from "@/lib/auth";
 import { canAccess } from "@/lib/security/guards";
 import { loadInternData, projectNames } from "@/lib/intern-data";
 import { formatDayLabel, formatMoney } from "@/lib/format";
 import { toArray } from "@/lib/journey";
+import { parseOffer, internStipendInrMinor } from "@/lib/offer";
 
 export const metadata: Metadata = {
   title: "Offer",
@@ -34,8 +35,7 @@ export const metadata: Metadata = {
  */
 export default async function ProposalDetail({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const session = await getSession();
-  if (!session) return null;
+  const session = await requireRole("intern");
 
   const data = await loadInternData(session.uid);
   const proposal = data.proposals.find((p) => p.id === id);
@@ -45,15 +45,15 @@ export default async function ProposalDetail({ params }: { params: Promise<{ id:
   // which offers exist.
   if (!proposal || !canAccess(session, proposal.internId)) notFound();
 
-  const offer = (proposal.offerDetails ?? {}) as Record<string, unknown>;
   const ratings = (proposal.aiRatings ?? {}) as Record<string, unknown>;
   const projects = await projectNames([proposal.projectId ?? ""]);
 
-  const role = typeof offer.roleTitle === "string" ? offer.roleTitle : "Internship";
+  const parsed = parseOffer(proposal.offerDetails, proposal.currency);
+  const role = parsed.roleTitle || "Internship";
   const company = data.names[proposal.employerId] ?? "A company on Findtern";
-  const stipendMinor = typeof offer.monthlyAmountMinor === "number" ? offer.monthlyAmountMinor : null;
+  const stipendMinor = internStipendInrMinor(parsed);
   const stipend = stipendMinor ? formatMoney(stipendMinor, "INR") : "To be confirmed";
-  const startDate = typeof offer.startDate === "string" ? offer.startDate : null;
+  const startDate = parsed.startDate;
   const status = proposalStatus(proposal.status);
   const skills = toArray<string>(proposal.skills);
   const ratingRows = [
@@ -69,7 +69,7 @@ export default async function ProposalDetail({ params }: { params: Promise<{ id:
     <div>
       <Link
         href="/intern/proposals"
-        className="mb-6 inline-flex min-h-9 items-center gap-1.5 text-sm font-medium text-ink-600 transition-colors duration-[var(--dur-instant)] hover:text-ink-900"
+        className="apple-spring apple-pressable mb-6 inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-ink-600 hover:text-ink-900"
       >
         <ArrowLeft className="size-4" aria-hidden />
         All offers
@@ -84,41 +84,56 @@ export default async function ProposalDetail({ params }: { params: Promise<{ id:
       <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <div className="space-y-4">
           <Surface className="p-6">
-            <h2 className="text-base font-semibold tracking-[-0.01em] text-ink-900">
-              What is on offer
-            </h2>
+            <SectionHead title="What is on offer" />
             <dl className="mt-4 divide-y divide-ink-100">
-              <Row label="Stipend" value={`${stipend} a month`} emphasis />
-              <Row
-                label="Hours"
-                value={
-                  typeof offer.hoursPerWeek === "number"
-                    ? `${offer.hoursPerWeek} a week`
-                    : "To be agreed"
-                }
-              />
-              <Row
-                label="Length"
-                value={
-                  typeof offer.durationWeeks === "number"
-                    ? `${offer.durationWeeks} weeks`
-                    : "To be agreed"
-                }
-              />
-              <Row
-                label="Starts"
-                value={startDate ? formatDayLabel(startDate) : "To be agreed"}
-              />
-              <Row label="Timezone" value={stringOr(offer.timezone, "Asia/Kolkata")} />
-              <Row label="Sent" value={formatDayLabel(proposal.createdAt)} />
+              {parsed.fullTime ? (
+                <>
+                  <DetailRow
+                    label="Annual CTC"
+                    value={
+                      <span className="text-lg font-semibold tabular-nums tracking-[-0.01em] text-ink-900">
+                        {parsed.fullTime.annualCtcMinor ? formatMoney(parsed.fullTime.annualCtcMinor, parsed.currency) : "To be agreed"}
+                      </span>
+                    }
+                  />
+                  <DetailRow label="Type" value="Full-time job" />
+                  <DetailRow label="Work mode" value={parsed.fullTime.jobMode || "To be agreed"} />
+                  {parsed.fullTime.location ? <DetailRow label="Location" value={parsed.fullTime.location} /> : null}
+                  <DetailRow
+                    label="Offer letter"
+                    value={
+                      <a href={`/api/proposals/${proposal.id}/offer-letter`} target="_blank" rel="noreferrer" className="font-medium text-brand-700 underline underline-offset-4">
+                        Open the offer letter
+                      </a>
+                    }
+                  />
+                </>
+              ) : (
+                <>
+                  <DetailRow
+                    label="Stipend"
+                    value={
+                      <span className="text-lg font-semibold tabular-nums tracking-[-0.01em] text-ink-900">
+                        {stipendMinor != null ? `${stipend} a month` : stipend}
+                      </span>
+                    }
+                  />
+                  <DetailRow label="Hours" value={parsed.monthlyHours ? `${parsed.monthlyHours} a month` : "To be agreed"} />
+                  <DetailRow label="Length" value={`${parsed.months} month${parsed.months === 1 ? "" : "s"}`} />
+                  <DetailRow label="Work mode" value={parsed.mode ? `${parsed.mode}${parsed.location && parsed.mode !== "remote" ? `, ${parsed.location}` : ""}` : "To be agreed"} />
+                  {parsed.paidLeavesPerMonth ? <DetailRow label="Paid leave" value={`${parsed.paidLeavesPerMonth} days a month`} /> : null}
+                  {parsed.laptop ? <DetailRow label="Laptop" value={parsed.laptop === "company" || parsed.laptop === "yes" ? "Provided by the company" : "Your own"} /> : null}
+                </>
+              )}
+              <DetailRow label="Starts" value={startDate ? formatDayLabel(startDate) : "To be agreed"} />
+              <DetailRow label="Timezone" value={parsed.timezone || "Asia/Kolkata"} />
+              <DetailRow label="Sent" value={formatDayLabel(proposal.createdAt)} />
             </dl>
           </Surface>
 
           {skills.length > 0 ? (
             <Surface className="p-6">
-              <h2 className="text-base font-semibold tracking-[-0.01em] text-ink-900">
-                What you were assessed on
-              </h2>
+              <SectionHead title="What you were assessed on" />
               <ul className="mt-3 flex flex-wrap gap-1.5">
                 {skills.map((skill) => (
                   <li key={skill}>
@@ -131,9 +146,7 @@ export default async function ProposalDetail({ params }: { params: Promise<{ id:
 
           {/* ── The decision ──────────────────────────────────────── */}
           <Surface className="p-6">
-            <h2 className="text-base font-semibold tracking-[-0.01em] text-ink-900">
-              {decided ? "What you decided" : "Your decision"}
-            </h2>
+            <SectionHead title={decided ? "What you decided" : "Your decision"} />
             {decided ? (
               <>
                 <p className="mt-2 text-pretty text-sm leading-relaxed text-ink-600">
@@ -142,7 +155,7 @@ export default async function ProposalDetail({ params }: { params: Promise<{ id:
                 {proposal.status === "accepted" || proposal.status === "hired" ? (
                   <Link
                     href="/intern/timesheets"
-                    className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-lg bg-primary px-5 text-sm font-semibold text-white shadow-sm transition-[background-color,transform] duration-[var(--dur-instant)] hover:bg-primary-hover active:scale-[0.98]"
+                    className="apple-spring apple-pressable mt-5 inline-flex min-h-11 items-center gap-2 rounded-[10px] bg-primary px-5 text-sm font-semibold text-white shadow-sm hover:bg-primary-hover active:scale-[0.98]"
                   >
                     Log your hours
                   </Link>
@@ -154,7 +167,6 @@ export default async function ProposalDetail({ params }: { params: Promise<{ id:
                   proposalId={proposal.id}
                   roleTitle={role}
                   company={company}
-                  stipend={stipend}
                   startDate={startDate}
                 />
               </div>
@@ -171,12 +183,10 @@ export default async function ProposalDetail({ params }: { params: Promise<{ id:
               contradict the pitch on the sign in page. */}
           {ratingRows.length > 0 ? (
             <Surface className="p-5">
-              <div className="flex items-start justify-between gap-3">
-                <h2 className="text-sm font-semibold tracking-[-0.01em] text-ink-900">
-                  Your score
-                </h2>
-                <Sparkles className="size-4 text-accent-500" aria-hidden />
-              </div>
+              <SectionHead
+                title="Your score"
+                action={<Sparkles className="size-4 text-accent-500" aria-hidden />}
+              />
               <ul className="mt-4 space-y-3">
                 {ratingRows.map(([label, value]) => (
                   <li key={label}>
@@ -199,9 +209,7 @@ export default async function ProposalDetail({ params }: { params: Promise<{ id:
 
           {/* ── What happens after you accept ─────────────────────── */}
           <Surface className="p-5">
-            <h2 className="text-sm font-semibold tracking-[-0.01em] text-ink-900">
-              After you accept
-            </h2>
+            <SectionHead title="After you accept" />
             <ol className="mt-3 space-y-3">
               {[
                 "The company books an interview and offers you times to choose from.",
@@ -210,7 +218,7 @@ export default async function ProposalDetail({ params }: { params: Promise<{ id:
                 "Every one of those becomes something you can show the next employer.",
               ].map((line, i) => (
                 <li key={i} className="flex gap-2.5">
-                  <span className="mt-0.5 grid size-5 shrink-0 place-items-center rounded-full bg-brand-50 text-2xs font-bold text-brand-700">
+                  <span className="mt-0.5 grid size-5 shrink-0 place-items-center rounded-full bg-brand-50 text-xs font-bold text-brand-700">
                     {i + 1}
                   </span>
                   <span className="text-pretty text-sm leading-relaxed text-ink-600">{line}</span>
@@ -221,9 +229,7 @@ export default async function ProposalDetail({ params }: { params: Promise<{ id:
 
           {!decided ? (
             <Surface className="p-5">
-              <h2 className="text-sm font-semibold tracking-[-0.01em] text-ink-900">
-                If you do nothing
-              </h2>
+              <SectionHead title="If you do nothing" />
               <div className="mt-2">
                 <WaitingNote
                   who="Nobody"
@@ -236,33 +242,4 @@ export default async function ProposalDetail({ params }: { params: Promise<{ id:
       </div>
     </div>
   );
-}
-
-function Row({
-  label,
-  value,
-  emphasis,
-}: {
-  label: string;
-  value: string;
-  emphasis?: boolean;
-}) {
-  return (
-    <div className="flex items-baseline justify-between gap-6 py-3">
-      <dt className="shrink-0 text-sm text-ink-500">{label}</dt>
-      <dd
-        className={
-          emphasis
-            ? "min-w-0 text-right text-lg font-semibold tabular-nums tracking-[-0.01em] text-ink-900"
-            : "min-w-0 text-right text-sm font-medium text-ink-900"
-        }
-      >
-        {value}
-      </dd>
-    </div>
-  );
-}
-
-function stringOr(v: unknown, fallback: string): string {
-  return typeof v === "string" && v.trim() ? v.trim() : fallback;
 }

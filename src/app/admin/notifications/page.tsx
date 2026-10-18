@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { desc, ilike } from "drizzle-orm";
+import { desc, ilike, count, eq } from "drizzle-orm";
 
 import { getDb, schema } from "@/lib/db";
 import { PageHeader } from "@/components/layout/page-header";
@@ -33,6 +33,10 @@ export default async function AdminNotifications({
   const db = getDb();
   const like = `%${query.trim()}%`;
 
+  const [[internTotal], [employerTotal]] = await Promise.all([
+    db.select({ c: count() }).from(schema.users).where(eq(schema.users.isActive, true)),
+    db.select({ c: count() }).from(schema.employers).where(eq(schema.employers.isActive, true)),
+  ]);
   const [interns, employers, history] = await Promise.all([
     query.trim()
       ? db
@@ -95,6 +99,7 @@ export default async function AdminNotifications({
       <NotificationComposer
         interns={interns.map((i) => ({ id: i.id, label: `${i.name} ${i.last}`.trim(), email: i.email }))}
         employers={employers.map((e) => ({ id: e.id, label: e.name, email: e.email }))}
+        totals={{ intern: Number(internTotal?.c ?? 0), employer: Number(employerTotal?.c ?? 0) }}
       />
 
       <Panel>

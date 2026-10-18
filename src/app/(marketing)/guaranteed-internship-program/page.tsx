@@ -1,5 +1,14 @@
 import type { Metadata } from "next";
-import { ArrowRight, Clock, Lock, Wallet } from "lucide-react";
+import {
+  ArrowRight,
+  CheckCircle2,
+  Clock,
+  Lock,
+  ShieldCheck,
+  Sparkles,
+  Wallet,
+  Zap,
+} from "lucide-react";
 
 import { PageHero, PageSection } from "@/components/marketing/page-hero";
 import { ButtonLink } from "@/components/ui/button";
@@ -11,7 +20,7 @@ import { FaqExplorer } from "@/components/marketing/faq-explorer";
 export const metadata: Metadata = {
   title: "Guaranteed Internship Program",
   description:
-    "Placed in 18 months or your deposit back. The three conditions, the exclusions, the clock start date, and exactly when a refund is paid.",
+    "Placed in 18 months or your deposit back. The step-by-step process, terms, exclusions, clock start date, and refund policy.",
   alternates: { canonical: "/guaranteed-internship-program" },
 };
 
@@ -20,6 +29,76 @@ export const metadata: Metadata = {
    on the terms page - kept in one place so they cannot drift apart. */
 
 const DEPOSIT = 2499;
+
+const STEPS = [
+  {
+    n: "01",
+    title: "Sign Up & Apply",
+    text: "Join Findtern and activate the Guaranteed Internship Program with complete transparency.",
+  },
+  {
+    n: "02",
+    title: "AI Interview & Rating",
+    text: "Take our structured AI-powered interview to evaluate your coding, problem solving, and communication.",
+  },
+  {
+    n: "03",
+    title: "Profile Visibility",
+    text: "Your verified rubric and badge are instantly surfaced to vetted employers and hiring managers.",
+  },
+  {
+    n: "04",
+    title: "Internship Placement",
+    text: "Matched directly to approved, paid internship opportunities tailored to your proven skills.",
+  },
+  {
+    n: "05",
+    title: "Guaranteed Outcome",
+    text: "Get placed within 18 months, or receive a 100% full refund if we fail to place you.",
+  },
+];
+
+const PROGRAM_TERMS = [
+  {
+    title: "1. 18-Month Placement Window",
+    text: "You will be matched and placed in a qualified internship within 18 months of your score confirmation date.",
+  },
+  {
+    title: "2. 100% Refund Assurance",
+    text: "If we are unable to secure you an internship placement within the period, we release a full 100% refund.",
+  },
+  {
+    title: "3. Defined Execution Window",
+    text: "The program features an active placement runway. Refunds are processed immediately once the 18-month guarantee window closes.",
+  },
+  {
+    title: "4. AI Interview & Verified Rating",
+    text: "Your internship placement is accelerated by your AI Interview performance, featuring mock evaluations, transparent scores, and direct shortlisting.",
+  },
+  {
+    title: "5. Active Engagement & Integrity",
+    text: "You agree to remain reachable and interview with matched employers. As long as you participate actively, our placement guarantee stands.",
+  },
+];
+
+const WHY_CHOOSE = [
+  {
+    title: "AI-Driven Screening",
+    text: "Objective skill assessment that showcases your technical and communicative strengths directly to founders.",
+  },
+  {
+    title: "Verified Hiring Companies",
+    text: "Every employer is legal-entity verified with authentic stipends and structured internship programs.",
+  },
+  {
+    title: "Transparent Rubric",
+    text: "No black-box filters. You see your exact scores across Coding, Communication, and Aptitude.",
+  },
+  {
+    title: "Guided Placement Track",
+    text: "Structured journey from profile onboarding and AI interview to offer review and verified placement.",
+  },
+];
 
 const CONDITIONS = [
   {
@@ -48,6 +127,34 @@ const TERMS = [
 ];
 
 const FAQS = [
+  {
+    id: "g-what-is",
+    category: "Program",
+    question: "What is the Guaranteed Internship Program?",
+    answer:
+      "It’s a structured, transparent process where you complete candidate onboarding and an AI-powered evaluation, become visible to verified hiring employers, and we work to get you placed within 18 months — or your deposit is refunded in full.",
+  },
+  {
+    id: "g-how-works",
+    category: "Process",
+    question: "How does the program work step by step?",
+    answer:
+      "You sign up, complete your evaluation and Incruiter AI interview, earn a verified score rubric, and get matched to active employer requirements. You apply, interview, and receive formal offers directly on the platform.",
+  },
+  {
+    id: "g-eligible",
+    category: "Eligibility",
+    question: "Who is eligible for the guarantee?",
+    answer:
+      "College students and early-career candidates who complete onboarding, submit accurate profile verification, and finish the AI interview evaluation.",
+  },
+  {
+    id: "g-charges",
+    category: "Pricing",
+    question: "Are there any hidden charges?",
+    answer:
+      "No. The program is completely transparent. The refundable deposit is held in trust until placement, and there are no hidden or recurring fees.",
+  },
   {
     id: "g1",
     category: "Refund",
@@ -89,22 +196,40 @@ export default function GuaranteePage() {
   return (
     <>
       <PageHero
-        eyebrow="The guarantee"
+        eyebrow="Guaranteed Internship Program"
         title={
           <>
-            Placed in 18 months, or{" "}
-            <span className="text-primary">₹{DEPOSIT.toLocaleString("en-IN")} back</span>.
+            Your Internship. Guaranteed.{" "}
+            <span className="text-primary">Or Your Money Back.</span>
           </>
         }
-        lead="A refundable deposit held until we place you. It is not a fee for a job and not a fee for an assessment - assessments are free everywhere else in this market, and pretending otherwise would be a strange way to earn your trust."
+        lead="A clear, step-by-step path from sign-up to placement — designed for confidence, transparency, and real outcomes. A refundable deposit held until we place you."
       >
-        <ButtonLink href="/signup" variant="primary" size="lg">
-          Get assessed
-          <ArrowRight className="size-4" aria-hidden />
-        </ButtonLink>
-        <ButtonLink href="/terms-and-conditions" variant="outline" size="lg">
-          Read the terms
-        </ButtonLink>
+        <div className="flex flex-wrap items-center gap-3">
+          <ButtonLink href="/signup" variant="primary" size="lg">
+            Sign Up Now
+            <ArrowRight className="size-4" aria-hidden />
+          </ButtonLink>
+          <ButtonLink href="/interns" variant="outline" size="lg">
+            Back to Interns
+          </ButtonLink>
+        </div>
+
+        {/* Hero Badges */}
+        <div className="mt-8 flex flex-wrap items-center gap-4 text-xs font-semibold text-ink-700">
+          <div className="inline-flex items-center gap-1.5 rounded-full border border-ink-200/80 bg-white/80 px-3.5 py-1.5 backdrop-blur-xs shadow-2xs">
+            <Clock className="size-3.5 text-primary" />
+            <span>18-Month Guarantee Window</span>
+          </div>
+          <div className="inline-flex items-center gap-1.5 rounded-full border border-ink-200/80 bg-white/80 px-3.5 py-1.5 backdrop-blur-xs shadow-2xs">
+            <Lock className="size-3.5 text-primary" />
+            <span>Verified Employers</span>
+          </div>
+          <div className="inline-flex items-center gap-1.5 rounded-full border border-ink-200/80 bg-white/80 px-3.5 py-1.5 backdrop-blur-xs shadow-2xs">
+            <ShieldCheck className="size-3.5 text-primary" />
+            <span>100% Refund Assurance</span>
+          </div>
+        </div>
       </PageHero>
 
       {/* ── Terms at a glance ──────────────────────────────────────── */}
@@ -113,7 +238,7 @@ export default function GuaranteePage() {
           {TERMS.map((t) => (
             <div
               key={t.label}
-              className="rounded-2xl border border-ink-200 bg-white p-5"
+              className="rounded-2xl border border-ink-200 bg-white p-5 shadow-2xs"
             >
               <dt className="text-2xs font-semibold uppercase tracking-[0.14em] text-ink-500">
                 {t.label}
@@ -125,6 +250,56 @@ export default function GuaranteePage() {
             </div>
           ))}
         </dl>
+      </PageSection>
+
+      {/* ── How it works: 5 Steps ──────────────────────────────────── */}
+      <PageSection>
+        <SectionHeading
+          lead="The process"
+          accent="How it works"
+          sub="One simple flow — you always know what’s next."
+        />
+        <ol className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-5">
+          {STEPS.map((step) => (
+            <li key={step.n}>
+              <div className="group relative flex h-full flex-col rounded-2xl border border-ink-200 bg-white p-6 transition-all hover:border-brand-300 hover:shadow-md">
+                <span className="grid size-10 place-items-center rounded-xl bg-brand-50 text-sm font-bold text-brand-700">
+                  {step.n}
+                </span>
+                <h3 className="mt-4 text-base font-semibold text-ink-900">
+                  {step.title}
+                </h3>
+                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                  {step.text}
+                </p>
+              </div>
+            </li>
+          ))}
+        </ol>
+      </PageSection>
+
+      {/* ── Program Terms & Conditions ─────────────────────────────── */}
+      <PageSection tone="muted">
+        <SectionHeading
+          lead="The contract"
+          accent="Terms & conditions"
+          sub="Clear rules. No surprises. Built for complete trust."
+        />
+        <div className="mt-12 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {PROGRAM_TERMS.map((term) => (
+            <TiltCard key={term.title} max={4} className="h-full">
+              <article className="flex h-full flex-col rounded-2xl border border-ink-200 bg-white p-6 shadow-2xs">
+                <div className="flex items-center gap-2.5">
+                  <span className="grid size-8 place-items-center rounded-lg bg-emerald-50 text-emerald-700">
+                    <CheckCircle2 className="size-4" />
+                  </span>
+                  <h3 className="text-base font-semibold text-ink-900">{term.title}</h3>
+                </div>
+                <p className="mt-3 text-sm leading-relaxed text-ink-600">{term.text}</p>
+              </article>
+            </TiltCard>
+          ))}
+        </div>
       </PageSection>
 
       {/* ── Three conditions ───────────────────────────────────────── */}
@@ -153,6 +328,47 @@ export default function GuaranteePage() {
             </li>
           ))}
         </ol>
+      </PageSection>
+
+      {/* ── Why choose Findtern ─────────────────────────────────────── */}
+      <PageSection tone="muted">
+        <div className="grid gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] lg:gap-16 items-center">
+          <div>
+            <span className="text-xs font-semibold uppercase tracking-wider text-brand-700">
+              Why choose Findtern
+            </span>
+            <h2 className="mt-3 text-balance text-3xl font-semibold tracking-tight text-ink-900 sm:text-4xl">
+              Faster shortlisting, better-fit matches, and a transparent path.
+            </h2>
+            <p className="mt-4 text-base text-muted-foreground leading-relaxed">
+              Findtern removes the guesswork from early-career hiring by verifying your skills with real evaluations that hiring managers trust.
+            </p>
+            <div className="mt-8 flex flex-wrap gap-3">
+              <ButtonLink href="/signup" variant="primary" size="lg">
+                Get Started
+                <ArrowRight className="size-4" aria-hidden />
+              </ButtonLink>
+              <ButtonLink href="/faq" variant="outline" size="lg">
+                View FAQ
+              </ButtonLink>
+            </div>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            {WHY_CHOOSE.map((item) => (
+              <div
+                key={item.title}
+                className="rounded-2xl border border-ink-200 bg-white p-5 shadow-2xs"
+              >
+                <div className="flex size-9 items-center justify-center rounded-xl bg-brand-50 text-brand-700">
+                  <Sparkles className="size-4" />
+                </div>
+                <h3 className="mt-3 text-base font-semibold text-ink-900">{item.title}</h3>
+                <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">{item.text}</p>
+              </div>
+            ))}
+          </div>
+        </div>
       </PageSection>
 
       {/* ── Exclusions ─────────────────────────────────────────────── */}
@@ -214,15 +430,42 @@ export default function GuaranteePage() {
         </div>
       </PageSection>
 
-      {/* ── FAQ ────────────────────────────────────────────────────── */}
+      {/* ── High-Converting CTA Band ────────────────────────────────── */}
       <PageSection>
+        <div className="relative overflow-hidden rounded-3xl bg-linear-to-br from-brand-900 via-brand-800 to-emerald-950 p-8 sm:p-12 text-white shadow-xl">
+          <div className="relative z-10 max-w-2xl">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-2xs font-semibold text-emerald-300">
+              <Zap className="size-3" />
+              Guaranteed Internship Program
+            </span>
+            <h2 className="mt-4 text-balance text-3xl font-bold tracking-tight sm:text-4xl text-white">
+              Start your career with confidence.
+            </h2>
+            <p className="mt-3 text-base text-brand-100 leading-relaxed">
+              Join the Guaranteed Internship Program today and take control of your path with verified screening, real employer shortlists, and 100% money-back peace of mind.
+            </p>
+            <div className="mt-8 flex flex-wrap gap-4">
+              <ButtonLink href="/signup" variant="accent" size="lg">
+                Sign Up Now
+                <ArrowRight className="size-4" aria-hidden />
+              </ButtonLink>
+              <ButtonLink href="/interns" variant="outlineLight" size="lg">
+                Explore Internships
+              </ButtonLink>
+            </div>
+          </div>
+        </div>
+      </PageSection>
+
+      {/* ── FAQ ────────────────────────────────────────────────────── */}
+      <PageSection tone="muted">
         <div className="grid gap-12 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] lg:gap-16">
           <div>
             <h2 className="text-balance text-3xl font-semibold tracking-[-0.025em] text-ink-900 sm:text-4xl">
               Guarantee questions
             </h2>
             <p className="mt-4 text-lg text-muted-foreground">
-              The edge cases, answered directly.
+              The edge cases and program details, answered directly.
             </p>
             <div className="mt-8 flex items-baseline gap-3">
               <p className="text-5xl font-bold tracking-tight text-primary">

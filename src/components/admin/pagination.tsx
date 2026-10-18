@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 /**
  * Pagination.
  *
- * A server component rendering plain `<Link>`s — no client JS, so it works
+ * A server component rendering plain `<Link>`s - no client JS, so it works
  * before hydration and can be middle-clicked. The page numbers are a windowed
  * sequence with ellipses, because a 88-page intern table rendered as
  * "1 2 3 4 5 6 7 8 9 … 88" pushes the useful control off the right edge.
@@ -70,7 +70,7 @@ export function Pagination({
     `${basePath}${toQueryString({ ...params, [pageParam]: String(target) })}`;
 
   const linkBase =
-    "inline-flex h-8 min-w-8 items-center justify-center rounded-lg px-2.5 text-sm font-medium transition-colors";
+    "apple-spring apple-pressable inline-flex h-8 min-w-8 items-center justify-center rounded-[10px] px-2.5 text-sm font-medium";
 
   return (
     <nav

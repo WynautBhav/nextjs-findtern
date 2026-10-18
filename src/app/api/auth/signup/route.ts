@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -6,11 +6,14 @@ import { getDb, schema } from "@/lib/db";
 import { hashPassword, isStrongPassword } from "@/lib/security/password";
 import { withSession, issueCsrfCookie } from "@/lib/auth";
 import { limiters, bucketKey, clientIp } from "@/lib/security/rate-limit";
+import { normalizePhone, phoneError } from "@/lib/phone";
+import { hasVerifiedSignupOtp } from "@/lib/signup-otp";
 
 const bodySchema = z.object({
   firstName: z.string().min(2),
   lastName: z.string().min(2),
   email: z.string().trim().toLowerCase().email(),
+  countryCode: z.string().trim().default("+91"),
   phoneNumber: z.string().min(6),
   password: z.string().min(8),
   agreedToTerms: z.literal(true),
@@ -29,6 +32,13 @@ export async function POST(req: Request) {
   if (!isStrongPassword(parsed.data.password)) {
     return NextResponse.json({ error: "Weak password" }, { status: 400 });
   }
+  const phoneProblem = phoneError(parsed.data.countryCode, parsed.data.phoneNumber);
+  if (phoneProblem) {
+    return NextResponse.json({ error: phoneProblem }, { status: 400 });
+  }
+  if (!(await hasVerifiedSignupOtp("intern", parsed.data.email))) {
+    return NextResponse.json({ error: "Verify your email before creating the account" }, { status: 400 });
+  }
 
   const db = getDb();
   const [existing] = await db
@@ -39,6 +49,15 @@ export async function POST(req: Request) {
   if (existing) {
     return NextResponse.json({ error: "Email already registered" }, { status: 409 });
   }
+  const phoneNumber = normalizePhone(parsed.data.phoneNumber);
+  const [phoneOwner] = await db
+    .select({ id: schema.users.id })
+    .from(schema.users)
+    .where(and(eq(schema.users.countryCode, parsed.data.countryCode), eq(schema.users.phoneNumber, phoneNumber)))
+    .limit(1);
+  if (phoneOwner) {
+    return NextResponse.json({ error: "Phone number already registered" }, { status: 409 });
+  }
 
   const password = await hashPassword(parsed.data.password);
   const [user] = await db
@@ -47,7 +66,8 @@ export async function POST(req: Request) {
       firstName: parsed.data.firstName,
       lastName: parsed.data.lastName,
       email: parsed.data.email,
-      phoneNumber: parsed.data.phoneNumber,
+      countryCode: parsed.data.countryCode,
+      phoneNumber,
       password,
       agreedToTerms: true,
       emailVerified: true,

@@ -17,7 +17,7 @@ import pg from "pg";
 
 import * as schema from "../src/lib/db/schema.ts";
 import { hashPassword } from "../src/lib/security/password.ts";
-import { PRICING_PLANS, PRICING_PLANS_USD } from "../src/lib/content/home.ts";
+import { PRICING_PLANS } from "../src/lib/content/home.ts";
 
 const PASSWORD = "Findtern@2026";
 
@@ -397,17 +397,18 @@ async function main() {
       currency: "INR",
       offerDetails: {
         roleTitle: project.projectName.split(" ")[0] + " Intern",
+        // Legacy offer_details shape: money in rupees (see src/lib/offer.ts).
         duration: "3m",
-        durationWeeks: 12,
-        hoursPerWeek: 25,
         monthlyHours: 100,
-        monthlyAmount: stipend * 100,
-        stipendMinor: stipend * 100,
+        monthlyAmount: stipend,
+        totalPrice: stipend * 3,
+        hourlyRate: stipend / 100,
+        perHireCharge: 0,
         mode: project.locationType ?? "remote",
-        city: project.city ?? "Bengaluru",
+        location: project.city ?? "Bengaluru",
         laptop: "company",
         startDate: new Date(Date.now() + (i * 2 + 3) * 86_400_000).toISOString().split("T")[0],
-        message: `We were extremely impressed by your Findtern technical score and would love to have you join our team.`,
+        jd: `We were extremely impressed by your Findtern technical score and would love to have you join our team.`,
       },
       aiRatings: {
         communication: 8,
@@ -594,8 +595,9 @@ async function main() {
 
   // ── Pricing Plans ─────────────────────────────────────────────────────
   console.log("Seeding pricing plans…");
-  await db.insert(schema.pricingPlans).values([
-    ...PRICING_PLANS.map((p) => ({
+  // INR only: the USD card is derived at ₹100 = $1 (src/lib/currency.ts).
+  await db.insert(schema.pricingPlans).values(
+    PRICING_PLANS.map((p) => ({
       slug: p.slug,
       displayName: p.displayName,
       region: "IN",
@@ -604,24 +606,15 @@ async function main() {
       perHireChargeMinor: p.perHireChargeMinor,
       internshipDuration: p.internshipDuration,
       features: p.features,
+      featureList: p.featureList,
+      compareAtHourlyMinor: p.compareAtHourlyMinor,
+      compareAtPerHireMinor: p.compareAtPerHireMinor,
+      isFeatured: p.isFeatured,
       gstApplicable: p.gstApplicable,
       sortOrder: p.sortOrder,
       isActive: true,
     })),
-    ...PRICING_PLANS_USD.map((p) => ({
-      slug: p.slug,
-      displayName: p.displayName,
-      region: null,
-      currency: p.currency,
-      priceHourlyMinor: p.priceHourlyMinor,
-      perHireChargeMinor: p.perHireChargeMinor,
-      internshipDuration: p.internshipDuration,
-      features: p.features,
-      gstApplicable: p.gstApplicable,
-      sortOrder: p.sortOrder,
-      isActive: true,
-    })),
-  ]);
+  );
 
   // ── Promo Codes ───────────────────────────────────────────────────────
   console.log("Seeding promo codes…");

@@ -12,11 +12,14 @@ export function LoginForm({
   redirectTo,
   forgotHref,
   googleHref,
+  verifyHref,
 }: {
   endpoint: string;
   redirectTo: string;
   forgotHref?: string;
   googleHref?: string;
+  /** Where an unverified account goes to verify; shown with that error. */
+  verifyHref?: string;
 }) {
   const router = useRouter();
   const [email, setEmail] = useState("");
@@ -58,7 +61,17 @@ export function LoginForm({
           className="flex items-start gap-2.5 rounded-lg border border-danger/25 bg-danger-soft px-3.5 py-3 text-sm text-danger"
         >
           <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden />
-          <span>{error}</span>
+          <span>
+            {error}
+            {verifyHref && error === "Email not verified" ? (
+              <>
+                {" "}
+                <Link href={`${verifyHref}?email=${encodeURIComponent(email)}`} className="font-semibold underline underline-offset-4">
+                  Verify it now
+                </Link>
+              </>
+            ) : null}
+          </span>
         </div>
       ) : null}
 

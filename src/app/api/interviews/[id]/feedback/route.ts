@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
+import { notify } from "@/lib/notify";
 
 const bodySchema = z.object({ feedback: z.string().max(2000) });
 
@@ -20,7 +21,17 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!interview) return NextResponse.json({ error: "Not found" }, { status: 404 });
   if (interview.employerId !== guard.session.uid) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
+  if (interview.status !== "scheduled" && interview.status !== "completed") {
+    return NextResponse.json({ error: "Feedback can be added after a scheduled interview." }, { status: 409 });
+  }
   const notes = interview.notes ? `${interview.notes}\nfeedback_text: ${parsed.data.feedback}` : `feedback_text: ${parsed.data.feedback}`;
   await db.update(schema.interviews).set({ notes, status: "completed", updatedAt: new Date() }).where(eq(schema.interviews.id, id));
+  await notify({
+    to: { type: "intern", id: interview.internId },
+    type: "interview_feedback",
+    title: "Interview feedback",
+    message: "The company shared feedback on your interview.",
+    data: { interviewId: id },
+  });
   return NextResponse.json({ ok: true });
 }

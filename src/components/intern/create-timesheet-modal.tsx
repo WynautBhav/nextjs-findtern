@@ -93,7 +93,7 @@ export function CreateTimesheetModal({
         }}
         className={
           className ||
-          "inline-flex items-center gap-1.5 rounded-lg bg-brand-700 px-3.5 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-brand-800 active:scale-[0.99]"
+          "apple-spring apple-pressable inline-flex min-h-11 items-center gap-1.5 rounded-[10px] bg-brand-700 px-3.5 text-xs font-semibold text-white shadow-sm hover:bg-brand-800"
         }
       >
         <Plus className="size-3.5" />
@@ -115,7 +115,7 @@ export function CreateTimesheetModal({
 
           <form onSubmit={handleCreate} className="space-y-4 pt-2">
             {errorMsg && (
-              <div className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs font-medium text-rose-700">
+              <div className="rounded-[10px] border border-rose-200 bg-rose-50 p-3 text-xs font-medium text-rose-700">
                 {errorMsg}
               </div>
             )}
@@ -126,7 +126,7 @@ export function CreateTimesheetModal({
                 Active Engagement <span className="text-rose-500">*</span>
               </label>
               {proposals.length === 1 ? (
-                <div className="rounded-lg border border-sand-200 bg-sand-50/70 p-3 text-xs">
+                <div className="rounded-[10px] border border-ink-200 bg-ink-50/70 p-3 text-xs">
                   <p className="font-semibold text-ink-900">{proposals[0].companyName}</p>
                   {proposals[0].roleTitle && (
                     <p className="text-text-subtle">{proposals[0].roleTitle}</p>
@@ -136,7 +136,7 @@ export function CreateTimesheetModal({
                 <select
                   value={selectedProposalId}
                   onChange={(e) => setSelectedProposalId(e.target.value)}
-                  className="w-full rounded-lg border border-sand-300 bg-white px-3 py-2 text-xs text-ink-900 focus:border-brand-500 focus:outline-none"
+                  className="apple-spring w-full rounded-[10px] border border-ink-200 bg-white px-3 py-2 text-[14px] text-ink-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
                 >
                   {proposals.map((p) => (
                     <option key={p.id} value={p.id}>
@@ -158,10 +158,10 @@ export function CreateTimesheetModal({
                   required
                   value={selectedMonth}
                   onChange={(e) => setSelectedMonth(e.target.value)}
-                  className="w-full rounded-lg border border-sand-300 px-3 py-2 text-xs text-ink-900 focus:border-brand-500 focus:outline-none"
+                  className="apple-spring w-full rounded-[10px] border border-ink-200 bg-white px-3 py-2 text-[14px] text-ink-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
                 />
               </div>
-              <p className="text-[11px] text-text-subtle">
+              <p className="text-xs text-text-subtle">
                 A calendar month period will be created with day-by-day hour entries ready for logging.
               </p>
             </div>
@@ -170,14 +170,14 @@ export function CreateTimesheetModal({
               <button
                 type="button"
                 onClick={() => setOpen(false)}
-                className="rounded-lg border border-sand-300 px-3.5 py-1.5 text-xs font-medium text-ink-700 hover:bg-sand-100"
+                className="apple-spring apple-pressable inline-flex min-h-11 items-center rounded-[10px] border border-ink-200 px-3.5 py-1.5 text-xs font-medium text-ink-700 hover:bg-ink-50"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={loading}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-brand-700 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-brand-800 disabled:opacity-50"
+                className="apple-spring apple-pressable inline-flex min-h-11 items-center gap-1.5 rounded-[10px] bg-brand-700 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-brand-800 disabled:opacity-50"
               >
                 {loading && <Loader2 className="size-3.5 animate-spin" />}
                 Initialize Period

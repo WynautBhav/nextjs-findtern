@@ -2,15 +2,17 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, Calendar, Sparkles } from "lucide-react";
 
-import { EmptyScene, PageHead, Surface } from "@/components/app/primitives";
+import { EmptyScene, PageHead, Pill, SectionHead, Surface } from "@/components/app/primitives";
 import { SlotPicker } from "@/components/app/slot-picker";
 import { AiFeedbackReport } from "@/components/employer/ai-feedback-report";
-import { getSession } from "@/lib/auth";
+import { AiInterviewJoinCard } from "@/components/intern/ai-interview-join-card";
+import { requireRole } from "@/lib/auth";
 import { getDb, schema } from "@/lib/db";
 import { eq } from "drizzle-orm";
 import { loadInternData } from "@/lib/intern-data";
 import { formatDayLabel, formatSlotTime } from "@/lib/format";
-import { slotOf, slotsOf } from "@/lib/journey";
+import { slotOf } from "@/lib/journey";
+import { readSkillRatings } from "@/lib/onboarding";
 
 export const metadata: Metadata = {
   title: "Interviews & Assessment",
@@ -18,8 +20,7 @@ export const metadata: Metadata = {
 };
 
 export default async function InternInterviews() {
-  const session = await getSession();
-  if (!session) return null;
+  const session = await requireRole("intern");
 
   const db = getDb();
   const [user] = await db
@@ -32,11 +33,19 @@ export default async function InternInterviews() {
 
   const data = await loadInternData(session.uid);
 
-  const upcoming = data.interviews.filter(
-    (i) => i.status === "scheduled" || i.status === "pending",
+  // Partition AI interview assessment vs company interviews
+  const aiInterview = data.interviews.find(
+    (i) =>
+      i.employerId === "admin" ||
+      (data.names[i.employerId] && data.names[i.employerId].toLowerCase().includes("ai")) ||
+      (!i.slot1 && !i.slot2 && !i.slot3 && (i.status === "waiting" || i.notes?.toLowerCase().includes("ai"))),
+  );
+
+  const upcomingEmployerInterviews = data.interviews.filter(
+    (i) => i.id !== aiInterview?.id && (i.status === "scheduled" || i.status === "pending"),
   );
   const past = data.interviews.filter(
-    (i) => i.status === "completed" || i.status === "missed",
+    (i) => i.id !== aiInterview?.id && (i.status === "completed" || i.status === "missed"),
   );
 
   const extra = (data.onboarding?.extraData ?? {}) as Record<string, unknown>;
@@ -47,25 +56,34 @@ export default async function InternInterviews() {
     aptitude?: number;
     interview?: number;
   };
-  const skills = Array.isArray(data.onboarding?.skills)
-    ? (data.onboarding?.skills as string[])
-    : [];
+  const skills = readSkillRatings(data.onboarding?.skills, extra).map((s) => s.name);
+
+  const aiFeedbackLink = (extra.aiFeedbackLink as string) || null;
+  const aiRecordingLink = (extra.aiRecordingLink as string) || null;
 
   return (
     <div className="space-y-8">
       <PageHead
-        title="Interviews"
-        lede="Your assessment results, upcoming company interviews, and feedback from past rounds."
+        title="Interviews & AI Evaluation"
+        lede="Your Incruiter AI assessment, verified score dossier, and upcoming company interview rounds."
       />
 
-      {/* Assessment results */}
-      <section className="space-y-3">
-        <div className="flex items-center gap-2">
-          <Sparkles className="size-4 text-brand-600" />
-          <h2 className="text-base font-semibold text-ink-900">
-            Your assessment results
-          </h2>
-        </div>
+      {/* Assessment section */}
+      <section className="space-y-4">
+        <SectionHead
+          title="AI Technical & Behavioral Assessment"
+          action={<Sparkles className="size-4 text-brand-600" aria-hidden />}
+        />
+
+        {aiInterview && (
+          <AiInterviewJoinCard
+            interviewId={aiInterview.id}
+            status={aiInterview.status}
+            meetingLink={aiInterview.meetingLink}
+            feedbackLink={aiFeedbackLink}
+            recordingLink={aiRecordingLink}
+          />
+        )}
 
         <AiFeedbackReport
           candidateName={candidateName}
@@ -78,19 +96,19 @@ export default async function InternInterviews() {
           }}
           skills={skills}
           bio={data.onboarding?.bio}
+          aiFeedbackLink={aiFeedbackLink}
+          aiRecordingLink={aiRecordingLink}
         />
       </section>
 
       {/* Company Interviews */}
       <section className="space-y-6">
-        <div className="flex items-center gap-2">
-          <Calendar className="size-4 text-brand-600" />
-          <h2 className="text-base font-semibold text-ink-900">
-            Employer Interview Rounds
-          </h2>
-        </div>
+        <SectionHead
+          title="Employer interview rounds"
+          action={<Calendar className="size-4 text-brand-600" aria-hidden />}
+        />
 
-        {data.interviews.length === 0 ? (
+        {upcomingEmployerInterviews.length === 0 ? (
           <EmptyScene
             art
             title="No employer interviews scheduled yet"
@@ -100,31 +118,26 @@ export default async function InternInterviews() {
           />
         ) : (
           <div className="space-y-6">
-            {upcoming.map((interview) => {
-              const slots = slotsOf(interview).map((iso, index) => ({
-                index: index + 1,
-                iso: iso.toISOString(),
-              }));
+            {upcomingEmployerInterviews.map((interview) => {
+              // Keep each slot's column number (1..3): select-slot reads by
+              // position, so an empty slot 1 must not renumber slot 2 as 1.
+              const slots = [interview.slot1, interview.slot2, interview.slot3].flatMap((d, i) =>
+                d instanceof Date ? [{ index: i + 1, iso: d.toISOString() }] : [],
+              );
               const company = data.names[interview.employerId] ?? "the company";
               return (
-                <div key={interview.id} className="rounded-2xl border border-ink-100 bg-white p-6 shadow-2xs">
+                <Surface key={interview.id} className="p-6">
                   <div className="mb-4 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
                     <div>
-                      <span className="text-2xs font-semibold uppercase tracking-wider text-brand-700">
-                        Coming up
-                      </span>
-                      <h3 className="text-base font-bold text-ink-900">
+                      <Pill tone="live">Coming up</Pill>
+                      <h3 className="mt-1.5 text-base font-semibold tracking-[-0.01em] text-ink-900">
                         Interview with {company}
                       </h3>
                     </div>
                     {interview.status === "pending" ? (
-                      <span className="rounded-full bg-amber-50 px-2.5 py-0.5 text-2xs font-semibold text-amber-800 border border-amber-200">
-                        Waiting on their time slots
-                      </span>
+                      <Pill tone="waiting">Waiting on their time slots</Pill>
                     ) : (
-                      <span className="rounded-full bg-brand-50 px-2.5 py-0.5 text-2xs font-semibold text-brand-700 border border-brand-200">
-                        Scheduled
-                      </span>
+                      <Pill tone="live">Scheduled</Pill>
                     )}
                   </div>
 
@@ -142,15 +155,13 @@ export default async function InternInterviews() {
                       appear here the moment they are set.
                     </p>
                   )}
-                </div>
+                </Surface>
               );
             })}
 
             {past.length > 0 ? (
               <div className="space-y-3 pt-2">
-                <h3 className="text-sm font-semibold text-ink-800">
-                  Completed & Past Rounds
-                </h3>
+                <SectionHead title="Completed & past rounds" />
                 <ul className="space-y-3">
                   {past.map((interview) => {
                     const company = data.names[interview.employerId] ?? "the company";
@@ -175,7 +186,7 @@ export default async function InternInterviews() {
                             </p>
                           ) : interview.notes?.trim() ? (
                             <div className="mt-3 rounded-xl border border-brand-200 bg-brand-50/50 p-4">
-                              <p className="text-2xs font-semibold uppercase tracking-[0.12em] text-brand-800">
+                              <p className="text-xs font-semibold text-brand-800">
                                 Feedback from the company
                               </p>
                               <p className="mt-1 text-xs leading-relaxed text-ink-800">
@@ -199,23 +210,21 @@ export default async function InternInterviews() {
       </section>
 
       {/* Tips */}
-      <section className="rounded-2xl border border-ink-100 bg-white p-5 shadow-2xs">
-        <h3 className="text-sm font-semibold text-ink-900">
-          Preparing for an interview
-        </h3>
+      <Surface className="p-5">
+        <SectionHead title="Preparing for an interview" />
         <p className="mt-1 text-xs leading-relaxed text-ink-600">
-          Review your assessment results before a technical round — they show your scores across coding, communication, and problem-solving, which is exactly what the interviewer has seen.
+          Review your assessment results before a technical round - they show your scores across coding, communication, and problem-solving, which is exactly what the interviewer has seen.
         </p>
         <div className="mt-3">
           <Link
             href="/intern/record"
-            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-ink-200 bg-ink-50 px-3.5 text-xs font-semibold text-ink-800 hover:bg-ink-100 transition-colors"
+            className="apple-spring apple-pressable inline-flex min-h-11 items-center gap-1.5 rounded-[10px] border border-ink-200 bg-ink-50 px-3.5 text-xs font-semibold text-ink-800 hover:bg-ink-100"
           >
             <span>View your verified record</span>
             <ArrowRight className="size-3" />
           </Link>
         </div>
-      </section>
+      </Surface>
     </div>
   );
 }

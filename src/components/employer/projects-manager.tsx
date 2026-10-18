@@ -57,6 +57,9 @@ export function ProjectsManager({
   const [fullTimeOffer, setFullTimeOffer] = useState(false);
   const [saving, setSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+  // Row actions (close/reopen, delete) report here, outside the edit sheet.
+  const [listError, setListError] = useState("");
+  const [busyId, setBusyId] = useState<string | null>(null);
 
   // Skills suggestion state
   const [skillFocused, setSkillFocused] = useState(false);
@@ -126,8 +129,9 @@ export function ProjectsManager({
       skills,
       scopeOfWork,
       locationType,
-      city: city.trim() || null,
-      state: state.trim() || null,
+      // Remote roles have no city; null clears one left over from an edit.
+      city: locationType === "remote" ? null : city.trim() || null,
+      state: locationType === "remote" ? null : state.trim() || null,
       timezone,
       fullTimeOffer,
     };
@@ -177,21 +181,47 @@ export function ProjectsManager({
 
   async function toggleStatus(project: Project) {
     const nextStatus = project.status === "active" ? "closed" : "active";
+    setBusyId(project.id);
+    setListError("");
     try {
       const res = await csrfFetch(`/api/employer/projects/${project.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: nextStatus }),
       });
-      if (res.ok) {
-        setProjects((prev) =>
-          prev.map((item) =>
-            item.id === project.id ? { ...item, status: nextStatus } : item,
-          ),
-        );
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        setListError(data.error ?? "Couldn't update this project. Try again.");
+        return;
       }
+      setProjects((prev) =>
+        prev.map((item) =>
+          item.id === project.id ? { ...item, status: nextStatus } : item,
+        ),
+      );
     } catch {
-      // Revert on fail
+      setListError("Couldn't reach the server. Check your connection and try again.");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function deleteProject(project: Project) {
+    if (!window.confirm(`Delete "${project.projectName}"? This can't be undone.`)) return;
+    setBusyId(project.id);
+    setListError("");
+    try {
+      const res = await csrfFetch(`/api/employer/projects/${project.id}`, { method: "DELETE" });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        setListError(data.error ?? "Couldn't delete this project.");
+        return;
+      }
+      setProjects((prev) => prev.filter((item) => item.id !== project.id));
+    } catch {
+      setListError("Couldn't reach the server. Check your connection and try again.");
+    } finally {
+      setBusyId(null);
     }
   }
 
@@ -225,7 +255,7 @@ export function ProjectsManager({
         <button
           type="button"
           onClick={openCreate}
-          className="inline-flex items-center gap-2 rounded-xl bg-brand-700 px-4 py-2.5 text-sm font-semibold text-white shadow-xs transition-all hover:bg-brand-600 active:scale-[0.98]"
+          className="apple-spring apple-pressable inline-flex min-h-11 items-center justify-center gap-2 rounded-[10px] bg-brand-700 px-4 text-sm font-semibold text-white shadow-xs hover:bg-brand-600"
         >
           <FolderPlus className="size-4" />
           <span>New Project</span>
@@ -234,11 +264,11 @@ export function ProjectsManager({
 
       {/* Tabs and Search Controls */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="inline-flex rounded-xl border border-ink-200/80 bg-white p-1 shadow-2xs">
+        <div className="inline-flex rounded-[10px] border border-ink-200/80 bg-white p-1 shadow-2xs">
           <button
             type="button"
             onClick={() => setFilterTab("all")}
-            className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+            className={`apple-spring apple-pressable inline-flex min-h-11 items-center rounded-[10px] px-3 text-xs font-medium tabular-nums ${
               filterTab === "all"
                 ? "bg-brand-700 text-white shadow-2xs font-semibold"
                 : "text-ink-600 hover:text-ink-900"
@@ -249,7 +279,7 @@ export function ProjectsManager({
           <button
             type="button"
             onClick={() => setFilterTab("active")}
-            className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+            className={`apple-spring apple-pressable inline-flex min-h-11 items-center rounded-[10px] px-3 text-xs font-medium tabular-nums ${
               filterTab === "active"
                 ? "bg-brand-700 text-white shadow-2xs font-semibold"
                 : "text-ink-600 hover:text-ink-900"
@@ -260,7 +290,7 @@ export function ProjectsManager({
           <button
             type="button"
             onClick={() => setFilterTab("closed")}
-            className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+            className={`apple-spring apple-pressable inline-flex min-h-11 items-center rounded-[10px] px-3 text-xs font-medium tabular-nums ${
               filterTab === "closed"
                 ? "bg-brand-700 text-white shadow-2xs font-semibold"
                 : "text-ink-600 hover:text-ink-900"
@@ -277,13 +307,14 @@ export function ProjectsManager({
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search projects or skills..."
-            className="h-9 w-full rounded-xl border border-ink-200 bg-white pl-9 pr-3 text-xs text-ink-900 outline-none transition-colors placeholder:text-ink-400 focus:border-brand-600"
+            className="apple-spring min-h-11 w-full rounded-[10px] border border-ink-200 bg-white pl-9 pr-3 text-[14px] text-ink-900 outline-none placeholder:text-ink-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
           />
           {searchQuery ? (
             <button
               type="button"
               onClick={() => setSearchQuery("")}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-ink-400 hover:text-ink-600"
+              aria-label="Clear search"
+              className="apple-spring apple-pressable absolute right-1.5 top-1/2 flex min-h-11 min-w-11 -translate-y-1/2 items-center justify-center rounded-[10px] text-ink-400 hover:text-ink-600"
             >
               <X className="size-3" />
             </button>
@@ -291,16 +322,22 @@ export function ProjectsManager({
         </div>
       </div>
 
+      {listError ? (
+        <div role="alert" className="rounded-[10px] border border-danger/30 bg-danger-soft p-3 text-sm text-danger">
+          {listError}
+        </div>
+      ) : null}
+
       {/* Projects List / Table */}
       {filtered.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-ink-200 bg-white/60 p-12 text-center">
-          <div className="mx-auto grid size-12 place-items-center rounded-2xl bg-brand-50 text-brand-700">
+        <div className="rounded-[20px] border border-dashed border-ink-200/70 bg-white/60 p-12 text-center shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)]">
+          <div className="mx-auto grid size-12 place-items-center rounded-[20px] bg-brand-50 text-brand-700">
             <Briefcase className="size-6" />
           </div>
           <h3 className="mt-4 text-base font-semibold text-ink-900">
             {projects.length === 0 ? "No projects created yet" : "No matching projects found"}
           </h3>
-          <p className="mx-auto mt-1 max-w-sm text-xs text-text-subtle">
+          <p className="mx-auto mt-1 max-w-sm text-sm text-text-subtle">
             {projects.length === 0
               ? "Create your first internship project to start matching with pre-vetted interns."
               : "Try clearing your search query or switching filters to see other projects."}
@@ -309,7 +346,7 @@ export function ProjectsManager({
             <button
               type="button"
               onClick={openCreate}
-              className="mt-5 inline-flex items-center gap-1.5 rounded-xl bg-brand-700 px-4 py-2 text-xs font-semibold text-white hover:bg-brand-600"
+              className="apple-spring apple-pressable mt-5 inline-flex min-h-11 items-center justify-center gap-1.5 rounded-[10px] bg-brand-700 px-4 text-sm font-semibold text-white hover:bg-brand-600"
             >
               <Plus className="size-3.5" />
               <span>Create Project</span>
@@ -329,14 +366,14 @@ export function ProjectsManager({
             return (
               <div
                 key={p.id}
-                className="group relative rounded-2xl border border-ink-200/80 bg-white p-5 shadow-2xs transition-all hover:border-ink-300 hover:shadow-xs"
+                className="apple-spring group relative rounded-[20px] border border-ink-200/70 bg-white p-5 shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)] hover:border-ink-300"
               >
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                   <div className="space-y-2">
                     <div className="flex flex-wrap items-center gap-2.5">
                       <h2 className="text-base font-semibold text-ink-900">{p.projectName}</h2>
                       <span
-                        className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-2xs font-semibold ${
+                        className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
                           isActive
                             ? "bg-brand-50 text-brand-700 border border-brand-200/60"
                             : "bg-ink-100 text-ink-600 border border-ink-200"
@@ -345,7 +382,7 @@ export function ProjectsManager({
                         {isActive ? "Active" : "Closed"}
                       </span>
                       {p.fullTimeOffer ? (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-accent-100/60 px-2.5 py-0.5 text-2xs font-medium text-accent-700 border border-accent-300/50">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-accent-100/60 px-2.5 py-0.5 text-xs font-medium text-accent-700 border border-accent-300/50">
                           <Sparkles className="size-3" />
                           <span>FTE Conversion</span>
                         </span>
@@ -378,7 +415,7 @@ export function ProjectsManager({
                         {projectSkills.map((s) => (
                           <span
                             key={s}
-                            className="rounded-lg bg-ink-50 px-2.5 py-0.5 text-2xs font-medium text-ink-700 border border-ink-200/60"
+                            className="rounded-[10px] bg-ink-50 px-2.5 py-0.5 text-xs font-medium text-ink-700 border border-ink-200/60"
                           >
                             {s}
                           </span>
@@ -391,7 +428,7 @@ export function ProjectsManager({
                   <div className="flex flex-wrap items-center gap-2 pt-2 sm:pt-0">
                     <Link
                       href={skillsHref}
-                      className="inline-flex items-center gap-1.5 rounded-xl border border-brand-200 bg-brand-50/60 px-3 py-1.5 text-xs font-semibold text-brand-700 hover:bg-brand-50 transition-colors"
+                      className="apple-spring apple-pressable inline-flex min-h-11 items-center justify-center gap-1.5 rounded-[10px] border border-brand-200 bg-brand-50/60 px-3 text-xs font-semibold text-brand-700 hover:bg-brand-50"
                       title="Find candidates matching this project's skills"
                     >
                       <Users className="size-3.5" />
@@ -401,7 +438,7 @@ export function ProjectsManager({
                     <button
                       type="button"
                       onClick={() => openEdit(p)}
-                      className="inline-flex items-center gap-1.5 rounded-xl border border-ink-200 bg-white px-3 py-1.5 text-xs font-medium text-ink-700 hover:bg-ink-50 transition-colors"
+                      className="apple-spring apple-pressable inline-flex min-h-11 items-center justify-center gap-1.5 rounded-[10px] border border-ink-200 bg-white px-3 text-xs font-medium text-ink-700 hover:bg-ink-50"
                     >
                       <Pencil className="size-3.5 text-ink-500" />
                       <span>Edit</span>
@@ -410,7 +447,8 @@ export function ProjectsManager({
                     <button
                       type="button"
                       onClick={() => toggleStatus(p)}
-                      className="inline-flex items-center gap-1.5 rounded-xl border border-ink-200 bg-white px-3 py-1.5 text-xs font-medium text-ink-700 hover:bg-ink-50 transition-colors"
+                      disabled={busyId === p.id}
+                      className="apple-spring apple-pressable inline-flex min-h-11 items-center justify-center gap-1.5 rounded-[10px] border border-ink-200 bg-white px-3 text-xs font-medium text-ink-700 hover:bg-ink-50 disabled:opacity-50"
                       title={isActive ? "Close this project" : "Reopen project"}
                     >
                       {isActive ? (
@@ -424,6 +462,14 @@ export function ProjectsManager({
                           <span>Reopen</span>
                         </>
                       )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => deleteProject(p)}
+                      disabled={busyId === p.id}
+                      className="inline-flex min-h-11 items-center justify-center rounded-[10px] px-3 text-xs font-medium text-danger hover:bg-danger-soft disabled:opacity-50"
+                    >
+                      Delete
                     </button>
                   </div>
                 </div>
@@ -447,7 +493,7 @@ export function ProjectsManager({
 
           <form onSubmit={handleSave} className="mt-6 space-y-5">
             {errorMsg ? (
-              <div className="rounded-xl border border-danger/30 bg-danger-soft p-3 text-xs text-danger">
+              <div className="rounded-[10px] border border-danger/30 bg-danger-soft p-3 text-sm text-danger">
                 {errorMsg}
               </div>
             ) : null}
@@ -463,7 +509,7 @@ export function ProjectsManager({
                 value={projectName}
                 onChange={(e) => setProjectName(e.target.value)}
                 placeholder="e.g. Frontend Engineering, Product Growth"
-                className="mt-1.5 h-10 w-full rounded-xl border border-ink-200 bg-white px-3.5 text-sm text-ink-900 outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600/20"
+                className="apple-spring mt-1.5 min-h-11 w-full rounded-[10px] border border-ink-200 bg-white px-3.5 text-[14px] text-ink-900 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
               />
             </div>
 
@@ -472,7 +518,7 @@ export function ProjectsManager({
               <label htmlFor="projectSkills" className="block text-xs font-semibold text-ink-800">
                 Required Skills * ({skills.length}/8)
               </label>
-              <p className="mt-0.5 text-2xs text-text-subtle">
+              <p className="mt-0.5 text-xs text-text-subtle">
                 Search the 2,482 shared skills vocabulary. Press Enter to add.
               </p>
 
@@ -493,20 +539,20 @@ export function ProjectsManager({
                     }}
                     placeholder="e.g. React, TypeScript, Python"
                     disabled={skills.length >= 8}
-                    className="h-10 flex-1 rounded-xl border border-ink-200 bg-white px-3.5 text-sm text-ink-900 outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600/20 disabled:bg-ink-50"
+                    className="apple-spring min-h-11 flex-1 rounded-[10px] border border-ink-200 bg-white px-3.5 text-[14px] text-ink-900 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 disabled:bg-ink-50"
                   />
                   <button
                     type="button"
                     onClick={() => addSkill(skillDraft)}
                     disabled={skills.length >= 8 || !skillDraft.trim()}
-                    className="rounded-xl border border-ink-200 bg-white px-3 text-xs font-semibold text-ink-800 hover:bg-ink-50 disabled:opacity-50"
+                    className="apple-spring apple-pressable min-h-11 rounded-[10px] border border-ink-200 bg-white px-3 text-xs font-semibold text-ink-800 hover:bg-ink-50 disabled:opacity-50"
                   >
                     Add
                   </button>
                 </div>
 
                 {skillSuggestions.length > 0 ? (
-                  <ul className="absolute left-0 right-0 z-30 mt-1 max-h-44 overflow-y-auto rounded-xl border border-ink-200 bg-white shadow-md">
+                  <ul className="absolute left-0 right-0 z-30 mt-1 max-h-44 overflow-y-auto rounded-[10px] border border-ink-200 bg-white shadow-md">
                     {skillSuggestions.map((s) => (
                       <li key={s}>
                         <button
@@ -515,7 +561,7 @@ export function ProjectsManager({
                             e.preventDefault();
                             addSkill(s);
                           }}
-                          className="w-full px-3.5 py-2 text-left text-xs text-ink-800 hover:bg-ink-50 transition-colors"
+                          className="apple-spring flex min-h-11 w-full items-center px-3.5 py-2 text-left text-xs text-ink-800 hover:bg-ink-50"
                         >
                           {s}
                         </button>
@@ -530,7 +576,7 @@ export function ProjectsManager({
                   {skills.map((s) => (
                     <span
                       key={s}
-                      className="inline-flex items-center gap-1 rounded-lg bg-brand-50 border border-brand-200 px-2.5 py-1 text-xs font-medium text-brand-700"
+                      className="inline-flex items-center gap-1 rounded-[10px] bg-brand-50 border border-brand-200 px-2.5 py-1 text-xs font-medium text-brand-700"
                     >
                       <span>{s}</span>
                       <button
@@ -556,7 +602,7 @@ export function ProjectsManager({
                   id="scope"
                   value={scopeOfWork}
                   onChange={(e) => setScopeOfWork(e.target.value)}
-                  className="mt-1.5 h-10 w-full rounded-xl border border-ink-200 bg-white px-3 text-xs text-ink-900 outline-none focus:border-brand-600"
+                  className="apple-spring mt-1.5 min-h-11 w-full rounded-[10px] border border-ink-200 bg-white px-3 text-[14px] text-ink-900 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
                 >
                   <option value="Short-term">Short-term (1–3 mos)</option>
                   <option value="Long-term">Long-term (4–6 mos)</option>
@@ -573,7 +619,7 @@ export function ProjectsManager({
                   id="locType"
                   value={locationType}
                   onChange={(e) => setLocationType(e.target.value)}
-                  className="mt-1.5 h-10 w-full rounded-xl border border-ink-200 bg-white px-3 text-xs text-ink-900 outline-none focus:border-brand-600"
+                  className="apple-spring mt-1.5 min-h-11 w-full rounded-[10px] border border-ink-200 bg-white px-3 text-[14px] text-ink-900 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
                 >
                   <option value="remote">Remote</option>
                   <option value="hybrid">Hybrid</option>
@@ -595,7 +641,7 @@ export function ProjectsManager({
                     value={city}
                     onChange={(e) => setCity(e.target.value)}
                     placeholder="e.g. Bengaluru, Gurugram"
-                    className="mt-1.5 h-10 w-full rounded-xl border border-ink-200 bg-white px-3 text-xs text-ink-900 outline-none focus:border-brand-600"
+                    className="apple-spring mt-1.5 min-h-11 w-full rounded-[10px] border border-ink-200 bg-white px-3 text-[14px] text-ink-900 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
                   />
                 </div>
                 <div>
@@ -608,7 +654,7 @@ export function ProjectsManager({
                     value={state}
                     onChange={(e) => setState(e.target.value)}
                     placeholder="e.g. Karnataka"
-                    className="mt-1.5 h-10 w-full rounded-xl border border-ink-200 bg-white px-3 text-xs text-ink-900 outline-none focus:border-brand-600"
+                    className="apple-spring mt-1.5 min-h-11 w-full rounded-[10px] border border-ink-200 bg-white px-3 text-[14px] text-ink-900 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
                   />
                 </div>
               </div>
@@ -624,7 +670,7 @@ export function ProjectsManager({
                   id="tz"
                   value={timezone}
                   onChange={(e) => setTimezone(e.target.value)}
-                  className="mt-1.5 h-10 w-full rounded-xl border border-ink-200 bg-white px-3 text-xs text-ink-900 outline-none focus:border-brand-600"
+                  className="apple-spring mt-1.5 min-h-11 w-full rounded-[10px] border border-ink-200 bg-white px-3 text-[14px] text-ink-900 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
                 >
                   <option value="Asia/Kolkata">Asia/Kolkata (IST)</option>
                   <option value="America/New_York">America/New_York (EST)</option>
@@ -634,12 +680,12 @@ export function ProjectsManager({
                 </select>
               </div>
 
-              <div className="flex items-center justify-between rounded-xl border border-ink-200/80 bg-ink-50/50 p-3.5">
+              <div className="flex items-center justify-between rounded-[10px] border border-ink-200/80 bg-ink-50/50 p-3.5">
                 <div>
                   <p className="text-xs font-semibold text-ink-900">
                     Full-time conversion opportunity?
                   </p>
-                  <p className="text-2xs text-text-subtle">
+                  <p className="text-xs text-text-subtle">
                     Attract high-performing candidates looking for post-internship roles.
                   </p>
                 </div>
@@ -647,7 +693,7 @@ export function ProjectsManager({
                   type="checkbox"
                   checked={fullTimeOffer}
                   onChange={(e) => setFullTimeOffer(e.target.checked)}
-                  className="size-4.5 rounded border-ink-300 text-brand-700 focus:ring-brand-600"
+                  className="size-4.5 rounded border-ink-300 text-brand-700 focus:border-brand-500 focus:ring-brand-500/20"
                 />
               </div>
             </div>
@@ -656,14 +702,14 @@ export function ProjectsManager({
               <button
                 type="button"
                 onClick={() => setSheetOpen(false)}
-                className="rounded-xl border border-ink-200 bg-white px-4 py-2 text-xs font-semibold text-ink-700 hover:bg-ink-50"
+                className="apple-spring apple-pressable min-h-11 rounded-[10px] border border-ink-200 bg-white px-4 text-xs font-semibold text-ink-700 hover:bg-ink-50"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={saving}
-                className="inline-flex items-center gap-2 rounded-xl bg-brand-700 px-5 py-2 text-xs font-semibold text-white shadow-xs hover:bg-brand-600 disabled:opacity-50"
+                className="apple-spring apple-pressable inline-flex min-h-11 items-center justify-center gap-2 rounded-[10px] bg-brand-700 px-5 text-xs font-semibold text-white shadow-xs hover:bg-brand-600 disabled:opacity-50"
               >
                 {saving ? (
                   <span>Saving...</span>

@@ -1,8 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { FileUpload } from "@/components/app/file-upload";
 
 import { suggestSkills } from "@/lib/data/skills";
+import { csrfFetch } from "@/lib/client-fetch";
+import { phoneError } from "@/lib/phone";
 import {
   ArrowLeft,
   ArrowRight,
@@ -137,15 +140,22 @@ export function EmployerOnboardingForm({ initial, hasExistingProject, employerId
 
     setNotice(null);
     try {
-      const res = await fetch(`/api/employer/${employerId}`, {
+      // The form names the primary contact's number after the contact; the
+      // table stores it as the account's own country code + phone number.
+      const { primaryContactCountryCode, primaryContactPhone, ...company } = values.company;
+      const res = await csrfFetch(`/api/employer/${employerId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(values.company),
+        body: JSON.stringify({
+          ...company,
+          countryCode: primaryContactCountryCode,
+          phoneNumber: primaryContactPhone,
+        }),
       });
       const data = await res.json().catch(() => ({}));
       setNotice(res.ok ? "Company saved." : (data.error ?? "Save failed"));
     } catch {
-      setNotice("Network error — answers still held in this browser.");
+      setNotice("Network error - answers still held in this browser.");
     }
   }
 
@@ -159,7 +169,7 @@ export function EmployerOnboardingForm({ initial, hasExistingProject, employerId
       const url = hasExistingProject
         ? `/api/employer/projects/${existingProjectId}`
         : `/api/employer/${employerId}/projects`;
-      const res = await fetch(url, {
+      const res = await csrfFetch(url, {
         method: hasExistingProject ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(values.project),
@@ -167,7 +177,7 @@ export function EmployerOnboardingForm({ initial, hasExistingProject, employerId
       const data = await res.json().catch(() => ({}));
       setNotice(res.ok ? "Project saved." : (data.error ?? "Save failed"));
     } catch {
-      setNotice("Network error — answers still held in this browser.");
+      setNotice("Network error - answers still held in this browser.");
     }
   }
 
@@ -186,7 +196,7 @@ export function EmployerOnboardingForm({ initial, hasExistingProject, employerId
                   onClick={() => goTo(i)}
                   aria-current={state === "current" ? "step" : undefined}
                   className={[
-                    "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-colors",
+                    "apple-spring apple-pressable flex min-h-11 w-full items-center gap-3 rounded-[10px] px-3 py-2.5 text-left text-sm",
                     state === "current"
                       ? "bg-brand-50 font-semibold text-brand-700"
                       : "text-ink-600 hover:bg-ink-100",
@@ -194,7 +204,7 @@ export function EmployerOnboardingForm({ initial, hasExistingProject, employerId
                 >
                   <span
                     className={[
-                      "grid size-7 shrink-0 place-items-center rounded-full text-2xs font-semibold",
+                      "grid size-7 shrink-0 place-items-center rounded-full text-xs font-semibold tabular-nums",
                       state === "current"
                         ? "bg-brand-700 text-white"
                         : state === "done"
@@ -217,7 +227,7 @@ export function EmployerOnboardingForm({ initial, hasExistingProject, employerId
       </nav>
 
       <div className="min-w-0">
-        <div className="rounded-2xl border border-ink-100 bg-white p-6 shadow-sm sm:p-8">
+        <div className="rounded-[20px] border border-ink-200/70 bg-white p-6 shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)] sm:p-8">
           <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-brand-700">
             Stage {stage + 1} of {STAGES.length}
           </p>
@@ -248,7 +258,7 @@ export function EmployerOnboardingForm({ initial, hasExistingProject, employerId
         {notice ? (
           <p
             role="status"
-            className="mt-4 flex items-start gap-2.5 rounded-xl border border-warning/25 bg-warning-soft px-4 py-3 text-sm text-ink-700"
+            className="mt-4 flex items-start gap-2.5 rounded-[10px] border border-warning/25 bg-warning-soft px-4 py-3 text-sm text-ink-700"
           >
             <TriangleAlert className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden />
             <span>{notice}</span>
@@ -260,7 +270,7 @@ export function EmployerOnboardingForm({ initial, hasExistingProject, employerId
             <button
               type="button"
               onClick={() => goTo(stage - 1)}
-              className="inline-flex h-11 items-center gap-2 rounded-lg border border-ink-200 bg-white px-4 text-sm font-medium text-ink-800 transition-colors hover:bg-ink-50"
+              className="apple-spring apple-pressable inline-flex min-h-11 items-center justify-center gap-2 rounded-[10px] border border-ink-200 bg-white px-4 text-sm font-medium text-ink-800 hover:bg-ink-50"
             >
               <ArrowLeft className="size-4" aria-hidden />
               Back
@@ -272,7 +282,7 @@ export function EmployerOnboardingForm({ initial, hasExistingProject, employerId
               <button
                 type="button"
                 onClick={onContinue}
-                className="group inline-flex h-11 items-center gap-2 rounded-lg bg-brand-700 px-5 text-sm font-semibold text-white transition-colors hover:bg-brand-600"
+                className="apple-spring apple-pressable group inline-flex min-h-11 items-center justify-center gap-2 rounded-[10px] bg-brand-700 px-5 text-sm font-semibold text-white hover:bg-brand-600"
               >
                 Continue to project
                 <ArrowRight
@@ -283,7 +293,7 @@ export function EmployerOnboardingForm({ initial, hasExistingProject, employerId
               <button
                 type="button"
                 onClick={onSaveCompany}
-                className="inline-flex h-11 items-center gap-2 rounded-lg border border-ink-200 bg-white px-4 text-sm font-medium text-ink-800 transition-colors hover:bg-ink-50"
+                className="apple-spring apple-pressable inline-flex min-h-11 items-center justify-center gap-2 rounded-[10px] border border-ink-200 bg-white px-4 text-sm font-medium text-ink-800 hover:bg-ink-50"
               >
                 <Save className="size-4" aria-hidden />
                 Save company details
@@ -293,7 +303,7 @@ export function EmployerOnboardingForm({ initial, hasExistingProject, employerId
             <button
               type="button"
               onClick={onSaveProject}
-              className="inline-flex h-11 items-center gap-2 rounded-lg bg-brand-700 px-5 text-sm font-semibold text-white transition-colors hover:bg-brand-600"
+              className="apple-spring apple-pressable inline-flex min-h-11 items-center justify-center gap-2 rounded-[10px] bg-brand-700 px-5 text-sm font-semibold text-white hover:bg-brand-600"
             >
               <Save className="size-4" aria-hidden />
               {hasExistingProject ? "Save project" : "Create project"}
@@ -301,7 +311,7 @@ export function EmployerOnboardingForm({ initial, hasExistingProject, employerId
           )}
 
           <p className="text-xs text-text-subtle">
-            Drafts are kept in this browser only, until the employer API lands.
+            Unsaved changes are kept in this browser until you save.
           </p>
         </div>
       </div>
@@ -348,7 +358,7 @@ function CompanyStage({
           placeholder="hiring@acme.com"
           value={values.companyEmail}
           error={errors.companyEmail}
-          hint="Work address only — a Gmail or Outlook mailbox is rejected here."
+          hint="Work address only - a Gmail or Outlook mailbox is rejected here."
           onChange={(v) => setCompany({ companyEmail: v })}
         />
         <Field
@@ -362,16 +372,18 @@ function CompanyStage({
         />
       </div>
 
-      <Field
-        id="logoUrl"
-        label="Logo URL"
-        type="url"
-        hint="Optional. Shown next to your project on a candidate's offer."
-        placeholder="https://cdn.example.com/logo.png"
-        value={values.logoUrl}
-        error={errors.logoUrl}
-        onChange={(v) => setCompany({ logoUrl: v })}
-      />
+      <div>
+        <p className="text-sm font-medium text-ink-800">Company logo</p>
+        <FileUpload
+          className="mt-2"
+          kind="employer_logo"
+          accept="image/jpeg,image/png,image/webp"
+          label="Logo"
+          hint="Optional. PNG, JPG or WebP up to 2 MB. Shown next to your project on a candidate's offer."
+          current={values.logoUrl ? "Logo on file" : null}
+          onUploaded={(r) => setCompany({ logoUrl: r.url })}
+        />
+      </div>
 
       <div className="grid gap-5 sm:grid-cols-3">
         <Field
@@ -406,7 +418,16 @@ function CompanyStage({
         onChange={(v) => setCompany({ gstNumber: v.toUpperCase() })}
       />
 
-      <fieldset className="rounded-xl border border-ink-100 bg-ink-50/60 p-5">
+      <Field
+        id="billingPincode"
+        label="Billing PIN code"
+        hint="Required for companies in India. It sets the GST on your invoice: CGST + SGST within Rajasthan, IGST elsewhere."
+        value={values.billingPincode}
+        error={errors.billingPincode}
+        onChange={(v) => setCompany({ billingPincode: v.replace(/\D/g, "").slice(0, 6) })}
+      />
+
+      <fieldset className="rounded-[10px] border border-ink-200/70 bg-ink-50/60 p-5">
         <legend className="px-1 text-sm font-semibold text-ink-900">Primary contact</legend>
         <p className="mt-0.5 text-xs text-text-subtle">
           The first person an intern or a Findtern coordinator calls.
@@ -440,7 +461,7 @@ function CompanyStage({
         </div>
       </fieldset>
 
-      <fieldset className="rounded-xl border border-ink-100 bg-ink-50/60 p-5">
+      <fieldset className="rounded-[10px] border border-ink-200/70 bg-ink-50/60 p-5">
         <legend className="px-1 text-sm font-semibold text-ink-900">
           Escalation contact
         </legend>
@@ -520,7 +541,7 @@ function ProjectStage({
       <Field
         id="projectName"
         label="Project name"
-        placeholder="Backend engineering — payments"
+        placeholder="Backend engineering - payments"
         value={values.projectName}
         error={errors.projectName}
         hint="Candidates see this verbatim. Name the work, not the requisition number."
@@ -530,7 +551,7 @@ function ProjectStage({
       <ChipInput
         id="skills"
         label="Skills"
-        hint="Up to 7. Start typing to search the shared skills vocabulary — the same list candidates pick from."
+        hint="Up to 7. Start typing to search the shared skills vocabulary - the same list candidates pick from."
         placeholder="TypeScript"
         entries={values.skills}
         max={7}
@@ -628,7 +649,7 @@ function ProjectStage({
         error={errors.preferredLocations}
       />
 
-      <label className="flex items-start gap-2.5 rounded-xl border border-ink-100 bg-ink-50/60 px-4 py-3.5 text-sm text-ink-700">
+      <label className="flex items-start gap-2.5 rounded-[10px] border border-ink-200/70 bg-ink-50/60 px-4 py-3.5 text-sm text-ink-700">
         <input
           type="checkbox"
           checked={values.fullTimeOffer}
@@ -644,11 +665,11 @@ function ProjectStage({
         </span>
       </label>
 
-      <p className="flex items-start gap-2 rounded-lg bg-ink-50 px-3.5 py-3 text-xs leading-relaxed text-ink-600">
+      <p className="flex items-start gap-2 rounded-[10px] bg-ink-50 px-3.5 py-3 text-xs leading-relaxed text-ink-600">
         <Info className="mt-0.5 size-3.5 shrink-0 text-ink-400" aria-hidden />
         <span>
           Every field here maps to a real column on <code className="font-mono">projects</code>
-          . Compensation is not one of them — it is set per proposal, because it depends on the
+          . Compensation is not one of them - it is set per proposal, because it depends on the
           candidate&apos;s Findtern Score.
         </span>
       </p>
@@ -671,7 +692,7 @@ function ToggleChip({
       aria-pressed={active}
       onClick={onClick}
       className={[
-        "rounded-full border px-4 py-1.5 text-sm font-medium transition-colors",
+        "apple-spring apple-pressable min-h-11 rounded-full border px-4 py-1.5 text-sm font-medium",
         active
           ? "border-brand-700 bg-brand-700 text-white"
           : "border-ink-200 bg-white text-ink-700 hover:bg-ink-50",
@@ -685,9 +706,9 @@ function ToggleChip({
 /* ── Form primitives ─────────────────────────────────────────────────────── */
 
 const FIELD_BASE =
-  "mt-2 h-11 w-full rounded-lg border bg-white px-3.5 text-sm text-ink-900 outline-none transition-[border-color,box-shadow] placeholder:text-ink-400 focus-visible:ring-[3px]";
-const FIELD_OK = "border-ink-200 focus-visible:border-brand-600 focus-visible:ring-brand-600/20";
-const FIELD_BAD = "border-danger focus-visible:border-danger focus-visible:ring-danger/20";
+  "apple-spring mt-2 min-h-11 w-full rounded-[10px] border bg-white px-3.5 text-[14px] text-ink-900 outline-none placeholder:text-ink-400 focus:ring-2";
+const FIELD_OK = "border-ink-200 focus:border-brand-500 focus:ring-brand-500/20";
+const FIELD_BAD = "border-danger focus:border-danger focus:ring-danger/20";
 
 function Field({
   id,
@@ -812,7 +833,7 @@ function PhoneField({
           value={code}
           onChange={(e) => onCodeChange(e.target.value)}
           aria-label={`${id} country code`}
-          className={`h-11 shrink-0 rounded-lg border bg-white px-2.5 text-sm text-ink-800 outline-none focus-visible:border-brand-600 focus-visible:ring-[3px] focus-visible:ring-brand-600/20 ${
+          className={`apple-spring min-h-11 shrink-0 rounded-[10px] border bg-white px-2.5 text-[14px] text-ink-800 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 ${
             error ? FIELD_BAD : FIELD_OK
           }`}
         >
@@ -912,14 +933,14 @@ function ChipInput({
           type="button"
           onClick={() => commit()}
           disabled={full}
-          className="inline-flex h-11 shrink-0 items-center gap-1.5 rounded-lg border border-ink-200 bg-white px-4 text-sm font-medium text-ink-800 transition-colors hover:bg-ink-50 disabled:pointer-events-none disabled:opacity-60"
+          className="apple-spring apple-pressable inline-flex min-h-11 shrink-0 items-center justify-center gap-1.5 rounded-[10px] border border-ink-200 bg-white px-4 text-sm font-medium text-ink-800 hover:bg-ink-50 disabled:pointer-events-none disabled:opacity-60"
         >
           <Plus className="size-4" aria-hidden />
           Add
         </button>
       </div>
       {options.length > 0 ? (
-        <ul className="mt-2 overflow-hidden rounded-lg border border-ink-200 bg-white shadow-xs">
+        <ul className="mt-2 overflow-hidden rounded-[10px] border border-ink-200 bg-white shadow-xs">
           {options.map((option) => (
             <li key={option}>
               <button
@@ -929,7 +950,7 @@ function ChipInput({
                   e.preventDefault();
                   commit(option);
                 }}
-                className="block w-full px-3 py-2 text-left text-sm text-ink-800 transition-colors hover:bg-ink-50"
+                className="apple-spring flex min-h-11 w-full items-center px-3 py-2 text-left text-sm text-ink-800 hover:bg-ink-50"
               >
                 {option}
               </button>
@@ -949,14 +970,14 @@ function ChipInput({
           {entries.map((entry) => (
             <li
               key={entry}
-              className="inline-flex items-center gap-1 rounded-full bg-brand-50 py-1 pl-3 pr-1 text-2xs font-medium text-brand-700"
+              className="inline-flex items-center gap-1 rounded-full bg-brand-50 py-1 pl-3 pr-1 text-xs font-medium text-brand-700"
             >
               {entry}
               <button
                 type="button"
                 onClick={() => onRemove(entry)}
                 aria-label={`Remove ${entry}`}
-                className="grid size-5 place-items-center rounded-full transition-colors hover:bg-brand-100"
+                className="apple-spring grid size-7 shrink-0 place-items-center rounded-full hover:bg-brand-100"
               >
                 <X className="size-3" aria-hidden />
               </button>
@@ -972,7 +993,7 @@ function ChipInput({
 
 /* ── Validation ──────────────────────────────────────────────────────────── */
 
-/** A domain with a dot and a 2+ character TLD — the legacy websiteUrl rule. */
+/** A domain with a dot and a 2+ character TLD - the legacy websiteUrl rule. */
 function looksLikeHost(raw: string): boolean {
   const value = raw.trim();
   if (!value) return false;
@@ -994,7 +1015,7 @@ function validateStage(values: OnboardingDraft, stage: number): Record<string, s
     const c = values.company;
     if (c.companyName.trim().length < 2) errors.companyName = "Company name is required.";
     if (c.websiteUrl.trim() && !looksLikeHost(c.websiteUrl)) {
-      errors.websiteUrl = "That does not look like a website — try acme.com.";
+      errors.websiteUrl = "That does not look like a website - try acme.com.";
     }
 
     const email = c.companyEmail.trim();
@@ -1012,6 +1033,11 @@ function validateStage(values: OnboardingDraft, stage: number): Record<string, s
     if (!c.state.trim()) errors.state = "State is required.";
     if (!c.country.trim()) errors.country = "Country is required.";
 
+    const inIndia = !c.country.trim() || /^(india|in)$/i.test(c.country.trim());
+    if (inIndia && !/^[1-9]\d{5}$/.test(c.billingPincode.trim())) {
+      errors.billingPincode = "Enter the 6-digit PIN code of your billing address.";
+    }
+
     if (c.gstNumber.trim() && !/^[0-9A-Z]{15}$/.test(c.gstNumber.trim())) {
       errors.gstNumber = "A GST number is 15 characters, letters and digits only.";
     }
@@ -1022,9 +1048,8 @@ function validateStage(values: OnboardingDraft, stage: number): Record<string, s
     if (c.primaryContactRole.trim().length < 2) {
       errors.primaryContactRole = "Their role is required, e.g. Talent acquisition.";
     }
-    if (!/^\d{6,15}$/.test(c.primaryContactPhone.trim())) {
-      errors.primaryContactPhone = "6 to 15 digits, no spaces.";
-    }
+    const primaryPhoneProblem = phoneError(c.primaryContactCountryCode, c.primaryContactPhone);
+    if (primaryPhoneProblem) errors.primaryContactPhone = primaryPhoneProblem;
 
     // All-or-nothing, mirroring the legacy superRefine on the setup form.
     const escalation = [
@@ -1043,8 +1068,12 @@ function validateStage(values: OnboardingDraft, stage: number): Record<string, s
         c.escalationContactEmail.trim().toLowerCase() === email.toLowerCase()
       ) {
         errors.escalationContactEmail = "That is already the primary contact email.";
-      } else if (!/^\d{6,15}$/.test(c.escalationContactPhone.trim())) {
-        errors.escalationContactPhone = "6 to 15 digits, no spaces.";
+      } else {
+        const escalationPhoneProblem = phoneError(
+          c.escalationContactCountryCode,
+          c.escalationContactPhone,
+        );
+        if (escalationPhoneProblem) errors.escalationContactPhone = escalationPhoneProblem;
       }
     }
   }
@@ -1082,7 +1111,7 @@ function subscribeToNothing() {
 
 /* Returns the raw string, not a parsed object: useSyncExternalStore compares
  * snapshots with Object.is, and JSON.parse would hand back a fresh object on
- * every call — an unconditional re-render loop. Parsing happens once, upstream,
+ * every call - an unconditional re-render loop. Parsing happens once, upstream,
  * in the useMemo. */
 function readDraft(): string | null {
   try {
@@ -1111,7 +1140,7 @@ function parseDraft(raw: string | null): DraftPatch {
       project: pick(record.project, PROJECT_KEYS) as Partial<ProjectDraft>,
     };
   } catch {
-    // A corrupt draft is not worth an error state — the form still works.
+    // A corrupt draft is not worth an error state - the form still works.
     return {};
   }
 }
@@ -1146,6 +1175,7 @@ const COMPANY_KEYS = [
   "escalationContactCountryCode",
   "escalationContactPhone",
   "gstNumber",
+  "billingPincode",
 ] as const;
 
 const PROJECT_KEYS = [

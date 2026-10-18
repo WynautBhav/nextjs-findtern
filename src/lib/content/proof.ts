@@ -1,5 +1,5 @@
 /**
- * PARTNERS, TESTIMONIALS, SKILLS — real CMS content.
+ * PARTNERS, TESTIMONIALS, SKILLS - real CMS content.
  *
  * Pulled from the live Findtern API on 2026-10-02:
  *   GET https://findtern.in/api/website/partners   → 9 rows
@@ -7,7 +7,7 @@
  *   GET https://findtern.in/api/website/skills     → 11 rows
  *
  * Every logo and avatar upstream is a base64 data URI inside the JSON body
- * — 1.9 MB of inline image data across the three endpoints. They are decoded
+ * - 1.9 MB of inline image data across the three endpoints. They are decoded
  * to real files under /public/media and converted to WebP here, which takes
  * the payload from 1.64 MB to about 168 KB. The API still serves data URIs;
  * when the data layer is wired to the database directly, these rows come back
@@ -117,7 +117,7 @@ export const HAPPY_FACES: CmsHappyFace[] = [
   },
   {
     "id": "aaec8ebe-b3fe-4162-ab90-30f7d59d6f2a",
-    "quote": "Hiring interns used to take weeks. With Findtern, we found the right talent in days—pre-vetted and ready to contribute",
+    "quote": "Hiring interns used to take weeks. With Findtern, we found the right talent in days-pre-vetted and ready to contribute",
     "title": "Founder",
     "name": "Anubhav Sharma",
     "company": "Stagelife Weddings",

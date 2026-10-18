@@ -11,26 +11,50 @@
  * components/marketing/region-rates.tsx instead.
  */
 
+export type Currency = "INR" | "USD";
+
+/**
+ * The one money formatter. `minor` is paise/cents.
+ * - zeroLabel: text for 0 (default "Free"); pass false to print ₹0.
+ * - decimals: fixed fraction digits (invoices use 2).
+ * - short: ₹1.2L / ₹12k for chart ticks and tiles.
+ */
 export function formatMoney(
   minor: number,
-  currency: "INR" | "USD" = "INR",
-  opts: { compact?: boolean; zeroLabel?: string } = {},
+  currency: Currency | string = "INR",
+  opts: { compact?: boolean; zeroLabel?: string | false; decimals?: number; short?: boolean } = {},
 ): string {
+  const cur: Currency = String(currency).toUpperCase() === "USD" ? "USD" : "INR";
   const value = minor / 100;
-  if (value === 0) return opts.zeroLabel ?? (currency === "INR" ? "Free" : "$0");
+  if (value === 0 && opts.zeroLabel !== false) return opts.zeroLabel ?? (cur === "INR" ? "Free" : "$0");
 
-  return new Intl.NumberFormat(currency === "INR" ? "en-IN" : "en-US", {
+  if (opts.short && Math.abs(value) >= 1000) {
+    if (cur === "INR") {
+      return Math.abs(value) >= 100000
+        ? `₹${(value / 100000).toFixed(Math.abs(value) >= 1000000 ? 1 : 0)}L`
+        : `₹${(value / 1000).toFixed(Math.abs(value) >= 10000 ? 0 : 1)}k`;
+    }
+    return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", notation: "compact", maximumFractionDigits: 1 }).format(value);
+  }
+
+  const digits = opts.decimals ?? (opts.compact || opts.short || Number.isInteger(value) ? 0 : 2);
+  return new Intl.NumberFormat(cur === "INR" ? "en-IN" : "en-US", {
     style: "currency",
-    currency,
-    maximumFractionDigits: opts.compact || Number.isInteger(value) ? 0 : 2,
-    minimumFractionDigits: 0,
+    currency: cur,
+    maximumFractionDigits: digits,
+    minimumFractionDigits: opts.decimals ?? 0,
   }).format(value);
+}
+
+/** 12,34,567 (Indian grouping). */
+export function formatNumber(n: number): string {
+  return n.toLocaleString("en-IN");
 }
 
 /** "INR 100/hr" - used in plan column headers. */
 export function formatRate(
   minor: number,
-  currency: "INR" | "USD" = "INR",
+  currency: Currency = "INR",
 ): string {
   return minor <= 0 ? formatMoney(0, currency) : `${formatMoney(minor, currency)}/hr`;
 }
@@ -38,7 +62,7 @@ export function formatRate(
 /** "INR 5,000 per hire", or a flat zero when there is no per-hire charge. */
 export function formatPerHire(
   minor: number,
-  currency: "INR" | "USD" = "INR",
+  currency: Currency = "INR",
 ): string {
   if (minor <= 0) return formatMoney(0, currency);
   return `${formatMoney(minor, currency)} per hire`;

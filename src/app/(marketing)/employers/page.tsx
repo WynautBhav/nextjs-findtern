@@ -16,6 +16,7 @@ import { PageHero, PageSection } from "@/components/marketing/page-hero";
 import { ButtonLink } from "@/components/ui/button";
 import { SectionHeading } from "@/components/ui/section-heading";
 import { EmployerPlanCards } from "@/components/marketing/employer-plan-cards";
+import { getPlans } from "@/lib/content";
 import { TiltCard } from "@/components/motion/tilt-card";
 import { CountUp } from "@/components/motion/count-up";
 import { FaqExplorer } from "@/components/marketing/faq-explorer";
@@ -73,7 +74,8 @@ const STEPS = [
   },
 ];
 
-export default function EmployersPage() {
+export default async function EmployersPage() {
+  const [plansInr, plansUsd] = await Promise.all([getPlans(true), getPlans(false)]);
   return (
     <>
       <PageHero
@@ -215,12 +217,12 @@ export default function EmployersPage() {
             </ButtonLink>
           }
         />
-        <EmployerPlanCards />
+        <EmployerPlanCards plansInr={plansInr} plansUsd={plansUsd} />
       </PageSection>
 
       {/* ── Numbers ────────────────────────────────────────────────── */}
-      <PageSection>
-        <div className="grid gap-10 sm:grid-cols-3">
+      <PageSection className="py-8 sm:py-14 md:py-20">
+        <div className="grid grid-cols-3 divide-x divide-ink-200/80 rounded-2xl border border-ink-200/80 bg-white/70 py-5 shadow-xs backdrop-blur-xs sm:divide-x-0 sm:border-0 sm:bg-transparent sm:py-0 sm:shadow-none sm:gap-10">
           <Figure value={160} suffix="hrs" label="Minimum engagement" />
           <Figure value={3} label="Screening stages" />
           <Figure value={7} suffix=" days" label="Typical time to hire" />
@@ -281,7 +283,7 @@ export default function EmployersPage() {
                 category: "Payment",
                 question: "When do I pay?",
                 answer:
-                  "Hourly tiers are billed against approved timesheets. A per-hire charge, where it applies, is invoiced once when the intern is hired. The intern's stipend is routed separately and does not come out of your invoice.",
+                  "Hourly tiers are billed against approved timesheets. The fixed ₹5,000 (or $50) per-hire charge is invoiced once when the intern is hired. The intern's stipend is routed separately and does not come out of your invoice.",
               },
               {
                 id: "e4",
@@ -315,12 +317,12 @@ function Figure({
   label: string;
 }) {
   return (
-    <div className="text-center">
-      <p className="text-4xl font-bold tracking-tight text-ink-900 sm:text-5xl">
+    <div className="px-1 text-center sm:px-0">
+      <p className="text-2xl font-bold tracking-tight text-ink-900 sm:text-4xl md:text-5xl">
         <CountUp value={value} />
-        {suffix ? <span className="text-xl font-medium text-ink-400">{suffix}</span> : null}
+        {suffix ? <span className="text-xs font-semibold text-ink-400 sm:text-xl sm:font-medium">{suffix}</span> : null}
       </p>
-      <p className="mt-2 text-base text-ink-500">{label}</p>
+      <p className="mt-1 text-[11px] leading-tight text-ink-500 sm:mt-2 sm:text-base">{label}</p>
     </div>
   );
 }

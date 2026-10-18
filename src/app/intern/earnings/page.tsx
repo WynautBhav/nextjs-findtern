@@ -4,10 +4,10 @@ import { ArrowDownRight, ArrowRight, Clock3, Info } from "lucide-react";
 
 import { EmptyScene, PageHead, Pill, SectionHead, Surface } from "@/components/app/primitives";
 import { CountUp } from "@/components/app/count-up";
-import { getSession } from "@/lib/auth";
+import { requireRole } from "@/lib/auth";
 import { loadInternData } from "@/lib/intern-data";
 import { formatDayLabel, formatMoney } from "@/lib/format";
-import { moneyPlain } from "@/lib/journey";
+import { parseOffer, internStipendInrMinor } from "@/lib/offer";
 
 export const metadata: Metadata = {
   title: "Stipend",
@@ -37,14 +37,13 @@ export const metadata: Metadata = {
  * date the system does not control.
  */
 export default async function InternEarnings() {
-  const session = await getSession();
-  if (!session) return null;
+  const session = await requireRole("intern");
 
   const data = await loadInternData(session.uid);
   const { money } = data;
 
-  const monthly = data.engagement?.offerDetails
-    ? Number((data.engagement.offerDetails as Record<string, unknown>).monthlyAmountMinor ?? 0)
+  const monthly = data.engagement
+    ? (internStipendInrMinor(parseOffer(data.engagement.offerDetails, data.engagement.currency)) ?? 0)
     : 0;
 
   return (
@@ -67,7 +66,7 @@ export default async function InternEarnings() {
           <div className="space-y-8">
             {/* ── The two figures, kept apart on purpose ─────────── */}
             <div className="grid gap-3 sm:grid-cols-2">
-              <div className="rounded-2xl border border-ink-100 bg-white p-6 shadow-[0_1px_2px_rgb(7_47_36/0.04)]">
+              <Surface className="p-6">
                 <p className="text-sm text-ink-500">Paid to you so far</p>
                 <p className="mt-2 text-3xl font-semibold tabular-nums tracking-[-0.025em] text-ink-900">
                   <CountUp value={money.paidMinor / 100} currency={money.currency} />
@@ -77,31 +76,31 @@ export default async function InternEarnings() {
                     ? `Last one landed ${formatDayLabel(money.lastPaidAt).toLowerCase()}.`
                     : "Nothing has been paid out yet."}
                 </p>
-              </div>
+              </Surface>
 
-              <div
+              <Surface
                 className={
                   money.incomingMinor > 0
-                    ? "rounded-2xl border border-accent-300/60 bg-accent-100/40 p-6"
-                    : "rounded-2xl border border-ink-100 bg-white p-6 shadow-[0_1px_2px_rgb(7_47_36/0.04)]"
+                    ? "border-accent-300/60 bg-accent-100/40 p-6"
+                    : "p-6"
                 }
               >
                 <p className="text-sm text-ink-600">On its way</p>
                 <p className="mt-2 text-3xl font-semibold tabular-nums tracking-[-0.025em] text-ink-900">
-                  {money.incomingMinor > 0 ? moneyPlain(money.incomingMinor, money.currency) : "Nothing"}
+                  {money.incomingMinor > 0 ? formatMoney(money.incomingMinor, money.currency, { zeroLabel: false }) : "Nothing"}
                 </p>
                 <p className="mt-2 text-pretty text-sm leading-relaxed text-ink-600">
                   {money.nextExpectedAt
                     ? `Scheduled for ${formatDayLabel(money.nextExpectedAt)}. It usually arrives within two working days of that date.`
                     : "Nothing is scheduled yet. The date appears here as soon as it is set."}
                 </p>
-              </div>
+              </Surface>
             </div>
 
             {/* ── Every payment ──────────────────────────────────── */}
             <section>
               <SectionHead title="Every payment" hint="Newest first, with the bank reference." />
-              <ul className="divide-y divide-ink-100 overflow-hidden rounded-2xl border border-ink-100 bg-white">
+              <ul className="divide-y divide-ink-100 overflow-hidden rounded-[20px] border border-ink-200/70 bg-white shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)]">
                 {data.payouts.map((payout) => {
                   const isPaid = payout.status === "paid";
                   return (
@@ -123,7 +122,7 @@ export default async function InternEarnings() {
 
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-semibold tabular-nums text-ink-900">
-                          {moneyPlain(payout.amountMinor ?? 0, payout.currency ?? "INR")}
+                          {formatMoney(payout.amountMinor ?? 0, payout.currency ?? "INR", { zeroLabel: false })}
                         </p>
                         <p className="mt-0.5 text-xs text-ink-500">
                           {payout.referenceId ? (
@@ -154,9 +153,7 @@ export default async function InternEarnings() {
           <aside className="space-y-4">
             {monthly > 0 ? (
               <Surface className="p-5">
-                <h2 className="text-sm font-semibold tracking-[-0.01em] text-ink-900">
-                  Your rate
-                </h2>
+                <SectionHead title="Your rate" />
                 <p className="mt-2 text-3xl font-semibold tabular-nums tracking-[-0.025em] text-ink-900">
                   {formatMoney(monthly, "INR")}
                 </p>
@@ -169,10 +166,10 @@ export default async function InternEarnings() {
             ) : null}
 
             <Surface className="p-5">
-              <h2 className="flex items-center gap-2 text-sm font-semibold tracking-[-0.01em] text-ink-900">
-                <Info className="size-4 text-ink-400" aria-hidden />
-                How payment works
-              </h2>
+              <SectionHead
+                title="How payment works"
+                action={<Info className="size-4 text-ink-400" aria-hidden />}
+              />
               <ol className="mt-3 space-y-3">
                 {[
                   "Your bank details are on your profile. Without them no stipend can be sent.",
@@ -181,7 +178,7 @@ export default async function InternEarnings() {
                   "Every payment is added to your record as proof of work you were paid for.",
                 ].map((line, i) => (
                   <li key={i} className="flex gap-2.5">
-                    <span className="mt-0.5 grid size-5 shrink-0 place-items-center rounded-full bg-ink-100 text-2xs font-bold text-ink-600">
+                    <span className="mt-0.5 grid size-5 shrink-0 place-items-center rounded-full bg-ink-100 text-xs font-bold text-ink-600">
                       {i + 1}
                     </span>
                     <span className="text-pretty text-sm leading-relaxed text-ink-600">{line}</span>
@@ -192,7 +189,7 @@ export default async function InternEarnings() {
 
             <Link
               href="/intern/profile"
-              className="flex items-center justify-between gap-3 rounded-2xl border border-ink-100 bg-white p-5 transition-[border-color,box-shadow] duration-[var(--dur-standard)] hover:border-ink-200 hover:shadow-[0_10px_28px_-16px_rgb(7_47_36/0.3)]"
+              className="apple-spring apple-pressable flex items-center justify-between gap-3 rounded-[20px] border border-ink-200/70 bg-white p-5 shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)] hover:border-ink-200"
             >
               <span className="text-sm font-medium text-ink-800">
                 Check your bank details

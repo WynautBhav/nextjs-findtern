@@ -25,6 +25,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import { parseOffer } from "@/lib/offer";
 
 export type Company360Props = {
   company: Employer;
@@ -37,6 +38,8 @@ export type Company360Props = {
     intern: UserType | null;
     projectName: string;
   }[];
+  /** Monthly-plan placements with the next month still to pay. */
+  dues: { proposalId: string; internName: string; role: string; monthsPaid: number; months: number; nextMinor: number | null; currency: string }[];
 };
 
 export function Company360View({
@@ -46,12 +49,17 @@ export function Company360View({
   interviews,
   payments,
   hiredInterns,
+  dues,
 }: Company360Props) {
   const [activeTab, setActiveTab] = useState<
     "projects" | "proposals" | "interviews" | "payments" | "upcoming" | "hired"
   >("projects");
 
   const [selectedProposal, setSelectedProposal] = useState<Proposal | null>(null);
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+  const [selectedInterview, setSelectedInterview] = useState<
+    (Interview & { internName?: string; internEmail?: string }) | null
+  >(null);
 
   const activeProjectsCount = projects.filter((p) => p.status === "active").length;
   const totalRevenueMinor = payments
@@ -184,7 +192,7 @@ export function Company360View({
           { key: "proposals" as const, label: "Proposals", count: proposals.length },
           { key: "interviews" as const, label: "Interviews", count: interviews.length },
           { key: "payments" as const, label: "Payments", count: payments.length },
-          { key: "upcoming" as const, label: "Upcoming Dues", count: 0 },
+          { key: "upcoming" as const, label: "Upcoming Dues", count: dues.length },
           { key: "hired" as const, label: "Hired Interns", count: hiredInterns.length },
         ] as const).map((tab) => (
           <button
@@ -222,12 +230,13 @@ export function Company360View({
                 <TableHead className="px-5 py-3 text-xs font-semibold text-ink-700">Skills</TableHead>
                 <TableHead className="px-5 py-3 text-xs font-semibold text-ink-700">Status</TableHead>
                 <TableHead className="px-5 py-3 text-xs font-semibold text-ink-700">Date Posted</TableHead>
+                <TableHead className="px-5 py-3 text-right text-xs font-semibold text-ink-700">Action</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {projects.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="py-8 text-center text-xs text-ink-500">
+                  <TableCell colSpan={6} className="py-8 text-center text-xs text-ink-500">
                     No internship projects posted by this company yet.
                   </TableCell>
                 </TableRow>
@@ -260,6 +269,16 @@ export function Company360View({
                     <TableCell className="px-5 py-3.5 text-xs text-ink-500">
                       {formatDate(proj.createdAt)}
                     </TableCell>
+                    <TableCell className="px-5 py-3.5 text-right">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedProject(proj)}
+                        className="inline-flex items-center gap-1 rounded-lg border border-ink-200 px-2.5 py-1 text-2xs font-semibold text-ink-700 hover:bg-brand-50 hover:text-brand-800"
+                      >
+                        <Eye className="size-3" />
+                        <span>Quick View</span>
+                      </button>
+                    </TableCell>
                   </TableRow>
                 ))
               )}
@@ -290,8 +309,8 @@ export function Company360View({
                 </TableRow>
               ) : (
                 proposals.map((prop) => {
-                  const offer = (prop.offerDetails ?? {}) as Record<string, unknown>;
-                  const stipendMinor = Number(offer.monthlyAmountMinor ?? 1500000);
+                  const offer = parseOffer(prop.offerDetails, prop.currency);
+                  const stipendMinor = offer.monthlyMinor;
                   return (
                     <TableRow key={prop.id} className="hover:bg-ink-50/60">
                       <TableCell className="px-5 py-3.5">
@@ -303,10 +322,10 @@ export function Company360View({
                         </Link>
                       </TableCell>
                       <TableCell className="px-5 py-3.5 text-xs text-ink-800">
-                        {String(offer.roleTitle || "Internship")}
+                        {offer.roleTitle || "Internship"}
                       </TableCell>
                       <TableCell className="px-5 py-3.5 text-xs font-semibold tabular-nums text-ink-900">
-                        {formatCurrency(stipendMinor, prop.currency === "USD" ? "USD" : "INR")}/mo
+                        {stipendMinor != null ? `${formatCurrency(stipendMinor, offer.currency)}/mo` : "—"}
                       </TableCell>
                       <TableCell className="px-5 py-3.5">
                         <StatusBadge value={prop.status} />
@@ -343,12 +362,13 @@ export function Company360View({
                 <TableHead className="px-5 py-3 text-xs font-semibold text-ink-700">Timezone</TableHead>
                 <TableHead className="px-5 py-3 text-xs font-semibold text-ink-700">Status</TableHead>
                 <TableHead className="px-5 py-3 text-xs font-semibold text-ink-700">Created</TableHead>
+                <TableHead className="px-5 py-3 text-right text-xs font-semibold text-ink-700">Action</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {interviews.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="py-8 text-center text-xs text-ink-500">
+                  <TableCell colSpan={6} className="py-8 text-center text-xs text-ink-500">
                     No interviews scheduled.
                   </TableCell>
                 </TableRow>
@@ -377,6 +397,16 @@ export function Company360View({
                     </TableCell>
                     <TableCell className="px-5 py-3.5 text-xs text-ink-500">
                       {formatDate(iv.createdAt)}
+                    </TableCell>
+                    <TableCell className="px-5 py-3.5 text-right">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedInterview(iv)}
+                        className="inline-flex items-center gap-1 rounded-lg border border-ink-200 px-2.5 py-1 text-2xs font-semibold text-ink-700 hover:bg-brand-50 hover:text-brand-800"
+                      >
+                        <Eye className="size-3" />
+                        <span>View</span>
+                      </button>
                     </TableCell>
                   </TableRow>
                 ))
@@ -415,7 +445,7 @@ export function Company360View({
                       {formatCurrency(pay.amountMinor, pay.currency === "USD" ? "USD" : "INR")}
                     </TableCell>
                     <TableCell className="px-5 py-3.5 text-xs font-mono text-ink-600">
-                      {pay.paymentId || "—"}
+                      {pay.paymentId || "-"}
                     </TableCell>
                     <TableCell className="px-5 py-3.5">
                       <StatusBadge value={pay.status} />
@@ -432,15 +462,30 @@ export function Company360View({
       )}
 
       {activeTab === "upcoming" && (
-        <div className="rounded-2xl border border-dashed border-ink-200 bg-white p-12 text-center">
-          <div className="mx-auto grid size-12 place-items-center rounded-2xl bg-ink-50 text-ink-400">
-            <Clock className="size-6" />
+        dues.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-ink-200 bg-white p-12 text-center">
+            <div className="mx-auto grid size-12 place-items-center rounded-2xl bg-ink-50 text-ink-400">
+              <Clock className="size-6" />
+            </div>
+            <h3 className="mt-3 text-sm font-semibold text-ink-900">No monthly dues</h3>
+            <p className="mt-1 text-xs text-text-subtle">No placement on a monthly plan has a month left to pay.</p>
           </div>
-          <h3 className="mt-3 text-sm font-semibold text-ink-900">No pending milestone dues</h3>
-          <p className="mt-1 text-xs text-text-subtle">
-            All recurring monthly stipends and per-hire fees for this employer are up to date.
-          </p>
-        </div>
+        ) : (
+          <ul className="divide-y divide-ink-100 rounded-2xl border border-ink-100 bg-white">
+            {dues.map((d) => (
+              <li key={d.proposalId} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5 text-sm">
+                <span>
+                  <span className="font-semibold text-ink-900">{d.internName}</span>
+                  <span className="text-text-subtle"> · {d.role}</span>
+                </span>
+                <span className="text-xs text-text-subtle">
+                  Month {d.monthsPaid + 1} of {d.months} due
+                  {d.nextMinor != null ? ` · ${formatCurrency(d.nextMinor, d.currency === "USD" ? "USD" : "INR")}` : ""}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )
       )}
 
       {activeTab === "hired" && (
@@ -464,7 +509,7 @@ export function Company360View({
                 </TableRow>
               ) : (
                 hiredInterns.map((h) => {
-                  const offer = (h.proposal.offerDetails ?? {}) as Record<string, unknown>;
+                  const offer = parseOffer(h.proposal.offerDetails, h.proposal.currency);
                   const internName = `${h.intern?.firstName || ""} ${h.intern?.lastName || ""}`.trim();
                   return (
                     <TableRow key={h.proposal.id} className="hover:bg-ink-50/60">
@@ -475,7 +520,7 @@ export function Company360View({
                         {h.projectName}
                       </TableCell>
                       <TableCell className="px-5 py-3.5 text-xs text-ink-700">
-                        {String(offer.roleTitle || "Intern")}
+                        {offer.roleTitle || "Internship"}
                       </TableCell>
                       <TableCell className="px-5 py-3.5 text-xs text-ink-500">
                         {formatDate(h.proposal.hiredAt || h.proposal.updatedAt)}
@@ -514,39 +559,148 @@ export function Company360View({
           </DialogHeader>
 
           {selectedProposal && (() => {
-            const offer = (selectedProposal.offerDetails ?? {}) as Record<string, unknown>;
+            const offer = parseOffer(selectedProposal.offerDetails, selectedProposal.currency);
             return (
               <div className="space-y-3 pt-2 text-xs">
                 <div className="flex justify-between border-b border-ink-100 pb-2">
                   <span className="text-text-subtle">Role Title:</span>
-                  <span className="font-semibold text-ink-900">{String(offer.roleTitle || "Internship")}</span>
+                  <span className="font-semibold text-ink-900">{offer.roleTitle || "Internship"}</span>
                 </div>
                 <div className="flex justify-between border-b border-ink-100 pb-2">
                   <span className="text-text-subtle">Stipend:</span>
                   <span className="font-semibold text-brand-800">
-                    {formatCurrency(
-                      Number(offer.monthlyAmountMinor ?? 1500000),
-                      selectedProposal.currency === "USD" ? "USD" : "INR"
-                    )}/mo
+                    {offer.monthlyMinor != null ? `${formatCurrency(offer.monthlyMinor, offer.currency)}/mo` : "Not stated"}
                   </span>
                 </div>
                 <div className="flex justify-between border-b border-ink-100 pb-2">
                   <span className="text-text-subtle">Duration:</span>
-                  <span className="font-semibold text-ink-900">{String(offer.durationMonths || "3 months")}</span>
+                  <span className="font-semibold text-ink-900">{`${offer.months} month${offer.months === 1 ? "" : "s"}`}</span>
                 </div>
                 <div className="flex justify-between border-b border-ink-100 pb-2">
                   <span className="text-text-subtle">Work Mode:</span>
-                  <span className="font-semibold text-ink-900 capitalize">{String(offer.workMode || "Remote")}</span>
+                  <span className="font-semibold text-ink-900 capitalize">{offer.mode || "Not stated"}</span>
                 </div>
                 <div className="space-y-1">
                   <span className="text-text-subtle">Scope of Work:</span>
                   <p className="rounded-xl border border-ink-100 bg-ink-50/50 p-2.5 text-2xs text-ink-800 leading-relaxed">
-                    {String(offer.scopeOfWork || "Standard project milestones.")}
+                    {offer.jd || "Not stated."}
                   </p>
                 </div>
               </div>
             );
           })()}
+        </DialogContent>
+      </Dialog>
+      {/* Project Quick View Modal */}
+      <Dialog
+        open={Boolean(selectedProject)}
+        onOpenChange={(open) => !open && setSelectedProject(null)}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Project Quick View</DialogTitle>
+            <DialogDescription>
+              Internship project specifications and parameters.
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedProject && (
+            <div className="space-y-3 pt-2 text-xs">
+              <div className="flex justify-between border-b border-ink-100 pb-2">
+                <span className="text-text-subtle">Project Title:</span>
+                <span className="font-semibold text-ink-900">{selectedProject.projectName}</span>
+              </div>
+              <div className="flex justify-between border-b border-ink-100 pb-2">
+                <span className="text-text-subtle">Work Mode:</span>
+                <span className="font-semibold text-ink-900 capitalize">
+                  {selectedProject.locationType || "Remote"}
+                </span>
+              </div>
+              <div className="flex justify-between border-b border-ink-100 pb-2">
+                <span className="text-text-subtle">Status:</span>
+                <StatusBadge value={selectedProject.status || "active"} />
+              </div>
+              <div className="flex justify-between border-b border-ink-100 pb-2">
+                <span className="text-text-subtle">Full Time Offer:</span>
+                <span className="font-semibold text-ink-900">
+                  {selectedProject.fullTimeOffer ? "Yes (PPO Available)" : "Internship Only"}
+                </span>
+              </div>
+              <div>
+                <span className="text-text-subtle">Required Skills:</span>
+                <div className="mt-1 flex flex-wrap gap-1">
+                  {(selectedProject.skills ?? []).map((s) => (
+                    <span key={s} className="rounded-md bg-ink-100 px-2 py-0.5 text-2xs text-ink-800">
+                      {s}
+                    </span>
+                  ))}
+                </div>
+              </div>
+              {selectedProject.scopeOfWork && (
+                <div className="space-y-1">
+                  <span className="text-text-subtle">Scope of Work:</span>
+                  <p className="rounded-xl border border-ink-100 bg-ink-50/50 p-2.5 text-2xs text-ink-800 leading-relaxed">
+                    {selectedProject.scopeOfWork}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Interview Session Modal */}
+      <Dialog
+        open={Boolean(selectedInterview)}
+        onOpenChange={(open) => !open && setSelectedInterview(null)}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Interview Session Details</DialogTitle>
+            <DialogDescription>
+              Evaluation schedule for candidate.
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedInterview && (
+            <div className="space-y-3 pt-2 text-xs">
+              <div className="flex justify-between border-b border-ink-100 pb-2">
+                <span className="text-text-subtle">Candidate:</span>
+                <span className="font-semibold text-ink-900">
+                  {selectedInterview.internName || "Candidate"}
+                </span>
+              </div>
+              <div className="flex justify-between border-b border-ink-100 pb-2">
+                <span className="text-text-subtle">Status:</span>
+                <StatusBadge value={selectedInterview.status} />
+              </div>
+              <div className="space-y-1 border-b border-ink-100 pb-2">
+                <span className="text-text-subtle">Offered Slots:</span>
+                <div className="space-y-0.5 mt-1">
+                  {[selectedInterview.slot1, selectedInterview.slot2, selectedInterview.slot3]
+                    .filter(Boolean)
+                    .map((s, idx) => (
+                      <p key={idx} className="text-2xs text-ink-800">
+                        • {formatDate(s)}
+                      </p>
+                    ))}
+                </div>
+              </div>
+              {selectedInterview.meetingLink && (
+                <div className="rounded-xl border border-brand-200 bg-brand-50 p-2.5">
+                  <span className="text-2xs font-semibold text-brand-800 uppercase">Meeting Link:</span>
+                  <a
+                    href={selectedInterview.meetingLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-0.5 block font-semibold text-xs text-brand-700 hover:underline break-all"
+                  >
+                    {selectedInterview.meetingLink}
+                  </a>
+                </div>
+              )}
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>

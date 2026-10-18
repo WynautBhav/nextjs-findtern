@@ -72,6 +72,6 @@ test("a period ending before it starts yields nothing", () => {
   assert.deepEqual(normaliseEntries([], new Date("2026-05-10"), new Date("2026-05-01")), []);
 });
 
-test("exposes exactly the four statuses the intern form writes", () => {
-  assert.deepEqual([...DAY_STATUSES], ["Present", "Absent", "Fixed off", "Holiday"]);
+test("exposes exactly the five statuses the intern form writes", () => {
+  assert.deepEqual([...DAY_STATUSES], ["Present", "Leave", "Absent", "Fixed off", "Holiday"]);
 });

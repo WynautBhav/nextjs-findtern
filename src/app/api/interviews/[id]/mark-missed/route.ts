@@ -14,6 +14,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!interview) return NextResponse.json({ error: "Not found" }, { status: 404 });
   if (interview.employerId !== guard.session.uid) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
+  // Only a scheduled interview whose time has passed can be missed.
+  const start = interview.selectedSlot ? [interview.slot1, interview.slot2, interview.slot3][interview.selectedSlot - 1] : null;
+  if (interview.status !== "scheduled" || !start || start.getTime() > Date.now()) {
+    return NextResponse.json({ error: "You can mark an interview missed once its time has passed." }, { status: 409 });
+  }
   await db.update(schema.interviews).set({ status: "missed", updatedAt: new Date() }).where(eq(schema.interviews.id, id));
   return NextResponse.json({ ok: true });
 }

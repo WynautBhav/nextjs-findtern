@@ -2,8 +2,13 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { desc, eq, inArray } from "drizzle-orm";
 
+import { ContactEditor } from "@/components/admin/contact-editor";
+import { ViewAsButton } from "@/components/admin/view-as-button";
+import { CompanyControls } from "@/components/admin/company-controls";
 import { getDb, schema } from "@/lib/db";
 import { Company360View } from "@/components/admin/company-360-view";
+import { monthlyDues } from "@/lib/dues";
+import { parseOffer } from "@/lib/offer";
 
 export async function generateMetadata({
   params,
@@ -124,14 +129,44 @@ export default async function AdminCompanyDetailPage({
     };
   });
 
+  const dues = monthlyDues(rawProposals, payments).map((d) => {
+    const prop = rawProposals.find((p) => p.id === d.proposalId)!;
+    const offer = parseOffer(prop.offerDetails, prop.currency);
+    const intern = internMap.get(prop.internId);
+    return {
+      ...d,
+      internName: intern ? `${intern.firstName} ${intern.lastName}`.trim() : "Intern",
+      role: offer.roleTitle || "Internship",
+      nextMinor: offer.monthlyMinor,
+      currency: offer.currency,
+    };
+  });
+
   return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap justify-end gap-2">
+        <ContactEditor
+          targetType="employer"
+          targetId={company.id}
+          initial={{
+            name: company.name,
+            email: company.companyEmail,
+            countryCode: company.countryCode,
+            phoneNumber: company.phoneNumber,
+          }}
+        />
+        <ViewAsButton targetType="employer" targetId={company.id} label="View as company" />
+        <CompanyControls id={company.id} isActive={company.isActive} fteStatus={company.internationalFteStatus} />
+      </div>
     <Company360View
       company={company}
       projects={projects}
       proposals={proposals}
       interviews={interviews}
       payments={payments}
+      dues={dues}
       hiredInterns={hiredInterns}
     />
+    </div>
   );
 }

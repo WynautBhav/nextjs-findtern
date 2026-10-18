@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
 import { getDb, schema } from "@/lib/db";
+import { forgetAccountStatus } from "@/lib/account-status";
 import { requireMutation } from "@/lib/guards-mutation";
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -10,5 +11,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!guard.ok) return guard.response;
   const db = getDb();
   await db.update(schema.users).set({ isActive: false }).where(eq(schema.users.id, id));
+  forgetAccountStatus("intern", id);
   return NextResponse.json({ ok: true });
 }

@@ -4,7 +4,7 @@ import { ArrowRight, BellOff } from "lucide-react";
 
 import { EmptyScene, PageHead, SectionHead, Surface } from "@/components/app/primitives";
 import { NotificationList } from "@/components/app/notification-list";
-import { getSession } from "@/lib/auth";
+import { requireRole } from "@/lib/auth";
 import { notificationsFor } from "@/lib/intern-data";
 
 export const metadata: Metadata = {
@@ -33,8 +33,7 @@ export const metadata: Metadata = {
  * row is a fact about a row, not a score about a person.
  */
 export default async function InternNotifications() {
-  const session = await getSession();
-  if (!session) return null;
+  const session = await requireRole("intern");
 
   const rows = await notificationsFor(session.uid);
   const needsYou = rows.filter((n) => NEEDS_ACTION.has(n.type));
@@ -100,10 +99,8 @@ export default async function InternNotifications() {
             <Surface className="flex items-start gap-3 p-5">
               <BellOff className="mt-0.5 size-5 shrink-0 text-ink-400" aria-hidden />
               <div>
-                <h2 className="text-sm font-semibold tracking-[-0.01em] text-ink-900">
-                  What you will never get
-                </h2>
-                <ul className="mt-2 space-y-1.5 text-pretty text-sm leading-relaxed text-ink-600">
+                <SectionHead title="What you will never get" />
+                <ul className="space-y-1.5 text-pretty text-sm leading-relaxed text-ink-600">
                   {[
                     "No streak reminders, and nothing that tells you your streak is at risk.",
                     "No nudges to open the app. Nothing is sent because you were quiet.",
@@ -115,7 +112,7 @@ export default async function InternNotifications() {
                 </ul>
                 <Link
                   href="/intern/settings"
-                  className="mt-4 inline-flex min-h-9 items-center gap-1.5 text-sm font-medium text-primary underline-offset-4 hover:underline"
+                  className="apple-spring apple-pressable mt-4 inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-primary underline-offset-4 hover:underline"
                 >
                   Notification settings
                   <ArrowRight className="size-3.5" aria-hidden />

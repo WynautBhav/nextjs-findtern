@@ -3,7 +3,7 @@
 /**
  * Skill filter.
  *
- * This was ten hardcoded chips, commented as a deliberate trade-off — so the
+ * This was ten hardcoded chips, commented as a deliberate trade-off - so the
  * filter could not express anything outside that list, and a role in Rust or R
  * was unfilterable. Now that the shared 2,482-skill vocabulary exists
  * (`src/lib/data/skills.ts`) the trade-off is gone, but it cannot go back as
@@ -65,10 +65,10 @@ export function SkillFilter({ active }: { active: string[] }) {
             onBlur={() => window.setTimeout(() => setOpen(false), 120)}
             placeholder="Search 2,482 skills"
             aria-label="Search skills to filter by"
-            className="h-8 w-full rounded-full border border-ink-200 bg-white px-3.5 text-xs text-ink-900 outline-none placeholder:text-ink-400 focus-visible:border-brand-600"
+            className="apple-spring min-h-11 w-full rounded-[10px] border border-ink-200 bg-white px-3.5 text-[14px] text-ink-900 outline-none placeholder:text-ink-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
           />
           {open && options.length > 0 ? (
-            <ul className="absolute left-0 right-0 z-20 mt-1 overflow-hidden rounded-lg border border-ink-200 bg-white shadow-sm">
+            <ul className="absolute left-0 right-0 z-20 mt-1 overflow-hidden rounded-[10px] border border-ink-200 bg-white shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)]">
               {options.map((skill) => (
                 <li key={skill}>
                   <button
@@ -77,7 +77,7 @@ export function SkillFilter({ active }: { active: string[] }) {
                       e.preventDefault();
                       add(skill);
                     }}
-                    className="block w-full px-3 py-1.5 text-left text-xs text-ink-800 transition-colors hover:bg-ink-50"
+                    className="apple-spring flex min-h-11 w-full items-center px-3 py-1.5 text-left text-[13px] text-ink-800 hover:bg-ink-50"
                   >
                     {skill}
                   </button>
@@ -91,10 +91,10 @@ export function SkillFilter({ active }: { active: string[] }) {
       {active.length > 0 ? (
         <ul className="mt-2.5 flex flex-wrap gap-1.5">
           {active.map((skill) => (
-            <li key={skill}>
+            <li key={skill} className="min-w-0">
               <Link
                 href={hrefWith(active.filter((s) => s !== skill))}
-                className="inline-flex items-center gap-1 rounded-full border border-brand-700 bg-brand-700 px-3 py-1 text-2xs font-medium text-white transition-colors hover:bg-brand-600"
+                className="apple-spring apple-pressable inline-flex min-h-11 items-center justify-center gap-1 rounded-full border border-brand-700 bg-brand-700 px-3 py-1 text-xs font-medium tabular-nums text-white hover:bg-brand-600"
               >
                 {skill}
                 <X className="size-3" aria-hidden />
@@ -103,10 +103,10 @@ export function SkillFilter({ active }: { active: string[] }) {
             </li>
           ))}
           {active.length > 1 ? (
-            <li>
+            <li className="min-w-0">
               <Link
                 href={hrefWith([])}
-                className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-2xs font-medium text-ink-600 underline-offset-4 hover:underline"
+                className="apple-spring inline-flex min-h-11 items-center gap-1 rounded-full px-2 py-1 text-xs font-medium tabular-nums text-ink-600 underline-offset-4 hover:underline"
               >
                 <Check className="size-3" aria-hidden />
                 Clear
@@ -115,8 +115,8 @@ export function SkillFilter({ active }: { active: string[] }) {
           ) : null}
         </ul>
       ) : (
-        <p className="mt-2 text-2xs text-ink-500">
-          No skill filter. Search the full vocabulary — it is the same list candidates pick from.
+        <p className="mt-2 text-xs tabular-nums text-ink-500">
+          No skill filter. Search the full vocabulary - it is the same list candidates pick from.
         </p>
       )}
     </div>

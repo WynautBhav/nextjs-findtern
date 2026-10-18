@@ -54,7 +54,16 @@ export type SessionData = {
    * across every handler.
    */
   permissions?: string[];
+  /**
+   * Set when an admin is viewing the site as this user ("View as"). The
+   * session is read-only: `requireMutation` refuses every write while it is
+   * present, and redaction lifts so the admin sees full names and contacts.
+   */
+  impersonator?: { uid: string; email: string };
 };
+
+/** "View as" sessions are short: an admin forgets to exit, not a user. */
+export const IMPERSONATION_TTL_MS = 1000 * 60 * 60;
 
 const TTL_MS = 1000 * 60 * 60 * 12; // 12h, matching the legacy maxAge
 
@@ -72,6 +81,8 @@ export function createSession(input: {
   email: string;
   /** Admin permission keys. Omitted for non admin sessions. */
   permissions?: string[];
+  /** The admin behind a "View as" session. */
+  impersonator?: { uid: string; email: string };
   ttlMs?: number;
   now?: number;
   /**
@@ -87,7 +98,8 @@ export function createSession(input: {
     role: input.role,
     email: input.email,
     ...(input.permissions ? { permissions: input.permissions } : {}),
-    exp: now + (input.ttlMs ?? TTL_MS),
+    ...(input.impersonator ? { impersonator: input.impersonator } : {}),
+    exp: now + (input.ttlMs ?? (input.impersonator ? IMPERSONATION_TTL_MS : TTL_MS)),
     sid: randomBytes(12).toString("base64url"),
   };
 
@@ -131,6 +143,11 @@ export function readSession(
   if (data.permissions !== undefined) {
     if (!Array.isArray(data.permissions)) return null;
     if (!data.permissions.every((p) => typeof p === "string")) return null;
+  }
+  if (data.impersonator !== undefined) {
+    const imp = data.impersonator as unknown as Record<string, unknown>;
+    if (!imp || typeof imp.uid !== "string" || typeof imp.email !== "string") return null;
+    if (data.role === "admin") return null;
   }
 
   return data;

@@ -23,7 +23,7 @@ import { BandRate } from "@/components/marketing/region-rates";
 export const metadata: Metadata = {
   title: "For interns",
   description:
-    "One assessment produces a Findtern Score you can see the working for. That score sets the rate employers pay - and if we do not place you in 18 months, your deposit comes back.",
+    "One assessment produces a Findtern Score you can see the working for. That score sets the rate employers pay - and if we do not place you, your deposit comes back.",
   alternates: { canonical: "/interns" },
 };
 
@@ -63,8 +63,8 @@ const STEPS = [
 const GUARANTEES = [
   {
     Icon: Clock,
-    title: "18 months, or the deposit back",
-    body: "The clock starts when your assessment is scored. If we have not placed you by the end of it, the refundable deposit is returned.",
+    title: "Placed, or the deposit back",
+    body: "The guarantee starts when your assessment is scored. If we have not placed you by the end of the guarantee window, the refundable deposit is returned. The window is set out in the intern terms.",
   },
   {
     Icon: Lock,
@@ -89,7 +89,7 @@ export default function InternsPage() {
             <span className="text-primary">deposit back</span>.
           </>
         }
-        lead="One assessment produces a score you can see the working for. That score sets the rate employers pay. If we do not place you in 18 months, the deposit comes back."
+        lead="One assessment produces a score you can see the working for. That score sets the rate employers pay. If we do not place you, the deposit comes back."
       >
         <ButtonLink href="/signup" variant="primary" size="lg">
           Get assessed
@@ -137,7 +137,7 @@ export default function InternsPage() {
                     <BandRate bandId={b.id} />
                   </p>
                   <p className="text-xs text-ink-500">
-                    {b.perHireMinor > 0 ? "employer pays per hire" : "no per-hire fee"}
+                    employer pays fixed per-hire fee
                   </p>
                 </div>
               </div>
@@ -214,10 +214,10 @@ export default function InternsPage() {
       </PageSection>
 
       {/* ── Numbers ────────────────────────────────────────────────── */}
-      <PageSection>
-        <div className="grid gap-10 sm:grid-cols-3">
+      <PageSection className="py-8 sm:py-14 md:py-20">
+        <div className="grid grid-cols-3 divide-x divide-ink-200/80 rounded-2xl border border-ink-200/80 bg-white/70 py-5 shadow-xs backdrop-blur-xs sm:divide-x-0 sm:border-0 sm:bg-transparent sm:py-0 sm:shadow-none sm:gap-10">
           <Figure value={31} suffix=" min" label="Hands-on assessment" />
-          <Figure value={18} suffix=" mo" label="Guarantee window" />
+          <Figure value={100} suffix="%" label="Refund if not placed" />
           <Figure value={0} suffix=" lock-in" label="Held against you" />
         </div>
       </PageSection>
@@ -290,12 +290,12 @@ function Figure({
   label: string;
 }) {
   return (
-    <div className="text-center">
-      <p className="text-4xl font-bold tracking-tight text-ink-900 sm:text-5xl">
+    <div className="px-1 text-center sm:px-0">
+      <p className="text-2xl font-bold tracking-tight text-ink-900 sm:text-4xl md:text-5xl">
         <CountUp value={value} />
-        {suffix ? <span className="text-xl font-medium text-ink-400">{suffix}</span> : null}
+        {suffix ? <span className="text-xs font-semibold text-ink-400 sm:text-xl sm:font-medium">{suffix}</span> : null}
       </p>
-      <p className="mt-2 text-base text-ink-500">{label}</p>
+      <p className="mt-1 text-[11px] leading-tight text-ink-500 sm:mt-2 sm:text-base">{label}</p>
     </div>
   );
 }

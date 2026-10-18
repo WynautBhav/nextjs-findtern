@@ -2,100 +2,75 @@
 
 import { useEffect, useRef, type ReactNode } from "react";
 
-import { gsap, prefersReducedMotion } from "@/lib/gsap";
+import { prefersReducedMotion } from "@/lib/gsap";
 import { cn } from "@/lib/utils";
 
 /**
- * Scroll-reactive marquee.
+ * Scroll-reactive seamless infinite marquee.
  *
- * A CSS marquee runs at one fixed speed no matter what the reader is doing,
- * which is what makes it read as wallpaper. This one reads vertical scroll
- * velocity, accelerating from its resting 1x up to 3x on a fast scroll and
- * reversing on scroll-up so the row visibly rewinds.
+ * Runs continuously at resting speed and accelerates with scroll velocity
+ * (from 1x up to 3x) while supporting smooth direction reversals on scroll-up.
  *
- * ── Implementation note ──────────────────────────────────────────────────
+ * ── True Seamless Infinite Loop ──────────────────────────────────────────
  *
- * The motion is a single GSAP tween per track whose rate is driven with
- * `timeScale()`. That is the whole mechanism, and it is worth being explicit
- * about why, because the previous version of this file did not work:
+ * To guarantee that the marquee track is NEVER empty on any screen width
+ * (from mobile up to 4K / ultrawide displays):
  *
- *  - It rebuilt the tween to change speed. But the rebuild condition only
- *    compared *direction*, so during a long downward scroll - the exact moment
- *    the effect is meant to show - the speed never changed at all. The
- *    advertised 0.25x–3x range did not exist.
+ *  1. An inner wrapper carries the master track plus 5 cloned tracks.
+ *     Even for short brand sets (e.g. 1,000px), 6 tracks span 6,000px, which
+ *     exceeds dual-4K monitor setups.
  *
- *  - Its `lastDirection` was module-level, shared by every marquee on the
- *    page. With two rows mounted, each frame one track's direction overwrote
- *    the other's, so both tweened, were killed, and were rebuilt continuously.
- *    The comment claimed to avoid that churn; it caused it.
+ *  2. The entire track container is translated smoothly via GPU-accelerated
+ *     `translate3d(-currentX, 0, 0)`.
  *
- *  - `pauseOnHover` set `animation-play-state`, a CSS keyframe property. This
- *    is a JS tween, so it had no effect whatsoever.
- *
- * `timeScale()` is retargeted in place by GSAP with no restart and no state to
- * rebuild, so the loop below only ever *reads* scroll position and writes one
- * number per track.
+ *  3. `currentX` advances by `(trackWidth / duration) * speed * dt`, and
+ *     wraps seamlessly using modulo arithmetic:
+ *       `currentX = ((currentX % trackWidth) + trackWidth) % trackWidth`
+ *     Because each cloned track is an exact replica of the master track,
+ *     resetting by exactly one track width is 100% invisible to the human eye.
+ *     There are zero seams, zero jumps, and zero blank areas at any point.
  */
 
-/** Seconds for one full pass at 1x. */
 const DEFAULT_DURATION = 34;
 
-type Handle = {
-  tween: gsap.core.Tween;
+type MarqueeHandle = {
   el: HTMLElement;
-  /** Fraction of the track width travelled per loop. */
-  setSpeed(speed: number, reverse: boolean): void;
-  setPaused(paused: boolean, reverse: boolean): void;
-  /** Whether this marquee opts into hover-pausing at all. */
+  trackWrapper: HTMLElement;
+  trackWidth: number;
+  duration: number;
+  currentX: number;
+  baseReverse: boolean;
   canPauseOnHover: boolean;
+  measure(): void;
+  advance(dt: number, speed: number, scrollReversed: boolean): void;
 };
 
-/** Shared rAF loop. Holds no per-track state of its own. */
-const handles = new Set<Handle>();
+const handles = new Set<MarqueeHandle>();
 let rafId = 0;
 let lastY = 0;
+let lastTime = 0;
 let smoothed = 0;
 
-function tick() {
+function tick(time: number) {
+  if (!lastTime) lastTime = time;
+  // Cap frame delta to 0.1s to prevent huge jumps when tab was backgrounded
+  const dt = Math.min((time - lastTime) / 1000, 0.1);
+  lastTime = time;
+
   const y = window.scrollY;
   const delta = y - lastY;
   lastY = y;
 
-  // Exponential smoothing, then a clamp. The clamp matters: a trackpad fling
-  // produces deltas in the hundreds, and without it the row launches.
+  // Exponential smoothing on scroll velocity
   smoothed += (delta - smoothed) * 0.16;
   smoothed = Math.max(-70, Math.min(70, smoothed));
 
-  // 1x is the resting rate, and it is the rate the `duration` prop describes.
-  //
-  // This was 0.25 at rest, which was wrong by a factor of four: `duration` is
-  // the time for one pass at 1x, so a 0.25 resting timeScale stretched a 38s
-  // pass to 152s - about 10px/second, which reads as completely frozen. The
-  // floor has to be 1 so the marquee keeps the pace it was designed with, and
-  // scroll velocity is what adds on top of it, from 1x up to 3x.
   const magnitude = Math.abs(smoothed);
   const speed = 1 + (magnitude / 70) * 2;
-  // A dead zone either side of zero, so scroll jitter does not make the row
-  // twitch back and forth around the resting state.
-  const reverse = smoothed < -1.5;
+  const scrollReversed = smoothed < -1.5;
 
   for (const h of handles) {
-    h.setSpeed(speed, reverse);
-    // Both branches are required. The pause used to be written one-way:
-    //
-    //   if (hovering) h.setPaused(true, reverse);
-    //
-    // which has no counterpart, so `paused` latched on the first time the
-    // cursor crossed the row and never cleared. The marquee would stop for
-    // good the first time you moved the mouse over it, and since the rows span
-    // the full viewport width that was effectively always.
-    //
-    // Hover-pausing is also off by default now. Nothing inside either marquee
-    // is interactive - no links, no buttons - so pausing bought nothing and
-    // only made the page look broken.
-    if (h.canPauseOnHover) {
-      h.setPaused(h.el.matches(":hover"), reverse);
-    }
+    h.advance(dt, speed, scrollReversed);
   }
 
   rafId = requestAnimationFrame(tick);
@@ -105,6 +80,7 @@ function start() {
   if (rafId) return;
   lastY = window.scrollY;
   smoothed = 0;
+  lastTime = 0;
   rafId = requestAnimationFrame(tick);
 }
 
@@ -112,6 +88,7 @@ function stop() {
   if (!rafId) return;
   cancelAnimationFrame(rafId);
   rafId = 0;
+  lastTime = 0;
 }
 
 export function VelocityMarquee({
@@ -129,89 +106,79 @@ export function VelocityMarquee({
    * clone `children`, because a caller may need the twin to differ - the
    * skills row renders the copy's titles as <p> instead of <h3> so the
    * document outline carries eleven headings rather than twenty-two.
-   *
-   * It is passed as a node rather than a render function on purpose: this
-   * component is used from Server Components, and a function prop cannot
-   * cross the RSC boundary.
    */
   loopCopy?: ReactNode;
   /** Seconds for one full pass at 1x. */
   duration?: number;
   reverse?: boolean;
   className?: string;
-  /**
-   * Pause while the cursor is over the row. Off by default: the homepage rows
-   * are decorative and contain nothing to click, and a full-width row that
-   * stops whenever the mouse crosses it reads as a bug rather than a
-   * courtesy. Turn it on only for a marquee whose contents are interactive.
-   */
   pauseOnHover?: boolean;
 }) {
-  const ref = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const trackWrapperRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const el = ref.current;
-    if (!el || prefersReducedMotion()) return;
+    const container = containerRef.current;
+    const trackWrapper = trackWrapperRef.current;
+    if (!container || !trackWrapper || prefersReducedMotion()) return;
 
-    const handle = el.querySelector<HTMLElement>("[data-track]");
-    if (!handle) return;
+    const masterTrack = trackWrapper.querySelector<HTMLElement>("[data-track-master]");
+    if (!masterTrack) return;
 
-    // Only the first track is animated. The DOM is [A][B] where B is a
-    // duplicate of A, so translating A left by exactly one A-width puts B
-    // precisely where A was - the seam is invisible and the cycle repeats
-    // forever. xPercent is relative to the animated element's own width, so
-    // one loop unit is 100, not 50.
-    const trackWidth = handle.offsetWidth || (el.clientWidth || 800) / 2;
-    const travelPx = Math.max(trackWidth, 1);
-    const pxPerSecond = travelPx / Math.max(duration, 1);
+    const measure = () => {
+      handle.trackWidth = masterTrack.offsetWidth || (container.clientWidth || 800) / 2;
+    };
 
-    const tween = gsap.to(handle, {
-      xPercent: -100,
-      duration: travelPx / pxPerSecond,
-      ease: "none",
-      repeat: -1,
-      // Never let GSAP's own lag smoothing fight the scroll-velocity signal.
-      overwrite: false,
-    });
-
-    let paused = false;
-    let currentSpeed = 1;
-    let currentReverse = reverse;
-
-    const h: Handle = {
-      tween,
-      el: handle,
+    const handle: MarqueeHandle = {
+      el: container,
+      trackWrapper,
+      trackWidth: masterTrack.offsetWidth || (container.clientWidth || 800) / 2,
+      duration: Math.max(duration, 1),
+      currentX: 0,
+      baseReverse: reverse,
       canPauseOnHover: pauseOnHover,
-      setSpeed(speed, rev) {
-        if (paused) return;
-        // Skip the write when nothing meaningful changed. `timeScale` on every
-        // frame for every track is wasted style recalculation.
-        if (Math.abs(speed - currentSpeed) < 0.01 && rev === currentReverse) return;
-        currentSpeed = speed;
-        currentReverse = rev;
-        tween.timeScale(speed * (rev ? -1 : 1));
-      },
-      setPaused(next, rev) {
-        if (next === paused) return;
-        paused = next;
-        tween.timeScale(next ? 0 : currentSpeed * (rev ? -1 : 1));
+      measure,
+      advance(dt: number, speed: number, scrollReversed: boolean) {
+        if (this.canPauseOnHover && this.el.matches(":hover")) return;
+        if (!this.trackWidth) this.measure();
+        if (this.trackWidth <= 0) return;
+
+        const basePxPerSec = this.trackWidth / this.duration;
+        // baseReverse = false means content moves LEFT (forward marquee).
+        // If scrollReversed is true, direction flips.
+        // If baseReverse is true, content moves RIGHT.
+        const isMovingRight = this.baseReverse ? !scrollReversed : scrollReversed;
+        const directionSign = isMovingRight ? -1 : 1;
+
+        const step = basePxPerSec * speed * directionSign * dt;
+        this.currentX += step;
+
+        // Modulo wrap so currentX stays in [0, trackWidth)
+        this.currentX = ((this.currentX % this.trackWidth) + this.trackWidth) % this.trackWidth;
+
+        this.trackWrapper.style.transform = `translate3d(${-this.currentX}px, 0, 0)`;
       },
     };
 
-    tween.timeScale(reverse ? -1 : 1);
-    handles.add(h);
+    measure();
+    handles.add(handle);
     start();
 
+    const onResize = () => handle.measure();
+    window.addEventListener("resize", onResize, { passive: true });
+
     return () => {
-      handles.delete(h);
-      tween.kill();
+      handles.delete(handle);
+      window.removeEventListener("resize", onResize);
       if (!handles.size) stop();
     };
   }, [reverse, duration, pauseOnHover]);
 
+  const copyContent = loopCopy ?? children;
+
   return (
     <div
-      ref={ref}
+      ref={containerRef}
       data-marquee
       className={cn(
         "group relative flex overflow-hidden",
@@ -219,15 +186,19 @@ export function VelocityMarquee({
         className,
       )}
     >
-      <Track>{children}</Track>
-      {/* The duplicate half of the loop. aria-hidden so the content is not
-          announced twice by a screen reader, and `copy` is true so the child
-          can render a non-heading twin - the aria-hidden attribute stops a
-          screen reader but not the document outline, and search engines index
-          headings regardless of it. */}
-      <Track aria-hidden copy>
-        {loopCopy ?? children}
-      </Track>
+      <div
+        ref={trackWrapperRef}
+        data-marquee-track
+        className="flex shrink-0 will-change-transform"
+      >
+        <Track data-track-master>{children}</Track>
+        {/* 5 Cloned tracks to guarantee seamless coverage even on 4K/ultrawide displays */}
+        <Track aria-hidden copy>{copyContent}</Track>
+        <Track aria-hidden copy>{copyContent}</Track>
+        <Track aria-hidden copy>{copyContent}</Track>
+        <Track aria-hidden copy>{copyContent}</Track>
+        <Track aria-hidden copy>{copyContent}</Track>
+      </div>
     </div>
   );
 }

@@ -11,18 +11,20 @@ import {
   MapPin,
   Scale,
   Send,
-  Sparkles,
 } from "lucide-react";
 
 import { bandFor } from "@/lib/score";
 import { formatRate } from "@/lib/format";
 import {
   RATING_META,
+  displayNameOf,
   type CandidateProfile,
 } from "@/lib/employer-candidates";
 import { resolvePricing, type Currency } from "@/lib/employer-pricing";
 import { ShortlistToggle } from "@/components/employer/shortlist-toggle";
 import { AiFeedbackReport } from "@/components/employer/ai-feedback-report";
+import { Pill } from "@/components/app/primitives";
+import { ButtonLink } from "@/components/ui/button";
 import {
   Sheet,
   SheetContent,
@@ -40,6 +42,8 @@ export interface CandidateCardProps {
   compareHref: string;
   projectId: string | null;
   shortlisted: boolean;
+  /** True when this employer hired the candidate - the only case the full name shows. */
+  nameUnlocked?: boolean;
 }
 
 export function CandidateCard({
@@ -50,35 +54,28 @@ export function CandidateCard({
   compareHref,
   projectId,
   shortlisted,
+  nameUnlocked = false,
 }: CandidateCardProps) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const band = bandFor(candidate.score);
   const pricing = resolvePricing(candidate.score, [], currency, region);
   const assessed = RATING_META.filter((meta) => candidate.ratings[meta.key] > 0);
+  const displayName = displayNameOf(candidate, nameUnlocked);
 
   return (
-    <li className="group relative flex flex-col justify-between rounded-2xl border border-sand-300 bg-white p-5 shadow-2xs transition-all duration-200 hover:border-brand-400 hover:shadow-md hover:-translate-y-0.5">
+    <li className="apple-spring group relative flex min-w-0 flex-col justify-between rounded-[20px] border border-ink-200/70 bg-white p-5 shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)] hover:border-brand-400">
       <div>
         {/* Top Header: Avatar + Identity + Hero Score Gauge */}
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-start gap-3.5 min-w-0">
-            {/* Avatar Initials with Tier Ring */}
-            <div className="relative shrink-0">
-              <span
-                aria-hidden
-                className="grid size-12 place-items-center rounded-xl bg-gradient-to-br from-brand-50 to-brand-100 font-bold text-brand-800 shadow-2xs text-base border border-brand-200/80"
-              >
-                {candidate.initials}
-              </span>
-              {candidate.scored && candidate.score >= 8.0 ? (
-                <span
-                  title="Top Tier Findtern Assessed"
-                  className="absolute -bottom-1 -right-1 grid size-5 place-items-center rounded-full bg-brand-700 text-white ring-2 ring-white shadow-2xs"
-                >
-                  <Sparkles className="size-2.5" />
-                </span>
-              ) : null}
-            </div>
+            {/* Flat initial tile - no gradient, no floating badge. The band
+                pill beside the name already carries the tier. */}
+            <span
+              aria-hidden
+              className="grid size-12 shrink-0 place-items-center rounded-[10px] bg-brand-50 font-bold text-brand-800 text-base border border-brand-200/80"
+            >
+              {candidate.initials}
+            </span>
 
             {/* Candidate Name, Band & Metadata */}
             <div className="min-w-0 flex-1">
@@ -86,32 +83,31 @@ export function CandidateCard({
                 <button
                   type="button"
                   onClick={() => setDrawerOpen(true)}
-                  className="text-left font-semibold text-ink-900 transition-colors hover:text-brand-700 line-clamp-1 text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 rounded-xs"
+                  title={displayName}
+                  className="inline-flex min-h-7 items-center text-left font-semibold tracking-[-0.01em] text-ink-900 hover:text-brand-700 line-clamp-1 text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 rounded-[10px]"
                 >
-                  {candidate.fullName}
+                  {displayName}
                 </button>
-                <span className="inline-flex items-center rounded-full bg-brand-50 px-2.5 py-0.5 text-2xs font-semibold text-brand-700 border border-brand-200/60">
-                  {band.name}
-                </span>
+                <Pill tone="live">{band.name}</Pill>
               </div>
 
               {/* Location, Work Modes & Hardware */}
               <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-text-subtle">
                 <span className="inline-flex items-center gap-1">
-                  <MapPin className="size-3.5 shrink-0 text-ink-400" />
-                  <span className="truncate">{candidate.location || "Location not stated"}</span>
+                  <MapPin className="size-3.5 shrink-0 text-ink-400" aria-hidden />
+                  <span className="truncate" title={candidate.location || "Location not stated"}>{candidate.location || "Location not stated"}</span>
                 </span>
                 {candidate.workModes.length > 0 ? (
                   <>
-                    <span className="text-sand-400">·</span>
+                    <span className="text-ink-300" aria-hidden>·</span>
                     <span className="capitalize">{candidate.workModes.join(", ")}</span>
                   </>
                 ) : null}
                 {candidate.hasLaptop ? (
                   <>
-                    <span className="text-sand-400">·</span>
-                    <span className="inline-flex items-center gap-1 text-emerald-700 font-medium text-2xs">
-                      <Laptop className="size-3" />
+                    <span className="text-ink-300" aria-hidden>·</span>
+                    <span className="inline-flex items-center gap-1 text-emerald-700 font-medium text-xs">
+                      <Laptop className="size-3" aria-hidden />
                       Laptop Ready
                     </span>
                   </>
@@ -120,20 +116,19 @@ export function CandidateCard({
             </div>
           </div>
 
-          {/* Hero Score & Rate Pill */}
+          {/* Score figure + rate - data, not a badge. No dark block, no
+              uppercase micro-label. */}
           <div className="shrink-0 text-right">
-            <div className="inline-flex items-center gap-1.5 rounded-xl bg-brand-900 px-3 py-1 text-white shadow-2xs">
-              <span className="text-2xs font-semibold uppercase tracking-wider text-accent-300">
-                Score
-              </span>
-              <span className="text-base font-bold tabular-nums text-white">
-                {candidate.scored ? candidate.score.toFixed(1) : "—"}
-              </span>
+            <p
+              className="text-xl font-bold tabular-nums tracking-tight text-ink-900"
+              title={candidate.scored ? `${band.name}: ${candidate.score.toFixed(1)} out of 10` : "Not scored yet"}
+            >
+              {candidate.scored ? candidate.score.toFixed(1) : "-"}
               {candidate.scored ? (
-                <span className="text-3xs text-white/70">/10</span>
+                <span className="text-xs font-medium tabular-nums text-text-subtle">/10</span>
               ) : null}
-            </div>
-            <p className="mt-1 text-xs font-bold tabular-nums text-brand-700">
+            </p>
+            <p className="mt-0.5 text-xs font-bold tabular-nums text-brand-700">
               {formatRate(pricing.hourlyRateMinor, currency)}
             </p>
           </div>
@@ -146,19 +141,19 @@ export function CandidateCard({
           </p>
         ) : null}
 
-        {/* Skills Chips */}
+        {/* Skills - the single chip recipe. No hover animation on a chip. */}
         {candidate.skills.length > 0 ? (
-          <ul className="mt-3 flex flex-wrap gap-1.5">
+          <ul className="mt-3 flex flex-wrap gap-1">
             {candidate.skills.slice(0, 5).map((skill) => (
               <li
                 key={skill}
-                className="rounded-md bg-sand-100/70 px-2 py-0.5 text-2xs font-medium text-ink-800 border border-sand-200/80 transition-colors hover:border-brand-300 hover:bg-brand-50/50"
+                className="rounded-md bg-ink-100 px-2 py-0.5 text-xs font-medium text-ink-700 border border-ink-200/70"
               >
                 {skill}
               </li>
             ))}
             {candidate.skills.length > 5 ? (
-              <li className="rounded-md bg-sand-100/70 px-2 py-0.5 text-2xs font-medium text-ink-500 border border-sand-200/80">
+              <li className="rounded-md bg-ink-100 px-2 py-0.5 text-xs font-medium tabular-nums text-ink-500 border border-ink-200/70">
                 +{candidate.skills.length - 5} more
               </li>
             ) : null}
@@ -169,21 +164,21 @@ export function CandidateCard({
 
         {/* 4-Axis Technical Assessment Gauges */}
         {assessed.length > 0 ? (
-          <div className="mt-3.5 grid grid-cols-2 gap-2 rounded-xl bg-sand-50/80 p-2.5 sm:grid-cols-4 border border-sand-200/60">
+          <div className="mt-3.5 grid grid-cols-2 gap-2 rounded-[10px] bg-ink-50/80 p-2.5 sm:grid-cols-4 border border-ink-200/70">
             {assessed.map((meta) => {
               const val = candidate.ratings[meta.key];
               const pct = Math.min(100, (val / 10) * 100);
               return (
-                <div key={meta.key} className="flex flex-col">
-                  <div className="flex items-center justify-between text-3xs font-semibold uppercase tracking-wider text-text-subtle">
-                    <span>{meta.label}</span>
+                <div key={meta.key} className="flex min-w-0 flex-col">
+                  <div className="flex items-center justify-between text-xs font-medium text-text-subtle">
+                    <span className="truncate">{meta.label}</span>
                     <span className="text-xs font-bold tabular-nums text-ink-900">
                       {val.toFixed(1)}
                     </span>
                   </div>
-                  <div className="mt-1.5 h-1.5 w-full rounded-full bg-sand-200 overflow-hidden">
+                  <div className="mt-1.5 h-1.5 w-full rounded-full bg-ink-200 overflow-hidden">
                     <div
-                      className="h-full rounded-full bg-brand-600 transition-all duration-300"
+                      className="h-full rounded-full bg-brand-600"
                       style={{ width: `${pct}%` }}
                     />
                   </div>
@@ -195,14 +190,14 @@ export function CandidateCard({
       </div>
 
       {/* Card Action Deck */}
-      <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-sand-200/80 pt-3">
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-ink-200/70 pt-3">
         {/* Left: Quick View & Compare */}
         <div className="flex items-center gap-1.5">
           <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>
             <SheetTrigger asChild>
               <button
                 type="button"
-                className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-sand-300 bg-white px-2.5 text-xs font-medium text-ink-700 transition hover:border-brand-300 hover:bg-brand-50/50 hover:text-brand-800"
+                className="apple-spring apple-pressable inline-flex min-h-11 items-center justify-center gap-1.5 rounded-[10px] border border-ink-200/70 bg-white px-2.5 text-[13px] font-medium text-ink-700 hover:border-brand-300 hover:text-brand-800"
               >
                 <Eye className="size-3.5 text-ink-500" aria-hidden />
                 <span>Quick View</span>
@@ -211,18 +206,18 @@ export function CandidateCard({
 
             <SheetContent
               side="right"
-              className="w-full sm:max-w-xl md:max-w-2xl overflow-y-auto p-0 border-l border-sand-200 bg-surface-alt"
+              className="w-full sm:max-w-xl md:max-w-2xl overflow-y-auto p-0 border-l border-ink-200/70 bg-surface-alt"
             >
               <div className="p-6">
-                <SheetHeader className="text-left pb-4 border-b border-sand-200">
+                <SheetHeader className="text-left pb-4 border-b border-ink-200/70">
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex items-start gap-4">
-                      <span className="grid size-14 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-brand-50 to-brand-100 text-lg font-bold text-brand-800 border border-brand-200">
+                      <span aria-hidden className="grid size-14 shrink-0 place-items-center rounded-[10px] bg-brand-50 text-lg font-bold tabular-nums text-brand-800 border border-brand-200">
                         {candidate.initials}
                       </span>
                       <div>
                         <SheetTitle className="text-xl font-bold text-ink-900">
-                          {candidate.fullName}
+                          {displayName}
                         </SheetTitle>
                         <SheetDescription className="mt-0.5 text-xs text-text-subtle">
                           {candidate.location || "Location not stated"}
@@ -231,9 +226,7 @@ export function CandidateCard({
                             : ""}
                         </SheetDescription>
                         <div className="mt-2 flex flex-wrap items-center gap-2">
-                          <span className="rounded-full bg-brand-50 px-2.5 py-0.5 text-2xs font-semibold text-brand-700 border border-brand-200">
-                            {band.name}
-                          </span>
+                          <Pill tone="live">{band.name}</Pill>
                           <span className="text-xs font-semibold tabular-nums text-ink-800">
                             {candidate.scored
                               ? `${candidate.score.toFixed(1)}/10 Findtern Score`
@@ -249,14 +242,16 @@ export function CandidateCard({
                 </SheetHeader>
 
                 {/* Quick actions bar inside drawer */}
-                <div className="mt-4 flex flex-wrap items-center gap-2 rounded-xl bg-white p-3 border border-sand-200 shadow-2xs">
-                  <Link
+                <div className="mt-4 flex flex-wrap items-center gap-2 rounded-[10px] bg-white p-3 border border-ink-200/70 shadow-2xs">
+                  <ButtonLink
                     href={`/employer/send-proposal?intern=${encodeURIComponent(candidate.id)}`}
-                    className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-brand-700 px-3.5 text-xs font-semibold text-white transition hover:bg-brand-800"
+                    variant="primary"
+                    size="sm"
+                    className="min-h-11 px-3.5 text-[13px] font-semibold"
                   >
-                    <Send className="size-3.5" />
-                    <span>Send Proposal</span>
-                  </Link>
+                    <Send className="size-3.5" aria-hidden />
+                    <span>Send proposal</span>
+                  </ButtonLink>
                   {projectId ? (
                     <ShortlistToggle
                       internId={candidate.id}
@@ -265,22 +260,24 @@ export function CandidateCard({
                       size="sm"
                     />
                   ) : null}
-                  <Link
+                  <ButtonLink
                     href={`/employer/intern/${encodeURIComponent(candidate.id)}`}
-                    className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-sand-300 bg-white px-3 text-xs font-medium text-ink-700 transition hover:bg-sand-50 ml-auto"
+                    variant="outline"
+                    size="sm"
+                    className="min-h-11 px-3 text-[13px] font-medium ml-auto"
                   >
-                    <span>Full Profile</span>
-                    <ExternalLink className="size-3.5 text-ink-400" />
-                  </Link>
+                    <span>Full profile</span>
+                    <ExternalLink className="size-3.5 text-ink-400" aria-hidden />
+                  </ButtonLink>
                 </div>
 
                 {/* Candidate bio */}
                 {candidate.bio ? (
-                  <div className="mt-5 rounded-xl border border-sand-200 bg-white p-4">
-                    <h4 className="text-xs font-semibold uppercase tracking-wider text-text-subtle">
-                      About Candidate
-                    </h4>
-                    <p className="mt-2 text-xs leading-relaxed text-ink-700 whitespace-pre-wrap">
+                  <div className="mt-5 rounded-[10px] border border-ink-200/70 bg-white p-4">
+                    <h3 className="text-[13px] font-semibold text-ink-900">
+                      About candidate
+                    </h3>
+                    <p className="mt-2 text-[13px] leading-relaxed text-ink-700 whitespace-pre-wrap">
                       {candidate.bio}
                     </p>
                   </div>
@@ -288,38 +285,38 @@ export function CandidateCard({
 
                 {/* Academics & Hardware */}
                 {candidate.academics ? (
-                  <div className="mt-4 rounded-xl border border-sand-200 bg-white p-4">
-                    <h4 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-text-subtle">
-                      <GraduationCap className="size-4 text-brand-600" />
-                      Academic Background
-                    </h4>
+                  <div className="mt-4 rounded-[10px] border border-ink-200/70 bg-white p-4">
+                    <h3 className="flex items-center gap-1.5 text-[13px] font-semibold text-ink-900">
+                      <GraduationCap className="size-4 text-brand-600" aria-hidden />
+                      Academic background
+                    </h3>
                     <div className="mt-3 grid gap-2 sm:grid-cols-2 text-xs">
-                      <div>
+                      <div className="min-w-0">
                         <span className="text-text-subtle block">Institution</span>
                         <span className="font-semibold text-ink-900">
-                          {candidate.academics.institution || "—"}
+                          {candidate.academics.institution || "-"}
                         </span>
                       </div>
-                      <div>
+                      <div className="min-w-0">
                         <span className="text-text-subtle block">Degree</span>
                         <span className="font-semibold text-ink-900">
                           {[candidate.academics.degree, candidate.academics.specialization]
                             .filter(Boolean)
-                            .join(" - ") || "—"}
+                            .join(" - ") || "-"}
                         </span>
                       </div>
-                      <div>
+                      <div className="min-w-0">
                         <span className="text-text-subtle block">Score / CGPA</span>
                         <span className="font-semibold tabular-nums text-ink-900">
                           {candidate.academics.score
                             ? `${candidate.academics.score} ${candidate.academics.scoreType || ""}`
-                            : "—"}
+                            : "-"}
                         </span>
                       </div>
-                      <div>
+                      <div className="min-w-0">
                         <span className="text-text-subtle block">Hardware</span>
                         <span className="font-semibold text-ink-900 inline-flex items-center gap-1">
-                          <Laptop className="size-3.5 text-ink-500" />
+                          <Laptop className="size-3.5 text-ink-500" aria-hidden />
                           {candidate.hasLaptop === true
                             ? "Dedicated Work Laptop"
                             : candidate.hasLaptop === false
@@ -333,15 +330,15 @@ export function CandidateCard({
 
                 {/* Verified Skills */}
                 {candidate.skills.length > 0 ? (
-                  <div className="mt-4 rounded-xl border border-sand-200 bg-white p-4">
-                    <h4 className="text-xs font-semibold uppercase tracking-wider text-text-subtle">
-                      Verified Skills ({candidate.skills.length})
-                    </h4>
-                    <ul className="mt-3 flex flex-wrap gap-1.5">
+                  <div className="mt-4 rounded-[10px] border border-ink-200/70 bg-white p-4">
+                    <h3 className="text-[13px] font-semibold tabular-nums text-ink-900">
+                      Verified skills ({candidate.skills.length})
+                    </h3>
+                    <ul className="mt-3 flex flex-wrap gap-1">
                       {candidate.skills.map((skill) => (
                         <li
                           key={skill}
-                          className="rounded-lg bg-sand-100 px-2.5 py-1 text-xs font-medium text-ink-800 border border-sand-200"
+                          className="rounded-md bg-ink-100 px-2 py-0.5 text-xs font-medium text-ink-700 border border-ink-200/70"
                         >
                           {skill}
                         </li>
@@ -353,7 +350,7 @@ export function CandidateCard({
                 {/* AI Interview Assessment Report */}
                 <div className="mt-5">
                   <AiFeedbackReport
-                    candidateName={candidate.fullName}
+                    candidateName={displayName}
                     findternScore={candidate.score}
                     ratings={{
                       communication: candidate.ratings.communication,
@@ -363,6 +360,8 @@ export function CandidateCard({
                     }}
                     skills={candidate.skills}
                     bio={candidate.bio}
+                    aiFeedbackLink={candidate.aiFeedbackLink}
+                    aiRecordingLink={candidate.aiRecordingLink}
                   />
                 </div>
               </div>
@@ -374,10 +373,10 @@ export function CandidateCard({
             href={compareHref}
             aria-pressed={selected}
             className={[
-              "inline-flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-medium transition",
+              "apple-spring apple-pressable inline-flex min-h-11 items-center justify-center gap-1.5 rounded-[10px] border px-2.5 text-[13px] font-medium",
               selected
                 ? "border-brand-600 bg-brand-50 text-brand-700 font-semibold"
-                : "border-sand-300 bg-white text-ink-700 hover:bg-sand-50",
+                : "border-ink-200/70 bg-white text-ink-700 hover:bg-ink-50",
             ].join(" ")}
           >
             {selected ? (
@@ -400,13 +399,15 @@ export function CandidateCard({
             />
           ) : null}
 
-          <Link
+          <ButtonLink
             href={`/employer/send-proposal?intern=${encodeURIComponent(candidate.id)}`}
-            className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-brand-700 px-3 text-xs font-semibold text-white shadow-2xs transition hover:bg-brand-800"
+            variant="primary"
+            size="sm"
+            className="min-h-11 px-3 text-[13px] font-semibold"
           >
             <Send className="size-3.5" aria-hidden />
             <span>Send proposal</span>
-          </Link>
+          </ButtonLink>
         </div>
       </div>
     </li>

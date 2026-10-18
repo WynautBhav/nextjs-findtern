@@ -3,7 +3,7 @@
 import { useId, useState } from "react";
 import { AlertCircle, Check, Send } from "lucide-react";
 
-import { SITE } from "@/lib/content/site";
+import { SITE, getGmailComposeUrl } from "@/lib/content/site";
 import { cn } from "@/lib/utils";
 
 /**
@@ -113,14 +113,14 @@ export function ContactForm() {
       const res = await fetch("/api/website/contact", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(v),
+        body: JSON.stringify({ ...v, phone: v.phone.replace(/\D/g, "") }),
       });
       if (!res.ok) throw new Error(String(res.status));
       setStatus("sent");
     } catch {
       setStatus("error");
       setError(
-        "The form endpoint is not connected in this build, so nothing was sent. Your message is ready to go by email instead.",
+        "We couldn't send that just now. Your message is ready to go by email instead.",
       );
     }
   }
@@ -140,7 +140,9 @@ export function ContactForm() {
         <p className="mt-2 max-w-sm text-base leading-relaxed text-ink-600">
           We read every one. If it needs a faster answer, email{" "}
           <a
-            href={`mailto:${SITE.email}`}
+            href={getGmailComposeUrl({ subject: "Findtern enquiry follow-up" })}
+            target="_blank"
+            rel="noopener noreferrer"
             className="font-medium text-primary underline underline-offset-4"
           >
             {SITE.email}
@@ -275,10 +277,12 @@ export function ContactForm() {
               <>
                 {" "}
                 <a
-                  href={mailto(v)}
-                  className="font-semibold underline underline-offset-4"
+                  href={gmailUrl(v)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-semibold text-primary underline underline-offset-4"
                 >
-                  Open it in your email client
+                  Open in Gmail
                 </a>
                 .
               </>
@@ -297,10 +301,12 @@ export function ContactForm() {
           {status === "sending" ? "Sending…" : "Send message"}
         </button>
         <a
-          href={mailto(v)}
+          href={gmailUrl(v)}
+          target="_blank"
+          rel="noopener noreferrer"
           className="text-sm text-ink-500 underline underline-offset-4 transition-colors hover:text-primary"
         >
-          or email us directly
+          or email us directly on Gmail
         </a>
       </div>
     </form>
@@ -352,19 +358,25 @@ function Field({
   );
 }
 
-function mailto(v: Values) {
-  const subject = v.subject || `Findtern enquiry - ${v.queryType}`;
-  const body = [
-    `Name: ${v.firstName} ${v.lastName}`,
-    `Email: ${v.email}`,
-    v.phone ? `Phone: ${v.countryCode} ${v.phone}` : "",
-    `Query: ${v.queryType}`,
-    "",
-    v.message,
-  ]
-    .filter(Boolean)
-    .join("\n");
-  return `mailto:${SITE.email}?subject=${encodeURIComponent(
+function formatBody(v: Values) {
+  const lines: string[] = [];
+  const name = `${v.firstName} ${v.lastName}`.trim();
+  if (name) lines.push(`Name: ${name}`);
+  if (v.email) lines.push(`Email: ${v.email}`);
+  if (v.phone) lines.push(`Phone: ${v.countryCode} ${v.phone}`.trim());
+  lines.push(`Query: ${v.queryType}`);
+  if (v.message.trim()) {
+    lines.push("");
+    lines.push(v.message.trim());
+  }
+  return lines.join("\n");
+}
+
+function gmailUrl(v: Values) {
+  const subject = v.subject.trim() || `Findtern enquiry - ${v.queryType}`;
+  return getGmailComposeUrl({
+    to: SITE.email,
     subject,
-  )}&body=${encodeURIComponent(body)}`;
+    body: formatBody(v),
+  });
 }

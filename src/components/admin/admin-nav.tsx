@@ -25,6 +25,8 @@ import {
   History,
   LogOut,
   X,
+  UserCheck,
+  Settings,
   type LucideIcon,
 } from "lucide-react";
 
@@ -46,6 +48,7 @@ const ICON_MAP: Record<string, LucideIcon> = {
   "/admin/dashboard": LayoutDashboard,
   "/admin/messages": MessageSquare,
   "/admin/interns": Users,
+  "/admin/users": UserCheck,
   "/admin/interns/terms": FileText,
   "/admin/interns/non-disclosure": ShieldCheck,
   "/admin/companies": Building2,
@@ -60,8 +63,10 @@ const ICON_MAP: Record<string, LucideIcon> = {
   "/admin/intern-invoices": Receipt,
   "/admin/promo-codes": Tag,
   "/admin/cms": Globe,
+  "/admin/cms/terms": ScrollText,
   "/admin/notifications": Bell,
   "/admin/notification-history": History,
+  "/admin/settings": Settings,
 };
 
 export function AdminNav({
@@ -81,14 +86,14 @@ export function AdminNav({
   };
 
   return (
-    <nav className="flex flex-col gap-6" aria-label="Admin Navigation">
+    <nav className="apple-admin flex flex-col gap-6" aria-label="Admin navigation">
       {groups.map((group) => (
-        <div key={group.label} className="space-y-1">
-          <p className="px-3 pb-1 text-2xs font-semibold tracking-wider text-on-dark-subtle/70 uppercase">
+        <div key={group.label} className="space-y-1.5">
+          <p className="px-3 text-[12px] font-semibold tracking-[0.02em] text-text-subtle">
             {group.label}
           </p>
 
-          <div className="flex flex-col space-y-0.5">
+          <div className="flex flex-col gap-0.5">
             {group.items.map((item) => {
               const active = isActive(item.href);
               const IconComponent = item.icon || ICON_MAP[item.href] || FileText;
@@ -100,28 +105,28 @@ export function AdminNav({
                   onClick={onNavigate}
                   aria-current={active ? "page" : undefined}
                   className={cn(
-                    "group flex items-center gap-3 rounded-lg px-3 py-2 text-xs font-medium transition-all duration-150",
+                    "apple-spring apple-pressable group flex min-h-11 items-center gap-3 rounded-[10px] px-3 text-[14px] font-medium tracking-[-0.01em]",
                     active
-                      ? "bg-white/12 text-white shadow-xs font-semibold"
-                      : "text-on-dark-subtle hover:bg-white/6 hover:text-white"
+                      ? "bg-brand-50 text-brand-800"
+                      : "text-ink-600 hover:bg-ink-100/70 hover:text-ink-900"
                   )}
                 >
                   <span
                     aria-hidden
                     className={cn(
-                      "grid size-6 place-items-center rounded-md transition-colors",
+                      "grid size-6 place-items-center",
                       active
-                        ? "bg-brand-500/30 text-accent-400"
-                        : "text-on-dark-subtle/80 group-hover:text-white"
+                        ? "text-brand-700"
+                        : "text-ink-400 group-hover:text-ink-700"
                     )}
                   >
-                    <IconComponent className="size-3.5" />
+                    <IconComponent className="size-4" />
                   </span>
 
                   <span className="truncate">{item.label}</span>
 
                   {item.badge !== undefined ? (
-                    <span className="ml-auto rounded-full bg-accent-400/20 px-1.5 py-0.5 text-2xs font-semibold text-accent-400 tabular-nums">
+                    <span className="ml-auto rounded-full bg-warning-soft px-1.5 py-0.5 text-[11px] font-semibold text-warning tabular-nums">
                       {item.badge}
                     </span>
                   ) : null}
@@ -147,18 +152,18 @@ export function AdminNavFooter({
   const [signingOut, setSigningOut] = useState(false);
 
   return (
-    <div className="border-t border-white/10 pt-4">
-      <div className="flex items-center gap-3 rounded-lg px-3 py-2 bg-white/4">
+    <div className="apple-admin border-t border-ink-200/70 pt-4">
+      <div className="flex items-center gap-3 rounded-[10px] px-3 py-2">
         <span
           aria-hidden
-          className="grid size-8 shrink-0 place-items-center rounded-full bg-brand-500/25 text-xs font-bold text-accent-400"
+          className="grid size-8 shrink-0 place-items-center rounded-full bg-brand-100 text-xs font-semibold text-brand-800"
         >
           {email.charAt(0).toUpperCase()}
         </span>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-xs font-semibold text-white">{email}</p>
+          <p className="truncate text-[13px] font-medium tracking-[-0.01em] text-ink-800">{email}</p>
           {role ? (
-            <p className="truncate text-2xs text-on-dark-subtle capitalize">
+            <p className="truncate text-[12px] text-text-subtle capitalize">
               {role.replace(/_/g, " ")}
             </p>
           ) : null}
@@ -172,9 +177,9 @@ export function AdminNavFooter({
           onSignOut?.();
         }}
         disabled={signingOut}
-        className="mt-2 flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-medium text-on-dark-subtle transition-colors hover:bg-white/6 hover:text-white disabled:opacity-50"
+        className="apple-spring apple-pressable mt-2 flex min-h-11 w-full items-center gap-2.5 rounded-[10px] px-3 py-2 text-[13px] font-medium text-text-subtle hover:bg-ink-100/70 hover:text-danger disabled:opacity-50"
       >
-        <LogOut className="size-3.5" aria-hidden />
+        <LogOut className="size-4" aria-hidden />
         <span>{signingOut ? "Signing out..." : "Sign out"}</span>
       </button>
     </div>
@@ -187,7 +192,7 @@ export function NavCloseButton({ onClick }: { onClick: () => void }) {
       type="button"
       onClick={onClick}
       aria-label="Close navigation"
-      className="absolute top-4 right-4 rounded-lg p-2 text-on-dark-subtle transition-colors hover:bg-white/10 hover:text-white"
+      className="apple-spring absolute top-4 right-4 flex min-h-11 min-w-11 items-center justify-center rounded-[10px] p-2 text-ink-500 hover:bg-ink-100 hover:text-ink-900"
     >
       <X className="size-5" />
     </button>

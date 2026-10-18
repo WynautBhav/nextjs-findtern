@@ -3,28 +3,24 @@ import { eq, desc } from "drizzle-orm";
 import { FileImage, FileText, Info, Video } from "lucide-react";
 
 import { getDb, schema } from "@/lib/db";
-import { getSession } from "@/lib/auth";
-import { EmptyScene, PageHead } from "@/components/app/primitives";
+import { requireRole } from "@/lib/auth";
+import { EmptyScene, PageHead, Surface } from "@/components/app/primitives";
 
 export const metadata: Metadata = {
   title: "Documents",
   robots: { index: false, follow: false },
 };
 
-/* Read-only for now.
- *
- * `intern_document` stores metadata only — name, MIME type, byte size. There is
- * no column holding the private-store key that `/api/uploads` returns, so this
- * page has nothing to link to: an "Open" button here would 404, and inventing a
- * permanent public URL for an Aadhaar image is the exact thing
- * `lib/security/store.ts` exists to prevent.
- *
- * Replacement uploads happen in the onboarding form, which posts to
- * `/api/uploads` and gets back a signed URL that dies in five minutes.
+/* Read-only. "View" links go through /intern/documents/open, which checks
+ * ownership and mints a fresh signed URL per click, so links never go stale.
+ * Replacement uploads happen in the onboarding form.
  */
 
 type DocumentRow = {
   id: string;
+  href: string;
+  /** Stored file name or key, when it differs from the label shown. */
+  key?: string;
   label: string;
   fileName: string;
   contentType: string | null;
@@ -33,20 +29,42 @@ type DocumentRow = {
 };
 
 export default async function InternDocuments() {
-  const session = await getSession();
+  const session = await requireRole("intern");
   let rows: DocumentRow[] = [];
   try {
     const db = getDb();
     const [record] = await db
       .select()
       .from(schema.internDocuments)
-      .where(eq(schema.internDocuments.userId, session!.uid))
+      .where(eq(schema.internDocuments.userId, session.uid))
       .orderBy(desc(schema.internDocuments.createdAt))
       .limit(1);
 
     rows = record ? flattenRecord(record) : [];
+    const [onboarding] = await db
+      .select({ extra: schema.internOnboarding.extraData })
+      .from(schema.internOnboarding)
+      .where(eq(schema.internOnboarding.userId, session.uid))
+      .limit(1);
+    const academics = ((onboarding?.extra ?? {}) as Record<string, unknown>).academics as Record<string, unknown> | undefined;
+    const sheets = Array.isArray(academics?.marksheetUploads) ? (academics.marksheetUploads as Record<string, unknown>[]) : [];
+    sheets.forEach((m, i) => {
+      const name = String(m.name ?? "");
+      if (!name) return;
+      rows.push({
+        id: `marksheet-${i}`,
+        href: "",
+        label: "Marksheet",
+        fileName: String(m.label || name.split("/").pop()),
+        contentType: typeof m.type === "string" ? m.type : null,
+        size: typeof m.size === "number" ? m.size : null,
+        stampedAt: null,
+        key: name,
+      });
+    });
+    rows = rows.map((r) => ({ ...r, href: `/intern/documents/open?key=${encodeURIComponent(r.key ?? r.fileName)}` }));
   } catch {
-    // DB unavailable — render empty state rather than crashing the page.
+    // DB unavailable - render empty state rather than crashing the page.
   }
 
   return (
@@ -65,10 +83,11 @@ export default async function InternDocuments() {
         />
       ) : (
         <>
-          <ul className="divide-y divide-ink-100 overflow-hidden rounded-2xl border border-ink-100 bg-white">
+          <Surface className="overflow-hidden p-0">
+          <ul className="divide-y divide-ink-100">
             {rows.map((doc) => (
               <li key={doc.id} className="flex items-center gap-4 px-5 py-4">
-                <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-brand-50 text-brand-700">
+                <span className="grid size-10 shrink-0 place-items-center rounded-[10px] bg-brand-50 text-brand-700">
                   <DocIcon contentType={doc.contentType} />
                 </span>
                 <div className="min-w-0 flex-1">
@@ -81,17 +100,24 @@ export default async function InternDocuments() {
                     <p className="mt-0.5">{formatDay(doc.stampedAt)}</p>
                   ) : null}
                 </div>
+                {doc.href ? (
+                  <a
+                    href={doc.href}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex min-h-11 shrink-0 items-center rounded-[10px] border border-ink-200 px-3 text-xs font-semibold text-ink-700 hover:bg-ink-50"
+                  >
+                    View
+                  </a>
+                ) : null}
               </li>
             ))}
           </ul>
+          </Surface>
 
-          <p className="mt-4 flex items-start gap-2 rounded-xl border border-info/20 bg-info-soft px-4 py-3 text-sm text-ink-700">
-            <Info className="mt-0.5 size-4 shrink-0 text-info" aria-hidden />
-            <span>
-              Files live in private storage and are never served from a public URL.
-              Only the metadata above is stored here — download links are minted per
-              request and expire after five minutes.
-            </span>
+          <p className="mt-4 flex items-start gap-2 text-sm text-text-subtle">
+            <Info className="mt-0.5 size-4 shrink-0" aria-hidden />
+            Only you and Findtern staff can open these.
           </p>
         </>
       )}
@@ -114,6 +140,7 @@ function flattenRecord(record: typeof schema.internDocuments.$inferSelect): Docu
     )
     .map((slot, i) => ({
       id: `${record.id}-${i}`,
+      href: "",
       label: slot.label,
       fileName: slot.name,
       contentType: slot.type,

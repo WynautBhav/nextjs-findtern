@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { eq, desc } from "drizzle-orm";
 
 import { getDb, schema } from "@/lib/db";
-import { getSession } from "@/lib/auth";
+import { requireRole } from "@/lib/auth";
 import { ProjectsManager } from "@/components/employer/projects-manager";
 
 export const metadata: Metadata = {
@@ -11,8 +11,8 @@ export const metadata: Metadata = {
 };
 
 export default async function EmployerProjectsPage() {
-  const session = await getSession();
-  const employerId = session!.uid;
+  const session = await requireRole("employer");
+  const employerId = session.uid;
 
   let rows: (typeof schema.projects.$inferSelect)[] = [];
   try {

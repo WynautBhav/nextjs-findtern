@@ -1,14 +1,21 @@
-import { count, desc, eq, sql, type SQL } from "drizzle-orm";
+import { and, count, desc, eq, gte, sql, type SQL } from "drizzle-orm";
 import { ArrowUpRight, ArrowDownLeft, Clock, CheckCircle2 } from "lucide-react";
 import Link from "next/link";
 
 import { getDb, schema } from "@/lib/db";
-import { formatDate, formatMoney } from "@/lib/format";
-import { flattenParams, parsePageRequest, searchAny, toPage } from "@/lib/admin/params";
+import { formatDate, formatMoney, formatNumber } from "@/lib/format";
+import { flattenParams, parsePageRequest, PERIOD_OPTIONS, periodStart, searchAny, toPage } from "@/lib/admin/params";
 import { AdminPageHeader } from "@/components/admin/panel";
 import { StatCard, StatGrid } from "@/components/admin/stat-card";
 import { DataTable } from "@/components/admin/data-table";
 import { StatusBadge } from "@/components/admin/status-badge";
+import { PayoutEditor } from "@/components/admin/payout-editor";
+import {
+  RevenueChart,
+  VolumeBars,
+  type RevenuePoint,
+  type VolumePoint,
+} from "@/components/admin/finance-charts";
 
 export default async function AdminTransactionsPage({
   searchParams,
@@ -37,7 +44,7 @@ export default async function AdminTransactionsPage({
     db
       .select({
         totalAmount: sql<number>`coalesce(sum(${schema.internPayouts.amountMinor}), 0)::bigint`,
-        paidCount: sql<number>`coalesce(count(case when ${schema.internPayouts.status} = 'completed' then 1 end), 0)::int`,
+        paidCount: sql<number>`coalesce(count(case when ${schema.internPayouts.status} = 'paid' then 1 end), 0)::int`,
         totalCount: sql<number>`count(*)::int`,
       })
       .from(schema.internPayouts),
@@ -47,7 +54,73 @@ export default async function AdminTransactionsPage({
       .where(eq(schema.internPayouts.status, "pending")),
   ]);
 
-  const num = (n: number) => n.toLocaleString("en-IN");
+
+  // ── Chart series: monthly collected revenue + daily volume ────────────────
+  // Aggregated in SQL, zero-filled in JS so flat weeks still render axes.
+  // Paid rows only - created/failed orders are not money.
+  let revenueData: RevenuePoint[] = [];
+  let volumeData: VolumePoint[] = [];
+  try {
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+    const weekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6);
+
+    const [monthlyRows, dailyRows] = await Promise.all([
+      db
+        .select({
+          month: sql<string>`to_char(date_trunc('month', ${schema.employerPayments.paidAt}), 'YYYY-MM')`,
+          total: sql<number>`coalesce(sum(${schema.employerPayments.amountMinor}), 0)::bigint`,
+        })
+        .from(schema.employerPayments)
+        .where(
+          and(
+            eq(schema.employerPayments.status, "paid"),
+            gte(schema.employerPayments.paidAt, monthStart),
+          ),
+        )
+        .groupBy(sql`1`),
+      db
+        .select({
+          day: sql<string>`to_char(date_trunc('day', ${schema.employerPayments.paidAt}), 'YYYY-MM-DD')`,
+          total: sql<number>`coalesce(sum(${schema.employerPayments.amountMinor}), 0)::bigint`,
+          n: sql<number>`count(*)::int`,
+        })
+        .from(schema.employerPayments)
+        .where(
+          and(
+            eq(schema.employerPayments.status, "paid"),
+            gte(schema.employerPayments.paidAt, weekStart),
+          ),
+        )
+        .groupBy(sql`1`),
+    ]);
+
+    const byMonth = new Map(monthlyRows.map((r) => [r.month, Number(r.total)]));
+    revenueData = Array.from({ length: 6 }, (_, i) => {
+      const d = new Date(now.getFullYear(), now.getMonth() - 5 + i, 1);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      return {
+        label: d.toLocaleString("en-IN", { month: "short" }),
+        totalMinor: byMonth.get(key) ?? 0,
+      };
+    });
+
+    const byDay = new Map(
+      dailyRows.map((r) => [r.day, { total: Number(r.total), n: Number(r.n) }]),
+    );
+    volumeData = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6 + i);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      const hit = byDay.get(key);
+      return {
+        label: d.toLocaleString("en-IN", { weekday: "short" }),
+        count: hit?.n ?? 0,
+        totalMinor: hit?.total ?? 0,
+      };
+    });
+  } catch {
+    // Charts are decoration - the stats and tables below must render anyway.
+  }
 
   if (view === "payouts") {
     // Intern Disbursements View
@@ -114,20 +187,20 @@ export default async function AdminTransactionsPage({
                 ? formatMoney(Number(paymentMetrics?.totalAmount ?? 0), "INR", { compact: true })
                 : "₹0"
             }
-            hint={`${num(paymentMetrics?.paidCount ?? 0)} employer receipts`}
+            hint={`${formatNumber(paymentMetrics?.paidCount ?? 0)} employer receipts`}
             icon={ArrowDownLeft}
             tone="brand"
           />
           <StatCard
             label="Outflow payouts"
             value={formatMoney(Number(payoutMetrics?.totalAmount ?? 0), "INR", { compact: true })}
-            hint={`${num(payoutMetrics?.totalCount ?? 0)} disbursement records`}
+            hint={`${formatNumber(payoutMetrics?.totalCount ?? 0)} disbursement records`}
             icon={ArrowUpRight}
             tone="info"
           />
           <StatCard
             label="Pending payouts"
-            value={num(Number(pendingPayoutsCount?.c ?? 0))}
+            value={formatNumber(Number(pendingPayoutsCount?.c ?? 0))}
             hint="Awaiting bank processing"
             icon={Clock}
             tone="accent"
@@ -140,6 +213,8 @@ export default async function AdminTransactionsPage({
             tone="success"
           />
         </StatGrid>
+
+        <FinanceCharts revenueData={revenueData} volumeData={volumeData} />
 
         <div className="flex border-b border-ink-200">
           <Link
@@ -172,7 +247,7 @@ export default async function AdminTransactionsPage({
               key: "status",
               label: "Status",
               options: [
-                { value: "completed", label: "Completed" },
+                { value: "paid", label: "Paid" },
                 { value: "pending", label: "Pending" },
                 { value: "failed", label: "Failed" },
               ],
@@ -227,6 +302,15 @@ export default async function AdminTransactionsPage({
                 </span>
               ),
             },
+            {
+              header: "Update",
+              cell: (row) =>
+                row.status === "pending" ? (
+                  <PayoutEditor payoutId={row.id} initialReference={row.referenceId} />
+                ) : (
+                  <span className="text-xs text-text-subtle">-</span>
+                ),
+            },
           ]}
         />
       </div>
@@ -244,6 +328,8 @@ export default async function AdminTransactionsPage({
       req.search,
     ),
     params.status ? eq(schema.employerPayments.status, params.status) : undefined,
+    params.currency ? eq(schema.employerPayments.currency, params.currency) : undefined,
+    periodStart(params.period) ? gte(schema.employerPayments.createdAt, periodStart(params.period)!) : undefined,
   ].filter(Boolean) as SQL[];
 
   const where = conditions.length
@@ -295,20 +381,20 @@ export default async function AdminTransactionsPage({
               ? formatMoney(Number(paymentMetrics?.totalAmount ?? 0), "INR", { compact: true })
               : "₹0"
           }
-          hint={`${num(paymentMetrics?.paidCount ?? 0)} employer receipts`}
+          hint={`${formatNumber(paymentMetrics?.paidCount ?? 0)} employer receipts`}
           icon={ArrowDownLeft}
           tone="brand"
         />
         <StatCard
           label="Outflow payouts"
           value={formatMoney(Number(payoutMetrics?.totalAmount ?? 0), "INR", { compact: true })}
-          hint={`${num(payoutMetrics?.totalCount ?? 0)} disbursement records`}
+          hint={`${formatNumber(payoutMetrics?.totalCount ?? 0)} disbursement records`}
           icon={ArrowUpRight}
           tone="info"
         />
         <StatCard
           label="Pending payouts"
-          value={num(Number(pendingPayoutsCount?.c ?? 0))}
+          value={formatNumber(Number(pendingPayoutsCount?.c ?? 0))}
           hint="Awaiting bank processing"
           icon={Clock}
           tone="accent"
@@ -320,15 +406,17 @@ export default async function AdminTransactionsPage({
           icon={CheckCircle2}
           tone="success"
         />
-      </StatGrid>
+        </StatGrid>
 
-      <div className="flex border-b border-ink-200">
-        <Link
-          href="/admin/transactions"
-          className="border-b-2 border-brand-700 px-4 py-2.5 text-sm font-semibold text-brand-800"
-        >
-          Employer payments
-        </Link>
+        <FinanceCharts revenueData={revenueData} volumeData={volumeData} />
+
+        <div className="flex border-b border-ink-200">
+          <Link
+            href="/admin/transactions"
+            className="border-b-2 border-brand-700 px-4 py-2.5 text-sm font-semibold text-brand-800"
+          >
+            Employer payments
+          </Link>
         <Link
           href="/admin/transactions?view=payouts"
           className="border-b-2 border-transparent px-4 py-2.5 text-sm font-medium text-ink-600 transition-colors hover:text-ink-900"
@@ -348,6 +436,7 @@ export default async function AdminTransactionsPage({
         noun="transactions"
         caption="Employer payments list"
         searchPlaceholder="Search company, order ID, or payment ID…"
+        exportHref={`/api/admin/export?${new URLSearchParams({ type: "payments", ...params }).toString()}`}
         filters={[
           {
             key: "status",
@@ -356,8 +445,11 @@ export default async function AdminTransactionsPage({
               { value: "paid", label: "Paid" },
               { value: "created", label: "Created" },
               { value: "failed", label: "Failed" },
+              { value: "cancelled", label: "Cancelled" },
             ],
           },
+          { key: "currency", label: "Currency", options: [{ value: "INR", label: "INR" }, { value: "USD", label: "USD" }] },
+          { key: "period", label: "Period", options: PERIOD_OPTIONS },
         ]}
         columns={[
           {
@@ -412,6 +504,37 @@ export default async function AdminTransactionsPage({
           },
         ]}
       />
+    </div>
+  );
+}
+
+/**
+ * Revenue + volume cards shared by both tabs. Server-rendered shell, client
+ * charts inside - the numbers come from the same paid-payments queries above.
+ */
+function FinanceCharts({
+  revenueData,
+  volumeData,
+}: {
+  revenueData: RevenuePoint[];
+  volumeData: VolumePoint[];
+}) {
+  return (
+    <div className="grid gap-4 lg:grid-cols-2">
+      <section className="rounded-[20px] border border-ink-200/70 bg-white p-5 shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)]">
+        <h2 className="text-sm font-semibold text-ink-900">Revenue overview</h2>
+        <p className="mt-0.5 text-xs text-text-subtle">Collected revenue · last 6 months</p>
+        <div className="mt-4">
+          <RevenueChart data={revenueData} />
+        </div>
+      </section>
+      <section className="rounded-[20px] border border-ink-200/70 bg-white p-5 shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)]">
+        <h2 className="text-sm font-semibold text-ink-900">Daily transaction volume</h2>
+        <p className="mt-0.5 text-xs text-text-subtle">Paid transactions · last 7 days</p>
+        <div className="mt-4">
+          <VolumeBars data={volumeData} />
+        </div>
+      </section>
     </div>
   );
 }

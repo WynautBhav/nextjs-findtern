@@ -4,8 +4,12 @@ import { z } from "zod";
 import { getDb, schema } from "@/lib/db";
 import { sendSmtpMail } from "@/lib/mailer";
 import { generateOtp, hashOtp, limiters, bucketKey, clientIp } from "@/lib/security/rate-limit";
+import { SIGNUP_OTP_SUBJECTS } from "@/lib/signup-otp";
 
-const bodySchema = z.object({ email: z.string().trim().toLowerCase().email() });
+const bodySchema = z.object({
+  email: z.string().trim().toLowerCase().email(),
+  subjectType: z.enum(SIGNUP_OTP_SUBJECTS).default("intern"),
+});
 
 export async function POST(req: Request) {
   const ip = clientIp(req.headers);
@@ -24,7 +28,7 @@ export async function POST(req: Request) {
   const db = getDb();
 
   await db.insert(schema.emailOtps).values({
-    subjectType: "intern",
+    subjectType: parsed.data.subjectType,
     subjectId: email,
     otpHash: hashOtp(otp, salt),
     expiresAt: new Date(Date.now() + 10 * 60_000),

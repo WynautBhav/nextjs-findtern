@@ -31,7 +31,15 @@ describe("password", () => {
     const legacy = "MyOldPassword123";
     assert.equal(await verifyPassword(legacy, legacy), true);
     assert.equal(await verifyPassword("not-it", legacy), false);
+    process.env.PASSWORD_UPGRADE = "on";
     assert.equal(needsRehash(legacy), true, "plaintext must be flagged");
+  });
+
+  test("no rehash while PASSWORD_UPGRADE is off (legacy app shares the DB)", () => {
+    const prev = process.env.PASSWORD_UPGRADE;
+    delete process.env.PASSWORD_UPGRADE;
+    assert.equal(needsRehash("MyOldPassword123"), false);
+    process.env.PASSWORD_UPGRADE = prev;
   });
 
   test("a current argon2 hash is not flagged for rehash", async () => {

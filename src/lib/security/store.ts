@@ -27,16 +27,19 @@ import { generateKey, type OpaqueKey } from "./sign.ts";
  * cannot escape to somewhere web-served.
  */
 
-const ROOT = resolve(process.env.UPLOAD_ROOT ?? join(process.cwd(), ".private-uploads"));
+const ROOT = resolve(/*turbopackIgnore: true*/ process.env.UPLOAD_ROOT ?? join(process.cwd(), ".private-uploads"));
 
-/** Hard cap per file. Aadhaar images are well under 2 MB. */
-export const MAX_BYTES = 2 * 1024 * 1024;
+/** Absolute cap per file; each upload kind has its own lower limit. */
+export const MAX_BYTES = 50 * 1024 * 1024;
 
 const ALLOWED = new Map([
   ["image/jpeg", ".jpg"],
   ["image/png", ".png"],
   ["image/webp", ".webp"],
   ["application/pdf", ".pdf"],
+  ["video/mp4", ".mp4"],
+  ["video/webm", ".webm"],
+  ["video/quicktime", ".mov"],
 ]);
 
 export type StoredFile = {
@@ -57,7 +60,7 @@ function assertInsideRoot(key: string): string {
   // whitelisted rather than merely well-formed, so a stored .html or .svg can
   // never be written, and no key can be read back without proving its type is
   // one of the four we accept.
-  if (!/^[A-Za-z0-9_-]{1,32}\.[A-Za-z0-9_-]{20,32}\.(jpg|png|webp|pdf)$/.test(key)) {
+  if (!/^[A-Za-z0-9_-]{1,40}\.[A-Za-z0-9_-]{20,32}\.(jpg|png|webp|pdf|mp4|webm|mov)$/.test(key)) {
     throw new Error("Malformed key");
   }
   return path;
@@ -68,14 +71,15 @@ export async function put(
   subject: string,
   bytes: Buffer,
   contentType: string,
+  maxBytes = MAX_BYTES,
 ): Promise<StoredFile> {
   const ext = ALLOWED.get(contentType);
   if (!ext) {
     throw new Error(`Unsupported content type: ${contentType}`);
   }
   if (bytes.length === 0) throw new Error("Empty file");
-  if (bytes.length > MAX_BYTES) {
-    throw new Error(`File exceeds ${MAX_BYTES} bytes`);
+  if (bytes.length > Math.min(maxBytes, MAX_BYTES)) {
+    throw new Error(`File exceeds ${maxBytes} bytes`);
   }
 
   const key = `${generateKey(subject)}${ext}`;
@@ -97,11 +101,11 @@ async function writeTemp(bytes: Buffer): Promise<string> {
 }
 
 export async function read(key: string): Promise<Buffer> {
-  return readFile(assertInsideRoot(key));
+  return readFile(/*turbopackIgnore: true*/ assertInsideRoot(key));
 }
 
 export function stream(key: string) {
-  return createReadStream(assertInsideRoot(key));
+  return createReadStream(/*turbopackIgnore: true*/ assertInsideRoot(key));
 }
 
 export async function remove(key: string): Promise<void> {
@@ -110,7 +114,7 @@ export async function remove(key: string): Promise<void> {
 
 export async function exists(key: string): Promise<boolean> {
   try {
-    await stat(assertInsideRoot(key));
+    await stat(/*turbopackIgnore: true*/ assertInsideRoot(key));
     return true;
   } catch {
     return false;
@@ -122,9 +126,59 @@ export function contentTypeFor(key: string): string {
   if (key.endsWith(".png")) return "image/png";
   if (key.endsWith(".webp")) return "image/webp";
   if (key.endsWith(".pdf")) return "application/pdf";
+  if (key.endsWith(".mp4")) return "video/mp4";
+  if (key.endsWith(".webm")) return "video/webm";
+  if (key.endsWith(".mov")) return "video/quicktime";
   return "application/octet-stream";
 }
 
 export function uploadRoot(): string {
   return ROOT;
+}
+
+/* ── Legacy uploads (read-only) ────────────────────────────────────────
+ * The legacy app wrote `<ms>-<uuid>.<ext>` (or `<uuid>.<ext>`) into
+ * uploads/ and three subfolders, and stored `/uploads/...` paths in the DB.
+ * Those files are served only through /api/files/legacy, which checks who
+ * may see each one; nothing here is a static mount. */
+
+const LEGACY_ROOT = resolve(/*turbopackIgnore: true*/ process.env.LEGACY_UPLOAD_ROOT ?? join(process.cwd(), ".legacy-uploads"));
+const LEGACY_NAME = /^(?:(academics|company-logos|support)\/)?(?:\d{10,16}-)?[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(jpe?g|png|webp|pdf|docx|mp4|webm|mov)$/i;
+
+/** Normalised legacy path ("academics/x.jpg") or null if it isn't one. */
+export function legacyPath(raw: string): { path: string; folder: string | null } | null {
+  const path = raw.replace(/^\/?uploads\//, "").replace(/^\/+/, "");
+  const m = LEGACY_NAME.exec(path);
+  if (!m) return null;
+  const abs = resolve(LEGACY_ROOT, path);
+  if (!abs.startsWith(LEGACY_ROOT + sep)) return null;
+  return { path, folder: m[1] ?? null };
+}
+
+export async function readLegacy(path: string): Promise<Buffer> {
+  const ok = legacyPath(path);
+  if (!ok) throw new Error("Malformed legacy path");
+  return readFile(/*turbopackIgnore: true*/ resolve(LEGACY_ROOT, ok.path));
+}
+
+const LEGACY_TYPES: Record<string, string> = {
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  png: "image/png",
+  webp: "image/webp",
+  pdf: "application/pdf",
+  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  mp4: "video/mp4",
+  webm: "video/webm",
+  mov: "video/quicktime",
+};
+
+export function legacyContentType(path: string): string {
+  return LEGACY_TYPES[path.split(".").pop()?.toLowerCase() ?? ""] ?? "application/octet-stream";
+}
+
+/** Read a stored file by whatever name the DB holds: a new key or a legacy name. */
+export async function readAny(name: string): Promise<{ bytes: Buffer; contentType: string }> {
+  if (legacyPath(name)) return { bytes: await readLegacy(name), contentType: legacyContentType(name) };
+  return { bytes: await read(name), contentType: contentTypeFor(name) };
 }

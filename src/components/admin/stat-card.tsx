@@ -65,21 +65,15 @@ export function StatCard({
   const styles = TONE_CLASS[tone];
   const body = (
     <>
-      <div
-        className={cn(
-          "absolute top-0 left-0 right-0 h-1 opacity-90 transition-opacity group-hover:opacity-100",
-          styles.topBorder
-        )}
-      />
       <div className="flex items-start justify-between gap-3">
-        <p className="text-2xs font-bold uppercase tracking-wider text-text-subtle">
+        <p className="text-[13px] leading-5 text-text-subtle">
           {label}
         </p>
         {Icon ? (
           <span
             aria-hidden
             className={cn(
-              "grid size-9 shrink-0 place-items-center rounded-xl border shadow-2xs transition-colors group-hover:scale-105",
+              "apple-spring grid size-8 shrink-0 place-items-center rounded-[10px] border text-ink-400 group-hover:text-brand-700",
               styles.icon
             )}
           >
@@ -89,13 +83,13 @@ export function StatCard({
       </div>
 
       <div className="mt-3 flex items-baseline gap-2">
-        <span className="text-3xl font-bold tracking-tight text-ink-900 tabular-nums">
+        <span className="text-[28px] font-bold leading-[34px] tracking-[-0.02em] text-ink-900 tabular-nums">
           {value}
         </span>
         {delta ? (
           <span
             className={cn(
-              "rounded-full px-2 py-0.5 text-2xs font-bold border tabular-nums",
+              "rounded-full px-2 py-0.5 text-[12px] font-semibold border tabular-nums",
               styles.deltaBadge
             )}
           >
@@ -105,14 +99,14 @@ export function StatCard({
       </div>
 
       {hint ? (
-        <p className="mt-1 text-xs leading-relaxed text-text-subtle">{hint}</p>
+        <p className="mt-1 text-[13px] leading-relaxed text-text-subtle">{hint}</p>
       ) : null}
     </>
   );
 
   const className = cn(
-    "group relative block overflow-hidden rounded-2xl border border-sand-300 bg-white p-5 shadow-2xs transition-all duration-200",
-    href && "hover:border-brand-400 hover:shadow-md hover:-translate-y-0.5 focus-visible:outline-2"
+    "apple-panel apple-spring group relative block overflow-hidden bg-white p-5",
+    href && "apple-pressable hover:border-brand-300 focus-visible:outline-2"
   );
 
   if (href) {

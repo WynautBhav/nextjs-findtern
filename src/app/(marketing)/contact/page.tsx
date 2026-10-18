@@ -3,7 +3,7 @@ import { Clock, Mail, MapPin } from "lucide-react";
 
 import { PageHero, PageSection } from "@/components/marketing/page-hero";
 import { ContactForm } from "@/components/marketing/contact-form";
-import { SITE } from "@/lib/content/site";
+import { SITE, getGmailComposeUrl } from "@/lib/content/site";
 
 export const metadata: Metadata = {
   title: "Contact",
@@ -38,7 +38,7 @@ export default function ContactPage() {
                 Icon={Mail}
                 label="Email"
                 value={SITE.email}
-                href={`mailto:${SITE.email}`}
+                href={getGmailComposeUrl()}
               />
               <Detail Icon={MapPin} label="Based in" value={SITE.address} />
               <Detail
@@ -90,6 +90,8 @@ function Detail({
         {href ? (
           <a
             href={href}
+            target={href.startsWith("http") ? "_blank" : undefined}
+            rel={href.startsWith("http") ? "noopener noreferrer" : undefined}
             className="mt-0.5 inline-flex items-center py-1 text-base text-ink-800 underline underline-offset-4 transition-colors hover:text-primary"
           >
             {value}

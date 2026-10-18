@@ -23,7 +23,7 @@ import {
 export const metadata: Metadata = {
   title: "Findtern | Internship Simplified",
   description:
-    "Hire a verified intern for the price of a coffee, or get placed in a paid internship in 18 months - or your deposit back. Structured screening, published rates, contracted work.",
+    "Hire a verified intern for the price of a coffee, or get placed in a paid internship - or your deposit back. Structured screening, published rates, contracted work.",
   alternates: { canonical: "/" },
 };
 

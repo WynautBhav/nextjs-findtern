@@ -9,6 +9,7 @@ import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/s
 import { csrfFetch } from "@/lib/client-fetch";
 import { AdminNav, AdminNavFooter, NavCloseButton, type NavGroup } from "./admin-nav";
 import { CommandPalette } from "./command-palette";
+import { Logo } from "@/components/brand/logo";
 
 export function AdminShell({
   groups,
@@ -42,10 +43,9 @@ export function AdminShell({
   return (
     <div className="apple-admin min-h-[100dvh] overflow-x-clip bg-ink-50 text-ink-900 lg:flex lg:items-stretch">
       <aside className="apple-material-sidebar sticky top-0 hidden h-[100dvh] w-[15.5rem] shrink-0 flex-col px-3 py-4 lg:flex">
-        <Link href="/admin/dashboard" className="apple-spring apple-pressable mb-6 flex min-h-11 items-center gap-3 rounded-[10px] px-3 py-2">
-          <span className="grid size-8 place-items-center rounded-[10px] bg-brand-700 text-sm font-semibold text-white">F</span>
-          <span className="text-[15px] font-semibold tracking-[-0.02em] text-ink-900">Findtern</span>
-          <span className="ml-auto text-[12px] font-medium text-text-subtle">Admin</span>
+        <Link href="/admin/dashboard" className="apple-spring apple-pressable mb-6 flex min-h-11 items-center justify-between gap-3 rounded-[10px] px-3 py-2">
+          <Logo alt="Findtern Admin" priority className="h-7" />
+          <span className="rounded-full bg-brand-50 border border-brand-200 px-2 py-0.5 text-2xs font-bold uppercase tracking-wider text-brand-700">Admin</span>
         </Link>
 
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1 [scrollbar-width:thin]">

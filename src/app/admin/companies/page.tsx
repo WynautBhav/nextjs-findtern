@@ -3,7 +3,7 @@ import { count, desc, eq, sql, type SQL } from "drizzle-orm";
 import { Building2, CheckCircle2, Briefcase, FileCheck, Download } from "lucide-react";
 
 import { getDb, schema } from "@/lib/db";
-import { formatDate } from "@/lib/format";
+import { formatDate, formatNumber } from "@/lib/format";
 import { flattenParams, parsePageRequest, searchAny, toPage } from "@/lib/admin/params";
 import { AdminPageHeader } from "@/components/admin/panel";
 import { StatCard, StatGrid } from "@/components/admin/stat-card";
@@ -88,7 +88,6 @@ export default async function AdminCompaniesPage({
   const activeProjectsCount = Number(activeProjectsMetric?.c ?? 0);
   const gstCount = Number(gstRegisteredMetric?.c ?? 0);
 
-  const num = (n: number) => n.toLocaleString("en-IN");
   const exportHref = `/api/admin/export?type=companies&${new URLSearchParams(params).toString()}`;
 
   return (
@@ -110,21 +109,21 @@ export default async function AdminCompaniesPage({
       <StatGrid cols={4}>
         <StatCard
           label="Registered companies"
-          value={num(totalCount)}
+          value={formatNumber(totalCount)}
           hint="Total employer accounts"
           icon={Building2}
           tone="brand"
         />
         <StatCard
           label="Setup completed"
-          value={num(setupCount)}
+          value={formatNumber(setupCount)}
           hint={`${totalCount > 0 ? Math.round((setupCount / totalCount) * 100) : 0}% completion rate`}
           icon={CheckCircle2}
           tone="success"
         />
         <StatCard
           label="Active projects"
-          value={num(activeProjectsCount)}
+          value={formatNumber(activeProjectsCount)}
           hint="Currently accepting applicants"
           icon={Briefcase}
           tone="info"
@@ -132,7 +131,7 @@ export default async function AdminCompaniesPage({
         />
         <StatCard
           label="Tax verified"
-          value={num(gstCount)}
+          value={formatNumber(gstCount)}
           hint="Registered GST records"
           icon={FileCheck}
           tone="accent"
