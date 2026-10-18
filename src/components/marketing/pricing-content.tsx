@@ -291,7 +291,15 @@ export function PricingContent({
 
       {/* ── Where the money goes ────────────────────────────────────── */}
       <PageSection tone="brand">
-        <WhereMoneyGoes plans={plans} isIndia={isIndia} />
+        <div className="mx-auto max-w-2xl text-center">
+          <h2 className="text-balance text-3xl font-semibold tracking-[-0.025em] text-white sm:text-4xl">
+            Where the money goes
+          </h2>
+          <p className="mt-4 text-lg text-on-dark-subtle">
+            Two numbers on every plan. Move the score and watch both of them.
+          </p>
+        </div>
+        <WhereMoneyGoes plansInr={plansInr} plansUsd={plansUsd} />
       </PageSection>
 
       {/* ── FAQ ────────────────────────────────────────────────────── */}
