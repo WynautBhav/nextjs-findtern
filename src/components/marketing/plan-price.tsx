@@ -1,19 +1,18 @@
-import { Sparkles } from "lucide-react";
-
 import { savingsPercent } from "@/lib/currency";
 import { formatMoney, formatRate } from "@/lib/format";
-import { PLAN_OFFER } from "@/lib/plan-offer";
 import { cn } from "@/lib/utils";
 
 /**
- * A price with an optional struck-through "was" price and a small tag.
+ * A price, with the previous price struck through when the admin has set one.
  *
- * The was-price comes from `pricing_plans.compare_at_*` (admin-set); when it is
- * null or not above the current price, only the current price renders. The
- * old price is a real <del> so screen readers announce it as removed.
+ * Two arrangements. `inline` is for table cells and running text: the old
+ * price sits before the new one. `stack` is for the top of a plan card: the
+ * old price sits above in small type and the new price carries the weight,
+ * so a reader scanning three cards sees three prices, not three badges.
  *
- * A price struck through to zero is the pilot offer rather than a "Save 100%"
- * discount, so the tag says so instead of printing a percentage.
+ * A percentage tag appears only for a partial discount. A price struck to
+ * zero is the pilot offer, and the card says so in a sentence (PilotNote)
+ * rather than with a "Save 100%" sticker.
  */
 export function PlanPrice({
   nowMinor,
@@ -21,6 +20,7 @@ export function PlanPrice({
   currency,
   kind = "rate",
   tone = "light",
+  layout = "inline",
   className,
   priceClassName,
 }: {
@@ -29,31 +29,50 @@ export function PlanPrice({
   currency: "INR" | "USD";
   kind?: "rate" | "money";
   tone?: "light" | "dark";
+  layout?: "inline" | "stack";
   className?: string;
   priceClassName?: string;
 }) {
   const format = kind === "rate" ? formatRate : formatMoney;
   const save = savingsPercent(nowMinor, wasMinor);
-  const tag = save == null ? null : nowMinor === 0 ? PLAN_OFFER.freeTag : `Save ${save}%`;
+  const struck = save != null && wasMinor ? format(wasMinor, currency) : null;
+  const tag = save != null && nowMinor > 0 ? `Save ${save}%` : null;
+  const muted = tone === "dark" ? "text-on-dark-subtle" : "text-ink-400";
+
+  if (layout === "stack") {
+    return (
+      <span className={cn("flex flex-col items-start tabular-nums", className)}>
+        {/* Reserve the line even without a strike, so three cards in a row
+            keep their prices on one baseline. Stacked cards on a phone have
+            no row to align to, so the blank line goes. */}
+        <span className={cn("text-sm font-medium leading-5", muted, !struck && "hidden md:block")} aria-hidden={!struck}>
+          {struck ? (
+            <del className="decoration-[1.5px]">
+              <span className="sr-only">Was </span>
+              {struck}
+            </del>
+          ) : (
+            " "
+          )}
+        </span>
+        <span className={priceClassName}>{format(nowMinor, currency)}</span>
+      </span>
+    );
+  }
 
   return (
-    <span className={cn("inline-flex flex-wrap items-baseline gap-x-2 gap-y-1", className)}>
-      {save != null && wasMinor ? (
-        <del
-          className={cn(
-            "text-sm font-medium decoration-[1.5px]",
-            tone === "dark" ? "text-on-dark-subtle" : "text-ink-400",
-          )}
-        >
+    <span className={cn("inline-flex flex-wrap items-baseline gap-x-2 gap-y-1 tabular-nums", className)}>
+      {struck ? (
+        <del className={cn("text-sm font-medium decoration-[1.5px]", muted)}>
           <span className="sr-only">Was </span>
-          {format(wasMinor, currency)}
+          {struck}
         </del>
       ) : null}
       <span className={priceClassName}>{format(nowMinor, currency)}</span>
       {tag ? (
         <span
           className={cn(
-            "self-center whitespace-nowrap rounded-full px-2 py-0.5 text-2xs font-semibold tracking-wide",
+            "self-center whitespace-nowrap rounded-full px-2 py-0.5 text-2xs font-semibold",
             tone === "dark" ? "bg-accent/20 text-accent-300" : "bg-accent-100 text-accent-700",
           )}
         >
@@ -65,25 +84,24 @@ export function PlanPrice({
 }
 
 /**
- * The framed "discounted price" note on a plan that carries an offer. One
- * component so the home table, pricing page and employer cards print the same
- * words. `tone="dark"` is for cards sitting on the brand wash.
+ * One sentence under a pilot-priced plan. Plain text in the card's secondary
+ * colour: the strikethrough above already shows the discount, so this only
+ * has to say why and for how long.
  */
-export function OfferFrame({ tone = "light", className }: { tone?: "light" | "dark"; className?: string }) {
+export function PilotNote({
+  wasMinor,
+  currency,
+  tone = "light",
+  className,
+}: {
+  wasMinor: number;
+  currency: "INR" | "USD";
+  tone?: "light" | "dark";
+  className?: string;
+}) {
   return (
-    <p
-      className={cn(
-        "flex items-start gap-2 rounded-xl border border-dashed px-3 py-2.5 text-xs leading-relaxed",
-        tone === "dark"
-          ? "border-accent-300/50 bg-accent/10 text-accent-200"
-          : "border-accent-400/70 bg-accent-100 text-accent-700",
-        className,
-      )}
-    >
-      <Sparkles className="mt-0.5 size-3.5 shrink-0 text-accent-500" aria-hidden />
-      <span>
-        <strong className="font-semibold">{PLAN_OFFER.badge}.</strong> {PLAN_OFFER.note}
-      </span>
+    <p className={cn("text-[13px] leading-relaxed", tone === "dark" ? "text-on-dark-subtle" : "text-ink-500", className)}>
+      Pilot pricing for the first batch. Back to {formatRate(wasMinor, currency)} once the pilot closes.
     </p>
   );
 }

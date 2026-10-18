@@ -1,14 +1,12 @@
 import type { Metadata } from "next";
 import {
+  ArrowDown,
   ArrowRight,
   Briefcase,
   CheckCircle2,
   CircleHelp,
   Clock,
   Coins,
-  Globe,
-  Landmark,
-  Receipt,
   Search,
   ShieldCheck,
   Users,
@@ -56,29 +54,6 @@ const PROBLEMS = [
     Icon: Coins,
     problem: "Expensive hiring",
     detail: "Agency fees stack on top of salary for a role that pays part-time.",
-  },
-];
-
-const INTERNATIONAL = [
-  {
-    Icon: Globe,
-    title: "No visa, no entity",
-    body: "The intern works from India under a Findtern engagement. You never sponsor anyone or register a local company.",
-  },
-  {
-    Icon: Receipt,
-    title: "One invoice, in dollars",
-    body: "You pay Findtern for the service, monthly or up front. The rate card is the same one Indian employers see, converted at a fixed ₹100 = $1.",
-  },
-  {
-    Icon: Landmark,
-    title: "Stipend handled here",
-    body: "We pay the intern in rupees against the hours you approve, and keep the records that Indian rules require.",
-  },
-  {
-    Icon: Clock,
-    title: "Same screening, same score",
-    body: "Interviewed, tested and scored before you see them. Time zones are agreed in the proposal and shown on every interview slot.",
   },
 ];
 
@@ -308,53 +283,53 @@ export default async function EmployersPage() {
 
         <div className="mt-16" id="calculator">
           <SectionHeading
-            lead="Not sure what it"
-            accent="costs?"
-            sub="Pick the plan and the weekly schedule. The monthly figure and the arithmetic behind it appear on the right."
+            lead="What an intern"
+            accent="costs a month"
+            sub="Change the three words that matter. The arithmetic sits beside the answer."
           />
           <PricingCalculator plansInr={plansInr} plansUsd={plansUsd} className="mt-12" />
         </div>
       </PageSection>
 
-      {/* ── Hiring from outside India ──────────────────────────────── */}
+      {/* ── Hiring from outside India ──────────────────────────────
+          An argument, not a feature grid: the headline states the model,
+          the figure shows where the money goes, and the list answers the
+          four questions an overseas founder actually asks. */}
       <PageSection id="international">
-        <div className="grid gap-12 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:items-center lg:gap-16">
+        <div className="grid gap-12 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:items-start lg:gap-20">
           <div>
-            <p className="text-2xs font-semibold uppercase tracking-[0.16em] text-primary">
-              Hiring from outside India
-            </p>
-            <h2 className="mt-4 text-balance text-3xl font-semibold tracking-[-0.025em] text-ink-900 sm:text-4xl">
-              You buy a service from Findtern. We pay the intern.
+            <h2 className="text-balance text-3xl font-semibold tracking-[-0.025em] text-ink-900 sm:text-4xl">
+              Hiring from outside India? You buy a service from us. We pay the intern.
             </h2>
-            <p className="mt-5 text-lg leading-relaxed text-muted-foreground">
-              A company abroad cannot usually put an Indian student on its payroll:
-              there is no work visa, no local entity, and no clean way to send a
-              monthly stipend to a foreign bank account. Findtern removes the
-              problem by sitting in the middle.
+            <p className="mt-6 text-lg leading-relaxed text-muted-foreground">
+              A company abroad cannot put an Indian student on its payroll. There is
+              no work visa, no local entity, and no clean way to send a monthly stipend
+              to a foreign bank account.
             </p>
             <p className="mt-4 text-base leading-relaxed text-muted-foreground">
-              You contract with Findtern for a screening and placement service and
-              pay us in US dollars, the way you already pay any overseas software or
-              advertising vendor. We engage the intern in India, pay the stipend in
-              rupees, and handle the timesheet and the paperwork on this side.
+              So you contract with Findtern for screening and placement and pay us in
+              dollars, the way you already pay any overseas software or advertising
+              vendor. We engage the intern in India, pay the stipend in rupees against
+              the hours you approve, and keep the records Indian rules require.
             </p>
           </div>
 
-          <ul className="grid gap-4 sm:grid-cols-2">
-            {INTERNATIONAL.map(({ Icon, title, body }) => (
-              <li key={title}>
-                <TiltCard max={4} className="h-full rounded-2xl">
-                  <article className="flex h-full flex-col rounded-2xl border border-ink-200 bg-white p-5 sm:p-6">
-                    <span className="inline-flex size-10 items-center justify-center rounded-lg bg-brand-50 text-primary">
-                      <Icon className="size-5" aria-hidden />
-                    </span>
-                    <h3 className="mt-4 text-base font-semibold tracking-tight text-ink-900">{title}</h3>
-                    <p className="mt-1.5 text-sm leading-relaxed text-ink-500">{body}</p>
-                  </article>
-                </TiltCard>
-              </li>
-            ))}
-          </ul>
+          <div>
+            <MoneyFlow />
+            <dl className="mt-8 divide-y divide-ink-200 border-y border-ink-200 text-sm">
+              {[
+                ["Work visa", "Not needed. The intern works from India."],
+                ["Local entity", "Not needed. Your contract is with Findtern."],
+                ["Your invoice", "In US dollars, monthly or up front. The same rate card, at ₹100 = $1."],
+                ["The stipend", "In rupees, paid by Findtern against the timesheet hours you approve."],
+              ].map(([term, detail]) => (
+                <div key={term} className="grid grid-cols-[7.5rem_minmax(0,1fr)] gap-4 py-3.5">
+                  <dt className="text-ink-500">{term}</dt>
+                  <dd className="leading-relaxed text-ink-800">{detail}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
         </div>
       </PageSection>
 
@@ -425,6 +400,59 @@ function Figure({
         {suffix ? <span className="text-xs font-semibold text-ink-400 sm:text-xl sm:font-medium">{suffix}</span> : null}
       </p>
       <p className="mt-1 text-[11px] leading-tight text-ink-500 sm:mt-2 sm:text-base">{label}</p>
+    </div>
+  );
+}
+
+/**
+ * Where the money goes. Three parties and two transfers, drawn as a line so
+ * the currency change is visible at a glance: dollars into Findtern, rupees
+ * out to the intern. Decorative only in the sense that the list below says
+ * the same thing in words.
+ */
+function MoneyFlow() {
+  return (
+    <figure aria-label="How payment moves: your company pays Findtern in US dollars, Findtern pays the intern in rupees">
+      {/* Stacked on phones, a line on anything wider. */}
+      <div className="grid grid-cols-1 items-stretch gap-y-1 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto_minmax(0,1fr)] sm:items-center sm:gap-x-3 sm:gap-y-0">
+        <FlowNode name="Your company" where="Anywhere" />
+        <FlowLink label="USD invoice" />
+        <FlowNode name="Findtern" where="Jaipur, India" emphasis />
+        <FlowLink label="INR stipend" />
+        <FlowNode name="The intern" where="Works from India" />
+      </div>
+    </figure>
+  );
+}
+
+function FlowNode({ name, where, emphasis }: { name: string; where: string; emphasis?: boolean }) {
+  return (
+    <div
+      className={
+        emphasis
+          ? "rounded-xl border border-brand-200 bg-brand-50 px-3 py-4 text-center sm:px-4"
+          : "rounded-xl border border-ink-200 bg-white px-3 py-4 text-center sm:px-4"
+      }
+    >
+      <p className={emphasis ? "text-sm font-semibold text-primary" : "text-sm font-semibold text-ink-900"}>{name}</p>
+      <p className="mt-0.5 text-xs text-ink-500">{where}</p>
+    </div>
+  );
+}
+
+function FlowLink({ label }: { label: string }) {
+  return (
+    <div className="flex items-center gap-3 pl-5 sm:flex-col sm:gap-1 sm:px-0.5 sm:pl-0">
+      {/* Down on phones, right on wider screens. */}
+      <span aria-hidden className="flex flex-col items-center text-ink-300 sm:hidden">
+        <span className="h-5 w-px bg-current" />
+        <ArrowDown className="-mt-1 size-3.5" />
+      </span>
+      <span className="whitespace-nowrap text-xs font-medium text-ink-600">{label}</span>
+      <span aria-hidden className="hidden items-center text-ink-300 sm:flex">
+        <span className="h-px w-10 bg-current md:w-12" />
+        <ArrowRight className="-ml-1 size-3.5" />
+      </span>
     </div>
   );
 }

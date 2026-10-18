@@ -10,7 +10,7 @@ import { FaqExplorer } from "@/components/marketing/faq-explorer";
 import { formatMoney, formatRate } from "@/lib/format";
 import { useRegionBands } from "@/components/marketing/region-rates";
 import { MonthlyRate } from "@/components/marketing/monthly-rate";
-import { OfferFrame, PlanPrice } from "@/components/marketing/plan-price";
+import { PilotNote, PlanPrice } from "@/components/marketing/plan-price";
 import { PricingCalculator } from "@/components/marketing/pricing-calculator";
 import { inrToUsd } from "@/lib/currency";
 import { pricingFaq } from "@/lib/content/pricing-faq";
@@ -150,15 +150,19 @@ export function PricingContent({
                     {band.min}–{band.max}/10
                   </p>
                   <PlanPrice
+                    layout="stack"
                     className="mt-4"
-                    priceClassName="text-2xl font-semibold tracking-tight text-ink-900"
+                    priceClassName="text-[2rem] font-semibold leading-none tracking-[-0.025em] text-ink-900"
                     nowMinor={plan?.priceHourlyMinor ?? band.rateMinor}
                     wasMinor={plan?.compareAtHourlyMinor}
                     currency={currency}
                   />
-                  <MonthlyRate hourlyMinor={plan?.priceHourlyMinor ?? band.rateMinor} currency={currency} className="mt-1" />
-                  <p className="mt-1.5 text-sm text-ink-500">{band.blurb}</p>
-                  {plan && planHasOffer(plan) ? <OfferFrame className="mt-4" /> : null}
+                  {plan && planHasOffer(plan) && plan.compareAtHourlyMinor ? (
+                    <PilotNote wasMinor={plan.compareAtHourlyMinor} currency={currency} className="mt-2" />
+                  ) : (
+                    <MonthlyRate hourlyMinor={plan?.priceHourlyMinor ?? band.rateMinor} currency={currency} className="mt-2" />
+                  )}
+                  <p className="mt-4 text-sm text-ink-500">{band.blurb}</p>
                   <p className="mt-5 flex items-center gap-2 border-t pt-4 text-sm text-ink-700">
                     <Check className="size-4 shrink-0 text-primary" aria-hidden />
                     <PlanPrice
@@ -203,10 +207,10 @@ export function PricingContent({
       <PageSection id="calculator">
         <div className="mx-auto max-w-2xl text-center">
           <h2 className="text-balance text-3xl font-semibold tracking-[-0.025em] text-ink-900 sm:text-4xl">
-            What does an intern cost per month?
+            What an intern costs a month
           </h2>
           <p className="mt-4 text-lg text-muted-foreground">
-            Pick the plan, the days a week and the hours a day. The arithmetic is shown, so you can check it.
+            Change the three words that matter. The arithmetic sits beside the answer.
           </p>
         </div>
         <PricingCalculator plansInr={plansInr} plansUsd={plansUsd} className="mt-12" />

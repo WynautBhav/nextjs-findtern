@@ -1,20 +1,17 @@
 "use client";
 
-import { useId, useState } from "react";
-import { Info } from "lucide-react";
-
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { formatMoney, formatNumber } from "@/lib/format";
 import { HOURS_PER_MONTH, WORK_MONTH } from "@/lib/plan-offer";
 import { cn } from "@/lib/utils";
 
 /**
- * "≈ ₹16,000 a month" beside an hourly rate, with the working one tap away.
+ * "₹16,000 a month at 160 hours" under an hourly rate.
  *
- * The hourly figure is the published price; the monthly one is arithmetic on
- * a stated assumption (8 h × 5 d × 4 w = 160 h). The assumption is shown in a
- * tooltip rather than hidden, because an employer who works six days a week
- * needs to know what to multiply. Hover and keyboard focus open it, and a tap
- * toggles it so it works on a phone, where there is no hover.
+ * The monthly figure is derived, so the assumption behind it is part of the
+ * sentence rather than hidden behind an icon: the hour count is the control,
+ * and the tooltip shows the multiplication. Employers who work six days a
+ * week can see what to change.
  */
 export function MonthlyRate({
   hourlyMinor,
@@ -27,50 +24,35 @@ export function MonthlyRate({
   tone?: "light" | "dark";
   className?: string;
 }) {
-  const id = useId();
-  const [open, setOpen] = useState(false);
   if (hourlyMinor <= 0) return null;
-
   const monthly = hourlyMinor * HOURS_PER_MONTH;
-  const muted = tone === "dark" ? "text-on-dark-subtle" : "text-ink-500";
+  const dark = tone === "dark";
 
   return (
-    <span className={cn("group relative inline-flex items-center gap-1.5 text-sm", muted, className)}>
-      <span>
-        ≈ <span className={cn("font-semibold", tone === "dark" ? "text-white" : "text-ink-800")}>{formatMoney(monthly, currency)}</span> a month
-      </span>
-      <button
-        type="button"
-        aria-label="How the monthly figure is calculated"
-        aria-expanded={open}
-        aria-describedby={id}
-        onClick={() => setOpen((v) => !v)}
-        onBlur={() => setOpen(false)}
-        className={cn(
-          "grid size-6 place-items-center rounded-full transition-colors",
-          tone === "dark" ? "text-on-dark-subtle hover:text-white" : "text-ink-400 hover:text-ink-800",
-        )}
-      >
-        <Info className="size-3.5" aria-hidden />
-      </button>
-      <span
-        id={id}
-        role="tooltip"
-        className={cn(
-          "pointer-events-none absolute left-0 top-full z-20 mt-2 w-60 rounded-xl border p-3 text-left text-xs leading-relaxed shadow-lg transition-opacity duration-150",
-          "border-ink-200 bg-white text-ink-700",
-          open ? "opacity-100" : "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100",
-        )}
-      >
-        <strong className="font-semibold text-ink-900">
-          {formatNumber(HOURS_PER_MONTH)} hours a month
-        </strong>
-        <br />
-        {WORK_MONTH.hoursPerDay} hours a day × {WORK_MONTH.daysPerWeek} days a week ={" "}
-        {WORK_MONTH.hoursPerDay * WORK_MONTH.daysPerWeek} hours a week, over {WORK_MONTH.weeksPerMonth} weeks.
-        <br />
-        {formatMoney(hourlyMinor, currency)} × {HOURS_PER_MONTH} = {formatMoney(monthly, currency)}.
-      </span>
-    </span>
+    <p className={cn("text-sm leading-5 tabular-nums", dark ? "text-on-dark-subtle" : "text-ink-500", className)}>
+      <span className={cn("font-medium", dark ? "text-white" : "text-ink-700")}>{formatMoney(monthly, currency)}</span> a month at{" "}
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            className={cn(
+              "cursor-help rounded-sm underline decoration-dotted decoration-[1.5px] underline-offset-[3px] transition-colors duration-150",
+              dark
+                ? "decoration-on-dark-subtle/70 hover:text-white"
+                : "decoration-ink-400 hover:text-ink-800",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
+            )}
+          >
+            {formatNumber(HOURS_PER_MONTH)} hours
+          </button>
+        </TooltipTrigger>
+        <TooltipContent>
+          {WORK_MONTH.hoursPerDay} hours a day × {WORK_MONTH.daysPerWeek} days a week × {WORK_MONTH.weeksPerMonth} weeks ={" "}
+          {HOURS_PER_MONTH} hours.
+          <br />
+          {formatMoney(hourlyMinor, currency)} × {HOURS_PER_MONTH} = {formatMoney(monthly, currency)}.
+        </TooltipContent>
+      </Tooltip>
+    </p>
   );
 }

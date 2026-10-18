@@ -6,7 +6,7 @@ import { ButtonLink } from "@/components/ui/button";
 import { TiltCard } from "@/components/motion/tilt-card";
 import { useRegionBands } from "@/components/marketing/region-rates";
 import { MonthlyRate } from "@/components/marketing/monthly-rate";
-import { OfferFrame, PlanPrice } from "@/components/marketing/plan-price";
+import { PilotNote, PlanPrice } from "@/components/marketing/plan-price";
 import type { CmsPlan } from "@/lib/content/types";
 import { planHasOffer } from "@/lib/plan-offer";
 import { cn } from "@/lib/utils";
@@ -56,15 +56,19 @@ export function EmployerPlanCards({
                 {plan?.displayName ?? b.name}
               </h3>
               <PlanPrice
-                className="mt-3"
-                priceClassName="text-3xl font-semibold tracking-tight text-ink-900"
+                layout="stack"
+                className="mt-4"
+                priceClassName="text-[2rem] font-semibold leading-none tracking-[-0.025em] text-ink-900"
                 nowMinor={plan?.priceHourlyMinor ?? b.rateMinor}
                 wasMinor={plan?.compareAtHourlyMinor}
                 currency={currency}
               />
-              <MonthlyRate hourlyMinor={plan?.priceHourlyMinor ?? b.rateMinor} currency={currency} className="mt-1" />
-              <p className="mt-1.5 text-sm text-ink-500">{plan?.features[0] ?? b.blurb}</p>
-              {plan && planHasOffer(plan) ? <OfferFrame className="mt-4" /> : null}
+              {plan && planHasOffer(plan) && plan.compareAtHourlyMinor ? (
+                <PilotNote wasMinor={plan.compareAtHourlyMinor} currency={currency} className="mt-2" />
+              ) : (
+                <MonthlyRate hourlyMinor={plan?.priceHourlyMinor ?? b.rateMinor} currency={currency} className="mt-2" />
+              )}
+              <p className="mt-4 text-sm text-ink-500">{plan?.features[0] ?? b.blurb}</p>
               <p className="mt-4 text-sm font-medium text-primary">
                 Score {b.min}–{b.max}/10
               </p>

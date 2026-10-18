@@ -1,21 +1,14 @@
 import type { CmsPlan } from "@/lib/content/types";
 
 /**
- * The one promotional frame on the rate card.
+ * The pilot offer and the monthly arithmetic, in one place.
  *
  * A plan is "on offer" when the admin has set a compare-at price above the
- * current one. The copy below is what every surface (home table, pricing
- * page, employer cards) prints beside that strikethrough, so the wording of
- * the pilot offer cannot drift between pages. Zero imports beyond the type,
- * so it is safe for `node --test`.
+ * current one. Every surface derives the same answer from this, so the home
+ * table, the pricing page and the employer cards cannot disagree about which
+ * plan is discounted. Zero imports beyond the type, so it is safe for
+ * `node --test`.
  */
-export const PLAN_OFFER = {
-  badge: "Pilot batch offer",
-  note: "Discounted price for the initial batch. Normal pricing applies once the pilot closes.",
-  /** Tag shown beside a price that has been struck through to zero. */
-  freeTag: "Free for the pilot",
-} as const;
-
 export function planHasOffer(plan: Pick<CmsPlan, "priceHourlyMinor" | "compareAtHourlyMinor" | "perHireChargeMinor" | "compareAtPerHireMinor">): boolean {
   return (
     (plan.compareAtHourlyMinor ?? 0) > plan.priceHourlyMinor ||

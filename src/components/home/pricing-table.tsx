@@ -7,7 +7,7 @@ import { ButtonLink } from "@/components/ui/button";
 import { formatMoney } from "@/lib/format";
 import { useIsIndia } from "@/components/marketing/region-rates";
 import { MonthlyRate } from "@/components/marketing/monthly-rate";
-import { OfferFrame, PlanPrice } from "@/components/marketing/plan-price";
+import { PilotNote, PlanPrice } from "@/components/marketing/plan-price";
 import type { CmsPlan } from "@/lib/content/types";
 import { planHasOffer } from "@/lib/plan-offer";
 import { cn } from "@/lib/utils";
@@ -198,17 +198,21 @@ export function PricingTable({
                   {plan.displayName}
                 </p>
                 <PlanPrice
-                  className="mt-1.5"
-                  priceClassName="text-3xl font-semibold tracking-[-0.02em] text-ink-900"
+                  layout="stack"
+                  className="mt-3"
+                  priceClassName="text-[2rem] font-semibold leading-none tracking-[-0.025em] text-ink-900"
                   nowMinor={plan.priceHourlyMinor}
                   wasMinor={plan.compareAtHourlyMinor}
                   currency={currency}
                 />
-                <MonthlyRate hourlyMinor={plan.priceHourlyMinor} currency={currency} className="mt-1" />
-                <p className="mt-1.5 text-sm text-ink-500">
+                {planHasOffer(plan) && plan.compareAtHourlyMinor ? (
+                  <PilotNote wasMinor={plan.compareAtHourlyMinor} currency={currency} className="mt-2" />
+                ) : (
+                  <MonthlyRate hourlyMinor={plan.priceHourlyMinor} currency={currency} className="mt-2" />
+                )}
+                <p className="mt-4 text-sm text-ink-500">
                   {plan.features[0]} · {plan.internshipDuration}
                 </p>
-                {planHasOffer(plan) ? <OfferFrame className="mt-4" /> : null}
 
                 <ul
                   className="mt-5 space-y-2.5 border-t border-ink-100 pt-5"
