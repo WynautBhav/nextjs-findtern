@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 
 import { csrfFetch } from "@/lib/client-fetch";
+import { EmptyState } from "@/components/layout/page-header";
 import { formatCurrency, formatPerHire, formatRate } from "@/lib/format";
 import { displayNameOf, type CandidateProfile } from "@/lib/employer-candidates";
 import { TIMEZONES } from "@/lib/timezones";
@@ -272,14 +273,14 @@ export function CartManager({
         </div>
 
         {projectOptions.length > 0 && (
-          <div className="flex items-center gap-2">
-            <span className="text-2xs font-semibold uppercase tracking-wider text-text-subtle">
+          <div className="flex min-w-0 items-center gap-2">
+            <span className="shrink-0 text-2xs font-semibold uppercase tracking-wider text-text-subtle">
               Project:
             </span>
             <select
               value={selectedProject}
               onChange={(e) => setSelectedProject(e.target.value)}
-              className="apple-spring min-h-11 rounded-[10px] border border-ink-200 bg-white px-3 text-[14px] font-medium text-ink-800 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+              className="apple-spring min-h-11 w-full min-w-0 flex-1 rounded-[10px] border border-ink-200 bg-white px-3 text-[14px] font-medium text-ink-800 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 sm:w-auto"
             >
               <option value="all">All Projects</option>
               {projectOptions.map(([id, name]) => (
@@ -295,32 +296,21 @@ export function CartManager({
       {/* Main Content Area */}
       {activeTab === "cart" ? (
         displayedCartLines.length === 0 ? (
-          <div className="rounded-[20px] border border-dashed border-ink-200/70 bg-white p-12 text-center">
-            <div className="mx-auto grid size-12 place-items-center rounded-[10px] bg-ink-50 text-ink-400">
-              <ShoppingCart className="size-6" />
-            </div>
-            <h3 className="mt-3 text-sm font-semibold text-ink-900">Your cart is empty</h3>
-            <p className="mt-1 text-xs text-text-subtle">
-              Shortlist candidates from your dashboard or candidate search to book meetings and send hiring proposals.
-            </p>
-            <div className="mt-5">
-              <Link
-                href="/employer/candidates"
-                className="apple-spring apple-pressable inline-flex min-h-11 items-center justify-center gap-1.5 rounded-[10px] bg-brand-700 px-4 text-xs font-semibold text-white hover:bg-brand-800"
-              >
-                Browse Candidates
-              </Link>
-            </div>
-          </div>
+          <EmptyState
+            title="Your cart is empty"
+            body="Shortlist candidates from your dashboard or candidate search to book meetings and send hiring proposals."
+            action={{ label: "Browse candidates", href: "/employer/candidates" }}
+            who="You - shortlist a candidate"
+          />
         ) : (
-          <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
-            <div className="space-y-4">
+          <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]">
+            <div className="min-w-0 space-y-4">
               {displayedCartLines.map((line) => (
                 <div
                   key={line.id}
                   className="apple-spring rounded-[20px] border border-ink-200/70 bg-white p-5 shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)] hover:border-brand-200"
                 >
-                  <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                     <div className="flex items-start gap-3.5">
                       <span className="grid size-11 place-items-center rounded-[10px] bg-brand-100 text-sm font-bold text-brand-800 shrink-0">
                         {line.candidate.initials}
@@ -349,7 +339,7 @@ export function CartManager({
                       </div>
                     </div>
 
-                    <div className="text-right sm:self-start shrink-0">
+                    <div className="shrink-0 md:self-start md:text-right">
                       <div className="inline-flex items-center gap-1 rounded-full bg-brand-50 px-2.5 py-0.5 text-xs font-bold tabular-nums text-brand-800 border border-brand-200/60">
                         <Sparkles className="size-3 fill-brand-600 text-brand-600" />
                         <span>Score: {line.candidate.score.toFixed(1)}</span>
@@ -435,7 +425,7 @@ export function CartManager({
             </div>
 
             {/* Sidebar Summary */}
-            <aside className="rounded-[20px] border border-ink-200/70 bg-white p-5 shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)] space-y-4 lg:sticky lg:top-8 lg:self-start">
+            <aside className="min-w-0 rounded-[20px] border border-ink-200/70 bg-white p-5 shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)] space-y-4 xl:sticky xl:top-8 xl:self-start">
               <h3 className="text-xs font-bold uppercase tracking-wider text-ink-800">
                 Cart Summary
               </h3>
@@ -492,8 +482,8 @@ export function CartManager({
             </div>
           </div>
         ) : (
-          <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
-            <div className="space-y-4">
+          <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]">
+            <div className="min-w-0 space-y-4">
               <div className="rounded-[20px] border border-brand-200 bg-brand-50/50 p-4">
                 <div className="flex items-center gap-2 text-xs font-bold text-brand-900">
                   <Sparkles className="size-4 text-brand-700" />
@@ -539,7 +529,7 @@ export function CartManager({
             </div>
 
             {/* Checkout Pricing Sidebar */}
-            <aside className="rounded-[20px] border border-ink-200/70 bg-white p-5 shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)] space-y-4 lg:sticky lg:top-8 lg:self-start">
+            <aside className="min-w-0 rounded-[20px] border border-ink-200/70 bg-white p-5 shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)] space-y-4 xl:sticky xl:top-8 xl:self-start">
               <h3 className="text-xs font-bold uppercase tracking-wider text-ink-800">
                 Order Summary
               </h3>

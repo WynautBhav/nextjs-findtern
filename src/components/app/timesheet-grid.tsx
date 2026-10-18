@@ -308,8 +308,8 @@ export function TimesheetGrid({
           const isWeekend = day.weekend;
           return (
             <li key={day.date} className={cn("px-5 py-3", isWeekend && "bg-ink-50/60")}>
-              <div className="flex items-center gap-4">
-                <div className="w-16 shrink-0">
+              <div className="grid grid-cols-[4rem_minmax(0,1fr)_minmax(0,1fr)] gap-x-3 gap-y-2 sm:grid-cols-[4rem_6rem_8rem_minmax(0,1fr)] sm:items-center">
+                <div className="min-w-0">
                   <p className="text-sm font-semibold text-ink-900">{day.weekday}</p>
                   <p className="text-xs tabular-nums text-ink-500">{day.label}</p>
                   {govtHoliday ? (
@@ -317,7 +317,7 @@ export function TimesheetGrid({
                   ) : null}
                 </div>
 
-                <div className="w-24 shrink-0">
+                <div className="min-w-0">
                   <label className="sr-only" htmlFor={`h-${day.date}`}>
                     Hours on {day.weekday} {day.label}
                   </label>
@@ -348,7 +348,7 @@ export function TimesheetGrid({
                   </div>
                 </div>
 
-                <div className="w-32 shrink-0">
+                <div className="min-w-0">
                   <label className="sr-only" htmlFor={`s-${day.date}`}>
                     Day status for {day.weekday} {day.label}
                   </label>
@@ -373,7 +373,7 @@ export function TimesheetGrid({
                   </select>
                 </div>
 
-                <div className="min-w-0 flex-1">
+                <div className="col-span-3 min-w-0 sm:col-span-1">
                   <label className="sr-only" htmlFor={`n-${day.date}`}>
                     What you worked on for {day.weekday} {day.label}
                   </label>
@@ -419,7 +419,7 @@ export function TimesheetGrid({
         </div>
 
         {!readOnly ? (
-          <div className="flex items-center gap-3">
+          <div className="flex w-full flex-wrap items-center justify-end gap-x-3 gap-y-2 sm:w-auto">
             {status === "draft" ? (
               <button
                 type="button"
@@ -448,7 +448,7 @@ export function TimesheetGrid({
               </button>
             ) : null}
             {missingStatus > 0 ? (
-              <span className="text-xs font-medium text-amber-700">
+              <span className="basis-full text-right text-xs font-medium text-amber-700 sm:basis-auto">
                 {missingStatus} day{missingStatus === 1 ? "" : "s"} still need{missingStatus === 1 ? "s" : ""} a status
               </span>
             ) : null}

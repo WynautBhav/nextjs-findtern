@@ -105,25 +105,6 @@ export default async function AdminInternDetail({ params }: { params: Promise<{ 
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap justify-end gap-2">
-        <ContactEditor
-          targetType="intern"
-          targetId={user.id}
-          initial={{
-            firstName: user.firstName,
-            lastName: user.lastName,
-            email: user.email,
-            countryCode: user.countryCode,
-            phoneNumber: user.phoneNumber,
-          }}
-        />
-        <ViewAsButton targetType="intern" targetId={user.id} label="View as candidate" />
-        <ApprovalSelect
-          internId={user.id}
-          value={String(((onboarding?.extraData ?? {}) as Record<string, unknown>).approvalStatus ?? "Pending")}
-        />
-      </div>
     <Intern360View
       user={user}
       onboarding={onboarding || null}
@@ -134,7 +115,26 @@ export default async function AdminInternDetail({ params }: { params: Promise<{ 
       payouts={payouts}
       employerNames={employerNames}
       projectNames={projectNames}
+      actions={
+        <>
+          <ContactEditor
+            targetType="intern"
+            targetId={user.id}
+            initial={{
+              firstName: user.firstName,
+              lastName: user.lastName,
+              email: user.email,
+              countryCode: user.countryCode,
+              phoneNumber: user.phoneNumber,
+            }}
+          />
+          <ViewAsButton targetType="intern" targetId={user.id} label="View as candidate" />
+          <ApprovalSelect
+            internId={user.id}
+            value={String(((onboarding?.extraData ?? {}) as Record<string, unknown>).approvalStatus ?? "Pending")}
+          />
+        </>
+      }
     />
-    </div>
   );
 }

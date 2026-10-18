@@ -8,6 +8,8 @@ import { CopyLink } from "@/components/marketing/copy-link";
 import { getBlogPost, getBlogPosts } from "@/lib/content";
 import { plainTextExcerpt, readingMinutes, sanitizeRichText } from "@/lib/richtext";
 import { tidyText } from "@/lib/text";
+import { JsonLd } from "@/components/seo/json-ld";
+import { blogPostingJsonLd, breadcrumbJsonLd } from "@/lib/seo";
 
 /* Slugs are the published, indexed ones - `Intern-10`, `Employer-12` and so on.
    Renaming them would break every existing link, so they are preserved exactly
@@ -39,8 +41,12 @@ export async function generateMetadata({
       description,
       type: "article",
       publishedTime: post.publishedAt,
+      modifiedTime: post.publishedAt,
+      authors: ["Findtern"],
+      section: post.slug.toLowerCase().startsWith("employer") ? "For employers" : "For interns",
       url: `/blog/${post.slug}`,
-      ...(post.coverImageUrl ? { images: [post.coverImageUrl] } : {}),
+      // The generated title card (opengraph-image.tsx beside this file) is
+      // the share image; CMS covers are inline base64 of assorted sizes.
     },
   };
 }
@@ -64,6 +70,15 @@ export default async function BlogDetailPage({
 
   return (
     <>
+      <JsonLd
+        data={[
+          blogPostingJsonLd(post),
+          breadcrumbJsonLd([
+            { name: "Blog", path: "/blog" },
+            { name: title, path: `/blog/${post.slug}` },
+          ]),
+        ]}
+      />
       {/* ── Article header ────────────────────────────────────────── */}
       <header className="relative isolate overflow-hidden border-b border-ink-100 bg-white">
         <div
@@ -88,6 +103,10 @@ export default async function BlogDetailPage({
             </h1>
 
             <div className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-ink-500">
+              <span>
+                By <span className="font-medium text-ink-700">the Findtern team</span>
+              </span>
+              <span aria-hidden className="h-1 w-1 rounded-full bg-ink-300" />
               <time dateTime={post.publishedAt}>
                 {new Date(post.publishedAt).toLocaleDateString("en-IN", {
                   day: "numeric",
@@ -109,7 +128,7 @@ export default async function BlogDetailPage({
               {/* Banners range from square to 3:1 and some carry text, so they
                   keep their own aspect ratio rather than being cropped. */}
               {/* eslint-disable-next-line @next/next/no-img-element -- served and cached by /api/blog-image */}
-              <img src={hero} alt="" decoding="async" className="block h-auto w-full" />
+              <img src={hero} alt={title} decoding="async" fetchPriority="high" className="block h-auto w-full" />
             </div>
           ) : null}
         </div>

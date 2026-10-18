@@ -5,8 +5,10 @@ import { Briefcase, Check, Gift, X, Zap } from "lucide-react";
 import { ButtonLink } from "@/components/ui/button";
 import { TiltCard } from "@/components/motion/tilt-card";
 import { useRegionBands } from "@/components/marketing/region-rates";
-import { PlanPrice } from "@/components/marketing/plan-price";
+import { MonthlyRate } from "@/components/marketing/monthly-rate";
+import { OfferFrame, PlanPrice } from "@/components/marketing/plan-price";
 import type { CmsPlan } from "@/lib/content/types";
+import { planHasOffer } from "@/lib/plan-offer";
 import { cn } from "@/lib/utils";
 
 /**
@@ -60,7 +62,9 @@ export function EmployerPlanCards({
                 wasMinor={plan?.compareAtHourlyMinor}
                 currency={currency}
               />
+              <MonthlyRate hourlyMinor={plan?.priceHourlyMinor ?? b.rateMinor} currency={currency} className="mt-1" />
               <p className="mt-1.5 text-sm text-ink-500">{plan?.features[0] ?? b.blurb}</p>
+              {plan && planHasOffer(plan) ? <OfferFrame className="mt-4" /> : null}
               <p className="mt-4 text-sm font-medium text-primary">
                 Score {b.min}–{b.max}/10
               </p>

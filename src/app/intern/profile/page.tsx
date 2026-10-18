@@ -56,7 +56,7 @@ export default async function InternProfile() {
         }
       />
 
-      <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_20rem]">
+      <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_20rem]">
         <div className="min-w-0 space-y-8">
           <SectionHead title="Your profile card" hint="This is the card an employer sees in search." />
           <ProfileCard

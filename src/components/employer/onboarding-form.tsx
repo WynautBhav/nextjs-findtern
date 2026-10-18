@@ -265,12 +265,12 @@ export function EmployerOnboardingForm({ initial, hasExistingProject, employerId
           </p>
         ) : null}
 
-        <div className="mt-6 flex flex-wrap items-center gap-3">
+        <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
           {stage > 0 ? (
             <button
               type="button"
               onClick={() => goTo(stage - 1)}
-              className="apple-spring apple-pressable inline-flex min-h-11 items-center justify-center gap-2 rounded-[10px] border border-ink-200 bg-white px-4 text-sm font-medium text-ink-800 hover:bg-ink-50"
+              className="apple-spring apple-pressable inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[10px] border border-ink-200 bg-white px-4 text-sm font-medium text-ink-800 hover:bg-ink-50 sm:w-auto"
             >
               <ArrowLeft className="size-4" aria-hidden />
               Back
@@ -282,7 +282,7 @@ export function EmployerOnboardingForm({ initial, hasExistingProject, employerId
               <button
                 type="button"
                 onClick={onContinue}
-                className="apple-spring apple-pressable group inline-flex min-h-11 items-center justify-center gap-2 rounded-[10px] bg-brand-700 px-5 text-sm font-semibold text-white hover:bg-brand-600"
+                className="apple-spring apple-pressable group inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[10px] bg-brand-700 px-5 text-sm font-semibold text-white hover:bg-brand-600 sm:w-auto"
               >
                 Continue to project
                 <ArrowRight
@@ -293,7 +293,7 @@ export function EmployerOnboardingForm({ initial, hasExistingProject, employerId
               <button
                 type="button"
                 onClick={onSaveCompany}
-                className="apple-spring apple-pressable inline-flex min-h-11 items-center justify-center gap-2 rounded-[10px] border border-ink-200 bg-white px-4 text-sm font-medium text-ink-800 hover:bg-ink-50"
+                className="apple-spring apple-pressable inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[10px] border border-ink-200 bg-white px-4 text-sm font-medium text-ink-800 hover:bg-ink-50 sm:w-auto"
               >
                 <Save className="size-4" aria-hidden />
                 Save company details
@@ -303,7 +303,7 @@ export function EmployerOnboardingForm({ initial, hasExistingProject, employerId
             <button
               type="button"
               onClick={onSaveProject}
-              className="apple-spring apple-pressable inline-flex min-h-11 items-center justify-center gap-2 rounded-[10px] bg-brand-700 px-5 text-sm font-semibold text-white hover:bg-brand-600"
+              className="apple-spring apple-pressable inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[10px] bg-brand-700 px-5 text-sm font-semibold text-white hover:bg-brand-600 sm:w-auto"
             >
               <Save className="size-4" aria-hidden />
               {hasExistingProject ? "Save project" : "Create project"}

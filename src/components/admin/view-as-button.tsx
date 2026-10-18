@@ -43,9 +43,9 @@ export function ViewAsButton({
         onClick={start}
         disabled={busy}
         title="Browse their dashboard read-only, with names and contacts unmasked"
-        className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-ink-200 bg-white px-3 text-xs font-semibold text-ink-700 hover:bg-ink-50 disabled:opacity-60"
+        className="apple-spring apple-pressable inline-flex min-h-11 items-center gap-1.5 whitespace-nowrap rounded-[10px] border border-ink-200 bg-white px-3.5 text-[14px] font-medium text-ink-700 hover:bg-ink-50 disabled:opacity-60"
       >
-        {busy ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : <Eye className="size-3.5" aria-hidden />}
+        {busy ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <Eye className="size-4" aria-hidden />}
         {label}
       </button>
       {error ? <span className="mt-1 text-2xs text-danger">{error}</span> : null}

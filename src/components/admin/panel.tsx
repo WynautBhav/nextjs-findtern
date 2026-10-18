@@ -12,12 +12,17 @@ import { cn } from "@/lib/utils";
  */
 
 export function Panel({
+  as: Tag = "section",
   className,
   children,
   ...props
-}: React.ComponentProps<"section">) {
+}: React.HTMLAttributes<HTMLElement> & {
+  /** Render as a `<ul>` (or `<div>`) when the panel *is* the list, so a list
+      of rows is not a `<ul>` nested inside a bare `<section>`. */
+  as?: "section" | "ul" | "div";
+}) {
   return (
-    <section
+    <Tag
       className={cn(
         "apple-panel apple-admin overflow-hidden bg-white",
         className,
@@ -25,7 +30,7 @@ export function Panel({
       {...props}
     >
       {children}
-    </section>
+    </Tag>
   );
 }
 
@@ -171,31 +176,31 @@ export function AttentionBanner({
   return (
     <div
       role="status"
-      className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-500/25 bg-amber-500/5 px-4 py-3 text-sm text-amber-950 backdrop-blur-xs dark:text-amber-200"
+      className="flex flex-col gap-3 rounded-xl border border-amber-500/25 bg-amber-500/5 px-4 py-3 text-sm text-amber-950 backdrop-blur-xs sm:flex-row sm:items-center sm:justify-between dark:text-amber-200"
     >
-      <div className="flex items-center gap-2.5">
-        <span className="relative flex size-2 shrink-0">
+      <div className="flex min-w-0 items-start gap-2.5">
+        <span className="relative mt-1.5 flex size-2 shrink-0">
           <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75" />
           <span className="relative inline-flex size-2 rounded-full bg-amber-500" />
         </span>
-        <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
-          <span className="font-semibold text-amber-900 dark:text-amber-100">Action Required:</span>
-          <span className="font-bold tabular-nums text-amber-900 dark:text-amber-100">
+        {/* One paragraph, not three spans: the count used to wrap onto its own
+            line at tablet widths. Inline <strong>s wrap with the sentence. */}
+        <p className="min-w-0 leading-relaxed text-amber-800 dark:text-amber-300">
+          <strong className="font-semibold text-amber-900 dark:text-amber-100">Action Required:</strong>{" "}
+          <strong className="font-bold tabular-nums text-amber-900 dark:text-amber-100">
             {count.toLocaleString("en-IN")}
-          </span>
-          <span className="text-amber-800 dark:text-amber-300">
-            {noun} {count === 1 ? "has" : "have"} incomplete onboarding profiles out of{" "}
-            <span className="font-semibold tabular-nums text-amber-900 dark:text-amber-100">
-              {total.toLocaleString("en-IN")}
-            </span>{" "}
-            total registered signups.
-          </span>
-        </div>
+          </strong>{" "}
+          {noun} {count === 1 ? "has" : "have"} incomplete onboarding profiles out of{" "}
+          <strong className="font-semibold tabular-nums text-amber-900 dark:text-amber-100">
+            {total.toLocaleString("en-IN")}
+          </strong>{" "}
+          total registered signups.
+        </p>
       </div>
       {href ? (
         <Link
           href={href}
-          className="apple-spring apple-pressable inline-flex min-h-11 items-center gap-1.5 rounded-[10px] bg-amber-500/15 px-3 py-1.5 text-xs font-semibold text-amber-900 hover:bg-amber-500/25 dark:text-amber-100"
+          className="apple-spring apple-pressable inline-flex min-h-11 shrink-0 items-center gap-1.5 self-start whitespace-nowrap rounded-[10px] bg-amber-500/15 px-3 py-1.5 text-xs font-semibold text-amber-900 hover:bg-amber-500/25 sm:self-auto dark:text-amber-100"
         >
           <span>Review Triage Queue</span>
           <span aria-hidden>→</span>

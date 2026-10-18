@@ -34,6 +34,14 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 
+/** Card-width labels for the four rating axes; the full label stays in `title`. */
+const SHORT_LABEL: Partial<Record<(typeof RATING_META)[number]["key"], string>> = {
+  communication: "Comms",
+  coding: "Coding",
+  aptitude: "Aptitude",
+  interview: "Interview",
+};
+
 export interface CandidateCardProps {
   candidate: CandidateProfile;
   currency: Currency;
@@ -164,14 +172,16 @@ export function CandidateCard({
 
         {/* 4-Axis Technical Assessment Gauges */}
         {assessed.length > 0 ? (
-          <div className="mt-3.5 grid grid-cols-2 gap-2 rounded-[10px] bg-ink-50/80 p-2.5 sm:grid-cols-4 border border-ink-200/70">
+          <div className="mt-3.5 grid grid-cols-2 gap-2 rounded-[10px] bg-ink-50/80 p-2.5 xl:grid-cols-4 border border-ink-200/70">
             {assessed.map((meta) => {
               const val = candidate.ratings[meta.key];
               const pct = Math.min(100, (val / 10) * 100);
               return (
                 <div key={meta.key} className="flex min-w-0 flex-col">
-                  <div className="flex items-center justify-between text-xs font-medium text-text-subtle">
-                    <span className="truncate">{meta.label}</span>
+                  <div className="flex items-center justify-between gap-1 text-xs font-medium text-text-subtle">
+                    <span className="truncate" title={meta.label}>
+                      {SHORT_LABEL[meta.key] ?? meta.label}
+                    </span>
                     <span className="text-xs font-bold tabular-nums text-ink-900">
                       {val.toFixed(1)}
                     </span>
@@ -189,15 +199,16 @@ export function CandidateCard({
         ) : null}
       </div>
 
-      {/* Card Action Deck */}
-      <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-ink-200/70 pt-3">
+      {/* Card Action Deck: a 2x2 grid of full-width buttons until the card is
+          wide enough (xl) for the two pairs to sit on one row. */}
+      <div className="mt-4 grid grid-cols-2 gap-2 border-t border-ink-200/70 pt-3 xl:flex xl:flex-wrap xl:items-center xl:justify-between">
         {/* Left: Quick View & Compare */}
-        <div className="flex items-center gap-1.5">
+        <div className="contents xl:flex xl:items-center xl:gap-1.5">
           <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>
             <SheetTrigger asChild>
               <button
                 type="button"
-                className="apple-spring apple-pressable inline-flex min-h-11 items-center justify-center gap-1.5 rounded-[10px] border border-ink-200/70 bg-white px-2.5 text-[13px] font-medium text-ink-700 hover:border-brand-300 hover:text-brand-800"
+                className="apple-spring apple-pressable inline-flex min-h-11 w-full items-center justify-center gap-1.5 rounded-[10px] border border-ink-200/70 bg-white px-2.5 text-[13px] font-medium text-ink-700 hover:border-brand-300 hover:text-brand-800 xl:w-auto"
               >
                 <Eye className="size-3.5 text-ink-500" aria-hidden />
                 <span>Quick View</span>
@@ -373,7 +384,7 @@ export function CandidateCard({
             href={compareHref}
             aria-pressed={selected}
             className={[
-              "apple-spring apple-pressable inline-flex min-h-11 items-center justify-center gap-1.5 rounded-[10px] border px-2.5 text-[13px] font-medium",
+              "apple-spring apple-pressable inline-flex min-h-11 w-full items-center justify-center gap-1.5 rounded-[10px] border px-2.5 text-[13px] font-medium xl:w-auto",
               selected
                 ? "border-brand-600 bg-brand-50 text-brand-700 font-semibold"
                 : "border-ink-200/70 bg-white text-ink-700 hover:bg-ink-50",
@@ -389,13 +400,14 @@ export function CandidateCard({
         </div>
 
         {/* Right: Shortlist & Send Proposal */}
-        <div className="flex items-center gap-1.5">
+        <div className="contents xl:flex xl:items-center xl:gap-1.5">
           {projectId ? (
             <ShortlistToggle
               internId={candidate.id}
               projectId={projectId}
               shortlisted={shortlisted}
               size="sm"
+              className="w-full xl:w-auto"
             />
           ) : null}
 
@@ -403,7 +415,7 @@ export function CandidateCard({
             href={`/employer/send-proposal?intern=${encodeURIComponent(candidate.id)}`}
             variant="primary"
             size="sm"
-            className="min-h-11 px-3 text-[13px] font-semibold"
+            className="min-h-11 w-full px-3 text-[13px] font-semibold xl:w-auto"
           >
             <Send className="size-3.5" aria-hidden />
             <span>Send proposal</span>

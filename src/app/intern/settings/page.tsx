@@ -53,7 +53,7 @@ export default async function InternSettings() {
         lede="Where to change what, and what is already handled for you."
       />
 
-      <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_22rem]">
+      <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_22rem]">
         <div className="min-w-0 space-y-8">
           <section>
             <SectionHead title="Your details" hint="Your email is your sign-in and can't be changed here." />

@@ -85,7 +85,7 @@ export default async function InternRecord() {
           Not four identical stat cards. Each one answers a question a
           candidate actually has: how much work, how much money, how many
           people vouch for me. */}
-      <div className="mb-6 grid grid-cols-3 gap-2 sm:gap-3">
+      <div className="mb-6 grid gap-3 sm:grid-cols-3">
         <Figure label="Hours a manager approved" value={hoursTotal} unit="hours" />
         <Figure label="Stipend paid to you" value={paidTotal} unit="rupees" money />
         <Figure label="Times someone vouched" value={data.proofs.length} unit="records" />
@@ -162,13 +162,13 @@ function Figure({
   money?: boolean;
 }) {
   return (
-    <Surface className="p-3 sm:px-5 sm:py-5">
-      <p className="line-clamp-2 text-balance text-[11px] leading-tight text-ink-500 sm:text-sm sm:leading-snug">{label}</p>
-      <p className="mt-1 sm:mt-2 flex items-baseline gap-1 sm:gap-1.5">
-        <span className="text-lg font-semibold tabular-nums tracking-[-0.025em] text-ink-900 sm:text-3xl">
+    <Surface className="p-5">
+      <p className="text-balance text-sm leading-snug text-ink-500">{label}</p>
+      <p className="mt-2 flex flex-wrap items-baseline gap-x-1.5">
+        <span className="text-3xl font-semibold tabular-nums tracking-[-0.025em] text-ink-900">
           <CountUp value={value} currency={money ? "INR" : undefined} />
         </span>
-        <span className="text-[10px] text-ink-500 sm:text-sm">{unit}</span>
+        <span className="text-sm text-ink-500">{unit}</span>
       </p>
     </Surface>
   );

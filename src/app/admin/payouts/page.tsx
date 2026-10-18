@@ -71,7 +71,7 @@ export default async function AdminPayouts({
   return (
     <div className="apple-admin space-y-4">
       <AdminPageHeader
-        title="Payouts"
+        title="Intern Disbursements"
         subtitle="Money out to interns, money in from employers."
       />
 

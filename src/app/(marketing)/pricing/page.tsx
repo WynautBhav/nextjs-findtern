@@ -3,12 +3,16 @@ import type { Metadata } from "next";
 import { PageHero } from "@/components/marketing/page-hero";
 import { ButtonLink } from "@/components/ui/button";
 import { PricingCta, PricingContent } from "@/components/marketing/pricing-content";
+import { JsonLd } from "@/components/seo/json-ld";
 import { getPlans } from "@/lib/content";
+import { pricingFaq } from "@/lib/content/pricing-faq";
+import { formatMoney } from "@/lib/format";
+import { breadcrumbJsonLd, faqJsonLd, pricingJsonLd, webPageJsonLd } from "@/lib/seo";
 
 export const metadata: Metadata = {
-  title: "Pricing",
+  title: "Intern Hiring Pricing: Free to ₹200/hr + ₹5,000 Per Hire",
   description:
-    "Three plans named after coffee: Espresso, Cappuccino and Latte. You pick the band of the score pool you want to hire from, and the rate follows.",
+    "Findtern's published rate card for hiring interns in India. Three plans named after coffee (Espresso, Cappuccino, Latte) priced by Findtern Score band, a flat ₹5,000 per-hire fee, GST included, and a monthly cost calculator.",
   alternates: { canonical: "/pricing" },
 };
 
@@ -19,9 +23,18 @@ export const metadata: Metadata = {
 
 export default async function PricingPage() {
   const [plansInr, plansUsd] = await Promise.all([getPlans(true), getPlans(false)]);
+  const perHire = formatMoney(plansInr[0]?.perHireChargeMinor ?? 500000, "INR");
 
   return (
     <>
+      <JsonLd
+        data={[
+          webPageJsonLd({ path: "/pricing", name: "Findtern pricing", description: String(metadata.description) }),
+          breadcrumbJsonLd([{ name: "Pricing", path: "/pricing" }]),
+          pricingJsonLd(plansInr),
+          faqJsonLd(pricingFaq(perHire)),
+        ]}
+      />
       <PageHero
         eyebrow="Rate card"
         title={

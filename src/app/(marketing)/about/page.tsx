@@ -9,15 +9,17 @@ import { SectionHeading } from "@/components/ui/section-heading";
 import { CountUp } from "@/components/motion/count-up";
 import { TiltCard } from "@/components/motion/tilt-card";
 import { CirclePhoto } from "@/components/home/sections";
-import { ABOUT_COPY } from "@/lib/content/site";
+import { ABOUT_COPY, PROOF_STATS } from "@/lib/content/site";
 import { PARTNERS, HAPPY_FACES } from "@/lib/content/proof";
 import { TestimonialCarousel } from "@/components/marketing/testimonial-carousel";
 import { VelocityMarquee } from "@/components/motion/velocity-marquee";
+import { JsonLd } from "@/components/seo/json-ld";
+import { breadcrumbJsonLd, webPageJsonLd } from "@/lib/seo";
 
 export const metadata: Metadata = {
-  title: "About us",
+  title: "About Findtern: Verified Intern Hiring Platform in India",
   description:
-    "Findtern screens, tests and scores interns before an employer ever sees them. Our mission, our method, and the guarantees behind every placement.",
+    "Findtern is a Jaipur-based platform that verifies, interviews, tests and scores interns before an employer sees them. Our mission, our method, and the product terms behind every placement.",
   alternates: { canonical: "/about" },
 };
 
@@ -42,6 +44,12 @@ const METHOD = [
 export default function AboutPage() {
   return (
     <>
+      <JsonLd
+        data={[
+          webPageJsonLd({ path: "/about", name: "About Findtern", description: String(metadata.description), type: "AboutPage" }),
+          breadcrumbJsonLd([{ name: "About", path: "/about" }]),
+        ]}
+      />
       <PageHero
         eyebrow="About Findtern"
         title={
@@ -129,14 +137,14 @@ export default function AboutPage() {
       {/* ── Numbers ─────────────────────────────────────────────────── */}
       <PageSection className="py-8 sm:py-14 md:py-20">
         <div className="grid grid-cols-3 divide-x divide-ink-200/80 rounded-2xl border border-ink-200/80 bg-white/70 py-5 shadow-xs backdrop-blur-xs sm:divide-x-0 sm:border-0 sm:bg-transparent sm:py-0 sm:shadow-none sm:gap-10">
-          <Figure value={100} suffix="%" label="Refund if not placed" />
-          <Figure value={3} label="Plans, no lock-in" />
-          <Figure value={5000} prefix="₹" label="Fixed per-hire fee" />
+          {PROOF_STATS.map((s) => (
+            <Figure key={s.label} value={s.value} prefix={s.prefix} suffix={s.suffix} label={s.label} />
+          ))}
         </div>
         <p className="mt-6 text-center text-xs sm:mt-8 sm:text-sm text-ink-500">
-          Product terms, not performance claims. Placement figures are published on
-          the <a href="/terms-and-conditions" className="text-primary underline underline-offset-4">terms page</a> once
-          they reach a threshold we are willing to stand behind.
+          Product terms, not performance claims. Candidates get their own guarantee on
+          the <a href="/interns" className="text-primary underline underline-offset-4">interns page</a>; placement
+          figures are published once they reach a threshold we are willing to stand behind.
         </p>
       </PageSection>
 

@@ -22,6 +22,7 @@ import {
   X,
 } from "lucide-react";
 import { FileUpload } from "@/components/app/file-upload";
+import { Pill } from "@/components/app/primitives";
 
 import { suggestSkills } from "@/lib/data/skills";
 import { suggestDistricts } from "@/lib/data/districts";
@@ -174,9 +175,9 @@ export function OnboardingForm({
   const StepView = STEP_VIEWS[step];
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[16rem_minmax(0,1fr)]">
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[16rem_minmax(0,1fr)]">
       {/* Sidebar Rail */}
-      <div className="space-y-4">
+      <div className="min-w-0 space-y-4">
         <div className="rounded-[20px] border border-ink-200/70 bg-white p-4 shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)]">
           <div className="flex items-center justify-between">
             <span className="text-2xs font-semibold uppercase tracking-wider text-text-subtle">
@@ -209,9 +210,9 @@ export function OnboardingForm({
                 {STEPS[step].title}
               </h2>
             </div>
-            <span className="rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700 border border-brand-200/60">
-              {STEPS[step].id.toUpperCase()}
-            </span>
+            <Pill tone={step === STEPS.length - 1 ? "live" : "neutral"} className="whitespace-nowrap">
+              {STEPS[step].title}
+            </Pill>
           </div>
 
           <p ref={blurbRef} tabIndex={-1} className="mt-3 text-xs leading-relaxed text-text-subtle outline-none">
@@ -257,7 +258,7 @@ export function OnboardingForm({
               <button
                 type="button"
                 onClick={() => goTo(step - 1)}
-                className="apple-spring apple-pressable inline-flex min-h-11 items-center gap-1.5 rounded-[10px] border border-ink-200 bg-white px-4 text-xs font-medium text-ink-800 shadow-2xs hover:bg-ink-50"
+                className="apple-spring apple-pressable inline-flex min-h-11 items-center gap-1.5 rounded-[10px] border border-ink-200 bg-white px-4 text-sm font-medium text-ink-800 shadow-2xs hover:bg-ink-50"
               >
                 <ArrowLeft className="size-3.5" aria-hidden />
                 Back
@@ -268,7 +269,7 @@ export function OnboardingForm({
               type="button"
               onClick={onSave}
               disabled={saving}
-              className="apple-spring apple-pressable inline-flex min-h-11 items-center gap-1.5 rounded-[10px] border border-ink-200 bg-white px-4 text-xs font-medium text-ink-700 shadow-2xs hover:bg-ink-50 disabled:opacity-60"
+              className="apple-spring apple-pressable inline-flex min-h-11 items-center gap-1.5 rounded-[10px] border border-ink-200 bg-white px-4 text-sm font-medium text-ink-700 shadow-2xs hover:bg-ink-50 disabled:opacity-60"
             >
               {saving ? <Loader2 className="size-3.5 animate-spin" /> : <Save className="size-3.5 text-ink-500" />}
               Save Draft
@@ -281,7 +282,7 @@ export function OnboardingForm({
               <button
                 type="button"
                 onClick={onContinue}
-                className="apple-spring apple-pressable group inline-flex min-h-11 items-center gap-1.5 rounded-[10px] bg-brand-700 px-5 text-xs font-semibold text-white shadow-2xs hover:bg-brand-600"
+                className="apple-spring apple-pressable group inline-flex min-h-11 items-center gap-1.5 rounded-[10px] bg-primary px-5 text-sm font-semibold text-white shadow-sm hover:bg-primary-hover"
               >
                 Continue
                 <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden />
@@ -291,7 +292,7 @@ export function OnboardingForm({
                 type="button"
                 onClick={onSubmit}
                 disabled={saving}
-                className="apple-spring apple-pressable inline-flex min-h-11 items-center gap-1.5 rounded-[10px] bg-brand-700 px-6 text-xs font-semibold text-white shadow-2xs hover:bg-brand-600 disabled:opacity-60"
+                className="apple-spring apple-pressable inline-flex min-h-11 items-center gap-1.5 rounded-[10px] bg-primary px-6 text-sm font-semibold text-white shadow-sm hover:bg-primary-hover disabled:opacity-60"
               >
                 {saving ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />}
                 Complete & Submit Profile
@@ -309,11 +310,11 @@ export function OnboardingForm({
 function StepRail({ step, onSelect }: { step: number; onSelect: (next: number) => void }) {
   return (
     <nav aria-label="Onboarding steps" className="rounded-[20px] border border-ink-200/70 bg-white p-2 shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)]">
-      <ol className="flex gap-1 overflow-x-auto lg:flex-col lg:overflow-visible">
+      <ol className="-mx-2 flex snap-x gap-1 overflow-x-auto px-2 lg:mx-0 lg:flex-col lg:overflow-visible lg:px-0">
         {STEPS.map((s, i) => {
           const state = i === step ? "current" : i < step ? "done" : "todo";
           return (
-            <li key={s.id} className="shrink-0 lg:shrink">
+            <li key={s.id} className="shrink-0 snap-start lg:shrink">
               <button
                 type="button"
                 onClick={() => onSelect(i)}
@@ -392,7 +393,7 @@ function PersonalStep({ values, update, errors, documents }: StepProps) {
         onChange={(v) => update("bio", v)}
       />
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-4 xl:grid-cols-2">
         <Field
           id="linkedinUrl"
           label="LinkedIn Profile"
@@ -424,7 +425,7 @@ function PersonalStep({ values, update, errors, documents }: StepProps) {
         />
       </div>
 
-      <div className="grid gap-4 rounded-xl border border-ink-200/70 p-4 sm:grid-cols-3">
+      <div className="grid gap-4 rounded-xl border border-ink-200/70 p-4 [grid-template-columns:repeat(auto-fit,minmax(11rem,1fr))]">
         <FileUpload kind="aadhaar" accept="image/jpeg,image/png,image/webp,application/pdf" label="Aadhaar" hint="Image or PDF, up to 10 MB." current={onFile("Aadhaar")} />
         <FileUpload kind="pan" accept="image/jpeg,image/png,image/webp,application/pdf" label="PAN" hint="Image or PDF, up to 10 MB." current={onFile("PAN")} />
         <FileUpload kind="intro_video" accept="video/mp4,video/webm,video/quicktime" label="Intro video" hint="Optional. Up to 50 MB." current={onFile("Intro video")} />
@@ -484,7 +485,7 @@ function AcademicsStep({ values, update, errors }: StepProps) {
     <div className="space-y-5">
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
-          <label htmlFor="qualificationLevel" className="block text-xs font-semibold text-ink-800">
+          <label htmlFor="qualificationLevel" className="block text-sm font-medium text-ink-800">
             Highest Qualification Level *
           </label>
           <select
@@ -501,7 +502,7 @@ function AcademicsStep({ values, update, errors }: StepProps) {
         </div>
 
         <div>
-          <label htmlFor="academicStatus" className="block text-xs font-semibold text-ink-800">
+          <label htmlFor="academicStatus" className="block text-sm font-medium text-ink-800">
             Academic Status *
           </label>
           <select
@@ -614,7 +615,7 @@ function ExperienceStep({ values, update }: StepProps) {
         <button
           type="button"
           onClick={addExperience}
-          className="apple-spring apple-pressable inline-flex min-h-11 items-center gap-1.5 rounded-[10px] bg-brand-50 px-3 py-1.5 text-xs font-semibold text-brand-700 hover:bg-brand-100 border border-brand-200"
+          className="apple-spring apple-pressable inline-flex min-h-11 items-center gap-1.5 rounded-[10px] bg-brand-50 px-3 py-1.5 text-sm font-semibold text-brand-700 hover:bg-brand-100 border border-brand-200"
         >
           <Plus className="size-3.5" />
           <span>Add Experience</span>
@@ -631,7 +632,7 @@ function ExperienceStep({ values, update }: StepProps) {
           <button
             type="button"
             onClick={addExperience}
-            className="apple-spring apple-pressable mt-3 inline-flex min-h-11 items-center gap-1.5 rounded-[10px] bg-white border border-ink-200 px-3 py-1.5 text-xs font-medium text-ink-700 shadow-2xs hover:bg-ink-50"
+            className="apple-spring apple-pressable mt-3 inline-flex min-h-11 items-center gap-1.5 rounded-[10px] bg-white border border-ink-200 px-3 py-1.5 text-sm font-medium text-ink-700 shadow-2xs hover:bg-ink-50"
           >
             <Plus className="size-3.5 text-brand-600" />
             <span>Add First Project / Role</span>
@@ -659,7 +660,7 @@ function ExperienceStep({ values, update }: StepProps) {
 
               <div className="grid gap-3 sm:grid-cols-3">
                 <div>
-                  <label className="block text-xs font-semibold text-ink-700">Type</label>
+                  <label className="block text-sm font-medium text-ink-700">Type</label>
                   <select
                     value={exp.type}
                     onChange={(e) => updateExperience(exp.id, { type: e.target.value })}
@@ -673,7 +674,7 @@ function ExperienceStep({ values, update }: StepProps) {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-ink-700">Company / Organization</label>
+                  <label className="block text-sm font-medium text-ink-700">Company / Organization</label>
                   <input
                     type="text"
                     value={exp.company}
@@ -683,7 +684,7 @@ function ExperienceStep({ values, update }: StepProps) {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-ink-700">Role / Title</label>
+                  <label className="block text-sm font-medium text-ink-700">Role / Title</label>
                   <input
                     type="text"
                     value={exp.role}
@@ -696,7 +697,7 @@ function ExperienceStep({ values, update }: StepProps) {
 
               <div className="grid gap-3 sm:grid-cols-2">
                 <div>
-                  <label className="block text-xs font-semibold text-ink-700">Timeline (From - To)</label>
+                  <label className="block text-sm font-medium text-ink-700">Timeline (From - To)</label>
                   <div className="flex items-center gap-2 mt-1">
                     <input
                       type="text"
@@ -730,7 +731,7 @@ function ExperienceStep({ values, update }: StepProps) {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-ink-700">Key Deliverables & Stack</label>
+                <label className="block text-sm font-medium text-ink-700">Key Deliverables & Stack</label>
                 <textarea
                   rows={2}
                   value={exp.description}
@@ -788,7 +789,7 @@ function SkillsStep({ values, update, errors }: StepProps) {
   return (
     <div className="space-y-5">
       <div>
-        <label className="block text-xs font-semibold text-ink-800">
+        <label className="block text-sm font-medium text-ink-800">
           Select Key Skills (4–7) *
         </label>
         <p className="mt-0.5 text-xs text-text-subtle">
@@ -812,7 +813,7 @@ function SkillsStep({ values, update, errors }: StepProps) {
             type="button"
             disabled={!draft.trim() || skills.length >= 7}
             onClick={() => addSkill(draft)}
-            className="apple-spring apple-pressable inline-flex min-h-11 items-center gap-1.5 rounded-[10px] bg-brand-700 px-4 text-xs font-semibold text-white shadow-2xs hover:bg-brand-600 disabled:opacity-50"
+            className="apple-spring apple-pressable inline-flex min-h-11 items-center gap-1.5 rounded-[10px] bg-primary px-4 text-sm font-semibold text-white shadow-sm hover:bg-primary-hover disabled:opacity-50"
           >
             <Plus className="size-3.5" />
             <span>Add</span>
@@ -931,7 +932,7 @@ function LanguagesStep({ values, update }: StepProps) {
         <button
           type="button"
           onClick={addLanguage}
-          className="apple-spring apple-pressable inline-flex min-h-11 items-center gap-1.5 rounded-[10px] bg-brand-50 px-3 py-1.5 text-xs font-semibold text-brand-700 hover:bg-brand-100 border border-brand-200"
+          className="apple-spring apple-pressable inline-flex min-h-11 items-center gap-1.5 rounded-[10px] bg-brand-50 px-3 py-1.5 text-sm font-semibold text-brand-700 hover:bg-brand-100 border border-brand-200"
         >
           <Plus className="size-3.5" />
           <span>Add Language</span>
@@ -1048,7 +1049,7 @@ function ExtracurricularStep({ values, update }: StepProps) {
         <button
           type="button"
           onClick={addActivity}
-          className="apple-spring apple-pressable inline-flex min-h-11 items-center gap-1.5 rounded-[10px] bg-brand-50 px-3 py-1.5 text-xs font-semibold text-brand-700 hover:bg-brand-100 border border-brand-200"
+          className="apple-spring apple-pressable inline-flex min-h-11 items-center gap-1.5 rounded-[10px] bg-brand-50 px-3 py-1.5 text-sm font-semibold text-brand-700 hover:bg-brand-100 border border-brand-200"
         >
           <Plus className="size-3.5" />
           <span>Add Activity</span>
@@ -1065,7 +1066,7 @@ function ExtracurricularStep({ values, update }: StepProps) {
           <button
             type="button"
             onClick={addActivity}
-            className="apple-spring apple-pressable mt-3 inline-flex min-h-11 items-center gap-1.5 rounded-[10px] bg-white border border-ink-200 px-3 py-1.5 text-xs font-medium text-ink-700 shadow-2xs hover:bg-ink-50"
+            className="apple-spring apple-pressable mt-3 inline-flex min-h-11 items-center gap-1.5 rounded-[10px] bg-white border border-ink-200 px-3 py-1.5 text-sm font-medium text-ink-700 shadow-2xs hover:bg-ink-50"
           >
             <Plus className="size-3.5 text-brand-600" />
             <span>Add Extracurricular</span>
@@ -1157,7 +1158,7 @@ function LocationPreferencesStep({ values, update, errors }: StepProps) {
     <div className="space-y-6">
       {/* Work Modes */}
       <div>
-        <label className="block text-xs font-semibold text-ink-800">
+        <label className="block text-sm font-medium text-ink-800">
           Internship Work Modes * (Select at least one)
         </label>
         <div className="mt-2.5 flex flex-wrap gap-2.5">
@@ -1168,7 +1169,7 @@ function LocationPreferencesStep({ values, update, errors }: StepProps) {
                 key={mode}
                 type="button"
                 onClick={() => toggleMode(mode)}
-                className={`apple-spring apple-pressable inline-flex min-h-11 items-center gap-2 rounded-[10px] border px-4 py-2.5 text-xs font-semibold capitalize ${
+                className={`apple-spring apple-pressable inline-flex min-h-11 items-center gap-2 rounded-[10px] border px-4 py-2.5 text-sm font-semibold capitalize ${
                   active
                     ? "border-brand-600 bg-brand-50 text-brand-800 shadow-2xs ring-1 ring-brand-600/30"
                     : "border-ink-200 bg-white text-ink-700 hover:bg-ink-50"
@@ -1189,7 +1190,7 @@ function LocationPreferencesStep({ values, update, errors }: StepProps) {
 
       {/* Preferred Locations (up to 5) */}
       <div>
-        <label className="block text-xs font-semibold text-ink-800">
+        <label className="block text-sm font-medium text-ink-800">
           Preferred Work Cities (Up to 5)
         </label>
         <p className="mt-0.5 text-xs text-text-subtle">
@@ -1213,7 +1214,7 @@ function LocationPreferencesStep({ values, update, errors }: StepProps) {
             type="button"
             disabled={!cityDraft.trim() || preferredLocations.length >= 5}
             onClick={() => addCity(cityDraft)}
-            className="apple-spring apple-pressable inline-flex min-h-11 items-center gap-1.5 rounded-[10px] bg-brand-700 px-4 text-xs font-semibold text-white shadow-2xs hover:bg-brand-600 disabled:opacity-50"
+            className="apple-spring apple-pressable inline-flex min-h-11 items-center gap-1.5 rounded-[10px] bg-primary px-4 text-sm font-semibold text-white shadow-sm hover:bg-primary-hover disabled:opacity-50"
           >
             <Plus className="size-3.5" />
             <span>Add</span>
@@ -1263,7 +1264,7 @@ function LocationPreferencesStep({ values, update, errors }: StepProps) {
 
       {/* Hardware / Laptop Radio */}
       <div>
-        <label className="block text-xs font-semibold text-ink-800">
+        <label className="block text-sm font-medium text-ink-800">
           Hardware Availability *
         </label>
         <div className="mt-2.5 grid gap-3 sm:grid-cols-2">
@@ -1605,7 +1606,7 @@ function Field({
 }) {
   return (
     <div>
-      <label htmlFor={id} className="block text-xs font-semibold text-ink-800">
+      <label htmlFor={id} className="block text-sm font-medium text-ink-800">
         {label}
       </label>
       {hint ? <p className="mt-0.5 text-xs text-text-subtle">{hint}</p> : null}
@@ -1648,7 +1649,7 @@ function TextArea({
 }) {
   return (
     <div>
-      <label htmlFor={id} className="block text-xs font-semibold text-ink-800">
+      <label htmlFor={id} className="block text-sm font-medium text-ink-800">
         {label}
       </label>
       {hint ? <p className="mt-0.5 text-xs text-text-subtle">{hint}</p> : null}

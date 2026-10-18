@@ -36,6 +36,9 @@ import { ArrowRight, Check } from "lucide-react";
 import type { ThreadNode, ThreadTone } from "@/lib/journey";
 import { cn } from "@/lib/utils";
 
+/** How many nodes from the top get the entry animation. */
+const ANIMATED_NODES = 4;
+
 const MARK: Record<ThreadTone, { dot: string; ring: string; text: string; label: string }> = {
   action: {
     dot: "bg-accent-500",
@@ -96,11 +99,15 @@ export function Thread({
       />
       {shown.map((node, i) => {
         const mark = MARK[node.tone];
+        // Only the first screenful rises in. Anything below is visible from the
+        // start, so a long record still reads in print, in reader mode and in
+        // any context where the observer never fires.
+        const animated = !reduce && i < ANIMATED_NODES;
         return (
           <motion.li
             key={node.id}
-            initial={reduce ? false : { opacity: 0, y: 10 }}
-            animate={reduce || inView ? { opacity: 1, y: 0 } : { opacity: 0, y: 10 }}
+            initial={animated ? { opacity: 0, y: 10 } : false}
+            animate={!animated || inView ? { opacity: 1, y: 0 } : { opacity: 0, y: 10 }}
             transition={{
               duration: 0.34,
               delay: reduce ? 0 : Math.min(i, 6) * 0.045,
@@ -215,7 +222,7 @@ export function StatusStrip({
         <span className="grid size-6 shrink-0 place-items-center rounded-full bg-accent-500">
           <span className="size-1.5 rounded-full bg-white" aria-hidden />
         </span>
-        <p className="min-w-0 flex-1 text-pretty text-sm font-medium text-ink-900">
+        <p className="min-w-0 flex-[1_1_16rem] text-pretty text-sm font-medium text-ink-900">
           {node.title}
           <span className="block text-sm font-normal text-ink-600">{node.detail}</span>
         </p>

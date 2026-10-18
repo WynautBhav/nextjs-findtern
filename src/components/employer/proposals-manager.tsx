@@ -186,8 +186,8 @@ export function ProposalsManager({
       )}
 
       {/* Filter and Search Bar */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="relative flex-1 max-w-md">
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+        <div className="relative min-w-[14rem] max-w-md flex-1 basis-64">
           <Search className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-ink-400" />
           <input
             type="text"

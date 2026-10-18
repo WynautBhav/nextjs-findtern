@@ -26,7 +26,7 @@ export default async function AdminCmsPage({
   return (
     <div className="space-y-6">
       <AdminPageHeader
-        title="Website content"
+        title="Website Content"
         subtitle="Testimonials, partners, FAQs, blog posts and featured skills on the public site. Prices live under Pricing & Fees."
       />
       <CmsEditor active={active} items={{ testimonial, partner, faq, blog, skill }} />

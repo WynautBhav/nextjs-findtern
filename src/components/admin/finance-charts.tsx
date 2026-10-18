@@ -24,7 +24,9 @@ export function RevenueChart({ data }: { data: RevenuePoint[] }) {
   const clipId = useId();
   const stroke = "var(--color-brand-600)";
 
-  if (data.length < 2) {
+  // A flat line at zero reads as a broken chart, so an all-zero series gets
+  // the same empty state as a too-short one.
+  if (data.length < 2 || data.every((d) => d.totalMinor === 0)) {
     return (
       <p className="py-12 text-center text-sm text-text-subtle">
         Not enough revenue history to chart yet.
@@ -119,6 +121,14 @@ export function RevenueChart({ data }: { data: RevenuePoint[] }) {
 export function VolumeBars({ data }: { data: VolumePoint[] }) {
   const [active, setActive] = useState<number | null>(null);
   const max = Math.max(1, ...data.map((d) => d.count));
+
+  if (data.length === 0 || data.every((d) => d.count === 0)) {
+    return (
+      <p className="py-12 text-center text-sm text-text-subtle">
+        Not enough transaction history to chart yet.
+      </p>
+    );
+  }
 
   return (
     <figure className="w-full">

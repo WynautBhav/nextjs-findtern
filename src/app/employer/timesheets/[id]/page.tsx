@@ -127,8 +127,8 @@ export default async function EmployerTimesheetDetail({
         subtitle={`${projectName ? `${projectName} · ` : ""}${formatDay(timesheet.periodStart)} – ${formatDay(timesheet.periodEnd)}`}
       />
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_19rem]">
-        <div className="space-y-4">
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_19rem]">
+        <div className="min-w-0 space-y-4">
           <section className="rounded-[20px] border border-ink-200/70 bg-white p-6 shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)]">
             <h2 className="text-sm font-semibold text-ink-900">Day log</h2>
             {entries.length === 0 ? (
@@ -198,7 +198,7 @@ export default async function EmployerTimesheetDetail({
           ) : null}
         </div>
 
-        <aside className="space-y-4">
+        <aside className="min-w-0 space-y-4">
           <section className="rounded-[20px] border border-ink-200/70 bg-white p-5 shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)]">
             <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-text-subtle">
               Status

@@ -146,7 +146,7 @@ export function CompanyProfileForm({
 
       <fieldset className="space-y-4">
         <legend className="text-sm font-semibold text-ink-900">Location</legend>
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           <Text id="country" label="Country" value={values.country} onChange={set("country")} />
           <Text id="state" label="State" value={values.state} onChange={set("state")} />
           <Text id="city" label="City" value={values.city} onChange={set("city")} />

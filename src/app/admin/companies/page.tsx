@@ -93,12 +93,12 @@ export default async function AdminCompaniesPage({
   return (
     <div className="space-y-6">
       <AdminPageHeader
-        title="Companies"
+        title="Hiring Partners"
         subtitle="Directory of hiring partners, organizational profiles and projects."
         action={
           <a
             href={exportHref}
-            className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-ink-200 bg-white px-3.5 text-sm font-medium text-ink-700 transition-colors hover:bg-ink-50"
+            className="apple-spring apple-pressable inline-flex min-h-11 cursor-pointer items-center gap-1.5 rounded-[10px] border border-ink-200 bg-white px-3.5 text-[14px] font-medium text-ink-700 hover:bg-ink-50"
           >
             <Download className="size-4" aria-hidden />
             Export CSV
@@ -222,11 +222,12 @@ export default async function AdminCompaniesPage({
           },
           {
             header: "GST status",
-            cell: (row) => (
-              <span className="text-xs font-mono text-ink-700">
-                {row.gstNumber || "Unlisted"}
-              </span>
-            ),
+            cell: (row) =>
+              row.gstNumber ? (
+                <span className="font-mono text-xs text-ink-700">{row.gstNumber}</span>
+              ) : (
+                <span className="text-[13px] text-text-subtle">Unlisted</span>
+              ),
           },
           {
             header: "Setup",

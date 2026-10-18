@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 
 import { formatDate, formatMoney } from "@/lib/format";
+import { AdminEmpty } from "@/components/admin/panel";
 import { StatusBadge } from "@/components/admin/status-badge";
 import { ProposalStatusEditor } from "@/components/admin/proposal-status-editor";
 import {
@@ -200,109 +201,51 @@ export function ProposalTrackerView({
 
   return (
     <div className="space-y-6">
-      {/* 3 Main Tabs */}
+      {/* Main tabs - the ink-100 segmented control shared with payouts and messages */}
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-ink-100 pb-3">
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => {
-              setActiveTab("companies");
-              setSearch("");
-              setStatusFilter("all");
-            }}
-            className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all ${
-              activeTab === "companies"
-                ? "bg-brand-700 text-white shadow-2xs"
-                : "border border-ink-200 bg-white text-ink-700 hover:bg-ink-50"
-            }`}
-          >
-            <Building2 className="size-4" />
-            <span>Company List</span>
-            <span
-              className={`rounded-full px-2 py-0.5 text-xs ${
-                activeTab === "companies" ? "bg-white/20 text-white" : "bg-ink-100 text-ink-700"
+        <div
+          role="tablist"
+          aria-label="Pipeline view"
+          className="flex max-w-full gap-0.5 overflow-x-auto rounded-[10px] bg-ink-100 p-1"
+        >
+          {(
+            [
+              { key: "companies", label: "Company List", Icon: Building2, count: companies.length },
+              { key: "proposals", label: "Proposals", Icon: Send, count: proposals.length },
+              { key: "candidates", label: "Candidates", Icon: Users, count: candidates.length },
+              { key: "interviews", label: "Interviews", Icon: Clock, count: interviews.length },
+            ] as const
+          ).map((tab) => (
+            <button
+              key={tab.key}
+              type="button"
+              role="tab"
+              aria-selected={activeTab === tab.key}
+              onClick={() => {
+                setActiveTab(tab.key);
+                setSearch("");
+                setStatusFilter("all");
+              }}
+              className={`apple-spring apple-pressable inline-flex min-h-11 shrink-0 items-center gap-2 whitespace-nowrap rounded-[8px] px-4 text-[14px] font-medium tracking-[-0.01em] ${
+                activeTab === tab.key ? "bg-white text-ink-900 shadow-xs" : "text-ink-500 hover:text-ink-800"
               }`}
             >
-              {companies.length}
-            </span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              setActiveTab("proposals");
-              setSearch("");
-              setStatusFilter("all");
-            }}
-            className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all ${
-              activeTab === "proposals"
-                ? "bg-brand-700 text-white shadow-2xs"
-                : "border border-ink-200 bg-white text-ink-700 hover:bg-ink-50"
-            }`}
-          >
-            <Send className="size-4" />
-            <span>Proposals</span>
-            <span
-              className={`rounded-full px-2 py-0.5 text-xs ${
-                activeTab === "proposals" ? "bg-white/20 text-white" : "bg-ink-100 text-ink-700"
-              }`}
-            >
-              {proposals.length}
-            </span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              setActiveTab("candidates");
-              setSearch("");
-              setStatusFilter("all");
-            }}
-            className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all ${
-              activeTab === "candidates"
-                ? "bg-brand-700 text-white shadow-2xs"
-                : "border border-ink-200 bg-white text-ink-700 hover:bg-ink-50"
-            }`}
-          >
-            <Users className="size-4" />
-            <span>Candidates</span>
-            <span
-              className={`rounded-full px-2 py-0.5 text-xs ${
-                activeTab === "candidates" ? "bg-white/20 text-white" : "bg-ink-100 text-ink-700"
-              }`}
-            >
-              {candidates.length}
-            </span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              setActiveTab("interviews");
-              setSearch("");
-              setStatusFilter("all");
-            }}
-            className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all ${
-              activeTab === "interviews"
-                ? "bg-brand-700 text-white shadow-2xs"
-                : "border border-ink-200 bg-white text-ink-700 hover:bg-ink-50"
-            }`}
-          >
-            <Clock className="size-4" />
-            <span>Interviews</span>
-            <span
-              className={`rounded-full px-2 py-0.5 text-xs ${
-                activeTab === "interviews" ? "bg-white/20 text-white" : "bg-ink-100 text-ink-700"
-              }`}
-            >
-              {interviews.length}
-            </span>
-          </button>
+              <tab.Icon className="size-4" aria-hidden />
+              <span>{tab.label}</span>
+              <span
+                className={`rounded-full px-2 py-0.5 text-xs tabular-nums ${
+                  activeTab === tab.key ? "bg-brand-50 text-brand-800" : "bg-ink-200/70 text-ink-600"
+                }`}
+              >
+                {tab.count}
+              </span>
+            </button>
+          ))}
         </div>
 
         {/* Global Search & Filters */}
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="relative min-w-[240px]">
+        <div className="flex w-full flex-wrap items-center gap-2 lg:w-auto">
+          <div className="relative w-full min-w-[12rem] flex-1 sm:w-auto sm:max-w-xs">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-ink-400" />
             <input
               type="text"
@@ -317,13 +260,14 @@ export function ProposalTrackerView({
                   ? "Search candidate, company, project..."
                   : "Search candidate, company..."
               }
-              className="w-full rounded-xl border border-ink-200 bg-white pl-9 pr-8 py-2 text-xs focus:border-brand-500 focus:outline-hidden focus:ring-2 focus:ring-brand-500/20"
+              className="min-h-11 w-full rounded-[10px] border border-ink-200 bg-white pl-9 pr-8 text-sm focus:border-brand-500 focus:outline-hidden focus:ring-2 focus:ring-brand-500/20"
             />
             {search && (
               <button
                 type="button"
                 onClick={() => setSearch("")}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-ink-400 hover:text-ink-700"
+                aria-label="Clear search"
+                className="absolute right-1 top-1/2 flex min-h-11 min-w-11 -translate-y-1/2 items-center justify-center rounded-[10px] text-ink-400 hover:text-ink-700"
               >
                 <X className="size-3.5" />
               </button>
@@ -336,7 +280,7 @@ export function ProposalTrackerView({
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
                 aria-label="Filter proposals by status"
-                className="rounded-xl border border-ink-200 bg-white px-3 py-2 text-xs text-ink-700 focus:border-brand-500 focus:outline-hidden"
+                className="min-h-11 rounded-[10px] border border-ink-200 bg-white px-3 text-sm text-ink-700 focus:border-brand-500 focus:outline-hidden"
               >
                 <option value="all">All Status</option>
                 <option value="sent">Sent</option>
@@ -351,7 +295,7 @@ export function ProposalTrackerView({
                 value={flowFilter}
                 onChange={(e) => setFlowFilter(e.target.value)}
                 aria-label="Filter proposals by flow type"
-                className="rounded-xl border border-ink-200 bg-white px-3 py-2 text-xs text-ink-700 focus:border-brand-500 focus:outline-hidden"
+                className="min-h-11 rounded-[10px] border border-ink-200 bg-white px-3 text-sm text-ink-700 focus:border-brand-500 focus:outline-hidden"
               >
                 <option value="all">All Flows</option>
                 <option value="direct">Direct Offer</option>
@@ -365,7 +309,7 @@ export function ProposalTrackerView({
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
               aria-label="Filter interviews by status"
-              className="rounded-xl border border-ink-200 bg-white px-3 py-2 text-xs text-ink-700 focus:border-brand-500 focus:outline-hidden"
+              className="min-h-11 rounded-[10px] border border-ink-200 bg-white px-3 text-sm text-ink-700 focus:border-brand-500 focus:outline-hidden"
             >
               <option value="all">All Status</option>
               <option value="scheduled">Scheduled</option>
@@ -380,10 +324,13 @@ export function ProposalTrackerView({
 
       {/* Tab 1: Company List View */}
       {activeTab === "companies" && (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {filteredCompanies.length === 0 ? (
-            <div className="col-span-full rounded-2xl border border-dashed border-ink-200 bg-white p-12 text-center text-sm text-ink-500">
-              No companies matching &quot;{search}&quot;.
+            <div className="col-span-full rounded-2xl border border-dashed border-ink-200 bg-white">
+              <AdminEmpty
+                title="No companies match"
+                body={search ? `Nothing matches "${search}". Try a shorter search.` : "No companies have sent proposals in this range."}
+              />
             </div>
           ) : (
             filteredCompanies.map((c) => (
@@ -393,21 +340,23 @@ export function ProposalTrackerView({
               >
                 <div>
                   <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-center gap-3">
-                      <div className="grid size-10 place-items-center rounded-xl bg-brand-50 text-base font-bold text-brand-800 border border-brand-200/50">
+                    <div className="flex min-w-0 flex-1 items-center gap-3">
+                      <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-brand-50 text-base font-bold text-brand-800 border border-brand-200/50">
                         {c.companyName.charAt(0).toUpperCase()}
                       </div>
                       <div className="min-w-0">
                         <h3 className="truncate text-sm font-bold text-ink-900 group-hover:text-brand-800 transition-colors">
                           {c.companyName}
                         </h3>
-                        <p className="truncate text-2xs text-text-subtle flex items-center gap-1">
-                          <Mail className="size-3" />
-                          <span>{c.companyEmail}</span>
+                        <p className="flex min-w-0 items-center gap-1 text-2xs text-text-subtle">
+                          <Mail className="size-3 shrink-0" />
+                          <span className="truncate">{c.companyEmail}</span>
                         </p>
                       </div>
                     </div>
-                    <StatusBadge value={c.isActive ? "active" : "inactive"} />
+                    <span className="shrink-0">
+                      <StatusBadge value={c.isActive ? "active" : "inactive"} />
+                    </span>
                   </div>
 
                   {c.city && (
@@ -421,22 +370,22 @@ export function ProposalTrackerView({
                   )}
 
                   {/* Stats Grid */}
-                  <div className="mt-4 grid grid-cols-4 gap-2 rounded-xl bg-ink-50/70 p-3 text-center">
-                    <div>
-                      <p className="text-2xs text-text-subtle">Proposals</p>
-                      <p className="text-base font-bold text-ink-900">{c.proposalsCount}</p>
+                  <div className="mt-4 grid grid-cols-2 gap-2 rounded-xl bg-ink-50/70 p-3 text-center xl:grid-cols-4">
+                    <div className="min-w-0">
+                      <p className="truncate text-2xs text-text-subtle">Proposals</p>
+                      <p className="text-base font-bold tabular-nums text-ink-900">{c.proposalsCount}</p>
                     </div>
-                    <div>
-                      <p className="text-2xs text-text-subtle">Interviews</p>
-                      <p className="text-base font-bold text-ink-900">{c.interviewsCount}</p>
+                    <div className="min-w-0">
+                      <p className="truncate text-2xs text-text-subtle">Interviews</p>
+                      <p className="text-base font-bold tabular-nums text-ink-900">{c.interviewsCount}</p>
                     </div>
-                    <div>
-                      <p className="text-2xs text-text-subtle">Hired</p>
-                      <p className="text-base font-bold text-emerald-700">{c.hiredCount}</p>
+                    <div className="min-w-0">
+                      <p className="truncate text-2xs text-text-subtle">Hired</p>
+                      <p className="text-base font-bold tabular-nums text-emerald-700">{c.hiredCount}</p>
                     </div>
-                    <div>
-                      <p className="text-2xs text-text-subtle">Rejected</p>
-                      <p className="text-base font-bold text-ink-700">{c.rejectedCount}</p>
+                    <div className="min-w-0">
+                      <p className="truncate text-2xs text-text-subtle">Rejected</p>
+                      <p className="text-base font-bold tabular-nums text-ink-700">{c.rejectedCount}</p>
                     </div>
                   </div>
                   <p className="mt-2 text-2xs text-text-subtle">
@@ -447,15 +396,15 @@ export function ProposalTrackerView({
                 </div>
 
                 {/* Actions */}
-                <div className="mt-5 flex items-center justify-between border-t border-ink-100 pt-3">
-                  <div className="flex items-center gap-2">
+                <div className="mt-5 flex flex-wrap items-center justify-between gap-2 border-t border-ink-100 pt-3">
+                  <div className="flex flex-wrap items-center gap-2">
                     <button
                       type="button"
                       onClick={() => {
                         setSelectedCompany(c);
                         setCompanyModalType("proposals");
                       }}
-                      className="inline-flex items-center gap-1 rounded-lg border border-ink-200 bg-white px-2.5 py-1 text-2xs font-medium text-ink-700 hover:bg-ink-50 hover:text-ink-900 transition-colors"
+                      className="apple-spring inline-flex min-h-9 items-center gap-1 whitespace-nowrap rounded-lg border border-ink-200 bg-white px-2.5 text-2xs font-medium text-ink-700 hover:bg-ink-50 hover:text-ink-900 max-lg:min-h-11"
                     >
                       <FileText className="size-3 text-brand-600" />
                       <span>Proposals ({c.proposalsCount})</span>
@@ -466,7 +415,7 @@ export function ProposalTrackerView({
                         setSelectedCompany(c);
                         setCompanyModalType("interviews");
                       }}
-                      className="inline-flex items-center gap-1 rounded-lg border border-ink-200 bg-white px-2.5 py-1 text-2xs font-medium text-ink-700 hover:bg-ink-50 hover:text-ink-900 transition-colors"
+                      className="apple-spring inline-flex min-h-9 items-center gap-1 whitespace-nowrap rounded-lg border border-ink-200 bg-white px-2.5 text-2xs font-medium text-ink-700 hover:bg-ink-50 hover:text-ink-900 max-lg:min-h-11"
                     >
                       <Clock className="size-3 text-amber-600" />
                       <span>Interviews ({c.interviewsCount})</span>
@@ -475,7 +424,7 @@ export function ProposalTrackerView({
 
                   <Link
                     href={`/admin/companies/${c.id}`}
-                    className="inline-flex items-center gap-1 text-2xs font-semibold text-brand-700 hover:underline"
+                    className="inline-flex min-h-9 items-center gap-1 whitespace-nowrap text-2xs font-semibold text-brand-700 hover:underline max-lg:min-h-11"
                   >
                     <span>360 View</span>
                     <ExternalLink className="size-3" />

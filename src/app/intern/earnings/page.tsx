@@ -15,6 +15,15 @@ export const metadata: Metadata = {
 };
 
 /**
+ * "landed today" / "landed yesterday" / "landed 7 Oct 2026". Only the relative
+ * words are lowercased mid-sentence; a month abbreviation keeps its capital.
+ */
+function whenLabel(value: Date | string | null): string {
+  const label = formatDayLabel(value);
+  return label === "Today" || label === "Yesterday" ? label.toLowerCase() : label;
+}
+
+/**
  * Stipend.
  *
  * ── The bug this fixes ─────────────────────────────────────────────────
@@ -62,7 +71,7 @@ export default async function InternEarnings() {
           next={{ label: "See your offers", href: "/intern/proposals" }}
         />
       ) : (
-        <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_18rem]">
+        <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_18rem]">
           <div className="space-y-8">
             {/* ── The two figures, kept apart on purpose ─────────── */}
             <div className="grid gap-3 sm:grid-cols-2">
@@ -73,7 +82,7 @@ export default async function InternEarnings() {
                 </p>
                 <p className="mt-2 text-pretty text-sm leading-relaxed text-ink-500">
                   {money.lastPaidAt
-                    ? `Last one landed ${formatDayLabel(money.lastPaidAt).toLowerCase()}.`
+                    ? `Last one landed ${whenLabel(money.lastPaidAt)}.`
                     : "Nothing has been paid out yet."}
                 </p>
               </Surface>
@@ -129,7 +138,7 @@ export default async function InternEarnings() {
                             <>
                               Reference {payout.referenceId}
                               {isPaid && payout.paidAt
-                                ? ` · landed ${formatDayLabel(payout.paidAt).toLowerCase()}`
+                                ? ` · landed ${whenLabel(payout.paidAt)}`
                                 : ""}
                             </>
                           ) : payout.notes ? (

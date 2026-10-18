@@ -123,6 +123,10 @@ export function StatCard({
 /**
  * Responsive KPI grid. `cols` is the desktop column count; the grid collapses
  * to 1 column on phones and 2 on tablets.
+ *
+ * The widest layout waits for `xl`, not `lg`: the sidebar appears at `lg`
+ * (1024px) and takes ~248px, so a 4-up grid at exactly 1024 would get ~165px
+ * cells and the values wrap.
  */
 export function StatGrid({
   cols = 4,
@@ -137,9 +141,9 @@ export function StatGrid({
     <div
       className={cn(
         "grid gap-4",
-        cols === 3 && "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3",
-        cols === 4 && "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4",
-        cols === 6 && "grid-cols-2 sm:grid-cols-3 lg:grid-cols-6",
+        cols === 3 && "grid-cols-1 sm:grid-cols-2 xl:grid-cols-3",
+        cols === 4 && "grid-cols-1 sm:grid-cols-2 xl:grid-cols-4",
+        cols === 6 && "grid-cols-2 sm:grid-cols-3 xl:grid-cols-6",
         className
       )}
     >

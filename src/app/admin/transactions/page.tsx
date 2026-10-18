@@ -17,6 +17,40 @@ import {
   type VolumePoint,
 } from "@/components/admin/finance-charts";
 
+/**
+ * Ledger view switch - the same ink-100 segmented control the payouts and
+ * messages pages use, so the console has one tab pattern rather than three.
+ */
+function LedgerTabs({ current }: { current: "payments" | "payouts" }) {
+  const tabs = [
+    { key: "payments", label: "Employer payments", href: "/admin/transactions" },
+    { key: "payouts", label: "Intern disbursements", href: "/admin/transactions?view=payouts" },
+  ] as const;
+  return (
+    <div
+      role="tablist"
+      aria-label="Ledger view"
+      className="grid grid-cols-2 gap-0.5 self-start overflow-x-auto rounded-[10px] bg-ink-100 p-1 sm:inline-grid sm:grid-cols-2"
+    >
+      {tabs.map((tab) => (
+        <Link
+          key={tab.key}
+          role="tab"
+          aria-selected={current === tab.key}
+          href={tab.href}
+          className={
+            current === tab.key
+              ? "apple-spring apple-pressable inline-flex min-h-11 items-center justify-center whitespace-nowrap rounded-[8px] bg-white px-4 text-[14px] font-medium tracking-[-0.01em] text-ink-900 shadow-xs"
+              : "apple-spring apple-pressable inline-flex min-h-11 items-center justify-center whitespace-nowrap rounded-[8px] px-4 text-[14px] font-medium tracking-[-0.01em] text-ink-500 hover:text-ink-800"
+          }
+        >
+          {tab.label}
+        </Link>
+      ))}
+    </div>
+  );
+}
+
 export default async function AdminTransactionsPage({
   searchParams,
 }: {
@@ -175,7 +209,7 @@ export default async function AdminTransactionsPage({
     return (
       <div className="space-y-6">
         <AdminPageHeader
-          title="Transactions"
+          title="Financial Ledger"
           subtitle="Financial settlements, payments collection and intern disbursements."
         />
 
@@ -216,20 +250,7 @@ export default async function AdminTransactionsPage({
 
         <FinanceCharts revenueData={revenueData} volumeData={volumeData} />
 
-        <div className="flex border-b border-ink-200">
-          <Link
-            href="/admin/transactions"
-            className="border-b-2 border-transparent px-4 py-2.5 text-sm font-medium text-ink-600 transition-colors hover:text-ink-900"
-          >
-            Employer payments
-          </Link>
-          <Link
-            href="/admin/transactions?view=payouts"
-            className="border-b-2 border-brand-700 px-4 py-2.5 text-sm font-semibold text-brand-800"
-          >
-            Intern disbursements
-          </Link>
-        </div>
+        <LedgerTabs current="payouts" />
 
         <DataTable
           basePath="/admin/transactions"
@@ -369,7 +390,7 @@ export default async function AdminTransactionsPage({
   return (
     <div className="space-y-6">
       <AdminPageHeader
-        title="Transactions"
+        title="Financial Ledger"
         subtitle="Financial settlements, payments collection and intern disbursements."
       />
 
@@ -410,20 +431,7 @@ export default async function AdminTransactionsPage({
 
         <FinanceCharts revenueData={revenueData} volumeData={volumeData} />
 
-        <div className="flex border-b border-ink-200">
-          <Link
-            href="/admin/transactions"
-            className="border-b-2 border-brand-700 px-4 py-2.5 text-sm font-semibold text-brand-800"
-          >
-            Employer payments
-          </Link>
-        <Link
-          href="/admin/transactions?view=payouts"
-          className="border-b-2 border-transparent px-4 py-2.5 text-sm font-medium text-ink-600 transition-colors hover:text-ink-900"
-        >
-          Intern disbursements
-        </Link>
-      </div>
+      <LedgerTabs current="payments" />
 
       <DataTable
         basePath="/admin/transactions"

@@ -61,7 +61,7 @@ export default async function AdminMessagesPage({
   return (
     <div className="space-y-6">
       <AdminPageHeader
-        title="Messages"
+        title="Inbound Messages"
         subtitle="Inbound contact inquiries, support tickets and user feedback."
       />
 

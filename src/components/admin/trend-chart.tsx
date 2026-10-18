@@ -35,6 +35,12 @@ export type TrendPoint = {
   interviews: number;
 };
 
+/** "27 Jul 2026" → "27 Jul"; month-only labels ("Jul") pass through. */
+function shortLabel(label: string): string {
+  const match = label.match(/^(\d{1,2})\s+([A-Za-z]{3})/);
+  return match ? `${match[1]} ${match[2]}` : label;
+}
+
 const SERIES = [
   {
     key: "proposals" as const,
@@ -225,6 +231,9 @@ export function TrendChart({
       </div>
 
       {/* X axis ---------------------------------------------------------- */}
+      {/* Twelve labels collide below the sidebar breakpoint, so phones show
+          every third label and tablets every second. The sr-only table below
+          still carries every point. */}
       <div className="mt-2 flex gap-2.5">
         <div className="shrink-0" />
         <div className="flex flex-1">
@@ -232,11 +241,13 @@ export function TrendChart({
             <span
               key={point.label}
               className={cn(
-                "flex-1 text-center text-xs transition-colors",
+                "flex-1 text-center text-2xs whitespace-nowrap transition-colors lg:text-xs",
+                index % 3 !== 0 && "max-sm:invisible",
+                index % 2 !== 0 && "max-lg:sm:invisible",
                 active === index ? "font-semibold text-ink-900" : "text-text-subtle",
               )}
             >
-              {point.label}
+              {shortLabel(point.label)}
             </span>
           ))}
         </div>

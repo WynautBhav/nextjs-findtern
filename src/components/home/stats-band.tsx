@@ -1,27 +1,25 @@
 import { CountUp } from "@/components/motion/count-up";
+import { PROOF_STATS as STATS } from "@/lib/content/site";
 
 /**
  * These are the numbers Findtern can actually stand behind, and each one is a
- * product term rather than a marketing number:
+ * product term rather than a marketing number, all three addressed to the
+ * employer the rest of the home page is talking to:
  *
- *   - 100% of the internship fee is refunded if a candidate is not placed
- *     (the window itself stays in the terms, not on marketing surfaces).
+ *   - 100% of profiles are verified, interviewed and tested before an
+ *     employer sees them.
  *   - 3 pricing plans (Espresso, Cappuccino, Latte) come from the pricing
  *   - ₹5,000 fixed per-hire fee applies across all plans.
  *
- * The previous band here read "1,200+ interns placed", "340+ hiring
- * companies" and "4.8/5 average rating". None of those were sourced - the live
- * site publishes no placement counts - and publishing an invented placement
- * number is the kind of claim that does not survive a journalist or a large
- * employer's due diligence. If real figures exist, they belong in the CMS
- * (stats are content, like every other number on this site) and this band
- * should read them from there rather than hardcode them.
+ * The candidate guarantee ("refund if not placed") used to sit here between
+ * two employer terms; it now lives on /interns with the rest of the
+ * candidate pitch. The previous band before that read "1,200+ interns
+ * placed", "340+ hiring companies" and "4.8/5 average rating". None of those
+ * were sourced - the live site publishes no placement counts - and publishing
+ * an invented placement number is the kind of claim that does not survive a
+ * journalist or a large employer's due diligence. If real figures exist, they
+ * belong in the CMS and this band should read them from there.
  */
-const STATS = [
-  { value: 100, prefix: "", suffix: "%", label: "Refund if not placed" },
-  { value: 3, prefix: "", suffix: "", label: "Plans, no lock-in" },
-  { value: 5000, prefix: "₹", suffix: "", label: "Fixed per-hire fee" },
-];
 
 /**
  * Dark metrics band. Breaks the light rhythm of the page and gives the

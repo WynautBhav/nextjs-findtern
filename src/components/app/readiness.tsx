@@ -139,10 +139,10 @@ export function ReadinessMeter({
               </span>
 
               <span className="min-w-0 flex-1">
-                <span className="flex items-center gap-2">
+                <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
                   <span
                     className={cn(
-                      "text-sm font-medium",
+                      "min-w-0 text-sm font-medium",
                       item.done ? "text-ink-600" : "text-ink-900",
                     )}
                   >

@@ -218,37 +218,9 @@ export default async function AdminProposalTrackerPage({
   return (
     <div className="space-y-6">
       <AdminPageHeader
-        title="Proposal tracker"
+        title="Proposal Pipeline"
         subtitle="End to end proposal pipeline between employers and student candidates."
         action={
-          <div className="flex flex-wrap items-end gap-2">
-          <form method="get" className="flex flex-wrap items-end gap-2" aria-label="Date range">
-            <input type="hidden" name="tab" value={initialTab} />
-            <label className="text-2xs font-medium text-ink-600">
-              From
-              <input
-                type="date"
-                name="from"
-                defaultValue={params.from ?? ""}
-                className="mt-1 block min-h-11 rounded-[10px] border border-ink-200 bg-white px-2.5 text-[13px] text-ink-800"
-              />
-            </label>
-            <label className="text-2xs font-medium text-ink-600">
-              To
-              <input
-                type="date"
-                name="to"
-                defaultValue={params.to ?? ""}
-                className="mt-1 block min-h-11 rounded-[10px] border border-ink-200 bg-white px-2.5 text-[13px] text-ink-800"
-              />
-            </label>
-            <button
-              type="submit"
-              className="min-h-11 rounded-[10px] bg-brand-700 px-3.5 text-[14px] font-medium text-white hover:bg-brand-600"
-            >
-              Apply
-            </button>
-          </form>
           <a
             href={exportHref}
             className="apple-spring apple-pressable inline-flex min-h-11 cursor-pointer items-center gap-1.5 rounded-[10px] border border-ink-200 bg-white px-3.5 text-[14px] font-medium text-ink-700 hover:bg-ink-50"
@@ -256,9 +228,45 @@ export default async function AdminProposalTrackerPage({
             <Download className="size-4" aria-hidden />
             Export CSV
           </a>
-          </div>
         }
       />
+
+      {/* The date range lives in its own row: beside the title it was wider
+          than a phone screen and pushed the Export button off the edge. */}
+      <form
+        method="get"
+        className="grid grid-cols-2 items-end gap-2 sm:flex sm:flex-wrap"
+        aria-label="Date range"
+      >
+        <input type="hidden" name="tab" value={initialTab} />
+        <label className="min-w-0 text-2xs font-medium text-ink-600">
+          From
+          <input
+            type="date"
+            name="from"
+            defaultValue={params.from ?? ""}
+            className="mt-1 block min-h-11 w-full min-w-0 rounded-[10px] border border-ink-200 bg-white px-2.5 text-[13px] text-ink-800 sm:w-auto"
+          />
+        </label>
+        <label className="min-w-0 text-2xs font-medium text-ink-600">
+          To
+          <input
+            type="date"
+            name="to"
+            defaultValue={params.to ?? ""}
+            className="mt-1 block min-h-11 w-full min-w-0 rounded-[10px] border border-ink-200 bg-white px-2.5 text-[13px] text-ink-800 sm:w-auto"
+          />
+        </label>
+        <button
+          type="submit"
+          className="apple-spring apple-pressable col-span-2 min-h-11 rounded-[10px] bg-brand-700 px-3.5 text-[14px] font-medium text-white hover:bg-brand-600 sm:col-span-1"
+        >
+          Apply
+        </button>
+        <span className="col-span-2 self-center text-[13px] text-text-subtle sm:col-span-1 sm:ml-1 sm:self-end sm:pb-3">
+          {rangeLabel}
+        </span>
+      </form>
 
       <StatGrid cols={4}>
         <StatCard

@@ -124,7 +124,7 @@ export default async function InternHome() {
         }
       />
 
-      <div className="grid gap-x-10 gap-y-8 lg:grid-cols-[minmax(0,1fr)_20rem]">
+      <div className="grid gap-x-10 gap-y-8 xl:grid-cols-[minmax(0,1fr)_20rem]">
         {/* ── Main column ─────────────────────────────────────────── */}
         <div className="min-w-0 space-y-8">
           <StatusStrip node={action} stage={data.stage} />

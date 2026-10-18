@@ -6,6 +6,7 @@ import { useState } from "react";
 import { Bell, Menu } from "lucide-react";
 
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { breadcrumbsFor } from "@/lib/breadcrumbs";
 import { csrfFetch } from "@/lib/client-fetch";
 import { AdminNav, AdminNavFooter, NavCloseButton, type NavGroup } from "./admin-nav";
 import { CommandPalette } from "./command-palette";
@@ -13,12 +14,15 @@ import { Logo } from "@/components/brand/logo";
 
 export function AdminShell({
   groups,
+  labels = {},
   email,
   role,
   unreadCount = 0,
   children,
 }: {
   groups: NavGroup[];
+  /** href → label, so breadcrumbs say what the sidebar says. */
+  labels?: Record<string, string>;
   email: string;
   role?: string;
   unreadCount?: number;
@@ -34,11 +38,7 @@ export function AdminShell({
     router.refresh();
   }
 
-  const crumbs = pathname
-    .split("/")
-    .filter(Boolean)
-    .slice(1)
-    .map((part) => part.replace(/[-_]/g, " ").replace(/^\w/, (c) => c.toUpperCase()));
+  const crumbs = breadcrumbsFor(pathname, labels);
 
   return (
     <div className="apple-admin min-h-[100dvh] overflow-x-clip bg-ink-50 text-ink-900 lg:flex lg:items-stretch">
@@ -57,8 +57,8 @@ export function AdminShell({
 
       {/* Main content column */}
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="apple-material-bar sticky top-0 z-30 flex h-14 items-center justify-between border-b border-ink-200/70 px-4 lg:hidden">
-          <div className="flex items-center gap-3">
+        <header className="apple-material-bar sticky top-0 z-30 flex h-14 items-center justify-between gap-2 border-b border-ink-200/70 px-4 lg:hidden">
+          <div className="flex min-w-0 flex-1 items-center gap-3">
             <Sheet open={open} onOpenChange={setOpen}>
               <SheetTrigger asChild>
                 <button
@@ -70,9 +70,13 @@ export function AdminShell({
                 </button>
               </SheetTrigger>
               <SheetContent side="left" showCloseButton={false} className="apple-admin flex w-72 flex-col bg-white p-4 text-ink-900">
-                <SheetTitle className="flex items-center gap-3 px-3 py-2 text-[15px] font-semibold tracking-[-0.02em]">
-                  <span className="grid size-8 place-items-center rounded-[10px] bg-brand-700 text-sm text-white">F</span>
-                  Findtern <span className="text-[12px] font-medium text-text-subtle">Admin</span>
+                {/* Same mark as the desktop sidebar, so the drawer is the
+                    sidebar moved rather than a different product. */}
+                <SheetTitle className="flex min-h-11 items-center gap-3 px-3 py-2 pr-12">
+                  <Logo alt="Findtern Admin" className="h-6" />
+                  <span className="rounded-full border border-brand-200 bg-brand-50 px-2 py-0.5 text-2xs font-bold uppercase tracking-wider text-brand-700">
+                    Admin
+                  </span>
                 </SheetTitle>
                 <NavCloseButton onClick={() => setOpen(false)} />
                 <div className="mt-6 flex-1 overflow-y-auto">
@@ -85,12 +89,12 @@ export function AdminShell({
             <div className="min-w-0">
               <p className="text-[12px] font-medium text-text-subtle">Findtern</p>
               <p className="truncate text-[13px] font-semibold tracking-[-0.01em] text-ink-900">
-                {crumbs[crumbs.length - 1] ?? "Dashboard"}
+                {crumbs[crumbs.length - 1]?.label ?? "Dashboard"}
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-2">
             <Link
               href="/admin/messages"
               className="apple-spring apple-pressable relative grid size-11 shrink-0 place-items-center rounded-[10px] text-ink-600 hover:bg-ink-100"
@@ -107,26 +111,28 @@ export function AdminShell({
           </div>
         </header>
 
-        <header className="apple-material-bar hidden h-14 items-center justify-between border-b border-ink-200/70 px-8 lg:flex">
-          <nav aria-label="Breadcrumb navigation" className="flex items-center gap-1.5 text-[13px] text-text-subtle">
-            <Link href="/admin/dashboard" className="apple-spring inline-flex min-h-7 items-center font-medium text-ink-600 hover:text-brand-700">
+        <header className="apple-material-bar hidden h-14 items-center justify-between gap-4 border-b border-ink-200/70 px-8 lg:flex">
+          <nav aria-label="Breadcrumb navigation" className="flex min-w-0 items-center gap-1.5 text-[13px] text-text-subtle">
+            <Link href="/admin/dashboard" className="apple-spring inline-flex min-h-7 shrink-0 items-center font-medium text-ink-600 hover:text-brand-700">
               Workspace
             </Link>
             {crumbs.map((crumb, index) => (
-              <span key={`${crumb}-${index}`} className="flex items-center gap-1.5">
+              <span key={crumb.href} className="flex min-w-0 items-center gap-1.5">
                 <span aria-hidden className="text-ink-300">/</span>
-                <span
-                  className={
-                    index === crumbs.length - 1 ? "font-semibold tracking-[-0.01em] text-ink-900" : "font-medium text-ink-600"
-                  }
-                >
-                  {crumb}
-                </span>
+                {index === crumbs.length - 1 ? (
+                  <span className="truncate font-semibold tracking-[-0.01em] text-ink-900">{crumb.label}</span>
+                ) : !crumb.link ? (
+                  <span className="truncate font-medium text-ink-600">{crumb.label}</span>
+                ) : (
+                  <Link href={crumb.href} className="apple-spring truncate font-medium text-ink-600 hover:text-brand-700">
+                    {crumb.label}
+                  </Link>
+                )}
               </span>
             ))}
           </nav>
 
-          <div className="flex items-center gap-3">
+          <div className="flex shrink-0 items-center gap-3">
             <Link
               href="/admin/messages"
               className="apple-spring apple-pressable relative inline-flex min-h-11 min-w-11 items-center justify-center rounded-[10px] border border-ink-200 bg-white text-ink-700 shadow-2xs hover:border-ink-300 hover:bg-ink-50"

@@ -44,10 +44,10 @@ export default async function EmployerAlerts() {
                   <Bell className="size-4" aria-hidden />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-baseline justify-between gap-2">
-                    <p className="text-sm font-semibold text-ink-900">{n.title}</p>
+                  <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between sm:gap-2">
+                    <p className="min-w-0 text-sm font-semibold text-ink-900">{n.title}</p>
                     {n.createdAt ? (
-                      <span className="text-xs tabular-nums text-text-subtle">
+                      <span className="shrink-0 whitespace-nowrap text-xs tabular-nums text-text-subtle">
                         {formatDate(n.createdAt)}
                       </span>
                     ) : null}

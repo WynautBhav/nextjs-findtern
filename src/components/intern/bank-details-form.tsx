@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
-import { Check, Loader2, Save, Building } from "lucide-react";
+import { Check, Loader2 } from "lucide-react";
 
+import { Surface } from "@/components/app/primitives";
 import { csrfFetch } from "@/lib/client-fetch";
 
 export type BankDetails = {
@@ -13,6 +13,11 @@ export type BankDetails = {
   ifscCode?: string;
   upiId?: string;
 };
+
+const input =
+  "mt-1.5 h-11 w-full rounded-[10px] border border-ink-200 bg-white px-3 text-sm text-ink-900 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20";
+
+const label = "block text-sm font-medium text-ink-800";
 
 export function BankDetailsForm({
   initialBank,
@@ -64,123 +69,105 @@ export function BankDetailsForm({
   };
 
   return (
-    <div className="rounded-[20px] border border-ink-100 bg-white p-6 shadow-2xs">
-      <div className="flex items-center gap-2 border-b border-ink-100 pb-4 mb-6">
-        <Building className="size-5 text-brand-700" />
-        <h3 className="font-bold text-base text-ink-900">Bank Details</h3>
-      </div>
-
+    <Surface className="p-6">
       <form onSubmit={handleSubmit} className="space-y-4">
-        {errorMsg ? (
-          <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-700">
-            {errorMsg}
-          </div>
-        ) : null}
-
-        {saved ? (
-          <div className="rounded-xl border border-brand-200 bg-brand-50 p-3 text-xs font-semibold text-brand-800">
-            Bank details saved.
-          </div>
-        ) : null}
-
-        <div>
-          <label htmlFor="bank-name" className="block text-2xs font-semibold uppercase tracking-wider text-text-subtle mb-1.5">
-            Bank Name
+        <div className="grid gap-4 sm:grid-cols-2">
+          <label htmlFor="bank-name" className={label}>
+            Bank name
+            <input
+              id="bank-name"
+              type="text"
+              required
+              placeholder="e.g. State Bank of India"
+              value={bankName}
+              onChange={(e) => setBankName(e.target.value)}
+              className={input}
+            />
           </label>
-          <input
-            id="bank-name"
-            type="text"
-            required
-            placeholder="e.g. State Bank of India, HDFC Bank"
-            value={bankName}
-            onChange={(e) => setBankName(e.target.value)}
-            className="w-full rounded-xl border border-ink-200 bg-white px-3.5 py-2.5 text-xs text-ink-900 focus:border-brand-500 focus:outline-hidden focus:ring-2 focus:ring-brand-500/20"
-          />
+
+          <label htmlFor="bank-account-holder" className={label}>
+            Account holder name
+            <input
+              id="bank-account-holder"
+              type="text"
+              required
+              placeholder="As it appears on your passbook"
+              value={accountHolderName}
+              onChange={(e) => setAccountHolderName(e.target.value)}
+              className={input}
+              autoComplete="name"
+            />
+          </label>
         </div>
 
-        <div>
-          <label htmlFor="bank-account-holder" className="block text-2xs font-semibold uppercase tracking-wider text-text-subtle mb-1.5">
-            Account Holder Name
+        <div className="grid gap-4 sm:grid-cols-2">
+          <label htmlFor="bank-account-number" className={label}>
+            Account number
+            <input
+              id="bank-account-number"
+              type="text"
+              required
+              inputMode="numeric"
+              placeholder="Bank account number"
+              value={accountNumber}
+              onChange={(e) => setAccountNumber(e.target.value)}
+              className={`${input} font-mono tabular-nums`}
+            />
           </label>
-          <input
-            id="bank-account-holder"
-            type="text"
-            required
-            placeholder="Name as it appears on your passbook / checkbook"
-            value={accountHolderName}
-            onChange={(e) => setAccountHolderName(e.target.value)}
-            className="w-full rounded-xl border border-ink-200 bg-white px-3.5 py-2.5 text-xs text-ink-900 focus:border-brand-500 focus:outline-hidden focus:ring-2 focus:ring-brand-500/20"
-          />
+
+          <label htmlFor="bank-ifsc" className={label}>
+            IFSC code
+            <input
+              id="bank-ifsc"
+              type="text"
+              required
+              placeholder="e.g. SBIN0001234"
+              value={ifscCode}
+              onChange={(e) => setIfscCode(e.target.value.toUpperCase())}
+              className={`${input} font-mono uppercase`}
+            />
+            <span className="mt-1 block text-xs font-normal text-text-subtle">
+              11 characters, printed on your cheque book and passbook.
+            </span>
+          </label>
         </div>
 
-        <div>
-          <label htmlFor="bank-account-number" className="block text-2xs font-semibold uppercase tracking-wider text-text-subtle mb-1.5">
-            Account Number
-          </label>
-          <input
-            id="bank-account-number"
-            type="text"
-            required
-            placeholder="Enter bank account number"
-            value={accountNumber}
-            onChange={(e) => setAccountNumber(e.target.value)}
-            className="w-full rounded-xl border border-ink-200 bg-white px-3.5 py-2.5 text-xs font-mono text-ink-900 focus:border-brand-500 focus:outline-hidden focus:ring-2 focus:ring-brand-500/20"
-          />
-        </div>
-
-        <div>
-          <label htmlFor="bank-ifsc" className="block text-2xs font-semibold uppercase tracking-wider text-text-subtle mb-1.5">
-            IFSC Code
-          </label>
-          <input
-            id="bank-ifsc"
-            type="text"
-            required
-            placeholder="11-character alphanumeric code (e.g. SBIN0001234)"
-            value={ifscCode}
-            onChange={(e) => setIfscCode(e.target.value.toUpperCase())}
-            className="w-full rounded-xl border border-ink-200 bg-white px-3.5 py-2.5 text-xs font-mono text-ink-900 uppercase focus:border-brand-500 focus:outline-hidden focus:ring-2 focus:ring-brand-500/20"
-          />
-        </div>
-
-        <div>
-          <label htmlFor="bank-upi" className="block text-2xs font-semibold uppercase tracking-wider text-text-subtle mb-1.5">
-            UPI ID (optional)
-          </label>
+        <label htmlFor="bank-upi" className={label}>
+          UPI ID (optional)
           <input
             id="bank-upi"
             type="text"
             placeholder="e.g. username@okhdfcbank"
             value={upiId}
             onChange={(e) => setUpiId(e.target.value)}
-            className="w-full rounded-xl border border-ink-200 bg-white px-3.5 py-2.5 text-xs text-ink-900 focus:border-brand-500 focus:outline-hidden focus:ring-2 focus:ring-brand-500/20"
+            className={input}
           />
-        </div>
+        </label>
 
-        <div className="flex items-center justify-between pt-4 border-t border-ink-100">
-          <Link
-            href="/intern/dashboard"
-            className="apple-spring apple-pressable inline-flex min-h-10 items-center justify-center rounded-[10px] border border-ink-200 bg-white px-4 text-xs font-semibold text-ink-700 hover:bg-ink-50"
-          >
-            Back
-          </Link>
-
+        <div className="flex flex-wrap items-center gap-3">
           <button
             type="submit"
             disabled={saving}
-            className="apple-spring apple-pressable inline-flex min-h-10 items-center justify-center gap-1.5 rounded-[10px] bg-brand-700 px-5 text-xs font-semibold text-white shadow-2xs hover:bg-brand-600 disabled:opacity-50"
+            className="apple-spring apple-pressable inline-flex min-h-11 items-center justify-center gap-2 rounded-[10px] bg-primary px-5 text-sm font-semibold text-white shadow-sm hover:bg-primary-hover disabled:opacity-60"
           >
             {saving ? (
-              <Loader2 className="size-3.5 animate-spin" />
+              <Loader2 className="size-4 animate-spin" aria-hidden />
             ) : saved ? (
-              <Check className="size-3.5" />
-            ) : (
-              <Save className="size-3.5" />
-            )}
-            <span>{saving ? "Saving..." : saved ? "Saved" : "Save Bank Details"}</span>
+              <Check className="size-4" aria-hidden />
+            ) : null}
+            {saving ? "Saving…" : saved ? "Saved" : "Save bank details"}
           </button>
+          {errorMsg ? (
+            <span role="alert" className="text-sm text-danger">
+              {errorMsg}
+            </span>
+          ) : saved ? (
+            <span role="status" className="text-sm text-success">
+              Bank details saved.
+            </span>
+          ) : null}
         </div>
       </form>
-    </div>
+    </Surface>
   );
 }

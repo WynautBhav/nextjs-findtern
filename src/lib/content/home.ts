@@ -84,7 +84,14 @@ export const POPULAR_STEPS: PopularStep[] = [
    Espresso / Cappuccino / Latte, mapped onto the Findtern Score bands.
    Amounts are minor units. The legacy code carried two different fallback
    price sets - the Home section used $5/$10, the Pricing page used $1/$2 -
-   and both disagreed with the Employers page. One table now, one source. */
+   and both disagreed with the Employers page. One table now, one source.
+
+   Pilot-batch pricing (decided 2026-10-18): the per-hire charge is ₹5,000 on
+   every plan with nothing struck through. Hourly rates are ₹50 / ₹100 / ₹200,
+   and only the Espresso rate is discounted - ₹50 struck through to free - so
+   the one strikethrough on the page is the one real offer. The earlier
+   "₹7,500 → ₹5,000" per-hire strike and the ₹150/₹300 hourly strikes were
+   removed because the business is not quoting those figures. */
 
 /** The same ✓ / ✗ rows on every card, so plans compare line by line. */
 function featureRows(tier: 0 | 1 | 2): CmsPlanFeature[] {
@@ -113,8 +120,8 @@ export const PRICING_PLANS: CmsPlan[] = [
       "Access to basic talent",
     ],
     featureList: featureRows(0),
-    compareAtHourlyMinor: null,
-    compareAtPerHireMinor: 750000,
+    compareAtHourlyMinor: 5000,
+    compareAtPerHireMinor: null,
     isFeatured: false,
     gstApplicable: true,
     sortOrder: 0,
@@ -130,7 +137,7 @@ export const PRICING_PLANS: CmsPlan[] = [
     internshipDuration: "1-6 months",
     features: ["Skilled interns", "6-8/10", "Access to medium skilled talent"],
     featureList: featureRows(1),
-    compareAtHourlyMinor: 15000,
+    compareAtHourlyMinor: null,
     compareAtPerHireMinor: null,
     isFeatured: true,
     gstApplicable: true,
@@ -145,9 +152,9 @@ export const PRICING_PLANS: CmsPlan[] = [
     priceHourlyMinor: 20000,
     perHireChargeMinor: 500000,
     internshipDuration: "1-6 months",
-    features: ["Top-rated talent", "8+/10 (Top Rated)", "Top-rated talent"],
+    features: ["Top-rated talent", "8+/10 (Top Rated)", "Access to top-decile talent"],
     featureList: featureRows(2),
-    compareAtHourlyMinor: 30000,
+    compareAtHourlyMinor: null,
     compareAtPerHireMinor: null,
     isFeatured: false,
     gstApplicable: true,

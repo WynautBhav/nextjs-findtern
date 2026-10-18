@@ -48,7 +48,7 @@ export function RoleCard({
       href={`${hrefBase}/${role.id}`}
       className="group flex h-full flex-col rounded-2xl border border-ink-100 bg-white p-5 transition-[border-color,box-shadow,transform] duration-[var(--dur-standard)] hover:-translate-y-0.5 hover:border-ink-200 hover:shadow-[0_14px_34px_-18px_rgb(7_47_36/0.32)]"
     >
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <h2 className="text-pretty text-base font-semibold tracking-[-0.015em] text-ink-900">
             {role.projectName}
@@ -59,7 +59,7 @@ export function RoleCard({
           </p>
         </div>
         {role.fullTimeOffer ? (
-          <Pill tone="waiting" className="shrink-0">
+          <Pill tone="waiting" className="shrink-0 whitespace-nowrap">
             Leads to full time
           </Pill>
         ) : null}

@@ -70,7 +70,7 @@ export function Pagination({
     `${basePath}${toQueryString({ ...params, [pageParam]: String(target) })}`;
 
   const linkBase =
-    "apple-spring apple-pressable inline-flex h-8 min-w-8 items-center justify-center rounded-[10px] px-2.5 text-sm font-medium";
+    "apple-spring apple-pressable inline-flex h-8 min-w-8 items-center justify-center rounded-[10px] px-2.5 text-sm font-medium max-lg:min-h-11 max-lg:min-w-11";
 
   return (
     <nav
@@ -89,7 +89,7 @@ export function Pagination({
         {noun}
       </p>
 
-      <div className="flex items-center gap-1">
+      <div className="flex flex-wrap items-center gap-1">
         <Link
           href={href(Math.max(1, page - 1))}
           aria-disabled={page <= 1}

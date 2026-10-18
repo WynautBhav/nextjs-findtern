@@ -201,16 +201,16 @@ export async function getBlogPosts(): Promise<CmsBlogPost[]> {
   return tryDb(async () => {
     const db = getDb();
     const rows = await db.select(blogColumns).from(t).where(eq(t.status, "published")).orderBy(desc(t.publishedAt));
-    return rows.length ? rows.map(withImageRoutes) : BLOG_POSTS;
-  }, BLOG_POSTS);
+    return rows.length ? rows.map(withImageRoutes) : FALLBACK_POSTS;
+  }, FALLBACK_POSTS);
 }
 
 export async function getBlogPost(slug: string): Promise<CmsBlogPost | null> {
   return tryDb(async () => {
     const db = getDb();
     const [row] = await db.select(blogColumns).from(t).where(eq(t.slug, slug)).limit(1);
-    return row ? withImageRoutes(row) : (BLOG_POSTS.find((p) => p.slug === slug) ?? null);
-  }, BLOG_POSTS.find((p) => p.slug === slug) ?? null);
+    return row ? withImageRoutes(row) : (FALLBACK_POSTS.find((p) => p.slug === slug) ?? null);
+  }, FALLBACK_POSTS.find((p) => p.slug === slug) ?? null);
 }
 
 /** Raw stored value of a partner logo or happy-face avatar. */
@@ -230,6 +230,8 @@ export async function getCmsImage(kind: "partner" | "face", id: string): Promise
 
 /** Raw stored value of a post's cover or banner (a data: or http(s) URL). */
 export async function getBlogImage(slug: string, kind: "cover" | "banner"): Promise<string | null> {
+  const fallback = BLOG_POSTS.find((p) => p.slug === slug);
+  const fromFallback = fallback ? (kind === "banner" ? fallback.bannerImageUrl || fallback.coverImageUrl : fallback.coverImageUrl) || null : null;
   return tryDb(async () => {
     const db = getDb();
     const [row] = await db
@@ -237,10 +239,21 @@ export async function getBlogImage(slug: string, kind: "cover" | "banner"): Prom
       .from(t)
       .where(eq(t.slug, slug))
       .limit(1);
-    if (!row) return null;
+    if (!row) return fromFallback;
     return (kind === "banner" ? row.banner || row.cover : row.cover) || null;
-  }, null);
+  }, fromFallback);
 }
+
+/**
+ * The TS fallback posts carry their images inline as base64 (that is how the
+ * CMS stores them), which once made /blog a 6 MB page whenever the database
+ * was empty or unreachable. Route them through /api/blog-image like DB rows.
+ */
+const FALLBACK_POSTS: CmsBlogPost[] = BLOG_POSTS.map((p) => ({
+  ...p,
+  coverImageUrl: p.coverImageUrl ? `/api/blog-image/${p.slug}/cover` : null,
+  bannerImageUrl: p.bannerImageUrl ? `/api/blog-image/${p.slug}/banner` : null,
+}));
 
 /* --------------------------------------------------------------------------
    Legal documents. One row per table, written by the admin editors

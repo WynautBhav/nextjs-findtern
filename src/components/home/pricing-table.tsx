@@ -6,8 +6,10 @@ import { Check, X } from "lucide-react";
 import { ButtonLink } from "@/components/ui/button";
 import { formatMoney } from "@/lib/format";
 import { useIsIndia } from "@/components/marketing/region-rates";
-import { PlanPrice } from "@/components/marketing/plan-price";
+import { MonthlyRate } from "@/components/marketing/monthly-rate";
+import { OfferFrame, PlanPrice } from "@/components/marketing/plan-price";
 import type { CmsPlan } from "@/lib/content/types";
+import { planHasOffer } from "@/lib/plan-offer";
 import { cn } from "@/lib/utils";
 
 /* ==========================================================================
@@ -202,9 +204,11 @@ export function PricingTable({
                   wasMinor={plan.compareAtHourlyMinor}
                   currency={currency}
                 />
+                <MonthlyRate hourlyMinor={plan.priceHourlyMinor} currency={currency} className="mt-1" />
                 <p className="mt-1.5 text-sm text-ink-500">
                   {plan.features[0]} · {plan.internshipDuration}
                 </p>
+                {planHasOffer(plan) ? <OfferFrame className="mt-4" /> : null}
 
                 <ul
                   className="mt-5 space-y-2.5 border-t border-ink-100 pt-5"

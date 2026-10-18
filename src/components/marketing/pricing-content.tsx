@@ -9,9 +9,13 @@ import { CountUp } from "@/components/motion/count-up";
 import { FaqExplorer } from "@/components/marketing/faq-explorer";
 import { formatMoney, formatRate } from "@/lib/format";
 import { useRegionBands } from "@/components/marketing/region-rates";
-import { PlanPrice } from "@/components/marketing/plan-price";
+import { MonthlyRate } from "@/components/marketing/monthly-rate";
+import { OfferFrame, PlanPrice } from "@/components/marketing/plan-price";
+import { PricingCalculator } from "@/components/marketing/pricing-calculator";
 import { inrToUsd } from "@/lib/currency";
+import { pricingFaq } from "@/lib/content/pricing-faq";
 import type { CmsPlan } from "@/lib/content/types";
+import { planHasOffer } from "@/lib/plan-offer";
 import { cn } from "@/lib/utils";
 
 /* Region-dependent body of /pricing. Amounts come from the `pricing_plans`
@@ -152,7 +156,9 @@ export function PricingContent({
                     wasMinor={plan?.compareAtHourlyMinor}
                     currency={currency}
                   />
+                  <MonthlyRate hourlyMinor={plan?.priceHourlyMinor ?? band.rateMinor} currency={currency} className="mt-1" />
                   <p className="mt-1.5 text-sm text-ink-500">{band.blurb}</p>
+                  {plan && planHasOffer(plan) ? <OfferFrame className="mt-4" /> : null}
                   <p className="mt-5 flex items-center gap-2 border-t pt-4 text-sm text-ink-700">
                     <Check className="size-4 shrink-0 text-primary" aria-hidden />
                     <PlanPrice
@@ -193,8 +199,21 @@ export function PricingContent({
         </div>
       </PageSection>
 
+      {/* ── Quick calculator ────────────────────────────────────────── */}
+      <PageSection id="calculator">
+        <div className="mx-auto max-w-2xl text-center">
+          <h2 className="text-balance text-3xl font-semibold tracking-[-0.025em] text-ink-900 sm:text-4xl">
+            What does an intern cost per month?
+          </h2>
+          <p className="mt-4 text-lg text-muted-foreground">
+            Pick the plan, the days a week and the hours a day. The arithmetic is shown, so you can check it.
+          </p>
+        </div>
+        <PricingCalculator plansInr={plansInr} plansUsd={plansUsd} className="mt-12" />
+      </PageSection>
+
       {/* ── The comparison matrix ───────────────────────────────────── */}
-      <PageSection>
+      <PageSection tone="muted">
         <div className="mx-auto max-w-2xl text-center">
           <h2 className="text-balance text-3xl font-semibold tracking-[-0.025em] text-ink-900 sm:text-4xl">
             Compare every attribute
@@ -205,7 +224,9 @@ export function PricingContent({
         </div>
 
         <div className="mt-12 overflow-hidden rounded-2xl border border-ink-200 bg-white shadow-sm">
-          <div className="overflow-x-auto">
+          {/* min-w-0 on the scroller: without it the 42rem table widened the
+              section itself on a 390px phone instead of scrolling inside. */}
+          <div className="min-w-0 overflow-x-auto [scrollbar-width:thin]">
             <table className="w-full min-w-[42rem] border-collapse text-left">
               <caption className="sr-only">
                 Findtern hiring plans compared across six attributes. Every plan carries
@@ -377,42 +398,7 @@ export function PricingContent({
           <FaqExplorer
             showSearch={false}
             showChips={false}
-            items={[
-              {
-                id: "p1",
-                category: "Pricing",
-                question: "What is the per-hire fee?",
-                answer: `Every plan carries a fixed ${formatMoney(perHireMinor, currency)} per-hire charge that covers candidate screening, testing, rubric scoring, and ongoing placement management.`,
-              },
-              {
-                id: "p2",
-                category: "Pricing",
-                question: "Can we negotiate the rate?",
-                answer:
-                  "No. The rate is the score band, and the band is the score. Negotiating it would mean the published rate card was not the real one.",
-              },
-              {
-                id: "p3",
-                category: "Pricing",
-                question: "What happens if an intern scores below 6?",
-                answer:
-                  "They still get scored and still appear in the pool. They sit in the Espresso band, which is free to browse with a per-hire charge on anyone you go on to hire.",
-              },
-              {
-                id: "p4",
-                category: "Pricing",
-                question: "Is there a minimum engagement length?",
-                answer:
-                  "The Skilled and Assured bands carry a 160-hour minimum, roughly four full working weeks. Below that neither side gets enough from the placement to make it worth doing.",
-              },
-              {
-                id: "p5",
-                category: "Pricing",
-                question: "Do you charge for the trial period?",
-                answer:
-                  "No. The scope agreed in the proposal is the scope billed. If work happens outside it, it is not billed - the timesheet is the contract.",
-              },
-            ]}
+            items={pricingFaq(formatMoney(perHireMinor, currency))}
           />
         </div>
       </PageSection>

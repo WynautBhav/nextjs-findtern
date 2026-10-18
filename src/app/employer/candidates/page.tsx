@@ -240,7 +240,7 @@ export default async function CandidatesPage({
       />
 
       <form method="get" className="mb-6 rounded-[20px] border border-ink-200/70 bg-white/90 p-5 shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)] backdrop-blur-sm">
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.2fr)_9.5rem_8rem_7.5rem_7.5rem_9.5rem_auto]">
+        <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-[minmax(0,1.2fr)_9.5rem_8rem_7.5rem_7.5rem_minmax(12rem,1fr)_auto]">
           <TextQuery
             defaultValue={filters.q}
             label="Keyword"
@@ -363,7 +363,7 @@ export default async function CandidatesPage({
                     key={size}
                     href={withFilters(filters, { pageSize: size, page: 1 })}
                     className={cn(
-                      "apple-spring rounded-md px-2 py-0.5 text-xs font-medium",
+                      "apple-spring inline-flex min-h-11 min-w-11 items-center justify-center rounded-md px-2 text-xs font-medium",
                       filters.pageSize === size
                         ? "bg-brand-50 text-brand-700 font-semibold ring-1 ring-brand-600/20"
                         : "text-ink-600 hover:bg-ink-100",
@@ -378,7 +378,7 @@ export default async function CandidatesPage({
                 <Link
                   href={withFilters(filters, { view: "grid" })}
                   className={cn(
-                    "apple-spring inline-flex size-7 items-center justify-center rounded-md",
+                    "apple-spring inline-flex size-11 items-center justify-center rounded-md",
                     filters.view === "grid"
                       ? "bg-brand-50 text-brand-700 font-semibold"
                       : "text-ink-500 hover:text-ink-900",
@@ -390,7 +390,7 @@ export default async function CandidatesPage({
                 <Link
                   href={withFilters(filters, { view: "list" })}
                   className={cn(
-                    "apple-spring inline-flex size-7 items-center justify-center rounded-md",
+                    "apple-spring inline-flex size-11 items-center justify-center rounded-md",
                     filters.view === "list"
                       ? "bg-brand-50 text-brand-700 font-semibold"
                       : "text-ink-500 hover:text-ink-900",
@@ -402,7 +402,7 @@ export default async function CandidatesPage({
                 <Link
                   href={withFilters(filters, { view: "table" })}
                   className={cn(
-                    "apple-spring inline-flex size-7 items-center justify-center rounded-md",
+                    "apple-spring inline-flex size-11 items-center justify-center rounded-md",
                     filters.view === "table"
                       ? "bg-brand-50 text-brand-700 font-semibold"
                       : "text-ink-500 hover:text-ink-900",

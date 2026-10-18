@@ -10,6 +10,7 @@ import { hiredInternIds } from "@/lib/employer-visibility";
 import { formatPeriod, normaliseEntries } from "@/lib/employer-timesheets";
 import { StatusPill } from "@/components/employer/timesheet-parts";
 import { EmptyScene } from "@/components/app/primitives";
+import { PageHeader } from "@/components/layout/page-header";
 
 export const metadata: Metadata = {
   title: "Timesheets",
@@ -110,20 +111,14 @@ export default async function EmployerTimesheets() {
 
   return (
     <div>
-      <header className="mb-7 flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
-        <div className="min-w-0 max-w-2xl">
-          <h1 className="text-balance text-2xl font-semibold tracking-[-0.02em] text-ink-900 md:text-3xl">
-            Timesheets
-          </h1>
-          <p className="mt-2 text-pretty text-[0.9375rem] leading-relaxed text-ink-600">
-            Review and approve the hours your interns have logged each month.
-          </p>
-        </div>
-      </header>
+      <PageHeader
+        title="Timesheets"
+        subtitle="Review and approve the hours your interns have logged each month."
+      />
 
       <div className="mb-6 grid grid-cols-3 gap-2 sm:gap-4">
         <Stat label="Awaiting review" value={awaitingReview} tone="warning" />
-        <Stat label="Total timesheets" value={rows.length} />
+        <Stat label="Total" value={rows.length} />
         <Stat
           label="Closed"
           value={rows.filter((row) => CLOSED.has(row.status)).length}
@@ -164,13 +159,16 @@ export default async function EmployerTimesheets() {
                   ) : null}
                 </div>
 
-                <p className="text-xs tabular-nums text-text-subtle">
-                  {row.loggedDays} day{row.loggedDays === 1 ? "" : "s"} logged
-                </p>
+                <div className="flex w-full items-center justify-between gap-3 sm:w-auto sm:justify-end sm:gap-4">
+                  <p className="text-xs tabular-nums text-text-subtle">
+                    {row.loggedDays} day{row.loggedDays === 1 ? "" : "s"} logged
+                  </p>
 
-                <StatusPill status={row.status} />
-
-                <ArrowRight className="size-4 shrink-0 text-ink-400" aria-hidden />
+                  <span className="flex items-center gap-3">
+                    <StatusPill status={row.status} />
+                    <ArrowRight className="size-4 shrink-0 text-ink-400" aria-hidden />
+                  </span>
+                </div>
               </Link>
             </li>
           ))}
@@ -197,7 +195,7 @@ function Stat({
         : "text-ink-900";
   return (
     <div className="apple-spring rounded-[16px] border border-ink-200/70 bg-white p-3 shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)] sm:rounded-[20px] sm:p-5">
-      <p className="truncate text-[11px] text-text-subtle sm:text-sm">{label}</p>
+      <p className="text-pretty text-[11px] leading-tight text-text-subtle sm:text-sm sm:leading-normal">{label}</p>
       <p className={`mt-0.5 text-lg font-semibold tabular-nums tracking-tight sm:mt-1 sm:text-3xl ${valueTone}`}>{value}</p>
     </div>
   );

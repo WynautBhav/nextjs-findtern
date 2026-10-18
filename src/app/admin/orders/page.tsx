@@ -60,7 +60,7 @@ export default async function AdminOrdersPage() {
   return (
     <div className="space-y-6">
       <AdminPageHeader
-        title="Orders"
+        title="Employer Orders"
         subtitle="Manage employer checkout orders, settlement transactions and invoices."
       />
 

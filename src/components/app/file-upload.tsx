@@ -65,7 +65,7 @@ export function FileUpload({
         <label
           htmlFor={id}
           className={cn(
-            "inline-flex min-h-11 cursor-pointer items-center gap-1.5 rounded-[10px] border border-ink-200 bg-white px-3 text-xs font-semibold text-ink-800 shadow-2xs hover:bg-ink-50 focus-within:ring-2 focus-within:ring-brand-500/30",
+            "inline-flex min-h-11 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-[10px] border border-ink-200 bg-white px-3 text-xs font-semibold text-ink-800 shadow-2xs hover:bg-ink-50 focus-within:ring-2 focus-within:ring-brand-500/30",
             state === "busy" && "pointer-events-none opacity-60",
           )}
         >

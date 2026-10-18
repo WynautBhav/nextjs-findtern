@@ -5,11 +5,13 @@ import { PageHero } from "@/components/marketing/page-hero";
 import { RoleCard } from "@/components/marketing/role-card";
 import { ButtonLink } from "@/components/ui/button";
 import { openProjects } from "@/lib/intern-data";
+import { JsonLd } from "@/components/seo/json-ld";
+import { breadcrumbJsonLd, webPageJsonLd } from "@/lib/seo";
 
 export const metadata: Metadata = {
-  title: "Open internships and roles",
+  title: "Open Internships in India: Live Roles on Findtern",
   description:
-    "Every role currently open on Findtern. Browse the brief, the skills and the company without an account.",
+    "Every internship currently open on Findtern, posted by verified companies. Browse the brief, the skills and the company without an account.",
   alternates: { canonical: "/opportunities" },
 };
 
@@ -32,6 +34,12 @@ export default async function PublicOpportunities() {
 
   return (
     <div>
+      <JsonLd
+        data={[
+          webPageJsonLd({ path: "/opportunities", name: "Open internships on Findtern", description: String(metadata.description), type: "CollectionPage" }),
+          breadcrumbJsonLd([{ name: "Open roles", path: "/opportunities" }]),
+        ]}
+      />
       <PageHero
         eyebrow="Open roles"
         title="Everything hiring on Findtern right now."

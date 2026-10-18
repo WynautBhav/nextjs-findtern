@@ -28,13 +28,13 @@ export function ApprovalSelect({ internId, value }: { internId: string; value: s
   }
 
   return (
-    <label className="inline-flex items-center gap-2 text-xs font-medium text-ink-700">
+    <label className="inline-flex items-center gap-2 whitespace-nowrap text-[13px] font-medium text-ink-700">
       Review
       <select
         value={v}
         disabled={state === "saving"}
         onChange={(e) => change(e.target.value)}
-        className="h-10 rounded-[10px] border border-ink-200 bg-white px-2.5 text-xs font-semibold text-ink-800"
+        className="min-h-11 rounded-[10px] border border-ink-200 bg-white px-2.5 text-[14px] font-medium text-ink-800"
       >
         {OPTIONS.map((o) => (
           <option key={o}>{o}</option>

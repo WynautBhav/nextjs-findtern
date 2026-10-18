@@ -23,11 +23,14 @@ export function ShortlistToggle({
   projectId,
   shortlisted,
   size = "md",
+  className,
 }: {
   internId: string;
   projectId: string;
   shortlisted: boolean;
   size?: "sm" | "md";
+  /** Applied to the wrapper; the button always fills it. */
+  className?: string;
 }) {
   const router = useRouter();
   const [state, setState] = useState(shortlisted);
@@ -62,7 +65,7 @@ export function ShortlistToggle({
   const pad = size === "sm" ? "min-h-11 px-3 text-[13px]" : "min-h-11 px-4 text-sm";
 
   return (
-    <span className="inline-flex min-w-0 flex-col items-start gap-1">
+    <span className={`inline-flex min-w-0 flex-col items-stretch gap-1 ${className ?? ""}`}>
       <button
         type="button"
         onClick={toggle}
@@ -70,8 +73,8 @@ export function ShortlistToggle({
         aria-pressed={state}
         className={
           state
-            ? `apple-spring apple-pressable inline-flex ${pad} items-center justify-center gap-1.5 rounded-[10px] border border-brand-300 bg-brand-50 font-medium text-brand-800 disabled:opacity-60`
-            : `apple-spring apple-pressable inline-flex ${pad} items-center justify-center gap-1.5 rounded-[10px] border border-ink-200 bg-white font-medium text-ink-800 hover:bg-ink-50 disabled:opacity-60`
+            ? `apple-spring apple-pressable inline-flex w-full ${pad} items-center justify-center gap-1.5 rounded-[10px] border border-brand-300 bg-brand-50 font-medium text-brand-800 disabled:opacity-60`
+            : `apple-spring apple-pressable inline-flex w-full ${pad} items-center justify-center gap-1.5 rounded-[10px] border border-ink-200 bg-white font-medium text-ink-800 hover:bg-ink-50 disabled:opacity-60`
         }
       >
         {busy ? (

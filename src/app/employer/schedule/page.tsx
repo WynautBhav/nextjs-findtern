@@ -157,7 +157,7 @@ export default async function EmployerSchedule() {
                         href={`/employer/intern/${encodeURIComponent(i.internId)}`}
                         variant="outline"
                         size="sm"
-                        className="min-h-9 px-3 text-xs font-medium"
+                        className="min-h-11 px-3 text-xs font-medium"
                       >
                         Profile
                       </ButtonLink>
@@ -166,7 +166,7 @@ export default async function EmployerSchedule() {
                           href={i.meetingLink}
                           variant="outline"
                           size="sm"
-                          className="min-h-9 px-3 text-xs font-medium"
+                          className="min-h-11 px-3 text-xs font-medium"
                         >
                           Join meeting
                         </ButtonLink>

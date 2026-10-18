@@ -26,7 +26,8 @@ export function CompanyControls({ id, isActive, fteStatus }: { id: string; isAct
     else router.refresh();
   }
 
-  const btn = "inline-flex min-h-10 items-center rounded-[10px] border px-3 text-xs font-semibold disabled:opacity-50";
+  const btn =
+    "apple-spring apple-pressable inline-flex min-h-11 items-center whitespace-nowrap rounded-[10px] border px-3.5 text-[14px] font-medium disabled:opacity-50";
   return (
     <div className="flex flex-wrap items-center gap-2">
       <button
@@ -47,13 +48,14 @@ export function CompanyControls({ id, isActive, fteStatus }: { id: string; isAct
           </button>
         </>
       ) : (
-        <span className="text-xs text-text-subtle">International FTE: {fteStatus}</span>
+        <span className="text-[13px] text-text-subtle">International FTE: {fteStatus}</span>
       )}
+      {/* Destructive action sits last and at the far end of the row. */}
       <button
         type="button"
         disabled={busy}
         onClick={() => window.confirm("Delete this employer permanently?") && call("DELETE")}
-        className={`${btn} border-transparent text-danger hover:bg-danger-soft`}
+        className={`${btn} border-transparent text-danger hover:bg-danger-soft sm:ml-auto`}
       >
         Delete
       </button>

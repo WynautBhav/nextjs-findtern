@@ -200,7 +200,7 @@ export default async function AdminInterns({
   return (
     <div>
       <AdminPageHeader
-        title="Interns"
+        title="Candidate Directory"
         subtitle="Every registered intern, their profile state, and directory visibility."
         action={
           <div className="flex flex-wrap items-center gap-2">
@@ -244,7 +244,7 @@ export default async function AdminInterns({
             ) : (
               <>
                 <Table>
-                  <TableHeader className="apple-material-bar sticky top-0 z-10">
+                  <TableHeader className="apple-material-bar">
                     <TableRow className="group/row hover:bg-transparent">
                       <TableHead scope="col" className="w-10 px-3 py-3">
                         <SelectAllCheckbox
@@ -292,6 +292,13 @@ export default async function AdminInterns({
                               <p className="mt-0.5 truncate text-[13px] text-text-subtle">
                                 {row.email} · Joined{" "}
                                 {row.createdAt ? formatDate(row.createdAt) : "-"}
+                              </p>
+                              {/* The Pipeline column is hidden below md; the same
+                                  numbers ride along here so phones still see them. */}
+                              <p className="mt-0.5 text-[12px] tabular-nums text-text-subtle md:hidden">
+                                <span className="font-semibold text-ink-800">{row.proposalCount}</span> proposals
+                                <span aria-hidden className="mx-1.5 text-ink-300">→</span>
+                                <span className="font-semibold text-ink-800">{row.interviewCount}</span> interviews
                               </p>
                             </div>
                           </div>

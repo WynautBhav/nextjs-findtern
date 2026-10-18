@@ -123,7 +123,9 @@ export function TableToolbar({
     <>
       <div className="flex flex-wrap items-center gap-2.5">
         {/* Search -------------------------------------------------------- */}
-        <div className="relative min-w-0 flex-1 sm:max-w-xs">
+        {/* `min-w-[12rem]` keeps the box a real search field when the row is
+            tight; it wraps to its own line instead of collapsing to the icon. */}
+        <div className="relative w-full min-w-[12rem] flex-1 sm:w-auto sm:max-w-xs">
           <Search
             aria-hidden
             className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-ink-400"
@@ -141,7 +143,7 @@ export function TableToolbar({
             }}
             placeholder={searchPlaceholder}
             aria-label={searchPlaceholder}
-            className="h-9 w-full rounded-[10px] border border-ink-200 bg-white pr-8 pl-9 text-sm text-ink-900 placeholder:text-ink-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 focus:outline-none [&::-webkit-search-cancel-button]:hidden"
+            className="h-9 w-full rounded-[10px] border border-ink-200 bg-white pr-8 pl-9 text-sm text-ink-900 placeholder:text-ink-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 focus:outline-none max-lg:min-h-11 [&::-webkit-search-cancel-button]:hidden"
           />
           {term ? (
             <button
@@ -175,7 +177,7 @@ export function TableToolbar({
                 value={value}
                 onChange={(e) => setParam(filter.key, e.target.value || null)}
                 className={cn(
-                  "apple-spring h-9 cursor-pointer rounded-[10px] border bg-white px-2.5 pr-7 text-sm focus:ring-2 focus:ring-brand-500/20 focus:outline-none",
+                  "apple-spring h-9 cursor-pointer rounded-[10px] border bg-white px-2.5 pr-7 text-sm focus:ring-2 focus:ring-brand-500/20 focus:outline-none max-lg:min-h-11",
                   value
                     ? "border-brand-300 font-medium text-brand-800"
                     : "border-ink-200 text-ink-700",
@@ -197,7 +199,7 @@ export function TableToolbar({
         {exportHref ? (
           <a
             href={exportHref}
-            className="apple-spring apple-pressable ml-auto inline-flex h-9 items-center gap-1.5 rounded-[10px] border border-ink-200 bg-white px-3 text-sm font-medium text-ink-700 hover:bg-ink-50"
+            className="apple-spring apple-pressable ml-auto inline-flex h-9 items-center gap-1.5 rounded-[10px] border border-ink-200 bg-white px-3 text-sm font-medium text-ink-700 hover:bg-ink-50 max-lg:min-h-11"
           >
             CSV
           </a>

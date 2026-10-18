@@ -2,8 +2,7 @@ import type { Metadata } from "next";
 import { desc, ilike, count, eq } from "drizzle-orm";
 
 import { getDb, schema } from "@/lib/db";
-import { PageHeader } from "@/components/layout/page-header";
-import { Panel, PanelHeader, PanelBody } from "@/components/admin/panel";
+import { AdminEmpty, AdminPageHeader, Panel, PanelHeader, PanelBody } from "@/components/admin/panel";
 import { NotificationComposer } from "@/components/admin/notification-composer";
 
 export const metadata: Metadata = { title: "Notifications" };
@@ -91,8 +90,8 @@ export default async function AdminNotifications({
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="Notifications"
+      <AdminPageHeader
+        title="Send Notification"
         subtitle="Send one message to candidates, companies, or both. Every send is listed below."
       />
 
@@ -109,7 +108,10 @@ export default async function AdminNotifications({
         />
         <PanelBody className="p-0">
           {history.length === 0 ? (
-            <p className="px-5 py-4 text-sm text-ink-500">Nothing sent yet.</p>
+            <AdminEmpty
+              title="Nothing sent yet"
+              body="Notifications you send from the composer above will be listed here."
+            />
           ) : (
             <ul className="divide-y divide-ink-100">
               {history.map((n) => (

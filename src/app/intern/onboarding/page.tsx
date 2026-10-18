@@ -61,7 +61,7 @@ export default async function InternOnboarding() {
     <div>
       <PageHead
         title="Complete your profile"
-        lede="Employers shortlist on what is filled in here. Five short steps."
+        lede="Employers shortlist on what is filled in here. Eight short steps."
       />
       <OnboardingForm
         initial={draft}

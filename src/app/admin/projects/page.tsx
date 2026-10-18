@@ -91,7 +91,7 @@ export default async function AdminProjectsPage({
   return (
     <div className="apple-admin space-y-4">
       <AdminPageHeader
-        title="Projects"
+        title="Work Projects"
         subtitle="Listings, demand and full-time potential."
         action={
           <a

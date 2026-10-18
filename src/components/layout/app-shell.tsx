@@ -32,6 +32,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { breadcrumbsFor } from "@/lib/breadcrumbs";
 import { csrfFetch } from "@/lib/client-fetch";
 import { Logo } from "@/components/brand/logo";
 
@@ -88,11 +89,10 @@ export function AppShell({
     },
   ];
 
-  const crumbs = pathname
-    .split("/")
-    .filter(Boolean)
-    .slice(1)
-    .map((part) => part.replace(/[-_]/g, " ").replace(/^\w/, (c) => c.toUpperCase()));
+  const crumbs = breadcrumbsFor(
+    pathname,
+    Object.fromEntries(resolvedGroups.flatMap((g) => g.items.map((i) => [i.href, i.label]))),
+  );
 
   const navContent = (
     <div className="flex flex-col gap-6">
@@ -203,12 +203,10 @@ export function AppShell({
                 className="flex w-72 flex-col bg-brand-950 p-5 text-white border-r border-white/10"
               >
                 <SheetHeader className="flex flex-row items-center justify-between">
-                  <SheetTitle className="text-white text-base font-semibold flex items-center gap-2">
-                    <span className="grid size-6 place-items-center rounded bg-brand-700 text-white font-bold text-xs">
-                      F
-                    </span>
-                    <span>
-                      Findtern <span className="text-accent-400">{brand}</span>
+                  <SheetTitle className="flex items-center gap-2.5 text-white">
+                    <Logo variant="white" alt={`Findtern ${brand}`} className="h-6" />
+                    <span className="rounded-full border border-accent-400/30 bg-accent-500/15 px-2 py-0.5 text-2xs font-bold uppercase tracking-wider text-accent-400">
+                      {brand}
                     </span>
                   </SheetTitle>
                   <button
@@ -267,32 +265,32 @@ export function AppShell({
 
         {/* Desktop top bar with breadcrumbs and user shortcuts */}
         <header className="sticky top-0 z-20 hidden items-center justify-between border-b border-ink-200/80 bg-white/95 px-8 py-3.5 backdrop-blur-md lg:flex shadow-2xs">
-          <nav aria-label="Breadcrumb navigation" className="flex items-center gap-1.5 text-[13px] text-text-subtle">
+          <nav aria-label="Breadcrumb navigation" className="flex min-w-0 items-center gap-1.5 text-[13px] text-text-subtle">
             <Link
               href="/employer/dashboard"
-              className="apple-spring inline-flex min-h-7 items-center font-medium text-ink-600 hover:text-brand-700"
+              className="apple-spring inline-flex min-h-7 shrink-0 items-center font-medium text-ink-600 hover:text-brand-700"
             >
               Console
             </Link>
             {crumbs.map((crumb, index) => (
-              <span key={`${crumb}-${index}`} className="flex items-center gap-1.5">
+              <span key={crumb.href} className="flex min-w-0 items-center gap-1.5">
                 <span aria-hidden className="text-ink-300">
                   /
                 </span>
-                <span
-                  className={
-                    index === crumbs.length - 1
-                      ? "font-semibold text-ink-900"
-                      : "font-medium text-ink-600"
-                  }
-                >
-                  {crumb}
-                </span>
+                {index === crumbs.length - 1 ? (
+                  <span className="truncate font-semibold text-ink-900">{crumb.label}</span>
+                ) : !crumb.link ? (
+                  <span className="truncate font-medium text-ink-600">{crumb.label}</span>
+                ) : (
+                  <Link href={crumb.href} className="apple-spring truncate font-medium text-ink-600 hover:text-brand-700">
+                    {crumb.label}
+                  </Link>
+                )}
               </span>
             ))}
           </nav>
 
-          <div className="flex items-center gap-3">
+          <div className="flex shrink-0 items-center gap-3">
             <Link
               href="/employer/cart"
               className="apple-spring apple-pressable inline-flex min-h-11 items-center gap-1.5 rounded-[10px] border border-ink-200 bg-white px-3 text-[13px] font-medium text-ink-700 shadow-2xs hover:border-ink-300 hover:bg-ink-50"
@@ -374,8 +372,9 @@ export function AppShell({
           </div>
         </header>
 
-        {/* Content body */}
-        <main className="mx-auto min-w-0 w-full max-w-[84rem] flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+        {/* Content body. Bottom padding clears the floating chat launcher so
+            the last row of a table or a right-aligned CTA is never under it. */}
+        <main className="mx-auto min-w-0 w-full max-w-[84rem] flex-1 px-4 pb-24 pt-6 sm:px-6 lg:px-8 lg:pb-24 lg:pt-8">
           {children}
         </main>
       </div>

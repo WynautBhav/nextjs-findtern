@@ -14,6 +14,7 @@ import {
   Users,
 } from "lucide-react";
 import { FullTimeOfferButton } from "@/components/employer/full-time-offer-button";
+import { PageHeader } from "@/components/layout/page-header";
 
 import { formatCurrency, formatDate, formatMoney } from "@/lib/format";
 import type { EmployerPayment, Proposal } from "@/lib/db/schema";
@@ -102,61 +103,55 @@ export function OrdersManager({
 
   return (
     <div className="space-y-6">
-      {/* Page Title & Subtitle */}
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-b border-ink-100 pb-5">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-ink-900">
-            Orders & Payments
-          </h1>
-          <p className="mt-1 text-sm text-text-subtle">
-            Manage your hired placements, invoice downloads, and upcoming monthly stipends.
-          </p>
-        </div>
-
-        <Link
-          href="/employer/cart"
-          className="apple-spring apple-pressable inline-flex min-h-11 items-center gap-2 rounded-[10px] bg-brand-700 px-4 text-xs font-semibold text-white shadow-xs hover:bg-brand-600"
-        >
-          <CreditCard className="size-4" />
-          <span>Checkout Active Hires</span>
-        </Link>
-      </div>
+      <PageHeader
+        title="Orders & Payments"
+        subtitle="Manage your hired placements, invoice downloads, and upcoming monthly stipends."
+        action={
+          <Link
+            href="/employer/cart"
+            className="apple-spring apple-pressable inline-flex min-h-11 items-center gap-2 whitespace-nowrap rounded-[10px] bg-brand-700 px-4 text-xs font-semibold text-white shadow-xs hover:bg-brand-600"
+          >
+            <CreditCard className="size-4" />
+            <span>Checkout Active Hires</span>
+          </Link>
+        }
+      />
 
       {/* Tabs strip */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="inline-flex rounded-[10px] border border-ink-200/80 bg-white p-1 shadow-2xs">
+        <div className="flex max-w-full min-w-0 overflow-x-auto rounded-[10px] border border-ink-200/80 bg-white p-1 shadow-2xs">
           <button
             type="button"
             onClick={() => setActiveTab("hired")}
-            className={`apple-spring apple-pressable min-h-11 rounded-[10px] px-3.5 text-xs font-medium ${
+            className={`apple-spring apple-pressable min-h-11 shrink-0 whitespace-nowrap rounded-[10px] px-3.5 text-xs font-medium tabular-nums ${
               activeTab === "hired"
                 ? "bg-brand-700 text-white shadow-2xs font-semibold"
                 : "text-ink-600 hover:text-ink-900"
             }`}
           >
-            Hired Candidates ({hiredCandidates.length})
+            Hired ({hiredCandidates.length})
           </button>
           <button
             type="button"
             onClick={() => setActiveTab("history")}
-            className={`apple-spring apple-pressable min-h-11 rounded-[10px] px-3.5 text-xs font-medium ${
+            className={`apple-spring apple-pressable min-h-11 shrink-0 whitespace-nowrap rounded-[10px] px-3.5 text-xs font-medium tabular-nums ${
               activeTab === "history"
                 ? "bg-brand-700 text-white shadow-2xs font-semibold"
                 : "text-ink-600 hover:text-ink-900"
             }`}
           >
-            Order & Invoice History ({paymentHistory.length})
+            Invoices ({paymentHistory.length})
           </button>
           <button
             type="button"
             onClick={() => setActiveTab("upcoming")}
-            className={`apple-spring apple-pressable min-h-11 rounded-[10px] px-3.5 text-xs font-medium ${
+            className={`apple-spring apple-pressable min-h-11 shrink-0 whitespace-nowrap rounded-[10px] px-3.5 text-xs font-medium ${
               activeTab === "upcoming"
                 ? "bg-brand-700 text-white shadow-2xs font-semibold"
                 : "text-ink-600 hover:text-ink-900"
             }`}
           >
-            Upcoming Payments Schedule
+            Upcoming
           </button>
         </div>
 
@@ -203,7 +198,7 @@ export function OrdersManager({
                 <button
                   type="button"
                   onClick={exportTimesheetsCsv}
-                  className="apple-spring apple-pressable inline-flex min-h-9 items-center justify-center gap-1.5 rounded-[10px] border border-ink-200 bg-white px-3 text-xs font-semibold text-ink-700 shadow-2xs hover:border-brand-400 hover:text-brand-800"
+                  className="apple-spring apple-pressable inline-flex min-h-11 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-[10px] border border-ink-200 bg-white px-3 text-xs font-semibold text-ink-700 shadow-2xs hover:border-brand-400 hover:text-brand-800"
                 >
                   <Download className="size-3.5" />
                   <span>Export Timesheet CSV</span>

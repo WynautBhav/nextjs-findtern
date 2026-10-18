@@ -99,9 +99,9 @@ export function NotificationComposer({
   }
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[22rem_minmax(0,1fr)]">
+    <div className="grid gap-6 xl:grid-cols-[22rem_minmax(0,1fr)]">
       <div className="rounded-xl border border-ink-200 bg-white p-5">
-        <div className="flex gap-1 rounded-lg bg-ink-100 p-1">
+        <div className="flex gap-0.5 rounded-[10px] bg-ink-100 p-1">
           {(["intern", "employer"] as const).map((value) => (
             <button
               key={value}
@@ -113,8 +113,8 @@ export function NotificationComposer({
               aria-pressed={audience === value}
               className={
                 audience === value
-                  ? "flex-1 rounded-md bg-white px-3 py-1.5 text-sm font-medium text-ink-900 shadow-xs"
-                  : "flex-1 rounded-md px-3 py-1.5 text-sm font-medium text-ink-600 transition-colors hover:text-ink-900"
+                  ? "apple-spring apple-pressable inline-flex min-h-11 flex-1 items-center justify-center whitespace-nowrap rounded-[8px] bg-white px-3 text-[14px] font-medium text-ink-900 shadow-xs"
+                  : "apple-spring apple-pressable inline-flex min-h-11 flex-1 items-center justify-center whitespace-nowrap rounded-[8px] px-3 text-[14px] font-medium text-ink-500 hover:text-ink-800"
               }
             >
               {value === "intern" ? "Candidates" : "Companies"}
@@ -129,7 +129,7 @@ export function NotificationComposer({
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search this list"
             aria-label="Search recipients"
-            className="h-9 w-full rounded-lg border border-ink-200 bg-white pl-9 pr-3 text-sm text-ink-900 outline-none placeholder:text-ink-400 focus-visible:border-brand-600"
+            className="h-9 w-full rounded-lg border border-ink-200 bg-white pl-9 pr-3 text-sm text-ink-900 outline-none placeholder:text-ink-400 focus-visible:border-brand-600 max-lg:min-h-11"
           />
         </div>
 
@@ -178,7 +178,7 @@ export function NotificationComposer({
       </div>
 
       <div className="rounded-xl border border-ink-200 bg-white p-5">
-        <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_10rem]">
+        <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_10rem]">
           <div>
             <label htmlFor="notif-title" className="block text-sm font-medium text-ink-800">
               Title
@@ -188,7 +188,7 @@ export function NotificationComposer({
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Timesheets are open for this month"
-              className="mt-1.5 h-10 w-full rounded-lg border border-ink-200 bg-white px-3.5 text-sm text-ink-900 outline-none placeholder:text-ink-400 focus-visible:border-brand-600"
+              className="mt-1.5 min-h-11 w-full rounded-lg border border-ink-200 bg-white px-3.5 text-sm text-ink-900 outline-none placeholder:text-ink-400 focus-visible:border-brand-600"
             />
           </div>
           <div>
@@ -199,7 +199,7 @@ export function NotificationComposer({
               id="notif-type"
               value={type}
               onChange={(e) => setType(e.target.value)}
-              className="mt-1.5 h-10 w-full rounded-lg border border-ink-200 bg-white px-3.5 text-sm text-ink-900 outline-none focus-visible:border-brand-600"
+              className="mt-1.5 min-h-11 w-full rounded-lg border border-ink-200 bg-white px-3.5 text-sm text-ink-900 outline-none focus-visible:border-brand-600"
             >
               <option value="custom">Custom</option>
               <option value="announcement">Announcement</option>
@@ -225,7 +225,7 @@ export function NotificationComposer({
             type="button"
             onClick={send}
             disabled={busy}
-            className="inline-flex h-10 items-center gap-2 rounded-lg bg-brand-700 px-5 text-sm font-semibold text-white transition-colors hover:bg-brand-600 disabled:opacity-60"
+            className="apple-spring apple-pressable inline-flex min-h-11 items-center gap-2 rounded-[10px] bg-brand-700 px-5 text-sm font-semibold text-white hover:bg-brand-600 disabled:opacity-60"
           >
             {busy ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
             Send to {picked.size}

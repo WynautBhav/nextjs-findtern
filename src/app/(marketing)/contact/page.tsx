@@ -4,17 +4,25 @@ import { Clock, Mail, MapPin } from "lucide-react";
 import { PageHero, PageSection } from "@/components/marketing/page-hero";
 import { ContactForm } from "@/components/marketing/contact-form";
 import { SITE, getGmailComposeUrl } from "@/lib/content/site";
+import { JsonLd } from "@/components/seo/json-ld";
+import { breadcrumbJsonLd, webPageJsonLd } from "@/lib/seo";
 
 export const metadata: Metadata = {
-  title: "Contact",
+  title: "Contact Findtern",
   description:
-    "Ask Findtern anything - hiring, interning, or a question about the rate card. Every message is read by a person.",
+    "Ask Findtern anything about hiring an intern, getting an internship, or how the rate card works. Jaipur, India. Every message is read by a person.",
   alternates: { canonical: "/contact" },
 };
 
 export default function ContactPage() {
   return (
     <>
+      <JsonLd
+        data={[
+          webPageJsonLd({ path: "/contact", name: "Contact Findtern", description: String(metadata.description), type: "ContactPage" }),
+          breadcrumbJsonLd([{ name: "Contact", path: "/contact" }]),
+        ]}
+      />
       <PageHero
         eyebrow="Contact"
         title={

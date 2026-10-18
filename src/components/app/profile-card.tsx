@@ -146,8 +146,8 @@ export function ProfileCard({
       <div className="pointer-events-none absolute -bottom-12 -left-12 size-48 rounded-full bg-brand-500/20 blur-2xl" />
 
       {/* Top row: Avatar + Verified Badge + Status Tag */}
-      <div className="relative z-10 flex items-start justify-between gap-3">
-        <div className="flex items-center gap-3.5">
+      <div className="relative z-10 flex flex-wrap items-start justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3.5">
           <div className="relative">
             <span className="grid size-14 place-items-center rounded-[14px] bg-gradient-to-br from-brand-700/60 to-emerald-600/40 text-lg font-bold tracking-[-0.01em] text-white ring-1 ring-white/20 shadow-[0_4px_16px_rgb(0_0_0/0.3)]">
               {initials}
@@ -160,7 +160,7 @@ export function ProfileCard({
           <div className="min-w-0">
             <Pill
               tone="neutral"
-              className="border border-white/15 bg-white/10 text-accent-300 backdrop-blur-xs"
+              className="whitespace-nowrap border border-white/15 bg-white/10 text-accent-300 backdrop-blur-xs"
             >
               <UserCheck className="size-3 text-accent-400" aria-hidden />
               <span>Verified candidate</span>
@@ -174,7 +174,7 @@ export function ProfileCard({
           </div>
         </div>
 
-        <div className="rounded-[10px] bg-white/10 border border-white/15 px-3 py-1.5 backdrop-blur-xs text-right">
+        <div className="shrink-0 whitespace-nowrap rounded-[10px] border border-white/15 bg-white/10 px-3 py-1.5 text-right backdrop-blur-xs">
           <span className="text-xs uppercase tracking-wider text-accent-300 font-semibold block">
             Status
           </span>

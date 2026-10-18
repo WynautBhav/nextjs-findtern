@@ -6,17 +6,26 @@ import { ButtonLink } from "@/components/ui/button";
 import { FaqExplorer } from "@/components/marketing/faq-explorer";
 import { FAQ_INTERN, FAQ_EMPLOYER } from "@/lib/content/faq";
 import { SITE } from "@/lib/content/site";
+import { JsonLd } from "@/components/seo/json-ld";
+import { breadcrumbJsonLd, faqJsonLd, webPageJsonLd } from "@/lib/seo";
 
 export const metadata: Metadata = {
-  title: "Frequently asked questions",
+  title: "Internship FAQ for Employers and Interns",
   description:
-    `${FAQ_INTERN.length + FAQ_EMPLOYER.length} answers on screening, scoring, the rate card, the guarantee, timesheets and payment - split by whether you are hiring or looking.`,
+    `${FAQ_INTERN.length + FAQ_EMPLOYER.length} answers on intern screening, the Findtern Score, the rate card, the placement guarantee, timesheets and payment - split by whether you are hiring or looking.`,
   alternates: { canonical: "/faq" },
 };
 
 export default function FaqPage() {
   return (
     <>
+      <JsonLd
+        data={[
+          webPageJsonLd({ path: "/faq", name: "Findtern FAQ", description: String(metadata.description), type: "FAQPage" }),
+          breadcrumbJsonLd([{ name: "FAQ", path: "/faq" }]),
+          faqJsonLd([...FAQ_EMPLOYER, ...FAQ_INTERN]),
+        ]}
+      />
       <PageHero
         eyebrow="FAQ"
         title={

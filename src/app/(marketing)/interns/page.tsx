@@ -19,11 +19,13 @@ import { CountUp } from "@/components/motion/count-up";
 import { FaqExplorer } from "@/components/marketing/faq-explorer";
 import { BANDS } from "@/lib/score";
 import { BandRate } from "@/components/marketing/region-rates";
+import { JsonLd } from "@/components/seo/json-ld";
+import { breadcrumbJsonLd, faqJsonLd, howToJsonLd, webPageJsonLd } from "@/lib/seo";
 
 export const metadata: Metadata = {
-  title: "For interns",
+  title: "Paid Internships in India with a Placement Guarantee | For Interns",
   description:
-    "One assessment produces a Findtern Score you can see the working for. That score sets the rate employers pay - and if we do not place you, your deposit comes back.",
+    "Get assessed once, get a Findtern Score you can see the working for, and get placed in a paid internship. If Findtern does not place you within the guarantee window, your deposit comes back.",
   alternates: { canonical: "/interns" },
 };
 
@@ -78,9 +80,60 @@ const GUARANTEES = [
   },
 ];
 
+const INTERN_FAQ = [
+    {
+      id: "i1",
+      category: "Getting started",
+      question: "Is Findtern free for interns?",
+      answer:
+        "Creating a profile is free. Making it live and visible to employers requires a refundable deposit, which is returned if we do not place you within the guarantee window.",
+    },
+    {
+      id: "i2",
+      category: "Scoring",
+      question: "What happens if my score is low?",
+      answer:
+        "You sit in a lower rate band, which means fewer employers see you because the filter starts higher up the pool. You are not flagged, and you are not blocked from re-scoring.",
+    },
+    {
+      id: "i3",
+      category: "Guarantee",
+      question: "What are the three refund conditions?",
+      answer:
+        "One: your assessment is scored. Two: you stay reachable and respond to employer requests. Three: you do not decline an offer you asked for. Failing any one ends the obligation - in your favour, not the platform's.",
+    },
+    {
+      id: "i4",
+      category: "Payment",
+      question: "When do I get paid?",
+      answer:
+        "You log hours weekly against the agreed scope. Your manager approves the week, and approved hours roll into the next payment run on a fixed cycle.",
+    },
+    {
+      id: "i5",
+      category: "Privacy",
+      question: "Who can see my contact details?",
+      answer:
+        "Nobody, until you respond to them. Employers see your score, skills, availability and work samples - not your phone number or email.",
+    },
+];
+
 export default function InternsPage() {
   return (
     <>
+      <JsonLd
+        data={[
+          webPageJsonLd({ path: "/interns", name: "Paid internships with Findtern", description: String(metadata.description) }),
+          breadcrumbJsonLd([{ name: "For interns", path: "/interns" }]),
+          howToJsonLd({
+            name: "How to get a paid internship through Findtern",
+            description: "Five stages from sign-up to a paid, contracted placement. About 31 minutes of hands-on time.",
+            totalTime: "PT31M",
+            steps: STEPS.map((s) => ({ name: s.title, text: s.body })),
+          }),
+          faqJsonLd(INTERN_FAQ),
+        ]}
+      />
       <PageHero
         eyebrow="For interns"
         title={
@@ -236,43 +289,7 @@ export default function InternsPage() {
           <FaqExplorer
             showSearch={false}
             showChips={false}
-            items={[
-              {
-                id: "i1",
-                category: "Getting started",
-                question: "Is Findtern free for interns?",
-                answer:
-                  "Creating a profile is free. Making it live and visible to employers requires a refundable deposit, which is returned if we do not place you within the guarantee window.",
-              },
-              {
-                id: "i2",
-                category: "Scoring",
-                question: "What happens if my score is low?",
-                answer:
-                  "You sit in a lower rate band, which means fewer employers see you because the filter starts higher up the pool. You are not flagged, and you are not blocked from re-scoring.",
-              },
-              {
-                id: "i3",
-                category: "Guarantee",
-                question: "What are the three refund conditions?",
-                answer:
-                  "One: your assessment is scored. Two: you stay reachable and respond to employer requests. Three: you do not decline an offer you asked for. Failing any one ends the obligation - in your favour, not the platform's.",
-              },
-              {
-                id: "i4",
-                category: "Payment",
-                question: "When do I get paid?",
-                answer:
-                  "You log hours weekly against the agreed scope. Your manager approves the week, and approved hours roll into the next payment run on a fixed cycle.",
-              },
-              {
-                id: "i5",
-                category: "Privacy",
-                question: "Who can see my contact details?",
-                answer:
-                  "Nobody, until you respond to them. Employers see your score, skills, availability and work samples - not your phone number or email.",
-              },
-            ]}
+            items={INTERN_FAQ}
           />
         </div>
       </PageSection>

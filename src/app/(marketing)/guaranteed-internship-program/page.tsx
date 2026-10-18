@@ -16,11 +16,13 @@ import { SectionHeading } from "@/components/ui/section-heading";
 import { TiltCard } from "@/components/motion/tilt-card";
 import { CountUp } from "@/components/motion/count-up";
 import { FaqExplorer } from "@/components/marketing/faq-explorer";
+import { JsonLd } from "@/components/seo/json-ld";
+import { breadcrumbJsonLd, faqJsonLd, webPageJsonLd } from "@/lib/seo";
 
 export const metadata: Metadata = {
-  title: "Guaranteed Internship Program",
+  title: "Guaranteed Internship Program: Placed or Your Deposit Back",
   description:
-    "Placed in 18 months or your deposit back. The step-by-step process, terms, exclusions, clock start date, and refund policy.",
+    "Findtern's internship guarantee for students in India: placed within 18 months of your score or the ₹2,499 deposit is refunded in full. The process, the three conditions, exclusions and refund timing.",
   alternates: { canonical: "/guaranteed-internship-program" },
 };
 
@@ -195,6 +197,20 @@ const FAQS = [
 export default function GuaranteePage() {
   return (
     <>
+      <JsonLd
+        data={[
+          webPageJsonLd({
+            path: "/guaranteed-internship-program",
+            name: "Findtern Guaranteed Internship Program",
+            description: String(metadata.description),
+          }),
+          breadcrumbJsonLd([
+            { name: "For interns", path: "/interns" },
+            { name: "Guaranteed Internship Program", path: "/guaranteed-internship-program" },
+          ]),
+          faqJsonLd(FAQS),
+        ]}
+      />
       <PageHero
         eyebrow="Guaranteed Internship Program"
         title={

@@ -267,7 +267,7 @@ export function StaffRolesManager({
             {staffList.map((staff) => (
               <li
                 key={staff.id}
-                className="apple-spring flex items-center gap-3 px-5 py-3 hover:bg-ink-50/70"
+                className="apple-spring flex flex-wrap items-center gap-3 px-5 py-3 hover:bg-ink-50/70"
               >
                 <span
                   aria-hidden
@@ -275,7 +275,9 @@ export function StaffRolesManager({
                 >
                   {(staff.name || staff.email).charAt(0).toUpperCase()}
                 </span>
-                <span className="min-w-0 flex-1">
+                {/* On phones the name block takes the first line and the
+                    controls wrap to a second, so nothing is hidden. */}
+                <span className="min-w-0 flex-1 basis-[calc(100%-3.25rem)] sm:basis-auto">
                   <span className="block truncate text-[15px] font-semibold tracking-[-0.01em] text-ink-900">
                     {staff.name || "Staff member"}
                   </span>
@@ -290,7 +292,7 @@ export function StaffRolesManager({
                   value={staff.role ?? ""}
                   disabled={busyId === staff.id}
                   onChange={(e) => updateStaff(staff.id, { role: e.target.value })}
-                  className="hidden h-10 rounded-[10px] border border-ink-200 bg-white px-2 text-xs sm:block"
+                  className="block min-h-11 w-full min-w-0 flex-1 rounded-[10px] border border-ink-200 bg-white px-2 text-xs sm:w-auto sm:flex-none"
                 >
                   {rolesList.map((r) => (
                     <option key={r.key} value={r.key}>
@@ -305,7 +307,7 @@ export function StaffRolesManager({
                     const pw = window.prompt(`New password for ${staff.email} (8+ characters)`);
                     if (pw) void updateStaff(staff.id, { password: pw });
                   }}
-                  className="inline-flex min-h-10 items-center rounded-[10px] px-2.5 text-xs font-medium text-ink-600 hover:bg-ink-100"
+                  className="inline-flex min-h-11 items-center whitespace-nowrap rounded-[10px] px-2.5 text-xs font-medium text-ink-600 hover:bg-ink-100"
                 >
                   Reset password
                 </button>
@@ -358,8 +360,12 @@ export function StaffRolesManager({
       <div className="grid gap-4 lg:grid-cols-2">
         {rolesList.map((role) => {
           const perms = Array.isArray(role.permissions) ? (role.permissions as string[]) : [];
+          // "*" is the super-admin wildcard, not an area; shown as one line
+          // rather than a literal asterisk row.
+          const fullAccess = perms.includes("*");
           const byArea = new Map<string, string[]>();
           for (const p of perms) {
+            if (p === "*") continue;
             const { area, verb } = splitPerm(p);
             if (!byArea.has(area)) byArea.set(area, []);
             if (verb) byArea.get(area)?.push(verb);
@@ -389,10 +395,10 @@ export function StaffRolesManager({
                 </div>
                 {role.key !== "super_admin" ? (
                   <span className="flex shrink-0 gap-1">
-                    <button type="button" onClick={() => editRole(role)} className="min-h-9 rounded-lg px-2.5 text-xs font-medium text-ink-700 hover:bg-ink-100">
+                    <button type="button" onClick={() => editRole(role)} className="min-h-9 rounded-lg px-2.5 text-xs font-medium text-ink-700 hover:bg-ink-100 max-lg:min-h-11">
                       Edit
                     </button>
-                    <button type="button" onClick={() => deleteRole(role.key)} className="min-h-9 rounded-lg px-2.5 text-xs font-medium text-danger hover:bg-danger-soft">
+                    <button type="button" onClick={() => deleteRole(role.key)} className="min-h-9 rounded-lg px-2.5 text-xs font-medium text-danger hover:bg-danger-soft max-lg:min-h-11">
                       Delete
                     </button>
                   </span>
@@ -406,6 +412,12 @@ export function StaffRolesManager({
               ) : null}
 
               <div className="mt-4 space-y-2 border-t border-ink-100 pt-4">
+                {fullAccess ? (
+                  <p className="flex items-center gap-2 text-[13px] font-medium tracking-[-0.01em] text-ink-700">
+                    <ShieldCheck className="size-4 text-brand-700" aria-hidden />
+                    Full access to everything
+                  </p>
+                ) : null}
                 {[...byArea.entries()].map(([area, verbs]) => (
                   <div key={area} className="flex items-center justify-between gap-3">
                     <span className="text-[13px] font-medium tracking-[-0.01em] text-ink-700">

@@ -143,21 +143,6 @@ export default async function AdminCompanyDetailPage({
   });
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap justify-end gap-2">
-        <ContactEditor
-          targetType="employer"
-          targetId={company.id}
-          initial={{
-            name: company.name,
-            email: company.companyEmail,
-            countryCode: company.countryCode,
-            phoneNumber: company.phoneNumber,
-          }}
-        />
-        <ViewAsButton targetType="employer" targetId={company.id} label="View as company" />
-        <CompanyControls id={company.id} isActive={company.isActive} fteStatus={company.internationalFteStatus} />
-      </div>
     <Company360View
       company={company}
       projects={projects}
@@ -166,7 +151,22 @@ export default async function AdminCompanyDetailPage({
       payments={payments}
       dues={dues}
       hiredInterns={hiredInterns}
+      actions={
+        <>
+          <ContactEditor
+            targetType="employer"
+            targetId={company.id}
+            initial={{
+              name: company.name,
+              email: company.companyEmail,
+              countryCode: company.countryCode,
+              phoneNumber: company.phoneNumber,
+            }}
+          />
+          <ViewAsButton targetType="employer" targetId={company.id} label="View as company" />
+          <CompanyControls id={company.id} isActive={company.isActive} fteStatus={company.internationalFteStatus} />
+        </>
+      }
     />
-    </div>
   );
 }

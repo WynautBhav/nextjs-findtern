@@ -54,9 +54,12 @@ export type Intern360Props = {
   payouts: InternPayout[];
   employerNames: Record<string, string>;
   projectNames: Record<string, string>;
+  /** Page-level controls (edit contact, view as, review status) rendered in the banner. */
+  actions?: React.ReactNode;
 };
 
 export function Intern360View({
+  actions,
   user,
   onboarding,
   documents,
@@ -209,13 +212,13 @@ export function Intern360View({
       </div>
 
       {/* Top 5 Metrics Cards (matches 48-admin-intern-profile-detail.png) */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
         <div className="rounded-2xl border border-ink-100 bg-white p-4 shadow-2xs">
           <div className="flex items-center justify-between text-text-subtle">
             <span className="text-2xs font-semibold uppercase tracking-wider">FindScore</span>
             <Star className="size-4 text-emerald-600" />
           </div>
-          <p className="mt-2 text-2xl font-bold tracking-tight text-ink-900 tabular-nums">
+          <p className="mt-2 truncate text-xl font-bold tracking-tight text-ink-900 tabular-nums xl:text-2xl">
             {score !== null ? score.toFixed(1) : "-"}
           </p>
           <p className="text-2xs text-text-subtle">Overall Rating</p>
@@ -226,7 +229,7 @@ export function Intern360View({
             <span className="text-2xs font-semibold uppercase tracking-wider">Skills</span>
             <Sparkles className="size-4 text-blue-600" />
           </div>
-          <p className="mt-2 text-2xl font-bold tracking-tight text-ink-900 tabular-nums">
+          <p className="mt-2 truncate text-xl font-bold tracking-tight text-ink-900 tabular-nums xl:text-2xl">
             {skills.length}
           </p>
           <p className="text-2xs text-text-subtle">Top skills</p>
@@ -237,7 +240,7 @@ export function Intern360View({
             <span className="text-2xs font-semibold uppercase tracking-wider">Interviews</span>
             <Clock className="size-4 text-purple-600" />
           </div>
-          <p className="mt-2 text-2xl font-bold tracking-tight text-ink-900 tabular-nums">
+          <p className="mt-2 truncate text-xl font-bold tracking-tight text-ink-900 tabular-nums xl:text-2xl">
             {interviews.length}
           </p>
           <p className="text-2xs text-text-subtle">Attempts</p>
@@ -248,7 +251,7 @@ export function Intern360View({
             <span className="text-2xs font-semibold uppercase tracking-wider">Proposals</span>
             <FileText className="size-4 text-amber-600" />
           </div>
-          <p className="mt-2 text-2xl font-bold tracking-tight text-ink-900 tabular-nums">
+          <p className="mt-2 truncate text-xl font-bold tracking-tight text-ink-900 tabular-nums xl:text-2xl">
             {proposals.length}
           </p>
           <p className="text-2xs text-text-subtle">Received</p>
@@ -259,10 +262,10 @@ export function Intern360View({
             <span className="text-2xs font-semibold uppercase tracking-wider">Total Payouts</span>
             <IndianRupee className="size-4 text-brand-700" />
           </div>
-          <p className="mt-2 text-2xl font-bold tracking-tight text-brand-800 tabular-nums">
+          <p className="mt-2 truncate text-xl font-bold tracking-tight text-brand-800 tabular-nums xl:text-2xl">
             {formatCurrency(paidMinor, "INR")}
           </p>
-          <p className="text-2xs text-text-subtle">
+          <p className="truncate text-2xs text-text-subtle">
             Paid · {formatCurrency(owedMinor, "INR")} owed
           </p>
         </div>
@@ -270,33 +273,39 @@ export function Intern360View({
 
       {/* Main Candidate Banner (matches 48-admin-intern-profile-detail.png) */}
       <div className="rounded-2xl border border-emerald-800/40 bg-gradient-to-r from-[#0E6049] to-[#094333] p-6 text-white shadow-sm">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <div className="grid size-14 place-items-center rounded-2xl bg-white text-xl font-bold text-brand-800 shadow-md">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+          <div className="flex min-w-0 items-center gap-4">
+            <div className="grid size-14 shrink-0 place-items-center rounded-2xl bg-white text-xl font-bold text-brand-800 shadow-md">
               {user.firstName.charAt(0).toUpperCase()}
             </div>
-            <div>
-              <div className="flex items-center gap-2">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
                 <h1 className="text-xl font-bold tracking-tight text-white">{candidateFullName}</h1>
-                <span className="rounded-full bg-white/20 px-2.5 py-0.5 text-2xs font-semibold text-white">
+                <span className="whitespace-nowrap rounded-full bg-white/20 px-2.5 py-0.5 text-2xs font-semibold text-white">
                   {user.isActive ? "Active" : "Inactive"}
                 </span>
-                <span className="rounded-full bg-emerald-400/30 px-2.5 py-0.5 text-2xs font-semibold text-white">
+                <span className="whitespace-nowrap rounded-full bg-emerald-400/30 px-2.5 py-0.5 text-2xs font-semibold text-white">
                   FindScore: {score !== null ? score.toFixed(1) : "-"}
                 </span>
               </div>
-              <p className="mt-1 flex items-center gap-2 text-xs text-white/80">
-                <MapPin className="size-3.5" />
+              <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-white/80">
+                <MapPin className="size-3.5 shrink-0" />
                 <span>{[onboarding?.city, onboarding?.state].filter(Boolean).join(", ") || "India"}</span>
-                <span>•</span>
-                <span>Joined: {user.createdAt ? formatDate(user.createdAt) : "-"}</span>
+                <span aria-hidden>•</span>
+                <span className="whitespace-nowrap">Joined: {user.createdAt ? formatDate(user.createdAt) : "-"}</span>
               </p>
             </div>
           </div>
+
+          {actions ? (
+            <div className="flex flex-wrap items-center gap-2 xl:shrink-0 xl:justify-end [&_label]:text-white/90">
+              {actions}
+            </div>
+          ) : null}
         </div>
 
         {/* 4 Skill Category Ratings Row */}
-        <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {[
             { label: "Communication", val: ratings.communication },
             { label: "Coding", val: ratings.coding },
@@ -305,10 +314,10 @@ export function Intern360View({
           ].map((item) => (
             <div
               key={item.label}
-              className="flex items-center justify-between rounded-xl bg-white/10 px-3.5 py-2.5 backdrop-blur-xs"
+              className="flex items-center justify-between gap-2 rounded-xl bg-white/10 px-3.5 py-2.5 backdrop-blur-xs"
             >
-              <span className="text-xs font-medium text-white/90">{item.label}</span>
-              <span className="font-bold text-sm text-white">
+              <span className="truncate text-xs font-medium text-white/90">{item.label}</span>
+              <span className="whitespace-nowrap text-sm font-bold tabular-nums text-white">
                 {typeof item.val === "number" ? `${item.val} / 5` : "-"}
               </span>
             </div>
@@ -333,7 +342,11 @@ export function Intern360View({
       </div>
 
       {/* 7 Tabs Header (matches 48-54 tabs) */}
-      <div className="flex items-center gap-1.5 overflow-x-auto border-b border-ink-100 pb-2">
+      <div
+        role="tablist"
+        aria-label="Candidate records"
+        className="flex max-w-full gap-0.5 overflow-x-auto rounded-[10px] bg-ink-100 p-1"
+      >
         {[
           { key: "documents" as const, label: "Documents", count: docRows.filter((d) => d.status === "Uploaded").length },
           { key: "profile" as const, label: "Profile", count: undefined },
@@ -346,18 +359,20 @@ export function Intern360View({
           <button
             key={tab.key}
             type="button"
+            role="tab"
+            aria-selected={activeTab === tab.key}
             onClick={() => setActiveTab(tab.key)}
-            className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition-all shrink-0 ${
+            className={`apple-spring apple-pressable inline-flex min-h-11 shrink-0 items-center gap-2 whitespace-nowrap rounded-[8px] px-4 text-[14px] font-medium tracking-[-0.01em] ${
               activeTab === tab.key
-                ? "bg-brand-700 text-white shadow-2xs"
-                : "border border-ink-200 bg-white text-ink-700 hover:bg-ink-50"
+                ? "bg-white text-ink-900 shadow-xs"
+                : "text-ink-500 hover:text-ink-800"
             }`}
           >
             <span>{tab.label}</span>
             {tab.count !== undefined && (
               <span
-                className={`rounded-full px-2 py-0.5 text-2xs ${
-                  activeTab === tab.key ? "bg-white/20 text-white" : "bg-ink-100 text-ink-700"
+                className={`rounded-full px-2 py-0.5 text-2xs tabular-nums ${
+                  activeTab === tab.key ? "bg-brand-50 text-brand-800" : "bg-ink-200/70 text-ink-600"
                 }`}
               >
                 {tab.count}

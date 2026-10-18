@@ -66,7 +66,7 @@ export default async function AdminRolesPage() {
   return (
     <div className="space-y-6">
       <AdminPageHeader
-        title="Roles and staff"
+        title="Roles and Access"
         subtitle="Staff account directory, role assignments and security permission matrix."
       />
 

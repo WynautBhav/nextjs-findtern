@@ -18,7 +18,7 @@ import { eq } from "drizzle-orm";
 
 import * as schema from "../src/lib/db/schema.ts";
 
-const WIDTHS = [1440, 390];
+const WIDTHS = [1440, 1024, 390];
 const DEFAULT_PORT = process.env.PORT || "3100";
 const BASE_URL = `http://localhost:${DEFAULT_PORT}`;
 const PASSWORD = "Findtern@2026";
@@ -330,9 +330,11 @@ async function main() {
             });
 
             // Path generation: role__route__width.png
-            const cleanRoute = route
-              .replace(/^\/[^/]+\/?/, "") // strip /admin/
-              .replace(/[/\\?%*:|"<>]/g, "_") || "dashboard";
+            // Public routes keep their first segment ("/pricing" → "pricing");
+            // role routes drop it ("/admin/interns" → "interns"). "/" → "home".
+            const cleanRoute =
+              (role === "public" ? route.replace(/^\//, "") : route.replace(/^\/[^/]+\/?/, ""))
+                .replace(/[/\\?%*:|"<>]/g, "_") || (role === "public" ? "home" : "dashboard");
             const filename = `${role}__${cleanRoute}__${width}.png`;
             const filepath = join(outputDir, filename);
 

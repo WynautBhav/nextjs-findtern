@@ -16,6 +16,7 @@ import {
 
 import { formatCurrency, formatDate } from "@/lib/format";
 import type { Employer, Project, Proposal, Interview, EmployerPayment, User as UserType } from "@/lib/db/schema";
+import { AdminEmpty } from "@/components/admin/panel";
 import { StatusBadge } from "@/components/admin/status-badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
@@ -40,6 +41,8 @@ export type Company360Props = {
   }[];
   /** Monthly-plan placements with the next month still to pay. */
   dues: { proposalId: string; internName: string; role: string; monthsPaid: number; months: number; nextMinor: number | null; currency: string }[];
+  /** Page-level controls (edit contact, view as, activate, delete) rendered beside the name. */
+  actions?: React.ReactNode;
 };
 
 export function Company360View({
@@ -50,6 +53,7 @@ export function Company360View({
   payments,
   hiredInterns,
   dues,
+  actions,
 }: Company360Props) {
   const [activeTab, setActiveTab] = useState<
     "projects" | "proposals" | "interviews" | "payments" | "upcoming" | "hired"
@@ -78,24 +82,24 @@ export function Company360View({
           <span>All Companies</span>
         </Link>
 
-        <div className="mt-2.5 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div className="flex items-start gap-4">
-            <span className="grid size-14 place-items-center rounded-2xl bg-brand-100 text-lg font-bold text-brand-800 border border-brand-200/60 shadow-2xs">
+        <div className="mt-2.5 flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+          <div className="flex min-w-0 items-start gap-4">
+            <span className="grid size-14 shrink-0 place-items-center rounded-2xl bg-brand-100 text-lg font-bold text-brand-800 border border-brand-200/60 shadow-2xs">
               {company.companyName.charAt(0).toUpperCase()}
             </span>
 
-            <div>
+            <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
                 <h1 className="text-xl font-bold tracking-tight text-ink-900">
                   {company.companyName}
                 </h1>
                 <StatusBadge value={company.isActive ? "active" : "inactive"} />
                 {company.setupCompleted ? (
-                  <span className="rounded-full bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-2xs font-semibold text-emerald-800">
+                  <span className="whitespace-nowrap rounded-full bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-2xs font-semibold text-emerald-800">
                     Setup Complete
                   </span>
                 ) : (
-                  <span className="rounded-full bg-amber-50 border border-amber-200 px-2 py-0.5 text-2xs font-semibold text-amber-800">
+                  <span className="whitespace-nowrap rounded-full bg-amber-50 border border-amber-200 px-2 py-0.5 text-2xs font-semibold text-amber-800">
                     Pending Onboarding
                   </span>
                 )}
@@ -138,11 +142,15 @@ export function Company360View({
               </div>
             </div>
           </div>
+
+          {actions ? (
+            <div className="flex flex-wrap items-center gap-2 xl:shrink-0 xl:justify-end">{actions}</div>
+          ) : null}
         </div>
       </div>
 
       {/* Metrics Cards */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <div className="rounded-2xl border border-ink-100 bg-white p-4 shadow-2xs">
           <p className="text-2xs font-semibold uppercase tracking-wider text-text-subtle">
             Projects Posted
@@ -186,7 +194,11 @@ export function Company360View({
       </div>
 
       {/* 6 Tabs Navigation */}
-      <div className="flex items-center gap-1.5 overflow-x-auto border-b border-ink-100 pb-2">
+      <div
+        role="tablist"
+        aria-label="Company records"
+        className="flex max-w-full gap-0.5 overflow-x-auto rounded-[10px] bg-ink-100 p-1"
+      >
         {([
           { key: "projects" as const, label: "Projects", count: projects.length },
           { key: "proposals" as const, label: "Proposals", count: proposals.length },
@@ -198,19 +210,21 @@ export function Company360View({
           <button
             key={tab.key}
             type="button"
+            role="tab"
+            aria-selected={activeTab === tab.key}
             onClick={() => setActiveTab(tab.key)}
-            className={`inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-semibold transition-colors shrink-0 ${
+            className={`apple-spring apple-pressable inline-flex min-h-11 shrink-0 items-center gap-2 whitespace-nowrap rounded-[8px] px-4 text-[14px] font-medium tracking-[-0.01em] ${
               activeTab === tab.key
-                ? "bg-brand-700 text-white shadow-2xs"
-                : "border border-ink-200 bg-white text-ink-700 hover:bg-ink-50"
+                ? "bg-white text-ink-900 shadow-xs"
+                : "text-ink-500 hover:text-ink-800"
             }`}
           >
             <span>{tab.label}</span>
             <span
-              className={`rounded-full px-1.5 py-0.2 text-2xs ${
+              className={`rounded-full px-1.5 py-0.5 text-2xs tabular-nums ${
                 activeTab === tab.key
-                  ? "bg-white/20 text-white"
-                  : "bg-ink-100 text-ink-700"
+                  ? "bg-brand-50 text-brand-800"
+                  : "bg-ink-200/70 text-ink-600"
               }`}
             >
               {tab.count}
@@ -227,7 +241,7 @@ export function Company360View({
               <TableRow className="bg-ink-50/60">
                 <TableHead className="px-5 py-3 text-xs font-semibold text-ink-700">Project Title</TableHead>
                 <TableHead className="px-5 py-3 text-xs font-semibold text-ink-700">Work Mode</TableHead>
-                <TableHead className="px-5 py-3 text-xs font-semibold text-ink-700">Skills</TableHead>
+                <TableHead className="hidden px-5 py-3 text-xs font-semibold text-ink-700 xl:table-cell">Skills</TableHead>
                 <TableHead className="px-5 py-3 text-xs font-semibold text-ink-700">Status</TableHead>
                 <TableHead className="px-5 py-3 text-xs font-semibold text-ink-700">Date Posted</TableHead>
                 <TableHead className="px-5 py-3 text-right text-xs font-semibold text-ink-700">Action</TableHead>
@@ -236,8 +250,8 @@ export function Company360View({
             <TableBody>
               {projects.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="py-8 text-center text-xs text-ink-500">
-                    No internship projects posted by this company yet.
+                  <TableCell colSpan={6} className="p-0">
+                    <AdminEmpty title="No projects yet" body="This company has not posted an internship project." />
                   </TableCell>
                 </TableRow>
               ) : (
@@ -249,15 +263,17 @@ export function Company360View({
                     <TableCell className="px-5 py-3.5 text-xs text-ink-700 capitalize">
                       {proj.locationType || "Remote"}
                     </TableCell>
-                    <TableCell className="px-5 py-3.5">
-                      <div className="flex flex-wrap gap-1 max-w-xs">
+                    {/* Hidden below xl: at the sidebar breakpoint the chips
+                        stacked one per line and tripled the row height. */}
+                    <TableCell className="hidden px-5 py-3.5 xl:table-cell">
+                      <div className="flex flex-nowrap items-center gap-1">
                         {(proj.skills ?? []).slice(0, 3).map((s) => (
-                          <span key={s} className="rounded-md bg-ink-100 px-1.5 py-0.5 text-2xs text-ink-700">
+                          <span key={s} className="whitespace-nowrap rounded-md bg-ink-100 px-1.5 py-0.5 text-2xs text-ink-700">
                             {s}
                           </span>
                         ))}
                         {(proj.skills ?? []).length > 3 && (
-                          <span className="text-2xs text-ink-500">
+                          <span className="whitespace-nowrap text-2xs text-ink-500">
                             +{(proj.skills ?? []).length - 3}
                           </span>
                         )}
@@ -303,8 +319,8 @@ export function Company360View({
             <TableBody>
               {proposals.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="py-8 text-center text-xs text-ink-500">
-                    No proposals sent by this company yet.
+                  <TableCell colSpan={6} className="p-0">
+                    <AdminEmpty title="No proposals yet" body="This company has not sent a proposal to any candidate." />
                   </TableCell>
                 </TableRow>
               ) : (
@@ -368,8 +384,8 @@ export function Company360View({
             <TableBody>
               {interviews.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="py-8 text-center text-xs text-ink-500">
-                    No interviews scheduled.
+                  <TableCell colSpan={6} className="p-0">
+                    <AdminEmpty title="No interviews" body="No interview has been scheduled with this company." />
                   </TableCell>
                 </TableRow>
               ) : (
@@ -431,8 +447,8 @@ export function Company360View({
             <TableBody>
               {payments.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="py-8 text-center text-xs text-ink-500">
-                    No payment transactions recorded for this employer.
+                  <TableCell colSpan={5} className="p-0">
+                    <AdminEmpty title="No payments" body="No payment transaction has been recorded for this employer." />
                   </TableCell>
                 </TableRow>
               ) : (
@@ -463,12 +479,12 @@ export function Company360View({
 
       {activeTab === "upcoming" && (
         dues.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-ink-200 bg-white p-12 text-center">
-            <div className="mx-auto grid size-12 place-items-center rounded-2xl bg-ink-50 text-ink-400">
-              <Clock className="size-6" />
-            </div>
-            <h3 className="mt-3 text-sm font-semibold text-ink-900">No monthly dues</h3>
-            <p className="mt-1 text-xs text-text-subtle">No placement on a monthly plan has a month left to pay.</p>
+          <div className="rounded-2xl border border-dashed border-ink-200 bg-white">
+            <AdminEmpty
+              icon={Clock}
+              title="No monthly dues"
+              body="No placement on a monthly plan has a month left to pay."
+            />
           </div>
         ) : (
           <ul className="divide-y divide-ink-100 rounded-2xl border border-ink-100 bg-white">
@@ -503,8 +519,8 @@ export function Company360View({
             <TableBody>
               {hiredInterns.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="py-8 text-center text-xs text-ink-500">
-                    No active hired interns under this employer.
+                  <TableCell colSpan={5} className="p-0">
+                    <AdminEmpty title="No hired interns" body="No candidate has been hired by this employer yet." />
                   </TableCell>
                 </TableRow>
               ) : (

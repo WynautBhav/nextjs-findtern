@@ -234,7 +234,7 @@ export default async function EmployerInternDetail({
         </p>
       ) : null}
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_19rem]">
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_19rem]">
         <div className="min-w-0 space-y-4">
           <section className="rounded-[20px] border border-ink-200/70 bg-white p-6 shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)]">
             <div className="flex flex-wrap items-start gap-5">
@@ -244,7 +244,7 @@ export default async function EmployerInternDetail({
               >
                 {profile.initials}
               </span>
-              <div className="min-w-0 flex-1">
+              <div className="min-w-[14rem] flex-1 basis-56">
                 <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-text-subtle">
                   Findtern Score
                 </p>
@@ -261,7 +261,7 @@ export default async function EmployerInternDetail({
               </div>
               <Link
                 href={`/employer/send-proposal?intern=${encodeURIComponent(profile.id)}`}
-                className="apple-spring apple-pressable inline-flex min-h-11 items-center justify-center gap-2 rounded-[10px] bg-brand-700 px-4 text-sm font-semibold text-white hover:bg-brand-600"
+                className="apple-spring apple-pressable inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[10px] bg-brand-700 px-4 text-sm font-semibold text-white hover:bg-brand-600 sm:w-auto"
               >
                 <Send className="size-4" aria-hidden />
                 Send proposal

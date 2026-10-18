@@ -55,7 +55,7 @@ export function ContactDetailsForm({
           <input required value={v.lastName} onChange={set("lastName")} className={input} autoComplete="family-name" />
         </label>
       </div>
-      <div className="grid gap-4 sm:grid-cols-[7rem_1fr]">
+      <div className="grid grid-cols-[6rem_1fr] gap-3 sm:gap-4">
         <label className="block text-sm font-medium text-ink-800">
           Code
           <input required value={v.countryCode} onChange={set("countryCode")} className={input} />

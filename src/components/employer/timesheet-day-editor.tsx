@@ -36,7 +36,7 @@ export function TimesheetDayEditor({ timesheetId, entries, editable }: { timeshe
   return (
     <div className="mt-5">
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[28rem] border-separate border-spacing-0 text-left text-sm">
+        <table className="w-full border-separate border-spacing-0 text-left text-sm">
           <thead>
             <tr>
               <th scope="col" className="border-b border-ink-100 pb-2 pr-4 text-xs font-medium text-text-subtle">Date</th>
@@ -79,7 +79,7 @@ export function TimesheetDayEditor({ timesheetId, entries, editable }: { timeshe
             type="button"
             disabled={busy || changed.length === 0}
             onClick={save}
-            className="inline-flex min-h-10 items-center rounded-[10px] border border-ink-200 bg-white px-3.5 text-xs font-semibold text-ink-800 hover:bg-ink-50 disabled:opacity-50"
+            className="inline-flex min-h-11 items-center rounded-[10px] border border-ink-200 bg-white px-3.5 text-xs font-semibold text-ink-800 hover:bg-ink-50 disabled:opacity-50"
           >
             {busy ? "Saving…" : changed.length ? `Save ${changed.length} change${changed.length === 1 ? "" : "s"}` : "No changes"}
           </button>

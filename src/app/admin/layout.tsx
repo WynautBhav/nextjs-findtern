@@ -13,31 +13,29 @@ import { getDb, schema } from "@/lib/db";
  */
 export const dynamic = "force-dynamic";
 
+/**
+ * Sidebar groups. Day-to-day work first (who is in the pipeline, who owes or
+ * is owed money), publishing second, and everything that is configured once
+ * and rarely revisited - the rate card, the legal texts, who can sign in -
+ * clubbed under Settings instead of being scattered across People and
+ * Content. The one-item "Work" group is folded into People & Work.
+ */
 const NAV: NavGroup[] = [
   {
     label: "Overview",
     items: [
       { href: "/admin/dashboard", label: "Dashboard" },
       { href: "/admin/proposal-tracker", label: "Proposal Pipeline" },
-      { href: "/admin/notification-history", label: "Notification History" },
       { href: "/admin/messages", label: "Inbound Messages" },
+      { href: "/admin/notification-history", label: "Notification History" },
     ],
   },
   {
-    label: "People",
+    label: "People & Work",
     items: [
       { href: "/admin/interns", label: "Candidate Directory" },
       { href: "/admin/users", label: "Registered Users" },
-      { href: "/admin/interns/terms", label: "Intern Terms" },
-      { href: "/admin/interns/non-disclosure", label: "Intern NDA" },
       { href: "/admin/companies", label: "Hiring Partners" },
-      { href: "/admin/companies/terms", label: "Company Terms" },
-      { href: "/admin/roles", label: "Roles and Access" },
-    ],
-  },
-  {
-    label: "Work",
-    items: [
       { href: "/admin/projects", label: "Work Projects" },
     ],
   },
@@ -48,21 +46,35 @@ const NAV: NavGroup[] = [
       { href: "/admin/intern-invoices", label: "Intern Invoices" },
       { href: "/admin/transactions", label: "Financial Ledger" },
       { href: "/admin/payouts", label: "Intern Disbursements" },
-      { href: "/admin/reports", label: "Analytics Reports" },
       { href: "/admin/promo-codes", label: "Promotional Codes" },
+      { href: "/admin/reports", label: "Analytics Reports" },
     ],
   },
   {
-    label: "Content & System",
+    label: "Publishing",
     items: [
       { href: "/admin/cms", label: "Website Content" },
-      { href: "/admin/cms/terms", label: "Platform Terms" },
       { href: "/admin/notifications", label: "Send Notification" },
+    ],
+  },
+  {
+    label: "Settings",
+    items: [
       { href: "/admin/settings", label: "Pricing & Fees" },
+      { href: "/admin/cms/terms", label: "Platform Terms" },
+      { href: "/admin/interns/terms", label: "Intern Terms" },
+      { href: "/admin/interns/non-disclosure", label: "Intern NDA" },
+      { href: "/admin/companies/terms", label: "Company Terms" },
+      { href: "/admin/roles", label: "Roles and Access" },
       { href: "/admin/account", label: "Your account" },
     ],
   },
 ];
+
+/** href → sidebar label, for breadcrumbs. */
+const NAV_LABELS: Record<string, string> = Object.fromEntries(
+  NAV.flatMap((g) => g.items.map((i) => [i.href, i.label])),
+);
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const session = await getSession();
@@ -85,7 +97,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   } catch {}
 
   return (
-    <AdminShell groups={groups} email={session.email} role={session.role} unreadCount={unreadMessages}>
+    <AdminShell groups={groups} labels={NAV_LABELS} email={session.email} role={session.role} unreadCount={unreadMessages}>
       {children}
     </AdminShell>
   );

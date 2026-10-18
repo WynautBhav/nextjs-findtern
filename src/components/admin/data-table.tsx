@@ -15,7 +15,7 @@ import { cn } from "@/lib/utils";
 /**
  * DataTable - the shared shell for every admin list.
  *
- * Owns the chrome (toolbar row, sticky header, pager) so each page only
+ * Owns the chrome (toolbar row, header, pager) so each page only
  * declares its columns and how to render a row. That is what stops the three
  * hand-rolled tables from drifting: they had different header padding, one had
  * no pager, and one showed a "CSV" button that downloaded the whole table
@@ -124,9 +124,17 @@ export function DataTable<T>({
           />
         )
       ) : (
-        <Table>
+        <>
+        {/* The Table primitive scrolls sideways inside its own container, so
+            `sticky` on the header never had anything to pin to. `min-w-[40rem]`
+            keeps the columns readable below the sidebar breakpoint instead of
+            squeezing every cell into a word-per-line stack. */}
+        <p className="border-b border-ink-100 px-5 py-1.5 text-2xs text-text-subtle lg:hidden" aria-hidden>
+          Scroll sideways to see every column →
+        </p>
+        <Table className="min-w-[40rem]">
           {caption ? <caption className="sr-only">{caption}</caption> : null}
-          <TableHeader className="apple-material-bar sticky top-0 z-10">
+          <TableHeader className="apple-material-bar">
             <TableRow className="hover:bg-transparent">
               {columns.map((column, index) => (
                 <TableHead
@@ -168,6 +176,7 @@ export function DataTable<T>({
             })}
           </TableBody>
         </Table>
+        </>
       )}
 
       {rows.length > 0 ? (

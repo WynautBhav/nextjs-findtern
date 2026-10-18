@@ -65,9 +65,19 @@ export const HOME_COPY = {
   headlineLead: "Hire an intern for",
   /** Accent clause - the last words, set in the accent colour. */
   headlineAccent: "the price of a coffee.",
+  /** Employer-facing on purpose: the hero, the audience cards and the
+   *  pricing table all speak to the company hiring, so the candidate pitch
+   *  lives on /interns rather than being mixed into this line. */
   subhead:
-    "Verified candidates, a published rate, and a payment that actually arrives. If we do not place you, your deposit comes back.",
+    "Interviewed, tested and scored before you see a profile. One published rate card, and you pay only for the hours you approve.",
 } as const;
+
+/** The home and about pages quote the same three product terms. */
+export const PROOF_STATS = [
+  { value: 100, prefix: "", suffix: "%", label: "Screened before you see them" },
+  { value: 3, prefix: "", suffix: "", label: "Plans, no lock-in" },
+  { value: 5000, prefix: "₹", suffix: "", label: "Fixed per-hire fee" },
+] as const;
 
 export const ABOUT_COPY = {
   titleLead: "About",

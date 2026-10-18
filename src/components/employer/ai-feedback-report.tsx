@@ -95,8 +95,8 @@ export function AiFeedbackReport({
     <section className="apple-spring min-w-0 overflow-hidden rounded-[20px] border border-brand-200/80 bg-white shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)]">
       {/* Header Banner */}
       <div className="bg-gradient-to-r from-brand-950 via-brand-900 to-brand-800 p-6 text-white">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div>
+        <div className="flex flex-col gap-4 2xl:flex-row 2xl:items-start 2xl:justify-between">
+          <div className="min-w-0">
             <div className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-0.5 text-2xs font-semibold text-accent-300 border border-white/15">
               <Sparkles className="size-3" />
               <span>Verified AI Interview Assessment</span>
@@ -109,7 +109,7 @@ export function AiFeedbackReport({
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 2xl:shrink-0 2xl:flex-nowrap">
             {aiFeedbackLink ? (
               <a
                 href={aiFeedbackLink}
@@ -156,7 +156,7 @@ export function AiFeedbackReport({
         </div>
 
         {/* Hero Score Grid */}
-        <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="mt-6 grid grid-cols-2 gap-3 xl:grid-cols-4">
           <div className="min-w-0 rounded-[10px] bg-white/10 p-3.5 border border-white/10 backdrop-blur-xs">
             <p className="text-2xs uppercase tracking-wider text-accent-300 font-semibold">
               Findtern Score
@@ -213,9 +213,9 @@ export function AiFeedbackReport({
           <div className="flex min-w-0 items-start gap-3.5 rounded-[10px] border border-brand-200/80 bg-brand-50/50 p-4">
             <ShieldCheck className="size-5 text-brand-700 shrink-0 mt-0.5" />
             <div className="min-w-0">
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                 <span className="text-xs font-bold text-brand-900">Recommendation Verdict:</span>
-                <span className="rounded-full bg-brand-100 px-2.5 py-0.5 text-xs font-semibold text-brand-800">
+                <span className="rounded-[10px] bg-brand-100 px-2.5 py-0.5 text-xs font-semibold text-brand-800">
                   {verdict}
                 </span>
               </div>
@@ -240,11 +240,11 @@ export function AiFeedbackReport({
           </div>
 
           {/* Subtabs */}
-          <div className="flex min-w-0 items-center gap-2 border-b border-ink-100 pb-2">
+          <div className="flex min-w-0 items-center gap-2 overflow-x-auto border-b border-ink-100 pb-2 [&>button]:shrink-0 [&>button]:whitespace-nowrap">
             <button
               type="button"
               onClick={() => setActiveTab("summary")}
-              className={`apple-spring apple-pressable rounded-[10px] px-3 py-1.5 min-h-11 text-[13px] font-semibold ${
+              className={`apple-spring apple-pressable whitespace-nowrap rounded-[10px] px-3 py-1.5 min-h-11 text-[13px] font-semibold ${
                 activeTab === "summary"
                   ? "bg-brand-700 text-white"
                   : "text-ink-600 hover:text-ink-900"
@@ -255,7 +255,7 @@ export function AiFeedbackReport({
             <button
               type="button"
               onClick={() => setActiveTab("axes")}
-              className={`apple-spring apple-pressable rounded-[10px] px-3 py-1.5 min-h-11 text-[13px] font-semibold ${
+              className={`apple-spring apple-pressable whitespace-nowrap rounded-[10px] px-3 py-1.5 min-h-11 text-[13px] font-semibold ${
                 activeTab === "axes"
                   ? "bg-brand-700 text-white"
                   : "text-ink-600 hover:text-ink-900"
@@ -266,7 +266,7 @@ export function AiFeedbackReport({
             <button
               type="button"
               onClick={() => setActiveTab("evidence")}
-              className={`apple-spring apple-pressable rounded-[10px] px-3 py-1.5 min-h-11 text-[13px] font-semibold ${
+              className={`apple-spring apple-pressable whitespace-nowrap rounded-[10px] px-3 py-1.5 min-h-11 text-[13px] font-semibold ${
                 activeTab === "evidence"
                   ? "bg-brand-700 text-white"
                   : "text-ink-600 hover:text-ink-900"
@@ -277,7 +277,7 @@ export function AiFeedbackReport({
           </div>
 
           {activeTab === "summary" && (
-            <div className="grid gap-5 md:grid-cols-2">
+            <div className="grid gap-5 xl:grid-cols-2">
               <div className="min-w-0 space-y-3 rounded-[10px] border border-ink-100 bg-ink-50/40 p-4">
                 <h4 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-brand-800">
                   <CheckCircle2 className="size-4 text-brand-700" />

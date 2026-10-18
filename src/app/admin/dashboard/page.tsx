@@ -13,6 +13,8 @@ import {
 import { getDb, schema } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { formatMoney } from "@/lib/format";
+import { AdminEmpty, AdminPageHeader, Panel } from "@/components/admin/panel";
+import { StatCard, StatGrid } from "@/components/admin/stat-card";
 import { TrendChart, type TrendPoint } from "@/components/admin/trend-chart";
 import { cn } from "@/lib/utils";
 
@@ -278,29 +280,24 @@ export default async function AdminDashboard() {
 
   return (
     <div className="mx-auto w-full max-w-[84rem] space-y-10">
-      <header className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <p className="text-sm text-text-subtle">
-            {now.toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long", timeZone: "Asia/Kolkata" })}
-          </p>
-          <h1 className="mt-1 text-[26px] font-semibold tracking-[-0.02em] text-ink-950">
-            {greeting(now)}
-            {firstName ? `, ${firstName}` : ""}
-          </h1>
-        </div>
-        <Link
-          href="/admin/reports"
-          className="inline-flex min-h-10 items-center gap-1.5 rounded-[10px] border border-ink-200 bg-white px-3.5 text-sm font-medium text-ink-700 hover:border-ink-300 hover:bg-ink-50"
-        >
-          Reports <ArrowUpRight className="size-4" aria-hidden />
-        </Link>
-      </header>
+      <AdminPageHeader
+        title={`${greeting(now)}${firstName ? `, ${firstName}` : ""}`}
+        subtitle={now.toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long", timeZone: "Asia/Kolkata" })}
+        action={
+          <Link
+            href="/admin/reports"
+            className="apple-spring apple-pressable inline-flex min-h-11 items-center gap-1.5 rounded-[10px] border border-ink-200 bg-white px-3.5 text-[14px] font-medium text-ink-700 hover:border-ink-300 hover:bg-ink-50"
+          >
+            Reports <ArrowUpRight className="size-4" aria-hidden />
+          </Link>
+        }
+      />
 
       {/* Needs a person */}
       <section>
         <h2 className="mb-3 text-[15px] font-semibold text-ink-950">Needs attention</h2>
         {tasks.length ? (
-          <ul className="divide-y divide-ink-100 overflow-hidden rounded-[14px] border border-ink-200/80 bg-white">
+          <Panel as="ul" className="divide-y divide-ink-100">
             {tasks.map((t) => (
               <li key={t.href} className="flex flex-col gap-3 px-5 py-3.5 sm:flex-row sm:items-center sm:gap-4">
                 <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-accent-100 text-accent-700">
@@ -314,54 +311,41 @@ export default async function AdminDashboard() {
                 </div>
                 <Link
                   href={t.href}
-                  className="inline-flex min-h-9 shrink-0 items-center gap-1.5 self-start rounded-[10px] border border-ink-200 px-3 text-[13px] font-medium text-ink-800 hover:border-ink-300 hover:bg-ink-50 sm:self-auto"
+                  className="apple-spring apple-pressable inline-flex min-h-9 shrink-0 items-center gap-1.5 self-start whitespace-nowrap rounded-[10px] border border-ink-200 px-3 text-[13px] font-medium text-ink-800 hover:border-ink-300 hover:bg-ink-50 max-lg:min-h-11 sm:self-auto"
                 >
                   {t.cta} <ArrowRight className="size-3.5" aria-hidden />
                 </Link>
               </li>
             ))}
-          </ul>
+          </Panel>
         ) : (
-          <p className="rounded-[14px] border border-ink-200/80 bg-white px-5 py-4 text-sm text-text-subtle">
-            Nothing is waiting on the team.
-          </p>
+          <Panel>
+            <p className="px-5 py-4 text-sm text-text-subtle">Nothing is waiting on the team.</p>
+          </Panel>
         )}
       </section>
 
       {/* Four numbers */}
-      <section className="grid overflow-hidden rounded-[14px] border border-ink-200/80 bg-white sm:grid-cols-2 lg:grid-cols-4">
-        {kpis.map((k, i) => (
-          <Link
-            key={k.label}
-            href={k.href}
-            className={cn(
-              "group px-5 py-4 transition-colors hover:bg-ink-50/70",
-              i > 0 && "border-t border-ink-100 sm:border-t-0",
-              i % 2 === 1 && "sm:border-l",
-              i === 2 && "sm:border-t lg:border-t-0 lg:border-l",
-              i === 3 && "sm:border-t lg:border-t-0",
-            )}
-          >
-            <p className="text-[13px] text-text-subtle">{k.label}</p>
-            <p className="mt-1 text-2xl font-semibold tabular-nums tracking-tight text-ink-950">{k.value}</p>
-            <p className="mt-0.5 text-xs text-text-subtle">
-              {"delta" in k && typeof k.delta === "number" ? (
-                k.delta > 0 ? (
-                  <span className="font-medium text-success">+{k.delta} this week</span>
-                ) : (
-                  "none new this week"
-                )
-              ) : (
-                k.note
-              )}
-            </p>
-          </Link>
-        ))}
-      </section>
+      <StatGrid cols={4}>
+        {kpis.map((k) => {
+          const hasDelta = "delta" in k && typeof k.delta === "number";
+          return (
+            <StatCard
+              key={k.label}
+              label={k.label}
+              value={k.value}
+              href={k.href}
+              tone="neutral"
+              delta={hasDelta && k.delta > 0 ? `+${k.delta}` : undefined}
+              hint={hasDelta ? (k.delta > 0 ? "new this week" : "none new this week") : k.note}
+            />
+          );
+        })}
+      </StatGrid>
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
         {/* Weekly activity */}
-        <section className="min-w-0 rounded-[14px] border border-ink-200/80 bg-white p-5 sm:p-6">
+        <Panel className="min-w-0 overflow-visible p-5 sm:p-6">
           <div className="flex items-baseline justify-between gap-4">
             <h2 className="text-[15px] font-semibold text-ink-950">Proposals and interviews, weekly</h2>
             <span className="text-xs text-text-subtle">last 12 weeks</span>
@@ -373,10 +357,10 @@ export default async function AdminDashboard() {
               <TrendChart data={trend} height={200} />
             </div>
           )}
-        </section>
+        </Panel>
 
         {/* Pipeline */}
-        <section className="min-w-0 rounded-[14px] border border-ink-200/80 bg-white p-5 sm:p-6">
+        <Panel className="min-w-0 p-5 sm:p-6">
           <div className="flex items-baseline justify-between gap-4">
             <h2 className="text-[15px] font-semibold text-ink-950">Proposal pipeline</h2>
             <Link href="/admin/proposal-tracker" className="text-xs font-medium text-brand-700 hover:underline">
@@ -410,25 +394,27 @@ export default async function AdminDashboard() {
               </div>
             ))}
           </dl>
-        </section>
+        </Panel>
       </div>
 
       {/* What just happened */}
       <section>
         <h2 className="mb-3 text-[15px] font-semibold text-ink-950">Recent activity</h2>
         {events.length ? (
-          <ul className="divide-y divide-ink-100 overflow-hidden rounded-[14px] border border-ink-200/80 bg-white">
+          <Panel as="ul" className="divide-y divide-ink-100">
             {events.map((e, i) => (
               <li key={`${e.href}-${i}`}>
                 <Link
                   href={e.href}
                   className="grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-4 px-5 py-3 transition-colors hover:bg-ink-50/70"
                 >
-                  <span className="min-w-0">
-                    <span className="text-[14px] font-medium text-ink-900">{e.label}</span>
-                    <span className="ml-2 truncate text-[13px] text-text-subtle">{e.detail}</span>
+                  {/* Label stays on one line; the detail truncates as a real
+                      flex child instead of an inline span that wrapped under it. */}
+                  <span className="flex min-w-0 items-baseline gap-2">
+                    <span className="shrink-0 whitespace-nowrap text-[14px] font-medium text-ink-900">{e.label}</span>
+                    <span className="min-w-0 truncate text-[13px] text-text-subtle">{e.detail}</span>
                   </span>
-                  <span className="text-xs tabular-nums text-text-subtle">
+                  <span className="whitespace-nowrap text-xs tabular-nums text-text-subtle">
                     {e.date
                       ? e.date.toLocaleDateString("en-IN", { day: "numeric", month: "short", timeZone: "Asia/Kolkata" })
                       : "-"}
@@ -436,9 +422,14 @@ export default async function AdminDashboard() {
                 </Link>
               </li>
             ))}
-          </ul>
+          </Panel>
         ) : (
-          <p className="text-sm text-text-subtle">Nothing yet.</p>
+          <Panel>
+            <AdminEmpty
+              title="Nothing yet"
+              body="Payments, accepted offers, new projects and sign-ups will show up here as they happen."
+            />
+          </Panel>
         )}
       </section>
     </div>

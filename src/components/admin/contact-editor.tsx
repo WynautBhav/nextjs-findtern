@@ -74,9 +74,9 @@ export function ContactEditor({
           setError(null);
           setOpen(true);
         }}
-        className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-ink-200 bg-white px-3 text-xs font-semibold text-ink-700 hover:bg-ink-50"
+        className="apple-spring apple-pressable inline-flex min-h-11 items-center gap-1.5 whitespace-nowrap rounded-[10px] border border-ink-200 bg-white px-3.5 text-[14px] font-medium text-ink-700 hover:bg-ink-50"
       >
-        <Pencil className="size-3.5" aria-hidden />
+        <Pencil className="size-4" aria-hidden />
         Edit contact
       </button>
       <Dialog open={open} onOpenChange={setOpen}>

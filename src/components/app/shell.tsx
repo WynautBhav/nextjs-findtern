@@ -26,7 +26,6 @@ import {
   BadgeCheck,
   Bell,
   BriefcaseBusiness,
-  Building,
   CalendarCheck2,
   CircleUserRound,
   Compass,
@@ -72,14 +71,18 @@ export const STAGE_NAV: Record<Stage, NavItem[]> = {
   ],
 };
 
-/** Everything that is not stage shaped. Reached from the profile sheet. */
+/**
+ * Everything that is not stage shaped. Reached from the profile sheet.
+ * Bank details live inside Settings (the same form, under "Bank account"),
+ * so they no longer get a second door in the sidebar; /intern/bank-details
+ * redirects there for old links.
+ */
 export const SECONDARY_NAV: NavItem[] = [
   { href: "/intern/opportunities", label: "Open roles", icon: <Compass className="size-4" /> },
   { href: "/intern/proposals", label: "Offers", icon: <BriefcaseBusiness className="size-4" /> },
   { href: "/intern/interviews", label: "Interviews", icon: <CalendarCheck2 className="size-4" /> },
   { href: "/intern/timesheets", label: "Timesheets", icon: <LayoutList className="size-4" /> },
   { href: "/intern/earnings", label: "Stipend", icon: <ReceiptIndianRupee className="size-4" /> },
-  { href: "/intern/bank-details", label: "Bank Details", icon: <Building className="size-4" /> },
   { href: "/intern/documents", label: "Documents", icon: <BadgeCheck className="size-4" /> },
   { href: "/intern/profile", label: "Your profile", icon: <CircleUserRound className="size-4" /> },
   { href: "/intern/notifications", label: "Notifications", icon: <Bell className="size-4" /> },
@@ -229,11 +232,8 @@ export function AppShell({
               >
                 <X className="size-5" aria-hidden />
               </button>
-              <div className="flex items-center gap-2.5 px-2 py-2">
-                <span className="grid size-8 place-items-center rounded-full bg-white/10">
-                  <BadgeCheck className="size-4 text-accent-300" aria-hidden />
-                </span>
-                <span className="text-base font-semibold tracking-tight text-white">Findtern</span>
+              <div className="flex min-h-11 items-center px-2 py-2 pr-12">
+                <Logo variant="white" className="h-6" />
               </div>
               <nav className="mt-6 max-h-[calc(100dvh-14rem)] overflow-y-auto overscroll-contain pb-4">
                 {navList(nav)}

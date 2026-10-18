@@ -61,7 +61,7 @@ export default async function EmployerAccount() {
     <div>
       <PageHeader title="Account" subtitle="Company profile and security." />
 
-      <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_22rem]">
+      <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_22rem]">
         <section className="min-w-0">
           <h2 className="text-sm font-semibold tracking-[-0.01em] text-ink-900">Company details</h2>
           <p className="mt-1 max-w-prose text-sm leading-relaxed text-ink-600">
@@ -72,7 +72,7 @@ export default async function EmployerAccount() {
           </div>
         </section>
 
-        <aside className="space-y-4">
+        <aside className="min-w-0 space-y-4">
           <section className="rounded-[20px] border border-ink-200/70 bg-white p-5 shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)]">
             <h2 className="text-sm font-semibold text-ink-900">Password</h2>
             <div className="mt-4">

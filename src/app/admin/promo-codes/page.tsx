@@ -41,7 +41,7 @@ export default async function AdminPromoCodesPage() {
   return (
     <div className="space-y-6">
       <AdminPageHeader
-        title="Promo codes"
+        title="Promotional Codes"
         subtitle="Incentive discounts, campaign vouchers and redemption limits."
       />
 

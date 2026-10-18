@@ -148,7 +148,7 @@ export function NotificationList({
                 <button
                   type="button"
                   onClick={() => markOne(n.id)}
-                  className="apple-spring apple-pressable inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-[10px] px-2.5 text-sm font-medium text-ink-600 hover:bg-ink-100 hover:text-ink-900"
+                  className="apple-spring apple-pressable inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-1.5 rounded-[10px] px-2.5 text-sm font-medium text-ink-600 hover:bg-ink-100 hover:text-ink-900"
                 >
                   <Check className="size-3.5" aria-hidden />
                   <span className="sr-only sm:not-sr-only">Read</span>

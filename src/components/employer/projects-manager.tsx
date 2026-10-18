@@ -25,6 +25,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import { PageHeader } from "@/components/layout/page-header";
 import { csrfFetch } from "@/lib/client-fetch";
 import { suggestSkills } from "@/lib/data/skills";
 import type { Project } from "@/lib/db/schema";
@@ -243,24 +244,20 @@ export function ProjectsManager({
 
   return (
     <div className="space-y-6">
-      {/* Top action bar */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-ink-100 pb-5">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-ink-900">Projects</h1>
-          <p className="mt-1 text-sm text-text-subtle">
-            Manage your internship postings, scopes of work, and matching criteria.
-          </p>
-        </div>
-
-        <button
-          type="button"
-          onClick={openCreate}
-          className="apple-spring apple-pressable inline-flex min-h-11 items-center justify-center gap-2 rounded-[10px] bg-brand-700 px-4 text-sm font-semibold text-white shadow-xs hover:bg-brand-600"
-        >
-          <FolderPlus className="size-4" />
-          <span>New Project</span>
-        </button>
-      </div>
+      <PageHeader
+        title="Projects"
+        subtitle="Manage your internship postings, scopes of work, and matching criteria."
+        action={
+          <button
+            type="button"
+            onClick={openCreate}
+            className="apple-spring apple-pressable inline-flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-[10px] bg-brand-700 px-4 text-sm font-semibold text-white shadow-xs hover:bg-brand-600"
+          >
+            <FolderPlus className="size-4" />
+            <span>New Project</span>
+          </button>
+        }
+      />
 
       {/* Tabs and Search Controls */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -368,7 +365,7 @@ export function ProjectsManager({
                 key={p.id}
                 className="apple-spring group relative rounded-[20px] border border-ink-200/70 bg-white p-5 shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)] hover:border-ink-300"
               >
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0">
                   <div className="space-y-2">
                     <div className="flex flex-wrap items-center gap-2.5">
                       <h2 className="text-base font-semibold text-ink-900">{p.projectName}</h2>
@@ -424,8 +421,9 @@ export function ProjectsManager({
                     ) : null}
                   </div>
 
-                  {/* Actions */}
-                  <div className="flex flex-wrap items-center gap-2 pt-2 sm:pt-0">
+                  {/* Actions: a full-width footer row, so the buttons never
+                      fight the title for horizontal space. */}
+                  <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-ink-100 pt-3">
                     <Link
                       href={skillsHref}
                       className="apple-spring apple-pressable inline-flex min-h-11 items-center justify-center gap-1.5 rounded-[10px] border border-brand-200 bg-brand-50/60 px-3 text-xs font-semibold text-brand-700 hover:bg-brand-50"

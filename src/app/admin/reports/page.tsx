@@ -156,7 +156,7 @@ export default async function AdminReportsPage({
   return (
     <div className="apple-admin space-y-4">
       <AdminPageHeader
-        title="Reports"
+        title="Analytics Reports"
         subtitle="Conversion, geography and raw exports."
       />
       <nav aria-label="Period" className="flex flex-wrap gap-1.5">
@@ -165,7 +165,7 @@ export default async function AdminReportsPage({
             key={o.value}
             href={o.value ? `/admin/reports?period=${o.value}` : "/admin/reports"}
             aria-current={(params.period ?? "") === o.value ? "page" : undefined}
-            className={`inline-flex min-h-9 items-center rounded-full px-3 text-xs font-medium ${
+            className={`inline-flex min-h-9 items-center rounded-full px-3 text-xs font-medium max-lg:min-h-11 ${
               (params.period ?? "") === o.value ? "bg-ink-900 text-white" : "bg-white text-ink-700 ring-1 ring-ink-200 hover:bg-ink-50"
             }`}
           >
@@ -291,7 +291,7 @@ export default async function AdminReportsPage({
           description="CSV for offline analysis and auditing."
           icon={FileSpreadsheet}
         />
-        <div className="grid gap-3 p-5 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-3 p-5 sm:grid-cols-2 xl:grid-cols-4">
           {exports.map((item) => (
             <div
               key={item.title}

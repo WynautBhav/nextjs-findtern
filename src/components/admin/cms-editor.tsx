@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 
+import { AdminEmpty, Panel, PanelHeader } from "@/components/admin/panel";
 import { FileUpload } from "@/components/app/file-upload";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { CMS_COLLECTIONS, type CmsField, type CmsType } from "@/lib/admin/cms-collections";
@@ -72,40 +73,51 @@ export function CmsEditor({ active, items }: { active: CmsType; items: Record<Cm
   const list = items[active];
   return (
     <div className="space-y-4">
-      <nav className="flex flex-wrap gap-1.5" aria-label="Content types">
+      {/* Same ink-100 segmented control as payouts / messages; scrolls
+          sideways on phones rather than wrapping into a pile of pills. */}
+      <nav
+        className="flex max-w-full gap-0.5 overflow-x-auto rounded-[10px] bg-ink-100 p-1"
+        aria-label="Content types"
+      >
         {(Object.keys(CMS_COLLECTIONS) as CmsType[]).map((t) => (
           <Link
             key={t}
             href={`/admin/cms?tab=${t}`}
+            aria-current={t === active ? "page" : undefined}
             className={cn(
-              "inline-flex min-h-10 items-center gap-2 rounded-[10px] px-3.5 text-sm font-medium",
-              t === active ? "bg-ink-900 text-white" : "text-ink-700 hover:bg-ink-100",
+              "apple-spring apple-pressable inline-flex min-h-11 shrink-0 items-center gap-2 whitespace-nowrap rounded-[8px] px-4 text-[14px] font-medium tracking-[-0.01em]",
+              t === active ? "bg-white text-ink-900 shadow-xs" : "text-ink-500 hover:text-ink-800",
             )}
           >
             {CMS_COLLECTIONS[t].label}
-            <span className="tabular-nums opacity-60">{items[t].length}</span>
+            <span className="tabular-nums text-ink-400">{items[t].length}</span>
           </Link>
         ))}
       </nav>
 
-      <div className="rounded-2xl border border-ink-100 bg-white">
-        <div className="flex items-center justify-between border-b border-ink-100 px-5 py-3.5">
-          <h2 className="text-sm font-semibold text-ink-900">{def.label}</h2>
-          <button
-            type="button"
-            onClick={() => open("new")}
-            className="inline-flex min-h-10 items-center gap-1.5 rounded-[10px] bg-brand-700 px-3.5 text-xs font-semibold text-white hover:bg-brand-600"
-          >
-            <Plus className="size-3.5" aria-hidden /> Add
-          </button>
-        </div>
+      <Panel>
+        <PanelHeader
+          title={def.label}
+          action={
+            <button
+              type="button"
+              onClick={() => open("new")}
+              className="apple-spring apple-pressable inline-flex min-h-11 items-center gap-1.5 rounded-[10px] bg-brand-700 px-3.5 text-[14px] font-medium text-white hover:bg-brand-600"
+            >
+              <Plus className="size-4" aria-hidden /> Add
+            </button>
+          }
+        />
         {error && editing === null ? (
           <p role="alert" className="border-b border-ink-100 bg-danger-soft px-5 py-3 text-sm text-danger">
             {error}
           </p>
         ) : null}
         {list.length === 0 ? (
-          <p className="px-5 py-10 text-center text-sm text-text-subtle">Nothing here yet.</p>
+          <AdminEmpty
+            title={`No ${def.label.toLowerCase()} yet`}
+            body="Use Add to publish the first entry. It shows on the public site as soon as it is saved."
+          />
         ) : (
           <ul className="divide-y divide-ink-100">
             {list.map((item) => {
@@ -121,12 +133,12 @@ export function CmsEditor({ active, items }: { active: CmsType; items: Record<Cm
                       type="button"
                       disabled={busy}
                       onClick={() => void send("PATCH", { id: item.id, isActive: hidden })}
-                      className="min-h-9 rounded-lg px-2.5 text-xs font-medium text-ink-700 hover:bg-ink-100"
+                      className="min-h-9 rounded-lg px-2.5 text-xs font-medium text-ink-700 hover:bg-ink-100 max-lg:min-h-11"
                     >
                       {hidden ? "Show" : "Hide"}
                     </button>
                   ) : null}
-                  <button type="button" onClick={() => open(item)} aria-label="Edit" className="grid size-9 place-items-center rounded-lg text-ink-500 hover:bg-ink-100">
+                  <button type="button" onClick={() => open(item)} aria-label="Edit" className="grid size-9 place-items-center rounded-lg text-ink-500 hover:bg-ink-100 max-lg:size-11">
                     <Pencil className="size-3.5" aria-hidden />
                   </button>
                   <button
@@ -136,7 +148,7 @@ export function CmsEditor({ active, items }: { active: CmsType; items: Record<Cm
                     onClick={() => {
                       if (window.confirm("Delete this item?")) void send("DELETE", { id: item.id });
                     }}
-                    className="grid size-9 place-items-center rounded-lg text-ink-400 hover:bg-danger-soft hover:text-danger"
+                    className="grid size-9 place-items-center rounded-lg text-ink-400 hover:bg-danger-soft hover:text-danger max-lg:size-11"
                   >
                     <Trash2 className="size-3.5" aria-hidden />
                   </button>
@@ -145,7 +157,7 @@ export function CmsEditor({ active, items }: { active: CmsType; items: Record<Cm
             })}
           </ul>
         )}
-      </div>
+      </Panel>
 
       <Sheet open={editing !== null} onOpenChange={(o) => !o && setEditing(null)}>
         <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-lg">

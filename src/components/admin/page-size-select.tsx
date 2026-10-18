@@ -40,7 +40,7 @@ export function PageSizeSelect({ pageKey = "per" }: { pageKey?: string }) {
         id="per"
         value={String(PER_PAGE_OPTIONS.includes(current as 10) ? current : 25)}
         onChange={(e) => change(e.target.value)}
-        className="apple-spring h-9 cursor-pointer rounded-[10px] border border-ink-200 bg-white px-2.5 pr-7 text-sm text-ink-700 focus:ring-2 focus:ring-brand-500/20 focus:outline-none"
+        className="apple-spring h-9 cursor-pointer rounded-[10px] border border-ink-200 bg-white px-2.5 pr-7 text-sm text-ink-700 focus:ring-2 focus:ring-brand-500/20 focus:outline-none max-lg:min-h-11"
       >
         {PER_PAGE_OPTIONS.map((option) => (
           <option key={option} value={String(option)}>

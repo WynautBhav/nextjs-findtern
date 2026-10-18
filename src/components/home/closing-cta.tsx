@@ -19,8 +19,8 @@ import { cn } from "@/lib/utils";
  * depth for none of the markup.
  */
 export function ClosingCta({
-  heading = "Start hiring or apply now!",
-  sub = "Two minutes to a profile. No fee above a 6 out of 10 score.",
+  heading = "Hire an intern, or register for one.",
+  sub = "Two minutes to a profile on either side. Screened candidates, a published rate card, nothing to negotiate.",
   primary = { label: "Hire an intern", href: "/employers" },
   secondary = { label: "Register for an internship", href: "/signup" },
   tone = "brand",

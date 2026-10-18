@@ -6,6 +6,7 @@ import { ArrowRight, CalendarClock, ClipboardCheck, CreditCard, FolderPlus, Send
 import { getDb, schema } from "@/lib/db";
 import { ButtonLink } from "@/components/ui/button";
 import { EmptyScene, SectionHead, Surface } from "@/components/app/primitives";
+import { PageHeader } from "@/components/layout/page-header";
 import { requireRole } from "@/lib/auth";
 import { displayNameOf, toCandidateProfile, type CandidateProfile } from "@/lib/employer-candidates";
 import { hiredInternIds } from "@/lib/employer-visibility";
@@ -188,28 +189,30 @@ export default async function EmployerDashboard() {
 
   return (
     <div className="space-y-10">
-      <header className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <p className="text-sm text-ink-500">{companyName || "Your company"}</p>
-          <h1 className="mt-1 text-2xl font-semibold tracking-[-0.02em] text-ink-900 md:text-[28px]">
-            {tasks.length
+      <div>
+        <p className="mb-1 text-sm text-ink-500">{companyName || "Your company"}</p>
+        <PageHeader
+          title={
+            tasks.length
               ? `${tasks.reduce((n, t) => n + t.count, 0)} things need you`
               : proposals.length
                 ? "You're all caught up"
-                : "Let's make your first hire"}
-          </h1>
-        </div>
-        <div className="flex gap-2">
-          <ButtonLink href="/employer/projects" variant="outline" size="sm" className="min-h-10">
-            <FolderPlus className="size-4" aria-hidden />
-            New project
-          </ButtonLink>
-          <ButtonLink href="/employer/candidates" variant="primary" size="sm" className="min-h-10">
-            Find candidates
-            <ArrowRight className="size-4" aria-hidden />
-          </ButtonLink>
-        </div>
-      </header>
+                : "Let's make your first hire"
+          }
+          action={
+            <div className="flex flex-wrap gap-2">
+              <ButtonLink href="/employer/projects" variant="outline" size="sm" className="min-h-11">
+                <FolderPlus className="size-4" aria-hidden />
+                New project
+              </ButtonLink>
+              <ButtonLink href="/employer/candidates" variant="primary" size="sm" className="min-h-11">
+                Find candidates
+                <ArrowRight className="size-4" aria-hidden />
+              </ButtonLink>
+            </div>
+          }
+        />
+      </div>
 
       {/* What is waiting on you */}
       {tasks.length ? (
@@ -227,7 +230,7 @@ export default async function EmployerDashboard() {
               </div>
               <Link
                 href={t.href}
-                className="inline-flex min-h-10 shrink-0 items-center gap-1.5 self-start rounded-[10px] border border-ink-200 bg-white px-3.5 text-sm font-medium text-ink-800 transition-colors hover:border-ink-300 hover:bg-ink-50 sm:self-auto"
+                className="inline-flex min-h-11 shrink-0 items-center gap-1.5 self-start rounded-[10px] border border-ink-200 bg-white px-3.5 text-sm font-medium text-ink-800 transition-colors hover:border-ink-300 hover:bg-ink-50 sm:self-auto"
               >
                 {t.cta}
                 <ArrowRight className="size-3.5" aria-hidden />
@@ -278,7 +281,7 @@ export default async function EmployerDashboard() {
         </Surface>
       </section>
 
-      <div className="grid min-w-0 gap-10 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
+      <div className="grid min-w-0 gap-10 xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
         {/* Projects */}
         <section className="min-w-0">
           <SectionHead

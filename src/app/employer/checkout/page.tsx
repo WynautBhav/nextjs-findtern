@@ -91,8 +91,8 @@ export default async function EmployerCheckout() {
           </div>
         </>
       ) : (
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
-          <div className="space-y-3">
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_20rem]">
+          <div className="min-w-0 space-y-3">
             {lines.map((line) => (
               <article key={line.id} className="rounded-[20px] border border-ink-200/70 bg-white p-5 shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)]">
                 <div className="flex flex-wrap items-start justify-between gap-4">
@@ -137,7 +137,7 @@ export default async function EmployerCheckout() {
             ))}
           </div>
 
-          <aside className="space-y-4 lg:sticky lg:top-8 lg:self-start">
+          <aside className="min-w-0 space-y-4 xl:sticky xl:top-8 xl:self-start">
             <CheckoutSummary
               employerId={uid}
               prefill={prefill}

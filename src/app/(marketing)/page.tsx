@@ -19,13 +19,29 @@ import {
   getPopularSteps,
   getFeaturedSkills,
 } from "@/lib/content";
+import { JsonLd } from "@/components/seo/json-ld";
+import { howToJsonLd, pricingJsonLd, webPageJsonLd } from "@/lib/seo";
 
 export const metadata: Metadata = {
-  title: "Findtern | Internship Simplified",
+  title: { absolute: "Findtern | Hire Pre-Screened Interns in India for the Price of a Coffee" },
   description:
-    "Hire a verified intern for the price of a coffee, or get placed in a paid internship - or your deposit back. Structured screening, published rates, contracted work.",
+    "Hire interns in India who are already interviewed, tested and scored. Three published plans from free to ₹200/hr, one flat ₹5,000 per-hire fee, billed only on approved hours. Students: get assessed and placed in a paid internship.",
   alternates: { canonical: "/" },
 };
+
+const HOME_HOWTO = howToJsonLd({
+  name: "How to hire a pre-screened intern on Findtern",
+  description: "Seven steps from a candidate signing up to an employer hiring them, with the screening done in between.",
+  steps: [
+    { name: "Candidate onboarding", text: "Interns create a profile and join the platform." },
+    { name: "Academic verification", text: "Academic details are added and verified for authenticity." },
+    { name: "AI interview", text: "Candidates pick their interest areas and complete a tailored, structured AI interview." },
+    { name: "Aptitude test", text: "Every candidate sits a structured aptitude test." },
+    { name: "Coding test", text: "Candidates from a coding background complete a live coding test." },
+    { name: "Findtern Score", text: "Each intern receives one score out of 10 from academics, interview and test results." },
+    { name: "Hire", text: "Employers filter, sort and select interns by Findtern Score, skills and interests, then send a proposal." },
+  ],
+});
 
 export default async function HomePage() {
   const [partners, skills, faces, steps, plansInr, plansUsd] = await Promise.all([
@@ -43,6 +59,18 @@ export default async function HomePage() {
 
   return (
     <>
+      <JsonLd
+        data={[
+          webPageJsonLd({
+            path: "/",
+            name: "Findtern - hire pre-screened interns in India",
+            description: String(metadata.description),
+          }),
+          HOME_HOWTO,
+          pricingJsonLd(plansInr),
+        ]}
+      />
+
       {/* 1 - Hero: copy, cinematic video band, two audience paths */}
       <HeroSplit />
 

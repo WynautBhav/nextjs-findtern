@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ArrowRight, Building2, GraduationCap } from "lucide-react";
+import { ArrowRight, Building2, Coffee, GraduationCap } from "lucide-react";
 
 import { ButtonLink } from "@/components/ui/button";
 import { TextReveal } from "@/components/motion/text-reveal";
@@ -152,22 +152,26 @@ export function HeroSplit() {
           </div>
         </div>
 
-        {/* ── The two audience paths ────────────────────────────── */}
+        {/* ── Two employer arguments ───────────────────────────────
+            Both cards speak to the company hiring. The candidate pitch used
+            to sit in the second slot, which put "get your deposit back"
+            beside "start hiring" on a page whose headline, stats and pricing
+            table are all addressed to employers. Candidates still have the
+            secondary CTA above and their own page at /interns. */}
         <div className="mt-14 grid gap-4 sm:mt-16 lg:grid-cols-2 lg:gap-5">
           <AudienceCard
-            kicker="For employers"
+            kicker="Screened for you"
             Icon={Building2}
             title="Hire someone who has already been screened"
             body="Browse candidates who are interviewed, tested, and scored. Filter by Findtern Score, skills, and interests."
             cta={{ label: "Start hiring", href: "/employers" }}
-            hrefPreview="/media/partner-6-manari-india.webp"
           />
           <AudienceCard
-            kicker="For candidates"
-            Icon={GraduationCap}
-            title="Get placed, or get your deposit back"
-            body="One assessment produces a score you can see the working for. That score sets the rate employers pay."
-            cta={{ label: "How it works", href: "/interns" }}
+            kicker="Priced by score"
+            Icon={Coffee}
+            title="Pay for approved hours, plus one flat per-hire fee"
+            body="Three plans named after coffee, each tied to a score band. The rate card is published, and the pilot-batch discount is on right now."
+            cta={{ label: "See pricing", href: "/pricing" }}
           />
         </div>
       </div>
@@ -251,7 +255,6 @@ function AudienceCard({
   title: string;
   body: string;
   cta: { label: string; href: string };
-  hrefPreview?: string;
 }) {
   return (
     <div className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.035] p-6 transition-colors duration-300 hover:border-white/20 hover:bg-white/[0.07] sm:p-7">

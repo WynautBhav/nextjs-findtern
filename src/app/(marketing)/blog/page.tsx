@@ -10,12 +10,14 @@ import type { CmsBlogPost } from "@/lib/content/types";
 import { plainTextExcerpt, readingMinutes } from "@/lib/richtext";
 import { tidyText } from "@/lib/text";
 import { cn } from "@/lib/utils";
+import { JsonLd } from "@/components/seo/json-ld";
+import { blogListJsonLd, breadcrumbJsonLd } from "@/lib/seo";
 
 export const metadata: Metadata = {
-  title: "Blog",
+  title: "Internship Hiring Blog: Scoring, Rates, Timesheets and the Guarantee",
   description:
-    "How scoring, rate cards, timesheets and the guarantee actually work - written by the team that builds them.",
-  alternates: { canonical: "/blog" },
+    "Articles for companies hiring interns in India and students looking for one: how the Findtern Score, rate card, timesheets and the placement guarantee actually work.",
+  alternates: { canonical: "/blog", types: { "application/rss+xml": "/blog/feed.xml" } },
 };
 
 export default async function BlogPage() {
@@ -24,6 +26,7 @@ export default async function BlogPage() {
 
   return (
     <>
+      <JsonLd data={[blogListJsonLd(posts), breadcrumbJsonLd([{ name: "Blog", path: "/blog" }])]} />
       <PageHero
         eyebrow="Read"
         title={
