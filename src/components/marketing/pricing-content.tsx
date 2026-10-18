@@ -12,7 +12,7 @@ import { useRegionBands } from "@/components/marketing/region-rates";
 import { MonthlyRate } from "@/components/marketing/monthly-rate";
 import { PilotNote, PlanPrice } from "@/components/marketing/plan-price";
 import { PricingCalculator } from "@/components/marketing/pricing-calculator";
-import { CostComparison } from "@/components/marketing/cost-comparison";
+import { WhereMoneyGoes } from "@/components/marketing/where-money-goes";
 import { pricingFaq } from "@/lib/content/pricing-faq";
 import type { CmsPlan } from "@/lib/content/types";
 import { planHasOffer } from "@/lib/plan-offer";
@@ -289,20 +289,9 @@ export function PricingContent({
         </p>
       </PageSection>
 
-      {/* ── Employer cost comparison ────────────────────────────────── */}
+      {/* ── Where the money goes ────────────────────────────────────── */}
       <PageSection tone="brand">
-        <div className="mx-auto max-w-2xl text-center">
-          <h2 className="text-balance text-3xl font-semibold tracking-[-0.025em] text-white sm:text-4xl">
-            Against the alternatives
-          </h2>
-          <p className="mt-4 text-lg text-on-dark-subtle">
-            {isIndia
-              ? "Two other ways to hire an intern in India, priced the way they are usually quoted."
-              : "Two other ways to hire an intern in the US, priced the way they are usually quoted."}
-          </p>
-        </div>
-
-        <CostComparison isIndia={isIndia} plans={plans} />
+        <WhereMoneyGoes plans={plans} isIndia={isIndia} />
       </PageSection>
 
       {/* ── FAQ ────────────────────────────────────────────────────── */}
