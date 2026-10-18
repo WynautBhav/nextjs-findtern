@@ -14,7 +14,7 @@ import type { CmsBlogPost, CmsHome, CmsLegalDoc, CmsPlan } from "./types";
 import { EMPLOYER_TERMS, PLATFORM_TERMS } from "./legal";
 import { INTERN_NDA, INTERN_TERMS } from "./legal-intern";
 import { getDb, schema, hasDb } from "@/lib/db";
-import { eq, desc, asc } from "drizzle-orm";
+import { eq, desc, asc, sql } from "drizzle-orm";
 import { inrMinorToUsdMinor } from "@/lib/currency";
 
 /* ==========================================================================
@@ -169,20 +169,59 @@ function planToUsd(p: CmsPlan): CmsPlan {
   };
 }
 
+/* Blog images are stored inline as base64 data URLs (46 of them, up to 500 KB
+   each). The list and detail accessors never load them: they return the
+   /api/blog-image route instead, which serves one image with caching. */
+const t = schema.websiteBlogPosts;
+const blogColumns = {
+  id: t.id,
+  slug: t.slug,
+  title: t.title,
+  excerpt: t.excerpt,
+  body: t.body,
+  status: t.status,
+  publishedAt: t.publishedAt,
+  hasCover: sql<boolean>`${t.coverImageUrl} is not null and ${t.coverImageUrl} <> ''`,
+  hasBanner: sql<boolean>`${t.bannerImageUrl} is not null and ${t.bannerImageUrl} <> ''`,
+};
+
+function withImageRoutes({ hasCover, hasBanner, ...row }: { hasCover: boolean; hasBanner: boolean; slug: string }): CmsBlogPost {
+  const base = `/api/blog-image/${encodeURIComponent(row.slug)}`;
+  return {
+    ...(row as unknown as CmsBlogPost),
+    coverImageUrl: hasCover ? `${base}/cover` : null,
+    bannerImageUrl: hasBanner ? `${base}/banner` : null,
+  };
+}
+
 export async function getBlogPosts(): Promise<CmsBlogPost[]> {
   return tryDb(async () => {
     const db = getDb();
-    const rows = await db.select().from(schema.websiteBlogPosts).where(eq(schema.websiteBlogPosts.status, "published")).orderBy(desc(schema.websiteBlogPosts.publishedAt));
-    return rows.length ? (rows as unknown as CmsBlogPost[]) : BLOG_POSTS;
+    const rows = await db.select(blogColumns).from(t).where(eq(t.status, "published")).orderBy(desc(t.publishedAt));
+    return rows.length ? rows.map(withImageRoutes) : BLOG_POSTS;
   }, BLOG_POSTS);
 }
 
 export async function getBlogPost(slug: string): Promise<CmsBlogPost | null> {
   return tryDb(async () => {
     const db = getDb();
-    const [row] = await db.select().from(schema.websiteBlogPosts).where(eq(schema.websiteBlogPosts.slug, slug)).limit(1);
-    return row ? (row as unknown as CmsBlogPost) : (BLOG_POSTS.find((p) => p.slug === slug) ?? null);
+    const [row] = await db.select(blogColumns).from(t).where(eq(t.slug, slug)).limit(1);
+    return row ? withImageRoutes(row) : (BLOG_POSTS.find((p) => p.slug === slug) ?? null);
   }, BLOG_POSTS.find((p) => p.slug === slug) ?? null);
+}
+
+/** Raw stored value of a post's cover or banner (a data: or http(s) URL). */
+export async function getBlogImage(slug: string, kind: "cover" | "banner"): Promise<string | null> {
+  return tryDb(async () => {
+    const db = getDb();
+    const [row] = await db
+      .select({ cover: t.coverImageUrl, banner: t.bannerImageUrl })
+      .from(t)
+      .where(eq(t.slug, slug))
+      .limit(1);
+    if (!row) return null;
+    return (kind === "banner" ? row.banner || row.cover : row.cover) || null;
+  }, null);
 }
 
 /* --------------------------------------------------------------------------

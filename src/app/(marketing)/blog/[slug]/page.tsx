@@ -40,6 +40,7 @@ export async function generateMetadata({
       type: "article",
       publishedTime: post.publishedAt,
       url: `/blog/${post.slug}`,
+      ...(post.coverImageUrl ? { images: [post.coverImageUrl] } : {}),
     },
   };
 }
@@ -59,6 +60,7 @@ export default async function BlogDetailPage({
   const title = tidyText(post.title);
   const clean = sanitizeRichText(post.body);
   const minutes = readingMinutes(post.body);
+  const hero = post.bannerImageUrl ?? post.coverImageUrl;
 
   return (
     <>
@@ -101,6 +103,15 @@ export default async function BlogDetailPage({
               <CopyLink />
             </div>
           </div>
+
+          {hero ? (
+            <div className="mt-10 max-w-4xl overflow-hidden rounded-2xl border border-ink-100 bg-ink-100">
+              {/* Banners range from square to 3:1 and some carry text, so they
+                  keep their own aspect ratio rather than being cropped. */}
+              {/* eslint-disable-next-line @next/next/no-img-element -- served and cached by /api/blog-image */}
+              <img src={hero} alt="" decoding="async" className="block h-auto w-full" />
+            </div>
+          ) : null}
         </div>
       </header>
 
@@ -123,8 +134,18 @@ export default async function BlogDetailPage({
                 <li key={r.id}>
                   <Link
                     href={`/blog/${r.slug}`}
-                    className="flex items-start py-1 text-sm font-medium leading-snug text-ink-700 transition-colors hover:text-primary"
+                    className="flex items-start gap-3 py-1 text-sm font-medium leading-snug text-ink-700 transition-colors hover:text-primary"
                   >
+                    {r.coverImageUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element -- served and cached by /api/blog-image
+                      <img
+                        src={r.coverImageUrl}
+                        alt=""
+                        loading="lazy"
+                        decoding="async"
+                        className="size-12 shrink-0 rounded-lg border border-ink-200 object-cover"
+                      />
+                    ) : null}
                     {tidyText(r.title)}
                   </Link>
                 </li>

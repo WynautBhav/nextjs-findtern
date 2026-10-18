@@ -21,6 +21,7 @@
     "shots": "PORT=3100 DATABASE_URL=postgresql://findtern:findtern_dev@localhost:5432/findtern SESSION_SECRET=verify-only-secret-at-least-32-characters node --experimental-strip-types scripts/shots.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1152.0",
     "@node-rs/argon2": "^2.2.1",
     "class-variance-authority": "^0.7.1",
     "cn": "^0.4.0",

@@ -6,6 +6,7 @@ import { PageHero, PageSection } from "@/components/marketing/page-hero";
 import { ButtonLink } from "@/components/ui/button";
 import { TiltCard } from "@/components/motion/tilt-card";
 import { getBlogPosts } from "@/lib/content";
+import type { CmsBlogPost } from "@/lib/content/types";
 import { plainTextExcerpt, readingMinutes } from "@/lib/richtext";
 import { tidyText } from "@/lib/text";
 import { cn } from "@/lib/utils";
@@ -44,16 +45,7 @@ export default async function BlogPage() {
             >
               <div className="grid lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
                 <div className="relative aspect-16/10 overflow-hidden bg-ink-100 lg:aspect-auto lg:min-h-72">
-                  {/* The CMS has no cover images, so the lead card uses a
-                      generated gradient keyed to the slug rather than a
-                      stock photo that means nothing. */}
-                  <div
-                    aria-hidden
-                    className={cn(
-                      "absolute inset-0 bg-gradient-to-br",
-                      gradientFor(lead.slug),
-                    )}
-                  />
+                  <Cover post={lead} eager />
                   <div className="absolute inset-0 flex items-end p-6">
                     <span className="rounded-full bg-white/90 px-3 py-1 text-2xs font-semibold uppercase tracking-[0.12em] text-primary backdrop-blur">
                       Latest
@@ -90,12 +82,9 @@ export default async function BlogPage() {
                   className="group flex h-full flex-col"
                 >
                   <div className="relative aspect-16/10 overflow-hidden bg-ink-100">
-                    <div
-                      aria-hidden
-                      className={cn(
-                        "absolute inset-0 bg-gradient-to-br transition-transform duration-500 ease-ease-out-expo [@media(any-hover:hover)]:group-hover:scale-105",
-                        gradientFor(post.slug),
-                      )}
+                    <Cover
+                      post={post}
+                      className="transition-transform duration-500 ease-ease-out-expo [@media(any-hover:hover)]:group-hover:scale-105"
                     />
                   </div>
                   <div className="flex flex-1 flex-col p-6">
@@ -137,14 +126,26 @@ export default async function BlogPage() {
   );
 }
 
+/** The post's CMS cover image, or its slug gradient when it has none. */
+function Cover({ post, eager, className }: { post: CmsBlogPost; eager?: boolean; className?: string }) {
+  if (post.coverImageUrl) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element -- served and cached by /api/blog-image
+      <img
+        src={post.coverImageUrl}
+        alt=""
+        loading={eager ? "eager" : "lazy"}
+        decoding="async"
+        className={cn("absolute inset-0 size-full object-cover", className)}
+      />
+    );
+  }
+  return <div aria-hidden className={cn("absolute inset-0 bg-gradient-to-br", gradientFor(post.slug), className)} />;
+}
+
 /**
- * Deterministic cover gradient per slug.
- *
- * The CMS has no cover images for any of the 23 posts, so the alternative is
- * either a stock photo that says nothing or a flat grey. A gradient keyed to
- * the slug gives each post a stable, distinct identity that survives without
- * an asset pipeline - and it is deterministic, so the same post is always the
- * same colour.
+ * Deterministic cover gradient per slug, for posts without a cover image. A
+ * gradient keyed to the slug gives each one a stable, distinct identity.
  */
 function gradientFor(slug: string): string {
   const pairs = [

@@ -34,8 +34,13 @@ export async function sendSmtpMail(opts: {
     const entry = `--- ${new Date().toISOString()}\nTo: ${[opts.to].flat().join(", ")}\nSubject: ${opts.subject}\n${
       opts.attachments?.length ? `Attachments: ${opts.attachments.map((a) => a.filename).join(", ")}\n` : ""
     }\n${opts.text}\n\n`;
-    await mkdir(dir, { recursive: true });
-    await appendFile(join(dir, `${new Date().toISOString().slice(0, 10)}.log`), entry);
+    try {
+      await mkdir(dir, { recursive: true });
+      await appendFile(join(dir, `${new Date().toISOString().slice(0, 10)}.log`), entry);
+    } catch {
+      // Read-only filesystem (Vercel): the console line below is the record.
+      console.info(entry);
+    }
     console.info(`[mail:log] ${opts.subject} → ${[opts.to].flat().join(", ")}`);
     return { ok: true };
   }
