@@ -46,4 +46,9 @@ else
   echo "Tables that differ (live vs restored), check they're only recent activity:"
   cat "$OUT/restore-diff-$STAMP.txt"
 fi
-dropdb "$TEST_DB"
+# Keep the restored copy for the migration rehearsal unless told otherwise.
+if [[ "${KEEP_TEST_DB:-1}" == "1" ]]; then
+  echo "Kept $TEST_DB for the rehearsal (drop it later with: dropdb $TEST_DB)"
+else
+  dropdb "$TEST_DB"
+fi
