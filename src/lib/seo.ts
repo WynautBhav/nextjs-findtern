@@ -21,6 +21,16 @@ export const ORG_ID = `${SITE_URL}/#organization`;
 export const WEBSITE_ID = `${SITE_URL}/#website`;
 export const LOGO_URL = `${SITE_URL}/media/findtern-logo.png`;
 
+/**
+ * True when this deployment is not the real domain (a Vercel preview or the
+ * staging copy). Read from PUBLIC_ORIGIN, which the hosts already set; an
+ * unset value means a local or legacy build and is treated as production.
+ */
+export function isStagingHost(): boolean {
+  const origin = (process.env.PUBLIC_ORIGIN ?? "").trim();
+  return origin !== "" && !origin.includes("findtern.in");
+}
+
 export function absoluteUrl(path: string): string {
   if (/^https?:\/\//.test(path)) return path;
   return `${SITE_URL}${path.startsWith("/") ? path : `/${path}`}`;

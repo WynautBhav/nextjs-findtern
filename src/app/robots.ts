@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next";
 
-import { SITE_URL } from "@/lib/seo";
+import { SITE_URL, isStagingHost } from "@/lib/seo";
 
 const PRIVATE = ["/admin", "/employer", "/intern", "/api"];
 
@@ -10,6 +10,11 @@ const PRIVATE = ["/admin", "/employer", "/intern", "/api"];
  * answer engines are welcome to read and cite the public pages.
  */
 export default function robots(): MetadataRoute.Robots {
+  // A preview or staging deploy (Vercel) must never be indexed: every page
+  // there canonicalises to findtern.in and would only create duplicates.
+  if (isStagingHost()) {
+    return { rules: { userAgent: "*", disallow: "/" } };
+  }
   const aiCrawlers = [
     "GPTBot",
     "OAI-SearchBot",

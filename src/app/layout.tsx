@@ -4,7 +4,7 @@ import { SmoothScroll } from "@/components/motion/smooth-scroll";
 import { Analytics } from "@/components/marketing/analytics";
 import { ChatWidget } from "@/components/chat/chat-widget";
 import { JsonLd } from "@/components/seo/json-ld";
-import { siteGraph } from "@/lib/seo";
+import { isStagingHost, siteGraph } from "@/lib/seo";
 import "./globals.css";
 
 /**
@@ -49,11 +49,15 @@ export const metadata: Metadata = {
     site: "@Findtern",
     creator: "@Findtern",
   },
-  robots: {
-    index: true,
-    follow: true,
-    googleBot: { index: true, follow: true, "max-image-preview": "large", "max-snippet": -1, "max-video-preview": -1 },
-  },
+  // Staging and preview deploys carry noindex so they never compete with
+  // findtern.in, which every canonical already points at.
+  robots: isStagingHost()
+    ? { index: false, follow: false }
+    : {
+        index: true,
+        follow: true,
+        googleBot: { index: true, follow: true, "max-image-preview": "large", "max-snippet": -1, "max-video-preview": -1 },
+      },
   alternates: {
     canonical: "/",
     types: { "application/rss+xml": `${SITE_URL}/blog/feed.xml` },
