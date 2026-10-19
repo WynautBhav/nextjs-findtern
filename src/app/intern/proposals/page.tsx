@@ -6,7 +6,7 @@ import { EmptyScene, PageHead, SectionHead } from "@/components/app/primitives";
 import { StatusPill, proposalStatus } from "@/components/app/proposal-status";
 import { requireRole } from "@/lib/auth";
 import { loadInternData, projectNames } from "@/lib/intern-data";
-import { formatDayLabel, formatMoney } from "@/lib/format";
+import { formatJoiningDate, formatMoney } from "@/lib/format";
 import type { ProposalRow } from "@/lib/journey";
 import { parseOffer, internStipendInrMinor, offerPastStart } from "@/lib/offer";
 
@@ -149,9 +149,9 @@ function OfferCard({
           <dd className="mt-0.5 text-sm font-semibold tabular-nums text-ink-900">{stipend}</dd>
         </div>
         <div>
-          <dt className="text-xs text-ink-600">Starts</dt>
+          <dt className="text-xs text-ink-600">Joining date</dt>
           <dd className="mt-0.5 text-sm font-medium text-ink-900">
-            {start ? formatDayLabel(start) : "To be agreed"}
+            {formatJoiningDate(start)}
           </dd>
         </div>
       </dl>

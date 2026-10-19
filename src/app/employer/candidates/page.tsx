@@ -24,7 +24,7 @@ import {
   type CandidateProfile,
   type Ratings,
 } from "@/lib/employer-candidates";
-import { hiredInternIds } from "@/lib/employer-visibility";
+import { hiredInternIds, hiredProposalSql } from "@/lib/employer-visibility";
 import { attachPhotos, candidatePoolClauses, scoreExpr } from "@/lib/employer-pool";
 import { requireEmployerSetup } from "@/lib/employer-setup";
 import { employerRegion, resolvePricing, type Currency } from "@/lib/employer-pricing";
@@ -128,6 +128,10 @@ export default async function CandidatesPage({
   let plans: (typeof schema.pricingPlans.$inferSelect)[] = [];
   /** This employer's latest open-or-hired proposal per candidate on the page. */
   const proposalFor = new Map<string, { id: string; status: string }>();
+  // Hired by this employer: compare drops them (legacy employer-compare.tsx:
+  // 550), so the toggle is not offered. A plain query, not `hiredInternIds`,
+  // which reports everyone as hired under admin "View as".
+  let hiredHere = new Set<string>();
 
   try {
     const db = getDb();
@@ -137,6 +141,15 @@ export default async function CandidatesPage({
       nameUnlocked = await hiredInternIds(db, uid);
     } catch {
       nameUnlocked = new Set<string>();
+    }
+    try {
+      const rows = await db
+        .select({ internId: schema.proposals.internId })
+        .from(schema.proposals)
+        .where(and(eq(schema.proposals.employerId, uid), hiredProposalSql()));
+      hiredHere = new Set(rows.map((r) => r.internId));
+    } catch {
+      hiredHere = new Set<string>();
     }
 
     // A shortlist is keyed on (project, candidate), so the page needs a project
@@ -712,6 +725,7 @@ export default async function CandidatesPage({
                         </td>
                         <td className="px-5 py-3.5 text-right">
                           <div className="flex items-center justify-end gap-1.5">
+                            {hiredHere.has(c.id) ? null : (
                             <Link
                               href={withFilters(filters, { ids: toggle(compareIds, c.id) })}
                               scroll={false}
@@ -727,6 +741,7 @@ export default async function CandidatesPage({
                             >
                               <Scale className="size-3.5" />
                             </Link>
+                            )}
                             <Link
                               href={`/employer/intern/${c.id}`}
                               className="apple-spring inline-flex min-h-8 items-center gap-1 rounded-lg bg-brand-700 px-2.5 text-xs font-semibold text-white shadow-xs hover:bg-brand-600"
@@ -759,6 +774,7 @@ export default async function CandidatesPage({
                   region={region}
                   selected={compareIds.includes(candidate.id)}
                   compareHref={withFilters(filters, { ids: toggle(compareIds, candidate.id) })}
+                  comparable={!hiredHere.has(candidate.id)}
                   projectId={activeProjectId}
                   shortlisted={shortlisted.has(candidate.id)}
                   nameUnlocked={nameUnlocked.has(candidate.id)}

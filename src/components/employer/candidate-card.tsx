@@ -50,6 +50,8 @@ export interface CandidateCardProps {
   region: "IN" | null;
   selected: boolean;
   compareHref: string;
+  /** False once this employer has hired them: compare leaves hires out. */
+  comparable?: boolean;
   projectId: string | null;
   shortlisted: boolean;
   /** True when this employer hired the candidate - the only case the full name shows. */
@@ -99,6 +101,7 @@ export function CandidateCard({
   region,
   selected,
   compareHref,
+  comparable = true,
   projectId,
   shortlisted,
   nameUnlocked = false,
@@ -424,6 +427,7 @@ export function CandidateCard({
           </Sheet>
 
           {/* Compare Toggle */}
+          {comparable ? (
           <Link
             href={compareHref}
             scroll={false}
@@ -443,6 +447,7 @@ export function CandidateCard({
             )}
             <span>{selected ? "Selected" : "Compare"}</span>
           </Link>
+          ) : null}
 
           <Link
             href={`/employer/intern/${encodeURIComponent(candidate.id)}`}

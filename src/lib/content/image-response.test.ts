@@ -16,14 +16,14 @@ test("a stored PNG is resized and served as WebP", async () => {
   assert.equal(meta.width, 480);
 });
 
-test("small images are not enlarged, GIFs pass through, SVG is refused", async () => {
+test("small images are not enlarged, GIFs become WebP, SVG is refused", async () => {
   const small = await sharp({ create: { width: 100, height: 40, channels: 3, background: "#fff" } }).jpeg().toBuffer();
   const res = await cmsImageResponse(`data:image/jpeg;base64,${small.toString("base64")}`, req, 480);
   assert.equal((await sharp(Buffer.from(await res.arrayBuffer())).metadata()).width, 100);
 
   const gif = await sharp({ create: { width: 10, height: 10, channels: 3, background: "#000" } }).gif().toBuffer();
   const g = await cmsImageResponse(`data:image/gif;base64,${gif.toString("base64")}`, req);
-  assert.equal(g.headers.get("content-type"), "image/gif");
+  assert.equal(g.headers.get("content-type"), "image/webp");
 
   const svg = await cmsImageResponse("data:image/svg+xml;base64,PHN2Zy8+", req);
   assert.equal(svg.status, 404);

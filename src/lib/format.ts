@@ -198,6 +198,22 @@ export function formatDayLabel(value: Date | string | null, now: Date = new Date
   return date.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
 }
 
+/**
+ * A joining date, always absolute ("24 Oct 2026") so it can be planned around,
+ * with the relative hint while it is close: "24 Oct 2026 · in 5 days".
+ */
+export function formatJoiningDate(value: Date | string | null, now: Date = new Date()): string {
+  if (!value) return "To be agreed";
+  const date = typeof value === "string" ? new Date(value) : value;
+  if (Number.isNaN(date.getTime())) return "To be agreed";
+  const absolute = date.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Kolkata" });
+  const ahead = calendarDaysBetween(now, date);
+  if (ahead === 0) return `${absolute} · today`;
+  if (ahead === 1) return `${absolute} · tomorrow`;
+  if (ahead > 1 && ahead < 7) return `${absolute} · in ${ahead} days`;
+  return absolute;
+}
+
 /** Whole calendar days from `from` to `to` in India time (negative = past). */
 function calendarDaysBetween(from: Date, to: Date): number {
   const day = (d: Date) =>

@@ -52,6 +52,27 @@ export async function POST(req: Request) {
     if (existing) {
       return NextResponse.json({ error: "An account with this email already exists. Sign in instead." }, { status: 400 });
     }
+    // One person, one role: the signup routes refuse an address held by the
+    // other side, so refuse it before mailing a code that cannot be used.
+    const [otherSide] =
+      subjectType === "intern"
+        ? await db
+            .select({ id: schema.employers.id })
+            .from(schema.employers)
+            .where(sql`lower(${schema.employers.companyEmail}) = ${email}`)
+            .limit(1)
+        : await db.select({ id: schema.users.id }).from(schema.users).where(sql`lower(${schema.users.email}) = ${email}`).limit(1);
+    if (otherSide) {
+      return NextResponse.json(
+        {
+          error:
+            subjectType === "intern"
+              ? "This email is registered to a company account. One email can't be used for both an intern and a company account."
+              : "This email is registered to an intern account. One email can't be used for both an intern and a company account.",
+        },
+        { status: 400 },
+      );
+    }
   }
 
   const [last] = await db

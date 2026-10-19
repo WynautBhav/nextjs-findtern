@@ -10,7 +10,7 @@ import { ScoreBar } from "@/components/app/score-bar";
 import { requireRole } from "@/lib/auth";
 import { canAccess } from "@/lib/security/guards";
 import { loadInternData, projectNames } from "@/lib/intern-data";
-import { formatDayLabel, formatMoney } from "@/lib/format";
+import { formatDayLabel, formatJoiningDate, formatMoney } from "@/lib/format";
 import { toArray } from "@/lib/journey";
 import { FREE_DECLINES, parseOffer, internStipendInrMinor, offerPastStart } from "@/lib/offer";
 
@@ -138,7 +138,7 @@ export default async function ProposalDetail({ params }: { params: Promise<{ id:
                   {parsed.laptop ? <DetailRow label="Laptop" value={parsed.laptop === "company" || parsed.laptop === "yes" ? "Provided by the company" : "Your own"} /> : null}
                 </>
               )}
-              <DetailRow label="Starts" value={startDate ? formatDayLabel(startDate) : "To be agreed"} />
+              <DetailRow label="Joining date" value={formatJoiningDate(startDate)} />
               <DetailRow label="Timezone" value={parsed.timezone || "Asia/Kolkata"} />
               <DetailRow label="Sent" value={formatDayLabel(proposal.createdAt)} />
             </dl>

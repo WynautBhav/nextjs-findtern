@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 
 import { csrfFetch } from "@/lib/client-fetch";
-import { formatCurrency, formatDate } from "@/lib/format";
+import { formatCurrency } from "@/lib/format";
 import { displayNameOf, initialsOf } from "@/lib/employer-candidates";
 import { Pill } from "@/components/app/primitives";
 import { EmptyScene } from "@/components/app/primitives";
@@ -32,13 +32,6 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetDescription,
-} from "@/components/ui/sheet";
 import { parseOffer } from "@/lib/offer";
 
 export type ProposalItem = {
@@ -78,7 +71,6 @@ export function ProposalsManager({
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [projectFilter, setProjectFilter] = useState<string>("all");
 
-  const [activeProposal, setActiveProposal] = useState<ProposalItem | null>(null);
   const [withdrawTarget, setWithdrawTarget] = useState<ProposalItem | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState("");
@@ -342,14 +334,16 @@ export function ProposalsManager({
 
                   {/* Actions Column */}
                   <div className="flex flex-wrap items-center gap-2 sm:self-center shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => setActiveProposal(item)}
+                    {/* The full page carries every term (start date, hours,
+                        rate, total, shift, leave, skills); a summary sheet here
+                        showed a subset and hid the rest. */}
+                    <Link
+                      href={`/employer/proposal/${item.proposal.id}`}
                       className="apple-spring apple-pressable inline-flex min-h-11 items-center justify-center gap-1.5 rounded-[10px] border border-ink-200 bg-white px-3.5 text-xs font-semibold text-ink-700 hover:border-ink-300 hover:bg-ink-50 hover:text-ink-900"
                     >
                       <Eye className="size-3.5" />
                       <span>View Details</span>
-                    </button>
+                    </Link>
 
                     {isAccepted && (
                       // Accepted offers are billed straight from checkout - the
@@ -427,113 +421,6 @@ export function ProposalsManager({
         </DialogContent>
       </Dialog>
 
-      {/* Proposal Details Sheet */}
-      <Sheet
-        open={Boolean(activeProposal)}
-        onOpenChange={(open) => !open && setActiveProposal(null)}
-      >
-        <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto">
-          {activeProposal && (() => {
-            const offer = parseOffer(activeProposal.proposal.offerDetails, activeProposal.proposal.currency);
-            const candidateName = nameOf(activeProposal);
-            const candidateInitials = initialsOf(
-              activeProposal.user?.firstName?.trim() || "",
-              activeProposal.user?.lastName?.trim() || "",
-            );
-            const contactUnlocked = activeProposal.internHired;
-            const roleTitle = offer.roleTitle || "Internship";
-            const stipendMinor = offer.monthlyMinor;
-            const duration = `${offer.months} month${offer.months === 1 ? "" : "s"}`;
-            const workMode = offer.mode || "Not stated";
-            const hasLaptop = offer.laptop === "company" || offer.laptop === "yes";
-            const scope = offer.jd || "Not stated.";
-
-            return (
-              <div className="space-y-6 pt-4">
-                <SheetHeader>
-                  <div className="flex items-center justify-between gap-2">
-                    <SheetTitle className="text-base font-bold text-ink-900">
-                      Proposal Details
-                    </SheetTitle>
-                    {getStatusBadge(activeProposal.proposal.status)}
-                  </div>
-                  <SheetDescription className="text-xs text-text-subtle">
-                    Offer sent on {formatDate(activeProposal.proposal.createdAt)}
-                  </SheetDescription>
-                </SheetHeader>
-
-                {/* Candidate Summary */}
-                <div className="rounded-[10px] border border-ink-200/70 bg-ink-50/50 p-4">
-                  <div className="flex items-center gap-3">
-                    <span className="grid size-10 place-items-center rounded-[10px] bg-brand-100 text-sm font-bold text-brand-800">
-                      {candidateInitials === "?" ? "C" : candidateInitials}
-                    </span>
-                    <div>
-                      <h3 className="text-xs font-bold text-ink-900">{candidateName}</h3>
-                      <p className="text-xs font-medium text-brand-700">{roleTitle}</p>
-                      {contactUnlocked && activeProposal.user?.email ? (
-                        <p className="text-xs text-text-subtle">{activeProposal.user.email}</p>
-                      ) : null}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Terms Overview */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="rounded-[10px] border border-ink-200/70 bg-white p-3.5">
-                    <p className="text-[13px] text-text-subtle">
-                      Monthly stipend
-                    </p>
-                    <p className="mt-1 text-sm font-bold tabular-nums text-brand-800">
-                      {stipendMinor != null ? formatCurrency(stipendMinor, offer.currency) : "Not stated"}
-                    </p>
-                  </div>
-
-                  <div className="rounded-[10px] border border-ink-200/70 bg-white p-3.5">
-                    <p className="text-[13px] text-text-subtle">
-                      Duration
-                    </p>
-                    <p className="mt-1 text-sm font-bold tabular-nums text-ink-900">{duration}</p>
-                  </div>
-
-                  <div className="rounded-[10px] border border-ink-200/70 bg-white p-3.5">
-                    <p className="text-[13px] text-text-subtle">
-                      Work mode
-                    </p>
-                    <p className="mt-1 text-sm font-bold text-ink-900 capitalize">{workMode}</p>
-                  </div>
-
-                  <div className="rounded-[10px] border border-ink-200/70 bg-white p-3.5">
-                    <p className="text-[13px] text-text-subtle">
-                      Laptop provided
-                    </p>
-                    <p className="mt-1 text-sm font-bold text-ink-900">{hasLaptop ? "Yes" : "No"}</p>
-                  </div>
-                </div>
-
-                {/* Scope of Work */}
-                <div className="rounded-[10px] border border-ink-200/70 bg-white p-4 space-y-2">
-                  <h3 className="text-xs font-bold text-ink-900">Scope of work & objectives</h3>
-                  <p className="text-xs text-ink-700 leading-relaxed whitespace-pre-wrap">{scope}</p>
-                </div>
-
-                {/* Bottom Action */}
-                <div className="pt-2 flex items-center justify-end gap-2">
-                  {activeProposal.proposal.status === "accepted" && (
-                    <Link
-                      href="/employer/checkout"
-                      className="inline-flex min-h-11 w-full items-center justify-center gap-1.5 rounded-[10px] bg-primary px-4 text-xs font-semibold text-white hover:bg-primary-hover"
-                    >
-                      <CheckCircle2 className="size-4" aria-hidden />
-                      <span>Proceed to hire candidate</span>
-                    </Link>
-                  )}
-                </div>
-              </div>
-            );
-          })()}
-        </SheetContent>
-      </Sheet>
     </div>
   );
 }

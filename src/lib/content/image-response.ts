@@ -16,8 +16,8 @@ const CACHE = "public, max-age=3600, s-maxage=86400, stale-while-revalidate=6048
  * Stored images are whatever the admin uploaded - a 350 KB PNG for a logo
  * drawn 120px wide was typical - so they are resized to `maxWidth` and
  * re-encoded as WebP before caching. The CDN keeps the small version, and the
- * original is only decoded on a cache miss. GIFs pass through untouched so an
- * animation is never flattened.
+ * original is only decoded on a cache miss. GIFs keep their animation as animated
+ * WebP.
  */
 export async function cmsImageResponse(
   value: string | null | undefined,
@@ -33,18 +33,18 @@ export async function cmsImageResponse(
     const original = Buffer.from(m[2], "base64");
     let body: Buffer = original;
     let contentType = type;
-    if (type !== "image/gif") {
-      try {
-        body = await sharp(original)
-          .rotate()
-          .resize({ width: maxWidth, withoutEnlargement: true })
-          .webp({ quality: 82 })
-          .toBuffer();
-        contentType = "image/webp";
-      } catch {
-        // A file sharp cannot read is still served as stored.
-        body = original;
-      }
+    try {
+      // `animated` keeps every GIF frame: an animated logo becomes an
+      // animated WebP, a still GIF a still one.
+      body = await sharp(original, { animated: type === "image/gif" })
+        .rotate()
+        .resize({ width: maxWidth, withoutEnlargement: true })
+        .webp({ quality: 82 })
+        .toBuffer();
+      contentType = "image/webp";
+    } catch {
+      // A file sharp cannot read is still served as stored.
+      body = original;
     }
     return new Response(new Uint8Array(body), {
       headers: { "Content-Type": contentType, "Cache-Control": CACHE, "X-Content-Type-Options": "nosniff" },
