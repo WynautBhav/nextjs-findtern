@@ -7,7 +7,7 @@ import { requireMutation } from "@/lib/guards-mutation";
 import { limiters, bucketKey, clientIp } from "@/lib/security/rate-limit";
 import { emails } from "@/lib/emails";
 import { initialsOf } from "@/lib/employer-candidates";
-import { employerNames, internFirstName, notify } from "@/lib/notify";
+import { employerNames, internFirstName, notify, resolveOfferNotifications } from "@/lib/notify";
 import { FREE_DECLINES, offerPastStart, parseOffer } from "@/lib/offer";
 
 /**
@@ -184,6 +184,9 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     return NextResponse.json({ error: "This offer changed a moment ago. Refresh and try again." }, { status: 409 });
   }
 
+  // Any status change here closes the offer as something to act on.
+  await resolveOfferNotifications(proposal.internId, [id]).catch(() => {});
+
   if (endsGuarantee) {
     const [onboarding] = await db
       .select({ id: schema.internOnboarding.id, extraData: schema.internOnboarding.extraData })
@@ -232,7 +235,9 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
           ne(schema.proposals.id, id),
           inArray(schema.proposals.status, ["draft", "sent", "interview_scheduled"]),
         ),
-      );
+      )
+      .returning({ id: schema.proposals.id })
+      .then((rows) => resolveOfferNotifications(proposal.internId, rows.map((r) => r.id)).catch(() => {}));
     await db
       .delete(schema.employerCartItems)
       .where(

@@ -233,7 +233,7 @@ export function TimesheetGrid({
           <h2 className="text-base font-semibold tracking-[-0.01em] text-ink-900">
             {readOnly ? "Hours for this period" : "Log your hours"}
           </h2>
-          <p className="mt-0.5 text-sm text-ink-500">
+          <p className="mt-0.5 text-sm text-ink-600">
             {readOnly
               ? "These hours have already been sent, so they are read only."
               : "Every change saves on its own. Mon–Fri are working days - weekends start as Fixed off and gazetted holidays come pre-marked. Pick a status for every day before sending."}
@@ -318,7 +318,7 @@ export function TimesheetGrid({
               <div className="grid grid-cols-[4rem_minmax(0,1fr)_minmax(0,1fr)] gap-x-3 gap-y-2 sm:grid-cols-[4rem_6rem_8rem_minmax(0,1fr)] sm:items-center">
                 <div className="min-w-0">
                   <p className="text-sm font-semibold text-ink-900">{day.weekday}</p>
-                  <p className="text-xs tabular-nums text-ink-500">{day.label}</p>
+                  <p className="text-xs tabular-nums text-ink-600">{day.label}</p>
                   {govtHoliday ? (
                     <p className="mt-0.5 text-2xs font-medium text-sky-700">{govtHoliday}</p>
                   ) : null}
@@ -349,7 +349,7 @@ export function TimesheetGrid({
                         locked && "cursor-not-allowed border-ink-200 bg-ink-50 text-ink-600",
                       )}
                     />
-                    <span className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-xs text-ink-400">
+                    <span className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-xs text-ink-600">
                       h
                     </span>
                   </div>
@@ -367,7 +367,7 @@ export function TimesheetGrid({
                     className={cn(
                       "apple-spring h-11 w-full rounded-[10px] border bg-white px-2 text-xs font-medium text-ink-900",
                       "focus:border-brand-500 focus:ring-2 focus:ring-brand-200 focus:outline-none",
-                      !dayStatus && "text-ink-400",
+                      !dayStatus && "text-ink-600",
                       locked && "cursor-not-allowed border-ink-200 bg-ink-50 text-ink-600",
                     )}
                   >
@@ -421,7 +421,7 @@ export function TimesheetGrid({
           </motion.span>
           <span className="text-sm text-ink-600">hours logged</span>
           {expectedHours ? (
-            <span className="text-sm text-ink-500">of about {expectedHours}</span>
+            <span className="text-sm text-ink-600">of about {expectedHours}</span>
           ) : null}
         </div>
 
@@ -455,7 +455,7 @@ export function TimesheetGrid({
               </button>
             ) : null}
             {periodOpen ? (
-              <span className="basis-full text-right text-xs font-medium text-ink-500 sm:basis-auto">
+              <span className="basis-full text-right text-xs font-medium text-ink-600 sm:basis-auto">
                 You can send this from {lastDayLabel}
               </span>
             ) : missingStatus > 0 ? (
@@ -495,7 +495,7 @@ export function TimesheetGrid({
           <label htmlFor={`note-${timesheetId}`} className="block text-sm font-medium text-ink-800">
             Anything your manager should know
           </label>
-          <p className="mt-0.5 text-sm text-ink-500">
+          <p className="mt-0.5 text-sm text-ink-600">
             Optional. Useful if something in this period does not fit the normal pattern.
           </p>
           <Textarea
@@ -533,7 +533,7 @@ export function TimesheetGrid({
 function SaveIndicator({ state, readOnly }: { state: SaveState; readOnly: boolean }) {
   if (readOnly) {
     return (
-      <span className="inline-flex items-center gap-1.5 text-sm font-medium text-ink-500">
+      <span className="inline-flex items-center gap-1.5 text-sm font-medium text-ink-600">
         <Check className="size-4 text-brand-600" strokeWidth={2.5} aria-hidden />
         Sent
       </span>
@@ -541,7 +541,7 @@ function SaveIndicator({ state, readOnly }: { state: SaveState; readOnly: boolea
   }
   if (state === "saving") {
     return (
-      <span className="inline-flex items-center gap-1.5 text-sm text-ink-500" aria-live="polite">
+      <span className="inline-flex items-center gap-1.5 text-sm text-ink-600" aria-live="polite">
         <Loader2 className="size-4 animate-spin" aria-hidden />
         Saving
       </span>
@@ -569,7 +569,7 @@ function SaveIndicator({ state, readOnly }: { state: SaveState; readOnly: boolea
       </span>
     );
   }
-  return <span className="text-sm text-ink-400">Autosaves</span>;
+  return <span className="text-sm text-ink-600">Autosaves</span>;
 }
 
 type Day = { date: string; weekday: string; label: string; weekend: boolean };

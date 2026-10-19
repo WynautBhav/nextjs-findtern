@@ -19,7 +19,7 @@ export default function MarketingLayout({
   return (
     <div className="flex min-h-dvh flex-col">
       <SiteHeader />
-      <main id="main" className="flex-1">
+      <main id="main" tabIndex={-1} className="outline-none flex-1">
         {children}
       </main>
       <SiteFooter />

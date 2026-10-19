@@ -138,18 +138,18 @@ function OfferCard({
           <h3 className="text-pretty text-base font-semibold tracking-[-0.015em] text-ink-900">
             {role}
           </h3>
-          <p className="mt-0.5 truncate text-sm text-ink-500">{company}</p>
+          <p className="mt-0.5 truncate text-sm text-ink-600">{company}</p>
         </div>
         <StatusPill status={p.status} />
       </div>
 
       <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 border-t border-ink-100 pt-4">
         <div>
-          <dt className="text-xs text-ink-500">Stipend</dt>
+          <dt className="text-xs text-ink-600">Stipend</dt>
           <dd className="mt-0.5 text-sm font-semibold tabular-nums text-ink-900">{stipend}</dd>
         </div>
         <div>
-          <dt className="text-xs text-ink-500">Starts</dt>
+          <dt className="text-xs text-ink-600">Starts</dt>
           <dd className="mt-0.5 text-sm font-medium text-ink-900">
             {start ? formatDayLabel(start) : "To be agreed"}
           </dd>

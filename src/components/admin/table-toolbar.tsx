@@ -153,7 +153,7 @@ export function TableToolbar({
                 inputRef.current?.focus();
               }}
               aria-label="Clear search"
-              className="apple-spring absolute top-1/2 right-2 flex min-h-11 min-w-11 -translate-y-1/2 items-center justify-center rounded-[10px] p-1 text-ink-400 hover:text-ink-700"
+              className="apple-spring absolute top-1/2 right-2 flex min-h-11 min-w-11 -translate-y-1/2 items-center justify-center rounded-[10px] p-1 text-ink-600 hover:text-ink-700"
             >
               <X className="size-3.5" />
             </button>
@@ -229,7 +229,7 @@ export function TableToolbar({
           <button
             type="button"
             onClick={clearAll}
-            className="apple-spring ml-1 inline-flex min-h-11 items-center text-xs font-medium text-ink-500 underline underline-offset-2 hover:text-ink-800"
+            className="apple-spring ml-1 inline-flex min-h-11 items-center text-xs font-medium text-ink-600 underline underline-offset-2 hover:text-ink-800"
           >
             Clear all
           </button>

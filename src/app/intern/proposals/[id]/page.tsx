@@ -45,7 +45,6 @@ export default async function ProposalDetail({ params }: { params: Promise<{ id:
   // which offers exist.
   if (!proposal || !canAccess(session, proposal.internId)) notFound();
 
-  const ratings = (proposal.aiRatings ?? {}) as Record<string, unknown>;
   const projects = await projectNames([proposal.projectId ?? ""]);
 
   const parsed = parseOffer(proposal.offerDetails, proposal.currency);
@@ -65,11 +64,16 @@ export default async function ProposalDetail({ params }: { params: Promise<{ id:
   const lapsed = (proposal.status === "sent" || proposal.status === "interview_scheduled") && offerPastStart(startDate);
   const status = proposalStatus(lapsed ? "expired" : proposal.status);
   const skills = toArray<string>(proposal.skills);
+  // The intern's own current ratings and the Findtern Score that stipend
+  // eligibility uses - not the snapshot copied onto the proposal, which could
+  // read 8.2 beside "Not eligible for stipend".
+  const ratings = (extra.ratings ?? {}) as Record<string, unknown>;
   const ratingRows = [
     ["Communication", ratings.communication],
     ["Coding", ratings.coding],
     ["Aptitude", ratings.aptitude],
-    ["Overall", ratings.overall],
+    ["AI interview", ratings.interview],
+    ["Findtern Score", score > 0 ? score : undefined],
   ].filter(([, v]) => typeof v === "number") as [string, number][];
 
   const decided = proposal.status !== "sent" || lapsed;
@@ -213,7 +217,7 @@ export default async function ProposalDetail({ params }: { params: Promise<{ id:
                   </li>
                 ))}
               </ul>
-              <p className="mt-4 text-pretty text-xs leading-relaxed text-ink-500">
+              <p className="mt-4 text-pretty text-xs leading-relaxed text-ink-600">
                 One assessment produces this and the rate that follows from it. Both are visible to
                 you before any employer sees them.
               </p>

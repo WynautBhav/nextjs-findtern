@@ -93,7 +93,7 @@ function Detail({
         <Icon className="size-4.5" aria-hidden />
       </span>
       <div>
-        <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-ink-500">
+        <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-ink-600">
           {label}
         </p>
         {href ? (

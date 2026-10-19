@@ -9,6 +9,7 @@ import { formatSlotTime } from "@/lib/format";
 import { CALENDAR_TOKEN_OWNER, createMeetEvent } from "@/lib/google";
 import { requireMutation } from "@/lib/guards-mutation";
 import { employerNames, notify } from "@/lib/notify";
+import { hiredProposalSql } from "@/lib/employer-visibility";
 
 const bodySchema = z.object({ slot: z.number().int().min(1).max(3) });
 const MEETING_MS = 30 * 60 * 1000;
@@ -35,9 +36,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const end = new Date(start.getTime() + MEETING_MS);
   const tz = interview.timezone || "Asia/Kolkata";
 
-  const [[intern], [employer], names] = await Promise.all([
+  const [[intern], names] = await Promise.all([
     db.select().from(schema.users).where(eq(schema.users.id, interview.internId)).limit(1),
-    db.select().from(schema.employers).where(eq(schema.employers.id, interview.employerId)).limit(1),
     employerNames(interview.employerId),
   ]);
 
@@ -55,11 +55,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       try {
         const ev = await createMeetEvent(token.refreshToken, {
           summary: "Findtern Interview",
-          description: `Interview between ${names.company} and a Findtern candidate.`,
+          description: "Findtern interview. Each party receives its own invite from Findtern.",
           start,
           end,
           timezone: tz,
-          attendees: [intern?.email, employer?.companyEmail].filter((e): e is string => Boolean(e)),
+          // No attendees: a shared Google invite shows every guest's email,
+          // which would hand the intern the company's address before a hire.
+          // Each side gets its own .ics below instead.
+          attendees: [],
         });
         meetingLink = ev.meetUrl;
         calendarEventId = ev.eventId;
@@ -83,13 +86,33 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       and(
         eq(schema.proposals.employerId, interview.employerId),
         eq(schema.proposals.internId, interview.internId),
-        eq(schema.proposals.status, "hired"),
+        hiredProposalSql(),
       ),
     )
     .limit(1);
   const companyForIntern = hire ? names.company : "a company on Findtern";
-  const invite = icsInvite({ uid: id, start, end, title: "Findtern Interview", description: meetingLink ?? "Meeting link to follow", url: meetingLink });
   const candidate = `Candidate ${initialsOf(intern?.firstName ?? "", intern?.lastName ?? "")}`;
+  // One file per side, each naming only what that side may see.
+  const sequence = Math.floor(Date.now() / 1000);
+  const linkLine = meetingLink ? `Join: ${meetingLink}` : "The meeting link will follow by email.";
+  const internInvite = icsInvite({
+    uid: `${id}-intern`,
+    start,
+    end,
+    title: `Interview with ${companyForIntern}`,
+    description: `Your Findtern interview with ${companyForIntern}.\n${linkLine}`,
+    url: meetingLink,
+    sequence,
+  });
+  const employerInvite = icsInvite({
+    uid: `${id}-employer`,
+    start,
+    end,
+    title: `Interview with ${candidate}`,
+    description: `Findtern interview with ${candidate}.\n${linkLine}`,
+    url: meetingLink,
+    sequence,
+  });
   await Promise.all([
     notify({
       to: { type: "intern", id: interview.internId },
@@ -98,7 +121,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       message: `Your interview with ${companyForIntern} is on ${when}.`,
       data: { interviewId: id },
       email: emails.meetingScheduled({ name: intern?.firstName ?? "", other: companyForIntern, when, link: meetingLink, forEmployer: false }),
-      attachments: [invite],
+      attachments: [internInvite],
     }),
     notify({
       to: { type: "employer", id: interview.employerId },
@@ -107,7 +130,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       message: `${candidate} picked ${when}.`,
       data: { interviewId: id },
       email: emails.meetingScheduled({ name: names.contact, other: candidate, when, link: meetingLink, forEmployer: true }),
-      attachments: [invite],
+      attachments: [employerInvite],
     }),
   ]);
   return NextResponse.json({ ok: true, meetingLink });

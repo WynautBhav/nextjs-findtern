@@ -134,7 +134,7 @@ export function AdminNotificationHistoryView({
           <tbody className="divide-y divide-ink-100">
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={6} className="py-12 text-center text-ink-500">
+                <td colSpan={6} className="py-12 text-center text-ink-600">
                   <Bell className="mx-auto size-8 text-ink-300 mb-2" />
                   <p className="font-medium text-xs">No notifications recorded</p>
                   <p className="text-2xs text-text-subtle mt-0.5">Dispatched broadcast updates will log in this ledger.</p>
@@ -151,7 +151,7 @@ export function AdminNotificationHistoryView({
                     onClick={() => setExpandedId(isExpanded ? null : item.id)}
                     className="cursor-pointer hover:bg-ink-50/40 transition-colors"
                   >
-                    <td className="px-3 py-3.5 text-center text-ink-400">
+                    <td className="px-3 py-3.5 text-center text-ink-600">
                       {isExpanded ? (
                         <ChevronDown className="size-4" />
                       ) : (

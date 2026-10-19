@@ -174,7 +174,7 @@ export function InternPayoutTools({
   return (
     <div className="space-y-4">
       {payouts.length === 0 ? (
-        <p className="text-sm text-ink-500">Nothing recorded yet.</p>
+        <p className="text-sm text-ink-600">Nothing recorded yet.</p>
       ) : (
         <ul className="divide-y divide-ink-100">
           {payouts.map((p) => (
@@ -183,7 +183,7 @@ export function InternPayoutTools({
                 <p className="text-sm font-semibold tabular-nums text-ink-900">
                   {formatMoney(p.amountMinor, p.currency as "INR" | "USD")}
                 </p>
-                <p className="text-2xs text-ink-500">
+                <p className="text-2xs text-ink-600">
                   {p.method}
                   {p.referenceId ? ` · ref ${p.referenceId}` : " · no reference"}
                   {p.notes ? ` · ${p.notes}` : ""}
@@ -240,7 +240,7 @@ export function InternPayoutTools({
         <div className="overflow-x-auto rounded-lg border border-ink-100">
           <table className="w-full min-w-[560px] text-left text-xs">
             <caption className="sr-only">Stipend still owed per placement</caption>
-            <thead className="bg-ink-50 text-2xs uppercase tracking-[0.08em] text-ink-500">
+            <thead className="bg-ink-50 text-2xs uppercase tracking-[0.08em] text-ink-600">
               <tr>
                 <th scope="col" className="px-3 py-2 font-semibold">Placement</th>
                 <th scope="col" className="px-3 py-2 font-semibold">Paid</th>
@@ -264,7 +264,7 @@ export function InternPayoutTools({
                   <td className="px-3 py-2 tabular-nums text-ink-700">{d.nextDate ?? "-"}</td>
                   <td className="px-3 py-2 text-right">
                     {d.pending ? (
-                      <span className="text-2xs text-ink-500">Pending payout exists</span>
+                      <span className="text-2xs text-ink-600">Pending payout exists</span>
                     ) : d.remainingMonths > 0 && d.monthlyShareMinor > 0 ? (
                       <button
                         type="button"

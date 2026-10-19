@@ -128,7 +128,7 @@ export function TrendChart({
         {/* Y axis ------------------------------------------------------- */}
         <div
           aria-hidden
-          className="flex shrink-0 flex-col justify-between py-px text-right text-2xs text-ink-400 tabular-nums"
+          className="flex shrink-0 flex-col justify-between py-px text-right text-2xs text-ink-600 tabular-nums"
           style={{ height }}
         >
           {ticks.map((tick) => (
@@ -295,7 +295,7 @@ function Tooltip({ point, xPercent }: { point: TrendPoint; xPercent: number }) {
       )}
       style={{ left: `${xPercent}%` }}
     >
-      <p className="text-2xs font-semibold tracking-wide text-ink-500 uppercase">
+      <p className="text-2xs font-semibold tracking-wide text-ink-600 uppercase">
         {point.label}
       </p>
       <dl className="mt-1 flex flex-col gap-0.5">
@@ -355,7 +355,7 @@ export function PipelineBars({
             <span className="text-xs text-text-subtle tabular-nums">
               {item.count.toLocaleString("en-IN")}
               {total > 0 ? (
-                <span className="ml-1.5 text-ink-400">
+                <span className="ml-1.5 text-ink-600">
                   {Math.round((item.count / total) * 100)}%
                 </span>
               ) : null}

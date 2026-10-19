@@ -122,7 +122,7 @@ export function CurrencyNote({ className, tone = "light" }: { className?: string
       : currency === "USD"
         ? "Billed in US dollars. No hidden fees."
         : `Billed in US dollars. ${currency} shown at a reference rate.`;
-  return <p className={cn("text-sm", tone === "dark" ? "text-on-dark-subtle" : "text-ink-500", className)}>{text}</p>;
+  return <p className={cn("text-sm", tone === "dark" ? "text-on-dark-subtle" : "text-ink-600", className)}>{text}</p>;
 }
 
 /**
@@ -146,7 +146,7 @@ export function CurrencyPicker({ tone = "light", className }: { tone?: "light" |
             className,
           )}
         >
-          <span className={dark ? "text-on-dark-subtle" : "text-ink-500"}>Prices in</span>
+          <span className={dark ? "text-on-dark-subtle" : "text-ink-600"}>Prices in</span>
           <span className="font-semibold tabular-nums">
             {symbolFor(currency)} {currency}
           </span>

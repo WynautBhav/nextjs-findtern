@@ -1,5 +1,7 @@
 import { and, eq, inArray } from "drizzle-orm";
 import { NextResponse } from "next/server";
+
+import { isHiredProposal } from "@/lib/hire-status";
 import { z } from "zod";
 
 import { getDb, schema } from "@/lib/db";
@@ -123,7 +125,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   // A full-time offer that is still open blocks an internship proposal
   // (legacy R:12767).
   const openOffers = await db
-    .select({ offerDetails: schema.proposals.offerDetails, currency: schema.proposals.currency })
+    .select({
+      offerDetails: schema.proposals.offerDetails,
+      currency: schema.proposals.currency,
+      status: schema.proposals.status,
+      hiredAt: schema.proposals.hiredAt,
+    })
     .from(schema.proposals)
     .where(
       and(
@@ -192,8 +199,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     data: { proposalId: proposal.id },
     email: emails.proposalReceived({
       internName: user.firstName,
-      // The company stays hidden from the intern until it hires them.
-      companyName: openOffers.length > 0 ? (await employerNames(id)).company : "A company on Findtern",
+      // The company stays hidden from the intern until it hires them. This
+      // used to reveal it whenever any offer was merely open.
+      companyName: openOffers.some(isHiredProposal) ? (await employerNames(id)).company : "A company on Findtern",
       role: b.roleTitle,
       proposalId: proposal.id,
     }),

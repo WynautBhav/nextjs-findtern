@@ -111,7 +111,7 @@ export default async function EmployerCheckout() {
                       {line.roleTitle}
                       {line.projectName ? ` · ${line.projectName}` : ""}
                     </p>
-                    <p className="mt-2 text-xs tabular-nums text-ink-500">
+                    <p className="mt-2 text-xs tabular-nums text-ink-600">
                       {line.durationLabel}
                       {line.monthlyMinor != null
                         ? ` · ${formatMoney(line.monthlyMinor, line.currency)}/month`

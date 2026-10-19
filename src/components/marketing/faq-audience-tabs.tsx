@@ -74,7 +74,7 @@ export function FaqAudienceTabs({ intern, employer }: { intern: CmsFaqItem[]; em
               </span>
               <span className="min-w-0">
                 <span className={cn("block text-base font-semibold", active ? "text-primary" : "text-ink-900")}>{label}</span>
-                <span className="mt-0.5 block text-sm text-ink-500">
+                <span className="mt-0.5 block text-sm text-ink-600">
                   {count} questions · {hint}
                 </span>
               </span>

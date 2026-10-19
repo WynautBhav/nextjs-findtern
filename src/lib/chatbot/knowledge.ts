@@ -192,7 +192,7 @@ export async function localAnswer(query: string): Promise<string> {
   return `${top.answer.trim()}${more}\n\n(Source: Findtern FAQ - ${top.category}. Ask me anything else!)`;
 }
 
-export const SYSTEM_PROMPT = `You are Fintern, Findtern's friendly support chatbot (findtern.in - "Internship Simplified").
+export const SYSTEM_PROMPT = `You are Findtern, Findtern's friendly support chatbot (findtern.in - "Internship Simplified").
 
 You do two jobs:
 1. Answer questions about Findtern (pricing, AI interview, Findtern Score, placement promise, policies).

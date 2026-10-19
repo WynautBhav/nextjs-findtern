@@ -89,7 +89,7 @@ export function LegalDocument({
         <div className="container-page py-12 sm:py-14">
           <Link
             href={backHref}
-            className="inline-flex items-center gap-1.5 text-sm font-medium text-ink-500 transition-colors hover:text-primary"
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-ink-600 transition-colors hover:text-primary"
           >
             <ArrowLeft className="size-4" aria-hidden />
             {backLabel}
@@ -98,7 +98,7 @@ export function LegalDocument({
             {title}
           </h1>
           {updated ? (
-            <p className="mt-3 text-sm text-ink-500">Last updated {updated}</p>
+            <p className="mt-3 text-sm text-ink-600">Last updated {updated}</p>
           ) : null}
         </div>
       </header>
@@ -110,7 +110,7 @@ export function LegalDocument({
             aria-label="On this page"
             className="hidden lg:sticky lg:top-28 lg:block lg:self-start"
           >
-            <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-ink-500">
+            <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-ink-600">
               On this page
             </p>
             {/* The longest terms document has 28 sections. Capped to a
@@ -136,7 +136,7 @@ export function LegalDocument({
                       "-ml-px block border-l-2 py-1.5 pl-4 text-sm leading-snug transition-colors duration-200",
                       active === h.id
                         ? "border-primary font-medium text-primary"
-                        : "border-transparent text-ink-500 hover:border-ink-300 hover:text-ink-900",
+                        : "border-transparent text-ink-600 hover:border-ink-300 hover:text-ink-900",
                       h.level === 3 && "pl-7",
                     )}
                   >

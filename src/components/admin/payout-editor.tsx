@@ -86,7 +86,7 @@ export function PayoutEditor({
         ))}
       </div>
       <label className="block">
-        <span className="mb-1 block text-2xs font-semibold tracking-wide text-ink-500 uppercase">
+        <span className="mb-1 block text-2xs font-semibold tracking-wide text-ink-600 uppercase">
           Bank reference {status === "paid" ? "(required)" : "(optional)"}
         </span>
         <input

@@ -1,6 +1,10 @@
-import { NextResponse } from "next/server";
+import sharp from "sharp";
 
 const TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
+
+const notFound = () => Response.json({ error: "Not found" }, { status: 404 });
+
+const CACHE = "public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800";
 
 /**
  * Serve a CMS image value. The legacy CMS stored images inline as base64 data
@@ -8,26 +12,48 @@ const TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
  * a URL (an upload route or an external link) is redirected to. SVG is
  * refused, so a CMS value can never be served as script-capable markup from
  * our origin.
+ *
+ * Stored images are whatever the admin uploaded - a 350 KB PNG for a logo
+ * drawn 120px wide was typical - so they are resized to `maxWidth` and
+ * re-encoded as WebP before caching. The CDN keeps the small version, and the
+ * original is only decoded on a cache miss. GIFs pass through untouched so an
+ * animation is never flattened.
  */
-export function cmsImageResponse(value: string | null | undefined, req: Request): Response {
-  if (!value) return NextResponse.json({ error: "Not found" }, { status: 404 });
+export async function cmsImageResponse(
+  value: string | null | undefined,
+  req: Request,
+  maxWidth = 640,
+): Promise<Response> {
+  if (!value) return notFound();
 
   const m = /^data:([a-z/+.-]+);base64,([\s\S]+)$/i.exec(value);
   if (m) {
     const type = m[1].toLowerCase();
-    if (!TYPES.has(type)) return NextResponse.json({ error: "Not found" }, { status: 404 });
-    return new Response(new Uint8Array(Buffer.from(m[2], "base64")), {
-      headers: {
-        "Content-Type": type,
-        "Cache-Control": "public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800",
-        "X-Content-Type-Options": "nosniff",
-      },
+    if (!TYPES.has(type)) return notFound();
+    const original = Buffer.from(m[2], "base64");
+    let body: Buffer = original;
+    let contentType = type;
+    if (type !== "image/gif") {
+      try {
+        body = await sharp(original)
+          .rotate()
+          .resize({ width: maxWidth, withoutEnlargement: true })
+          .webp({ quality: 82 })
+          .toBuffer();
+        contentType = "image/webp";
+      } catch {
+        // A file sharp cannot read is still served as stored.
+        body = original;
+      }
+    }
+    return new Response(new Uint8Array(body), {
+      headers: { "Content-Type": contentType, "Cache-Control": CACHE, "X-Content-Type-Options": "nosniff" },
     });
   }
   if (/^https?:\/\//i.test(value) || (value.startsWith("/") && !value.startsWith("//"))) {
-    return NextResponse.redirect(new URL(value, req.url), 302);
+    return Response.redirect(new URL(value, req.url), 302);
   }
-  return NextResponse.json({ error: "Not found" }, { status: 404 });
+  return notFound();
 }
 
 /** Inline data URLs become a route URL; anything else passes through. */

@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 
 import { getDb, schema } from "@/lib/db";
 import { renderEmail, type EmailContent } from "@/lib/emails";
@@ -73,4 +73,30 @@ export async function employerNames(id: string): Promise<{ contact: string; comp
     .where(eq(schema.employers.id, id))
     .limit(1);
   return { contact: (e?.name ?? "").split(" ")[0] ?? "", company: e?.company ?? "A company on Findtern" };
+}
+
+/** Offer notifications that ask the intern to act. */
+const OFFER_ACTION_TYPES = ["proposal_received", "proposal_updated", "full_time_offer_received"];
+
+/**
+ * Mark the intern's "you have an offer" notifications read once the offer is
+ * no longer open (answered, expired, withdrawn, closed by Findtern). They
+ * used to sit unread under "Needs you" for an offer that needed nothing.
+ */
+export async function resolveOfferNotifications(internId: string, proposalIds: string[]): Promise<void> {
+  const ids = [...new Set(proposalIds.filter(Boolean))];
+  if (ids.length === 0) return;
+  const db = getDb();
+  await db
+    .update(schema.notifications)
+    .set({ isRead: true, readAt: new Date() })
+    .where(
+      and(
+        eq(schema.notifications.recipientType, "intern"),
+        eq(schema.notifications.recipientId, internId),
+        eq(schema.notifications.isRead, false),
+        inArray(schema.notifications.type, OFFER_ACTION_TYPES),
+        inArray(sql`${schema.notifications.data}->>'proposalId'`, ids),
+      ),
+    );
 }

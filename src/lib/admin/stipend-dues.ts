@@ -1,4 +1,5 @@
 import { internStipendInrMinor, parseOffer } from "../offer.ts";
+import { isHiredProposal } from "../hire-status.ts";
 
 /**
  * What Findtern owes an intern per hired placement, month by month (legacy
@@ -11,7 +12,14 @@ import { internStipendInrMinor, parseOffer } from "../offer.ts";
  * Full-time offers have no stipend and are left out.
  */
 
-type ProposalLike = { id: string; status: string; employerId: string | null; offerDetails: unknown; currency?: string | null };
+type ProposalLike = {
+  id: string;
+  status: string;
+  employerId: string | null;
+  offerDetails: unknown;
+  currency?: string | null;
+  hiredAt?: Date | string | null;
+};
 type PayoutLike = { status: string; raw: unknown };
 
 export type StipendDue = {
@@ -58,7 +66,7 @@ export function stipendDues(proposals: ProposalLike[], payouts: PayoutLike[], sc
     else if (p.status === "pending") pending.add(id);
   }
   return proposals
-    .filter((p) => p.status === "hired")
+    .filter((p) => isHiredProposal(p))
     .map((p) => ({ p, offer: parseOffer(p.offerDetails, p.currency) }))
     .filter(({ offer }) => !offer.fullTime)
     .map(({ p, offer }) => {
@@ -79,4 +87,14 @@ export function stipendDues(proposals: ProposalLike[], payouts: PayoutLike[], sc
         nextDate: remainingMonths > 0 ? addMonthsIso(offer.startDate, paidMonths + 1) : null,
       };
     });
+}
+
+/**
+ * What is still owed to an intern across their placements: every unpaid
+ * month at their share, from the dues table - not just payout rows already
+ * created, which made a hired intern with no payout scheduled read as owed
+ * nothing. Payouts not tied to a placement are added on top.
+ */
+export function owedMinor(dues: StipendDue[], unlinkedPendingMinor: number): number {
+  return dues.reduce((sum, d) => sum + d.remainingMinor, 0) + unlinkedPendingMinor;
 }

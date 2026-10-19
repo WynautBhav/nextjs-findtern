@@ -89,7 +89,7 @@ export function PopularTimeline({ steps }: { steps: PopularStep[] }) {
                   />
                 ))}
               </div>
-              <p className="mt-4 flex items-baseline gap-3 text-sm text-ink-500">
+              <p className="mt-4 flex items-baseline gap-3 text-sm text-ink-600">
                 <span className="font-semibold tabular-nums text-primary">
                   {String(active + 1).padStart(2, "0")} / {String(steps.length).padStart(2, "0")}
                 </span>
@@ -120,13 +120,13 @@ export function PopularTimeline({ steps }: { steps: PopularStep[] }) {
                       "mt-0.5 flex size-10 items-center justify-center rounded-full border transition-colors duration-300",
                       isActive
                         ? "border-primary bg-primary text-white"
-                        : "border-ink-200 bg-white text-ink-500",
+                        : "border-ink-200 bg-white text-ink-600",
                     )}
                   >
                     <Icon className="size-4" aria-hidden />
                   </span>
                   <div>
-                    <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-ink-400">
+                    <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-ink-600">
                       Step {i + 1}
                     </p>
                     <h3

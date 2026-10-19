@@ -42,7 +42,7 @@ function LedgerTabs({ current }: { current: "payments" | "payouts" }) {
           className={
             current === tab.key
               ? "apple-spring apple-pressable inline-flex min-h-11 items-center justify-center whitespace-nowrap rounded-[8px] bg-white px-4 text-[14px] font-medium tracking-[-0.01em] text-ink-900 shadow-xs"
-              : "apple-spring apple-pressable inline-flex min-h-11 items-center justify-center whitespace-nowrap rounded-[8px] px-4 text-[14px] font-medium tracking-[-0.01em] text-ink-500 hover:text-ink-800"
+              : "apple-spring apple-pressable inline-flex min-h-11 items-center justify-center whitespace-nowrap rounded-[8px] px-4 text-[14px] font-medium tracking-[-0.01em] text-ink-600 hover:text-ink-800"
           }
         >
           {tab.label}

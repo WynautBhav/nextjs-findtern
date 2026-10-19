@@ -59,7 +59,9 @@ function validate(v: Record<string, string>): Record<string, string> {
     if (problem) errors.phoneNumber = problem;
   }
   if (needsBillingPincode(v.country) && !/^[1-9]\d{5}$/.test(v.billingPincode?.trim() ?? "")) {
-    errors.billingPincode = "Enter the 6-digit PIN code of your billing address.";
+    errors.billingPincode = v.billingPincode?.trim()
+      ? "Enter the 6-digit PIN code of your billing address."
+      : "Required for GST invoices in India. Enter the 6-digit PIN code of your billing address.";
   }
   if (v.gstNumber?.trim() && !/^[0-9A-Z]{15}$/i.test(v.gstNumber.trim())) {
     errors.gstNumber = "A GST number is 15 characters, letters and digits only.";

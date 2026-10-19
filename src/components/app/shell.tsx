@@ -171,14 +171,14 @@ export function AppShell({
   return (
     <div className="apple-admin min-h-[100dvh] overflow-x-clip bg-surface lg:flex">
       {/* ── Desktop rail ────────────────────────────────────────────── */}
-      <aside className="sticky top-0 hidden h-[100dvh] w-64 shrink-0 flex-col bg-brand-950 px-4 py-6 lg:flex">
+      <aside aria-label="Sidebar" className="sticky top-0 hidden h-[100dvh] w-64 shrink-0 flex-col bg-brand-950 px-4 py-6 lg:flex">
         <Link href="/intern/dashboard" className="flex items-center gap-2.5 px-2">
           <Logo variant="white" priority className="h-7" />
         </Link>
 
-        <nav className="mt-8 min-h-0 flex-1 overflow-y-auto overscroll-contain [scrollbar-width:thin]">
+        <nav aria-label="Main" className="mt-8 min-h-0 flex-1 overflow-y-auto overscroll-contain [scrollbar-width:thin]">
           {navList(nav)}
-          <p className="mb-2 mt-7 px-3 text-2xs font-semibold uppercase tracking-[0.14em] text-on-dark-subtle/55">
+          <p className="mb-2 mt-7 px-3 text-2xs font-semibold uppercase tracking-[0.14em] text-on-dark-subtle">
             More
           </p>
           {navList(SECONDARY_NAV.filter((i) => !nav.some((n) => n.href === i.href)))}
@@ -222,7 +222,7 @@ export function AppShell({
                 </svg>
               </button>
             </SheetTrigger>
-            <SheetContent side="left" showCloseButton={false} className="w-[19rem] border-r-0 bg-brand-950 p-4 text-white">
+            <SheetContent side="left" showCloseButton={false} aria-modal="true" aria-label="Findtern Intern navigation" className="w-[19rem] border-r-0 bg-brand-950 p-4 text-white">
               <SheetTitle className="sr-only">Navigation</SheetTitle>
               <button
                 type="button"
@@ -235,9 +235,9 @@ export function AppShell({
               <div className="flex min-h-11 items-center px-2 py-2 pr-12">
                 <Logo variant="white" className="h-6" />
               </div>
-              <nav className="mt-6 max-h-[calc(100dvh-14rem)] overflow-y-auto overscroll-contain pb-4">
+              <nav aria-label="Main (menu)" className="mt-6 max-h-[calc(100dvh-14rem)] overflow-y-auto overscroll-contain pb-4">
                 {navList(nav)}
-                <p className="mb-2 mt-7 px-3 text-2xs font-semibold uppercase tracking-[0.14em] text-on-dark-subtle/70">
+                <p className="mb-2 mt-7 px-3 text-2xs font-semibold uppercase tracking-[0.14em] text-on-dark-subtle">
                   Also here
                 </p>
                 {navList(SECONDARY_NAV.filter((i) => !nav.some((n) => n.href === i.href)))}
@@ -272,7 +272,7 @@ export function AppShell({
           </Link>
         </header>
 
-        <main className="min-w-0 flex-1 pb-28 lg:pb-16">
+        <main id="main" tabIndex={-1} className="outline-none min-w-0 flex-1 pb-28 lg:pb-16">
           <div className="container-page pt-6 lg:pt-10">{children}</div>
         </main>
 
@@ -291,7 +291,7 @@ export function AppShell({
                     aria-current={active ? "page" : undefined}
                     className={cn(
                       "apple-spring relative flex min-h-16 flex-col items-center justify-center gap-1 px-1 py-2 text-[0.6875rem] font-medium",
-                      active ? "text-brand-700" : "text-ink-500 hover:text-ink-800",
+                      active ? "text-brand-700" : "text-ink-600 hover:text-ink-800",
                     )}
                   >
                     <span className="relative">

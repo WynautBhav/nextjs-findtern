@@ -58,7 +58,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   // changing it would skip the email verification signup requires.
   const d = parsed.data;
   if (needsBillingPincode(d.country) && !d.billingPincode) {
-    return NextResponse.json({ error: "Billing PIN code is required for a company in India" }, { status: 400 });
+    return NextResponse.json({ error: "Billing PIN code is required for GST invoices in India" }, { status: 400 });
   }
   // The escalation contact is optional, but all-or-nothing.
   const escalation = [d.escalationContactName, d.escalationContactRole, d.escalationContactEmail, d.escalationContactPhone];

@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { getDb, schema } from "@/lib/db";
-import { emails } from "@/lib/emails";
+import { emails, icsInvite } from "@/lib/emails";
 import { requireMutation } from "@/lib/guards-mutation";
 import { employerNames, internFirstName, notify } from "@/lib/notify";
 import { wallTimeToUtc } from "@/lib/timezones";
@@ -71,6 +71,27 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   // tell (legacy R:11717 skipped it too).
   if (!byEmployer && interview.employerId === "admin") return NextResponse.json({ ok: true });
 
+  // A booked slot put an invite in each side's calendar; withdraw the
+  // recipient's copy (same per-party uid as select-slot sent).
+  const bookedStart =
+    interview.status === "scheduled" && interview.selectedSlot
+      ? [interview.slot1, interview.slot2, interview.slot3][interview.selectedSlot - 1]
+      : null;
+  const cancelFor = (party: "intern" | "employer") =>
+    bookedStart
+      ? [
+          icsInvite({
+            uid: `${id}-${party}`,
+            start: bookedStart,
+            end: new Date(bookedStart.getTime() + 30 * 60_000),
+            title: "Findtern interview (cancelled)",
+            description: "This time was replaced. New times are on Findtern.",
+            cancel: true,
+            sequence: Math.floor(Date.now() / 1000),
+          }),
+        ]
+      : undefined;
+
   await notify(
     byEmployer
       ? {
@@ -80,6 +101,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
           message: "The company offered new times. Pick the one that works for you.",
           data: { interviewId: id },
           email: emails.interviewRescheduled({ name: await internFirstName(interview.internId), byEmployer: true }),
+          attachments: cancelFor("intern"),
         }
       : {
           to: { type: "employer", id: interview.employerId },
@@ -88,6 +110,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
           message: "The candidate asked to reschedule. Offer new slots.",
           data: { interviewId: id },
           email: emails.interviewRescheduled({ name: (await employerNames(interview.employerId)).contact, byEmployer: false }),
+          attachments: cancelFor("employer"),
         },
   );
   return NextResponse.json({ ok: true });

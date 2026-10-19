@@ -196,7 +196,7 @@ export function ProfileCard({
           {bio ? (
             <p className="text-pretty leading-relaxed text-ink-700">{bio}</p>
           ) : (
-            <p className="text-pretty leading-relaxed text-ink-500">
+            <p className="text-pretty leading-relaxed text-ink-600">
               No bio yet. A line or two about what you do well is the part a recruiter reads out loud.
             </p>
           )}

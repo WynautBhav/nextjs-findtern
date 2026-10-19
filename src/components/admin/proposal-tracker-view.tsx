@@ -231,7 +231,7 @@ export function ProposalTrackerView({
                 setStatusFilter("all");
               }}
               className={`apple-spring apple-pressable inline-flex min-h-11 shrink-0 items-center gap-2 whitespace-nowrap rounded-[8px] px-4 text-[14px] font-medium tracking-[-0.01em] ${
-                activeTab === tab.key ? "bg-white text-ink-900 shadow-xs" : "text-ink-500 hover:text-ink-800"
+                activeTab === tab.key ? "bg-white text-ink-900 shadow-xs" : "text-ink-600 hover:text-ink-800"
               }`}
             >
               <tab.Icon className="size-4" aria-hidden />
@@ -271,7 +271,7 @@ export function ProposalTrackerView({
                 type="button"
                 onClick={() => setSearch("")}
                 aria-label="Clear search"
-                className="absolute right-1 top-1/2 flex min-h-11 min-w-11 -translate-y-1/2 items-center justify-center rounded-[10px] text-ink-400 hover:text-ink-700"
+                className="absolute right-1 top-1/2 flex min-h-11 min-w-11 -translate-y-1/2 items-center justify-center rounded-[10px] text-ink-600 hover:text-ink-700"
               >
                 <X className="size-3.5" />
               </button>
@@ -375,7 +375,7 @@ export function ProposalTrackerView({
                   </div>
 
                   {c.city && (
-                    <div className="mt-3 flex items-center gap-1 text-2xs text-ink-500">
+                    <div className="mt-3 flex items-center gap-1 text-2xs text-ink-600">
                       <MapPin className="size-3" />
                       <span>
                         {c.city}
@@ -470,7 +470,7 @@ export function ProposalTrackerView({
               <tbody className="divide-y divide-ink-100">
                 {filteredCandidates.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-4 py-12 text-center text-sm text-ink-500">
+                    <td colSpan={7} className="px-4 py-12 text-center text-sm text-ink-600">
                       No candidates received proposals in this range.
                     </td>
                   </tr>
@@ -492,7 +492,7 @@ export function ProposalTrackerView({
                       <td className="px-4 py-3 text-right font-semibold tabular-nums text-ink-900">{c.received}</td>
                       <td className="px-4 py-3 text-right tabular-nums text-emerald-700">{c.won}</td>
                       <td className="px-4 py-3 text-right tabular-nums text-ink-700">{c.lost}</td>
-                      <td className="px-4 py-3 text-right tabular-nums text-ink-500">{c.open}</td>
+                      <td className="px-4 py-3 text-right tabular-nums text-ink-600">{c.open}</td>
                       <td className="max-w-[16rem] px-4 py-3 text-ink-600">{c.companies.join(", ")}</td>
                     </tr>
                   ))
@@ -521,7 +521,7 @@ export function ProposalTrackerView({
               <tbody className="divide-y divide-ink-100">
                 {filteredProposals.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="py-10 text-center text-ink-500">
+                    <td colSpan={6} className="py-10 text-center text-ink-600">
                       No proposals match current filters.
                     </td>
                   </tr>
@@ -606,7 +606,7 @@ export function ProposalTrackerView({
               <tbody className="divide-y divide-ink-100">
                 {filteredInterviews.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="py-10 text-center text-ink-500">
+                    <td colSpan={6} className="py-10 text-center text-ink-600">
                       No interviews match current filters.
                     </td>
                   </tr>
@@ -756,7 +756,7 @@ export function ProposalTrackerView({
 
               {/* Offer Details Grid */}
               <div>
-                <h5 className="text-xs font-bold uppercase tracking-wider text-ink-500 mb-2">
+                <h5 className="text-xs font-bold uppercase tracking-wider text-ink-600 mb-2">
                   Agreed Offer Terms
                 </h5>
                 {selectedProposal.offerDetails && Object.keys(selectedProposal.offerDetails).length > 0 ? (
@@ -773,7 +773,7 @@ export function ProposalTrackerView({
                     ))}
                   </div>
                 ) : (
-                  <p className="text-xs text-ink-500 italic">No custom terms recorded on this proposal.</p>
+                  <p className="text-xs text-ink-600 italic">No custom terms recorded on this proposal.</p>
                 )}
               </div>
 
@@ -823,7 +823,7 @@ export function ProposalTrackerView({
 
               {/* Slots List */}
               <div className="space-y-2">
-                <p className="text-2xs font-bold uppercase tracking-wider text-ink-500">Offered Time Slots</p>
+                <p className="text-2xs font-bold uppercase tracking-wider text-ink-600">Offered Time Slots</p>
                 {[
                   { num: 1, val: selectedInterview.slot1 },
                   { num: 2, val: selectedInterview.slot2 },
@@ -904,7 +904,7 @@ export function ProposalTrackerView({
 
           <div className="mt-3 space-y-2">
             {companyProposals.length === 0 ? (
-              <p className="py-6 text-center text-xs text-ink-500">No proposals sent yet.</p>
+              <p className="py-6 text-center text-xs text-ink-600">No proposals sent yet.</p>
             ) : (
               companyProposals.map((p) => (
                 <div
@@ -957,7 +957,7 @@ export function ProposalTrackerView({
 
           <div className="mt-3 space-y-2">
             {companyInterviews.length === 0 ? (
-              <p className="py-6 text-center text-xs text-ink-500">No interviews scheduled yet.</p>
+              <p className="py-6 text-center text-xs text-ink-600">No interviews scheduled yet.</p>
             ) : (
               companyInterviews.map((i) => (
                 <div

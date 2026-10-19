@@ -234,7 +234,7 @@ export function InterviewActions({
             >
               Cancel
             </button>
-            <span className="ml-auto text-xs tabular-nums text-ink-400">{feedback.length}/2000</span>
+            <span className="ml-auto text-xs tabular-nums text-ink-600">{feedback.length}/2000</span>
           </div>
         </div>
       ) : null}

@@ -535,7 +535,7 @@ export default async function CandidatesPage({
           <Link
             href={withFilters(filters, { ids: [] })}
             scroll={false}
-            className="apple-spring text-[13px] font-medium text-ink-500 underline-offset-4 hover:text-ink-900 hover:underline"
+            className="apple-spring text-[13px] font-medium text-ink-600 underline-offset-4 hover:text-ink-900 hover:underline"
           >
             Clear
           </Link>
@@ -597,7 +597,7 @@ export default async function CandidatesPage({
                     "apple-spring inline-flex size-11 items-center justify-center rounded-md",
                     filters.view === "grid"
                       ? "bg-brand-50 text-brand-700 font-semibold"
-                      : "text-ink-500 hover:text-ink-900",
+                      : "text-ink-600 hover:text-ink-900",
                   )}
                   title="Grid view"
                 >
@@ -609,7 +609,7 @@ export default async function CandidatesPage({
                     "apple-spring inline-flex size-11 items-center justify-center rounded-md",
                     filters.view === "list"
                       ? "bg-brand-50 text-brand-700 font-semibold"
-                      : "text-ink-500 hover:text-ink-900",
+                      : "text-ink-600 hover:text-ink-900",
                   )}
                   title="List view"
                 >
@@ -621,7 +621,7 @@ export default async function CandidatesPage({
                     "apple-spring inline-flex size-11 items-center justify-center rounded-md",
                     filters.view === "table"
                       ? "bg-brand-50 text-brand-700 font-semibold"
-                      : "text-ink-500 hover:text-ink-900",
+                      : "text-ink-600 hover:text-ink-900",
                   )}
                   title="Table view"
                 >
@@ -673,10 +673,10 @@ export default async function CandidatesPage({
                           {c.score > 0 ? (
                             <span className="inline-flex items-baseline gap-0.5 font-bold tabular-nums text-brand-800">
                               <span className="text-sm">{c.score.toFixed(1)}</span>
-                              <span className="text-2xs text-ink-400">/10</span>
+                              <span className="text-2xs text-ink-600">/10</span>
                             </span>
                           ) : (
-                            <span className="text-2xs text-ink-400">Unscored</span>
+                            <span className="text-2xs text-ink-600">Unscored</span>
                           )}
                         </td>
                         <td className="px-5 py-3.5">
@@ -695,7 +695,7 @@ export default async function CandidatesPage({
                               Needs Hardware
                             </span>
                           ) : (
-                            <span className="text-2xs text-ink-400">-</span>
+                            <span className="text-2xs text-ink-600">-</span>
                           )}
                         </td>
                         <td className="px-5 py-3.5 max-w-[220px]">
@@ -706,7 +706,7 @@ export default async function CandidatesPage({
                               </span>
                             ))}
                             {c.skills.length > 3 ? (
-                              <span className="text-2xs text-ink-400">+{c.skills.length - 3}</span>
+                              <span className="text-2xs text-ink-600">+{c.skills.length - 3}</span>
                             ) : null}
                           </div>
                         </td>
@@ -715,7 +715,8 @@ export default async function CandidatesPage({
                             <Link
                               href={withFilters(filters, { ids: toggle(compareIds, c.id) })}
                               scroll={false}
-                              aria-pressed={isSelected}
+                              // A link, so no aria-pressed: the label carries the state.
+                              aria-label={isSelected ? "Remove from compare" : "Add to compare"}
                               className={cn(
                                 "apple-spring inline-flex size-8 items-center justify-center rounded-lg border text-xs",
                                 isSelected
@@ -969,7 +970,7 @@ function TextQuery({
         {label ?? "Keyword"}
       </label>
       <div className="relative mt-2">
-        <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-ink-400">
+        <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-ink-600">
           {isSearch ? (
             <Search className="size-4" aria-hidden />
           ) : (
@@ -1018,7 +1019,7 @@ function SelectQuery({
             </option>
           ))}
         </select>
-        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-ink-400">
+        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-ink-600">
           <SlidersHorizontal className="size-3.5" aria-hidden />
         </div>
       </div>

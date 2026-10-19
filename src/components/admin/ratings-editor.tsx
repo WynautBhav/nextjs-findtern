@@ -95,7 +95,7 @@ export function RatingsEditor({
         <p className="text-xs font-semibold uppercase tracking-[0.14em] text-text-subtle">
           AI interview ratings & Incruiter reports
         </p>
-        <p className="text-2xs text-ink-500">
+        <p className="text-2xs text-ink-600">
           Findtern Score{" "}
           <span className="font-semibold tabular-nums text-ink-800">
             {saved !== null ? saved.toFixed(1) : score !== null ? score.toFixed(1) : "-"}

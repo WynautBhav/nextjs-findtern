@@ -68,11 +68,11 @@ export function EmployerPlanCards({
               ) : (
                 <MonthlyRate hourlyMinor={plan?.priceHourlyMinor ?? b.rateMinor} currency={currency} className="mt-2" />
               )}
-              <p className="mt-4 text-sm text-ink-500">{plan?.features[0] ?? b.blurb}</p>
+              <p className="mt-4 text-sm text-ink-600">{plan?.features[0] ?? b.blurb}</p>
               <p className="mt-4 text-sm font-medium text-primary">
                 Score {b.min}–{b.max}/10
               </p>
-              <p className="mt-2 flex flex-wrap items-baseline gap-1.5 text-sm text-ink-500">
+              <p className="mt-2 flex flex-wrap items-baseline gap-1.5 text-sm text-ink-600">
                 <PlanPrice
                   nowMinor={plan?.perHireChargeMinor ?? b.perHireMinor}
                   wasMinor={plan?.compareAtPerHireMinor}
@@ -86,7 +86,7 @@ export function EmployerPlanCards({
                   {plan.featureList.map((f) => (
                     <li
                       key={f.label}
-                      className={cn("flex gap-2.5 text-sm", f.included ? "text-ink-700" : "text-ink-400")}
+                      className={cn("flex gap-2.5 text-sm", f.included ? "text-ink-700" : "text-ink-600")}
                     >
                       {f.included ? (
                         <Check className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />

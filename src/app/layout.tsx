@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Poppins } from "next/font/google";
 import { SmoothScroll } from "@/components/motion/smooth-scroll";
-import { Analytics } from "@/components/marketing/analytics";
+import { AnalyticsGate } from "@/components/marketing/analytics-gate";
 import { ChatWidget } from "@/components/chat/chat-widget";
 import { JsonLd } from "@/components/seo/json-ld";
 import { isStagingHost, siteGraph } from "@/lib/seo";
@@ -97,7 +97,7 @@ export default function RootLayout({
         <SmoothScroll>{children}</SmoothScroll>
         {/* Organization + WebSite once, site-wide. Pages add their own graphs. */}
         <JsonLd data={siteGraph()} />
-        <Analytics />
+        <AnalyticsGate />
         <ChatWidget />
       </body>
     </html>

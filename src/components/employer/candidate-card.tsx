@@ -206,13 +206,13 @@ export function CandidateCard({
               </li>
             ))}
             {candidate.skills.length > 5 ? (
-              <li className="rounded-md bg-ink-100 px-2 py-0.5 text-xs font-medium tabular-nums text-ink-500 border border-ink-200/70">
+              <li className="rounded-md bg-ink-100 px-2 py-0.5 text-xs font-medium tabular-nums text-ink-600 border border-ink-200/70">
                 +{candidate.skills.length - 5} more
               </li>
             ) : null}
           </ul>
         ) : (
-          <p className="mt-3 text-xs text-ink-400 italic">No skills listed yet.</p>
+          <p className="mt-3 text-xs text-ink-600 italic">No skills listed yet.</p>
         )}
 
         {/* 4-Axis Technical Assessment Gauges */}
@@ -427,7 +427,8 @@ export function CandidateCard({
           <Link
             href={compareHref}
             scroll={false}
-            aria-pressed={selected}
+            // A link, so no aria-pressed: the label carries the state.
+            aria-label={selected ? "Remove from compare" : "Add to compare"}
             className={[
               "apple-spring apple-pressable inline-flex min-h-11 w-full items-center justify-center gap-1.5 rounded-[10px] border px-2.5 text-[13px] font-medium xl:w-auto",
               selected

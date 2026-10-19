@@ -167,7 +167,7 @@ export function SlotPicker({
                 >
                   {formatSlotTime(slot.iso, timezone).split(", ").slice(-1)[0]}
                 </span>
-                <span className="mt-auto pt-2 text-xs font-medium text-ink-500">
+                <span className="mt-auto pt-2 text-xs font-medium text-ink-600">
                   {isPendingChoice
                     ? "Sending..."
                     : isActive

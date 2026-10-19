@@ -38,7 +38,7 @@ export function CopyLink({ label = "Copy link" }: { label?: string }) {
       type="button"
       onClick={copy}
       aria-live="polite"
-      className="inline-flex items-center gap-1.5 text-sm text-ink-500 transition-colors hover:text-primary"
+      className="inline-flex items-center gap-1.5 text-sm text-ink-600 transition-colors hover:text-primary"
     >
       {copied ? (
         <Check className="size-3.5 text-primary" aria-hidden />

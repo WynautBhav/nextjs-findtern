@@ -57,7 +57,7 @@ export function SectionHead({
     <div className={cn("mb-3 flex items-baseline justify-between gap-4", className)}>
       <div className="min-w-0">
         <h2 className="text-base font-semibold tracking-[-0.01em] text-ink-900">{title}</h2>
-        {hint ? <p className="mt-0.5 text-sm text-ink-500">{hint}</p> : null}
+        {hint ? <p className="mt-0.5 text-sm text-ink-600">{hint}</p> : null}
       </div>
       {action ? <div className="shrink-0">{action}</div> : null}
     </div>
@@ -169,7 +169,7 @@ export function EmptyScene({
       )}
     >
       {art ? <ThreadMark className="mb-5" /> : null}
-      <h3 className="text-balance text-lg font-semibold tracking-[-0.01em] text-ink-900">{title}</h3>
+      <h2 className="text-balance text-lg font-semibold tracking-[-0.01em] text-ink-900">{title}</h2>
       <p className="mt-2 max-w-md text-pretty text-sm leading-relaxed text-ink-600">{body}</p>
       {who ? (
         <p className="mt-3 rounded-full bg-ink-100 px-3 py-1 text-xs font-medium text-ink-600">
@@ -261,7 +261,7 @@ export function DetailRow({
 }) {
   return (
     <div className="flex items-baseline justify-between gap-6 py-3">
-      <dt className="shrink-0 text-sm text-ink-500">{label}</dt>
+      <dt className="shrink-0 text-sm text-ink-600">{label}</dt>
       <dd className={cn("min-w-0 text-right text-sm font-medium text-ink-900", mono && "tabular-nums")}>
         {value}
       </dd>

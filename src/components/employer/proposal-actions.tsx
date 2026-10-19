@@ -50,7 +50,7 @@ export function ProposalActions({
     return (
       <Link
         href="/employer/checkout"
-        className="apple-spring apple-pressable inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[10px] bg-emerald-600 px-4 text-sm font-semibold text-white shadow-2xs hover:bg-emerald-700"
+        className="apple-spring apple-pressable inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[10px] bg-emerald-700 px-4 text-sm font-semibold text-white shadow-2xs hover:bg-emerald-800"
       >
         Proceed to checkout - payment completes the hire
       </Link>

@@ -16,7 +16,7 @@ import { getDb, schema } from "@/lib/db";
 import { monthlyDues } from "@/lib/dues";
 import { parseOffer } from "@/lib/offer";
 import { initialsOf, scoreOf } from "@/lib/employer-candidates";
-import { hiredInternIds, isAdminViewing } from "@/lib/employer-visibility";
+import { hiredInternIds, hiredProposalSql, isAdminViewing } from "@/lib/employer-visibility";
 import { employerRegion, type Currency } from "@/lib/employer-pricing";
 
 
@@ -135,7 +135,7 @@ export async function payableCheckout(
     const hiredRows = await db
       .select({ internId: schema.proposals.internId })
       .from(schema.proposals)
-      .where(and(eq(schema.proposals.employerId, employerId), eq(schema.proposals.status, "hired")));
+      .where(and(eq(schema.proposals.employerId, employerId), hiredProposalSql()));
     const hiredIds = (await isAdminViewing())
       ? await hiredInternIds(db, employerId)
       : new Set(hiredRows.map((row) => row.internId));

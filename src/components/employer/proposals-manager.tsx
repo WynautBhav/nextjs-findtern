@@ -202,7 +202,7 @@ export function ProposalsManager({
             <button
               type="button"
               onClick={() => setSearch("")}
-              className="apple-spring absolute right-1 top-1/2 grid min-h-11 min-w-11 -translate-y-1/2 place-items-center rounded-[10px] text-ink-400 hover:text-ink-700"
+              className="apple-spring absolute right-1 top-1/2 grid min-h-11 min-w-11 -translate-y-1/2 place-items-center rounded-[10px] text-ink-600 hover:text-ink-700"
             >
               <X className="size-3.5" />
             </button>
@@ -305,7 +305,7 @@ export function ProposalsManager({
                       <p className="mt-0.5 text-xs font-medium text-brand-800">
                         {roleTitle}
                         {item.project ? (
-                          <span className="text-ink-400 font-normal"> · Project: {item.project.projectName}</span>
+                          <span className="text-ink-600 font-normal"> · Project: {item.project.projectName}</span>
                         ) : null}
                       </p>
 

@@ -26,7 +26,7 @@ import { toInrMinor } from "@/lib/admin/money";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { StatusBadge } from "@/components/admin/status-badge";
 import { InternPayoutTools } from "@/components/admin/intern-payout-tools";
-import { stipendDues } from "@/lib/admin/stipend-dues";
+import { owedMinor, stipendDues } from "@/lib/admin/stipend-dues";
 import { InternSkillsEditor } from "@/components/admin/intern-skills-editor";
 import { RatingsEditor } from "@/components/admin/ratings-editor";
 import type {
@@ -148,9 +148,14 @@ export function Intern360View({
   const paidMinor = payouts
     .filter((p) => p.status === "paid")
     .reduce((sum, p) => sum + toInrMinor(p.amountMinor, p.currency), 0);
-  const owedMinor = payouts
-    .filter((p) => p.status !== "paid")
+  const dues = stipendDues(proposals, payouts, typeof score === "number" ? score : null);
+  const unlinkedPendingMinor = payouts
+    .filter((p) => {
+      const raw = (p.raw ?? {}) as Record<string, unknown>;
+      return p.status !== "paid" && !raw.proposalId && !raw.proposal_id;
+    })
     .reduce((sum, p) => sum + toInrMinor(p.amountMinor, p.currency), 0);
+  const owedTotalMinor = owedMinor(dues, unlinkedPendingMinor);
 
   // Filtered interviews & proposals
   const filteredInterviews = interviews.filter((i) => {
@@ -265,10 +270,11 @@ export function Intern360View({
             <IndianRupee className="size-4 text-brand-700" />
           </div>
           <p className="mt-2 truncate text-xl font-bold tracking-tight text-brand-800 tabular-nums xl:text-2xl">
-            {formatCurrency(paidMinor, "INR")}
+            {/* zeroLabel off: the "Free" label is for prices, never money owed to an intern. */}
+            {formatCurrency(paidMinor, "INR", { zeroLabel: false })}
           </p>
           <p className="truncate text-2xs text-text-subtle">
-            Paid · {formatCurrency(owedMinor, "INR")} owed
+            Paid · {formatCurrency(owedTotalMinor, "INR", { zeroLabel: false })} owed
           </p>
         </div>
       </div>
@@ -312,7 +318,7 @@ export function Intern360View({
             { label: "Communication", val: ratings.communication },
             { label: "Coding", val: ratings.coding },
             { label: "Aptitude", val: ratings.aptitude },
-            { label: "AI Interview", val: ratings.aiInterview },
+            { label: "AI Interview", val: ratings.interview },
           ].map((item) => (
             <div
               key={item.label}
@@ -320,7 +326,7 @@ export function Intern360View({
             >
               <span className="truncate text-xs font-medium text-white/90">{item.label}</span>
               <span className="whitespace-nowrap text-sm font-bold tabular-nums text-white">
-                {typeof item.val === "number" ? `${item.val} / 5` : "-"}
+                {typeof item.val === "number" ? `${item.val} / 10` : "-"}
               </span>
             </div>
           ))}
@@ -367,7 +373,7 @@ export function Intern360View({
             className={`apple-spring apple-pressable inline-flex min-h-11 shrink-0 items-center gap-2 whitespace-nowrap rounded-[8px] px-4 text-[14px] font-medium tracking-[-0.01em] ${
               activeTab === tab.key
                 ? "bg-white text-ink-900 shadow-xs"
-                : "text-ink-500 hover:text-ink-800"
+                : "text-ink-600 hover:text-ink-800"
             }`}
           >
             <span>{tab.label}</span>
@@ -475,7 +481,7 @@ export function Intern360View({
                   ))}
                 </div>
               ) : (
-                <p className="text-xs text-ink-500">No academic history records added.</p>
+                <p className="text-xs text-ink-600">No academic history records added.</p>
               )}
             </div>
           </div>
@@ -540,7 +546,7 @@ export function Intern360View({
               <tbody className="divide-y divide-ink-100">
                 {filteredInterviews.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="py-8 text-center text-ink-500">
+                    <td colSpan={5} className="py-8 text-center text-ink-600">
                       No interviews matching filter.
                     </td>
                   </tr>
@@ -639,7 +645,7 @@ export function Intern360View({
               <tbody className="divide-y divide-ink-100">
                 {filteredProposals.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="py-8 text-center text-ink-500">
+                    <td colSpan={5} className="py-8 text-center text-ink-600">
                       No proposals matching filter.
                     </td>
                   </tr>
@@ -692,7 +698,7 @@ export function Intern360View({
             <tbody className="divide-y divide-ink-100">
               {timesheets.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="py-8 text-center text-ink-500">
+                  <td colSpan={4} className="py-8 text-center text-ink-600">
                     No timesheets recorded for this candidate.
                   </td>
                 </tr>
@@ -743,11 +749,7 @@ export function Intern360View({
                   employerId: p.employerId ?? "",
                   label: `${(p.employerId && employerNames[p.employerId]) || "Company"} · ${(p.projectId && projectNames[p.projectId]) || "Project"}`,
                 }))}
-              dues={stipendDues(
-                proposals,
-                payouts,
-                Number(((onboarding?.extraData ?? {}) as Record<string, unknown>).findternScore) || null,
-              )}
+              dues={dues}
             />
           </div>
         </div>
@@ -817,7 +819,7 @@ export function Intern360View({
               )}
             </div>
           ) : (
-            <div className="py-8 text-center text-xs text-ink-500">
+            <div className="py-8 text-center text-xs text-ink-600">
               No bank account submitted by candidate. Payouts require verified bank coordinates.
             </div>
           )}

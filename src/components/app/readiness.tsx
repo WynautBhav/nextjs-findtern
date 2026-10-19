@@ -128,7 +128,7 @@ export function ReadinessMeter({
                   "grid size-6 shrink-0 place-items-center rounded-full ring-1 ring-inset",
                   item.done
                     ? "bg-brand-600 text-white ring-brand-600"
-                    : "bg-white text-ink-400 ring-ink-200",
+                    : "bg-white text-ink-600 ring-ink-200",
                 )}
               >
                 {item.done ? (
@@ -153,7 +153,7 @@ export function ReadinessMeter({
                   ) : null}
                 </span>
                 {!item.done && item.unlocks ? (
-                  <span className="mt-0.5 block text-pretty text-sm leading-snug text-ink-500">
+                  <span className="mt-0.5 block text-pretty text-sm leading-snug text-ink-600">
                     {item.unlocks}
                   </span>
                 ) : null}
@@ -162,7 +162,7 @@ export function ReadinessMeter({
               <span
                 className={cn(
                   "shrink-0 text-xs font-semibold",
-                  item.done ? "text-ink-400" : "text-primary",
+                  item.done ? "text-ink-600" : "text-primary",
                 )}
               >
                 {item.done ? (
@@ -206,7 +206,7 @@ export function ReadinessStrip({
     <>
       <Surface className={cn("p-5", className)}>
         <div className="flex items-baseline justify-between gap-4">
-          <h2 className="text-[13px] font-medium text-ink-500">Profile completeness</h2>
+          <h2 className="text-[13px] font-medium text-ink-600">Profile completeness</h2>
           <button
             type="button"
             onClick={() => setOpen(true)}

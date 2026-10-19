@@ -319,7 +319,7 @@ export function ProjectsManager({
               type="button"
               onClick={() => setSearchQuery("")}
               aria-label="Clear search"
-              className="apple-spring apple-pressable absolute right-1.5 top-1/2 flex min-h-11 min-w-11 -translate-y-1/2 items-center justify-center rounded-[10px] text-ink-400 hover:text-ink-600"
+              className="apple-spring apple-pressable absolute right-1.5 top-1/2 flex min-h-11 min-w-11 -translate-y-1/2 items-center justify-center rounded-[10px] text-ink-600 hover:text-ink-600"
             >
               <X className="size-3" />
             </button>
@@ -414,7 +414,7 @@ export function ProjectsManager({
                     {/* Required skills chips */}
                     {projectSkills.length > 0 ? (
                       <div className="flex flex-wrap items-center gap-1.5 pt-1">
-                        <span className="text-2xs font-semibold uppercase tracking-wider text-ink-400">
+                        <span className="text-2xs font-semibold uppercase tracking-wider text-ink-600">
                           Skills:
                         </span>
                         {projectSkills.map((s) => (

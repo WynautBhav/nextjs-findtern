@@ -160,6 +160,7 @@ async function main() {
   );
 
   // ── 12 Employer Companies ─────────────────────────────────────────────
+  const CITY_PINCODES: Record<string, string> = { Bengaluru: "560001", Gurugram: "122001", Mumbai: "400001" };
   console.log("Seeding 12 employers…");
   const employerInserts = COMPANIES.map((c, i) => ({
     name: i === 0 ? PRIMARY_ACCOUNTS[1].name : `${c.name} Hiring Team`,
@@ -174,6 +175,9 @@ async function main() {
     country: "India",
     city: c.city,
     state: c.state,
+    // Required for India (GST invoices); the account form refuses a save
+    // without it.
+    billingPincode: CITY_PINCODES[c.city] ?? "560001",
     primaryContactName: i === 0 ? PRIMARY_ACCOUNTS[1].name : `Director of Talent, ${c.name}`,
     primaryContactRole: "Hiring Manager",
     websiteUrl: `https://${c.name.toLowerCase().replace(/[^a-z0-9]/g, "")}.in`,
@@ -302,6 +306,19 @@ async function main() {
         college: collegeObj.name,
         degree: collegeObj.degree,
         graduationYear: 2025 + (i % 3),
+        // The shape real profiles store (legacy StepAcademics), so the
+        // onboarding form opens filled in for seeded candidates.
+        academics: {
+          level: collegeObj.degree.startsWith("M") ? "masters" : "bachelors",
+          degree: collegeObj.degree.split(" ")[0],
+          specialization: collegeObj.degree.split(" ").slice(1).join(" "),
+          institution: collegeObj.name,
+          status: 2025 + (i % 3) <= 2025 ? "Completed" : "Pursuing",
+          startYear: String(2021 + (i % 3)),
+          endYear: String(2025 + (i % 3)),
+          scoreType: "cgpa",
+          score: (6.5 + (i % 30) / 10).toFixed(1),
+        },
         findternScore: score,
         approvalStatus: "Approved",
         ratings: {

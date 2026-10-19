@@ -22,7 +22,7 @@ import {
   toCandidateProfile,
   type CandidateProfile,
 } from "@/lib/employer-candidates";
-import { hiredInternIds } from "@/lib/employer-visibility";
+import { hiredInternIds, hiredProposalSql } from "@/lib/employer-visibility";
 import { attachPhotos, visibleInternIds } from "@/lib/employer-pool";
 import { CandidateAvatar } from "@/components/employer/candidate-avatar";
 import { employerRegion, resolvePricing } from "@/lib/employer-pricing";
@@ -115,7 +115,7 @@ export default async function CompareCandidates({
           db
             .select({ internId: schema.proposals.internId })
             .from(schema.proposals)
-            .where(and(eq(schema.proposals.employerId, session.uid), eq(schema.proposals.status, "hired"))),
+            .where(and(eq(schema.proposals.employerId, session.uid), hiredProposalSql())),
         ]);
         const hired = new Set(hiredRows.map((r) => r.internId));
         const comparable = ids.filter((id) => visible.has(id) && !hired.has(id));
@@ -288,7 +288,7 @@ export default async function CompareCandidates({
                         href={removeCandidateHref(candidate.id)}
                         title="Remove from comparison"
                         aria-label="Remove from comparison"
-                        className="apple-spring apple-pressable inline-flex min-h-11 min-w-11 items-center justify-center rounded-[10px] text-ink-400 hover:bg-ink-100 hover:text-ink-700"
+                        className="apple-spring apple-pressable inline-flex min-h-11 min-w-11 items-center justify-center rounded-[10px] text-ink-600 hover:bg-ink-100 hover:text-ink-700"
                       >
                         <X className="size-4" />
                       </Link>
@@ -680,7 +680,7 @@ function SkillsMatrix({ candidates }: { candidates: CandidateProfile[] }) {
         className="sticky left-0 z-10 bg-white/95 backdrop-blur-xs p-4 text-left align-top text-xs font-semibold text-ink-700 border-r border-ink-100"
       >
         <span>All Skills Coverage</span>
-        <span className="mt-1 block text-xs font-normal tabular-nums text-ink-400">
+        <span className="mt-1 block text-xs font-normal tabular-nums text-ink-600">
           {vocabulary.length} combined
         </span>
       </th>

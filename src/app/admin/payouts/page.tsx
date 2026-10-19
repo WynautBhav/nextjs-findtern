@@ -153,7 +153,7 @@ export default async function AdminPayouts({
               "apple-spring apple-pressable inline-flex min-h-11 items-center justify-center rounded-[8px] px-4 text-[14px] font-medium tracking-[-0.01em] tabular-nums",
               currentTab === tab.key
                 ? "bg-white text-ink-900 shadow-xs"
-                : "text-ink-500 hover:text-ink-800",
+                : "text-ink-600 hover:text-ink-800",
             )}
           >
             {tab.label}

@@ -130,7 +130,7 @@ export default async function AdminNotifications({
                 <li key={n.id} className="px-5 py-3">
                   <div className="flex flex-wrap items-baseline justify-between gap-2">
                     <p className="text-sm font-medium text-ink-900">{n.title}</p>
-                    <p className="text-2xs text-ink-500">
+                    <p className="text-2xs text-ink-600">
                       {n.recipientType} ·{" "}
                       {n.createdAt
                         ? new Date(n.createdAt).toLocaleString("en-IN", {

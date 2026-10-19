@@ -304,10 +304,10 @@ export function AiFeedbackReport({
           {activeTab === "summary" && (
             <div className="grid gap-5 xl:grid-cols-2">
               <div className="min-w-0 space-y-3 rounded-[10px] border border-ink-100 bg-ink-50/40 p-4">
-                <h4 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-brand-800">
+                <h3 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-brand-800">
                   <CheckCircle2 className="size-4 text-brand-700" />
                   <span>Key Strengths Observed</span>
-                </h4>
+                </h3>
                 <ul className="space-y-2 text-xs text-ink-800">
                   <li className="flex items-start gap-2">
                     <span className="size-1.5 rounded-full bg-brand-600 shrink-0 mt-1.5" />
@@ -331,10 +331,10 @@ export function AiFeedbackReport({
               </div>
 
               <div className="min-w-0 space-y-3 rounded-[10px] border border-ink-100 bg-ink-50/40 p-4">
-                <h4 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-accent-700">
+                <h3 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-accent-700">
                   <TrendingUp className="size-4 text-accent-600" />
                   <span>Growth & Mentorship Areas</span>
-                </h4>
+                </h3>
                 <ul className="space-y-2 text-xs text-ink-800">
                   <li className="flex items-start gap-2">
                     <span className="size-1.5 rounded-full bg-accent-500 shrink-0 mt-1.5" />
@@ -417,7 +417,7 @@ export function AiFeedbackReport({
           {activeTab === "evidence" && (
             <div className="space-y-3">
               <div className="rounded-[10px] border border-ink-100 bg-ink-50/50 p-4 space-y-2">
-                <div className="flex items-center justify-between text-xs font-semibold text-ink-500">
+                <div className="flex items-center justify-between text-xs font-semibold text-ink-600">
                   <span>Question 2: State Management & Race Conditions</span>
                   <span className="tabular-nums text-brand-700">Score: 9.0 / 10</span>
                 </div>
@@ -430,7 +430,7 @@ export function AiFeedbackReport({
               </div>
 
               <div className="rounded-[10px] border border-ink-100 bg-ink-50/50 p-4 space-y-2">
-                <div className="flex items-center justify-between text-xs font-semibold text-ink-500">
+                <div className="flex items-center justify-between text-xs font-semibold text-ink-600">
                   <span>Question 4: Team Conflict & Code Reviews</span>
                   <span className="tabular-nums text-brand-700">Score: 8.5 / 10</span>
                 </div>

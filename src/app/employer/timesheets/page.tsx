@@ -155,7 +155,7 @@ export default async function EmployerTimesheets() {
                     {formatPeriod(row.periodStart, row.periodEnd)}
                   </p>
                   {row.internNote ? (
-                    <p className="mt-1.5 line-clamp-1 text-xs text-ink-500">&ldquo;{row.internNote}&rdquo;</p>
+                    <p className="mt-1.5 line-clamp-1 text-xs text-ink-600">&ldquo;{row.internNote}&rdquo;</p>
                   ) : null}
                 </div>
 

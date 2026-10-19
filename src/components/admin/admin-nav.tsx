@@ -117,7 +117,7 @@ export function AdminNav({
                       "grid size-6 place-items-center",
                       active
                         ? "text-brand-700"
-                        : "text-ink-400 group-hover:text-ink-700"
+                        : "text-ink-600 group-hover:text-ink-700"
                     )}
                   >
                     <IconComponent className="size-4" />
@@ -192,7 +192,7 @@ export function NavCloseButton({ onClick }: { onClick: () => void }) {
       type="button"
       onClick={onClick}
       aria-label="Close navigation"
-      className="apple-spring absolute top-4 right-4 flex min-h-11 min-w-11 items-center justify-center rounded-[10px] p-2 text-ink-500 hover:bg-ink-100 hover:text-ink-900"
+      className="apple-spring absolute top-4 right-4 flex min-h-11 min-w-11 items-center justify-center rounded-[10px] p-2 text-ink-600 hover:bg-ink-100 hover:text-ink-900"
     >
       <X className="size-5" />
     </button>

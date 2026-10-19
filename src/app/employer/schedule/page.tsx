@@ -148,7 +148,7 @@ export default async function EmployerSchedule() {
                         })}
                       </ul>
                     ) : (
-                      <p className="mt-3 text-xs text-ink-500">
+                      <p className="mt-3 text-xs text-ink-600">
                         No slots proposed. Reschedule to offer three times.
                       </p>
                     )}

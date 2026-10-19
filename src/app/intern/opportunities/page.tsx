@@ -47,7 +47,7 @@ export default async function InternOpportunities() {
         />
       ) : (
         <>
-          <p className="mb-5 text-sm text-ink-500">
+          <p className="mb-5 text-sm text-ink-600">
             {rows.length} role{rows.length === 1 ? "" : "s"} open
             {applied.size > 0 ? `, ${applied.size} you have already been considered for` : ""}
           </p>

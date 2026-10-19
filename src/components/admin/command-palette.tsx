@@ -81,7 +81,7 @@ export function CommandPalette() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="apple-spring flex min-h-11 items-center gap-2.5 rounded-[10px] border border-ink-200 bg-white px-3 py-1.5 text-[13px] text-ink-500 shadow-xs hover:border-brand-500 hover:text-ink-800"
+        className="apple-spring flex min-h-11 items-center gap-2.5 rounded-[10px] border border-ink-200 bg-white px-3 py-1.5 text-[13px] text-ink-600 shadow-xs hover:border-brand-500 hover:text-ink-800"
         aria-label="Search navigation"
       >
         <Search className="size-3.5" aria-hidden />
@@ -113,7 +113,7 @@ export function CommandPalette() {
               <button
                 type="button"
                 onClick={() => setOpen(false)}
-                className="rounded-md p-1 text-ink-400 hover:bg-ink-100 hover:text-ink-700"
+                className="rounded-md p-1 text-ink-600 hover:bg-ink-100 hover:text-ink-700"
               >
                 <X className="size-4" />
               </button>
@@ -121,7 +121,7 @@ export function CommandPalette() {
 
             <div className="max-h-72 overflow-y-auto p-2 space-y-1">
               {filtered.length === 0 ? (
-                <p className="px-3 py-6 text-center text-xs text-ink-500">
+                <p className="px-3 py-6 text-center text-xs text-ink-600">
                   No matching destinations found
                 </p>
               ) : (
@@ -138,7 +138,7 @@ export function CommandPalette() {
                         <Icon className="size-3.5" />
                       </span>
                       <span className="flex-1 truncate text-ink-900">{item.title}</span>
-                      <span className="rounded bg-ink-100 px-1.5 py-0.5 text-2xs text-ink-500">
+                      <span className="rounded bg-ink-100 px-1.5 py-0.5 text-2xs text-ink-600">
                         {item.category}
                       </span>
                     </button>
@@ -147,7 +147,7 @@ export function CommandPalette() {
               )}
             </div>
 
-            <div className="flex items-center justify-between border-t border-ink-100 bg-ink-50/50 px-3.5 py-2 text-2xs text-ink-500">
+            <div className="flex items-center justify-between border-t border-ink-100 bg-ink-50/50 px-3.5 py-2 text-2xs text-ink-600">
               <span>Navigate with arrow keys or click</span>
               <span>Press Escape to close</span>
             </div>

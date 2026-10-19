@@ -82,7 +82,7 @@ export function AboutSection() {
                     <span className="text-base font-medium text-ink-300">% refund</span>
                   </p>
                 </div>
-                <p className="ml-auto max-w-32 text-right text-xs leading-snug text-ink-400">
+                <p className="ml-auto max-w-32 text-right text-xs leading-snug text-ink-600">
                   If we cannot place you, the internship fee comes back
                 </p>
               </div>

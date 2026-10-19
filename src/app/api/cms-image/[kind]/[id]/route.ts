@@ -9,5 +9,6 @@ export const runtime = "nodejs";
 export async function GET(req: Request, ctx: { params: Promise<{ kind: string; id: string }> }) {
   const { kind, id } = await ctx.params;
   if (kind !== "partner" && kind !== "face") return NextResponse.json({ error: "Not found" }, { status: 404 });
-  return cmsImageResponse(await getCmsImage(kind, id), req);
+  // Logos and avatars are drawn small; 480px covers 2x on every layout.
+  return cmsImageResponse(await getCmsImage(kind, id), req, 480);
 }

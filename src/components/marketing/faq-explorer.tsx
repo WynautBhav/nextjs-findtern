@@ -158,7 +158,7 @@ export function FaqExplorer({
         </AccordionPrimitive>
       )}
 
-      <p className="mt-8 text-sm text-ink-500">
+      <p className="mt-8 text-sm text-ink-600">
         Showing {filtered.length} of {items.length}. Still stuck?{" "}
         <EmailLink />
       </p>

@@ -153,7 +153,7 @@ function Step({
           "mt-0.5 grid size-6 shrink-0 place-items-center rounded-full text-xs font-bold",
           state === "done" && "bg-brand-600 text-white",
           state === "current" && "border-2 border-brand-600 text-brand-700",
-          state === "todo" && "border-2 border-ink-200 text-ink-400",
+          state === "todo" && "border-2 border-ink-200 text-ink-600",
         )}
       >
         {state === "done" ? <Check className="size-3.5" strokeWidth={3.5} /> : n}
@@ -162,7 +162,7 @@ function Step({
         <h3
           className={cn(
             "text-[15px] font-semibold tracking-[-0.01em]",
-            state === "todo" ? "text-ink-500" : "text-ink-900",
+            state === "todo" ? "text-ink-600" : "text-ink-900",
           )}
         >
           {title}

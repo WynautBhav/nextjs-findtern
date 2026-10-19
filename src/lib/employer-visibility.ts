@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNotNull, or, type SQL } from "drizzle-orm";
 
 import { getSession } from "./auth";
 import { getDb } from "./db";
@@ -42,6 +42,11 @@ export async function hiredInternIds(
   const rows = await db
     .select({ internId: proposals.internId })
     .from(proposals)
-    .where(and(eq(proposals.employerId, employerId), eq(proposals.status, "hired")));
+    .where(and(eq(proposals.employerId, employerId), hiredProposalSql()));
   return new Set(rows.map((row) => row.internId));
+}
+
+/** SQL twin of `isHiredProposal` (lib/hire-status): status hired, or hiredAt set. */
+export function hiredProposalSql(): SQL {
+  return or(eq(proposals.status, "hired"), isNotNull(proposals.hiredAt))!;
 }

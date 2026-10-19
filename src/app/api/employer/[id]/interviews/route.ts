@@ -8,6 +8,7 @@ import { requireMutation } from "@/lib/guards-mutation";
 import { employerNames, internFirstName, notify } from "@/lib/notify";
 import { wallTimeToUtc } from "@/lib/timezones";
 import { canEmployerSeeIntern } from "@/lib/employer-pool";
+import { hiredProposalSql } from "@/lib/employer-visibility";
 import { hasDuplicateSlots, isBlockingInterview, isQuarterHourWall } from "@/lib/employer-interview-rules";
 
 const wall = z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/);
@@ -131,7 +132,7 @@ async function hiredBy(db: ReturnType<typeof getDb>, employerId: string, internI
   const [row] = await db
     .select({ id: schema.proposals.id })
     .from(schema.proposals)
-    .where(and(eq(schema.proposals.employerId, employerId), eq(schema.proposals.internId, internId), eq(schema.proposals.status, "hired")))
+    .where(and(eq(schema.proposals.employerId, employerId), eq(schema.proposals.internId, internId), hiredProposalSql()))
     .limit(1);
   return Boolean(row);
 }

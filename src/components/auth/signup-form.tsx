@@ -313,7 +313,7 @@ export function SignupForm({
                 return (
                   <li
                     key={rule.label}
-                    className={met ? "text-xs text-success" : "text-xs text-ink-400"}
+                    className={met ? "text-xs text-success" : "text-xs text-ink-600"}
                   >
                     {rule.label}
                   </li>

@@ -69,7 +69,7 @@ export default async function SignupPage({
             <span className="absolute inset-0 flex items-center" aria-hidden>
               <span className="w-full border-t border-ink-100" />
             </span>
-            <span className="relative mx-auto block w-fit bg-white px-3 text-xs uppercase tracking-[0.12em] text-ink-400">
+            <span className="relative mx-auto block w-fit bg-white px-3 text-xs uppercase tracking-[0.12em] text-ink-600">
               or with your email
             </span>
           </div>

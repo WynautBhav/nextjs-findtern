@@ -317,7 +317,7 @@ export function PromoCodesManager({
               type="button"
               onClick={() => setSearch("")}
               aria-label="Clear search"
-              className="apple-spring absolute top-1/2 right-2 flex min-h-11 min-w-11 -translate-y-1/2 items-center justify-center rounded-[10px] text-ink-400 hover:text-ink-700"
+              className="apple-spring absolute top-1/2 right-2 flex min-h-11 min-w-11 -translate-y-1/2 items-center justify-center rounded-[10px] text-ink-600 hover:text-ink-700"
             >
               <X className="size-4" />
             </button>
@@ -395,7 +395,7 @@ export function PromoCodesManager({
                     onClick={() => copyToClipboard(promo.code)}
                     title="Copy code"
                     aria-label={`Copy code ${promo.code}`}
-                    className="apple-spring apple-pressable inline-flex min-h-11 min-w-11 items-center justify-center rounded-[10px] text-ink-400 hover:bg-ink-100 hover:text-ink-700"
+                    className="apple-spring apple-pressable inline-flex min-h-11 min-w-11 items-center justify-center rounded-[10px] text-ink-600 hover:bg-ink-100 hover:text-ink-700"
                   >
                     {isCopied ? (
                       <Check className="size-4 text-emerald-600" />
@@ -413,7 +413,7 @@ export function PromoCodesManager({
                 <p className="mt-2 text-[28px] font-bold leading-[34px] tracking-[-0.02em] tabular-nums text-brand-800">
                   {benefitLabel(promo)}
                 </p>
-                <p className="mt-1 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink-500">
+                <p className="mt-1 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink-600">
                   {promo.appliesTo === "intern" ? "Interns only" : promo.appliesTo === "employer" ? "Companies only" : "Interns and companies"}
                 </p>
                 {promo.description ? (
@@ -458,7 +458,7 @@ export function PromoCodesManager({
                       type="button"
                       onClick={() => setDeleteTarget(promo)}
                       aria-label={`Delete ${promo.code}`}
-                      className="apple-spring apple-pressable inline-flex min-h-11 min-w-11 items-center justify-center rounded-[10px] text-ink-400 hover:bg-danger-soft hover:text-danger"
+                      className="apple-spring apple-pressable inline-flex min-h-11 min-w-11 items-center justify-center rounded-[10px] text-ink-600 hover:bg-danger-soft hover:text-danger"
                     >
                       <Trash2 className="size-4" />
                     </button>

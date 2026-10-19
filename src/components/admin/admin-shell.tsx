@@ -42,7 +42,7 @@ export function AdminShell({
 
   return (
     <div className="apple-admin min-h-[100dvh] overflow-x-clip bg-ink-50 text-ink-900 lg:flex lg:items-stretch">
-      <aside className="apple-material-sidebar sticky top-0 hidden h-[100dvh] w-[15.5rem] shrink-0 flex-col px-3 py-4 lg:flex">
+      <aside aria-label="Sidebar" className="apple-material-sidebar sticky top-0 hidden h-[100dvh] w-[15.5rem] shrink-0 flex-col px-3 py-4 lg:flex">
         <Link href="/admin/dashboard" className="apple-spring apple-pressable mb-6 flex min-h-11 items-center justify-between gap-3 rounded-[10px] px-3 py-2">
           <Logo alt="Findtern Admin" priority className="h-7" />
           <span className="rounded-full bg-brand-50 border border-brand-200 px-2 py-0.5 text-2xs font-bold uppercase tracking-wider text-brand-700">Admin</span>
@@ -150,7 +150,7 @@ export function AdminShell({
           </div>
         </header>
 
-        <main className="mx-auto min-w-0 w-full max-w-[84rem] flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">{children}</main>
+        <main id="main" tabIndex={-1} className="outline-none mx-auto min-w-0 w-full max-w-[84rem] flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">{children}</main>
       </div>
     </div>
   );

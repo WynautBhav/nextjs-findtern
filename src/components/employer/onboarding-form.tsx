@@ -242,7 +242,7 @@ export function EmployerOnboardingForm({
                         ? "bg-brand-700 text-white"
                         : state === "done"
                           ? "bg-brand-100 text-brand-700"
-                          : "bg-ink-100 text-ink-500",
+                          : "bg-ink-100 text-ink-600",
                     ].join(" ")}
                   >
                     {state === "done" ? (

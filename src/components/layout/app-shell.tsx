@@ -99,11 +99,11 @@ export function AppShell({
       {resolvedGroups.map((group, groupIdx) => (
         <div key={group.title ?? groupIdx} className="space-y-1.5">
           {group.title ? (
-            <p className="px-3 text-2xs font-semibold uppercase tracking-wider text-on-dark-subtle/70">
+            <p className="px-3 text-2xs font-semibold uppercase tracking-wider text-on-dark-subtle">
               {group.title}
             </p>
           ) : null}
-          <nav className="flex flex-col gap-1">
+          <nav aria-label={group.title ? `${group.title} navigation` : "Main navigation"} className="flex flex-col gap-1">
             {group.items.map((item) => {
               const active =
                 pathname === item.href ||
@@ -147,7 +147,7 @@ export function AppShell({
   return (
     <div className="apple-admin flex min-h-[100dvh] overflow-x-clip bg-ink-50">
       {/* Desktop sticky sidebar */}
-      <aside className="sticky top-0 hidden h-[100dvh] w-64 shrink-0 flex-col bg-brand-950 px-4 py-6 lg:flex border-r border-white/5">
+      <aside aria-label="Sidebar" className="sticky top-0 hidden h-[100dvh] w-64 shrink-0 flex-col bg-brand-950 px-4 py-6 lg:flex border-r border-white/5">
         <Link href="/employer/dashboard" className="px-3 flex items-center justify-between gap-2.5">
           <Logo variant="white" priority className="h-7" />
           <span className="text-2xs font-bold uppercase tracking-wider text-accent-400 bg-accent-500/15 border border-accent-400/30 px-2 py-0.5 rounded-full">
@@ -166,7 +166,7 @@ export function AppShell({
             <div className="min-w-0 pr-2">
               <p className="truncate text-xs font-semibold text-white">{companyName}</p>
               {email ? (
-                <p className="truncate text-2xs text-on-dark-subtle/80">{email}</p>
+                <p className="truncate text-2xs text-on-dark-subtle">{email}</p>
               ) : null}
             </div>
             <button
@@ -200,6 +200,8 @@ export function AppShell({
               <SheetContent
                 side="left"
                 showCloseButton={false}
+                aria-modal="true"
+                aria-label={`Findtern ${brand} navigation`}
                 className="flex w-72 flex-col bg-brand-950 p-5 text-white border-r border-white/10"
               >
                 <SheetHeader className="flex flex-row items-center justify-between">
@@ -374,7 +376,7 @@ export function AppShell({
 
         {/* Content body. Bottom padding clears the floating chat launcher so
             the last row of a table or a right-aligned CTA is never under it. */}
-        <main className="mx-auto min-w-0 w-full max-w-[84rem] flex-1 px-4 pb-24 pt-6 sm:px-6 lg:px-8 lg:pb-24 lg:pt-8">
+        <main id="main" tabIndex={-1} className="outline-none mx-auto min-w-0 w-full max-w-[84rem] flex-1 px-4 pb-24 pt-6 sm:px-6 lg:px-8 lg:pb-24 lg:pt-8">
           {children}
         </main>
       </div>

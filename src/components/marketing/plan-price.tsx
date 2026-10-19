@@ -38,7 +38,7 @@ export function PlanPrice({
   const save = savingsPercent(nowMinor, wasMinor);
   const struck = save != null && wasMinor ? format(wasMinor, currency) : null;
   const tag = save != null && nowMinor > 0 ? `Save ${save}%` : null;
-  const muted = tone === "dark" ? "text-on-dark-subtle" : "text-ink-400";
+  const muted = tone === "dark" ? "text-on-dark-subtle" : "text-ink-600";
 
   if (layout === "stack") {
     return (
@@ -101,7 +101,7 @@ export function OfferNote({
   className?: string;
 }) {
   return (
-    <p className={cn("text-[13px] leading-relaxed", tone === "dark" ? "text-on-dark-subtle" : "text-ink-500", className)}>
+    <p className={cn("text-[13px] leading-relaxed", tone === "dark" ? "text-on-dark-subtle" : "text-ink-600", className)}>
       Free through 2026. {formatRate(wasMinor, currency)} from January 2027.
     </p>
   );

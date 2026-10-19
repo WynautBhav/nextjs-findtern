@@ -141,7 +141,7 @@ export default function AboutPage() {
             <Figure key={s.label} value={s.value} prefix={s.prefix} suffix={s.suffix} label={s.label} />
           ))}
         </div>
-        <p className="mt-6 text-center text-xs sm:mt-8 sm:text-sm text-ink-500">
+        <p className="mt-6 text-center text-xs sm:mt-8 sm:text-sm text-ink-600">
           Product terms, not performance claims. Candidates get their own guarantee on
           the <a href="/interns" className="text-primary underline underline-offset-4">interns page</a>; placement
           figures are published once they reach a threshold we are willing to stand behind.
@@ -150,7 +150,7 @@ export default function AboutPage() {
 
       {/* ── Who we work with ────────────────────────────────────────── */}
       <PageSection tone="muted" className="py-14">
-        <p className="text-center text-2xs font-semibold uppercase tracking-[0.16em] text-ink-500">
+        <p className="text-center text-2xs font-semibold uppercase tracking-[0.16em] text-ink-600">
           Trusted by{" "}
           <span className="text-primary">leading companies</span> across India
         </p>
@@ -228,9 +228,9 @@ function Figure({
     <div className="px-1 text-center sm:px-0">
       <p className="text-2xl font-bold tracking-tight text-ink-900 sm:text-4xl md:text-5xl">
         <CountUp value={value} prefix={prefix} />
-        {suffix ? <span className="text-xs font-semibold text-ink-400 sm:text-xl sm:font-medium">{suffix}</span> : null}
+        {suffix ? <span className="text-xs font-semibold text-ink-600 sm:text-xl sm:font-medium">{suffix}</span> : null}
       </p>
-      <p className="mt-1 text-[11px] leading-tight text-ink-500 sm:mt-2 sm:text-base">{label}</p>
+      <p className="mt-1 text-[11px] leading-tight text-ink-600 sm:mt-2 sm:text-base">{label}</p>
     </div>
   );
 }

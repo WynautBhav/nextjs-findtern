@@ -221,7 +221,7 @@ export function Company360View({
             className={`apple-spring apple-pressable inline-flex min-h-11 shrink-0 items-center gap-2 whitespace-nowrap rounded-[8px] px-4 text-[14px] font-medium tracking-[-0.01em] ${
               activeTab === tab.key
                 ? "bg-white text-ink-900 shadow-xs"
-                : "text-ink-500 hover:text-ink-800"
+                : "text-ink-600 hover:text-ink-800"
             }`}
           >
             <span>{tab.label}</span>
@@ -278,7 +278,7 @@ export function Company360View({
                           </span>
                         ))}
                         {(proj.skills ?? []).length > 3 && (
-                          <span className="whitespace-nowrap text-2xs text-ink-500">
+                          <span className="whitespace-nowrap text-2xs text-ink-600">
                             +{(proj.skills ?? []).length - 3}
                           </span>
                         )}
@@ -287,7 +287,7 @@ export function Company360View({
                     <TableCell className="px-5 py-3.5">
                       <StatusBadge value={proj.status || "active"} />
                     </TableCell>
-                    <TableCell className="px-5 py-3.5 text-xs text-ink-500">
+                    <TableCell className="px-5 py-3.5 text-xs text-ink-600">
                       {formatDate(proj.createdAt)}
                     </TableCell>
                     <TableCell className="px-5 py-3.5 text-right">
@@ -351,7 +351,7 @@ export function Company360View({
                       <TableCell className="px-5 py-3.5">
                         <StatusBadge value={prop.status} />
                       </TableCell>
-                      <TableCell className="px-5 py-3.5 text-xs text-ink-500">
+                      <TableCell className="px-5 py-3.5 text-xs text-ink-600">
                         {formatDate(prop.createdAt)}
                       </TableCell>
                       <TableCell className="px-5 py-3.5 text-right">
@@ -416,7 +416,7 @@ export function Company360View({
                     <TableCell className="px-5 py-3.5">
                       <StatusBadge value={iv.status} />
                     </TableCell>
-                    <TableCell className="px-5 py-3.5 text-xs text-ink-500">
+                    <TableCell className="px-5 py-3.5 text-xs text-ink-600">
                       {formatDate(iv.createdAt)}
                     </TableCell>
                     <TableCell className="px-5 py-3.5 text-right">
@@ -471,7 +471,7 @@ export function Company360View({
                     <TableCell className="px-5 py-3.5">
                       <StatusBadge value={pay.status} />
                     </TableCell>
-                    <TableCell className="px-5 py-3.5 text-xs text-ink-500">
+                    <TableCell className="px-5 py-3.5 text-xs text-ink-600">
                       {formatDate(pay.createdAt)}
                     </TableCell>
                   </TableRow>
@@ -543,7 +543,7 @@ export function Company360View({
                       <TableCell className="px-5 py-3.5 text-xs text-ink-700">
                         {offer.roleTitle || "Internship"}
                       </TableCell>
-                      <TableCell className="px-5 py-3.5 text-xs text-ink-500">
+                      <TableCell className="px-5 py-3.5 text-xs text-ink-600">
                         {formatDate(h.proposal.hiredAt || h.proposal.updatedAt)}
                       </TableCell>
                       <TableCell className="px-5 py-3.5 text-right">

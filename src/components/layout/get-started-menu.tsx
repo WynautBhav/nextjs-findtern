@@ -55,7 +55,7 @@ export function GetStartedMenu({ className = "" }: { className?: string }) {
             <UserPlus className="size-4 shrink-0 text-brand-600" aria-hidden />
             <span className="flex flex-col items-start gap-0.5">
               <span>A job or internship</span>
-              <span className="text-xs font-normal text-ink-500">
+              <span className="text-xs font-normal text-ink-600">
                 Create a candidate account
               </span>
             </span>
@@ -67,7 +67,7 @@ export function GetStartedMenu({ className = "" }: { className?: string }) {
             <UserPlus className="size-4 shrink-0 text-brand-600" aria-hidden />
             <span className="flex flex-col items-start gap-0.5">
               <span>Interns to hire</span>
-              <span className="text-xs font-normal text-ink-500">
+              <span className="text-xs font-normal text-ink-600">
                 Register your company
               </span>
             </span>
@@ -88,7 +88,7 @@ export function GetStartedMenu({ className = "" }: { className?: string }) {
             <LogIn className="size-4 shrink-0 text-ink-500" aria-hidden />
             <span className="flex flex-col items-start gap-0.5">
               <span>Sign in</span>
-              <span className="text-xs font-normal text-ink-500">
+              <span className="text-xs font-normal text-ink-600">
                 Candidates and employers
               </span>
             </span>

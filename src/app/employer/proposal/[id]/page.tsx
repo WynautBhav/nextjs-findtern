@@ -109,13 +109,16 @@ export default async function EmployerProposalDetail({
   const offer = parseOffer(raw, proposal.currency);
   const currency = offer.currency;
   const skills = Array.isArray(proposal.skills) ? proposal.skills.filter(Boolean) : [];
-  const ratings = Object.entries(proposal.aiRatings ?? {}).filter(
-    (entry): entry is [string, number] => typeof entry[1] === "number",
+  const snapshot = Object.entries(proposal.aiRatings ?? {}).filter(
+    (entry): entry is [string, number] => typeof entry[1] === "number" && entry[0] !== "overall",
   );
   const lapsed = (proposal.status === "sent" || proposal.status === "interview_scheduled") && offerPastStart(offer.startDate);
   const statusKey = lapsed ? "expired" : proposal.status;
   const status = STATUS[statusKey] ?? { label: statusKey.replace(/_/g, " "), tone: "bg-ink-100 text-ink-700", next: "" };
   const score = offerScore(raw) ?? 0;
+  // The Findtern Score shown is the one the offer was priced on, so it can
+  // never disagree with the rate or the stipend rule beside it.
+  const ratings: [string, number][] = score > 0 ? [["overall", score], ...snapshot] : snapshot;
   const editable = EDITABLE.has(proposal.status) && !lapsed && !offer.fullTime;
   const city = typeof raw.city === "string" ? raw.city : "";
   const state = typeof raw.state === "string" ? raw.state : "";

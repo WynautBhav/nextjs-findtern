@@ -36,8 +36,10 @@ export default async function InternNotifications() {
   const session = await requireRole("intern");
 
   const rows = await notificationsFor(session.uid);
-  const needsYou = rows.filter((n) => NEEDS_ACTION.has(n.type));
-  const updates = rows.filter((n) => !NEEDS_ACTION.has(n.type));
+  // Read rows have been dealt with: an offer that was answered, or an alert
+  // already opened, drops out of "Needs you" into the history below.
+  const needsYou = rows.filter((n) => NEEDS_ACTION.has(n.type) && !n.isRead);
+  const updates = rows.filter((n) => !(NEEDS_ACTION.has(n.type) && !n.isRead));
 
   return (
     <div>

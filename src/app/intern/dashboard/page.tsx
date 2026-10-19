@@ -179,7 +179,7 @@ export default async function InternHome() {
               }
             />
             {data.thread.length === 0 && gettingStarted ? (
-              <p className="text-sm text-ink-500">
+              <p className="text-sm text-ink-600">
                 Offers, interviews, timesheets and payments appear here once your profile is live.
               </p>
             ) : data.thread.length === 0 ? (
@@ -190,7 +190,7 @@ export default async function InternHome() {
                 who="About four minutes"
               />
             ) : history.length === 0 ? (
-              <p className="text-sm text-ink-500">Nothing else yet.</p>
+              <p className="text-sm text-ink-600">Nothing else yet.</p>
             ) : (
               <Thread nodes={history.slice(0, 6)} compact />
             )}
@@ -220,7 +220,7 @@ export default async function InternHome() {
                         <span className="block truncate text-sm font-medium text-ink-900 group-hover:text-brand-700">
                           {p.projectName}
                         </span>
-                        <span className="block truncate text-[13px] text-ink-500">
+                        <span className="block truncate text-[13px] text-ink-600">
                           {p.scopeOfWork}
                         </span>
                       </span>
@@ -237,7 +237,7 @@ export default async function InternHome() {
         <aside className="space-y-4">
           {upcomingInterviewItem ? (
             <Surface className="p-5">
-              <p className="text-[13px] font-medium text-ink-500">Next interview</p>
+              <p className="text-[13px] font-medium text-ink-600">Next interview</p>
               <p className="mt-1 text-[15px] font-semibold text-ink-900">
                 {data.names[upcomingInterviewItem.interview.employerId] ?? "Employer interview"}
               </p>
@@ -266,7 +266,7 @@ export default async function InternHome() {
 
           <Surface className="p-5">
             <div className="flex items-baseline justify-between">
-              <p className="text-[13px] font-medium text-ink-500">Findtern Score</p>
+              <p className="text-[13px] font-medium text-ink-600">Findtern Score</p>
               <Link href="/intern/record" className="text-xs font-medium text-primary hover:underline">
                 Details
               </Link>
@@ -277,7 +277,7 @@ export default async function InternHome() {
               <>
                 <p className="mt-1 text-3xl font-semibold tabular-nums tracking-tight text-ink-900">
                   {score.toFixed(1)}
-                  <span className="ml-0.5 text-sm font-normal text-ink-400">/10</span>
+                  <span className="ml-0.5 text-sm font-normal text-ink-600">/10</span>
                 </p>
                 {ratings ? (
                   <dl className="mt-4 space-y-1.5 border-t border-ink-100 pt-4 text-[13px]">
@@ -292,7 +292,7 @@ export default async function InternHome() {
                       .filter(([, v]) => v > 0)
                       .map(([label, v]) => (
                         <div key={label} className="flex justify-between gap-2">
-                          <dt className="text-ink-500">{label}</dt>
+                          <dt className="text-ink-600">{label}</dt>
                           <dd className="font-medium tabular-nums text-ink-900">{v.toFixed(1)}</dd>
                         </div>
                       ))}
@@ -310,7 +310,7 @@ export default async function InternHome() {
 
           {working || data.money.paidMinor > 0 ? (
             <Surface className="p-5">
-              <p className="text-[13px] font-medium text-ink-500">Paid to you</p>
+              <p className="text-[13px] font-medium text-ink-600">Paid to you</p>
               <p className="mt-1 text-2xl font-semibold tabular-nums tracking-tight text-ink-900">
                 {formatMoney(data.money.paidMinor, "INR")}
               </p>

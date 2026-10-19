@@ -65,7 +65,7 @@ export default async function PublicOpportunities() {
           </div>
         ) : (
           <>
-            <p className="mb-5 text-sm text-ink-500">
+            <p className="mb-5 text-sm text-ink-600">
               {rows.length} role{rows.length === 1 ? "" : "s"} open
             </p>
             <ul className="grid gap-3 lg:grid-cols-2">
@@ -100,7 +100,7 @@ export default async function PublicOpportunities() {
               </div>
             </div>
 
-            <p className="mt-6 text-center text-sm text-ink-500">
+            <p className="mt-6 text-center text-sm text-ink-600">
               Already have an account?{" "}
               <Link
                 href="/intern/opportunities"

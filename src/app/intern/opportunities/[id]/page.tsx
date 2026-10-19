@@ -126,7 +126,7 @@ export default async function RoleDetail({ params }: { params: Promise<{ id: str
                     className={
                       step.done
                         ? "mt-0.5 grid size-5 shrink-0 place-items-center rounded-full bg-brand-600 text-white"
-                        : "mt-0.5 grid size-5 shrink-0 place-items-center rounded-full border-2 border-ink-200 text-xs font-bold text-ink-400"
+                        : "mt-0.5 grid size-5 shrink-0 place-items-center rounded-full border-2 border-ink-200 text-xs font-bold text-ink-600"
                     }
                   >
                     {step.done ? <Check className="size-3" strokeWidth={3.5} /> : i + 1}
@@ -174,7 +174,7 @@ export default async function RoleDetail({ params }: { params: Promise<{ id: str
                 value={
                   <span className="inline-flex items-center gap-2">
                     <CompanyInitials name={role.companyName} className="size-7 text-[11px]" />
-                    <span className="text-ink-500">Name shared with an offer</span>
+                    <span className="text-ink-600">Name shared with an offer</span>
                   </span>
                 }
               />

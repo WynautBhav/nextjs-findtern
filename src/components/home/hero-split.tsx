@@ -221,7 +221,7 @@ export function HeroSplit() {
       <div className="container-page pb-14 sm:pb-20">
         <div
           ref={bandRef}
-          className="relative overflow-hidden rounded-3xl border border-white/10 bg-brand-950 bg-[url('/media/hero-poster.jpg')] bg-cover bg-center shadow-2xl"
+          className="relative overflow-hidden rounded-3xl border border-white/10 bg-brand-950 bg-[url('/media/hero-poster.webp')] bg-cover bg-center shadow-2xl"
         >
           {/* Taller on phones so the caption has its own lower third instead
               of sitting across the subject; wide from sm up, where the
@@ -232,7 +232,7 @@ export function HeroSplit() {
               "aspect-4/5 w-full object-cover object-[center_30%] transition-opacity duration-1000 sm:aspect-16/9 sm:object-[center_35%] lg:aspect-21/9",
               ready ? "opacity-100" : "opacity-0",
             )}
-            poster="/media/hero-poster.jpg"
+            poster="/media/hero-poster.webp"
             muted
             loop
             playsInline

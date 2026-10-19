@@ -75,14 +75,14 @@ export function RoleCard({
 
       <div className="mt-auto flex flex-wrap items-center gap-x-4 gap-y-2 pt-4">
         {place || role.locationType ? (
-          <span className="flex items-center gap-1.5 text-xs text-ink-500">
+          <span className="flex items-center gap-1.5 text-xs text-ink-600">
             <MapPin className="size-3.5 shrink-0" aria-hidden />
             {role.locationType ? capitalise(role.locationType) : place}
             {place && role.locationType ? ` in ${place}` : ""}
           </span>
         ) : null}
         {role.createdAt ? (
-          <span className="text-xs text-ink-400">
+          <span className="text-xs text-ink-600">
             Posted {formatDayLabel(role.createdAt).toLowerCase()}
           </span>
         ) : null}

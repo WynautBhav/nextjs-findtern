@@ -88,7 +88,7 @@ export default async function BlogDetailPage({
         <div className="container-page relative py-12 sm:py-16">
           <Link
             href="/blog"
-            className="inline-flex items-center gap-1.5 text-sm font-medium text-ink-500 transition-colors hover:text-primary"
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-ink-600 transition-colors hover:text-primary"
           >
             <ArrowLeft className="size-4" aria-hidden />
             All posts
@@ -102,7 +102,7 @@ export default async function BlogDetailPage({
               {title}
             </h1>
 
-            <div className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-ink-500">
+            <div className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-ink-600">
               <span>
                 By <span className="font-medium text-ink-700">the Findtern team</span>
               </span>
@@ -145,7 +145,7 @@ export default async function BlogDetailPage({
 
         <aside className="lg:sticky lg:top-28 lg:self-start">
           <div className="rounded-2xl border border-ink-200 bg-ink-50 p-5">
-            <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-ink-500">
+            <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-ink-600">
               Related
             </p>
             <ul className="mt-3 space-y-1">

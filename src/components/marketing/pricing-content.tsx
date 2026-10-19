@@ -99,7 +99,7 @@ export function PricingContent({
                   <h3 className="mt-5 text-lg font-semibold tracking-tight text-ink-900">
                     {plan?.displayName ?? band.name}
                   </h3>
-                  <p className="mt-1 text-sm text-ink-500">
+                  <p className="mt-1 text-sm text-ink-600">
                     {band.min}–{band.max}/10
                   </p>
                   <PlanPrice
@@ -115,7 +115,7 @@ export function PricingContent({
                   ) : (
                     <MonthlyRate hourlyMinor={plan?.priceHourlyMinor ?? band.rateMinor} currency={currency} className="mt-2" />
                   )}
-                  <p className="mt-4 text-sm text-ink-500">{band.blurb}</p>
+                  <p className="mt-4 text-sm text-ink-600">{band.blurb}</p>
                   <p className="mt-5 flex items-center gap-2 border-t pt-4 text-sm text-ink-700">
                     <Check className="size-4 shrink-0 text-primary" aria-hidden />
                     <PlanPrice
@@ -133,7 +133,7 @@ export function PricingContent({
                           key={f.label}
                           className={cn(
                             "flex gap-2.5 text-sm",
-                            f.included ? "text-ink-700" : "text-ink-400",
+                            f.included ? "text-ink-700" : "text-ink-600",
                           )}
                         >
                           {f.included ? (
@@ -193,7 +193,7 @@ export function PricingContent({
                 <tr className="border-b border-ink-200">
                   <th
                     scope="col"
-                    className="w-1/3 bg-ink-50 px-6 py-5 text-2xs font-semibold uppercase tracking-[0.14em] text-ink-500"
+                    className="w-1/3 bg-ink-50 px-6 py-5 text-2xs font-semibold uppercase tracking-[0.14em] text-ink-600"
                   >
                     Plan
                   </th>
@@ -221,7 +221,7 @@ export function PricingContent({
                         {p.displayName}
                       </span>
                       <PlanPrice
-                        className="mt-1 text-sm font-medium text-ink-500"
+                        className="mt-1 text-sm font-medium text-ink-600"
                         nowMinor={p.priceHourlyMinor}
                         wasMinor={p.compareAtHourlyMinor}
                         currency={currency}
@@ -241,7 +241,7 @@ export function PricingContent({
                   >
                     <th
                       scope="row"
-                      className="px-6 py-4 text-sm font-medium text-ink-500"
+                      className="px-6 py-4 text-sm font-medium text-ink-600"
                     >
                       {row.label}
                     </th>
@@ -315,7 +315,7 @@ export function PricingContent({
                     a prefix change must remount rather than update in place. */}
                 {formatMoney(perHireMinor, currency)}
               </p>
-              <p className="text-sm text-ink-500">
+              <p className="text-sm text-ink-600">
                 fixed per-hire fee
                 <br />
                 on every plan

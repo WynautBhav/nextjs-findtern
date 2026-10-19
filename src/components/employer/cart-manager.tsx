@@ -189,7 +189,7 @@ export function CartManager({
           </p>
           <Link
             href="/employer/checkout"
-            className="apple-spring apple-pressable inline-flex min-h-11 items-center gap-1.5 rounded-[10px] bg-emerald-600 px-4 text-xs font-semibold text-white hover:bg-emerald-700"
+            className="apple-spring apple-pressable inline-flex min-h-11 items-center gap-1.5 rounded-[10px] bg-emerald-700 px-4 text-xs font-semibold text-white hover:bg-emerald-800"
           >
             <CreditCard className="size-3.5" aria-hidden />
             Go to checkout
@@ -198,17 +198,18 @@ export function CartManager({
       ) : null}
 
       <div className="flex flex-col gap-3 border-b border-ink-100 pb-3 sm:flex-row sm:items-center sm:justify-between">
-        <p className="inline-flex items-center gap-2 text-sm font-semibold text-ink-800">
+        <h2 className="inline-flex items-center gap-2 text-sm font-semibold text-ink-800">
           <ShoppingCart className="size-4 text-ink-400" aria-hidden />
           Shortlisted ({cartLines.length})
-        </p>
+        </h2>
 
         {projectOptions.length > 0 && (
           <div className="flex min-w-0 items-center gap-2">
-            <span className="shrink-0 text-2xs font-semibold uppercase tracking-wider text-text-subtle">
+            <label htmlFor="cart-project" className="shrink-0 text-2xs font-semibold uppercase tracking-wider text-text-subtle">
               Project:
-            </span>
+            </label>
             <select
+              id="cart-project"
               value={selectedProject}
               onChange={(e) => setSelectedProject(e.target.value)}
               className="apple-spring min-h-11 w-full min-w-0 flex-1 rounded-[10px] border border-ink-200 bg-white px-3 text-[14px] font-medium text-ink-800 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 sm:w-auto"
@@ -246,7 +247,7 @@ export function CartManager({
                     </span>
 
                     <div className="min-w-0">
-                      <h4 className="text-sm font-bold text-ink-900">{nameOf(line)}</h4>
+                      <h3 className="text-sm font-bold text-ink-900">{nameOf(line)}</h3>
                       <p className="mt-0.5 text-xs text-text-subtle">
                         Project: <strong className="text-ink-800">{line.projectName}</strong>
                         {line.candidate.location ? ` · ${line.candidate.location}` : ""}
@@ -321,7 +322,7 @@ export function CartManager({
           </div>
 
           <aside className="min-w-0 space-y-4 rounded-[20px] border border-ink-200/70 bg-white p-5 shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)] xl:sticky xl:top-8 xl:self-start">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-ink-800">How hiring works</h3>
+            <h2 className="text-xs font-bold uppercase tracking-wider text-ink-800">How hiring works</h2>
             <ol className="space-y-2.5 text-xs leading-relaxed text-ink-600">
               <li>1. Book a meeting if you want to talk first.</li>
               <li>2. Send a proposal. The candidate reads it and accepts or declines.</li>
@@ -355,7 +356,7 @@ export function CartManager({
           {meetingSuccess ? (
             <div className="rounded-[10px] border border-emerald-200 bg-emerald-50 p-6 text-center space-y-2">
               <CheckCircle2 className="size-8 text-emerald-600 mx-auto" />
-              <h4 className="text-sm font-bold text-emerald-900">Interview Request Sent!</h4>
+              <h3 className="text-sm font-bold text-emerald-900">Interview Request Sent!</h3>
               <p className="text-xs text-emerald-800">
                 The candidate has been notified to pick from your offered slots.
               </p>
@@ -405,10 +406,11 @@ export function CartManager({
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-ink-800">
+                <label htmlFor="cart-timezone" className="block text-xs font-semibold text-ink-800">
                   Timezone
                 </label>
                 <select
+                  id="cart-timezone"
                   value={timezone}
                   onChange={(e) => setTimezone(e.target.value)}
                   className="apple-spring mt-1 min-h-11 w-full rounded-[10px] border border-ink-200 bg-white px-3 text-[14px] text-ink-900 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"

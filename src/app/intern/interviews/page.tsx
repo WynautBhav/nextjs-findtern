@@ -207,10 +207,10 @@ export default async function InternInterviews() {
                       <li key={interview.id}>
                         <Surface className="p-5">
                           <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-                            <h4 className="text-sm font-semibold tracking-[-0.01em] text-ink-900">
+                            <h3 className="text-sm font-semibold tracking-[-0.01em] text-ink-900">
                               {company}
-                            </h4>
-                            <p className="text-xs text-ink-500">
+                            </h3>
+                            <p className="text-xs text-ink-600">
                               {formatDayLabel(when)} at{" "}
                               {formatSlotTime(when, interview.timezone).split(", ").slice(-1)[0]}
                             </p>

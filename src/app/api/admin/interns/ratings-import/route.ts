@@ -2,7 +2,7 @@ import { eq, inArray, sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
 import { applyRatings, RATINGS_TEMPLATE, RATINGS_TEMPLATE_ROWS, readRatingsRows, readRatingsSheet, type RatingsRow } from "@/lib/admin/ratings";
-import { isXlsx, readXlsxRows, writeXlsx } from "@/lib/admin/xlsx";
+import { buildXlsx, isXlsx, readXlsxRows, XLSX_MIME } from "@/lib/xlsx";
 import { afterRatingsSaved } from "@/lib/admin/score-live";
 import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
@@ -10,9 +10,9 @@ import { requireMutation } from "@/lib/guards-mutation";
 /** The sheet template (legacy column names): Excel by default, `?format=csv` for CSV. */
 export async function GET(req: Request) {
   if (new URL(req.url).searchParams.get("format") !== "csv") {
-    return new Response(new Uint8Array(writeXlsx(RATINGS_TEMPLATE_ROWS, "ratings")), {
+    return new Response(new Uint8Array(buildXlsx("ratings", RATINGS_TEMPLATE_ROWS)), {
       headers: {
-        "content-type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "content-type": XLSX_MIME,
         "content-disposition": 'attachment; filename="ratings-template.xlsx"',
       },
     });

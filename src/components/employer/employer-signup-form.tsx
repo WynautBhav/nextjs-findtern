@@ -323,7 +323,7 @@ export function EmployerSignupForm() {
           {PASSWORD_RULES.map((rule) => {
             const met = rule.test(password);
             return (
-              <li key={rule.label} className={met ? "text-xs text-success" : "text-xs text-ink-400"}>
+              <li key={rule.label} className={met ? "text-xs text-success" : "text-xs text-ink-600"}>
                 {rule.label}
               </li>
             );

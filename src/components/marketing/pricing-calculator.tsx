@@ -98,10 +98,10 @@ export function PricingCalculator({
           <span className="text-[clamp(2.5rem,5vw,3.5rem)] font-semibold leading-none tracking-[-0.035em] text-ink-900">
             {money(monthly)}
           </span>
-          <span className="text-lg font-medium text-ink-500">a month</span>
+          <span className="text-lg font-medium text-ink-600">a month</span>
         </p>
 
-        <p className="mt-5 max-w-sm text-sm leading-relaxed text-ink-500">
+        <p className="mt-5 max-w-sm text-sm leading-relaxed text-ink-600">
           Billed against the timesheet hours you approve.{" "}
           {isIndia ? "Prices include GST." : currency === "USD" ? "Billed in US dollars." : `Billed in US dollars; ${currency} shown at a reference rate.`}
         </p>
@@ -128,7 +128,7 @@ export function PricingCalculator({
           </Row>
         </dl>
 
-        <p className="mt-4 text-xs leading-relaxed text-ink-500">
+        <p className="mt-4 text-xs leading-relaxed text-ink-600">
           {formatNumber(hours)} h × {days} d × {WORK_MONTH.weeksPerMonth} weeks = {formatNumber(hoursMonth)} hours.
         </p>
 
@@ -199,7 +199,7 @@ function InlineSelect({
             >
               <span className={cn(selected && "text-primary")}>{o.label}</span>
               <span className="flex items-center gap-2">
-                {o.hint ? <span className="text-xs font-normal tabular-nums text-ink-500">{o.hint}</span> : null}
+                {o.hint ? <span className="text-xs font-normal tabular-nums text-ink-600">{o.hint}</span> : null}
                 <Check className={cn("size-4 text-primary transition-opacity", selected ? "opacity-100" : "opacity-0")} aria-hidden />
               </span>
             </DropdownMenuItem>

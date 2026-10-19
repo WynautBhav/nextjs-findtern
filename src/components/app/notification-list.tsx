@@ -113,10 +113,10 @@ export function NotificationList({
               className="flex items-start gap-4 px-5 py-4"
             >
               {!isRead ? (
-                <span
-                  aria-label="Unread"
-                  className="mt-2 size-2 shrink-0 rounded-full bg-accent-500"
-                />
+                <span className="mt-2 size-2 shrink-0 rounded-full bg-accent-500">
+                  {/* aria-label is not allowed on a plain span; text is. */}
+                  <span className="sr-only">Unread</span>
+                </span>
               ) : (
                 <span aria-hidden className="mt-2 size-2 shrink-0" />
               )}
@@ -131,7 +131,7 @@ export function NotificationList({
                   {n.title}
                 </p>
                 <p className="mt-1 text-pretty text-sm leading-relaxed text-ink-600">{n.message}</p>
-                <p className="mt-1.5 text-xs tabular-nums text-ink-400">
+                <p className="mt-1.5 text-xs tabular-nums text-ink-600">
                   {n.createdAt
                     ? n.createdAt.toLocaleDateString("en-IN", {
                         day: "numeric",

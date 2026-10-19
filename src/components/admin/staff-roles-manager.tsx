@@ -317,7 +317,7 @@ export function StaffRolesManager({
                   onClick={() => handleDeleteStaff(staff.id)}
                   title="Revoke access"
                   aria-label={`Revoke access for ${staff.email}`}
-                  className="apple-spring apple-pressable inline-flex min-h-11 min-w-11 items-center justify-center rounded-[10px] text-ink-400 hover:bg-danger-soft hover:text-danger disabled:opacity-50"
+                  className="apple-spring apple-pressable inline-flex min-h-11 min-w-11 items-center justify-center rounded-[10px] text-ink-600 hover:bg-danger-soft hover:text-danger disabled:opacity-50"
                 >
                   {busyId === staff.id ? (
                     <Loader2 className="size-4 animate-spin" />

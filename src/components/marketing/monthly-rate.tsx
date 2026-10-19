@@ -30,7 +30,7 @@ export function MonthlyRate({
   const dark = tone === "dark";
 
   return (
-    <p className={cn("text-sm leading-5 tabular-nums", dark ? "text-on-dark-subtle" : "text-ink-500", className)}>
+    <p className={cn("text-sm leading-5 tabular-nums", dark ? "text-on-dark-subtle" : "text-ink-600", className)}>
       <span className={cn("font-medium", dark ? "text-white" : "text-ink-700")}>{formatMoney(monthly, currency)}</span> a month at{" "}
       <Tooltip>
         <TooltipTrigger asChild>

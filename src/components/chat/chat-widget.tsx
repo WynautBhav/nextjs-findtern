@@ -19,7 +19,7 @@ const QUICK_PROMPTS = [
 const GREETING: Msg = {
   role: "assistant",
   content:
-    "Hi, I'm Fintern - Findtern's assistant. Ask me anything about Findtern, or tell me where you're stuck and I'll walk you through the platform step by step.",
+    "Hi, I'm Findtern - Findtern's assistant. Ask me anything about Findtern, or tell me where you're stuck and I'll walk you through the platform step by step.",
 };
 
 /* ── Tiny safe markdown for bot replies ────────────────────────────────
@@ -166,7 +166,7 @@ function BotText({ content }: { content: string }) {
 }
 
 /**
- * Fintern - always-visible chatbot.
+ * Findtern - always-visible chatbot.
  *
  * Fixed bottom-right launcher + panel, rendered from the root layout so it
  * survives every navigation. Brand green header, theme tokens only, keyboard
@@ -222,13 +222,13 @@ export function ChatWidget() {
       }
       setMessages([...next, { role: "assistant", content: json.reply }]);
     } catch {
-      setError("Couldn't reach Fintern just now. Try again or write to communicate@findtern.in.");
+      setError("Couldn't reach Findtern just now. Try again or write to communicate@findtern.in.");
     } finally {
       setBusy(false);
     }
   }
 
-  // Do not render marketing/support Fintern chat in the admin workspace
+  // Do not render marketing/support Findtern chat in the admin workspace
   if (pathname?.startsWith("/admin")) {
     return null;
   }
@@ -252,7 +252,7 @@ export function ChatWidget() {
       {/* ── Panel ─────────────────────────────────────────── */}
       <div
         role="dialog"
-        aria-label="Chat with Fintern"
+        aria-label="Chat with Findtern"
         aria-hidden={!open}
         inert={!open}
         className={cn(
@@ -268,7 +268,7 @@ export function ChatWidget() {
             F
           </span>
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold leading-tight">Fintern</p>
+            <p className="text-sm font-semibold leading-tight">Findtern</p>
             <p className="flex items-center gap-1.5 text-xs text-on-dark-subtle">
               <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse-dot" aria-hidden />
               Online · replies instantly
@@ -311,7 +311,7 @@ export function ChatWidget() {
             </div>
           ))}
           {busy && (
-            <div className="flex items-center gap-1.5 self-start rounded-xl border border-ink-200 bg-white px-3 py-2.5 shadow-xs" aria-label="Fintern is typing">
+            <div className="flex items-center gap-1.5 self-start rounded-xl border border-ink-200 bg-white px-3 py-2.5 shadow-xs" aria-label="Findtern is typing">
               {[0, 1, 2].map((d) => (
                 <span
                   key={d}
@@ -353,7 +353,7 @@ export function ChatWidget() {
           }}
         >
           <label htmlFor="fintern-input" className="sr-only">
-            Ask Fintern anything
+            Ask Findtern anything
           </label>
           <input
             id="fintern-input"
@@ -381,7 +381,7 @@ export function ChatWidget() {
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        aria-label={open ? "Hide Fintern chat" : "Chat with Fintern"}
+        aria-label={open ? "Hide Findtern chat" : "Chat with Findtern"}
         className={cn(
           "relative pointer-events-auto group flex items-center justify-center rounded-full text-sm font-semibold text-white shadow-lg transition-all duration-[180ms] ease-out-expo",
           "bg-gradient-to-br from-primary to-brand-900 hover:shadow-glow",
@@ -404,7 +404,7 @@ export function ChatWidget() {
           </div>
         )}
         <span className={cn(open || inApp ? "hidden" : "hidden sm:inline font-medium")}>
-          Chat with Fintern
+          Chat with Findtern
         </span>
       </button>
     </div>

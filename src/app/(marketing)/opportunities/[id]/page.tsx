@@ -58,7 +58,7 @@ export default async function PublicRoleDetail({ params }: { params: Promise<{ i
       <section className="container-page pt-6 pb-4">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0">
-            <p className="flex items-center gap-2 text-sm text-ink-500">
+            <p className="flex items-center gap-2 text-sm text-ink-600">
               <span aria-hidden className="grid size-7 place-items-center rounded-lg bg-brand-50 text-2xs font-semibold text-primary">
                 {companyInitials(role.companyName)}
               </span>
@@ -112,7 +112,7 @@ export default async function PublicRoleDetail({ params }: { params: Promise<{ i
                       className={
                         i < 2
                           ? "mt-0.5 grid size-5 shrink-0 place-items-center rounded-full bg-brand-600 text-white"
-                          : "mt-0.5 grid size-5 shrink-0 place-items-center rounded-full border-2 border-ink-200 text-2xs font-bold text-ink-400"
+                          : "mt-0.5 grid size-5 shrink-0 place-items-center rounded-full border-2 border-ink-200 text-2xs font-bold text-ink-600"
                       }
                     >
                       {i < 2 ? <Check className="size-3" strokeWidth={3.5} /> : i + 1}
@@ -129,14 +129,14 @@ export default async function PublicRoleDetail({ params }: { params: Promise<{ i
               <h2 className="text-sm font-semibold tracking-[-0.01em] text-ink-900">At a glance</h2>
               <dl className="mt-3 divide-y divide-ink-100">
                 <div className="flex items-start justify-between gap-4 py-2.5">
-                  <dt className="text-sm text-ink-500">Company</dt>
+                  <dt className="text-sm text-ink-600">Company</dt>
                   <dd className="text-right text-sm font-medium text-ink-900">
                     {companyInitials(role.companyName)}
-                    <span className="block text-xs font-normal text-ink-500">Name shared once they make an offer</span>
+                    <span className="block text-xs font-normal text-ink-600">Name shared once they make an offer</span>
                   </dd>
                 </div>
                 <div className="flex items-start justify-between gap-4 py-2.5">
-                  <dt className="text-sm text-ink-500">Where</dt>
+                  <dt className="text-sm text-ink-600">Where</dt>
                   <dd className="flex items-center gap-1.5 text-right text-sm font-medium text-ink-900">
                     {role.locationType ? (
                       <>
@@ -149,13 +149,13 @@ export default async function PublicRoleDetail({ params }: { params: Promise<{ i
                   </dd>
                 </div>
                 <div className="flex items-start justify-between gap-4 py-2.5">
-                  <dt className="text-sm text-ink-500">City</dt>
+                  <dt className="text-sm text-ink-600">City</dt>
                   <dd className="text-right text-sm font-medium text-ink-900">
                     {place || "Not stated"}
                   </dd>
                 </div>
                 <div className="flex items-start justify-between gap-4 py-2.5">
-                  <dt className="text-sm text-ink-500">Posted</dt>
+                  <dt className="text-sm text-ink-600">Posted</dt>
                   <dd className="text-right text-sm font-medium text-ink-900">
                     {formatDayLabel(role.createdAt)}
                   </dd>

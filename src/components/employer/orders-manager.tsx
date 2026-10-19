@@ -236,9 +236,9 @@ export function OrdersManager({
               <div className="mx-auto grid size-12 place-items-center rounded-[10px] bg-brand-50 text-brand-700">
                 <Users className="size-6" />
               </div>
-              <h3 className="mt-4 text-base font-semibold text-ink-900">
+              <h2 className="mt-4 text-base font-semibold text-ink-900">
                 No hired candidates yet
-              </h3>
+              </h2>
               <p className="mx-auto mt-1 max-w-sm text-xs text-text-subtle">
                 Once a candidate accepts your proposal and passes checkout, their hiring contract
                 and monthly timesheets will show here.
@@ -273,9 +273,9 @@ export function OrdersManager({
                 >
                   <div className="flex items-start justify-between">
                     <div>
-                      <h3 className="text-base font-semibold text-ink-900">
+                      <h2 className="text-base font-semibold text-ink-900">
                         {item.candidateName}
-                      </h3>
+                      </h2>
                       <p className="text-xs text-text-subtle font-medium">
                         Role on {item.projectName}
                       </p>
@@ -288,7 +288,7 @@ export function OrdersManager({
 
                   <div className="grid grid-cols-2 gap-3 rounded-[10px] bg-ink-50/60 p-3.5 text-xs">
                     <div>
-                      <p className="text-2xs uppercase tracking-wider text-ink-400 font-semibold">
+                      <p className="text-2xs uppercase tracking-wider text-ink-600 font-semibold">
                         Monthly Stipend
                       </p>
                       <p className="mt-0.5 font-semibold text-ink-900 tabular-nums">
@@ -296,7 +296,7 @@ export function OrdersManager({
                       </p>
                     </div>
                     <div>
-                      <p className="text-2xs uppercase tracking-wider text-ink-400 font-semibold">
+                      <p className="text-2xs uppercase tracking-wider text-ink-600 font-semibold">
                         Duration
                       </p>
                       <p className="mt-0.5 font-semibold tabular-nums text-ink-900">
@@ -347,7 +347,7 @@ export function OrdersManager({
               <div className="mx-auto grid size-12 place-items-center rounded-[10px] bg-brand-50 text-brand-700">
                 <Receipt className="size-6" />
               </div>
-              <h3 className="mt-4 text-base font-semibold text-ink-900">No payment orders recorded</h3>
+              <h2 className="mt-4 text-base font-semibold text-ink-900">No payment orders recorded</h2>
               <p className="mx-auto mt-1 max-w-sm text-xs text-text-subtle">
                 Completed checkout transactions and platform invoices will appear in this ledger.
               </p>
@@ -373,7 +373,7 @@ export function OrdersManager({
                         <td className="px-5 py-3.5 font-mono text-xs tabular-nums text-ink-800">
                           {p.orderId}
                           {p.invoiceNumber ? (
-                            <span className="mt-0.5 block font-sans text-2xs font-semibold text-ink-500">
+                            <span className="mt-0.5 block font-sans text-2xs font-semibold text-ink-600">
                               Invoice {p.invoiceNumber}
                             </span>
                           ) : null}
@@ -430,9 +430,9 @@ export function OrdersManager({
             <div className="flex items-start gap-3">
               <Calendar className="size-5 text-brand-700 shrink-0 mt-0.5" />
               <div>
-                <h4 className="text-xs font-semibold text-brand-900">
+                <h3 className="text-xs font-semibold text-brand-900">
                   Monthly Intern Stipend Settlement Schedule
-                </h4>
+                </h3>
                 <p className="mt-0.5 text-xs text-brand-800/80 leading-relaxed">
                   Findtern handles automatic escrow and verified monthly timesheet payouts. Dues
                   become payable each calendar cycle following timesheet approval.
@@ -444,9 +444,9 @@ export function OrdersManager({
           {upcomingDues.length === 0 ? (
             <div className="rounded-[20px] border border-dashed border-ink-200/70 bg-white/60 p-12 text-center">
               <Clock className="mx-auto size-8 text-ink-400" />
-              <h3 className="mt-3 text-sm font-semibold text-ink-900">
+              <h2 className="mt-3 text-sm font-semibold text-ink-900">
                 No active billing schedules
-              </h3>
+              </h2>
               <p className="mt-1 text-xs text-text-subtle">
                 Once interns are active on placements, your upcoming monthly stipend schedule will
                 populate here.

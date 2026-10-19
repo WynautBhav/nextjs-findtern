@@ -118,7 +118,7 @@ export function FeedbackFab({ className, variant = "fab" }: { className?: string
                       "apple-spring inline-flex min-h-11 items-center justify-center rounded-[8px] px-2 text-[13px] font-medium",
                       kind === k.value
                         ? "bg-white text-ink-900 shadow-xs"
-                        : "text-ink-500 hover:text-ink-800",
+                        : "text-ink-600 hover:text-ink-800",
                     )}
                   >
                     {k.label}

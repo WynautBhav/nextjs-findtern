@@ -411,7 +411,7 @@ function StepRail({ step, onSelect }: { step: number; onSelect: (next: number) =
                       ? "bg-brand-700 text-white"
                       : state === "done"
                       ? "bg-brand-100 text-brand-700"
-                      : "bg-ink-100 text-ink-500",
+                      : "bg-ink-100 text-ink-600",
                   ].join(" ")}
                 >
                   {state === "done" ? <Check className="size-3" aria-hidden /> : i + 1}
@@ -446,9 +446,9 @@ function PersonalStep({ values, update, errors, documents, account, onUploaded }
             )}
           </div>
           <div className="flex-1">
-            <h4 id="photo" tabIndex={-1} className="text-xs font-semibold text-ink-900 focus:outline-none">
+            <h3 id="photo" tabIndex={-1} className="text-xs font-semibold text-ink-900 focus:outline-none">
               Profile Photo (Passport Size 2x2&quot;) *
-            </h4>
+            </h3>
             <p className="mt-0.5 text-xs text-text-subtle">
               JPG, PNG or WebP, up to 5 MB. A clear, front-facing photo.
             </p>
@@ -1049,7 +1049,7 @@ function ExperienceStep({ values, update, errors }: StepProps) {
       {experiences.length === 0 ? (
         <div className="rounded-xl border border-dashed border-ink-200 p-8 text-center bg-ink-50/50">
           <Briefcase className="mx-auto size-8 text-ink-400" />
-          <h4 className="mt-2 text-xs font-semibold text-ink-800">No experience records yet</h4>
+          <h3 className="mt-2 text-xs font-semibold text-ink-800">No experience records yet</h3>
           <p className="mt-1 text-xs text-text-subtle">
             Freshers can add academic capstone projects, open-source work, or freelance contracts.
           </p>
@@ -1357,7 +1357,7 @@ function SkillsStep({ values, update, errors, skillsLocked }: StepProps) {
                   type="button"
                   onClick={() => removeSkill(skill)}
                   aria-label={`Remove skill ${skill}`}
-                  className="apple-spring rounded-md p-1.5 text-ink-400 hover:bg-ink-100 hover:text-danger"
+                  className="apple-spring rounded-md p-1.5 text-ink-600 hover:bg-ink-100 hover:text-danger"
                 >
                   <X className="size-3.5" />
                 </button>
@@ -1484,7 +1484,7 @@ function LanguagesStep({ values, update }: StepProps) {
                 <button
                   type="button"
                   onClick={() => removeLang(lang.id)}
-                  className="apple-spring rounded-md p-1.5 text-ink-400 hover:text-danger hover:bg-ink-100"
+                  className="apple-spring rounded-md p-1.5 text-ink-600 hover:text-danger hover:bg-ink-100"
                 >
                   <Trash2 className="size-3.5" />
                 </button>
@@ -1546,7 +1546,7 @@ function ExtracurricularStep({ values, update }: StepProps) {
       {extracurriculars.length === 0 ? (
         <div className="rounded-xl border border-dashed border-ink-200 p-8 text-center bg-ink-50/50">
           <Award className="mx-auto size-8 text-ink-400" />
-          <h4 className="mt-2 text-xs font-semibold text-ink-800">No extracurriculars listed yet</h4>
+          <h3 className="mt-2 text-xs font-semibold text-ink-800">No extracurriculars listed yet</h3>
           <p className="mt-1 text-xs text-text-subtle">
             Optional but highly recommended - highlights your teamwork, initiative, and drive beyond marks.
           </p>
@@ -1592,7 +1592,7 @@ function ExtracurricularStep({ values, update }: StepProps) {
                 <button
                   type="button"
                   onClick={() => removeActivity(act.id)}
-                  className="apple-spring rounded-md p-1.5 text-ink-400 hover:text-danger hover:bg-ink-100"
+                  className="apple-spring rounded-md p-1.5 text-ink-600 hover:text-danger hover:bg-ink-100"
                 >
                   <Trash2 className="size-3.5" />
                 </button>

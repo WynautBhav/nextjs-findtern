@@ -156,7 +156,7 @@ export function MessagesInbox({
                 "apple-spring inline-flex min-h-11 items-center justify-center rounded-[8px] px-4 text-[14px] font-medium tracking-[-0.01em] capitalize",
                 filter === tab
                   ? "bg-white text-ink-900 shadow-xs"
-                  : "text-ink-500 hover:text-ink-800",
+                  : "text-ink-600 hover:text-ink-800",
               )}
             >
               {tab}
@@ -208,7 +208,7 @@ export function MessagesInbox({
                       className={cn(
                         "grid size-10 shrink-0 place-items-center rounded-full text-[13px] font-semibold",
                         msg.isRead
-                          ? "bg-ink-100 text-ink-500"
+                          ? "bg-ink-100 text-ink-600"
                           : "bg-brand-100 text-brand-800",
                       )}
                     >
@@ -271,7 +271,7 @@ export function MessagesInbox({
                             toggleReadStatus(msg.id, msg.isRead);
                           }
                         }}
-                        className="apple-spring apple-pressable hidden min-h-11 min-w-11 items-center justify-center rounded-[10px] text-ink-400 group-hover:inline-flex hover:bg-ink-100 hover:text-ink-800 focus-visible:inline-flex"
+                        className="apple-spring apple-pressable hidden min-h-11 min-w-11 items-center justify-center rounded-[10px] text-ink-600 group-hover:inline-flex hover:bg-ink-100 hover:text-ink-800 focus-visible:inline-flex"
                       >
                         {msg.isRead ? (
                           <Mail className="size-4" />
@@ -292,7 +292,7 @@ export function MessagesInbox({
                             deleteMessage(msg.id);
                           }
                         }}
-                        className="apple-spring apple-pressable hidden min-h-11 min-w-11 items-center justify-center rounded-[10px] text-ink-400 group-hover:inline-flex hover:bg-danger-soft hover:text-danger focus-visible:inline-flex"
+                        className="apple-spring apple-pressable hidden min-h-11 min-w-11 items-center justify-center rounded-[10px] text-ink-600 group-hover:inline-flex hover:bg-danger-soft hover:text-danger focus-visible:inline-flex"
                       >
                         <Trash2 className="size-4" />
                       </span>

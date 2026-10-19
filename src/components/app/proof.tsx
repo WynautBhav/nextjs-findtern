@@ -85,7 +85,7 @@ export function ProofCard({
       <div className="p-5 pt-6">
         <div>
           <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-ink-500">
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-ink-600">
               {meta.label}
             </p>
             <Pill tone={KIND_TONE[proof.kind]}>{formatDate(proof.at)}</Pill>
@@ -106,7 +106,7 @@ export function ProofCard({
               transition={{ duration: 0.3, delay: reduce ? 0 : 0.16 + i * 0.05 }}
               className="flex items-baseline justify-between gap-5 py-2.5"
             >
-              <dt className="shrink-0 text-sm text-ink-500">{fact.label}</dt>
+              <dt className="shrink-0 text-sm text-ink-600">{fact.label}</dt>
               <dd className="min-w-0 text-right text-sm font-medium text-ink-900">
                 {fact.value}
               </dd>
@@ -115,7 +115,7 @@ export function ProofCard({
         </dl>
 
         <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2">
-          <p className="text-xs text-ink-500">
+          <p className="text-xs text-ink-600">
             {proof.issuedBy ? `Confirmed by ${proof.issuedBy}` : "On your record"}
           </p>
           <div className="ml-auto flex items-center gap-3">
@@ -211,7 +211,7 @@ export function RecordExport({
         {done ? <Check className="size-4" aria-hidden /> : <Download className="size-4" aria-hidden />}
         {done ? "Downloaded" : "Download your record"}
       </button>
-      <p className="text-sm text-ink-500">A plain text file. Opens anywhere.</p>
+      <p className="text-sm text-ink-600">A plain text file. Opens anywhere.</p>
     </div>
   );
 }

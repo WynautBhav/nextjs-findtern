@@ -106,10 +106,10 @@ function MoneyTable({ title, description, rows, filter }: { title: string; descr
       <PanelHeader title={`${title} (${rows.length})`} description={description} action={filter} />
       <PanelBody className="overflow-x-auto">
         {rows.length === 0 ? (
-          <p className="text-sm text-ink-500">Nothing in this range.</p>
+          <p className="text-sm text-ink-600">Nothing in this range.</p>
         ) : (
           <table className="w-full min-w-[720px] text-left text-sm">
-            <thead className="text-2xs uppercase tracking-[0.08em] text-ink-500">
+            <thead className="text-2xs uppercase tracking-[0.08em] text-ink-600">
               <tr>
                 <th scope="col" className="py-2 pr-3 font-semibold">Date</th>
                 <th scope="col" className="py-2 pr-3 font-semibold">Description</th>
@@ -131,14 +131,14 @@ function MoneyTable({ title, description, rows, filter }: { title: string; descr
                   <td className="whitespace-nowrap py-2 pr-3 text-right font-semibold tabular-nums text-ink-900">
                     {formatMoney(r.amountMinor, r.currency as "INR" | "USD")}
                   </td>
-                  <td className="py-2 font-mono text-2xs text-ink-500">{r.reference ?? ""}</td>
+                  <td className="py-2 font-mono text-2xs text-ink-600">{r.reference ?? ""}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         )}
         {rows.length > shown.length ? (
-          <p className="mt-3 text-xs text-ink-500">Showing the latest {shown.length}. The CSV export has all {rows.length}.</p>
+          <p className="mt-3 text-xs text-ink-600">Showing the latest {shown.length}. The CSV export has all {rows.length}.</p>
         ) : null}
       </PanelBody>
     </Panel>

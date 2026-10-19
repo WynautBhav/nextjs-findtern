@@ -16,6 +16,7 @@ import {
   type TimesheetRow,
 } from "@/lib/journey";
 import { parseOffer } from "@/lib/offer";
+import { isHiredProposal } from "@/lib/hire-status";
 
 /**
  * One read for every intern screen.
@@ -63,7 +64,7 @@ export async function loadInternData(uid: string) {
     // only follows a hire). Every intern screen reads names from here.
     const revealed = new Set(
       p
-        .filter((x) => x.status === "hired" || parseOffer(x.offerDetails, x.currency).fullTime)
+        .filter((x) => isHiredProposal(x) || parseOffer(x.offerDetails, x.currency).fullTime)
         .map((x) => x.employerId),
     );
     for (const row of rows) {

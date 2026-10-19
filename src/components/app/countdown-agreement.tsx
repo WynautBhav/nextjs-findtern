@@ -108,7 +108,7 @@ function AgreementBody({
           />
           <span>
             <span className="block font-medium text-ink-900">{agreeLabel}</span>
-            <span className="mt-1 block text-xs text-ink-500" aria-live="polite">
+            <span className="mt-1 block text-xs text-ink-600" aria-live="polite">
               {left > 0 ? `Please read for ${left}s before you can continue.` : "You can continue once you tick the box."}
             </span>
           </span>

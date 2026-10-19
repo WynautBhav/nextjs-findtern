@@ -187,7 +187,7 @@ export default async function InternsPage() {
           </div>
 
           <div className="rounded-2xl border border-ink-200 bg-white p-6 sm:p-8">
-            <p className="text-sm text-ink-500">One-time fee</p>
+            <p className="text-sm text-ink-600">One-time fee</p>
             <p className="mt-1 text-5xl font-semibold tabular-nums tracking-[-0.03em] text-ink-900">
               {formatMoney(feeMinor, "INR", { zeroLabel: false })}
             </p>
@@ -327,9 +327,9 @@ function Figure({
     <div className="px-1 text-center sm:px-0">
       <p className="text-2xl font-bold tracking-tight text-ink-900 sm:text-4xl md:text-5xl">
         <CountUp value={value} />
-        {suffix ? <span className="text-xs font-semibold text-ink-400 sm:text-xl sm:font-medium">{suffix}</span> : null}
+        {suffix ? <span className="text-xs font-semibold text-ink-600 sm:text-xl sm:font-medium">{suffix}</span> : null}
       </p>
-      <p className="mt-1 text-[11px] leading-tight text-ink-500 sm:mt-2 sm:text-base">{label}</p>
+      <p className="mt-1 text-[11px] leading-tight text-ink-600 sm:mt-2 sm:text-base">{label}</p>
     </div>
   );
 }

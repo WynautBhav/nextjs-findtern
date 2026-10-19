@@ -208,7 +208,7 @@ export default async function EmployerDashboard() {
   return (
     <div className="space-y-10">
       <div>
-        <p className="mb-1 text-sm text-ink-500">{companyName || "Your company"}</p>
+        <p className="mb-1 text-sm text-ink-600">{companyName || "Your company"}</p>
         <PageHeader
           title={
             tasks.length
@@ -244,7 +244,7 @@ export default async function EmployerDashboard() {
                 <p className="text-[15px] font-medium text-ink-900">
                   <span className="tabular-nums">{t.count}</span> {t.label}
                 </p>
-                <p className="mt-0.5 text-sm text-ink-500">{t.detail}</p>
+                <p className="mt-0.5 text-sm text-ink-600">{t.detail}</p>
               </div>
               <Link
                 href={t.href}
@@ -284,7 +284,7 @@ export default async function EmployerDashboard() {
                 i === 2 && "sm:border-l",
               )}
             >
-              <p className="text-[13px] text-ink-500">{s.label}</p>
+              <p className="text-[13px] text-ink-600">{s.label}</p>
               <p
                 className={cn(
                   "mt-1 text-2xl font-semibold tabular-nums tracking-tight",
@@ -293,7 +293,7 @@ export default async function EmployerDashboard() {
               >
                 {s.value}
               </p>
-              <p className="mt-0.5 text-xs text-ink-400">{s.note}</p>
+              <p className="mt-0.5 text-xs text-ink-600">{s.note}</p>
             </div>
           ))}
         </Surface>
@@ -347,11 +347,11 @@ export default async function EmployerDashboard() {
                           </span>
                           <span className="sr-only">{open ? "(open)" : "(closed)"}</span>
                         </p>
-                        <p className="mt-0.5 truncate pl-3.5 text-[13px] text-ink-500">
+                        <p className="mt-0.5 truncate pl-3.5 text-[13px] text-ink-600">
                           {skills.join(" · ") || "No skills listed"}
                         </p>
                       </div>
-                      <p className="text-right text-[13px] tabular-nums text-ink-500">
+                      <p className="text-right text-[13px] tabular-nums text-ink-600">
                         <span className="font-medium text-ink-800">{stats.total}</span> sent
                         {stats.won ? (
                           <>
@@ -378,7 +378,7 @@ export default async function EmployerDashboard() {
             }
           />
           {candidates.length === 0 ? (
-            <p className="text-sm text-ink-500">No scored candidates yet.</p>
+            <p className="text-sm text-ink-600">No scored candidates yet.</p>
           ) : (
             <Surface as="ul" className="divide-y divide-ink-100 overflow-hidden">
               {candidates.map((c) => {
@@ -398,7 +398,7 @@ export default async function EmployerDashboard() {
                         <span className="block truncate text-sm font-medium text-ink-900 group-hover:text-brand-700">
                           {displayNameOf(c, nameUnlocked.has(c.id))}
                         </span>
-                        <span className="block truncate text-[13px] text-ink-500">
+                        <span className="block truncate text-[13px] text-ink-600">
                           {c.skills.slice(0, 3).join(" · ") || c.location || "Profile in progress"}
                         </span>
                       </span>
@@ -406,7 +406,7 @@ export default async function EmployerDashboard() {
                         <span className="block text-sm font-semibold tabular-nums text-ink-900">
                           {c.score.toFixed(1)}
                         </span>
-                        <span className="block text-[11px] text-ink-400">{PLAN_NAME[band.id]}</span>
+                        <span className="block text-[11px] text-ink-600">{PLAN_NAME[band.id]}</span>
                       </span>
                     </Link>
                   </li>

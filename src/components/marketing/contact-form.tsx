@@ -316,7 +316,7 @@ export function ContactForm() {
           href={gmailUrl(v)}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-sm text-ink-500 underline underline-offset-4 transition-colors hover:text-primary"
+          className="text-sm text-ink-600 underline underline-offset-4 transition-colors hover:text-primary"
         >
           or email us directly on Gmail
         </a>
@@ -364,7 +364,7 @@ function Field({
           {error}
         </p>
       ) : hint ? (
-        <p className="mt-1.5 text-xs text-ink-500">{hint}</p>
+        <p className="mt-1.5 text-xs text-ink-600">{hint}</p>
       ) : null}
     </div>
   );

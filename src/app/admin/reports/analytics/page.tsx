@@ -74,7 +74,7 @@ export default async function AdminAnalyticsPage({
                 ["Signup growth", a.rates.monthlyGrowth == null ? "-" : `${a.rates.monthlyGrowth}%`],
               ].map(([k, v]) => (
                 <div key={k}>
-                  <dt className="text-2xs uppercase tracking-[0.08em] text-ink-500">{k}</dt>
+                  <dt className="text-2xs uppercase tracking-[0.08em] text-ink-600">{k}</dt>
                   <dd className="mt-0.5 font-semibold tabular-nums text-ink-900">{v}</dd>
                 </div>
               ))}
@@ -94,7 +94,7 @@ export default async function AdminAnalyticsPage({
         <PanelHeader title="Monthly performance" description="Offers sent, hires, offer success and interview rate per month." />
         <PanelBody className="overflow-x-auto">
           <table className="w-full min-w-[520px] text-left text-sm">
-            <thead className="text-2xs uppercase tracking-[0.08em] text-ink-500">
+            <thead className="text-2xs uppercase tracking-[0.08em] text-ink-600">
               <tr>
                 <th scope="col" className="py-2 pr-4 font-semibold">Month</th>
                 <th scope="col" className="py-2 pr-4 text-right font-semibold">Offers</th>
@@ -129,7 +129,7 @@ export default async function AdminAnalyticsPage({
           <PanelHeader title="Top companies" description="By hires in the range, then offers sent." />
           <PanelBody className="overflow-x-auto">
             <table className="w-full min-w-[480px] text-left text-sm">
-              <thead className="text-2xs uppercase tracking-[0.08em] text-ink-500">
+              <thead className="text-2xs uppercase tracking-[0.08em] text-ink-600">
                 <tr>
                   <th scope="col" className="py-2 pr-3 font-semibold">Company</th>
                   <th scope="col" className="py-2 pr-3 text-right font-semibold">Projects</th>
@@ -163,7 +163,7 @@ export default async function AdminAnalyticsPage({
           <PanelHeader title="Top candidates" description="By offers, then interviews, then applications." />
           <PanelBody className="overflow-x-auto">
             <table className="w-full min-w-[420px] text-left text-sm">
-              <thead className="text-2xs uppercase tracking-[0.08em] text-ink-500">
+              <thead className="text-2xs uppercase tracking-[0.08em] text-ink-600">
                 <tr>
                   <th scope="col" className="py-2 pr-3 font-semibold">Candidate</th>
                   <th scope="col" className="py-2 pr-3 text-right font-semibold">Offers received</th>
@@ -196,10 +196,10 @@ export default async function AdminAnalyticsPage({
         <PanelHeader title="Hires in this range" description="Internship and full-time, newest first." />
         <PanelBody className="overflow-x-auto">
           {a.hiredList.length === 0 ? (
-            <p className="text-sm text-ink-500">No hires in this range.</p>
+            <p className="text-sm text-ink-600">No hires in this range.</p>
           ) : (
             <table className="w-full min-w-[480px] text-left text-sm">
-              <thead className="text-2xs uppercase tracking-[0.08em] text-ink-500">
+              <thead className="text-2xs uppercase tracking-[0.08em] text-ink-600">
                 <tr>
                   <th scope="col" className="py-2 pr-3 font-semibold">Candidate</th>
                   <th scope="col" className="py-2 pr-3 font-semibold">Company</th>
@@ -231,13 +231,13 @@ function RankList({ title, note, rows }: { title: string; note: string; rows: [s
       <PanelHeader title={title} description={note} />
       <PanelBody>
         {rows.length === 0 ? (
-          <p className="text-sm text-ink-500">Nothing in this range.</p>
+          <p className="text-sm text-ink-600">Nothing in this range.</p>
         ) : (
           <ol className="space-y-2 text-sm">
             {rows.map(([label, value], i) => (
               <li key={label} className="flex items-baseline justify-between gap-3">
                 <span className="min-w-0 truncate text-ink-800">
-                  <span className="mr-2 tabular-nums text-ink-400">{i + 1}.</span>
+                  <span className="mr-2 tabular-nums text-ink-600">{i + 1}.</span>
                   {label}
                 </span>
                 <span className="shrink-0 font-semibold tabular-nums text-ink-900">{value}</span>

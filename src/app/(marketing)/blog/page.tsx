@@ -97,7 +97,7 @@ export default async function BlogPage() {
                     <p className="mt-3 line-clamp-3 flex-1 text-sm leading-relaxed text-muted-foreground">
                       {plainTextExcerpt(post.body, 150)}
                     </p>
-                    <p className="mt-5 flex items-center gap-1.5 border-t border-ink-100 pt-4 text-xs text-ink-500">
+                    <p className="mt-5 flex items-center gap-1.5 border-t border-ink-100 pt-4 text-xs text-ink-600">
                       <Clock3 className="size-3.5" aria-hidden />
                       {readingMinutes(post.body)} min read
                     </p>

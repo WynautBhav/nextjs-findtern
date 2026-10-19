@@ -115,7 +115,7 @@ export function SkillFilter({ active }: { active: string[] }) {
           ) : null}
         </ul>
       ) : (
-        <p className="mt-2 text-xs tabular-nums text-ink-500">
+        <p className="mt-2 text-xs tabular-nums text-ink-600">
           No skill filter. Search the full vocabulary - it is the same list candidates pick from.
         </p>
       )}

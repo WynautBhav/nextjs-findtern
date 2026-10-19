@@ -287,7 +287,7 @@ export function OfferDecision({
           Turn this down
         </button>
       </div>
-      <p className="mt-3 text-sm text-ink-500">
+      <p className="mt-3 text-sm text-ink-600">
         {guaranteeEnded
           ? "Turning it down is fine and nothing is deleted."
           : freeLeft > 0

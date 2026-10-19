@@ -249,11 +249,11 @@ export function ActivationCard({
       {promo ? (
         <dl className="mt-3 space-y-1.5 rounded-[10px] bg-ink-50 p-3 text-sm">
           <div className="flex items-baseline justify-between">
-            <dt className="text-ink-500">Activation</dt>
+            <dt className="text-ink-600">Activation</dt>
             <dd className="tabular-nums text-ink-800">{formatMoney(feeMinor, "INR")}</dd>
           </div>
           <div className="flex items-baseline justify-between">
-            <dt className="text-ink-500">Code {promo.code}</dt>
+            <dt className="text-ink-600">Code {promo.code}</dt>
             <dd className="tabular-nums text-brand-700">−{formatMoney(discount, "INR")}</dd>
           </div>
           <div className="flex items-baseline justify-between border-t border-ink-100 pt-1.5">

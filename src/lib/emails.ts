@@ -259,16 +259,35 @@ export const emails = {
 };
 
 /** A calendar invite attachment (.ics) for a scheduled meeting. */
-export function icsInvite(o: { uid: string; start: Date; end: Date; title: string; description: string; url?: string | null }) {
+/**
+ * A calendar file for ONE recipient. Interviews send each side its own file
+ * (uid suffixed per party) with no attendee list, so neither party learns the
+ * other's email and the intern's copy can keep the company masked. `cancel`
+ * withdraws a previously sent copy with the same uid; `sequence` must grow
+ * for a later file to replace an earlier one.
+ */
+export function icsInvite(o: {
+  uid: string;
+  start: Date;
+  end: Date;
+  title: string;
+  description: string;
+  url?: string | null;
+  cancel?: boolean;
+  sequence?: number;
+}) {
   const stamp = (d: Date) => d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
   const fold = (s: string) => s.replace(/[\\,;]/g, (m) => `\\${m}`).replace(/\n/g, "\\n");
+  const method = o.cancel ? "CANCEL" : "REQUEST";
   const body = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
     "PRODID:-//Findtern//Interviews//EN",
-    "METHOD:REQUEST",
+    `METHOD:${method}`,
     "BEGIN:VEVENT",
     `UID:${o.uid}@findtern.in`,
+    `SEQUENCE:${o.sequence ?? 0}`,
+    ...(o.cancel ? ["STATUS:CANCELLED"] : []),
     `DTSTAMP:${stamp(new Date())}`,
     `DTSTART:${stamp(o.start)}`,
     `DTEND:${stamp(o.end)}`,
@@ -278,5 +297,5 @@ export function icsInvite(o: { uid: string; start: Date; end: Date; title: strin
     "END:VEVENT",
     "END:VCALENDAR",
   ].join("\r\n");
-  return { filename: "invite.ics", content: body, contentType: "text/calendar; method=REQUEST" };
+  return { filename: o.cancel ? "cancel.ics" : "invite.ics", content: body, contentType: `text/calendar; method=${method}` };
 }

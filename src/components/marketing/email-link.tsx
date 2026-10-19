@@ -59,7 +59,7 @@ export function EmailLink({
         title={copied ? "Copied" : "Copy address"}
         className={cn(
           "inline-grid size-8 shrink-0 place-items-center rounded-md transition-colors",
-          dark ? "text-on-dark-subtle hover:bg-white/10 hover:text-white" : "text-ink-400 hover:bg-ink-100 hover:text-ink-800",
+          dark ? "text-on-dark-subtle hover:bg-white/10 hover:text-white" : "text-ink-600 hover:bg-ink-100 hover:text-ink-800",
         )}
       >
         {copied ? <Check className="size-3.5" aria-hidden /> : <Copy className="size-3.5" aria-hidden />}

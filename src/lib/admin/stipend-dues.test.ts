@@ -45,3 +45,22 @@ test("addMonthsIso clamps to month end", () => {
   assert.equal(addMonthsIso("2026-11-15", 2), "2027-01-15");
   assert.equal(addMonthsIso(null, 1), null);
 });
+
+test("owed counts unpaid months of a hire with no payout rows yet, and hiredAt counts as hired", async () => {
+  const { stipendDues, owedMinor } = await import("./stipend-dues.ts");
+  // QA repro: ₹32,000 a month, 1 month, score 9.1, hired via hiredAt, no payouts.
+  const proposals = [
+    {
+      id: "p1",
+      status: "accepted",
+      hiredAt: new Date("2026-10-01"),
+      employerId: "e1",
+      offerDetails: { monthlyAmount: 32000, duration: "1m", startDate: "2026-10-01" },
+      currency: "INR",
+    },
+  ];
+  const dues = stipendDues(proposals, [], 9.1);
+  assert.equal(dues.length, 1);
+  assert.equal(owedMinor(dues, 0), 1_600_000);
+  assert.equal(owedMinor(dues, 50_000), 1_650_000);
+});

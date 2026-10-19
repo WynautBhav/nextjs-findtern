@@ -99,11 +99,11 @@ export function SkillStudentsDialog({
           <DialogHeader className="min-w-0 text-left">
             <DialogTitle className="text-lg font-semibold tracking-tight text-ink-900 sm:text-xl">
               {skill.title}
-              <span className="ml-2 text-sm font-normal text-ink-500 tabular-nums">
+              <span className="ml-2 text-sm font-normal text-ink-600 tabular-nums">
                 {skill.resourceCount} candidates
               </span>
             </DialogTitle>
-            <DialogDescription className="mt-1 text-[13px] leading-relaxed text-ink-500">
+            <DialogDescription className="mt-1 text-[13px] leading-relaxed text-ink-600">
               Screened and scored. Names show as initials until you hire.
             </DialogDescription>
           </DialogHeader>
@@ -131,7 +131,7 @@ export function SkillStudentsDialog({
               ))}
             </ul>
           ) : students.length === 0 ? (
-            <p className="px-6 py-14 text-center text-sm text-ink-500">
+            <p className="px-6 py-14 text-center text-sm text-ink-600">
               No {skill.title.toLowerCase()} candidates to show right now.
             </p>
           ) : (
@@ -162,7 +162,7 @@ export function SkillStudentsDialog({
 
                     <div className="min-w-0">
                       <h4 className="text-[15px] font-semibold text-ink-900">{student.shortName}</h4>
-                      <p className="mt-0.5 truncate text-[13px] text-ink-500">
+                      <p className="mt-0.5 truncate text-[13px] text-ink-600">
                         {[student.college, student.degree, [student.city, student.state].filter(Boolean).join(", ")]
                           .filter(Boolean)
                           .join(" · ")}
@@ -175,12 +175,12 @@ export function SkillStudentsDialog({
                             </span>
                           ))}
                           {student.skills.length > 5 ? (
-                            <span className="px-1 py-0.5 text-xs text-ink-500">+{student.skills.length - 5}</span>
+                            <span className="px-1 py-0.5 text-xs text-ink-600">+{student.skills.length - 5}</span>
                           ) : null}
                         </p>
                       ) : null}
                       {ratings.length ? (
-                        <p className="mt-2 text-xs text-ink-500 tabular-nums">
+                        <p className="mt-2 text-xs text-ink-600 tabular-nums">
                           {ratings.map(([label, value]) => `${label} ${value.toFixed(1)}`).join("  ·  ")}
                         </p>
                       ) : null}
@@ -189,9 +189,9 @@ export function SkillStudentsDialog({
                     <div className="text-right">
                       <p className="text-xl font-semibold leading-none tracking-tight text-ink-900 tabular-nums">
                         {student.score.toFixed(1)}
-                        <span className="text-xs font-normal text-ink-400">/10</span>
+                        <span className="text-xs font-normal text-ink-600">/10</span>
                       </p>
-                      <p className="mt-1.5 text-xs text-ink-500">{student.band}</p>
+                      <p className="mt-1.5 text-xs text-ink-600">{student.band}</p>
                     </div>
                   </li>
                 );
@@ -201,7 +201,7 @@ export function SkillStudentsDialog({
         </div>
 
         <footer className="flex flex-col gap-3 border-t border-ink-100 bg-ink-50/60 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-          <p className="text-[13px] text-ink-500">Full profiles open once you send a proposal.</p>
+          <p className="text-[13px] text-ink-600">Full profiles open once you send a proposal.</p>
           <ButtonLink href="/employer/signup" variant="primary" size="sm" className="shrink-0">
             Start hiring
             <ArrowRight className="size-3.5" aria-hidden />

@@ -274,13 +274,13 @@ export default function GuaranteePage() {
               key={t.label}
               className="rounded-2xl border border-ink-200 bg-white p-5 shadow-2xs"
             >
-              <dt className="text-2xs font-semibold uppercase tracking-[0.14em] text-ink-500">
+              <dt className="text-2xs font-semibold uppercase tracking-[0.14em] text-ink-600">
                 {t.label}
               </dt>
               <dd className="mt-2 text-2xl font-semibold tracking-tight text-ink-900">
                 {t.value}
               </dd>
-              <p className="mt-1 text-sm text-ink-500">{t.note}</p>
+              <p className="mt-1 text-sm text-ink-600">{t.note}</p>
             </div>
           ))}
         </dl>
@@ -505,7 +505,7 @@ export default function GuaranteePage() {
               <p className="text-5xl font-bold tracking-tight text-primary">
                 <CountUp value={FEE} prefix="₹" />
               </p>
-              <p className="text-sm text-ink-500">
+              <p className="text-sm text-ink-600">
                 one-time fee,
                 <br />
                 refundable on conditions

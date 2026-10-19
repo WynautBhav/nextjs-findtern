@@ -102,6 +102,8 @@ export default async function InternRecord() {
         <>
           <RecordCount proofs={data.proofs} />
           <div className="mt-6">
+            {/* The proof cards are h3s; this keeps the outline h1 > h2 > h3. */}
+            <h2 className="sr-only">Your records</h2>
             <FreshProofGrid proofs={data.proofs} />
           </div>
         </>
@@ -163,12 +165,12 @@ function Figure({
 }) {
   return (
     <Surface className="p-5">
-      <p className="text-balance text-sm leading-snug text-ink-500">{label}</p>
+      <p className="text-balance text-sm leading-snug text-ink-600">{label}</p>
       <p className="mt-2 flex flex-wrap items-baseline gap-x-1.5">
         <span className="text-3xl font-semibold tabular-nums tracking-[-0.025em] text-ink-900">
           <CountUp value={value} currency={money ? "INR" : undefined} />
         </span>
-        <span className="text-sm text-ink-500">{unit}</span>
+        <span className="text-sm text-ink-600">{unit}</span>
       </p>
     </Surface>
   );

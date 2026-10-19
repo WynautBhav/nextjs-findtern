@@ -108,7 +108,7 @@ export function Pagination({
 
         {pageWindow(page, pages).map((entry, index) =>
           entry === "gap" ? (
-            <span key={`gap-${index}`} aria-hidden className="px-1 text-ink-400">
+            <span key={`gap-${index}`} aria-hidden className="px-1 text-ink-600">
               …
             </span>
           ) : (

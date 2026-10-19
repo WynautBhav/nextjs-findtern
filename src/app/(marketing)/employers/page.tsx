@@ -164,7 +164,7 @@ export default async function EmployersPage() {
           third flex item competing with the two buttons. */}
       <div className="border-b border-ink-100 bg-ink-50/70">
         <div className="container-page py-6 text-center">
-          <p className="text-sm text-ink-500">
+          <p className="text-sm text-ink-600">
             Not sure which band you need?{" "}
             <a
               href="/contact"
@@ -188,7 +188,7 @@ export default async function EmployersPage() {
               >
                 <Icon className="size-5 text-ink-400" aria-hidden />
                 <h3 className="mt-3 text-base font-semibold text-ink-900">{problem}</h3>
-                <p className="mt-1.5 text-sm leading-relaxed text-ink-500">{detail}</p>
+                <p className="mt-1.5 text-sm leading-relaxed text-ink-600">{detail}</p>
               </article>
             ))}
           </div>
@@ -230,7 +230,7 @@ export default async function EmployersPage() {
               >
                 <Icon className="size-5 text-ink-400" aria-hidden />
                 <h3 className="mt-3 text-base font-semibold text-ink-900">{problem}</h3>
-                <p className="mt-1.5 text-sm leading-relaxed text-ink-500">{detail}</p>
+                <p className="mt-1.5 text-sm leading-relaxed text-ink-600">{detail}</p>
               </article>
             ))}
           </div>
@@ -328,7 +328,7 @@ export default async function EmployersPage() {
                 ["The stipend", "In rupees, paid by Findtern against the timesheet hours you approve."],
               ].map(([term, detail]) => (
                 <div key={term} className="grid grid-cols-[7.5rem_minmax(0,1fr)] gap-4 py-3.5">
-                  <dt className="text-ink-500">{term}</dt>
+                  <dt className="text-ink-600">{term}</dt>
                   <dd className="leading-relaxed text-ink-800">{detail}</dd>
                 </div>
               ))}
@@ -401,9 +401,9 @@ function Figure({
     <div className="px-1 text-center sm:px-0">
       <p className="text-2xl font-bold tracking-tight text-ink-900 sm:text-4xl md:text-5xl">
         <CountUp value={value} />
-        {suffix ? <span className="text-xs font-semibold text-ink-400 sm:text-xl sm:font-medium">{suffix}</span> : null}
+        {suffix ? <span className="text-xs font-semibold text-ink-600 sm:text-xl sm:font-medium">{suffix}</span> : null}
       </p>
-      <p className="mt-1 text-[11px] leading-tight text-ink-500 sm:mt-2 sm:text-base">{label}</p>
+      <p className="mt-1 text-[11px] leading-tight text-ink-600 sm:mt-2 sm:text-base">{label}</p>
     </div>
   );
 }
@@ -439,7 +439,7 @@ function FlowNode({ name, where, emphasis }: { name: string; where: string; emph
       }
     >
       <p className={emphasis ? "text-sm font-semibold text-primary" : "text-sm font-semibold text-ink-900"}>{name}</p>
-      <p className="mt-0.5 text-xs text-ink-500">{where}</p>
+      <p className="mt-0.5 text-xs text-ink-600">{where}</p>
     </div>
   );
 }

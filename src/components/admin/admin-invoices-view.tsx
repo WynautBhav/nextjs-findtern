@@ -209,7 +209,7 @@ export function AdminInvoicesView({
             <tbody className="divide-y divide-ink-100">
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-12 text-center text-ink-500">
+                  <td colSpan={7} className="py-12 text-center text-ink-600">
                     <Receipt className="mx-auto mb-2 size-8 text-ink-300" />
                     <p className="text-xs font-medium">Nothing matches these filters</p>
                   </td>

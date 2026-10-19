@@ -86,11 +86,11 @@ export function CmsEditor({ active, items }: { active: CmsType; items: Record<Cm
             aria-current={t === active ? "page" : undefined}
             className={cn(
               "apple-spring apple-pressable inline-flex min-h-11 shrink-0 items-center gap-2 whitespace-nowrap rounded-[8px] px-4 text-[14px] font-medium tracking-[-0.01em]",
-              t === active ? "bg-white text-ink-900 shadow-xs" : "text-ink-500 hover:text-ink-800",
+              t === active ? "bg-white text-ink-900 shadow-xs" : "text-ink-600 hover:text-ink-800",
             )}
           >
             {CMS_COLLECTIONS[t].label}
-            <span className="tabular-nums text-ink-400">{items[t].length}</span>
+            <span className="tabular-nums text-ink-600">{items[t].length}</span>
           </Link>
         ))}
       </nav>

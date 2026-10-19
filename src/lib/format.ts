@@ -184,11 +184,25 @@ export function formatDayLabel(value: Date | string | null, now: Date = new Date
   if (!value) return "Unknown";
   const date = typeof value === "string" ? new Date(value) : value;
   if (Number.isNaN(date.getTime())) return "Unknown";
+  // Future dates (a start date, a scheduled payout) count calendar days
+  // ahead. This used to fall into the `days <= 0` branch, so every upcoming
+  // start date read "Today".
+  const ahead = calendarDaysBetween(now, date);
+  if (ahead === 1) return "Tomorrow";
+  if (ahead > 1 && ahead < 7) return `In ${ahead} days`;
+  if (ahead >= 7) return date.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
   const days = Math.floor((now.getTime() - date.getTime()) / 86_400_000);
   if (days <= 0) return "Today";
   if (days === 1) return "Yesterday";
   if (days < 7) return `${days} days ago`;
   return date.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+}
+
+/** Whole calendar days from `from` to `to` in India time (negative = past). */
+function calendarDaysBetween(from: Date, to: Date): number {
+  const day = (d: Date) =>
+    Date.parse(`${new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(d)}T00:00:00Z`);
+  return Math.round((day(to) - day(from)) / 86_400_000);
 }
 
 /** "September 2026" */

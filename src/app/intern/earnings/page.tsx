@@ -7,6 +7,7 @@ import { requireRole } from "@/lib/auth";
 import { loadInternData } from "@/lib/intern-data";
 import { formatDayLabel, formatMoney } from "@/lib/format";
 import { parseOffer, internStipendInrMinor, stipendEligible } from "@/lib/offer";
+import { earningsView } from "@/lib/earnings-view";
 
 export const metadata: Metadata = {
   title: "Stipend",
@@ -19,7 +20,7 @@ export const metadata: Metadata = {
  */
 function whenLabel(value: Date | string | null): string {
   const label = formatDayLabel(value);
-  return label === "Today" || label === "Yesterday" ? label.toLowerCase() : label;
+  return /^(Today|Yesterday|Tomorrow|In \d+ days)$/.test(label) ? label.toLowerCase() : label;
 }
 
 /**
@@ -68,7 +69,7 @@ export default async function InternEarnings() {
         lede="What has been paid, what is on its way, and when each one landed."
       />
 
-      {data.payouts.length === 0 ? (
+      {earningsView(data.payouts.length, Boolean(data.engagement)) === "empty" ? (
         <EmptyScene
           art
           title="No stipend yet"
@@ -82,14 +83,14 @@ export default async function InternEarnings() {
             {/* ── The two figures, kept apart on purpose ─────────── */}
             <div className="grid gap-3 sm:grid-cols-2">
               <Surface className="p-6">
-                <p className="text-sm text-ink-500">Paid to you so far</p>
+                <p className="text-sm text-ink-600">Paid to you so far</p>
                 <p className="mt-2 text-3xl font-semibold tabular-nums tracking-[-0.025em] text-ink-900">
                   {/* Static, never animated: a count-up shows in-between
                       figures (and stalls in a throttled tab), which reads as
                       a wrong amount. INR passes through unconverted. */}
                   {formatMoney(money.paidMinor, money.currency, { zeroLabel: false })}
                 </p>
-                <p className="mt-2 text-pretty text-sm leading-relaxed text-ink-500">
+                <p className="mt-2 text-pretty text-sm leading-relaxed text-ink-600">
                   {money.lastPaidAt
                     ? `Last one landed ${whenLabel(money.lastPaidAt)}.`
                     : "Nothing has been paid out yet."}
@@ -109,7 +110,7 @@ export default async function InternEarnings() {
                 </p>
                 <p className="mt-2 text-pretty text-sm leading-relaxed text-ink-600">
                   {money.nextExpectedAt
-                    ? `Scheduled for ${formatDayLabel(money.nextExpectedAt)}. It usually arrives within two working days of that date.`
+                    ? `Scheduled for ${whenLabel(money.nextExpectedAt)}. It usually arrives within two working days of that date.`
                     : "Nothing is scheduled yet. The date appears here as soon as it is set."}
                 </p>
               </Surface>
@@ -118,6 +119,14 @@ export default async function InternEarnings() {
             {/* ── Every payment ──────────────────────────────────── */}
             <section>
               <SectionHead title="Every payment" hint="Newest first, with the bank reference." />
+              {data.payouts.length === 0 ? (
+                <Surface className="p-5">
+                  <p className="text-pretty text-sm leading-relaxed text-ink-600">
+                    No payment has been recorded yet. Your first one is scheduled once your first
+                    month is approved, and appears here with its date.
+                  </p>
+                </Surface>
+              ) : (
               <ul className="divide-y divide-ink-100 overflow-hidden rounded-[20px] border border-ink-200/70 bg-white shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)]">
                 {data.payouts.map((payout) => {
                   const isPaid = payout.status === "paid";
@@ -142,7 +151,7 @@ export default async function InternEarnings() {
                         <p className="text-sm font-semibold tabular-nums text-ink-900">
                           {formatMoney(payout.amountMinor ?? 0, payout.currency ?? "INR", { zeroLabel: false })}
                         </p>
-                        <p className="mt-0.5 text-xs text-ink-500">
+                        <p className="mt-0.5 text-xs text-ink-600">
                           {payout.referenceId ? (
                             <>
                               Reference {payout.referenceId}
@@ -165,6 +174,7 @@ export default async function InternEarnings() {
                   );
                 })}
               </ul>
+              )}
             </section>
           </div>
 
@@ -197,7 +207,7 @@ export default async function InternEarnings() {
                 <p className="mt-2 text-3xl font-semibold tabular-nums tracking-[-0.025em] text-ink-900">
                   {formatMoney(monthly, "INR")}
                 </p>
-                <p className="mt-1 text-sm text-ink-500">a month</p>
+                <p className="mt-1 text-sm text-ink-600">a month</p>
                 <p className="mt-3 text-pretty text-sm leading-relaxed text-ink-600">
                   Agreed in your offer, visible before you accepted it, and never renegotiated
                   behind your back.

@@ -234,7 +234,7 @@ function SkillCard({
             <Users className="size-3.5" aria-hidden />
             <span>{skill.resourceCount} {skill.resourceCount === 1 ? "student" : "students"}</span>
           </span>
-          <span className="flex items-center gap-1 text-xs font-medium text-ink-500 transition-colors group-hover/skill:text-primary">
+          <span className="flex items-center gap-1 text-xs font-medium text-ink-600 transition-colors group-hover/skill:text-primary">
             <span>View bench</span>
             <ArrowRight className="size-3 transition-transform duration-200 group-hover/skill:translate-x-0.5" aria-hidden />
           </span>

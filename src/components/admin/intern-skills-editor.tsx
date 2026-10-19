@@ -116,7 +116,7 @@ export function InternSkillsEditor({
                   setSaved(false);
                 }}
                 aria-label={`Remove ${skill.name}`}
-                className="text-ink-400 transition-colors hover:text-danger"
+                className="text-ink-600 transition-colors hover:text-danger"
               >
                 <X className="size-3" aria-hidden />
               </button>
@@ -124,7 +124,7 @@ export function InternSkillsEditor({
           ))}
         </ul>
       ) : (
-        <p className="mt-2 text-xs text-ink-500">
+        <p className="mt-2 text-xs text-ink-600">
           None recorded. Employers filtering on skills will not find this candidate.
         </p>
       )}

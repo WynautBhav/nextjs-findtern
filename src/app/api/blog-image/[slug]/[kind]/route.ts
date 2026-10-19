@@ -9,5 +9,6 @@ export const runtime = "nodejs";
 export async function GET(req: Request, ctx: { params: Promise<{ slug: string; kind: string }> }) {
   const { slug, kind } = await ctx.params;
   if (kind !== "cover" && kind !== "banner") return NextResponse.json({ error: "Not found" }, { status: 404 });
-  return cmsImageResponse(await getBlogImage(slug, kind), req);
+  // Covers and banners span the article column; 1600px covers 2x.
+  return cmsImageResponse(await getBlogImage(slug, kind), req, 1600);
 }

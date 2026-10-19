@@ -120,7 +120,7 @@ export function NotificationComposer({
               className={
                 audience === value
                   ? "apple-spring apple-pressable inline-flex min-h-11 flex-1 items-center justify-center whitespace-nowrap rounded-[8px] bg-white px-3 text-[14px] font-medium text-ink-900 shadow-xs"
-                  : "apple-spring apple-pressable inline-flex min-h-11 flex-1 items-center justify-center whitespace-nowrap rounded-[8px] px-3 text-[14px] font-medium text-ink-500 hover:text-ink-800"
+                  : "apple-spring apple-pressable inline-flex min-h-11 flex-1 items-center justify-center whitespace-nowrap rounded-[8px] px-3 text-[14px] font-medium text-ink-600 hover:text-ink-800"
               }
             >
               {value === "intern" ? "Candidates" : value === "employer" ? "Companies" : "Both"}
@@ -148,7 +148,7 @@ export function NotificationComposer({
         </div>
 
         <div className="mt-3 flex items-center justify-between text-xs">
-          <span className="text-ink-500">
+          <span className="text-ink-600">
             {audience === "both" ? "Every active account" : `${picked.size} of ${roster.length} selected`}
           </span>
           <label className="flex items-center gap-1.5 font-medium text-ink-800">
@@ -174,11 +174,11 @@ export function NotificationComposer({
         </div>
 
         {roster.length >= 50 ? (
-          <p className="mt-2 text-2xs text-ink-500">Showing the 50 newest. Search and press Enter to find anyone else.</p>
+          <p className="mt-2 text-2xs text-ink-600">Showing the 50 newest. Search and press Enter to find anyone else.</p>
         ) : null}
         <ul className="mt-2 max-h-80 space-y-0.5 overflow-y-auto">
           {filtered.length === 0 ? (
-            <li className="py-4 text-sm text-ink-500">
+            <li className="py-4 text-sm text-ink-600">
               {audience === "both" ? "Goes to every active candidate and company." : "Nobody matches that."}
             </li>
           ) : (
@@ -193,7 +193,7 @@ export function NotificationComposer({
                   />
                   <span className="min-w-0">
                     <span className="block truncate text-sm text-ink-800">{p.label}</span>
-                    <span className="block truncate text-2xs text-ink-500">{p.email}</span>
+                    <span className="block truncate text-2xs text-ink-600">{p.email}</span>
                   </span>
                 </label>
               </li>
@@ -255,7 +255,7 @@ export function NotificationComposer({
             {busy ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
             Send to {picked.size}
           </button>
-          <p className="text-2xs text-ink-500">
+          <p className="text-2xs text-ink-600">
             Notifications appear in the recipient&apos;s bell. Nothing is emailed.
           </p>
         </div>

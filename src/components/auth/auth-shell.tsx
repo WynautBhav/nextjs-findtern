@@ -89,7 +89,7 @@ export function AuthShell({
       </aside>
 
       {/* ── Form panel ──────────────────────────────────────────── */}
-      <main className="flex flex-col justify-center px-6 py-12 sm:px-10 lg:px-16">
+      <main id="main" tabIndex={-1} className="outline-none flex flex-col justify-center px-6 py-12 sm:px-10 lg:px-16">
         <div className="mx-auto w-full max-w-sm">
           {/* Compact brand lockup, mobile only. */}
           <Link href="/" className="mb-10 inline-flex items-center gap-2.5 lg:hidden">
