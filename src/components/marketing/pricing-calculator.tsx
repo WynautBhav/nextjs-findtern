@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 import { ButtonLink } from "@/components/ui/button";
-import { useIsIndia } from "@/components/marketing/region-rates";
+import { useCurrency } from "@/components/marketing/region-rates";
 import { formatMoney, formatNumber, formatRate } from "@/lib/format";
 import { WORK_MONTH, monthlyHours } from "@/lib/plan-offer";
 import type { CmsPlan } from "@/lib/content/types";
@@ -28,12 +28,16 @@ import { cn } from "@/lib/utils";
  * kept separate from the recurring figure so neither is mistaken for the
  * other.
  *
+ * Hours are fixed at a full 8-hour day - internships are not sold by
+ * the part day - so only the plan and the days a week change.
+ *
  * Days a week is 5 or 6 - nobody is asked whether they want someone seven
  * days a week. Weeks a month is fixed at four, the same assumption the plan
  * cards use, so the two never disagree.
  */
 const DAYS = [5, 6] as const;
-const HOURS = [4, 6, 8] as const;
+/** Internships are full days. The hours are fixed, not offered as a choice. */
+const HOURS_PER_DAY = WORK_MONTH.hoursPerDay;
 
 export function PricingCalculator({
   plansInr,
@@ -44,13 +48,13 @@ export function PricingCalculator({
   plansUsd: CmsPlan[];
   className?: string;
 }) {
-  const isIndia = useIsIndia();
+  const currency = useCurrency();
+  const isIndia = currency === "INR";
   const plans = isIndia ? plansInr : plansUsd;
-  const currency = plans[0]?.currency ?? (isIndia ? "INR" : "USD");
   const featuredIdx = Math.max(0, plans.findIndex((p) => p.isFeatured));
 
   const [planIdx, setPlanIdx] = useState(featuredIdx);
-  const [hours, setHours] = useState<number>(WORK_MONTH.hoursPerDay);
+  const hours = HOURS_PER_DAY;
   const [days, setDays] = useState<number>(WORK_MONTH.daysPerWeek);
   const uid = useId();
 
@@ -79,15 +83,7 @@ export function PricingCalculator({
             onChange={(v) => setPlanIdx(Number(v))}
             options={plans.map((p, i) => ({ value: String(i), label: p.displayName, hint: formatRate(p.priceHourlyMinor, currency) }))}
           />{" "}
-          intern working{" "}
-          <InlineSelect
-            id={`${uid}-hours`}
-            label="Hours a day"
-            value={String(hours)}
-            onChange={(v) => setHours(Number(v))}
-            options={HOURS.map((h) => ({ value: String(h), label: `${h} hours` }))}
-          />{" "}
-          a day,{" "}
+          intern working full days,{" "}
           <InlineSelect
             id={`${uid}-days`}
             label="Days a week"
@@ -107,7 +103,7 @@ export function PricingCalculator({
 
         <p className="mt-5 max-w-sm text-sm leading-relaxed text-ink-500">
           Billed against the timesheet hours you approve.{" "}
-          {isIndia ? "Prices include GST." : "No hidden fees."}
+          {isIndia ? "Prices include GST." : currency === "USD" ? "Billed in US dollars." : `Billed in US dollars; ${currency} shown at a reference rate.`}
         </p>
       </div>
 

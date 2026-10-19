@@ -80,6 +80,8 @@ export type TrackerProposal = {
   companyName: string;
   projectId: string;
   projectName: string;
+  /** Full-time offer (legacy "Full-time Hired" label and filter). */
+  fullTime?: boolean;
 };
 
 export type TrackerInterview = {
@@ -120,6 +122,7 @@ export function ProposalTrackerView({
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [flowFilter, setFlowFilter] = useState("all");
+  const [kindFilter, setKindFilter] = useState<"all" | "fulltime" | "internship">("all");
 
   // Dialog States
   const [selectedProposal, setSelectedProposal] = useState<TrackerProposal | null>(null);
@@ -165,10 +168,11 @@ export function ProposalTrackerView({
 
       const matchStatus = statusFilter === "all" || p.status === statusFilter;
       const matchFlow = flowFilter === "all" || p.flowType === flowFilter;
+      const matchKind = kindFilter === "all" || (kindFilter === "fulltime" ? Boolean(p.fullTime) : !p.fullTime);
 
-      return matchSearch && matchStatus && matchFlow;
+      return matchSearch && matchStatus && matchFlow && matchKind;
     });
-  }, [proposals, search, statusFilter, flowFilter]);
+  }, [proposals, search, statusFilter, flowFilter, kindFilter]);
 
   // Filtered Interviews
   const filteredInterviews = useMemo(() => {
@@ -300,6 +304,17 @@ export function ProposalTrackerView({
                 <option value="all">All Flows</option>
                 <option value="direct">Direct Offer</option>
                 <option value="interview_first">Interview First</option>
+              </select>
+
+              <select
+                value={kindFilter}
+                onChange={(e) => setKindFilter(e.target.value as typeof kindFilter)}
+                aria-label="Filter proposals by offer type"
+                className="min-h-11 rounded-[10px] border border-ink-200 bg-white px-3 text-sm text-ink-700 focus:border-brand-500 focus:outline-hidden"
+              >
+                <option value="all">Internship &amp; full-time</option>
+                <option value="internship">Internship</option>
+                <option value="fulltime">Full-time</option>
               </select>
             </>
           )}
@@ -540,7 +555,11 @@ export function ProposalTrackerView({
                         </td>
                         <td className="px-5 py-3.5">
                           <div className="flex items-center gap-2">
-                            <StatusBadge value={p.status} />
+                            {p.fullTime && p.status === "hired" ? (
+                              <StatusBadge tone="success" label="Full-time Hired" />
+                            ) : (
+                              <StatusBadge value={p.status} />
+                            )}
                             <span className="rounded-md bg-ink-100 px-1.5 py-0.5 text-2xs text-ink-600">
                               {p.flowType === "direct" ? "Direct" : "Interview"}
                             </span>

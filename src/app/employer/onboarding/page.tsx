@@ -6,6 +6,7 @@ import { requireRole } from "@/lib/auth";
 import {
   companyFromRecord,
   emptyDraft,
+  missingCompanyFields,
   projectFromRecord,
   type OnboardingDraft,
 } from "@/lib/employer-onboarding";
@@ -24,15 +25,23 @@ export const metadata: Metadata = {
  * `employer-onboarding.tsx` (1,329 lines) into one page whose entire cost is the
  * two record shapes in `lib/employer-onboarding.ts`.
  *
- * Nothing here writes: there is no `PATCH /api/employer/:id` and no
- * `POST /api/employer/projects` in this build. The form says so on save.
+ * Signup lands here, and the dashboard and candidate browser send an employer
+ * back here until the company profile and a first project both exist
+ * (lib/employer-setup). `?stage=project` opens on the project stage when only
+ * that is missing.
  */
 
-export default async function EmployerOnboarding() {
+export default async function EmployerOnboarding({
+  searchParams,
+}: {
+  searchParams: Promise<{ stage?: string | string[] }>;
+}) {
   const session = await requireRole("employer");
   const uid = session.uid;
+  const { stage } = await searchParams;
 
   const draft: OnboardingDraft = emptyDraft();
+  let companyComplete = false;
   let project: typeof schema.projects.$inferSelect | undefined;
 
   try {
@@ -43,7 +52,10 @@ export default async function EmployerOnboarding() {
       .where(eq(schema.employers.id, uid))
       .limit(1);
 
-    if (employer) draft.company = companyFromRecord(employer);
+    if (employer) {
+      draft.company = companyFromRecord(employer);
+      companyComplete = missingCompanyFields(employer).length === 0;
+    }
 
     // The newest project seeds stage 2. Editing an arbitrary one would imply a
     // per-row update route, which does not exist.
@@ -63,13 +75,14 @@ export default async function EmployerOnboarding() {
     <div>
       <PageHeader
         title="Set up your hiring account"
-        subtitle="Two short stages. Candidates only ever see what you fill in here."
+        subtitle="Two short stages - finish both to start browsing candidates. Candidates only ever see what you fill in here."
       />
       <EmployerOnboardingForm
         initial={draft}
         hasExistingProject={draft.project.projectName.length > 0}
         employerId={uid}
         existingProjectId={project?.id}
+        initialStage={stage === "project" && companyComplete ? 1 : 0}
       />
     </div>
   );

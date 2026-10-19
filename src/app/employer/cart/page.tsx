@@ -3,9 +3,10 @@ import { and, asc, eq, inArray } from "drizzle-orm";
 
 import { getDb, schema } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
-import { toCandidateProfile } from "@/lib/employer-candidates";
+import { redactForEmployer, toCandidateProfile } from "@/lib/employer-candidates";
 import { hiredInternIds, isAdminViewing } from "@/lib/employer-visibility";
 import { employerRegion, resolvePricing, type Currency } from "@/lib/employer-pricing";
+import { visibleInternIds } from "@/lib/employer-pool";
 import { PageHeader } from "@/components/layout/page-header";
 import { CartManager, type CartLineItem } from "@/components/employer/cart-manager";
 
@@ -19,11 +20,11 @@ export default async function EmployerCartPage() {
   const uid = session.uid;
 
   let cartLines: CartLineItem[] = [];
-  let stagedLines: CartLineItem[] = [];
   let currency: Currency = "INR";
   let region: "IN" | null = null;
   let plans: (typeof schema.pricingPlans.$inferSelect)[] = [];
   let nameUnlockedIds: string[] = [];
+  let awaitingPayment = 0;
   const unlockAll = await isAdminViewing();
 
   try {
@@ -47,6 +48,13 @@ export default async function EmployerCartPage() {
     region = employerRegion(employer ?? {});
     currency = region === "IN" ? "INR" : "USD";
 
+    awaitingPayment = (
+      await db
+        .select({ id: schema.proposals.id })
+        .from(schema.proposals)
+        .where(and(eq(schema.proposals.employerId, uid), inArray(schema.proposals.status, ["accepted", "processing"])))
+    ).length;
+
     const items = await db
       .select()
       .from(schema.employerCartItems)
@@ -63,7 +71,24 @@ export default async function EmployerCartPage() {
     }
 
     if (items.length > 0) {
-      const internIds = Array.from(new Set(items.map((item) => item.internId)));
+      const allInternIds = Array.from(new Set(items.map((item) => item.internId)));
+      // Rows whose intern left the pool (hid their profile, deactivated) drop
+      // out, unless this employer already has a relationship with them -
+      // legacy purged them from cart and compare (employer-cart.tsx:1632).
+      const visible = await visibleInternIds(db, uid, allInternIds);
+      const internIds = allInternIds.filter((id) => visible.has(id));
+      // Pairs already accepted or hired are past the shortlist.
+      const settled = await db
+        .select({ projectId: schema.proposals.projectId, internId: schema.proposals.internId })
+        .from(schema.proposals)
+        .where(
+          and(
+            eq(schema.proposals.employerId, uid),
+            inArray(schema.proposals.status, ["accepted", "processing", "hired"]),
+          ),
+        );
+      const settledPairs = new Set(settled.map((r) => `${r.projectId}:${r.internId}`));
+
       const projectIds = Array.from(new Set(items.map((item) => item.projectId)));
 
       const [userRows, onboardingRows, projectRows] = await Promise.all([
@@ -93,7 +118,12 @@ export default async function EmployerCartPage() {
       const parseItem = (item: typeof items[number]): CartLineItem | null => {
         const user = usersById.get(item.internId);
         if (!user) return null;
-        const candidate = toCandidateProfile(user, onboardingByUser.get(item.internId));
+        if (settledPairs.has(`${item.projectId}:${item.internId}`)) return null;
+        // Name, email and recording stay server-side until hire.
+        const candidate = redactForEmployer(
+          toCandidateProfile(user, onboardingByUser.get(item.internId)),
+          unlockAll || nameUnlockedIds.includes(item.internId),
+        );
         const pricing = resolvePricing(candidate.score, plans, currency, region);
 
         return {
@@ -112,10 +142,6 @@ export default async function EmployerCartPage() {
         .map(parseItem)
         .filter((l): l is CartLineItem => l !== null);
 
-      stagedLines = items
-        .filter((item) => item.listType === "checkout")
-        .map(parseItem)
-        .filter((l): l is CartLineItem => l !== null);
     }
   } catch {
     // Database fallback
@@ -131,7 +157,7 @@ export default async function EmployerCartPage() {
       <CartManager
         employerId={uid}
         initialCartLines={cartLines}
-        initialStagedLines={stagedLines}
+        awaitingPayment={awaitingPayment}
         currency={currency}
         nameUnlockedIds={nameUnlockedIds}
         unlockAll={unlockAll}

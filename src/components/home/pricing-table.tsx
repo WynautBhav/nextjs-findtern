@@ -5,7 +5,8 @@ import { Check, X } from "lucide-react";
 
 import { ButtonLink } from "@/components/ui/button";
 import { formatMoney } from "@/lib/format";
-import { useIsIndia } from "@/components/marketing/region-rates";
+import { CurrencyNote, CurrencyPicker, useCurrency } from "@/components/marketing/region-rates";
+import type { PriceCurrency } from "@/lib/currency";
 import { MonthlyRate } from "@/components/marketing/monthly-rate";
 import { OfferNote, PlanPrice } from "@/components/marketing/plan-price";
 import type { CmsPlan } from "@/lib/content/types";
@@ -56,7 +57,7 @@ type PlanRow = {
   strong?: boolean;
 };
 
-function rowsFor(currency: CmsPlan["currency"]): PlanRow[] {
+function rowsFor(currency: PriceCurrency): PlanRow[] {
   return [
     { label: "Who is it for", value: (p) => p.features[0] ?? "-" },
     { label: "Findtern Score", value: (p) => p.features[1] ?? "-", strong: true },
@@ -93,9 +94,9 @@ export function PricingTable({
   plansInr: CmsPlan[];
   plansUsd: CmsPlan[];
 }) {
-  const isIndia = useIsIndia();
+  const currency = useCurrency();
+  const isIndia = currency === "INR";
   const plans = isIndia ? plansInr : plansUsd;
-  const currency = plans[0]?.currency ?? (isIndia ? "INR" : "USD");
   const ROWS = rowsFor(currency);
   const featuredIdx = Math.max(
     0,
@@ -123,6 +124,7 @@ export function PricingTable({
           <p className="mt-5 text-lg text-on-dark-subtle">
             Affordable. Flexible. Transparent.
           </p>
+          <CurrencyPicker tone="dark" className="mt-6" />
         </div>
 
         {/* ── Plan switcher, mobile only ────────────────────────────
@@ -354,15 +356,13 @@ export function PricingTable({
             <Check className="size-4 text-accent" aria-hidden />
             Fixed {formatMoney(plans[0].perHireChargeMinor, currency)} per hiring on every placement
           </p>
-          {isIndia ? (
-            <p className="text-xs text-on-dark-subtle">Prices include GST</p>
-          ) : null}
+          <CurrencyNote tone="dark" className="text-xs" />
 
           <div className="mt-2 flex flex-col items-center gap-3 sm:flex-row">
             <ButtonLink href="/pricing" variant="accent" size="lg">
               See full pricing
             </ButtonLink>
-            <ButtonLink href="/employers" variant="outlineLight" size="lg">
+            <ButtonLink href="/contact" variant="outlineLight" size="lg">
               Talk to us
             </ButtonLink>
           </div>

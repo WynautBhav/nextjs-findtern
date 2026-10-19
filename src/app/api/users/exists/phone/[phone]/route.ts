@@ -2,8 +2,18 @@ import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
 import { getDb, schema } from "@/lib/db";
+import { bucketKey, clientIp, limiters } from "@/lib/security/rate-limit";
 
-export async function GET(_req: Request, { params }: { params: Promise<{ phone: string }> }) {
+/**
+ * Signup's "is this number taken?" pre-check. It only says whether the number
+ * is in use, never by which kind of account: this route is public, so naming
+ * the role would let anyone map numbers to interns and employers. The signup
+ * POST - rate limited and the real guard - gives the specific reason.
+ */
+export async function GET(req: Request, { params }: { params: Promise<{ phone: string }> }) {
+  if (!limiters.phoneLookup.take(bucketKey(clientIp(req.headers)))) {
+    return NextResponse.json({ error: "Too many attempts" }, { status: 429 });
+  }
   const { phone } = await params;
   const digits = phone.replace(/\D/g, "");
   if (!digits) return NextResponse.json({ exists: false });

@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, inArray } from "drizzle-orm";
 
 import { getDb, schema } from "@/lib/db";
 import { AdminPageHeader } from "@/components/admin/panel";
 import { getInvoiceSeller } from "@/lib/invoice-seller";
+import { orderProposalIds } from "@/lib/payments";
 import { AdminInvoicesView, type AdminInvoiceRow } from "@/components/admin/admin-invoices-view";
 
 export const metadata: Metadata = {
@@ -16,6 +17,7 @@ export default async function AdminOrdersPage() {
   const rawOrders = await db
     .select({
       id: schema.employerPayments.id,
+      invoiceNumber: schema.employerPayments.invoiceNumber,
       orderId: schema.employerPayments.orderId,
       paymentId: schema.employerPayments.paymentId,
       amountMinor: schema.employerPayments.amountMinor,
@@ -30,13 +32,29 @@ export default async function AdminOrdersPage() {
       country: schema.employers.country,
       state: schema.employers.state,
       billingPincode: schema.employers.billingPincode,
+      raw: schema.employerPayments.raw,
     })
     .from(schema.employerPayments)
     .leftJoin(schema.employers, eq(schema.employers.id, schema.employerPayments.employerId))
     .orderBy(desc(schema.employerPayments.createdAt));
 
+  // Which interns each order paid for (legacy showed them on every order).
+  const proposalIds = Array.from(new Set(rawOrders.flatMap((o) => orderProposalIds(o.raw))));
+  const internByProposal = new Map<string, string>();
+  if (proposalIds.length > 0) {
+    const named = await db
+      .select({ id: schema.proposals.id, first: schema.users.firstName, last: schema.users.lastName })
+      .from(schema.proposals)
+      .leftJoin(schema.users, eq(schema.users.id, schema.proposals.internId))
+      .where(inArray(schema.proposals.id, proposalIds));
+    for (const p of named) internByProposal.set(p.id, `${p.first ?? ""} ${p.last ?? ""}`.trim() || "Candidate");
+  }
+  const rawOf = (o: (typeof rawOrders)[number]) =>
+    (o.raw ?? {}) as { promoCode?: string; discountMinor?: number; promo?: { promoCode?: string; discountMinor?: number }; needsReview?: unknown };
+
   const rows: AdminInvoiceRow[] = rawOrders.map((o) => ({
     id: o.id,
+    invoiceNumber: o.invoiceNumber,
     orderId: o.orderId,
     paymentId: o.paymentId,
     amountMinor: o.amountMinor,
@@ -45,6 +63,10 @@ export default async function AdminOrdersPage() {
     paidAt: o.paidAt ? o.paidAt.toISOString() : null,
     createdAt: o.createdAt ? o.createdAt.toISOString() : null,
     partyId: o.employerId,
+    interns: orderProposalIds(o.raw).map((id) => internByProposal.get(id) ?? "Candidate").join("; "),
+    promoCode: rawOf(o).promo?.promoCode ?? rawOf(o).promoCode ?? null,
+    discountMinor: rawOf(o).promo?.discountMinor ?? rawOf(o).discountMinor ?? null,
+    needsReview: Boolean(rawOf(o).needsReview),
     partyName: o.companyName || "Unknown employer",
     partyEmail: o.companyEmail || "-",
     buyer: {

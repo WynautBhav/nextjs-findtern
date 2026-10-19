@@ -5,6 +5,7 @@ import { z } from "zod";
 import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
 import { notifyStipendPaid } from "@/lib/payments";
+import { queueNextMonth } from "@/lib/admin/stipend-queue";
 
 /**
  * Mark a payout paid.
@@ -28,6 +29,21 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   }
 
   const db = getDb();
+  const [existing] = await db
+    .select({
+      status: schema.internPayouts.status,
+      method: schema.internPayouts.method,
+      notes: schema.internPayouts.notes,
+      raw: schema.internPayouts.raw,
+    })
+    .from(schema.internPayouts)
+    .where(and(eq(schema.internPayouts.id, payoutId), eq(schema.internPayouts.internId, id)))
+    .limit(1);
+  if (!existing) return NextResponse.json({ error: "Unknown payout" }, { status: 404 });
+  // Legacy answered "Already paid"; overwriting would restamp the date and
+  // swap the bank reference on money that already left.
+  if (existing.status === "paid") return NextResponse.json({ error: "Already paid" }, { status: 409 });
+
   const updated = await db
     .update(schema.internPayouts)
     .set({
@@ -46,5 +62,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   if (updated.length === 0) return NextResponse.json({ error: "Unknown payout" }, { status: 404 });
   await notifyStipendPaid(payoutId);
-  return NextResponse.json({ ok: true });
+  const next = await queueNextMonth(db, id, existing);
+  return NextResponse.json({ ok: true, next });
 }

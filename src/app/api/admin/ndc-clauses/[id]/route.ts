@@ -1,4 +1,5 @@
 import { eq } from "drizzle-orm";
+import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -22,6 +23,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 
   const db = getDb();
   await db.update(schema.internNonDisclosureClauses).set({ ...parsed.data, updatedAt: new Date() }).where(eq(schema.internNonDisclosureClauses.id, id));
+  revalidatePath("/", "layout"); // the public NDA page reads these
   return NextResponse.json({ ok: true });
 }
 
@@ -31,5 +33,6 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
   if (!guard.ok) return guard.response;
   const db = getDb();
   await db.delete(schema.internNonDisclosureClauses).where(eq(schema.internNonDisclosureClauses.id, id));
+  revalidatePath("/", "layout"); // the public NDA page reads these
   return NextResponse.json({ ok: true });
 }

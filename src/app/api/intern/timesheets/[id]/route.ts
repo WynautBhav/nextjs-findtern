@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
+import { periodDays, todayIst } from "@/lib/timesheet-days";
 
 /**
  * Autosave for a draft timesheet.
@@ -64,10 +65,19 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     );
   }
 
+  // Only days inside the period, and nothing claimed for a day that has not
+  // happened yet - an approved future "Present" is a bill for unworked time.
+  const inPeriod = new Set(periodDays(sheet.periodStart, sheet.periodEnd));
+  const today = todayIst();
+  const entries = parsed.data.entries.filter((e) => inPeriod.size === 0 || inPeriod.has(e.date));
+  if (entries.some((e) => e.date > today && (e.hours > 0 || e.status !== "" || e.note.trim() !== ""))) {
+    return NextResponse.json({ error: "You can't log a day that hasn't happened yet." }, { status: 400 });
+  }
+
   const [updated] = await db
     .update(schema.timesheets)
     .set({
-      entries: parsed.data.entries,
+      entries,
       internNote: parsed.data.note ?? sheet.internNote,
       updatedAt: new Date(),
     })

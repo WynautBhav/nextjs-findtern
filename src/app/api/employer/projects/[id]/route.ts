@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq, ne, sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -7,16 +7,18 @@ import { requireMutation } from "@/lib/guards-mutation";
 
 const bodySchema = z.object({
   projectName: z.string().min(2).optional(),
-  skills: z.array(z.string()).min(1).optional(),
+  // Sheet row 59: at most 7 skills on a project.
+  skills: z.array(z.string().trim().min(1)).min(1, "Add at least one skill.").max(7, "A project can have at most 7 skills.").optional(),
   scopeOfWork: z.string().optional(),
   fullTimeOffer: z.boolean().optional(),
-  locationType: z.string().optional(),
+  locationType: z.enum(["remote", "hybrid", "onsite"]).optional(),
   preferredLocations: z.array(z.string()).optional(),
   pincode: z.string().optional(),
   city: z.string().nullable().optional(),
   state: z.string().nullable().optional(),
   timezone: z.string().optional(),
-  status: z.string().optional(),
+  // "closed" is what this build writes; "inactive" is the legacy spelling.
+  status: z.enum(["active", "closed", "inactive"]).optional(),
 });
 
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -25,12 +27,46 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   if (!guard.ok) return guard.response;
 
   const parsed = bodySchema.safeParse(await req.json().catch(() => null));
-  if (!parsed.success) return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+  if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid input" }, { status: 400 });
 
   const db = getDb();
   const [project] = await db.select().from(schema.projects).where(eq(schema.projects.id, id)).limit(1);
   if (!project) return NextResponse.json({ error: "Not found" }, { status: 404 });
   if (project.employerId !== guard.session.uid) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+  // Project names are unique per employer, ignoring case (legacy R:10740).
+  if (parsed.data.projectName) {
+    const [clash] = await db
+      .select({ id: schema.projects.id })
+      .from(schema.projects)
+      .where(
+        and(
+          eq(schema.projects.employerId, project.employerId),
+          ne(schema.projects.id, id),
+          sql`lower(trim(${schema.projects.projectName})) = ${parsed.data.projectName.trim().toLowerCase()}`,
+        ),
+      )
+      .limit(1);
+    if (clash) return NextResponse.json({ error: "You already have a project with that name." }, { status: 409 });
+  }
+  // At least one project stays active (legacy R:10757): the candidate pool
+  // and shortlist need one to work against.
+  if (parsed.data.status && parsed.data.status !== "active" && (project.status ?? "active") === "active") {
+    const [otherActive] = await db
+      .select({ id: schema.projects.id })
+      .from(schema.projects)
+      .where(
+        and(
+          eq(schema.projects.employerId, project.employerId),
+          ne(schema.projects.id, id),
+          sql`coalesce(${schema.projects.status}, 'active') = 'active'`,
+        ),
+      )
+      .limit(1);
+    if (!otherActive) {
+      return NextResponse.json({ error: "Keep at least one project active - open another before closing this one." }, { status: 409 });
+    }
+  }
 
   await db.update(schema.projects).set({ ...parsed.data, updatedAt: new Date() }).where(eq(schema.projects.id, id));
   return NextResponse.json({ ok: true });

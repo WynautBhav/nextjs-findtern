@@ -400,7 +400,7 @@ export function MessagesInbox({
                     Message
                   </p>
                   <p className="mt-2 text-[14px] leading-relaxed whitespace-pre-wrap text-ink-800">
-                    {selectedMessage.message}
+                    <MessageBody text={selectedMessage.message} />
                   </p>
                 </div>
               </div>
@@ -409,5 +409,33 @@ export function MessagesInbox({
         </SheetContent>
       </Sheet>
     </div>
+  );
+}
+
+/**
+ * Message text with support attachments ("Attachment: /api/admin/support-file/<key>")
+ * turned into links. Only that exact admin path is linked; everything else
+ * stays plain text.
+ */
+function MessageBody({ text }: { text: string }) {
+  const parts = text.split(/(\/api\/admin\/support-file\/[A-Za-z0-9_.-]+)/g);
+  return (
+    <>
+      {parts.map((part, i) =>
+        /^\/api\/admin\/support-file\/[A-Za-z0-9_.-]+$/.test(part) ? (
+          <a
+            key={i}
+            href={part}
+            target="_blank"
+            rel="noreferrer"
+            className="font-medium text-brand-700 underline underline-offset-4 hover:text-brand-800"
+          >
+            Open attachment
+          </a>
+        ) : (
+          <span key={i}>{part}</span>
+        ),
+      )}
+    </>
   );
 }

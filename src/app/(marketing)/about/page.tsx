@@ -151,8 +151,8 @@ export default function AboutPage() {
       {/* ── Who we work with ────────────────────────────────────────── */}
       <PageSection tone="muted" className="py-14">
         <p className="text-center text-2xs font-semibold uppercase tracking-[0.16em] text-ink-500">
-          Working with{" "}
-          <span className="text-primary">{PARTNERS.length} teams</span> across India
+          Trusted by{" "}
+          <span className="text-primary">leading companies</span> across India
         </p>
         <VelocityMarquee duration={40} className="mt-8">
           {PARTNERS.map((p) => (

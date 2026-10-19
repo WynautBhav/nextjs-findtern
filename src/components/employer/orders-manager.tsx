@@ -19,7 +19,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import { formatCurrency, formatDate, formatMoney } from "@/lib/format";
 import type { EmployerPayment, Proposal } from "@/lib/db/schema";
 import { placeOfSupply, type InvoiceBuyerProfile } from "@/lib/gst";
-import { downloadInvoice, taxInvoiceHtml, type InvoiceSeller } from "@/lib/invoice";
+import { downloadInvoice, invoiceNumberOf, taxInvoiceHtml, type InvoiceSeller } from "@/lib/invoice";
 import { downloadCsv } from "@/lib/admin/csv";
 
 export type HiredInternItem = {
@@ -36,8 +36,63 @@ export type HiredInternItem = {
   canOfferFullTime?: boolean;
 };
 
+/** A monthly-plan placement with months still owed. */
+export type UpcomingDue = HiredInternItem & { monthsPaid: number; nextDue: string | null };
+
+/**
+ * One line per placement the order paid for (from the order notes), instead
+ * of one generic line. Falls back to the generic text for old orders.
+ */
+function invoiceLines(payment: EmployerPayment, labels: Record<string, string>): string[] {
+  const raw = (payment.raw ?? {}) as Record<string, unknown>;
+  const notes = ((raw.notes ?? (raw.order as Record<string, unknown> | undefined)?.notes) ?? {}) as Record<string, unknown>;
+  let ids: unknown = notes.proposalIds ?? notes.proposal_ids ?? [];
+  if (typeof ids === "string") {
+    try {
+      ids = JSON.parse(ids);
+    } catch {
+      ids = [];
+    }
+  }
+  return (Array.isArray(ids) ? ids : []).map((id) => labels[String(id)]).filter(Boolean);
+}
+
+/** Promo the order used, as the order route stored it. */
+function invoicePromo(payment: EmployerPayment): { code: string; discountMinor: number | null } | null {
+  const raw = (payment.raw ?? {}) as { promo?: { promoCode?: string; discountMinor?: number }; promoCode?: string };
+  const code = raw.promo?.promoCode ?? raw.promoCode;
+  return code ? { code, discountMinor: raw.promo?.discountMinor ?? null } : null;
+}
+
+function invoiceDescription(payment: EmployerPayment, labels: Record<string, string>): string {
+  const raw = (payment.raw ?? {}) as Record<string, unknown>;
+  const notes = ((raw.notes ?? (raw.order as Record<string, unknown> | undefined)?.notes) ?? {}) as Record<string, unknown>;
+  let ids: unknown = notes.proposalIds ?? notes.proposal_ids ?? [];
+  if (typeof ids === "string") {
+    try {
+      ids = JSON.parse(ids);
+    } catch {
+      ids = [];
+    }
+  }
+  const lines = (Array.isArray(ids) ? ids : []).map((id) => labels[String(id)]).filter(Boolean);
+  const monthly = notes.paymentMode === "monthly";
+  if (lines.length === 0) return "Intern hiring services (per-hire charge and hourly engagement)";
+  return `Intern hiring services${monthly ? " - monthly instalment" : ""}: ${lines.join("; ")}`;
+}
+
+/** The stored order status as the employer should read it. */
+function paymentStatusLabel(status: string): { label: string; paid: boolean } {
+  if (status === "paid" || status === "captured") return { label: "Paid", paid: true };
+  if (status === "failed") return { label: "Failed", paid: false };
+  if (status === "cancelled" || status === "canceled") return { label: "Cancelled", paid: false };
+  return { label: "Pending", paid: false };
+}
+
 export function OrdersManager({
   hiredCandidates,
+  upcomingDues,
+  lineLabels,
   paymentHistory,
   seller,
   buyer,
@@ -47,6 +102,9 @@ export function OrdersManager({
   employerId: string;
   fteStatus: string;
   hiredCandidates: HiredInternItem[];
+  upcomingDues: UpcomingDue[];
+  /** proposalId → line label, to itemise each invoice. */
+  lineLabels: Record<string, string>;
   paymentHistory: EmployerPayment[];
   seller: InvoiceSeller;
   buyer: InvoiceBuyerProfile;
@@ -75,17 +133,20 @@ export function OrdersManager({
   async function downloadTaxInvoice(payment: EmployerPayment) {
     const currency = payment.currency || "INR";
     const html = taxInvoiceHtml({
-      invoiceNo: `INV-${payment.id.slice(0, 8).toUpperCase()}`,
+      invoiceNo: invoiceNumberOf(payment),
       date: payment.paidAt ? new Date(payment.paidAt) : new Date(),
       orderId: payment.orderId,
       paymentId: payment.paymentId,
       currency,
       amountMinor: payment.amountMinor,
-      description: "Intern hiring services (per-hire charge and hourly engagement)",
+      description: invoiceDescription(payment, lineLabels),
+      // One line per placement the order paid for, plus the promo row.
+      items: invoiceLines(payment, lineLabels),
+      promo: invoicePromo(payment),
       seller,
       buyer: { ...buyer, place: placeOfSupply({ ...buyer, currency }) },
     });
-    await downloadInvoice(html, `Invoice-${payment.orderId.slice(-8).toUpperCase()}.pdf`);
+    await downloadInvoice(html, `Invoice-${invoiceNumberOf(payment).replace(/\//g, "-")}.pdf`);
   }
 
   function exportTimesheetsCsv() {
@@ -306,11 +367,16 @@ export function OrdersManager({
                 </thead>
                 <tbody className="divide-y divide-ink-100">
                   {filteredHistory.map((p) => {
-                    const isPaid = p.status === "paid" || p.status === "captured";
+                    const { label: statusLabel, paid: isPaid } = paymentStatusLabel(p.status);
                     return (
                       <tr key={p.id} className="apple-spring hover:bg-ink-50/40">
                         <td className="px-5 py-3.5 font-mono text-xs tabular-nums text-ink-800">
                           {p.orderId}
+                          {p.invoiceNumber ? (
+                            <span className="mt-0.5 block font-sans text-2xs font-semibold text-ink-500">
+                              Invoice {p.invoiceNumber}
+                            </span>
+                          ) : null}
                         </td>
                         <td className="px-5 py-3.5 font-mono text-xs text-text-subtle">
                           {p.paymentId || "-"}
@@ -329,18 +395,23 @@ export function OrdersManager({
                                 : "bg-ink-100 text-ink-600 border border-ink-200"
                             }`}
                           >
-                            {isPaid ? "Paid" : "Created"}
+                            {statusLabel}
                           </span>
                         </td>
                         <td className="px-5 py-3.5 text-right">
-                          <button
-                            type="button"
-                            onClick={() => downloadTaxInvoice(p)}
-                            className="apple-spring apple-pressable inline-flex min-h-11 items-center justify-center gap-1 rounded-[10px] border border-ink-200 bg-white px-2.5 text-xs font-medium text-ink-700 hover:border-ink-300 hover:bg-ink-50"
-                          >
-                            <Download className="size-3" />
-                            <span>Tax Invoice</span>
-                          </button>
+                          {/* A tax invoice exists only for money received. */}
+                          {isPaid ? (
+                            <button
+                              type="button"
+                              onClick={() => downloadTaxInvoice(p)}
+                              className="apple-spring apple-pressable inline-flex min-h-11 items-center justify-center gap-1 rounded-[10px] border border-ink-200 bg-white px-2.5 text-xs font-medium text-ink-700 hover:border-ink-300 hover:bg-ink-50"
+                            >
+                              <Download className="size-3" />
+                              <span>Tax Invoice</span>
+                            </button>
+                          ) : (
+                            <span className="text-xs text-text-subtle">-</span>
+                          )}
                         </td>
                       </tr>
                     );
@@ -370,7 +441,7 @@ export function OrdersManager({
             </div>
           </div>
 
-          {hiredCandidates.length === 0 ? (
+          {upcomingDues.length === 0 ? (
             <div className="rounded-[20px] border border-dashed border-ink-200/70 bg-white/60 p-12 text-center">
               <Clock className="mx-auto size-8 text-ink-400" />
               <h3 className="mt-3 text-sm font-semibold text-ink-900">
@@ -395,7 +466,7 @@ export function OrdersManager({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-ink-100">
-                  {hiredCandidates.map((item) => (
+                  {upcomingDues.map((item) => (
                     <tr key={item.proposal.id} className="apple-spring hover:bg-ink-50/40">
                       <td className="px-5 py-3.5 font-medium text-ink-900">
                         {item.candidateName}
@@ -404,7 +475,10 @@ export function OrdersManager({
                         {item.projectName}
                       </td>
                       <td className="px-5 py-3.5 tabular-nums text-text-subtle">
-                        1st of Next Month
+                        {item.nextDue ? formatDate(item.nextDue) : "On payment"}
+                        <span className="block text-[11px]">
+                          Month {item.monthsPaid + 1} of {item.durationMonths}
+                        </span>
                       </td>
                       <td className="px-5 py-3.5 font-semibold text-ink-900 tabular-nums">
                         {item.monthlyStipend != null ? formatMoney(item.monthlyStipend, item.currency) : "—"}
@@ -416,7 +490,7 @@ export function OrdersManager({
                       </td>
                       <td className="px-5 py-3.5 text-right">
                         <Link
-                          href="/employer/cart"
+                          href="/employer/checkout"
                           className="apple-spring apple-pressable inline-flex min-h-11 items-center justify-center gap-1 rounded-[10px] bg-brand-700 px-3 text-xs font-semibold text-white hover:bg-brand-600"
                         >
                           <span>Pay Installment</span>

@@ -101,7 +101,7 @@ const PRIVACY = `
 <p>If we change this policy in a way that affects your rights, we will say so on this page and, for material changes, by email before it takes effect.</p>
 
 <h2>Contact</h2>
-<p>${SITE.email} · ${SITE.address}</p>
+<p><a href="mailto:${SITE.email}">${SITE.email}</a> · ${SITE.address}</p>
 `.trim();
 
 export default function PrivacyPage() {

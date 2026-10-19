@@ -20,9 +20,9 @@ import { JsonLd } from "@/components/seo/json-ld";
 import { breadcrumbJsonLd, faqJsonLd, webPageJsonLd } from "@/lib/seo";
 
 export const metadata: Metadata = {
-  title: "Guaranteed Internship Program: Placed or Your Deposit Back",
+  title: "Guaranteed Internship Program: Placed or Your Fee Back",
   description:
-    "Findtern's internship guarantee for students in India: placed within 18 months of your score or the ₹2,499 deposit is refunded in full. The process, the three conditions, exclusions and refund timing.",
+    "Findtern's internship guarantee for students in India: placed within 18 months of your score or the ₹2,499 fee is refunded in full. The process, the three conditions, exclusions and refund timing.",
   alternates: { canonical: "/guaranteed-internship-program" },
 };
 
@@ -30,7 +30,7 @@ export const metadata: Metadata = {
    and Conditions and on the live site. These are the same numbers that appear
    on the terms page - kept in one place so they cannot drift apart. */
 
-const DEPOSIT = 2499;
+const FEE = 2499;
 
 const STEPS = [
   {
@@ -74,12 +74,16 @@ const PROGRAM_TERMS = [
     text: "The program features an active placement runway. Refunds are processed immediately once the 18-month guarantee window closes.",
   },
   {
-    title: "4. AI Interview & Verified Rating",
-    text: "Your internship placement is accelerated by your AI Interview performance, featuring mock evaluations, transparent scores, and direct shortlisting.",
+    title: "4. Hiding your profile",
+    text: "You can hide your profile from employers when you need a break, but never for more than 30 days at a time. The guarantee only runs while employers can see you.",
   },
   {
     title: "5. Active Engagement & Integrity",
     text: "You agree to remain reachable and interview with matched employers. As long as you participate actively, our placement guarantee stands.",
+  },
+  {
+    title: "6. What counts as a placement",
+    text: "A contracted engagement of 160 hours or more: a signed proposal with an employer, hours logged on weekly timesheets, and a stipend paid through Findtern. About four full-time weeks. Shorter work does not count.",
   },
 ];
 
@@ -106,7 +110,7 @@ const CONDITIONS = [
   {
     n: "01",
     title: "Your assessment is scored",
-    body: "You complete the full rubric. A low score is not a disqualifier - it changes your rate, not your eligibility.",
+    body: "You complete the full assessment. A low score is not a disqualifier - it changes which employers see you, not your guarantee.",
   },
   {
     n: "02",
@@ -115,13 +119,13 @@ const CONDITIONS = [
   },
   {
     n: "03",
-    title: "You do not decline an offer you wanted",
-    body: "Declining a placement you asked for ends the obligation. Not being invited to one does not.",
+    title: "You turn down no more than 3 offers",
+    body: "You can say no to up to 3 offers in the window. Turning down a 4th ends the obligation. Not getting offers never counts against you.",
   },
 ];
 
 const TERMS = [
-  { label: "Deposit", value: `₹${DEPOSIT.toLocaleString("en-IN")}`, note: "refundable" },
+  { label: "Fee", value: `₹${FEE.toLocaleString("en-IN")}`, note: "refundable on conditions" },
   { label: "Clock starts", value: "Your score", note: "not your sign-up date" },
   { label: "Refund timing", value: "After 18 months", note: "not during the window" },
   { label: "Lock-in on you", value: "None", note: "the obligation runs on us" },
@@ -134,7 +138,7 @@ const FAQS = [
     category: "Program",
     question: "What is the Guaranteed Internship Program?",
     answer:
-      "It’s a structured, transparent process where you complete candidate onboarding and an AI-powered evaluation, become visible to verified hiring employers, and we work to get you placed within 18 months — or your deposit is refunded in full.",
+      "It’s a structured, transparent process where you complete candidate onboarding and an AI-powered evaluation, become visible to verified hiring employers, and we work to get you placed within 18 months — or your fee is refunded in full.",
   },
   {
     id: "g-how-works",
@@ -155,7 +159,7 @@ const FAQS = [
     category: "Pricing",
     question: "Are there any hidden charges?",
     answer:
-      "No. The program is completely transparent. The refundable deposit is held in trust until placement, and there are no hidden or recurring fees.",
+      "No. You pay one fee, once. It is refunded in full if we do not place you within 18 months and you met the three conditions. There are no hidden or recurring charges.",
   },
   {
     id: "g1",
@@ -181,9 +185,23 @@ const FAQS = [
   {
     id: "g4",
     category: "Refund",
-    question: "What counts as declining an offer?",
+    question: "How many offers can I turn down?",
     answer:
-      "Declining a placement you explicitly asked for. Being sent a request you did not initiate, and not responding, is not a decline. Going quiet on a request you did initiate is, and it ends the obligation.",
+      "Up to 3 during the 18-month window. Turning down a 4th ends the guarantee. Only formal offers count - an interview request you pass on is not an offer.",
+  },
+  {
+    id: "g4a",
+    category: "Refund",
+    question: "Can I hide my profile during the window?",
+    answer:
+      "Yes, for at most 30 days at a time. While your profile is hidden employers cannot find you, so the guarantee pauses with it and resumes the day you are visible again.",
+  },
+  {
+    id: "g4b",
+    category: "Refund",
+    question: "What does a 160+ hour contracted engagement mean?",
+    answer:
+      "A signed proposal with a Findtern employer for at least 160 working hours - about four full-time weeks - logged on weekly timesheets and paid through the platform. Anything shorter does not count as a placement, so the guarantee keeps running.",
   },
   {
     id: "g5",
@@ -219,7 +237,7 @@ export default function GuaranteePage() {
             <span className="text-primary">Or Your Money Back.</span>
           </>
         }
-        lead="A clear, step-by-step path from sign-up to placement — designed for confidence, transparency, and real outcomes. A refundable deposit held until we place you."
+        lead="A clear, step-by-step path from sign-up to placement — designed for confidence, transparency, and real outcomes. One fee, refunded in full if we do not place you."
       >
         <div className="flex flex-wrap items-center gap-3">
           <ButtonLink href="/signup" variant="primary" size="lg">
@@ -330,7 +348,7 @@ export default function GuaranteePage() {
             <li key={n}>
               <TiltCard max={5} className="h-full rounded-2xl">
                 <article className="flex h-full flex-col rounded-2xl border border-ink-200 bg-white p-6 sm:p-7">
-                  <span className="text-4xl font-bold tracking-tight text-brand-100">
+                  <span className="grid size-11 place-items-center rounded-xl bg-brand-50 text-base font-semibold tabular-nums text-primary">
                     {n}
                   </span>
                   <h3 className="mt-4 text-lg font-semibold tracking-tight text-ink-900">
@@ -485,12 +503,12 @@ export default function GuaranteePage() {
             </p>
             <div className="mt-8 flex items-baseline gap-3">
               <p className="text-5xl font-bold tracking-tight text-primary">
-                <CountUp value={DEPOSIT} prefix="₹" />
+                <CountUp value={FEE} prefix="₹" />
               </p>
               <p className="text-sm text-ink-500">
-                refundable, held
+                one-time fee,
                 <br />
-                until you are placed
+                refundable on conditions
               </p>
             </div>
           </div>

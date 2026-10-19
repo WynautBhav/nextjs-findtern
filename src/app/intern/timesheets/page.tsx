@@ -7,6 +7,7 @@ import { sheetLabel, sheetTone } from "@/components/app/status";
 import { TimesheetGrid, type Entry } from "@/components/app/timesheet-grid";
 import { CreateTimesheetModal } from "@/components/intern/create-timesheet-modal";
 import { requireRole } from "@/lib/auth";
+import { parseOffer } from "@/lib/offer";
 import { loadInternData } from "@/lib/intern-data";
 import { formatDayLabel, formatMonth } from "@/lib/format";
 import { hoursIn, toArray, workLines } from "@/lib/journey";
@@ -37,8 +38,9 @@ export default async function InternTimesheets() {
   const data = await loadInternData(session.uid);
   const sheets = data.timesheets;
 
+  // Same gate as the create API: hired placements only, never a full-time offer.
   const acceptedProposals = data.proposals
-    .filter((p) => p.status === "accepted" || p.status === "hired" || p.hiredAt !== null)
+    .filter((p) => p.status === "hired" && !parseOffer(p.offerDetails, p.currency).fullTime)
     .map((p) => ({
       id: p.id,
       companyName: data.names[p.employerId] || "Your Employer",

@@ -10,9 +10,9 @@ export const SITE = {
   name: "Findtern",
   tagline: "Internship Simplified",
   description:
-    "Hire a verified intern for the price of a coffee, or get placed in a paid internship - or your deposit back.",
+    "Hire a verified intern for the price of a coffee, or get placed in a paid internship - or your fee back.",
   url: "https://findtern.in",
-  email: "admin@findtern.in",
+  email: "communicate@findtern.in",
   phone: "",
   city: "Jaipur, Rajasthan, India",
   address: "Jaipur, Rajasthan, India",

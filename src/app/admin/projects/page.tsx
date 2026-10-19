@@ -4,6 +4,7 @@ import { Briefcase, Sparkles, CheckCircle2, Send, Download } from "lucide-react"
 import { getDb, schema } from "@/lib/db";
 import { formatDate, formatNumber } from "@/lib/format";
 import { flattenParams, parsePageRequest, searchAny, toPage } from "@/lib/admin/params";
+import { activeProject, realEmployerId } from "@/lib/admin/scope";
 import { AdminPageHeader } from "@/components/admin/panel";
 import { StatCard, StatGrid } from "@/components/admin/stat-card";
 import { DataTable } from "@/components/admin/data-table";
@@ -28,6 +29,7 @@ export default async function AdminProjectsPage({
       ],
       req.search,
     ),
+    realEmployerId(schema.projects.employerId),
     params.status ? eq(schema.projects.status, params.status) : undefined,
     params.type === "full_time" ? eq(schema.projects.fullTimeOffer, true) : undefined,
     params.type === "internship" ? eq(schema.projects.fullTimeOffer, false) : undefined,
@@ -73,10 +75,10 @@ export default async function AdminProjectsPage({
       .from(schema.projects)
       .innerJoin(schema.employers, eq(schema.employers.id, schema.projects.employerId))
       .where(where),
-    db.select({ c: count() }).from(schema.projects),
-    db.select({ c: count() }).from(schema.projects).where(eq(schema.projects.status, "active")),
-    db.select({ c: count() }).from(schema.projects).where(eq(schema.projects.fullTimeOffer, true)),
-    db.select({ c: count() }).from(schema.proposals),
+    db.select({ c: count() }).from(schema.projects).where(realEmployerId(schema.projects.employerId)),
+    db.select({ c: count() }).from(schema.projects).where(sql`${activeProject()} and ${realEmployerId(schema.projects.employerId)}`),
+    db.select({ c: count() }).from(schema.projects).where(sql`${schema.projects.fullTimeOffer} = true and ${realEmployerId(schema.projects.employerId)}`),
+    db.select({ c: count() }).from(schema.proposals).where(realEmployerId(schema.proposals.employerId)),
   ]);
 
   const page = toPage(rows, Number(totalRow?.c ?? 0), req.page, req.perPage);

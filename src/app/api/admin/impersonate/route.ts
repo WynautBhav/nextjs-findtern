@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { withSession } from "@/lib/auth";
-import { stashAdminCookie } from "@/lib/admin/impersonation";
+import { canViewAs, stashAdminCookie } from "@/lib/admin/impersonation";
 import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
 import { readSession } from "@/lib/security/session";
@@ -22,6 +22,11 @@ const bodySchema = z.object({
 export async function POST(req: Request) {
   const guard = await requireMutation({ req, roles: ["admin"] });
   if (!guard.ok) return guard.response;
+  // Super admins only (the proxy also has no rule for this path, which means
+  // the same thing there); checked here too so the route stands on its own.
+  if (!(await canViewAs(guard.session.uid, guard.session.permissions))) {
+    return NextResponse.json({ error: "Only super admins can view as a user" }, { status: 403 });
+  }
 
   const parsed = bodySchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Invalid input" }, { status: 400 });

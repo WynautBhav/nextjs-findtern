@@ -4,7 +4,7 @@ import { z } from "zod";
 
 import { getDb, schema } from "@/lib/db";
 import { verifyOtp, limiters, bucketKey, clientIp } from "@/lib/security/rate-limit";
-import { SIGNUP_OTP_SUBJECTS } from "@/lib/signup-otp";
+import { SIGNUP_OTP_SUBJECTS, attachOtpProof } from "@/lib/signup-otp";
 
 const bodySchema = z.object({
   email: z.string().trim().toLowerCase().email(),
@@ -47,5 +47,8 @@ export async function POST(req: Request) {
     .set({ usedAt: new Date() })
     .where(eq(schema.emailOtps.id, row.id));
 
-  return NextResponse.json({ ok: true });
+  // Binds the verification to this browser: account creation checks it.
+  const res = NextResponse.json({ ok: true });
+  attachOtpProof(res, subjectType, email);
+  return res;
 }

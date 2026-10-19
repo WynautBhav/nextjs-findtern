@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { getDb, schema } from "@/lib/db";
 import { applyRatings } from "@/lib/admin/ratings";
+import { afterRatingsSaved } from "@/lib/admin/score-live";
 import { requireMutation } from "@/lib/guards-mutation";
 
 /**
@@ -16,7 +17,8 @@ import { requireMutation } from "@/lib/guards-mutation";
  * here are exactly `RATING_META`, and the Findtern Score is their mean, which
  * is what the pricing bands are built on.
  */
-const AXIS = z.number().min(0).max(10);
+// null clears that rating, as an emptied box did in legacy.
+const AXIS = z.number().min(0).max(10).nullable();
 
 const bodySchema = z.object({
   communication: AXIS.optional(),
@@ -40,7 +42,8 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   if (!row) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const { communication, coding, aptitude, interview } = parsed.data;
-  const updatedExtra = applyRatings((row.extraData as Record<string, unknown>) ?? {}, { communication, coding, aptitude, interview });
+  const prevExtra = (row.extraData as Record<string, unknown>) ?? {};
+  const updatedExtra = applyRatings(prevExtra, { communication, coding, aptitude, interview });
 
   if (parsed.data.aiFeedbackLink !== undefined) {
     updatedExtra.aiFeedbackLink = parsed.data.aiFeedbackLink ? parsed.data.aiFeedbackLink.trim() : null;
@@ -50,5 +53,6 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   }
 
   await db.update(schema.internOnboarding).set({ extraData: updatedExtra }).where(eq(schema.internOnboarding.id, row.id));
+  await afterRatingsSaved(id, prevExtra, updatedExtra);
   return NextResponse.json({ ok: true, findternScore: updatedExtra.findternScore });
 }

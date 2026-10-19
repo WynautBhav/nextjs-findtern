@@ -55,7 +55,11 @@ export function RatingsEditor({
     const payload: Record<string, unknown> = {};
     for (const axis of AXES) {
       const raw = values[axis.key].trim();
-      if (!raw) continue;
+      // An emptied box clears that rating (legacy behaviour).
+      if (!raw) {
+        payload[axis.key] = null;
+        continue;
+      }
       const n = Number(raw);
       if (!Number.isFinite(n) || n < 0 || n > 10) {
         setError(`${axis.label} must be a number between 0 and 10.`);

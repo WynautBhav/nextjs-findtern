@@ -4,37 +4,28 @@ import { z } from "zod";
 
 import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
+import { parseOffer } from "@/lib/offer";
+import { timesheetPeriod } from "@/lib/employer-timesheets";
+import { isoDay, periodDays, todayIst } from "@/lib/timesheet-days";
 
+/**
+ * Only the month is taken from the client. The period, the status (always
+ * draft) and the day rows are derived here - a client-chosen period or
+ * `status: "submitted"` used to skip the fill-every-day check and the
+ * employer notification that the submit route carries.
+ */
 const bodySchema = z.object({
   proposalId: z.string().min(1),
   month: z.string().regex(/^\d{4}-\d{2}$/).optional(),
-  periodStart: z.string().datetime().optional(),
-  periodEnd: z.string().datetime().optional(),
-  entries: z.array(z.any()).optional(),
-  status: z.enum(["draft", "submitted"]).default("draft"),
-  internNote: z.string().optional(),
+  internNote: z.string().max(2000).optional(),
 });
 
-function generateMonthEntries(start: Date, end: Date) {
-  const entries: { date: string; hours: number; note: string }[] = [];
-  const curr = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate()));
-  const stop = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), end.getUTCDate()));
-
-  while (curr <= stop) {
-    const yyyy = curr.getUTCFullYear();
-    const mm = String(curr.getUTCMonth() + 1).padStart(2, "0");
-    const dd = String(curr.getUTCDate()).padStart(2, "0");
-    entries.push({
-      date: `${yyyy}-${mm}-${dd}`,
-      hours: 0,
-      note: "",
-    });
-    curr.setUTCDate(curr.getUTCDate() + 1);
-  }
-  return entries;
+/** One blank row per day, from the same walk the editor and submit use. */
+function generateMonthEntries(start: string, end: string) {
+  return periodDays(start, end).map((date) => ({ date, hours: 0, note: "" }));
 }
 
-/** Create or initialize a monthly timesheet for an accepted proposal. */
+/** Create a draft timesheet for one engagement month of a hired placement. */
 export async function POST(req: Request) {
   const guard = await requireMutation({ req, roles: ["intern"] });
   if (!guard.ok) return guard.response;
@@ -60,33 +51,33 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Proposal not found or access denied" }, { status: 404 });
   }
 
-  const isAccepted =
-    proposal.status === "accepted" ||
-    proposal.status === "hired" ||
-    proposal.hiredAt !== null;
-
-  if (!isAccepted) {
-    return NextResponse.json({ error: "Proposal is not active" }, { status: 400 });
+  // Legacy rules (routes.ts 13605-13678): hired placements only, never a
+  // full-time offer, one sheet for a one-month engagement, and the period
+  // clamped to the joining date and contract end.
+  if (proposal.status !== "hired") {
+    return NextResponse.json({ error: "Timesheets open once the employer confirms your hire." }, { status: 400 });
+  }
+  const offer = parseOffer(proposal.offerDetails, proposal.currency);
+  if (offer.fullTime) {
+    return NextResponse.json({ error: "Timesheets are not used for full-time offers." }, { status: 400 });
   }
 
-  // Calculate period start and end
-  let start: Date;
-  let end: Date;
+  // Periods follow the engagement's own months from the joining date; with
+  // no month given, the earliest started period without a sheet is opened.
+  // A one-month engagement therefore has exactly one period by construction.
+  const existingSheets = await db
+    .select({ periodStart: schema.timesheets.periodStart, periodEnd: schema.timesheets.periodEnd })
+    .from(schema.timesheets)
+    .where(eq(schema.timesheets.proposalId, proposal.id));
+  const taken = existingSheets
+    .filter((s) => s.periodStart && s.periodEnd)
+    .map((s) => ({ start: isoDay(s.periodStart!), end: isoDay(s.periodEnd!) }));
 
-  if (parsed.data.month) {
-    const [yearStr, monthStr] = parsed.data.month.split("-");
-    const year = parseInt(yearStr, 10);
-    const month = parseInt(monthStr, 10) - 1;
-    start = new Date(Date.UTC(year, month, 1));
-    end = new Date(Date.UTC(year, month + 1, 0, 23, 59, 59, 999));
-  } else if (parsed.data.periodStart && parsed.data.periodEnd) {
-    start = new Date(parsed.data.periodStart);
-    end = new Date(parsed.data.periodEnd);
-  } else {
-    const now = new Date();
-    start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-    end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0, 23, 59, 59, 999));
-  }
+  const todayIso = todayIst();
+  const period = timesheetPeriod(parsed.data.month ?? null, offer.startDate, offer.months, todayIso, taken);
+  if ("error" in period) return NextResponse.json({ error: period.error }, { status: 400 });
+  const start = new Date(`${period.start}T00:00:00.000Z`);
+  const end = new Date(`${period.end}T23:59:59.999Z`);
 
   // Check if a timesheet already exists for this proposal and overlapping date
   const [existing] = await db
@@ -111,10 +102,7 @@ export async function POST(req: Request) {
     );
   }
 
-  const initialEntries =
-    parsed.data.entries && parsed.data.entries.length > 0
-      ? parsed.data.entries
-      : generateMonthEntries(start, end);
+  const initialEntries = generateMonthEntries(period.start, period.end);
 
   const [sheet] = await db
     .insert(schema.timesheets)
@@ -124,10 +112,10 @@ export async function POST(req: Request) {
       internId: proposal.internId,
       periodStart: start,
       periodEnd: end,
-      status: parsed.data.status,
+      status: "draft",
       entries: initialEntries,
       internNote: parsed.data.internNote || null,
-      submittedAt: parsed.data.status === "submitted" ? new Date() : null,
+      submittedAt: null,
     })
     .returning();
 

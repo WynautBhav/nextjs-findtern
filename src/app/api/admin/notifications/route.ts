@@ -1,12 +1,14 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
+import { realEmployers } from "@/lib/admin/scope";
 
 const bodySchema = z.object({
-  recipientType: z.enum(["intern", "employer"]),
+  /** "both" (legacy audience) always means every active account of both types. */
+  recipientType: z.enum(["intern", "employer", "both"]),
   /** Explicit list, or `all: true` for every active account of that type. */
   recipientIds: z.array(z.string()).default([]),
   all: z.boolean().default(false),
@@ -23,25 +25,31 @@ export async function POST(req: Request) {
   if (!parsed.success) return NextResponse.json({ error: "Invalid input" }, { status: 400 });
 
   const db = getDb();
-  const ids = parsed.data.all
-    ? (
-        parsed.data.recipientType === "intern"
-          ? await db.select({ id: schema.users.id }).from(schema.users).where(eq(schema.users.isActive, true))
-          : await db.select({ id: schema.employers.id }).from(schema.employers).where(eq(schema.employers.isActive, true))
-      ).map((r) => r.id)
-    : parsed.data.recipientIds;
-  if (ids.length === 0) return NextResponse.json({ error: "No recipients" }, { status: 400 });
+  const { recipientType } = parsed.data;
+  const all = parsed.data.all || recipientType === "both";
+  const allInterns = async () =>
+    (await db.select({ id: schema.users.id }).from(schema.users).where(and(eq(schema.users.role, "intern"), eq(schema.users.isActive, true)))).map((r) => r.id);
+  // Never the internal "admin" / AI-interview employers.
+  const allEmployers = async () =>
+    (await db.select({ id: schema.employers.id }).from(schema.employers).where(and(realEmployers(), eq(schema.employers.isActive, true)))).map((r) => r.id);
+  const recipients: { type: "intern" | "employer"; id: string }[] = all
+    ? [
+        ...(recipientType !== "employer" ? (await allInterns()).map((id) => ({ type: "intern" as const, id })) : []),
+        ...(recipientType !== "intern" ? (await allEmployers()).map((id) => ({ type: "employer" as const, id })) : []),
+      ]
+    : parsed.data.recipientIds.map((id) => ({ type: recipientType as "intern" | "employer", id }));
+  if (recipients.length === 0) return NextResponse.json({ error: "No recipients" }, { status: 400 });
   // Same `custom` notifications the per-person send writes, in chunks.
-  for (let i = 0; i < ids.length; i += 500) {
+  for (let i = 0; i < recipients.length; i += 500) {
     await db.insert(schema.notifications).values(
-      ids.slice(i, i + 500).map((id) => ({
-      recipientType: parsed.data.recipientType,
-      recipientId: id,
-      type: parsed.data.type,
+      recipients.slice(i, i + 500).map((r) => ({
+        recipientType: r.type,
+        recipientId: r.id,
+        type: parsed.data.type,
         title: parsed.data.title,
         message: parsed.data.message,
       })),
     );
   }
-  return NextResponse.json({ ok: true, count: ids.length });
+  return NextResponse.json({ ok: true, count: recipients.length });
 }

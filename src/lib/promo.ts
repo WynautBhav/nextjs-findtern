@@ -1,7 +1,7 @@
 import { and, eq, sql } from "drizzle-orm";
 
 import { getDb, schema } from "@/lib/db";
-import { promoDiscount, promoProblem } from "@/lib/promo-rules";
+import { promoAudienceProblem, promoDiscount, promoProblem, type PromoAudience } from "@/lib/promo-rules";
 
 /**
  * Promo codes against a real order: shared by the intern activation payment
@@ -22,6 +22,8 @@ export async function quotePromo(input: {
   subjectId: string;
   orderMinor: number;
   currency: "INR" | "USD";
+  /** Who is redeeming; inferred from `subjectId` when not given. */
+  audience?: PromoAudience;
 }): Promise<PromoQuote> {
   const db = getDb();
   const [row] = await db
@@ -30,6 +32,10 @@ export async function quotePromo(input: {
     .where(eq(schema.promoCodes.code, input.code.trim().toUpperCase()))
     .limit(1);
   if (!row || !row.isActive) return { ok: false, error: "Invalid promo code", status: 404 };
+
+  const audience = input.audience ?? (await audienceOf(input.subjectId));
+  const scopeProblem = promoAudienceProblem(row.appliesTo, audience);
+  if (scopeProblem) return { ok: false, error: scopeProblem, status: 400 };
 
   const problem = promoProblem(row, input.orderMinor, input.currency);
   if (problem) return { ok: false, error: problem, status: 400 };
@@ -43,6 +49,17 @@ export async function quotePromo(input: {
 
   const discountMinor = promoDiscount(row, input.orderMinor, input.currency);
   return { ok: true, promo: row, discountMinor, payableMinor: input.orderMinor - discountMinor };
+}
+
+/** An id is an employer's if it is in `employers`; otherwise an intern's. */
+async function audienceOf(subjectId: string): Promise<PromoAudience> {
+  const db = getDb();
+  const [employer] = await db
+    .select({ id: schema.employers.id })
+    .from(schema.employers)
+    .where(eq(schema.employers.id, subjectId))
+    .limit(1);
+  return employer ? "employer" : "intern";
 }
 
 /** Idempotent: a second call for the same code and account is a no-op. */

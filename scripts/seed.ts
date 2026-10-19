@@ -303,6 +303,7 @@ async function main() {
         degree: collegeObj.degree,
         graduationYear: 2025 + (i % 3),
         findternScore: score,
+        approvalStatus: "Approved",
         ratings: {
           communication: comm,
           coding: coding,

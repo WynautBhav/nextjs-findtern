@@ -147,3 +147,27 @@ export function safeNext(next: unknown, fallback: string): string {
   }
   return next;
 }
+
+/** What the sign-in pages say for each `?oauthError=` the callback sends back. */
+export function oauthErrorMessage(code: string | undefined): string | null {
+  switch (code) {
+    case undefined:
+    case "":
+      return null;
+    case "gmail_only":
+      return "Use a personal Gmail address to continue with Google. Work and college accounts are not accepted.";
+    case "no_email":
+      return "Google did not share a verified email address for that account. Try another account, or sign up with your email.";
+    case "inactive":
+      return "This account has been deactivated. Contact support if you think that is a mistake.";
+    case "not_configured":
+      return "Google sign-in is not available right now. Use your email and password instead.";
+    case "bad_state":
+    case "missing_code":
+      return "The Google sign-in expired or was interrupted. Please try again.";
+    case "no_account":
+      return "There is no account for that Google address yet. Create one below.";
+    default:
+      return "Google sign-in did not complete. Please try again.";
+  }
+}

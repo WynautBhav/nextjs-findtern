@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -72,9 +72,23 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
       { status: 409 },
     );
   }
-  await db.delete(schema.employerCartItems).where(eq(schema.employerCartItems.employerId, id));
-  await db.delete(schema.projects).where(eq(schema.projects.employerId, id));
-  await db.delete(schema.employers).where(eq(schema.employers.id, id));
+  const [employer] = await db.select({ email: schema.employers.companyEmail }).from(schema.employers).where(eq(schema.employers.id, id)).limit(1);
+  if (!employer) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  // One transaction, and nothing left behind that still points at the
+  // account: reset links, sign-up codes, Google tokens, saved searches,
+  // profile views and their notifications.
+  const subjects = [id, employer.email.toLowerCase()];
+  await db.transaction(async (tx) => {
+    await tx.delete(schema.employerCartItems).where(eq(schema.employerCartItems.employerId, id));
+    await tx.delete(schema.projects).where(eq(schema.projects.employerId, id));
+    await tx.delete(schema.passwordResetTokens).where(and(eq(schema.passwordResetTokens.subjectType, "employer"), inArray(schema.passwordResetTokens.subjectId, subjects)));
+    await tx.delete(schema.emailOtps).where(and(eq(schema.emailOtps.subjectType, "employer"), inArray(schema.emailOtps.subjectId, subjects)));
+    await tx.delete(schema.employerGoogleTokens).where(eq(schema.employerGoogleTokens.employerId, id));
+    await tx.delete(schema.employerSavedSearches).where(eq(schema.employerSavedSearches.employerId, id));
+    await tx.delete(schema.profileViews).where(eq(schema.profileViews.employerId, id));
+    await tx.delete(schema.notifications).where(and(eq(schema.notifications.recipientType, "employer"), eq(schema.notifications.recipientId, id)));
+    await tx.delete(schema.employers).where(eq(schema.employers.id, id));
+  });
   forgetAccountStatus("employer", id);
   return NextResponse.json({ ok: true });
 }

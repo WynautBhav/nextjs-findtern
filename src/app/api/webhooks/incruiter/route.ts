@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 
 import { applyRatings, type RatingUpdate } from "@/lib/admin/ratings";
+import { afterRatingsSaved } from "@/lib/admin/score-live";
 import { getDb, schema } from "@/lib/db";
 
 export const runtime = "nodejs";
@@ -68,7 +69,8 @@ export async function POST(req: Request) {
         communication: pick("communication"),
       };
       const url = (v: unknown) => (typeof v === "string" && /^https:\/\//.test(v) ? v : undefined);
-      const extra = applyRatings((onboarding.extraData as Record<string, unknown>) ?? {}, updates);
+      const prevExtra = (onboarding.extraData as Record<string, unknown>) ?? {};
+      const extra = applyRatings(prevExtra, updates);
       await db
         .update(schema.internOnboarding)
         .set({
@@ -80,6 +82,7 @@ export async function POST(req: Request) {
           updatedAt: new Date(),
         })
         .where(eq(schema.internOnboarding.id, onboarding.id));
+      await afterRatingsSaved(String(internId), prevExtra, extra);
     }
   }
   return NextResponse.json({ ok: true });

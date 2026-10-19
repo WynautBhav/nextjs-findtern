@@ -26,7 +26,7 @@ export default async function Image({ params }: { params: Promise<{ slug: string
     getBlogPost(slug),
     readFile(join(process.cwd(), "src/assets/fonts/Poppins-SemiBold.ttf")),
     readFile(join(process.cwd(), "src/assets/fonts/Poppins-Regular.ttf")),
-    readFile(join(process.cwd(), "public/media/logo-remove.png")),
+    readFile(join(process.cwd(), "public/media/findtern-logo-white.png")),
   ]);
   const logoSrc = `data:image/png;base64,${logo.toString("base64")}`;
   const title = post ? tidyText(post.title) : "Findtern Blog";
@@ -51,7 +51,7 @@ export default async function Image({ params }: { params: Promise<{ slug: string
       >
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           {/* eslint-disable-next-line @next/next/no-img-element -- satori needs a plain img */}
-          <img src={logoSrc} alt="" width={180} height={87} style={{ filter: "brightness(0) invert(1)", objectFit: "contain" }} />
+          <img src={logoSrc} alt="" width={200} height={60} style={{ objectFit: "contain" }} />
           <span style={{ fontSize: 22, color: "#F5BB63", letterSpacing: "0.14em", textTransform: "uppercase" }}>Blog</span>
         </div>
 

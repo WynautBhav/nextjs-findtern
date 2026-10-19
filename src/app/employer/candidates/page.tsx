@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { and, asc, desc, eq, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import {
   ArrowUpRight,
   Filter,
@@ -18,13 +18,20 @@ import {
 import { getDb, schema } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
 import {
+  RATING_META,
+  redactForEmployer,
   toCandidateProfile,
   type CandidateProfile,
+  type Ratings,
 } from "@/lib/employer-candidates";
 import { hiredInternIds } from "@/lib/employer-visibility";
-import { employerRegion, type Currency } from "@/lib/employer-pricing";
+import { attachPhotos, candidatePoolClauses, scoreExpr } from "@/lib/employer-pool";
+import { requireEmployerSetup } from "@/lib/employer-setup";
+import { employerRegion, resolvePricing, type Currency } from "@/lib/employer-pricing";
+import { BANDS, PLAN_NAME, type BandId } from "@/lib/score";
 import { SkillFilter } from "@/components/employer/skill-filter";
 import { CandidateCard } from "@/components/employer/candidate-card";
+import { CandidateAvatar } from "@/components/employer/candidate-avatar";
 import { PageHeader, EmptyState } from "@/components/layout/page-header";
 import { cn } from "@/lib/utils";
 
@@ -33,6 +40,8 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
+type SortKey = "score" | keyof Ratings;
+
 type Filters = {
   q: string;
   skills: string[];
@@ -40,39 +49,68 @@ type Filters = {
   mode: string;
   minScore: number;
   laptop: string;
+  /** Plan (price band) - the legacy page's hourly-price filter. */
+  plan: BandId | "";
+  /** Per-axis AI interview rating floors, out of 10. */
+  minRatings: Ratings;
+  sort: SortKey;
+  dir: "desc" | "asc";
   view: "grid" | "list" | "table";
   pageSize: number;
   page: number;
   project?: string;
+  /** False when the employer chose "show everyone" over the project's defaults. */
+  projectDefaults: boolean;
+  /** Candidates ticked for Compare. Carried on every link so paging keeps them. */
+  ids: string[];
 };
+
+const SORT_OPTIONS: { value: SortKey; label: string }[] = [
+  { value: "score", label: "Findtern Score" },
+  ...RATING_META.map((meta) => ({ value: meta.key, label: meta.label })),
+];
+
+// Any whole-number floor 1-9, like the legacy 0-10 sliders.
+const RATING_FLOORS = [
+  { value: "", label: "Any" },
+  ...Array.from({ length: 9 }, (_, i) => ({ value: String(i + 1), label: `${i + 1}+` })),
+];
+const SCORE_HINT: Record<number, string> = { 4: " Top 70%", 6: " Top 40%", 8: " Top 10%" };
+const SCORE_FLOORS = [
+  { value: "", label: "Any score" },
+  ...Array.from({ length: 9 }, (_, i) => ({ value: String(i + 1), label: `${i + 1}.0+${SCORE_HINT[i + 1] ?? ""}` })),
+];
+
+type SearchParams = {
+  q?: string | string[];
+  skills?: string | string[];
+  city?: string | string[];
+  mode?: string | string[];
+  min?: string | string[];
+  laptop?: string | string[];
+  plan?: string | string[];
+  sort?: string | string[];
+  dir?: string | string[];
+  view?: string | string[];
+  pageSize?: string | string[];
+  ids?: string | string[];
+  page?: string | string[];
+  project?: string | string[];
+  pf?: string | string[];
+} & { [K in `r_${keyof Ratings}`]?: string | string[] };
 
 export default async function CandidatesPage({
   searchParams,
 }: {
-  searchParams: Promise<{
-    q?: string | string[];
-    skills?: string | string[];
-    city?: string | string[];
-    mode?: string | string[];
-    min?: string | string[];
-    laptop?: string | string[];
-    view?: string | string[];
-    pageSize?: string | string[];
-    ids?: string | string[];
-    page?: string | string[];
-    project?: string | string[];
-  }>;
+  searchParams: Promise<SearchParams>;
 }) {
   const session = await requireRole("employer");
   const uid = session.uid;
+  await requireEmployerSetup(uid);
   const params = await searchParams;
 
   const filters = readFilters(params);
-  const compareIds = (one(params.ids) ?? "")
-    .split(",")
-    .map((id) => id.trim())
-    .filter(Boolean)
-    .slice(0, 4);
+  const compareIds = filters.ids;
 
   let candidates: CandidateProfile[] = [];
   let total = 0;
@@ -84,7 +122,12 @@ export default async function CandidatesPage({
   let projects: { id: string; projectName: string }[] = [];
   let shortlisted = new Set<string>();
   let activeProjectId: string | null = null;
+  /** What the selected project filled in (row 61), for the note above the list. */
+  let projectApplied: { name: string; skills: string[]; city: string; onsite: boolean } | null = null;
   let nameUnlocked = new Set<string>();
+  let plans: (typeof schema.pricingPlans.$inferSelect)[] = [];
+  /** This employer's latest open-or-hired proposal per candidate on the page. */
+  const proposalFor = new Map<string, { id: string; status: string }>();
 
   try {
     const db = getDb();
@@ -98,11 +141,18 @@ export default async function CandidatesPage({
 
     // A shortlist is keyed on (project, candidate), so the page needs a project
     // to shortlist against. This mirrors the legacy page's project selector.
-    projects = await db
-      .select({ id: schema.projects.id, projectName: schema.projects.projectName })
+    const projectRows = await db
+      .select({
+        id: schema.projects.id,
+        projectName: schema.projects.projectName,
+        skills: schema.projects.skills,
+        city: schema.projects.city,
+        locationType: schema.projects.locationType,
+      })
       .from(schema.projects)
       .where(eq(schema.projects.employerId, uid))
       .orderBy(asc(schema.projects.projectName));
+    projects = projectRows.map((p) => ({ id: p.id, projectName: p.projectName }));
     activeProjectId =
       (one(params.project) && projects.find((p) => p.id === one(params.project))?.id) ||
       projects[0]?.id ||
@@ -133,10 +183,9 @@ export default async function CandidatesPage({
     region = employerRegion(employer ?? {});
     currency = region === "IN" ? "INR" : "USD";
 
-    // `extra_data->>'findternScore'` is what the sort runs on. Casting is safe
-    // for anything the jsonb writer put there; a non-numeric value yields null
-    // and sorts last with the unscored.
-    const clauses = [eq(schema.users.isActive, true)];
+    // The pool rule (active, live, open to work, AI-interviewed) lives in
+    // lib/employer-pool so the dashboard's "matches" list applies the same one.
+    const clauses = candidatePoolClauses();
 
     if (filters.q) {
       // Keyword only - never a name. Employers browse a redacted pool, so the
@@ -148,17 +197,57 @@ export default async function CandidatesPage({
       );
     }
 
-    // Every required skill has to appear somewhere in the jsonb array. AND-ed
-    // rather than OR-ed so "React + TypeScript" means both, not either.
-    for (const skill of filters.skills) {
+    // Row 61 / legacy dashboard:1528: the selected project fills in its own
+    // skills and city when the employer has not typed any, and a non-remote
+    // project leaves out remote-only candidates. "Show everyone" (pf=0)
+    // switches that off; typed filters always win.
+    const project = projectRows.find((p) => p.id === activeProjectId);
+    let skillTerms = filters.skills;
+    let cityText = filters.city;
+    if (project && filters.projectDefaults) {
+      const projectSkills = (Array.isArray(project.skills) ? project.skills : []).filter(Boolean).slice(0, 7);
+      const onsite = Boolean(project.locationType && project.locationType !== "remote");
+      if (skillTerms.length === 0) skillTerms = projectSkills;
+      if (!cityText && onsite && project.city) cityText = project.city;
+      if (onsite && !filters.mode) {
+        clauses.push(
+          sql`((${schema.internOnboarding.locationTypes})::text ILIKE '%onsite%' OR (${schema.internOnboarding.locationTypes})::text ILIKE '%hybrid%')`,
+        );
+      }
+      if (skillTerms !== filters.skills || cityText !== filters.city || onsite) {
+        projectApplied = {
+          name: project.projectName,
+          skills: skillTerms === filters.skills ? [] : skillTerms,
+          city: cityText === filters.city ? "" : cityText,
+          onsite,
+        };
+      }
+    }
+
+    // Any of the chosen skills (legacy rule): "React + Node" finds people with
+    // either, and those with more of them rank first.
+    if (skillTerms.length > 0) {
       clauses.push(
-        sql`(${schema.internOnboarding.skills})::text ILIKE ${`%${skill}%`}`,
+        sql`(${sql.join(
+          skillTerms.map((skill) => sql`(${schema.internOnboarding.skills})::text ILIKE ${`%${skill}%`}`),
+          sql` OR `,
+        )})`,
       );
     }
 
-    if (filters.city) {
+    // The city they live in, or one they said they would work from. Several
+    // cities (comma-separated) match any of them; candidates matching more
+    // rank higher, as legacy did (dashboard:2639).
+    const cityList = cityTerms(cityText);
+    if (cityList.length > 0) {
       clauses.push(
-        sql`lower(${schema.internOnboarding.city}) LIKE ${`%${filters.city.toLowerCase()}%`}`,
+        sql`(${sql.join(
+          cityList.map(
+            (c) =>
+              sql`(lower(${schema.internOnboarding.city}) LIKE ${`%${c}%`} OR lower((${schema.internOnboarding.preferredLocations})::text) LIKE ${`%${c}%`})`,
+          ),
+          sql` OR `,
+        )})`,
       );
     }
 
@@ -175,23 +264,28 @@ export default async function CandidatesPage({
     }
 
     if (filters.minScore > 0) {
-      clauses.push(
-        sql`COALESCE((${schema.internOnboarding.extraData}->>'findternScore')::float8, 0) >= ${filters.minScore}`,
-      );
+      clauses.push(sql`${scoreExpr()} >= ${filters.minScore}`);
     }
 
-    // Hidden profiles stay out of the pool. A missing flag counts as visible,
-    // so interns who never saw the toggle keep showing up.
-    clauses.push(
-      sql`(${schema.internOnboarding.userId} IS NULL OR COALESCE((${schema.internOnboarding.extraData}->>'openToWork'), 'true') <> 'false')`,
-    );
+    if (filters.plan) {
+      const band = BANDS.find((b) => b.id === filters.plan);
+      if (band) {
+        // The top band is closed at 10, the others half-open - as `bandFor`.
+        clauses.push(
+          band.max >= 10
+            ? sql`${scoreExpr()} >= ${band.min}`
+            : sql`(${scoreExpr()} >= ${band.min} AND ${scoreExpr()} < ${band.max})`,
+        );
+      }
+    }
 
     // Bounded fetch: the ranking happens in memory, so the ceiling has to be
-    // here rather than after the sort.
+    // here rather than after the sort. Inner join: a candidate with no
+    // onboarding row has no score, so the pool rule excludes them anyway.
     const rows = await db
       .select({ user: schema.users, onboarding: schema.internOnboarding })
       .from(schema.users)
-      .leftJoin(
+      .innerJoin(
         schema.internOnboarding,
         eq(schema.internOnboarding.userId, schema.users.id),
       )
@@ -212,20 +306,63 @@ export default async function CandidatesPage({
         seen.add(row.user.id);
         return true;
       })
-      .map((row) => toCandidateProfile(row.user, row.onboarding));
+      .map((row) => toCandidateProfile(row.user, row.onboarding))
+      // Rating floors run here: `ratings` is a nested jsonb object whose
+      // values the legacy writer stored as numbers or numeric strings.
+      .filter((p) => RATING_META.every((meta) => p.ratings[meta.key] >= filters.minRatings[meta.key]));
 
-    // Score first, then initials - a stable order matters when two candidates share
-    // a score and pagination would otherwise reshuffle them between pages.
+    // The chosen axis first, then score, then initials - a stable order matters
+    // when two candidates tie and pagination would otherwise reshuffle them.
     // (Initials, never the name: the pool is redacted until hire.)
+    const valueOf = (p: CandidateProfile) => (filters.sort === "score" ? p.score : p.ratings[filters.sort]);
+    const sign = filters.dir === "asc" ? -1 : 1;
+    const cityMatches = (p: CandidateProfile) => {
+      if (cityList.length < 2) return 0;
+      const hay = [p.city, ...p.preferredLocations].join("|").toLowerCase();
+      return cityList.filter((c) => hay.includes(c)).length;
+    };
+    const lowered = skillTerms.map((t) => t.toLowerCase());
+    const skillMatches = (p: CandidateProfile) => {
+      if (lowered.length < 2) return 0;
+      const have = p.skills.map((x) => x.toLowerCase());
+      return lowered.filter((t) => have.some((h) => h.includes(t))).length;
+    };
     profiles.sort(
       (a, b) =>
-        b.score - a.score || a.initials.localeCompare(b.initials) || a.id.localeCompare(b.id),
+        skillMatches(b) - skillMatches(a) ||
+        cityMatches(b) - cityMatches(a) ||
+        sign * (valueOf(b) - valueOf(a)) ||
+        b.score - a.score ||
+        a.initials.localeCompare(b.initials) ||
+        a.id.localeCompare(b.id),
     );
 
     total = profiles.length;
     pages = Math.max(1, Math.ceil(total / filters.pageSize));
     const start = (Math.min(filters.page, pages) - 1) * filters.pageSize;
     candidates = profiles.slice(start, start + filters.pageSize);
+    await attachPhotos(db, candidates).catch(() => undefined);
+
+    plans = await db.select().from(schema.pricingPlans).where(eq(schema.pricingPlans.isActive, true));
+    if (candidates.length > 0) {
+      const rows = await db
+        .select({ id: schema.proposals.id, internId: schema.proposals.internId, status: schema.proposals.status })
+        .from(schema.proposals)
+        .where(
+          and(
+            eq(schema.proposals.employerId, uid),
+            inArray(
+              schema.proposals.internId,
+              candidates.map((c) => c.id),
+            ),
+            inArray(schema.proposals.status, ["sent", "accepted", "processing", "interview_scheduled", "hired"]),
+          ),
+        )
+        .orderBy(desc(schema.proposals.createdAt));
+      for (const row of rows) {
+        if (!proposalFor.has(row.internId)) proposalFor.set(row.internId, { id: row.id, status: row.status });
+      }
+    }
   } catch {
     // DB unavailable - the filter form still renders and the list shows its
     // empty state, which is what a missing DATABASE_URL should look like.
@@ -240,13 +377,16 @@ export default async function CandidatesPage({
       />
 
       <form method="get" className="mb-6 rounded-[20px] border border-ink-200/70 bg-white/90 p-5 shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)] backdrop-blur-sm">
+        {compareIds.length > 0 ? <input type="hidden" name="ids" value={compareIds.join(",")} /> : null}
+        {filters.view !== "grid" ? <input type="hidden" name="view" value={filters.view} /> : null}
+        {!filters.projectDefaults ? <input type="hidden" name="pf" value="0" /> : null}
         <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-[minmax(0,1.2fr)_9.5rem_8rem_7.5rem_7.5rem_minmax(12rem,1fr)_auto]">
           <TextQuery
             defaultValue={filters.q}
             label="Keyword"
             placeholder="Skill, bio, or city…"
           />
-          <TextQuery name="city" label="City" defaultValue={filters.city} placeholder="Bengaluru" />
+          <TextQuery name="city" label="Cities" defaultValue={filters.city} placeholder="Bengaluru, Pune" />
           <SelectQuery
             name="mode"
             label="Work mode"
@@ -262,12 +402,7 @@ export default async function CandidatesPage({
             name="min"
             label="Min score"
             defaultValue={filters.minScore > 0 ? String(filters.minScore) : ""}
-            options={[
-              { value: "", label: "Any score" },
-              { value: "4", label: "4.0+ Top 70%" },
-              { value: "6", label: "6.0+ Top 40%" },
-              { value: "8", label: "8.0+ Top 10%" },
-            ]}
+            options={SCORE_FLOORS}
           />
           <SelectQuery
             name="laptop"
@@ -304,10 +439,86 @@ export default async function CandidatesPage({
           </div>
         </div>
 
+        <details
+          className="group mt-4 border-t border-ink-100 pt-4"
+          open={hasAdvancedFilters(filters) || undefined}
+        >
+          <summary className="inline-flex min-h-11 cursor-pointer list-none items-center gap-2 text-sm font-semibold text-ink-700 hover:text-brand-700">
+            <SlidersHorizontal className="size-4" aria-hidden />
+            More filters
+            <span className="text-xs font-normal text-text-subtle">Plan, AI interview ratings, sort order</span>
+          </summary>
+          <div className="mt-3 grid gap-4 sm:grid-cols-2 md:grid-cols-4 xl:grid-cols-8">
+            <SelectQuery
+              name="plan"
+              label="Plan"
+              defaultValue={filters.plan}
+              options={[
+                { value: "", label: "Any plan" },
+                ...BANDS.map((band) => ({
+                  value: band.id,
+                  label: `${PLAN_NAME[band.id]} (${band.min}-${band.max})`,
+                })),
+              ]}
+            />
+            {RATING_META.map((meta) => (
+              <SelectQuery
+                key={meta.key}
+                name={`r_${meta.key}`}
+                label={`Min ${meta.label.toLowerCase()}`}
+                defaultValue={filters.minRatings[meta.key] > 0 ? String(filters.minRatings[meta.key]) : ""}
+                options={RATING_FLOORS}
+              />
+            ))}
+            <SelectQuery
+              name="sort"
+              label="Sort by"
+              defaultValue={filters.sort === "score" ? "" : filters.sort}
+              options={SORT_OPTIONS.map((o) => ({ value: o.value === "score" ? "" : o.value, label: o.label }))}
+            />
+            <SelectQuery
+              name="dir"
+              label="Order"
+              defaultValue={filters.dir === "asc" ? "asc" : ""}
+              options={[
+                { value: "", label: "Highest first" },
+                { value: "asc", label: "Lowest first" },
+              ]}
+            />
+          </div>
+        </details>
+
         <SkillFilter active={filters.skills} />
       </form>
 
-      {compareIds.length >= 2 ? (
+      {projectApplied ? (
+        <p className="mb-5 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-[14px] border border-brand-200 bg-brand-50 px-4 py-3 text-sm text-ink-700">
+          <span>
+            Matched to <span className="font-semibold text-ink-900">{projectApplied.name}</span>
+            {projectApplied.skills.length > 0 ? `: any of ${projectApplied.skills.join(", ")}` : ""}
+            {projectApplied.city ? `, in or open to ${projectApplied.city}` : ""}
+            {projectApplied.onsite ? ", available on-site or hybrid" : ""}. Best matches first.
+          </span>
+          <Link
+            href={withFilters(filters, { projectDefaults: false, page: "" })}
+            className="font-medium text-brand-700 underline-offset-4 hover:underline"
+          >
+            Show everyone
+          </Link>
+        </p>
+      ) : !filters.projectDefaults && activeProjectId ? (
+        <p className="mb-5 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-[14px] border border-ink-200 bg-white px-4 py-3 text-sm text-ink-700">
+          Showing the whole pool.
+          <Link
+            href={withFilters(filters, { projectDefaults: true, page: "" })}
+            className="font-medium text-brand-700 underline-offset-4 hover:underline"
+          >
+            Match to the selected project
+          </Link>
+        </p>
+      ) : null}
+
+      {compareIds.length >= 1 ? (
         <div className="fixed bottom-6 left-1/2 z-40 flex -translate-x-1/2 items-center gap-3.5 rounded-full border border-brand-200/80 bg-white/95 px-5 py-2.5 shadow-2xl backdrop-blur-md">
           <div className="flex items-center gap-2">
             <span className="relative flex size-2.5">
@@ -315,23 +526,28 @@ export default async function CandidatesPage({
               <span className="relative inline-flex size-2.5 rounded-full bg-brand-600" />
             </span>
             <span className="text-xs font-semibold text-ink-900">
-              {compareIds.length} candidates selected
+              {compareIds.length === 1
+                ? "1 selected - pick one more to compare"
+                : `${compareIds.length} candidates selected`}
             </span>
           </div>
           <div className="h-4 w-px bg-ink-200" />
           <Link
-            href="/employer/candidates"
+            href={withFilters(filters, { ids: [] })}
+            scroll={false}
             className="apple-spring text-[13px] font-medium text-ink-500 underline-offset-4 hover:text-ink-900 hover:underline"
           >
             Clear
           </Link>
-          <Link
-            href={compareHref(filters, compareIds)}
-            className="apple-spring apple-pressable inline-flex min-h-11 items-center justify-center gap-1.5 rounded-full bg-brand-700 px-4 text-[13px] font-semibold text-white shadow-xs hover:bg-brand-600"
-          >
-            <Scale className="size-3.5" aria-hidden />
-            Compare Side-by-Side
-          </Link>
+          {compareIds.length >= 2 ? (
+            <Link
+              href={compareHref(filters)}
+              className="apple-spring apple-pressable inline-flex min-h-11 items-center justify-center gap-1.5 rounded-full bg-brand-700 px-4 text-[13px] font-semibold text-white shadow-xs hover:bg-brand-600"
+            >
+              <Scale className="size-3.5" aria-hidden />
+              Compare Side-by-Side
+            </Link>
+          ) : null}
         </div>
       ) : null}
 
@@ -435,9 +651,11 @@ export default async function CandidatesPage({
                       <tr key={c.id} className="apple-spring hover:bg-ink-50/50">
                         <td className="px-5 py-3.5">
                           <div className="flex items-center gap-3">
-                            <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-brand-50 text-xs font-bold text-brand-700 ring-1 ring-brand-600/20">
-                              {c.initials}
-                            </span>
+                            <CandidateAvatar
+                              photoUrl={c.photoUrl}
+                              initials={c.initials}
+                              className="size-9 rounded-xl text-xs ring-1 ring-brand-600/20"
+                            />
                             <div>
                               <Link
                                 href={`/employer/intern/${c.id}`}
@@ -495,10 +713,9 @@ export default async function CandidatesPage({
                         <td className="px-5 py-3.5 text-right">
                           <div className="flex items-center justify-end gap-1.5">
                             <Link
-                              href={withFilters(filters, {
-                                page: "",
-                                ids: toggle(compareIds, c.id).join(","),
-                              })}
+                              href={withFilters(filters, { ids: toggle(compareIds, c.id) })}
+                              scroll={false}
+                              aria-pressed={isSelected}
                               className={cn(
                                 "apple-spring inline-flex size-8 items-center justify-center rounded-lg border text-xs",
                                 isSelected
@@ -534,17 +751,18 @@ export default async function CandidatesPage({
               {candidates.map((candidate) => (
                 <CandidateCard
                   key={candidate.id}
-                  candidate={candidate}
+                  // The AI interview recording stays hidden until hire; only the
+                  // written report is shown before (legacy detail:1578).
+                  candidate={redactForEmployer(candidate, nameUnlocked.has(candidate.id))}
                   currency={currency}
                   region={region}
                   selected={compareIds.includes(candidate.id)}
-                  compareHref={withFilters(filters, {
-                    page: "",
-                    ids: toggle(compareIds, candidate.id).join(","),
-                  })}
+                  compareHref={withFilters(filters, { ids: toggle(compareIds, candidate.id) })}
                   projectId={activeProjectId}
                   shortlisted={shortlisted.has(candidate.id)}
                   nameUnlocked={nameUnlocked.has(candidate.id)}
+                  pricing={resolvePricing(candidate.score, plans, currency, region)}
+                  proposal={proposalFor.get(candidate.id) ?? null}
                 />
               ))}
             </ul>
@@ -584,18 +802,7 @@ export default async function CandidatesPage({
 
 /* ── Filters ─────────────────────────────────────────────────────────────── */
 
-function readFilters(params: {
-  q?: string | string[];
-  skills?: string | string[];
-  city?: string | string[];
-  mode?: string | string[];
-  min?: string | string[];
-  laptop?: string | string[];
-  view?: string | string[];
-  pageSize?: string | string[];
-  page?: string | string[];
-  project?: string | string[];
-}): Filters {
+function readFilters(params: SearchParams): Filters {
   const min = Number(one(params.min) ?? "0");
   const page = Number(one(params.page) ?? "1");
   const ps = Number(one(params.pageSize) ?? "24");
@@ -603,6 +810,12 @@ function readFilters(params: {
   const viewRaw = (one(params.view) ?? "").trim().toLowerCase();
   const view: "grid" | "list" | "table" =
     viewRaw === "list" || viewRaw === "table" ? viewRaw : "grid";
+  const planRaw = (one(params.plan) ?? "").trim();
+  const sortRaw = (one(params.sort) ?? "").trim();
+  const floor = (raw: string | string[] | undefined) => {
+    const n = Number(one(raw) ?? "0");
+    return Number.isFinite(n) && n > 0 ? Math.min(10, n) : 0;
+  };
 
   return {
     q: (one(params.q) ?? "").trim().slice(0, 60),
@@ -611,24 +824,53 @@ function readFilters(params: {
       .map((skill) => skill.trim())
       .filter(Boolean)
       .slice(0, 7),
-    city: (one(params.city) ?? "").trim().slice(0, 60),
+    city: (one(params.city) ?? "").trim().slice(0, 160),
     mode: (one(params.mode) ?? "").trim(),
     minScore: Number.isFinite(min) && min > 0 ? min : 0,
     laptop: (one(params.laptop) ?? "").trim().toLowerCase(),
+    plan: BANDS.some((b) => b.id === planRaw) ? (planRaw as BandId) : "",
+    minRatings: {
+      communication: floor(params.r_communication),
+      coding: floor(params.r_coding),
+      aptitude: floor(params.r_aptitude),
+      interview: floor(params.r_interview),
+    },
+    sort: SORT_OPTIONS.some((o) => o.value === sortRaw) ? (sortRaw as SortKey) : "score",
+    dir: one(params.dir) === "asc" ? "asc" : "desc",
     view,
     pageSize,
     page: Number.isFinite(page) && page > 0 ? Math.floor(page) : 1,
     project: (one(params.project) ?? "").trim(),
+    projectDefaults: one(params.pf) !== "0",
+    ids: Array.from(
+      new Set(
+        (Array.isArray(params.ids) ? params.ids.join(",") : (params.ids ?? ""))
+          .split(",")
+          .map((id) => id.trim())
+          .filter(Boolean),
+      ),
+    ).slice(0, 4),
   };
+}
+
+function hasAdvancedFilters(filters: Filters): boolean {
+  return (
+    Boolean(filters.plan) ||
+    filters.sort !== "score" ||
+    filters.dir === "asc" ||
+    RATING_META.some((meta) => filters.minRatings[meta.key] > 0)
+  );
 }
 
 function one(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
 }
 
+/** Tick or untick a candidate for Compare. Four columns is the compare page's limit. */
 function toggle(list: string[], value: string): string[] {
   const hit = list.some((entry) => entry.toLowerCase() === value.toLowerCase());
-  return hit ? list.filter((entry) => entry.toLowerCase() !== value.toLowerCase()) : [...list, value];
+  if (hit) return list.filter((entry) => entry.toLowerCase() !== value.toLowerCase());
+  return [...list, value].slice(-4);
 }
 
 /**
@@ -641,10 +883,19 @@ function toggle(list: string[], value: string): string[] {
  */
 function withFilters(
   base: Filters,
-  patch: Partial<Omit<Filters, "page">> & { page?: number | ""; ids?: string } = {},
+  patch: Partial<Omit<Filters, "page">> & { page?: number | "" } = {},
 ): string {
   const page = patch.page === "" ? 1 : (patch.page ?? base.page);
   const merged: Filters = { ...base, ...patch, page };
+  return `/employer/candidates${queryOf(merged)}`;
+}
+
+/**
+ * The query string for a set of filters. The compare selection used to be
+ * passed in as a patch key this builder never wrote back out, so every
+ * Compare link dropped it and ticking a candidate did nothing.
+ */
+function queryOf(merged: Filters): string {
   const next = new URLSearchParams();
 
   if (merged.q) next.set("q", merged.q);
@@ -653,21 +904,30 @@ function withFilters(
   if (merged.mode) next.set("mode", merged.mode);
   if (merged.minScore > 0) next.set("min", String(merged.minScore));
   if (merged.laptop) next.set("laptop", merged.laptop);
+  if (merged.plan) next.set("plan", merged.plan);
+  for (const meta of RATING_META) {
+    const value = merged.minRatings[meta.key];
+    if (value > 0) next.set(`r_${meta.key}`, String(value));
+  }
+  if (merged.sort !== "score") next.set("sort", merged.sort);
+  if (merged.dir === "asc") next.set("dir", "asc");
   if (merged.view && merged.view !== "grid") next.set("view", merged.view);
   if (merged.pageSize && merged.pageSize !== 24) next.set("pageSize", String(merged.pageSize));
   if (merged.project) next.set("project", merged.project);
+  if (!merged.projectDefaults) next.set("pf", "0");
+  if (merged.ids.length > 0) next.set("ids", merged.ids.join(","));
   if (merged.page > 1) next.set("page", String(merged.page));
 
   const query = next.toString();
-  return query ? `/employer/candidates?${query}` : "/employer/candidates";
+  return query ? `?${query}` : "";
 }
 
-/** The compare selection rides along with the filters, not instead of them. */
-function compareHref(filters: Filters, ids: string[]): string {
-  const next = new URLSearchParams(withFilters(filters).split("?")[1] ?? "");
-  if (ids.length > 0) next.set("ids", ids.join(","));
-  const query = next.toString();
-  return query ? `/employer/compare?${query}` : "/employer/compare";
+/**
+ * The compare page reads `ids` and `project`; the rest of the filters ride
+ * along so "Back to candidates" can return to the same view.
+ */
+function compareHref(filters: Filters): string {
+  return `/employer/compare${queryOf({ ...filters, page: 1 })}`;
 }
 
 function ActiveFilters({ filters }: { filters: Filters }) {
@@ -677,7 +937,8 @@ function ActiveFilters({ filters }: { filters: Filters }) {
     filters.mode ||
     filters.minScore > 0 ||
     filters.skills.length > 0 ||
-    filters.laptop;
+    filters.laptop ||
+    hasAdvancedFilters(filters);
   if (!active) return null;
   return (
     <Link
@@ -763,4 +1024,16 @@ function SelectQuery({
       </div>
     </div>
   );
+}
+
+/** Up to five lower-cased city terms from the comma-separated filter. */
+function cityTerms(raw: string): string[] {
+  return Array.from(
+    new Set(
+      raw
+        .split(",")
+        .map((c) => c.trim().toLowerCase())
+        .filter(Boolean),
+    ),
+  ).slice(0, 5);
 }

@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ArrowRight, Building2, Coffee, GraduationCap } from "lucide-react";
+import { ArrowRight, Building2, Check, Coffee, GraduationCap, Pause, Play } from "lucide-react";
 
 import { ButtonLink } from "@/components/ui/button";
 import { TextReveal } from "@/components/motion/text-reveal";
 import { ScoreCard } from "@/components/home/score-card";
 import { HOME_COPY } from "@/lib/content/site";
+import { prefersReducedMotion } from "@/lib/gsap";
 import { cn } from "@/lib/utils";
 
 /**
@@ -45,16 +46,42 @@ import { cn } from "@/lib/utils";
  */
 export function HeroSplit() {
   const [ready, setReady] = useState(false);
+  const [shown, setShown] = useState(false);
+  const [paused, setPaused] = useState(true);
+  const userPaused = useRef(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const bandRef = useRef<HTMLDivElement>(null);
+
+  const togglePlayback = () => {
+    const v = videoRef.current;
+    if (!v) return;
+    const next = !paused;
+    userPaused.current = next;
+    if (next) {
+      v.pause();
+    } else {
+      // Under save-data or reduced motion nothing has been fetched yet.
+      if (v.networkState === HTMLMediaElement.NETWORK_EMPTY) v.load();
+      void v.play().catch(() => {});
+    }
+  };
 
   useEffect(() => {
     const v = videoRef.current;
     if (!v) return;
     const onCanPlay = () => setReady(true);
+    // The control mirrors what the element is actually doing, not intent.
+    const onPlay = () => setPaused(false);
+    const onPause = () => setPaused(true);
     v.addEventListener("canplay", onCanPlay);
+    v.addEventListener("play", onPlay);
+    v.addEventListener("pause", onPause);
     if (v.readyState >= 3) setReady(true);
-    return () => v.removeEventListener("canplay", onCanPlay);
+    return () => {
+      v.removeEventListener("canplay", onCanPlay);
+      v.removeEventListener("play", onPlay);
+      v.removeEventListener("pause", onPause);
+    };
   }, []);
 
   useEffect(() => {
@@ -65,6 +92,9 @@ export function HeroSplit() {
     const saveData =
       (navigator as { connection?: { saveData?: boolean } }).connection?.saveData ??
       false;
+
+    // Reduced motion: the poster stands in until the visitor presses play.
+    if (prefersReducedMotion()) userPaused.current = true;
 
     let loaded = false;
     const load = () => {
@@ -85,8 +115,9 @@ export function HeroSplit() {
 
     const visible = new IntersectionObserver(
       ([entry]) => {
+        if (entry.isIntersecting) setShown(true);
         if (!loaded) return;
-        if (entry.isIntersecting) {
+        if (entry.isIntersecting && !userPaused.current) {
           void v.play().catch(() => {});
         } else {
           v.pause();
@@ -169,8 +200,8 @@ export function HeroSplit() {
           <AudienceCard
             kicker="Priced by score"
             Icon={Coffee}
-            title="Pay for approved hours, plus one flat per-hire fee"
-            body="Three plans named after coffee, each tied to a score band. The rate card is published, and the 2026 discount is on now."
+            title="A published price for every score band"
+            body="Espresso, Cappuccino and Latte: three plans, one per score band, each with a fixed hourly rate and a flat ₹5,000 per hire. Espresso is free through 2026."
             cta={{ label: "See pricing", href: "/pricing" }}
           />
         </div>
@@ -192,12 +223,14 @@ export function HeroSplit() {
           ref={bandRef}
           className="relative overflow-hidden rounded-3xl border border-white/10 bg-brand-950 bg-[url('/media/hero-poster.jpg')] bg-cover bg-center shadow-2xl"
         >
-          {/* ── Background Video with Reduced Opacity ────────────── */}
+          {/* Taller on phones so the caption has its own lower third instead
+              of sitting across the subject; wide from sm up, where the
+              caption keeps to the left of the centred graduate. */}
           <video
             ref={videoRef}
             className={cn(
-              "aspect-16/9 w-full object-cover object-[center_35%] transition-opacity duration-1000 sm:aspect-21/9",
-              ready ? "opacity-80" : "opacity-0",
+              "aspect-4/5 w-full object-cover object-[center_30%] transition-opacity duration-1000 sm:aspect-16/9 sm:object-[center_35%] lg:aspect-21/9",
+              ready ? "opacity-100" : "opacity-0",
             )}
             poster="/media/hero-poster.jpg"
             muted
@@ -216,27 +249,59 @@ export function HeroSplit() {
             <source src="/media/hero-720.mp4" type="video/mp4" />
           </video>
 
-          {/* Bottom-weighted scrim: legible caption, footage left alone above it. */}
+          {/* Scrims. The overlay used to sit on a flat tint over the whole
+              frame, which buried the subject. These only darken where the
+              text is: the bottom on every size, plus the left edge from sm
+              up, so the graduate in the centre stays at full brightness. */}
           <div
-            className="pointer-events-none absolute inset-0 bg-gradient-to-t from-brand-950/90 via-brand-950/30 to-transparent"
             aria-hidden
+            className="pointer-events-none absolute inset-x-0 bottom-0 h-3/5 bg-gradient-to-t from-brand-950/95 via-brand-950/60 to-transparent sm:h-4/5 sm:via-brand-950/40"
+          />
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-y-0 left-0 hidden w-3/5 bg-gradient-to-r from-brand-950/70 via-brand-950/25 to-transparent sm:block"
           />
 
-          {/* A caption, not a second hero: the CTAs already sit above. */}
-          <div className="absolute inset-x-0 bottom-0 z-10 flex flex-col gap-4 p-6 sm:flex-row sm:items-end sm:justify-between sm:p-10">
-            <div className="max-w-xl">
-              <p className="text-2xs font-semibold uppercase tracking-[0.16em] text-white/60">
-                How hiring works here
-              </p>
-              <h2 className="mt-2 text-balance text-xl font-medium leading-snug tracking-tight text-white sm:text-2xl md:text-3xl">
-                Screened before you meet them. Billed only for approved hours.
+          <div
+            className={cn(
+              "absolute inset-x-0 bottom-0 flex flex-col gap-4 p-6 sm:p-9 lg:flex-row lg:items-end lg:justify-between lg:gap-10 lg:p-12",
+              "transition-[opacity,translate] duration-700 ease-out motion-reduce:transition-none",
+              shown ? "translate-y-0 opacity-100" : "translate-y-3 opacity-0 motion-reduce:translate-y-0 motion-reduce:opacity-100",
+            )}
+          >
+            {/* Capped to the left third from sm up: the graduate sits at
+                roughly 37-67% of the frame width, and the copy must not
+                reach their head. */}
+            <div className="max-w-md sm:max-w-[34%]">
+              <span className="inline-flex items-center gap-1.5 text-2xs font-semibold uppercase tracking-[0.14em] text-accent-300">
+                <GraduationCap className="size-3" aria-hidden />
+                Why it works
+              </span>
+              <h2 className="mt-3 text-balance text-[1.5rem] font-medium leading-[1.15] tracking-[-0.02em] text-white sm:text-[clamp(1.25rem,2.3vw,2.125rem)]">
+                Screened before you meet them.{" "}
+                <span className="text-accent-400">Billed only for approved hours.</span>
               </h2>
             </div>
-            <ul className="flex shrink-0 flex-wrap gap-x-5 gap-y-1 text-sm text-white/75">
-              <li>Coding, aptitude and interview tested</li>
-              <li>Weekly timesheets</li>
+            <ul className="flex shrink-0 flex-col gap-2 text-sm text-white/85 sm:flex-row sm:gap-5">
+              {["Coding, aptitude and interview tested", "Weekly timesheets"].map((item) => (
+                <li key={item} className="inline-flex items-center gap-2">
+                  <Check className="size-3.5 text-accent-300" aria-hidden />
+                  {item}
+                </li>
+              ))}
             </ul>
           </div>
+
+          {/* Looping motion longer than 5 s needs a way to stop it (WCAG
+              2.2.2). Kept small and out of the caption's corner. */}
+          <button
+            type="button"
+            onClick={togglePlayback}
+            aria-label={paused ? "Play background video" : "Pause background video"}
+            className="absolute right-4 top-4 grid size-11 place-items-center rounded-full border border-white/15 bg-brand-950/50 text-white/80 transition-colors hover:bg-brand-950/75 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white sm:right-5 sm:top-5"
+          >
+            {paused ? <Play className="size-4" aria-hidden /> : <Pause className="size-4" aria-hidden />}
+          </button>
         </div>
       </div>
     </section>

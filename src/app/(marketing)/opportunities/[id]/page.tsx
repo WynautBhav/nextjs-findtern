@@ -1,3 +1,4 @@
+import { companyInitials } from "@/lib/format";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -18,7 +19,7 @@ export async function generateMetadata({
   const role = await projectById(id);
   if (!role) return { title: "Role not found" };
   return {
-    title: `${role.projectName} at ${role.companyName}`,
+    title: `${role.projectName} internship`,
     description: role.scopeOfWork ?? undefined,
     alternates: { canonical: `/opportunities/${role.id}` },
   };
@@ -57,7 +58,12 @@ export default async function PublicRoleDetail({ params }: { params: Promise<{ i
       <section className="container-page pt-6 pb-4">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0">
-            <p className="text-sm text-ink-500">{role.companyName}</p>
+            <p className="flex items-center gap-2 text-sm text-ink-500">
+              <span aria-hidden className="grid size-7 place-items-center rounded-lg bg-brand-50 text-2xs font-semibold text-primary">
+                {companyInitials(role.companyName)}
+              </span>
+              A verified company on Findtern
+            </p>
             <h1 className="mt-1 text-pretty text-3xl font-semibold tracking-[-0.02em] text-ink-900 sm:text-4xl">
               {role.projectName}
             </h1>
@@ -125,7 +131,8 @@ export default async function PublicRoleDetail({ params }: { params: Promise<{ i
                 <div className="flex items-start justify-between gap-4 py-2.5">
                   <dt className="text-sm text-ink-500">Company</dt>
                   <dd className="text-right text-sm font-medium text-ink-900">
-                    {role.companyName}
+                    {companyInitials(role.companyName)}
+                    <span className="block text-xs font-normal text-ink-500">Name shared once they make an offer</span>
                   </dd>
                 </div>
                 <div className="flex items-start justify-between gap-4 py-2.5">

@@ -304,11 +304,28 @@ describe("rate limiting", () => {
     assert.ok(!bucketKey("1.1.1.1", "user@example.com").includes("example.com"));
   });
 
-  test("reads the client ip from proxy headers", () => {
+  test("forwarding headers are ignored unless a proxy is trusted", () => {
     const h = (m: Record<string, string>) => ({ get: (n: string) => m[n.toLowerCase()] ?? null });
-    assert.equal(clientIp(h({ "x-forwarded-for": "9.9.9.9, 8.8.8.8" })), "9.9.9.9");
-    assert.equal(clientIp(h({ "x-real-ip": "7.7.7.7" })), "7.7.7.7");
-    assert.equal(clientIp(h({})), "unknown");
+    const saved = { trust: process.env.TRUST_PROXY, vercel: process.env.VERCEL };
+    try {
+      delete process.env.TRUST_PROXY;
+      delete process.env.VERCEL;
+      // A spoofed header must not pick the caller's bucket.
+      assert.equal(clientIp(h({ "x-forwarded-for": "9.9.9.9" })), "unknown");
+      assert.equal(clientIp(h({ "x-real-ip": "7.7.7.7" })), "unknown");
+
+      process.env.TRUST_PROXY = "1";
+      // Behind nginx the right-most entry is the peer nginx saw; a value the
+      // client pre-filled sits to its left and is ignored.
+      assert.equal(clientIp(h({ "x-forwarded-for": "9.9.9.9, 8.8.8.8" })), "8.8.8.8");
+      assert.equal(clientIp(h({ "x-real-ip": "7.7.7.7" })), "7.7.7.7");
+      assert.equal(clientIp(h({})), "unknown");
+    } finally {
+      if (saved.trust === undefined) delete process.env.TRUST_PROXY;
+      else process.env.TRUST_PROXY = saved.trust;
+      if (saved.vercel === undefined) delete process.env.VERCEL;
+      else process.env.VERCEL = saved.vercel;
+    }
   });
 
   test("login limiter is actually tight", () => {

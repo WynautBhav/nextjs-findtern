@@ -25,7 +25,12 @@ function createDb() {
     connectionString,
   );
   const ssl = isLocal ? false : { rejectUnauthorized };
-  const pool = new pg.Pool({ connectionString, ssl, max: 10 });
+  // Every `timestamp` column is "without time zone" and Drizzle reads it as
+  // UTC, but `defaultNow()` is evaluated in the session time zone. On a server
+  // set to Asia/Kolkata that stored local wall time, read back 5h30 late (an
+  // OTP cooldown of ~19,850 s). Pinning the session to UTC at connection
+  // startup makes now() and JS agree, with no per-connection query to race.
+  const pool = new pg.Pool({ connectionString, ssl, max: 10, options: "-c TimeZone=UTC" });
   return drizzle(pool, { schema });
 }
 

@@ -7,17 +7,19 @@ import { Loader2 } from "lucide-react";
 import { csrfFetch } from "@/lib/client-fetch";
 
 /**
- * Admin override for one proposal row. Staff can nudge a stuck trail -
- * withdraw a stale sent offer or expire it - through the same guarded status
- * route the parties use, so the state machine and ownership checks still
- * apply. Hired / accepted rows are history and render nothing.
+ * Admin override for one proposal row, through the same guarded status route
+ * the parties use. Staff can close a stale open offer, reject it on the
+ * candidate's behalf (the candidate gets a neutral "closed by Findtern"
+ * email), or cancel an accepted offer the employer has not paid for - the
+ * employer cannot back out themselves once the candidate has accepted.
+ * Staff never accept for a candidate. Hired rows are history.
  */
-const EDITABLE = ["sent", "interview_scheduled", "draft"] as const;
-const OPTIONS = [
-  { value: "withdrawn", label: "Withdraw" },
-  { value: "rejected", label: "Reject" },
-  { value: "expired", label: "Expire" },
-] as const;
+const OPEN = ["sent", "interview_scheduled", "draft"];
+const OPEN_OPTIONS = [
+  { value: "expired", label: "Close as expired" },
+  { value: "rejected", label: "Reject for candidate" },
+];
+const ACCEPTED_OPTIONS = [{ value: "withdrawn", label: "Cancel (unpaid)" }];
 
 export function ProposalStatusEditor({
   proposalId,
@@ -31,7 +33,8 @@ export function ProposalStatusEditor({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  if (!(EDITABLE as readonly string[]).includes(status)) {
+  const options = OPEN.includes(status) ? OPEN_OPTIONS : status === "accepted" ? ACCEPTED_OPTIONS : [];
+  if (options.length === 0) {
     return <span className="text-xs text-text-subtle">-</span>;
   }
 
@@ -71,7 +74,7 @@ export function ProposalStatusEditor({
         className="apple-spring h-11 min-w-0 flex-1 rounded-[10px] border border-ink-200/90 bg-white px-2 text-xs font-medium text-ink-900 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
       >
         <option value="">Set status…</option>
-        {OPTIONS.map((option) => (
+        {options.map((option) => (
           <option key={option.value} value={option.value}>
             {option.label}
           </option>

@@ -94,7 +94,7 @@ export function ChangePasswordForm({
         onChange={setNext}
         type={show ? "text" : "password"}
         autoComplete="new-password"
-        hint="At least 8 characters, with a lowercase letter, an uppercase letter and a number."
+        hint="At least 8 characters, with a lowercase letter, an uppercase letter, a number and a special character."
       />
       <Field
         id="confirm-password"

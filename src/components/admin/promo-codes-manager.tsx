@@ -68,6 +68,7 @@ export function PromoCodesManager({
   const [validFrom, setValidFrom] = useState("");
   const [validUntil, setValidUntil] = useState("");
   const [isActive, setIsActive] = useState(true);
+  const [appliesTo, setAppliesTo] = useState<"intern" | "employer" | "both">("both");
 
   // Delete Dialog state
   const [deleteTarget, setDeleteTarget] = useState<PromoCode | null>(null);
@@ -87,6 +88,7 @@ export function PromoCodesManager({
     setValidFrom("");
     setValidUntil("");
     setIsActive(true);
+    setAppliesTo("both");
     setErrorMsg("");
     setModalOpen(true);
   }
@@ -101,13 +103,12 @@ export function PromoCodesManager({
     setMinOrderAmountRupees(
       promo.minOrderAmountMinor ? Math.round(promo.minOrderAmountMinor / 100) : ""
     );
-    setValidFrom(
-      promo.validFrom ? new Date(promo.validFrom).toISOString().slice(0, 16) : ""
-    );
-    setValidUntil(
-      promo.validUntil ? new Date(promo.validUntil).toISOString().slice(0, 16) : ""
-    );
+    // datetime-local wants local time; toISOString() is UTC, which moved
+    // the dates 5½ hours earlier on every save.
+    setValidFrom(promo.validFrom ? toLocalInput(promo.validFrom) : "");
+    setValidUntil(promo.validUntil ? toLocalInput(promo.validUntil) : "");
     setIsActive(promo.isActive);
+    setAppliesTo(promo.appliesTo === "intern" || promo.appliesTo === "employer" ? promo.appliesTo : "both");
     setErrorMsg("");
     setModalOpen(true);
   }
@@ -132,6 +133,10 @@ export function PromoCodesManager({
       setErrorMsg("Percentage discount cannot exceed 100%.");
       return;
     }
+    if (validFrom && validUntil && new Date(validUntil) < new Date(validFrom)) {
+      setErrorMsg("The end date must be on or after the start date.");
+      return;
+    }
 
     setSaving(true);
     try {
@@ -147,6 +152,7 @@ export function PromoCodesManager({
         validFrom: validFrom ? new Date(validFrom).toISOString() : null,
         validUntil: validUntil ? new Date(validUntil).toISOString() : null,
         isActive,
+        appliesTo,
       };
 
       if (editingPromo) {
@@ -177,6 +183,7 @@ export function PromoCodesManager({
                   validFrom: validFrom ? new Date(validFrom) : null,
                   validUntil: validUntil ? new Date(validUntil) : null,
                   isActive,
+                  appliesTo,
                   updatedAt: new Date(),
                 }
               : p
@@ -406,6 +413,9 @@ export function PromoCodesManager({
                 <p className="mt-2 text-[28px] font-bold leading-[34px] tracking-[-0.02em] tabular-nums text-brand-800">
                   {benefitLabel(promo)}
                 </p>
+                <p className="mt-1 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink-500">
+                  {promo.appliesTo === "intern" ? "Interns only" : promo.appliesTo === "employer" ? "Companies only" : "Interns and companies"}
+                </p>
                 {promo.description ? (
                   <p className="mt-1 truncate text-[13px] text-text-subtle">
                     {promo.description}
@@ -601,6 +611,22 @@ export function PromoCodesManager({
               </div>
             </div>
 
+            <div>
+              <label htmlFor="promo-applies" className="block text-[13px] font-semibold text-ink-800">
+                Who can use it
+              </label>
+              <select
+                id="promo-applies"
+                value={appliesTo}
+                onChange={(e) => setAppliesTo(e.target.value as "intern" | "employer" | "both")}
+                className={inputClass}
+              >
+                <option value="both">Interns and companies</option>
+                <option value="intern">Interns only (activation fee)</option>
+                <option value="employer">Companies only (checkout)</option>
+              </select>
+            </div>
+
             <div className="flex items-center justify-between rounded-[10px] bg-ink-50 px-3 py-2">
               <span className="text-[14px] font-medium text-ink-800">
                 Active{isActive ? "" : " · disabled"}
@@ -667,4 +693,11 @@ export function PromoCodesManager({
       </Dialog>
     </div>
   );
+}
+
+/** A Date as `YYYY-MM-DDTHH:mm` in the browser's own time zone. */
+function toLocalInput(value: string | Date): string {
+  const d = new Date(value);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }

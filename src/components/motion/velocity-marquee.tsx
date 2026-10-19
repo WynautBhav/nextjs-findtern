@@ -139,7 +139,9 @@ export function VelocityMarquee({
       canPauseOnHover: pauseOnHover,
       measure,
       advance(dt: number, speed: number, scrollReversed: boolean) {
-        if (this.canPauseOnHover && this.el.matches(":hover")) return;
+        // Hover or keyboard focus holds the row still, so a card can be read
+        // and clicked instead of chased.
+        if (this.canPauseOnHover && this.el.matches(":hover, :focus-within")) return;
         if (!this.trackWidth) this.measure();
         if (this.trackWidth <= 0) return;
 
@@ -164,12 +166,15 @@ export function VelocityMarquee({
     handles.add(handle);
     start();
 
-    const onResize = () => handle.measure();
-    window.addEventListener("resize", onResize, { passive: true });
+    // The track's width changes after mount as logos and fonts load. Measured
+    // once, the wrap point sat short of the real width and the row jumped
+    // every cycle, so re-measure whenever the master track resizes.
+    const observer = new ResizeObserver(() => handle.measure());
+    observer.observe(masterTrack);
 
     return () => {
       handles.delete(handle);
-      window.removeEventListener("resize", onResize);
+      observer.disconnect();
       if (!handles.size) stop();
     };
   }, [reverse, duration, pauseOnHover]);
@@ -181,7 +186,9 @@ export function VelocityMarquee({
       ref={containerRef}
       data-marquee
       className={cn(
-        "group relative flex overflow-hidden",
+        // With reduced motion the row never moves, so it scrolls by hand
+        // instead of hiding every card past the first screen.
+        "group relative flex overflow-hidden motion-reduce:overflow-x-auto",
         "[mask-image:linear-gradient(to_right,transparent,black_6%,black_94%,transparent)]",
         className,
       )}
@@ -216,8 +223,11 @@ function Track({
     <div
       data-track
       data-track-copy={copy ? "" : undefined}
+      // The clones are decoration: aria-hidden alone left their buttons in
+      // the tab order, so keyboard users tabbed through every card six times.
+      inert={copy || undefined}
       {...rest}
-      className="flex shrink-0 items-center"
+      className={cn("flex shrink-0 items-center", copy && "motion-reduce:hidden")}
     >
       {children}
     </div>

@@ -1,9 +1,9 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, or, sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { getDb, schema } from "@/lib/db";
-import { hashPassword, isStrongPassword } from "@/lib/security/password";
+import { hashPassword, isStrongPassword, WEAK_PASSWORD_MESSAGE } from "@/lib/security/password";
 import { withSession, issueCsrfCookie } from "@/lib/auth";
 import { limiters, bucketKey, clientIp } from "@/lib/security/rate-limit";
 import { isPersonalEmail } from "@/lib/employer-onboarding";
@@ -28,14 +28,14 @@ export async function POST(req: Request) {
   const parsed = bodySchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Invalid input" }, { status: 400 });
   if (!isStrongPassword(parsed.data.password)) {
-    return NextResponse.json({ error: "Weak password" }, { status: 400 });
+    return NextResponse.json({ error: WEAK_PASSWORD_MESSAGE }, { status: 400 });
   }
   if (isPersonalEmail(parsed.data.companyEmail)) {
     return NextResponse.json({ error: "Use your company email address" }, { status: 400 });
   }
   const phoneProblem = phoneError(parsed.data.countryCode, parsed.data.phoneNumber);
   if (phoneProblem) return NextResponse.json({ error: phoneProblem }, { status: 400 });
-  if (!(await hasVerifiedSignupOtp("employer", parsed.data.companyEmail))) {
+  if (!(await hasVerifiedSignupOtp(req, "employer", parsed.data.companyEmail))) {
     return NextResponse.json({ error: "Verify your email before creating the account" }, { status: 400 });
   }
 
@@ -49,6 +49,25 @@ export async function POST(req: Request) {
     .where(and(eq(schema.employers.countryCode, parsed.data.countryCode), eq(schema.employers.phoneNumber, phoneNumber)))
     .limit(1);
   if (phoneOwner) return NextResponse.json({ error: "Phone number already registered" }, { status: 409 });
+
+  // One person, one role: an email or phone already on an intern account
+  // cannot also open an employer account.
+  const [internOwner] = await db
+    .select({ id: schema.users.id })
+    .from(schema.users)
+    .where(
+      or(
+        sql`lower(${schema.users.email}) = ${parsed.data.companyEmail}`,
+        and(eq(schema.users.countryCode, parsed.data.countryCode), eq(schema.users.phoneNumber, phoneNumber)),
+      ),
+    )
+    .limit(1);
+  if (internOwner) {
+    return NextResponse.json(
+      { error: "This email or phone number is already registered as an intern account" },
+      { status: 409 },
+    );
+  }
 
   const password = await hashPassword(parsed.data.password);
   const [employer] = await db

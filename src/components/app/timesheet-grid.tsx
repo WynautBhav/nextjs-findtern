@@ -43,6 +43,7 @@ import { motion, useReducedMotion } from "motion/react";
 import { csrfFetch } from "@/lib/client-fetch";
 import { DAY_STATUSES } from "@/lib/employer-timesheets";
 import { defaultDayStatus, holidayName } from "@/lib/holidays";
+import { periodDays, todayIst, weekdayOf } from "@/lib/timesheet-days";
 import { Textarea } from "@/components/ui/textarea";
 import { Surface } from "@/components/app/primitives";
 import { cn } from "@/lib/utils";
@@ -77,8 +78,10 @@ export function TimesheetGrid({
 
   // A sheet the manager sent back can be fixed and resent.
   const readOnly = status !== "draft" && status !== "rejected";
+  // Today in India, the same clock the API uses for "no future days".
+  const todayIso = useMemo(() => todayIst(), []);
   const [entries, setEntries] = useState<Entry[]>(() =>
-    withDayDefaults(buildDays(periodStart, periodEnd), initialEntries),
+    withDayDefaults(buildDays(periodStart, periodEnd), initialEntries, todayIso),
   );
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [note, setNote] = useState(internNote ?? "");
@@ -91,19 +94,21 @@ export function TimesheetGrid({
 
   const days = useMemo(() => buildDays(periodStart, periodEnd), [periodStart, periodEnd]);
 
-  // The daily habit: today's ISO in local time, matching buildDays exactly.
-  const todayIso = useMemo(() => {
-    const now = new Date();
-    now.setHours(12, 0, 0, 0);
-    return toIso(now);
-  }, []);
+  // A sheet goes for approval once its last day has arrived; before then the
+  // remaining days cannot be claimed, so it could never be complete.
+  const lastDay = days[days.length - 1]?.date ?? null;
+  const periodOpen = lastDay !== null && lastDay > todayIso;
+  const lastDayLabel = lastDay
+    ? new Date(`${lastDay}T12:00:00Z`).toLocaleDateString("en-IN", { day: "numeric", month: "long", timeZone: "UTC" })
+    : "";
   const todayInPeriod = days.some((d) => d.date === todayIso);
   const todayEntry = entries.find((e) => e.date === todayIso);
   const todayHours = todayEntry?.hours ?? 0;
-  const todayLabel = new Date(`${todayIso}T12:00:00`).toLocaleDateString("en-IN", {
+  const todayLabel = new Date(`${todayIso}T12:00:00Z`).toLocaleDateString("en-IN", {
     weekday: "long",
     day: "numeric",
     month: "long",
+    timeZone: "UTC",
   });
 
   function bumpToday(delta: number) {
@@ -306,6 +311,8 @@ export function TimesheetGrid({
           const dayStatus = entry?.status ?? "";
           const govtHoliday = holidayName(day.date);
           const isWeekend = day.weekend;
+          const future = day.date > todayIso;
+          const locked = readOnly || future;
           return (
             <li key={day.date} className={cn("px-5 py-3", isWeekend && "bg-ink-50/60")}>
               <div className="grid grid-cols-[4rem_minmax(0,1fr)_minmax(0,1fr)] gap-x-3 gap-y-2 sm:grid-cols-[4rem_6rem_8rem_minmax(0,1fr)] sm:items-center">
@@ -329,7 +336,7 @@ export function TimesheetGrid({
                       min={0}
                       max={MAX_DAILY}
                       step={0.5}
-                      disabled={readOnly}
+                      disabled={locked}
                       value={hours === 0 ? "" : hours}
                       placeholder="0"
                       onChange={(e) => {
@@ -339,7 +346,7 @@ export function TimesheetGrid({
                       className={cn(
                         "apple-spring h-11 w-full rounded-[10px] border bg-white pr-8 pl-3 text-sm tabular-nums text-ink-900",
                         "placeholder:text-ink-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-200 focus:outline-none",
-                        readOnly && "cursor-not-allowed border-ink-200 bg-ink-50 text-ink-600",
+                        locked && "cursor-not-allowed border-ink-200 bg-ink-50 text-ink-600",
                       )}
                     />
                     <span className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-xs text-ink-400">
@@ -354,14 +361,14 @@ export function TimesheetGrid({
                   </label>
                   <select
                     id={`s-${day.date}`}
-                    disabled={readOnly}
+                    disabled={locked}
                     value={dayStatus}
                     onChange={(e) => setDayStatus(day.date, e.target.value)}
                     className={cn(
                       "apple-spring h-11 w-full rounded-[10px] border bg-white px-2 text-xs font-medium text-ink-900",
                       "focus:border-brand-500 focus:ring-2 focus:ring-brand-200 focus:outline-none",
                       !dayStatus && "text-ink-400",
-                      readOnly && "cursor-not-allowed border-ink-200 bg-ink-50 text-ink-600",
+                      locked && "cursor-not-allowed border-ink-200 bg-ink-50 text-ink-600",
                     )}
                   >
                     <option value="">Status…</option>
@@ -380,9 +387,9 @@ export function TimesheetGrid({
                   <input
                     id={`n-${day.date}`}
                     type="text"
-                    disabled={readOnly}
+                    disabled={locked}
                     value={entry?.note ?? ""}
-                    placeholder={isWeekend ? "Weekend" : "What did you work on"}
+                    placeholder={future ? "Not yet" : isWeekend ? "Weekend" : "What did you work on"}
                     onChange={(e) => {
                       setSaveState("saving");
                       setDayNote(day.date, e.target.value);
@@ -390,7 +397,7 @@ export function TimesheetGrid({
                     className={cn(
                       "apple-spring h-11 w-full rounded-[10px] border bg-white px-3 text-sm text-ink-900",
                       "placeholder:text-ink-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-200 focus:outline-none",
-                      readOnly && "cursor-not-allowed border-ink-200 bg-ink-50 text-ink-600",
+                      locked && "cursor-not-allowed border-ink-200 bg-ink-50 text-ink-600",
                     )}
                   />
                 </div>
@@ -447,7 +454,11 @@ export function TimesheetGrid({
                 {deleting ? "Deleting…" : "Delete draft"}
               </button>
             ) : null}
-            {missingStatus > 0 ? (
+            {periodOpen ? (
+              <span className="basis-full text-right text-xs font-medium text-ink-500 sm:basis-auto">
+                You can send this from {lastDayLabel}
+              </span>
+            ) : missingStatus > 0 ? (
               <span className="basis-full text-right text-xs font-medium text-amber-700 sm:basis-auto">
                 {missingStatus} day{missingStatus === 1 ? "" : "s"} still need{missingStatus === 1 ? "s" : ""} a status
               </span>
@@ -455,8 +466,14 @@ export function TimesheetGrid({
             <button
               type="button"
               onClick={submit}
-              disabled={submitState === "saving" || total === 0 || missingStatus > 0}
-              title={missingStatus > 0 ? "Pick a status for every day first" : undefined}
+              disabled={submitState === "saving" || total === 0 || missingStatus > 0 || periodOpen}
+              title={
+                periodOpen
+                  ? `This period runs to ${lastDayLabel}`
+                  : missingStatus > 0
+                    ? "Pick a status for every day first"
+                    : undefined
+              }
               className="apple-spring apple-pressable inline-flex min-h-11 items-center justify-center gap-2 rounded-[10px] bg-primary px-5 text-sm font-semibold text-white shadow-sm hover:bg-primary-hover disabled:pointer-events-none disabled:opacity-55"
             >
               {submitState === "saving" ? (
@@ -563,55 +580,37 @@ type Day = { date: string; weekday: string; label: string; weekend: boolean };
  * the initial state - it never overwrites a saved status, and nothing is
  * persisted until the next edit or submit.
  */
-function withDayDefaults(days: Day[], saved: Entry[]): Entry[] {
+function withDayDefaults(days: Day[], saved: Entry[], todayIso: string): Entry[] {
   const byDate = new Map(saved.map((e) => [e.date, e]));
   return days.map((day) => {
     const existing = byDate.get(day.date);
     if (existing) {
       return { ...existing, status: existing.status ?? "" };
     }
-    const preset = defaultDayStatus(day.date);
+    // Future days stay blank: the API refuses a status on a day not yet lived.
+    const preset = day.date > todayIso ? "" : defaultDayStatus(day.date);
     if (!preset) return { date: day.date, hours: 0, note: "", status: "" };
     return { date: day.date, hours: 0, note: "", status: preset };
   });
 }
 
 /**
- * Weekdays between two dates, inclusive.
+ * Every day between two dates, inclusive, as calendar days (UTC date math on
+ * the stored bounds - see timesheet-days.ts for why local time added a day).
  *
  * Weekends are rendered too, dimmed. A grid with holes where the weekend is
  * hides the most common reason a month looks short, which is that someone
  * simply did not work Saturday, and that is not a gap worth feeling bad about.
  */
 function buildDays(startIso: string | null, endIso: string | null): Day[] {
-  if (!startIso || !endIso) return [];
-  const start = new Date(startIso);
-  const end = new Date(endIso);
-  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return [];
-
-  const out: Day[] = [];
-  const cursor = new Date(start);
-  cursor.setHours(12, 0, 0, 0);
-  const last = new Date(end);
-  last.setHours(12, 0, 0, 0);
-
-  let guard = 0;
-  while (cursor <= last && guard < 40) {
-    const weekdayIndex = cursor.getDay();
-    out.push({
-      date: toIso(cursor),
-      weekday: cursor.toLocaleDateString("en-IN", { weekday: "short" }),
-      label: String(cursor.getDate()),
+  return periodDays(startIso, endIso).map((date) => {
+    const weekdayIndex = weekdayOf(date);
+    const noonUtc = new Date(`${date}T12:00:00Z`);
+    return {
+      date,
+      weekday: noonUtc.toLocaleDateString("en-IN", { weekday: "short", timeZone: "UTC" }),
+      label: String(noonUtc.getUTCDate()),
       weekend: weekdayIndex === 0 || weekdayIndex === 6,
-    });
-    cursor.setDate(cursor.getDate() + 1);
-    guard += 1;
-  }
-  return out;
-}
-
-function toIso(d: Date): string {
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${d.getFullYear()}-${m}-${day}`;
+    };
+  });
 }

@@ -78,7 +78,7 @@ export default async function InternDocuments() {
         <EmptyScene
           art
           title="No documents uploaded"
-          body="Profile photo, intro video, Aadhaar and PAN uploads will be listed here once they are added."
+          body="Profile photo, Aadhaar and PAN uploads will be listed here once they are added."
           next={{ label: "Add them in the profile editor", href: "/intern/onboarding" }}
         />
       ) : (

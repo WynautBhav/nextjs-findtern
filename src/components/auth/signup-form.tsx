@@ -17,6 +17,10 @@ import { isValidPhone, phoneError, phoneHint } from "@/lib/phone";
  * The OTP is required, not decorative: step 3 refuses any email without a
  * verified code from step 2 (`hasVerifiedSignupOtp`), so calling it directly
  * does not skip verification. `countryCode` is persisted with the number.
+ *
+ * With `google` set, the candidate is back from Google with a verified
+ * address: the callback recorded that verification as a used OTP row, so step
+ * 3 is called directly and the email is fixed to the Google one.
  */
 
 type Stage = "details" | "otp" | "creating";
@@ -26,15 +30,20 @@ const PASSWORD_RULES = [
   { test: (v: string) => /[a-z]/.test(v), label: "One lowercase letter" },
   { test: (v: string) => /[A-Z]/.test(v), label: "One uppercase letter" },
   { test: (v: string) => /\d/.test(v), label: "One number" },
+  { test: (v: string) => /[^A-Za-z0-9]/.test(v), label: "One special character" },
 ];
 
-export function SignupForm() {
+export function SignupForm({
+  google = null,
+}: {
+  google?: { email: string; firstName: string; lastName: string } | null;
+} = {}) {
   const router = useRouter();
 
   const [stage, setStage] = useState<Stage>("details");
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
-  const [email, setEmail] = useState("");
+  const [firstName, setFirstName] = useState(google?.firstName ?? "");
+  const [lastName, setLastName] = useState(google?.lastName ?? "");
+  const [email, setEmail] = useState(google?.email ?? "");
   const [countryCode, setCountryCode] = useState("+91");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [phoneTaken, setPhoneTaken] = useState(false);
@@ -133,8 +142,13 @@ export function SignupForm() {
         }),
       });
       if (!res.ok) {
-        setError(await readError(res, "Could not create the account."));
-        setStage("otp");
+        const message = await readError(res, "Could not create the account.");
+        setError(
+          google && /verify your email/i.test(message)
+            ? "Your Google confirmation has expired (it lasts 30 minutes). Continue with Google again to finish."
+            : message,
+        );
+        setStage(google ? "details" : "otp");
         return;
       }
       // Session cookie is set by the response; a refresh picks it up server-side.
@@ -142,7 +156,7 @@ export function SignupForm() {
       router.refresh();
     } catch {
       setError("Network error. Nothing was created.");
-      setStage("otp");
+      setStage(google ? "details" : "otp");
     }
   }
 
@@ -152,7 +166,7 @@ export function SignupForm() {
       noValidate
       onSubmit={(e) => {
         e.preventDefault();
-        if (stage === "details") void sendOtp();
+        if (stage === "details") void (google ? createAccount() : sendOtp());
         else if (stage === "otp") void (verified ? createAccount() : verifyOtp());
       }}
     >
@@ -166,7 +180,7 @@ export function SignupForm() {
         </div>
       ) : null}
 
-      {stage === "details" ? (
+      {stage === "details" || (google && stage === "creating") ? (
         <div className="space-y-5">
           <div className="grid gap-5 sm:grid-cols-2">
             <TextInput
@@ -185,15 +199,35 @@ export function SignupForm() {
             />
           </div>
 
-          <TextInput
-            id="email"
-            label="Email"
-            type="email"
-            value={email}
-            onChange={setEmail}
-            autoComplete="email"
-            placeholder="you@gmail.com"
-          />
+          {google ? (
+            <div>
+              <label htmlFor="email" className="block text-sm font-medium text-ink-800">
+                Email
+              </label>
+              <input
+                id="email"
+                type="email"
+                value={email}
+                readOnly
+                aria-describedby="email-google"
+                className="mt-2 h-11 w-full rounded-lg border border-ink-200 bg-ink-50 px-3.5 text-sm text-ink-700 outline-none"
+              />
+              <p id="email-google" className="mt-1.5 flex items-center gap-1.5 text-xs text-success">
+                <MailCheck className="size-3.5" aria-hidden />
+                Verified by Google
+              </p>
+            </div>
+          ) : (
+            <TextInput
+              id="email"
+              label="Email"
+              type="email"
+              value={email}
+              onChange={setEmail}
+              autoComplete="email"
+              placeholder="you@gmail.com"
+            />
+          )}
 
           <div>
             <label htmlFor="phoneNumber" className="block text-sm font-medium text-ink-800">
@@ -249,7 +283,8 @@ export function SignupForm() {
             </div>
             {phoneTaken ? (
               <p className="mt-1.5 text-xs text-danger">
-                That number is already registered. Use another, or sign in instead.
+                That number is already registered, on an intern or a company account. One number
+                can&apos;t be used for both. Use another, or sign in instead.
               </p>
             ) : phoneNumber && !isValidPhone(countryCode, phoneNumber) ? (
               <p className="mt-1.5 text-xs text-danger">{phoneError(countryCode, phoneNumber)}</p>
@@ -313,9 +348,19 @@ export function SignupForm() {
             </span>
           </label>
 
-          <Submit disabled={!detailsOk || loading} loading={loading}>
-            Send verification code
-          </Submit>
+          {google ? (
+            <Submit
+              disabled={!detailsOk || stage === "creating"}
+              loading={stage === "creating"}
+              pendingLabel="Creating account…"
+            >
+              Create account
+            </Submit>
+          ) : (
+            <Submit disabled={!detailsOk || loading} loading={loading}>
+              Send verification code
+            </Submit>
+          )}
         </div>
       ) : (
         <div className="space-y-5">

@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -75,6 +75,19 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     .where(eq(schema.interviews.id, id));
 
   const when = formatSlotTime(start, tz);
+  // The intern sees the company's name only once it has hired them.
+  const [hire] = await db
+    .select({ id: schema.proposals.id })
+    .from(schema.proposals)
+    .where(
+      and(
+        eq(schema.proposals.employerId, interview.employerId),
+        eq(schema.proposals.internId, interview.internId),
+        eq(schema.proposals.status, "hired"),
+      ),
+    )
+    .limit(1);
+  const companyForIntern = hire ? names.company : "a company on Findtern";
   const invite = icsInvite({ uid: id, start, end, title: "Findtern Interview", description: meetingLink ?? "Meeting link to follow", url: meetingLink });
   const candidate = `Candidate ${initialsOf(intern?.firstName ?? "", intern?.lastName ?? "")}`;
   await Promise.all([
@@ -82,9 +95,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       to: { type: "intern", id: interview.internId },
       type: "meeting_scheduled",
       title: "Interview scheduled",
-      message: `Your interview with ${names.company} is on ${when}.`,
+      message: `Your interview with ${companyForIntern} is on ${when}.`,
       data: { interviewId: id },
-      email: emails.meetingScheduled({ name: intern?.firstName ?? "", other: names.company, when, link: meetingLink, forEmployer: false }),
+      email: emails.meetingScheduled({ name: intern?.firstName ?? "", other: companyForIntern, when, link: meetingLink, forEmployer: false }),
       attachments: [invite],
     }),
     notify({

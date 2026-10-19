@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { eq } from "drizzle-orm";
-import { ArrowLeft, CheckCircle2, CircleSlash, FileText, StickyNote } from "lucide-react";
+import { ArrowLeft, CheckCircle2, CircleSlash, Download, FileText, StickyNote } from "lucide-react";
 
 import { getDb, schema } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
@@ -211,6 +211,14 @@ export default async function EmployerTimesheetDetail({
               <Stamp label="Approved" value={timesheet.approvedAt} />
               <Stamp label="Rejected" value={timesheet.rejectedAt} />
             </dl>
+            <a
+              href={`/api/timesheets/${encodeURIComponent(timesheet.id)}/export`}
+              download
+              className="apple-spring apple-pressable mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[10px] border border-ink-200 bg-white px-4 text-sm font-medium text-ink-700 hover:border-brand-300 hover:text-brand-800"
+            >
+              <Download className="size-4" aria-hidden />
+              Download Excel
+            </a>
           </section>
 
           <section className="rounded-[20px] border border-ink-200/70 bg-white p-5 shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)]">

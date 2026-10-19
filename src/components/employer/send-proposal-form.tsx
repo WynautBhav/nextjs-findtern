@@ -9,6 +9,7 @@ import { csrfFetch } from "@/lib/client-fetch";
 import { RATING_META, type CandidateSummary } from "@/lib/employer-candidates";
 import { durationMonths, type Currency, type Pricing } from "@/lib/employer-pricing";
 import { formatMoney, formatPerHire, formatRate } from "@/lib/format";
+import { CountdownAgreement, EMPLOYER_HIRING_POLICY } from "@/components/app/countdown-agreement";
 
 /**
  * Proposal composer.
@@ -25,7 +26,9 @@ import { formatMoney, formatPerHire, formatRate } from "@/lib/format";
  * without editing `offer_details` directly.
  *
  * The server recomputes the rate and totals from the candidate's band; the
- * figures here are a preview.
+ * figures here are a preview. The currency is not a choice: it follows the
+ * company's country. Sending opens the hiring-policy agreement (legacy
+ * PolicyConfirmationDialog) every time.
  */
 
 type ProjectOption = {
@@ -80,6 +83,7 @@ export function SendProposalForm({
   candidate: CandidateSummary;
   projects: ProjectOption[];
   pricing: Record<Currency, Pricing>;
+  /** The company's billing currency, fixed by its country (India → INR). */
   defaultCurrency: Currency;
   rateCardSource: "plan" | "default";
   employerId: string;
@@ -88,8 +92,12 @@ export function SendProposalForm({
   const router = useRouter();
   const firstProject = projects[0];
 
-  const [currency, setCurrency] = useState<Currency>(defaultCurrency);
+  // Row 64: no currency choice. Indian companies see INR, everyone else USD.
+  const currency = defaultCurrency;
   const [projectId, setProjectId] = useState(firstProject?.id ?? "");
+  // The selected project owns the timezone; legacy sent it, the rewrite always
+  // fell back to Asia/Kolkata.
+  const selectedTimezone = projects.find((p) => p.id === projectId)?.timezone || "Asia/Kolkata";
   const [roleTitle, setRoleTitle] = useState(firstProject?.projectName ?? "");
   // Below a score of 6 the legacy rule caps offers at two months.
   const shortOnly = candidate.scored && candidate.score > 0 && candidate.score < 6;
@@ -100,16 +108,22 @@ export function SendProposalForm({
   const [mode, setMode] = useState(firstProject?.locationType ?? "remote");
   const [city, setCity] = useState("");
   const [state, setState] = useState("");
+  const [officeDays, setOfficeDays] = useState("3");
+  const [homeDays, setHomeDays] = useState("2");
   const [shift, setShift] = useState("full-day");
   const [laptop, setLaptop] = useState("company");
   const [paidLeaves, setPaidLeaves] = useState("2");
   const [message, setMessage] = useState("");
   const [restrictions, setRestrictions] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [notice, setNotice] = useState<string | null>(null);
+  const [notice, setNotice] = useState<{ tone: "ok" | "bad"; text: string } | null>(null);
+  const [policyOpen, setPolicyOpen] = useState(false);
+  const [sending, setSending] = useState(false);
 
   const rate = pricing[currency];
   const months = durationMonths(duration);
+  // An offer lapses on its start date, so the earliest start is tomorrow (IST).
+  const minStart = useMemo(() => tomorrowIst(), []);
 
   const totals = useMemo(() => {
     const hours = Number(monthlyHours) || 0;
@@ -124,11 +138,21 @@ export function SendProposalForm({
     return { monthly, internship, perHire, grand: internship + perHire };
   }, [monthlyHours, monthlyOverride, rate, months, candidate.score]);
 
-  async function onSubmit() {
-    const problems = validate({ projectId, roleTitle, duration, startDate, monthlyHours, monthlyOverride, mode, city, laptop, message });
+  /** Validate first; the policy agreement only opens for a complete offer. */
+  function review() {
+    const problems = validate({ projectId, roleTitle, duration, startDate, minStart, monthlyHours, monthlyOverride, mode, city, state, officeDays, homeDays, laptop, message });
     setErrors(problems);
-    if (Object.keys(problems).length > 0) return;
+    if (Object.keys(problems).length > 0) {
+      setNotice({ tone: "bad", text: "Some details need attention before this can be sent." });
+      document.getElementById(Object.keys(problems)[0])?.focus();
+      return;
+    }
+    setNotice(null);
+    setPolicyOpen(true);
+  }
 
+  async function send() {
+    setSending(true);
     setNotice(null);
     try {
       const res = await csrfFetch(`/api/employer/${employerId}/proposals`, {
@@ -138,206 +162,161 @@ export function SendProposalForm({
           internId,
           projectId,
           flowType: "direct",
-          currency,
+          agreedToPolicy: true,
           roleTitle: roleTitle.trim(),
           jd: [message.trim(), restrictions.trim()].filter(Boolean).join("\n\n"),
           mode,
           location: [city.trim(), state.trim()].filter(Boolean).join(", "),
+          ...(mode !== "remote" ? { city: city.trim(), state: state.trim() } : {}),
+          ...(mode === "hybrid" ? { officeDays: Number(officeDays), homeDays: Number(homeDays) } : {}),
+          timezone: selectedTimezone,
           startDate,
           duration,
           monthlyHours: Number(monthlyHours) || 0,
           ...(monthlyOverride.trim() ? { monthlyAmount: Number(monthlyOverride) } : {}),
-          shiftFrom: SHIFT_HOURS[shift]?.[0] ?? "",
-          shiftTo: SHIFT_HOURS[shift]?.[1] ?? "",
+          shiftFrom: SHIFT_HOURS[shift]?.[0] || "flexible",
+          shiftTo: SHIFT_HOURS[shift]?.[1] || "flexible",
           laptop,
           paidLeavesPerMonth: Number(paidLeaves) || 0,
           skills: projects.find((p) => p.id === projectId)?.skills ?? [],
         }),
       });
       const data = await res.json().catch(() => ({}));
+      setPolicyOpen(false);
       if (res.ok) {
-        setNotice("Proposal sent successfully! Redirecting…");
-        setTimeout(() => {
-          router.push("/employer/proposals");
-        }, 1200);
-      } else {
-        setNotice(data.error ?? "Failed to send proposal");
+        setNotice({ tone: "ok", text: "Proposal sent. Taking you to your proposals…" });
+        router.push("/employer/proposals");
+        return;
       }
+      setNotice({ tone: "bad", text: data.error ?? "The proposal was not sent. Nothing has changed - try again." });
     } catch {
-      setNotice("Network error occurred");
+      setPolicyOpen(false);
+      setNotice({ tone: "bad", text: "You appear to be offline. Nothing was sent." });
+    } finally {
+      setSending(false);
     }
   }
 
+  const durationLabel = DURATIONS.find((d) => d.value === duration)?.label ?? "";
+
   return (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
-      <div className="min-w-0 space-y-6">
-        {/* ── Candidate ─────────────────────────────────────────────── */}
-        <section className="rounded-[20px] border border-ink-200/70 bg-white p-6 shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)]">
-          <h2 className="text-sm font-semibold text-ink-900">Candidate</h2>
-          <div className="mt-4 flex flex-wrap items-start gap-5">
-            <span
-              aria-hidden
-              className="grid size-14 shrink-0 place-items-center rounded-full bg-brand-100 text-lg font-semibold text-brand-700"
-            >
-              {candidate.initials}
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="font-semibold text-ink-900">{candidate.name}</p>
-              <p className="text-sm text-text-subtle">{candidate.location || "Location not stated"}</p>
-              <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5">
-                <span className="inline-flex items-center gap-1.5 text-sm font-medium tabular-nums text-ink-800">
-                  <CircleGauge className="size-4 text-ink-400" aria-hidden />
-                  {candidate.scored ? `${candidate.score.toFixed(1)}/10` : "Not scored"}
-                </span>
-                {RATING_META.filter((r) => candidate.ratings[r.key] > 0).map((r) => (
-                  <span key={r.key} className="text-xs tabular-nums text-text-subtle">
-                    {r.label} {candidate.ratings[r.key]}
-                  </span>
-                ))}
-              </div>
-              {candidate.skills.length > 0 ? (
-                <ul className="mt-3 flex flex-wrap gap-1.5">
-                  {candidate.skills.map((skill) => (
-                    <li
-                      key={skill}
-                      className="rounded-full bg-brand-50 px-2.5 py-1 text-xs font-medium text-brand-700"
+    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_21rem]">
+      <form
+        noValidate
+        onSubmit={(e) => {
+          e.preventDefault();
+          review();
+        }}
+        className="min-w-0 overflow-hidden rounded-[20px] border border-ink-200/70 bg-white shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)]"
+      >
+        {/* ── 1. The role ─────────────────────────────────────────────── */}
+        <Step n={1} title="The role" hint="What the candidate is being offered, and from when.">
+          {projects.length === 0 ? (
+            <p className="rounded-[10px] border border-warning/25 bg-warning-soft px-3.5 py-3 text-sm text-ink-700">
+              You have no projects yet. A proposal has to attach to one -{" "}
+              <Link href="/employer/projects" className="font-medium text-brand-700 underline underline-offset-4">
+                create it first
+              </Link>
+              .
+            </p>
+          ) : (
+            <SelectField
+              id="projectId"
+              label="Project"
+              value={projectId}
+              options={projects.map((p) => ({ value: p.id, label: p.projectName }))}
+              error={errors.projectId}
+              onChange={(v) => {
+                setProjectId(v);
+                const project = projects.find((p) => p.id === v);
+                if (project) {
+                  // Keep the role title in step with the project unless the
+                  // employer has already typed their own.
+                  if (!roleTitle.trim() || projects.some((p) => p.projectName === roleTitle)) {
+                    setRoleTitle(project.projectName);
+                  }
+                  if (project.locationType) setMode(project.locationType);
+                }
+              }}
+            />
+          )}
+
+          <Field
+            id="roleTitle"
+            label="Role title"
+            value={roleTitle}
+            error={errors.roleTitle}
+            placeholder="Backend engineering intern"
+            hint="What the candidate sees at the top of the offer."
+            onChange={setRoleTitle}
+          />
+
+          <div className="grid gap-5 sm:grid-cols-2">
+            <div>
+              <span className="block text-sm font-medium text-ink-800">Duration</span>
+              <div role="radiogroup" aria-label="Duration" className="mt-2 grid grid-cols-4 gap-1.5">
+                {DURATIONS.map((d) => {
+                  const disabled = shortOnly && (d.value === "3m" || d.value === "6m");
+                  return (
+                    <button
+                      key={d.value}
+                      type="button"
+                      role="radio"
+                      aria-checked={duration === d.value}
+                      disabled={disabled}
+                      onClick={() => setDuration(d.value)}
+                      className={[
+                        "apple-spring apple-pressable min-h-11 rounded-[10px] border text-sm font-medium tabular-nums disabled:cursor-not-allowed disabled:opacity-40",
+                        duration === d.value
+                          ? "border-brand-700 bg-brand-700 text-white"
+                          : "border-ink-200 bg-white text-ink-700 hover:border-ink-300 hover:bg-ink-50",
+                      ].join(" ")}
                     >
-                      {skill}
-                    </li>
-                  ))}
-                </ul>
+                      {d.value.replace("m", "")} mo
+                    </button>
+                  );
+                })}
+              </div>
+              {shortOnly ? (
+                <p className="mt-1.5 text-xs text-text-subtle">Candidates scoring below 6 can be offered up to 2 months.</p>
               ) : null}
             </div>
-            <Link
-              href={`/employer/intern/${encodeURIComponent(candidate.id)}`}
-              className="apple-spring inline-flex min-h-11 items-center rounded-[10px] text-sm font-medium text-brand-700 underline-offset-4 hover:underline"
-            >
-              Full profile
-            </Link>
-          </div>
-        </section>
-
-        {/* ── Role ──────────────────────────────────────────────────── */}
-        <section className="rounded-[20px] border border-ink-200/70 bg-white p-6 shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)]">
-          <h2 className="text-sm font-semibold text-ink-900">Role</h2>
-          <div className="mt-4 space-y-5">
-            {projects.length === 0 ? (
-              <p className="rounded-[10px] border border-warning/25 bg-warning-soft px-3.5 py-3 text-sm text-ink-700">
-                You have no projects yet. A proposal has to attach to one - create it first.
-              </p>
-            ) : (
-              <SelectField
-                id="projectId"
-                label="Project"
-                value={projectId}
-                options={projects.map((p) => ({ value: p.id, label: p.projectName }))}
-                error={errors.projectId}
-                onChange={(v) => {
-                  setProjectId(v);
-                  const project = projects.find((p) => p.id === v);
-                  if (project) {
-                    // Keep the role title in step with the project unless the
-                    // employer has already typed their own.
-                    if (!roleTitle.trim() || projects.some((p) => p.projectName === roleTitle)) {
-                      setRoleTitle(project.projectName);
-                    }
-                    if (project.locationType) setMode(project.locationType);
-                  }
-                }}
-              />
-            )}
-
             <Field
-              id="roleTitle"
-              label="Role title"
-              value={roleTitle}
-              error={errors.roleTitle}
-              placeholder="Backend engineering intern"
-              hint="What the candidate sees on the offer."
-              onChange={setRoleTitle}
+              id="startDate"
+              label="Start date"
+              type="date"
+              min={minStart}
+              value={startDate}
+              error={errors.startDate}
+              hint="The offer closes on this date if unanswered."
+              onChange={setStartDate}
             />
-
-            <div className="grid gap-5 sm:grid-cols-2">
-              <SelectField
-                id="duration"
-                label="Duration"
-                value={duration}
-                options={DURATIONS.filter((d) => !shortOnly || d.value === "1m" || d.value === "2m").map((d) => ({ value: d.value, label: d.label }))}
-                error={errors.duration}
-                onChange={setDuration}
-              />
-              <Field
-                id="startDate"
-                label="Start date"
-                type="date"
-                value={startDate}
-                error={errors.startDate}
-                onChange={setStartDate}
-              />
-            </div>
           </div>
-        </section>
+        </Step>
 
-        {/* ── Compensation ───────────────────────────────────────────── */}
-        <section className="rounded-[20px] border border-ink-200/70 bg-white p-6 shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)]">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <h2 className="text-sm font-semibold text-ink-900">Compensation</h2>
-            <div
-              role="radiogroup"
-              aria-label="Currency"
-              className="inline-flex rounded-[10px] border border-ink-200 p-0.5"
-            >
-              {(["INR", "USD"] as const).map((code) => (
-                <button
-                  key={code}
-                  type="button"
-                  role="radio"
-                  aria-checked={currency === code}
-                  onClick={() => setCurrency(code)}
-                  className={[
-                    "apple-spring apple-pressable min-h-11 rounded-md px-3 text-xs font-semibold",
-                    currency === code
-                      ? "bg-brand-700 text-white"
-                      : "text-ink-600 hover:bg-ink-100",
-                  ].join(" ")}
-                >
-                  {code}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="mt-4 rounded-[10px] border border-brand-200 bg-brand-50 p-4">
-            <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-brand-700">
-              {rate.bandName} band
+        {/* ── 2. Pay ──────────────────────────────────────────────────── */}
+        <Step n={2} title="Pay" hint={`The hourly rate is fixed by the candidate's score band. Billed in ${currency}, set by your company's country.`}>
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-[14px] bg-brand-50 px-4 py-3.5">
+            <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-brand-700">{rate.bandName} band</p>
+            <p className="text-sm text-ink-700">
+              <span className="font-semibold tabular-nums text-ink-900">{formatRate(rate.hourlyRateMinor, currency)}</span>
+              {candidate.score < 6 ? (
+                <>
+                  {" · "}
+                  <span className="tabular-nums">{formatPerHire(rate.perHireMinor, currency)}</span> per hire
+                </>
+              ) : (
+                " · no per-hire charge"
+              )}
             </p>
-            <p className="mt-1 text-sm text-ink-700">{rate.bandBlurb}</p>
-            <dl className="mt-3 grid gap-3 sm:grid-cols-2">
-              <div>
-                <dt className="text-xs text-text-subtle">Published rate</dt>
-                <dd className="mt-0.5 text-sm font-semibold tabular-nums text-ink-900">
-                  {formatRate(rate.hourlyRateMinor, currency)}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-xs text-text-subtle">Per-hire charge</dt>
-                <dd className="mt-0.5 text-sm font-semibold tabular-nums text-ink-900">
-                  {formatPerHire(rate.perHireMinor, currency)}
-                </dd>
-              </div>
-            </dl>
-            <p className="mt-3 flex items-start gap-2 text-xs leading-relaxed text-ink-600">
+            <p className="flex w-full items-start gap-1.5 text-xs text-ink-600">
               <Info className="mt-0.5 size-3.5 shrink-0 text-ink-400" aria-hidden />
-              <span>
-                {rateCardSource === "plan"
-                  ? "Rates come from your plan."
-                  : "Standard published rates apply."}{" "}
-                A fixed ₹5,000 (or $50) per-hire charge applies across all plans.
-              </span>
+              {rateCardSource === "plan" ? "Rates come from your plan." : "Standard published rates apply."}{" "}
+              {rate.bandBlurb}
             </p>
           </div>
 
-          <div className="mt-5 grid gap-5 sm:grid-cols-2">
+          <div className="grid gap-5 sm:grid-cols-2">
             <Field
               id="monthlyHours"
               label="Hours per month"
@@ -349,196 +328,255 @@ export function SendProposalForm({
             />
             <Field
               id="monthlyAmount"
-              label="Monthly amount"
+              label={`Monthly amount (${currency})`}
               inputMode="decimal"
               value={monthlyOverride}
               error={errors.monthlyAmount}
               placeholder={totals.monthly.toFixed(0)}
-              hint={`Derived: ${formatRate(rate.hourlyRateMinor, currency)} × ${monthlyHours || 0}h. Type a number to override.`}
+              hint="Leave blank to use rate × hours, or type a higher figure."
               onChange={setMonthlyOverride}
             />
           </div>
-        </section>
+        </Step>
 
-        {/* ── Restrictions ───────────────────────────────────────────── */}
-        <section className="rounded-[20px] border border-ink-200/70 bg-white p-6 shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)]">
-          <h2 className="text-sm font-semibold text-ink-900">Restrictions</h2>
-          <p className="mt-1 text-sm text-text-subtle">
-            The constraints this offer places on the intern. They are shown to the candidate
-            before they accept.
-          </p>
+        {/* ── 3. Work setup ───────────────────────────────────────────── */}
+        <Step n={3} title="Work setup" hint="The constraints this offer places on the intern. Shown before they accept.">
+          <fieldset>
+            <legend className="text-sm font-medium text-ink-800">Work mode</legend>
+            <div className="mt-2 grid grid-cols-3 gap-1.5 sm:max-w-sm">
+              {MODES.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  aria-pressed={mode === option.value}
+                  onClick={() => setMode(option.value)}
+                  className={[
+                    "apple-spring apple-pressable min-h-11 rounded-[10px] border text-sm font-medium",
+                    mode === option.value
+                      ? "border-brand-700 bg-brand-700 text-white"
+                      : "border-ink-200 bg-white text-ink-700 hover:border-ink-300 hover:bg-ink-50",
+                  ].join(" ")}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </fieldset>
 
-          <div className="mt-5 space-y-5">
-            <fieldset>
-              <legend className="text-sm font-medium text-ink-800">Work mode</legend>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {MODES.map((option) => (
-                  <button
-                    key={option.value}
-                    type="button"
-                    aria-pressed={mode === option.value}
-                    onClick={() => setMode(option.value)}
-                    className={[
-                      "apple-spring apple-pressable min-h-11 rounded-full border px-4 text-sm font-medium",
-                      mode === option.value
-                        ? "border-brand-700 bg-brand-700 text-white"
-                        : "border-ink-200 bg-white text-ink-700 hover:border-ink-300 hover:bg-ink-50",
-                    ].join(" ")}
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
-            </fieldset>
-
-            {mode !== "remote" ? (
-              <div className="grid gap-5 sm:grid-cols-2">
-                <Field
-                  id="city"
-                  label="City"
-                  value={city}
-                  error={errors.city}
-                  onChange={setCity}
-                />
-                <Field
-                  id="state"
-                  label="State"
-                  value={state}
-                  onChange={setState}
-                />
-              </div>
-            ) : null}
-
+          {mode !== "remote" ? (
             <div className="grid gap-5 sm:grid-cols-2">
-              <SelectField
-                id="shift"
-                label="Working hours"
-                value={shift}
-                options={SHIFT_PRESETS.map((s) => ({ value: s.value, label: s.label }))}
-                onChange={setShift}
+              <Field id="city" label="City" value={city} error={errors.city} onChange={setCity} />
+              <Field id="state" label="State" value={state} error={errors.state} onChange={setState} />
+            </div>
+          ) : null}
+
+          {mode === "hybrid" ? (
+            <div className="grid gap-5 sm:grid-cols-2">
+              <Field
+                id="officeDays"
+                label="Office days per week"
+                inputMode="numeric"
+                value={officeDays}
+                error={errors.officeDays}
+                onChange={(v) => setOfficeDays(v.replace(/\D/g, "").slice(0, 1))}
               />
               <Field
-                id="paidLeaves"
-                label="Paid leaves per month"
+                id="homeDays"
+                label="Work-from-home days per week"
                 inputMode="numeric"
-                value={paidLeaves}
-                onChange={(v) => setPaidLeaves(v.replace(/\D/g, ""))}
+                value={homeDays}
+                error={errors.homeDays}
+                onChange={(v) => setHomeDays(v.replace(/\D/g, "").slice(0, 1))}
               />
             </div>
+          ) : null}
 
+          <div className="grid gap-5 sm:grid-cols-3">
+            <SelectField
+              id="shift"
+              label="Working hours"
+              value={shift}
+              options={SHIFT_PRESETS.map((s) => ({ value: s.value, label: s.label }))}
+              onChange={setShift}
+            />
             <SelectField
               id="laptop"
               label="Laptop"
               value={laptop}
               options={LAPTOP_OPTIONS.map((l) => ({ value: l.value, label: l.label }))}
-              hint="Required."
               error={errors.laptop}
               onChange={setLaptop}
             />
-
-            <ReadOnlyField
-              id="timezone"
-              label="Intern timezone"
-              value={firstProject?.timezone ?? "Asia/Kolkata"}
-              hint="Owned by the project. Interview slots are offered in this zone."
-            />
-
-            <TextArea
-              id="restrictions"
-              label="Anything else"
-              hint="Free text. Be specific - this is the part candidates read to decide."
-              rows={3}
-              placeholder="No client data on personal devices. Two fixed Saturdays a month for college."
-              value={restrictions}
-              onChange={setRestrictions}
+            <Field
+              id="paidLeaves"
+              label="Paid leave / month"
+              inputMode="numeric"
+              value={paidLeaves}
+              onChange={(v) => setPaidLeaves(v.replace(/\D/g, ""))}
             />
           </div>
-        </section>
 
-        {/* ── Message ───────────────────────────────────────────────── */}
-        <section className="rounded-[20px] border border-ink-200/70 bg-white p-6 shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)]">
-          <h2 className="text-sm font-semibold text-ink-900">Message to candidate</h2>
-          <div className="mt-4">
-            <TextArea
-              id="message"
-              label="Cover note"
-              hint="Plain text. The candidate sees this with your offer."
-              rows={6}
-              placeholder="What the intern will own, who they will work with, and what success looks like at the end of it."
-              value={message}
-              error={errors.message}
-              onChange={setMessage}
-            />
-          </div>
-        </section>
+          <ReadOnlyField
+            id="timezone"
+            label="Timezone"
+            value={selectedTimezone}
+            hint="Set on the project. Interview slots are offered in this zone."
+          />
+        </Step>
 
-        {notice ? (
-          <p
-            role="status"
-            className="flex items-start gap-2.5 rounded-[10px] border border-warning/25 bg-warning-soft px-4 py-3 text-sm text-ink-700"
-          >
-            <TriangleAlert className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden />
-            <span>{notice}</span>
-          </p>
-        ) : null}
+        {/* ── 4. Message ──────────────────────────────────────────────── */}
+        <Step n={4} title="Message" hint="Plain text. This is the part candidates read to decide." last>
+          <TextArea
+            id="message"
+            label="What the intern will do"
+            rows={6}
+            placeholder="What the intern will own, who they will work with, and what success looks like at the end of it."
+            value={message}
+            error={errors.message}
+            onChange={setMessage}
+          />
+          <TextArea
+            id="restrictions"
+            label="Anything else (optional)"
+            rows={3}
+            placeholder="No client data on personal devices. Two fixed Saturdays a month for college."
+            value={restrictions}
+            onChange={setRestrictions}
+          />
+        </Step>
 
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3 border-t border-ink-100 bg-ink-50/60 px-6 py-4 lg:hidden">
           <button
-            type="button"
-            onClick={onSubmit}
-            className="apple-spring apple-pressable group inline-flex min-h-11 items-center gap-2 rounded-[10px] bg-brand-700 px-5 text-sm font-semibold text-white hover:bg-brand-600"
+            type="submit"
+            disabled={sending}
+            className="apple-spring apple-pressable inline-flex min-h-11 items-center gap-2 rounded-[10px] bg-brand-700 px-5 text-sm font-semibold text-white hover:bg-brand-600 disabled:opacity-55"
           >
             <Send className="size-4" aria-hidden />
-            Send proposal
+            Review and send
           </button>
-          <p className="text-xs text-text-subtle">
-            Sending requires the proposals route, which does not exist yet.
-          </p>
         </div>
-      </div>
+      </form>
 
       {/* ── Summary ─────────────────────────────────────────────────── */}
       <aside className="space-y-4 lg:sticky lg:top-8 lg:self-start">
-        <section className="rounded-[20px] border border-ink-200/70 bg-white p-5 shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)]">
-          <p className="flex items-center gap-1.5 text-2xs font-semibold uppercase tracking-[0.14em] text-text-subtle">
-            <Sparkles className="size-3.5" aria-hidden />
-            Offer total
-          </p>
-          <dl className="mt-4 space-y-3">
-            <Row label={`Monthly (${months} mo × ${DURATIONS.find((d) => d.value === duration)?.label.toLowerCase()})`}>
-              {formatMoney(Math.round(totals.monthly * 100), currency)}
-            </Row>
-            <Row label="Internship subtotal">
-              {formatMoney(Math.round(totals.internship * 100), currency)}
-            </Row>
-            <Row label="Per-hire charge">
-              {formatPerHire(Math.round(totals.perHire * 100), currency)}
-            </Row>
-            <div className="border-t border-ink-100 pt-3">
-              <Row label="Total payable" strong>
-                {formatMoney(Math.round(totals.grand * 100), currency)}
-              </Row>
+        <section className="overflow-hidden rounded-[20px] border border-ink-200/70 bg-white shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)]">
+          <div className="flex items-center gap-3 border-b border-ink-100 p-5">
+            <span aria-hidden className="grid size-11 shrink-0 place-items-center rounded-full bg-brand-100 text-sm font-semibold text-brand-700">
+              {candidate.initials}
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="truncate font-semibold text-ink-900">{candidate.name}</p>
+              <p className="flex items-center gap-1.5 text-xs tabular-nums text-text-subtle">
+                <CircleGauge className="size-3.5" aria-hidden />
+                {candidate.scored ? `${candidate.score.toFixed(1)}/10` : "Not scored"}
+                {RATING_META.filter((r) => candidate.ratings[r.key] > 0).length > 0 ? " · " : ""}
+                {RATING_META.filter((r) => candidate.ratings[r.key] > 0)
+                  .map((r) => `${r.label.slice(0, 4)} ${candidate.ratings[r.key]}`)
+                  .join(" · ")}
+              </p>
             </div>
-          </dl>
-          <p className="mt-4 text-xs leading-relaxed text-text-subtle">
-            Charged when the intern accepts, not when you send this. The per-hire charge applies
-            once per hire.
-          </p>
-        </section>
+            <Link
+              href={`/employer/intern/${encodeURIComponent(candidate.id)}`}
+              className="apple-spring inline-flex min-h-11 items-center text-xs font-medium text-brand-700 underline-offset-4 hover:underline"
+            >
+              Profile
+            </Link>
+          </div>
 
-        <section className="rounded-[20px] border border-brand-200 bg-brand-50 p-5">
-          <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-brand-700">
-            How this offer is priced
-          </p>
-          <p className="mt-2.5 text-sm leading-relaxed text-ink-700">
-            The hourly rate is fixed by their score band, not by you.
-            What you can change is the hours, and the monthly figure if you are paying above
-            the band.
-          </p>
+          <div className="p-5">
+            <p className="flex items-center gap-1.5 text-2xs font-semibold uppercase tracking-[0.14em] text-text-subtle">
+              <Sparkles className="size-3.5" aria-hidden />
+              Offer total
+            </p>
+            <dl className="mt-4 space-y-2.5">
+              <Row label="Monthly">{formatMoney(Math.round(totals.monthly * 100), currency)}</Row>
+              <Row label={`× ${durationLabel.toLowerCase()}`}>{formatMoney(Math.round(totals.internship * 100), currency)}</Row>
+              {totals.perHire > 0 ? (
+                <Row label="Per-hire charge">{formatPerHire(Math.round(totals.perHire * 100), currency)}</Row>
+              ) : null}
+              <div className="border-t border-ink-100 pt-3">
+                <Row label="Total payable" strong>
+                  {formatMoney(Math.round(totals.grand * 100), currency)}
+                </Row>
+              </div>
+            </dl>
+            <p className="mt-3 text-xs leading-relaxed text-text-subtle">
+              Nothing is charged now. You pay once the candidate accepts.
+            </p>
+
+            {notice ? (
+              <p
+                role="status"
+                className={[
+                  "mt-4 flex items-start gap-2 rounded-[10px] px-3 py-2.5 text-sm",
+                  notice.tone === "ok" ? "bg-success-soft text-ink-800" : "border border-warning/25 bg-warning-soft text-ink-700",
+                ].join(" ")}
+              >
+                {notice.tone === "bad" ? <TriangleAlert className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden /> : null}
+                <span>{notice.text}</span>
+              </p>
+            ) : null}
+
+            <button
+              type="button"
+              onClick={review}
+              disabled={sending || projects.length === 0}
+              className="apple-spring apple-pressable mt-4 hidden min-h-11 w-full items-center justify-center gap-2 rounded-[10px] bg-brand-700 px-5 text-sm font-semibold text-white hover:bg-brand-600 disabled:opacity-55 lg:inline-flex"
+            >
+              <Send className="size-4" aria-hidden />
+              Review and send
+            </button>
+          </div>
         </section>
       </aside>
+
+      <CountdownAgreement
+        open={policyOpen}
+        onOpenChange={setPolicyOpen}
+        title="Findtern hiring policies"
+        description="Read and accept these before the proposal goes to the candidate."
+        sections={EMPLOYER_HIRING_POLICY}
+        agreeLabel="I have read and agree to the above policies."
+        confirmLabel="Agree and send"
+        busy={sending}
+        onConfirm={send}
+      />
     </div>
   );
+}
+
+function Step({
+  n,
+  title,
+  hint,
+  last,
+  children,
+}: {
+  n: number;
+  title: string;
+  hint?: string;
+  last?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className={`grid gap-5 p-6 sm:grid-cols-[2rem_minmax(0,1fr)] sm:gap-x-4 ${last ? "" : "border-b border-ink-100"}`}>
+      <span aria-hidden className="hidden size-8 place-items-center rounded-full bg-ink-100 text-sm font-semibold tabular-nums text-ink-700 sm:grid">
+        {n}
+      </span>
+      <div className="min-w-0 space-y-5">
+        <div>
+          <h2 className="text-base font-semibold tracking-[-0.01em] text-ink-900">{title}</h2>
+          {hint ? <p className="mt-0.5 text-sm text-text-subtle">{hint}</p> : null}
+        </div>
+        {children}
+      </div>
+    </section>
+  );
+}
+
+/** Tomorrow in India, as YYYY-MM-DD. */
+function tomorrowIst(): string {
+  return new Date(Date.now() + 330 * 60_000 + 86_400_000).toISOString().slice(0, 10);
 }
 
 function Row({
@@ -583,6 +621,7 @@ function Field({
   type = "text",
   placeholder,
   inputMode,
+  min,
 }: {
   id: string;
   label: string;
@@ -593,6 +632,7 @@ function Field({
   type?: string;
   placeholder?: string;
   inputMode?: "text" | "numeric" | "decimal" | "email" | "url";
+  min?: string;
 }) {
   return (
     <div>
@@ -607,6 +647,7 @@ function Field({
         value={value}
         placeholder={placeholder}
         inputMode={inputMode}
+        min={min}
         onChange={(e) => onChange(e.target.value)}
         aria-invalid={error ? true : undefined}
         aria-describedby={error ? `${id}-error` : undefined}
@@ -750,10 +791,14 @@ type Draft = {
   roleTitle: string;
   duration: string;
   startDate: string;
+  minStart: string;
   monthlyHours: string;
   monthlyOverride: string;
   mode: string;
   city: string;
+  state: string;
+  officeDays: string;
+  homeDays: string;
   laptop: string;
   message: string;
 };
@@ -768,6 +813,8 @@ function validate(draft: Draft): Record<string, string> {
     errors.startDate = "A start date is required.";
   } else if (Number.isNaN(Date.parse(draft.startDate))) {
     errors.startDate = "That is not a date.";
+  } else if (draft.startDate < draft.minStart) {
+    errors.startDate = "Pick a date after today.";
   }
 
   const hours = Number(draft.monthlyHours);
@@ -786,6 +833,16 @@ function validate(draft: Draft): Record<string, string> {
 
   if (draft.mode !== "remote" && !draft.city.trim()) {
     errors.city = "An on-site or hybrid role needs a city.";
+  }
+  if (draft.mode !== "remote" && !draft.state.trim()) {
+    errors.state = "An on-site or hybrid role needs a state.";
+  }
+  if (draft.mode === "hybrid") {
+    const office = Number(draft.officeDays);
+    const home = Number(draft.homeDays);
+    if (!(office >= 1)) errors.officeDays = "At least one office day.";
+    if (!(home >= 1)) errors.homeDays = "At least one home day.";
+    if (office + home > 7) errors.homeDays = "Office and home days add up to more than a week.";
   }
 
   if (!draft.laptop) errors.laptop = "Say who provides the laptop.";

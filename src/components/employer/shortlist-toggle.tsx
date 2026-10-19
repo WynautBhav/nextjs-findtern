@@ -52,6 +52,12 @@ export function ShortlistToggle({
         }),
       });
       const data = await res.json().catch(() => ({}));
+      // An offer is already out (or they are hired): go to it, as legacy did
+      // from compare (employer-compare.tsx:457).
+      if (res.status === 409 && typeof data.proposalId === "string") {
+        router.push(`/employer/proposal/${encodeURIComponent(data.proposalId)}`);
+        return;
+      }
       if (!res.ok) throw new Error(data.error ?? "Could not update your shortlist.");
       setState(!state);
       router.refresh();

@@ -6,6 +6,7 @@ import { emails } from "@/lib/emails";
 import { formatDate } from "@/lib/format";
 import { requireMutation } from "@/lib/guards-mutation";
 import { employerNames, notify } from "@/lib/notify";
+import { periodDays, todayIst } from "@/lib/timesheet-days";
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -34,16 +35,18 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     ]),
   );
   if (sheet.periodStart && sheet.periodEnd) {
-    const missing: string[] = [];
-    const cursor = new Date(sheet.periodStart);
-    const end = new Date(sheet.periodEnd);
-    cursor.setHours(12, 0, 0, 0);
-    end.setHours(12, 0, 0, 0);
-    while (cursor <= end) {
-      const iso = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, "0")}-${String(cursor.getDate()).padStart(2, "0")}`;
-      if (!known.has(String(byDate.get(iso) ?? ""))) missing.push(iso);
-      cursor.setDate(cursor.getDate() + 1);
+    // Date-only walk (see timesheet-days.ts): the old local-time loop added a
+    // phantom day after the period end in IST, so no sheet could ever send.
+    const days = periodDays(sheet.periodStart, sheet.periodEnd);
+    const today = todayIst();
+    const lastDay = days[days.length - 1];
+    if (lastDay && lastDay > today) {
+      return NextResponse.json(
+        { error: `This period runs to ${formatDate(`${lastDay}T12:00:00Z`)}. You can send it for approval from that day.` },
+        { status: 400 },
+      );
     }
+    const missing = days.filter((iso) => !known.has(String(byDate.get(iso) ?? "")));
     if (missing.length > 0) {
       return NextResponse.json(
         {

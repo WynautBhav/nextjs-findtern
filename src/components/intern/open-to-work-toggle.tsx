@@ -15,7 +15,14 @@ import { Switch } from "@/components/ui/switch";
  * in `extra_data.openToWork`; absent counts as on, so nobody who never saw
  * this switch silently disappears.
  */
-export function OpenToWorkToggle({ initial }: { initial: boolean }) {
+export function OpenToWorkToggle({
+  initial,
+  visibleAgainAt = null,
+}: {
+  initial: boolean;
+  /** ISO time the 30-day hiding limit runs out (only while hidden). */
+  visibleAgainAt?: string | null;
+}) {
   const router = useRouter();
   const [on, setOn] = useState(initial);
   const [saving, setSaving] = useState(false);
@@ -51,8 +58,10 @@ export function OpenToWorkToggle({ initial }: { initial: boolean }) {
         <p className="text-sm font-semibold text-ink-900">Open to work</p>
         <p className="mt-0.5 text-xs leading-relaxed text-text-subtle">
           {on
-            ? "Employers can find you in the candidate pool."
-            : "Hidden from the pool. Your applications keep going."}
+            ? "Employers can find you in the candidate pool. You can hide for up to 30 days at a time."
+            : visibleAgainAt
+              ? `Hidden from the pool. You'll be visible again on ${new Date(visibleAgainAt).toLocaleDateString("en-IN", { day: "numeric", month: "long", timeZone: "Asia/Kolkata" })} - hiding is limited to 30 days.`
+              : "Hidden from the pool for up to 30 days. Your applications keep going."}
         </p>
         {error ? (
           <p role="alert" className="mt-1 text-xs font-medium text-red-700">

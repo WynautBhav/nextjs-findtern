@@ -3,6 +3,7 @@ import { and, eq, gte, lt, lte, or, sql } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { readSkills, scoreOf } from "@/lib/employer-candidates";
 import { notify } from "@/lib/notify";
+import { HIDE_LIMIT_DAYS, HIDE_REMINDER_DAYS, visibleAgainAt } from "@/lib/profile-hide";
 
 /**
  * In-process jobs, ported from the legacy interviewReminderScheduler and
@@ -30,23 +31,26 @@ export function startSchedulers() {
 
 const dayKey = (d: Date) => d.toISOString().slice(0, 10);
 const monthKey = (d: Date) => d.toISOString().slice(0, 7);
+/** Legacy `isoWeekKeyUtc`: the week's Monday as YYYY-MM-DD, then `_wk`. Kept
+    byte-identical so the two apps share one dedupe key per week. */
 function weekKey(d: Date) {
-  const t = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
-  t.setUTCDate(t.getUTCDate() + 4 - (t.getUTCDay() || 7));
-  const week = Math.ceil(((t.getTime() - Date.UTC(t.getUTCFullYear(), 0, 1)) / 86_400_000 + 1) / 7);
-  return `${t.getUTCFullYear()}-W${String(week).padStart(2, "0")}`;
+  const base = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+  const monday = new Date(base.getTime() - ((base.getUTCDay() + 6) % 7) * 86_400_000);
+  return `${dayKey(monday)}_wk`;
 }
 
 /* ── Interview reminders: 24h, 12h and 1h before, both parties ───────── */
 
 const REMINDER_HOURS = [24, 12, 1] as const;
+const AI_EMPLOYER_EMAIL = "ai-interview@findtern.ai";
 
 async function interviewReminders() {
   const db = getDb();
   const now = Date.now();
   const rows = await db
-    .select()
+    .select({ i: schema.interviews, email: schema.employers.companyEmail })
     .from(schema.interviews)
+    .leftJoin(schema.employers, eq(schema.employers.id, schema.interviews.employerId))
     .where(
       and(
         eq(schema.interviews.status, "scheduled"),
@@ -57,25 +61,42 @@ async function interviewReminders() {
         ),
       ),
     );
-  for (const i of rows) {
-    const start = [i.slot1, i.slot2, i.slot3][(i.selectedSlot ?? 1) - 1];
+  for (const { i, email } of rows) {
+    // AI interviews are run by Findtern, not an employer (legacy
+    // interviewReminderScheduler.ts skips employerId "admin").
+    if (i.employerId === "admin" || email === AI_EMPLOYER_EMAIL) continue;
+    // No slot picked yet: the first slot that exists (legacy
+    // interviewReminderScheduler.ts:5), not blindly slot 1.
+    const slots = [i.slot1, i.slot2, i.slot3];
+    const start = i.selectedSlot ? slots[i.selectedSlot - 1] : slots.find(Boolean);
     if (!start) continue;
     const hoursLeft = (start.getTime() - now) / 3_600_000;
     // The tightest window we're inside; earlier ones were sent on earlier ticks.
     const hours = [...REMINDER_HOURS].reverse().find((h) => hoursLeft > 0 && hoursLeft <= h);
     if (!hours) continue;
-    const title = hours === 1 ? "Interview in 1 hour" : `Interview in ${hours} hours`;
+    // The bucket only dedupes. The copy states the real time left, so an
+    // interview booked 5 hours out does not get "in 12 hours".
+    const left = timeLeft(hoursLeft);
     for (const who of ["intern", "employer"] as const) {
       await notify({
         to: { type: who, id: who === "intern" ? i.internId : i.employerId },
         type: "interview_reminder",
-        title,
-        message: hours === 1 ? "Your interview starts in 1 hour." : `Reminder: your interview is in ${hours} hours.`,
+        title: `Interview in ${left}`,
+        message: `Reminder: your interview starts in ${left}.`,
         data: { interviewId: i.id, hours, meetingLink: i.meetingLink },
         dedupeKey: `interview_reminder:${i.id}:${who}:${hours}h`,
       });
     }
   }
+}
+
+function timeLeft(hours: number): string {
+  if (hours < 1) {
+    const mins = Math.max(1, Math.round(hours * 60));
+    return mins === 1 ? "1 minute" : `${mins} minutes`;
+  }
+  const h = Math.round(hours);
+  return h === 1 ? "1 hour" : `${h} hours`;
 }
 
 /* ── Six-hourly notification jobs ────────────────────────────────────── */
@@ -86,6 +107,7 @@ async function notificationJobs() {
     ["monthly profile views", monthlyProfileViews],
     ["cart inactivity", cartInactivity],
     ["weekly hire tip", weeklyHireTip],
+    ["profile hide limit", profileHideLimit],
     ["intern profile nudge", internProfileNudges],
     ["employer profile nudge", employerProfileNudges],
     ["talent spotlight", talentSpotlight],
@@ -139,20 +161,104 @@ async function cartInactivity(now: Date) {
   }
 }
 
+/**
+ * Mondays, to onboarded employers with a hire. Alternates by ISO week: even
+ * weeks carry the legacy full-time pitch (notificationScheduler.ts:17), odd
+ * weeks the timesheet tip. One dedupe key per employer per week either way.
+ */
 async function weeklyHireTip(now: Date) {
   if (now.getUTCDay() !== 1) return;
   const rows = await getDb()
-    .selectDistinct({ employerId: schema.proposals.employerId })
+    .select({
+      employerId: schema.proposals.employerId,
+      internId: schema.proposals.internId,
+      first: schema.users.firstName,
+      last: schema.users.lastName,
+    })
     .from(schema.proposals)
-    .where(eq(schema.proposals.status, "hired"));
-  for (const r of rows) {
+    .innerJoin(schema.employers, eq(schema.employers.id, schema.proposals.employerId))
+    .leftJoin(schema.users, eq(schema.users.id, schema.proposals.internId))
+    .where(
+      and(
+        eq(schema.proposals.status, "hired"),
+        eq(schema.employers.isActive, true),
+        eq(schema.employers.onboardingCompleted, true),
+      ),
+    );
+  const firstHire = new Map<string, (typeof rows)[number]>();
+  for (const r of rows) if (!firstHire.has(r.employerId)) firstHire.set(r.employerId, r);
+  const pitchWeek = isoWeekNumber(now) % 2 === 0;
+  for (const [employerId, r] of firstHire) {
+    const internName = `${r.first ?? ""} ${r.last ?? ""}`.trim() || "your intern";
     await notify({
-      to: { type: "employer", id: r.employerId },
+      to: { type: "employer", id: employerId },
       type: "weekly_hire_tip",
       title: "Weekly tip",
-      message: "Approve timesheets on time and share clear weekly goals; interns who get both deliver more.",
-      dedupeKey: `weekly_hire_tip:${r.employerId}:${weekKey(now)}`,
+      message: pitchWeek
+        ? `Internship going well? Consider hiring ${internName} full-time.`
+        : "Approve timesheets on time and share clear weekly goals; interns who get both deliver more.",
+      data: pitchWeek ? { internId: r.internId, internName } : undefined,
+      dedupeKey: `weekly_hire_tip:${employerId}:${weekKey(now)}`,
     });
+  }
+}
+
+/** ISO-8601 week number (1-53) of a UTC date. */
+function isoWeekNumber(d: Date): number {
+  const t = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+  t.setUTCDate(t.getUTCDate() + 4 - (t.getUTCDay() || 7));
+  const yearStart = new Date(Date.UTC(t.getUTCFullYear(), 0, 1));
+  return Math.ceil(((t.getTime() - yearStart.getTime()) / 86_400_000 + 1) / 7);
+}
+
+/* ── 30-day profile hiding: remind, then switch back on ──────────────── */
+
+async function profileHideLimit(now: Date) {
+  const db = getDb();
+  const rows = await db
+    .select({ id: schema.internOnboarding.id, userId: schema.internOnboarding.userId, extra: schema.internOnboarding.extraData })
+    .from(schema.internOnboarding)
+    .where(sql`${schema.internOnboarding.extraData}->>'openToWork' = 'false'`);
+  for (const r of rows) {
+    const extra = (r.extra ?? {}) as Record<string, unknown>;
+    let hiddenAt = typeof extra.hiddenAt === "string" ? extra.hiddenAt : null;
+    if (!hiddenAt) {
+      // Hidden before the limit existed: the clock starts now, never backdated.
+      hiddenAt = now.toISOString();
+      await db
+        .update(schema.internOnboarding)
+        .set({ extraData: { ...extra, hiddenAt } })
+        .where(eq(schema.internOnboarding.id, r.id));
+      continue;
+    }
+    const until = visibleAgainAt(hiddenAt);
+    if (!until) continue;
+    const msLeft = until.getTime() - now.getTime();
+    if (msLeft <= 0) {
+      await db
+        .update(schema.internOnboarding)
+        .set({ extraData: { ...extra, openToWork: true, hiddenAt: null, hideReminderSentAt: null }, updatedAt: now })
+        .where(eq(schema.internOnboarding.id, r.id));
+      await notify({
+        to: { type: "intern", id: r.userId },
+        type: "profile_visible_again",
+        title: "Your profile is visible again",
+        message: `Profiles can be hidden for up to ${HIDE_LIMIT_DAYS} days, so employers can see yours again. Your placement guarantee is running.`,
+        dedupeKey: `profile_visible_again:${r.userId}:${hiddenAt}`,
+      });
+    } else if (msLeft <= HIDE_REMINDER_DAYS * 86_400_000 && !extra.hideReminderSentAt) {
+      await notify({
+        to: { type: "intern", id: r.userId },
+        type: "profile_hide_ending",
+        title: "Your profile becomes visible soon",
+        message: `Your profile has been hidden for almost ${HIDE_LIMIT_DAYS} days. It will be visible to employers again on ${until.toLocaleDateString("en-IN", { day: "numeric", month: "long", timeZone: "Asia/Kolkata" })}.`,
+        dedupeKey: `profile_hide_ending:${r.userId}:${hiddenAt}`,
+      });
+      await db
+        .update(schema.internOnboarding)
+        .set({ extraData: { ...extra, hideReminderSentAt: now.toISOString() } })
+        .where(eq(schema.internOnboarding.id, r.id));
+    }
   }
 }
 
@@ -194,7 +300,9 @@ async function talentSpotlight(now: Date) {
   const projects = await db
     .select({ employerId: schema.projects.employerId, skills: schema.projects.skills })
     .from(schema.projects)
-    .where(eq(schema.projects.status, "active"));
+    // Deactivated employers get nothing.
+    .innerJoin(schema.employers, eq(schema.employers.id, schema.projects.employerId))
+    .where(and(eq(schema.projects.status, "active"), eq(schema.employers.isActive, true)));
   if (projects.length === 0) return;
   const pool = (await db.select().from(schema.internOnboarding))
     .map((o) => ({ score: scoreOf(o), skills: new Set(readSkills(o.skills).map((s) => s.toLowerCase())) }))

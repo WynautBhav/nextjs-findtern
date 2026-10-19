@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { ArrowRight, BriefcaseBusiness, MapPin } from "lucide-react";
+import { ArrowRight, MapPin } from "lucide-react";
 
 import { Pill } from "@/components/app/primitives";
-import { formatDayLabel } from "@/lib/format";
+import { companyInitials, formatDayLabel } from "@/lib/format";
+import { cn } from "@/lib/utils";
 import { toArray } from "@/lib/journey";
 
 /**
@@ -16,6 +17,10 @@ import { toArray } from "@/lib/journey";
  * `applied` is the only difference between the two callers: a signed-in
  * candidate sees which roles they have already been considered for, a guest
  * sees nothing that would require an account to understand.
+ *
+ * The company is shown as initials only. Candidates are matched on the role,
+ * not courted by a brand, and the name stays out of reach of anyone trying to
+ * contact the company around the platform (the Non-Bypass Agreement).
  */
 
 export type RoleCardRole = {
@@ -49,14 +54,11 @@ export function RoleCard({
       className="group flex h-full flex-col rounded-2xl border border-ink-100 bg-white p-5 transition-[border-color,box-shadow,transform] duration-[var(--dur-standard)] hover:-translate-y-0.5 hover:border-ink-200 hover:shadow-[0_14px_34px_-18px_rgb(7_47_36/0.32)]"
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h2 className="text-pretty text-base font-semibold tracking-[-0.015em] text-ink-900">
+        <div className="flex min-w-0 items-start gap-3">
+          <CompanyInitials name={role.companyName} />
+          <h2 className="min-w-0 self-center text-pretty text-base font-semibold tracking-[-0.015em] text-ink-900">
             {role.projectName}
           </h2>
-          <p className="mt-1 flex items-center gap-1.5 text-sm text-ink-500">
-            <BriefcaseBusiness className="size-3.5 shrink-0" aria-hidden />
-            <span className="truncate">{role.companyName}</span>
-          </p>
         </div>
         {role.fullTimeOffer ? (
           <Pill tone="waiting" className="shrink-0 whitespace-nowrap">
@@ -109,6 +111,23 @@ export function RoleCard({
         </ul>
       ) : null}
     </Link>
+  );
+}
+
+/** A company as an avatar-style initials chip. The full name is never rendered. */
+export function CompanyInitials({ name, className }: { name: string | null | undefined; className?: string }) {
+  const initials = companyInitials(name);
+  return (
+    <span
+      role="img"
+      aria-label={`Company ${initials.split("").join(" ")}`}
+      className={cn(
+        "grid size-9 shrink-0 place-items-center rounded-full bg-brand-50 text-xs font-semibold tracking-wide text-brand-800",
+        className,
+      )}
+    >
+      {initials}
+    </span>
   );
 }
 

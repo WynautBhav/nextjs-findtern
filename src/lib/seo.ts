@@ -19,7 +19,7 @@ import { tidyText } from "@/lib/text";
 export const SITE_URL = SITE.url;
 export const ORG_ID = `${SITE_URL}/#organization`;
 export const WEBSITE_ID = `${SITE_URL}/#website`;
-export const LOGO_URL = `${SITE_URL}/media/findtern-logo.png`;
+export const LOGO_URL = `${SITE_URL}/media/findtern-logo-green.png`;
 
 /**
  * True when this deployment is not the real domain (a Vercel preview or the
@@ -50,7 +50,7 @@ export function organizationJsonLd() {
     name: SITE.name,
     alternateName: "Findtern.in",
     url: SITE_URL,
-    logo: { "@type": "ImageObject", url: LOGO_URL, width: 3363, height: 1013 },
+    logo: { "@type": "ImageObject", url: LOGO_URL, width: 1200, height: 361 },
     description: SITE.description,
     foundingDate: String(SITE.foundedYear),
     email: SITE.email,

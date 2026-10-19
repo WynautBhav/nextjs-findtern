@@ -5,6 +5,7 @@ import { z } from "zod";
 import { getDb, schema } from "@/lib/db";
 import { emails } from "@/lib/emails";
 import { requireMutation } from "@/lib/guards-mutation";
+import { sendSmtpMail } from "@/lib/mailer";
 import { employerNames, internFirstName, notify } from "@/lib/notify";
 import { parseOffer } from "@/lib/offer";
 
@@ -95,6 +96,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         currency: b.ctcCurrency,
       },
       skills: base.skills,
+      // The assessment the hire was made on travels with the full-time offer
+      // (legacy routes.ts:13261).
+      aiRatings: base.aiRatings ?? null,
     })
     .returning();
 
@@ -111,5 +115,38 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       proposalId: proposal.id,
     }),
   });
+
+  // Internal alert, as legacy (routes.ts:13326): a row in the admin inbox and
+  // a mail to the team, so a PPO is followed up by a person. The offer is
+  // already saved, so a failed alert must not fail the request.
+  const companyName = (employer?.companyName ?? "").trim() || "Employer";
+  const summary = [
+    `employer: ${companyName} (${id})`,
+    `candidate: ${base.internId}`,
+    `proposal: ${proposal.id}`,
+    `jobTitle: ${b.jobTitle}`,
+    `jobMode: ${b.jobMode}`,
+    ...(b.jobMode !== "remote" ? [`jobLocation: ${b.jobLocationCity}, ${b.jobLocationState}`] : []),
+    `timezone: ${b.timezone}`,
+    `shift: ${b.shiftFrom} - ${b.shiftTo}`,
+    `annualCtc: ${b.ctcCurrency} ${b.annualCtc}`,
+  ].join("\n");
+  try {
+    await db.insert(schema.contactMessages).values({
+      firstName: companyName,
+      lastName: id.slice(0, 36),
+      email: employer?.companyEmail ?? "employer@findtern.in",
+      queryType: "hiring",
+      subject: `Full-time offer: ${b.jobTitle.slice(0, 120)}`,
+      message: summary,
+    });
+    await sendSmtpMail({
+      to: process.env.ADMIN_ALERT_EMAIL ?? "admin@findtern.in",
+      subject: `PPO - Full-time offer proposal from ${companyName}`,
+      text: summary,
+    });
+  } catch (err) {
+    console.error("[full-time-offer] admin alert failed", err);
+  }
   return NextResponse.json({ proposal }, { status: 201 });
 }

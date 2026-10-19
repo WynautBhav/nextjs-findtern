@@ -170,7 +170,7 @@ export function ResetPasswordForm({
           className="mt-2 h-11 w-full rounded-lg border border-ink-200 bg-white px-3.5 text-sm text-ink-900 outline-none transition-[border-color,box-shadow] focus-visible:border-brand-600 focus-visible:ring-[3px] focus-visible:ring-brand-600/20"
         />
         <p id="password-rules" className="mt-1.5 text-xs text-text-subtle">
-          At least 8 characters, with a lowercase letter, an uppercase letter and a number.
+          At least 8 characters, with a lowercase letter, an uppercase letter, a number and a special character.
         </p>
       </div>
 

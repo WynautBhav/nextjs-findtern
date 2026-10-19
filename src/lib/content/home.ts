@@ -33,16 +33,16 @@ export const POPULAR_STEPS: PopularStep[] = [
     icon: "user-plus",
   },
   {
-    title: "Academic Verification",
-    description: "They add their academic details, which we verify for authenticity.",
+    title: "Personal Verification",
+    description: "They add their personal details and identity documents, which we verify for authenticity.",
     image: "/media/Acedmics.jpeg",
-    imageAlt: "Academic records being verified",
+    imageAlt: "Personal details and identity documents being verified",
     icon: "file-text",
   },
   {
-    title: "Interest-Based AI Interview",
+    title: "Skill-Based AI Interview",
     description:
-      "Candidates specify their interest areas, and our AI conducts a tailored interview.",
+      "Candidates choose the skills they want to be hired for, and our AI interviews them on exactly those skills.",
     image: "/media/AIinterview.jpg",
     imageAlt: "A structured interview in progress",
     icon: "user-check",
@@ -64,7 +64,7 @@ export const POPULAR_STEPS: PopularStep[] = [
   {
     title: "Performance Scoring",
     description:
-      "Each intern receives a Findtern Score based on academics, interview, and test results.",
+      "Each intern receives one Findtern Score out of 10, built from their AI interview, aptitude and coding results.",
     image: "/media/PerformanceScoring.jpg",
     imageAlt: "Performance scoring across assessment dimensions",
     icon: "trending-up",

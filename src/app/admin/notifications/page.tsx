@@ -1,5 +1,8 @@
 import type { Metadata } from "next";
-import { desc, ilike, count, eq } from "drizzle-orm";
+import { and, desc, count, eq, notInArray, sql } from "drizzle-orm";
+import { searchAny } from "@/lib/admin/params";
+import { AUTO_NOTIFICATION_TYPES } from "@/lib/admin/notification-types";
+import { realEmployers } from "@/lib/admin/scope";
 
 import { getDb, schema } from "@/lib/db";
 import { AdminEmpty, AdminPageHeader, Panel, PanelHeader, PanelBody } from "@/components/admin/panel";
@@ -30,11 +33,16 @@ export default async function AdminNotifications({
   const query = Array.isArray(params.q) ? params.q[0] : (params.q ?? "");
 
   const db = getDb();
-  const like = `%${query.trim()}%`;
+  // Names as well as emails, every word must match (legacy picker behaviour).
+  const internSearch = searchAny([sql`${schema.users.firstName}`, sql`${schema.users.lastName}`, sql`${schema.users.email}`], query);
+  const employerSearch = searchAny(
+    [sql`${schema.employers.companyName}`, sql`${schema.employers.name}`, sql`${schema.employers.companyEmail}`],
+    query,
+  );
 
   const [[internTotal], [employerTotal]] = await Promise.all([
-    db.select({ c: count() }).from(schema.users).where(eq(schema.users.isActive, true)),
-    db.select({ c: count() }).from(schema.employers).where(eq(schema.employers.isActive, true)),
+    db.select({ c: count() }).from(schema.users).where(and(eq(schema.users.role, "intern"), eq(schema.users.isActive, true))),
+    db.select({ c: count() }).from(schema.employers).where(and(realEmployers(), eq(schema.employers.isActive, true))),
   ]);
   const [interns, employers, history] = await Promise.all([
     query.trim()
@@ -46,7 +54,7 @@ export default async function AdminNotifications({
             email: schema.users.email,
           })
           .from(schema.users)
-          .where(ilike(schema.users.email, like))
+          .where(and(eq(schema.users.role, "intern"), internSearch))
           .orderBy(desc(schema.users.createdAt))
           .limit(50)
       : db
@@ -57,6 +65,7 @@ export default async function AdminNotifications({
             email: schema.users.email,
           })
           .from(schema.users)
+          .where(eq(schema.users.role, "intern"))
           .orderBy(desc(schema.users.createdAt))
           .limit(50),
     query.trim()
@@ -68,7 +77,7 @@ export default async function AdminNotifications({
             email: schema.employers.companyEmail,
           })
           .from(schema.employers)
-          .where(ilike(schema.employers.companyEmail, like))
+          .where(and(realEmployers(), employerSearch))
           .orderBy(desc(schema.employers.createdAt))
           .limit(50)
       : db
@@ -79,11 +88,13 @@ export default async function AdminNotifications({
             email: schema.employers.companyEmail,
           })
           .from(schema.employers)
+          .where(realEmployers())
           .orderBy(desc(schema.employers.createdAt))
           .limit(50),
     db
       .select()
       .from(schema.notifications)
+      .where(notInArray(schema.notifications.type, AUTO_NOTIFICATION_TYPES))
       .orderBy(desc(schema.notifications.createdAt))
       .limit(15),
   ]);
@@ -99,6 +110,7 @@ export default async function AdminNotifications({
         interns={interns.map((i) => ({ id: i.id, label: `${i.name} ${i.last}`.trim(), email: i.email }))}
         employers={employers.map((e) => ({ id: e.id, label: e.name, email: e.email }))}
         totals={{ intern: Number(internTotal?.c ?? 0), employer: Number(employerTotal?.c ?? 0) }}
+        query={query}
       />
 
       <Panel>

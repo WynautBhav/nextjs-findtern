@@ -6,7 +6,7 @@ import { Upload } from "lucide-react";
 
 import { csrfFetch } from "@/lib/client-fetch";
 
-/** Upload a CSV of AI-interview ratings; matches rows to interns by email. */
+/** Upload an Excel (.xlsx) or CSV sheet of AI-interview ratings; matches rows to interns by email. */
 export function RatingsImport() {
   const router = useRouter();
   const input = useRef<HTMLInputElement>(null);
@@ -16,7 +16,12 @@ export function RatingsImport() {
   async function upload(file: File) {
     setBusy(true);
     setResult(null);
-    const res = await csrfFetch("/api/admin/interns/ratings-import", { method: "POST", headers: { "Content-Type": "text/csv" }, body: await file.text() });
+    const xlsx = /\.xlsx$/i.test(file.name);
+    const res = await csrfFetch("/api/admin/interns/ratings-import", {
+      method: "POST",
+      headers: { "Content-Type": xlsx ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" : "text/csv" },
+      body: xlsx ? await file.arrayBuffer() : await file.text(),
+    });
     const data = (await res.json().catch(() => ({}))) as { updated?: number; failures?: { row: number; reason: string }[]; error?: string };
     setBusy(false);
     if (input.current) input.current.value = "";
@@ -31,10 +36,13 @@ export function RatingsImport() {
       <label className="inline-flex min-h-11 cursor-pointer items-center gap-1.5 rounded-[10px] border border-ink-200 bg-white px-3.5 text-[14px] font-medium text-ink-700 hover:bg-ink-50">
         <Upload className="size-4" aria-hidden />
         {busy ? "Importing…" : "Import ratings"}
-        <input ref={input} type="file" accept=".csv,text/csv" className="sr-only" disabled={busy} onChange={(e) => e.target.files?.[0] && upload(e.target.files[0])} />
+        <input ref={input} type="file" accept=".xlsx,.csv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" className="sr-only" disabled={busy} onChange={(e) => e.target.files?.[0] && upload(e.target.files[0])} />
       </label>
       <a href="/api/admin/interns/ratings-import" className="text-xs font-medium text-brand-700 underline-offset-4 hover:underline">
-        Template
+        Excel template
+      </a>
+      <a href="/api/admin/interns/ratings-import?format=csv" className="text-xs font-medium text-brand-700 underline-offset-4 hover:underline">
+        CSV
       </a>
       {result ? <span role="status" className="w-full text-xs text-text-subtle sm:w-auto">{result}</span> : null}
     </div>

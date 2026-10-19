@@ -6,6 +6,7 @@ import { formatMoney } from "@/lib/format";
 import { employerNames, internFirstName, notify } from "@/lib/notify";
 import { parseOffer } from "@/lib/offer";
 import { recordPromoUse } from "@/lib/promo";
+import { assignInvoiceNumber } from "@/lib/invoice-number";
 
 /**
  * Settling a paid Razorpay order. Called by the checkout verify routes and by
@@ -61,6 +62,7 @@ export async function settleEmployerOrder(input: {
     .where(and(eq(schema.employerPayments.id, order.id), ne(schema.employerPayments.status, "paid")))
     .returning({ id: schema.employerPayments.id });
   if (claimed.length === 0) return { ok: true, hired: 0 };
+  await assignInvoiceNumber("employer", order.id);
 
   const promo = promoOf(order.raw);
   if (promo) {
@@ -90,6 +92,21 @@ export async function settleEmployerOrder(input: {
       .where(eq(schema.employerPayments.id, order.id));
     console.error(`[payments] order ${input.orderId}: paid for ${ids.length}, hired ${hired.length} - needs review`);
   }
+  // Legacy routes.ts:15658: a hired intern's onboarding status moves to
+  // "Onboarding" until they are set up with the company.
+  for (const p of hired) {
+    const [ob] = await db
+      .select({ id: schema.internOnboarding.id, extraData: schema.internOnboarding.extraData })
+      .from(schema.internOnboarding)
+      .where(eq(schema.internOnboarding.userId, p.internId))
+      .limit(1);
+    if (!ob) continue;
+    await db
+      .update(schema.internOnboarding)
+      .set({ extraData: { ...((ob.extraData ?? {}) as Record<string, unknown>), onboardingStatus: "Onboarding", isOnboarded: false } })
+      .where(eq(schema.internOnboarding.id, ob.id));
+  }
+
   const { contact, company } = await employerNames(order.employerId);
   const roles = await db
     .select({ id: schema.proposals.id, offer: schema.proposals.offerDetails, currency: schema.proposals.currency })
@@ -126,6 +143,35 @@ export async function settleEmployerOrder(input: {
       email: emails.hireConfirmed({ internName: await internFirstName(p.internId), companyName: company, role: roleOf(p.id) }),
     });
   }
+
+  // Full-time hires also get the hiring-fee receipt (legacy routes.ts:15806).
+  for (const p of hired) {
+    const r = roles.find((x) => x.id === p.id);
+    const offer = r ? parseOffer(r.offer, r.currency) : null;
+    if (!offer?.fullTime) continue;
+    const [intern] = await db
+      .select({ first: schema.users.firstName, last: schema.users.lastName })
+      .from(schema.users)
+      .where(eq(schema.users.id, p.internId))
+      .limit(1);
+    const candidate = `${intern?.first ?? ""} ${intern?.last ?? ""}`.trim() || "Candidate";
+    await notify({
+      to: { type: "employer", id: order.employerId },
+      type: "full_time_fee_paid",
+      title: "Hiring fee received",
+      message: `Full-time hiring fee received for ${candidate}.`,
+      data: { proposalId: p.id, orderId: input.orderId },
+      dedupeKey: `full_time_fee_paid:${p.id}`,
+      email: emails.fullTimeFeePaid({
+        employerName: contact,
+        candidate,
+        role: roleOf(p.id),
+        ctc: offer.fullTime.annualCtcMinor ? formatMoney(offer.fullTime.annualCtcMinor, offer.currency, { zeroLabel: false }) : "As per offer",
+        // One order can pay for several hires; the total is only this hire's when it is the only one.
+        amount: hired.length === 1 ? formatMoney(order.amountMinor, order.currency, { zeroLabel: false }) : "Included in this order",
+      }),
+    });
+  }
   return { ok: true, hired: hired.length };
 }
 
@@ -157,6 +203,7 @@ export async function settleInternOrder(input: {
     .where(and(eq(schema.internPayments.id, payment.id), ne(schema.internPayments.status, "paid")))
     .returning({ id: schema.internPayments.id });
   if (claimed.length > 0) {
+    if (payment.amountMinor > 0) await assignInvoiceNumber("intern", payment.id);
     const promo = promoOf(payment.raw);
     if (promo) {
       await recordPromoUse({ code: promo.code, subjectId: payment.internId, orderId: input.orderId, discountMinor: promo.discountMinor });
@@ -177,6 +224,31 @@ export async function settleInternOrder(input: {
   return { ok: true };
 }
 
+/**
+ * Legacy `extraData.payment` (routes.ts:14882): besides the flag, the order,
+ * the promo and the three amounts, read from the intern_payments row.
+ */
+async function paymentRecord(orderId: string | undefined): Promise<Record<string, unknown>> {
+  if (!orderId) return {};
+  const db = getDb();
+  const [row] = await db
+    .select({ amountMinor: schema.internPayments.amountMinor, gateway: schema.internPayments.gateway, raw: schema.internPayments.raw })
+    .from(schema.internPayments)
+    .where(eq(schema.internPayments.orderId, orderId))
+    .limit(1);
+  if (!row) return {};
+  const promo = promoOf(row.raw);
+  const free = orderId.startsWith("free_");
+  const discount = promo?.discountMinor ?? 0;
+  return {
+    gateway: free ? "free" : row.gateway,
+    promoCode: promo?.code ?? null,
+    originalAmountMinor: row.amountMinor + discount,
+    discountAmountMinor: discount,
+    finalAmountMinor: row.amountMinor,
+  };
+}
+
 export async function markInternPaidFlag(internId: string, ref: { orderId?: string; paymentId?: string } = {}) {
   const db = getDb();
   const [row] = await db
@@ -188,9 +260,10 @@ export async function markInternPaidFlag(internId: string, ref: { orderId?: stri
   const extra = (row.extraData ?? {}) as Record<string, unknown>;
   const current = (extra.payment ?? {}) as Record<string, unknown>;
   if (current.isPaid === true) return;
+  const record = await paymentRecord(ref.orderId);
   await db
     .update(schema.internOnboarding)
-    .set({ extraData: { ...extra, payment: { ...current, isPaid: true, paidAt: new Date().toISOString(), ...ref } } })
+    .set({ extraData: { ...extra, payment: { ...current, isPaid: true, paidAt: new Date().toISOString(), ...record, ...ref } } })
     .where(eq(schema.internOnboarding.id, row.id));
 }
 
@@ -233,7 +306,8 @@ export async function notifyStipendPaid(payoutId: string) {
     title: "Stipend transferred",
     message: `${amount} has been sent to your bank account.`,
     data: { payoutId },
-    dedupeKey: `stipend_paid_${payoutId}`,
+    // Legacy key format; both apps share the notifications table.
+    dedupeKey: `stipend_paid:${payoutId}`,
     email: emails.stipendTransferred({ internName: await internFirstName(p.internId), role, amount }),
   });
 }

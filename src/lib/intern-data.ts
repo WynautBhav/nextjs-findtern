@@ -15,6 +15,7 @@ import {
   type ProposalRow,
   type TimesheetRow,
 } from "@/lib/journey";
+import { parseOffer } from "@/lib/offer";
 
 /**
  * One read for every intern screen.
@@ -29,6 +30,9 @@ import {
  * its own.
  */
 export type InternData = ReturnType<typeof loadInternData>;
+
+/** What an intern sees in place of a company name before the hire. */
+export const HIDDEN_COMPANY = "Hidden company";
 
 export async function loadInternData(uid: string) {
   const db = getDb();
@@ -54,7 +58,18 @@ export async function loadInternData(uid: string) {
       .select({ id: schema.employers.id, companyName: schema.employers.companyName })
       .from(schema.employers)
       .where(inArray(schema.employers.id, employerIds));
-    for (const row of rows) if (row.companyName) names[row.id] = row.companyName;
+    // Non-bypass masking (legacy routes.ts:14169): the company stays hidden
+    // until it has hired this intern, or has sent a full-time offer (which
+    // only follows a hire). Every intern screen reads names from here.
+    const revealed = new Set(
+      p
+        .filter((x) => x.status === "hired" || parseOffer(x.offerDetails, x.currency).fullTime)
+        .map((x) => x.employerId),
+    );
+    for (const row of rows) {
+      if (!row.companyName) continue;
+      names[row.id] = revealed.has(row.id) ? row.companyName : HIDDEN_COMPANY;
+    }
   }
 
   const source = { proposals: p, interviews: i, timesheets: t, payouts: r, names };

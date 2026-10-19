@@ -24,6 +24,7 @@ export function SectionHeading({
   sub,
   id,
   action,
+  tone = "light",
 }: {
   /** Plain text before the accented word. */
   lead?: string;
@@ -39,6 +40,8 @@ export function SectionHeading({
   id?: string;
   /** Optional control rendered to the right of the heading. */
   action?: React.ReactNode;
+  /** `dark` for headings on the brand wash: white lead, amber accent. */
+  tone?: "light" | "dark";
 }) {
   const { ref, revealed } = useRevealFlag<HTMLDivElement>();
   const Heading = (headingTag ?? Tag) as "h1" | "h2" | "h3";
@@ -58,17 +61,19 @@ export function SectionHeading({
         <Heading
           id={id}
           className={cn(
-            "text-balance text-3xl font-bold tracking-[-0.02em] text-ink-900 sm:text-4xl",
+            "text-balance text-3xl font-bold tracking-[-0.02em] sm:text-4xl",
+            tone === "dark" ? "text-white" : "text-ink-900",
             align === "center" && !action && "mx-auto",
           )}
         >
           {lead ? <>{lead} </> : null}
-          <span className="smile">{accent}</span>
+          <span className={cn("smile", tone === "dark" && "!text-accent-300")}>{accent}</span>
         </Heading>
         {sub ? (
           <p
             className={cn(
-              "mt-4 text-lg text-muted-foreground",
+              "mt-4 text-lg",
+              tone === "dark" ? "text-on-dark-subtle" : "text-muted-foreground",
               align === "center" && !action && "mx-auto max-w-2xl",
             )}
           >

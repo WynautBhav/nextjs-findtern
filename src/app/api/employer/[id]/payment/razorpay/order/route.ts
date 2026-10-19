@@ -11,9 +11,10 @@ import { createOrder, razorpayKeyId } from "@/lib/razorpay";
 
 const bodySchema = z.object({
   currency: z.enum(["INR", "USD"]).default("INR"),
-  /** Pay for these accepted proposals only; omitted = all of them. */
-  proposalIds: z.array(z.string().min(1)).max(50).optional(),
-  mode: z.enum(["upfront", "monthly"]).default("upfront"),
+  /** One hire per payment (legacy checkout). */
+  proposalIds: z.array(z.string().min(1)).length(1, "Pay for one hire at a time"),
+  /** Accepted for old clients; new hires always pay upfront. */
+  mode: z.enum(["upfront", "monthly"]).optional(),
   promoCode: z.string().trim().min(1).optional(),
 });
 
@@ -23,15 +24,16 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!guard.ok) return guard.response;
 
   const parsed = bodySchema.safeParse(await req.json().catch(() => null));
-  if (!parsed.success) return NextResponse.json({ error: "Invalid input" }, { status: 400 });
-  const { currency, mode } = parsed.data;
+  if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid input" }, { status: 400 });
+  const { currency } = parsed.data;
+  // The plan choice is gone: a new hire is paid upfront. A running monthly
+  // placement is still billed its due month (payableCheckout prices `due`).
+  const mode = "upfront" as const;
 
   // Amount is recomputed from the accepted offers; the client never sends it.
   const { lines } = await payableCheckout(id, { proposalIds: parsed.data.proposalIds, mode });
   const paying = lines.filter((l) => l.currency === currency);
   if (paying.length === 0) return NextResponse.json({ error: "Nothing payable in this currency" }, { status: 400 });
-  const blocked = mode === "monthly" ? paying.find((l) => !l.due && l.charge.monthlyBlocked) : undefined;
-  if (blocked) return NextResponse.json({ error: blocked.charge.monthlyBlocked }, { status: 400 });
 
   if (paying.some((l) => l.charge.totalMinor <= 0)) {
     return NextResponse.json({ error: "One of these offers has no amount to pay. Edit it before checking out." }, { status: 400 });
@@ -58,7 +60,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   let amountMinor = computedMinor;
   let promo: { promoCode: string; discountMinor: number } | null = null;
   if (parsed.data.promoCode) {
-    const quote = await quotePromo({ code: parsed.data.promoCode, subjectId: id, orderMinor: amountMinor, currency });
+    const quote = await quotePromo({ code: parsed.data.promoCode, subjectId: id, orderMinor: amountMinor, currency, audience: "employer" });
     if (!quote.ok) return NextResponse.json({ error: quote.error }, { status: quote.status });
     if (quote.payableMinor <= 0) {
       return NextResponse.json({ error: "This code covers the whole order - contact us to complete it" }, { status: 400 });

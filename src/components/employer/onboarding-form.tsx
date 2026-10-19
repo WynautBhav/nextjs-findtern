@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useRouter } from "next/navigation";
 import { FileUpload } from "@/components/app/file-upload";
 
 import { suggestSkills } from "@/lib/data/skills";
@@ -41,9 +42,11 @@ import {
  * form collected, so the stepper here carries all of the state and the two
  * record shapes live in `lib/employer-onboarding.ts`.
  *
- * There is no `PATCH /api/employer/:id` and no `POST /api/employer/projects` in
- * this build, so both saves say so out loud rather than posting into the void.
- * A localStorage draft means a half-finished setup survives a refresh.
+ * "Continue" saves the company (`PATCH /api/employer/:id`) before moving on,
+ * and creating the project finishes onboarding and opens the dashboard - the
+ * hiring screens send an employer back here until both exist
+ * (lib/employer-setup). A localStorage draft means a half-finished setup
+ * survives a refresh.
  *
  * Motion is CSS-only: globals.css collapses transitions under
  * `prefers-reduced-motion`, and nothing here listens to scroll.
@@ -73,10 +76,20 @@ type Props = {
   hasExistingProject: boolean;
   employerId: string;
   existingProjectId?: string;
+  /** 1 when the company is already complete and only the project is missing. */
+  initialStage?: StageIndex;
 };
 
-export function EmployerOnboardingForm({ initial, hasExistingProject, employerId, existingProjectId }: Props) {
-  const [stage, setStage] = useState<StageIndex>(0);
+export function EmployerOnboardingForm({
+  initial,
+  hasExistingProject,
+  employerId,
+  existingProjectId,
+  initialStage = 0,
+}: Props) {
+  const router = useRouter();
+  const [stage, setStage] = useState<StageIndex>(initialStage);
+  const [busy, setBusy] = useState(false);
   const [edits, setEdits] = useState<Partial<OnboardingDraft>>({});
   const [dirty, setDirty] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -126,19 +139,19 @@ export function EmployerOnboardingForm({ initial, hasExistingProject, employerId
     blurbRef.current?.focus();
   }
 
-  function onContinue() {
-    const problems = validateStage(values, stage);
-    setErrors(problems);
-    if (Object.keys(problems).length > 0) return;
-    goTo(stage + 1);
+  async function onContinue() {
+    // Continuing used to only validate, so an employer could reach the
+    // project stage (and then the dashboard) with no company saved at all.
+    if (await onSaveCompany()) goTo(1);
   }
 
-  async function onSaveCompany() {
+  async function onSaveCompany(): Promise<boolean> {
     const problems = validateStage(values, 0);
     setErrors(problems);
-    if (Object.keys(problems).length > 0) return;
+    if (Object.keys(problems).length > 0) return false;
 
     setNotice(null);
+    setBusy(true);
     try {
       // The form names the primary contact's number after the contact; the
       // table stores it as the account's own country code + phone number.
@@ -154,8 +167,12 @@ export function EmployerOnboardingForm({ initial, hasExistingProject, employerId
       });
       const data = await res.json().catch(() => ({}));
       setNotice(res.ok ? "Company saved." : (data.error ?? "Save failed"));
+      return res.ok;
     } catch {
       setNotice("Network error - answers still held in this browser.");
+      return false;
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -165,6 +182,7 @@ export function EmployerOnboardingForm({ initial, hasExistingProject, employerId
     if (Object.keys(problems).length > 0) return;
 
     setNotice(null);
+    setBusy(true);
     try {
       const url = hasExistingProject
         ? `/api/employer/projects/${existingProjectId}`
@@ -175,9 +193,22 @@ export function EmployerOnboardingForm({ initial, hasExistingProject, employerId
         body: JSON.stringify(values.project),
       });
       const data = await res.json().catch(() => ({}));
-      setNotice(res.ok ? "Project saved." : (data.error ?? "Save failed"));
+      if (!res.ok) {
+        setNotice(data.error ?? "Save failed");
+        return;
+      }
+      // Setup is done: drop the browser draft and open the dashboard.
+      try {
+        window.localStorage.removeItem(DRAFT_KEY);
+      } catch {
+        // Private mode - nothing was stored.
+      }
+      router.push("/employer/dashboard");
+      router.refresh();
     } catch {
       setNotice("Network error - answers still held in this browser.");
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -193,7 +224,9 @@ export function EmployerOnboardingForm({ initial, hasExistingProject, employerId
               <li key={item.id} className="shrink-0 lg:shrink">
                 <button
                   type="button"
-                  onClick={() => goTo(i)}
+                  // Skipping ahead still saves the company - the project stage
+                  // is no use without one.
+                  onClick={() => (i === 1 && stage === 0 ? void onContinue() : goTo(i))}
                   aria-current={state === "current" ? "step" : undefined}
                   className={[
                     "apple-spring apple-pressable flex min-h-11 w-full items-center gap-3 rounded-[10px] px-3 py-2.5 text-left text-sm",
@@ -282,9 +315,10 @@ export function EmployerOnboardingForm({ initial, hasExistingProject, employerId
               <button
                 type="button"
                 onClick={onContinue}
-                className="apple-spring apple-pressable group inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[10px] bg-brand-700 px-5 text-sm font-semibold text-white hover:bg-brand-600 sm:w-auto"
+                disabled={busy}
+                className="apple-spring apple-pressable group inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[10px] bg-brand-700 px-5 text-sm font-semibold text-white hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
               >
-                Continue to project
+                Save and continue
                 <ArrowRight
                   className="size-4 transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none"
                   aria-hidden
@@ -293,7 +327,8 @@ export function EmployerOnboardingForm({ initial, hasExistingProject, employerId
               <button
                 type="button"
                 onClick={onSaveCompany}
-                className="apple-spring apple-pressable inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[10px] border border-ink-200 bg-white px-4 text-sm font-medium text-ink-800 hover:bg-ink-50 sm:w-auto"
+                disabled={busy}
+                className="apple-spring apple-pressable inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[10px] border border-ink-200 bg-white px-4 text-sm font-medium text-ink-800 hover:bg-ink-50 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
               >
                 <Save className="size-4" aria-hidden />
                 Save company details
@@ -303,7 +338,8 @@ export function EmployerOnboardingForm({ initial, hasExistingProject, employerId
             <button
               type="button"
               onClick={onSaveProject}
-              className="apple-spring apple-pressable inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[10px] bg-brand-700 px-5 text-sm font-semibold text-white hover:bg-brand-600 sm:w-auto"
+              disabled={busy}
+              className="apple-spring apple-pressable inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[10px] bg-brand-700 px-5 text-sm font-semibold text-white hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
             >
               <Save className="size-4" aria-hidden />
               {hasExistingProject ? "Save project" : "Create project"}
@@ -1014,7 +1050,9 @@ function validateStage(values: OnboardingDraft, stage: number): Record<string, s
   if (stage === 0) {
     const c = values.company;
     if (c.companyName.trim().length < 2) errors.companyName = "Company name is required.";
-    if (c.websiteUrl.trim() && !looksLikeHost(c.websiteUrl)) {
+    if (!c.websiteUrl.trim()) {
+      errors.websiteUrl = "Website is required.";
+    } else if (!looksLikeHost(c.websiteUrl)) {
       errors.websiteUrl = "That does not look like a website - try acme.com.";
     }
 

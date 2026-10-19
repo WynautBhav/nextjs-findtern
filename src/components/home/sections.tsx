@@ -23,7 +23,6 @@ import {
 } from "lucide-react";
 
 import { SectionHeading } from "@/components/ui/section-heading";
-import { TiltCard } from "@/components/motion/tilt-card";
 import { VelocityMarquee } from "@/components/motion/velocity-marquee";
 import { TestimonialCarousel } from "@/components/marketing/testimonial-carousel";
 import { SkillStudentsDialog } from "./skill-students-dialog";
@@ -75,7 +74,7 @@ export function PartnersMarquee({ partners }: { partners: CmsPartner[] }) {
  */
 function PartnerCard({ partner }: { partner: CmsPartner }) {
   const inner = (
-    <div className="flex h-14 w-40 items-center justify-center px-2 transition-opacity duration-300 group-hover/logo:opacity-100 sm:w-44">
+    <div className="flex h-20 w-48 items-center justify-center px-3 transition-opacity duration-300 group-hover/logo:opacity-100 sm:w-56">
       <img
         src={partner.logoUrl}
         alt={partner.name}
@@ -83,7 +82,7 @@ function PartnerCard({ partner }: { partner: CmsPartner }) {
         height={56}
         loading="lazy"
         decoding="async"
-        className="max-h-11 w-auto max-w-full object-contain opacity-80"
+        className="max-h-16 w-auto max-w-full object-contain opacity-90"
       />
     </div>
   );
@@ -163,6 +162,7 @@ export function SkillsMarquee({ skills }: { skills: CmsFeaturedSkill[] }) {
       <VelocityMarquee
         duration={30}
         reverse
+        pauseOnHover
         className="mt-12"
         loopCopy={skills.map((s) => (
           <SkillCard
@@ -204,11 +204,14 @@ function SkillCard({
   const Heading = isLoopCopy ? "p" : "h3";
 
   return (
-    <TiltCard max={7} className="w-60 shrink-0 px-2 py-1">
+    // Every card is the same box: a tilt on a row that is already moving read
+    // as the card slipping, and two-line titles made neighbours jump in
+    // height. The title keeps a two-line slot so all cards line up.
+    <div className="w-64 shrink-0 px-2 py-2">
       <button
         type="button"
         onClick={() => onSelect(skill)}
-        className="group/skill flex h-full w-full flex-col text-left gap-3.5 rounded-2xl border border-ink-200 bg-white p-5 transition-[border-color,box-shadow] duration-200 ease-ease-out hover:border-primary hover:shadow-md cursor-pointer focus-visible:outline-2 focus-visible:outline-primary"
+        className="group/skill flex h-[11.5rem] w-full cursor-pointer flex-col gap-3 rounded-2xl border border-ink-200 bg-white p-5 text-left transition-[border-color,box-shadow,transform] duration-200 ease-ease-out hover:-translate-y-0.5 hover:border-primary hover:shadow-md focus-visible:outline-2 focus-visible:outline-primary"
       >
         <span className="inline-flex size-11 items-center justify-center rounded-xl bg-gradient-to-br from-brand-50 to-brand-100 text-primary transition-colors duration-200 ease-ease-out group-hover/skill:from-primary group-hover/skill:to-brand-800 group-hover/skill:text-white">
           <Icon className="size-5" aria-hidden />
@@ -216,7 +219,7 @@ function SkillCard({
 
         <Heading
           className={cn(
-            "text-base font-semibold leading-snug text-ink-900 group-hover/skill:text-primary transition-colors",
+            "line-clamp-2 min-h-[2.75rem] text-base font-semibold leading-snug text-ink-900 group-hover/skill:text-primary transition-colors",
             !isLoopCopy && "tracking-tight",
           )}
         >
@@ -231,13 +234,13 @@ function SkillCard({
             <Users className="size-3.5" aria-hidden />
             <span>{skill.resourceCount} {skill.resourceCount === 1 ? "student" : "students"}</span>
           </span>
-          <span className="flex items-center gap-1 text-[11px] font-medium text-ink-500 transition-colors group-hover/skill:text-primary">
+          <span className="flex items-center gap-1 text-xs font-medium text-ink-500 transition-colors group-hover/skill:text-primary">
             <span>View bench</span>
             <ArrowRight className="size-3 transition-transform duration-200 group-hover/skill:translate-x-0.5" aria-hidden />
           </span>
         </div>
       </button>
-    </TiltCard>
+    </div>
   );
 }
 

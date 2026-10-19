@@ -84,9 +84,10 @@ describe("password", () => {
   });
 
   test("strength policy matches the legacy rule", () => {
-    assert.equal(isStrongPassword("Abcdef12"), true);
-    assert.equal(isStrongPassword("abcdef12"), false, "needs an upper case");
-    assert.equal(isStrongPassword("Abcdefgh"), false, "needs a digit");
+    assert.equal(isStrongPassword("Abcdef1!"), true);
+    assert.equal(isStrongPassword("Abcdef12"), false, "needs a special character");
+    assert.equal(isStrongPassword("abcdef1!"), false, "needs an upper case");
+    assert.equal(isStrongPassword("Abcdefg!"), false, "needs a digit");
     assert.equal(isStrongPassword("Ab1"), false, "needs 8 chars");
     assert.equal(isStrongPassword(""), false);
   });

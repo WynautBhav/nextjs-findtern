@@ -269,7 +269,8 @@ type LegalTable =
 async function getLegalDoc(table: LegalTable, fallback: CmsLegalDoc): Promise<CmsLegalDoc> {
   return tryDb(async () => {
     const db = getDb();
-    const [row] = await db.select().from(table).limit(1);
+    // The newest row is the live one, matching the admin editor and legacy.
+    const [row] = await db.select().from(table).orderBy(desc(table.updatedAt), desc(table.createdAt)).limit(1);
     if (!row?.bodyHtml?.trim()) return fallback;
     return {
       ...fallback,

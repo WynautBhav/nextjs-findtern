@@ -1,4 +1,4 @@
-import { and, count, gte, sql } from "drizzle-orm";
+import { and, count, eq, gte, lt, sql } from "drizzle-orm";
 import type { AnyPgColumn } from "drizzle-orm/pg-core";
 import Link from "next/link";
 import {
@@ -10,14 +10,17 @@ import {
   CheckCircle2,
   FileSpreadsheet,
   TrendingUp,
+  IndianRupee,
 } from "lucide-react";
 
 import { getDb, schema } from "@/lib/db";
 import { AdminPageHeader, Panel, PanelHeader, PanelBody } from "@/components/admin/panel";
 import { StatCard, StatGrid } from "@/components/admin/stat-card";
 import { TrendChart, PipelineBars, type TrendPoint } from "@/components/admin/trend-chart";
-import { formatNumber } from "@/lib/format";
+import { formatMoney, formatNumber } from "@/lib/format";
 import { flattenParams, PERIOD_OPTIONS, periodStart } from "@/lib/admin/params";
+import { inrMinorSql, meaningfulProfile, realEmployerId, realEmployers } from "@/lib/admin/scope";
+import { RevenueChart, type RevenuePoint } from "@/components/admin/finance-charts";
 
 export default async function AdminReportsPage({
   searchParams,
@@ -25,10 +28,18 @@ export default async function AdminReportsPage({
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const params = flattenParams(await searchParams);
-  const since = periodStart(params.period);
+  // A custom from-to range wins over the preset period.
+  const validDate = (v?: string) => (v && !Number.isNaN(Date.parse(v)) ? new Date(v) : null);
+  const rangeFrom = validDate(params.from);
+  const rangeTo = validDate(params.to);
+  const since = rangeFrom ?? (rangeTo ? null : periodStart(params.period));
+  const until = rangeTo ? new Date(rangeTo.getTime() + 86_400_000) : null;
   /** Totals respect the chosen period; trend charts always show six months. */
-  const from = (col: AnyPgColumn) => (since ? gte(col, since) : undefined);
+  const from = (col: AnyPgColumn) => and(since ? gte(col, since) : undefined, until ? lt(col, until) : undefined);
   const db = getDb();
+  // Test employers (the internal "admin" one and the AI-interview one) are not real activity.
+  const realProposal = realEmployerId(schema.proposals.employerId);
+  const realInterview = realEmployerId(schema.interviews.employerId);
 
   const [
     [signupsTotal],
@@ -42,14 +53,20 @@ export default async function AdminReportsPage({
     projectTypesRaw,
     proposalsMonthly,
     interviewsMonthly,
+    [revenueTotal],
+    revenueMonthly,
   ] = await Promise.all([
-    db.select({ c: count() }).from(schema.users).where(from(schema.users.createdAt)),
-    db.select({ c: count() }).from(schema.internOnboarding).where(from(schema.internOnboarding.createdAt)),
-    db.select({ c: count() }).from(schema.proposals).where(from(schema.proposals.createdAt)),
-    db.select({ c: count() }).from(schema.interviews).where(from(schema.interviews.createdAt)),
-    db.select({ c: count() }).from(schema.proposals).where(and(sql`${schema.proposals.hiredAt} is not null`, from(schema.proposals.hiredAt))),
-    db.select({ c: count() }).from(schema.employers).where(from(schema.employers.createdAt)),
-    db.select({ c: count() }).from(schema.projects).where(from(schema.projects.createdAt)),
+    db.select({ c: count() }).from(schema.users).where(and(eq(schema.users.role, "intern"), from(schema.users.createdAt))),
+    db
+      .select({ c: count() })
+      .from(schema.internOnboarding)
+      .innerJoin(schema.users, eq(schema.users.id, schema.internOnboarding.userId))
+      .where(and(eq(schema.users.role, "intern"), meaningfulProfile(), from(schema.internOnboarding.createdAt))),
+    db.select({ c: count() }).from(schema.proposals).where(and(realProposal, from(schema.proposals.createdAt))),
+    db.select({ c: count() }).from(schema.interviews).where(and(realInterview, from(schema.interviews.createdAt))),
+    db.select({ c: count() }).from(schema.proposals).where(and(realProposal, sql`${schema.proposals.hiredAt} is not null`, from(schema.proposals.hiredAt))),
+    db.select({ c: count() }).from(schema.employers).where(and(realEmployers(), from(schema.employers.createdAt))),
+    db.select({ c: count() }).from(schema.projects).where(and(realEmployerId(schema.projects.employerId), from(schema.projects.createdAt))),
     db
       .select({
         state: sql<string>`coalesce(${schema.internOnboarding.state}, 'Unlisted')`,
@@ -81,8 +98,29 @@ export default async function AdminReportsPage({
         c: count(),
       })
       .from(schema.interviews)
-      .where(sql`${schema.interviews.createdAt} >= date_trunc('month', now()) - interval '5 months'`)
+      .where(and(realInterview, sql`${schema.interviews.createdAt} >= date_trunc('month', now()) - interval '5 months'`))
       .groupBy(sql`1`),
+    // Revenue: paid employer orders + intern fees in the period, USD converted.
+    db
+      .select({
+        total: sql<number>`(
+          coalesce((select sum(${inrMinorSql(schema.employerPayments.amountMinor, schema.employerPayments.currency)}) from ${schema.employerPayments} where ${and(eq(schema.employerPayments.status, "paid"), from(schema.employerPayments.paidAt))}), 0)
+          + coalesce((select sum(${inrMinorSql(schema.internPayments.amountMinor, schema.internPayments.currency)}) from ${schema.internPayments} where ${and(eq(schema.internPayments.status, "paid"), from(schema.internPayments.paidAt))}), 0)
+        )::bigint`,
+      })
+      .from(sql`(select 1) as one`),
+    Promise.all(
+      ([schema.employerPayments, schema.internPayments] as const).map((t) =>
+        db
+          .select({
+            month: sql<string>`to_char(date_trunc('month', ${t.paidAt} AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata'), 'YYYY-MM')`,
+            total: sql<number>`coalesce(sum(${inrMinorSql(t.amountMinor, t.currency)}), 0)::bigint`,
+          })
+          .from(t)
+          .where(and(eq(t.status, "paid"), sql`${t.paidAt} >= date_trunc('month', now()) - interval '5 months'`))
+          .groupBy(sql`1`),
+      ),
+    ).then((sets) => sets.flat()),
   ]);
 
   const totalSignups = Number(signupsTotal?.c ?? 0);
@@ -111,6 +149,10 @@ export default async function AdminReportsPage({
   }
   const proposalsByMonth = new Map(proposalsMonthly.map((r) => [r.month, Number(r.c)]));
   const interviewsByMonth = new Map(interviewsMonthly.map((r) => [r.month, Number(r.c)]));
+  const revenueByMonth = new Map<string, number>();
+  for (const r of revenueMonthly) revenueByMonth.set(r.month, (revenueByMonth.get(r.month) ?? 0) + Number(r.total));
+  const revenueTrend: RevenuePoint[] = buckets.map((b) => ({ label: b.label, totalMinor: revenueByMonth.get(b.key) ?? 0 }));
+  const totalRevenue = Number(revenueTotal?.total ?? 0);
   const trend: TrendPoint[] = buckets.map((b) => ({
     label: b.label,
     proposals: proposalsByMonth.get(b.key) ?? 0,
@@ -148,8 +190,18 @@ export default async function AdminReportsPage({
     },
     {
       title: "Payments ledger",
-      body: "Receipts, order IDs and verification.",
+      body: "Receipts, order IDs, GST split and verification.",
       href: "/api/admin/export?type=payments",
+    },
+    {
+      title: "Intern payouts",
+      body: "Stipend transfers, references and schedule.",
+      href: "/api/admin/export?type=payouts",
+    },
+    {
+      title: "Intern payments",
+      body: "Activation fees, promo codes and GST split.",
+      href: "/api/admin/export?type=intern-payments",
     },
   ];
 
@@ -158,6 +210,24 @@ export default async function AdminReportsPage({
       <AdminPageHeader
         title="Analytics Reports"
         subtitle="Conversion, geography and raw exports."
+        action={
+          <>
+            <Link
+              href="/admin/reports/analytics"
+              className="inline-flex min-h-11 items-center gap-1.5 rounded-[10px] border border-ink-200 bg-white px-3.5 text-[14px] font-medium text-ink-700 hover:bg-ink-50"
+            >
+              <BarChart3 className="size-4" aria-hidden />
+              Hiring analytics
+            </Link>
+            <Link
+              href="/admin/reports/money"
+              className="inline-flex min-h-11 items-center gap-1.5 rounded-[10px] border border-ink-200 bg-white px-3.5 text-[14px] font-medium text-ink-700 hover:bg-ink-50"
+            >
+              <IndianRupee className="size-4" aria-hidden />
+              Money in and out
+            </Link>
+          </>
+        }
       />
       <nav aria-label="Period" className="flex flex-wrap gap-1.5">
         {[{ value: "", label: "All time" }, ...PERIOD_OPTIONS].map((o) => (
@@ -172,9 +242,29 @@ export default async function AdminReportsPage({
             {o.label}
           </Link>
         ))}
+        <form method="get" className="flex flex-wrap items-center gap-1.5 text-xs text-ink-600">
+          <label className="inline-flex items-center gap-1">
+            From
+            <input type="date" name="from" defaultValue={params.from ?? ""} className="h-9 rounded-lg border border-ink-200 px-2 text-sm" />
+          </label>
+          <label className="inline-flex items-center gap-1">
+            To
+            <input type="date" name="to" defaultValue={params.to ?? ""} className="h-9 rounded-lg border border-ink-200 px-2 text-sm" />
+          </label>
+          <button type="submit" className="h-9 rounded-full bg-white px-3 font-medium text-ink-700 ring-1 ring-ink-200 hover:bg-ink-50">
+            Apply range
+          </button>
+        </form>
       </nav>
 
       <StatGrid cols={4}>
+        <StatCard
+          label="Revenue collected"
+          value={formatMoney(totalRevenue, "INR", { zeroLabel: "₹0" })}
+          hint="Paid orders and intern fees · USD at ₹100/$"
+          icon={IndianRupee}
+          tone="success"
+        />
         <StatCard
           label="Profile completion"
           value={`${profileRate}%`}
@@ -214,6 +304,17 @@ export default async function AdminReportsPage({
           />
           <PanelBody>
             <TrendChart data={trend} />
+          </PanelBody>
+        </Panel>
+
+        <Panel className="bg-white">
+          <PanelHeader
+            title="Revenue trend"
+            description="Collected revenue over the last six months (India time)."
+            icon={IndianRupee}
+          />
+          <PanelBody>
+            <RevenueChart data={revenueTrend} />
           </PanelBody>
         </Panel>
 

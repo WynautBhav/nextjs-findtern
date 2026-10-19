@@ -556,7 +556,7 @@ export function deriveReadiness(
 ): ReadinessItem[] {
   const draft = onboarding ? draftFromRecord(onboarding) : null;
   const academics = draft?.academics ?? { institution: "", degree: "" };
-  const bank = draft?.bank ?? { accountNumber: "", ifscCode: "", upiId: "" };
+  const bank = draft?.bank ?? { accountHolderName: "", bankName: "", accountNumber: "", ifscCode: "", upiId: "" };
   const skills = draft?.skills ?? [];
   const live = proposals.some((p) => {
     const s = (p.status ?? "").toLowerCase();
@@ -601,7 +601,7 @@ export function deriveReadiness(
     },
     {
       id: "linkedin",
-      label: "LinkedIn, if you have one",
+      label: "LinkedIn profile",
       unlocks: "Helps employers verify you are who you say you are.",
       done: Boolean(onboarding?.linkedinUrl),
       href: "/intern/onboarding",
@@ -614,16 +614,9 @@ export function deriveReadiness(
       href: "/intern/onboarding",
     },
     {
-      id: "aadhaar",
-      label: "Identity document",
-      unlocks: "No internship can be paid out without it.",
-      done: Boolean(doc?.aadhaarImageName),
-      href: "/intern/onboarding",
-      blocking: live,
-    },
-    {
+      // The only document image required; Aadhaar is the number alone.
       id: "pan",
-      label: "Tax document",
+      label: "PAN card image",
       unlocks: "Needed before the first stipend is released.",
       done: Boolean(doc?.panImageName),
       href: "/intern/onboarding",
@@ -633,8 +626,8 @@ export function deriveReadiness(
       id: "bank",
       label: "Bank account for your stipend",
       unlocks: "Your stipend cannot be sent anywhere else.",
-      done: Boolean((bank.accountNumber && bank.ifscCode) || bank.upiId),
-      href: "/intern/onboarding",
+      done: Boolean(bank.accountHolderName && bank.bankName && bank.accountNumber && bank.ifscCode),
+      href: "/intern/bank-details",
       blocking: live,
     },
   ];

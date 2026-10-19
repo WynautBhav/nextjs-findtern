@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, Building2, Video } from "lucide-react";
+import { ArrowRight, Video } from "lucide-react";
 
 import { EmptyScene, PageHead, SectionHead, Surface } from "@/components/app/primitives";
 import { ReadinessStrip } from "@/components/app/readiness";
 import { StatusStrip, Thread } from "@/components/app/thread";
 import { ActivationCard } from "@/components/intern/activation-card";
+import { GettingStarted } from "@/components/intern/getting-started";
+import { CompanyInitials } from "@/components/marketing/role-card";
 import { OpenToWorkToggle } from "@/components/intern/open-to-work-toggle";
 import { requireRole } from "@/lib/auth";
 import { getDb, schema } from "@/lib/db";
@@ -15,6 +17,8 @@ import { isPast, nextAction, slotOf } from "@/lib/journey";
 import { formatMoney } from "@/lib/format";
 import { isInternPaid } from "@/lib/payments";
 import { getInternActivationFeeMinor } from "@/lib/platform-settings";
+import { visibleAgainAt } from "@/lib/profile-hide";
+import { profileCompletion } from "@/lib/onboarding";
 
 export const metadata: Metadata = {
   title: "Home",
@@ -93,6 +97,9 @@ export default async function InternHome() {
   const extra = data.onboarding?.extraData;
   const openToWork =
     !extra || typeof extra !== "object" || (extra as Record<string, unknown>).openToWork !== false;
+  const visibleAgain = openToWork
+    ? null
+    : visibleAgainAt((extra as Record<string, unknown> | null)?.hiddenAt)?.toISOString() ?? null;
 
   // Scheduled company or AI assessment interview
   const scheduledInterviews = data.interviews.filter(
@@ -108,6 +115,13 @@ export default async function InternHome() {
   const fullName = `${user?.first ?? ""} ${user?.last ?? ""}`.trim() || "Candidate";
   const score = scoreOf(data.onboarding);
   const ratings = ratingsOf(data.onboarding);
+  // Profile → activation → AI interview, in that order, until all three are done.
+  const completion = profileCompletion(data.onboarding, {
+    hasPanImage: Boolean(data.document?.panImageName),
+    hasPhoto: Boolean(data.document?.profilePhotoName),
+  });
+  const gettingStarted = !working && (!completion.complete || !activated || score === null);
+
   // The pending action is shown once, in the strip; the thread skips it.
   const history = action ? data.thread.filter((n) => n !== action) : data.thread;
 
@@ -118,7 +132,9 @@ export default async function InternHome() {
         lede={
           working
             ? "Your internship, and anything waiting on you."
-            : action
+            : gettingStarted
+              ? "Three steps, in order, before employers can find you."
+              : action
               ? "One thing is waiting on you."
               : "Nothing is waiting on you. Employers can find your profile."
         }
@@ -127,20 +143,29 @@ export default async function InternHome() {
       <div className="grid gap-x-10 gap-y-8 xl:grid-cols-[minmax(0,1fr)_20rem]">
         {/* ── Main column ─────────────────────────────────────────── */}
         <div className="min-w-0 space-y-8">
-          <StatusStrip node={action} stage={data.stage} />
-
-          {!working && !activated ? (
-            <ActivationCard
-              alreadyPaid={activated}
+          {gettingStarted ? (
+            <GettingStarted
+              completion={completion}
+              activated={activated}
+              scored={score !== null}
               feeMinor={activationFeeMinor}
-              internId={session.uid}
-              prefill={{
-                name: fullName,
-                email: user?.email,
-                contact: user ? `${user.countryCode}${user.phoneNumber}` : undefined,
-              }}
+              action={
+                <ActivationCard
+                  embedded
+                  alreadyPaid={activated}
+                  feeMinor={activationFeeMinor}
+                  internId={session.uid}
+                  prefill={{
+                    name: fullName,
+                    email: user?.email,
+                    contact: user ? `${user.countryCode}${user.phoneNumber}` : undefined,
+                  }}
+                />
+              }
             />
           ) : null}
+
+          <StatusStrip node={action} stage={data.stage} />
 
           <section>
             <SectionHead
@@ -153,7 +178,11 @@ export default async function InternHome() {
                 ) : null
               }
             />
-            {data.thread.length === 0 ? (
+            {data.thread.length === 0 && gettingStarted ? (
+              <p className="text-sm text-ink-500">
+                Offers, interviews, timesheets and payments appear here once your profile is live.
+              </p>
+            ) : data.thread.length === 0 ? (
               <EmptyScene
                 title="Your activity starts with your profile"
                 body="Once your profile is filled in, every application, interview, timesheet and payment lands here in order."
@@ -167,7 +196,8 @@ export default async function InternHome() {
             )}
           </section>
 
-          {!working && openRoles.length > 0 ? (
+          {/* Roles open up once the profile is complete and activation is paid. */}
+          {!working && completion.complete && activated && openRoles.length > 0 ? (
             <section>
               <SectionHead
                 title="Open roles"
@@ -185,18 +215,13 @@ export default async function InternHome() {
                       href={`/intern/opportunities/${p.id}`}
                       className="group grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 px-4 py-3.5 transition-colors hover:bg-ink-50/70"
                     >
-                      <span
-                        aria-hidden
-                        className="grid size-9 place-items-center rounded-full bg-brand-50 text-xs font-semibold text-brand-800"
-                      >
-                        {p.companyName ? p.companyName.charAt(0).toUpperCase() : <Building2 className="size-4" />}
-                      </span>
+                      <CompanyInitials name={p.companyName} />
                       <span className="min-w-0">
                         <span className="block truncate text-sm font-medium text-ink-900 group-hover:text-brand-700">
                           {p.projectName}
                         </span>
                         <span className="block truncate text-[13px] text-ink-500">
-                          {[p.companyName, p.scopeOfWork].filter(Boolean).join(" · ")}
+                          {p.scopeOfWork}
                         </span>
                       </span>
                       <ArrowRight className="size-4 text-ink-300 group-hover:text-brand-700" aria-hidden />
@@ -280,7 +305,7 @@ export default async function InternHome() {
           <ReadinessStrip readiness={data.readiness} />
 
           <Surface className="p-5">
-            <OpenToWorkToggle initial={openToWork} />
+            <OpenToWorkToggle initial={openToWork} visibleAgainAt={visibleAgain} />
           </Surface>
 
           {working || data.money.paidMinor > 0 ? (

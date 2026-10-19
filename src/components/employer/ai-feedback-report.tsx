@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   CheckCircle2,
   ChevronDown,
@@ -62,7 +62,32 @@ export function AiFeedbackReport({
         ? "Recommended - Solid Technical Fundamentals"
         : "Conditional Recommendation - Needs Mentorship";
 
+  const sectionRef = useRef<HTMLElement>(null);
+
+  /**
+   * Print this dossier only. The candidates page renders one dossier per
+   * card, and a bare window.print() printed every one of them - nine
+   * identical-looking reports for nine cards. The dossier's markup is copied
+   * into a print-only root and everything else on the page is hidden for the
+   * duration of the print dialog.
+   */
   function downloadPdfDossier() {
+    const el = sectionRef.current;
+    if (!el) {
+      window.print();
+      return;
+    }
+    const root = document.createElement("div");
+    root.id = "print-root";
+    root.innerHTML = el.outerHTML;
+    document.body.appendChild(root);
+    document.body.classList.add("printing-one");
+    const cleanup = () => {
+      root.remove();
+      document.body.classList.remove("printing-one");
+      window.removeEventListener("afterprint", cleanup);
+    };
+    window.addEventListener("afterprint", cleanup);
     window.print();
   }
 
@@ -92,7 +117,7 @@ export function AiFeedbackReport({
   }
 
   return (
-    <section className="apple-spring min-w-0 overflow-hidden rounded-[20px] border border-brand-200/80 bg-white shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)]">
+    <section ref={sectionRef} className="apple-spring min-w-0 overflow-hidden rounded-[20px] border border-brand-200/80 bg-white shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)]">
       {/* Header Banner */}
       <div className="bg-gradient-to-r from-brand-950 via-brand-900 to-brand-800 p-6 text-white">
         <div className="flex flex-col gap-4 2xl:flex-row 2xl:items-start 2xl:justify-between">

@@ -4,6 +4,7 @@ import { z } from "zod";
 import { createHash, randomBytes } from "node:crypto";
 
 import { getDb, schema } from "@/lib/db";
+import { emails, renderEmail } from "@/lib/emails";
 import { sendSmtpMail } from "@/lib/mailer";
 import { limiters, bucketKey, clientIp } from "@/lib/security/rate-limit";
 
@@ -12,9 +13,13 @@ const bodySchema = z.object({
   role: z.enum(["intern", "employer"]).default("intern"),
 });
 
+/** Legacy reset links lived 30 minutes (routes.ts:3428). */
+const RESET_TTL_MINUTES = 30;
+
 export async function POST(req: Request) {
   const ip = clientIp(req.headers);
-  if (!limiters.login.take(bucketKey(ip))) {
+  // Its own budget, so resets cannot starve logins or the other way round.
+  if (!limiters.forgotPassword.take(bucketKey(ip))) {
     return NextResponse.json({ error: "Too many attempts" }, { status: 429 });
   }
   const parsed = bodySchema.safeParse(await req.json().catch(() => null));
@@ -47,15 +52,14 @@ export async function POST(req: Request) {
     subjectType: isEmployer ? "employer" : "user",
     subjectId: subject.id,
     tokenHash,
-    expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+    expiresAt: new Date(Date.now() + RESET_TTL_MINUTES * 60_000),
   });
 
   const base = process.env.PUBLIC_ORIGIN ?? "http://localhost:3000";
   const resetPath = isEmployer ? "/employer/reset-password" : "/reset-password";
   await sendSmtpMail({
     to: subject.email,
-    subject: "Reset your Findtern password",
-    text: `Reset your password: ${base}${resetPath}?token=${token}`,
+    ...renderEmail(emails.passwordReset({ url: `${base}${resetPath}?token=${token}`, ttlMinutes: RESET_TTL_MINUTES })),
   });
   return NextResponse.json({ ok: true });
 }

@@ -5,10 +5,9 @@ import { ArrowRight, Check, Coffee, X } from "lucide-react";
 import { PageSection } from "@/components/marketing/page-hero";
 import { ButtonLink } from "@/components/ui/button";
 import { TiltCard } from "@/components/motion/tilt-card";
-import { CountUp } from "@/components/motion/count-up";
 import { FaqExplorer } from "@/components/marketing/faq-explorer";
 import { formatMoney } from "@/lib/format";
-import { useRegionBands } from "@/components/marketing/region-rates";
+import { CurrencyNote, useRegionBands } from "@/components/marketing/region-rates";
 import { MonthlyRate } from "@/components/marketing/monthly-rate";
 import { OfferNote, PlanPrice } from "@/components/marketing/plan-price";
 import { PricingCalculator } from "@/components/marketing/pricing-calculator";
@@ -164,7 +163,7 @@ export function PricingContent({
             What an intern costs a month
           </h2>
           <p className="mt-4 text-lg text-muted-foreground">
-            Change the three words that matter. The arithmetic sits beside the answer.
+            Pick the plan and the days a week. Every day is a full 8-hour day; the arithmetic sits beside the answer.
           </p>
         </div>
         <PricingCalculator plansInr={plansInr} plansUsd={plansUsd} className="mt-12" />
@@ -284,9 +283,7 @@ export function PricingContent({
           </div>
         </div>
 
-        <p className="mt-6 text-center text-sm text-ink-500">
-          {isIndia ? "Prices include GST." : "No hidden fees."}
-        </p>
+        <CurrencyNote className="mt-6 text-center" />
       </PageSection>
 
       {/* ── Where the money goes ────────────────────────────────────── */}
@@ -316,11 +313,7 @@ export function PricingContent({
               <p className="text-5xl font-bold tracking-tight text-primary">
                 {/* Keyed by currency: the tween writes to the DOM directly, so
                     a prefix change must remount rather than update in place. */}
-                <CountUp
-                  key={currency}
-                  value={perHireMinor / 100}
-                  prefix={currency === "INR" ? "₹" : "$"}
-                />
+                {formatMoney(perHireMinor, currency)}
               </p>
               <p className="text-sm text-ink-500">
                 fixed per-hire fee

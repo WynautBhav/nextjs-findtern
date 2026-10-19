@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { currentAdminPermissions } from "@/lib/account-status";
 import { isHttps } from "@/lib/auth";
 
 /**
@@ -47,4 +48,15 @@ export async function restoreAdminCookie(res: NextResponse, token: string, expMs
       `Expires=${new Date(expMs).toUTCString()}`,
     ].join("; "),
   );
+}
+
+/**
+ * "View as" is super admin only. Read from the role, not the session cookie,
+ * so a demoted super admin loses it within the permission cache window.
+ */
+export async function canViewAs(uid: string | undefined, sessionPermissions: readonly string[] | undefined): Promise<boolean> {
+  if (!uid) return false;
+  const fresh = await currentAdminPermissions(uid);
+  const perms = fresh === undefined ? (sessionPermissions ?? []) : (fresh ?? []);
+  return perms.includes("*");
 }

@@ -39,7 +39,7 @@ export const FAQ_INTERN: CmsFaqItem[] = [
     "id": "60d53375-b7f4-4d15-818d-60af3fb14aaf",
     "category": "Intern",
     "question": "Is Findtern free for the interns?",
-    "answer": "Creating a profile on Findtern is free. However, to make your profile live and visible to companies, you must take the AI interview, which comes with a one-time fee of ₹2500.\nThe AI interview generates your Findtern Score, showcasing your technical and soft skills and helping companies easily notice and shortlist your profile.",
+    "answer": "Creating a profile on Findtern is free. However, to make your profile live and visible to companies, you must take the AI interview, which comes with a one-time fee of ₹2,499.\nThe AI interview generates your Findtern Score, showcasing your technical and soft skills and helping companies easily notice and shortlist your profile.",
     "sortOrder": 0,
     "isActive": true
   },
@@ -79,7 +79,7 @@ export const FAQ_INTERN: CmsFaqItem[] = [
     "id": "dae66303-29d6-44b8-b56c-f0198337a67a",
     "category": "Intern",
     "question": "Can I talk to someone from Findtern if I face issues during the AI interview?",
-    "answer": "Yes, you can reach our support team via email at [admin@findtern.in] or submit your query directly at https://findtern.in/contact. We understand that technical glitches can happen, and our team is always ready to assist you so you can complete your AI interview without any stress.",
+    "answer": "Yes, you can reach our support team via email at [communicate@findtern.in] or submit your query directly at https://findtern.in/contact. We understand that technical glitches can happen, and our team is always ready to assist you so you can complete your AI interview without any stress.",
     "sortOrder": 0,
     "isActive": true
   },
@@ -94,7 +94,7 @@ export const FAQ_INTERN: CmsFaqItem[] = [
   {
     "id": "02fff963-6383-4428-a564-df455fbdbe99",
     "category": "Intern",
-    "question": "Is the ₹2500 AI interview fee refundable if I don’t get internships?",
+    "question": "Is the ₹2,499 AI interview fee refundable if I don’t get internships?",
     "answer": "The AI interview fee is refundable. If you do not secure an internship within the guarantee window set out in the intern terms, you will receive a full refund.\n",
     "sortOrder": 0,
     "isActive": true
@@ -271,7 +271,7 @@ export const FAQ_INTERN: CmsFaqItem[] = [
     "id": "dc519ea8-7aff-4eae-b788-3e69a2fbcefa",
     "category": "Intern",
     "question": "Who do I contact if I face a technical issue?",
-    "answer": "If you face any technical issues like AI interview not loading, profile glitches, or notification delays, you can reach out to Findtern Support through the “Help & Support” section in your dashboard or email us at admin@Findtern.in. Our team will assist you quickly.",
+    "answer": "If you face any technical issues like AI interview not loading, profile glitches, or notification delays, you can reach out to Findtern Support through the “Help & Support” section in your dashboard or email us at communicate@findtern.in. Our team will assist you quickly.",
     "sortOrder": 0,
     "isActive": true
   },
@@ -383,7 +383,7 @@ export const FAQ_INTERN: CmsFaqItem[] = [
     "id": "ed74b0f2-46ae-457e-9e6b-f1d23e6e1e2e",
     "category": "Intern",
     "question": "Are there part-time and full-time internship options?",
-    "answer": "Yes, Findtern offers both part-time and full-time internships. Many companies also provide flexible or remote internship opportunities, making it easier for students to balance academics with work experience.",
+    "answer": "Findtern internships are full-time: 8 hours a day, 5 or 6 days a week. Many companies offer remote or hybrid work, which makes it easier to fit the internship around your studies.",
     "sortOrder": 0,
     "isActive": true
   },
@@ -407,7 +407,7 @@ export const FAQ_INTERN: CmsFaqItem[] = [
     "id": "d5d72a92-563f-4c3c-aa06-c068848b5772",
     "category": "Intern",
     "question": "What types of internships are listed on Findtern?",
-    "answer": "Findtern lists verified internships across multiple domains such as marketing, finance, human resources (HR), IT, data analysis, design, and more. Both online internships and on-site internships are available, depending on the company’s requirements. Whether you’re looking for paid internships, part-time roles, or full-time industry exposure, you’ll find diverse opportunities tailored for students and freshers.Every opportunity is screened to ensure that students get access to genuine and relevant internships.\n",
+    "answer": "Findtern lists verified internships across multiple domains such as marketing, finance, human resources (HR), IT, data analysis, design, and more. Both online internships and on-site internships are available, depending on the company’s requirements. Every internship is paid and full-time, giving you real industry exposure. Every opportunity is screened to ensure that students get access to genuine and relevant internships.\n",
     "sortOrder": 0,
     "isActive": true
   }
@@ -690,7 +690,7 @@ export const FAQ_EMPLOYER: CmsFaqItem[] = [
     "id": "761374b5-52f2-4776-8676-6fc1a2226052",
     "category": "Employer",
     "question": "How can I contact Findtern support?",
-    "answer": "You can reach us at:\n 📧 Email: Admin@findtern.in\n",
+    "answer": "You can reach us at:\n 📧 Email: communicate@findtern.in\n",
     "sortOrder": 0,
     "isActive": true
   },

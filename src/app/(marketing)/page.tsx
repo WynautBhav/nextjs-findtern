@@ -34,11 +34,11 @@ const HOME_HOWTO = howToJsonLd({
   description: "Seven steps from a candidate signing up to an employer hiring them, with the screening done in between.",
   steps: [
     { name: "Candidate onboarding", text: "Interns create a profile and join the platform." },
-    { name: "Academic verification", text: "Academic details are added and verified for authenticity." },
-    { name: "AI interview", text: "Candidates pick their interest areas and complete a tailored, structured AI interview." },
+    { name: "Personal verification", text: "Personal details and identity documents are added and verified for authenticity." },
+    { name: "Skill-based AI interview", text: "Candidates choose the skills they want to be hired for and complete a structured AI interview on exactly those skills." },
     { name: "Aptitude test", text: "Every candidate sits a structured aptitude test." },
     { name: "Coding test", text: "Candidates from a coding background complete a live coding test." },
-    { name: "Findtern Score", text: "Each intern receives one score out of 10 from academics, interview and test results." },
+    { name: "Findtern Score", text: "Each intern receives one Findtern Score out of 10, built from their AI interview, aptitude and coding results." },
     { name: "Hire", text: "Employers filter, sort and select interns by Findtern Score, skills and interests, then send a proposal." },
   ],
 });

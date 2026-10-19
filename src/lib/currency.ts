@@ -25,3 +25,45 @@ export function savingsPercent(nowMinor: number, wasMinor: number | null | undef
   if (!wasMinor || wasMinor <= nowMinor) return null;
   return Math.round(((wasMinor - nowMinor) / wasMinor) * 100);
 }
+
+/* ── Display currencies ────────────────────────────────────────────────
+ * Findtern bills in INR (India) and USD (everywhere else). A visitor abroad
+ * can choose to *see* the USD rate card in their own currency; the amount
+ * is converted from the USD figure at the reference rate below, rounded for
+ * display, and labelled as a reference - the invoice is still in USD.
+ * Rates are per 1 USD, reviewed by hand, deliberately not live: a price
+ * that drifts between page loads reads as a bait. */
+export const DISPLAY_RATES = {
+  USD: 1,
+  EUR: 0.92,
+  GBP: 0.79,
+  AED: 3.67,
+  SGD: 1.35,
+  AUD: 1.52,
+  CAD: 1.37,
+} as const;
+
+export type DisplayCurrency = keyof typeof DISPLAY_RATES;
+
+/** Every currency a visitor can pick. INR is the authored card; the rest derive from USD. */
+export type PriceCurrency = "INR" | DisplayCurrency;
+
+export const PRICE_CURRENCIES: { code: PriceCurrency; label: string }[] = [
+  { code: "INR", label: "Indian rupee" },
+  { code: "USD", label: "US dollar" },
+  { code: "EUR", label: "Euro" },
+  { code: "GBP", label: "British pound" },
+  { code: "AED", label: "UAE dirham" },
+  { code: "SGD", label: "Singapore dollar" },
+  { code: "AUD", label: "Australian dollar" },
+  { code: "CAD", label: "Canadian dollar" },
+];
+
+export function isPriceCurrency(value: string): value is PriceCurrency {
+  return PRICE_CURRENCIES.some((c) => c.code === value);
+}
+
+/** True for a currency shown by converting the USD card (not USD itself). */
+export function isConvertedCurrency(c: string): c is Exclude<DisplayCurrency, "USD"> {
+  return c !== "USD" && c in DISPLAY_RATES;
+}

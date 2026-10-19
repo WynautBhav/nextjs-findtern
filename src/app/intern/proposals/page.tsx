@@ -8,7 +8,7 @@ import { requireRole } from "@/lib/auth";
 import { loadInternData, projectNames } from "@/lib/intern-data";
 import { formatDayLabel, formatMoney } from "@/lib/format";
 import type { ProposalRow } from "@/lib/journey";
-import { parseOffer, internStipendInrMinor } from "@/lib/offer";
+import { parseOffer, internStipendInrMinor, offerPastStart } from "@/lib/offer";
 
 export const metadata: Metadata = {
   title: "Offers",
@@ -34,8 +34,17 @@ export default async function InternProposals() {
   const data = await loadInternData(session.uid);
   const projects = await projectNames(data.proposals.map((p) => p.projectId ?? ""));
 
-  const open = data.proposals.filter((p) => p.status === "sent");
-  const closed = data.proposals.filter((p) => p.status !== "sent");
+  // An unanswered offer whose start date has arrived reads as expired.
+  const shown = data.proposals.map((p) =>
+    (p.status === "sent" || p.status === "interview_scheduled") &&
+    offerPastStart(((p.offerDetails ?? {}) as Record<string, unknown>).startDate as string | undefined)
+      ? { ...p, status: "expired" }
+      : p,
+  );
+  const open = shown.filter((p) => p.status === "sent");
+  const closed = shown.filter((p) => p.status !== "sent");
+
+  const score = Number(((data.onboarding?.extraData ?? {}) as Record<string, unknown>).findternScore ?? 0) || 0;
 
   const rows = (list: typeof data.proposals) =>
     list.map((p) => {
@@ -45,7 +54,8 @@ export default async function InternProposals() {
         role: typeof offer.roleTitle === "string" ? offer.roleTitle : "Internship",
         company: data.names[p.employerId] ?? "A company on Findtern",
         stipend: (() => {
-          const minor = internStipendInrMinor(parseOffer(p.offerDetails, p.currency));
+          const minor = internStipendInrMinor(parseOffer(p.offerDetails, p.currency), score);
+          if (minor === 0) return "Not eligible for stipend";
           return minor != null ? `${formatMoney(minor, "INR")}/month` : "Stipend to be confirmed";
         })(),
         start: typeof offer.startDate === "string" ? offer.startDate : null,

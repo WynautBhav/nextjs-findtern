@@ -7,6 +7,8 @@ import { AdminPageHeader } from "@/components/admin/panel";
 import { StatCard, StatGrid } from "@/components/admin/stat-card";
 import { MessagesInbox } from "@/components/admin/messages-inbox";
 import { formatNumber } from "@/lib/format";
+import { getSession } from "@/lib/auth";
+import { allows } from "@/lib/admin/permissions";
 
 export default async function AdminMessagesPage({
   searchParams,
@@ -18,7 +20,16 @@ export default async function AdminMessagesPage({
 
   const db = getDb();
 
+  // Legacy buckets: staff see only the messages their role handles.
+  const session = await getSession();
+  const seeIntern = allows(session?.permissions, ["contact:intern:read", "contact:intern:write"]);
+  const seeEmployer = allows(session?.permissions, ["contact:employer:read", "contact:employer:write"]);
+  const isInternMsg = sql`lower(trim(coalesce(${schema.contactMessages.queryType}, ''))) = 'intern'`;
+  const bucket: SQL | undefined =
+    seeIntern && seeEmployer ? undefined : seeIntern ? isInternMsg : seeEmployer ? sql`not ${isInternMsg}` : sql`false`;
+
   const conditions: (SQL | undefined)[] = [
+    bucket,
     searchAny(
       [
         sql`${schema.contactMessages.firstName}`,
@@ -50,8 +61,11 @@ export default async function AdminMessagesPage({
       .orderBy(desc(schema.contactMessages.createdAt))
       .limit(req.perPage)
       .offset(req.offset),
-    db.select({ c: count() }).from(schema.contactMessages),
-    db.select({ c: count() }).from(schema.contactMessages).where(eq(schema.contactMessages.isRead, false)),
+    db.select({ c: count() }).from(schema.contactMessages).where(bucket),
+    db
+      .select({ c: count() })
+      .from(schema.contactMessages)
+      .where(bucket ? sql`${bucket} and ${schema.contactMessages.isRead} = false` : eq(schema.contactMessages.isRead, false)),
   ]);
   const totalInbound = Number(totalInboundRow?.c ?? 0);
   const unreadCount = Number(unreadCountRow?.c ?? 0);

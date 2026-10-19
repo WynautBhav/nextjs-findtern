@@ -1,23 +1,60 @@
 import { and, desc, eq, gt, isNotNull } from "drizzle-orm";
+import type { NextResponse } from "next/server";
 
 import { getDb, schema } from "@/lib/db";
+import { readCookie } from "@/lib/security/session";
+import { sign, verify } from "@/lib/security/sign";
 
 /**
  * Signup email verification, shared by the intern and employer flows.
  *
- * `send-otp` stores a hashed code, `verify-otp` stamps `usedAt`. The account
- * routes call `hasVerifiedSignupOtp` so a client that skips straight to the
- * create call is refused: `emailVerified: true` is only ever written after a
- * real verification inside this window.
+ * `send-otp` stores a hashed code, `verify-otp` stamps `usedAt` and hands the
+ * browser a signed proof cookie. The account routes call
+ * `hasVerifiedSignupOtp`, which needs both: a code verified inside the window
+ * AND the proof cookie for that exact email. Without the cookie, anyone who
+ * submitted the signup form for a just-verified address inside the window
+ * would get the account with their own password - legacy bound verification
+ * to the browser session for the same reason (routes.ts:3753).
  */
 
 export const SIGNUP_OTP_SUBJECTS = ["intern", "employer"] as const;
 export type SignupOtpSubject = (typeof SIGNUP_OTP_SUBJECTS)[number];
 
-/** How long after verifying the code the account must be created. */
-const VERIFIED_WINDOW_MS = 30 * 60_000;
+/** How long after verifying the code the account must be created (legacy: 15 min). */
+export const VERIFIED_WINDOW_MS = 15 * 60_000;
 
-export async function hasVerifiedSignupOtp(subject: SignupOtpSubject, email: string): Promise<boolean> {
+const PROOF_COOKIE = "ft_otp";
+const PROOF_KIND = "signup-otp";
+
+/** Attach the proof that this browser entered the code for `email`. */
+export function attachOtpProof(res: NextResponse, subject: SignupOtpSubject, email: string): void {
+  const ttl = VERIFIED_WINDOW_MS / 1000;
+  res.cookies.set(PROOF_COOKIE, sign({ k: email, s: subject, d: PROOF_KIND }, ttl), {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: ttl,
+  });
+}
+
+function hasOtpProof(req: Request, subject: SignupOtpSubject, email: string): boolean {
+  const token = readCookie(req.headers.get("cookie"), PROOF_COOKIE);
+  if (!token) return false;
+  try {
+    const p = verify(token);
+    return p.d === PROOF_KIND && p.s === subject && p.k === email;
+  } catch {
+    return false;
+  }
+}
+
+export async function hasVerifiedSignupOtp(
+  req: Request,
+  subject: SignupOtpSubject,
+  email: string,
+): Promise<boolean> {
+  if (!hasOtpProof(req, subject, email)) return false;
   const db = getDb();
   const [row] = await db
     .select({ id: schema.emailOtps.id })

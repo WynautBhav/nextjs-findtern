@@ -1,9 +1,10 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
+import { poolInternIds } from "@/lib/employer-pool";
 
 /**
  * Employer cart.
@@ -65,6 +66,36 @@ export async function POST(req: Request) {
         .limit(1);
       if (!project) return NextResponse.json({ error: "Unknown project" }, { status: 404 });
 
+      // Only someone in the candidate pool can be shortlisted, and not anyone
+      // this employer already hired or has an offer out to - legacy refused
+      // both and sent the employer to the existing proposal instead.
+      if (!(await poolInternIds(db, [internId])).has(internId)) {
+        return NextResponse.json({ error: "This candidate is not available" }, { status: 404 });
+      }
+      const [existing] = await db
+        .select({ id: schema.proposals.id, status: schema.proposals.status })
+        .from(schema.proposals)
+        .where(
+          and(
+            eq(schema.proposals.employerId, employerId),
+            eq(schema.proposals.internId, internId),
+            inArray(schema.proposals.status, ["sent", "accepted", "processing", "hired"]),
+          ),
+        )
+        .limit(1);
+      if (existing) {
+        return NextResponse.json(
+          {
+            error:
+              existing.status === "hired"
+                ? "You have already hired this candidate"
+                : "You already have an offer out to this candidate",
+            proposalId: existing.id,
+          },
+          { status: 409 },
+        );
+      }
+
       await db
         .insert(schema.employerCartItems)
         .values({ employerId, projectId, internId, listType })
@@ -87,42 +118,17 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true });
     }
 
-    // stage / stage_all: promote shortlisted rows into the checkout set.
-    // Shortlisted rows stay put - a shortlist is a browsing aid, the staged set
-    // is the billable one, and conflating them makes "remove" ambiguous.
-    const stageAll = parsed.data.action === "stage_all";
-    const single = parsed.data.action === "stage" ? parsed.data : null;
-    const filters = [
-      eq(schema.employerCartItems.employerId, employerId),
-      eq(schema.employerCartItems.listType, "cart"),
-    ];
-    if (single) filters.push(eq(schema.employerCartItems.internId, single.internId));
-    if (single?.projectId) filters.push(eq(schema.employerCartItems.projectId, single.projectId));
-
-    const rows = await db
-      .select()
-      .from(schema.employerCartItems)
-      .where(and(...filters));
-
-    if (rows.length === 0) {
+    // stage / stage_all (sheet row 62): nobody is hired straight from the
+    // shortlist. A hire starts with a proposal the candidate accepts, and
+    // accepted offers are paid at /employer/checkout.
+    if (parsed.data.action === "stage" || parsed.data.action === "stage_all") {
       return NextResponse.json(
-        { error: stageAll ? "Your shortlist is empty" : "That candidate is not shortlisted" },
-        { status: 404 },
+        { error: "Send this candidate a proposal first. Accepted offers are paid at checkout." },
+        { status: 400 },
       );
     }
 
-    for (const row of rows) {
-      await db
-        .insert(schema.employerCartItems)
-        .values({
-          employerId,
-          projectId: row.projectId,
-          internId: row.internId,
-          listType: "checkout",
-        })
-        .onConflictDoNothing();
-    }
-    return NextResponse.json({ ok: true, staged: rows.length });
+    return NextResponse.json({ error: "Unknown action" }, { status: 400 });
   } catch (e: unknown) {
     console.error("[employer/cart]", e);
     return NextResponse.json(

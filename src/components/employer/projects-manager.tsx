@@ -28,7 +28,10 @@ import {
 import { PageHeader } from "@/components/layout/page-header";
 import { csrfFetch } from "@/lib/client-fetch";
 import { suggestSkills } from "@/lib/data/skills";
-import type { Project } from "@/lib/db/schema";
+import { scopeLabel, scopeOfWorkOptions, type Project } from "@/lib/db/schema";
+
+/** Sheet row 59: a project lists at most 7 skills (the API enforces it too). */
+const MAX_SKILLS = 7;
 
 export function ProjectsManager({
   employerId,
@@ -50,7 +53,7 @@ export function ProjectsManager({
   const [projectName, setProjectName] = useState("");
   const [skills, setSkills] = useState<string[]>([]);
   const [skillDraft, setSkillDraft] = useState("");
-  const [scopeOfWork, setScopeOfWork] = useState("Short-term");
+  const [scopeOfWork, setScopeOfWork] = useState<string>(scopeOfWorkOptions[0].value);
   const [locationType, setLocationType] = useState("remote");
   const [city, setCity] = useState("");
   const [state, setState] = useState("");
@@ -74,7 +77,7 @@ export function ProjectsManager({
     setProjectName("");
     setSkills([]);
     setSkillDraft("");
-    setScopeOfWork("Short-term");
+    setScopeOfWork(scopeOfWorkOptions[0].value);
     setLocationType("remote");
     setCity("");
     setState("");
@@ -89,7 +92,12 @@ export function ProjectsManager({
     setProjectName(p.projectName);
     setSkills((p.skills as string[]) ?? []);
     setSkillDraft("");
-    setScopeOfWork(p.scopeOfWork ?? "Short-term");
+    // An older value maps to the nearest current option on edit.
+    setScopeOfWork(
+      scopeOfWorkOptions.find((o) => o.value === p.scopeOfWork)?.value ??
+        scopeOfWorkOptions.find((o) => o.label === scopeLabel(p.scopeOfWork))?.value ??
+        scopeOfWorkOptions[0].value,
+    );
     setLocationType(p.locationType ?? "remote");
     setCity(p.city ?? "");
     setState(p.state ?? "");
@@ -102,7 +110,7 @@ export function ProjectsManager({
   function addSkill(s: string) {
     const trimmed = s.trim();
     if (!trimmed || skills.some((e) => e.toLowerCase() === trimmed.toLowerCase())) return;
-    if (skills.length >= 8) return;
+    if (skills.length >= MAX_SKILLS) return;
     setSkills([...skills, trimmed]);
     setSkillDraft("");
   }
@@ -390,7 +398,7 @@ export function ProjectsManager({
                     <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-text-subtle">
                       <span className="flex items-center gap-1">
                         <Briefcase className="size-3.5 text-ink-400" />
-                        <span>{p.scopeOfWork || "Standard"}</span>
+                        <span>{scopeLabel(p.scopeOfWork)}</span>
                       </span>
                       <span className="flex items-center gap-1">
                         <MapPin className="size-3.5 text-ink-400" />
@@ -514,7 +522,7 @@ export function ProjectsManager({
             {/* Skills selection with 2,482 shared vocabulary */}
             <div>
               <label htmlFor="projectSkills" className="block text-xs font-semibold text-ink-800">
-                Required Skills * ({skills.length}/8)
+                Required Skills * ({skills.length}/{MAX_SKILLS})
               </label>
               <p className="mt-0.5 text-xs text-text-subtle">
                 Search the 2,482 shared skills vocabulary. Press Enter to add.
@@ -536,13 +544,13 @@ export function ProjectsManager({
                       }
                     }}
                     placeholder="e.g. React, TypeScript, Python"
-                    disabled={skills.length >= 8}
+                    disabled={skills.length >= MAX_SKILLS}
                     className="apple-spring min-h-11 flex-1 rounded-[10px] border border-ink-200 bg-white px-3.5 text-[14px] text-ink-900 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 disabled:bg-ink-50"
                   />
                   <button
                     type="button"
                     onClick={() => addSkill(skillDraft)}
-                    disabled={skills.length >= 8 || !skillDraft.trim()}
+                    disabled={skills.length >= MAX_SKILLS || !skillDraft.trim()}
                     className="apple-spring apple-pressable min-h-11 rounded-[10px] border border-ink-200 bg-white px-3 text-xs font-semibold text-ink-800 hover:bg-ink-50 disabled:opacity-50"
                   >
                     Add
@@ -602,10 +610,11 @@ export function ProjectsManager({
                   onChange={(e) => setScopeOfWork(e.target.value)}
                   className="apple-spring mt-1.5 min-h-11 w-full rounded-[10px] border border-ink-200 bg-white px-3 text-[14px] text-ink-900 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
                 >
-                  <option value="Short-term">Short-term (1–3 mos)</option>
-                  <option value="Long-term">Long-term (4–6 mos)</option>
-                  <option value="Trial-to-hire">Trial to Hire</option>
-                  <option value="Custom">Custom Scope</option>
+                  {scopeOfWorkOptions.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
                 </select>
               </div>
 

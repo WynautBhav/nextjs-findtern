@@ -26,8 +26,9 @@ export const metadata: Metadata = {
  * taking money for.
  *
  * ── Payment ─────────────────────────────────────────────────────────────
- * One Razorpay order per currency total: an order is single-currency, and
- * converting silently would bill the wrong amount. The totals come from
+ * One hire per Razorpay order (legacy checkout), paid upfront in the
+ * currency of the company's country. A monthly placement that is already
+ * running shows up here when its next month is due. The totals come from
  * `payableCheckout` (lib/employer-payable), which the order route also calls
  * to recompute the charge server-side - the client only carries ids, so an
  * edited request cannot change the price. The verify route checks the HMAC
@@ -145,10 +146,8 @@ export default async function EmployerCheckout() {
                 id: line.id,
                 label: `${displayNameOf({ fullName: line.internName, initials: line.internInitials }, line.nameUnlocked)} · ${line.roleTitle}`,
                 currency: line.currency,
-                // A due month is always a one-month charge, whichever plan is picked.
-                upfrontMinor: line.charge.totalMinor,
-                monthlyMinor: line.due ? line.charge.totalMinor : line.monthlyCharge.totalMinor,
-                monthlyBlocked: line.due ? null : line.charge.monthlyBlocked,
+                // New hires pay upfront; a running monthly placement pays its due month.
+                amountMinor: line.charge.totalMinor,
               }))}
             />
 

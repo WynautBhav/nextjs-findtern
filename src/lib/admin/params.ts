@@ -90,10 +90,16 @@ export function searchAny(
   columns: SQL.Aliased[] | SQL[],
   needle: string,
 ): SQL | undefined {
-  if (!needle) return undefined;
-  const escaped = needle.replace(/([%_\\])/g, "\\$1");
-  const parts = columns.map((c) => sql`${c} ILIKE ${`%${escaped}%`} ESCAPE '\\'`);
-  return sql`(${sql.join(parts, sql` OR `)})`;
+  // Every word must match some column (legacy rule), so "john doe" finds
+  // John Doe even though no single column holds both words.
+  const words = needle.trim().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return undefined;
+  const perWord = words.map((word) => {
+    const escaped = word.replace(/([%_\\])/g, "\\$1");
+    const parts = columns.map((c) => sql`${c} ILIKE ${`%${escaped}%`} ESCAPE '\\'`);
+    return sql`(${sql.join(parts, sql` OR `)})`;
+  });
+  return sql`(${sql.join(perWord, sql` AND `)})`;
 }
 
 /** The uniform result shape every admin list query resolves to. */

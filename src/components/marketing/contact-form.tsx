@@ -5,6 +5,8 @@ import { AlertCircle, Check, Send } from "lucide-react";
 
 import { SITE, getGmailComposeUrl } from "@/lib/content/site";
 import { cn } from "@/lib/utils";
+import { EmailLink } from "@/components/marketing/email-link";
+import { INDIA_CODE, phoneError, phoneHint } from "@/lib/phone";
 
 /**
  * Contact form.
@@ -71,6 +73,10 @@ export function ContactForm() {
   const [error, setError] = useState<string | null>(null);
   const uid = useId();
 
+  // Optional, but when given it must be a real number for its country:
+  // exactly 10 digits starting 6-9 for India, 6-15 digits elsewhere.
+  const phoneProblem = v.phone.trim() ? phoneError(v.countryCode, v.phone) : null;
+
   const emailProblem =
     v.queryType === "hiring" && v.email.includes("@")
       ? FREE_EMAIL.includes(v.email.split("@")[1]?.toLowerCase() ?? "")
@@ -85,7 +91,7 @@ export function ContactForm() {
     v.message.trim().length < 10 && "a message of at least 10 characters",
   ].filter(Boolean) as string[];
 
-  const valid = missing.length === 0 && !emailProblem;
+  const valid = missing.length === 0 && !emailProblem && !phoneProblem;
 
   const set =
     (k: keyof Values) =>
@@ -139,15 +145,7 @@ export function ContactForm() {
         </h3>
         <p className="mt-2 max-w-sm text-base leading-relaxed text-ink-600">
           We read every one. If it needs a faster answer, email{" "}
-          <a
-            href={getGmailComposeUrl({ subject: "Findtern enquiry follow-up" })}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="font-medium text-primary underline underline-offset-4"
-          >
-            {SITE.email}
-          </a>
-          .
+          <EmailLink subject="Findtern enquiry follow-up" />
         </p>
       </div>
     );
@@ -218,7 +216,11 @@ export function ContactForm() {
           />
         </Field>
 
-        <Field id={`${uid}-ph`} label="Phone" hint="Optional">
+        <Field
+          id={`${uid}-ph`}
+          label="Phone"
+          hint={phoneProblem ?? `Optional. ${phoneHint(v.countryCode)}`}
+        >
           <div className="flex gap-2">
             <select
               aria-label="Country code"
@@ -235,10 +237,20 @@ export function ContactForm() {
             <input
               id={`${uid}-ph`}
               type="tel"
+              inputMode="numeric"
               value={v.phone}
-              onChange={set("phone")}
+              onChange={(e) => {
+                // Digits only, capped at the country's length, so a number
+                // can never be typed longer than it is allowed to be.
+                const max = v.countryCode === INDIA_CODE ? 10 : 15;
+                const digits = e.target.value.replace(/\D/g, "").slice(0, max);
+                setV((prev) => ({ ...prev, phone: digits }));
+                if (status === "error") setStatus("idle");
+              }}
+              maxLength={v.countryCode === INDIA_CODE ? 10 : 15}
               autoComplete="tel-national"
-              className={inputCls}
+              aria-invalid={phoneProblem ? true : undefined}
+              className={cn(inputCls, phoneProblem && "border-danger")}
             />
           </div>
         </Field>

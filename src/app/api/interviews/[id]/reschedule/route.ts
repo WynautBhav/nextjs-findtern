@@ -7,6 +7,7 @@ import { emails } from "@/lib/emails";
 import { requireMutation } from "@/lib/guards-mutation";
 import { employerNames, internFirstName, notify } from "@/lib/notify";
 import { wallTimeToUtc } from "@/lib/timezones";
+import { hasDuplicateSlots, isQuarterHourWall } from "@/lib/employer-interview-rules";
 
 const wall = z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/);
 const bodySchema = z.object({ slot1: wall.optional(), slot2: wall.optional(), slot3: wall.optional() });
@@ -38,10 +39,17 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   let slots: (Date | null)[] = [interview.slot1, interview.slot2, interview.slot3];
   if (byEmployer) {
     const wanted = [parsed.data.slot1, parsed.data.slot2, parsed.data.slot3].filter((s): s is string => Boolean(s));
-    if (wanted.length === 0) return NextResponse.json({ error: "Offer at least one time" }, { status: 400 });
+    // Same rule as booking: three times, on the quarter hour.
+    if (wanted.length !== 3) return NextResponse.json({ error: "Offer three time slots." }, { status: 400 });
+    if (!wanted.every(isQuarterHourWall)) {
+      return NextResponse.json({ error: "Slots start on the hour or at :15, :30 or :45." }, { status: 400 });
+    }
     slots = wanted.map((s) => wallTimeToUtc(s, interview.timezone || "Asia/Kolkata"));
     if (slots.some((s) => s!.getTime() < Date.now())) {
       return NextResponse.json({ error: "Slots must be in the future" }, { status: 400 });
+    }
+    if (hasDuplicateSlots(slots as Date[])) {
+      return NextResponse.json({ error: "Offer different times - two slots are the same." }, { status: 400 });
     }
   }
 
@@ -58,6 +66,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       updatedAt: new Date(),
     })
     .where(eq(schema.interviews.id, id));
+
+  // An AI interview's "employer" is the synthetic `admin` row - nobody to
+  // tell (legacy R:11717 skipped it too).
+  if (!byEmployer && interview.employerId === "admin") return NextResponse.json({ ok: true });
 
   await notify(
     byEmployer

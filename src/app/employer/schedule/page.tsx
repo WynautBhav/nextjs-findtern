@@ -3,13 +3,13 @@ import { desc, eq, inArray } from "drizzle-orm";
 
 import { getDb, schema } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
+import { canMarkMissed, displayInterviewStatus, isMeetingLinkLive } from "@/lib/employer-interview-rules";
 import { PageHeader, EmptyState } from "@/components/layout/page-header";
 import { Pill } from "@/components/app/primitives";
 import { ButtonLink } from "@/components/ui/button";
 import { interviewPill } from "@/components/app/status";
 import { displayNameOf, initialsOf } from "@/lib/employer-candidates";
 import { hiredInternIds } from "@/lib/employer-visibility";
-import { isPast } from "@/lib/journey";
 import { InterviewActions } from "@/components/employer/interview-actions";
 
 /**
@@ -101,7 +101,11 @@ export default async function EmployerSchedule() {
           {rows.map((i) => {
             const slots = [i.slot1, i.slot2, i.slot3].filter((s): s is Date => s instanceof Date);
             const chosen = i.selectedSlot && i.selectedSlot >= 1 ? i.selectedSlot : null;
-            const past = slots.length > 0 && isPast(slots[0]);
+            // "Past" for actions means the meeting time plus the 15-minute
+            // grace (mark missed); a pending invite whose slots all passed
+            // shows as expired; the join link goes an hour after the start.
+            const past = canMarkMissed(i);
+            const shownStatus = displayInterviewStatus(i);
             return (
               <li key={i.id} className="apple-spring rounded-[20px] border border-ink-200/70 bg-white p-5 shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)]">
                 <div className="flex flex-wrap items-start justify-between gap-4">
@@ -151,7 +155,7 @@ export default async function EmployerSchedule() {
                   </div>
 
                   <div className="flex shrink-0 flex-col items-end gap-3">
-                    <StatusPill status={i.status} />
+                    <StatusPill status={shownStatus} />
                     <div className="flex items-center gap-2">
                       <ButtonLink
                         href={`/employer/intern/${encodeURIComponent(i.internId)}`}
@@ -161,7 +165,7 @@ export default async function EmployerSchedule() {
                       >
                         Profile
                       </ButtonLink>
-                      {i.meetingLink ? (
+                      {i.meetingLink && isMeetingLinkLive(i) ? (
                         <ButtonLink
                           href={i.meetingLink}
                           variant="outline"
@@ -175,7 +179,7 @@ export default async function EmployerSchedule() {
                   </div>
                 </div>
 
-                <InterviewActions interviewId={i.id} past={past} status={i.status} />
+                <InterviewActions interviewId={i.id} past={past} status={i.status} timezone={i.timezone || "Asia/Kolkata"} />
               </li>
             );
           })}

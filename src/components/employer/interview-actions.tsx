@@ -18,6 +18,7 @@ import { useRouter } from "next/navigation";
 import { Bell, CalendarClock, Check, Loader2, MessageSquare, X } from "lucide-react";
 
 import { csrfFetch } from "@/lib/client-fetch";
+import { isQuarterHourWall, suggestedSlots } from "@/lib/employer-interview-rules";
 
 type Panel = "none" | "reschedule" | "feedback";
 
@@ -25,10 +26,13 @@ export function InterviewActions({
   interviewId,
   past,
   status,
+  timezone = "Asia/Kolkata",
 }: {
   interviewId: string;
   past: boolean;
   status: string;
+  /** The interview's timezone; suggested slots are wall-clock times in it. */
+  timezone?: string;
 }) {
   const router = useRouter();
   const [panel, setPanel] = useState<Panel>("none");
@@ -75,14 +79,20 @@ export function InterviewActions({
   }
 
   async function reschedule() {
-    const payload: Record<string, string> = {};
-    slots.forEach((v, i) => {
-      if (v) payload[`slot${i + 1}`] = v; // wall-clock; the server applies the interview's timezone
-    });
-    if (Object.keys(payload).length === 0) {
-      setError("Offer at least one time.");
+    if (slots.some((v) => !v)) {
+      setError("Offer three times.");
       return;
     }
+    if (!slots.every(isQuarterHourWall)) {
+      setError("Slots start on the hour or at :15, :30 or :45.");
+      return;
+    }
+    if (new Set(slots).size !== 3) {
+      setError("Offer three different times.");
+      return;
+    }
+    // Wall-clock; the server applies the interview's timezone.
+    const payload = { slot1: slots[0], slot2: slots[1], slot3: slots[2] };
     if (await post("reschedule", payload, "reschedule")) {
       setNotice("New slots offered.");
       setPanel("none");
@@ -119,7 +129,10 @@ export function InterviewActions({
         <Action
           icon={<CalendarClock className="size-3.5" />}
           label={panel === "reschedule" ? "Cancel reschedule" : "Reschedule"}
-          onClick={() => setPanel(panel === "reschedule" ? "none" : "reschedule")}
+          onClick={() => {
+            if (panel !== "reschedule") setSlots(suggestedSlots(Date.now(), timezone));
+            setPanel(panel === "reschedule" ? "none" : "reschedule");
+          }}
           active={panel === "reschedule"}
           disabled={busy !== null || closed}
         />
@@ -146,14 +159,16 @@ export function InterviewActions({
         <div className="mt-4 rounded-[10px] border border-ink-200/70 bg-ink-50 p-4">
           <p className="text-sm font-medium text-ink-800">Offer three new times</p>
           <p className="mt-1 text-xs leading-relaxed text-ink-600">
-            The candidate picks one. Blank fields are ignored. Times are read in the interview&apos;s
-            timezone.
+            The candidate picks one. Suggested: the next quarter hour and the two hours after it -
+            change any of them. Times are read in the interview&apos;s timezone ({timezone}).
           </p>
           <div className="mt-3 grid gap-2 sm:grid-cols-3">
             {slots.map((value, idx) => (
               <input
                 key={idx}
                 type="datetime-local"
+                step={900}
+                required
                 value={value}
                 onChange={(e) => {
                   const next = [...slots] as [string, string, string];

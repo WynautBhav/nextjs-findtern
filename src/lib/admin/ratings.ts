@@ -1,20 +1,45 @@
-export type RatingUpdate = Partial<Record<"communication" | "coding" | "aptitude" | "interview", number>>;
+export const RATING_KEYS = ["communication", "coding", "aptitude", "interview"] as const;
+
+/** A number sets the rating, `null` clears it, `undefined` leaves it alone. */
+export type RatingUpdate = Partial<Record<(typeof RATING_KEYS)[number], number | null>>;
+
+const clampRound = (n: number) => Math.round(Math.min(10, Math.max(0, n)) * 10) / 10;
 
 /**
- * Merge new AI-interview ratings into `extraData`. The Findtern Score is the
- * given one when present (bulk import column), otherwise the mean of the
- * four ratings.
+ * Merge new AI-interview ratings into `extraData`.
+ *
+ * Same rule as legacy: the Findtern Score is the given one when present (bulk
+ * import column), otherwise the mean of the four core ratings only - older
+ * `overall` / `academic` keys never count - clamped to 0-10 and rounded to one
+ * decimal. With no ratings left and no given score, the score is removed.
  */
 export function applyRatings(
   extra: Record<string, unknown>,
   updates: RatingUpdate,
   explicitScore?: number | null,
 ): Record<string, unknown> {
-  const defined = Object.fromEntries(Object.entries(updates).filter(([, v]) => typeof v === "number"));
-  const ratings = { ...((extra.ratings as Record<string, number>) ?? {}), ...defined };
-  const values = Object.values(ratings).filter((v): v is number => typeof v === "number");
-  const mean = values.length ? values.reduce((a, b) => a + b, 0) / values.length : null;
-  return { ...extra, ratings, findternScore: explicitScore ?? mean };
+  const ratings: Record<string, number> = { ...((extra.ratings as Record<string, number>) ?? {}) };
+  for (const [k, v] of Object.entries(updates)) {
+    if (v === null) delete ratings[k];
+    else if (typeof v === "number") ratings[k] = v;
+  }
+  const values = RATING_KEYS.map((k) => ratings[k]).filter((v): v is number => typeof v === "number" && Number.isFinite(v));
+  const score =
+    typeof explicitScore === "number" && Number.isFinite(explicitScore)
+      ? clampRound(explicitScore)
+      : values.length
+        ? clampRound(values.reduce((a, b) => a + b, 0) / values.length)
+        : null;
+  const next: Record<string, unknown> = { ...extra, ratings };
+  if (score === null) delete next.findternScore;
+  else next.findternScore = score;
+  return next;
+}
+
+/** True when this change gives the intern their first live (> 0) score. */
+export function firstLiveScore(prev: Record<string, unknown>, next: Record<string, unknown>): boolean {
+  const live = (e: Record<string, unknown>) => typeof e.findternScore === "number" && e.findternScore > 0;
+  return !live(prev) && live(next);
 }
 
 /** Minimal RFC 4180 CSV reader: quoted fields, escaped quotes, CRLF. */
@@ -51,20 +76,39 @@ export function parseCsv(text: string): string[][] {
 
 export const RATINGS_TEMPLATE = "email,communication,coding,aptitude,ai interview,findternScore\r\nintern@example.com,8,7,6,7,7\r\n";
 
+/** The same template as rows, for the .xlsx sample (legacy shipped an Excel one). */
+export const RATINGS_TEMPLATE_ROWS: (string | number)[][] = [
+  ["email", "communication", "coding", "aptitude", "ai interview", "findternScore"],
+  ["intern@example.com", 8, 7, 6, 7, 7],
+];
+
+/** Legacy aliases. Headings match ignoring case, spaces, `-` and `_`. */
 const HEADER_KEYS: Record<string, string[]> = {
-  email: ["email", "email address", "user email"],
-  communication: ["communication", "comm"],
-  coding: ["coding", "code"],
-  aptitude: ["aptitude", "apt"],
-  interview: ["ai interview", "ai_interview", "interview"],
-  findternScore: ["findternscore", "findtern score", "score"],
+  email: ["email", "email address", "user email", "e-mail", "mail"],
+  communication: ["communication", "comm", "communication rating"],
+  coding: ["coding", "code", "coding rating"],
+  aptitude: ["aptitude", "apt", "aptitude rating"],
+  interview: ["ai interview", "interview", "ai interview rating", "interview rating"],
+  findternScore: ["findternscore", "findtern score", "findtern", "score"],
 };
 
+const normHeader = (h: string) => h.toLowerCase().replace(/[\s\-_]/g, "");
+
 /** Rows of { email, updates, score } from the bulk ratings sheet. */
-export function readRatingsSheet(text: string): { row: number; email: string; updates: RatingUpdate; score: number | null; error?: string }[] {
-  const [header, ...rows] = parseCsv(text);
+export function readRatingsSheet(text: string): RatingsRow[] {
+  return readRatingsRows(parseCsv(text));
+}
+
+export type RatingsRow = { row: number; email: string; updates: RatingUpdate; score: number | null; error?: string };
+
+/** Same as `readRatingsSheet`, from rows already split into cells (CSV or .xlsx). */
+export function readRatingsRows(cells: string[][]): RatingsRow[] {
+  const [header, ...rows] = cells;
   if (!header) return [];
-  const col = (key: string) => header.findIndex((h) => HEADER_KEYS[key].includes(h.trim().toLowerCase()));
+  const col = (key: string) => {
+    const wanted = HEADER_KEYS[key].map(normHeader);
+    return header.findIndex((h) => wanted.includes(normHeader(h)));
+  };
   const idx = Object.fromEntries(Object.keys(HEADER_KEYS).map((k) => [k, col(k)]));
   const num = (r: string[], k: string) => {
     if (idx[k] < 0) return undefined;

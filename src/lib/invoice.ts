@@ -36,7 +36,20 @@ export type InvoiceInput = {
   buyer: InvoiceBuyer;
   /** SAC for the service line; 998519 = other employment & labour supply services. */
   sac?: string;
+  /** Placements this payment covers, listed under the service line (legacy did). */
+  items?: string[];
+  /** Promo applied; the total above is already net of it. */
+  promo?: { code: string; discountMinor?: number | null } | null;
 };
+
+/**
+ * The invoice number to print: the FY serial stored at payment
+ * (lib/invoice-number), else the old id-derived form for rows paid before
+ * numbering existed and not yet backfilled.
+ */
+export function invoiceNumberOf(row: { id: string; invoiceNumber?: string | null }, fallbackPrefix = "INV"): string {
+  return row.invoiceNumber || `${fallbackPrefix}-${row.id.slice(0, 8).toUpperCase()}`;
+}
 
 function esc(value: unknown): string {
   return String(value ?? "")
@@ -153,7 +166,11 @@ export function taxInvoiceHtml(input: InvoiceInput): string {
     </thead>
     <tbody>
       <tr>
-        <td><strong>${esc(input.description)}</strong><br /><span class="muted">Order ref: ${esc(input.orderId)}</span></td>
+        <td><strong>${esc(input.description)}</strong><br /><span class="muted">Order ref: ${esc(input.orderId)}</span>${
+          input.items?.length
+            ? `<br /><span class="muted">${input.items.map((item) => `• ${esc(item)}`).join("<br />")}</span>`
+            : ""
+        }</td>
         <td>${esc(input.sac ?? "998519")}</td>
         <td style="text-align: right">${m(split.baseMinor)}</td>
       </tr>
@@ -163,6 +180,13 @@ export function taxInvoiceHtml(input: InvoiceInput): string {
   <div class="totals">
     <div class="row"><span>Taxable value</span><span>${m(split.baseMinor)}</span></div>
     ${taxRows}
+    ${
+      input.promo
+        ? `<div class="row"><span>Promo ${esc(input.promo.code)} applied</span><span>${
+            input.promo.discountMinor ? `− ${m(input.promo.discountMinor)}` : "included"
+          }</span></div>`
+        : ""
+    }
     <div class="row final"><span>Total paid</span><span>${m(split.totalMinor)}</span></div>
   </div>
   ${exportNote}

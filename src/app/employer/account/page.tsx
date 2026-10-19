@@ -55,6 +55,7 @@ export default async function EmployerAccount() {
     escalationContactCountryCode: employer?.escalationContactCountryCode ?? null,
     escalationContactPhone: employer?.escalationContactPhone ?? null,
     gstNumber: employer?.gstNumber ?? null,
+    billingPincode: employer?.billingPincode ?? null,
   };
 
   return (

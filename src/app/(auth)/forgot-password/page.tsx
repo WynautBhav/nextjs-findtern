@@ -14,7 +14,7 @@ export default function ForgotPasswordPage() {
       compact
       eyebrow="Account recovery"
       title="Reset your password."
-      subtitle="We email a single-use link that expires in one hour."
+      subtitle="We email a single-use link that expires in 30 minutes."
     >
       <h1 className="text-2xl font-semibold tracking-tight text-ink-900">Forgot password</h1>
       <p className="mt-1.5 text-sm text-text-subtle">

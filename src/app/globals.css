@@ -921,6 +921,36 @@
   margin-block-start: 0;
 }
 
+/* Legal documents: clause headings at reading size, separated by a rule.
+   At article size every clause title read like a page title, so a short
+   agreement looked like a stack of posters. */
+.prose-legal .rt-h2 {
+  font-size: var(--text-lg);
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: -0.01em;
+  margin-block: 2.25em 0.5em;
+  padding-top: 1.75em;
+  border-top: 1px solid var(--color-ink-100);
+}
+/* The body HTML is injected into a wrapper div, so the first clause heading
+   is a grandchild of the article, not a child. */
+.prose-legal > div > .rt-h2:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+.prose-legal .rt-h3 {
+  font-size: var(--text-base);
+  font-weight: 600;
+  letter-spacing: 0;
+  margin-block: 1.5em 0.4em;
+}
+.prose-legal .rt-h4 {
+  font-size: var(--text-base);
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
 .prose-rt .rt-ul,
 .prose-rt .rt-ol {
   margin-block: 1.15em;
@@ -1118,6 +1148,19 @@
   }
 
   /* ── Clean PDF & Print Rules ────────────────────────────────────────── */
+  /* Single-dossier print (AiFeedbackReport): only #print-root is printed. */
+  #print-root {
+    display: none;
+  }
+  @media print {
+    body.printing-one > *:not(#print-root) {
+      display: none !important;
+    }
+    body.printing-one #print-root {
+      display: block;
+    }
+  }
+
   @media print {
     nav,
     header,

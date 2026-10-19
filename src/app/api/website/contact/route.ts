@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { getDb, schema } from "@/lib/db";
 import { limiters, bucketKey, clientIp } from "@/lib/security/rate-limit";
+import { isValidPhone } from "@/lib/phone";
 
 const bodySchema = z.object({
   firstName: z.string().trim().min(1).max(80),
@@ -13,11 +14,14 @@ const bodySchema = z.object({
   queryType: z.enum(["intern", "general", "hiring"]).default("general"),
   subject: z.string().trim().max(200).default(""),
   message: z.string().trim().min(2).max(5000),
+}).refine((d) => !d.phone || isValidPhone(d.countryCode, d.phone), {
+  message: "Invalid phone number",
+  path: ["phone"],
 });
 
 export async function POST(req: Request) {
   const ip = clientIp(req.headers);
-  if (!limiters.login.take(bucketKey(ip))) {
+  if (!limiters.contact.take(bucketKey(ip))) {
     return NextResponse.json({ error: "Too many attempts" }, { status: 429 });
   }
   const parsed = bodySchema.safeParse(await req.json().catch(() => null));

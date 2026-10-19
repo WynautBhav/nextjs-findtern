@@ -6,6 +6,7 @@ import { RatingsImport } from "@/components/admin/ratings-import";
 import { getDb, schema } from "@/lib/db";
 import { formatDate } from "@/lib/format";
 import { flattenParams, parsePageRequest, searchAny, toPage } from "@/lib/admin/params";
+import { aiInterviewStatus, findternScoreSql, meaningfulProfile } from "@/lib/admin/scope";
 import {
   AdminEmpty,
   AdminPageHeader,
@@ -51,6 +52,18 @@ type InternRow = {
   proposalCount: number;
   interviewCount: number;
   hasProfile: boolean;
+  openToWork: boolean;
+  aiStatus: string;
+  score: number | null;
+};
+
+const AI_STATUS_LABEL: Record<string, string> = {
+  not_applied: "Not applied",
+  applied: "Applied",
+  scheduled: "Scheduled",
+  sent: "Sent",
+  expired: "Expired",
+  completed: "Completed",
 };
 
 const FILTERS: ToolbarFilter[] = [
@@ -75,8 +88,14 @@ const FILTERS: ToolbarFilter[] = [
     label: "Visibility",
     options: [
       { value: "live", label: "Live" },
-      { value: "hidden", label: "Hidden" },
+      { value: "hidden", label: "Hidden by admin" },
+      { value: "intern_hidden", label: "Hidden by intern" },
     ],
+  },
+  {
+    key: "ai",
+    label: "AI interview",
+    options: Object.entries(AI_STATUS_LABEL).map(([value, label]) => ({ value, label })),
   },
 ];
 
@@ -121,7 +140,12 @@ export default async function AdminInterns({
   const req = parsePageRequest(params);
   const db = getDb();
 
+  const profileFilled = meaningfulProfile();
+  const aiStatus = aiInterviewStatus();
+  // The intern's own "open to work" switch; missing means on.
+  const openToWork = sql<boolean>`coalesce(${schema.internOnboarding.extraData}->>'openToWork', 'true') <> 'false'`;
   const conditions: (SQL | undefined)[] = [
+    eq(schema.users.role, "intern"),
     searchAny(
       [
         sql`${schema.users.firstName}`,
@@ -132,11 +156,14 @@ export default async function AdminInterns({
       req.search,
     ),
     params.status ? eq(schema.users.isActive, params.status === "active") : undefined,
-    params.visibility ? eq(schema.users.profileVisibility, params.visibility) : undefined,
-    params.profile === "complete"
-      ? sql`${schema.internOnboarding.id} is not null`
-      : undefined,
-    params.profile === "incomplete" ? sql`${schema.internOnboarding.id} is null` : undefined,
+    params.visibility === "intern_hidden"
+      ? sql`not ${openToWork}`
+      : params.visibility
+        ? eq(schema.users.profileVisibility, params.visibility)
+        : undefined,
+    params.profile === "complete" ? profileFilled : undefined,
+    params.profile === "incomplete" ? sql`not ${profileFilled}` : undefined,
+    params.ai ? sql`${aiStatus} = ${params.ai}` : undefined,
   ].filter(Boolean) as SQL[];
 
   const where = conditions.length
@@ -166,7 +193,10 @@ export default async function AdminInterns({
         createdAt: schema.users.createdAt,
         proposalCount,
         interviewCount,
-        hasProfile: sql<boolean>`(${schema.internOnboarding.id} is not null)`,
+        hasProfile: profileFilled,
+        openToWork,
+        aiStatus,
+        score: findternScoreSql(),
       })
       .from(schema.users)
       .leftJoin(schema.internOnboarding, eq(schema.internOnboarding.userId, schema.users.id))
@@ -179,12 +209,12 @@ export default async function AdminInterns({
       .from(schema.users)
       .leftJoin(schema.internOnboarding, eq(schema.internOnboarding.userId, schema.users.id))
       .where(where),
-    db.select({ c: count() }).from(schema.users),
+    db.select({ c: count() }).from(schema.users).where(eq(schema.users.role, "intern")),
     db
       .select({ c: count() })
       .from(schema.users)
       .leftJoin(schema.internOnboarding, eq(schema.internOnboarding.userId, schema.users.id))
-      .where(sql`${schema.internOnboarding.id} is null`),
+      .where(sql`${schema.users.role} = 'intern' and not ${profileFilled}`),
   ]);
 
   // Dates cross into the client boundary for `SelectAllCheckbox`, which receives
@@ -262,6 +292,9 @@ export default async function AdminInterns({
                         Pipeline
                       </TableHead>
                       <TableHead scope="col" className="px-3 py-3 text-[12px] font-semibold tracking-[0.02em] text-ink-600 capitalize">
+                        AI interview
+                      </TableHead>
+                      <TableHead scope="col" className="px-3 py-3 text-[12px] font-semibold tracking-[0.02em] text-ink-600 capitalize">
                         State
                       </TableHead>
                     </TableRow>
@@ -325,6 +358,17 @@ export default async function AdminInterns({
                           </span>
                         </TableCell>
                         <TableCell className="px-3 py-3">
+                          <span className="flex flex-col items-start gap-1">
+                            <StatusBadge
+                              tone={row.aiStatus === "completed" ? "success" : row.aiStatus === "not_applied" ? "neutral" : "info"}
+                              label={AI_STATUS_LABEL[row.aiStatus] ?? row.aiStatus}
+                            />
+                            <span className="text-[12px] tabular-nums text-text-subtle">
+                              {row.score != null ? `Score ${row.score.toFixed(1)}` : "No score"}
+                            </span>
+                          </span>
+                        </TableCell>
+                        <TableCell className="px-3 py-3">
                           <span className="flex flex-col items-start gap-1.5">
                             <StatusBadge
                               tone={row.hasProfile ? "success" : "warning"}
@@ -354,6 +398,12 @@ export default async function AdminInterns({
                                 />
                                 {row.visibility}
                               </span>
+                              {!row.openToWork ? (
+                                <>
+                                  <span aria-hidden className="text-ink-300">·</span>
+                                  <span>Hidden by intern</span>
+                                </>
+                              ) : null}
                             </span>
                           </span>
                         </TableCell>

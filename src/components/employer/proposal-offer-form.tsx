@@ -12,48 +12,96 @@ export type EditableOffer = {
   duration?: string;
   startDate?: string;
   monthlyHours?: number;
+  /** Major units of the offer currency. */
+  monthlyAmount?: number;
   paidLeavesPerMonth?: number;
   message?: string;
+  mode?: string;
+  city?: string;
+  state?: string;
+  officeDays?: number;
+  homeDays?: number;
+  shiftFrom?: string;
+  shiftTo?: string;
+  laptop?: string;
 };
 
+const DURATIONS = ["1m", "2m", "3m", "6m"] as const;
+
+/** Tomorrow in India: an offer lapses on its start date. */
+function tomorrowIst(): string {
+  return new Date(Date.now() + 330 * 60_000 + 86_400_000).toISOString().slice(0, 10);
+}
+
 /**
- * Inline offer editor on the proposal detail page. Same fields the composer
- * writes, minus identity (project / candidate never change). Draft / sent
- * only - the server rejects anything later, and the form does not render
- * there at all.
+ * Offer editor on the proposal page. The composer's fields minus identity
+ * (project and candidate never change) and minus currency (set by the
+ * company's country). Draft / sent internship offers only: the server rejects
+ * anything later, and full-time offers, and the form does not render there.
+ * A monthly figure typed here is kept; blank means hours × the band rate.
  */
 export function ProposalOfferForm({
   proposalId,
   initial,
+  currency,
+  shortOnly = false,
 }: {
   proposalId: string;
   initial: EditableOffer;
+  currency: "INR" | "USD";
+  /** Score below 6: at most two months. */
+  shortOnly?: boolean;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [roleTitle, setRoleTitle] = useState(initial.roleTitle ?? "");
   const [duration, setDuration] = useState(initial.duration ?? "3m");
-  const [startDate, setStartDate] = useState(initial.startDate ?? "");
-  const [monthlyHours, setMonthlyHours] = useState(
-    initial.monthlyHours !== undefined ? String(initial.monthlyHours) : "",
-  );
-  const [leaves, setLeaves] = useState(
-    initial.paidLeavesPerMonth !== undefined ? String(initial.paidLeavesPerMonth) : "",
-  );
+  const [startDate, setStartDate] = useState(/^\d{4}-\d{2}-\d{2}$/.test(initial.startDate ?? "") ? initial.startDate! : "");
+  const [monthlyHours, setMonthlyHours] = useState(initial.monthlyHours ? String(initial.monthlyHours) : "");
+  const [monthlyAmount, setMonthlyAmount] = useState(initial.monthlyAmount ? String(initial.monthlyAmount) : "");
+  const [leaves, setLeaves] = useState(initial.paidLeavesPerMonth !== undefined ? String(initial.paidLeavesPerMonth) : "0");
+  const [mode, setMode] = useState(initial.mode || "remote");
+  const [city, setCity] = useState(initial.city ?? "");
+  const [state, setState] = useState(initial.state ?? "");
+  const [officeDays, setOfficeDays] = useState(initial.officeDays ? String(initial.officeDays) : "3");
+  const [homeDays, setHomeDays] = useState(initial.homeDays ? String(initial.homeDays) : "2");
+  const [shiftFrom, setShiftFrom] = useState(initial.shiftFrom || "09:00");
+  const [shiftTo, setShiftTo] = useState(initial.shiftTo || "18:00");
+  const [laptop, setLaptop] = useState(initial.laptop || "company");
   const [message, setMessage] = useState(initial.message ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
   async function save() {
-    setSaving(true);
     setError("");
-    const offer: Record<string, unknown> = {};
-    if (roleTitle.trim()) offer.roleTitle = roleTitle.trim();
-    if (["1m", "2m", "3m", "6m"].includes(duration)) offer.duration = duration;
-    if (startDate.trim()) offer.startDate = startDate.trim();
-    if (monthlyHours.trim() !== "") offer.monthlyHours = Math.max(0, Math.min(744, Number(monthlyHours) || 0));
-    if (leaves.trim() !== "") offer.paidLeavesPerMonth = Math.max(0, Math.min(31, Number(leaves) || 0));
-    offer.message = message.trim();
+    if (roleTitle.trim().length < 2) return setError("Give the role a title.");
+    if (!startDate || startDate < tomorrowIst()) return setError("Pick a start date after today.");
+    if (mode !== "remote" && (!city.trim() || !state.trim())) return setError("An on-site or hybrid role needs a city and state.");
+    if (!message.trim()) return setError("Add a job description.");
+
+    const offer: Record<string, unknown> = {
+      roleTitle: roleTitle.trim(),
+      duration,
+      startDate,
+      paidLeavesPerMonth: Math.max(0, Math.min(10, Number(leaves) || 0)),
+      message: message.trim(),
+      mode,
+      laptop,
+      shiftFrom: shiftFrom || "flexible",
+      shiftTo: shiftTo || "flexible",
+    };
+    if (monthlyHours.trim() !== "") offer.monthlyHours = Math.max(1, Math.min(300, Number(monthlyHours) || 1));
+    if (monthlyAmount.trim() !== "" && Number(monthlyAmount) > 0) offer.monthlyAmount = Number(monthlyAmount);
+    if (mode !== "remote") {
+      offer.city = city.trim();
+      offer.state = state.trim();
+    }
+    if (mode === "hybrid") {
+      offer.officeDays = Number(officeDays) || 1;
+      offer.homeDays = Number(homeDays) || 1;
+    }
+
+    setSaving(true);
     try {
       const res = await csrfFetch(`/api/proposals/${encodeURIComponent(proposalId)}`, {
         method: "PATCH",
@@ -87,18 +135,19 @@ export function ProposalOfferForm({
 
   const input =
     "apple-spring h-11 w-full rounded-[10px] border border-ink-200/90 bg-white px-3 text-sm text-ink-900 outline-none placeholder:text-ink-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20";
+  const label = "mb-1 block text-xs font-semibold text-ink-700";
 
   return (
-    <div className="space-y-3 rounded-[10px] border border-ink-200/70 bg-ink-50/60 p-4">
-      <div className="grid gap-3 sm:grid-cols-2">
+    <div className="space-y-3 rounded-[14px] border border-ink-200/70 bg-ink-50/60 p-4">
+      <label className="block">
+        <span className={label}>Role title</span>
+        <input value={roleTitle} onChange={(e) => setRoleTitle(e.target.value)} className={input} />
+      </label>
+      <div className="grid grid-cols-2 gap-3">
         <label className="block">
-          <span className="mb-1 block text-xs font-semibold text-ink-700">Role title</span>
-          <input value={roleTitle} onChange={(e) => setRoleTitle(e.target.value)} className={input} />
-        </label>
-        <label className="block">
-          <span className="mb-1 block text-xs font-semibold text-ink-700">Duration</span>
+          <span className={label}>Duration</span>
           <select value={duration} onChange={(e) => setDuration(e.target.value)} className={input}>
-            {["1m", "2m", "3m", "6m"].map((d) => (
+            {DURATIONS.filter((d) => !shortOnly || d === "1m" || d === "2m").map((d) => (
               <option key={d} value={d}>
                 {d === "1m" ? "1 month" : `${d.replace("m", "")} months`}
               </option>
@@ -106,24 +155,75 @@ export function ProposalOfferForm({
           </select>
         </label>
         <label className="block">
-          <span className="mb-1 block text-xs font-semibold text-ink-700">Start date</span>
-          <input value={startDate} onChange={(e) => setStartDate(e.target.value)} placeholder="e.g. 1 Nov 2026" className={input} />
+          <span className={label}>Start date</span>
+          <input type="date" min={tomorrowIst()} value={startDate} onChange={(e) => setStartDate(e.target.value)} className={input} />
         </label>
         <label className="block">
-          <span className="mb-1 block text-xs font-semibold text-ink-700">Hours per month</span>
+          <span className={label}>Hours / month</span>
           <input value={monthlyHours} inputMode="numeric" onChange={(e) => setMonthlyHours(e.target.value.replace(/[^\d]/g, ""))} className={cn(input, "tabular-nums")} />
         </label>
-        <label className="block sm:col-span-2">
-          <span className="mb-1 block text-xs font-semibold text-ink-700">Paid leaves per month</span>
-          <input value={leaves} inputMode="numeric" onChange={(e) => setLeaves(e.target.value.replace(/[^\d]/g, ""))} className={cn(input, "w-32 tabular-nums")} />
+        <label className="block">
+          <span className={label}>Monthly ({currency})</span>
+          <input value={monthlyAmount} inputMode="decimal" placeholder="rate × hours" onChange={(e) => setMonthlyAmount(e.target.value.replace(/[^\d.]/g, ""))} className={cn(input, "tabular-nums")} />
+        </label>
+        <label className="block">
+          <span className={label}>Work mode</span>
+          <select value={mode} onChange={(e) => setMode(e.target.value)} className={input}>
+            <option value="remote">Remote</option>
+            <option value="hybrid">Hybrid</option>
+            <option value="onsite">On-site</option>
+          </select>
+        </label>
+        <label className="block">
+          <span className={label}>Laptop</span>
+          <select value={laptop} onChange={(e) => setLaptop(e.target.value)} className={input}>
+            <option value="company">Company provides</option>
+            <option value="intern">Intern provides</option>
+          </select>
+        </label>
+        {mode !== "remote" ? (
+          <>
+            <label className="block">
+              <span className={label}>City</span>
+              <input value={city} onChange={(e) => setCity(e.target.value)} className={input} />
+            </label>
+            <label className="block">
+              <span className={label}>State</span>
+              <input value={state} onChange={(e) => setState(e.target.value)} className={input} />
+            </label>
+          </>
+        ) : null}
+        {mode === "hybrid" ? (
+          <>
+            <label className="block">
+              <span className={label}>Office days / week</span>
+              <input value={officeDays} inputMode="numeric" onChange={(e) => setOfficeDays(e.target.value.replace(/\D/g, "").slice(0, 1))} className={cn(input, "tabular-nums")} />
+            </label>
+            <label className="block">
+              <span className={label}>Home days / week</span>
+              <input value={homeDays} inputMode="numeric" onChange={(e) => setHomeDays(e.target.value.replace(/\D/g, "").slice(0, 1))} className={cn(input, "tabular-nums")} />
+            </label>
+          </>
+        ) : null}
+        <label className="block">
+          <span className={label}>Shift from</span>
+          <input type="time" value={shiftFrom} onChange={(e) => setShiftFrom(e.target.value)} className={input} />
+        </label>
+        <label className="block">
+          <span className={label}>Shift to</span>
+          <input type="time" value={shiftTo} onChange={(e) => setShiftTo(e.target.value)} className={input} />
+        </label>
+        <label className="block">
+          <span className={label}>Paid leave / month</span>
+          <input value={leaves} inputMode="numeric" onChange={(e) => setLeaves(e.target.value.replace(/[^\d]/g, ""))} className={cn(input, "tabular-nums")} />
         </label>
       </div>
       <label className="block">
-        <span className="mb-1 block text-xs font-semibold text-ink-700">Cover note</span>
-        <textarea value={message} onChange={(e) => setMessage(e.target.value)} rows={3} className="apple-spring min-h-24 w-full rounded-[10px] border border-ink-200/90 bg-white px-3 py-2 text-sm text-ink-900 outline-none placeholder:text-ink-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20" />
+        <span className={label}>Job description</span>
+        <textarea value={message} onChange={(e) => setMessage(e.target.value)} rows={4} className="apple-spring min-h-24 w-full rounded-[10px] border border-ink-200/90 bg-white px-3 py-2 text-sm text-ink-900 outline-none placeholder:text-ink-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20" />
       </label>
       {error ? (
-        <p role="alert" className="text-xs font-medium text-red-700">
+        <p role="alert" className="text-xs font-medium text-danger">
           {error}
         </p>
       ) : null}
@@ -145,6 +245,7 @@ export function ProposalOfferForm({
           Cancel
         </button>
       </div>
+      <p className="text-xs text-text-subtle">The candidate is told the offer changed and asked to review it again.</p>
     </div>
   );
 }

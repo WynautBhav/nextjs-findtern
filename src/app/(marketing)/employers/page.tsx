@@ -26,6 +26,7 @@ import { HAPPY_FACES } from "@/lib/content/proof";
 import { TestimonialCarousel } from "@/components/marketing/testimonial-carousel";
 import { JsonLd } from "@/components/seo/json-ld";
 import { breadcrumbJsonLd, faqJsonLd, howToJsonLd, webPageJsonLd } from "@/lib/seo";
+import { CurrencyPicker } from "@/components/marketing/region-rates";
 
 export const metadata: Metadata = {
   title: "Hire Pre-Screened Interns in India | For Employers",
@@ -279,13 +280,16 @@ export default async function EmployersPage() {
             </ButtonLink>
           }
         />
+        <div className="mt-8 flex justify-center">
+          <CurrencyPicker />
+        </div>
         <EmployerPlanCards plansInr={plansInr} plansUsd={plansUsd} />
 
         <div className="mt-16" id="calculator">
           <SectionHeading
             lead="What an intern"
             accent="costs a month"
-            sub="Change the three words that matter. The arithmetic sits beside the answer."
+            sub="Pick the plan and the days a week. Every day is a full 8-hour day; the arithmetic sits beside the answer."
           />
           <PricingCalculator plansInr={plansInr} plansUsd={plansUsd} className="mt-12" />
         </div>

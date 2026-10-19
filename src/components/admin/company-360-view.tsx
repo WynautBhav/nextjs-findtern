@@ -27,6 +27,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { parseOffer } from "@/lib/offer";
+import { toInrMinor } from "@/lib/admin/money";
 
 export type Company360Props = {
   company: Employer;
@@ -65,10 +66,14 @@ export function Company360View({
     (Interview & { internName?: string; internEmail?: string }) | null
   >(null);
 
-  const activeProjectsCount = projects.filter((p) => p.status === "active").length;
+  // Same "active" rule as the projects list: anything not closed; empty counts as active.
+  const activeProjectsCount = projects.filter(
+    (p) => !["inactive", "closed", "archived"].includes(String(p.status || "active").toLowerCase()),
+  ).length;
+  // USD orders converted at ₹100/$ so the total is one currency.
   const totalRevenueMinor = payments
     .filter((p) => p.status === "paid")
-    .reduce((sum, p) => sum + (p.amountMinor ?? 0), 0);
+    .reduce((sum, p) => sum + toInrMinor(p.amountMinor, p.currency), 0);
 
   return (
     <div className="space-y-6">

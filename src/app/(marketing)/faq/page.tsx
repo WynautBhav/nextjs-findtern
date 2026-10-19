@@ -3,34 +3,47 @@ import { ArrowRight } from "lucide-react";
 
 import { PageHero, PageSection } from "@/components/marketing/page-hero";
 import { ButtonLink } from "@/components/ui/button";
-import { FaqExplorer } from "@/components/marketing/faq-explorer";
-import { FAQ_INTERN, FAQ_EMPLOYER } from "@/lib/content/faq";
-import { SITE } from "@/lib/content/site";
+import { FaqAudienceTabs } from "@/components/marketing/faq-audience-tabs";
+import { getFaqItems } from "@/lib/content";
 import { JsonLd } from "@/components/seo/json-ld";
 import { breadcrumbJsonLd, faqJsonLd, webPageJsonLd } from "@/lib/seo";
+import { EmailLink } from "@/components/marketing/email-link";
 
-export const metadata: Metadata = {
-  title: "Internship FAQ for Employers and Interns",
-  description:
-    `${FAQ_INTERN.length + FAQ_EMPLOYER.length} answers on intern screening, the Findtern Score, the rate card, the placement guarantee, timesheets and payment - split by whether you are hiring or looking.`,
-  alternates: { canonical: "/faq" },
-};
+/** Admin-managed FAQs, split by audience. Anything not filed under
+    Employer is treated as an intern question, so a mistyped category in the
+    CMS still shows up rather than vanishing. */
+async function getFaqsByAudience() {
+  const items = await getFaqItems();
+  const employer = items.filter((f) => f.category.trim().toLowerCase().startsWith("employer"));
+  const intern = items.filter((f) => !employer.includes(f));
+  return { intern, employer };
+}
 
-export default function FaqPage() {
+export async function generateMetadata(): Promise<Metadata> {
+  const { intern, employer } = await getFaqsByAudience();
+  return {
+    title: "Internship FAQ for Employers and Interns",
+    description: `${intern.length + employer.length} answers on intern screening, the Findtern Score, the rate card, the placement guarantee, timesheets and payment - split by whether you are hiring or looking.`,
+    alternates: { canonical: "/faq" },
+  };
+}
+
+export default async function FaqPage() {
+  const [{ intern, employer }, metadata] = await Promise.all([getFaqsByAudience(), generateMetadata()]);
   return (
     <>
       <JsonLd
         data={[
           webPageJsonLd({ path: "/faq", name: "Findtern FAQ", description: String(metadata.description), type: "FAQPage" }),
           breadcrumbJsonLd([{ name: "FAQ", path: "/faq" }]),
-          faqJsonLd([...FAQ_EMPLOYER, ...FAQ_INTERN]),
+          faqJsonLd([...employer, ...intern]),
         ]}
       />
       <PageHero
         eyebrow="FAQ"
         title={
           <>
-            {FAQ_INTERN.length + FAQ_EMPLOYER.length} answers,{" "}
+            {intern.length + employer.length} answers,{" "}
             <span className="text-primary">no asterisks</span>.
           </>
         }
@@ -43,27 +56,7 @@ export default function FaqPage() {
       </PageHero>
 
       <PageSection>
-        <h2 className="text-3xl font-semibold tracking-[-0.025em] text-ink-900 sm:text-4xl">
-          For interns
-        </h2>
-        <p className="mt-3 text-lg text-muted-foreground">
-          Assessment, scoring, fees and the guarantee.
-        </p>
-        <div className="mt-10">
-          <FaqExplorer items={FAQ_INTERN} />
-        </div>
-      </PageSection>
-
-      <PageSection tone="muted">
-        <h2 className="text-3xl font-semibold tracking-[-0.025em] text-ink-900 sm:text-4xl">
-          For employers
-        </h2>
-        <p className="mt-3 text-lg text-muted-foreground">
-          Screening, hiring, timesheets and payment.
-        </p>
-        <div className="mt-10">
-          <FaqExplorer items={FAQ_EMPLOYER} />
-        </div>
+        <FaqAudienceTabs intern={intern} employer={employer} />
       </PageSection>
 
       <PageSection className="text-center">
@@ -71,7 +64,7 @@ export default function FaqPage() {
           Answered here and it still did not help?
         </h2>
         <p className="mx-auto mt-3 max-w-md text-base text-muted-foreground">
-          Email {SITE.email} and a human answers. We would rather fix a
+          Email <EmailLink /> and a human answers. We would rather fix a
           confusing page than route around it.
         </p>
         <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">

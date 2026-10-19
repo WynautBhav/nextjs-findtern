@@ -4,6 +4,8 @@ import { desc, eq, inArray } from "drizzle-orm";
 
 import { ContactEditor } from "@/components/admin/contact-editor";
 import { ViewAsButton } from "@/components/admin/view-as-button";
+import { getSession } from "@/lib/auth";
+import { canViewAs } from "@/lib/admin/impersonation";
 import { CompanyControls } from "@/components/admin/company-controls";
 import { getDb, schema } from "@/lib/db";
 import { Company360View } from "@/components/admin/company-360-view";
@@ -35,6 +37,8 @@ export default async function AdminCompanyDetailPage({
 }) {
   const { id } = await params;
   const db = getDb();
+  const session = await getSession();
+  const viewAs = await canViewAs(session?.uid, session?.permissions);
 
   const [company] = await db
     .select()
@@ -115,9 +119,9 @@ export default async function AdminCompanyDetailPage({
     };
   });
 
-  // Hired interns (accepted proposals or marked hired)
+  // Hired = status "hired" (paid for). "Accepted" is not yet a hire.
   const hiredProposals = rawProposals.filter(
-    (p) => p.status === "accepted" || p.hiredAt !== null
+    (p) => p.status === "hired"
   );
 
   const hiredInterns = hiredProposals.map((prop) => {
@@ -163,7 +167,7 @@ export default async function AdminCompanyDetailPage({
               phoneNumber: company.phoneNumber,
             }}
           />
-          <ViewAsButton targetType="employer" targetId={company.id} label="View as company" />
+          {viewAs ? <ViewAsButton targetType="employer" targetId={company.id} label="View as company" /> : null}
           <CompanyControls id={company.id} isActive={company.isActive} fteStatus={company.internationalFteStatus} />
         </>
       }

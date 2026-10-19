@@ -16,10 +16,11 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Check, Loader2, Plus } from "lucide-react";
+import { Check, Loader2, Mail, Plus } from "lucide-react";
 
 import { csrfFetch } from "@/lib/client-fetch";
 import { formatMoney } from "@/lib/format";
+import type { StipendDue } from "@/lib/admin/stipend-dues";
 
 type Payout = {
   id: string;
@@ -36,9 +37,15 @@ type Payout = {
 export function InternPayoutTools({
   internId,
   payouts,
+  placements = [],
+  dues = [],
 }: {
   internId: string;
   payouts: Payout[];
+  /** Hired proposals this payout can be filed against. */
+  placements?: { id: string; employerId: string; label: string }[];
+  /** What is still owed per placement (legacy dues table); prefills the form. */
+  dues?: StipendDue[];
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -50,6 +57,8 @@ export function InternPayoutTools({
   const [currency, setCurrency] = useState<"INR" | "USD">("INR");
   const [method, setMethod] = useState("bank");
   const [notes, setNotes] = useState("");
+  const [scheduledFor, setScheduledFor] = useState("");
+  const [proposalId, setProposalId] = useState(placements.length === 1 ? placements[0].id : "");
 
   async function create(e: React.FormEvent) {
     e.preventDefault();
@@ -58,6 +67,11 @@ export function InternPayoutTools({
       setError("Enter an amount greater than zero.");
       return;
     }
+    if (!scheduledFor) {
+      setError("Pick the date this payout is scheduled for.");
+      return;
+    }
+    const placement = placements.find((p) => p.id === proposalId);
     setBusy("create");
     setError(null);
     setNotice(null);
@@ -70,6 +84,9 @@ export function InternPayoutTools({
           currency,
           method,
           status: "pending",
+          scheduledFor,
+          source: "admin",
+          ...(placement ? { proposalId: placement.id, employerId: placement.employerId } : {}),
           ...(notes.trim() ? { notes: notes.trim() } : {}),
         }),
       });
@@ -77,11 +94,41 @@ export function InternPayoutTools({
       if (!res.ok) throw new Error(data.error ?? "Could not create the payout.");
       setAmount("");
       setNotes("");
+      setScheduledFor("");
       setOpen(false);
       setNotice("Payout recorded as pending.");
       router.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not create the payout.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  function prefill(d: StipendDue) {
+    setAmount(String(d.monthlyShareMinor / 100));
+    setCurrency("INR");
+    setScheduledFor(d.nextDate ?? "");
+    setProposalId(d.proposalId);
+    setError(null);
+    setNotice(null);
+    setOpen(true);
+  }
+
+  async function resendEmail(payout: Payout) {
+    setBusy(`mail:${payout.id}`);
+    setError(null);
+    setNotice(null);
+    try {
+      const res = await csrfFetch(
+        `/api/admin/interns/${encodeURIComponent(internId)}/payouts/${encodeURIComponent(payout.id)}/resend-email`,
+        { method: "POST" },
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error ?? "Could not send the email.");
+      setNotice("Stipend email sent again.");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not send the email.");
     } finally {
       setBusy(null);
     }
@@ -111,7 +158,11 @@ export function InternPayoutTools({
       );
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error ?? "Could not mark the payout paid.");
-      setNotice("Payout marked paid.");
+      setNotice(
+        data.next?.scheduledFor
+          ? `Payout marked paid. Next month queued as pending for ${data.next.scheduledFor}.`
+          : "Payout marked paid.",
+      );
       router.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not mark the payout paid.");
@@ -164,12 +215,72 @@ export function InternPayoutTools({
                     )}
                     Mark paid
                   </button>
-                ) : null}
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => resendEmail(p)}
+                    disabled={busy !== null}
+                    className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-ink-200 bg-white px-3 text-xs font-medium text-ink-800 transition-colors hover:bg-ink-50 disabled:opacity-60"
+                  >
+                    {busy === `mail:${p.id}` ? (
+                      <Loader2 className="size-3.5 animate-spin" aria-hidden />
+                    ) : (
+                      <Mail className="size-3.5" aria-hidden />
+                    )}
+                    Resend email
+                  </button>
+                )}
               </div>
             </li>
           ))}
         </ul>
       )}
+
+      {dues.length > 0 ? (
+        <div className="overflow-x-auto rounded-lg border border-ink-100">
+          <table className="w-full min-w-[560px] text-left text-xs">
+            <caption className="sr-only">Stipend still owed per placement</caption>
+            <thead className="bg-ink-50 text-2xs uppercase tracking-[0.08em] text-ink-500">
+              <tr>
+                <th scope="col" className="px-3 py-2 font-semibold">Placement</th>
+                <th scope="col" className="px-3 py-2 font-semibold">Paid</th>
+                <th scope="col" className="px-3 py-2 font-semibold">Monthly share</th>
+                <th scope="col" className="px-3 py-2 font-semibold">Still owed</th>
+                <th scope="col" className="px-3 py-2 font-semibold">Next due</th>
+                <th scope="col" className="px-3 py-2"><span className="sr-only">Action</span></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-ink-100">
+              {dues.map((d) => (
+                <tr key={d.proposalId}>
+                  <td className="px-3 py-2 text-ink-800">{placements.find((p) => p.id === d.proposalId)?.label ?? "Placement"}</td>
+                  <td className="px-3 py-2 tabular-nums text-ink-700">
+                    {d.paidMonths} of {d.months}
+                  </td>
+                  <td className="px-3 py-2 tabular-nums text-ink-700">
+                    {d.monthlyShareMinor > 0 ? formatMoney(d.monthlyShareMinor, "INR") : "No stipend (score below 6)"}
+                  </td>
+                  <td className="px-3 py-2 tabular-nums text-ink-700">{formatMoney(d.remainingMinor, "INR")}</td>
+                  <td className="px-3 py-2 tabular-nums text-ink-700">{d.nextDate ?? "-"}</td>
+                  <td className="px-3 py-2 text-right">
+                    {d.pending ? (
+                      <span className="text-2xs text-ink-500">Pending payout exists</span>
+                    ) : d.remainingMonths > 0 && d.monthlyShareMinor > 0 ? (
+                      <button
+                        type="button"
+                        onClick={() => prefill(d)}
+                        className="text-xs font-medium text-brand-700 underline-offset-4 hover:underline"
+                      >
+                        Prefill payout
+                      </button>
+                    ) : null}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
 
       {open ? (
         <form onSubmit={create} className="space-y-3 rounded-lg border border-ink-100 bg-ink-50 p-4">
@@ -213,6 +324,39 @@ export function InternPayoutTools({
               >
                 <option value="bank">Bank transfer</option>
                 <option value="upi">UPI</option>
+              </select>
+            </div>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label htmlFor="payout-scheduled" className="block text-xs font-medium text-ink-700">
+                Scheduled for
+              </label>
+              <input
+                id="payout-scheduled"
+                type="date"
+                required
+                value={scheduledFor}
+                onChange={(e) => setScheduledFor(e.target.value)}
+                className="mt-1 h-9 w-full rounded-lg border border-ink-200 bg-white px-3 text-sm text-ink-900 outline-none focus-visible:border-brand-600"
+              />
+            </div>
+            <div>
+              <label htmlFor="payout-placement" className="block text-xs font-medium text-ink-700">
+                Placement
+              </label>
+              <select
+                id="payout-placement"
+                value={proposalId}
+                onChange={(e) => setProposalId(e.target.value)}
+                className="mt-1 h-9 w-full rounded-lg border border-ink-200 bg-white px-3 text-sm text-ink-900 outline-none focus-visible:border-brand-600"
+              >
+                <option value="">Not linked</option>
+                {placements.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.label}
+                  </option>
+                ))}
               </select>
             </div>
           </div>

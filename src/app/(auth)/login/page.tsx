@@ -1,15 +1,25 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { AlertCircle } from "lucide-react";
+
 import { AuthShell } from "@/components/auth/auth-shell";
 import { LoginForm } from "@/components/auth/login-form";
+import { oauthErrorMessage } from "@/lib/google";
 
 export const metadata: Metadata = {
   title: "Sign in | Findtern",
   robots: { index: false, follow: false },
 };
 
-export default function LoginPage() {
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
+  const raw = (await searchParams).oauthError;
+  const oauthError = oauthErrorMessage(Array.isArray(raw) ? raw[0] : raw);
+
   return (
     <AuthShell
       eyebrow="For candidates"
@@ -26,6 +36,16 @@ export default function LoginPage() {
     >
       <h1 className="text-2xl font-semibold tracking-tight text-ink-900">Welcome back</h1>
       <p className="mt-1.5 text-sm text-text-subtle">Sign in to your intern account.</p>
+
+      {oauthError ? (
+        <div
+          role="alert"
+          className="mt-6 flex items-start gap-2.5 rounded-lg border border-danger/25 bg-danger-soft px-3.5 py-3 text-sm text-danger"
+        >
+          <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden />
+          <span>{oauthError}</span>
+        </div>
+      ) : null}
 
       <div className="mt-8">
         <LoginForm

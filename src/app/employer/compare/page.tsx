@@ -23,6 +23,8 @@ import {
   type CandidateProfile,
 } from "@/lib/employer-candidates";
 import { hiredInternIds } from "@/lib/employer-visibility";
+import { attachPhotos, visibleInternIds } from "@/lib/employer-pool";
+import { CandidateAvatar } from "@/components/employer/candidate-avatar";
 import { employerRegion, resolvePricing } from "@/lib/employer-pricing";
 import { ShortlistToggle } from "@/components/employer/shortlist-toggle";
 import { PageHeader, EmptyState } from "@/components/layout/page-header";
@@ -57,6 +59,7 @@ export default async function CompareCandidates({
 
   let candidates: CandidateProfile[] = [];
   let currency: "INR" | "USD" = "INR";
+  let plans: (typeof schema.pricingPlans.$inferSelect)[] = [];
   let projects: { id: string; projectName: string; skills: unknown }[] = [];
   let activeProject: { id: string; projectName: string; skills: unknown } | null = null;
   let shortlisted = new Set<string>();
@@ -103,10 +106,32 @@ export default async function CompareCandidates({
       }
 
       if (ids.length > 0) {
-        const rows = await db
-          .select()
-          .from(schema.users)
-          .where(and(inArray(schema.users.id, ids), eq(schema.users.isActive, true)));
+        // Only candidates this employer may open, minus anyone they already
+        // hired - legacy dropped both from compare (employer-compare.tsx:550).
+        // A plain query, not `hiredInternIds`: under admin "View as" that set
+        // reports everyone as hired, which would empty the page.
+        const [visible, hiredRows] = await Promise.all([
+          visibleInternIds(db, session.uid, ids),
+          db
+            .select({ internId: schema.proposals.internId })
+            .from(schema.proposals)
+            .where(and(eq(schema.proposals.employerId, session.uid), eq(schema.proposals.status, "hired"))),
+        ]);
+        const hired = new Set(hiredRows.map((r) => r.internId));
+        const comparable = ids.filter((id) => visible.has(id) && !hired.has(id));
+        const rows = comparable.length
+          ? await db
+              .select()
+              .from(schema.users)
+              .where(
+                and(
+                  inArray(schema.users.id, comparable),
+                  eq(schema.users.isActive, true),
+                  eq(schema.users.role, "intern"),
+                ),
+              )
+          : [];
+        plans = await db.select().from(schema.pricingPlans).where(eq(schema.pricingPlans.isActive, true));
 
         const byId = new Map(rows.map((row) => [row.id, row]));
 
@@ -124,6 +149,7 @@ export default async function CompareCandidates({
           .map((id) => byId.get(id))
           .filter((row): row is NonNullable<typeof row> => Boolean(row))
           .map((row) => toCandidateProfile(row, onboardingByUser.get(row.id)));
+        await attachPhotos(db, candidates).catch(() => undefined);
 
         const [employer] = await db
           .select({
@@ -170,7 +196,7 @@ export default async function CompareCandidates({
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <ButtonLink
-          href="/employer/candidates"
+          href={`/employer/candidates?ids=${encodeURIComponent(ids.join(","))}`}
           variant="link"
           size="sm"
           className="min-h-11 px-0 text-sm font-medium"
@@ -228,7 +254,7 @@ export default async function CompareCandidates({
                 </span>
               </th>
               {candidates.map((candidate) => {
-                const rate = resolvePricing(candidate.score, [], currency, null);
+                const rate = resolvePricing(candidate.score, plans, currency, null);
                 return (
                   <th
                     key={candidate.id}
@@ -237,12 +263,11 @@ export default async function CompareCandidates({
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex items-start gap-3">
-                        <span
-                          aria-hidden
-                          className="grid size-11 shrink-0 place-items-center rounded-[10px] bg-brand-100 font-bold text-brand-700 text-sm"
-                        >
-                          {candidate.initials}
-                        </span>
+                        <CandidateAvatar
+                          photoUrl={candidate.photoUrl}
+                          initials={candidate.initials}
+                          className="size-11 rounded-[10px] text-sm"
+                        />
                         <div className="min-w-0">
                           <Link
                             href={`/employer/intern/${encodeURIComponent(candidate.id)}`}
@@ -332,7 +357,7 @@ export default async function CompareCandidates({
 
             <Row label="Published Rate">
               {candidates.map((candidate) => {
-                const rate = resolvePricing(candidate.score, [], currency, null);
+                const rate = resolvePricing(candidate.score, plans, currency, null);
                 return (
                   <Cell key={candidate.id}>
                     <span className="text-sm font-semibold tabular-nums text-brand-800">

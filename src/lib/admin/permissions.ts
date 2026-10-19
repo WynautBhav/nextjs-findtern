@@ -7,7 +7,7 @@
 
 export const PERMISSIONS = [
   { key: "dashboard:read", label: "See the dashboard" },
-  { key: "users:read", label: "See registered users and view as them" },
+  { key: "users:read", label: "See registered users" },
   { key: "interns:read", label: "See candidate profiles and assessments" },
   { key: "interns:write", label: "Edit, approve or deactivate candidates" },
   { key: "companies:read", label: "See employer accounts and projects" },
@@ -34,58 +34,72 @@ type Rule = [prefix: string, read: Permission[], write?: Permission[]];
 const CONTACT_R: Permission[] = ["contact:intern:read", "contact:employer:read"];
 const CONTACT_W: Permission[] = ["contact:intern:write", "contact:employer:write"];
 
+/*
+ * Pages that moved groups in this build also accept the permission legacy
+ * gated them on, so no existing role loses access at cutover and none gains
+ * anything it did not have: intern terms/NDA were `interns:*`, company terms
+ * `companies:*`, promo codes `cms:*`, intern invoices `reports:read`.
+ */
+const INTERN_LEGAL_R: Permission[] = ["cms:read", "interns:read"];
+const INTERN_LEGAL_W: Permission[] = ["cms:write", "interns:write"];
+const COMPANY_LEGAL_R: Permission[] = ["cms:read", "companies:read"];
+const COMPANY_LEGAL_W: Permission[] = ["cms:write", "companies:write"];
+const PROMO_R: Permission[] = ["transactions:read", "cms:read"];
+const PROMO_W: Permission[] = ["transactions:write", "cms:write"];
+
 /** Longest prefix wins, so specific paths sit next to their parents. */
 const RULES: Rule[] = [
   // pages
   ["/admin/dashboard", ["dashboard:read"]],
   ["/admin/proposal-tracker", ["interns:read"], ["interns:write"]],
   ["/admin/notification-history", ["notifications:read"]],
-  ["/admin/notifications", ["notifications:read"], ["notifications:write"]],
+  // Someone who may send must be able to open the composer (legacy quirk fixed).
+  ["/admin/notifications", ["notifications:read", "notifications:write"], ["notifications:write"]],
   ["/admin/messages", CONTACT_R, CONTACT_W],
-  ["/admin/interns/terms", ["cms:read"], ["cms:write"]],
-  ["/admin/interns/non-disclosure", ["cms:read"], ["cms:write"]],
+  ["/admin/interns/terms", INTERN_LEGAL_R, INTERN_LEGAL_W],
+  ["/admin/interns/non-disclosure", INTERN_LEGAL_R, INTERN_LEGAL_W],
   ["/admin/interns", ["interns:read"], ["interns:write"]],
   ["/admin/users", ["users:read"]],
-  ["/admin/companies/terms", ["cms:read"], ["cms:write"]],
+  ["/admin/companies/terms", COMPANY_LEGAL_R, COMPANY_LEGAL_W],
   ["/admin/companies", ["companies:read"], ["companies:write"]],
   ["/admin/roles", ["roles:write"]],
   ["/admin/projects", ["companies:read"]],
   ["/admin/orders", ["transactions:read"]],
-  ["/admin/intern-invoices", ["transactions:read"]],
+  ["/admin/intern-invoices", ["transactions:read", "reports:read"]],
   ["/admin/transactions", ["transactions:read"]],
   ["/admin/payouts", ["transactions:read"]],
-  ["/admin/promo-codes", ["transactions:read"]],
+  ["/admin/promo-codes", PROMO_R, PROMO_W],
   ["/admin/reports", ["reports:read"]],
   ["/admin/cms", ["cms:read"]],
   ["/admin/settings", ["cms:read"]],
   ["/admin/no-access", []],
   // admin APIs
-  ["/api/admin/metrics", ["dashboard:read"]],
+  ["/api/admin/reports", ["reports:read"]],
   ["/api/admin/notifications", ["notifications:read"], ["notifications:write"]],
   ["/api/admin/messages", CONTACT_R, CONTACT_W],
   ["/api/admin/support-file", CONTACT_R],
   ["/api/admin/interns/", ["interns:read"], ["interns:write"]],
   ["/api/admin/interns/status", ["interns:read"], ["interns:write"]],
   ["/api/admin/interns/visibility", ["interns:read"], ["interns:write"]],
-  ["/api/admin/intern", ["cms:read"], ["cms:write"]],
+  ["/api/admin/intern", INTERN_LEGAL_R, INTERN_LEGAL_W],
   ["/api/admin/interviews", ["interns:read"], ["interns:write"]],
-  ["/api/admin/company", ["cms:read"], ["cms:write"]],
+  ["/api/admin/company", COMPANY_LEGAL_R, COMPANY_LEGAL_W],
   ["/api/admin/companies", ["companies:read"], ["companies:write"]],
   ["/api/admin/users", ["users:read"], ["interns:write"]],
   ["/api/admin/contact", ["users:read"], ["interns:write", "companies:write"]],
-  ["/api/admin/impersonate", ["users:read"], ["users:read"]],
+  // /api/admin/impersonate has no rule on purpose: no rule = super admin only.
   ["/api/admin/roles", ["roles:write"], ["roles:write"]],
   ["/api/admin/staff", ["roles:write"], ["roles:write"]],
   ["/api/admin/orders", ["transactions:read"], ["transactions:write"]],
   ["/api/admin/transactions", ["transactions:read"], ["transactions:write"]],
   ["/api/admin/payouts", ["transactions:read"], ["transactions:write"]],
   ["/api/admin/all-payouts", ["transactions:read"], ["transactions:write"]],
-  ["/api/admin/promo-codes", ["transactions:read"], ["transactions:write"]],
+  ["/api/admin/promo-codes", PROMO_R, PROMO_W],
   // Per-type check happens in the route (interns, companies, payments…).
   ["/api/admin/export", []],
   ["/api/admin/cms", ["cms:read"], ["cms:write"]],
   ["/api/admin/website", ["cms:read"], ["cms:write"]],
-  ["/api/admin/ndc-clauses", ["cms:read"], ["cms:write"]],
+  ["/api/admin/ndc-clauses", INTERN_LEGAL_R, INTERN_LEGAL_W],
   ["/api/admin/pricing", ["cms:read"], ["cms:write"]],
   ["/api/admin/google", ["cms:write"]],
   ["/api/admin/account", [], []],
@@ -139,4 +153,26 @@ export const EXPORT_PERMISSIONS: Record<string, Permission[]> = {
   companies: ["companies:read", "reports:read"],
   projects: ["companies:read", "reports:read"],
   payments: ["transactions:read", "reports:read"],
+  payouts: ["transactions:read", "reports:read"],
+  "intern-payments": ["transactions:read", "reports:read"],
 };
+
+/** Where staff land, in order of preference: the first page their role opens. */
+const LANDING_PAGES = [
+  "/admin/dashboard",
+  "/admin/interns",
+  "/admin/companies",
+  "/admin/proposal-tracker",
+  "/admin/messages",
+  "/admin/transactions",
+  "/admin/payouts",
+  "/admin/reports",
+  "/admin/notifications",
+  "/admin/cms",
+  "/admin/users",
+  "/admin/roles",
+];
+
+export function firstAllowedPage(granted: readonly string[] | undefined): string | null {
+  return LANDING_PAGES.find((path) => allows(granted, requiredPermissions(path))) ?? null;
+}

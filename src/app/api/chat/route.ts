@@ -73,7 +73,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ reply, source: "local-fallback" });
     } catch {
       return NextResponse.json(
-        { error: "Chat is temporarily unavailable. Please try again or write to admin@findtern.in." },
+        { error: "Chat is temporarily unavailable. Please try again or write to communicate@findtern.in." },
         { status: 503 },
       );
     }

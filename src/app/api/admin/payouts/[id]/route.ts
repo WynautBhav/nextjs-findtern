@@ -5,6 +5,7 @@ import { z } from "zod";
 import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
 import { notifyStipendPaid } from "@/lib/payments";
+import { queueNextMonth } from "@/lib/admin/stipend-queue";
 
 const patchSchema = z
   .object({
@@ -40,11 +41,26 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
   const db = getDb();
   const [existing] = await db
-    .select({ id: schema.internPayouts.id, status: schema.internPayouts.status })
+    .select({
+      id: schema.internPayouts.id,
+      internId: schema.internPayouts.internId,
+      status: schema.internPayouts.status,
+      method: schema.internPayouts.method,
+      notes: schema.internPayouts.notes,
+      raw: schema.internPayouts.raw,
+    })
     .from(schema.internPayouts)
     .where(eq(schema.internPayouts.id, id))
     .limit(1);
   if (!existing) return NextResponse.json({ error: "Payout not found" }, { status: 404 });
+
+  // A paid payout is money that left the bank: it cannot be re-opened or re-paid.
+  if (existing.status === "paid" && parsed.data.status !== undefined && parsed.data.status !== "paid") {
+    return NextResponse.json({ error: "This payout is already paid and can't be reopened" }, { status: 409 });
+  }
+  if (existing.status === "paid" && parsed.data.status === "paid") {
+    return NextResponse.json({ error: "Already paid" }, { status: 409 });
+  }
 
   const set: Partial<typeof schema.internPayouts.$inferInsert> = { updatedAt: new Date() };
   if (parsed.data.status !== undefined) {
@@ -61,6 +77,10 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   }
 
   await db.update(schema.internPayouts).set(set).where(eq(schema.internPayouts.id, id));
-  if (parsed.data.status === "paid" && existing.status !== "paid") await notifyStipendPaid(id);
-  return NextResponse.json({ ok: true });
+  let next = null;
+  if (parsed.data.status === "paid" && existing.status !== "paid") {
+    await notifyStipendPaid(id);
+    next = await queueNextMonth(db, existing.internId, existing);
+  }
+  return NextResponse.json({ ok: true, next });
 }

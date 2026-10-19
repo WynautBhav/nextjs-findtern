@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { ArrowRight, CalendarClock, ClipboardCheck, CreditCard, FolderPlus, Send, ShoppingBag } from "lucide-react";
 
 import { getDb, schema } from "@/lib/db";
@@ -10,6 +10,9 @@ import { PageHeader } from "@/components/layout/page-header";
 import { requireRole } from "@/lib/auth";
 import { displayNameOf, toCandidateProfile, type CandidateProfile } from "@/lib/employer-candidates";
 import { hiredInternIds } from "@/lib/employer-visibility";
+import { attachPhotos, candidatePoolClauses, scoreExpr } from "@/lib/employer-pool";
+import { requireEmployerSetup } from "@/lib/employer-setup";
+import { CandidateAvatar } from "@/components/employer/candidate-avatar";
 import { proposalOutcome } from "@/lib/proposals";
 import { PLAN_NAME, bandFor } from "@/lib/score";
 import { cn } from "@/lib/utils";
@@ -43,6 +46,8 @@ type Task = {
 export default async function EmployerDashboard() {
   const session = await requireRole("employer");
   const employerId = session.uid;
+  // No company profile or no project yet: finish onboarding first.
+  await requireEmployerSetup(employerId);
 
   let companyName = "";
   let projects: ProjectRow[] = [];
@@ -71,7 +76,11 @@ export default async function EmployerDashboard() {
         .where(eq(schema.projects.employerId, employerId))
         .orderBy(desc(schema.projects.createdAt)),
       db
-        .select({ status: schema.proposals.status, projectId: schema.proposals.projectId })
+        .select({
+          status: schema.proposals.status,
+          projectId: schema.proposals.projectId,
+          internId: schema.proposals.internId,
+        })
         .from(schema.proposals)
         .where(eq(schema.proposals.employerId, employerId)),
       db
@@ -94,10 +103,14 @@ export default async function EmployerDashboard() {
     submittedSheets = sheetRows.length;
     pendingInterviews = interviewRows.filter((i) => i.status === "pending" || i.status === "proposed").length;
     upcomingInterviews = interviewRows.filter((i) => i.status === "scheduled").length;
-    shortlisted = new Set(cartRows.map((c) => c.internId)).size;
+    // "No proposal yet" means exactly that: anyone already proposed to is out.
+    const proposedTo = new Set(proposalRows.map((p) => p.internId));
+    shortlisted = new Set(cartRows.map((c) => c.internId).filter((id) => !proposedTo.has(id))).size;
 
     // Candidates who match the skills this employer is hiring for, best score
     // first. Falls back to the top of the pool when no project lists skills.
+    // Same pool rule as the candidate browser: no un-interviewed, hidden or
+    // unlisted interns.
     const wanted = Array.from(
       new Set(projectRows.filter((p) => p.status === "active").flatMap((p) => (p.skills as string[]) ?? [])),
     ).map((s) => s.toLowerCase());
@@ -105,14 +118,19 @@ export default async function EmployerDashboard() {
       .select({ user: schema.users, onboarding: schema.internOnboarding })
       .from(schema.users)
       .innerJoin(schema.internOnboarding, eq(schema.users.id, schema.internOnboarding.userId))
-      .where(eq(schema.users.isActive, true))
-      .orderBy(desc(sql`COALESCE((${schema.internOnboarding.extraData}->>'findternScore')::float8, 0)`))
+      .where(and(...candidatePoolClauses()))
+      .orderBy(desc(scoreExpr()), desc(schema.internOnboarding.updatedAt))
       .limit(40);
-    const profiles = pool.map((r) => toCandidateProfile(r.user, r.onboarding));
+    // `intern_onboarding.user_id` is not unique; one card per intern.
+    const seen = new Set<string>();
+    const profiles = pool
+      .filter((r) => !seen.has(r.user.id) && Boolean(seen.add(r.user.id)))
+      .map((r) => toCandidateProfile(r.user, r.onboarding));
     const matching = wanted.length
       ? profiles.filter((c) => c.skills.some((s) => wanted.includes(s.toLowerCase())))
       : profiles;
     candidates = (matching.length ? matching : profiles).slice(0, 5);
+    await attachPhotos(db, candidates).catch(() => undefined);
   } catch (err) {
     console.error("Failed to load employer dashboard:", err);
     loadFailed = true;
@@ -371,12 +389,11 @@ export default async function EmployerDashboard() {
                       href={`/employer/intern/${encodeURIComponent(c.id)}`}
                       className="group grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 px-4 py-3 transition-colors hover:bg-ink-50/70"
                     >
-                      <span
-                        aria-hidden
-                        className="flex size-9 items-center justify-center rounded-full bg-brand-50 text-xs font-semibold text-brand-800"
-                      >
-                        {c.initials}
-                      </span>
+                      <CandidateAvatar
+                        photoUrl={c.photoUrl}
+                        initials={c.initials}
+                        className="size-9 rounded-full text-xs font-semibold"
+                      />
                       <span className="min-w-0">
                         <span className="block truncate text-sm font-medium text-ink-900 group-hover:text-brand-700">
                           {displayNameOf(c, nameUnlocked.has(c.id))}

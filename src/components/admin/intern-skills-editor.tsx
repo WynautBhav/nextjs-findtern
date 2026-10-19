@@ -20,17 +20,21 @@ import { csrfFetch } from "@/lib/client-fetch";
 
 const MIN = 4;
 const MAX = 7;
+const LEVELS = ["Beginner", "Intermediate", "Advanced"] as const;
+type Level = (typeof LEVELS)[number];
+type Skill = { name: string; rating: Level };
 
 export function InternSkillsEditor({
   internId,
   skills,
 }: {
   internId: string;
-  skills: string[];
+  skills: Skill[];
 }) {
   const router = useRouter();
   const [value, setValue] = useState("");
-  const [list, setList] = useState<string[]>(skills);
+  const [list, setList] = useState<Skill[]>(skills);
+  const dirty = JSON.stringify(list) !== JSON.stringify(skills);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -42,11 +46,11 @@ export function InternSkillsEditor({
       setError(`At most ${MAX} skills.`);
       return;
     }
-    if (list.some((s) => s.toLowerCase() === skill.toLowerCase())) {
+    if (list.some((s) => s.name.toLowerCase() === skill.toLowerCase())) {
       setError("Already on the list.");
       return;
     }
-    setList([...list, skill]);
+    setList([...list, { name: skill, rating: "Beginner" }]);
     setValue("");
     setError(null);
     setSaved(false);
@@ -86,17 +90,32 @@ export function InternSkillsEditor({
         <ul className="mt-2 flex flex-wrap gap-1.5">
           {list.map((skill) => (
             <li
-              key={skill}
-              className="inline-flex items-center gap-1 rounded-full bg-ink-100 px-2.5 py-1 text-xs font-medium text-ink-700"
+              key={skill.name}
+              className="inline-flex items-center gap-1.5 rounded-full bg-ink-100 py-1 pl-2.5 pr-2 text-xs font-medium text-ink-700"
             >
-              {skill}
+              {skill.name}
+              <select
+                value={skill.rating}
+                onChange={(e) => {
+                  setList(list.map((s) => (s.name === skill.name ? { ...s, rating: e.target.value as Level } : s)));
+                  setSaved(false);
+                }}
+                aria-label={`Level for ${skill.name}`}
+                className="rounded-md border border-ink-200 bg-white px-1 py-0.5 text-[11px] text-ink-700"
+              >
+                {LEVELS.map((l) => (
+                  <option key={l} value={l}>
+                    {l}
+                  </option>
+                ))}
+              </select>
               <button
                 type="button"
                 onClick={() => {
-                  setList(list.filter((s) => s !== skill));
+                  setList(list.filter((s) => s.name !== skill.name));
                   setSaved(false);
                 }}
-                aria-label={`Remove ${skill}`}
+                aria-label={`Remove ${skill.name}`}
                 className="text-ink-400 transition-colors hover:text-danger"
               >
                 <X className="size-3" aria-hidden />
@@ -136,7 +155,7 @@ export function InternSkillsEditor({
         <button
           type="button"
           onClick={save}
-          disabled={busy || list.length === skills.length}
+          disabled={busy || !dirty}
           className="inline-flex h-9 items-center gap-2 rounded-lg bg-brand-700 px-4 text-sm font-semibold text-white transition-colors hover:bg-brand-600 disabled:opacity-60"
         >
           {busy ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : null}

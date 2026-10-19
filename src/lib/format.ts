@@ -11,6 +11,8 @@
  * components/marketing/region-rates.tsx instead.
  */
 
+import { DISPLAY_RATES, isConvertedCurrency, type PriceCurrency } from "./currency.ts";
+
 export type Currency = "INR" | "USD";
 
 /**
@@ -24,7 +26,17 @@ export function formatMoney(
   currency: Currency | string = "INR",
   opts: { compact?: boolean; zeroLabel?: string | false; decimals?: number; short?: boolean } = {},
 ): string {
-  const cur: Currency = String(currency).toUpperCase() === "USD" ? "USD" : "INR";
+  const upper = String(currency).toUpperCase();
+  // A converted display currency: the amount is USD cents, shown in the
+  // visitor's chosen currency at the reference rate (lib/currency).
+  if (isConvertedCurrency(upper)) {
+    const value = (minor / 100) * DISPLAY_RATES[upper];
+    const fmt = (v: number, d: number) =>
+      new Intl.NumberFormat("en", { style: "currency", currency: upper, maximumFractionDigits: d, minimumFractionDigits: 0 }).format(v);
+    if (value === 0) return opts.zeroLabel === false ? fmt(0, 0) : (opts.zeroLabel ?? fmt(0, 0));
+    return fmt(value, value < 10 ? 2 : 0);
+  }
+  const cur: Currency = upper === "USD" ? "USD" : "INR";
   const value = minor / 100;
   if (value === 0 && opts.zeroLabel !== false) return opts.zeroLabel ?? (cur === "INR" ? "Free" : "$0");
 
@@ -54,7 +66,7 @@ export function formatNumber(n: number): string {
 /** "INR 100/hr" - used in plan column headers. */
 export function formatRate(
   minor: number,
-  currency: Currency = "INR",
+  currency: Currency | PriceCurrency = "INR",
 ): string {
   return minor <= 0 ? formatMoney(0, currency) : `${formatMoney(minor, currency)}/hr`;
 }
@@ -207,4 +219,22 @@ export function formatBytes(bytes: number | null | undefined): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+/**
+ * Two-letter initials for a company, for places that show who is hiring
+ * without naming them (the open-roles list). "Northwind Labs" → "NL",
+ * "Acme" → "AC", "IBM India Pvt Ltd" → "II". Legal suffixes are skipped so
+ * "Zeta Pvt. Ltd." is "ZE", not "ZP".
+ */
+export function companyInitials(name: string | null | undefined): string {
+  const all = String(name ?? "")
+    .replace(/[^\p{L}\p{N}\s&-]/gu, " ")
+    .split(/[\s&-]+/)
+    .filter(Boolean);
+  const meaningful = all.filter((w) => !/^(pvt|private|ltd|limited|llp|inc|llc|co|corp|the|and|of)$/i.test(w));
+  const words = meaningful.length > 0 ? meaningful : all;
+  if (words.length === 0) return "?";
+  const letters = words.length === 1 ? words[0].slice(0, 2) : words[0][0] + words[1][0];
+  return letters.toUpperCase();
 }

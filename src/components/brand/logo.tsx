@@ -1,5 +1,5 @@
-import Image from "next/image";
-
+/* eslint-disable @next/next/no-img-element -- see the note below on why the
+   logo bypasses next/image. */
 import { cn } from "@/lib/utils";
 
 /**
@@ -8,13 +8,21 @@ import { cn } from "@/lib/utils";
  *  - `green` - the wordmark on light backgrounds (marketing header, admin).
  *  - `white` - for dark/brand-green backgrounds (footer, app sidebars).
  *
- * Until the official white logo file arrives, `white` renders the existing
- * light asset forced to pure white with a CSS filter. Swap WHITE_SRC (and drop
- * the filter) when the real file lands; every surface updates at once.
+ * Both files are trimmed, true-colour 1200px masters cut from the original
+ * artwork. They are served as-is rather than through next/image: the
+ * optimiser re-encoded the flat-colour mark to lossy WebP at quality 75 and
+ * sized it for 200px, which is what made the edges look soft and the small
+ * type smudge on high-density screens. At ~66 KB / 36 KB the originals are
+ * cheaper than the quality loss.
  */
-const GREEN_SRC = "/media/findtern-logo.png";
-const WHITE_SRC = "/media/logo-remove.png";
-const WHITE_IS_PLACEHOLDER = true;
+const SRC = {
+  green: "/media/findtern-logo-green.png",
+  white: "/media/findtern-logo-white.png",
+} as const;
+
+/** Intrinsic size of both masters, so the browser reserves the right box. */
+const WIDTH = 1200;
+const HEIGHT = 361;
 
 export function Logo({
   variant = "green",
@@ -27,16 +35,16 @@ export function Logo({
   priority?: boolean;
   alt?: string;
 }) {
-  const white = variant === "white";
   return (
-    <Image
-      src={white ? WHITE_SRC : GREEN_SRC}
+    <img
+      src={SRC[variant]}
       alt={alt}
-      width={white ? 718 : 3363}
-      height={white ? 347 : 1013}
-      priority={priority}
-      sizes="200px"
-      className={cn("w-auto object-contain", white && WHITE_IS_PLACEHOLDER && "brightness-0 invert", className)}
+      width={WIDTH}
+      height={HEIGHT}
+      decoding="async"
+      loading={priority ? "eager" : "lazy"}
+      fetchPriority={priority ? "high" : undefined}
+      className={cn("w-auto object-contain", className)}
     />
   );
 }

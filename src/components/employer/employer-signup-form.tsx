@@ -27,6 +27,7 @@ const PASSWORD_RULES = [
   { test: (v: string) => /[a-z]/.test(v), label: "One lowercase letter" },
   { test: (v: string) => /[A-Z]/.test(v), label: "One uppercase letter" },
   { test: (v: string) => /\d/.test(v), label: "One number" },
+  { test: (v: string) => /[^A-Za-z0-9]/.test(v), label: "One special character" },
 ];
 
 export function EmployerSignupForm() {

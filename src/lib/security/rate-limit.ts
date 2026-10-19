@@ -94,6 +94,11 @@ export const limiters = {
   signup: new RateLimiter(5, 60 * 60_000),
   upload: new RateLimiter(20, 60 * 60_000),
   generic: new RateLimiter(60, 60_000),
+  // Public form: tight like login, but its own bucket so it cannot eat logins.
+  contact: new RateLimiter(8, 15 * 60_000),
+  // Signup's "is this number taken?" pre-check. Unauthenticated, so it is
+  // throttled to stop it being used to scan which numbers hold accounts.
+  phoneLookup: new RateLimiter(10, 15 * 60_000),
 };
 
 /**
@@ -116,9 +121,26 @@ export function bucketKey(ip: string, identifier?: string): string {
 export function clientIp(headers: {
   get(name: string): string | null;
 }): string {
-  const fwd = headers.get("x-forwarded-for");
-  if (fwd) return fwd.split(",")[0].trim();
-  return headers.get("x-real-ip") ?? "unknown";
+  // Forwarding headers are client-controlled unless a proxy we run rewrote
+  // them. The first X-Forwarded-For entry is whatever the caller sent, so
+  // trusting it let anyone rotate a fake IP and walk past every login, OTP and
+  // reset limit. Only trust them behind a known proxy:
+  //  - TRUST_PROXY=1: our nginx (deploy/nginx-findtern.conf) sets
+  //    X-Forwarded-For to $remote_addr, so the right-most entry is the real
+  //    peer even if a client pre-filled the header.
+  //  - Vercel: the platform overwrites x-real-ip / x-forwarded-for.
+  const trustProxy = /^(1|true|yes)$/i.test(process.env.TRUST_PROXY ?? "");
+  if (trustProxy) {
+    const fwd = headers.get("x-forwarded-for");
+    const last = fwd?.split(",").map((s) => s.trim()).filter(Boolean).pop();
+    return last || headers.get("x-real-ip") || "unknown";
+  }
+  if (process.env.VERCEL === "1") {
+    return headers.get("x-real-ip") || headers.get("x-forwarded-for")?.split(",")[0].trim() || "unknown";
+  }
+  // No trusted proxy configured: every caller shares one bucket rather than
+  // choosing their own. Set TRUST_PROXY=1 in production behind nginx.
+  return "unknown";
 }
 
 /**

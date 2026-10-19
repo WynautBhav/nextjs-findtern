@@ -22,9 +22,11 @@ import {
 } from "lucide-react";
 
 import { csrfFetch } from "@/lib/client-fetch";
+import { toInrMinor } from "@/lib/admin/money";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { StatusBadge } from "@/components/admin/status-badge";
 import { InternPayoutTools } from "@/components/admin/intern-payout-tools";
+import { stipendDues } from "@/lib/admin/stipend-dues";
 import { InternSkillsEditor } from "@/components/admin/intern-skills-editor";
 import { RatingsEditor } from "@/components/admin/ratings-editor";
 import type {
@@ -145,10 +147,10 @@ export function Intern360View({
 
   const paidMinor = payouts
     .filter((p) => p.status === "paid")
-    .reduce((sum, p) => sum + (p.amountMinor ?? 0), 0);
+    .reduce((sum, p) => sum + toInrMinor(p.amountMinor, p.currency), 0);
   const owedMinor = payouts
     .filter((p) => p.status !== "paid")
-    .reduce((sum, p) => sum + (p.amountMinor ?? 0), 0);
+    .reduce((sum, p) => sum + toInrMinor(p.amountMinor, p.currency), 0);
 
   // Filtered interviews & proposals
   const filteredInterviews = interviews.filter((i) => {
@@ -485,7 +487,7 @@ export function Intern360View({
               <p className="text-xs text-text-subtle mb-4">
                 Modify skills list displayed to hiring employers.
               </p>
-              <InternSkillsEditor internId={user.id} skills={skills} />
+              <InternSkillsEditor internId={user.id} skills={draft?.skillsWithRatings ?? skills.map((name) => ({ name, rating: "Beginner" as const }))} />
             </div>
 
             <div className="rounded-2xl border border-ink-100 bg-white p-5 shadow-2xs">
@@ -731,7 +733,22 @@ export function Intern360View({
             <p className="text-xs text-text-subtle mt-0.5 mb-4">
               Create and mark stipends disbursed to this student with bank reference verification.
             </p>
-            <InternPayoutTools internId={user.id} payouts={payouts} />
+            <InternPayoutTools
+              internId={user.id}
+              payouts={payouts}
+              placements={proposals
+                .filter((p) => p.status === "hired")
+                .map((p) => ({
+                  id: p.id,
+                  employerId: p.employerId ?? "",
+                  label: `${(p.employerId && employerNames[p.employerId]) || "Company"} · ${(p.projectId && projectNames[p.projectId]) || "Project"}`,
+                }))}
+              dues={stipendDues(
+                proposals,
+                payouts,
+                Number(((onboarding?.extraData ?? {}) as Record<string, unknown>).findternScore) || null,
+              )}
+            />
           </div>
         </div>
       )}

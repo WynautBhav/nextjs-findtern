@@ -3,7 +3,8 @@ import { eq, desc } from "drizzle-orm";
 
 import { getDb, schema } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
-import { OrdersManager, type HiredInternItem } from "@/components/employer/orders-manager";
+import { OrdersManager, type HiredInternItem, type UpcomingDue } from "@/components/employer/orders-manager";
+import { monthlyDues } from "@/lib/dues";
 import type { InvoiceBuyerProfile } from "@/lib/gst";
 import { getInvoiceSeller } from "@/lib/invoice-seller";
 import { parseOffer } from "@/lib/offer";
@@ -19,6 +20,9 @@ export default async function EmployerOrdersPage() {
 
   let paymentRows: (typeof schema.employerPayments.$inferSelect)[] = [];
   let hiredItems: HiredInternItem[] = [];
+  let upcoming: UpcomingDue[] = [];
+  /** proposalId → "Role · Project · Candidate", for itemising invoices. */
+  const lineLabels: Record<string, string> = {};
   let buyer: InvoiceBuyerProfile = { name: "Customer" };
   let fteStatus = "none";
 
@@ -66,6 +70,18 @@ export default async function EmployerOrdersPage() {
       )
       .orderBy(desc(schema.proposals.createdAt));
 
+    for (const r of proposalRows) {
+      const offer = parseOffer(r.proposal.offerDetails, r.proposal.currency);
+      // Paid orders only ever cover hired rows, so the name is unmasked here.
+      lineLabels[r.proposal.id] = [
+        offer.roleTitle || "Internship",
+        r.projectName ?? "Project",
+        r.proposal.status === "hired" ? `${r.firstName} ${r.lastName}`.trim() : null,
+      ]
+        .filter(Boolean)
+        .join(" · ");
+    }
+
     // Interns who already have a full-time offer from this employer.
     const fullTimeFor = new Set(
       proposalRows
@@ -73,8 +89,10 @@ export default async function EmployerOrdersPage() {
         .filter((r) => parseOffer(r.proposal.offerDetails, r.proposal.currency).fullTime)
         .map((r) => r.proposal.internId),
     );
+    // Hired only. Accepted-but-unpaid offers used to land here too, which
+    // both mislabelled them and unmasked their name and email before hire.
     hiredItems = proposalRows
-      .filter((r) => r.proposal.status === "accepted" || r.proposal.hiredAt !== null)
+      .filter((r) => r.proposal.status === "hired")
       .map((r) => {
         const offer = parseOffer(r.proposal.offerDetails, r.proposal.currency);
 
@@ -93,6 +111,26 @@ export default async function EmployerOrdersPage() {
             !fullTimeFor.has(r.proposal.internId),
         };
       });
+
+    // Monthly-plan placements with months still to pay. The next due date is
+    // start + months already paid (the legacy rule), not "1st of next month".
+    const byId = new Map(hiredItems.map((h) => [h.proposal.id, h]));
+    upcoming = monthlyDues(
+      proposalRows.map((r) => r.proposal),
+      paymentRows,
+    ).flatMap((due) => {
+      const item = byId.get(due.proposalId);
+      if (!item) return [];
+      let nextDue: string | null = null;
+      if (item.startDate) {
+        const d = new Date(item.startDate);
+        if (!Number.isNaN(d.getTime())) {
+          d.setMonth(d.getMonth() + due.monthsPaid);
+          nextDue = d.toISOString();
+        }
+      }
+      return [{ ...item, monthsPaid: due.monthsPaid, nextDue }];
+    });
   } catch (err) {
     console.error("Failed to load employer orders data:", err);
   }
@@ -100,6 +138,8 @@ export default async function EmployerOrdersPage() {
   return (
     <OrdersManager
       hiredCandidates={hiredItems}
+      upcomingDues={upcoming}
+      lineLabels={lineLabels}
       paymentHistory={paymentRows}
       seller={getInvoiceSeller()}
       buyer={buyer}

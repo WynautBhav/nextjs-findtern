@@ -1,12 +1,16 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
 import {
   ArrowLeft,
   Award,
   BookOpen,
+  Briefcase,
   GraduationCap,
+  Languages,
+  Medal,
+  Sparkles,
   Laptop,
   Link2,
   MapPin,
@@ -28,6 +32,12 @@ import {
 import { employerRegion, resolvePricing } from "@/lib/employer-pricing";
 import { PageHeader, EmptyState } from "@/components/layout/page-header";
 import { AiFeedbackReport } from "@/components/employer/ai-feedback-report";
+import { CandidateAvatar } from "@/components/employer/candidate-avatar";
+import { attachPhotos, canEmployerSeeIntern } from "@/lib/employer-pool";
+import { isBlockingInterview } from "@/lib/employer-interview-rules";
+import { notify } from "@/lib/notify";
+import { parseOffer } from "@/lib/offer";
+import { draftFromRecord, monthLabel, type OnboardingDraft } from "@/lib/onboarding";
 
 export const metadata: Metadata = {
   title: "Candidate",
@@ -37,26 +47,30 @@ export const metadata: Metadata = {
 /**
  * A candidate, as one employer is allowed to see them.
  *
- * `canAccess(session, internId)` is the *wrong* check here and would be a bug:
- * it answers "is this user the intern", which is false for every employer, and
- * true for an admin. Visibility is a query instead - this employer sent them a
- * proposal and they responded. That is `requireVisibleToEmployer`'s
- * `isVisible` callback, expressed as a page.
- *
- * The candidate pool screen (`/employer/candidates`) is deliberately more
- * permissive - it shows initials, score and skills for browsing. This page is the
- * one that opens up academics and courses, so it holds the stricter bar.
+ * Visible when the intern is in the candidate pool today (`candidatePoolClauses`:
+ * live, open to work, AI-interviewed) or this employer already has a proposal
+ * or interview with them. Anyone else 404s, as legacy did for interns outside
+ * the open-to-work list.
  *
  * Names (and LinkedIn, which leaks the name) stay redacted until this employer
  * hires the intern - see `displayNameOf` in `lib/employer-candidates`.
  */
 
+/** What the "Send proposal" control should do for this candidate. */
+type ProposalAction =
+  | { kind: "send" }
+  | { kind: "view"; proposalId: string }
+  | { kind: "blocked"; reason: string };
+
 export default async function EmployerInternDetail({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ project?: string }>;
 }) {
   const { id } = await params;
+  const { project: requestedProject } = await searchParams;
   const session = await requireRole("employer");
   const employerId = session.uid;
 
@@ -71,8 +85,11 @@ export default async function EmployerInternDetail({
   let visible = false;
   /** True when a query could not run. Rendered, not hidden. */
   let lookupFailed = false;
-  /** The employer's newest active project and whether this candidate is on its shortlist. */
+  /** The selected (or newest active) project and whether this candidate is on its shortlist. */
   let shortlist: { projectId: string; on: boolean } | null = null;
+  let plans: (typeof schema.pricingPlans.$inferSelect)[] = [];
+  let action: ProposalAction = { kind: "send" };
+  let details: Partial<OnboardingDraft> = {};
 
   try {
     const db = getDb();
@@ -80,18 +97,20 @@ export default async function EmployerInternDetail({
     const [user] = await db
       .select()
       .from(schema.users)
-      .where(and(eq(schema.users.id, id), eq(schema.users.isActive, true)))
+      .where(and(eq(schema.users.id, id), eq(schema.users.isActive, true), eq(schema.users.role, "intern")))
       .limit(1);
 
-    if (user) {
+    const adminViewing = await isAdminViewing();
+    if (user && (adminViewing || (await canEmployerSeeIntern(db, employerId, id)))) {
       visible = true;
-      const adminViewing = await isAdminViewing();
-      const [project] = await db
+      // `?project=` keeps the shortlist on the project the employer was
+      // browsing; otherwise the newest active one.
+      const projectRows = await db
         .select({ id: schema.projects.id })
         .from(schema.projects)
         .where(and(eq(schema.projects.employerId, employerId), eq(schema.projects.status, "active")))
-        .orderBy(desc(schema.projects.createdAt))
-        .limit(1);
+        .orderBy(desc(schema.projects.createdAt));
+      const project = projectRows.find((row) => row.id === requestedProject) ?? projectRows[0];
       if (project) {
         const [item] = await db
           .select({ id: schema.employerCartItems.id })
@@ -106,15 +125,34 @@ export default async function EmployerInternDetail({
           .limit(1);
         shortlist = { projectId: project.id, on: Boolean(item) };
       }
-      // One view per employer per day feeds the intern's monthly views summary.
+      // One view per employer per day feeds the intern's monthly views summary,
+      // and tells the intern (legacy "Spotlight" notice, once per employer/day).
       if (!adminViewing) {
-        await db.execute(sql`
+        const recorded = await db.execute(sql`
           INSERT INTO profile_views (employer_id, intern_id)
           SELECT ${employerId}, ${id}
           WHERE NOT EXISTS (
             SELECT 1 FROM profile_views WHERE employer_id = ${employerId} AND intern_id = ${id}
               AND created_at > now() - interval '1 day'
-          )`);
+          )
+          RETURNING id`);
+        if (recorded.rows.length > 0) {
+          const now = new Date();
+          const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+          const [{ views }] = await db
+            .select({ views: sql<number>`count(*)::int` })
+            .from(schema.profileViews)
+            .where(and(eq(schema.profileViews.internId, id), gte(schema.profileViews.createdAt, monthStart)));
+          const name = (user.firstName ?? "").trim();
+          await notify({
+            to: { type: "intern", id },
+            type: "profile_view",
+            title: "Profile viewed",
+            message: `🚀 Spotlight's on you${name ? `, ${name}` : ""} - ${views} profile view${views === 1 ? "" : "s"} and counting!`,
+            data: { employerId, monthViews: views },
+            dedupeKey: `profile_view:${id}:${employerId}:${now.toISOString().slice(0, 10)}`,
+          }).catch(() => undefined);
+        }
       }
       if (adminViewing) {
         nameUnlocked = true;
@@ -125,7 +163,13 @@ export default async function EmployerInternDetail({
       }
 
       const proposals = await db
-        .select({ projectId: schema.proposals.projectId, status: schema.proposals.status })
+        .select({
+          id: schema.proposals.id,
+          projectId: schema.proposals.projectId,
+          status: schema.proposals.status,
+          offerDetails: schema.proposals.offerDetails,
+          currency: schema.proposals.currency,
+        })
         .from(schema.proposals)
         .where(
           and(
@@ -164,6 +208,29 @@ export default async function EmployerInternDetail({
         }));
       }
 
+      // Same conditions legacy used to disable "Send proposal" (detail:1049).
+      const interviews = await db
+        .select()
+        .from(schema.interviews)
+        .where(and(eq(schema.interviews.employerId, employerId), eq(schema.interviews.internId, id)));
+      const CLOSED = ["rejected", "withdrawn", "expired"];
+      const openForProject = proposals.find(
+        (p) => p.projectId === project?.id && !CLOSED.includes(p.status) && p.status !== "hired",
+      );
+      if (proposals.some((p) => p.status === "hired")) {
+        action = { kind: "blocked", reason: "Already hired - see Orders." };
+      } else if (
+        proposals.some((p) => !CLOSED.includes(p.status) && parseOffer(p.offerDetails, p.currency).fullTime)
+      ) {
+        action = { kind: "blocked", reason: "A full-time offer is already out." };
+      } else if (openForProject) {
+        action = { kind: "view", proposalId: openForProject.id };
+      } else if (
+        interviews.some((iv) => (!project || !iv.projectId || iv.projectId === project.id) && isBlockingInterview(iv))
+      ) {
+        action = { kind: "blocked", reason: "Finish the booked interview first." };
+      }
+
       const [onboarding] = await db
         .select()
         .from(schema.internOnboarding)
@@ -171,6 +238,9 @@ export default async function EmployerInternDetail({
         .limit(1);
 
       profile = toCandidateProfile(user, onboarding);
+      if (onboarding) details = draftFromRecord(onboarding);
+      plans = await db.select().from(schema.pricingPlans).where(eq(schema.pricingPlans.isActive, true));
+      await attachPhotos(db, [profile]).catch(() => undefined);
 
       const [employer] = await db
         .select({
@@ -187,7 +257,7 @@ export default async function EmployerInternDetail({
     lookupFailed = true;
   }
 
-  // A candidate who does not exist gets a 404.
+  // Not in the pool and no relationship with this employer: 404.
   if (!lookupFailed && !visible) notFound();
 
   // Reachable only when a query threw: a successful run either 404s above or
@@ -209,7 +279,14 @@ export default async function EmployerInternDetail({
   }
 
   const band = bandFor(profile.score);
-  const pricing = resolvePricing(profile.score, [], currency, null);
+  const pricing = resolvePricing(profile.score, plans, currency, null);
+  const experiences = (details.experiences ?? []).filter((e) => e.company || e.role);
+  const qualifications = [
+    ...(details.academics?.professional ?? []),
+    ...(details.academics?.certifications ?? []),
+  ].filter((q) => q.name);
+  const languages = (details.languages ?? []).filter((l) => l.language);
+  const activities = (details.extracurriculars ?? []).filter((a) => a.activity);
   const academics = profile.academics;
   const displayName = displayNameOf(profile, nameUnlocked);
 
@@ -238,12 +315,11 @@ export default async function EmployerInternDetail({
         <div className="min-w-0 space-y-4">
           <section className="rounded-[20px] border border-ink-200/70 bg-white p-6 shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)]">
             <div className="flex flex-wrap items-start gap-5">
-              <span
-                aria-hidden
-                className="grid size-16 shrink-0 place-items-center rounded-[10px] bg-brand-100 text-xl font-semibold tabular-nums text-brand-700"
-              >
-                {profile.initials}
-              </span>
+              <CandidateAvatar
+                photoUrl={profile.photoUrl}
+                initials={profile.initials}
+                className="size-16 rounded-[10px] text-xl font-semibold tabular-nums"
+              />
               <div className="min-w-[14rem] flex-1 basis-56">
                 <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-text-subtle">
                   Findtern Score
@@ -259,13 +335,26 @@ export default async function EmployerInternDetail({
                 </p>
                 <p className="mt-1.5 text-sm text-text-subtle">{band.blurb}</p>
               </div>
-              <Link
-                href={`/employer/send-proposal?intern=${encodeURIComponent(profile.id)}`}
-                className="apple-spring apple-pressable inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[10px] bg-brand-700 px-4 text-sm font-semibold text-white hover:bg-brand-600 sm:w-auto"
-              >
-                <Send className="size-4" aria-hidden />
-                Send proposal
-              </Link>
+              {action.kind === "send" ? (
+                <Link
+                  href={`/employer/send-proposal?intern=${encodeURIComponent(profile.id)}${shortlist ? `&project=${encodeURIComponent(shortlist.projectId)}` : ""}`}
+                  className="apple-spring apple-pressable inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[10px] bg-brand-700 px-4 text-sm font-semibold text-white hover:bg-brand-600 sm:w-auto"
+                >
+                  <Send className="size-4" aria-hidden />
+                  Send proposal
+                </Link>
+              ) : action.kind === "view" ? (
+                <Link
+                  href={`/employer/proposal/${encodeURIComponent(action.proposalId)}`}
+                  className="apple-spring apple-pressable inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[10px] border border-ink-200 bg-white px-4 text-sm font-semibold text-ink-800 hover:bg-ink-50 sm:w-auto"
+                >
+                  View sent proposal
+                </Link>
+              ) : (
+                <p className="w-full rounded-[10px] bg-ink-50 px-4 py-2.5 text-sm text-ink-600 sm:w-auto">
+                  {action.reason}
+                </p>
+              )}
             </div>
             {shortlist ? (
               <div className="mt-4 flex flex-wrap items-center gap-3">
@@ -312,7 +401,8 @@ export default async function EmployerInternDetail({
             skills={profile.skills}
             bio={profile.bio}
             aiFeedbackLink={profile.aiFeedbackLink}
-            aiRecordingLink={profile.aiRecordingLink}
+            // Recording only after hire; the written report before (legacy).
+            aiRecordingLink={nameUnlocked ? profile.aiRecordingLink : null}
           />
 
           {academics ? (
@@ -341,6 +431,94 @@ export default async function EmployerInternDetail({
                 </Detail>
                 <Detail label="Status">{academics.status ? humanise(academics.status) : "Not stated"}</Detail>
               </dl>
+            </section>
+          ) : null}
+
+          {experiences.length > 0 ? (
+            <section className="rounded-[20px] border border-ink-200/70 bg-white p-6 shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)]">
+              <h2 className="flex items-center gap-2 text-sm font-semibold text-ink-900">
+                <Briefcase className="size-4 text-ink-400" aria-hidden />
+                Experience &amp; projects
+              </h2>
+              <ul className="mt-4 divide-y divide-ink-100">
+                {experiences.map((exp) => (
+                  <li key={exp.id} className="py-3 first:pt-0 last:pb-0">
+                    <p className="text-sm font-medium text-ink-900">
+                      {[exp.role, exp.company].filter(Boolean).join(" · ")}
+                    </p>
+                    <p className="mt-0.5 text-xs tabular-nums text-text-subtle">
+                      {[
+                        exp.type,
+                        [monthLabel(exp.from), exp.current ? "Present" : monthLabel(exp.to)].filter(Boolean).join(" – "),
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </p>
+                    {exp.description ? (
+                      <p className="mt-1.5 whitespace-pre-line text-sm text-ink-700">{exp.description}</p>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
+
+          {qualifications.length > 0 ? (
+            <section className="rounded-[20px] border border-ink-200/70 bg-white p-6 shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)]">
+              <h2 className="flex items-center gap-2 text-sm font-semibold text-ink-900">
+                <Medal className="size-4 text-ink-400" aria-hidden />
+                Certifications &amp; qualifications
+              </h2>
+              <ul className="mt-4 divide-y divide-ink-100">
+                {qualifications.map((q) => (
+                  <li key={q.id} className="py-3 first:pt-0 last:pb-0">
+                    <p className="text-sm font-medium text-ink-900">{q.name}</p>
+                    <p className="mt-0.5 text-xs tabular-nums text-text-subtle">
+                      {[q.issuer, q.year].filter(Boolean).join(" · ") || "No further detail recorded"}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
+
+          {languages.length > 0 || activities.length > 0 ? (
+            <section className="grid gap-6 rounded-[20px] border border-ink-200/70 bg-white p-6 shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)] sm:grid-cols-2">
+              {languages.length > 0 ? (
+                <div className="min-w-0">
+                  <h2 className="flex items-center gap-2 text-sm font-semibold text-ink-900">
+                    <Languages className="size-4 text-ink-400" aria-hidden />
+                    Languages
+                  </h2>
+                  <ul className="mt-3 space-y-2 text-sm text-ink-700">
+                    {languages.map((l) => (
+                      <li key={l.id}>
+                        <span className="font-medium text-ink-900">{l.language}</span>
+                        <span className="text-text-subtle">
+                          {" "}
+                          · {[l.level, l.read && "Read", l.write && "Write", l.speak && "Speak"].filter(Boolean).join(", ")}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+              {activities.length > 0 ? (
+                <div className="min-w-0">
+                  <h2 className="flex items-center gap-2 text-sm font-semibold text-ink-900">
+                    <Sparkles className="size-4 text-ink-400" aria-hidden />
+                    Extracurriculars
+                  </h2>
+                  <ul className="mt-3 space-y-2 text-sm text-ink-700">
+                    {activities.map((a) => (
+                      <li key={a.id}>
+                        <span className="font-medium text-ink-900">{a.activity}</span>
+                        <span className="text-text-subtle"> · {[a.category, a.level].filter(Boolean).join(", ")}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
             </section>
           ) : null}
 
@@ -376,7 +554,9 @@ export default async function EmployerInternDetail({
               {formatRate(pricing.hourlyRateMinor, currency)}
             </p>
             <p className="mt-1 text-xs tabular-nums text-text-subtle">
-              plus {formatRate(pricing.perHireMinor, currency)} per hire
+              {pricing.perHireMinor > 0
+                ? `plus ${formatRate(pricing.perHireMinor, currency)} per hire`
+                : "No per-hire fee at this score"}
             </p>
             <p className="mt-4 text-xs leading-relaxed text-ink-600">
               Fixed by the band, not negotiable in the composer. You set hours and can pay above
@@ -432,6 +612,7 @@ export default async function EmployerInternDetail({
             ) : null}
           </section>
 
+          {appliedProjects.length > 0 ? (
           <section className="rounded-[20px] border border-ink-200/70 bg-white p-5 shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)]">
             <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-text-subtle">
               Your proposals to them
@@ -448,11 +629,8 @@ export default async function EmployerInternDetail({
                 </li>
               ))}
             </ul>
-            <p className="mt-4 border-t border-ink-100 pt-3 text-xs leading-relaxed text-text-subtle">
-              You can see this profile because you sent them a proposal. It is not in the open
-              candidate pool.
-            </p>
           </section>
+          ) : null}
         </aside>
       </div>
     </div>

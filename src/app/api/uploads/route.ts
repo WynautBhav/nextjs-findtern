@@ -27,10 +27,34 @@ const KINDS: Record<string, { roles: SessionData["role"][]; types: string[]; max
   intro_video: { roles: ["intern"], types: VIDEO, max: 50 * MB },
   marksheet: { roles: ["intern"], types: DOCS, max: 25 * MB },
   employer_logo: { roles: ["employer"], types: IMAGES, max: 2 * MB, isPublic: true },
-  offer_letter: { roles: ["employer"], types: ["application/pdf"], max: 10 * MB },
+  // PDF, PNG or JPG, as legacy accepted (employer-orders full-time dialog).
+  offer_letter: { roles: ["employer"], types: ["application/pdf", "image/png", "image/jpeg"], max: 10 * MB },
   cms_image: { roles: ["admin"], types: IMAGES, max: 5 * MB, isPublic: true },
   support: { roles: ["intern", "employer"], types: [...DOCS, ...VIDEO], max: 10 * MB },
 };
+
+/**
+ * Photos and scanned documents are re-encoded to WebP before anything is
+ * stored: auto-rotated from EXIF, EXIF/GPS stripped, capped in size. Only the
+ * WebP is ever written - the original upload never touches disk or the
+ * bucket. PDFs, videos, offer letters, logos and CMS images are kept as sent.
+ * Documents keep more pixels than the face photo so ID numbers stay legible.
+ */
+const WEBP: Record<string, { maxPx: number; quality: number }> = {
+  profile_photo: { maxPx: 1200, quality: 80 },
+  aadhaar: { maxPx: 2000, quality: 85 },
+  pan: { maxPx: 2000, quality: 85 },
+  marksheet: { maxPx: 2000, quality: 85 },
+};
+
+async function toWebp(bytes: Buffer, opts: { maxPx: number; quality: number }): Promise<Buffer> {
+  const sharp = (await import("sharp")).default;
+  return sharp(bytes, { failOn: "error", limitInputPixels: 60_000_000 })
+    .rotate()
+    .resize({ width: opts.maxPx, height: opts.maxPx, fit: "inside", withoutEnlargement: true })
+    .webp({ quality: opts.quality })
+    .toBuffer();
+}
 
 const DOC_COLUMNS = {
   profile_photo: ["profilePhotoName", "profilePhotoType", "profilePhotoSize"],
@@ -77,8 +101,20 @@ export async function POST(req: Request): Promise<Response> {
   if (bytes.length === 0) return NextResponse.json({ error: "Empty file" }, { status: 400 });
   if (bytes.length > kind.max) return NextResponse.json({ error: `The file must be under ${limitMb} MB` }, { status: 413 });
 
-  const stored = await put(kind.isPublic ? "public" : session.uid, bytes, type, kind.max);
-  const fileName = decodeFileName(req.headers.get("x-file-name") ?? "").slice(0, 120);
+  let contentType = type;
+  let fileName = decodeFileName(req.headers.get("x-file-name") ?? "").slice(0, 120);
+  const webp = WEBP[kindName];
+  if (webp && IMAGES.includes(type)) {
+    try {
+      bytes = await toWebp(bytes, webp);
+    } catch {
+      return NextResponse.json({ error: "That image could not be read. Try a JPG or PNG." }, { status: 415 });
+    }
+    contentType = "image/webp";
+    fileName = fileName ? `${fileName.replace(/\.[A-Za-z0-9]{1,5}$/, "")}.webp` : fileName;
+  }
+
+  const stored = await put(kind.isPublic ? "public" : session.uid, bytes, contentType, kind.max);
   await attach(kindName, session, stored, fileName);
 
   return NextResponse.json(

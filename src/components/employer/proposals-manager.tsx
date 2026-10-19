@@ -24,7 +24,7 @@ import { Pill } from "@/components/app/primitives";
 import { EmptyScene } from "@/components/app/primitives";
 import { ButtonLink } from "@/components/ui/button";
 import { employerProposalPill } from "@/components/app/status";
-import type { Proposal, User as UserType, InternOnboarding, Project } from "@/lib/db/schema";
+import type { Proposal, Project } from "@/lib/db/schema";
 import {
   Dialog,
   DialogContent,
@@ -43,14 +43,16 @@ import { parseOffer } from "@/lib/offer";
 
 export type ProposalItem = {
   proposal: Proposal;
-  user: UserType | null;
-  onboarding: InternOnboarding | null;
+  /** Identity only. `email` is null unless this employer has hired them. */
+  user: { firstName: string; lastName: string; email: string | null } | null;
   project: Project | null;
+  /** Hired by this employer on any project - the unmasking rule. */
+  internHired: boolean;
 };
 
 /**
- * Redacted identity for one proposal row. Full name shows only on `hired` -
- * sent / accepted / in-cart candidates are initials, same rule as the pool.
+ * Redacted identity for one proposal row. Full name shows once this employer
+ * has hired the intern on any project - same rule as the pool.
  */
 function nameOf(item: ProposalItem): string {
   const first = item.user?.firstName?.trim() || "";
@@ -60,7 +62,7 @@ function nameOf(item: ProposalItem): string {
       fullName: `${first} ${last}`.trim() || "Candidate",
       initials: initialsOf(first, last),
     },
-    item.proposal.status === "hired",
+    item.internHired,
   );
 }
 
@@ -438,7 +440,7 @@ export function ProposalsManager({
               activeProposal.user?.firstName?.trim() || "",
               activeProposal.user?.lastName?.trim() || "",
             );
-            const contactUnlocked = activeProposal.proposal.status === "hired";
+            const contactUnlocked = activeProposal.internHired;
             const roleTitle = offer.roleTitle || "Internship";
             const stipendMinor = offer.monthlyMinor;
             const duration = `${offer.months} month${offer.months === 1 ? "" : "s"}`;

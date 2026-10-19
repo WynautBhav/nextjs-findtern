@@ -17,6 +17,7 @@ import { AdminEmpty, AdminPageHeader, Panel } from "@/components/admin/panel";
 import { StatCard, StatGrid } from "@/components/admin/stat-card";
 import { TrendChart, type TrendPoint } from "@/components/admin/trend-chart";
 import { cn } from "@/lib/utils";
+import { inrMinorSql, meaningfulProfile, realEmployerId, realEmployers } from "@/lib/admin/scope";
 
 /**
  * Admin home: what needs a person today, four numbers that move, the pipeline
@@ -49,11 +50,13 @@ export default async function AdminDashboard() {
   const db = getDb();
   const now = new Date();
   const weekAgo = new Date(now.getTime() - WEEK_MS);
-  const trendStart = new Date(now.getTime() - 12 * WEEK_MS);
+  // Six calendar months including this one (legacy dashboard chart).
+  const trendStart = new Date(now.getFullYear(), now.getMonth() - 5, 1);
 
   const [
     [admin],
     [candidates],
+    [signups],
     [candidatesNew],
     [companies],
     [companiesNew],
@@ -64,8 +67,8 @@ export default async function AdminDashboard() {
     [sheetsWaiting],
     [interviewsUpcoming],
     proposalStatus,
-    weeklyProposals,
-    weeklyInterviews,
+    monthlyProposals,
+    monthlyInterviews,
     recentUsers,
     recentProjects,
     recentAccepted,
@@ -74,42 +77,73 @@ export default async function AdminDashboard() {
     session
       ? db.select({ name: schema.admins.name }).from(schema.admins).where(eq(schema.admins.id, session.uid)).limit(1)
       : Promise.resolve([undefined]),
-    db.select({ value: count() }).from(schema.users).where(eq(schema.users.isActive, true)),
-    db.select({ value: count() }).from(schema.users).where(gte(schema.users.createdAt, weekAgo)),
-    db.select({ value: count() }).from(schema.employers).where(eq(schema.employers.isActive, true)),
-    db.select({ value: count() }).from(schema.employers).where(gte(schema.employers.createdAt, weekAgo)),
-    db
-      .select({ value: sql<number>`coalesce(sum(${schema.employerPayments.amountMinor}), 0)::bigint` })
-      .from(schema.employerPayments)
-      .where(and(eq(schema.employerPayments.status, "paid"), eq(schema.employerPayments.currency, "INR"))),
-    db
-      .select({ value: sql<number>`coalesce(sum(${schema.employerPayments.amountMinor}), 0)::bigint` })
-      .from(schema.employerPayments)
-      .where(
-        and(
-          eq(schema.employerPayments.status, "paid"),
-          eq(schema.employerPayments.currency, "INR"),
-          gte(schema.employerPayments.paidAt, weekAgo),
-        ),
-      ),
+    // Legacy "total interns": active interns with a real profile, not every signup.
     db
       .select({ value: count() })
       .from(schema.users)
       .leftJoin(schema.internOnboarding, eq(schema.internOnboarding.userId, schema.users.id))
-      .where(sql`${schema.internOnboarding.id} is null`),
+      .where(and(eq(schema.users.role, "intern"), eq(schema.users.isActive, true), meaningfulProfile())),
+    db.select({ value: count() }).from(schema.users).where(eq(schema.users.role, "intern")),
+    db.select({ value: count() }).from(schema.users).where(and(eq(schema.users.role, "intern"), gte(schema.users.createdAt, weekAgo))),
+    // Legacy rule: active, onboarded, real companies (not the test employers).
+    db
+      .select({ value: count() })
+      .from(schema.employers)
+      .where(and(realEmployers(), eq(schema.employers.isActive, true), eq(schema.employers.onboardingCompleted, true))),
+    db.select({ value: count() }).from(schema.employers).where(and(realEmployers(), gte(schema.employers.createdAt, weekAgo))),
+    // Paid employer orders plus intern fees, USD converted (same as Reports).
+    db.execute<{ value: number }>(sql`
+      SELECT coalesce(sum(v), 0)::bigint AS value FROM (
+        SELECT ${inrMinorSql(schema.employerPayments.amountMinor, schema.employerPayments.currency)} AS v
+          FROM ${schema.employerPayments} WHERE ${schema.employerPayments.status} = 'paid'
+        UNION ALL
+        SELECT ${inrMinorSql(schema.internPayments.amountMinor, schema.internPayments.currency)}
+          FROM ${schema.internPayments} WHERE ${schema.internPayments.status} = 'paid'
+      ) t`).then((r) => r.rows),
+    db.execute<{ value: number }>(sql`
+      SELECT coalesce(sum(v), 0)::bigint AS value FROM (
+        SELECT ${inrMinorSql(schema.employerPayments.amountMinor, schema.employerPayments.currency)} AS v
+          FROM ${schema.employerPayments}
+          WHERE ${schema.employerPayments.status} = 'paid' AND ${schema.employerPayments.paidAt} >= ${weekAgo}
+        UNION ALL
+        SELECT ${inrMinorSql(schema.internPayments.amountMinor, schema.internPayments.currency)}
+          FROM ${schema.internPayments}
+          WHERE ${schema.internPayments.status} = 'paid' AND ${schema.internPayments.paidAt} >= ${weekAgo}
+      ) t`).then((r) => r.rows),
+    db
+      .select({ value: count() })
+      .from(schema.users)
+      .leftJoin(schema.internOnboarding, eq(schema.internOnboarding.userId, schema.users.id))
+      .where(sql`${schema.users.role} = 'intern' and not ${meaningfulProfile()}`),
     db.select({ value: count() }).from(schema.contactMessages).where(eq(schema.contactMessages.isRead, false)),
     db.select({ value: count() }).from(schema.timesheets).where(eq(schema.timesheets.status, "submitted")),
-    db.select({ value: count() }).from(schema.interviews).where(eq(schema.interviews.status, "scheduled")),
-    db.select({ status: schema.proposals.status, value: count() }).from(schema.proposals).groupBy(schema.proposals.status),
+    // Upcoming only: a picked slot still in the future, employer interviews
+    // only (AI interviews are not on anyone's calendar). Legacy rule.
     db
-      .select({ week: sql<string>`to_char(date_trunc('week', ${schema.proposals.createdAt}), 'YYYY-MM-DD')`, c: count() })
+      .select({ value: count() })
+      .from(schema.interviews)
+      .where(
+        and(
+          eq(schema.interviews.status, "scheduled"),
+          realEmployerId(schema.interviews.employerId),
+          sql`(CASE ${schema.interviews.selectedSlot} WHEN 1 THEN ${schema.interviews.slot1} WHEN 2 THEN ${schema.interviews.slot2} WHEN 3 THEN ${schema.interviews.slot3} END) > now()`,
+        ),
+      ),
+    db
+      .select({ status: schema.proposals.status, value: count() })
       .from(schema.proposals)
-      .where(gte(schema.proposals.createdAt, trendStart))
+      .where(realEmployerId(schema.proposals.employerId))
+      .groupBy(schema.proposals.status),
+    db
+      .select({ month: sql<string>`to_char(${schema.proposals.createdAt}, 'YYYY-MM')`, c: count() })
+      .from(schema.proposals)
+      .where(and(gte(schema.proposals.createdAt, trendStart), realEmployerId(schema.proposals.employerId)))
       .groupBy(sql`1`),
     db
-      .select({ week: sql<string>`to_char(date_trunc('week', ${schema.interviews.createdAt}), 'YYYY-MM-DD')`, c: count() })
+      .select({ month: sql<string>`to_char(${schema.interviews.createdAt}, 'YYYY-MM')`, c: count() })
       .from(schema.interviews)
-      .where(gte(schema.interviews.createdAt, trendStart))
+      // AI interviews are an intern step, not hiring activity.
+      .where(and(gte(schema.interviews.createdAt, trendStart), realEmployerId(schema.interviews.employerId)))
       .groupBy(sql`1`),
     db
       .select({
@@ -118,6 +152,7 @@ export default async function AdminDashboard() {
         date: schema.users.createdAt,
       })
       .from(schema.users)
+      .where(eq(schema.users.role, "intern"))
       .orderBy(desc(schema.users.createdAt))
       .limit(5),
     db
@@ -129,6 +164,7 @@ export default async function AdminDashboard() {
       })
       .from(schema.projects)
       .leftJoin(schema.employers, eq(schema.employers.id, schema.projects.employerId))
+      .where(realEmployerId(schema.projects.employerId))
       .orderBy(desc(schema.projects.createdAt))
       .limit(5),
     db
@@ -142,7 +178,7 @@ export default async function AdminDashboard() {
       .from(schema.proposals)
       .leftJoin(schema.users, eq(schema.users.id, schema.proposals.internId))
       .leftJoin(schema.employers, eq(schema.employers.id, schema.proposals.employerId))
-      .where(sql`${schema.proposals.status} in ('accepted', 'hired')`)
+      .where(and(sql`${schema.proposals.status} in ('accepted', 'hired')`, realEmployerId(schema.proposals.employerId)))
       .orderBy(desc(schema.proposals.updatedAt))
       .limit(5),
     db
@@ -211,7 +247,12 @@ export default async function AdminDashboard() {
   ].filter((t) => t.count > 0);
 
   const kpis = [
-    { label: "Active candidates", value: n(candidates).toLocaleString("en-IN"), delta: n(candidatesNew), href: "/admin/interns" },
+    {
+      label: "Total interns",
+      value: n(candidates).toLocaleString("en-IN"),
+      note: `with a profile · ${n(signups).toLocaleString("en-IN")} signups${n(candidatesNew) ? `, ${n(candidatesNew)} this week` : ""}`,
+      href: "/admin/interns",
+    },
     { label: "Hiring companies", value: n(companies).toLocaleString("en-IN"), delta: n(companiesNew), href: "/admin/companies" },
     {
       label: "Placements",
@@ -220,27 +261,22 @@ export default async function AdminDashboard() {
       href: "/admin/proposal-tracker",
     },
     {
-      label: "Revenue (INR)",
+      label: "Revenue",
       value: formatMoney(n(revenue), "INR", { zeroLabel: "₹0" }),
       note: n(revenueWeek) ? `${formatMoney(n(revenueWeek), "INR")} this week` : "nothing this week",
       href: "/admin/transactions",
     },
   ];
 
-  // Weekly buckets, Monday-start (Postgres date_trunc('week')).
-  const monday = (d: Date) => {
-    const x = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
-    x.setUTCDate(x.getUTCDate() - ((x.getUTCDay() + 6) % 7));
-    return x;
-  };
-  const pMap = new Map(weeklyProposals.map((r) => [r.week, Number(r.c)]));
-  const iMap = new Map(weeklyInterviews.map((r) => [r.week, Number(r.c)]));
+  // Six monthly buckets, zero-filled (legacy showed months, not weeks).
+  const pMap = new Map(monthlyProposals.map((r) => [r.month, Number(r.c)]));
+  const iMap = new Map(monthlyInterviews.map((r) => [r.month, Number(r.c)]));
   const trend: TrendPoint[] = [];
-  for (let i = 11; i >= 0; i--) {
-    const wk = monday(new Date(now.getTime() - i * WEEK_MS));
-    const key = wk.toISOString().slice(0, 10);
+  for (let i = 5; i >= 0; i--) {
+    const m = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const key = `${m.getFullYear()}-${String(m.getMonth() + 1).padStart(2, "0")}`;
     trend.push({
-      label: wk.toLocaleDateString("en-IN", { day: "numeric", month: "short", timeZone: "UTC" }),
+      label: m.toLocaleDateString("en-IN", { month: "short" }),
       proposals: pMap.get(key) ?? 0,
       interviews: iMap.get(key) ?? 0,
     });
@@ -344,14 +380,14 @@ export default async function AdminDashboard() {
       </StatGrid>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
-        {/* Weekly activity */}
+        {/* Monthly activity */}
         <Panel className="min-w-0 overflow-visible p-5 sm:p-6">
           <div className="flex items-baseline justify-between gap-4">
-            <h2 className="text-[15px] font-semibold text-ink-950">Proposals and interviews, weekly</h2>
-            <span className="text-xs text-text-subtle">last 12 weeks</span>
+            <h2 className="text-[15px] font-semibold text-ink-950">Proposals and interviews, monthly</h2>
+            <span className="text-xs text-text-subtle">last 6 months</span>
           </div>
           {trendTotal === 0 ? (
-            <p className="mt-10 mb-10 text-center text-sm text-text-subtle">No proposals or interviews in the last 12 weeks.</p>
+            <p className="mt-10 mb-10 text-center text-sm text-text-subtle">No proposals or interviews in the last 6 months.</p>
           ) : (
             <div className="mt-4">
               <TrendChart data={trend} height={200} />

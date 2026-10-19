@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, ArrowRight, Check, MapPin } from "lucide-react";
 
 import { DetailRow, PageHead, Pill, SectionHead, Surface } from "@/components/app/primitives";
+import { CompanyInitials } from "@/components/marketing/role-card";
 import { requireRole } from "@/lib/auth";
 import { loadInternData, projectById } from "@/lib/intern-data";
 import { formatDayLabel } from "@/lib/format";
@@ -56,9 +57,9 @@ export default async function RoleDetail({ params }: { params: Promise<{ id: str
         lede={
           existing
             ? existing.status === "accepted" || existing.status === "hired"
-              ? `You are doing this role now at ${role.companyName}.`
-              : `You already have an offer from ${role.companyName} for this.`
-            : `${role.companyName} is hiring for this right now.`
+              ? "You are doing this role now."
+              : "You already have an offer for this role."
+            : "This company is hiring for this right now."
         }
         action={
           existing ? (
@@ -168,7 +169,15 @@ export default async function RoleDetail({ params }: { params: Promise<{ id: str
           <Surface className="p-5">
             <SectionHead title="At a glance" className="mb-0" />
             <dl className="divide-y divide-ink-100">
-              <DetailRow label="Company" value={role.companyName} />
+              <DetailRow
+                label="Company"
+                value={
+                  <span className="inline-flex items-center gap-2">
+                    <CompanyInitials name={role.companyName} className="size-7 text-[11px]" />
+                    <span className="text-ink-500">Name shared with an offer</span>
+                  </span>
+                }
+              />
               <DetailRow
                 label="Where"
                 value={

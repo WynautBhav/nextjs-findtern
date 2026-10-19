@@ -1,3 +1,4 @@
+import type { PriceCurrency } from "@/lib/currency";
 import { savingsPercent } from "@/lib/currency";
 import { formatMoney, formatRate } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -26,7 +27,7 @@ export function PlanPrice({
 }: {
   nowMinor: number;
   wasMinor?: number | null;
-  currency: "INR" | "USD";
+  currency: PriceCurrency;
   kind?: "rate" | "money";
   tone?: "light" | "dark";
   layout?: "inline" | "stack";
@@ -95,7 +96,7 @@ export function OfferNote({
   className,
 }: {
   wasMinor: number;
-  currency: "INR" | "USD";
+  currency: PriceCurrency;
   tone?: "light" | "dark";
   className?: string;
 }) {

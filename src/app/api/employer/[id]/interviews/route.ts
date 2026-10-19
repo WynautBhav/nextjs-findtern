@@ -7,15 +7,18 @@ import { emails } from "@/lib/emails";
 import { requireMutation } from "@/lib/guards-mutation";
 import { employerNames, internFirstName, notify } from "@/lib/notify";
 import { wallTimeToUtc } from "@/lib/timezones";
+import { canEmployerSeeIntern } from "@/lib/employer-pool";
+import { hasDuplicateSlots, isBlockingInterview, isQuarterHourWall } from "@/lib/employer-interview-rules";
 
 const wall = z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/);
 const bodySchema = z.object({
   internId: z.string().min(1),
   projectId: z.string().optional(),
-  /** Wall-clock times in `timezone` ("2026-11-03T15:30"), not browser-converted. */
+  /** Wall-clock times in `timezone` ("2026-11-03T15:30"), not browser-converted.
+   *  Exactly three, on the quarter hour (legacy R:11179, sheet row 66). */
   slot1: wall,
-  slot2: wall.optional(),
-  slot3: wall.optional(),
+  slot2: wall,
+  slot3: wall,
   timezone: z.string().min(1).default("Asia/Kolkata"),
 });
 
@@ -27,31 +30,44 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!guard.ok) return guard.response;
 
   const parsed = bodySchema.safeParse(await req.json().catch(() => null));
-  if (!parsed.success) return NextResponse.json({ error: "Pick at least one slot" }, { status: 400 });
+  if (!parsed.success) return NextResponse.json({ error: "Offer three time slots." }, { status: 400 });
   const b = parsed.data;
+  if (![b.slot1, b.slot2, b.slot3].every(isQuarterHourWall)) {
+    return NextResponse.json({ error: "Slots start on the hour or at :15, :30 or :45." }, { status: 400 });
+  }
 
   let slots: Date[];
   try {
-    slots = [b.slot1, b.slot2, b.slot3].filter((s): s is string => Boolean(s)).map((s) => wallTimeToUtc(s, b.timezone));
+    slots = [b.slot1, b.slot2, b.slot3].map((s) => wallTimeToUtc(s, b.timezone));
   } catch {
     return NextResponse.json({ error: "Unknown timezone" }, { status: 400 });
   }
   if (slots.some((s) => s.getTime() < Date.now())) {
     return NextResponse.json({ error: "Slots must be in the future" }, { status: 400 });
   }
+  if (hasDuplicateSlots(slots)) {
+    return NextResponse.json({ error: "Offer different times - two slots are the same." }, { status: 400 });
+  }
 
   const db = getDb();
+  // Only a pool candidate, or one this employer already works with.
+  if (!(await canEmployerSeeIntern(db, id, b.internId))) {
+    return NextResponse.json({ error: "Unknown candidate" }, { status: 404 });
+  }
+  let projectName: string | null = null;
   if (b.projectId) {
     const [project] = await db
-      .select({ id: schema.projects.id })
+      .select({ id: schema.projects.id, projectName: schema.projects.projectName })
       .from(schema.projects)
       .where(and(eq(schema.projects.id, b.projectId), eq(schema.projects.employerId, id)))
       .limit(1);
     if (!project) return NextResponse.json({ error: "Unknown project" }, { status: 404 });
+    projectName = project.projectName;
   }
-  // One open meeting per candidate per employer.
-  const [open] = await db
-    .select({ id: schema.interviews.id })
+  // One open meeting per candidate per employer. A meeting whose slots have
+  // all passed is stale and no longer holds the candidate (legacy R:11370).
+  const openRows = await db
+    .select()
     .from(schema.interviews)
     .where(
       and(
@@ -59,8 +75,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         eq(schema.interviews.internId, b.internId),
         inArray(schema.interviews.status, OPEN),
       ),
-    )
-    .limit(1);
+    );
+  const open = openRows.find((iv) => isBlockingInterview(iv));
   if (open) {
     return NextResponse.json({ error: "A meeting with this candidate is already open - finish it first." }, { status: 409 });
   }
@@ -72,8 +88,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       internId: b.internId,
       projectId: b.projectId,
       slot1: slots[0],
-      slot2: slots[1] ?? null,
-      slot3: slots[2] ?? null,
+      slot2: slots[1],
+      slot3: slots[2],
       timezone: b.timezone,
       status: "pending",
     })
@@ -87,8 +103,35 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     data: { interviewId: interview.id },
     email: emails.interviewInvitation({
       internName: await internFirstName(b.internId),
-      companyName: (await employerNames(id)).company,
+      // The company stays hidden from the intern until it hires them.
+      companyName: (await hiredBy(db, id, b.internId)) ? (await employerNames(id)).company : "A company on Findtern",
+      project: projectName,
+      slots: [b.slot1, b.slot2, b.slot3].map(wallLabel),
+      timezone: b.timezone,
     }),
   });
   return NextResponse.json({ interview }, { status: 201 });
+}
+
+/** "Tue 3 Nov 2026, 3:30 pm" for a wall-clock "2026-11-03T15:30". */
+function wallLabel(wall: string): string {
+  const d = new Date(`${wall.slice(0, 16)}:00Z`);
+  return d.toLocaleString("en-IN", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: "UTC",
+  });
+}
+
+async function hiredBy(db: ReturnType<typeof getDb>, employerId: string, internId: string): Promise<boolean> {
+  const [row] = await db
+    .select({ id: schema.proposals.id })
+    .from(schema.proposals)
+    .where(and(eq(schema.proposals.employerId, employerId), eq(schema.proposals.internId, internId), eq(schema.proposals.status, "hired")))
+    .limit(1);
+  return Boolean(row);
 }

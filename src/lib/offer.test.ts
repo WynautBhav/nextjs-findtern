@@ -34,8 +34,17 @@ test("missing money stays null, never a made-up default", () => {
   assert.equal(internStipendInrMinor(o), null);
 });
 
-test("intern stipend is shown in INR, USD converted at 100", () => {
-  assert.equal(internStipendInrMinor(parseOffer({ monthlyAmount: 120 }, "USD")), 1_200_000);
+test("intern stipend is half the employer's monthly amount, in INR, USD converted at 100", () => {
+  assert.equal(internStipendInrMinor(parseOffer({ monthlyAmount: 120 }, "USD")), 600_000);
+  assert.equal(internStipendInrMinor(parseOffer({ monthlyAmount: 12001 }, "INR")), 600_050);
+});
+
+test("no stipend for a scored candidate below 6; unscored is not penalised", () => {
+  const o = parseOffer({ monthlyAmount: 12000 }, "INR");
+  assert.equal(internStipendInrMinor(o, 5.9), 0);
+  assert.equal(internStipendInrMinor(o, 6), 600_000);
+  assert.equal(internStipendInrMinor(o, 0), 600_000);
+  assert.equal(internStipendInrMinor(o, null), 600_000);
 });
 
 test("buildOffer writes the legacy shape and round-trips", () => {
@@ -91,4 +100,14 @@ test("monthly dues: one of three months paid leaves the next month due", () => {
     ],
   );
   assert.deepEqual(dues, [{ proposalId: "p1", monthsPaid: 1, months: 3 }]);
+});
+
+test("an offer lapses on its start date (IST), not before", async () => {
+  const { offerPastStart, todayIst } = await import("./offer.ts");
+  // 20:00 UTC on 18 Oct is already 19 Oct in India.
+  const now = new Date(Date.UTC(2026, 9, 18, 20, 0));
+  assert.equal(todayIst(now), "2026-10-19");
+  assert.equal(offerPastStart("2026-10-19", now), true);
+  assert.equal(offerPastStart("2026-10-20", now), false);
+  assert.equal(offerPastStart(null, now), false);
 });

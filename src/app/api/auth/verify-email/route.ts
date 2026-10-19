@@ -24,7 +24,7 @@ export async function POST(req: Request) {
   if (!parsed.success) return NextResponse.json({ error: "Invalid input" }, { status: 400 });
   const { email, role } = parsed.data;
 
-  if (!(await hasVerifiedSignupOtp(role, email))) {
+  if (!(await hasVerifiedSignupOtp(req, role, email))) {
     return NextResponse.json({ error: "Enter the code we emailed you first" }, { status: 400 });
   }
   const db = getDb();

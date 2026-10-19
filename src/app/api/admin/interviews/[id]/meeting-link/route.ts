@@ -60,19 +60,29 @@ export async function PUT(
     return NextResponse.json({ error: "Interview not found" }, { status: 404 });
   }
 
-  // Construct notes with feedback & recording tags if provided
+  // Notes carry the feedback & recording tags (legacy storage). Fields sent
+  // empty clear their part instead of silently keeping the old value; fields
+  // not sent at all keep what was there.
+  const oldLines = String(existing.notes ?? "").split("\n");
+  const oldTag = (tag: string) => oldLines.find((l) => l.startsWith(`${tag}: `))?.slice(tag.length + 2) ?? "";
+  const oldFree = oldLines.filter((l) => !/^(feedback|recording): /.test(l)).join("\n").trim();
+  const pick = (given: string | null | undefined, old: string) => (given === undefined ? old : (given ?? "").trim());
+  const nextFree = pick(notes, oldFree);
+  const nextFeedback = pick(feedbackLink, oldTag("feedback"));
+  const nextRecording = pick(recordingLink, oldTag("recording"));
   const noteParts: string[] = [];
-  if (notes && notes.trim()) noteParts.push(notes.trim());
-  if (feedbackLink && feedbackLink.trim()) noteParts.push(`feedback: ${feedbackLink.trim()}`);
-  if (recordingLink && recordingLink.trim()) noteParts.push(`recording: ${recordingLink.trim()}`);
-  const combinedNotes = noteParts.length > 0 ? noteParts.join("\n") : existing.notes;
+  if (nextFree) noteParts.push(nextFree);
+  if (nextFeedback) noteParts.push(`feedback: ${nextFeedback}`);
+  if (nextRecording) noteParts.push(`recording: ${nextRecording}`);
+  const combinedNotes = noteParts.length > 0 ? noteParts.join("\n") : null;
 
   const [employer] = await db
     .select({ email: schema.employers.companyEmail })
     .from(schema.employers)
     .where(eq(schema.employers.id, existing.employerId))
     .limit(1);
-  const isAi = employer?.email === AI_EMAIL;
+  // Legacy AI interviews sit on employer id "admin"; ours on the synthetic employer.
+  const isAi = existing.employerId === "admin" || employer?.email === AI_EMAIL;
 
   const currentStatus = String(existing.status ?? "").toLowerCase();
   const isTerminal = ["completed", "expired", "cancelled", "canceled"].includes(currentStatus);
@@ -142,8 +152,9 @@ export async function PUT(
     console.error("AI interview unlock notification failed:", notifyErr);
   }
 
-  // Persist feedback/recording links to intern onboarding extraData if present
-  if ((feedbackLink && feedbackLink.trim()) || (recordingLink && recordingLink.trim())) {
+  // Mirror the links onto the candidate profile (what the ratings editor and
+  // employer report read) so the two copies can't disagree; empty clears.
+  if (feedbackLink !== undefined || recordingLink !== undefined) {
     try {
       const [onboarding] = await db
         .select()
@@ -154,12 +165,8 @@ export async function PUT(
       if (onboarding) {
         const extra = (onboarding.extraData as Record<string, unknown>) ?? {};
         const updatedExtra = { ...extra };
-        if (feedbackLink && feedbackLink.trim()) {
-          updatedExtra.aiFeedbackLink = feedbackLink.trim();
-        }
-        if (recordingLink && recordingLink.trim()) {
-          updatedExtra.aiRecordingLink = recordingLink.trim();
-        }
+        if (feedbackLink !== undefined) updatedExtra.aiFeedbackLink = nextFeedback || null;
+        if (recordingLink !== undefined) updatedExtra.aiRecordingLink = nextRecording || null;
         await db
           .update(schema.internOnboarding)
           .set({ extraData: updatedExtra })

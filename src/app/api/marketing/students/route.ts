@@ -6,6 +6,11 @@ import { draftFromRecord } from "@/lib/onboarding";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * What the public site may show about a candidate. No internal user id (`id`
+ * is a per-response list key) and no free-text bio - the candidate wrote that
+ * for employers, not for the open web.
+ */
 export type PublicStudent = {
   id: string;
   initials: string;
@@ -25,9 +30,11 @@ export type PublicStudent = {
     interview?: number;
     domain?: number;
   };
-  summary: string;
   available: boolean;
 };
+
+/** Server-side only: the bio is used to match a category, never returned. */
+type Candidate = PublicStudent & { bio: string };
 
 const CATEGORY_KEYWORDS: Record<string, string[]> = {
   "human resource": [
@@ -82,13 +89,13 @@ function getCategoryKeywords(categoryName: string): string[] {
   return [norm];
 }
 
-function matchesCategory(student: PublicStudent, keywords: string[]): boolean {
+function matchesCategory(student: Candidate, keywords: string[]): boolean {
   const targetCategory = (student.category || "").toLowerCase();
   const allTexts = [
     targetCategory,
     ...student.skills,
     student.degree,
-    student.summary,
+    student.bio,
   ].join(" ");
 
   return keywords.some((kw) => {
@@ -107,7 +114,7 @@ export async function GET(req: Request) {
 
   // Real, scored, publicly listed candidates only. No placeholder profiles:
   // an empty category shows an empty state, not invented people.
-  let students: PublicStudent[] = [];
+  let students: Candidate[] = [];
   try {
     const rows = await getDb()
       .select({ user: schema.users, onboarding: schema.internOnboarding })
@@ -133,7 +140,7 @@ export async function GET(req: Request) {
       const initials = initialsOf((user.firstName || "").trim(), (user.lastName || "").trim());
       return [
         {
-          id: user.id,
+          id: "",
           initials,
           shortName: `Candidate ${initials}`,
           score,
@@ -151,9 +158,9 @@ export async function GET(req: Request) {
             interview: real("interview"),
             domain: real("domain"),
           },
-          summary: onboarding.bio || onboarding.previewSummary || "",
+          bio: onboarding.bio || onboarding.previewSummary || "",
           available: extra.openToWork !== false,
-        } satisfies PublicStudent,
+        } satisfies Candidate,
       ];
     });
   } catch {
@@ -165,5 +172,10 @@ export async function GET(req: Request) {
     students = students.filter((s) => matchesCategory(s, keywords));
   }
   students.sort((a, b) => b.score - a.score);
-  return NextResponse.json({ skill: rawSkill || "all", students: students.slice(0, 40), total: students.length });
+  const visible: PublicStudent[] = students.slice(0, 40).map((c, i) => {
+    const pub: PublicStudent & { bio?: string } = { ...c, id: `c${i + 1}` };
+    delete pub.bio;
+    return pub;
+  });
+  return NextResponse.json({ skill: rawSkill || "all", students: visible, total: students.length });
 }

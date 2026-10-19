@@ -8,6 +8,7 @@ import { getPlans } from "@/lib/content";
 import { pricingFaq } from "@/lib/content/pricing-faq";
 import { formatMoney } from "@/lib/format";
 import { breadcrumbJsonLd, faqJsonLd, pricingJsonLd, webPageJsonLd } from "@/lib/seo";
+import { CurrencyPicker } from "@/components/marketing/region-rates";
 
 export const metadata: Metadata = {
   title: "Intern Hiring Pricing: Free to ₹200/hr + ₹5,000 Per Hire",
@@ -51,6 +52,9 @@ export default async function PricingPage() {
         </ButtonLink>
       </PageHero>
 
+      <div className="flex justify-center bg-ink-50/70 pt-10">
+        <CurrencyPicker />
+      </div>
       <PricingContent plansInr={plansInr} plansUsd={plansUsd} />
     </>
   );

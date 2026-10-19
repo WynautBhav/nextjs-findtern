@@ -2,6 +2,9 @@ import type { Metadata } from "next";
 import { desc } from "drizzle-orm";
 
 import { getDb, schema } from "@/lib/db";
+import { getSession } from "@/lib/auth";
+import { allows } from "@/lib/admin/permissions";
+import { realEmployers } from "@/lib/admin/scope";
 import { AdminPageHeader } from "@/components/admin/panel";
 import { AdminUsersView } from "@/components/admin/admin-users-view";
 
@@ -12,6 +15,10 @@ export const metadata: Metadata = {
 
 export default async function AdminUsersPage() {
   const db = getDb();
+  // Staff accounts are only listed for people who manage staff (roles:write);
+  // users:read alone is about candidates and companies.
+  const session = await getSession();
+  const showStaff = allows(session?.permissions, ["roles:write"]);
 
   const [internUsers, employerUsers, adminUsers] = await Promise.all([
     db
@@ -38,11 +45,15 @@ export default async function AdminUsersPage() {
         phoneNumber: schema.employers.phoneNumber,
         countryCode: schema.employers.countryCode,
         emailVerified: schema.employers.emailVerified,
+        isActive: schema.employers.isActive,
         createdAt: schema.employers.createdAt,
       })
       .from(schema.employers)
+      .where(realEmployers())
       .orderBy(desc(schema.employers.createdAt)),
-    db
+    !showStaff
+      ? Promise.resolve([] as { id: string; name: string | null; email: string; role: string | null; createdAt: Date | null }[])
+      : db
       .select({
         id: schema.admins.id,
         name: schema.admins.name,
@@ -77,7 +88,7 @@ export default async function AdminUsersPage() {
         phoneNumber: e.phoneNumber,
         countryCode: e.countryCode,
         role: "employer",
-        status: "active",
+        status: e.isActive ? "active" : "inactive",
         emailVerified: e.emailVerified,
         createdAt: e.createdAt,
       };

@@ -19,15 +19,18 @@ export function NotificationComposer({
   interns,
   employers,
   totals,
+  query: serverQuery = "",
 }: {
   interns: Person[];
   employers: Person[];
   /** Active accounts per audience, for "send to everyone". */
   totals: { intern: number; employer: number };
+  /** The search the roster was loaded with (`?q=`). */
+  query?: string;
 }) {
   const router = useRouter();
-  const [audience, setAudience] = useState<"intern" | "employer">("intern");
-  const [query, setQuery] = useState("");
+  const [audience, setAudience] = useState<"intern" | "employer" | "both">("intern");
+  const [query, setQuery] = useState(serverQuery);
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [everyone, setEveryone] = useState(false);
   const [title, setTitle] = useState("");
@@ -37,7 +40,10 @@ export function NotificationComposer({
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState<string | null>(null);
 
-  const roster = audience === "intern" ? interns : employers;
+  // "Both" is legacy's everyone-everywhere broadcast: no individual picking.
+  const roster = audience === "intern" ? interns : audience === "employer" ? employers : [];
+  const sendToEveryone = everyone || audience === "both";
+  const audienceTotal = audience === "both" ? totals.intern + totals.employer : totals[audience];
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -58,7 +64,7 @@ export function NotificationComposer({
   }
 
   async function send() {
-    if (picked.size === 0 && !everyone) {
+    if (picked.size === 0 && !sendToEveryone) {
       setError("Pick at least one recipient.");
       return;
     }
@@ -74,8 +80,8 @@ export function NotificationComposer({
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           recipientType: audience,
-          recipientIds: everyone ? [] : Array.from(picked),
-          all: everyone,
+          recipientIds: sendToEveryone ? [] : Array.from(picked),
+          all: sendToEveryone,
           title: title.trim(),
           message: message.trim(),
           type,
@@ -83,9 +89,9 @@ export function NotificationComposer({
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error ?? "Could not send the notification.");
-      const noun = audience === "intern" ? "candidate" : "company";
       const n = Number(data.count ?? picked.size);
-      setSent(`Sent to ${n} ${noun}${n === 1 ? "" : "s"}.`);
+      const noun = audience === "intern" ? (n === 1 ? "candidate" : "candidates") : audience === "employer" ? (n === 1 ? "company" : "companies") : "accounts";
+      setSent(`Sent to ${n} ${noun}.`);
       setEveryone(false);
       setPicked(new Set());
       setTitle("");
@@ -102,7 +108,7 @@ export function NotificationComposer({
     <div className="grid gap-6 xl:grid-cols-[22rem_minmax(0,1fr)]">
       <div className="rounded-xl border border-ink-200 bg-white p-5">
         <div className="flex gap-0.5 rounded-[10px] bg-ink-100 p-1">
-          {(["intern", "employer"] as const).map((value) => (
+          {(["intern", "employer", "both"] as const).map((value) => (
             <button
               key={value}
               type="button"
@@ -117,7 +123,7 @@ export function NotificationComposer({
                   : "apple-spring apple-pressable inline-flex min-h-11 flex-1 items-center justify-center whitespace-nowrap rounded-[8px] px-3 text-[14px] font-medium text-ink-500 hover:text-ink-800"
               }
             >
-              {value === "intern" ? "Candidates" : "Companies"}
+              {value === "intern" ? "Candidates" : value === "employer" ? "Companies" : "Both"}
             </button>
           ))}
         </div>
@@ -127,19 +133,33 @@ export function NotificationComposer({
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search this list"
+            placeholder="Search by name or email, press Enter"
             aria-label="Search recipients"
+            onKeyDown={(e) => {
+              // Enter searches everyone on the server; typing filters the loaded list.
+              if (e.key === "Enter") {
+                e.preventDefault();
+                const q = query.trim();
+                router.push(q ? `?q=${encodeURIComponent(q)}` : "?");
+              }
+            }}
             className="h-9 w-full rounded-lg border border-ink-200 bg-white pl-9 pr-3 text-sm text-ink-900 outline-none placeholder:text-ink-400 focus-visible:border-brand-600 max-lg:min-h-11"
           />
         </div>
 
         <div className="mt-3 flex items-center justify-between text-xs">
           <span className="text-ink-500">
-            {picked.size} of {roster.length} selected
+            {audience === "both" ? "Every active account" : `${picked.size} of ${roster.length} selected`}
           </span>
           <label className="flex items-center gap-1.5 font-medium text-ink-800">
-            <input type="checkbox" className="size-4 accent-brand-700" checked={everyone} onChange={(e) => setEveryone(e.target.checked)} />
-            Everyone ({totals[audience]})
+            <input
+              type="checkbox"
+              className="size-4 accent-brand-700"
+              checked={sendToEveryone}
+              disabled={audience === "both"}
+              onChange={(e) => setEveryone(e.target.checked)}
+            />
+            Everyone ({audienceTotal})
           </label>
           <button
             type="button"
@@ -153,9 +173,14 @@ export function NotificationComposer({
           </button>
         </div>
 
+        {roster.length >= 50 ? (
+          <p className="mt-2 text-2xs text-ink-500">Showing the 50 newest. Search and press Enter to find anyone else.</p>
+        ) : null}
         <ul className="mt-2 max-h-80 space-y-0.5 overflow-y-auto">
           {filtered.length === 0 ? (
-            <li className="py-4 text-sm text-ink-500">Nobody matches that.</li>
+            <li className="py-4 text-sm text-ink-500">
+              {audience === "both" ? "Goes to every active candidate and company." : "Nobody matches that."}
+            </li>
           ) : (
             filtered.map((p) => (
               <li key={p.id}>

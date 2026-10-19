@@ -96,13 +96,53 @@ export function parseOffer(raw: unknown, rowCurrency?: string | null): Offer {
 }
 
 
+/** The intern's share of what the employer pays each month (legacy routes.ts:13408). */
+export const INTERN_STIPEND_SHARE = 0.5;
+
+/**
+ * Legacy rule (proposals.tsx:590): a scored candidate below 6 is not paid a
+ * stipend. An unscored candidate (0 / missing) is not penalised.
+ */
+export function stipendEligible(score: number | null | undefined): boolean {
+  const s = Number(score ?? 0);
+  return !(s > 0 && s < 6);
+}
+
 /**
  * The stipend the intern sees, always in INR minor units (legacy rule: USD
- * offers are shown converted). Null when the offer has no monthly amount.
+ * offers are shown converted): half of the employer's monthly amount, rounded
+ * down, and 0 for a candidate scored below 6. Null when the offer has no
+ * monthly amount.
  */
-export function internStipendInrMinor(offer: Offer): number | null {
+export function internStipendInrMinor(offer: Offer, score?: number | null): number | null {
   if (offer.monthlyMinor == null) return null;
-  return offer.currency === "USD" ? offer.monthlyMinor * INR_PER_USD : offer.monthlyMinor;
+  if (!stipendEligible(score)) return 0;
+  const inr = offer.currency === "USD" ? offer.monthlyMinor * INR_PER_USD : offer.monthlyMinor;
+  return Math.floor(inr * INTERN_STIPEND_SHARE);
+}
+
+/** Today's date in India (YYYY-MM-DD) - offers are dated in IST. */
+export function todayIst(now: Date = new Date()): string {
+  return new Date(now.getTime() + 330 * 60_000).toISOString().slice(0, 10);
+}
+
+/**
+ * Legacy rule (proposals.tsx:483): an offer can be answered only while its
+ * start date is still ahead. On the start day it reads as expired.
+ */
+export function offerPastStart(startDate: string | null | undefined, now: Date = new Date()): boolean {
+  const day = String(startDate ?? "").slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(day) && day <= todayIst(now);
+}
+
+/** Formal offers an intern may decline before the guarantee ends. */
+export const FREE_DECLINES = 3;
+
+/** Score the offer was priced on, when the row carries one. */
+export function offerScore(raw: unknown): number | null {
+  const o = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+  const n = Number(o.candidateScore);
+  return Number.isFinite(n) && n > 0 ? n : null;
 }
 
 export type OfferInput = {
@@ -111,6 +151,11 @@ export type OfferInput = {
   jd?: string;
   mode: string;
   location?: string;
+  city?: string;
+  state?: string;
+  /** Hybrid only: days per week in the office and at home. */
+  officeDays?: number;
+  homeDays?: number;
   startDate: string;
   duration: string;
   monthlyHours: number;
@@ -139,6 +184,8 @@ export function buildOffer(input: OfferInput): Record<string, unknown> {
     mode: input.mode,
     currency: input.currency,
     location: input.mode === "remote" ? "Remote" : (input.location ?? ""),
+    ...(input.mode !== "remote" ? { city: input.city ?? "", state: input.state ?? "" } : {}),
+    ...(input.mode === "hybrid" ? { wfoDays: input.officeDays ?? null, wfhDays: input.homeDays ?? null } : {}),
     startDate: input.startDate,
     duration: input.duration,
     shiftFrom: input.shiftFrom ?? "",

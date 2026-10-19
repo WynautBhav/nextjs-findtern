@@ -3,6 +3,7 @@ import { eq, desc } from "drizzle-orm";
 
 import { getDb, schema } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
+import { hiredInternIds } from "@/lib/employer-visibility";
 import { PageHeader } from "@/components/layout/page-header";
 import {
   ProposalsManager,
@@ -23,18 +24,18 @@ export default async function EmployerProposalsPage() {
   try {
     const db = getDb();
     const rows = await db
+      // Only the identity columns the list renders. Selecting the whole
+      // `users` row shipped every candidate's password hash, email and phone
+      // to the browser in the RSC payload.
       .select({
         proposal: schema.proposals,
-        user: schema.users,
-        onboarding: schema.internOnboarding,
+        firstName: schema.users.firstName,
+        lastName: schema.users.lastName,
+        email: schema.users.email,
         project: schema.projects,
       })
       .from(schema.proposals)
       .leftJoin(schema.users, eq(schema.proposals.internId, schema.users.id))
-      .leftJoin(
-        schema.internOnboarding,
-        eq(schema.proposals.internId, schema.internOnboarding.userId)
-      )
       .leftJoin(
         schema.projects,
         eq(schema.proposals.projectId, schema.projects.id)
@@ -42,7 +43,25 @@ export default async function EmployerProposalsPage() {
       .where(eq(schema.proposals.employerId, employerId))
       .orderBy(desc(schema.proposals.createdAt));
 
-    proposals = rows;
+    // Unmask on a hire with this employer on any project, as every other
+    // employer screen does; email leaves the server only for those.
+    const hired = await hiredInternIds(db, employerId);
+    proposals = rows.map((row) => {
+      const unlocked = hired.has(row.proposal.internId);
+      return {
+        proposal: row.proposal,
+        project: row.project,
+        internHired: unlocked,
+        user:
+          row.firstName === null && row.lastName === null
+            ? null
+            : {
+                firstName: row.firstName ?? "",
+                lastName: row.lastName ?? "",
+                email: unlocked ? row.email : null,
+              },
+      };
+    });
   } catch {
     // Database fallback
   }

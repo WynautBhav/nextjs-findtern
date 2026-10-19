@@ -204,7 +204,7 @@ export function WhereMoneyGoes({ plansInr, plansUsd }: { plansInr: CmsPlan[]; pl
       </div>
 
       <p className="mt-6 text-sm text-on-dark-subtle">
-        No other charges. {isIndia ? "Prices include GST. " : ""}Take an intern on full time later and 8.33% of CTC applies then, not before.
+        No other charges. {isIndia ? "Prices include GST. " : currency === "USD" ? "Billed in US dollars. " : `Billed in US dollars; ${currency} shown at a reference rate. `}Take an intern on full time later and 8.33% of CTC applies then, not before.
       </p>
     </div>
   );

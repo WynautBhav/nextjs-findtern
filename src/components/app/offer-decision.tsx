@@ -29,6 +29,7 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { AlertCircle, Check, Loader2, X } from "lucide-react";
 
 import { csrfFetch } from "@/lib/client-fetch";
+import { CountdownAgreement, FULL_TIME_ACCEPTANCE_TERMS } from "@/components/app/countdown-agreement";
 
 type Outcome = { kind: "accepted" | "declined"; error?: string };
 
@@ -37,28 +38,49 @@ export function OfferDecision({
   roleTitle,
   company,
   startDate,
+  fullTime = false,
+  declinesUsed = 0,
+  freeDeclines = 3,
+  guaranteeEnded = false,
 }: {
   proposalId: string;
   roleTitle: string;
   company: string;
   startDate: string | null;
+  /** Full-time offers need the binding acceptance agreement. */
+  fullTime?: boolean;
+  /** Offers this intern has already turned down. */
+  declinesUsed?: number;
+  freeDeclines?: number;
+  guaranteeEnded?: boolean;
 }) {
   const router = useRouter();
   const reduce = useReducedMotion();
   const [confirming, setConfirming] = useState(false);
+  const [fullTimeOpen, setFullTimeOpen] = useState(false);
+  const [declineWarning, setDeclineWarning] = useState(false);
+  // Declining past the free allowance ends the placement guarantee; it is
+  // allowed, but only after the intern has seen that consequence.
+  const lastFreeUsed = declinesUsed >= freeDeclines && !guaranteeEnded;
+  const freeLeft = Math.max(0, freeDeclines - declinesUsed);
   const [agreed, setAgreed] = useState(false);
   const [outcome, setOutcome] = useState<Outcome | null>(null);
   const [busy, setBusy] = useState<"accept" | "decline" | null>(null);
   const [, startTransition] = useTransition();
 
-  async function decide(kind: "accepted" | "declined") {
+  async function decide(kind: "accepted" | "declined", opts: { fullTimeAgreed?: boolean; acknowledgeGuaranteeEnd?: boolean } = {}) {
     setBusy(kind === "accepted" ? "accept" : "decline");
     try {
       const res = await csrfFetch(`/api/proposals/${proposalId}/status`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         // The API speaks "rejected"; "declined" is only this screen's wording.
-        body: JSON.stringify({ status: kind === "declined" ? "rejected" : kind, agreedToTerms: kind === "accepted" && agreed }),
+        body: JSON.stringify({
+          status: kind === "declined" ? "rejected" : kind,
+          agreedToTerms: kind === "accepted" && (agreed || Boolean(opts.fullTimeAgreed)),
+          agreedToFullTimeTerms: kind === "accepted" && Boolean(opts.fullTimeAgreed),
+          acknowledgeGuaranteeEnd: kind === "declined" && Boolean(opts.acknowledgeGuaranteeEnd),
+        }),
       });
       if (!res.ok) {
         const body = (await res.json().catch(() => ({}))) as { error?: string };
@@ -70,6 +92,8 @@ export function OfferDecision({
         });
         setBusy(null);
         setConfirming(false);
+        setFullTimeOpen(false);
+        setDeclineWarning(false);
         return;
       }
       setOutcome({ kind });
@@ -201,10 +225,52 @@ export function OfferDecision({
         </p>
       ) : null}
 
+      {declineWarning ? (
+        <div role="alertdialog" aria-label="Turning this down ends your guarantee" className="mb-4 rounded-[20px] border border-warning/40 bg-warning-soft p-5">
+          <p className="text-sm font-semibold text-ink-900">This would be offer number {declinesUsed + 1} you turn down</p>
+          <p className="mt-1.5 text-pretty text-sm leading-relaxed text-ink-700">
+            The placement guarantee covers up to {freeDeclines} declined offers. Turning this one down ends the
+            guarantee, so the fee is no longer refundable. You can still receive and accept offers.
+          </p>
+          <div className="mt-4 flex flex-wrap gap-3">
+            <button
+              type="button"
+              onClick={() => decide("declined", { acknowledgeGuaranteeEnd: true })}
+              disabled={busy !== null}
+              className="apple-spring apple-pressable inline-flex min-h-11 items-center gap-2 rounded-[10px] bg-ink-900 px-5 text-sm font-semibold text-white hover:bg-ink-800 disabled:opacity-55"
+            >
+              {busy === "decline" ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
+              Turn it down anyway
+            </button>
+            <button
+              type="button"
+              onClick={() => setDeclineWarning(false)}
+              className="apple-spring apple-pressable inline-flex min-h-11 items-center rounded-[10px] border border-ink-200 bg-white px-5 text-sm font-medium text-ink-700 hover:bg-ink-50"
+            >
+              Keep it open
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {fullTime ? (
+        <CountdownAgreement
+          open={fullTimeOpen}
+          onOpenChange={setFullTimeOpen}
+          title="Full-time offer acceptance"
+          description="Before accepting this full-time employment offer, read and acknowledge the following terms."
+          sections={FULL_TIME_ACCEPTANCE_TERMS}
+          agreeLabel="I confirm that I have read, understood, and agreed to the above terms. I acknowledge that accepting this offer is a binding professional commitment."
+          confirmLabel="Accept the offer"
+          busy={busy === "accept"}
+          onConfirm={() => decide("accepted", { fullTimeAgreed: true })}
+        />
+      ) : null}
+
       <div className="flex flex-wrap gap-3">
         <button
           type="button"
-          onClick={() => setConfirming(true)}
+          onClick={() => (fullTime ? setFullTimeOpen(true) : setConfirming(true))}
           disabled={busy !== null || confirming}
           className="apple-spring apple-pressable inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-[10px] bg-primary px-5 text-sm font-semibold text-white shadow-sm hover:bg-primary-hover disabled:opacity-55 sm:flex-none"
         >
@@ -213,8 +279,8 @@ export function OfferDecision({
         </button>
         <button
           type="button"
-          onClick={() => decide("declined")}
-          disabled={busy !== null || confirming}
+          onClick={() => (lastFreeUsed ? setDeclineWarning(true) : decide("declined"))}
+          disabled={busy !== null || confirming || declineWarning}
           className="apple-spring apple-pressable inline-flex min-h-11 items-center justify-center gap-2 rounded-[10px] border border-ink-200 bg-white px-5 text-sm font-medium text-ink-700 hover:border-ink-300 hover:bg-ink-50 disabled:opacity-55"
         >
           {busy === "decline" ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
@@ -222,7 +288,11 @@ export function OfferDecision({
         </button>
       </div>
       <p className="mt-3 text-sm text-ink-500">
-        Turning it down is fine and nothing is deleted. You can apply again later.
+        {guaranteeEnded
+          ? "Turning it down is fine and nothing is deleted."
+          : freeLeft > 0
+            ? `Turning it down is fine and nothing is deleted. You can turn down ${freeLeft} more offer${freeLeft === 1 ? "" : "s"} and keep your guarantee.`
+            : "You have turned down " + declinesUsed + " offers. Turning down another ends your placement guarantee."}
       </p>
     </div>
   );

@@ -81,6 +81,12 @@ export type CandidateProfile = {
   updatedAt: Date | null;
   aiFeedbackLink?: string | null;
   aiRecordingLink?: string | null;
+  /**
+   * The avatar route for this candidate, or null when there is no photo.
+   * `attachPhotos` (lib/employer-pool) sets it for an uploaded one, which
+   * needs the documents table.
+   */
+  photoUrl?: string | null;
 };
 
 export const MODE_LABEL: Record<string, string> = {
@@ -137,6 +143,17 @@ export function displayNameOf(
 }
 
 /**
+ * What may cross to the browser for an employer who has not hired this
+ * candidate: no name, no email, no LinkedIn, no interview recording. Pages
+ * that hand profiles to client components pass them through this, so the
+ * non-bypass rule does not depend on every component remembering it.
+ */
+export function redactForEmployer<T extends CandidateProfile>(profile: T, unlocked: boolean): T {
+  if (unlocked) return profile;
+  return { ...profile, firstName: "", lastName: "", fullName: "", email: "", linkedinUrl: "", aiRecordingLink: null };
+}
+
+/**
  * Intern ids this employer has hired (any project). Lives in
  * `lib/employer-visibility` (not here) so this module stays import-free and
  * unit-testable under plain node. Feed the result into `displayNameOf` so
@@ -179,6 +196,10 @@ export function toCandidateProfile(
     updatedAt: onboarding?.updatedAt ?? null,
     aiFeedbackLink: (typeof extra?.aiFeedbackLink === "string" && extra.aiFeedbackLink.trim()) || null,
     aiRecordingLink: (typeof extra?.aiRecordingLink === "string" && extra.aiRecordingLink.trim()) || null,
+    // Uploaded photos only - `attachPhotos` (lib/employer-pool) sets this.
+    // Saved external URLs are never served (the avatar route was an open
+    // redirect while it followed them).
+    photoUrl: null,
   };
 }
 

@@ -15,3 +15,26 @@ test("score is the mean unless given", () => {
   assert.equal(applyRatings({}, { coding: 8, aptitude: 6 }).findternScore, 7);
   assert.equal(applyRatings({}, { coding: 8 }, 9).findternScore, 9);
 });
+
+test("score: four core keys only, clamped and rounded to one decimal", () => {
+  const extra = { ratings: { overall: 2, academic: 1 } };
+  assert.equal(applyRatings(extra, { coding: 7, aptitude: 8, interview: 8 }).findternScore, 7.7);
+  assert.equal(applyRatings({}, {}, 12).findternScore, 10);
+  assert.equal(applyRatings({}, {}, 6.66).findternScore, 6.7);
+});
+
+test("null clears a rating; clearing all removes the score", () => {
+  const start = applyRatings({}, { coding: 8, aptitude: 6 });
+  const one = applyRatings(start, { coding: null });
+  assert.deepEqual(one.ratings, { aptitude: 6 });
+  assert.equal(one.findternScore, 6);
+  const none = applyRatings(one, { aptitude: null });
+  assert.equal("findternScore" in none, false);
+});
+
+test("headers match ignoring case, spaces, dashes and underscores", () => {
+  const rows = readRatingsSheet("E-Mail,AI_Interview,Findtern-Score\r\nx@y.com,7,7\r\n");
+  assert.equal(rows[0].email, "x@y.com");
+  assert.equal(rows[0].updates.interview, 7);
+  assert.equal(rows[0].score, 7);
+});

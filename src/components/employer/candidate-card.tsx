@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import {
+  ArrowUpRight,
   Check,
   Eye,
   ExternalLink,
@@ -20,9 +21,10 @@ import {
   displayNameOf,
   type CandidateProfile,
 } from "@/lib/employer-candidates";
-import { resolvePricing, type Currency } from "@/lib/employer-pricing";
+import { resolvePricing, type Currency, type Pricing } from "@/lib/employer-pricing";
 import { ShortlistToggle } from "@/components/employer/shortlist-toggle";
 import { AiFeedbackReport } from "@/components/employer/ai-feedback-report";
+import { CandidateAvatar } from "@/components/employer/candidate-avatar";
 import { Pill } from "@/components/app/primitives";
 import { ButtonLink } from "@/components/ui/button";
 import {
@@ -52,6 +54,43 @@ export interface CandidateCardProps {
   shortlisted: boolean;
   /** True when this employer hired the candidate - the only case the full name shows. */
   nameUnlocked?: boolean;
+  /** Resolved server-side against the CMS rate card; falls back to the bands. */
+  pricing?: Pricing;
+  /** This employer's latest open or hired proposal to the candidate, if any. */
+  proposal?: { id: string; status: string } | null;
+}
+
+/** Legacy cards changed their action once a proposal existed (dashboard:2513). */
+function ProposalAction({
+  candidateId,
+  projectId,
+  proposal,
+  className,
+}: {
+  candidateId: string;
+  projectId: string | null;
+  proposal: { id: string; status: string } | null;
+  className?: string;
+}) {
+  if (proposal) {
+    return (
+      <ButtonLink
+        href={`/employer/proposal/${encodeURIComponent(proposal.id)}`}
+        variant="outline"
+        size="sm"
+        className={className}
+      >
+        <span>{proposal.status === "hired" ? "Hired - view placement" : "View proposal"}</span>
+      </ButtonLink>
+    );
+  }
+  const query = `intern=${encodeURIComponent(candidateId)}${projectId ? `&project=${encodeURIComponent(projectId)}` : ""}`;
+  return (
+    <ButtonLink href={`/employer/send-proposal?${query}`} variant="primary" size="sm" className={className}>
+      <Send className="size-3.5" aria-hidden />
+      <span>Send proposal</span>
+    </ButtonLink>
+  );
 }
 
 export function CandidateCard({
@@ -63,10 +102,12 @@ export function CandidateCard({
   projectId,
   shortlisted,
   nameUnlocked = false,
+  pricing: resolved,
+  proposal = null,
 }: CandidateCardProps) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const band = bandFor(candidate.score);
-  const pricing = resolvePricing(candidate.score, [], currency, region);
+  const pricing = resolved ?? resolvePricing(candidate.score, [], currency, region);
   const assessed = RATING_META.filter((meta) => candidate.ratings[meta.key] > 0);
   const displayName = displayNameOf(candidate, nameUnlocked);
 
@@ -76,14 +117,13 @@ export function CandidateCard({
         {/* Top Header: Avatar + Identity + Hero Score Gauge */}
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-start gap-3.5 min-w-0">
-            {/* Flat initial tile - no gradient, no floating badge. The band
-                pill beside the name already carries the tier. */}
-            <span
-              aria-hidden
-              className="grid size-12 shrink-0 place-items-center rounded-[10px] bg-brand-50 font-bold text-brand-800 text-base border border-brand-200/80"
-            >
-              {candidate.initials}
-            </span>
+            {/* Photo, or a flat initial tile - no gradient, no floating badge.
+                The band pill beside the name already carries the tier. */}
+            <CandidateAvatar
+              photoUrl={candidate.photoUrl}
+              initials={candidate.initials}
+              className="size-12 rounded-[10px] text-base border border-brand-200/80"
+            />
 
             {/* Candidate Name, Band & Metadata */}
             <div className="min-w-0 flex-1">
@@ -97,6 +137,11 @@ export function CandidateCard({
                   {displayName}
                 </button>
                 <Pill tone="live">{band.name}</Pill>
+                {proposal ? (
+                  <Pill tone={proposal.status === "hired" ? "live" : "waiting"}>
+                    {proposal.status === "hired" ? "Hired" : `Proposal ${proposal.status}`}
+                  </Pill>
+                ) : null}
               </div>
 
               {/* Location, Work Modes & Hardware */}
@@ -223,9 +268,11 @@ export function CandidateCard({
                 <SheetHeader className="text-left pb-4 border-b border-ink-200/70">
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex items-start gap-4">
-                      <span aria-hidden className="grid size-14 shrink-0 place-items-center rounded-[10px] bg-brand-50 text-lg font-bold tabular-nums text-brand-800 border border-brand-200">
-                        {candidate.initials}
-                      </span>
+                      <CandidateAvatar
+                        photoUrl={candidate.photoUrl}
+                        initials={candidate.initials}
+                        className="size-14 rounded-[10px] text-lg tabular-nums border border-brand-200"
+                      />
                       <div>
                         <SheetTitle className="text-xl font-bold text-ink-900">
                           {displayName}
@@ -254,15 +301,12 @@ export function CandidateCard({
 
                 {/* Quick actions bar inside drawer */}
                 <div className="mt-4 flex flex-wrap items-center gap-2 rounded-[10px] bg-white p-3 border border-ink-200/70 shadow-2xs">
-                  <ButtonLink
-                    href={`/employer/send-proposal?intern=${encodeURIComponent(candidate.id)}`}
-                    variant="primary"
-                    size="sm"
+                  <ProposalAction
+                    candidateId={candidate.id}
+                    projectId={projectId}
+                    proposal={proposal}
                     className="min-h-11 px-3.5 text-[13px] font-semibold"
-                  >
-                    <Send className="size-3.5" aria-hidden />
-                    <span>Send proposal</span>
-                  </ButtonLink>
+                  />
                   {projectId ? (
                     <ShortlistToggle
                       internId={candidate.id}
@@ -382,6 +426,7 @@ export function CandidateCard({
           {/* Compare Toggle */}
           <Link
             href={compareHref}
+            scroll={false}
             aria-pressed={selected}
             className={[
               "apple-spring apple-pressable inline-flex min-h-11 w-full items-center justify-center gap-1.5 rounded-[10px] border px-2.5 text-[13px] font-medium xl:w-auto",
@@ -397,6 +442,14 @@ export function CandidateCard({
             )}
             <span>{selected ? "Selected" : "Compare"}</span>
           </Link>
+
+          <Link
+            href={`/employer/intern/${encodeURIComponent(candidate.id)}`}
+            className="apple-spring apple-pressable inline-flex min-h-11 w-full items-center justify-center gap-1.5 rounded-[10px] border border-ink-200/70 bg-white px-2.5 text-[13px] font-medium text-ink-700 hover:border-brand-300 hover:text-brand-800 xl:w-auto"
+          >
+            <span>View profile</span>
+            <ArrowUpRight className="size-3.5 text-ink-400" aria-hidden />
+          </Link>
         </div>
 
         {/* Right: Shortlist & Send Proposal */}
@@ -411,15 +464,18 @@ export function CandidateCard({
             />
           ) : null}
 
-          <ButtonLink
-            href={`/employer/send-proposal?intern=${encodeURIComponent(candidate.id)}`}
-            variant="primary"
-            size="sm"
-            className="min-h-11 w-full px-3 text-[13px] font-semibold xl:w-auto"
-          >
-            <Send className="size-3.5" aria-hidden />
-            <span>Send proposal</span>
-          </ButtonLink>
+          <ProposalAction
+            candidateId={candidate.id}
+            projectId={projectId}
+            proposal={proposal}
+            className={[
+              "min-h-11 w-full px-3 text-[13px] font-semibold xl:w-auto",
+              // Quick View, Compare, View profile and Shortlist fill two rows of
+              // the 2-column grid; without a project there is no Shortlist and
+              // this button closes the second row instead of starting a third.
+              projectId ? "col-span-2" : "",
+            ].join(" ")}
+          />
         </div>
       </div>
     </li>

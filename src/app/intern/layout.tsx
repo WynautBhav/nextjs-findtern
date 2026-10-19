@@ -40,9 +40,8 @@ export default async function InternLayout({ children }: { children: React.React
     .where(eq(schema.internDocuments.userId, session.uid))
     .limit(1);
 
-  const extra = data.onboarding?.extraData as Record<string, unknown> | undefined;
-  const externalPhoto = typeof extra?.photoUrl === "string" ? extra.photoUrl : null;
-  const photoUrl = doc?.profilePhotoName ? "/api/intern/avatar" : externalPhoto;
+  // Uploaded photos only; a saved outside URL is never rendered.
+  const photoUrl = doc?.profilePhotoName ? "/api/intern/avatar" : null;
 
   const [unread] = await db
     .select({ value: count() })

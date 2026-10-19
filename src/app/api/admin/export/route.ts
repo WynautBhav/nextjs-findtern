@@ -5,6 +5,8 @@ import { getDb, schema } from "@/lib/db";
 import { csvFilename, csvResponse, toCsv, type CsvColumn } from "@/lib/admin/csv";
 import { flattenParams, parsePageRequest, periodStart, searchAny } from "@/lib/admin/params";
 import { allows, EXPORT_PERMISSIONS } from "@/lib/admin/permissions";
+import { aiInterviewStatus, findternScoreSql, meaningfulProfile, realEmployerId, realEmployers } from "@/lib/admin/scope";
+import { placeOfSupply, splitGst } from "@/lib/gst";
 import { requireRole } from "@/lib/security/guards";
 
 /**
@@ -59,6 +61,10 @@ export async function GET(req: Request) {
       return exportProposals(req2.search, params);
     case "payments":
       return exportPayments(req2.search, params);
+    case "payouts":
+      return exportPayouts(req2.search, params);
+    case "intern-payments":
+      return exportInternPayments(req2.search, params);
     default:
       return NextResponse.json({ error: `Unknown export type "${type}"` }, { status: 400 });
   }
@@ -67,7 +73,12 @@ export async function GET(req: Request) {
 async function exportInterns(search: string, params: Record<string, string>) {
   const db = getDb();
 
+  // Same filters as the intern list, so the file matches the screen.
+  const profileFilled = meaningfulProfile();
+  const aiStatus = aiInterviewStatus();
+  const openToWork = sql<boolean>`coalesce(${schema.internOnboarding.extraData}->>'openToWork', 'true') <> 'false'`;
   const conditions: (SQL | undefined)[] = [
+    eq(schema.users.role, "intern"),
     searchAny(
       [
         sql`${schema.users.firstName}`,
@@ -78,7 +89,14 @@ async function exportInterns(search: string, params: Record<string, string>) {
       search,
     ),
     params.status ? eq(schema.users.isActive, params.status === "active") : undefined,
-    params.visibility ? eq(schema.users.profileVisibility, params.visibility) : undefined,
+    params.visibility === "intern_hidden"
+      ? sql`not ${openToWork}`
+      : params.visibility
+        ? eq(schema.users.profileVisibility, params.visibility)
+        : undefined,
+    params.profile === "complete" ? profileFilled : undefined,
+    params.profile === "incomplete" ? sql`not ${profileFilled}` : undefined,
+    params.ai ? sql`${aiStatus} = ${params.ai}` : undefined,
   ].filter(Boolean) as SQL[];
 
   const where = conditions.length
@@ -95,7 +113,12 @@ async function exportInterns(search: string, params: Record<string, string>) {
       isActive: schema.users.isActive,
       visibility: schema.users.profileVisibility,
       createdAt: schema.users.createdAt,
-      hasProfile: sql<boolean>`(${schema.internOnboarding.id} is not null)`,
+      hasProfile: profileFilled,
+      openToWork,
+      aiStatus,
+      score: findternScoreSql(),
+      offers: sql<number>`(select count(*)::int from ${schema.proposals} p where p.intern_id = ${schema.users.id})`,
+      hired: sql<number>`(select count(*)::int from ${schema.proposals} p where p.intern_id = ${schema.users.id} and p.status = 'hired')`,
     })
     .from(schema.users)
     .leftJoin(schema.internOnboarding, eq(schema.internOnboarding.userId, schema.users.id))
@@ -113,6 +136,11 @@ async function exportInterns(search: string, params: Record<string, string>) {
     { header: "Profile complete", value: (r) => (r.hasProfile ? "yes" : "no") },
     { header: "Account", value: (r) => (r.isActive ? "active" : "inactive") },
     { header: "Directory", value: (r) => r.visibility },
+    { header: "Open to work", value: (r) => (r.openToWork ? "yes" : "no") },
+    { header: "AI interview", value: (r) => r.aiStatus },
+    { header: "Findtern Score", value: (r) => (r.score != null ? r.score.toFixed(1) : "") },
+    { header: "Offers", value: (r) => String(r.offers) },
+    { header: "Hired", value: (r) => String(r.hired) },
   ];
 
   return csvResponse(toCsv(rows, columns), csvFilename("interns"));
@@ -127,11 +155,17 @@ async function exportCompanies(search: string, params: Record<string, string>) {
         sql`${schema.employers.companyName}`,
         sql`${schema.employers.companyEmail}`,
         sql`${schema.employers.city}`,
+        sql`${schema.employers.primaryContactName}`,
+        sql`${schema.employers.country}`,
+        sql`${schema.employers.phoneNumber}`,
       ],
       search,
     ),
-    params.setup === "complete" ? eq(schema.employers.setupCompleted, true) : undefined,
-    params.setup === "incomplete" ? eq(schema.employers.setupCompleted, false) : undefined,
+    realEmployers(),
+    params.status ? eq(schema.employers.isActive, params.status === "active") : undefined,
+    params.setup === "complete" ? eq(schema.employers.onboardingCompleted, true) : undefined,
+    params.setup === "incomplete" ? eq(schema.employers.onboardingCompleted, false) : undefined,
+    params.fte ? eq(schema.employers.internationalFteStatus, params.fte) : undefined,
   ].filter(Boolean) as SQL[];
 
   const where = conditions.length
@@ -149,6 +183,8 @@ async function exportCompanies(search: string, params: Record<string, string>) {
       country: schema.employers.country,
       size: schema.employers.companySize,
       setupCompleted: schema.employers.setupCompleted,
+      onboardingCompleted: schema.employers.onboardingCompleted,
+      internationalFteStatus: schema.employers.internationalFteStatus,
       isActive: schema.employers.isActive,
       createdAt: schema.employers.createdAt,
     })
@@ -167,6 +203,8 @@ async function exportCompanies(search: string, params: Record<string, string>) {
     { header: "Country", value: (r) => r.country },
     { header: "Size", value: (r) => r.size },
     { header: "Setup complete", value: (r) => (r.setupCompleted ? "yes" : "no") },
+    { header: "Onboarding complete", value: (r) => (r.onboardingCompleted ? "yes" : "no") },
+    { header: "International FTE", value: (r) => (r.internationalFteStatus && r.internationalFteStatus !== "none" ? r.internationalFteStatus : "") },
     { header: "Account", value: (r) => (r.isActive ? "active" : "inactive") },
     { header: "Joined", value: (r) => (r.createdAt ? r.createdAt.toISOString() : "") },
   ];
@@ -182,6 +220,7 @@ async function exportProjects(search: string, params: Record<string, string>) {
       [sql`${schema.projects.projectName}`, sql`${schema.employers.companyName}`],
       search,
     ),
+    realEmployerId(schema.projects.employerId),
     params.status ? eq(schema.projects.status, params.status) : undefined,
     params.ft === "yes" ? eq(schema.projects.fullTimeOffer, true) : undefined,
     params.ft === "no" ? eq(schema.projects.fullTimeOffer, false) : undefined,
@@ -234,6 +273,7 @@ async function exportProposals(search: string, params: Record<string, string>) {
       ],
       search,
     ),
+    realEmployerId(schema.proposals.employerId),
     params.status ? eq(schema.proposals.status, params.status) : undefined,
     params.flow ? eq(schema.proposals.flowType, params.flow) : undefined,
   ].filter(Boolean) as SQL[];
@@ -309,6 +349,10 @@ async function exportPayments(search: string, params: Record<string, string>) {
       gateway: schema.employerPayments.gateway,
       paidAt: schema.employerPayments.paidAt,
       createdAt: schema.employerPayments.createdAt,
+      country: schema.employers.country,
+      gstin: schema.employers.gstNumber,
+      pincode: schema.employers.billingPincode,
+      state: schema.employers.state,
     })
     .from(schema.employerPayments)
     .innerJoin(schema.employers, eq(schema.employers.id, schema.employerPayments.employerId))
@@ -323,6 +367,9 @@ async function exportPayments(search: string, params: Record<string, string>) {
     { header: "Email", value: (r) => r.companyEmail },
     { header: "Amount", value: (r) => (r.amountMinor / 100).toFixed(2) },
     { header: "Currency", value: (r) => r.currency },
+    // 18% GST is included in INR amounts; USD (export) carries none.
+    { header: "Amount before GST", value: (r) => (gstOf(r).baseMinor / 100).toFixed(2) },
+    { header: "GST", value: (r) => ((r.amountMinor - gstOf(r).baseMinor) / 100).toFixed(2) },
     { header: "Status", value: (r) => r.status },
     { header: "Gateway", value: (r) => r.gateway },
     { header: "Paid at", value: (r) => (r.paidAt ? r.paidAt.toISOString() : "") },
@@ -330,4 +377,106 @@ async function exportPayments(search: string, params: Record<string, string>) {
   ];
 
   return csvResponse(toCsv(rows, columns), csvFilename("payments"));
+}
+
+function gstOf(r: { amountMinor: number; currency: string; country: string | null; gstin: string | null; pincode: string | null; state: string | null }) {
+  return splitGst(r.amountMinor, placeOfSupply({ currency: r.currency, country: r.country, gstin: r.gstin, pincode: r.pincode, state: r.state }));
+}
+
+/** Stipend payouts to interns, honouring the payouts page filters. */
+async function exportPayouts(search: string, params: Record<string, string>) {
+  const db = getDb();
+  const since = periodStart(params.period);
+  const parts = [
+    searchAny([sql`${schema.users.firstName}`, sql`${schema.users.lastName}`, sql`${schema.users.email}`, sql`${schema.internPayouts.referenceId}`], search),
+    params.status ? eq(schema.internPayouts.status, params.status) : undefined,
+    params.currency ? eq(schema.internPayouts.currency, params.currency) : undefined,
+    since ? gte(schema.internPayouts.createdAt, since) : undefined,
+    params.from && !Number.isNaN(Date.parse(params.from)) ? gte(schema.internPayouts.createdAt, new Date(params.from)) : undefined,
+    params.to && !Number.isNaN(Date.parse(params.to))
+      ? sql`${schema.internPayouts.createdAt} < ${new Date(Date.parse(params.to) + 86_400_000)}`
+      : undefined,
+    params.q ? searchAny([sql`${schema.users.firstName}`, sql`${schema.users.lastName}`, sql`${schema.users.email}`, sql`${schema.internPayouts.referenceId}`], params.q) : undefined,
+  ].filter(Boolean) as SQL[];
+  const rows = await db
+    .select({
+      intern: sql<string>`${schema.users.firstName} || ' ' || ${schema.users.lastName}`,
+      email: schema.users.email,
+      amountMinor: schema.internPayouts.amountMinor,
+      currency: schema.internPayouts.currency,
+      status: schema.internPayouts.status,
+      method: schema.internPayouts.method,
+      referenceId: schema.internPayouts.referenceId,
+      raw: schema.internPayouts.raw,
+      notes: schema.internPayouts.notes,
+      paidAt: schema.internPayouts.paidAt,
+      createdAt: schema.internPayouts.createdAt,
+    })
+    .from(schema.internPayouts)
+    .innerJoin(schema.users, eq(schema.users.id, schema.internPayouts.internId))
+    .where(parts.length ? sql`${parts.reduce((acc, c) => sql`${acc} and ${c}`)}` : undefined)
+    .orderBy(desc(schema.internPayouts.createdAt))
+    .limit(MAX_ROWS);
+  const meta = (r: (typeof rows)[number], k: string) => String((r.raw as Record<string, unknown> | null)?.[k] ?? "");
+  const columns: CsvColumn<(typeof rows)[number]>[] = [
+    { header: "Intern", value: (r) => r.intern },
+    { header: "Email", value: (r) => r.email },
+    { header: "Amount", value: (r) => (r.amountMinor / 100).toFixed(2) },
+    { header: "Currency", value: (r) => r.currency },
+    { header: "Status", value: (r) => r.status },
+    { header: "Method", value: (r) => r.method ?? "" },
+    { header: "Reference", value: (r) => r.referenceId ?? "" },
+    { header: "Scheduled for", value: (r) => meta(r, "scheduledFor") },
+    { header: "Employer", value: (r) => meta(r, "employerId") },
+    { header: "Proposal", value: (r) => meta(r, "proposalId") },
+    { header: "Notes", value: (r) => r.notes ?? "" },
+    { header: "Paid at", value: (r) => (r.paidAt ? r.paidAt.toISOString() : "") },
+    { header: "Created at", value: (r) => (r.createdAt ? r.createdAt.toISOString() : "") },
+  ];
+  return csvResponse(toCsv(rows, columns), csvFilename("payouts"));
+}
+
+/** Intern activation-fee payments. */
+async function exportInternPayments(search: string, params: Record<string, string>) {
+  const db = getDb();
+  const since = periodStart(params.period);
+  const parts = [
+    searchAny([sql`${schema.users.firstName}`, sql`${schema.users.lastName}`, sql`${schema.users.email}`, sql`${schema.internPayments.orderId}`], search),
+    params.status ? eq(schema.internPayments.status, params.status) : undefined,
+    since ? gte(schema.internPayments.createdAt, since) : undefined,
+  ].filter(Boolean) as SQL[];
+  const rows = await db
+    .select({
+      intern: sql<string>`${schema.users.firstName} || ' ' || ${schema.users.lastName}`,
+      email: schema.users.email,
+      orderId: schema.internPayments.orderId,
+      paymentId: schema.internPayments.paymentId,
+      amountMinor: schema.internPayments.amountMinor,
+      currency: schema.internPayments.currency,
+      status: schema.internPayments.status,
+      raw: schema.internPayments.raw,
+      paidAt: schema.internPayments.paidAt,
+      createdAt: schema.internPayments.createdAt,
+    })
+    .from(schema.internPayments)
+    .innerJoin(schema.users, eq(schema.users.id, schema.internPayments.internId))
+    .where(parts.length ? sql`${parts.reduce((acc, c) => sql`${acc} and ${c}`)}` : undefined)
+    .orderBy(desc(schema.internPayments.createdAt))
+    .limit(MAX_ROWS);
+  const columns: CsvColumn<(typeof rows)[number]>[] = [
+    { header: "Intern", value: (r) => r.intern },
+    { header: "Email", value: (r) => r.email },
+    { header: "Order ID", value: (r) => r.orderId },
+    { header: "Payment ID", value: (r) => r.paymentId ?? "" },
+    { header: "Amount", value: (r) => (r.amountMinor / 100).toFixed(2) },
+    { header: "Currency", value: (r) => r.currency },
+    // Interns are billed in India with GST included; no state is known, so IGST.
+    { header: "Amount before GST", value: (r) => (splitGst(r.amountMinor, placeOfSupply({ currency: r.currency })).baseMinor / 100).toFixed(2) },
+    { header: "GST", value: (r) => ((r.amountMinor - splitGst(r.amountMinor, placeOfSupply({ currency: r.currency })).baseMinor) / 100).toFixed(2) },
+    { header: "Promo code", value: (r) => String((r.raw as Record<string, unknown> | null)?.promoCode ?? "") },
+    { header: "Status", value: (r) => r.status },
+    { header: "Paid at", value: (r) => (r.paidAt ? r.paidAt.toISOString() : "") },
+    { header: "Created at", value: (r) => (r.createdAt ? r.createdAt.toISOString() : "") },
+  ];
+  return csvResponse(toCsv(rows, columns), csvFilename("intern-payments"));
 }

@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/social-icons";
 import { FOOTER_SECTIONS, SITE } from "@/lib/content/site";
 import { Logo } from "@/components/brand/logo";
+import { EmailLink } from "@/components/marketing/email-link";
 
 /**
  * Site footer.
@@ -31,12 +32,12 @@ export function SiteFooter() {
         className="pointer-events-none absolute inset-x-0 -top-px h-px bg-gradient-to-r from-transparent via-on-dark-accent/40 to-transparent"
       />
 
-      <div className="container-wide py-16 lg:py-20">
+      <div className="container-page py-16 lg:py-20">
         <div className="grid gap-12 lg:grid-cols-[1.5fr_repeat(3,1fr)] lg:gap-10">
           {/* Brand */}
           <div className="max-w-sm">
             <Link href="/" aria-label="Findtern - home" className="inline-block">
-              <Logo variant="white" className="h-11" />
+              <Logo variant="white" className="h-14" />
             </Link>
             <p className="mt-5 text-base leading-relaxed text-on-dark-subtle">
               Your gateway to skilled interns, effortlessly. Verified
@@ -93,13 +94,8 @@ export function SiteFooter() {
           <p className="text-sm text-text-subtle">
             {year} © Findtern. All rights reserved.
           </p>
-          <p className="text-sm text-text-subtle">
-            <a
-              href={`mailto:${SITE.email}`}
-              className="inline-flex items-center py-1.5 transition-colors hover:text-white"
-            >
-              {SITE.email}
-            </a>
+          <p className="text-sm">
+            <EmailLink tone="dark" />
           </p>
         </div>
       </div>

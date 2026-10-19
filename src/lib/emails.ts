@@ -87,14 +87,22 @@ export const emails = {
     cta: { label: "View proposal", url: `${origin()}/intern/proposals/${o.proposalId}` },
   }),
 
-  proposalDecision: (o: { employerName: string; candidate: string; role: string; accepted: boolean; proposalId: string }): EmailContent => ({
-    subject: "Candidate decision update | Findtern",
-    heading: o.accepted ? "Your offer was accepted" : "Your offer was declined",
+  proposalDecision: (o: { employerName: string; candidate: string; role: string; accepted: boolean; proposalId: string; fullTime?: boolean }): EmailContent => ({
+    subject: o.fullTime ? "Full-time offer update | Findtern" : "Candidate decision update | Findtern",
+    heading: o.fullTime
+      ? o.accepted
+        ? "Your full-time offer was accepted"
+        : "Your full-time offer was declined"
+      : o.accepted
+        ? "Your offer was accepted"
+        : "Your offer was declined",
     greeting: hi(o.employerName),
     lines: [
-      `${o.candidate} has responded to your proposal for ${o.role}.`,
+      `${o.candidate} has responded to your ${o.fullTime ? "full-time offer" : "proposal"} for ${o.role}.`,
       o.accepted
-        ? "Complete the payment to confirm the hire. Names and contact details unlock once it’s done."
+        ? o.fullTime
+          ? "Complete the full-time hiring fee (8.33% of the annual CTC) to confirm the joining."
+          : "Complete the payment to confirm the hire. Names and contact details unlock once it’s done."
         : "You can send an offer to another candidate from your shortlist.",
     ],
     status: o.accepted ? "Accepted" : "Declined",
@@ -111,12 +119,26 @@ export const emails = {
     cta: { label: "See open roles", url: `${origin()}/intern/opportunities` },
   }),
 
-  interviewInvitation: (o: { internName: string; companyName: string; project?: string | null }): EmailContent => ({
+  /** Staff closed an offer. Neutral: it was not the company withdrawing. */
+  proposalClosed: (o: { internName: string; role: string }): EmailContent => ({
+    subject: "Update on an offer | Findtern",
+    heading: "An offer was closed",
+    greeting: hi(o.internName),
+    lines: [`The offer for ${o.role} has been closed by the Findtern team. Nothing is needed from you.`, "Your profile stays visible to other employers."],
+    cta: { label: "See your offers", url: `${origin()}/intern/proposals` },
+  }),
+
+  interviewInvitation: (o: { internName: string; companyName: string; project?: string | null; slots?: string[]; timezone?: string }): EmailContent => ({
     subject: "Interview invitation | Select a time slot on Findtern",
     heading: "You’ve been invited to an interview",
     greeting: hi(o.internName),
-    lines: [`You’ve received a meeting invitation from ${o.companyName}${o.project ? ` for ${o.project}` : ""}. They’ve shared a few time slots.`],
-    bullets: ["View the available slots", "Select the time that works best for you", "Confirm the meeting"],
+    lines: [
+      `You’ve received a meeting invitation from ${o.companyName}${o.project ? ` for ${o.project}` : ""}.`,
+      o.slots?.length
+        ? `Pick one of these times${o.timezone ? ` (${o.timezone})` : ""}:`
+        : "They’ve shared a few time slots.",
+    ],
+    bullets: o.slots?.length ? o.slots : ["View the available slots", "Select the time that works best for you", "Confirm the meeting"],
     status: "Awaiting your slot selection",
     cta: { label: "Pick a slot", url: `${origin()}/intern/interviews` },
   }),
@@ -208,6 +230,31 @@ export const emails = {
     lines: [`We’ve received the full-time hiring fee for ${o.candidate}. Thank you for hiring through Findtern.`],
     facts: [["Candidate", o.candidate], ["Role", o.role], ["Annual CTC offered", o.ctc], ["Amount paid", o.amount]],
     cta: { label: "View orders and invoice", url: `${origin()}/employer/orders` },
+  }),
+
+  /** Signup code. Employers get the legacy "company email" wording. */
+  otp: (o: { otp: string; ttlMinutes: number; forEmployer: boolean }): EmailContent => ({
+    subject: o.forEmployer ? "Verify your company email | Findtern" : "Verify your Findtern email",
+    heading: o.forEmployer ? "Verify your company email" : "Verify your email",
+    greeting: hi(""),
+    lines: [
+      o.forEmployer
+        ? "Use the code below to confirm your company email address on Findtern."
+        : "Use the code below to confirm your Findtern email address.",
+      `This code expires in ${o.ttlMinutes} minutes. If you did not request it, you can ignore this email.`,
+    ],
+    facts: [["Verification code", o.otp]],
+  }),
+
+  passwordReset: (o: { url: string; ttlMinutes: number }): EmailContent => ({
+    subject: "Reset your Findtern password",
+    heading: "Reset your password",
+    greeting: hi(""),
+    lines: [
+      "We received a request to reset your Findtern password.",
+      `The link works once and expires in ${o.ttlMinutes} minutes. If you did not ask for this, you can ignore this email and your password stays the same.`,
+    ],
+    cta: { label: "Reset password", url: o.url },
   }),
 };
 

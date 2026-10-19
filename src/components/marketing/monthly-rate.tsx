@@ -1,5 +1,6 @@
 "use client";
 
+import type { PriceCurrency } from "@/lib/currency";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { formatMoney, formatNumber } from "@/lib/format";
 import { HOURS_PER_MONTH, WORK_MONTH } from "@/lib/plan-offer";
@@ -20,7 +21,7 @@ export function MonthlyRate({
   className,
 }: {
   hourlyMinor: number;
-  currency: "INR" | "USD";
+  currency: PriceCurrency;
   tone?: "light" | "dark";
   className?: string;
 }) {

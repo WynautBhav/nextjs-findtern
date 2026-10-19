@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -64,10 +64,16 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
       status: decision,
       approvedAt: decision === "approved" ? now : null,
       rejectedAt: decision === "rejected" ? now : null,
-      managerNote: reason ?? null,      updatedAt: now,
+      managerNote: reason ?? null,
+      updatedAt: now,
     })
-    .where(eq(schema.timesheets.id, id))
+    // Guarded on the status read above: two decisions racing on the same
+    // sheet must not both win (and both notify).
+    .where(and(eq(schema.timesheets.id, id), eq(schema.timesheets.status, "submitted")))
     .returning();
+  if (!updated) {
+    return NextResponse.json({ error: "Timesheet was already decided" }, { status: 409 });
+  }
 
   await db.insert(schema.notifications).values({
     recipientType: "intern",

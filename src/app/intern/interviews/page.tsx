@@ -5,7 +5,10 @@ import { ArrowRight, Calendar, Sparkles } from "lucide-react";
 import { EmptyScene, PageHead, Pill, SectionHead, Surface } from "@/components/app/primitives";
 import { SlotPicker } from "@/components/app/slot-picker";
 import { AiFeedbackReport } from "@/components/employer/ai-feedback-report";
+import { isMeetingLinkLive, isStaleInterview } from "@/lib/employer-interview-rules";
 import { AiInterviewJoinCard } from "@/components/intern/ai-interview-join-card";
+import { AiInterviewButton } from "@/components/intern/activation-card";
+import { isInternPaid } from "@/lib/payments";
 import { requireRole } from "@/lib/auth";
 import { getDb, schema } from "@/lib/db";
 import { eq } from "drizzle-orm";
@@ -31,7 +34,7 @@ export default async function InternInterviews() {
 
   const candidateName = user ? `${user.firstName || ""} ${user.lastName || ""}`.trim() || "Candidate" : "Candidate";
 
-  const data = await loadInternData(session.uid);
+  const [data, paid] = await Promise.all([loadInternData(session.uid), isInternPaid(session.uid)]);
 
   // Partition AI interview assessment vs company interviews
   const aiInterview = data.interviews.find(
@@ -41,11 +44,14 @@ export default async function InternInterviews() {
       (!i.slot1 && !i.slot2 && !i.slot3 && (i.status === "waiting" || i.notes?.toLowerCase().includes("ai"))),
   );
 
+  // An open invite whose slots have all passed is expired, not upcoming.
   const upcomingEmployerInterviews = data.interviews.filter(
-    (i) => i.id !== aiInterview?.id && (i.status === "scheduled" || i.status === "pending"),
+    (i) => i.id !== aiInterview?.id && (i.status === "scheduled" || i.status === "pending") && !isStaleInterview(i),
   );
   const past = data.interviews.filter(
-    (i) => i.id !== aiInterview?.id && (i.status === "completed" || i.status === "missed"),
+    (i) =>
+      i.id !== aiInterview?.id &&
+      (i.status === "completed" || i.status === "missed" || isStaleInterview(i)),
   );
 
   const extra = (data.onboarding?.extraData ?? {}) as Record<string, unknown>;
@@ -74,6 +80,35 @@ export default async function InternInterviews() {
           title="AI Technical & Behavioral Assessment"
           action={<Sparkles className="size-4 text-brand-600" aria-hidden />}
         />
+
+        {/* No AI interview yet and no score: this page is where a candidate
+            looks for it, so the request lives here as well as on Home. */}
+        {!aiInterview && !(findternScore > 0) ? (
+          <Surface className="p-5 sm:p-6">
+            <h3 className="text-base font-semibold tracking-[-0.01em] text-ink-900">Your AI interview</h3>
+            {paid ? (
+              <>
+                <p className="mt-1 text-sm leading-relaxed text-ink-600">
+                  Request it here. The joining link arrives in your notifications, usually within two working days.
+                </p>
+                <AiInterviewButton internId={session.uid} />
+              </>
+            ) : (
+              <>
+                <p className="mt-1 text-sm leading-relaxed text-ink-600">
+                  The AI interview opens once the one-time activation is paid. It produces your Findtern Score.
+                </p>
+                <Link
+                  href="/intern/dashboard"
+                  className="apple-spring apple-pressable mt-4 inline-flex min-h-11 items-center gap-2 rounded-[10px] bg-primary px-5 text-sm font-semibold text-white hover:bg-primary-hover"
+                >
+                  Go to activation
+                  <ArrowRight className="size-4" aria-hidden />
+                </Link>
+              </>
+            )}
+          </Surface>
+        ) : null}
 
         {aiInterview && (
           <AiInterviewJoinCard
@@ -147,7 +182,7 @@ export default async function InternInterviews() {
                       slots={slots}
                       timezone={interview.timezone}
                       chosen={interview.selectedSlot}
-                      meetUrl={interview.meetingLink}
+                      meetUrl={isMeetingLinkLive(interview) ? interview.meetingLink : null}
                     />
                   ) : (
                     <p className="text-pretty text-xs leading-relaxed text-ink-600">
@@ -167,6 +202,7 @@ export default async function InternInterviews() {
                     const company = data.names[interview.employerId] ?? "the company";
                     const when = slotOf(interview) ?? interview.createdAt;
                     const missed = interview.status === "missed";
+                    const expired = isStaleInterview(interview);
                     return (
                       <li key={interview.id}>
                         <Surface className="p-5">
@@ -180,7 +216,11 @@ export default async function InternInterviews() {
                             </p>
                           </div>
 
-                          {missed ? (
+                          {expired ? (
+                            <p className="mt-3 text-pretty text-xs leading-relaxed text-ink-600">
+                              Every proposed time passed before a slot was confirmed, so this invite expired.
+                            </p>
+                          ) : missed ? (
                             <p className="mt-3 text-pretty text-xs leading-relaxed text-ink-600">
                               This round was marked as missed. Message the company directly if you want to reschedule.
                             </p>

@@ -17,15 +17,15 @@ import { SectionHeading } from "@/components/ui/section-heading";
 import { TiltCard } from "@/components/motion/tilt-card";
 import { CountUp } from "@/components/motion/count-up";
 import { FaqExplorer } from "@/components/marketing/faq-explorer";
-import { BANDS } from "@/lib/score";
-import { BandRate } from "@/components/marketing/region-rates";
+import { formatMoney } from "@/lib/format";
+import { getInternActivationFeeMinor } from "@/lib/platform-settings";
 import { JsonLd } from "@/components/seo/json-ld";
 import { breadcrumbJsonLd, faqJsonLd, howToJsonLd, webPageJsonLd } from "@/lib/seo";
 
 export const metadata: Metadata = {
   title: "Paid Internships in India with a Placement Guarantee | For Interns",
   description:
-    "Get assessed once, get a Findtern Score you can see the working for, and get placed in a paid internship. If Findtern does not place you within the guarantee window, your deposit comes back.",
+    "Get assessed once, get a Findtern Score you can see the working for, and get placed in a paid internship. If Findtern does not place you within 18 months of your score, your fee comes back.",
   alternates: { canonical: "/interns" },
 };
 
@@ -33,40 +33,40 @@ const STEPS = [
   {
     Icon: GraduationCap,
     title: "Sign up and register",
-    body: "Academics, skills, languages and what you actually want to do. About 6 minutes.",
-    time: "6 min",
+    body: "Your details, academics, experience and the skills you want to be hired for.",
+    time: "15 min",
   },
   {
     Icon: UserCheck,
     title: "Get assessed",
-    body: "A structured interview and aptitude test, generated for the field you picked - not one generic test for everyone.",
-    time: "25 min",
+    body: "One AI interview on the skills you picked, plus an aptitude test. Laptop, webcam and microphone, in one sitting.",
+    time: "30–60 min",
   },
   {
     Icon: Star,
     title: "See your score",
-    body: "Five dimensions, weighted, with the arithmetic shown. Your rate follows from the band you land in.",
-    time: "Instant",
+    body: "One score out of 10, with each part shown: communication, aptitude, coding and the interview. Employers see the same report you do.",
+    time: "After review",
   },
   {
     Icon: MessageSquare,
     title: "Get matched",
     body: "Verified employers see your profile against live requirements. Your contact details stay closed until you respond.",
-    time: "Ongoing",
+    time: "Until placed",
   },
   {
     Icon: BadgeCheck,
     title: "Get placed and paid",
     body: "Signed engagement, approved timesheet, stipend through the platform. Every hour logged.",
-    time: "Ongoing",
+    time: "Monthly",
   },
 ];
 
 const GUARANTEES = [
   {
     Icon: Clock,
-    title: "Placed, or the deposit back",
-    body: "The guarantee starts when your assessment is scored. If we have not placed you by the end of the guarantee window, the refundable deposit is returned. The window is set out in the intern terms.",
+    title: "Placed in 18 months, or your fee back",
+    body: "The clock starts the day your assessment is scored. If we have not placed you in a paid internship within 18 months, the full fee is refunded.",
   },
   {
     Icon: Lock,
@@ -86,7 +86,7 @@ const INTERN_FAQ = [
       category: "Getting started",
       question: "Is Findtern free for interns?",
       answer:
-        "Creating a profile is free. Making it live and visible to employers requires a refundable deposit, which is returned if we do not place you within the guarantee window.",
+        "Creating a profile is free. Making it live and visible to employers requires a one-time fee, refunded in full if we do not place you within 18 months of your score.",
     },
     {
       id: "i2",
@@ -100,7 +100,21 @@ const INTERN_FAQ = [
       category: "Guarantee",
       question: "What are the three refund conditions?",
       answer:
-        "One: your assessment is scored. Two: you stay reachable and respond to employer requests. Three: you do not decline an offer you asked for. Failing any one ends the obligation - in your favour, not the platform's.",
+        "One: your assessment is scored. Two: you stay reachable and respond to employer requests. Three: you turn down no more than 3 offers. Failing any one ends the obligation - in your favour, not the platform's.",
+    },
+    {
+      id: "i3a",
+      category: "Guarantee",
+      question: "Can I hide my profile from employers?",
+      answer:
+        "Yes, when you need a break - exams, travel, a family matter. A profile can stay hidden for at most 30 days at a time, and the guarantee only runs while employers can see you.",
+    },
+    {
+      id: "i3b",
+      category: "Guarantee",
+      question: "How many offers can I turn down?",
+      answer:
+        "Up to 3 during the 18-month window. Turning down a 4th ends the guarantee. Only formal offers count - an interview request you pass on is not an offer.",
     },
     {
       id: "i4",
@@ -118,7 +132,8 @@ const INTERN_FAQ = [
     },
 ];
 
-export default function InternsPage() {
+export default async function InternsPage() {
+  const feeMinor = await getInternActivationFeeMinor();
   return (
     <>
       <JsonLd
@@ -127,8 +142,8 @@ export default function InternsPage() {
           breadcrumbJsonLd([{ name: "For interns", path: "/interns" }]),
           howToJsonLd({
             name: "How to get a paid internship through Findtern",
-            description: "Five stages from sign-up to a paid, contracted placement. About 31 minutes of hands-on time.",
-            totalTime: "PT31M",
+            description: "Five stages from sign-up to a paid, contracted placement. 45 to 75 minutes of your own time.",
+            totalTime: "PT75M",
             steps: STEPS.map((s) => ({ name: s.title, text: s.body })),
           }),
           faqJsonLd(INTERN_FAQ),
@@ -139,10 +154,10 @@ export default function InternsPage() {
         title={
           <>
             Get placed, or get your{" "}
-            <span className="text-primary">deposit back</span>.
+            <span className="text-primary">fee back</span>.
           </>
         }
-        lead="One assessment produces a score you can see the working for. That score sets the rate employers pay. If we do not place you, the deposit comes back."
+        lead="One assessment produces a score you can see the working for. Pay once to be assessed, and if we do not place you within 18 months, the fee comes back."
       >
         <ButtonLink href="/signup" variant="primary" size="lg">
           Get assessed
@@ -154,47 +169,48 @@ export default function InternsPage() {
       </PageHero>
 
       {/* ── The score is the price ──────────────────────────────────── */}
+      {/* ── What it costs you ─────────────────────────────────────────
+          The employer rate card used to sit here. A candidate reading this
+          page wants their own price, and it was three clicks away inside
+          the guarantee terms. */}
       <PageSection tone="muted">
-        <div className="grid gap-12 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] lg:items-center lg:gap-16">
+        <div className="grid gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-center lg:gap-16">
           <div>
-            <SectionHeading lead="Your score is" accent="the price" align="left" />
+            <SectionHeading lead="What it" accent="costs you" align="left" />
             <p className="mt-6 text-balance text-xl leading-relaxed text-ink-700">
-              No negotiation, no recruiter leverage, no auction. The score you
-              earn is the rate you cost, and the table below is the whole table.
+              Your profile is free. To be assessed and shown to employers you pay
+              once, and that fee comes back if we do not place you.
             </p>
             <p className="mt-4 text-base leading-relaxed text-muted-foreground">
-              A low score changes your rate. It does not disqualify you.
+              Your score never changes what you pay. It decides which employers see you.
             </p>
-            <ButtonLink href="/pricing" variant="primary" size="md" className="mt-8">
-              See the full rate card
-              <ArrowRight className="size-4" aria-hidden />
-            </ButtonLink>
           </div>
 
-          <div className="grid gap-4">
-            {BANDS.map((b) => (
-              <div
-                key={b.id}
-                className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-ink-200 bg-white p-5 sm:p-6"
-              >
-                <div>
-                  <p className="text-lg font-semibold tracking-tight text-ink-900">
-                    {b.name}
-                  </p>
-                  <p className="mt-0.5 text-sm text-ink-500">
-                    Score {b.min}–{b.max} · {b.blurb}
-                  </p>
-                </div>
-                <div className="text-right">
-                  <p className="text-2xl font-semibold tracking-tight text-primary">
-                    <BandRate bandId={b.id} />
-                  </p>
-                  <p className="text-xs text-ink-500">
-                    employer pays fixed per-hire fee
-                  </p>
-                </div>
-              </div>
-            ))}
+          <div className="rounded-2xl border border-ink-200 bg-white p-6 sm:p-8">
+            <p className="text-sm text-ink-500">One-time fee</p>
+            <p className="mt-1 text-5xl font-semibold tabular-nums tracking-[-0.03em] text-ink-900">
+              {formatMoney(feeMinor, "INR", { zeroLabel: false })}
+            </p>
+            <ul className="mt-6 divide-y divide-ink-100 border-y border-ink-100 text-sm">
+              {[
+                ["Covers", "Your AI interview, the aptitude test and your Findtern Score report."],
+                ["Paid", "Once. No subscription, no renewal, nothing per application."],
+                ["Refund", "In full, if you are not placed in a paid internship within 18 months of your score."],
+              ].map(([term, detail]) => (
+                <li key={term} className="grid grid-cols-[5.5rem_minmax(0,1fr)] gap-4 py-3.5">
+                  <span className="font-medium text-ink-900">{term}</span>
+                  <span className="leading-relaxed text-ink-600">{detail}</span>
+                </li>
+              ))}
+            </ul>
+            <div className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-3">
+              <ButtonLink href="/signup" variant="primary" size="md">
+                Create a free profile
+              </ButtonLink>
+              <ButtonLink href="/guaranteed-internship-program" variant="link" size="md" className="px-0">
+                How the refund works
+              </ButtonLink>
+            </div>
           </div>
         </div>
       </PageSection>
@@ -204,7 +220,7 @@ export default function InternsPage() {
         <SectionHeading
           lead="Five stages. You always know"
           accent="which one you are in."
-          sub="Total hands-on time is about 31 minutes. Everything after the assessment is us doing the work."
+          sub="Your own time adds up to 45 to 75 minutes. Everything after the assessment is us doing the work."
         />
         <ol className="mt-14 space-y-4">
           {STEPS.map(({ Icon, title, body, time }) => (
@@ -237,9 +253,10 @@ export default function InternsPage() {
       {/* ── Guarantees ──────────────────────────────────────────────── */}
       <PageSection tone="brand">
         <SectionHeading
+          tone="dark"
           lead="The Findtern"
           accent="guarantee"
-          sub="Published before you pay anything, not after."
+          sub="Placed within 18 months of your score, or every rupee of the fee comes back."
         />
         <div className="mt-14 grid gap-5 md:grid-cols-3">
           {GUARANTEES.map(({ Icon, title, body }) => (
@@ -269,7 +286,7 @@ export default function InternsPage() {
       {/* ── Numbers ────────────────────────────────────────────────── */}
       <PageSection className="py-8 sm:py-14 md:py-20">
         <div className="grid grid-cols-3 divide-x divide-ink-200/80 rounded-2xl border border-ink-200/80 bg-white/70 py-5 shadow-xs backdrop-blur-xs sm:divide-x-0 sm:border-0 sm:bg-transparent sm:py-0 sm:shadow-none sm:gap-10">
-          <Figure value={31} suffix=" min" label="Hands-on assessment" />
+          <Figure value={18} suffix=" months" label="Placement window" />
           <Figure value={100} suffix="%" label="Refund if not placed" />
           <Figure value={0} suffix=" lock-in" label="Held against you" />
         </div>

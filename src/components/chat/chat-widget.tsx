@@ -222,7 +222,7 @@ export function ChatWidget() {
       }
       setMessages([...next, { role: "assistant", content: json.reply }]);
     } catch {
-      setError("Couldn't reach Fintern just now. Try again or write to admin@findtern.in.");
+      setError("Couldn't reach Fintern just now. Try again or write to communicate@findtern.in.");
     } finally {
       setBusy(false);
     }

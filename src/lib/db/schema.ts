@@ -423,12 +423,28 @@ export const companySizes = [
   { value: "1000+", label: "1000+ employees" },
 ] as const;
 
+// Sheet row 60: three options. Older rows may still hold "short-term",
+// "medium-term", "long-term" or "not-sure" - `scopeLabel` reads those too.
 export const scopeOfWorkOptions = [
-  { value: "short-term", label: "Short-Term: 30–60 days" },
-  { value: "medium-term", label: "Medium-Term: 60–90 days" },
-  { value: "long-term", label: "Long-Term: 90+ days" },
-  { value: "not-sure", label: "Not Sure" },
+  { value: "upto-60", label: "Up to 60 days" },
+  { value: "upto-90", label: "Up to 90 days" },
+  { value: "upto-180", label: "Up to 180 days" },
 ] as const;
+
+const LEGACY_SCOPE_LABEL: Record<string, string> = {
+  "short-term": "Up to 60 days",
+  "medium-term": "Up to 90 days",
+  "long-term": "Up to 180 days",
+  "not-sure": "Not decided",
+  "Short-term": "Up to 90 days",
+  "Long-term": "Up to 180 days",
+};
+
+/** Display label for any stored scope value, current or legacy. */
+export function scopeLabel(value: string | null | undefined): string {
+  if (!value) return "Not set";
+  return scopeOfWorkOptions.find((o) => o.value === value)?.label ?? LEGACY_SCOPE_LABEL[value] ?? value;
+}
 
 export const timezones = [
   // UTC / Global
@@ -604,6 +620,8 @@ export const internPayments = pgTable("intern_payments", {
   status: text("status").notNull().default("created"),
   raw: jsonb("raw").$type<Record<string, unknown>>().default({}),
   paidAt: timestamp("paid_at"),
+  /** GST invoice number, assigned once at payment ("FT/2026-27/0001"). */
+  invoiceNumber: text("invoice_number").unique(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -641,11 +659,23 @@ export const employerPayments = pgTable("employer_payments", {
   status: text("status").notNull().default("created"),
   raw: jsonb("raw").$type<Record<string, unknown>>().default({}),
   paidAt: timestamp("paid_at"),
+  /** GST invoice number, assigned once at payment ("FT/2026-27/0001"). */
+  invoiceNumber: text("invoice_number").unique(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 export type EmployerPayment = typeof employerPayments.$inferSelect;
+
+/**
+ * One running invoice serial per Indian financial year (April-March), shared
+ * by employer orders and intern fees so a number is never issued twice.
+ */
+export const invoiceCounters = pgTable("invoice_counters", {
+  fy: text("fy").primaryKey(), // "2026-27"
+  last: integer("last").notNull().default(0),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
 export type InsertEmployerPayment = typeof employerPayments.$inferInsert;
 
 // --------------------------------------------------
@@ -813,6 +843,8 @@ export const promoCodes = pgTable("promo_codes", {
   validFrom: timestamp("valid_from"),
   validUntil: timestamp("valid_until"),
   isActive: boolean("is_active").notNull().default(true),
+  /** Where the code can be redeemed: "intern" | "employer" | "both". */
+  appliesTo: text("applies_to").notNull().default("both"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

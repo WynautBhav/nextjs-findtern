@@ -30,6 +30,7 @@ export function ActivationCard({
   feeMinor,
   prefill,
   alreadyPaid = false,
+  embedded = false,
 }: {
   internId: string;
   /** Admin-set activation fee (platform_settings), GST-inclusive. */
@@ -37,6 +38,8 @@ export function ActivationCard({
   prefill: { name?: string; email?: string; contact?: string };
   /** Set when a paid row already exists, so only the interview step is offered. */
   alreadyPaid?: boolean;
+  /** Inside the Home checklist: no card chrome or heading, the step supplies both. */
+  embedded?: boolean;
 }) {
   const router = useRouter();
   const [code, setCode] = useState("");
@@ -147,6 +150,18 @@ export function ActivationCard({
     }
   }
 
+  if ((state === "paid" || alreadyPaid) && embedded) {
+    return (
+      <div>
+        <p className="text-sm leading-relaxed text-ink-600">
+          {alreadyPaid ? "Activation is paid." : "Payment confirmed."} Request the interview and the
+          link arrives in your notifications.
+        </p>
+        <AiInterviewButton internId={internId} />
+      </div>
+    );
+  }
+
   if (state === "paid" || alreadyPaid) {
     if (alreadyPaid) {
       return (
@@ -179,7 +194,13 @@ export function ActivationCard({
   }
 
   return (
-    <section className="rounded-xl border border-ink-100 bg-white p-6">
+    <section className={embedded ? "" : "rounded-xl border border-ink-100 bg-white p-6"}>
+      {embedded ? (
+        <p className="text-pretty text-sm leading-relaxed text-ink-600">
+          One payment covers the AI interview and your Findtern Score. No subscription, nothing
+          recurring.
+        </p>
+      ) : (
       <div className="flex items-start gap-3">
         <span className="mt-0.5 inline-flex size-9 shrink-0 items-center justify-center rounded-[10px] bg-brand-50 text-brand-700">
           <Sparkles className="size-4" aria-hidden />
@@ -195,6 +216,7 @@ export function ActivationCard({
           </p>
         </div>
       </div>
+      )}
 
       <div className="mt-4 flex flex-col gap-2 sm:flex-row">
         <input
@@ -277,7 +299,7 @@ export function ActivationCard({
  * notifications, so the button reports the truth rather than pretending the
  * interview is scheduled - it is requested, not booked, and the copy says so.
  */
-function AiInterviewButton({ internId }: { internId: string }) {
+export function AiInterviewButton({ internId }: { internId: string }) {
   const router = useRouter();
   const [status, setStatus] = useState<"idle" | "busy" | "applied" | "in-flight">("idle");
   const [message, setMessage] = useState<string | null>(null);

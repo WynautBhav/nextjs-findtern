@@ -1,10 +1,12 @@
 import Link from "next/link";
-import { count, desc, eq, sql, type SQL } from "drizzle-orm";
+import { and, count, desc, eq, inArray, sql, type SQL } from "drizzle-orm";
 import { Building2, CheckCircle2, Briefcase, FileCheck, Download } from "lucide-react";
 
 import { getDb, schema } from "@/lib/db";
-import { formatDate, formatNumber } from "@/lib/format";
+import { formatDate, formatMoney, formatNumber } from "@/lib/format";
+import { companyMoney } from "@/lib/admin/company-money";
 import { flattenParams, parsePageRequest, searchAny, toPage } from "@/lib/admin/params";
+import { activeProject, realEmployerId, realEmployers } from "@/lib/admin/scope";
 import { AdminPageHeader } from "@/components/admin/panel";
 import { StatCard, StatGrid } from "@/components/admin/stat-card";
 import { DataTable } from "@/components/admin/data-table";
@@ -27,12 +29,18 @@ export default async function AdminCompaniesPage({
         sql`${schema.employers.companyEmail}`,
         sql`${schema.employers.city}`,
         sql`${schema.employers.primaryContactName}`,
+        sql`${schema.employers.country}`,
+        sql`${schema.employers.phoneNumber}`,
       ],
       req.search,
     ),
+    // The internal "admin" and AI-interview employers are not companies.
+    realEmployers(),
     params.status ? eq(schema.employers.isActive, params.status === "active") : undefined,
-    params.setup === "complete" ? eq(schema.employers.setupCompleted, true) : undefined,
-    params.setup === "incomplete" ? eq(schema.employers.setupCompleted, false) : undefined,
+    // Legacy status: Complete = onboarded (first project created), Pending = not yet.
+    params.setup === "complete" ? eq(schema.employers.onboardingCompleted, true) : undefined,
+    params.setup === "incomplete" ? eq(schema.employers.onboardingCompleted, false) : undefined,
+    params.fte ? eq(schema.employers.internationalFteStatus, params.fte) : undefined,
   ].filter(Boolean) as SQL[];
 
   const where = conditions.length
@@ -65,7 +73,8 @@ export default async function AdminCompaniesPage({
         primaryContactName: schema.employers.primaryContactName,
         primaryContactRole: schema.employers.primaryContactRole,
         gstNumber: schema.employers.gstNumber,
-        setupCompleted: schema.employers.setupCompleted,
+        onboardingCompleted: schema.employers.onboardingCompleted,
+        internationalFteStatus: schema.employers.internationalFteStatus,
         isActive: schema.employers.isActive,
         createdAt: schema.employers.createdAt,
         projectCount: projectCountSubquery,
@@ -76,11 +85,53 @@ export default async function AdminCompaniesPage({
       .limit(req.perPage)
       .offset(req.offset),
     db.select({ c: count() }).from(schema.employers).where(where),
-    db.select({ c: count() }).from(schema.employers),
-    db.select({ c: count() }).from(schema.employers).where(eq(schema.employers.setupCompleted, true)),
-    db.select({ c: count() }).from(schema.projects).where(eq(schema.projects.status, "active")),
-    db.select({ c: count() }).from(schema.employers).where(sql`${schema.employers.gstNumber} is not null`),
+    db.select({ c: count() }).from(schema.employers).where(realEmployers()),
+    db.select({ c: count() }).from(schema.employers).where(sql`${realEmployers()} and ${schema.employers.onboardingCompleted} = true`),
+    db.select({ c: count() }).from(schema.projects).where(sql`${activeProject()} and ${realEmployerId(schema.projects.employerId)}`),
+    db.select({ c: count() }).from(schema.employers).where(sql`${realEmployers()} and ${schema.employers.gstNumber} is not null`),
   ]);
+
+  // Money columns for this page only: what each company paid last, what it
+  // still owes and when the next payment is due.
+  const pageIds = rows.map((r) => r.id);
+  const [moneyProposals, moneyPayments] = pageIds.length
+    ? await Promise.all([
+        db
+          .select({
+            id: schema.proposals.id,
+            employerId: schema.proposals.employerId,
+            internId: schema.proposals.internId,
+            status: schema.proposals.status,
+            offerDetails: schema.proposals.offerDetails,
+            currency: schema.proposals.currency,
+          })
+          .from(schema.proposals)
+          .where(and(inArray(schema.proposals.employerId, pageIds), inArray(schema.proposals.status, ["accepted", "processing", "hired"]))),
+        db
+          .select({
+            employerId: schema.employerPayments.employerId,
+            status: schema.employerPayments.status,
+            amountMinor: schema.employerPayments.amountMinor,
+            currency: schema.employerPayments.currency,
+            paidAt: schema.employerPayments.paidAt,
+            createdAt: schema.employerPayments.createdAt,
+            raw: schema.employerPayments.raw,
+          })
+          .from(schema.employerPayments)
+          .where(and(inArray(schema.employerPayments.employerId, pageIds), eq(schema.employerPayments.status, "paid"))),
+      ])
+    : [[], []];
+  const internIds = [...new Set(moneyProposals.map((p) => p.internId))];
+  const scoreRows = internIds.length
+    ? await db
+        .select({ userId: schema.internOnboarding.userId, extraData: schema.internOnboarding.extraData })
+        .from(schema.internOnboarding)
+        .where(inArray(schema.internOnboarding.userId, internIds))
+    : [];
+  const scores = new Map(
+    scoreRows.map((r) => [r.userId, Number(((r.extraData ?? {}) as Record<string, unknown>).findternScore) || 0]),
+  );
+  const money = companyMoney(pageIds, moneyProposals, moneyPayments, (id) => scores.get(id) ?? 0);
 
   const page = toPage(rows, Number(totalRow?.c ?? 0), req.page, req.perPage);
   const totalCount = Number(totalCompaniesMetric?.c ?? 0);
@@ -115,7 +166,7 @@ export default async function AdminCompaniesPage({
           tone="brand"
         />
         <StatCard
-          label="Setup completed"
+          label="Onboarding completed"
           value={formatNumber(setupCount)}
           hint={`${totalCount > 0 ? Math.round((setupCount / totalCount) * 100) : 0}% completion rate`}
           icon={CheckCircle2}
@@ -148,7 +199,7 @@ export default async function AdminCompaniesPage({
         rows={rows}
         noun="companies"
         caption="Registered employers directory"
-        searchPlaceholder="Search company, contact, or location…"
+        searchPlaceholder="Search company, contact, phone, or location…"
         filters={[
           {
             key: "status",
@@ -160,10 +211,19 @@ export default async function AdminCompaniesPage({
           },
           {
             key: "setup",
-            label: "Setup",
+            label: "Onboarding",
             options: [
               { value: "complete", label: "Complete" },
-              { value: "incomplete", label: "Incomplete" },
+              { value: "incomplete", label: "Pending" },
+            ],
+          },
+          {
+            key: "fte",
+            label: "International FTE",
+            options: [
+              { value: "applied", label: "Applied" },
+              { value: "approved", label: "Approved" },
+              { value: "rejected", label: "Declined" },
             ],
           },
         ]}
@@ -221,6 +281,43 @@ export default async function AdminCompaniesPage({
             ),
           },
           {
+            header: "Last payment",
+            cell: (row) => {
+              const m = money.get(row.id);
+              return m?.lastPaymentAt ? (
+                <div className="text-xs tabular-nums">
+                  <p className="font-medium text-ink-800">{formatMoney(m.lastPaymentInrMinor ?? 0, "INR")}</p>
+                  <p className="text-text-subtle">{formatDate(m.lastPaymentAt)}</p>
+                </div>
+              ) : (
+                <span className="text-[13px] text-text-subtle">None</span>
+              );
+            },
+          },
+          {
+            header: "Next due",
+            cell: (row) => {
+              const due = money.get(row.id)?.nextDueDate;
+              return due ? (
+                <span className="text-xs tabular-nums text-ink-700">{formatDate(due)}</span>
+              ) : (
+                <span className="text-[13px] text-text-subtle">None</span>
+              );
+            },
+          },
+          {
+            header: "Amount left",
+            align: "right",
+            cell: (row) => {
+              const left = money.get(row.id)?.amountLeftInrMinor ?? 0;
+              return left > 0 ? (
+                <span className="font-semibold tabular-nums text-ink-800">{formatMoney(left, "INR")}</span>
+              ) : (
+                <span className="text-[13px] text-text-subtle">Nothing due</span>
+              );
+            },
+          },
+          {
             header: "GST status",
             cell: (row) =>
               row.gstNumber ? (
@@ -230,13 +327,22 @@ export default async function AdminCompaniesPage({
               ),
           },
           {
-            header: "Setup",
+            header: "Onboarding",
             cell: (row) => (
               <StatusBadge
-                tone={row.setupCompleted ? "success" : "warning"}
-                label={row.setupCompleted ? "Complete" : "Incomplete"}
+                tone={row.onboardingCompleted ? "success" : "warning"}
+                label={row.onboardingCompleted ? "Complete" : "Pending"}
               />
             ),
+          },
+          {
+            header: "International FTE",
+            cell: (row) =>
+              row.internationalFteStatus && row.internationalFteStatus !== "none" ? (
+                <StatusBadge value={row.internationalFteStatus} />
+              ) : (
+                <span className="text-[13px] text-text-subtle">None</span>
+              ),
           },
           {
             header: "Account",

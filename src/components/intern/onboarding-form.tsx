@@ -24,26 +24,42 @@ import {
 import { FileUpload } from "@/components/app/file-upload";
 import { Pill } from "@/components/app/primitives";
 
-import { suggestSkills } from "@/lib/data/skills";
+import Link from "next/link";
+
+import { NON_TECH_SKILLS, suggestSkills } from "@/lib/data/skills";
 import { suggestDistricts } from "@/lib/data/districts";
+import { suggestColleges } from "@/lib/data/colleges";
 import { csrfFetch } from "@/lib/client-fetch";
-import type {
-  ExtracurricularEntry,
-  ExperienceEntry,
-  LanguageEntry,
-  OnboardingDraft,
-  SkillWithRating,
-  StoredDocument,
+import {
+  DEGREES,
+  EMERGENCY_RELATIONS,
+  EXPERIENCE_TYPES,
+  QUALIFICATION_LEVELS,
+  cascadeWorkModes,
+  degreeOption,
+  monthLabel,
+  toMonth,
+  validateProfile,
+  validateStep,
+  type ExtracurricularEntry,
+  type ExperienceEntry,
+  type LanguageEntry,
+  type OnboardingDraft,
+  type QualificationEntry,
+  type SkillWithRating,
+  type StoredDocument,
 } from "@/lib/onboarding";
 
 const DRAFT_KEY = "findtern:intern-onboarding:v2";
 const SAVED_AT = "__savedAt";
 const WORK_MODES = ["remote", "hybrid", "onsite"] as const;
+const COUNTRY_CODES = ["+91", "+1", "+44", "+61", "+49", "+65", "+971"] as const;
+const MB = 1024 * 1024;
 
 export const STEPS = [
   { id: "personal", title: "About Me", blurb: "Basic details, passport photo, and contact information." },
   { id: "academics", title: "Academics", blurb: "Degree, institution, specialization, and academic marks." },
-  { id: "experience", title: "Experience", blurb: "Internships, freelance work, side projects, and roles." },
+  { id: "experience", title: "Experience", blurb: "Internships, freelance work, jobs or major projects." },
   { id: "skills", title: "Skills", blurb: "Select 4 to 7 skills and rate your proficiency level." },
   { id: "languages", title: "Languages", blurb: "Languages you are comfortable with for work and communication." },
   { id: "extracurricular", title: "Extra-Curricular", blurb: "Activities outside academics highlighting leadership and teamwork." },
@@ -62,6 +78,12 @@ type StepProps = {
   onJumpStep?: (step: number) => void;
   onSave?: () => Promise<void>;
   saving?: boolean;
+  /** The number on the account (captured at signup). */
+  account: { countryCode: string; phoneNumber: string } | null;
+  hasPanImage: boolean;
+  /** Skills are frozen: rated, or an AI interview is queued. */
+  skillsLocked?: boolean;
+  onUploaded: (kind: string) => void;
 };
 
 export function OnboardingForm({
@@ -69,12 +91,23 @@ export function OnboardingForm({
   documents,
   email,
   serverUpdatedAt = null,
+  account = null,
+  hasPanImage: panOnFile = false,
+  hasPhoto: photoOnFile = false,
+  skillsLocked = false,
 }: {
   initial: OnboardingDraft;
   documents: StoredDocument[];
   email: string;
   /** When the saved profile last changed (ISO). A local draft older than this is stale. */
   serverUpdatedAt?: string | null;
+  account?: { countryCode: string; phoneNumber: string } | null;
+  /** A PAN card image is already on file. */
+  hasPanImage?: boolean;
+  /** A profile photo is already on file. */
+  hasPhoto?: boolean;
+  /** Rated or AI interview queued - the skills step is read-only. */
+  skillsLocked?: boolean;
 }) {
   const router = useRouter();
   const [step, setStep] = useState(0);
@@ -83,6 +116,12 @@ export function OnboardingForm({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [notice, setNotice] = useState<{ text: string; ok: boolean } | null>(null);
   const [saving, setSaving] = useState(false);
+  // Set once the final submit succeeds; the button stays locked while the
+  // dashboard loads, so a second click cannot submit the profile again.
+  const [submitted, setSubmitted] = useState(false);
+  const [uploaded, setUploaded] = useState<string[]>([]);
+  const hasPanImage = panOnFile || uploaded.includes("pan");
+  const hasPhoto = photoOnFile || uploaded.includes("profile_photo");
   const blurbRef = useRef<HTMLParagraphElement>(null);
 
   // One draft per account, so two people on one browser never see each other's.
@@ -90,7 +129,15 @@ export function OnboardingForm({
   const stored = useSyncExternalStore(subscribeToNothing, () => readDraft(draftKey), () => null);
 
   const values = useMemo<OnboardingDraft>(() => {
-    return { ...initial, ...parseDraft(stored, serverUpdatedAt), ...edits };
+    const local = parseDraft(stored, serverUpdatedAt);
+    // Academics is merged field by field: a draft saved by an older version of
+    // this form lacks the newer keys, and must not blank them.
+    return {
+      ...initial,
+      ...local,
+      ...edits,
+      academics: { ...initial.academics, ...local.academics, ...edits.academics },
+    };
   }, [initial, stored, serverUpdatedAt, edits]);
 
   useEffect(() => {
@@ -114,21 +161,39 @@ export function OnboardingForm({
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  function onContinue() {
-    const problems = validate(values, step);
+  const ctx = { hasPanImage, hasPhoto, ownPhone: account };
+
+  function showProblems(problems: Record<string, string>) {
     setErrors(problems);
-    if (Object.keys(problems).length > 0) return;
+    // Move focus to the first field that needs attention.
+    const first = Object.keys(problems)[0];
+    if (first) {
+      window.requestAnimationFrame(() => document.getElementById(first)?.focus());
+    }
+  }
+
+  function onContinue() {
+    const problems = validateStep(values, step, ctx);
+    if (Object.keys(problems).length > 0) return showProblems(problems);
+    setErrors({});
     goTo(Math.min(step + 1, STEPS.length - 1));
   }
 
   function onSubmit() {
-    const problems = validate(values, STEPS.length - 1);
-    setErrors(problems);
-    if (Object.keys(problems).length > 0) return;
-    void onSave();
+    if (saving || submitted) return;
+    // Every step, not just this one: a skipped step is caught here, and the
+    // candidate is taken to it rather than told something is wrong somewhere.
+    const failed = validateProfile(values, ctx);
+    if (failed) {
+      if (failed.step !== step) goTo(failed.step);
+      setNotice({ text: `Some details on "${STEPS[failed.step].title}" need attention before you submit.`, ok: false });
+      setErrors(failed.errors);
+      return;
+    }
+    void onSave(true);
   }
 
-  async function onSave() {
+  async function onSave(final = false) {
     setSaving(true);
     setNotice(null);
     try {
@@ -137,18 +202,27 @@ export function OnboardingForm({
         headers: { "Content-Type": "application/json" },
         // Bank details are edited in Settings; sending them from here would
         // overwrite a newer copy saved there.
-        body: JSON.stringify({ ...values, bank: undefined }),
+        body: JSON.stringify({ ...values, bank: undefined, final }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
+        if (typeof data.step === "number" && data.fields) {
+          goTo(data.step);
+          setErrors(data.fields);
+        }
         setNotice({ text: data.error ?? "Failed to save profile. Please try again.", ok: false });
         return;
       }
-      setNotice({ text: "Profile saved.", ok: true });
+      setNotice({ text: final ? "Profile submitted. Taking you to your dashboard…" : "Draft saved.", ok: true });
       try {
         window.localStorage.removeItem(draftKey);
       } catch {
         // no-op
+      }
+      if (final) {
+        setSubmitted(true);
+        router.replace("/intern/dashboard");
+        return;
       }
       router.refresh();
     } catch {
@@ -229,6 +303,10 @@ export function OnboardingForm({
               onJumpStep={goTo}
               onSave={onSave}
               saving={saving}
+              account={account}
+              hasPanImage={hasPanImage}
+              skillsLocked={skillsLocked}
+              onUploaded={(kind) => setUploaded((prev) => (prev.includes(kind) ? prev : [...prev, kind]))}
             />
           </div>
         </div>
@@ -267,8 +345,8 @@ export function OnboardingForm({
 
             <button
               type="button"
-              onClick={onSave}
-              disabled={saving}
+              onClick={() => void onSave()}
+              disabled={saving || submitted}
               className="apple-spring apple-pressable inline-flex min-h-11 items-center gap-1.5 rounded-[10px] border border-ink-200 bg-white px-4 text-sm font-medium text-ink-700 shadow-2xs hover:bg-ink-50 disabled:opacity-60"
             >
               {saving ? <Loader2 className="size-3.5 animate-spin" /> : <Save className="size-3.5 text-ink-500" />}
@@ -291,11 +369,11 @@ export function OnboardingForm({
               <button
                 type="button"
                 onClick={onSubmit}
-                disabled={saving}
+                disabled={saving || submitted}
                 className="apple-spring apple-pressable inline-flex min-h-11 items-center gap-1.5 rounded-[10px] bg-primary px-6 text-sm font-semibold text-white shadow-sm hover:bg-primary-hover disabled:opacity-60"
               >
-                {saving ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />}
-                Complete & Submit Profile
+                {saving || submitted ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />}
+                {submitted ? "Submitted" : "Complete & Submit Profile"}
               </button>
             )}
           </div>
@@ -350,24 +428,26 @@ function StepRail({ step, onSelect }: { step: number; onSelect: (next: number) =
 
 /* ── Step 1: About Me (Personal + Passport Photo) ────────────────────────── */
 
-function PersonalStep({ values, update, errors, documents }: StepProps) {
+function PersonalStep({ values, update, errors, documents, account, onUploaded }: StepProps) {
   const onFile = (label: string) => (documents.find((d) => d.label === label) ? `${label} on file` : null);
+  // A locally cached draft can carry an empty photoUrl; the stored avatar wins.
+  const photoSrc = values.photoUrl || (documents.some((d) => d.label === "Profile photo") ? "/api/intern/avatar" : "");
   return (
-    <div className="space-y-5">
+    <div className="space-y-8">
       {/* Passport Photo Upload Slot */}
       <div className="rounded-xl border border-dashed border-ink-200 bg-ink-50/50 p-4.5 text-center sm:text-left">
         <div className="flex flex-col sm:flex-row items-center gap-4">
           <div className="grid size-20 place-items-center rounded-xl bg-white border border-ink-200 shadow-2xs overflow-hidden shrink-0">
-            {values.photoUrl ? (
+            {photoSrc ? (
               /* eslint-disable-next-line @next/next/no-img-element */
-              <img src={values.photoUrl} alt="Passport photo" className="size-full object-cover" />
+              <img src={photoSrc} alt="Passport photo" className="size-full object-cover" />
             ) : (
               <User className="size-8 text-ink-400" />
             )}
           </div>
           <div className="flex-1">
-            <h4 className="text-xs font-semibold text-ink-900">
-              Profile Photo (Passport Size 2x2&quot;)
+            <h4 id="photo" tabIndex={-1} className="text-xs font-semibold text-ink-900 focus:outline-none">
+              Profile Photo (Passport Size 2x2&quot;) *
             </h4>
             <p className="mt-0.5 text-xs text-text-subtle">
               JPG, PNG or WebP, up to 5 MB. A clear, front-facing photo.
@@ -377,99 +457,224 @@ function PersonalStep({ values, update, errors, documents }: StepProps) {
               kind="profile_photo"
               accept="image/jpeg,image/png,image/webp"
               label="Photo"
+              maxBytes={5 * MB}
               current={documents.find((d) => d.label === "Profile photo") ? "Photo on file" : null}
               onUploaded={() => update("photoUrl", `/api/intern/avatar?v=${Date.now()}`)}
             />
+            {errors.photo ? (
+              <p role="alert" className="mt-1.5 text-xs font-medium text-danger">
+                {errors.photo}
+              </p>
+            ) : null}
           </div>
         </div>
       </div>
 
-      <TextArea
-        id="bio"
-        label="Professional Bio *"
-        hint="Summarize your technical strengths, goals, and passions in 2-3 sentences."
-        value={values.bio}
-        error={errors.bio}
-        onChange={(v) => update("bio", v)}
-      />
-
-      <div className="grid gap-4 xl:grid-cols-2">
+      <div className="space-y-5">
+        <TextArea
+          id="bio"
+          label="Professional Bio *"
+          hint="Summarize your technical strengths, goals, and passions in 2-3 sentences."
+          value={values.bio}
+          error={errors.bio}
+          onChange={(v) => update("bio", v)}
+        />
         <Field
           id="linkedinUrl"
-          label="LinkedIn Profile"
+          label="LinkedIn Profile *"
           type="url"
           placeholder="https://linkedin.com/in/username"
           value={values.linkedinUrl}
           error={errors.linkedinUrl}
           onChange={(v) => update("linkedinUrl", v)}
         />
-        <Field
-          id="aadhaarNumber"
-          label="Aadhaar Number (12 digits)"
-          placeholder="1234 5678 9012"
-          inputMode="numeric"
-          maxLength={14}
-          value={values.aadhaarNumber || ""}
-          error={errors.aadhaarNumber}
-          onChange={(v) => update("aadhaarNumber", v.replace(/\D/g, "").slice(0, 12))}
-        />
-        <Field
-          id="panNumber"
-          label="PAN *"
-          hint="Required for stipend payouts. Format ABCDE1234F."
-          placeholder="ABCDE1234F"
-          maxLength={10}
-          value={values.panNumber || ""}
-          error={errors.panNumber}
-          onChange={(v) => update("panNumber", v.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 10))}
-        />
       </div>
 
-      <div className="grid gap-4 rounded-xl border border-ink-200/70 p-4 [grid-template-columns:repeat(auto-fit,minmax(11rem,1fr))]">
-        <FileUpload kind="aadhaar" accept="image/jpeg,image/png,image/webp,application/pdf" label="Aadhaar" hint="Image or PDF, up to 10 MB." current={onFile("Aadhaar")} />
-        <FileUpload kind="pan" accept="image/jpeg,image/png,image/webp,application/pdf" label="PAN" hint="Image or PDF, up to 10 MB." current={onFile("PAN")} />
-        <FileUpload kind="intro_video" accept="video/mp4,video/webm,video/quicktime" label="Intro video" hint="Optional. Up to 50 MB." current={onFile("Intro video")} />
-      </div>
+      <Group
+        title="Identity documents"
+        hint="Used to verify you and to pay your stipend. Never shown to employers."
+      >
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field
+            id="aadhaarNumber"
+            label="Aadhaar Number *"
+            hint="12 digits. Spaces are removed for you."
+            placeholder="2345 6789 0123"
+            inputMode="numeric"
+            // No maxLength: it cut a pasted "1234 5678 9012" before the
+            // spaces were stripped. onChange keeps the 12-digit cap.
+            value={values.aadhaarNumber || ""}
+            error={errors.aadhaarNumber}
+            onChange={(v) => update("aadhaarNumber", v.replace(/\D/g, "").slice(0, 12))}
+          />
+          <Field
+            id="panNumber"
+            label="PAN *"
+            hint="Required for stipend payouts. Format ABCDE1234F."
+            placeholder="ABCDE1234F"
+            maxLength={10}
+            value={values.panNumber || ""}
+            error={errors.panNumber}
+            onChange={(v) => update("panNumber", v.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 10))}
+          />
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <UploadSlot id="panImage" title="PAN card image *" error={errors.panImage}>
+            <FileUpload
+              kind="pan"
+              accept="image/jpeg,image/png,image/webp,application/pdf"
+              label="PAN card image"
+              noun="PAN card image"
+              maxBytes={10 * MB}
+              hint="Photo or scan of the front. JPG, PNG, WebP or PDF, up to 10 MB."
+              current={onFile("PAN")}
+              onUploaded={() => onUploaded("pan")}
+            />
+          </UploadSlot>
+          <UploadSlot title="Aadhaar card image (optional)">
+            <FileUpload
+              kind="aadhaar"
+              accept="image/jpeg,image/png,image/webp,application/pdf"
+              label="Aadhaar card image"
+              noun="Aadhaar card image"
+              maxBytes={10 * MB}
+              hint="JPG, PNG, WebP or PDF, up to 10 MB."
+              current={onFile("Aadhaar")}
+            />
+          </UploadSlot>
+        </div>
+      </Group>
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        <Field
-          id="city"
-          label="Current City *"
-          placeholder="e.g. Bengaluru"
-          value={values.city}
-          error={errors.city}
-          onChange={(v) => update("city", v)}
-        />
-        <Field
-          id="state"
-          label="State"
-          placeholder="Karnataka"
-          value={values.state}
-          onChange={(v) => update("state", v)}
-        />
-        <Field
-          id="pinCode"
-          label="PIN Code"
-          inputMode="numeric"
-          maxLength={6}
-          placeholder="560001"
-          value={values.pinCode}
-          error={errors.pinCode}
-          onChange={(v) => update("pinCode", v.replace(/\D/g, ""))}
-        />
-      </div>
+      <Group title="Where you live">
+        <div className="grid gap-4 sm:grid-cols-3">
+          <Field
+            id="city"
+            label="Current City *"
+            placeholder="e.g. Bengaluru"
+            value={values.city}
+            error={errors.city}
+            onChange={(v) => update("city", v)}
+          />
+          <Field
+            id="state"
+            label="State *"
+            placeholder="Karnataka"
+            value={values.state}
+            error={errors.state}
+            onChange={(v) => update("state", v)}
+          />
+          <Field
+            id="pinCode"
+            label="PIN Code *"
+            inputMode="numeric"
+            maxLength={6}
+            placeholder="560001"
+            value={values.pinCode}
+            error={errors.pinCode}
+            onChange={(v) => update("pinCode", v.replace(/\D/g, ""))}
+          />
+        </div>
+      </Group>
 
-      <Field
-        id="emergencyPhone"
-        label="Contact / Emergency Phone Number"
-        hint="10-digit primary mobile number for interview communications."
-        inputMode="tel"
-        maxLength={10}
-        placeholder="9876543210"
-        value={values.emergencyPhone}
-        error={errors.emergencyPhone}
-        onChange={(v) => update("emergencyPhone", v.replace(/\D/g, ""))}
-      />
+      <Group
+        title="Your contact number"
+        hint="The number you signed up with. Interview and offer updates go here."
+      >
+        {account ? (
+          <PhoneField
+            id="ownPhone"
+            label="Mobile number"
+            code={account.countryCode}
+            number={account.phoneNumber}
+            disabled
+            hint={
+              <>
+                To change it, go to{" "}
+                <Link href="/intern/settings" className="font-medium text-brand-700 underline-offset-4 hover:underline">
+                  Settings
+                </Link>
+                .
+              </>
+            }
+          />
+        ) : (
+          <p className="text-sm text-ink-600">
+            There is no number on your account yet.{" "}
+            <Link href="/intern/settings" className="font-medium text-brand-700 underline-offset-4 hover:underline">
+              Add one in Settings
+            </Link>
+            .
+          </p>
+        )}
+      </Group>
+
+      <Group
+        title="Emergency contact"
+        hint="Someone we can reach if we cannot reach you. Only Findtern sees this."
+      >
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field
+            id="emergencyName"
+            label="Name *"
+            placeholder="e.g. Sunita Sharma"
+            value={values.emergencyName ?? ""}
+            error={errors.emergencyName}
+            autoComplete="off"
+            onChange={(v) => update("emergencyName", v)}
+          />
+          <SelectField
+            id="emergencyRelation"
+            label="Relationship"
+            value={values.emergencyRelation ?? ""}
+            onChange={(v) => update("emergencyRelation", v)}
+            options={[{ value: "", label: "Choose…" }, ...EMERGENCY_RELATIONS.map((r) => ({ value: r, label: r }))]}
+          />
+        </div>
+        <PhoneField
+          id="emergencyPhone"
+          label="Emergency phone number *"
+          code={values.emergencyCountryCode || "+91"}
+          number={values.emergencyPhone}
+          error={errors.emergencyPhone}
+          onCode={(v) => update("emergencyCountryCode", v)}
+          onNumber={(v) => update("emergencyPhone", v)}
+          hint="Not your own number. Digits only, without the country code."
+        />
+      </Group>
+
+      <Group
+        title="Second contact (optional)"
+        hint="Another person we can try if your emergency contact does not answer. Only Findtern sees this."
+      >
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field
+            id="secondPocName"
+            label="Name"
+            placeholder="e.g. Arjun Mehta"
+            value={values.secondPocName ?? ""}
+            error={errors.secondPocName}
+            autoComplete="off"
+            onChange={(v) => update("secondPocName", v)}
+          />
+          <SelectField
+            id="secondPocRelation"
+            label="Relationship"
+            value={values.secondPocRelation ?? ""}
+            onChange={(v) => update("secondPocRelation", v)}
+            options={[{ value: "", label: "Choose…" }, ...EMERGENCY_RELATIONS.map((r) => ({ value: r, label: r }))]}
+          />
+        </div>
+        <PhoneField
+          id="secondPocPhone"
+          label="Phone number"
+          code={values.secondPocCountryCode || "+91"}
+          number={values.secondPocPhone ?? ""}
+          error={errors.secondPocPhone}
+          onCode={(v) => update("secondPocCountryCode", v)}
+          onNumber={(v) => update("secondPocPhone", v)}
+          hint="Different from your own and your emergency contact's number."
+        />
+      </Group>
     </div>
   );
 }
@@ -480,74 +685,114 @@ function AcademicsStep({ values, update, errors }: StepProps) {
   const academics = values.academics;
   const set = (patch: Partial<OnboardingDraft["academics"]>) =>
     update("academics", { ...academics, ...patch });
+  const option = degreeOption(academics.degree);
+  // Kept while typing, so a custom name that happens to match a list entry
+  // ("B.A" on the way to "B.Arch") does not swap the text box out mid-word.
+  const [typingOther, setTypingOther] = useState(option === "Other");
+  const showOther = typingOther || option === "Other";
+  const completed = academics.status === "Completed";
+  const level = academics.qualificationLevel || "Bachelor's";
+  const levels = QUALIFICATION_LEVELS.some((l) => l.value === level)
+    ? [...QUALIFICATION_LEVELS]
+    : [...QUALIFICATION_LEVELS, { value: level, label: level === "High School" ? "High School / 12th" : level }];
 
   return (
     <div className="space-y-5">
       <div className="grid gap-4 sm:grid-cols-2">
-        <div>
-          <label htmlFor="qualificationLevel" className="block text-sm font-medium text-ink-800">
-            Highest Qualification Level *
-          </label>
-          <select
-            id="qualificationLevel"
-            value={academics.qualificationLevel || "Bachelor's"}
-            onChange={(e) => set({ qualificationLevel: e.target.value })}
-            className="apple-spring mt-2 h-10 w-full rounded-[10px] border border-ink-200 bg-white px-3 text-[14px] font-medium text-ink-900 shadow-2xs outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
-          >
-            <option value="Bachelor's">Bachelor&apos;s Degree</option>
-            <option value="Master's">Master&apos;s Degree</option>
-            <option value="Diploma">Diploma / Polytechnic</option>
-            <option value="High School">High School / 12th</option>
-          </select>
-        </div>
-
-        <div>
-          <label htmlFor="academicStatus" className="block text-sm font-medium text-ink-800">
-            Academic Status *
-          </label>
-          <select
-            id="academicStatus"
-            value={academics.status || "Pursuing"}
-            onChange={(e) => set({ status: e.target.value })}
-            className="apple-spring mt-2 h-10 w-full rounded-[10px] border border-ink-200 bg-white px-3 text-[14px] font-medium text-ink-900 shadow-2xs outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
-          >
-            <option value="Pursuing">Currently Pursuing / Enrolled</option>
-            <option value="Completed">Graduated / Completed</option>
-          </select>
-        </div>
+        <SelectField
+          id="qualificationLevel"
+          label="Highest Qualification Level *"
+          value={level}
+          onChange={(v) => set({ qualificationLevel: v })}
+          options={levels}
+        />
+        <SelectField
+          id="academicStatus"
+          label="Academic Status *"
+          value={academics.status || "Pursuing"}
+          onChange={(v) => set({ status: v })}
+          options={[
+            { value: "Pursuing", label: "Currently pursuing" },
+            { value: "Completed", label: "Graduated / completed" },
+          ]}
+        />
       </div>
 
       <Field
         id="institution"
         label="College / University Institution *"
+        hint="Start typing to pick from the list, or type your college's full name if it is not there."
         placeholder="e.g. JECRC University, IIT Bombay, Anna University"
         value={academics.institution}
         error={errors.institution}
+        list="college-options"
+        autoComplete="off"
         onChange={(v) => set({ institution: v })}
       />
+      <datalist id="college-options">
+        {suggestColleges(academics.institution).map((c) => (
+          <option key={c} value={c} />
+        ))}
+      </datalist>
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field
-          id="degree"
-          label="Degree *"
-          placeholder="e.g. B.Tech, B.Sc, BCA, MCA"
-          value={academics.degree}
-          error={errors.degree}
-          onChange={(v) => set({ degree: v })}
-        />
+        <div className="space-y-3">
+          <SelectField
+            id={showOther ? "degreeSelect" : "degree"}
+            label="Degree *"
+            value={showOther ? "Other" : option}
+            error={showOther ? undefined : errors.degree}
+            onChange={(v) => {
+              if (v === "Other") {
+                setTypingOther(true);
+                set({ degree: option === "Other" ? academics.degree : "Other" });
+              } else {
+                setTypingOther(false);
+                set({ degree: v });
+              }
+            }}
+            options={[
+              { value: "", label: "Choose your degree…" },
+              ...DEGREES.map((d) => ({ value: d.value, label: d.value })),
+              { value: "Other", label: "Other" },
+            ]}
+          />
+          {showOther ? (
+            <Field
+              id="degree"
+              label="Degree name *"
+              placeholder="e.g. B.Arch, LLB, B.Pharm"
+              value={academics.degree === "Other" ? "" : academics.degree}
+              error={errors.degree}
+              onChange={(v) => set({ degree: v || "Other" })}
+            />
+          ) : null}
+        </div>
         <Field
           id="branch"
-          label="Specialization / Branch"
-          placeholder="e.g. Computer Science, Artificial Intelligence"
+          label="Specialization / Branch *"
+          placeholder="e.g. Computer Science, Marketing"
           value={academics.branch}
+          error={errors.branch}
           onChange={(v) => set({ branch: v })}
         />
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <Field
+          id="startYear"
+          label="Start Year *"
+          placeholder="e.g. 2022"
+          inputMode="numeric"
+          maxLength={4}
+          value={academics.startYear}
+          error={errors.startYear}
+          onChange={(v) => set({ startYear: v.replace(/\D/g, "") })}
+        />
+        <Field
           id="yearOfGraduation"
-          label="Graduation Year"
+          label={completed ? "End Year *" : "Expected End Year *"}
+          hint={completed ? `The year you graduated - ${new Date().getFullYear()} or earlier.` : "A future year is fine."}
           placeholder="e.g. 2026"
           inputMode="numeric"
           maxLength={4}
@@ -555,28 +800,207 @@ function AcademicsStep({ values, update, errors }: StepProps) {
           error={errors.yearOfGraduation}
           onChange={(v) => set({ yearOfGraduation: v.replace(/\D/g, "") })}
         />
-        <Field
-          id="cgpa"
-          label="CGPA or Percentage"
-          placeholder="e.g. 8.4 / 10 or 84%"
-          value={academics.cgpa}
-          onChange={(v) => set({ cgpa: v })}
-        />
       </div>
+
+      <fieldset>
+        <legend className="block text-sm font-medium text-ink-800">
+          {completed ? "Final score *" : "Score so far *"}
+        </legend>
+        <div className="mt-2 grid gap-3 sm:grid-cols-[auto_minmax(0,1fr)] sm:items-start">
+          <div role="radiogroup" aria-label="Score type" className="flex gap-2">
+            {(
+              [
+                ["cgpa", "CGPA"],
+                ["percentage", "Percentage"],
+              ] as const
+            ).map(([value, label]) => {
+              const active = academics.scoreType === value;
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  role="radio"
+                  aria-checked={active}
+                  onClick={() => set({ scoreType: value })}
+                  className={`apple-spring apple-pressable inline-flex min-h-11 items-center rounded-[10px] border px-4 text-sm font-semibold sm:min-h-10 ${
+                    active
+                      ? "border-brand-600 bg-brand-50 text-brand-800 ring-1 ring-brand-600/30"
+                      : "border-ink-200 bg-white text-ink-700 hover:bg-ink-50"
+                  }`}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+          <div>
+            <input
+              id="cgpa"
+              name="cgpa"
+              inputMode="decimal"
+              aria-label={academics.scoreType === "cgpa" ? "CGPA out of 10" : "Percentage out of 100"}
+              placeholder={academics.scoreType === "cgpa" ? "e.g. 8.4 (out of 10)" : "e.g. 84 (out of 100)"}
+              value={academics.cgpa}
+              onChange={(e) => set({ cgpa: e.target.value.replace(/[^\d.]/g, "").slice(0, 6) })}
+              aria-invalid={errors.cgpa ? true : undefined}
+              aria-describedby={errors.cgpa ? "cgpa-error" : undefined}
+              className={`${CONTROL} w-full ${errors.cgpa ? FIELD_BAD : FIELD_OK}`}
+            />
+            {errors.cgpa ? (
+              <p id="cgpa-error" className="mt-1 text-xs text-danger">
+                {errors.cgpa}
+              </p>
+            ) : (
+              <p className="mt-1 text-xs text-text-subtle">
+                {academics.scoreType === "cgpa" ? "Out of 10." : "Out of 100."}
+              </p>
+            )}
+          </div>
+        </div>
+      </fieldset>
+
       <FileUpload
         kind="marksheet"
         accept="image/jpeg,image/png,image/webp,application/pdf"
         label="Marksheet"
+        maxBytes={25 * MB}
         hint="Latest semester or final marksheet. Image or PDF, up to 25 MB. You can upload more than one."
+      />
+
+      <QualificationList
+        title="Professional qualifications"
+        hint="CA, CS, CMA, CFA, ACCA and similar. Optional."
+        addLabel="Add qualification"
+        prefix="professional"
+        namePlaceholder="e.g. CA Intermediate"
+        issuerPlaceholder="e.g. ICAI"
+        rows={academics.professional ?? []}
+        errors={errors}
+        onChange={(rows) => set({ professional: rows })}
+      />
+
+      <QualificationList
+        title="Certifications"
+        hint="Courses and certificates with a named issuer. Optional."
+        addLabel="Add certification"
+        prefix="certifications"
+        namePlaceholder="e.g. Google Data Analytics"
+        issuerPlaceholder="e.g. Coursera, NPTEL, AWS"
+        rows={academics.certifications ?? []}
+        errors={errors}
+        onChange={(rows) => set({ certifications: rows })}
       />
     </div>
   );
 }
 
+function QualificationList({
+  title,
+  hint,
+  addLabel,
+  prefix,
+  namePlaceholder,
+  issuerPlaceholder,
+  rows,
+  errors,
+  onChange,
+}: {
+  title: string;
+  hint: string;
+  addLabel: string;
+  prefix: string;
+  namePlaceholder: string;
+  issuerPlaceholder: string;
+  rows: QualificationEntry[];
+  errors: Record<string, string>;
+  onChange: (rows: QualificationEntry[]) => void;
+}) {
+  const patch = (id: string, next: Partial<QualificationEntry>) =>
+    onChange(rows.map((r) => (r.id === id ? { ...r, ...next } : r)));
+  const add = () =>
+    onChange([...rows, { id: `${prefix}-${Date.now()}`, name: "", issuer: "", year: "", credentialUrl: "" }]);
+
+  return (
+    <Group
+      title={title}
+      hint={hint}
+      action={
+        <button
+          type="button"
+          onClick={add}
+          className="apple-spring apple-pressable inline-flex min-h-11 items-center gap-1.5 rounded-[10px] border border-brand-200 bg-brand-50 px-3 text-sm font-semibold text-brand-700 hover:bg-brand-100"
+        >
+          <Plus className="size-3.5" aria-hidden />
+          {addLabel}
+        </button>
+      }
+    >
+      {rows.length === 0 ? (
+        <p className="text-xs text-text-subtle">None added.</p>
+      ) : (
+        <div className="space-y-3">
+          {rows.map((row, i) => {
+            const k = `${prefix}.${row.id}`;
+            return (
+              <div key={row.id} className="space-y-3 rounded-xl border border-ink-100 bg-ink-50 p-4 shadow-2xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-2xs font-semibold uppercase tracking-wider text-brand-700">
+                    {title.replace(/s$/, "")} {i + 1}
+                  </span>
+                  <RemoveButton label={`Remove ${title.toLowerCase().replace(/s$/, "")} ${i + 1}`} onClick={() => onChange(rows.filter((r) => r.id !== row.id))} />
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Field
+                    id={`${k}.name`}
+                    label="Name *"
+                    placeholder={namePlaceholder}
+                    value={row.name}
+                    error={errors[`${k}.name`]}
+                    onChange={(v) => patch(row.id, { name: v })}
+                  />
+                  <Field
+                    id={`${k}.issuer`}
+                    label="Issued by *"
+                    placeholder={issuerPlaceholder}
+                    value={row.issuer}
+                    error={errors[`${k}.issuer`]}
+                    onChange={(v) => patch(row.id, { issuer: v })}
+                  />
+                  <Field
+                    id={`${k}.year`}
+                    label="Year *"
+                    placeholder="e.g. 2024"
+                    inputMode="numeric"
+                    maxLength={4}
+                    value={row.year}
+                    error={errors[`${k}.year`]}
+                    onChange={(v) => patch(row.id, { year: v.replace(/\D/g, "") })}
+                  />
+                  <Field
+                    id={`${k}.credentialUrl`}
+                    label="Credential link (optional)"
+                    type="url"
+                    placeholder="https://"
+                    value={row.credentialUrl}
+                    error={errors[`${k}.credentialUrl`]}
+                    onChange={(v) => patch(row.id, { credentialUrl: v })}
+                  />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </Group>
+  );
+}
+
 /* ── Step 3: Experience ─────────────────────────────────────────────────── */
 
-function ExperienceStep({ values, update }: StepProps) {
+function ExperienceStep({ values, update, errors }: StepProps) {
   const experiences = values.experiences || [];
+  const now = new Date();
+  const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 
   function addExperience() {
     const newItem: ExperienceEntry = {
@@ -608,9 +1032,9 @@ function ExperienceStep({ values, update }: StepProps) {
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-xs text-text-subtle">
-          Add any past internships, freelance gigs, or major software projects.
+          Optional, but every entry you add needs all of its details.
         </p>
         <button
           type="button"
@@ -640,108 +1064,106 @@ function ExperienceStep({ values, update }: StepProps) {
         </div>
       ) : (
         <div className="space-y-4">
-          {experiences.map((exp, idx) => (
-            <div
-              key={exp.id}
-              className="rounded-xl border border-ink-100 bg-ink-50 p-4.5 shadow-2xs space-y-3"
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-2xs font-semibold uppercase tracking-wider text-brand-700">
-                  Experience #{idx + 1}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => removeExperience(exp.id)}
-                  className="apple-spring rounded-md p-1 text-ink-400 hover:bg-ink-100 hover:text-danger"
-                >
-                  <Trash2 className="size-3.5" />
-                </button>
-              </div>
+          {experiences.map((exp, idx) => {
+            const k = `exp.${exp.id}`;
+            const isProject = exp.type === "Project";
+            return (
+              <div
+                key={exp.id}
+                className="rounded-xl border border-ink-100 bg-ink-50 p-4.5 shadow-2xs space-y-4"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-2xs font-semibold uppercase tracking-wider text-brand-700">
+                    Experience {idx + 1}
+                  </span>
+                  <RemoveButton label={`Remove experience ${idx + 1}`} onClick={() => removeExperience(exp.id)} />
+                </div>
 
-              <div className="grid gap-3 sm:grid-cols-3">
-                <div>
-                  <label className="block text-sm font-medium text-ink-700">Type</label>
-                  <select
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <SelectField
+                    id={`${k}.type`}
+                    label="Type *"
                     value={exp.type}
-                    onChange={(e) => updateExperience(exp.id, { type: e.target.value })}
-                    className="apple-spring mt-1 h-9 w-full rounded-[10px] border border-ink-200 bg-white px-2.5 text-[14px] text-ink-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
-                  >
-                    <option value="Internship">Internship</option>
-                    <option value="Project">Personal / Academic Project</option>
-                    <option value="Freelance">Freelance Contract</option>
-                    <option value="Part-time">Part-time</option>
-                    <option value="Full-time">Full-time</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-ink-700">Company / Organization</label>
-                  <input
-                    type="text"
+                    error={errors[`${k}.type`]}
+                    onChange={(v) => updateExperience(exp.id, { type: v })}
+                    options={[...EXPERIENCE_TYPES]}
+                  />
+                  <Field
+                    id={`${k}.company`}
+                    label={isProject ? "Organisation / College *" : "Company *"}
+                    placeholder={isProject ? "e.g. College, client, or Self" : "e.g. Infosys"}
                     value={exp.company}
-                    placeholder="e.g. Findtern or Stealth Startup"
-                    onChange={(e) => updateExperience(exp.id, { company: e.target.value })}
-                    className="apple-spring mt-1 h-9 w-full rounded-[10px] border border-ink-200 bg-white px-2.5 text-[14px] text-ink-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                    error={errors[`${k}.company`]}
+                    onChange={(v) => updateExperience(exp.id, { company: v })}
                   />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-ink-700">Role / Title</label>
-                  <input
-                    type="text"
+                  <Field
+                    id={`${k}.role`}
+                    label="Role / Title *"
+                    placeholder="e.g. Marketing Intern"
                     value={exp.role}
-                    placeholder="e.g. React Frontend Intern"
-                    onChange={(e) => updateExperience(exp.id, { role: e.target.value })}
-                    className="apple-spring mt-1 h-9 w-full rounded-[10px] border border-ink-200 bg-white px-2.5 text-[14px] text-ink-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                    error={errors[`${k}.role`]}
+                    onChange={(v) => updateExperience(exp.id, { role: v })}
                   />
                 </div>
-              </div>
 
-              <div className="grid gap-3 sm:grid-cols-2">
                 <div>
-                  <label className="block text-sm font-medium text-ink-700">Timeline (From - To)</label>
-                  <div className="flex items-center gap-2 mt-1">
-                    <input
-                      type="text"
-                      placeholder="e.g. Jan 2025"
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <Field
+                      id={`${k}.from`}
+                      label="Start month *"
+                      type="month"
+                      placeholder="YYYY-MM"
+                      max={thisMonth}
                       value={exp.from}
-                      onChange={(e) => updateExperience(exp.id, { from: e.target.value })}
-                      className="apple-spring h-9 flex-1 rounded-[10px] border border-ink-200 bg-white px-2.5 text-[14px] focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                      error={errors[`${k}.from`]}
+                      onChange={(v) => updateExperience(exp.id, { from: v })}
                     />
-                    <span className="text-xs text-ink-400">to</span>
-                    <input
-                      type="text"
-                      placeholder={exp.current ? "Present" : "e.g. Jun 2025"}
-                      disabled={exp.current}
-                      value={exp.current ? "Present" : exp.to}
-                      onChange={(e) => updateExperience(exp.id, { to: e.target.value })}
-                      className="apple-spring h-9 flex-1 rounded-[10px] border border-ink-200 bg-white px-2.5 text-[14px] disabled:bg-ink-100 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
-                    />
+                    {exp.current ? (
+                      <div>
+                        <span className="block text-sm font-medium text-ink-800">End month</span>
+                        <p
+                          aria-live="polite"
+                          className={`${CONTROL} mt-2 flex w-full items-center border-ink-200 bg-ink-100 text-ink-600`}
+                        >
+                          Present
+                        </p>
+                      </div>
+                    ) : (
+                      <Field
+                        id={`${k}.to`}
+                        label="End month *"
+                        type="month"
+                        placeholder="YYYY-MM"
+                        min={exp.from || undefined}
+                        max={thisMonth}
+                        value={exp.to}
+                        error={errors[`${k}.to`]}
+                        onChange={(v) => updateExperience(exp.id, { to: v })}
+                      />
+                    )}
                   </div>
-                </div>
-                <div className="flex items-end pb-1.5">
-                  <label className="flex items-center gap-2 cursor-pointer text-xs text-ink-700">
+                  <label className="mt-2 inline-flex min-h-11 cursor-pointer items-center gap-2.5 text-sm text-ink-800">
                     <input
                       type="checkbox"
                       checked={exp.current}
-                      onChange={(e) => updateExperience(exp.id, { current: e.target.checked })}
-                      className="size-4 rounded-xs border-ink-300 text-brand-700"
+                      onChange={(e) => updateExperience(exp.id, { current: e.target.checked, to: e.target.checked ? "" : exp.to })}
+                      className="size-4 shrink-0 rounded border-ink-300 accent-brand-700"
                     />
-                    <span>I currently work here / ongoing</span>
+                    I currently work here
                   </label>
                 </div>
-              </div>
 
-              <div>
-                <label className="block text-sm font-medium text-ink-700">Key Deliverables & Stack</label>
-                <textarea
-                  rows={2}
+                <TextArea
+                  id={`${k}.description`}
+                  label="What you did *"
+                  hint="Your work, the tools you used, and a result if you have one."
                   value={exp.description}
-                  placeholder="Built customer analytics dashboard in Next.js, optimized SQL queries by 40%..."
-                  onChange={(e) => updateExperience(exp.id, { description: e.target.value })}
-                  className="apple-spring mt-1 w-full rounded-[10px] border border-ink-200 bg-white p-2.5 text-[14px] leading-relaxed focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                  error={errors[`${k}.description`]}
+                  onChange={(v) => updateExperience(exp.id, { description: v })}
                 />
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
@@ -750,10 +1172,33 @@ function ExperienceStep({ values, update }: StepProps) {
 
 /* ── Step 4: Skills with Proficiency Ratings ────────────────────────────── */
 
-function SkillsStep({ values, update, errors }: StepProps) {
+function SkillsStep({ values, update, errors, skillsLocked }: StepProps) {
   const [draft, setDraft] = useState("");
+  const [allNonTech, setAllNonTech] = useState(false);
   const skills = values.skills || [];
   const skillsWithRatings = values.skillsWithRatings || [];
+
+  // Legacy rule: once rated (or an AI interview is queued) the interview is
+  // built on these skills, so they stop being editable. The API enforces it.
+  if (skillsLocked) {
+    return (
+      <div className="space-y-4">
+        <p className="rounded-[10px] border border-ink-200 bg-ink-50 px-4 py-3 text-sm text-ink-700">
+          Your skills are locked because your AI interview is based on them. Write to us if one is wrong.
+        </p>
+        <ul className="flex flex-wrap gap-1.5">
+          {skills.map((skill) => (
+            <li key={skill} className="rounded-full bg-brand-50 px-2.5 py-1 text-xs font-medium text-brand-700">
+              {skill}
+              {skillsWithRatings.find((s) => s.name === skill)?.rating
+                ? ` · ${skillsWithRatings.find((s) => s.name === skill)?.rating}`
+                : ""}
+            </li>
+          ))}
+        </ul>
+      </div>
+    );
+  }
 
   function addSkill(name: string) {
     const clean = name.trim();
@@ -789,7 +1234,7 @@ function SkillsStep({ values, update, errors }: StepProps) {
   return (
     <div className="space-y-5">
       <div>
-        <label className="block text-sm font-medium text-ink-800">
+        <label htmlFor="skills" className="block text-sm font-medium text-ink-800">
           Select Key Skills (4–7) *
         </label>
         <p className="mt-0.5 text-xs text-text-subtle">
@@ -798,8 +1243,9 @@ function SkillsStep({ values, update, errors }: StepProps) {
 
         <div className="mt-2.5 flex gap-2">
           <input
+            id="skills"
             value={draft}
-            placeholder="Type skill e.g. React, Python, UI/UX..."
+            placeholder="Type a skill, e.g. React, Sales, Excel…"
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
@@ -807,7 +1253,7 @@ function SkillsStep({ values, update, errors }: StepProps) {
                 addSkill(draft);
               }
             }}
-            className="apple-spring h-10 flex-1 rounded-[10px] border border-ink-200 bg-white px-3 text-[14px] text-ink-900 shadow-2xs outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+            className="apple-spring h-11 min-w-0 flex-1 rounded-[10px] border border-ink-200 bg-white px-3 text-[14px] text-ink-900 shadow-2xs outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 sm:h-10"
           />
           <button
             type="button"
@@ -840,6 +1286,38 @@ function SkillsStep({ values, update, errors }: StepProps) {
           </div>
         ) : null}
       </div>
+
+      {/* Non-technical skills: one tap, so nobody has to guess the exact word. */}
+      {skills.length < 7 ? (
+        <div>
+          <p className="text-xs font-medium text-ink-700">Non-technical skills</p>
+          <ul className="mt-2 flex flex-wrap gap-1.5">
+            {(allNonTech ? NON_TECH_SKILLS : NON_TECH_SKILLS.slice(0, 14))
+              .filter((s) => !skills.some((have) => have.toLowerCase() === s.toLowerCase()))
+              .map((s) => (
+                <li key={s}>
+                  <button
+                    type="button"
+                    onClick={() => addSkill(s)}
+                    className="apple-spring inline-flex min-h-11 items-center sm:min-h-9 rounded-[10px] border border-ink-200 bg-white px-2.5 text-xs font-medium text-ink-700 hover:border-brand-200 hover:bg-brand-50 hover:text-brand-700"
+                  >
+                    + {s}
+                  </button>
+                </li>
+              ))}
+            <li>
+              <button
+                type="button"
+                onClick={() => setAllNonTech((v) => !v)}
+                aria-expanded={allNonTech}
+                className="inline-flex min-h-11 items-center sm:min-h-9 px-2 text-xs font-medium text-brand-700 underline-offset-4 hover:underline"
+              >
+                {allNonTech ? "Show fewer" : `${NON_TECH_SKILLS.length - 14} more`}
+              </button>
+            </li>
+          </ul>
+        </div>
+      ) : null}
 
       {/* Selected skills with ratings cards */}
       <div className="space-y-2.5 pt-2">
@@ -973,6 +1451,15 @@ function LanguagesStep({ values, update }: StepProps) {
               </select>
 
               <div className="flex items-center gap-2 text-xs text-ink-600 font-medium">
+                <label className="flex items-center gap-1 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={lang.read !== false}
+                    onChange={(e) => updateLang(lang.id, { read: e.target.checked })}
+                    className="size-3.5 rounded-xs"
+                  />
+                  <span>Read</span>
+                </label>
                 <label className="flex items-center gap-1 cursor-pointer">
                   <input
                     type="checkbox"
@@ -1133,11 +1620,10 @@ function LocationPreferencesStep({ values, update, errors }: StepProps) {
   const locationTypes = values.locationTypes || [];
   const preferredLocations = values.preferredLocations || [];
 
-  function toggleMode(mode: string) {
-    const next = locationTypes.includes(mode)
-      ? locationTypes.filter((m) => m !== mode)
-      : [...locationTypes, mode];
-    update("locationTypes", next);
+  const needsCities = locationTypes.includes("onsite") || locationTypes.includes("hybrid");
+
+  function toggleMode(mode: (typeof WORK_MODES)[number]) {
+    update("locationTypes", cascadeWorkModes(locationTypes, mode));
   }
 
   function addCity(city: string) {
@@ -1161,6 +1647,9 @@ function LocationPreferencesStep({ values, update, errors }: StepProps) {
         <label className="block text-sm font-medium text-ink-800">
           Internship Work Modes * (Select at least one)
         </label>
+        <p className="mt-0.5 text-xs text-text-subtle">
+          Onsite includes hybrid and remote; hybrid includes remote.
+        </p>
         <div className="mt-2.5 flex flex-wrap gap-2.5">
           {WORK_MODES.map((mode) => {
             const active = locationTypes.includes(mode);
@@ -1190,17 +1679,22 @@ function LocationPreferencesStep({ values, update, errors }: StepProps) {
 
       {/* Preferred Locations (up to 5) */}
       <div>
-        <label className="block text-sm font-medium text-ink-800">
-          Preferred Work Cities (Up to 5)
+        <label htmlFor="preferredLocations" className="block text-sm font-medium text-ink-800">
+          Preferred Work Cities {needsCities ? "* (1 to 5)" : "(Up to 5)"}
         </label>
         <p className="mt-0.5 text-xs text-text-subtle">
-          Where you are open to relocating or working on-site/hybrid.
+          {needsCities
+            ? "Required for onsite or hybrid work: the cities you can work from in person."
+            : "Where you are open to relocating or working on-site/hybrid."}
         </p>
 
         <div className="mt-2.5 flex gap-2">
           <input
+            id="preferredLocations"
             value={cityDraft}
             placeholder="Type city e.g. Bengaluru, Pune, Delhi, Mumbai..."
+            aria-invalid={errors.preferredLocations ? true : undefined}
+            aria-describedby={errors.preferredLocations ? "preferredLocations-error" : undefined}
             onChange={(e) => setCityDraft(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
@@ -1238,6 +1732,12 @@ function LocationPreferencesStep({ values, update, errors }: StepProps) {
                 </button>
               ))}
           </div>
+        ) : null}
+
+        {errors.preferredLocations ? (
+          <p id="preferredLocations-error" className="mt-1 text-xs text-danger">
+            {errors.preferredLocations}
+          </p>
         ) : null}
 
         {preferredLocations.length > 0 ? (
@@ -1316,6 +1816,11 @@ function LocationPreferencesStep({ values, update, errors }: StepProps) {
             </div>
           </label>
         </div>
+        {errors.hasLaptop ? (
+          <p id="hasLaptop-error" className="mt-1 text-xs text-danger">
+            {errors.hasLaptop}
+          </p>
+        ) : null}
       </div>
     </div>
   );
@@ -1416,19 +1921,45 @@ function ProfilePreviewStep({ values, update, errors, email, onJumpStep }: StepP
                 </span>
               </div>
               <div>
-                <span className="text-xs text-text-subtle block">Graduation</span>
+                <span className="text-xs text-text-subtle block">Years</span>
                 <span className="font-semibold text-ink-900">
-                  {values.academics.yearOfGraduation || "-"} ({values.academics.status || "Pursuing"})
+                  {[values.academics.startYear, values.academics.yearOfGraduation].filter(Boolean).join(" – ") || "-"}{" "}
+                  <span className="font-normal text-text-subtle">
+                    ({values.academics.status === "Completed" ? "Completed" : "Pursuing"})
+                  </span>
                 </span>
               </div>
               <div>
-                <span className="text-xs text-text-subtle block">CGPA / Marks</span>
+                <span className="text-xs text-text-subtle block">
+                  {values.academics.scoreType === "percentage" ? "Percentage" : "CGPA"}
+                </span>
                 <span className="font-semibold tabular-nums text-ink-900">
-                  {values.academics.cgpa || "-"}
+                  {values.academics.cgpa
+                    ? values.academics.scoreType === "percentage"
+                      ? `${values.academics.cgpa}%`
+                      : `${values.academics.cgpa} / 10`
+                    : "-"}
                 </span>
               </div>
             </div>
           </div>
+
+          {[...(values.academics.professional ?? []), ...(values.academics.certifications ?? [])].length > 0 ? (
+            <div>
+              <h4 className="text-2xs font-semibold uppercase tracking-wider text-text-subtle">
+                Qualifications &amp; Certifications
+              </h4>
+              <ul className="mt-2 space-y-1 text-xs text-ink-800">
+                {[...(values.academics.professional ?? []), ...(values.academics.certifications ?? [])].map((q) => (
+                  <li key={q.id}>
+                    <span className="font-semibold">{q.name || "Untitled"}</span>
+                    {q.issuer ? <span className="text-text-subtle"> · {q.issuer}</span> : null}
+                    {q.year ? <span className="text-text-subtle"> · {q.year}</span> : null}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
 
           {/* Skills with Ratings Tile */}
           {values.skills.length > 0 ? (
@@ -1495,7 +2026,7 @@ function ProfilePreviewStep({ values, update, errors, email, onJumpStep }: StepP
                         <span className="text-text-subtle"> at {exp.company || "Project"}</span>
                       </div>
                       <span className="text-xs font-medium text-text-subtle">
-                        {exp.from} – {exp.current ? "Present" : exp.to}
+                        {monthLabel(exp.from)} – {exp.current ? "Present" : monthLabel(exp.to)}
                       </span>
                     </div>
                     {exp.description ? (
@@ -1576,8 +2107,10 @@ const STEP_VIEWS = [
 
 /* ── Form primitives ────────────────────────────────────────────────────── */
 
-const FIELD_BASE =
-  "apple-spring mt-2 h-10 w-full rounded-[10px] border bg-white px-3.5 text-[14px] text-ink-900 outline-none placeholder:text-ink-400 focus-visible:ring-[3px]";
+/** One control size for inputs and selects: 44px on touch-first widths, 40px from sm up. */
+const CONTROL =
+  "apple-spring h-11 rounded-[10px] border bg-white px-3.5 text-[14px] text-ink-900 outline-none placeholder:text-ink-400 focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:bg-ink-100 disabled:text-ink-600 sm:h-10";
+const FIELD_BASE = `${CONTROL} mt-2 w-full`;
 const FIELD_OK = "border-ink-200 focus-visible:border-brand-600 focus-visible:ring-brand-600/20";
 const FIELD_BAD = "border-danger focus-visible:border-danger focus-visible:ring-danger/20";
 
@@ -1592,6 +2125,10 @@ function Field({
   placeholder,
   inputMode,
   maxLength,
+  min,
+  max,
+  autoComplete,
+  list,
 }: {
   id: string;
   label: string;
@@ -1603,6 +2140,11 @@ function Field({
   placeholder?: string;
   inputMode?: "text" | "numeric" | "decimal" | "tel" | "email" | "url";
   maxLength?: number;
+  min?: string;
+  max?: string;
+  autoComplete?: string;
+  /** id of a <datalist> to suggest from; free text is still accepted. */
+  list?: string;
 }) {
   return (
     <div>
@@ -1618,6 +2160,10 @@ function Field({
         placeholder={placeholder}
         inputMode={inputMode}
         maxLength={maxLength}
+        min={min}
+        max={max}
+        autoComplete={autoComplete}
+        list={list}
         onChange={(e) => onChange(e.target.value)}
         aria-invalid={error ? true : undefined}
         aria-describedby={error ? `${id}-error` : undefined}
@@ -1674,53 +2220,185 @@ function TextArea({
   );
 }
 
-/* ── Validation ─────────────────────────────────────────────────────────── */
+function SelectField({
+  id,
+  label,
+  value,
+  onChange,
+  options,
+  error,
+  hint,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  options: readonly { value: string; label: string }[];
+  error?: string;
+  hint?: string;
+}) {
+  return (
+    <div>
+      <label htmlFor={id} className="block text-sm font-medium text-ink-800">
+        {label}
+      </label>
+      {hint ? <p className="mt-0.5 text-xs text-text-subtle">{hint}</p> : null}
+      <select
+        id={id}
+        name={id}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={error ? `${id}-error` : undefined}
+        className={`${FIELD_BASE} pr-8 ${error ? FIELD_BAD : FIELD_OK}`}
+      >
+        {options.map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+      {error ? (
+        <p id={`${id}-error`} className="mt-1 text-xs text-danger">
+          {error}
+        </p>
+      ) : null}
+    </div>
+  );
+}
 
-function validate(values: OnboardingDraft, step: number): Record<string, string> {
-  const errors: Record<string, string> = {};
+/** Country code + number, the same split the signup form uses. */
+function PhoneField({
+  id,
+  label,
+  code,
+  number,
+  onCode,
+  onNumber,
+  error,
+  hint,
+  disabled = false,
+}: {
+  id: string;
+  label: string;
+  code: string;
+  number: string;
+  onCode?: (value: string) => void;
+  onNumber?: (value: string) => void;
+  error?: string;
+  hint?: React.ReactNode;
+  disabled?: boolean;
+}) {
+  const codes = COUNTRY_CODES.includes(code as (typeof COUNTRY_CODES)[number]) ? COUNTRY_CODES : [code, ...COUNTRY_CODES];
+  return (
+    <div>
+      <label htmlFor={id} className="block text-sm font-medium text-ink-800">
+        {label}
+      </label>
+      <div className="mt-2 flex gap-2">
+        <select
+          aria-label={`${label}: country code`}
+          value={code}
+          disabled={disabled}
+          onChange={(e) => onCode?.(e.target.value)}
+          className={`${CONTROL} w-24 shrink-0 pr-7 ${FIELD_OK}`}
+        >
+          {codes.map((c) => (
+            <option key={c} value={c}>
+              {c}
+            </option>
+          ))}
+        </select>
+        <input
+          id={id}
+          name={id}
+          inputMode="numeric"
+          autoComplete={disabled ? undefined : "off"}
+          maxLength={code === "+91" ? 10 : 15}
+          placeholder="9876543210"
+          value={number}
+          disabled={disabled}
+          onChange={(e) => onNumber?.(e.target.value.replace(/\D/g, ""))}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error ? `${id}-error` : hint ? `${id}-hint` : undefined}
+          className={`${CONTROL} w-full min-w-0 tabular-nums ${error ? FIELD_BAD : FIELD_OK}`}
+        />
+      </div>
+      {error ? (
+        <p id={`${id}-error`} className="mt-1 text-xs text-danger">
+          {error}
+        </p>
+      ) : hint ? (
+        <p id={`${id}-hint`} className="mt-1 text-xs text-text-subtle">
+          {hint}
+        </p>
+      ) : null}
+    </div>
+  );
+}
 
-  if (step === 0) {
-    if (values.bio.trim().length < 20) {
-      errors.bio = "Write at least a sentence or two - 20 characters minimum.";
-    }
-    if (values.linkedinUrl?.trim() && !/^https?:\/\/\S+\.\S+/.test(values.linkedinUrl.trim())) {
-      errors.linkedinUrl = "That does not look like a valid URL.";
-    }
-    if (!values.city.trim()) errors.city = "City is required.";
-    if (values.pinCode && !/^\d{6}$/.test(values.pinCode)) {
-      errors.pinCode = "PIN code must be 6 digits.";
-    }
-    if (values.aadhaarNumber && !/^\d{12}$/.test(values.aadhaarNumber.replace(/\s/g, ""))) {
-      errors.aadhaarNumber = "Aadhaar number must be exactly 12 digits.";
-    }
-    if (!values.panNumber?.trim()) {
-      errors.panNumber = "PAN is required for stipend payouts.";
-    } else if (!/^[A-Z]{5}[0-9]{4}[A-Z]$/.test(values.panNumber.trim())) {
-      errors.panNumber = "PAN must look like ABCDE1234F - 5 letters, 4 digits, 1 letter.";
-    }
-  }
+/** A titled group of fields inside a step. */
+function Group({
+  title,
+  hint,
+  action,
+  children,
+}: {
+  title: string;
+  hint?: string;
+  action?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="space-y-4 border-t border-ink-100 pt-6">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="text-sm font-semibold text-ink-900">{title}</h3>
+          {hint ? <p className="mt-0.5 text-xs text-text-subtle">{hint}</p> : null}
+        </div>
+        {action}
+      </div>
+      {children}
+    </section>
+  );
+}
 
-  if (step === 1) {
-    if (!values.academics.institution.trim()) errors.institution = "Institution name is required.";
-    if (!values.academics.degree.trim()) errors.degree = "Degree is required.";
-    if (values.academics.yearOfGraduation && !/^\d{4}$/.test(values.academics.yearOfGraduation)) {
-      errors.yearOfGraduation = "Use a 4-digit graduation year.";
-    }
-  }
+/** One upload with its own title and error, inside a group. */
+function UploadSlot({
+  id,
+  title,
+  error,
+  children,
+}: {
+  id?: string;
+  title: string;
+  error?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      id={id}
+      tabIndex={id ? -1 : undefined}
+      className={`rounded-xl border p-4 outline-none ${error ? "border-danger/40 bg-danger-soft" : "border-ink-200/70"}`}
+    >
+      <p className="text-sm font-medium text-ink-800">{title}</p>
+      <div className="mt-2">{children}</div>
+      {error ? <p className="mt-2 text-xs text-danger">{error}</p> : null}
+    </div>
+  );
+}
 
-  if (step === 3) {
-    if (values.skills.length < 4) errors.skills = "Add at least 4 key skills (up to 7).";
-  }
-
-  if (step === 6) {
-    if (values.locationTypes.length === 0) errors.locationTypes = "Pick at least one work mode.";
-  }
-
-  if (step === 7 && !values.ndaAccepted) {
-    errors.ndaAccepted = "Accept the Non-Bypass Agreement to submit your profile.";
-  }
-
-  return errors;
+function RemoveButton({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      className="apple-spring -mr-2 grid size-11 place-items-center rounded-[10px] text-ink-400 hover:bg-ink-100 hover:text-danger"
+    >
+      <Trash2 className="size-4" aria-hidden />
+    </button>
+  );
 }
 
 function subscribeToNothing() {
@@ -1746,6 +2424,10 @@ function parseDraft(raw: string | null, serverUpdatedAt: string | null): Partial
     if (serverUpdatedAt) {
       const serverAt = Date.parse(serverUpdatedAt);
       if (typeof savedAt !== "number" || (Number.isFinite(serverAt) && savedAt < serverAt)) return {};
+    }
+    // Drafts from before the month pickers held free text like "Jan 2025".
+    if (Array.isArray(draft.experiences)) {
+      draft.experiences = draft.experiences.map((e) => ({ ...e, from: toMonth(e.from ?? ""), to: toMonth(e.to ?? "") }));
     }
     return draft;
   } catch {

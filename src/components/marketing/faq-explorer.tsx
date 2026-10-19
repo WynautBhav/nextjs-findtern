@@ -10,6 +10,7 @@ import { Search, X } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { cn } from "@/lib/utils";
+import { EmailLink } from "@/components/marketing/email-link";
 
 /**
  * Filterable FAQ.
@@ -33,11 +34,14 @@ export function FaqExplorer({
   className,
   showSearch = true,
   showChips = true,
+  showCategory = true,
 }: {
   items: { id: string; category: string; question: string; answer: string }[];
   className?: string;
   showSearch?: boolean;
   showChips?: boolean;
+  /** Per-row category badge. Off when the page already splits by audience. */
+  showCategory?: boolean;
 }) {
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("All");
@@ -138,9 +142,11 @@ export function FaqExplorer({
             >
               <AccordionTrigger className="px-5 py-5 text-left text-base font-medium text-ink-900 hover:no-underline sm:px-7 sm:text-lg">
                 <span className="flex-1 pr-4">{item.question}</span>
-                <span className="mr-3 hidden shrink-0 rounded-full bg-ink-100 px-2.5 py-0.5 text-2xs font-semibold uppercase tracking-[0.1em] text-ink-600 sm:inline">
-                  {item.category}
-                </span>
+                {showCategory ? (
+                  <span className="mr-3 hidden shrink-0 rounded-full bg-ink-100 px-2.5 py-0.5 text-2xs font-semibold uppercase tracking-[0.1em] text-ink-600 sm:inline">
+                    {item.category}
+                  </span>
+                ) : null}
               </AccordionTrigger>
               <AccordionContent className="px-5 pb-6 sm:px-7">
                 <p className="max-w-3xl whitespace-pre-line text-base leading-relaxed text-muted-foreground">
@@ -154,12 +160,7 @@ export function FaqExplorer({
 
       <p className="mt-8 text-sm text-ink-500">
         Showing {filtered.length} of {items.length}. Still stuck?{" "}
-        <a
-          href="mailto:admin@findtern.in"
-          className="inline-flex items-center py-1 font-medium text-primary underline underline-offset-4"
-        >
-          admin@findtern.in
-        </a>
+        <EmailLink />
       </p>
     </div>
   );

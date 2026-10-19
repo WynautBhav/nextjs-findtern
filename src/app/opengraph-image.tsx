@@ -18,7 +18,7 @@ export default async function Image() {
   const [semiBold, regular, logo] = await Promise.all([
     readFile(join(process.cwd(), "src/assets/fonts/Poppins-SemiBold.ttf")),
     readFile(join(process.cwd(), "src/assets/fonts/Poppins-Regular.ttf")),
-    readFile(join(process.cwd(), "public/media/logo-remove.png")),
+    readFile(join(process.cwd(), "public/media/findtern-logo-white.png")),
   ]);
   const logoSrc = `data:image/png;base64,${logo.toString("base64")}`;
 
@@ -39,7 +39,7 @@ export default async function Image() {
         }}
       >
         {/* eslint-disable-next-line @next/next/no-img-element -- satori needs a plain img */}
-        <img src={logoSrc} alt="" width={236} height={114} style={{ filter: "brightness(0) invert(1)", objectFit: "contain" }} />
+        <img src={logoSrc} alt="" width={266} height={80} style={{ objectFit: "contain" }} />
 
         <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
           {/* Two stacked lines: satori does not wrap text across sibling spans. */}

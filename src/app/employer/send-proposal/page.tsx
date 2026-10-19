@@ -5,6 +5,7 @@ import { ArrowLeft } from "lucide-react";
 
 import { getDb, schema } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
+import { canEmployerSeeIntern } from "@/lib/employer-pool";
 import { displayNameOf, toCandidateProfile, type CandidateSummary } from "@/lib/employer-candidates";
 import { hiredInternIds } from "@/lib/employer-visibility";
 import { employerRegion, resolvePricing, type Currency, type Pricing } from "@/lib/employer-pricing";
@@ -33,11 +34,9 @@ type ProjectOption = {
  * form. Everything but the form is gone or belongs on the candidate browser, so
  * what remains is the form plus a derived price panel.
  *
- * The candidate arrives as `?intern=<id>`. Without one the page says so instead
- * of rendering a form that cannot be filled in.
- *
- * There is no `POST /api/employer/:id/proposals` in this build - the form says
- * so on submit rather than posting into the void.
+ * The candidate arrives as `?intern=<id>`. Without one (or for someone outside
+ * the pool with no relationship to this employer) the page says so instead of
+ * rendering a form that cannot be filled in.
  */
 
 export default async function SendProposal({
@@ -94,10 +93,10 @@ export default async function SendProposal({
       const [user] = await db
         .select()
         .from(schema.users)
-        .where(and(eq(schema.users.id, internId), eq(schema.users.isActive, true)))
+        .where(and(eq(schema.users.id, internId), eq(schema.users.isActive, true), eq(schema.users.role, "intern")))
         .limit(1);
 
-      if (user) {
+      if (user && (await canEmployerSeeIntern(db, uid, user.id))) {
         const [onboarding] = await db
           .select()
           .from(schema.internOnboarding)

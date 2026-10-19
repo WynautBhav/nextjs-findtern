@@ -1,6 +1,6 @@
 import type { pricingPlans } from "@/lib/db/schema";
 import { inrMinorToUsdMinor } from "@/lib/currency";
-import { BANDS, bandFor, bandsForRegion } from "@/lib/score";
+import { BANDS, PER_HIRE_CUTOFF, bandFor, bandsForRegion } from "@/lib/score";
 
 /**
  * What a candidate costs, derived from their Findtern Score.
@@ -53,6 +53,10 @@ export function resolvePricing(
   region: "IN" | null,
 ): Pricing {
   const band = bandFor(score);
+  // The per-hire fee is charged only below the cutoff (lib/checkout.ts, the
+  // proposals route). Every band carries it in the rate card, so without this
+  // the screens quoted a fee to 6+ candidates that billing never charged.
+  const chargesPerHire = score < PER_HIRE_CUTOFF;
   // The CMS fallback must be in the employer's currency: INR band minors
   // formatted as USD once quoted a $100/hr rate that should have been $1.
   const fallbackBand =
@@ -61,7 +65,7 @@ export function resolvePricing(
     bandName: fallbackBand.name,
     bandBlurb: fallbackBand.blurb,
     hourlyRateMinor: fallbackBand.rateMinor,
-    perHireMinor: fallbackBand.perHireMinor,
+    perHireMinor: chargesPerHire ? fallbackBand.perHireMinor : 0,
     source: "default",
   };
 
@@ -96,7 +100,7 @@ export function resolvePricing(
     bandName: plan.displayName || band.name,
     bandBlurb: band.blurb,
     hourlyRateMinor: convert(plan.priceHourlyMinor),
-    perHireMinor: convert(plan.perHireChargeMinor),
+    perHireMinor: chargesPerHire ? convert(plan.perHireChargeMinor) : 0,
     source: "plan",
   };
 }

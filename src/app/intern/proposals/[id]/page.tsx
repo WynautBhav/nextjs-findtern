@@ -12,7 +12,7 @@ import { canAccess } from "@/lib/security/guards";
 import { loadInternData, projectNames } from "@/lib/intern-data";
 import { formatDayLabel, formatMoney } from "@/lib/format";
 import { toArray } from "@/lib/journey";
-import { parseOffer, internStipendInrMinor } from "@/lib/offer";
+import { FREE_DECLINES, parseOffer, internStipendInrMinor, offerPastStart } from "@/lib/offer";
 
 export const metadata: Metadata = {
   title: "Offer",
@@ -51,10 +51,19 @@ export default async function ProposalDetail({ params }: { params: Promise<{ id:
   const parsed = parseOffer(proposal.offerDetails, proposal.currency);
   const role = parsed.roleTitle || "Internship";
   const company = data.names[proposal.employerId] ?? "A company on Findtern";
-  const stipendMinor = internStipendInrMinor(parsed);
-  const stipend = stipendMinor ? formatMoney(stipendMinor, "INR") : "To be confirmed";
+  const extra = (data.onboarding?.extraData ?? {}) as Record<string, unknown>;
+  const score = Number(extra.findternScore ?? 0) || 0;
+  const stipendMinor = internStipendInrMinor(parsed, score);
+  const stipend =
+    stipendMinor === 0 ? "Not eligible for stipend" : stipendMinor ? formatMoney(stipendMinor, "INR") : "To be confirmed";
+  const declinesUsed = data.proposals.filter(
+    (p) => p.status === "rejected" && ((p.offerDetails ?? {}) as Record<string, unknown>).declinedBy === "intern",
+  ).length;
+  const guaranteeEnded = typeof extra.guaranteeEndedAt === "string";
   const startDate = parsed.startDate;
-  const status = proposalStatus(proposal.status);
+  // Unanswered on or after its start date: closed, shown as expired.
+  const lapsed = (proposal.status === "sent" || proposal.status === "interview_scheduled") && offerPastStart(startDate);
+  const status = proposalStatus(lapsed ? "expired" : proposal.status);
   const skills = toArray<string>(proposal.skills);
   const ratingRows = [
     ["Communication", ratings.communication],
@@ -63,7 +72,7 @@ export default async function ProposalDetail({ params }: { params: Promise<{ id:
     ["Overall", ratings.overall],
   ].filter(([, v]) => typeof v === "number") as [string, number][];
 
-  const decided = proposal.status !== "sent";
+  const decided = proposal.status !== "sent" || lapsed;
 
   return (
     <div>
@@ -114,7 +123,7 @@ export default async function ProposalDetail({ params }: { params: Promise<{ id:
                     label="Stipend"
                     value={
                       <span className="text-lg font-semibold tabular-nums tracking-[-0.01em] text-ink-900">
-                        {stipendMinor != null ? `${stipend} a month` : stipend}
+                        {stipendMinor ? `${stipend} a month` : stipend}
                       </span>
                     }
                   />
@@ -168,6 +177,10 @@ export default async function ProposalDetail({ params }: { params: Promise<{ id:
                   roleTitle={role}
                   company={company}
                   startDate={startDate}
+                  fullTime={Boolean(parsed.fullTime)}
+                  declinesUsed={declinesUsed}
+                  freeDeclines={FREE_DECLINES}
+                  guaranteeEnded={guaranteeEnded}
                 />
               </div>
             )}

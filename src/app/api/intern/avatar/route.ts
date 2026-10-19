@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { getSession } from "@/lib/auth";
 import { getDb, schema } from "@/lib/db";
 import { readAny } from "@/lib/security/store";
+import { canEmployerSeeIntern } from "@/lib/employer-pool";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -22,6 +23,17 @@ export async function GET(req: Request) {
   }
 
   const db = getDb();
+  // An employer gets the photo of a pool candidate or someone they already
+  // proposed to / interviewed - the same reach as the detail page.
+  if (
+    targetId !== session.uid &&
+    session.role === "employer" &&
+    !session.impersonator &&
+    !(await canEmployerSeeIntern(db, session.uid, targetId))
+  ) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   const [doc] = await db
     .select({
       profilePhotoName: schema.internDocuments.profilePhotoName,
@@ -31,17 +43,10 @@ export async function GET(req: Request) {
     .where(eq(schema.internDocuments.userId, targetId))
     .limit(1);
 
+  // Only photos uploaded to Findtern are served. This used to redirect to any
+  // http(s) URL an intern saved as their photo, which made this an open
+  // redirect on our own domain.
   if (!doc?.profilePhotoName) {
-    // Check if there is an external photoUrl in onboarding extraData
-    const [onboarding] = await db
-      .select({ extraData: schema.internOnboarding.extraData })
-      .from(schema.internOnboarding)
-      .where(eq(schema.internOnboarding.userId, targetId))
-      .limit(1);
-    const photoUrl = (onboarding?.extraData as Record<string, unknown> | undefined)?.photoUrl;
-    if (typeof photoUrl === "string" && photoUrl.startsWith("http")) {
-      return NextResponse.redirect(photoUrl);
-    }
     return NextResponse.json({ error: "No avatar uploaded" }, { status: 404 });
   }
 

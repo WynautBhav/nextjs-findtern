@@ -4,7 +4,7 @@ import { z } from "zod";
 import { createHash } from "node:crypto";
 
 import { getDb, schema } from "@/lib/db";
-import { hashPassword, isStrongPassword } from "@/lib/security/password";
+import { hashPassword, isStrongPassword, WEAK_PASSWORD_MESSAGE } from "@/lib/security/password";
 
 const bodySchema = z.object({
   token: z.string().min(1),
@@ -15,7 +15,7 @@ export async function POST(req: Request) {
   const parsed = bodySchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Invalid input" }, { status: 400 });
   if (!isStrongPassword(parsed.data.password)) {
-    return NextResponse.json({ error: "Weak password" }, { status: 400 });
+    return NextResponse.json({ error: WEAK_PASSWORD_MESSAGE }, { status: 400 });
   }
 
   const db = getDb();
@@ -31,7 +31,7 @@ export async function POST(req: Request) {
 
   const password = await hashPassword(parsed.data.password);
   if (row.subjectType === "employer") {
-    await db.update(schema.employers).set({ password }).where(eq(schema.employers.id, row.subjectId));
+    await db.update(schema.employers).set({ password, passwordChangedAt: new Date() }).where(eq(schema.employers.id, row.subjectId));
   } else {
     await db.update(schema.users).set({ password }).where(eq(schema.users.id, row.subjectId));
   }

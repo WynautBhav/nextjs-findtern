@@ -56,7 +56,7 @@ export function VerifyEmailForm({ role, initialEmail, loginHref }: { role: "inte
         e.preventDefault();
         if (step === "email") {
           void run(async () => {
-            await post("/api/auth/signup/send-otp", { email, subjectType: role });
+            await post("/api/auth/signup/send-otp", { email, subjectType: role, purpose: "verify" });
             setStep("code");
           });
         } else {

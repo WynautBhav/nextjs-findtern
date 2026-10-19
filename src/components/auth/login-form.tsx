@@ -160,16 +160,23 @@ export function LoginForm({
               or
             </span>
           </div>
-          <a
-            href={googleHref}
-            className="flex h-11 w-full items-center justify-center gap-2.5 rounded-lg border border-ink-200 bg-white px-4 text-sm font-medium text-ink-800 transition-colors [@media(any-hover:hover)]:hover:bg-ink-50"
-          >
-            <GoogleGlyph />
-            Continue with Google
-          </a>
+          <GoogleButton href={googleHref} />
         </>
       ) : null}
     </form>
+  );
+}
+
+/** The one Google button, shared by sign in and sign up. */
+export function GoogleButton({ href, label = "Continue with Google" }: { href: string; label?: string }) {
+  return (
+    <a
+      href={href}
+      className="flex h-11 w-full items-center justify-center gap-2.5 rounded-lg border border-ink-200 bg-white px-4 text-sm font-medium text-ink-800 transition-colors [@media(any-hover:hover)]:hover:bg-ink-50"
+    >
+      <GoogleGlyph />
+      {label}
+    </a>
   );
 }
 

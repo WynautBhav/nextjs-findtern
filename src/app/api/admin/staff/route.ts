@@ -5,7 +5,7 @@ import { z } from "zod";
 import { getDb, schema } from "@/lib/db";
 import { canGrant } from "@/lib/admin/permissions";
 import { requireMutation } from "@/lib/guards-mutation";
-import { hashPassword } from "@/lib/security/password";
+import { hashPassword, isStrongPassword } from "@/lib/security/password";
 
 const createStaffSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
@@ -29,6 +29,8 @@ export async function POST(req: Request) {
 
   const { name, email, password, role } = parsed.data;
   const db = getDb();
+  if (!isStrongPassword(password)) return NextResponse.json({ error: WEAK_PASSWORD }, { status: 400 });
+  if (!(await roleExists(role))) return NextResponse.json({ error: "Invalid role" }, { status: 400 });
   if (!(await mayAssign(guard.session.permissions, role))) {
     return NextResponse.json({ error: "You can only assign roles within your own permissions." }, { status: 403 });
   }
@@ -97,13 +99,18 @@ export async function PATCH(req: Request) {
   if (role && id === guard.session.uid) {
     return NextResponse.json({ error: "You can't change your own role" }, { status: 400 });
   }
+  if (password && !isStrongPassword(password)) return NextResponse.json({ error: WEAK_PASSWORD }, { status: 400 });
   const db = getDb();
+  // Who they are now matters as much as what they become: without this, anyone
+  // with roles:write could reset a super admin's password and sign in as them.
+  const [target] = await db.select({ role: schema.admins.role }).from(schema.admins).where(eq(schema.admins.id, id)).limit(1);
+  if (!target) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (!(await mayAssign(guard.session.permissions, target.role ?? ""))) {
+    return NextResponse.json({ error: "You can't change someone with more access than you." }, { status: 403 });
+  }
+  if (role && !(await roleExists(role))) return NextResponse.json({ error: "Unknown role" }, { status: 400 });
   if (role && !(await mayAssign(guard.session.permissions, role))) {
     return NextResponse.json({ error: "You can only assign roles within your own permissions." }, { status: 403 });
-  }
-  if (role) {
-    const [exists] = await db.select({ id: schema.adminRoles.id }).from(schema.adminRoles).where(eq(schema.adminRoles.key, role)).limit(1);
-    if (!exists && role !== "super_admin") return NextResponse.json({ error: "Unknown role" }, { status: 400 });
   }
   const updated = await db
     .update(schema.admins)
@@ -111,8 +118,16 @@ export async function PATCH(req: Request) {
     .where(eq(schema.admins.id, id))
     .returning({ id: schema.admins.id });
   if (updated.length === 0) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  // Takes effect at their next sign-in, when permissions are re-read.
+  // Permissions are re-read per request (cached ~30s), so this applies almost at once.
   return NextResponse.json({ ok: true });
+}
+
+const WEAK_PASSWORD = "Password is too weak. Use at least 8 characters mixing upper and lower case letters, numbers and symbols.";
+
+async function roleExists(roleKey: string): Promise<boolean> {
+  if (roleKey.toLowerCase() === "super_admin") return true;
+  const [row] = await getDb().select({ id: schema.adminRoles.id }).from(schema.adminRoles).where(eq(schema.adminRoles.key, roleKey)).limit(1);
+  return Boolean(row);
 }
 
 /** A role may be assigned only by someone who holds all of its permissions. */

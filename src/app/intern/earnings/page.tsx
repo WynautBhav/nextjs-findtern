@@ -3,11 +3,10 @@ import Link from "next/link";
 import { ArrowDownRight, ArrowRight, Clock3, Info } from "lucide-react";
 
 import { EmptyScene, PageHead, Pill, SectionHead, Surface } from "@/components/app/primitives";
-import { CountUp } from "@/components/app/count-up";
 import { requireRole } from "@/lib/auth";
 import { loadInternData } from "@/lib/intern-data";
 import { formatDayLabel, formatMoney } from "@/lib/format";
-import { parseOffer, internStipendInrMinor } from "@/lib/offer";
+import { parseOffer, internStipendInrMinor, stipendEligible } from "@/lib/offer";
 
 export const metadata: Metadata = {
   title: "Stipend",
@@ -51,9 +50,16 @@ export default async function InternEarnings() {
   const data = await loadInternData(session.uid);
   const { money } = data;
 
-  const monthly = data.engagement
-    ? (internStipendInrMinor(parseOffer(data.engagement.offerDetails, data.engagement.currency)) ?? 0)
-    : 0;
+  const score = Number(((data.onboarding?.extraData ?? {}) as Record<string, unknown>).findternScore ?? 0) || 0;
+  const eligible = stipendEligible(score);
+  const engagementOffer = data.engagement ? parseOffer(data.engagement.offerDetails, data.engagement.currency) : null;
+  const monthly = engagementOffer ? (internStipendInrMinor(engagementOffer, score) ?? 0) : 0;
+  // Legacy "remaining expected" (routes.ts:13525): the whole engagement at the
+  // intern's share, less what is paid and what is already scheduled.
+  const remainingMinor =
+    engagementOffer && monthly > 0 && money.currency === "INR"
+      ? Math.max(0, monthly * engagementOffer.months - money.paidMinor - money.incomingMinor)
+      : 0;
 
   return (
     <div>
@@ -78,7 +84,10 @@ export default async function InternEarnings() {
               <Surface className="p-6">
                 <p className="text-sm text-ink-500">Paid to you so far</p>
                 <p className="mt-2 text-3xl font-semibold tabular-nums tracking-[-0.025em] text-ink-900">
-                  <CountUp value={money.paidMinor / 100} currency={money.currency} />
+                  {/* Static, never animated: a count-up shows in-between
+                      figures (and stalls in a throttled tab), which reads as
+                      a wrong amount. INR passes through unconverted. */}
+                  {formatMoney(money.paidMinor, money.currency, { zeroLabel: false })}
                 </p>
                 <p className="mt-2 text-pretty text-sm leading-relaxed text-ink-500">
                   {money.lastPaidAt
@@ -160,6 +169,28 @@ export default async function InternEarnings() {
           </div>
 
           <aside className="space-y-4">
+            {data.engagement && !eligible ? (
+              <Surface className="p-5">
+                <SectionHead title="Your rate" />
+                <p className="mt-2 text-lg font-semibold text-ink-900">Not eligible for stipend</p>
+                <p className="mt-2 text-pretty text-sm leading-relaxed text-ink-600">
+                  Candidates with a Findtern Score below 6 are not paid a stipend. Re-scoring
+                  above 6 makes later engagements paid.
+                </p>
+              </Surface>
+            ) : null}
+            {remainingMinor > 0 ? (
+              <Surface className="p-5">
+                <SectionHead title="Still to come" />
+                <p className="mt-2 text-3xl font-semibold tabular-nums tracking-[-0.025em] text-ink-900">
+                  {formatMoney(remainingMinor, "INR")}
+                </p>
+                <p className="mt-3 text-pretty text-sm leading-relaxed text-ink-600">
+                  The rest of this internship at your monthly rate, less what has been paid or
+                  scheduled. It firms up as each month is approved.
+                </p>
+              </Surface>
+            ) : null}
             {monthly > 0 ? (
               <Surface className="p-5">
                 <SectionHead title="Your rate" />

@@ -6,6 +6,7 @@ import { requireMutation } from "@/lib/guards-mutation";
 import { getInternActivationFeeMinor } from "@/lib/platform-settings";
 import { quotePromo, recordPromoUse } from "@/lib/promo";
 import { isInternPaid, markInternPaidFlag } from "@/lib/payments";
+import { internProfileStatus } from "@/lib/profile-complete";
 import { createOrder, razorpayKeyId } from "@/lib/razorpay";
 
 const bodySchema = z.object({ promoCode: z.string().trim().min(1).optional() }).partial();
@@ -16,6 +17,16 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!guard.ok) return guard.response;
   if (await isInternPaid(id)) {
     return NextResponse.json({ error: "Your profile is already activated." }, { status: 409 });
+  }
+
+  // Profile first, then payment (dashboard order, now enforced here too).
+  const profile = await internProfileStatus(id);
+  if (!profile.complete) {
+    const missing = profile.items.filter((i) => !i.done).map((i) => i.label);
+    return NextResponse.json(
+      { error: `Complete your profile before paying. Still needed: ${missing.join(", ")}.`, missing },
+      { status: 400 },
+    );
   }
 
   const parsed = bodySchema.safeParse(await req.json().catch(() => ({})));

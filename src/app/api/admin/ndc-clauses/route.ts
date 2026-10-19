@@ -1,4 +1,5 @@
 import { asc } from "drizzle-orm";
+import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -33,5 +34,6 @@ export async function POST(req: Request) {
 
   const db = getDb();
   const [clause] = await db.insert(schema.internNonDisclosureClauses).values(parsed.data).returning();
+  revalidatePath("/", "layout"); // the public NDA page reads these
   return NextResponse.json({ clause }, { status: 201 });
 }

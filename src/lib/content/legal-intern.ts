@@ -98,7 +98,7 @@ export const INTERN_TERMS: CmsLegalDoc = {
 <p>We may update these Terms &amp; Conditions from time to time. Continued use of Findtern after any changes implies your acceptance of the revised terms.</p>
 
 <h2>10. Contact Us</h2>
-<p>For any questions about these Terms &amp; Conditions, please reach out to us at <a href="mailto:admin@findtern.in">admin@findtern.in</a>.</p>
+<p>For any questions about these Terms &amp; Conditions, please reach out to us at <a href="mailto:communicate@findtern.in">communicate@findtern.in</a>.</p>
 `.trim(),
 };
 

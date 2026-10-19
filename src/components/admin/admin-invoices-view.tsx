@@ -6,14 +6,17 @@ import { Download, Eye, FileText, Receipt, Search } from "lucide-react";
 
 import { downloadCsv } from "@/lib/admin/csv";
 import { formatDate, formatMoney } from "@/lib/format";
-import { placeOfSupply, type InvoiceBuyerProfile } from "@/lib/gst";
-import { downloadInvoice, taxInvoiceHtml, type InvoiceSeller } from "@/lib/invoice";
+import { placeOfSupply, splitGst, type InvoiceBuyerProfile } from "@/lib/gst";
+import { toInrMinor } from "@/lib/admin/money";
+import { downloadInvoice, taxInvoiceHtml, type InvoiceSeller, invoiceNumberOf } from "@/lib/invoice";
 import { StatusBadge } from "@/components/admin/status-badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 /** One payment row, from either employer orders or intern activation fees. */
 export type AdminInvoiceRow = {
   id: string;
+  /** FY serial stored at payment ("FT/2026-27/0001"); null for unpaid rows. */
+  invoiceNumber?: string | null;
   orderId: string;
   paymentId?: string | null;
   amountMinor: number;
@@ -25,6 +28,14 @@ export type AdminInvoiceRow = {
   partyName: string;
   partyEmail: string;
   buyer: InvoiceBuyerProfile;
+  /** Interns this order paid for (employer orders). */
+  interns?: string;
+  promoCode?: string | null;
+  discountMinor?: number | null;
+  /** Paid, but not every proposal could be hired - accounts should refund the difference. */
+  needsReview?: boolean;
+  /** Paid outside this ledger (only the profile's paid flag records it). */
+  flagOnly?: boolean;
 };
 
 const KINDS = {
@@ -63,6 +74,9 @@ export function AdminInvoicesView({
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("all");
   const [currency, setCurrency] = useState("all");
+  const [promo, setPromo] = useState("all");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
   const [selected, setSelected] = useState<AdminInvoiceRow | null>(null);
 
   const filtered = useMemo(() => {
@@ -71,12 +85,16 @@ export function AdminInvoicesView({
       (r) =>
         (!q || [r.orderId, r.paymentId ?? "", r.partyName, r.partyEmail].some((v) => v.toLowerCase().includes(q))) &&
         (status === "all" || (status === "paid" ? isPaid(r) : r.status === status)) &&
-        (currency === "all" || r.currency === currency),
+        (currency === "all" || r.currency === currency) &&
+        (promo === "all" || (promo === "with" ? Boolean(r.promoCode) : !r.promoCode)) &&
+        inDateRange(r.paidAt ?? r.createdAt, from, to),
     );
-  }, [rows, search, status, currency]);
+  }, [rows, search, status, currency, promo, from, to]);
 
-  const paidMinor = rows.filter(isPaid).reduce((s, r) => s + (r.amountMinor || 0), 0);
-  const pendingMinor = rows.filter((r) => !isPaid(r)).reduce((s, r) => s + (r.amountMinor || 0), 0);
+  // One currency: USD converted at ₹100/$ (adding cents to paise overstated nothing and understated USD).
+  const paidMinor = rows.filter(isPaid).reduce((s, r) => s + toInrMinor(r.amountMinor, r.currency), 0);
+  const pendingMinor = rows.filter((r) => !isPaid(r)).reduce((s, r) => s + toInrMinor(r.amountMinor, r.currency), 0);
+  const gstBase = (r: AdminInvoiceRow) => splitGst(r.amountMinor, placeOfSupply({ ...r.buyer, currency: r.currency })).baseMinor;
 
   function exportCsv() {
     downloadCsv(k.csv, filtered, [
@@ -84,9 +102,15 @@ export function AdminInvoicesView({
       { header: "Payment ID", value: (r) => r.paymentId },
       { header: k.party, value: (r) => r.partyName },
       { header: "Email", value: (r) => r.partyEmail },
+      ...(kind === "employer" ? [{ header: "Interns", value: (r: AdminInvoiceRow) => r.interns ?? "" }] : []),
       { header: "Amount", value: (r) => (r.amountMinor / 100).toFixed(2) },
       { header: "Currency", value: (r) => r.currency },
+      // 18% GST is included in INR amounts; USD (export) carries none.
+      { header: "Amount before GST", value: (r) => (gstBase(r) / 100).toFixed(2) },
+      { header: "GST", value: (r) => ((r.amountMinor - gstBase(r)) / 100).toFixed(2) },
+      { header: "Promo code", value: (r) => r.promoCode ?? "" },
       { header: "Status", value: (r) => r.status },
+      { header: "Needs review", value: (r) => (r.needsReview ? "yes" : "") },
       { header: "Paid At", value: (r) => r.paidAt },
       { header: "Created At", value: (r) => r.createdAt },
     ]);
@@ -94,7 +118,7 @@ export function AdminInvoicesView({
 
   async function printInvoice(r: AdminInvoiceRow) {
     const html = taxInvoiceHtml({
-      invoiceNo: `${k.invoicePrefix}-${r.id.slice(0, 8).toUpperCase()}`,
+      invoiceNo: invoiceNumberOf(r, k.invoicePrefix),
       date: r.paidAt || r.createdAt ? new Date((r.paidAt ?? r.createdAt)!) : new Date(),
       orderId: r.orderId,
       paymentId: r.paymentId,
@@ -104,6 +128,8 @@ export function AdminInvoicesView({
       seller,
       buyer: { ...r.buyer, place: placeOfSupply({ ...r.buyer, currency: r.currency }) },
       sac: k.sac,
+      items: r.interns ? r.interns.split("; ").filter(Boolean) : undefined,
+      promo: r.promoCode ? { code: r.promoCode, discountMinor: r.discountMinor } : null,
     });
     await downloadInvoice(html, `Invoice-${r.orderId.slice(-8).toUpperCase()}.pdf`);
   }
@@ -115,8 +141,8 @@ export function AdminInvoicesView({
     <div className="space-y-6">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <Metric label="Payments" value={String(rows.length)} />
-        <Metric label="Collected (INR)" value={formatMoney(paidMinor, "INR", { zeroLabel: false })} tone="text-brand-700" />
-        <Metric label="Not collected (INR)" value={formatMoney(pendingMinor, "INR", { zeroLabel: false })} tone="text-amber-700" />
+        <Metric label="Collected (USD at ₹100/$)" value={formatMoney(paidMinor, "INR", { zeroLabel: false })} tone="text-brand-700" />
+        <Metric label="Not collected (USD at ₹100/$)" value={formatMoney(pendingMinor, "INR", { zeroLabel: false })} tone="text-amber-700" />
       </div>
 
       <div className="rounded-2xl border border-ink-100 bg-white p-6 shadow-2xs">
@@ -158,6 +184,13 @@ export function AdminInvoicesView({
             <option value="failed">Failed</option>
             <option value="cancelled">Cancelled</option>
           </select>
+          <select value={promo} onChange={(e) => setPromo(e.target.value)} aria-label="Promo code" className={select}>
+            <option value="all">Any promo</option>
+            <option value="with">With promo code</option>
+            <option value="without">Without promo code</option>
+          </select>
+          <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} aria-label="From date" className={select} />
+          <input type="date" value={to} onChange={(e) => setTo(e.target.value)} aria-label="To date" className={select} />
         </div>
 
         <div className="mt-5 overflow-x-auto rounded-xl border border-ink-100">
@@ -194,7 +227,11 @@ export function AdminInvoicesView({
                     <td className="px-5 py-3.5 font-bold tabular-nums text-ink-900">{money(r)}</td>
                     <td className="px-5 py-3.5 font-mono text-2xs text-text-subtle">{r.paymentId || "-"}</td>
                     <td className="px-5 py-3.5">
-                      <StatusBadge value={isPaid(r) ? "paid" : r.status} />
+                      <span className="inline-flex flex-wrap items-center gap-1">
+                        <StatusBadge value={isPaid(r) ? "paid" : r.status} />
+                        {r.needsReview ? <StatusBadge tone="danger" label="Needs review" /> : null}
+                        {r.flagOnly ? <StatusBadge tone="neutral" label="Marked paid" /> : null}
+                      </span>
                     </td>
                     <td className="px-5 py-3.5 tabular-nums text-text-subtle">{formatDate(r.paidAt ?? r.createdAt)}</td>
                     <td className="px-5 py-3.5 text-right">
@@ -281,4 +318,12 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
       <dd className="text-ink-900">{children}</dd>
     </div>
   );
+}
+
+/** `YYYY-MM-DD` bounds, inclusive; empty bounds are open. */
+function inDateRange(at: string | null | undefined, from: string, to: string): boolean {
+  if (!from && !to) return true;
+  if (!at) return false;
+  const day = at.slice(0, 10);
+  return (!from || day >= from) && (!to || day <= to);
 }

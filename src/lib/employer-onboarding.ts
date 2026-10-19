@@ -107,6 +107,40 @@ export function isPersonalEmail(email: string): boolean {
   return PERSONAL_EMAIL_DOMAINS.has(domain);
 }
 
+/**
+ * Company fields every employer must fill in. Logo, GST number and the
+ * escalation contact are the optional ones (and say so on the form); the
+ * billing PIN is required only for an Indian address - see `needsBillingPincode`.
+ * One list so the onboarding form, the account form, `PATCH /api/employer/:id`
+ * and the dashboard gate cannot disagree about what "complete" means.
+ */
+export const REQUIRED_COMPANY_FIELDS = [
+  ["companyName", "Company name"],
+  ["websiteUrl", "Website"],
+  ["companySize", "Company size"],
+  ["country", "Country"],
+  ["state", "State"],
+  ["city", "City"],
+  ["primaryContactName", "Primary contact name"],
+  ["primaryContactRole", "Primary contact role"],
+  ["phoneNumber", "Phone"],
+] as const;
+
+export type RequiredCompanyField = (typeof REQUIRED_COMPANY_FIELDS)[number][0];
+
+/** India (or a blank country, which the form defaults to India) needs a billing PIN for GST. */
+export function needsBillingPincode(country: string | null | undefined): boolean {
+  const c = (country ?? "").trim();
+  return !c || /^(india|in)$/i.test(c);
+}
+
+/** Labels of the required company fields that are blank on this record. */
+export function missingCompanyFields(
+  row: Partial<Record<RequiredCompanyField, string | null | undefined>>,
+): string[] {
+  return REQUIRED_COMPANY_FIELDS.filter(([key]) => !(row[key] ?? "").trim()).map(([, label]) => label);
+}
+
 export function emptyCompany(): CompanyDraft {
   return {
     companyName: "",

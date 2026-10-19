@@ -1,7 +1,7 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 
-import { suggestSkills, skillKey, SKILLS } from "./skills.ts";
+import { suggestSkills, skillKey, SKILLS, NON_TECH_SKILLS } from "./skills.ts";
 import { suggestDistricts, stateForDistrict, DISTRICTS, STATES } from "./districts.ts";
 
 /**
@@ -40,6 +40,17 @@ describe("skills vocabulary", () => {
 
   test("normalises punctuation for matching", () => {
     assert.equal(skillKey("React.js"), skillKey("ReactJS"));
+  });
+});
+
+describe("non-technical skills", () => {
+  test("are offered without changing the legacy list", () => {
+    assert.ok(NON_TECH_SKILLS.length >= 20);
+    assert.equal(new Set(NON_TECH_SKILLS.map((s) => s.toLowerCase())).size, NON_TECH_SKILLS.length);
+  });
+
+  test("every one is findable by search, including those the legacy list lacks", () => {
+    for (const skill of NON_TECH_SKILLS) assert.equal(suggestSkills(skill)[0], skill, skill);
   });
 });
 

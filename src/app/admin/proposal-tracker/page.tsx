@@ -3,6 +3,8 @@ import { Send, CheckCircle2, Clock, Download, Sparkles } from "lucide-react";
 
 import { getDb, schema } from "@/lib/db";
 import { flattenParams } from "@/lib/admin/params";
+import { isTestEmployer } from "@/lib/admin/scope";
+import { parseOffer } from "@/lib/offer";
 import { acceptanceRate, proposalOutcome } from "@/lib/proposals";
 import { AdminPageHeader } from "@/components/admin/panel";
 import { StatCard, StatGrid } from "@/components/admin/stat-card";
@@ -97,8 +99,12 @@ export default async function AdminProposalTrackerPage({
 
   // Every figure below is computed from the same date-filtered rows, so the
   // stat cards, company cards and tables always agree with each other.
-  const rawProposals = allProposals.filter((p) => inRange(p.createdAt));
-  const rawInterviews = allInterviews.filter((i) => inRange(i.createdAt));
+  // The internal "admin" and AI-interview employers are not hiring activity.
+  const testIds = new Set(employersList.filter((e) => isTestEmployer(e)).map((e) => e.id));
+  testIds.add("admin");
+  const realEmployersList = employersList.filter((e) => !testIds.has(e.id));
+  const rawProposals = allProposals.filter((p) => inRange(p.createdAt) && !testIds.has(p.employerId));
+  const rawInterviews = allInterviews.filter((i) => inRange(i.createdAt) && !testIds.has(i.employerId));
 
   const totalCount = rawProposals.length;
   const wonTotal = rawProposals.filter((p) => proposalOutcome(p.status) === "won").length;
@@ -155,7 +161,7 @@ export default async function AdminProposalTrackerPage({
     }
   }
 
-  const trackerCompanies: TrackerCompany[] = employersList.map((emp) => ({
+  const trackerCompanies: TrackerCompany[] = realEmployersList.map((emp) => ({
     id: emp.id,
     companyName: emp.companyName,
     companyEmail: emp.companyEmail,
@@ -186,6 +192,7 @@ export default async function AdminProposalTrackerPage({
     companyName: p.companyName ?? "Unknown Company",
     projectId: p.projectId,
     projectName: p.projectName ?? "Project",
+    fullTime: parseOffer(p.offerDetails, p.currency).fullTime !== null,
   }));
 
   const trackerInterviews: TrackerInterview[] = rawInterviews.map((i) => ({

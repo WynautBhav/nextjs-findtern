@@ -49,3 +49,14 @@ test("minimum order converts for USD", () => {
   assert.notEqual(promoProblem(min, 9999, "USD"), null); // $99.99
   assert.equal(promoProblem(min, 10000, "USD"), null); // $100
 });
+
+test("promo audience and window", async () => {
+  const { promoAudienceProblem, promoWindowProblem } = await import("./promo-rules.ts");
+  assert.equal(promoAudienceProblem("both", "employer"), null);
+  assert.equal(promoAudienceProblem(undefined, "intern"), null);
+  assert.ok(promoAudienceProblem("intern", "employer"));
+  assert.ok(promoAudienceProblem("employer", "intern"));
+  assert.ok(promoWindowProblem(new Date("2026-11-02"), new Date("2026-11-01")));
+  assert.equal(promoWindowProblem(new Date("2026-11-01"), new Date("2026-11-01")), null);
+  assert.equal(promoWindowProblem(null, new Date("2026-11-01")), null);
+});

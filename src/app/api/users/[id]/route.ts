@@ -32,7 +32,13 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     .from(schema.users)
     .where(and(eq(schema.users.phoneNumber, phone), ne(schema.users.id, id)))
     .limit(1);
-  if (taken) return NextResponse.json({ error: "This phone number is already in use." }, { status: 409 });
+  // An employer's number is taken too: one phone per person across roles.
+  const [employerOwner] = await db
+    .select({ id: schema.employers.id })
+    .from(schema.employers)
+    .where(and(eq(schema.employers.countryCode, b.countryCode), eq(schema.employers.phoneNumber, phone)))
+    .limit(1);
+  if (taken || employerOwner) return NextResponse.json({ error: "This phone number is already in use." }, { status: 409 });
 
   await db
     .update(schema.users)

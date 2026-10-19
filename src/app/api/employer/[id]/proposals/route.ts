@@ -8,31 +8,56 @@ import { resolvePricing } from "@/lib/employer-pricing";
 import { requireMutation } from "@/lib/guards-mutation";
 import { emails } from "@/lib/emails";
 import { employerNames, notify } from "@/lib/notify";
-import { buildOffer } from "@/lib/offer";
+import { buildOffer, parseOffer, todayIst } from "@/lib/offer";
+import { employerRegion } from "@/lib/employer-pricing";
+import { canEmployerSeeIntern } from "@/lib/employer-pool";
+import { isBlockingInterview } from "@/lib/employer-interview-rules";
 
 const LIVE = ["draft", "sent", "accepted", "interview_scheduled", "processing"];
 
-const bodySchema = z.object({
+const bodySchema = z
+  .object({
   internId: z.string().min(1),
   projectId: z.string().min(1),
   flowType: z.enum(["direct", "interview_first"]).default("direct"),
-  currency: z.enum(["INR", "USD"]).default("INR"),
+  /** Ignored: the currency follows the company's country (India → INR). */
+  currency: z.enum(["INR", "USD"]).optional(),
+  /** The hiring-policy agreement shown before every proposal. */
+  agreedToPolicy: z.literal(true, { message: "Agree to Findtern's hiring policies to send a proposal." }),
   roleTitle: z.string().trim().min(2).max(120),
-  jd: z.string().trim().max(4000).default(""),
+  // Legacy required a job description, a city and state off-remote, the
+  // hybrid split, a shift, a timezone and the laptop answer.
+  jd: z.string().trim().min(1, "Add a job description.").max(4000),
   mode: z.enum(["remote", "hybrid", "onsite"]),
   location: z.string().trim().max(120).default(""),
+  city: z.string().trim().max(80).default(""),
+  state: z.string().trim().max(80).default(""),
+  officeDays: z.number().int().min(1).max(6).optional(),
+  homeDays: z.number().int().min(1).max(6).optional(),
   startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   duration: z.enum(["1m", "2m", "3m", "6m"]),
   monthlyHours: z.number().int().min(1).max(300),
   /** Employer's own monthly figure, major units. Omitted = hours × band rate. */
   monthlyAmount: z.number().positive().max(10_000_000).optional(),
-  shiftFrom: z.string().max(10).default(""),
-  shiftTo: z.string().max(10).default(""),
-  timezone: z.string().max(64).default("Asia/Kolkata"),
-  laptop: z.string().max(20).default(""),
+  shiftFrom: z.string().min(1, "Pick the working hours.").max(10),
+  shiftTo: z.string().min(1, "Pick the working hours.").max(10),
+  timezone: z.string().min(1, "Pick a timezone.").max(64),
+  laptop: z.string().min(1, "Say who provides the laptop.").max(20),
   paidLeavesPerMonth: z.number().int().min(0).max(10).default(0),
   skills: z.array(z.string()).max(30).default([]),
-});
+})
+  .superRefine((b, ctx) => {
+    if (b.mode !== "remote" && (!b.city || !b.state)) {
+      ctx.addIssue({ code: "custom", message: "An on-site or hybrid role needs a city and state." });
+    }
+    if (b.mode === "hybrid") {
+      if (!b.officeDays || !b.homeDays) {
+        ctx.addIssue({ code: "custom", message: "A hybrid role needs office and work-from-home days." });
+      } else if (b.officeDays + b.homeDays > 7) {
+        ctx.addIssue({ code: "custom", message: "Office and home days add up to more than a week." });
+      }
+    }
+  });
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -44,17 +69,30 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid input" }, { status: 400 });
   }
   const b = parsed.data;
-  if (b.startDate < new Date().toISOString().slice(0, 10)) {
-    return NextResponse.json({ error: "The start date can't be in the past." }, { status: 400 });
+  // An offer lapses on its start date, so the start has to be after today.
+  if (b.startDate <= todayIst()) {
+    return NextResponse.json({ error: "Pick a start date after today." }, { status: 400 });
   }
 
   const db = getDb();
+  // Indian companies are billed in INR, everyone else in USD (row 64).
+  const [employer] = await db
+    .select({ country: schema.employers.country, countryCode: schema.employers.countryCode })
+    .from(schema.employers)
+    .where(eq(schema.employers.id, id))
+    .limit(1);
+  const currency = employerRegion(employer ?? {}) === "IN" ? "INR" : "USD";
   const [project] = await db
     .select({ id: schema.projects.id })
     .from(schema.projects)
     .where(and(eq(schema.projects.id, b.projectId), eq(schema.projects.employerId, id)))
     .limit(1);
   if (!project) return NextResponse.json({ error: "Unknown project" }, { status: 404 });
+
+  // Only a pool candidate, or one this employer already works with.
+  if (!(await canEmployerSeeIntern(db, id, b.internId))) {
+    return NextResponse.json({ error: "Unknown candidate" }, { status: 404 });
+  }
 
   // One live offer per candidate per employer, across projects (legacy rule).
   const [live] = await db
@@ -79,21 +117,40 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     db.select().from(schema.users).where(eq(schema.users.id, b.internId)).limit(1),
     db.select().from(schema.internOnboarding).where(eq(schema.internOnboarding.userId, b.internId)).limit(1),
   ]);
-  if (!user || !onboarding) return NextResponse.json({ error: "Unknown candidate" }, { status: 404 });
+  if (!user || !onboarding || user.role !== "intern" || !user.isActive) {
+    return NextResponse.json({ error: "Unknown candidate" }, { status: 404 });
+  }
+  // A full-time offer that is still open blocks an internship proposal
+  // (legacy R:12767).
+  const openOffers = await db
+    .select({ offerDetails: schema.proposals.offerDetails, currency: schema.proposals.currency })
+    .from(schema.proposals)
+    .where(
+      and(
+        eq(schema.proposals.employerId, id),
+        eq(schema.proposals.internId, b.internId),
+        inArray(schema.proposals.status, [...LIVE, "hired"]),
+      ),
+    );
+  if (openOffers.some((o) => parseOffer(o.offerDetails, o.currency).fullTime)) {
+    return NextResponse.json({ error: "A full-time offer has already been sent to this candidate." }, { status: 409 });
+  }
   const { ratings } = toCandidateProfile(user, onboarding);
   const score = scoreOf(onboarding);
   if (!(score > 0)) {
     return NextResponse.json({ error: "This candidate hasn't completed the AI interview yet." }, { status: 400 });
   }
-  const [pendingInterview] = await db
-    .select({ id: schema.interviews.id })
+  // An interview booked for this project holds the offer until it happens.
+  // One whose slots have all passed no longer blocks (legacy R:12880).
+  const interviewRows = await db
+    .select()
     .from(schema.interviews)
-    .where(
-      and(eq(schema.interviews.employerId, id), eq(schema.interviews.internId, b.internId), eq(schema.interviews.status, "pending")),
-    )
-    .limit(1);
+    .where(and(eq(schema.interviews.employerId, id), eq(schema.interviews.internId, b.internId)));
+  const pendingInterview = interviewRows.find(
+    (iv) => (!iv.projectId || iv.projectId === b.projectId) && isBlockingInterview(iv),
+  );
   if (pendingInterview) {
-    return NextResponse.json({ error: "Wait for the candidate to confirm the interview slot before sending an offer." }, { status: 409 });
+    return NextResponse.json({ error: "The offer opens once the interview has happened." }, { status: 409 });
   }
   if (score < 6 && (b.duration === "3m" || b.duration === "6m")) {
     return NextResponse.json({ error: "Candidates scoring below 6 can be offered up to 2 months." }, { status: 400 });
@@ -101,9 +158,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   // Price comes from the candidate's band, never from the request.
   const plans = await db.select().from(schema.pricingPlans).where(eq(schema.pricingPlans.isActive, true));
-  const rate = resolvePricing(score, plans, b.currency, null);
+  const rate = resolvePricing(score, plans, currency, null);
   const offerDetails = buildOffer({
     ...b,
+    currency,
     hourlyRateMinor: rate.hourlyRateMinor,
     // Per-hire applies below a score of 6 only (legacy rule).
     perHireMinor: score < 6 ? rate.perHireMinor : 0,
@@ -119,8 +177,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       internId: b.internId,
       projectId: b.projectId,
       flowType: b.flowType,
-      currency: b.currency,
-      offerDetails,
+      currency,
+      offerDetails: { ...offerDetails, policyAcceptedAt: new Date().toISOString() },
       aiRatings: { communication: ratings.communication, coding: ratings.coding, aptitude: ratings.aptitude, overall: score },
       skills: b.skills,
       status: "sent",
@@ -134,7 +192,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     data: { proposalId: proposal.id },
     email: emails.proposalReceived({
       internName: user.firstName,
-      companyName: (await employerNames(id)).company,
+      // The company stays hidden from the intern until it hires them.
+      companyName: openOffers.length > 0 ? (await employerNames(id)).company : "A company on Findtern",
       role: b.roleTitle,
       proposalId: proposal.id,
     }),

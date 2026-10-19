@@ -38,7 +38,7 @@ export async function POST(req: Request) {
   }
 
   if (!employer.isActive) {
-    return NextResponse.json({ error: "This account has been deactivated. Contact support@findtern.in." }, { status: 403 });
+    return NextResponse.json({ error: "This account has been deactivated. Contact communicate@findtern.in." }, { status: 403 });
   }
 
   if (needsRehash(employer.password)) {

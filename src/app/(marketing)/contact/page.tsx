@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
+import type { ReactNode } from "react";
 import { Clock, Mail, MapPin } from "lucide-react";
 
 import { PageHero, PageSection } from "@/components/marketing/page-hero";
 import { ContactForm } from "@/components/marketing/contact-form";
-import { SITE, getGmailComposeUrl } from "@/lib/content/site";
+import { SITE } from "@/lib/content/site";
+import { EmailLink } from "@/components/marketing/email-link";
 import { JsonLd } from "@/components/seo/json-ld";
 import { breadcrumbJsonLd, webPageJsonLd } from "@/lib/seo";
 
@@ -45,8 +47,7 @@ export default function ContactPage() {
               <Detail
                 Icon={Mail}
                 label="Email"
-                value={SITE.email}
-                href={getGmailComposeUrl()}
+                value={<EmailLink subject="Findtern enquiry" className="mt-0.5 text-base" />}
               />
               <Detail Icon={MapPin} label="Based in" value={SITE.address} />
               <Detail
@@ -83,7 +84,7 @@ function Detail({
 }: {
   Icon: typeof Mail;
   label: string;
-  value: string;
+  value: ReactNode;
   href?: string;
 }) {
   return (
@@ -104,8 +105,10 @@ function Detail({
           >
             {value}
           </a>
-        ) : (
+        ) : typeof value === "string" ? (
           <p className="mt-1 text-base text-ink-800">{value}</p>
+        ) : (
+          value
         )}
       </div>
     </li>

@@ -8,9 +8,10 @@ import { ChevronRight, X } from "lucide-react";
 
 import { ButtonLink } from "@/components/ui/button";
 import { GetStartedMenu } from "@/components/layout/get-started-menu";
-import { NAV_LINKS, SITE } from "@/lib/content/site";
+import { NAV_LINKS } from "@/lib/content/site";
 import { cn } from "@/lib/utils";
 import { Logo } from "@/components/brand/logo";
+import { EmailLink } from "@/components/marketing/email-link";
 
 /**
  * Site header.
@@ -215,12 +216,7 @@ export function SiteHeader() {
               >
                 Sign in
               </Link>
-              <a
-                href={`mailto:${SITE.email}`}
-                className="text-sm text-text-subtle transition-colors hover:text-primary"
-              >
-                {SITE.email}
-              </a>
+              <EmailLink className="text-sm" />
             </div>
           </nav>
         </div>

@@ -4,6 +4,8 @@ import { desc, eq, inArray } from "drizzle-orm";
 
 import { ContactEditor } from "@/components/admin/contact-editor";
 import { ViewAsButton } from "@/components/admin/view-as-button";
+import { getSession } from "@/lib/auth";
+import { canViewAs } from "@/lib/admin/impersonation";
 import { ApprovalSelect } from "@/components/admin/approval-select";
 import { getDb, schema } from "@/lib/db";
 import { Intern360View } from "@/components/admin/intern-360-view";
@@ -28,6 +30,8 @@ export async function generateMetadata({
 
 export default async function AdminInternDetail({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  const session = await getSession();
+  const viewAs = await canViewAs(session?.uid, session?.permissions);
 
   const db = getDb();
   const [user] = await db.select().from(schema.users).where(eq(schema.users.id, id)).limit(1);
@@ -128,7 +132,7 @@ export default async function AdminInternDetail({ params }: { params: Promise<{ 
               phoneNumber: user.phoneNumber,
             }}
           />
-          <ViewAsButton targetType="intern" targetId={user.id} label="View as candidate" />
+          {viewAs ? <ViewAsButton targetType="intern" targetId={user.id} label="View as candidate" /> : null}
           <ApprovalSelect
             internId={user.id}
             value={String(((onboarding?.extraData ?? {}) as Record<string, unknown>).approvalStatus ?? "Pending")}

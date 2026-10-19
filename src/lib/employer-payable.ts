@@ -87,12 +87,13 @@ export async function payableCheckout(
 
 
   // Accepted offers awaiting payment, plus hired monthly-plan placements
-  // whose next month is due.
+  // whose next month is due. `processing` is the legacy status for an accepted
+  // offer mid-payment; without it those rows could never be paid.
   const [open, payments] = await Promise.all([
     db
       .select()
       .from(schema.proposals)
-      .where(and(eq(schema.proposals.employerId, employerId), inArray(schema.proposals.status, ["accepted", "hired"])))
+      .where(and(eq(schema.proposals.employerId, employerId), inArray(schema.proposals.status, ["accepted", "processing", "hired"])))
       .orderBy(desc(schema.proposals.updatedAt)),
     db
       .select({ status: schema.employerPayments.status, raw: schema.employerPayments.raw })
@@ -102,7 +103,7 @@ export async function payableCheckout(
   const dues = new Map(monthlyDues(open, payments).map((d) => [d.proposalId, d]));
   const proposals = open.filter(
     (p) =>
-      (p.status === "accepted" || dues.has(p.id)) && (!opts.proposalIds?.length || opts.proposalIds.includes(p.id)),
+      (p.status === "accepted" || p.status === "processing" || dues.has(p.id)) && (!opts.proposalIds?.length || opts.proposalIds.includes(p.id)),
   );
 
   let lines: PayableLine[] = [];

@@ -352,7 +352,7 @@ export function AppShell({
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
                   <a
-                    href="mailto:support@findtern.in"
+                    href="mailto:communicate@findtern.in"
                     className="flex items-center gap-2 cursor-pointer text-ink-600"
                   >
                     <HelpCircle className="size-3.5 text-ink-500" />

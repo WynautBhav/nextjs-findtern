@@ -1,5 +1,4 @@
-import { getBlogPosts, getPlans } from "@/lib/content";
-import { FAQ_EMPLOYER, FAQ_INTERN } from "@/lib/content/faq";
+import { getBlogPosts, getFaqItems, getPlans } from "@/lib/content";
 import { SITE } from "@/lib/content/site";
 import { formatMoney, formatRate } from "@/lib/format";
 import { plainTextExcerpt } from "@/lib/richtext";
@@ -16,7 +15,10 @@ export const revalidate = 3600;
  * the pages it links to.
  */
 export async function GET() {
-  const [plans, posts] = await Promise.all([getPlans(true), getBlogPosts().catch(() => [])]);
+  const [plans, posts, faqs] = await Promise.all([getPlans(true), getBlogPosts().catch(() => []), getFaqItems()]);
+  const isEmployerFaq = (f: (typeof faqs)[number]) => f.category.trim().toLowerCase().startsWith("employer");
+  const employerFaqs = faqs.filter(isEmployerFaq);
+  const internFaqs = faqs.filter((f) => !isEmployerFaq(f));
 
   const lines: string[] = [
     `# ${SITE.name}`,
@@ -33,7 +35,7 @@ export async function GET() {
     "- Findtern Score: one number out of 10 across communication, aptitude, role depth, coding and academics; the score band sets the rate",
     "- Billing: hourly rate against approved weekly timesheets, plus one fixed per-hire charge; prices in INR include GST; USD is derived at ₹100 = $1",
     "- Overseas employers: contract with Findtern for the service and pay in USD; Findtern engages and pays the intern in India (no visa, no local entity)",
-    "- Candidate guarantee: placed within the guarantee window or the refundable deposit is returned (terms at /guaranteed-internship-program)",
+    "- Candidate guarantee: placed within the guarantee window or the fee is refunded in full (terms at /guaranteed-internship-program)",
     "",
     "## Plans (INR, published rate card)",
     "",
@@ -54,10 +56,10 @@ export async function GET() {
     `- [For employers](${SITE_URL}/employers): how screening works, plans, cost calculator, hiring from outside India`,
     `- [Pricing](${SITE_URL}/pricing): the full rate card, monthly cost calculator, comparison with agencies and in-house hiring`,
     `- [For interns](${SITE_URL}/interns): the assessment, the score, the guarantee`,
-    `- [Guaranteed Internship Program](${SITE_URL}/guaranteed-internship-program): deposit, clock, refund conditions`,
+    `- [Guaranteed Internship Program](${SITE_URL}/guaranteed-internship-program): fee, clock, refund conditions`,
     `- [Open roles](${SITE_URL}/opportunities): live internship listings`,
     `- [About](${SITE_URL}/about): mission and method`,
-    `- [FAQ](${SITE_URL}/faq): ${FAQ_INTERN.length + FAQ_EMPLOYER.length} answered questions`,
+    `- [FAQ](${SITE_URL}/faq): ${faqs.length} answered questions`,
     `- [Blog](${SITE_URL}/blog): articles on hiring and interning`,
     `- [Contact](${SITE_URL}/contact)`,
     `- [Terms](${SITE_URL}/terms-and-conditions), [Intern terms](${SITE_URL}/intern-terms-and-conditions), [Employer terms](${SITE_URL}/employer-terms-and-conditions), [Privacy](${SITE_URL}/privacy)`,
@@ -71,7 +73,7 @@ export async function GET() {
   }
 
   lines.push("", "## Frequently asked", "");
-  for (const f of [...FAQ_EMPLOYER.slice(0, 8), ...FAQ_INTERN.slice(0, 8)]) {
+  for (const f of [...employerFaqs.slice(0, 8), ...internFaqs.slice(0, 8)]) {
     lines.push(`- **${tidyText(f.question)}** ${tidyText(f.answer).replace(/\s+/g, " ")}`);
   }
   lines.push("", `Full list: ${SITE_URL}/faq`, "");

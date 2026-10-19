@@ -151,7 +151,7 @@ export function LegalDocument({
         {/* ── Body ──────────────────────────────────────────────────── */}
         <article
           ref={articleRef}
-          className="prose-rt min-w-0 max-w-3xl scroll-mt-28"
+          className="prose-rt prose-legal min-w-0 max-w-3xl scroll-mt-28"
         >
           <div dangerouslySetInnerHTML={{ __html: clean }} />
         </article>
