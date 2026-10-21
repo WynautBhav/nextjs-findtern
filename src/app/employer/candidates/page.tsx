@@ -35,6 +35,7 @@ import { CandidateCard } from "@/components/employer/candidate-card";
 import { CandidateAvatar } from "@/components/employer/candidate-avatar";
 import { PageHeader, EmptyState } from "@/components/layout/page-header";
 import { cn } from "@/lib/utils";
+import { MAX_SORT_FIELDS, compareBySortFields, parseSortFields } from "@/lib/candidate-sort";
 
 export const metadata: Metadata = {
   title: "Candidates",
@@ -54,8 +55,18 @@ type Filters = {
   plan: BandId | "";
   /** Per-axis AI interview rating floors, out of 10. */
   minRatings: Ratings;
-  sort: SortKey;
+  /** Sort fields in priority order (legacy multi-field sort); empty = Findtern Score. */
+  sorts: SortKey[];
   dir: "desc" | "asc";
+  /**
+   * Legacy "Include remote candidates": with a city filter (typed or from an
+   * on-site project) remote-willing candidates from anywhere are included,
+   * ranked after the city matches; the on-site project's onsite/hybrid-only
+   * default is dropped too.
+   */
+  remote: boolean;
+  /** Legacy "Maximum skill match": rank candidates with more of the chosen skills first. */
+  skillPriority: boolean;
   view: "grid" | "list" | "table";
   pageSize: number;
   page: number;
@@ -98,6 +109,8 @@ type SearchParams = {
   page?: string | string[];
   project?: string | string[];
   pf?: string | string[];
+  remote?: string | string[];
+  sm?: string | string[];
 } & { [K in `r_${keyof Ratings}`]?: string | string[] };
 
 export default async function CandidatesPage({
@@ -218,12 +231,15 @@ export default async function CandidatesPage({
     const project = projectRows.find((p) => p.id === activeProjectId);
     let skillTerms = filters.skills;
     let cityText = filters.city;
+    // Picking the Remote work mode means "remote candidates": a remote hire's
+    // home city does not matter, so it behaves as "include remote" too.
+    const includeRemote = filters.remote || filters.mode === "remote";
     if (project && filters.projectDefaults) {
       const projectSkills = (Array.isArray(project.skills) ? project.skills : []).filter(Boolean).slice(0, 7);
       const onsite = Boolean(project.locationType && project.locationType !== "remote");
       if (skillTerms.length === 0) skillTerms = projectSkills;
       if (!cityText && onsite && project.city) cityText = project.city;
-      if (onsite && !filters.mode) {
+      if (onsite && !filters.mode && !includeRemote) {
         clauses.push(
           sql`((${schema.internOnboarding.locationTypes})::text ILIKE '%onsite%' OR (${schema.internOnboarding.locationTypes})::text ILIKE '%hybrid%')`,
         );
@@ -233,7 +249,7 @@ export default async function CandidatesPage({
           name: project.projectName,
           skills: skillTerms === filters.skills ? [] : skillTerms,
           city: cityText === filters.city ? "" : cityText,
-          onsite,
+          onsite: onsite && !filters.mode && !includeRemote,
         };
       }
     }
@@ -254,15 +270,14 @@ export default async function CandidatesPage({
     // rank higher, as legacy did (dashboard:2639).
     const cityList = cityTerms(cityText);
     if (cityList.length > 0) {
-      clauses.push(
-        sql`(${sql.join(
-          cityList.map(
-            (c) =>
-              sql`(lower(${schema.internOnboarding.city}) LIKE ${`%${c}%`} OR lower((${schema.internOnboarding.preferredLocations})::text) LIKE ${`%${c}%`})`,
-          ),
-          sql` OR `,
-        )})`,
+      const inCity = cityList.map(
+        (c) =>
+          sql`(lower(${schema.internOnboarding.city}) LIKE ${`%${c}%`} OR lower((${schema.internOnboarding.preferredLocations})::text) LIKE ${`%${c}%`})`,
       );
+      // "Include remote": anyone open to remote work qualifies wherever they
+      // live; the city matches still rank first (cityMatches below).
+      if (includeRemote) inCity.push(sql`(${schema.internOnboarding.locationTypes})::text ILIKE '%remote%'`);
+      clauses.push(sql`(${sql.join(inCity, sql` OR `)})`);
     }
 
     if (filters.laptop === "yes") {
@@ -328,16 +343,15 @@ export default async function CandidatesPage({
     // The chosen axis first, then score, then initials - a stable order matters
     // when two candidates tie and pagination would otherwise reshuffle them.
     // (Initials, never the name: the pool is redacted until hire.)
-    const valueOf = (p: CandidateProfile) => (filters.sort === "score" ? p.score : p.ratings[filters.sort]);
-    const sign = filters.dir === "asc" ? -1 : 1;
     const cityMatches = (p: CandidateProfile) => {
-      if (cityList.length < 2) return 0;
+      // One city only ranks when remote candidates are mixed in with it.
+      if (cityList.length < (includeRemote ? 1 : 2)) return 0;
       const hay = [p.city, ...p.preferredLocations].join("|").toLowerCase();
       return cityList.filter((c) => hay.includes(c)).length;
     };
     const lowered = skillTerms.map((t) => t.toLowerCase());
     const skillMatches = (p: CandidateProfile) => {
-      if (lowered.length < 2) return 0;
+      if (!filters.skillPriority || lowered.length < 2) return 0;
       const have = p.skills.map((x) => x.toLowerCase());
       return lowered.filter((t) => have.some((h) => h.includes(t))).length;
     };
@@ -345,7 +359,7 @@ export default async function CandidatesPage({
       (a, b) =>
         skillMatches(b) - skillMatches(a) ||
         cityMatches(b) - cityMatches(a) ||
-        sign * (valueOf(b) - valueOf(a)) ||
+        compareBySortFields(a, b, filters.sorts, filters.dir) ||
         b.score - a.score ||
         a.initials.localeCompare(b.initials) ||
         a.id.localeCompare(b.id),
@@ -453,6 +467,39 @@ export default async function CandidatesPage({
           </div>
         </div>
 
+        <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-2">
+          <label className="inline-flex min-h-11 cursor-pointer items-center gap-2.5 text-sm text-ink-700">
+            <input
+              type="checkbox"
+              name="remote"
+              value="1"
+              defaultChecked={filters.remote}
+              className="size-4 rounded border-ink-300 accent-brand-700"
+            />
+            <span>
+              <span className="font-medium text-ink-900">Include remote candidates</span>
+              <span className="block text-xs text-text-subtle">
+                With a city or an on-site project, also show interns open to remote work from anywhere.
+              </span>
+            </span>
+          </label>
+          <label className="inline-flex min-h-11 cursor-pointer items-center gap-2.5 text-sm text-ink-700">
+            {/* Unchecked boxes send nothing, so a hidden 0 marks "off"; a checked box adds sm=1 after it. */}
+            <input type="hidden" name="sm" value="0" />
+            <input
+              type="checkbox"
+              name="sm"
+              value="1"
+              defaultChecked={filters.skillPriority}
+              className="size-4 rounded border-ink-300 accent-brand-700"
+            />
+            <span>
+              <span className="font-medium text-ink-900">Maximum skill match first</span>
+              <span className="block text-xs text-text-subtle">Rank interns with more of the chosen skills higher.</span>
+            </span>
+          </label>
+        </div>
+
         <details
           className="group mt-4 border-t border-ink-100 pt-4"
           open={hasAdvancedFilters(filters) || undefined}
@@ -460,9 +507,9 @@ export default async function CandidatesPage({
           <summary className="inline-flex min-h-11 cursor-pointer list-none items-center gap-2 text-sm font-semibold text-ink-700 hover:text-brand-700">
             <SlidersHorizontal className="size-4" aria-hidden />
             More filters
-            <span className="text-xs font-normal text-text-subtle">Plan, AI interview ratings, sort order</span>
+            <span className="text-xs font-normal text-text-subtle">Plan, AI interview ratings, multi-field sort</span>
           </summary>
-          <div className="mt-3 grid gap-4 sm:grid-cols-2 md:grid-cols-4 xl:grid-cols-8">
+          <div className="mt-3 grid gap-4 sm:grid-cols-2 md:grid-cols-4 xl:grid-cols-5">
             <SelectQuery
               name="plan"
               label="Plan"
@@ -484,12 +531,19 @@ export default async function CandidatesPage({
                 options={RATING_FLOORS}
               />
             ))}
-            <SelectQuery
-              name="sort"
-              label="Sort by"
-              defaultValue={filters.sort === "score" ? "" : filters.sort}
-              options={SORT_OPTIONS.map((o) => ({ value: o.value === "score" ? "" : o.value, label: o.label }))}
-            />
+            {Array.from({ length: MAX_SORT_FIELDS }, (_, i) => (
+              <SelectQuery
+                key={i}
+                name="sort"
+                id={`filter-sort-${i}`}
+                label={i === 0 ? "Sort by" : "Then by"}
+                defaultValue={filters.sorts[i] ?? ""}
+                options={[
+                  { value: "", label: i === 0 ? "Findtern Score" : "None" },
+                  ...SORT_OPTIONS.filter((o) => i > 0 || o.value !== "score"),
+                ]}
+              />
+            ))}
             <SelectQuery
               name="dir"
               label="Order"
@@ -712,16 +766,14 @@ export default async function CandidatesPage({
                             <span className="text-2xs text-ink-600">-</span>
                           )}
                         </td>
-                        <td className="px-5 py-3.5 max-w-[220px]">
+                        <td className="px-5 py-3.5 min-w-[220px] max-w-[320px]">
+                          {/* Every skill (at most seven), never "+N". */}
                           <div className="flex flex-wrap gap-1">
-                            {c.skills.slice(0, 3).map((s) => (
-                              <span key={s} className="rounded-md bg-ink-100 px-1.5 py-0.5 text-2xs font-medium text-ink-700 truncate max-w-[100px]">
+                            {c.skills.map((s) => (
+                              <span key={s} className="rounded-md bg-ink-100 px-1.5 py-0.5 text-2xs font-medium text-ink-700">
                                 {s}
                               </span>
                             ))}
-                            {c.skills.length > 3 ? (
-                              <span className="text-2xs text-ink-600">+{c.skills.length - 3}</span>
-                            ) : null}
                           </div>
                         </td>
                         <td className="px-5 py-3.5 text-right">
@@ -829,7 +881,6 @@ function readFilters(params: SearchParams): Filters {
   const view: "grid" | "list" | "table" =
     viewRaw === "list" || viewRaw === "table" ? viewRaw : "grid";
   const planRaw = (one(params.plan) ?? "").trim();
-  const sortRaw = (one(params.sort) ?? "").trim();
   const floor = (raw: string | string[] | undefined) => {
     const n = Number(one(raw) ?? "0");
     return Number.isFinite(n) && n > 0 ? Math.min(10, n) : 0;
@@ -853,8 +904,11 @@ function readFilters(params: SearchParams): Filters {
       aptitude: floor(params.r_aptitude),
       interview: floor(params.r_interview),
     },
-    sort: SORT_OPTIONS.some((o) => o.value === sortRaw) ? (sortRaw as SortKey) : "score",
+    sorts: parseSortFields(params.sort),
     dir: one(params.dir) === "asc" ? "asc" : "desc",
+    remote: ["1", "true", "on"].includes(one(params.remote) ?? ""),
+    // Absent = on (the default); the form sends sm=0, plus sm=1 when ticked.
+    skillPriority: params.sm === undefined || (Array.isArray(params.sm) ? params.sm : [params.sm]).includes("1"),
     view,
     pageSize,
     page: Number.isFinite(page) && page > 0 ? Math.floor(page) : 1,
@@ -874,7 +928,7 @@ function readFilters(params: SearchParams): Filters {
 function hasAdvancedFilters(filters: Filters): boolean {
   return (
     Boolean(filters.plan) ||
-    filters.sort !== "score" ||
+    filters.sorts.length > 0 ||
     filters.dir === "asc" ||
     RATING_META.some((meta) => filters.minRatings[meta.key] > 0)
   );
@@ -927,8 +981,10 @@ function queryOf(merged: Filters): string {
     const value = merged.minRatings[meta.key];
     if (value > 0) next.set(`r_${meta.key}`, String(value));
   }
-  if (merged.sort !== "score") next.set("sort", merged.sort);
+  if (merged.sorts.length > 0) next.set("sort", merged.sorts.join(","));
   if (merged.dir === "asc") next.set("dir", "asc");
+  if (merged.remote) next.set("remote", "1");
+  if (!merged.skillPriority) next.set("sm", "0");
   if (merged.view && merged.view !== "grid") next.set("view", merged.view);
   if (merged.pageSize && merged.pageSize !== 24) next.set("pageSize", String(merged.pageSize));
   if (merged.project) next.set("project", merged.project);
@@ -956,6 +1012,8 @@ function ActiveFilters({ filters }: { filters: Filters }) {
     filters.minScore > 0 ||
     filters.skills.length > 0 ||
     filters.laptop ||
+    filters.remote ||
+    !filters.skillPriority ||
     hasAdvancedFilters(filters);
   if (!active) return null;
   return (
@@ -1009,23 +1067,25 @@ function TextQuery({
 
 function SelectQuery({
   name,
+  id = `filter-${name}`,
   label,
   defaultValue,
   options,
 }: {
   name: string;
+  id?: string;
   label: string;
   defaultValue: string;
   options: { value: string; label: string }[];
 }) {
   return (
     <div className="min-w-0">
-      <label htmlFor={`filter-${name}`} className="block text-xs font-semibold text-ink-700">
+      <label htmlFor={id} className="block text-xs font-semibold text-ink-700">
         {label}
       </label>
       <div className="relative mt-2">
         <select
-          id={`filter-${name}`}
+          id={id}
           name={name}
           defaultValue={defaultValue}
           className="apple-spring min-h-11 w-full appearance-none rounded-[10px] border border-ink-200/90 bg-white/90 px-3.5 pr-8 text-[14px] text-ink-900 shadow-2xs outline-none placeholder:text-ink-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"

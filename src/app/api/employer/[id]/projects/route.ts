@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
+import { projectLocationsError } from "@/lib/project-locations";
 
 const bodySchema = z.object({
   projectName: z.string().min(2),
@@ -26,6 +27,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   const parsed = bodySchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid input" }, { status: 400 });
+  // A new project has no legacy list to keep: at most three places.
+  const locationProblem = projectLocationsError(parsed.data.preferredLocations ?? []);
+  if (locationProblem) return NextResponse.json({ error: locationProblem }, { status: 400 });
 
   const db = getDb();
   // Project names are unique per employer, ignoring case (legacy R:10682).

@@ -46,7 +46,7 @@ const MODE: Record<string, string> = { remote: "Remote", hybrid: "Hybrid", onsit
  * yours. Checking only the first is the legacy IDOR. A proposal belonging to
  * another employer is a `notFound()`, not a 403.
  *
- * Layout: the four numbers an employer decides on (monthly, total, start,
+ * Layout: the four numbers an employer decides on (monthly, hours, start,
  * length) sit in one strip under the title; the terms the candidate reads
  * follow in the order they read them; status and the next action stay in the
  * side column.
@@ -134,7 +134,8 @@ export default async function EmployerProposalDetail({
       ]
     : [
         ["Monthly", offer.monthlyMinor != null ? formatMoney(offer.monthlyMinor, currency) : "-"],
-        ["Total", offer.totalMinor != null ? formatMoney(offer.totalMinor, currency) : "-"],
+        // One month's amount only (client QA) - no monthly × months total.
+        ["Hours / month", offer.monthlyHours ? `${offer.monthlyHours} h` : "-"],
         ["Starts", offer.startDate ? formatDate(offer.startDate) : "-"],
         ["Length", `${offer.months} month${offer.months === 1 ? "" : "s"}`],
       ];
@@ -200,7 +201,7 @@ export default async function EmployerProposalDetail({
               <dl className="mt-4 grid gap-x-6 gap-y-4 sm:grid-cols-3">
                 <Detail label="Hours per month">{offer.monthlyHours ? `${offer.monthlyHours} h` : "-"}</Detail>
                 <Detail label="Hourly rate">{offer.hourlyRateMinor ? `${formatMoney(offer.hourlyRateMinor, currency)}/h` : "-"}</Detail>
-                <Detail label="Per-hire charge">{offer.perHireMinor ? formatMoney(offer.perHireMinor, currency) : "None"}</Detail>
+                {offer.perHireMinor ? <Detail label="Per-hire charge">{formatMoney(offer.perHireMinor, currency)}</Detail> : null}
                 <Detail label="Paid leave">{offer.paidLeavesPerMonth ? `${offer.paidLeavesPerMonth} days a month` : "None"}</Detail>
                 <Detail label="Working hours">
                   {offer.shiftFrom && offer.shiftFrom !== "flexible" ? `${offer.shiftFrom}–${offer.shiftTo}` : "Flexible"}

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray } from "drizzle-orm";
 
 import { getDb, schema } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
@@ -90,6 +90,21 @@ export default async function EmployerCartPage() {
           ),
         );
       const settledPairs = new Set(settled.map((r) => `${r.projectId}:${r.internId}`));
+      // An offer already out (one live offer per candidate, on any project):
+      // the line links to it instead of offering "Send Proposal" again, which
+      // made a sent proposal look like it had gone nowhere.
+      const openRows = await db
+        .select({ id: schema.proposals.id, internId: schema.proposals.internId, projectId: schema.proposals.projectId })
+        .from(schema.proposals)
+        .where(
+          and(
+            eq(schema.proposals.employerId, uid),
+            inArray(schema.proposals.status, ["draft", "sent", "interview_scheduled"]),
+          ),
+        )
+        .orderBy(desc(schema.proposals.createdAt));
+      const openProposal = new Map<string, string>();
+      for (const row of openRows) if (!openProposal.has(row.internId)) openProposal.set(row.internId, row.id);
 
       const projectIds = Array.from(new Set(items.map((item) => item.projectId)));
 
@@ -136,6 +151,7 @@ export default async function EmployerCartPage() {
           candidate,
           hourlyRateMinor: pricing.hourlyRateMinor,
           perHireMinor: pricing.perHireMinor,
+          openProposalId: openProposal.get(item.internId) ?? null,
         };
       };
 

@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
+import { projectLocationsError } from "@/lib/project-locations";
 
 const bodySchema = z.object({
   projectName: z.string().min(2).optional(),
@@ -33,6 +34,13 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   const [project] = await db.select().from(schema.projects).where(eq(schema.projects.id, id)).limit(1);
   if (!project) return NextResponse.json({ error: "Not found" }, { status: 404 });
   if (project.employerId !== guard.session.uid) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+  // At most three preferred locations, except that a project saved under the
+  // old limit of five may resave the places it already has.
+  if (parsed.data.preferredLocations) {
+    const locationProblem = projectLocationsError(parsed.data.preferredLocations, project.preferredLocations ?? []);
+    if (locationProblem) return NextResponse.json({ error: locationProblem }, { status: 400 });
+  }
 
   // Project names are unique per employer, ignoring case (legacy R:10740).
   if (parsed.data.projectName) {

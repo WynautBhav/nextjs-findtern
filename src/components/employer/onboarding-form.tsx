@@ -9,6 +9,8 @@ import { isIndiaCountry } from "@/lib/data/countries";
 import { suggestSkills } from "@/lib/data/skills";
 import { csrfFetch } from "@/lib/client-fetch";
 import { phoneError } from "@/lib/phone";
+import { websiteDomainError } from "@/lib/company-domain";
+import { MAX_PROJECT_LOCATIONS, projectLocationsError } from "@/lib/project-locations";
 import {
   ArrowLeft,
   ArrowRight,
@@ -107,7 +109,14 @@ export function EmployerOnboardingForm({
   const values = useMemo<OnboardingDraft>(() => {
     const draft = parseDraft(stored);
     return {
-      company: { ...initial.company, ...draft.company, ...edits.company },
+      // The company email is the sign-up login: always the server's value,
+      // never a browser draft or an edit.
+      company: {
+        ...initial.company,
+        ...draft.company,
+        ...edits.company,
+        companyEmail: initial.company.companyEmail,
+      },
       project: { ...initial.project, ...draft.project, ...edits.project },
     };
   }, [initial, stored, edits]);
@@ -157,7 +166,9 @@ export function EmployerOnboardingForm({
     try {
       // The form names the primary contact's number after the contact; the
       // table stores it as the account's own country code + phone number.
-      const { primaryContactCountryCode, primaryContactPhone, ...company } = values.company;
+      // companyEmail is read-only (the route ignores it), so it is not sent.
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { primaryContactCountryCode, primaryContactPhone, companyEmail, ...company } = values.company;
       const res = await csrfFetch(`/api/employer/${employerId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -179,7 +190,7 @@ export function EmployerOnboardingForm({
   }
 
   async function onSaveProject() {
-    const problems = validateStage(values, 1);
+    const problems = validateStage(values, 1, hasExistingProject ? initial.project.preferredLocations : []);
     setErrors(problems);
     if (Object.keys(problems).length > 0) return;
 
@@ -394,17 +405,22 @@ function CompanyStage({
           id="companyEmail"
           label="Company email"
           type="email"
-          placeholder="hiring@acme.com"
           value={values.companyEmail}
           error={errors.companyEmail}
-          hint="Work address only - a Gmail or Outlook mailbox is rejected here."
-          onChange={(v) => setCompany({ companyEmail: v })}
+          hint="Your sign-up email. It cannot be changed here."
+          readOnly
+          onChange={() => {}}
         />
         <Field
           id="websiteUrl"
           label="Website"
           type="url"
-          placeholder="acme.com"
+          placeholder={companyDomainOf(values.companyEmail) || "acme.com"}
+          hint={
+            companyDomainOf(values.companyEmail)
+              ? `Must be on ${companyDomainOf(values.companyEmail)} (subdomains are fine).`
+              : undefined
+          }
           value={values.websiteUrl}
           error={errors.websiteUrl}
           onChange={(v) => setCompany({ websiteUrl: v })}
@@ -509,8 +525,7 @@ function CompanyStage({
           Escalation contact
         </legend>
         <p className="mt-0.5 text-xs text-text-subtle">
-          Optional. Used when the primary contact is unreachable mid-internship. Fill all
-          four or none.
+          Required. Used when the primary contact is unreachable mid-internship.
         </p>
         <div className="mt-4 space-y-5">
           <div className="grid gap-5 sm:grid-cols-2">
@@ -684,11 +699,11 @@ function ProjectStage({
       <ChipInput
         id="preferredLocations"
         label="Preferred locations"
-        hint="Optional. Up to 5 cities - pick from the suggestions or type your own."
+        hint={`Optional. Up to ${MAX_PROJECT_LOCATIONS} cities - pick from the suggestions or type your own.`}
         placeholder="Bengaluru"
         suggest={(q) => districtOptions(q).map((d) => d.district)}
         entries={values.preferredLocations}
-        max={5}
+        max={MAX_PROJECT_LOCATIONS}
         draft={placeDraft}
         onDraftChange={setPlaceDraft}
         onAdd={(place) => setProject({ preferredLocations: [...values.preferredLocations, place] })}
@@ -772,6 +787,7 @@ function Field({
   placeholder,
   inputMode,
   maxLength,
+  readOnly,
 }: {
   id: string;
   label: string;
@@ -783,6 +799,7 @@ function Field({
   placeholder?: string;
   inputMode?: "text" | "numeric" | "decimal" | "tel" | "email" | "url";
   maxLength?: number;
+  readOnly?: boolean;
 }) {
   return (
     <div>
@@ -798,10 +815,12 @@ function Field({
         placeholder={placeholder}
         inputMode={inputMode}
         maxLength={maxLength}
+        readOnly={readOnly}
+        aria-readonly={readOnly || undefined}
         onChange={(e) => onChange(e.target.value)}
         aria-invalid={error ? true : undefined}
         aria-describedby={error ? `${id}-error` : undefined}
-        className={`${FIELD_BASE} ${error ? FIELD_BAD : FIELD_OK}`}
+        className={`${FIELD_BASE} ${error ? FIELD_BAD : FIELD_OK} ${readOnly ? "cursor-not-allowed bg-ink-50 text-ink-600" : ""}`}
       />
       {error ? (
         <p id={`${id}-error`} className="mt-1.5 text-xs text-danger">
@@ -1012,7 +1031,9 @@ function ChipInput({
 
       {full ? (
         <p className="mt-1.5 text-xs text-text-subtle">
-          {entries.length} of {max} used. Remove one to swap it out.
+          {entries.length > max
+            ? `Saved under an older limit. You can keep these, but adding a new one needs ${entries.length - max + 1} removed.`
+            : `${entries.length} of ${max} used. Remove one to swap it out.`}
         </p>
       ) : null}
 
@@ -1044,41 +1065,31 @@ function ChipInput({
 
 /* ── Validation ──────────────────────────────────────────────────────────── */
 
-/** A domain with a dot and a 2+ character TLD - the legacy websiteUrl rule. */
-function looksLikeHost(raw: string): boolean {
-  const value = raw.trim();
-  if (!value) return false;
-  const normalised = /^https?:\/\//i.test(value) ? value : `https://${value}`;
-  try {
-    const url = new URL(normalised);
-    if (url.protocol !== "http:" && url.protocol !== "https:") return false;
-    const host = url.hostname.trim();
-    return host.includes(".") && (host.split(".").pop() ?? "").length >= 2;
-  } catch {
-    return false;
-  }
+/** The company domain the website must match, or "" for a personal-mailbox login. */
+function companyDomainOf(email: string): string {
+  const e = email.trim();
+  if (!e.includes("@") || isPersonalEmail(e)) return "";
+  return e.split("@").pop()!.toLowerCase();
 }
 
-function validateStage(values: OnboardingDraft, stage: number): Record<string, string> {
+function validateStage(
+  values: OnboardingDraft,
+  stage: number,
+  storedLocations: readonly string[] = [],
+): Record<string, string> {
   const errors: Record<string, string> = {};
 
   if (stage === 0) {
     const c = values.company;
     if (c.companyName.trim().length < 2) errors.companyName = "Company name is required.";
+    // The email is the read-only sign-up login, so it is not validated here;
+    // the website must sit on its domain (the route checks the same rule).
+    const email = c.companyEmail.trim();
     if (!c.websiteUrl.trim()) {
       errors.websiteUrl = "Website is required.";
-    } else if (!looksLikeHost(c.websiteUrl)) {
-      errors.websiteUrl = "That does not look like a website - try acme.com.";
-    }
-
-    const email = c.companyEmail.trim();
-    if (!email) {
-      errors.companyEmail = "Company email is required.";
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      errors.companyEmail = "Enter a valid email address.";
-    } else if (isPersonalEmail(email)) {
-      errors.companyEmail =
-        "Use your company domain. Personal mailboxes cannot register an employer account.";
+    } else {
+      const problem = websiteDomainError(c.websiteUrl, email, { skipDomainCheck: !companyDomainOf(email) });
+      if (problem) errors.websiteUrl = problem;
     }
 
     if (!c.companySize) errors.companySize = "Select a company size.";
@@ -1104,30 +1115,28 @@ function validateStage(values: OnboardingDraft, stage: number): Record<string, s
     const primaryPhoneProblem = phoneError(c.primaryContactCountryCode, c.primaryContactPhone);
     if (primaryPhoneProblem) errors.primaryContactPhone = primaryPhoneProblem;
 
-    // All-or-nothing, mirroring the legacy superRefine on the setup form.
-    const escalation = [
-      c.escalationContactName,
-      c.escalationContactRole,
-      c.escalationContactEmail,
-      c.escalationContactPhone,
-    ];
-    if (escalation.some((field) => field.trim())) {
-      if (escalation.some((field) => !field.trim())) {
-        errors.escalationContactName =
-          "Fill in every escalation field or none of them.";
-      } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(c.escalationContactEmail.trim())) {
-        errors.escalationContactEmail = "Enter a valid email address.";
-      } else if (
-        c.escalationContactEmail.trim().toLowerCase() === email.toLowerCase()
-      ) {
-        errors.escalationContactEmail = "That is already the primary contact email.";
-      } else {
-        const escalationPhoneProblem = phoneError(
-          c.escalationContactCountryCode,
-          c.escalationContactPhone,
-        );
-        if (escalationPhoneProblem) errors.escalationContactPhone = escalationPhoneProblem;
-      }
+    // The escalation contact is mandatory: name, role, email and phone.
+    if (!c.escalationContactName.trim()) {
+      errors.escalationContactName = "An escalation contact name is required.";
+    }
+    if (!c.escalationContactRole.trim()) {
+      errors.escalationContactRole = "Their role is required.";
+    }
+    const escalationEmail = c.escalationContactEmail.trim();
+    if (!escalationEmail) {
+      errors.escalationContactEmail = "An escalation contact email is required.";
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(escalationEmail)) {
+      errors.escalationContactEmail = "Enter a valid email address.";
+    } else if (isPersonalEmail(escalationEmail)) {
+      errors.escalationContactEmail = "Use a company email for the escalation contact.";
+    } else if (escalationEmail.toLowerCase() === email.toLowerCase()) {
+      errors.escalationContactEmail = "That is already the primary contact email.";
+    }
+    if (!c.escalationContactPhone.trim()) {
+      errors.escalationContactPhone = "An escalation contact phone is required.";
+    } else {
+      const escalationPhoneProblem = phoneError(c.escalationContactCountryCode, c.escalationContactPhone);
+      if (escalationPhoneProblem) errors.escalationContactPhone = escalationPhoneProblem;
     }
   }
 
@@ -1147,9 +1156,9 @@ function validateStage(values: OnboardingDraft, stage: number): Record<string, s
         errors.projectPincode = "A PIN code is 6 digits.";
       }
     }
-    if (p.preferredLocations.length > 5) {
-      errors.preferredLocations = "Five locations is the limit.";
-    }
+    // An existing project saved under the old limit of five keeps its list.
+    const locationProblem = projectLocationsError(p.preferredLocations, storedLocations);
+    if (locationProblem) errors.preferredLocations = locationProblem;
   }
 
   return errors;
@@ -1209,10 +1218,10 @@ function pick(value: unknown, keys: readonly string[]): Record<string, unknown> 
   return out;
 }
 
+// companyEmail is deliberately absent: it is read-only and always the server's.
 const COMPANY_KEYS = [
   "companyName",
   "websiteUrl",
-  "companyEmail",
   "logoUrl",
   "companySize",
   "country",

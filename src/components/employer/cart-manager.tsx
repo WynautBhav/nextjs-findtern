@@ -38,6 +38,8 @@ export type CartLineItem = {
   candidate: CandidateProfile;
   hourlyRateMinor: number;
   perHireMinor: number;
+  /** A proposal already out to this candidate (any project), if any. */
+  openProposalId?: string | null;
 };
 
 export function CartManager({
@@ -253,7 +255,7 @@ export function CartManager({
                         {line.candidate.location ? ` · ${line.candidate.location}` : ""}
                       </p>
                       <div className="mt-2 flex flex-wrap gap-1.5">
-                        {line.candidate.skills.slice(0, 5).map((s) => (
+                        {line.candidate.skills.map((s) => (
                           <span key={s} className="rounded-md bg-ink-100 px-2 py-0.5 text-xs font-medium text-ink-700">
                             {s}
                           </span>
@@ -297,13 +299,23 @@ export function CartManager({
                       <span>Book Meeting</span>
                     </button>
 
-                    <Link
-                      href={`/employer/send-proposal?intern=${encodeURIComponent(line.candidate.id)}&project=${encodeURIComponent(line.projectId)}`}
-                      className="apple-spring apple-pressable inline-flex min-h-11 items-center justify-center gap-1.5 rounded-[10px] bg-brand-700 px-3.5 text-xs font-semibold text-white hover:bg-brand-800"
-                    >
-                      <Send className="size-3.5" />
-                      <span>Send Proposal</span>
-                    </Link>
+                    {line.openProposalId ? (
+                      <Link
+                        href={`/employer/proposal/${encodeURIComponent(line.openProposalId)}`}
+                        className="apple-spring apple-pressable inline-flex min-h-11 items-center justify-center gap-1.5 rounded-[10px] border border-ink-200 bg-white px-3.5 text-xs font-semibold text-ink-800 hover:bg-ink-50"
+                      >
+                        <Send className="size-3.5" />
+                        <span>Proposal sent - view</span>
+                      </Link>
+                    ) : (
+                      <Link
+                        href={`/employer/send-proposal?intern=${encodeURIComponent(line.candidate.id)}&project=${encodeURIComponent(line.projectId)}`}
+                        className="apple-spring apple-pressable inline-flex min-h-11 items-center justify-center gap-1.5 rounded-[10px] bg-brand-700 px-3.5 text-xs font-semibold text-white hover:bg-brand-800"
+                      >
+                        <Send className="size-3.5" />
+                        <span>Send Proposal</span>
+                      </Link>
+                    )}
                   </div>
 
                   <button

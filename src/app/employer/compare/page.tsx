@@ -16,7 +16,7 @@ import { getDb, schema } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
 import { requireEmployerSetup } from "@/lib/employer-setup";
 import { bandFor } from "@/lib/score";
-import { formatRate } from "@/lib/format";
+import { formatMoney, formatRate } from "@/lib/format";
 import {
   RATING_META,
   displayNameOf,
@@ -365,9 +365,12 @@ export default async function CompareCandidates({
                     <span className="text-sm font-semibold tabular-nums text-brand-800">
                       {formatRate(rate.hourlyRateMinor, currency)}
                     </span>
-                    <span className="mt-0.5 block text-xs text-text-subtle">
-                      {rate.perHireMinor > 0 ? "plus one-time hire fee" : "zero placement surcharge"}
-                    </span>
+                    {/* A zero per-hire fee is not a line worth showing (client QA). */}
+                    {rate.perHireMinor > 0 ? (
+                      <span className="mt-0.5 block text-xs text-text-subtle">
+                        plus {formatMoney(rate.perHireMinor, currency)} one-time hire fee
+                      </span>
+                    ) : null}
                   </Cell>
                 );
               })}
@@ -445,7 +448,7 @@ export default async function CompareCandidates({
               ))}
             </Row>
 
-            <SkillsMatrix candidates={candidates} />
+            <SkillsMatrix candidates={candidates} requiredSkills={projectSkills} />
 
             <Row label="Profile Last Updated">
               {candidates.map((candidate) => (
@@ -641,84 +644,58 @@ function ProjectRequirementRow({
   );
 }
 
-function SkillsMatrix({ candidates }: { candidates: CandidateProfile[] }) {
-  const vocabulary = Array.from(
-    new Set(
-      candidates.flatMap((candidate) =>
-        candidate.skills.map((skill) => skill.split("·")[0].trim()).filter(Boolean),
-      ),
-    ),
-  ).sort((a, b) => a.localeCompare(b));
-
-  if (vocabulary.length === 0) {
-    return (
-      <tr>
-        <th
-          scope="row"
-          className="sticky left-0 z-10 bg-white p-4 text-left align-top text-xs font-medium text-text-subtle"
-        >
-          Skills
-        </th>
-        {candidates.map((candidate) => (
-          <Cell key={candidate.id}>-</Cell>
-        ))}
-      </tr>
-    );
-  }
-
-  const matched = candidates.map((candidate) =>
-    new Set(candidate.skills.map((skill) => skill.split("·")[0].trim().toLowerCase())),
-  );
-  const counts = matched.map(
-    (set) => vocabulary.filter((skill) => set.has(skill.toLowerCase())).length,
-  );
-  const best = Math.max(...counts, 0);
-  const contested = counts.filter((count) => count === best).length === 1 && best > 0;
-
+/**
+ * Each candidate's own profile skills (an intern picks 4-7), with the ones the
+ * selected project asks for ticked and listed first. This used to render the
+ * union of every compared candidate's skills down each column, so four
+ * candidates with a handful each read as "16 skills" - a merged vocabulary,
+ * not anything one candidate has.
+ */
+function SkillsMatrix({
+  candidates,
+  requiredSkills,
+}: {
+  candidates: CandidateProfile[];
+  requiredSkills: string[];
+}) {
+  const wanted = new Set(requiredSkills.map((s) => s.trim().toLowerCase()).filter(Boolean));
+  const nameOf = (skill: string) => skill.split("·")[0].trim();
   return (
     <tr>
       <th
         scope="row"
         className="sticky left-0 z-10 bg-white/95 backdrop-blur-xs p-4 text-left align-top text-xs font-semibold text-ink-700 border-r border-ink-100"
       >
-        <span>All Skills Coverage</span>
-        <span className="mt-1 block text-xs font-normal tabular-nums text-ink-600">
-          {vocabulary.length} combined
+        <span>Skills</span>
+        <span className="mt-1 block text-xs font-normal text-ink-600">
+          {wanted.size > 0 ? "Profile skills; project matches ticked" : "From the candidate's profile"}
         </span>
       </th>
-      {candidates.map((candidate, i) => {
-        const has = matched[i];
-        const count = counts[i];
-        const leader = contested && count === best;
+      {candidates.map((candidate) => {
+        const skills = Array.from(new Set(candidate.skills.map(nameOf).filter(Boolean)));
+        const isMatch = (skill: string) => wanted.has(skill.toLowerCase());
+        const ordered = [...skills.filter(isMatch), ...skills.filter((skill) => !isMatch(skill))];
         return (
           <td key={candidate.id} className="p-4 align-top border-r border-ink-100/60 last:border-r-0">
-            <ul className="space-y-1">
-              {vocabulary.map((skill) => {
-                const on = has.has(skill.toLowerCase());
-                return (
-                  <li
-                    key={skill}
-                    className={[
-                      "flex items-center gap-1.5 text-xs",
-                      on ? "text-ink-800" : "text-ink-300",
-                    ].join(" ")}
-                  >
-                    {on ? (
-                      <Check className="size-3 shrink-0 text-brand-600" aria-hidden />
-                    ) : (
-                      <Minus className="size-3 shrink-0 text-ink-300" aria-hidden />
-                    )}
-                    <span className={on ? "font-medium" : "line-through decoration-ink-200"}>
-                      {skill}
-                    </span>
-                  </li>
-                );
-              })}
-            </ul>
-            <span className="mt-2 block text-xs tabular-nums text-text-subtle">
-              {count} of {vocabulary.length}
-              {leader ? " - widest coverage" : ""}
-            </span>
+            {ordered.length === 0 ? (
+              "-"
+            ) : (
+              <ul className="space-y-1">
+                {ordered.map((skill) => {
+                  const match = isMatch(skill);
+                  return (
+                    <li key={skill} className="flex items-center gap-1.5 text-xs text-ink-800">
+                      {match ? (
+                        <Check className="size-3 shrink-0 text-brand-600" aria-label="Matches the project" />
+                      ) : (
+                        <Minus className="size-3 shrink-0 text-ink-300" aria-hidden />
+                      )}
+                      <span className={match ? "font-semibold" : "font-medium"}>{skill}</span>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
           </td>
         );
       })}

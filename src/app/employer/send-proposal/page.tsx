@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { and, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { ArrowLeft } from "lucide-react";
 
 import { getDb, schema } from "@/lib/db";
@@ -43,13 +43,14 @@ type ProjectOption = {
 export default async function SendProposal({
   searchParams,
 }: {
-  searchParams: Promise<{ intern?: string | string[] }>;
+  searchParams: Promise<{ intern?: string | string[]; project?: string | string[] }>;
 }) {
   const session = await requireRole("employer");
   await requireEmployerSetup(session.uid);
   const uid = session.uid;
-  const { intern: internParam } = await searchParams;
+  const { intern: internParam, project: projectParam } = await searchParams;
   const internId = (Array.isArray(internParam) ? internParam[0] : internParam)?.trim() ?? "";
+  const projectId = (Array.isArray(projectParam) ? projectParam[0] : projectParam)?.trim() ?? "";
 
   let projects: ProjectOption[] = [];
   let candidate: CandidateSummary | null = null;
@@ -67,11 +68,19 @@ export default async function SendProposal({
         skills: schema.projects.skills,
         locationType: schema.projects.locationType,
         timezone: schema.projects.timezone,
+        status: schema.projects.status,
       })
       .from(schema.projects)
-      .where(eq(schema.projects.employerId, uid));
+      .where(eq(schema.projects.employerId, uid))
+      .orderBy(asc(schema.projects.projectName));
+    // Active projects first, so the default is never a closed one.
+    const isActive = (status: string | null) => (status ?? "active") === "active";
+    rows.sort((a, b) => Number(isActive(b.status)) - Number(isActive(a.status)));
     projects = rows.map((row) => ({
-      ...row,
+      id: row.id,
+      projectName: row.projectName,
+      locationType: row.locationType,
+      timezone: row.timezone,
       skills: Array.isArray(row.skills) ? row.skills.filter(Boolean) : [],
     }));
 
@@ -201,6 +210,7 @@ export default async function SendProposal({
         rateCardSource={hasPlans ? "plan" : "default"}
         employerId={uid}
         internId={internId}
+        initialProjectId={projectId}
       />
     </div>
   );

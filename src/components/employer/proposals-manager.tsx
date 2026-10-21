@@ -84,9 +84,9 @@ export function ProposalsManager({
 
   // Metrics
   const totalSent = proposals.length;
-  const pendingCount = proposals.filter((p) => p.proposal.status === "sent").length;
+  const pendingCount = proposals.filter((p) => p.proposal.status === "sent" || p.proposal.status === "interview_scheduled").length;
   const acceptedCount = proposals.filter((p) => p.proposal.status === "accepted").length;
-  const closedCount = proposals.filter((p) => ["rejected", "withdrawn"].includes(p.proposal.status)).length;
+  const closedCount = proposals.filter((p) => ["rejected", "withdrawn", "expired"].includes(p.proposal.status)).length;
 
   const filtered = proposals.filter((item) => {
     const projectName = (item.project?.projectName || "").toLowerCase();
@@ -224,9 +224,12 @@ export function ProposalsManager({
           >
             <option value="all">All Statuses</option>
             <option value="sent">Under Review</option>
+            <option value="interview_scheduled">Interview booked</option>
             <option value="accepted">Accepted (Ready to Hire)</option>
+            <option value="processing">Payment processing</option>
             <option value="rejected">Declined</option>
             <option value="withdrawn">Withdrawn</option>
+            <option value="expired">Expired</option>
             <option value="hired">Hired</option>
           </select>
 

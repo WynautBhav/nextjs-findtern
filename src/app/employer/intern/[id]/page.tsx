@@ -23,7 +23,7 @@ import { requireRole } from "@/lib/auth";
 import { isAdminViewing } from "@/lib/employer-visibility";
 import { ShortlistToggle } from "@/components/employer/shortlist-toggle";
 import { bandFor } from "@/lib/score";
-import { formatRate } from "@/lib/format";
+import { formatMoney, formatRate } from "@/lib/format";
 import {
   displayNameOf,
   toCandidateProfile,
@@ -214,9 +214,12 @@ export default async function EmployerInternDetail({
         .from(schema.interviews)
         .where(and(eq(schema.interviews.employerId, employerId), eq(schema.interviews.internId, id)));
       const CLOSED = ["rejected", "withdrawn", "expired"];
-      const openForProject = proposals.find(
-        (p) => p.projectId === project?.id && !CLOSED.includes(p.status) && p.status !== "hired",
-      );
+      // One live offer per candidate across all projects (the send route
+      // enforces it), so an open offer on any project is "View proposal" -
+      // matching only the selected project hid offers filed under another one.
+      const isOpen = (p: (typeof proposals)[number]) => !CLOSED.includes(p.status) && p.status !== "hired";
+      const openForProject =
+        proposals.find((p) => p.projectId === project?.id && isOpen(p)) ?? proposals.find(isOpen);
       if (proposals.some((p) => p.status === "hired")) {
         action = { kind: "blocked", reason: "Already hired - see Orders." };
       } else if (
@@ -554,11 +557,11 @@ export default async function EmployerInternDetail({
             <p className="mt-3 text-lg font-semibold tabular-nums tracking-tight text-ink-900">
               {formatRate(pricing.hourlyRateMinor, currency)}
             </p>
-            <p className="mt-1 text-xs tabular-nums text-text-subtle">
-              {pricing.perHireMinor > 0
-                ? `plus ${formatRate(pricing.perHireMinor, currency)} per hire`
-                : "No per-hire fee at this score"}
-            </p>
+            {pricing.perHireMinor > 0 ? (
+              <p className="mt-1 text-xs tabular-nums text-text-subtle">
+                plus {formatMoney(pricing.perHireMinor, currency)} per hire
+              </p>
+            ) : null}
             <p className="mt-4 text-xs leading-relaxed text-ink-600">
               Fixed by the band, not negotiable in the composer. You set hours and can pay above
               the band.

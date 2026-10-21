@@ -197,10 +197,11 @@ export function CandidateCard({
           </p>
         ) : null}
 
-        {/* Skills - the single chip recipe. No hover animation on a chip. */}
+        {/* Skills - the single chip recipe. No hover animation on a chip. Every
+            skill is shown (a profile has at most seven), never "+N more". */}
         {candidate.skills.length > 0 ? (
           <ul className="mt-3 flex flex-wrap gap-1">
-            {candidate.skills.slice(0, 5).map((skill) => (
+            {candidate.skills.map((skill) => (
               <li
                 key={skill}
                 className="rounded-md bg-ink-100 px-2 py-0.5 text-xs font-medium text-ink-700 border border-ink-200/70"
@@ -208,11 +209,6 @@ export function CandidateCard({
                 {skill}
               </li>
             ))}
-            {candidate.skills.length > 5 ? (
-              <li className="rounded-md bg-ink-100 px-2 py-0.5 text-xs font-medium tabular-nums text-ink-600 border border-ink-200/70">
-                +{candidate.skills.length - 5} more
-              </li>
-            ) : null}
           </ul>
         ) : (
           <p className="mt-3 text-xs text-ink-600 italic">No skills listed yet.</p>

@@ -7,7 +7,7 @@ import { CircleGauge, Info, Send, Sparkles, TriangleAlert } from "lucide-react";
 
 import { csrfFetch } from "@/lib/client-fetch";
 import { RATING_META, type CandidateSummary } from "@/lib/employer-candidates";
-import { durationMonths, type Currency, type Pricing } from "@/lib/employer-pricing";
+import { type Currency, type Pricing } from "@/lib/employer-pricing";
 import { formatMoney, formatPerHire, formatRate } from "@/lib/format";
 import { CountdownAgreement, EMPLOYER_HIRING_POLICY } from "@/components/app/countdown-agreement";
 
@@ -79,6 +79,7 @@ export function SendProposalForm({
   rateCardSource,
   employerId,
   internId,
+  initialProjectId,
 }: {
   candidate: CandidateSummary;
   projects: ProjectOption[];
@@ -88,9 +89,14 @@ export function SendProposalForm({
   rateCardSource: "plan" | "default";
   employerId: string;
   internId: string;
+  /** The project the employer came from (shortlist, cart, candidates filter). */
+  initialProjectId?: string;
 }) {
   const router = useRouter();
-  const firstProject = projects[0];
+  // The project the employer came from, not just the first one in the list:
+  // the cart and profile links pass `?project=`, and ignoring it filed the
+  // proposal under another project.
+  const firstProject = projects.find((p) => p.id === initialProjectId) ?? projects[0];
 
   // Row 64: no currency choice. Indian companies see INR, everyone else USD.
   const currency = defaultCurrency;
@@ -121,7 +127,6 @@ export function SendProposalForm({
   const [sending, setSending] = useState(false);
 
   const rate = pricing[currency];
-  const months = durationMonths(duration);
   // An offer lapses on its start date, so the earliest start is tomorrow (IST).
   const minStart = useMemo(() => tomorrowIst(), []);
 
@@ -131,12 +136,10 @@ export function SendProposalForm({
     const monthly = monthlyOverride.trim()
       ? Number(monthlyOverride) || 0
       : derivedMonthly;
-    // The per-hire charge applies once, not per month.
-    const internship = monthly * months;
-    // Per-hire applies below a score of 6 only.
+    // Per-hire applies below a score of 6 only, once (not per month).
     const perHire = candidate.score < 6 ? rate.perHireMinor / 100 : 0;
-    return { monthly, internship, perHire, grand: internship + perHire };
-  }, [monthlyHours, monthlyOverride, rate, months, candidate.score]);
+    return { monthly, perHire };
+  }, [monthlyHours, monthlyOverride, rate, candidate.score]);
 
   /** Validate first; the policy agreement only opens for a complete offer. */
   function review() {
@@ -486,19 +489,17 @@ export function SendProposalForm({
           <div className="p-5">
             <p className="flex items-center gap-1.5 text-2xs font-semibold uppercase tracking-[0.14em] text-text-subtle">
               <Sparkles className="size-3.5" aria-hidden />
-              Offer total
+              Offer amount
             </p>
+            {/* One month's figure only (client QA), not monthly × months. */}
             <dl className="mt-4 space-y-2.5">
-              <Row label="Monthly">{formatMoney(Math.round(totals.monthly * 100), currency)}</Row>
-              <Row label={`× ${durationLabel.toLowerCase()}`}>{formatMoney(Math.round(totals.internship * 100), currency)}</Row>
+              <Row label="Monthly amount" strong>
+                {formatMoney(Math.round(totals.monthly * 100), currency)}
+              </Row>
+              <Row label="Duration">{durationLabel || "-"}</Row>
               {totals.perHire > 0 ? (
-                <Row label="Per-hire charge">{formatPerHire(Math.round(totals.perHire * 100), currency)}</Row>
+                <Row label="Per-hire charge (one-time)">{formatPerHire(Math.round(totals.perHire * 100), currency)}</Row>
               ) : null}
-              <div className="border-t border-ink-100 pt-3">
-                <Row label="Total payable" strong>
-                  {formatMoney(Math.round(totals.grand * 100), currency)}
-                </Row>
-              </div>
             </dl>
             <p className="mt-3 text-xs leading-relaxed text-text-subtle">
               Nothing is charged now. You pay once the candidate accepts.

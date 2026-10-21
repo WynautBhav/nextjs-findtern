@@ -75,7 +75,11 @@ export default async function EmployerProposalsPage() {
         subtitle="Track and manage hiring proposals sent to candidates - review statuses, withdraw active offers, or proceed to onboarding."
       />
 
+      {/* The manager copies its props into state (for optimistic withdraws),
+          so a changed server list must remount it - otherwise a refresh or a
+          revisit after sending shows the stale list without the new proposal. */}
       <ProposalsManager
+        key={proposals.map((p) => `${p.proposal.id}:${p.proposal.status}`).join("|")}
         initialProposals={proposals}
         employerId={employerId}
       />

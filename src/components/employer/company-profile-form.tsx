@@ -16,7 +16,8 @@ import { isIndiaCountry } from "@/lib/data/countries";
 
 import { csrfFetch } from "@/lib/client-fetch";
 import { phoneError } from "@/lib/phone";
-import { REQUIRED_COMPANY_FIELDS, needsBillingPincode } from "@/lib/employer-onboarding";
+import { websiteDomainError } from "@/lib/company-domain";
+import { REQUIRED_COMPANY_FIELDS, isPersonalEmail, needsBillingPincode } from "@/lib/employer-onboarding";
 
 export type CompanyProfile = {
   companyName: string;
@@ -43,17 +44,39 @@ export type CompanyProfile = {
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+/** The company domain the website must match, or "" for a personal-mailbox login. */
+function companyDomainOf(email: string): string {
+  const e = (email ?? "").trim();
+  if (!e.includes("@") || isPersonalEmail(e)) return "";
+  return e.split("@").pop()!.toLowerCase();
+}
+
+const ESCALATION_FIELDS = [
+  ["escalationContactName", "Escalation contact name"],
+  ["escalationContactRole", "Escalation contact role"],
+  ["escalationContactEmail", "Escalation contact email"],
+  ["escalationContactPhone", "Escalation contact phone"],
+] as const;
+
 /**
- * Everything is mandatory except what the form labels Optional: the logo, the
- * GST number and the escalation contact (all four of its fields, or none).
+ * Everything is mandatory except what the form labels Optional: the logo and
+ * the GST number. The escalation contact (name, role, email, phone) is
+ * mandatory, and the website must sit on the login email's domain.
  * The billing PIN is mandatory for an Indian address. The server applies the
  * same rules (`PATCH /api/employer/:id`); this is so the employer sees which
  * field, not just the first error.
  */
-function validate(v: Record<string, string>): Record<string, string> {
+function validate(v: Record<string, string>, savedWebsite = ""): Record<string, string> {
   const errors: Record<string, string> = {};
   for (const [key, label] of REQUIRED_COMPANY_FIELDS) {
     if (!v[key]?.trim()) errors[key] = `${label} is required.`;
+  }
+  // A website already on file is kept as is: the domain rule applies when it
+  // is entered or changed, so older accounts can still save other fields.
+  if (!errors.websiteUrl && v.websiteUrl.trim() !== savedWebsite.trim()) {
+    const domain = companyDomainOf(v.companyEmail);
+    const problem = websiteDomainError(v.websiteUrl, v.companyEmail, { skipDomainCheck: !domain });
+    if (problem) errors.websiteUrl = problem;
   }
   if (!v.countryCode?.trim()) errors.countryCode = "Country code is required.";
   if (!errors.phoneNumber) {
@@ -68,18 +91,17 @@ function validate(v: Record<string, string>): Record<string, string> {
   if (v.gstNumber?.trim() && !/^[0-9A-Z]{15}$/i.test(v.gstNumber.trim())) {
     errors.gstNumber = "A GST number is 15 characters, letters and digits only.";
   }
-  const escalation = ["escalationContactName", "escalationContactRole", "escalationContactEmail", "escalationContactPhone"];
-  if (escalation.some((k) => v[k]?.trim())) {
-    for (const k of escalation) {
-      if (!v[k]?.trim()) errors[k] = "Fill in every escalation field, or clear them all.";
-    }
-    if (!errors.escalationContactEmail && !EMAIL_RE.test(v.escalationContactEmail.trim())) {
-      errors.escalationContactEmail = "Enter a valid email address.";
-    }
-    if (!errors.escalationContactPhone) {
-      const problem = phoneError(v.escalationContactCountryCode || "+91", v.escalationContactPhone);
-      if (problem) errors.escalationContactPhone = problem;
-    }
+  for (const [k, label] of ESCALATION_FIELDS) {
+    if (!v[k]?.trim()) errors[k] = `${label} is required.`;
+  }
+  if (!errors.escalationContactEmail) {
+    const email = v.escalationContactEmail.trim();
+    if (!EMAIL_RE.test(email)) errors.escalationContactEmail = "Enter a valid email address.";
+    else if (isPersonalEmail(email)) errors.escalationContactEmail = "Use a company email for the escalation contact.";
+  }
+  if (!errors.escalationContactPhone) {
+    const problem = phoneError(v.escalationContactCountryCode || "+91", v.escalationContactPhone);
+    if (problem) errors.escalationContactPhone = problem;
   }
   return errors;
 }
@@ -118,7 +140,7 @@ export function CompanyProfileForm({
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    const problems = validate(values);
+    const problems = validate(values, profile.websiteUrl ?? "");
     setErrors(problems);
     if (Object.keys(problems).length > 0) {
       setError("Some required details are missing - see the highlighted fields.");
@@ -182,17 +204,22 @@ export function CompanyProfileForm({
           label="Company email"
           type="email"
           value={values.companyEmail}
-          onChange={set("companyEmail")}
+          onChange={() => {}}
           readOnly
-          hint="Your login. Contact us to change it."
+          hint="Your sign-up email. It cannot be changed here."
         />
         <Text
           id="websiteUrl"
           label="Website"
           value={values.websiteUrl}
           onChange={set("websiteUrl")}
-          placeholder="findtern.com"
+          placeholder={companyDomainOf(values.companyEmail) || "acme.com"}
           error={errors.websiteUrl}
+          hint={
+            companyDomainOf(values.companyEmail)
+              ? `Must be on ${companyDomainOf(values.companyEmail)} (subdomains are fine).`
+              : undefined
+          }
           required
         />
         <div>
@@ -289,13 +316,10 @@ export function CompanyProfileForm({
       </fieldset>
 
       <fieldset className="space-y-4">
-        <legend className="text-sm font-semibold text-ink-900">
-          Escalation contact
-          <span className="ml-2 text-xs font-normal text-text-subtle">Optional</span>
-        </legend>
+        <legend className="text-sm font-semibold text-ink-900">Escalation contact</legend>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Text id="escalationContactName" label="Name" value={values.escalationContactName} onChange={set("escalationContactName")} error={errors.escalationContactName} />
-          <Text id="escalationContactRole" label="Role" value={values.escalationContactRole} onChange={set("escalationContactRole")} error={errors.escalationContactRole} />
+          <Text id="escalationContactName" label="Name" value={values.escalationContactName} onChange={set("escalationContactName")} error={errors.escalationContactName} required />
+          <Text id="escalationContactRole" label="Role" value={values.escalationContactRole} onChange={set("escalationContactRole")} error={errors.escalationContactRole} required />
           <Text
             id="escalationContactEmail"
             label="Email"
@@ -303,6 +327,7 @@ export function CompanyProfileForm({
             value={values.escalationContactEmail}
             onChange={set("escalationContactEmail")}
             error={errors.escalationContactEmail}
+            required
           />
           <div className="grid grid-cols-2 gap-3">
             <Text
@@ -319,6 +344,7 @@ export function CompanyProfileForm({
               value={values.escalationContactPhone}
               onChange={set("escalationContactPhone")}
               error={errors.escalationContactPhone}
+              required
             />
           </div>
         </div>
