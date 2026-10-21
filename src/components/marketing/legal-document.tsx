@@ -103,7 +103,14 @@ export function LegalDocument({
         </div>
       </header>
 
-      <div className="container-page grid gap-12 py-12 lg:grid-cols-[16rem_minmax(0,1fr)] lg:gap-16">
+      {/* Two columns only when there is a TOC; otherwise the body would land
+          in the 16rem rail (the Non-Bypass Agreement has no headings). */}
+      <div
+        className={cn(
+          "container-page grid gap-12 py-12 lg:gap-16",
+          headings.length > 2 && "lg:grid-cols-[16rem_minmax(0,1fr)]",
+        )}
+      >
         {/* ── Table of contents ────────────────────────────────────── */}
         {headings.length > 2 ? (
           <nav

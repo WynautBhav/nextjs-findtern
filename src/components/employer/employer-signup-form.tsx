@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { AlertCircle, ArrowLeft, ArrowRight, Loader2, MailCheck } from "lucide-react";
@@ -49,6 +49,9 @@ export function EmployerSignupForm({
   const [companyEmail, setCompanyEmail] = useState(google?.email ?? "");
   const [countryCode, setCountryCode] = useState("+91");
   const [phoneNumber, setPhoneNumber] = useState("");
+  // The number a "taken" answer was for, so an edit drops a stale answer.
+  const [takenNumber, setTakenNumber] = useState<string | null>(null);
+  const phoneTaken = takenNumber === `${countryCode}${phoneNumber}`;
   const [password, setPassword] = useState("");
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -69,8 +72,27 @@ export function EmployerSignupForm({
     /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail) &&
     !personal &&
     isValidPhone(countryCode, phoneNumber) &&
+    !phoneTaken &&
     passwordOk &&
     agreedToTerms;
+
+  // Same 400ms duplicate check as the intern form. Without it a number that
+  // is already on an intern account is only refused after the email code.
+  useEffect(() => {
+    if (!isValidPhone(countryCode, phoneNumber)) return;
+    const timer = window.setTimeout(async () => {
+      try {
+        const res = await fetch(
+          `/api/users/exists/phone/${phoneNumber}?cc=${encodeURIComponent(countryCode)}`,
+        );
+        const data = await res.json().catch(() => ({ exists: false }));
+        if (data.exists) setTakenNumber(`${countryCode}${phoneNumber}`);
+      } catch {
+        // Never block signup on a failed check; the signup route is the guard.
+      }
+    }, 400);
+    return () => window.clearTimeout(timer);
+  }, [countryCode, phoneNumber]);
 
   async function post(url: string, body: unknown): Promise<string | null> {
     const res = await fetch(url, {
@@ -358,17 +380,25 @@ export function EmployerSignupForm({
             inputMode="numeric"
             maxLength={phoneMaxLength}
             value={phoneNumber}
+            aria-invalid={phoneTaken || undefined}
             onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, ""))}
             autoComplete="tel-national"
             placeholder={countryCode === "+91" ? "9876543210" : "2015550123"}
             className="apple-spring min-h-11 w-full rounded-[10px] border border-ink-200 bg-white px-3.5 text-[14px] tabular-nums text-ink-900 outline-none placeholder:text-ink-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
           />
         </div>
-        <p className="mt-1.5 text-xs text-text-subtle">
-          {phoneNumber && !isValidPhone(countryCode, phoneNumber)
-            ? phoneError(countryCode, phoneNumber)
-            : phoneHint(countryCode)}
-        </p>
+        {phoneTaken ? (
+          <p className="mt-1.5 text-xs text-danger">
+            That number is already registered, on an intern or a company account. One number
+            can&apos;t be used for both. Use another, or sign in instead.
+          </p>
+        ) : (
+          <p className="mt-1.5 text-xs text-text-subtle">
+            {phoneNumber && !isValidPhone(countryCode, phoneNumber)
+              ? phoneError(countryCode, phoneNumber)
+              : phoneHint(countryCode)}
+          </p>
+        )}
       </div>
 
       <div>
