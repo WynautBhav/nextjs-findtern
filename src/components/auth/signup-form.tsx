@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { AlertCircle, ArrowLeft, ArrowRight, Loader2, MailCheck } from "lucide-react";
 
 import { isValidPhone, phoneError, phoneHint } from "@/lib/phone";
+import { DIAL_CODES } from "@/lib/data/dial-codes";
 
 /**
  * Intern signup: three real API calls, in order.
@@ -118,6 +119,9 @@ export function SignupForm({
       setVerified(true);
       setOtpRejected(false);
       setLoading(false);
+      // The code was the last thing asked of them: create the account now
+      // instead of waiting for a second click on the same button.
+      await createAccount();
     } catch {
       setError("Network error. Try again.");
       setLoading(false);
@@ -145,7 +149,7 @@ export function SignupForm({
         const message = await readError(res, "Could not create the account.");
         setError(
           google && /verify your email/i.test(message)
-            ? "Your Google confirmation has expired (it lasts 30 minutes). Continue with Google again to finish."
+            ? "Your Google confirmation has expired (it lasts 15 minutes). Continue with Google again to finish."
             : message,
         );
         setStage(google ? "details" : "otp");
@@ -236,13 +240,17 @@ export function SignupForm({
             <div className="mt-2 flex gap-2">
               <select
                 value={countryCode}
-                onChange={(e) => setCountryCode(e.target.value)}
+                onChange={(e) => {
+                  setCountryCode(e.target.value);
+                  // A "taken" result was for the old code; let the server re-check.
+                  setPhoneTaken(false);
+                }}
                 aria-label="Country code"
-                className="h-11 shrink-0 rounded-lg border border-ink-200 bg-white px-2.5 text-sm text-ink-800 outline-none focus-visible:border-brand-600 focus-visible:ring-[3px] focus-visible:ring-brand-600/20"
+                className="h-11 w-36 shrink-0 rounded-lg border border-ink-200 bg-white px-2.5 text-sm text-ink-800 outline-none focus-visible:border-brand-600 focus-visible:ring-[3px] focus-visible:ring-brand-600/20"
               >
-                {["+91", "+1", "+44", "+61", "+49", "+65", "+971"].map((code) => (
-                  <option key={code} value={code}>
-                    {code}
+                {DIAL_CODES.map((d) => (
+                  <option key={d.code} value={d.code}>
+                    {d.code} · {d.country}
                   </option>
                 ))}
               </select>
@@ -265,7 +273,7 @@ export function SignupForm({
                   window.clearTimeout(phoneCheckTimer.current);
                   phoneCheckTimer.current = window.setTimeout(async () => {
                     try {
-                      const res = await fetch(`/api/users/exists/phone/${digits}`);
+                      const res = await fetch(`/api/users/exists/phone/${digits}?cc=${encodeURIComponent(countryCode)}`);
                       const data = await res.json().catch(() => ({ exists: false }));
                       setPhoneTaken(Boolean(data.exists));
                     } catch {
@@ -409,8 +417,8 @@ export function SignupForm({
           ) : null}
 
           <Submit
-            disabled={otp.length !== 6 || loading}
-            loading={loading && stage !== "creating"}
+            disabled={otp.length !== 6 || loading || stage === "creating"}
+            loading={loading || stage === "creating"}
             pendingLabel={stage === "creating" ? "Creating account…" : "Working…"}
           >
             {verified ? "Create account" : "Verify code"}

@@ -45,7 +45,7 @@ export function LegalDocument({
   // read the headings back out of the string that actually gets rendered.
   // Reading them before the ids exist produces a table of contents whose
   // links all point at nothing.
-  const clean = useMemo(() => withHeadingIds(sanitizeRichText(html)), [html]);
+  const clean = useMemo(() => withSubsections(withHeadingIds(sanitizeRichText(html))), [html]);
   const headings = useMemoHeadings(clean);
   const [active, setActive] = useState<string | null>(headings[0]?.id ?? null);
   const articleRef = useRef<HTMLElement>(null);
@@ -175,12 +175,23 @@ function useMemoHeadings(clean: string) {
     const re = /<h([23]) class="rt-h[23]" id="([^"]+)">([\s\S]*?)<\/h\1>/gi;
     let m: RegExpExecArray | null;
     while ((m = re.exec(clean))) {
-      const text = m[3].replace(/<[^>]*>/g, "").trim();
+      // The TOC renders as text, so entities the sanitiser kept ("&amp;") are decoded.
+      const text = decodeEntities(m[3].replace(/<[^>]*>/g, "")).trim();
       if (!text) continue;
       out.push({ id: m[2], text, level: Number(m[1]) });
     }
     return out;
   }, [clean]);
+}
+
+function decodeEntities(text: string): string {
+  return text
+    .replace(/&nbsp;/g, " ")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, "&");
 }
 
 /** Deterministic, collision-resistant id from heading text. */
@@ -211,4 +222,27 @@ function withHeadingIds(clean: string): string {
       }">${inner}</h${level}>`;
     },
   );
+}
+
+/**
+ * Group each h3 with the blocks under it, up to the next h2 or h3, in a
+ * `.rt-sub` wrapper, so "2.1" sits indented under "2." with its own text.
+ * The sanitised HTML is flat siblings, and CSS alone cannot select "after
+ * this h3 but before the next h2". A run whose tags do not balance (an h3
+ * inside a list item) is left as it was rather than wrapped mid-list.
+ */
+function withSubsections(clean: string): string {
+  return clean.replace(
+    /<h3 class="rt-h3"[^>]*>[\s\S]*?<\/h3>[\s\S]*?(?=<h[23] class=|$)/g,
+    (run) => (isBalanced(run) ? `<div class="rt-sub">${run}</div>` : run),
+  );
+}
+
+function isBalanced(html: string): boolean {
+  const depth: Record<string, number> = {};
+  for (const [, close, tag] of html.matchAll(/<(\/?)(ul|ol|li|blockquote|div)\b[^>]*>/g)) {
+    depth[tag] = (depth[tag] ?? 0) + (close ? -1 : 1);
+    if (depth[tag] < 0) return false;
+  }
+  return Object.values(depth).every((d) => d === 0);
 }

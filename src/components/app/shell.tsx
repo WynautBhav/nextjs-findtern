@@ -30,8 +30,11 @@ import {
   CircleUserRound,
   Compass,
   House,
+  CircleQuestionMark,
   LayoutList,
   LogOut,
+  Mail,
+  MessageSquareText,
   ReceiptIndianRupee,
   ScrollText,
   Settings2,
@@ -88,6 +91,13 @@ export const SECONDARY_NAV: NavItem[] = [
   { href: "/intern/notifications", label: "Notifications", icon: <Bell className="size-4" /> },
   { href: "/intern/settings", label: "Settings", icon: <Settings2 className="size-4" /> },
 ];
+
+/** Help that is the same at every stage: shown under the nav in the sidebar and the menu. */
+const HELP_LINKS = [
+  { href: "/faq", label: "FAQ", icon: <CircleQuestionMark className="size-4" aria-hidden /> },
+  { href: "/contact", label: "Contact", icon: <MessageSquareText className="size-4" aria-hidden /> },
+  { href: "mailto:communicate@findtern.in", label: "Email us", icon: <Mail className="size-4" aria-hidden /> },
+] as const;
 
 function isActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`);
@@ -168,12 +178,36 @@ export function AppShell({
     </ul>
   );
 
+  const helpLinks = (
+    <ul className="flex flex-col gap-0.5">
+      {HELP_LINKS.map((item) => {
+        const cls =
+          "apple-spring flex min-h-11 items-center gap-2.5 rounded-[10px] px-3 text-sm text-on-dark-subtle hover:bg-white/6 hover:text-white";
+        return (
+          <li key={item.href}>
+            {item.href.startsWith("mailto:") ? (
+              <a href={item.href} className={cls} title="communicate@findtern.in">
+                {item.icon}
+                {item.label}
+              </a>
+            ) : (
+              <Link href={item.href} onClick={() => setOpen(false)} className={cls}>
+                {item.icon}
+                {item.label}
+              </Link>
+            )}
+          </li>
+        );
+      })}
+    </ul>
+  );
+
   return (
     <div className="apple-admin min-h-[100dvh] overflow-x-clip bg-surface lg:flex">
       {/* ── Desktop rail ────────────────────────────────────────────── */}
       <aside aria-label="Sidebar" className="sticky top-0 hidden h-[100dvh] w-64 shrink-0 flex-col bg-brand-950 px-4 py-6 lg:flex">
         <Link href="/intern/dashboard" className="flex items-center gap-2.5 px-2">
-          <Logo variant="white" priority className="h-7" />
+          <Logo variant="white" priority className="h-9" />
         </Link>
 
         <nav aria-label="Main" className="mt-8 min-h-0 flex-1 overflow-y-auto overscroll-contain [scrollbar-width:thin]">
@@ -182,6 +216,10 @@ export function AppShell({
             More
           </p>
           {navList(SECONDARY_NAV.filter((i) => !nav.some((n) => n.href === i.href)))}
+          <p className="mb-2 mt-7 px-3 text-2xs font-semibold uppercase tracking-[0.14em] text-on-dark-subtle">
+            Help
+          </p>
+          {helpLinks}
         </nav>
 
         <div className="mt-4 shrink-0 border-t border-white/10 pt-3">
@@ -233,7 +271,7 @@ export function AppShell({
                 <X className="size-5" aria-hidden />
               </button>
               <div className="flex min-h-11 items-center px-2 py-2 pr-12">
-                <Logo variant="white" className="h-6" />
+                <Logo variant="white" className="h-8" />
               </div>
               <nav aria-label="Main (menu)" className="mt-6 max-h-[calc(100dvh-14rem)] overflow-y-auto overscroll-contain pb-4">
                 {navList(nav)}
@@ -241,6 +279,10 @@ export function AppShell({
                   Also here
                 </p>
                 {navList(SECONDARY_NAV.filter((i) => !nav.some((n) => n.href === i.href)))}
+                <p className="mb-2 mt-7 px-3 text-2xs font-semibold uppercase tracking-[0.14em] text-on-dark-subtle">
+                  Help
+                </p>
+                {helpLinks}
               </nav>
               <button
                 type="button"
@@ -252,8 +294,8 @@ export function AppShell({
               </button>
             </SheetContent>
           </Sheet>
-          <Link href="/intern/dashboard" className="min-w-0 flex-1 truncate text-base font-semibold tracking-tight text-ink-900">
-            Findtern
+          <Link href="/intern/dashboard" aria-label="Findtern home" className="flex min-w-0 flex-1 items-center">
+            <Logo variant="green" priority className="h-7" />
           </Link>
           <Link
             href="/intern/notifications"

@@ -945,6 +945,13 @@
   letter-spacing: 0;
   margin-block: 1.5em 0.4em;
 }
+/* A sub-clause ("2.1") and everything under it, up to the next heading, sit
+   one step in from the clause they belong to. LegalDocument wraps each h3
+   run in .rt-sub; a bare h3 (one it could not wrap) still gets the indent. */
+.prose-legal .rt-sub,
+.prose-legal :not(.rt-sub) > .rt-h3 {
+  margin-inline-start: 1.25rem;
+}
 .prose-legal .rt-h4 {
   font-size: var(--text-base);
   font-weight: 600;
@@ -986,6 +993,32 @@
 }
 .prose-rt .rt-li > .rt-p {
   margin-block: 0.3em;
+}
+
+/* Legal overrides for the list rules above; they must come after them. */
+/* Clause lists read as separate obligations, not one run-on paragraph:
+   more air between items than an article list. */
+.prose-legal .rt-li {
+  margin-block: 0.75em;
+  line-height: 1.8;
+}
+.prose-legal .rt-li > .rt-p {
+  margin-block: 0.4em;
+}
+.prose-legal .rt-li > .rt-p:first-child {
+  margin-block-start: 0;
+}
+/* Numbered clauses (the intern NDA is one <ol> of titled clauses): the
+   number sits outside in brand colour, and each clause gets room. */
+.prose-legal .rt-ol {
+  padding-inline-start: 1.6em;
+}
+.prose-legal .rt-ol > .rt-li {
+  margin-block: 1.25em;
+  padding-inline-start: 0.35em;
+}
+.prose-legal .rt-ol > .rt-li .rt-ul {
+  margin-block: 0.5em 0;
 }
 
 .prose-rt .rt-strong {

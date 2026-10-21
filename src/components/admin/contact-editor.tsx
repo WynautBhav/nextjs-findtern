@@ -14,11 +14,12 @@ import {
 } from "@/components/ui/dialog";
 import { csrfFetch } from "@/lib/client-fetch";
 import { isValidPhone, phoneError, phoneHint } from "@/lib/phone";
+import { DIAL_CODE_VALUES } from "@/lib/data/dial-codes";
 
 const inputClass =
   "apple-spring mt-1.5 min-h-10 w-full rounded-[10px] border border-ink-200 bg-white px-3 text-[14px] text-ink-900 outline-none placeholder:text-ink-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20";
 
-const CODES = ["+91", "+1", "+44", "+61", "+49", "+65", "+971", "+974"];
+const CODES = DIAL_CODE_VALUES;
 
 type Contact = {
   firstName?: string;

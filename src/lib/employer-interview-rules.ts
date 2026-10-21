@@ -117,12 +117,13 @@ function wallString(epoch: number): string {
 }
 
 /**
- * Suggested slots (sheet row 66): the first quarter hour at least an hour
- * from now in the interview's timezone, then one and two hours after it.
- * Wall-clock strings, editable by the employer.
+ * Suggested slots (sheet row 66): the nearest upcoming quarter hour (:00, :15,
+ * :30, :45) that is at least 15 minutes from now in the interview's timezone,
+ * then one and two hours after it. Wall-clock strings, editable by the
+ * employer.
  */
 export function suggestedSlots(now: number, timeZone: string): [string, string, string] {
-  const base = wallEpoch(now + 60 * 60_000, timeZone);
+  const base = wallEpoch(now + 15 * 60_000, timeZone);
   const quarter = 15 * 60_000;
   const first = Math.ceil(base / quarter) * quarter;
   return [wallString(first), wallString(first + 60 * 60_000), wallString(first + 120 * 60_000)];

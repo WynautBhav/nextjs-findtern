@@ -46,8 +46,19 @@ export default function ContactPage() {
             <ul className="mt-8 space-y-6">
               <Detail
                 Icon={Mail}
-                label="Email"
+                label="Interns and students"
                 value={<EmailLink subject="Findtern enquiry" className="mt-0.5 text-base" />}
+              />
+              <Detail
+                Icon={Mail}
+                label="Employers and hiring"
+                value={
+                  <EmailLink
+                    email={SITE.adminEmail}
+                    subject="Hiring enquiry"
+                    className="mt-0.5 text-base"
+                  />
+                }
               />
               <Detail Icon={MapPin} label="Based in" value={SITE.address} />
               <Detail

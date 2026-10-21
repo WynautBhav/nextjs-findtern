@@ -164,7 +164,7 @@ export const EMPLOYER_HIRING_POLICY: AgreementSection[] = [
     title: "Mandatory PPO reporting",
     lines: [
       "Employers must notify Findtern before issuing any PPO or full-time employment offer to interns sourced through the platform.",
-      "PPO-related communication must be shared at communicate@findtern.in.",
+      "PPO-related communication must be shared at admin@findtern.in.",
       "Failure to disclose PPO conversion may result in contractual and financial penalties.",
     ],
   },

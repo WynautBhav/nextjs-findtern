@@ -3,6 +3,7 @@ import { eq, desc } from "drizzle-orm";
 
 import { getDb, schema } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
+import { requireEmployerSetup } from "@/lib/employer-setup";
 import { hiredInternIds } from "@/lib/employer-visibility";
 import { PageHeader } from "@/components/layout/page-header";
 import {
@@ -17,6 +18,7 @@ export const metadata: Metadata = {
 
 export default async function EmployerProposalsPage() {
   const session = await requireRole("employer");
+  await requireEmployerSetup(session.uid);
   const employerId = session.uid;
 
   let proposals: ProposalItem[] = [];

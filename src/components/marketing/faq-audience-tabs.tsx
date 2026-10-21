@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Building2, GraduationCap } from "lucide-react";
 
 import { FaqExplorer } from "@/components/marketing/faq-explorer";
+import { SITE } from "@/lib/content/site";
 import type { CmsFaqItem } from "@/lib/content/types";
 import { cn } from "@/lib/utils";
 
@@ -85,7 +86,12 @@ export function FaqAudienceTabs({ intern, employer }: { intern: CmsFaqItem[]; em
 
       <div id="faq-panel" role="tabpanel" aria-labelledby={`faq-tab-${audience}`} className="mt-10">
         {/* Keyed so search and filters reset when the audience changes. */}
-        <FaqExplorer key={audience} items={items} showCategory={false} />
+        <FaqExplorer
+          key={audience}
+          items={items}
+          showCategory={false}
+          email={audience === "employer" ? SITE.adminEmail : SITE.email}
+        />
       </div>
     </div>
   );

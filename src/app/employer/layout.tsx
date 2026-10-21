@@ -13,6 +13,8 @@ import {
   ShoppingBag,
   Clock,
   Send,
+  HelpCircle,
+  Mail,
 } from "lucide-react";
 
 import { AppShell, type NavGroup } from "@/components/layout/app-shell";
@@ -46,6 +48,13 @@ const NAV_GROUPS: NavGroup[] = [
       { href: "/employer/orders", label: "Orders", icon: <ShoppingCart className="size-4" /> },
       { href: "/employer/alerts", label: "Alerts", icon: <Bell className="size-4" /> },
       { href: "/employer/account", label: "Company Profile", icon: <Building2 className="size-4" /> },
+    ],
+  },
+  {
+    title: "Help",
+    items: [
+      { href: "/faq#employers", label: "FAQ", icon: <HelpCircle className="size-4" /> },
+      { href: "/contact", label: "Contact", icon: <Mail className="size-4" /> },
     ],
   },
 ];

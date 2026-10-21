@@ -20,7 +20,8 @@ export async function GET(req: Request) {
     httpOnly: true,
     secure: await isHttps(),
     sameSite: "lax",
-    path: "/api/auth/google",
+    // "/" so the legacy /auth/google/callback alias also receives it.
+    path: "/",
     maxAge: 600,
   });
   return res;

@@ -1,9 +1,10 @@
 "use client";
 
+import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { Check, Copy } from "lucide-react";
 
-import { SITE } from "@/lib/content/site";
+import { SITE, contactEmailFor } from "@/lib/content/site";
 import { cn } from "@/lib/utils";
 
 /**
@@ -69,4 +70,13 @@ export function EmailLink({
       </span>
     </span>
   );
+}
+
+/**
+ * The site-chrome address: admin@ on the employer pages (home, /employers,
+ * /pricing), communicate@ everywhere else. For the header and footer, which
+ * are shared by both audiences and only know the page from its path.
+ */
+export function ContactEmailLink(props: Omit<Parameters<typeof EmailLink>[0], "email">) {
+  return <EmailLink {...props} email={contactEmailFor(usePathname())} />;
 }

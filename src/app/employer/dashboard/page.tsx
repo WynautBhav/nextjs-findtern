@@ -130,7 +130,7 @@ export default async function EmployerDashboard() {
       ? profiles.filter((c) => c.skills.some((s) => wanted.includes(s.toLowerCase())))
       : profiles;
     candidates = (matching.length ? matching : profiles).slice(0, 5);
-    await attachPhotos(db, candidates).catch(() => undefined);
+    await attachPhotos(db, candidates, nameUnlocked).catch(() => undefined);
   } catch (err) {
     console.error("Failed to load employer dashboard:", err);
     loadFailed = true;

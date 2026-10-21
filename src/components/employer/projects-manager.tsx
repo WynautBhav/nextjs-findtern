@@ -25,6 +25,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import { CityField, StateField } from "@/components/employer/location-fields";
 import { PageHeader } from "@/components/layout/page-header";
 import { csrfFetch } from "@/lib/client-fetch";
 import { suggestSkills } from "@/lib/data/skills";
@@ -36,9 +37,12 @@ const MAX_SKILLS = 7;
 export function ProjectsManager({
   employerId,
   initialProjects,
+  india = true,
 }: {
   employerId: string;
   initialProjects: Project[];
+  /** The company is in India: state/city pickers apply. */
+  india?: boolean;
 }) {
   const router = useRouter();
   const [projects, setProjects] = useState<Project[]>(initialProjects);
@@ -638,32 +642,18 @@ export function ProjectsManager({
             {/* City & State (if not remote) */}
             {locationType !== "remote" ? (
               <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label htmlFor="city" className="block text-xs font-semibold text-ink-800">
-                    City
-                  </label>
-                  <input
-                    id="city"
-                    type="text"
-                    value={city}
-                    onChange={(e) => setCity(e.target.value)}
-                    placeholder="e.g. Bengaluru, Gurugram"
-                    className="apple-spring mt-1.5 min-h-11 w-full rounded-[10px] border border-ink-200 bg-white px-3 text-[14px] text-ink-900 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="state" className="block text-xs font-semibold text-ink-800">
-                    State
-                  </label>
-                  <input
-                    id="state"
-                    type="text"
-                    value={state}
-                    onChange={(e) => setState(e.target.value)}
-                    placeholder="e.g. Karnataka"
-                    className="apple-spring mt-1.5 min-h-11 w-full rounded-[10px] border border-ink-200 bg-white px-3 text-[14px] text-ink-900 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
-                  />
-                </div>
+                <StateField compact id="state" label="State" india={india} value={state} onChange={setState} />
+                <CityField
+                  compact
+                  id="city"
+                  label="City"
+                  india={india}
+                  state={state}
+                  onStateChange={setState}
+                  value={city}
+                  onChange={setCity}
+                  placeholder="e.g. Bengaluru, Gurugram"
+                />
               </div>
             ) : null}
 

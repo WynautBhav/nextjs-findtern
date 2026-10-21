@@ -1,11 +1,11 @@
 import {
   companySizes,
-  countryCodes,
   scopeOfWorkOptions,
   timezones,
   type employers,
   type projects,
 } from "@/lib/db/schema";
+import { DIAL_CODES } from "@/lib/data/dial-codes";
 
 /**
  * Employer onboarding shape.
@@ -67,7 +67,7 @@ export type OnboardingDraft = {
 export const COMPANY_SIZE_OPTIONS = companySizes;
 export const SCOPE_OPTIONS = scopeOfWorkOptions;
 export const TIMEZONE_OPTIONS = timezones;
-export const COUNTRY_CODE_OPTIONS = countryCodes;
+export const COUNTRY_CODE_OPTIONS = DIAL_CODES;
 
 /** Matches `projects.location_type`; the legacy form sent these exact strings. */
 export const LOCATION_TYPES = [

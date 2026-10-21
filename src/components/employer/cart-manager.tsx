@@ -282,7 +282,7 @@ export function CartManager({
                       type="button"
                       onClick={() => {
                         // Row 66: three suggested quarter-hour slots, an hour
-                        // apart, starting at least an hour from now. Editable.
+                        // apart, from the nearest quarter hour 15+ min out. Editable.
                         const [a, b, c] = suggestedSlots(Date.now(), timezone);
                         setSlot1(a);
                         setSlot2(b);

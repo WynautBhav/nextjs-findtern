@@ -26,8 +26,10 @@ import { Pill } from "@/components/app/primitives";
 
 import Link from "next/link";
 
-import { NON_TECH_SKILLS, suggestSkills } from "@/lib/data/skills";
-import { suggestDistricts } from "@/lib/data/districts";
+import { NON_TECH_SKILLS, TECH_SKILLS, suggestSkills } from "@/lib/data/skills";
+import { STATES, stateForDistrict, suggestDistricts } from "@/lib/data/districts";
+import { BANKS } from "@/lib/data/banks";
+import { DIAL_CODES, DIAL_CODE_VALUES } from "@/lib/data/dial-codes";
 import { suggestColleges } from "@/lib/data/colleges";
 import { csrfFetch } from "@/lib/client-fetch";
 import {
@@ -35,12 +37,14 @@ import {
   EMERGENCY_RELATIONS,
   EXPERIENCE_TYPES,
   QUALIFICATION_LEVELS,
+  bankProblem,
   cascadeWorkModes,
   degreeOption,
   monthLabel,
   toMonth,
   validateProfile,
   validateStep,
+  widestWorkMode,
   type ExtracurricularEntry,
   type ExperienceEntry,
   type LanguageEntry,
@@ -53,7 +57,6 @@ import {
 const DRAFT_KEY = "findtern:intern-onboarding:v2";
 const SAVED_AT = "__savedAt";
 const WORK_MODES = ["remote", "hybrid", "onsite"] as const;
-const COUNTRY_CODES = ["+91", "+1", "+44", "+61", "+49", "+65", "+971"] as const;
 const MB = 1024 * 1024;
 
 export const STEPS = [
@@ -81,6 +84,10 @@ type StepProps = {
   /** The number on the account (captured at signup). */
   account: { countryCode: string; phoneNumber: string } | null;
   hasPanImage: boolean;
+  hasAadhaarImage: boolean;
+  /** The "confirm account number" box; kept out of the draft. */
+  bankConfirm: string;
+  setBankConfirm: (value: string) => void;
   /** Skills are frozen: rated, or an AI interview is queued. */
   skillsLocked?: boolean;
   onUploaded: (kind: string) => void;
@@ -93,6 +100,7 @@ export function OnboardingForm({
   serverUpdatedAt = null,
   account = null,
   hasPanImage: panOnFile = false,
+  hasAadhaarImage: aadhaarOnFile = false,
   hasPhoto: photoOnFile = false,
   skillsLocked = false,
 }: {
@@ -104,6 +112,8 @@ export function OnboardingForm({
   account?: { countryCode: string; phoneNumber: string } | null;
   /** A PAN card image is already on file. */
   hasPanImage?: boolean;
+  /** An Aadhaar card image is already on file. */
+  hasAadhaarImage?: boolean;
   /** A profile photo is already on file. */
   hasPhoto?: boolean;
   /** Rated or AI interview queued - the skills step is read-only. */
@@ -113,7 +123,10 @@ export function OnboardingForm({
   const [step, setStep] = useState(0);
   const [edits, setEdits] = useState<Partial<OnboardingDraft>>({});
   const [dirty, setDirty] = useState(false);
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  // What the last Continue / Submit flagged. What is shown (`errors`, below)
+  // is this list re-checked against the current values, so a message goes
+  // away as soon as the field it is about is fixed.
+  const [flagged, setErrors] = useState<Record<string, string>>({});
   const [notice, setNotice] = useState<{ text: string; ok: boolean } | null>(null);
   const [saving, setSaving] = useState(false);
   // Set once the final submit succeeds; the button stays locked while the
@@ -121,6 +134,10 @@ export function OnboardingForm({
   const [submitted, setSubmitted] = useState(false);
   const [uploaded, setUploaded] = useState<string[]>([]);
   const hasPanImage = panOnFile || uploaded.includes("pan");
+  const hasAadhaarImage = aadhaarOnFile || uploaded.includes("aadhaar");
+  // Starts as the stored number, so someone who already saved bank details
+  // does not have to type it twice to get past this step.
+  const [bankConfirm, setBankConfirm] = useState(initial.bank?.accountNumber ?? "");
   const hasPhoto = photoOnFile || uploaded.includes("profile_photo");
   const blurbRef = useRef<HTMLParagraphElement>(null);
 
@@ -143,7 +160,10 @@ export function OnboardingForm({
   useEffect(() => {
     if (!dirty) return;
     try {
-      window.localStorage.setItem(draftKey, JSON.stringify({ ...values, [SAVED_AT]: Date.now() }));
+      // Bank details never go into localStorage.
+      const { bank: _bank, ...rest } = values;
+      void _bank;
+      window.localStorage.setItem(draftKey, JSON.stringify({ ...rest, [SAVED_AT]: Date.now() }));
     } catch {
       // Quota errors in private mode are non-fatal
     }
@@ -161,7 +181,22 @@ export function OnboardingForm({
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  const ctx = { hasPanImage, hasPhoto, ownPhone: account };
+  const ctx = { hasPanImage, hasAadhaarImage, hasPhoto, ownPhone: account, bankAccountConfirm: bankConfirm };
+
+  const errors = useMemo(() => {
+    const keys = Object.keys(flagged);
+    if (keys.length === 0) return flagged;
+    const now = validateStep(values, step, {
+      hasPanImage,
+      hasAadhaarImage,
+      hasPhoto,
+      ownPhone: account,
+      bankAccountConfirm: bankConfirm,
+    });
+    const still: Record<string, string> = {};
+    for (const k of keys) if (now[k]) still[k] = now[k];
+    return still;
+  }, [flagged, values, step, hasPanImage, hasAadhaarImage, hasPhoto, account, bankConfirm]);
 
   function showProblems(problems: Record<string, string>) {
     setErrors(problems);
@@ -200,9 +235,18 @@ export function OnboardingForm({
       const res = await csrfFetch("/api/intern/onboarding", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        // Bank details are edited in Settings; sending them from here would
-        // overwrite a newer copy saved there.
-        body: JSON.stringify({ ...values, bank: undefined, final }),
+        // Bank details go only when this form touched them (or on the final
+        // submit, which has validated them), and only in full: the API
+        // refuses a half-filled bank, and an untouched copy could overwrite a
+        // newer one saved from Settings.
+        body: JSON.stringify({
+          ...values,
+          bank:
+            final || (edits.bank && bankProblem(values.bank) === null)
+              ? { ...values.bank, ifscCode: values.bank.ifscCode.trim().toUpperCase(), accountNumber: values.bank.accountNumber.replace(/\s/g, "") }
+              : undefined,
+          final,
+        }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -305,6 +349,9 @@ export function OnboardingForm({
               saving={saving}
               account={account}
               hasPanImage={hasPanImage}
+              hasAadhaarImage={hasAadhaarImage}
+              bankConfirm={bankConfirm}
+              setBankConfirm={setBankConfirm}
               skillsLocked={skillsLocked}
               onUploaded={(kind) => setUploaded((prev) => (prev.includes(kind) ? prev : [...prev, kind]))}
             />
@@ -428,7 +475,11 @@ function StepRail({ step, onSelect }: { step: number; onSelect: (next: number) =
 
 /* ── Step 1: About Me (Personal + Passport Photo) ────────────────────────── */
 
-function PersonalStep({ values, update, errors, documents, account, onUploaded }: StepProps) {
+function PersonalStep({ values, update, errors, documents, account, onUploaded, bankConfirm, setBankConfirm }: StepProps) {
+  const bank = values.bank;
+  const setBank = (patch: Partial<OnboardingDraft["bank"]>) => update("bank", { ...bank, ...patch });
+  // Legacy rows can hold a state spelled differently from the list; it stays selectable.
+  const states = values.state && !STATES.includes(values.state) ? [values.state, ...STATES] : STATES;
   const onFile = (label: string) => (documents.find((d) => d.label === label) ? `${label} on file` : null);
   // A locally cached draft can carry an empty photoUrl; the stored avatar wins.
   const photoSrc = values.photoUrl || (documents.some((d) => d.label === "Profile photo") ? "/api/intern/avatar" : "");
@@ -531,15 +582,16 @@ function PersonalStep({ values, update, errors, documents, account, onUploaded }
               onUploaded={() => onUploaded("pan")}
             />
           </UploadSlot>
-          <UploadSlot title="Aadhaar card image (optional)">
+          <UploadSlot id="aadhaarImage" title="Aadhaar card image *" error={errors.aadhaarImage}>
             <FileUpload
               kind="aadhaar"
               accept="image/jpeg,image/png,image/webp,application/pdf"
               label="Aadhaar card image"
               noun="Aadhaar card image"
               maxBytes={10 * MB}
-              hint="JPG, PNG, WebP or PDF, up to 10 MB."
+              hint="Photo or scan of the front. JPG, PNG, WebP or PDF, up to 10 MB."
               current={onFile("Aadhaar")}
+              onUploaded={() => onUploaded("aadhaar")}
             />
           </UploadSlot>
         </div>
@@ -553,15 +605,29 @@ function PersonalStep({ values, update, errors, documents, account, onUploaded }
             placeholder="e.g. Bengaluru"
             value={values.city}
             error={errors.city}
-            onChange={(v) => update("city", v)}
+            list="city-options"
+            autoComplete="off"
+            onChange={(v) => {
+              update("city", v);
+              // Picking a district from the list fills its state.
+              const state = stateForDistrict(v);
+              if (state) update("state", state);
+            }}
           />
-          <Field
+          <datalist id="city-options">
+            {suggestDistricts(values.city, 8).map((d) => (
+              <option key={`${d.district}-${d.state}`} value={d.district}>
+                {d.state}
+              </option>
+            ))}
+          </datalist>
+          <SelectField
             id="state"
             label="State *"
-            placeholder="Karnataka"
             value={values.state}
             error={errors.state}
             onChange={(v) => update("state", v)}
+            options={[{ value: "", label: "Choose your state…" }, ...states.map((st) => ({ value: st, label: st }))]}
           />
           <Field
             id="pinCode"
@@ -674,6 +740,79 @@ function PersonalStep({ values, update, errors, documents, account, onUploaded }
           onNumber={(v) => update("secondPocPhone", v)}
           hint="Different from your own and your emergency contact's number."
         />
+      </Group>
+
+      <Group
+        title="Bank account"
+        hint="Where your stipend is paid. Use an account in your own name. Only Findtern sees this."
+      >
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field
+            id="bankAccountHolderName"
+            label="Account holder name *"
+            placeholder="As printed on your passbook"
+            value={bank.accountHolderName}
+            error={errors.bankAccountHolderName}
+            autoComplete="name"
+            onChange={(v) => setBank({ accountHolderName: v })}
+          />
+          <Field
+            id="bankName"
+            label="Bank name *"
+            placeholder="Start typing, e.g. State Bank of India"
+            hint="Pick from the list, or type the full name if your bank is not there."
+            value={bank.bankName}
+            error={errors.bankName}
+            list="bank-options"
+            autoComplete="off"
+            onChange={(v) => setBank({ bankName: v })}
+          />
+          <datalist id="bank-options">
+            {BANKS.map((b) => (
+              <option key={b} value={b} />
+            ))}
+          </datalist>
+          <Field
+            id="bankAccountNumber"
+            label="Account number *"
+            placeholder="9 to 18 digits"
+            inputMode="numeric"
+            autoComplete="off"
+            value={bank.accountNumber}
+            error={errors.bankAccountNumber}
+            onChange={(v) => setBank({ accountNumber: v.replace(/\D/g, "").slice(0, 18) })}
+          />
+          <Field
+            id="bankAccountConfirm"
+            label="Confirm account number *"
+            placeholder="Type it again"
+            inputMode="numeric"
+            autoComplete="off"
+            value={bankConfirm}
+            error={errors.bankAccountConfirm}
+            onChange={(v) => setBankConfirm(v.replace(/\D/g, "").slice(0, 18))}
+          />
+          <Field
+            id="bankIfscCode"
+            label="IFSC code *"
+            placeholder="e.g. SBIN0001234"
+            hint="11 characters, printed on your cheque book and passbook."
+            maxLength={11}
+            autoComplete="off"
+            value={bank.ifscCode}
+            error={errors.bankIfscCode}
+            onChange={(v) => setBank({ ifscCode: v.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 11) })}
+          />
+          <Field
+            id="bankUpiId"
+            label="UPI ID (optional)"
+            placeholder="e.g. name@okaxis"
+            autoComplete="off"
+            value={bank.upiId}
+            error={errors.bankUpiId}
+            onChange={(v) => setBank({ upiId: v.trim() })}
+          />
+        </div>
       </Group>
     </div>
   );
@@ -999,8 +1138,6 @@ function QualificationList({
 
 function ExperienceStep({ values, update, errors }: StepProps) {
   const experiences = values.experiences || [];
-  const now = new Date();
-  const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 
   function addExperience() {
     const newItem: ExperienceEntry = {
@@ -1106,51 +1243,46 @@ function ExperienceStep({ values, update, errors }: StepProps) {
                   />
                 </div>
 
-                <div>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <Field
-                      id={`${k}.from`}
-                      label="Start month *"
-                      type="month"
-                      placeholder="YYYY-MM"
-                      max={thisMonth}
-                      value={exp.from}
-                      error={errors[`${k}.from`]}
-                      onChange={(v) => updateExperience(exp.id, { from: v })}
-                    />
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <MonthYearField
+                    id={`${k}.from`}
+                    label="Start date *"
+                    value={exp.from}
+                    error={errors[`${k}.from`]}
+                    onChange={(v) => updateExperience(exp.id, { from: v })}
+                  />
+                  <div>
                     {exp.current ? (
                       <div>
-                        <span className="block text-sm font-medium text-ink-800">End month</span>
+                        <span className="block text-sm font-medium text-ink-800">End date</span>
                         <p
                           aria-live="polite"
-                          className={`${CONTROL} mt-2 flex w-full items-center border-ink-200 bg-ink-100 text-ink-600`}
+                          className={`${CONTROL} mt-2 flex w-full items-center gap-2 border-brand-200 bg-brand-50 font-medium text-brand-800`}
                         >
+                          <span className="size-2 shrink-0 rounded-full bg-brand-600" aria-hidden />
                           Present
+                          <span className="font-normal text-brand-700/80">· ongoing</span>
                         </p>
                       </div>
                     ) : (
-                      <Field
+                      <MonthYearField
                         id={`${k}.to`}
-                        label="End month *"
-                        type="month"
-                        placeholder="YYYY-MM"
-                        min={exp.from || undefined}
-                        max={thisMonth}
+                        label="End date *"
                         value={exp.to}
                         error={errors[`${k}.to`]}
                         onChange={(v) => updateExperience(exp.id, { to: v })}
                       />
                     )}
+                    <label className="mt-1 inline-flex min-h-11 cursor-pointer items-center gap-2.5 text-sm text-ink-800 sm:min-h-9">
+                      <input
+                        type="checkbox"
+                        checked={exp.current}
+                        onChange={(e) => updateExperience(exp.id, { current: e.target.checked, to: e.target.checked ? "" : exp.to })}
+                        className="size-4 shrink-0 rounded border-ink-300 accent-brand-700"
+                      />
+                      I currently work here
+                    </label>
                   </div>
-                  <label className="mt-2 inline-flex min-h-11 cursor-pointer items-center gap-2.5 text-sm text-ink-800">
-                    <input
-                      type="checkbox"
-                      checked={exp.current}
-                      onChange={(e) => updateExperience(exp.id, { current: e.target.checked, to: e.target.checked ? "" : exp.to })}
-                      className="size-4 shrink-0 rounded border-ink-300 accent-brand-700"
-                    />
-                    I currently work here
-                  </label>
                 </div>
 
                 <TextArea
@@ -1174,7 +1306,6 @@ function ExperienceStep({ values, update, errors }: StepProps) {
 
 function SkillsStep({ values, update, errors, skillsLocked }: StepProps) {
   const [draft, setDraft] = useState("");
-  const [allNonTech, setAllNonTech] = useState(false);
   const skills = values.skills || [];
   const skillsWithRatings = values.skillsWithRatings || [];
 
@@ -1287,35 +1418,11 @@ function SkillsStep({ values, update, errors, skillsLocked }: StepProps) {
         ) : null}
       </div>
 
-      {/* Non-technical skills: one tap, so nobody has to guess the exact word. */}
+      {/* One-tap picks, technical and non-technical, so nobody has to guess the exact word. */}
       {skills.length < 7 ? (
-        <div>
-          <p className="text-xs font-medium text-ink-700">Non-technical skills</p>
-          <ul className="mt-2 flex flex-wrap gap-1.5">
-            {(allNonTech ? NON_TECH_SKILLS : NON_TECH_SKILLS.slice(0, 14))
-              .filter((s) => !skills.some((have) => have.toLowerCase() === s.toLowerCase()))
-              .map((s) => (
-                <li key={s}>
-                  <button
-                    type="button"
-                    onClick={() => addSkill(s)}
-                    className="apple-spring inline-flex min-h-11 items-center sm:min-h-9 rounded-[10px] border border-ink-200 bg-white px-2.5 text-xs font-medium text-ink-700 hover:border-brand-200 hover:bg-brand-50 hover:text-brand-700"
-                  >
-                    + {s}
-                  </button>
-                </li>
-              ))}
-            <li>
-              <button
-                type="button"
-                onClick={() => setAllNonTech((v) => !v)}
-                aria-expanded={allNonTech}
-                className="inline-flex min-h-11 items-center sm:min-h-9 px-2 text-xs font-medium text-brand-700 underline-offset-4 hover:underline"
-              >
-                {allNonTech ? "Show fewer" : `${NON_TECH_SKILLS.length - 14} more`}
-              </button>
-            </li>
-          </ul>
+        <div className="space-y-4">
+          <SkillChips title="Technical" options={TECH_SKILLS} initial={12} have={skills} onPick={addSkill} />
+          <SkillChips title="Non-technical" options={NON_TECH_SKILLS} initial={12} have={skills} onPick={addSkill} />
         </div>
       ) : null}
 
@@ -1366,6 +1473,56 @@ function SkillsStep({ values, update, errors, skillsLocked }: StepProps) {
           );
         })}
       </div>
+    </div>
+  );
+}
+
+/** A labelled group of one-tap skill picks with a show more / fewer toggle. */
+function SkillChips({
+  title,
+  options,
+  initial,
+  have,
+  onPick,
+}: {
+  title: string;
+  options: string[];
+  initial: number;
+  have: string[];
+  onPick: (skill: string) => void;
+}) {
+  const [all, setAll] = useState(false);
+  const taken = (s: string) => have.some((h) => h.toLowerCase() === s.toLowerCase());
+  const shown = (all ? options : options.slice(0, initial)).filter((s) => !taken(s));
+  const hidden = options.length - initial;
+  return (
+    <div>
+      <p className="text-xs font-medium text-ink-700">{title}</p>
+      <ul className="mt-2 flex flex-wrap gap-1.5">
+        {shown.map((s) => (
+          <li key={s}>
+            <button
+              type="button"
+              onClick={() => onPick(s)}
+              className="apple-spring inline-flex min-h-11 items-center sm:min-h-9 rounded-[10px] border border-ink-200 bg-white px-2.5 text-xs font-medium text-ink-700 hover:border-brand-200 hover:bg-brand-50 hover:text-brand-700"
+            >
+              + {s}
+            </button>
+          </li>
+        ))}
+        {hidden > 0 ? (
+          <li>
+            <button
+              type="button"
+              onClick={() => setAll((v) => !v)}
+              aria-expanded={all}
+              className="inline-flex min-h-11 items-center sm:min-h-9 px-2 text-xs font-medium text-brand-700 underline-offset-4 hover:underline"
+            >
+              {all ? "Show fewer" : `${hidden} more`}
+            </button>
+          </li>
+        ) : null}
+      </ul>
     </div>
   );
 }
@@ -1618,12 +1775,15 @@ function ExtracurricularStep({ values, update }: StepProps) {
 function LocationPreferencesStep({ values, update, errors }: StepProps) {
   const [cityDraft, setCityDraft] = useState("");
   const locationTypes = values.locationTypes || [];
-  const preferredLocations = values.preferredLocations || [];
+  // Legacy rows can repeat a city; show and save each one once.
+  const preferredLocations = Array.from(new Set(values.preferredLocations || []));
+  // One pick; the stored set is that mode plus every less on-site one.
+  const picked = widestWorkMode(locationTypes);
 
-  const needsCities = locationTypes.includes("onsite") || locationTypes.includes("hybrid");
+  const needsCities = picked === "onsite" || picked === "hybrid";
 
-  function toggleMode(mode: (typeof WORK_MODES)[number]) {
-    update("locationTypes", cascadeWorkModes(locationTypes, mode));
+  function pickMode(mode: (typeof WORK_MODES)[number]) {
+    update("locationTypes", cascadeWorkModes([], mode));
   }
 
   function addCity(city: string) {
@@ -1644,20 +1804,29 @@ function LocationPreferencesStep({ values, update, errors }: StepProps) {
     <div className="space-y-6">
       {/* Work Modes */}
       <div>
-        <label className="block text-sm font-medium text-ink-800">
-          Internship Work Modes * (Select at least one)
-        </label>
-        <p className="mt-0.5 text-xs text-text-subtle">
-          Onsite includes hybrid and remote; hybrid includes remote.
+        <p id="locationTypes-label" className="block text-sm font-medium text-ink-800">
+          Work mode *
         </p>
-        <div className="mt-2.5 flex flex-wrap gap-2.5">
+        <p id="locationTypes-help" className="mt-0.5 text-xs text-text-subtle">
+          Pick the most on-site option you can do. Onsite also covers hybrid and remote; hybrid also covers remote.
+        </p>
+        <div
+          id="locationTypes"
+          role="radiogroup"
+          tabIndex={-1}
+          aria-labelledby="locationTypes-label"
+          aria-describedby="locationTypes-help"
+          className="mt-2.5 flex flex-wrap gap-2.5 outline-none"
+        >
           {WORK_MODES.map((mode) => {
-            const active = locationTypes.includes(mode);
+            const active = picked === mode;
             return (
               <button
                 key={mode}
                 type="button"
-                onClick={() => toggleMode(mode)}
+                role="radio"
+                aria-checked={active}
+                onClick={() => pickMode(mode)}
                 className={`apple-spring apple-pressable inline-flex min-h-11 items-center gap-2 rounded-[10px] border px-4 py-2.5 text-sm font-semibold capitalize ${
                   active
                     ? "border-brand-600 bg-brand-50 text-brand-800 shadow-2xs ring-1 ring-brand-600/30"
@@ -2151,7 +2320,6 @@ function Field({
       <label htmlFor={id} className="block text-sm font-medium text-ink-800">
         {label}
       </label>
-      {hint ? <p className="mt-0.5 text-xs text-text-subtle">{hint}</p> : null}
       <input
         id={id}
         name={id}
@@ -2166,14 +2334,10 @@ function Field({
         list={list}
         onChange={(e) => onChange(e.target.value)}
         aria-invalid={error ? true : undefined}
-        aria-describedby={error ? `${id}-error` : undefined}
+        aria-describedby={error ? `${id}-error` : hint ? `${id}-hint` : undefined}
         className={`${FIELD_BASE} ${error ? FIELD_BAD : FIELD_OK}`}
       />
-      {error ? (
-        <p id={`${id}-error`} className="mt-1 text-xs text-danger">
-          {error}
-        </p>
-      ) : null}
+      <FieldNote id={id} error={error} hint={hint} />
     </div>
   );
 }
@@ -2198,7 +2362,6 @@ function TextArea({
       <label htmlFor={id} className="block text-sm font-medium text-ink-800">
         {label}
       </label>
-      {hint ? <p className="mt-0.5 text-xs text-text-subtle">{hint}</p> : null}
       <textarea
         id={id}
         name={id}
@@ -2206,16 +2369,12 @@ function TextArea({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         aria-invalid={error ? true : undefined}
-        aria-describedby={error ? `${id}-error` : undefined}
+        aria-describedby={error ? `${id}-error` : hint ? `${id}-hint` : undefined}
         className={`apple-spring mt-2 w-full rounded-[10px] border bg-white px-3.5 py-2.5 text-[14px] leading-relaxed text-ink-900 outline-none focus-visible:ring-[3px] ${
           error ? FIELD_BAD : FIELD_OK
         }`}
       />
-      {error ? (
-        <p id={`${id}-error`} className="mt-1 text-xs text-danger">
-          {error}
-        </p>
-      ) : null}
+      <FieldNote id={id} error={error} hint={hint} />
     </div>
   );
 }
@@ -2242,14 +2401,13 @@ function SelectField({
       <label htmlFor={id} className="block text-sm font-medium text-ink-800">
         {label}
       </label>
-      {hint ? <p className="mt-0.5 text-xs text-text-subtle">{hint}</p> : null}
       <select
         id={id}
         name={id}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         aria-invalid={error ? true : undefined}
-        aria-describedby={error ? `${id}-error` : undefined}
+        aria-describedby={error ? `${id}-error` : hint ? `${id}-hint` : undefined}
         className={`${FIELD_BASE} pr-8 ${error ? FIELD_BAD : FIELD_OK}`}
       >
         {options.map((o) => (
@@ -2258,12 +2416,100 @@ function SelectField({
           </option>
         ))}
       </select>
-      {error ? (
-        <p id={`${id}-error`} className="mt-1 text-xs text-danger">
-          {error}
-        </p>
-      ) : null}
+      <FieldNote id={id} error={error} hint={hint} />
     </div>
+  );
+}
+
+/**
+ * The line under a control: the error when there is one, otherwise the hint.
+ * Hints sit below the input, never between label and input, so two fields
+ * side by side keep their inputs on the same line whichever has a hint.
+ */
+function FieldNote({ id, error, hint }: { id: string; error?: string; hint?: React.ReactNode }) {
+  if (error) {
+    return (
+      <p id={`${id}-error`} className="mt-1 text-xs text-danger">
+        {error}
+      </p>
+    );
+  }
+  return hint ? (
+    <p id={`${id}-hint`} className="mt-1 text-xs text-text-subtle">
+      {hint}
+    </p>
+  ) : null;
+}
+
+const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/**
+ * Month + year as two selects, stored as `YYYY-MM` (the legacy shape and what
+ * validation reads). A half-picked value is kept as "YYYY-" or "-MM" so the
+ * other select does not reset; validation reports it as incomplete.
+ */
+function MonthYearField({
+  id,
+  label,
+  value,
+  onChange,
+  error,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  error?: string;
+}) {
+  const match = /^(\d{4})?-(\d{2})?$/.exec(value);
+  const year = match?.[1] ?? "";
+  const month = match?.[2] ?? "";
+  const thisYear = new Date().getFullYear();
+  const years = Array.from({ length: 41 }, (_, i) => String(thisYear - i));
+  if (year && !years.includes(year)) years.push(year);
+  const set = (y: string, m: string) => onChange(y || m ? `${y}-${m}` : "");
+  const describedBy = error ? `${id}-error` : `${id}-hint`;
+  return (
+    <fieldset>
+      <legend className="block text-sm font-medium text-ink-800">{label}</legend>
+      <div className="mt-2 grid grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] gap-2">
+        <select
+          id={id}
+          aria-label={`${label.replace(/\s*\*$/, "")}: month`}
+          value={month}
+          onChange={(e) => set(year, e.target.value)}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={describedBy}
+          className={`${CONTROL} w-full pr-7 ${error ? FIELD_BAD : FIELD_OK}`}
+        >
+          <option value="">MM</option>
+          {MONTH_NAMES.map((name, i) => {
+            const mm = String(i + 1).padStart(2, "0");
+            return (
+              <option key={mm} value={mm}>
+                {mm} · {name}
+              </option>
+            );
+          })}
+        </select>
+        <select
+          aria-label={`${label.replace(/\s*\*$/, "")}: year`}
+          value={year}
+          onChange={(e) => set(e.target.value, month)}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={describedBy}
+          className={`${CONTROL} w-full pr-7 tabular-nums ${error ? FIELD_BAD : FIELD_OK}`}
+        >
+          <option value="">YYYY</option>
+          {years.map((y) => (
+            <option key={y} value={y}>
+              {y}
+            </option>
+          ))}
+        </select>
+      </div>
+      <FieldNote id={id} error={error} hint="MM / YYYY" />
+    </fieldset>
   );
 }
 
@@ -2289,7 +2535,7 @@ function PhoneField({
   hint?: React.ReactNode;
   disabled?: boolean;
 }) {
-  const codes = COUNTRY_CODES.includes(code as (typeof COUNTRY_CODES)[number]) ? COUNTRY_CODES : [code, ...COUNTRY_CODES];
+  const codes = DIAL_CODE_VALUES.includes(code) ? DIAL_CODES : [{ code, country: "" }, ...DIAL_CODES];
   return (
     <div>
       <label htmlFor={id} className="block text-sm font-medium text-ink-800">
@@ -2301,11 +2547,11 @@ function PhoneField({
           value={code}
           disabled={disabled}
           onChange={(e) => onCode?.(e.target.value)}
-          className={`${CONTROL} w-24 shrink-0 pr-7 ${FIELD_OK}`}
+          className={`${CONTROL} w-36 shrink-0 pr-7 ${FIELD_OK}`}
         >
           {codes.map((c) => (
-            <option key={c} value={c}>
-              {c}
+            <option key={c.code} value={c.code}>
+              {c.country ? `${c.code} · ${c.country}` : c.code}
             </option>
           ))}
         </select>

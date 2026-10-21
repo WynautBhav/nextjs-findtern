@@ -35,6 +35,7 @@ export function FaqExplorer({
   showSearch = true,
   showChips = true,
   showCategory = true,
+  email,
 }: {
   items: { id: string; category: string; question: string; answer: string }[];
   className?: string;
@@ -42,6 +43,8 @@ export function FaqExplorer({
   showChips?: boolean;
   /** Per-row category badge. Off when the page already splits by audience. */
   showCategory?: boolean;
+  /** "Still stuck?" address. Employer FAQs pass SITE.adminEmail; defaults to communicate@. */
+  email?: string;
 }) {
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("All");
@@ -160,7 +163,7 @@ export function FaqExplorer({
 
       <p className="mt-8 text-sm text-ink-600">
         Showing {filtered.length} of {items.length}. Still stuck?{" "}
-        <EmailLink />
+        <EmailLink email={email} />
       </p>
     </div>
   );

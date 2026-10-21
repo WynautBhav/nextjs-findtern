@@ -60,12 +60,15 @@ test("slots start on the quarter hour", async () => {
   assert.equal(isQuarterHourWall("2026-11-03T10:07"), false);
 });
 
-test("suggested slots: next quarter hour at least an hour out, then +1h and +2h", async () => {
+test("suggested slots: nearest quarter hour at least 15 min out, then +1h and +2h", async () => {
   const { suggestedSlots } = await import("./employer-interview-rules.ts");
-  // 10:07 IST on 19 Oct 2026 = 04:37 UTC.
+  // 10:07 IST on 19 Oct 2026 = 04:37 UTC -> 10:22 rounds up to 10:30.
   const now = Date.UTC(2026, 9, 19, 4, 37);
-  assert.deepEqual(suggestedSlots(now, "Asia/Kolkata"), ["2026-10-19T11:15", "2026-10-19T12:15", "2026-10-19T13:15"]);
-  // Exactly on a quarter, one hour ahead stays on it; crosses midnight cleanly.
-  const late = Date.UTC(2026, 9, 19, 17, 15); // 22:45 IST
-  assert.deepEqual(suggestedSlots(late, "Asia/Kolkata"), ["2026-10-19T23:45", "2026-10-20T00:45", "2026-10-20T01:45"]);
+  assert.deepEqual(suggestedSlots(now, "Asia/Kolkata"), ["2026-10-19T10:30", "2026-10-19T11:30", "2026-10-19T12:30"]);
+  // 10:14 IST -> 10:29 rounds to 10:30; 10:16 IST -> 10:31 rounds to 10:45.
+  assert.equal(suggestedSlots(Date.UTC(2026, 9, 19, 4, 44), "Asia/Kolkata")[0], "2026-10-19T10:30");
+  assert.equal(suggestedSlots(Date.UTC(2026, 9, 19, 4, 46), "Asia/Kolkata")[0], "2026-10-19T10:45");
+  // Exactly on a quarter, 15 minutes ahead stays on it; crosses midnight cleanly.
+  const late = Date.UTC(2026, 9, 19, 18, 15); // 23:45 IST
+  assert.deepEqual(suggestedSlots(late, "Asia/Kolkata"), ["2026-10-20T00:00", "2026-10-20T01:00", "2026-10-20T02:00"]);
 });

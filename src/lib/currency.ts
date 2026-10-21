@@ -45,18 +45,17 @@ export const DISPLAY_RATES = {
 
 export type DisplayCurrency = keyof typeof DISPLAY_RATES;
 
-/** Every currency a visitor can pick. INR is the authored card; the rest derive from USD. */
+/** Every currency a price can be shown in. INR is the authored card; the rest derive from USD. */
 export type PriceCurrency = "INR" | DisplayCurrency;
 
+/**
+ * What the marketing picker offers: INR or USD only, the two currencies
+ * Findtern bills in. A stored choice outside this list (an older EUR pick)
+ * fails isPriceCurrency and falls back to the timezone default.
+ */
 export const PRICE_CURRENCIES: { code: PriceCurrency; label: string }[] = [
   { code: "INR", label: "Indian rupee" },
   { code: "USD", label: "US dollar" },
-  { code: "EUR", label: "Euro" },
-  { code: "GBP", label: "British pound" },
-  { code: "AED", label: "UAE dirham" },
-  { code: "SGD", label: "Singapore dollar" },
-  { code: "AUD", label: "Australian dollar" },
-  { code: "CAD", label: "Canadian dollar" },
 ];
 
 export function isPriceCurrency(value: string): value is PriceCurrency {

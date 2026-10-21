@@ -59,9 +59,52 @@ export const NON_TECH_SKILLS: string[] = [
   "Video Editing",
 ];
 
+/**
+ * Technical skills, offered as one-tap picks next to the non-technical ones.
+ * Every entry is spelled exactly as in the legacy vocabulary, so a pick here
+ * stores the same string the legacy picker would.
+ */
+export const TECH_SKILLS: string[] = [
+  "Python",
+  "JavaScript",
+  "TypeScript",
+  "React",
+  "Node.js",
+  "Next.js",
+  "HTML",
+  "CSS",
+  "SQL",
+  "Java",
+  "C++",
+  "Data Analysis",
+  "Machine Learning",
+  "Deep Learning",
+  "Data Visualization",
+  "Power BI",
+  "Tableau",
+  "Pandas",
+  "Figma",
+  "UI/UX Design",
+  "AWS",
+  "Docker",
+  "Git",
+  "Linux",
+  "MongoDB",
+  "PostgreSQL",
+  "MySQL",
+  "Django",
+  "Flutter",
+  "Kotlin",
+  "Angular",
+  "Spring Boot",
+  "REST API",
+  "Cybersecurity",
+  "SEO",
+];
+
 const KNOWN = new Set(SKILLS.map((s) => s.toLowerCase()));
 /** What the picker searches: the legacy list plus non-technical skills it lacks. */
-const POOL: string[] = [...SKILLS, ...NON_TECH_SKILLS.filter((s) => !KNOWN.has(s.toLowerCase()))];
+const POOL: string[] = [...SKILLS, ...[...TECH_SKILLS, ...NON_TECH_SKILLS].filter((s) => !KNOWN.has(s.toLowerCase()))];
 
 /**
  * Case- and punctuation-insensitive key for a skill, so "React.js", "react js"

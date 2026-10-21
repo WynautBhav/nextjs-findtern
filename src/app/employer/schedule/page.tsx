@@ -3,6 +3,7 @@ import { desc, eq, inArray } from "drizzle-orm";
 
 import { getDb, schema } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
+import { requireEmployerSetup } from "@/lib/employer-setup";
 import { canMarkMissed, displayInterviewStatus, isMeetingLinkLive } from "@/lib/employer-interview-rules";
 import { PageHeader, EmptyState } from "@/components/layout/page-header";
 import { Pill } from "@/components/app/primitives";
@@ -28,6 +29,7 @@ import { InterviewActions } from "@/components/employer/interview-actions";
  */
 export default async function EmployerSchedule() {
   const session = await requireRole("employer");
+  await requireEmployerSetup(session.uid);
   const uid = session.uid;
 
   let rows: (typeof schema.interviews.$inferSelect)[] = [];

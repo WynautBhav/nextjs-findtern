@@ -23,6 +23,7 @@ import { TiltCard } from "@/components/motion/tilt-card";
 import { CountUp } from "@/components/motion/count-up";
 import { FaqExplorer } from "@/components/marketing/faq-explorer";
 import { HAPPY_FACES } from "@/lib/content/proof";
+import { SITE } from "@/lib/content/site";
 import { TestimonialCarousel } from "@/components/marketing/testimonial-carousel";
 import { JsonLd } from "@/components/seo/json-ld";
 import { breadcrumbJsonLd, faqJsonLd, howToJsonLd, webPageJsonLd } from "@/lib/seo";
@@ -381,6 +382,7 @@ export default async function EmployersPage() {
             showSearch={false}
             showChips={false}
             items={EMPLOYER_FAQ}
+            email={SITE.adminEmail}
           />
         </div>
       </PageSection>

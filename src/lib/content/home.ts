@@ -40,7 +40,7 @@ export const POPULAR_STEPS: PopularStep[] = [
     icon: "file-text",
   },
   {
-    title: "Skill-Based AI Interview",
+    title: "Skill Based AI Interview",
     description:
       "Candidates choose the skills they want to be hired for, and our AI interviews them on exactly those skills.",
     image: "/media/AIinterview.jpg",

@@ -7,6 +7,7 @@ import {
   ShieldCheck,
   Sparkles,
   Wallet,
+  XCircle,
   Zap,
 } from "lucide-react";
 
@@ -18,19 +19,26 @@ import { CountUp } from "@/components/motion/count-up";
 import { FaqExplorer } from "@/components/marketing/faq-explorer";
 import { JsonLd } from "@/components/seo/json-ld";
 import { breadcrumbJsonLd, faqJsonLd, webPageJsonLd } from "@/lib/seo";
+import { getInternActivationFeeMinor } from "@/lib/platform-settings";
 
-export const metadata: Metadata = {
-  title: "Guaranteed Internship Program: Placed or Your Fee Back",
-  description:
-    "Findtern's internship guarantee for students in India: placed within 18 months of your score or the ₹2,499 fee is refunded in full. The process, the three conditions, exclusions and refund timing.",
-  alternates: { canonical: "/guaranteed-internship-program" },
-};
+/** The fee is admin-editable (platform_settings), so the page and its
+    metadata read it rather than a hardcoded figure. Whole rupees. */
+async function getFeeRupees(): Promise<number> {
+  return Math.round((await getInternActivationFeeMinor()) / 100);
+}
+
+export async function generateMetadata(): Promise<Metadata> {
+  const fee = await getFeeRupees();
+  return {
+    title: "Guaranteed Internship Program: Placed or Your Fee Back",
+    description: `Findtern's internship guarantee for students in India: placed within 18 months of your score or the ₹${fee.toLocaleString("en-IN")} fee is refunded in full. The process, the three conditions, exclusions and refund timing.`,
+    alternates: { canonical: "/guaranteed-internship-program" },
+  };
+}
 
 /* Terms of record, transcribed from the guarantee as published in the Terms
    and Conditions and on the live site. These are the same numbers that appear
    on the terms page - kept in one place so they cannot drift apart. */
-
-const FEE = 2499;
 
 const STEPS = [
   {
@@ -124,8 +132,8 @@ const CONDITIONS = [
   },
 ];
 
-const TERMS = [
-  { label: "Fee", value: `₹${FEE.toLocaleString("en-IN")}`, note: "refundable on conditions" },
+const termsFor = (fee: number) => [
+  { label: "Fee", value: `₹${fee.toLocaleString("en-IN")}`, note: "refundable on conditions" },
   { label: "Clock starts", value: "Your score", note: "not your sign-up date" },
   { label: "Refund timing", value: "After 18 months", note: "not during the window" },
   { label: "Lock-in on you", value: "None", note: "the obligation runs on us" },
@@ -212,7 +220,8 @@ const FAQS = [
   },
 ];
 
-export default function GuaranteePage() {
+export default async function GuaranteePage() {
+  const [fee, metadata] = await Promise.all([getFeeRupees(), generateMetadata()]);
   return (
     <>
       <JsonLd
@@ -269,7 +278,7 @@ export default function GuaranteePage() {
       {/* ── Terms at a glance ──────────────────────────────────────── */}
       <PageSection tone="muted">
         <dl className="grid gap-5 sm:grid-cols-2 lg:grid-cols-5">
-          {TERMS.map((t) => (
+          {termsFor(fee).map((t) => (
             <div
               key={t.label}
               className="rounded-2xl border border-ink-200 bg-white p-5 shadow-2xs"
@@ -444,6 +453,11 @@ export default function GuaranteePage() {
                 title: "A score you never completed",
                 body: "The clock only starts when the assessment is scored. An unscored profile is not under guarantee.",
               },
+              {
+                Icon: XCircle,
+                title: "More than 3 offers turned down",
+                body: "Reject more than 3 offers and you are no longer eligible for the refund. Only formal offers count, not interview requests.",
+              },
             ].map(({ Icon, title, body }) => (
               <li
                 key={title}
@@ -503,7 +517,7 @@ export default function GuaranteePage() {
             </p>
             <div className="mt-8 flex items-baseline gap-3">
               <p className="text-5xl font-bold tracking-tight text-primary">
-                <CountUp value={FEE} prefix="₹" />
+                <CountUp value={fee} prefix="₹" />
               </p>
               <p className="text-sm text-ink-600">
                 one-time fee,

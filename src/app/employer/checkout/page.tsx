@@ -4,6 +4,7 @@ import { ShieldCheck } from "lucide-react";
 
 import { getDb, schema } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
+import { requireEmployerSetup } from "@/lib/employer-setup";
 import { formatMoney } from "@/lib/format";
 import { and, eq } from "drizzle-orm";
 import { payableCheckout, type PayableLine } from "@/lib/employer-payable";
@@ -38,6 +39,7 @@ export const metadata: Metadata = {
 
 export default async function EmployerCheckout() {
   const session = await requireRole("employer");
+  await requireEmployerSetup(session.uid);
   const uid = session.uid;
 
   let lines: PayableLine[] = [];

@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -27,7 +27,8 @@ export async function POST(req: Request) {
   const [employer] = await db
     .select()
     .from(schema.employers)
-    .where(eq(schema.employers.companyEmail, parsed.data.email))
+    // Legacy rows may carry mixed-case addresses; the input is already lower-cased.
+    .where(sql`lower(${schema.employers.companyEmail}) = ${parsed.data.email}`)
     .limit(1);
 
   if (!employer || !(await verifyPassword(parsed.data.password, employer.password))) {
@@ -38,7 +39,7 @@ export async function POST(req: Request) {
   }
 
   if (!employer.isActive) {
-    return NextResponse.json({ error: "This account has been deactivated. Contact communicate@findtern.in." }, { status: 403 });
+    return NextResponse.json({ error: "This account has been deactivated. Contact admin@findtern.in." }, { status: 403 });
   }
 
   if (needsRehash(employer.password)) {

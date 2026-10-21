@@ -7,6 +7,7 @@ import { SITE, getGmailComposeUrl } from "@/lib/content/site";
 import { cn } from "@/lib/utils";
 import { EmailLink } from "@/components/marketing/email-link";
 import { INDIA_CODE, phoneError, phoneHint } from "@/lib/phone";
+import { DIAL_CODES } from "@/lib/data/dial-codes";
 
 /**
  * Contact form.
@@ -145,7 +146,7 @@ export function ContactForm() {
         </h3>
         <p className="mt-2 max-w-sm text-base leading-relaxed text-ink-600">
           We read every one. If it needs a faster answer, email{" "}
-          <EmailLink subject="Findtern enquiry follow-up" />
+          <EmailLink email={inboxFor(v)} subject="Findtern enquiry follow-up" />
         </p>
       </div>
     );
@@ -226,11 +227,11 @@ export function ContactForm() {
               aria-label="Country code"
               value={v.countryCode}
               onChange={set("countryCode")}
-              className={cn(inputCls, "w-28 shrink-0")}
+              className={cn(inputCls, "w-36 shrink-0")}
             >
-              {["+91", "+1", "+44", "+61", "+65", "+971", "+27"].map((c) => (
-                <option key={c} value={c}>
-                  {c}
+              {DIAL_CODES.map((d) => (
+                <option key={d.code} value={d.code}>
+                  {d.code} · {d.country}
                 </option>
               ))}
             </select>
@@ -384,10 +385,15 @@ function formatBody(v: Values) {
   return lines.join("\n");
 }
 
+/** Hiring enquiries go to the employer inbox; everything else to communicate@. */
+function inboxFor(v: Values) {
+  return v.queryType === "hiring" ? SITE.adminEmail : SITE.email;
+}
+
 function gmailUrl(v: Values) {
   const subject = v.subject.trim() || `Findtern enquiry - ${v.queryType}`;
   return getGmailComposeUrl({
-    to: SITE.email,
+    to: inboxFor(v),
     subject,
     body: formatBody(v),
   });

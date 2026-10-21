@@ -11,7 +11,7 @@ import { GetStartedMenu } from "@/components/layout/get-started-menu";
 import { NAV_LINKS } from "@/lib/content/site";
 import { cn } from "@/lib/utils";
 import { Logo } from "@/components/brand/logo";
-import { EmailLink } from "@/components/marketing/email-link";
+import { ContactEmailLink } from "@/components/marketing/email-link";
 
 /**
  * Site header.
@@ -107,7 +107,7 @@ export function SiteHeader() {
           <Logo
             alt="Findtern - Internship Simplified"
             priority
-            className={cn("transition-all duration-200", scrolled ? "h-8" : "h-9.5")}
+            className={cn("transition-all duration-200", scrolled ? "h-10" : "h-11")}
           />
         </Link>
 
@@ -216,7 +216,7 @@ export function SiteHeader() {
               >
                 Sign in
               </Link>
-              <EmailLink className="text-sm" />
+              <ContactEmailLink className="text-sm" />
             </div>
           </nav>
         </div>

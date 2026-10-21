@@ -9,11 +9,13 @@ import {
   emptyDraft,
   formatProblems,
   monthLabel,
+  profileCompletion,
   scoreProblem,
   storedFromDraft,
   toMonth,
   validateProfile,
   validateStep,
+  widestWorkMode,
   type OnboardingDraft,
 } from "./onboarding.ts";
 
@@ -161,18 +163,20 @@ function complete(): OnboardingDraft {
     locationTypes: ["remote"],
     hasLaptop: true,
     ndaAccepted: true,
+    bank: { accountHolderName: "Asha Rao", bankName: "State Bank of India", accountNumber: "123456789012", ifscCode: "SBIN0001234", upiId: "" },
   };
 }
-const ctx = { hasPanImage: true, hasPhoto: true, now: NOW };
+const ctx = { hasPanImage: true, hasAadhaarImage: true, hasPhoto: true, now: NOW };
 
 test("a complete profile passes every step", () => {
   assert.equal(validateProfile(complete(), ctx), null);
 });
 
-test("Aadhaar number and PAN image are required on the About step", () => {
-  const e = validateStep({ ...complete(), aadhaarNumber: "" }, 0, { ...ctx, hasPanImage: false });
+test("Aadhaar number, Aadhaar image and PAN image are required on the About step", () => {
+  const e = validateStep({ ...complete(), aadhaarNumber: "" }, 0, { ...ctx, hasPanImage: false, hasAadhaarImage: false });
   assert.ok(e.aadhaarNumber);
   assert.ok(e.panImage);
+  assert.ok(e.aadhaarImage);
   assert.match(validateStep({ ...complete(), aadhaarNumber: "12345" }, 0, ctx).aadhaarNumber, /12 digits/);
   assert.ok(validateStep({ ...complete(), aadhaarNumber: "123456789012" }, 0, ctx).aadhaarNumber, "cannot start with 1");
 });
@@ -282,4 +286,40 @@ test("UPI ID is optional but must look like name@bank", () => {
   assert.equal(bankProblem(bank), null);
   assert.equal(bankProblem({ ...bank, upiId: "sunita.sharma@okaxis" }), null);
   assert.ok(bankProblem({ ...bank, upiId: "not-a-upi" }));
+});
+
+test("bank details are required on the About step, field by field", () => {
+  const base = complete();
+  assert.deepEqual(validateStep(base, 0, ctx), {});
+  const e = validateStep({ ...base, bank: { ...base.bank, bankName: "", ifscCode: "SBIN1" } }, 0, ctx);
+  assert.ok(e.bankName);
+  assert.ok(e.bankIfscCode);
+  assert.equal(e.bankAccountNumber, undefined);
+  assert.ok(validateStep(base, 0, { ...ctx, bankAccountConfirm: "123456789099" }).bankAccountConfirm);
+  assert.equal(validateStep(base, 0, { ...ctx, bankAccountConfirm: "123456789012" }).bankAccountConfirm, undefined);
+});
+
+test("one work mode is shown: the widest stored", () => {
+  assert.equal(widestWorkMode(["remote", "hybrid", "onsite"]), "onsite");
+  assert.equal(widestWorkMode(["Remote", "On-site"]), "onsite");
+  assert.equal(widestWorkMode(["remote", "hybrid"]), "hybrid");
+  assert.equal(widestWorkMode([]), null);
+});
+
+test("profile completion: Aadhaar image counts, marksheet does not", () => {
+  const row = {
+    bio: "Final-year student who builds things.",
+    linkedinUrl: "https://www.linkedin.com/in/someone",
+    city: "Jaipur",
+    state: "Rajasthan",
+    pinCode: "302017",
+    aadhaarNumber: "234567890123",
+    panNumber: "ABCDE1234F",
+  };
+  const ids = profileCompletion(row, { hasPanImage: true, hasAadhaarImage: true }).items.map((i) => i.id);
+  assert.ok(!ids.includes("marksheet"));
+  const identity = (aadhaar: boolean) =>
+    profileCompletion(row, { hasPanImage: true, hasAadhaarImage: aadhaar }).items.find((i) => i.id === "identity")?.done;
+  assert.equal(identity(true), true);
+  assert.equal(identity(false), false);
 });

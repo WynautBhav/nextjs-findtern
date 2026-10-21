@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import { FileUpload } from "@/components/app/file-upload";
+import { CityField, CountrySelect, StateField, districtOptions } from "@/components/employer/location-fields";
+import { isIndiaCountry } from "@/lib/data/countries";
 
 import { suggestSkills } from "@/lib/data/skills";
 import { csrfFetch } from "@/lib/client-fetch";
@@ -283,6 +285,7 @@ export function EmployerOnboardingForm({
                 setSkillDraft={setSkillDraft}
                 placeDraft={placeDraft}
                 setPlaceDraft={setPlaceDraft}
+                india={isIndiaCountry(values.company.country)}
               />
             )}
           </div>
@@ -422,26 +425,30 @@ function CompanyStage({
       </div>
 
       <div className="grid gap-5 sm:grid-cols-3">
-        <Field
-          id="city"
-          label="City"
-          value={values.city}
-          error={errors.city}
-          onChange={(v) => setCompany({ city: v })}
-        />
-        <Field
-          id="state"
-          label="State"
-          value={values.state}
-          error={errors.state}
-          onChange={(v) => setCompany({ state: v })}
-        />
-        <Field
+        <CountrySelect
           id="country"
           label="Country"
           value={values.country}
           error={errors.country}
           onChange={(v) => setCompany({ country: v })}
+        />
+        <StateField
+          id="state"
+          label="State"
+          india={isIndiaCountry(values.country)}
+          value={values.state}
+          error={errors.state}
+          onChange={(v) => setCompany({ state: v })}
+        />
+        <CityField
+          id="city"
+          label="City"
+          india={isIndiaCountry(values.country)}
+          state={values.state}
+          onStateChange={(v) => setCompany({ state: v })}
+          value={values.city}
+          error={errors.city}
+          onChange={(v) => setCompany({ city: v })}
         />
       </div>
 
@@ -554,6 +561,7 @@ function ProjectStage({
   setSkillDraft,
   placeDraft,
   setPlaceDraft,
+  india,
 }: {
   values: ProjectDraft;
   errors: Record<string, string>;
@@ -562,6 +570,8 @@ function ProjectStage({
   setSkillDraft: (v: string) => void;
   placeDraft: string;
   setPlaceDraft: (v: string) => void;
+  /** The company is in India: state/city pickers apply to the project too. */
+  india: boolean;
 }) {
   function toggleWorkMode(mode: string) {
     setProject({
@@ -642,18 +652,22 @@ function ProjectStage({
 
       {values.locationType && values.locationType !== "remote" ? (
         <div className="grid gap-5 sm:grid-cols-3">
-          <Field
+          <StateField
+            id="projectState"
+            label="State"
+            india={india}
+            value={values.state}
+            onChange={(v) => setProject({ state: v })}
+          />
+          <CityField
             id="projectCity"
             label="City"
+            india={india}
+            state={values.state}
+            onStateChange={(v) => setProject({ state: v })}
             value={values.city}
             error={errors.projectCity}
             onChange={(v) => setProject({ city: v })}
-          />
-          <Field
-            id="projectState"
-            label="State"
-            value={values.state}
-            onChange={(v) => setProject({ state: v })}
           />
           <Field
             id="projectPincode"
@@ -670,8 +684,9 @@ function ProjectStage({
       <ChipInput
         id="preferredLocations"
         label="Preferred locations"
-        hint="Optional. City or region names, up to 5."
+        hint="Optional. Up to 5 cities - pick from the suggestions or type your own."
         placeholder="Bengaluru"
+        suggest={(q) => districtOptions(q).map((d) => d.district)}
         entries={values.preferredLocations}
         max={5}
         draft={placeDraft}

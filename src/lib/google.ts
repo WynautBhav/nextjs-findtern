@@ -156,6 +156,8 @@ export function oauthErrorMessage(code: string | undefined): string | null {
       return null;
     case "gmail_only":
       return "Use a personal Gmail address to continue with Google. Work and college accounts are not accepted.";
+    case "company_email_only":
+      return "Employer accounts need a company Google Workspace address. Personal Gmail and other free mailboxes cannot register a company.";
     case "no_email":
       return "Google did not share a verified email address for that account. Try another account, or sign up with your email.";
     case "inactive":

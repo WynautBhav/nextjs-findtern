@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import {
   ArrowRight,
   BadgeCheck,
@@ -114,7 +115,7 @@ const INTERN_FAQ = [
       category: "Guarantee",
       question: "How many offers can I turn down?",
       answer:
-        "Up to 3 during the 18-month window. Turning down a 4th ends the guarantee. Only formal offers count - an interview request you pass on is not an offer.",
+        "Up to 3 during the 18-month window. Reject more than 3 offers and you are no longer eligible for the refund. Only formal offers count - an interview request you pass on is not an offer.",
     },
     {
       id: "i4",
@@ -157,7 +158,26 @@ export default async function InternsPage() {
             <span className="text-primary">fee back</span>.
           </>
         }
-        lead="One assessment produces a score you can see the working for. Pay once to be assessed, and if we do not place you within 18 months, the fee comes back."
+        lead={
+          <>
+            One assessment produces a score you can see the working for. Pay once to be assessed, and if we do not place you within 18 months, the fee comes back.
+            {/* The price, in one line. A candidate wants their own number here,
+                not three clicks away inside the guarantee terms. */}
+            <span className="mt-4 block text-base text-ink-700">
+              One-time fee{" "}
+              <strong className="font-semibold tabular-nums text-ink-900">
+                {formatMoney(feeMinor, "INR", { zeroLabel: false })}
+              </strong>
+              , refunded in full if you are not placed.{" "}
+              <Link
+                href="/guaranteed-internship-program"
+                className="font-medium text-primary underline-offset-4 hover:underline focus-visible:underline"
+              >
+                How the guarantee works
+              </Link>
+            </span>
+          </>
+        }
       >
         <ButtonLink href="/signup" variant="primary" size="lg">
           Get assessed
@@ -167,53 +187,6 @@ export default async function InternsPage() {
           Read the guarantee
         </ButtonLink>
       </PageHero>
-
-      {/* ── The score is the price ──────────────────────────────────── */}
-      {/* ── What it costs you ─────────────────────────────────────────
-          The employer rate card used to sit here. A candidate reading this
-          page wants their own price, and it was three clicks away inside
-          the guarantee terms. */}
-      <PageSection tone="muted">
-        <div className="grid gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-center lg:gap-16">
-          <div>
-            <SectionHeading lead="What it" accent="costs you" align="left" />
-            <p className="mt-6 text-balance text-xl leading-relaxed text-ink-700">
-              Your profile is free. To be assessed and shown to employers you pay
-              once, and that fee comes back if we do not place you.
-            </p>
-            <p className="mt-4 text-base leading-relaxed text-muted-foreground">
-              Your score never changes what you pay. It decides which employers see you.
-            </p>
-          </div>
-
-          <div className="rounded-2xl border border-ink-200 bg-white p-6 sm:p-8">
-            <p className="text-sm text-ink-600">One-time fee</p>
-            <p className="mt-1 text-5xl font-semibold tabular-nums tracking-[-0.03em] text-ink-900">
-              {formatMoney(feeMinor, "INR", { zeroLabel: false })}
-            </p>
-            <ul className="mt-6 divide-y divide-ink-100 border-y border-ink-100 text-sm">
-              {[
-                ["Covers", "Your AI interview, the aptitude test and your Findtern Score report."],
-                ["Paid", "Once. No subscription, no renewal, nothing per application."],
-                ["Refund", "In full, if you are not placed in a paid internship within 18 months of your score."],
-              ].map(([term, detail]) => (
-                <li key={term} className="grid grid-cols-[5.5rem_minmax(0,1fr)] gap-4 py-3.5">
-                  <span className="font-medium text-ink-900">{term}</span>
-                  <span className="leading-relaxed text-ink-600">{detail}</span>
-                </li>
-              ))}
-            </ul>
-            <div className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-3">
-              <ButtonLink href="/signup" variant="primary" size="md">
-                Create a free profile
-              </ButtonLink>
-              <ButtonLink href="/guaranteed-internship-program" variant="link" size="md" className="px-0">
-                How the refund works
-              </ButtonLink>
-            </div>
-          </div>
-        </div>
-      </PageSection>
 
       {/* ── Five stages ─────────────────────────────────────────────── */}
       <PageSection>

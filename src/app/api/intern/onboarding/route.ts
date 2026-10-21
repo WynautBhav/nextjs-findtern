@@ -190,7 +190,8 @@ export async function POST(req: Request) {
   // Impossible values are refused even on a draft save; completeness is not.
   const format = formatProblems(parsed.data);
   if (format) return NextResponse.json({ error: format }, { status: 400 });
-  // Bank details are saved on their own (Bank details page) and only in full.
+  // Bank details are saved only in full - from Settings, or from the About Me
+  // step (which leaves them out of a draft save until they are complete).
   if (parsed.data.bank) {
     const bank = bankProblem(parsed.data.bank);
     if (bank) return NextResponse.json({ error: bank }, { status: 400 });
@@ -234,7 +235,11 @@ export async function POST(req: Request) {
       .where(eq(schema.users.id, session.uid))
       .limit(1);
     const [doc] = await db
-      .select({ pan: schema.internDocuments.panImageName, photo: schema.internDocuments.profilePhotoName })
+      .select({
+        pan: schema.internDocuments.panImageName,
+        aadhaar: schema.internDocuments.aadhaarImageName,
+        photo: schema.internDocuments.profilePhotoName,
+      })
       .from(schema.internDocuments)
       .where(eq(schema.internDocuments.userId, session.uid))
       .limit(1);
@@ -248,6 +253,7 @@ export async function POST(req: Request) {
     };
     const failed = validateProfile(full, {
       hasPanImage: Boolean(doc?.pan),
+      hasAadhaarImage: Boolean(doc?.aadhaar),
       hasPhoto: Boolean(doc?.photo),
       ownPhone: account?.phoneNumber ? { countryCode: account.countryCode || "+91", phoneNumber: account.phoneNumber } : null,
     });

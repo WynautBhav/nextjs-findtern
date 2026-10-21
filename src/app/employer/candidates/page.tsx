@@ -29,6 +29,7 @@ import { attachPhotos, candidatePoolClauses, scoreExpr } from "@/lib/employer-po
 import { requireEmployerSetup } from "@/lib/employer-setup";
 import { employerRegion, resolvePricing, type Currency } from "@/lib/employer-pricing";
 import { BANDS, PLAN_NAME, type BandId } from "@/lib/score";
+import { CityFilter } from "@/components/employer/city-filter";
 import { SkillFilter } from "@/components/employer/skill-filter";
 import { CandidateCard } from "@/components/employer/candidate-card";
 import { CandidateAvatar } from "@/components/employer/candidate-avatar";
@@ -354,7 +355,7 @@ export default async function CandidatesPage({
     pages = Math.max(1, Math.ceil(total / filters.pageSize));
     const start = (Math.min(filters.page, pages) - 1) * filters.pageSize;
     candidates = profiles.slice(start, start + filters.pageSize);
-    await attachPhotos(db, candidates).catch(() => undefined);
+    await attachPhotos(db, candidates, nameUnlocked).catch(() => undefined);
 
     plans = await db.select().from(schema.pricingPlans).where(eq(schema.pricingPlans.isActive, true));
     if (candidates.length > 0) {
@@ -399,7 +400,7 @@ export default async function CandidatesPage({
             label="Keyword"
             placeholder="Skill, bio, or city…"
           />
-          <TextQuery name="city" label="Cities" defaultValue={filters.city} placeholder="Bengaluru, Pune" />
+          <CityFilter key={filters.city} defaultValue={filters.city} />
           <SelectQuery
             name="mode"
             label="Work mode"

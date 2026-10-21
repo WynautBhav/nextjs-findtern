@@ -118,6 +118,7 @@ export default async function InternHome() {
   // Profile → activation → AI interview, in that order, until all three are done.
   const completion = profileCompletion(data.onboarding, {
     hasPanImage: Boolean(data.document?.panImageName),
+    hasAadhaarImage: Boolean(data.document?.aadhaarImageName),
     hasPhoto: Boolean(data.document?.profilePhotoName),
   });
   const gettingStarted = !working && (!completion.complete || !activated || score === null);
@@ -196,8 +197,8 @@ export default async function InternHome() {
             )}
           </section>
 
-          {/* Roles open up once the profile is complete and activation is paid. */}
-          {!working && completion.complete && activated && openRoles.length > 0 ? (
+          {/* Roles open up once activation is paid (payment needs a complete profile). */}
+          {!working && activated && openRoles.length > 0 ? (
             <section>
               <SectionHead
                 title="Open roles"

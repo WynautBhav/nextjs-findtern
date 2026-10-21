@@ -13,6 +13,7 @@ import { OfferNote, PlanPrice } from "@/components/marketing/plan-price";
 import { PricingCalculator } from "@/components/marketing/pricing-calculator";
 import { WhereMoneyGoes } from "@/components/marketing/where-money-goes";
 import { pricingFaq } from "@/lib/content/pricing-faq";
+import { SITE } from "@/lib/content/site";
 import type { CmsPlan } from "@/lib/content/types";
 import { planHasOffer } from "@/lib/plan-offer";
 import { cn } from "@/lib/utils";
@@ -326,6 +327,7 @@ export function PricingContent({
             showSearch={false}
             showChips={false}
             items={pricingFaq(formatMoney(perHireMinor, currency))}
+            email={SITE.adminEmail}
           />
         </div>
       </PageSection>

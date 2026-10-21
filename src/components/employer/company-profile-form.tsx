@@ -11,6 +11,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { FileUpload } from "@/components/app/file-upload";
+import { CityField, CountrySelect, StateField } from "@/components/employer/location-fields";
+import { isIndiaCountry } from "@/lib/data/countries";
 
 import { csrfFetch } from "@/lib/client-fetch";
 import { phoneError } from "@/lib/phone";
@@ -102,9 +104,11 @@ export function CompanyProfileForm({
   const [error, setError] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const set = (key: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const set = (key: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+    setValue(key)(e.target.value);
+  const setValue = (key: string) => (value: string) => {
     setState("idle");
-    setValues((v) => ({ ...v, [key]: e.target.value }));
+    setValues((v) => ({ ...v, [key]: value }));
     setErrors((prev) => {
       const next = { ...prev };
       delete next[key];
@@ -234,9 +238,27 @@ export function CompanyProfileForm({
       <fieldset className="space-y-4">
         <legend className="text-sm font-semibold text-ink-900">Location</legend>
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          <Text id="country" label="Country" value={values.country} onChange={set("country")} error={errors.country} required />
-          <Text id="state" label="State" value={values.state} onChange={set("state")} error={errors.state} required />
-          <Text id="city" label="City" value={values.city} onChange={set("city")} error={errors.city} required />
+          <CountrySelect id="country" label="Country" value={values.country} onChange={setValue("country")} error={errors.country} required />
+          <StateField
+            id="state"
+            label="State"
+            india={isIndiaCountry(values.country)}
+            value={values.state}
+            onChange={setValue("state")}
+            error={errors.state}
+            required
+          />
+          <CityField
+            id="city"
+            label="City"
+            india={isIndiaCountry(values.country)}
+            state={values.state}
+            onStateChange={setValue("state")}
+            value={values.city}
+            onChange={setValue("city")}
+            error={errors.city}
+            required
+          />
         </div>
       </fieldset>
 

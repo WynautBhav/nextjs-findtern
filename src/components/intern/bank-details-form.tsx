@@ -5,6 +5,7 @@ import { Check, Loader2 } from "lucide-react";
 
 import { Surface } from "@/components/app/primitives";
 import { csrfFetch } from "@/lib/client-fetch";
+import { BANKS } from "@/lib/data/banks";
 
 export type BankDetails = {
   bankName?: string;
@@ -45,7 +46,7 @@ export function BankDetailsForm({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           bank: {
-            bankName,
+            bankName: bankName.trim(),
             accountHolderName: accountHolderName.trim(),
             accountNumber,
             ifscCode: ifscCode.toUpperCase().trim(),
@@ -78,11 +79,21 @@ export function BankDetailsForm({
               id="bank-name"
               type="text"
               required
-              placeholder="e.g. State Bank of India"
+              placeholder="Start typing, e.g. State Bank of India"
               value={bankName}
+              list="bank-name-options"
+              autoComplete="off"
               onChange={(e) => setBankName(e.target.value)}
               className={input}
             />
+            <datalist id="bank-name-options">
+              {BANKS.map((b) => (
+                <option key={b} value={b} />
+              ))}
+            </datalist>
+            <span className="mt-1 block text-xs font-normal text-text-subtle">
+              Pick from the list, or type the full name if your bank is not there.
+            </span>
           </label>
 
           <label htmlFor="bank-account-holder" className={label}>

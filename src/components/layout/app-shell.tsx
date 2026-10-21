@@ -35,6 +35,7 @@ import {
 import { breadcrumbsFor } from "@/lib/breadcrumbs";
 import { csrfFetch } from "@/lib/client-fetch";
 import { Logo } from "@/components/brand/logo";
+import { SITE } from "@/lib/content/site";
 
 export type NavItem = {
   href: string;
@@ -354,7 +355,7 @@ export function AppShell({
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
                   <a
-                    href="mailto:communicate@findtern.in"
+                    href={`mailto:${SITE.adminEmail}`}
                     className="flex items-center gap-2 cursor-pointer text-ink-600"
                   >
                     <HelpCircle className="size-3.5 text-ink-500" />

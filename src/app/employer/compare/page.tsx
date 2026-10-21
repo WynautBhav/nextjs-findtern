@@ -14,6 +14,7 @@ import {
 
 import { getDb, schema } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
+import { requireEmployerSetup } from "@/lib/employer-setup";
 import { bandFor } from "@/lib/score";
 import { formatRate } from "@/lib/format";
 import {
@@ -44,6 +45,7 @@ export default async function CompareCandidates({
   searchParams: Promise<{ ids?: string | string[]; project?: string | string[] }>;
 }) {
   const session = await requireRole("employer");
+  await requireEmployerSetup(session.uid);
   const { ids: idsParam, project: projectParamRaw } = await searchParams;
   const raw = Array.isArray(idsParam) ? idsParam.join(",") : (idsParam ?? "");
   const projectParam = Array.isArray(projectParamRaw) ? projectParamRaw[0] : projectParamRaw;
@@ -149,7 +151,7 @@ export default async function CompareCandidates({
           .map((id) => byId.get(id))
           .filter((row): row is NonNullable<typeof row> => Boolean(row))
           .map((row) => toCandidateProfile(row, onboardingByUser.get(row.id)));
-        await attachPhotos(db, candidates).catch(() => undefined);
+        await attachPhotos(db, candidates, nameUnlocked).catch(() => undefined);
 
         const [employer] = await db
           .select({

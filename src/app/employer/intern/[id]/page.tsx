@@ -238,9 +238,10 @@ export default async function EmployerInternDetail({
         .limit(1);
 
       profile = toCandidateProfile(user, onboarding);
+      // Photo follows the name: initials until hired.
+      await attachPhotos(db, [profile], { has: () => nameUnlocked }).catch(() => undefined);
       if (onboarding) details = draftFromRecord(onboarding);
       plans = await db.select().from(schema.pricingPlans).where(eq(schema.pricingPlans.isActive, true));
-      await attachPhotos(db, [profile]).catch(() => undefined);
 
       const [employer] = await db
         .select({

@@ -8,7 +8,7 @@ import {
 } from "@/components/ui/social-icons";
 import { FOOTER_SECTIONS, SITE } from "@/lib/content/site";
 import { Logo } from "@/components/brand/logo";
-import { EmailLink } from "@/components/marketing/email-link";
+import { ContactEmailLink } from "@/components/marketing/email-link";
 
 /**
  * Site footer.
@@ -65,10 +65,12 @@ export function SiteFooter() {
               redundant and put the footer's column titles at the same outline
               level as the page's own sections. Demoted to <p>.
 
-              Each link is a 44px-tall row rather than bare text - the previous
+              Each link is an at-least-44px row rather than bare text - the previous
               inline links measured 21px and failed WCAG 2.5.8. Negative margin
               pulls the visual rhythm back to the original 12px pitch without
-              shrinking the target. */}
+              shrinking the target. min-h + py rather than a fixed h-11, so a
+              label that wraps ("Intern Non-Bypass Agreement") grows its row
+              evenly instead of crowding its neighbours. */}
           {FOOTER_SECTIONS.map((section) => (
             <nav key={section.heading} aria-label={section.heading}>
               <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-on-dark-accent">
@@ -79,7 +81,7 @@ export function SiteFooter() {
                   <li key={link.href}>
                     <Link
                       href={link.href}
-                      className="flex h-11 items-center text-base text-on-dark-subtle transition-colors hover:text-white"
+                      className="flex min-h-11 items-center py-2 text-base leading-snug text-on-dark-subtle transition-colors hover:text-white"
                     >
                       {link.label}
                     </Link>
@@ -95,7 +97,7 @@ export function SiteFooter() {
             {year} © Findtern. All rights reserved.
           </p>
           <p className="text-sm">
-            <EmailLink tone="dark" />
+            <ContactEmailLink tone="dark" />
           </p>
         </div>
       </div>

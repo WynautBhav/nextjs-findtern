@@ -10,6 +10,8 @@ import { loadInternData, projectById } from "@/lib/intern-data";
 import { formatDayLabel } from "@/lib/format";
 import { toArray } from "@/lib/journey";
 
+import { LockedRoles, rolesGate } from "../_gate";
+
 export const metadata: Metadata = {
   title: "Role",
   robots: { index: false, follow: false },
@@ -39,6 +41,19 @@ export default async function RoleDetail({ params }: { params: Promise<{ id: str
 
   const data = await loadInternData(session.uid);
   const existing = data.proposals.find((p) => p.projectId === id) ?? null;
+  // A role they already have an offer on stays readable; anything else waits
+  // for the same unlock as the list.
+  if (!existing) {
+    const gate = await rolesGate(session.uid, data);
+    if (!gate.unlocked) {
+      return (
+        <div>
+          <PageHead title="Open roles" lede="What companies are hiring for right now." />
+          <LockedRoles {...gate} />
+        </div>
+      );
+    }
+  }
   const skills = toArray<string>(role.skills);
   const place = [role.city, role.state].filter(Boolean).join(", ");
 

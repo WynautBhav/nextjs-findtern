@@ -5,6 +5,7 @@ import { ArrowLeft } from "lucide-react";
 
 import { getDb, schema } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
+import { requireEmployerSetup } from "@/lib/employer-setup";
 import { canEmployerSeeIntern } from "@/lib/employer-pool";
 import { displayNameOf, toCandidateProfile, type CandidateSummary } from "@/lib/employer-candidates";
 import { hiredInternIds } from "@/lib/employer-visibility";
@@ -45,6 +46,7 @@ export default async function SendProposal({
   searchParams: Promise<{ intern?: string | string[] }>;
 }) {
   const session = await requireRole("employer");
+  await requireEmployerSetup(session.uid);
   const uid = session.uid;
   const { intern: internParam } = await searchParams;
   const internId = (Array.isArray(internParam) ? internParam[0] : internParam)?.trim() ?? "";

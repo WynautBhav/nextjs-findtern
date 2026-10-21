@@ -6,7 +6,7 @@ import { ArrowRight, Building2, Check, Coffee, GraduationCap, Pause, Play } from
 import { ButtonLink } from "@/components/ui/button";
 import { TextReveal } from "@/components/motion/text-reveal";
 import { ScoreCard } from "@/components/home/score-card";
-import { HOME_COPY } from "@/lib/content/site";
+import { HOME_COPY, HOME_STUDENT_COPY } from "@/lib/content/site";
 import { prefersReducedMotion } from "@/lib/gsap";
 import { cn } from "@/lib/utils";
 
@@ -43,8 +43,19 @@ import { cn } from "@/lib/utils";
  *    the same two-sided problem - and it puts the split under the headline for
  *    exactly this reason: it gives each audience its own argument instead of
  *    two nav buttons arguing over the same bar.
+ *
+ *  - A small "I'm hiring / I'm a student" switch above the headline. Employer
+ *    stays the default; the student side swaps only the headline, subhead
+ *    and CTAs, so a student landing here is not told to "hire an intern".
  */
+
+type Audience = "employer" | "student";
 export function HeroSplit() {
+  const [audience, setAudience] = useState<Audience>("employer");
+  // The word-by-word reveal is for first paint only. After a switch the new
+  // subhead renders plainly instead of replaying the animation.
+  const [switched, setSwitched] = useState(false);
+  const copy = audience === "employer" ? HOME_COPY : HOME_STUDENT_COPY;
   const [ready, setReady] = useState(false);
   const [shown, setShown] = useState(false);
   const [paused, setPaused] = useState(true);
@@ -149,32 +160,87 @@ export function HeroSplit() {
         <div className="grid items-center gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.9fr)] lg:gap-16">
           {/* ── Copy ────────────────────────────────────────────── */}
           <div>
-            <h1 className="text-balance text-[clamp(2.5rem,6.5vw,5.5rem)] font-medium leading-[0.98] tracking-[-0.04em] text-white">
-              {HOME_COPY.headlineLead}{" "}
-              <span className="text-accent-400">{HOME_COPY.headlineAccent}</span>
-            </h1>
-
-            <TextReveal
-              as="p"
-              trigger={false}
-              delay={0.55}
-              stagger={0.02}
-              className="mt-7 max-w-md text-lg leading-relaxed text-on-dark-subtle"
-              text={HOME_COPY.subhead}
-            />
-
-            <div className="mt-9 flex flex-col gap-3 sm:flex-row">
-              <ButtonLink href="/employers" variant="accent" size="lg">
-                <Building2 className="size-4" aria-hidden />
-                Hire an intern
-                <ArrowRight className="size-4" aria-hidden />
-              </ButtonLink>
-              <ButtonLink href="/interns" variant="outlineLight" size="lg">
-                <GraduationCap className="size-4" aria-hidden />
-                Find my internship
-              </ButtonLink>
+            <div
+              role="group"
+              aria-label="Show the page for"
+              className="mb-7 inline-flex rounded-full border border-white/15 bg-white/[0.04] p-1"
+            >
+              {(
+                [
+                  { id: "employer", label: "I'm hiring", Icon: Building2 },
+                  { id: "student", label: "I'm a student", Icon: GraduationCap },
+                ] as const
+              ).map(({ id, label, Icon }) => (
+                <button
+                  key={id}
+                  type="button"
+                  aria-pressed={audience === id}
+                  aria-controls="hero-copy"
+                  onClick={() => {
+                    if (id === audience) return;
+                    setAudience(id);
+                    setSwitched(true);
+                  }}
+                  className={cn(
+                    "inline-flex min-h-10 items-center gap-1.5 rounded-full px-4 text-sm font-medium transition-colors duration-200 motion-reduce:transition-none",
+                    "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white",
+                    audience === id
+                      ? "bg-white text-brand-950"
+                      : "text-on-dark-subtle hover:text-white",
+                  )}
+                >
+                  <Icon className="size-3.5" aria-hidden />
+                  {label}
+                </button>
+              ))}
             </div>
 
+            <div id="hero-copy">
+              <h1 className="text-balance text-[clamp(2.5rem,6.5vw,5.5rem)] font-medium leading-[0.98] tracking-[-0.04em] text-white">
+                {copy.headlineLead}{" "}
+                <span className="text-accent-400">{copy.headlineAccent}</span>
+              </h1>
+
+              {switched ? (
+                <p className="mt-7 max-w-md text-lg leading-relaxed text-on-dark-subtle">{copy.subhead}</p>
+              ) : (
+                <TextReveal
+                  as="p"
+                  trigger={false}
+                  delay={0.55}
+                  stagger={0.02}
+                  className="mt-7 max-w-md text-lg leading-relaxed text-on-dark-subtle"
+                  text={copy.subhead}
+                />
+              )}
+
+              <div className="mt-9 flex flex-col gap-3 sm:flex-row">
+                {audience === "employer" ? (
+                  <>
+                    <ButtonLink href="/employers" variant="accent" size="lg">
+                      <Building2 className="size-4" aria-hidden />
+                      Hire an intern
+                      <ArrowRight className="size-4" aria-hidden />
+                    </ButtonLink>
+                    <ButtonLink href="/interns" variant="outlineLight" size="lg">
+                      <GraduationCap className="size-4" aria-hidden />
+                      Find my internship
+                    </ButtonLink>
+                  </>
+                ) : (
+                  <>
+                    <ButtonLink href="/signup" variant="accent" size="lg">
+                      <GraduationCap className="size-4" aria-hidden />
+                      Create my profile
+                      <ArrowRight className="size-4" aria-hidden />
+                    </ButtonLink>
+                    <ButtonLink href="/interns" variant="outlineLight" size="lg">
+                      How it works for interns
+                    </ButtonLink>
+                  </>
+                )}
+              </div>
+            </div>
           </div>
 
           {/* ── Proof artifact ───────────────────────────────────── */}

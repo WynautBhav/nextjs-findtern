@@ -27,6 +27,7 @@ export default async function InternOnboarding() {
   let account: { countryCode: string; phoneNumber: string } | null = null;
   let locked = false;
   let hasPanImage = false;
+  let hasAadhaarImage = false;
   let hasPhoto = false;
 
   try {
@@ -61,6 +62,7 @@ export default async function InternOnboarding() {
 
     if (record) {
       hasPanImage = Boolean(record.panImageName);
+      hasAadhaarImage = Boolean(record.aadhaarImageName);
       hasPhoto = Boolean(record.profilePhotoName);
       // The upload writes intern_documents, not extra.photoUrl, so the form's
       // photo is derived from the stored avatar and survives a reload.
@@ -92,6 +94,7 @@ export default async function InternOnboarding() {
         account={account}
         skillsLocked={locked}
         hasPanImage={hasPanImage}
+        hasAadhaarImage={hasAadhaarImage}
         hasPhoto={hasPhoto}
       />
     </div>

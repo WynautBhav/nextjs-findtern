@@ -3,6 +3,7 @@ import { and, asc, eq, inArray } from "drizzle-orm";
 
 import { getDb, schema } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
+import { requireEmployerSetup } from "@/lib/employer-setup";
 import { redactForEmployer, toCandidateProfile } from "@/lib/employer-candidates";
 import { hiredInternIds, isAdminViewing } from "@/lib/employer-visibility";
 import { employerRegion, resolvePricing, type Currency } from "@/lib/employer-pricing";
@@ -17,6 +18,7 @@ export const metadata: Metadata = {
 
 export default async function EmployerCartPage() {
   const session = await requireRole("employer");
+  await requireEmployerSetup(session.uid);
   const uid = session.uid;
 
   let cartLines: CartLineItem[] = [];

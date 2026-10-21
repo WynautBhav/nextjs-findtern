@@ -12,7 +12,10 @@ export const SITE = {
   description:
     "Hire a verified intern for the price of a coffee, or get placed in a paid internship - or your fee back.",
   url: "https://findtern.in",
+  /** Interns and general queries. */
   email: "communicate@findtern.in",
+  /** Employers: hiring, billing and company-account queries. */
+  adminEmail: "admin@findtern.in",
   phone: "",
   city: "Jaipur, Rajasthan, India",
   address: "Jaipur, Rajasthan, India",
@@ -24,6 +27,16 @@ export const SITE = {
     linkedin: "https://www.linkedin.com/company/findtern-in/",
   },
 } as const;
+
+/** Employer-facing marketing pages, where the header and footer show the
+ *  admin address instead of the intern one. Exact paths, so /employers is
+ *  matched but /employer (the signed-in app) is not. */
+const EMPLOYER_PATHS = new Set(["/", "/employers", "/pricing"]);
+
+/** The contact address for the page at `pathname`. */
+export function contactEmailFor(pathname: string | null | undefined): string {
+  return pathname && EMPLOYER_PATHS.has(pathname) ? SITE.adminEmail : SITE.email;
+}
 
 /**
  * Direct web compose URL for Gmail with pre-filled recipient, subject, and body.
@@ -70,6 +83,16 @@ export const HOME_COPY = {
    *  lives on /interns rather than being mixed into this line. */
   subhead:
     "Interviewed, tested and scored before you see a profile. One published rate card, and you pay only for the hours you approve.",
+} as const;
+
+/** The same hero, for a student who flips the home audience switch. The
+ *  employer copy above stays the default; this only swaps the headline,
+ *  subhead and CTAs, and the rest of the student pitch lives on /interns. */
+export const HOME_STUDENT_COPY = {
+  headlineLead: "Get a paid internship,",
+  headlineAccent: "or get your fee back.",
+  subhead:
+    "One AI interview and an aptitude test give you a Findtern Score that verified employers hire on. Not placed within 18 months? The fee comes back.",
 } as const;
 
 /** The home and about pages quote the same three product terms. */

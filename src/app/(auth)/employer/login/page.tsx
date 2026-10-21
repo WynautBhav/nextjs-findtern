@@ -1,15 +1,25 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { AlertCircle } from "lucide-react";
+
 import { AuthShell } from "@/components/auth/auth-shell";
 import { LoginForm } from "@/components/auth/login-form";
+import { oauthErrorMessage } from "@/lib/google";
 
 export const metadata: Metadata = {
   title: "Employer sign in | Findtern",
   robots: { index: false, follow: false },
 };
 
-export default function EmployerLoginPage() {
+export default async function EmployerLoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
+  const raw = (await searchParams).oauthError;
+  const oauthError = oauthErrorMessage(Array.isArray(raw) ? raw[0] : raw);
+
   return (
     <AuthShell
       eyebrow="For employers"
@@ -18,6 +28,12 @@ export default function EmployerLoginPage() {
       footer={
         <p className="text-sm text-text-subtle">
           New to Findtern?{" "}
+          <Link href="/employer/signup" className="font-medium text-brand-700 underline-offset-4 hover:underline">
+            Sign up
+          </Link>
+          <span className="mx-2 text-ink-300" aria-hidden>
+            ·
+          </span>
           <Link href="/employers" className="font-medium text-brand-700 underline-offset-4 hover:underline">
             See how hiring works
           </Link>
@@ -26,6 +42,16 @@ export default function EmployerLoginPage() {
     >
       <h1 className="text-2xl font-semibold tracking-tight text-ink-900">Employer sign in</h1>
       <p className="mt-1.5 text-sm text-text-subtle">Access your hiring dashboard.</p>
+
+      {oauthError ? (
+        <div
+          role="alert"
+          className="mt-6 flex items-start gap-2.5 rounded-lg border border-danger/25 bg-danger-soft px-3.5 py-3 text-sm text-danger"
+        >
+          <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden />
+          <span>{oauthError}</span>
+        </div>
+      ) : null}
 
       <div className="mt-8">
         <LoginForm

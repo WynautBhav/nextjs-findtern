@@ -618,6 +618,13 @@ export function workModes(raw: string[]): string[] {
   return WORK_MODE_ORDER.filter((m) => seen.has(m));
 }
 
+/** The single mode a candidate picked: the most on-site one stored. Legacy
+ *  rows can hold any mix ("remote" + "onsite"); the widest one wins. */
+export function widestWorkMode(raw: string[]): (typeof WORK_MODE_ORDER)[number] | null {
+  const modes = workModes(raw);
+  return (modes[modes.length - 1] as (typeof WORK_MODE_ORDER)[number] | undefined) ?? null;
+}
+
 /** The modes after tapping `mode`: tapping the furthest selected mode steps
  *  back one level; tapping any other selects it and everything before it. */
 export function cascadeWorkModes(current: string[], mode: string): string[] {
@@ -640,6 +647,11 @@ export const EMERGENCY_RELATIONS = ["Parent", "Guardian", "Sibling", "Spouse", "
 export type ValidationContext = {
   /** A PAN card image is on file (uploaded now or earlier). */
   hasPanImage: boolean;
+  /** An Aadhaar card image is on file (uploaded now or earlier). */
+  hasAadhaarImage: boolean;
+  /** The "confirm account number" box. Browser only: the server never sees
+   *  it, so it is checked only when given. */
+  bankAccountConfirm?: string;
   /** The account's own number, so the emergency contact cannot repeat it. */
   ownPhone?: { countryCode: string; phoneNumber: string } | null;
   /** A profile photo is on file (uploaded now or earlier). */
@@ -713,6 +725,7 @@ export function validateStep(values: OnboardingDraft, step: number, ctx: Validat
     if (!pan) errors.panNumber = "PAN is required for stipend payouts.";
     else if (!PAN.test(pan)) errors.panNumber = "PAN must look like ABCDE1234F - 5 letters, 4 digits, 1 letter.";
     if (!ctx.hasPanImage) errors.panImage = "Upload a photo or scan of your PAN card.";
+    if (!ctx.hasAadhaarImage) errors.aadhaarImage = "Upload a photo or scan of your Aadhaar card.";
 
     if (!(values.emergencyName ?? "").trim()) errors.emergencyName = "Enter the name of someone we can call in an emergency.";
     const ePhone = (values.emergencyPhone ?? "").trim();
@@ -745,6 +758,17 @@ export function validateStep(values: OnboardingDraft, step: number, ctx: Validat
       } else if (!(values.secondPocName ?? "").trim()) {
         errors.secondPocName = "Add the name of your second contact.";
       }
+    }
+
+    // Bank account: required here so the stipend can be paid (legacy key
+    // extra.bankDetails, the same one Settings writes).
+    Object.assign(errors, bankErrors(values.bank ?? {}));
+    if (
+      ctx.bankAccountConfirm !== undefined &&
+      !errors.bankAccountNumber &&
+      ctx.bankAccountConfirm.replace(/\s/g, "") !== (values.bank?.accountNumber ?? "").replace(/\s/g, "")
+    ) {
+      errors.bankAccountConfirm = "The account numbers do not match.";
     }
   }
 
@@ -844,19 +868,25 @@ export function formatProblems(values: DraftInput): string | null {
 
 const IFSC = /^[A-Z]{4}0[A-Z0-9]{6}$/;
 
+/** Bank details, field by field; keys are the About Me step's field ids. */
+export function bankErrors(bank: Partial<OnboardingDraft["bank"]>): ValidationErrors {
+  const errors: ValidationErrors = {};
+  if (!(bank.accountHolderName ?? "").trim()) errors.bankAccountHolderName = "Enter the account holder's name.";
+  if (!(bank.bankName ?? "").trim() || bank.bankName?.trim().toLowerCase() === "other") errors.bankName = "Enter your bank's name.";
+  const account = (bank.accountNumber ?? "").replace(/\s/g, "");
+  if (!account) errors.bankAccountNumber = "Enter your bank account number.";
+  else if (!/^\d{9,18}$/.test(account)) errors.bankAccountNumber = "Account number must be 9 to 18 digits.";
+  const ifsc = (bank.ifscCode ?? "").trim().toUpperCase();
+  if (!ifsc) errors.bankIfscCode = "Enter your IFSC code.";
+  else if (!IFSC.test(ifsc)) errors.bankIfscCode = "IFSC must be 11 characters, like SBIN0001234.";
+  const upi = (bank.upiId ?? "").trim();
+  if (upi && !UPI.test(upi)) errors.bankUpiId = "UPI ID should look like name@bank.";
+  return errors;
+}
+
 /** Bank details are required in full (UPI stays optional). Null when valid. */
 export function bankProblem(bank: Partial<OnboardingDraft["bank"]>): string | null {
-  if (!(bank.accountHolderName ?? "").trim()) return "Enter the account holder's name.";
-  if (!(bank.bankName ?? "").trim()) return "Enter your bank's name.";
-  const account = (bank.accountNumber ?? "").replace(/\s/g, "");
-  if (!account) return "Enter your bank account number.";
-  if (!/^\d{9,18}$/.test(account)) return "Account number must be 9 to 18 digits.";
-  const ifsc = (bank.ifscCode ?? "").trim().toUpperCase();
-  if (!ifsc) return "Enter your IFSC code.";
-  if (!IFSC.test(ifsc)) return "IFSC must be 11 characters, like SBIN0001234.";
-  const upi = (bank.upiId ?? "").trim();
-  if (upi && !UPI.test(upi)) return "UPI ID should look like name@bank.";
-  return null;
+  return Object.values(bankErrors(bank))[0] ?? null;
 }
 
 /** NPCI VPA shape: handle@psp, e.g. sunita.sharma@okaxis. */
@@ -873,16 +903,16 @@ export type CompletionItem = { id: string; label: string; done: boolean; href: s
  */
 export type CompletionDocs = {
   hasPanImage: boolean;
+  /** An Aadhaar card image is on file. */
+  hasAadhaarImage?: boolean;
   /** A profile photo is on file. */
   hasPhoto?: boolean;
 };
 
 export function profileCompletion(row: OnboardingLike | null, docs: boolean | CompletionDocs): { items: CompletionItem[]; done: number; total: number; complete: boolean } {
-  const { hasPanImage, hasPhoto = false } = typeof docs === "boolean" ? { hasPanImage: docs } : docs;
+  const { hasPanImage, hasAadhaarImage = false, hasPhoto = false } = typeof docs === "boolean" ? { hasPanImage: docs } : docs;
   const d = row ? draftFromRecord(row) : null;
   const extra = obj(row?.extraData);
-  const academicsExtra = obj(extra.academics);
-  const marksheets = Array.isArray(academicsExtra.marksheetUploads) ? academicsExtra.marksheetUploads : [];
   const modes = d?.locationTypes ?? [];
   const needsCities = modes.includes("onsite") || modes.includes("hybrid");
   const form = "/intern/onboarding";
@@ -894,8 +924,14 @@ export function profileCompletion(row: OnboardingLike | null, docs: boolean | Co
       done: Boolean(d && (d.bio ?? "").trim().length >= 20 && d.linkedinUrl && d.city && d.state && d.pinCode),
       href: form,
     },
-    // PAN card is the only document image required; Aadhaar is the number alone.
-    { id: "identity", label: "Aadhaar number, PAN and PAN card image", done: Boolean(d?.aadhaarNumber && d?.panNumber && hasPanImage), href: form },
+    // Identity: both numbers and both card images. A marksheet is optional
+    // and not part of this list.
+    {
+      id: "identity",
+      label: "Aadhaar and PAN, with card images",
+      done: Boolean(d?.aadhaarNumber && d?.panNumber && hasPanImage && hasAadhaarImage),
+      href: form,
+    },
     { id: "emergency", label: "Emergency contact", done: Boolean(d?.emergencyPhone), href: form },
     {
       id: "academics",
@@ -903,9 +939,8 @@ export function profileCompletion(row: OnboardingLike | null, docs: boolean | Co
       done: Boolean(d?.academics?.institution && d.academics.degree && d.academics.branch && d.academics.yearOfGraduation && d.academics.cgpa),
       href: form,
     },
-    // Marksheet, languages and laptop: the legacy checklist items
-    // (dashboard.tsx:500-553) that the first rewrite of this list dropped.
-    { id: "marksheet", label: "Marksheet uploaded", done: marksheets.length > 0, href: form },
+    // Languages and laptop: legacy checklist items (dashboard.tsx:500-553).
+    // The marksheet item is gone: uploading one is optional.
     { id: "skills", label: "At least 4 skills", done: (d?.skills?.length ?? 0) >= 4, href: form },
     { id: "languages", label: "Languages you work in", done: arr(extra.languages).length > 0, href: form },
     {
@@ -916,7 +951,7 @@ export function profileCompletion(row: OnboardingLike | null, docs: boolean | Co
     },
     { id: "laptop", label: "Laptop availability", done: d?.hasLaptop === true || d?.hasLaptop === false, href: form },
     { id: "agreement", label: "Non-Bypass Agreement accepted", done: Boolean(extra.ndaAcceptedAt), href: form },
-    { id: "bank", label: "Bank account details", done: bankProblem(d?.bank ?? {}) === null, href: "/intern/bank-details" },
+    { id: "bank", label: "Bank account details", done: bankProblem(d?.bank ?? {}) === null, href: form },
   ];
   const done = items.filter((i) => i.done).length;
   return { items, done, total: items.length, complete: done === items.length };

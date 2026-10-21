@@ -18,10 +18,18 @@ export async function internProfileStatus(internId: string) {
     .orderBy(desc(schema.internOnboarding.createdAt))
     .limit(1);
   const [doc] = await db
-    .select({ pan: schema.internDocuments.panImageName, photo: schema.internDocuments.profilePhotoName })
+    .select({
+      pan: schema.internDocuments.panImageName,
+      aadhaar: schema.internDocuments.aadhaarImageName,
+      photo: schema.internDocuments.profilePhotoName,
+    })
     .from(schema.internDocuments)
     .where(eq(schema.internDocuments.userId, internId))
     .orderBy(desc(schema.internDocuments.createdAt))
     .limit(1);
-  return profileCompletion(row ?? null, { hasPanImage: Boolean(doc?.pan), hasPhoto: Boolean(doc?.photo) });
+  return profileCompletion(row ?? null, {
+    hasPanImage: Boolean(doc?.pan),
+    hasAadhaarImage: Boolean(doc?.aadhaar),
+    hasPhoto: Boolean(doc?.photo),
+  });
 }

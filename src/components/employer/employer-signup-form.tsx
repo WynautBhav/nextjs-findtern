@@ -20,6 +20,14 @@ import { isValidPhone, phoneError, phoneHint } from "@/lib/phone";
  * Same three calls as the intern form: send-otp → verify-otp → create, with
  * `subjectType: "employer"`. The create route refuses an email that has not
  * been verified, so the OTP step cannot be skipped by calling it directly.
+ *
+ * Once the code is accepted it is spent, so `verified` is remembered: a failed
+ * create (phone taken, network) retries only the create call, and the
+ * employer can go back and fix details without being asked for a new code.
+ *
+ * With `google` set, the employer is back from Google with a verified company
+ * address: the email is locked, the code step is skipped, and the create call
+ * passes on the proof cookie the OAuth callback set.
  */
 
 const PASSWORD_RULES = [
@@ -30,11 +38,15 @@ const PASSWORD_RULES = [
   { test: (v: string) => /[^A-Za-z0-9]/.test(v), label: "One special character" },
 ];
 
-export function EmployerSignupForm() {
+export function EmployerSignupForm({
+  google = null,
+}: {
+  google?: { email: string; name: string } | null;
+} = {}) {
   const router = useRouter();
-  const [name, setName] = useState("");
+  const [name, setName] = useState(google?.name ?? "");
   const [companyName, setCompanyName] = useState("");
-  const [companyEmail, setCompanyEmail] = useState("");
+  const [companyEmail, setCompanyEmail] = useState(google?.email ?? "");
   const [countryCode, setCountryCode] = useState("+91");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [password, setPassword] = useState("");
@@ -43,6 +55,8 @@ export function EmployerSignupForm() {
   const [loading, setLoading] = useState(false);
   const [stage, setStage] = useState<"details" | "otp">("details");
   const [otp, setOtp] = useState("");
+  /** The code for `trimmedEmail` was accepted (or Google vouched for it). */
+  const [verified, setVerified] = useState(Boolean(google));
 
   const trimmedEmail = companyEmail.trim().toLowerCase();
   const personal = trimmedEmail.length > 0 && isPersonalEmail(trimmedEmail);
@@ -85,8 +99,69 @@ export function EmployerSignupForm() {
     setLoading(false);
   }
 
+  async function createAccount() {
+    setError(null);
+    setLoading(true);
+    try {
+      const problem = await post("/api/auth/employer/signup", {
+        name: name.trim(),
+        companyName: companyName.trim(),
+        companyEmail: trimmedEmail,
+        countryCode,
+        phoneNumber,
+        password,
+        agreedToTerms: true,
+      });
+      if (problem) {
+        setError(
+          /verify your email/i.test(problem)
+            ? google
+              ? "Your Google confirmation has expired (it lasts 15 minutes). Continue with Google again to finish."
+              : "Your verification has expired (it lasts 15 minutes). Send a new code to finish."
+            : problem,
+        );
+        if (/verify your email/i.test(problem) && !google) {
+          setVerified(false);
+          setOtp("");
+        }
+        setLoading(false);
+        return;
+      }
+      router.push("/employer/onboarding");
+      router.refresh();
+    } catch {
+      setError("Network error. Nothing was created.");
+      setLoading(false);
+    }
+  }
+
+  async function verifyOtp() {
+    setError(null);
+    setLoading(true);
+    try {
+      const otpProblem = await post("/api/auth/signup/verify-otp", {
+        email: trimmedEmail,
+        otp,
+        subjectType: "employer",
+      });
+      if (otpProblem) {
+        setError(otpProblem);
+        setLoading(false);
+        return;
+      }
+    } catch {
+      setError("Network error");
+      setLoading(false);
+      return;
+    }
+    setVerified(true);
+    // The code was the last thing asked for: create the account straight away.
+    await createAccount();
+  }
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (loading) return;
 
     if (stage === "details") {
       const problems = validate({
@@ -102,42 +177,13 @@ export function EmployerSignupForm() {
         setError(Object.values(problems)[0]);
         return;
       }
-      await sendOtp();
+      if (verified) await createAccount();
+      else await sendOtp();
       return;
     }
 
-    setError(null);
-    setLoading(true);
-    try {
-      const otpProblem = await post("/api/auth/signup/verify-otp", {
-        email: trimmedEmail,
-        otp,
-        subjectType: "employer",
-      });
-      if (otpProblem) {
-        setError(otpProblem);
-        setLoading(false);
-        return;
-      }
-      const problem = await post("/api/auth/employer/signup", {
-        name: name.trim(),
-        companyName: companyName.trim(),
-        companyEmail: trimmedEmail,
-        countryCode,
-        phoneNumber,
-        password,
-        agreedToTerms: true,
-      });
-      if (problem) {
-        setError(problem);
-        setLoading(false);
-        return;
-      }
-      router.push("/employer/onboarding");
-    } catch {
-      setError("Network error");
-      setLoading(false);
-    }
+    if (verified) await createAccount();
+    else await verifyOtp();
   }
 
   return (
@@ -156,11 +202,19 @@ export function EmployerSignupForm() {
         <div className="space-y-5">
           <p className="flex items-start gap-2.5 rounded-[10px] border border-brand-200 bg-brand-50 px-3.5 py-3 text-sm text-ink-700">
             <MailCheck className="mt-0.5 size-4 shrink-0 text-brand-700" aria-hidden />
-            <span>
-              We sent a 6-digit code to <strong className="font-semibold">{trimmedEmail}</strong>. It
-              expires in 10 minutes.
-            </span>
+            {verified ? (
+              <span>
+                <strong className="font-semibold">{trimmedEmail}</strong> is verified. If creating the
+                account failed, fix the details or try again - no new code is needed.
+              </span>
+            ) : (
+              <span>
+                We sent a 6-digit code to <strong className="font-semibold">{trimmedEmail}</strong>. It
+                expires in 10 minutes.
+              </span>
+            )}
           </p>
+          {verified ? null : (
           <div>
             <label htmlFor="otp" className="block text-sm font-medium text-ink-800">
               Verification code
@@ -176,9 +230,10 @@ export function EmployerSignupForm() {
               className="apple-spring mt-2 min-h-12 w-full rounded-[10px] border border-ink-200 bg-white px-3.5 text-center font-mono text-lg tracking-[0.5em] text-ink-900 outline-none placeholder:text-ink-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
             />
           </div>
+          )}
           <button
             type="submit"
-            disabled={otp.length !== 6 || loading}
+            disabled={(!verified && otp.length !== 6) || loading}
             className="apple-spring apple-pressable flex min-h-11 w-full items-center justify-center gap-2 rounded-[10px] bg-brand-700 px-4 text-sm font-semibold text-white hover:bg-brand-600 disabled:pointer-events-none disabled:opacity-60"
           >
             {loading ? (
@@ -186,6 +241,8 @@ export function EmployerSignupForm() {
                 <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden />
                 Working…
               </>
+            ) : verified ? (
+              "Create account"
             ) : (
               "Verify and create account"
             )}
@@ -195,7 +252,7 @@ export function EmployerSignupForm() {
               type="button"
               onClick={() => {
                 setStage("details");
-                setOtp("");
+                if (!verified) setOtp("");
                 setError(null);
               }}
               className="inline-flex items-center gap-1.5 font-medium text-ink-600 hover:text-ink-900"
@@ -203,14 +260,16 @@ export function EmployerSignupForm() {
               <ArrowLeft className="size-3.5" aria-hidden />
               Change details
             </button>
-            <button
-              type="button"
-              onClick={() => void sendOtp()}
-              disabled={loading}
-              className="font-medium text-brand-700 underline-offset-4 hover:underline disabled:opacity-60"
-            >
-              Resend code
-            </button>
+            {verified ? null : (
+              <button
+                type="button"
+                onClick={() => void sendOtp()}
+                disabled={loading}
+                className="font-medium text-brand-700 underline-offset-4 hover:underline disabled:opacity-60"
+              >
+                Resend code
+              </button>
+            )}
           </div>
         </div>
       ) : (
@@ -245,14 +304,20 @@ export function EmployerSignupForm() {
           autoComplete="email"
           required
           value={companyEmail}
+          readOnly={Boolean(google)}
           onChange={(e) => {
+            if (google) return;
             setCompanyEmail(e.target.value);
+            // A different address needs its own code.
+            if (e.target.value.trim().toLowerCase() !== trimmedEmail) setVerified(false);
             if (error) setError(null);
           }}
           placeholder="hiring@acme.com"
           aria-invalid={personal ? true : undefined}
           aria-describedby="companyEmail-note"
-          className={`apple-spring mt-2 min-h-11 w-full rounded-[10px] border bg-white px-3.5 text-[14px] text-ink-900 outline-none placeholder:text-ink-400 focus:ring-2 ${
+          className={`apple-spring mt-2 min-h-11 w-full rounded-[10px] border px-3.5 text-[14px] text-ink-900 outline-none placeholder:text-ink-400 focus:ring-2 ${
+            google ? "bg-ink-50 text-ink-700" : "bg-white"
+          } ${
             personal
               ? "border-danger focus:border-danger focus:ring-danger/20"
               : "border-ink-200 focus:border-brand-500 focus:ring-brand-500/20"
@@ -262,7 +327,9 @@ export function EmployerSignupForm() {
           id="companyEmail-note"
           className={`mt-1.5 text-xs ${personal ? "text-danger" : "text-text-subtle"}`}
         >
-          {personal
+          {google
+            ? "Verified by Google."
+            : personal
             ? "That is a personal mailbox. Employers need an address at the company domain - the server rejects Gmail, Yahoo, Outlook and the rest."
             : "Must be at your company domain. Personal mailboxes are rejected."}
         </p>
@@ -366,7 +433,7 @@ export function EmployerSignupForm() {
           </>
         ) : (
           <>
-            Send verification code
+            {verified ? "Create account" : "Send verification code"}
             <ArrowRight
               className="size-4 transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none"
               aria-hidden

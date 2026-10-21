@@ -690,7 +690,7 @@ export const FAQ_EMPLOYER: CmsFaqItem[] = [
     "id": "761374b5-52f2-4776-8676-6fc1a2226052",
     "category": "Employer",
     "question": "How can I contact Findtern support?",
-    "answer": "You can reach us at:\n 📧 Email: communicate@findtern.in\n",
+    "answer": "You can reach us at:\n 📧 Email: admin@findtern.in\n",
     "sortOrder": 0,
     "isActive": true
   },

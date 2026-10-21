@@ -1,36 +1,53 @@
 import { createHash, randomBytes } from "node:crypto";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
 import { getDb, schema } from "@/lib/db";
 import { withSession, issueCsrfCookie } from "@/lib/auth";
 import { exchangeCode, fetchProfile, googleConfig, NONCE_COOKIE, safeNext } from "@/lib/google";
-import { attachOtpProof } from "@/lib/signup-otp";
+import { isPersonalEmail } from "@/lib/employer-onboarding";
+import { attachOtpProof, type SignupOtpSubject } from "@/lib/signup-otp";
 
 function fail(req: Request, path: string, code: string) {
   const res = NextResponse.redirect(new URL(`${path}?oauthError=${code}`, req.url));
-  res.cookies.delete(NONCE_COOKIE);
+  res.cookies.delete({ name: NONCE_COOKIE, path: "/" });
   return res;
+}
+
+/** Google's verification of `email`, stored like a redeemed signup code. */
+async function recordGoogleVerification(subject: SignupOtpSubject, email: string) {
+  await getDb().insert(schema.emailOtps).values({
+    subjectType: subject,
+    subjectId: email,
+    // Not a code anyone can redeem: a hash of random bytes, already used.
+    otpHash: createHash("sha256").update(randomBytes(32)).digest("hex"),
+    expiresAt: new Date(),
+    usedAt: new Date(),
+  });
 }
 
 export async function GET(req: Request) {
   const url = new URL(req.url);
   const code = url.searchParams.get("code");
   const stateRaw = url.searchParams.get("state");
-  if (!code || !stateRaw) return fail(req, "/login", "missing_code");
+  // Until the state is decoded the role is unknown; afterwards employer
+  // failures go back to the employer door, not the candidate one.
+  let loginPath = "/login";
+  if (!code || !stateRaw) return fail(req, loginPath, "missing_code");
 
   let state: { role?: string; next?: string; nonce?: string };
   try {
     state = JSON.parse(Buffer.from(stateRaw, "base64url").toString());
   } catch {
-    return fail(req, "/login", "bad_state");
+    return fail(req, loginPath, "bad_state");
   }
+  if (state.role === "employer") loginPath = "/employer/login";
   const nonce = (await cookies()).get(NONCE_COOKIE)?.value;
-  if (!nonce || nonce !== state.nonce) return fail(req, "/login", "bad_state");
+  if (!nonce || nonce !== state.nonce) return fail(req, loginPath, "bad_state");
 
   const cfg = googleConfig();
-  if (!cfg) return fail(req, "/login", "not_configured");
+  if (!cfg) return fail(req, loginPath, "not_configured");
 
   let email: string | undefined;
   let givenName = "";
@@ -42,14 +59,34 @@ export async function GET(req: Request) {
     givenName = (profile.given_name ?? "").trim();
     familyName = (profile.family_name ?? "").trim();
   } catch {
-    return fail(req, "/login", "google_failed");
+    return fail(req, loginPath, "google_failed");
   }
-  if (!email) return fail(req, "/login", "no_email");
+  if (!email) return fail(req, loginPath, "no_email");
 
   const db = getDb();
   if (state.role === "employer") {
-    const [employer] = await db.select().from(schema.employers).where(eq(schema.employers.companyEmail, email)).limit(1);
-    if (!employer) return fail(req, "/employer/signup", "no_account");
+    const [employer] = await db
+      .select()
+      .from(schema.employers)
+      .where(sql`lower(${schema.employers.companyEmail}) = ${email}`)
+      .limit(1);
+    if (!employer) {
+      // New company. Same shape as the candidate path below: no account is
+      // created here (phone, password and terms are still missing); Google's
+      // verification is recorded as a used OTP and the form on
+      // /employer/signup finishes it through the normal signup API.
+      if (isPersonalEmail(email)) return fail(req, "/employer/signup", "company_email_only");
+      await recordGoogleVerification("employer", email);
+      const to = new URL("/employer/signup", req.url);
+      to.searchParams.set("google", "1");
+      to.searchParams.set("email", email);
+      const name = [givenName, familyName].filter(Boolean).join(" ");
+      if (name) to.searchParams.set("name", name);
+      const res = NextResponse.redirect(to);
+      res.cookies.delete({ name: NONCE_COOKIE, path: "/" });
+      attachOtpProof(res, "employer", email);
+      return res;
+    }
     if (!employer.isActive) return fail(req, "/employer/login", "inactive");
     // Google has verified the address, so a later password login is not stuck
     // on "verify your email".
@@ -57,7 +94,7 @@ export async function GET(req: Request) {
       await db.update(schema.employers).set({ emailVerified: true }).where(eq(schema.employers.id, employer.id));
     }
     const res = NextResponse.redirect(new URL(safeNext(state.next, "/employer/dashboard"), req.url));
-    res.cookies.delete(NONCE_COOKIE);
+    res.cookies.delete({ name: NONCE_COOKIE, path: "/" });
     await issueCsrfCookie(res);
     return withSession(res, { uid: employer.id, role: "employer", email: employer.companyEmail });
   }
@@ -77,21 +114,14 @@ export async function GET(req: Request) {
      * signup API's existing `hasVerifiedSignupOtp` check then accepts it
      * without a second code, inside the same 15-minute window. The proof cookie
      * below binds that to this browser, exactly as entering a code would. */
-    await db.insert(schema.emailOtps).values({
-      subjectType: "intern",
-      subjectId: email,
-      // Not a code anyone can redeem: a hash of random bytes, already used.
-      otpHash: createHash("sha256").update(randomBytes(32)).digest("hex"),
-      expiresAt: new Date(),
-      usedAt: new Date(),
-    });
+    await recordGoogleVerification("intern", email);
     const to = new URL("/signup", req.url);
     to.searchParams.set("google", "1");
     to.searchParams.set("email", email);
     if (givenName) to.searchParams.set("firstName", givenName);
     if (familyName) to.searchParams.set("lastName", familyName);
     const res = NextResponse.redirect(to);
-    res.cookies.delete(NONCE_COOKIE);
+    res.cookies.delete({ name: NONCE_COOKIE, path: "/" });
     attachOtpProof(res, "intern", email);
     return res;
   }
@@ -101,7 +131,7 @@ export async function GET(req: Request) {
     await db.update(schema.users).set({ emailVerified: true }).where(eq(schema.users.id, user.id));
   }
   const res = NextResponse.redirect(new URL(safeNext(state.next, "/intern/dashboard"), req.url));
-  res.cookies.delete(NONCE_COOKIE);
+  res.cookies.delete({ name: NONCE_COOKIE, path: "/" });
   await issueCsrfCookie(res);
   return withSession(res, { uid: user.id, role: "intern", email: user.email });
 }

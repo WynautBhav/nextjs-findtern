@@ -40,7 +40,7 @@ export async function POST(req: Request) {
   }
 
   const db = getDb();
-  const [existing] = await db.select().from(schema.employers).where(eq(schema.employers.companyEmail, parsed.data.companyEmail)).limit(1);
+  const [existing] = await db.select().from(schema.employers).where(sql`lower(${schema.employers.companyEmail}) = ${parsed.data.companyEmail}`).limit(1);
   if (existing) return NextResponse.json({ error: "Email already registered" }, { status: 409 });
   const phoneNumber = normalizePhone(parsed.data.phoneNumber);
   const [phoneOwner] = await db

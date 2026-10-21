@@ -5,6 +5,8 @@ import { RoleCard } from "@/components/marketing/role-card";
 import { requireRole } from "@/lib/auth";
 import { loadInternData, openProjects } from "@/lib/intern-data";
 
+import { LockedRoles, rolesGate } from "./_gate";
+
 export const metadata: Metadata = {
   title: "Open roles",
   robots: { index: false, follow: false },
@@ -27,6 +29,15 @@ export default async function InternOpportunities() {
   const session = await requireRole("intern");
 
   const data = await loadInternData(session.uid);
+  const gate = await rolesGate(session.uid, data);
+  if (!gate.unlocked) {
+    return (
+      <div>
+        <PageHead title="Open roles" lede="What companies are hiring for right now." />
+        <LockedRoles {...gate} />
+      </div>
+    );
+  }
   const rows = await openProjects();
   const applied = new Set(data.proposals.map((p) => p.projectId).filter(Boolean));
 

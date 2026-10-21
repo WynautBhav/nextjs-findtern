@@ -106,6 +106,10 @@ export function sanitizeRichText(input: string): string {
   //    background.
   out = out.replace(/<span[^>]*id="docs-internal-guid-[^"]*"[^>]*>/gi, "");
   out = out.replace(/<!--[\s\S]*?-->/g, "");
+  // Docs spacer blocks: a `<div>` holding nothing but a `<br>` (often inside
+  // an empty span). Unwrapped, each one leaves a bare line break between a
+  // heading and its list.
+  out = out.replace(/<div\b[^>]*>(?:\s|<span\b[^>]*>|<\/span>|<br\s*\/?>)*<\/div\s*>/gi, "");
 
   // 3. Walk every remaining tag. Anything unrecognised is unwrapped - its
   //    children are kept, the tag itself is discarded - so content survives
@@ -137,6 +141,19 @@ export function sanitizeRichText(input: string): string {
     },
   );
 
+  // 3a. An address pasted as a link without its href (Docs smart chips do
+  //     this) renders as a link that goes nowhere. Give it its mailto.
+  out = out.replace(
+    /<a class="rt-a">\s*([\w.+-]+@[\w-]+(?:\.[\w-]+)+)\s*<\/a>/g,
+    (_m, email: string) => `<a class="rt-a" href="mailto:${escapeAttr(email)}">${email}</a>`,
+  );
+
+  // 3b. An `<li>` opened directly inside another `<li>` (no list between
+  //     them). Docs pastes a styled wrapper bullet around the real items, so
+  //     the browser renders one empty bullet and a lopsided indent. The
+  //     wrapper is unwrapped and its children become ordinary items.
+  out = unwrapNestedListItems(out);
+
   // 4. Demote headings that are not headings.
   //
   //    Google Docs "Heading 3" is the default style a writer applies to
@@ -148,27 +165,73 @@ export function sanitizeRichText(input: string): string {
   //
   //    A heading is short and does not end like a sentence. Anything longer
   //    than MAX_HEADING_CHARS, or ending in sentence punctuation, is body copy
-  //    wearing a heading tag, and becomes a paragraph.
+  //    wearing a heading tag, and becomes a paragraph. A "heading" that wraps
+  //    whole blocks (the live intern NDA puts its entire clause list inside
+  //    one <h3>) is unwrapped instead: a <p> around a list is invalid, and
+  //    the browser would split it into stray empty paragraphs.
   out = out.replace(
     /<h([234]) class="rt-h[234]">([\s\S]*?)<\/h\1>/gi,
-    (_m, level: string, inner: string) => {
+    (match, _level: string, inner: string) => {
+      if (/<(?:p|ul|ol|li|blockquote|pre|h[234])\b/i.test(inner)) return inner;
       const text = inner.replace(/<[^>]*>/g, "").trim();
       const looksLikeProse =
         text.length > MAX_HEADING_CHARS || /[.!?,;]$/.test(text);
-      if (looksLikeProse) return `<p class="rt-p">${inner}</p>`;
-      // Surviving headings are re-levelled one step up so the document starts
-      // at h2: the h3/h4 mix from Docs becomes a clean h2/h3 outline.
-      const lifted = Math.max(2, Number(level) - 1);
-      return `<h${lifted} class="rt-h${lifted}">${inner}</h${lifted}>`;
+      return looksLikeProse ? `<p class="rt-p">${inner}</p>` : match;
     },
   );
 
+  //    Surviving headings are re-levelled so the document starts at h2: the
+  //    h3/h4 mix from Docs becomes a clean h2/h3 outline. Only when there is
+  //    no h2 already - lifting unconditionally turned "2.1" sub-clauses and
+  //    "For Interns" sub-heads in the legal documents into h2s, level with
+  //    the clauses they belong to.
+  const levels = [...out.matchAll(/<h([234]) class="rt-h[234]">/g)].map((m) => Number(m[1]));
+  const shift = levels.length ? Math.min(...levels) - 2 : 0;
+  if (shift > 0) {
+    out = out.replace(
+      /<(\/?)h([234])( class="rt-h[234]")?>/g,
+      (_m, close: string, level: string, cls?: string) => {
+        const lifted = Number(level) - shift;
+        return close ? `</h${lifted}>` : `<h${lifted}${cls ? ` class="rt-h${lifted}"` : ""}>`;
+      },
+    );
+  }
+
   // 5. Collapse the whitespace left behind by unwrapping.
   out = out.replace(/(^|[^<])\s{2,}/g, "$1 ");
+  // Docs pads paragraph and item ends with <br><br> for spacing; the
+  // stylesheet already spaces blocks, so trailing breaks only add gaps.
+  out = out.replace(/(?:<br>\s*)+(?=<\/(?:p|li|h[234])>)/g, "");
   // Empty paragraphs produced by unwrapping carry nothing and render as gaps.
-  out = out.replace(/<p class="rt-p">\s*<\/p>/g, "");
+  out = out.replace(/<p class="rt-p">(?:\s|<br>)*<\/p>/g, "");
 
   return out.trim();
+}
+
+/** Drops the outer tag pair of any `li` whose first child level is an `li`. */
+function unwrapNestedListItems(html: string): string {
+  const parts = html.split(/(<\/?(?:li|ul|ol)\b[^>]*>)/);
+  // Each open tag on the stack remembers where it sits in `parts`.
+  const stack: { tag: string; at: number; dropped: boolean }[] = [];
+  for (let i = 1; i < parts.length; i += 2) {
+    const token = parts[i];
+    const tag = /^<\/?(li|ul|ol)/i.exec(token)![1].toLowerCase();
+    if (token.startsWith("</")) {
+      const open = stack.pop();
+      if (open?.dropped) parts[i] = "";
+      continue;
+    }
+    const top = stack[stack.length - 1];
+    // Only an empty wrapper. `<li>text<li>` is an omitted end tag, which the
+    // browser already closes on its own; unwrapping it would orphan "text".
+    const wrapperIsEmpty = top && parts.slice(top.at + 1, i).join("").replace(/<[^>]*>/g, "").trim() === "";
+    if (tag === "li" && top?.tag === "li" && !top.dropped && wrapperIsEmpty) {
+      parts[top.at] = "";
+      top.dropped = true;
+    }
+    stack.push({ tag, at: i, dropped: false });
+  }
+  return parts.join("");
 }
 
 /** A heading longer than this is prose. Roughly a clause and a half. */

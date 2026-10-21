@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import { MessageCircle, Send, X } from "lucide-react";
+import { motion, useReducedMotion } from "motion/react";
 
 import { cn } from "@/lib/utils";
 
@@ -15,6 +16,8 @@ const QUICK_PROMPTS = [
   "What does it cost for employers?",
   "Is placement guaranteed?",
 ];
+
+const TEASER_KEY = "findtern:chat-teaser-seen";
 
 const GREETING: Msg = {
   role: "assistant",
@@ -182,6 +185,33 @@ export function ChatWidget() {
   const [error, setError] = useState<string | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const [teaser, setTeaser] = useState(false);
+  const reduceMotion = useReducedMotion();
+
+  // A one-time "Questions? Ask me" nudge a few seconds after load. Dismissed
+  // (or the chat opened) once per browser session; storage can throw in a
+  // private window, in which case it simply shows again next load.
+  useEffect(() => {
+    if (pathname?.startsWith("/admin")) return;
+    try {
+      if (window.sessionStorage.getItem(TEASER_KEY)) return;
+    } catch {
+      // ignore
+    }
+    const t = window.setTimeout(() => setTeaser(true), 4000);
+    return () => window.clearTimeout(t);
+    // Once per mount; the widget lives in the root layout.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function dismissTeaser() {
+    setTeaser(false);
+    try {
+      window.sessionStorage.setItem(TEASER_KEY, "1");
+    } catch {
+      // ignore
+    }
+  }
 
   useEffect(() => {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight });
@@ -376,19 +406,56 @@ export function ChatWidget() {
         </form>
       </div>
 
+      {/* ── Teaser (once per session) ─────────────────────── */}
+      {teaser && !open ? (
+        <motion.div
+          role="status"
+          initial={reduceMotion ? false : { opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+          className="pointer-events-auto relative flex items-center gap-1 rounded-2xl border border-ink-200 bg-white py-1.5 pl-3.5 pr-1.5 text-sm font-medium text-ink-800 shadow-lg"
+        >
+          <button
+            type="button"
+            onClick={() => {
+              dismissTeaser();
+              setOpen(true);
+            }}
+            className="rounded-lg py-1 text-left hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+          >
+            Questions? Ask me
+          </button>
+          <button
+            type="button"
+            onClick={dismissTeaser}
+            aria-label="Dismiss"
+            className="grid size-8 shrink-0 place-items-center rounded-lg text-ink-500 hover:bg-ink-100 hover:text-ink-800"
+          >
+            <X className="size-3.5" aria-hidden />
+          </button>
+          <span
+            aria-hidden
+            className="absolute -bottom-1.5 right-6 size-3 rotate-45 border-r border-b border-ink-200 bg-white"
+          />
+        </motion.div>
+      ) : null}
+
       {/* ── Launcher (always visible) ─────────────────────── */}
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => {
+          if (teaser) dismissTeaser();
+          setOpen((v) => !v);
+        }}
         aria-expanded={open}
-        aria-label={open ? "Hide Findtern chat" : "Chat with Findtern"}
+        aria-label={open ? "Hide Findtern chat" : inApp ? "Ask me - chat with Findtern" : "Chat with Findtern"}
         className={cn(
-          "relative pointer-events-auto group flex items-center justify-center rounded-full text-sm font-semibold text-white shadow-lg transition-all duration-[180ms] ease-out-expo",
+          "relative pointer-events-auto group flex items-center justify-center rounded-full text-sm font-semibold text-white shadow-lg transition-all duration-[180ms] ease-out-expo motion-reduce:transition-none",
           "bg-gradient-to-br from-primary to-brand-900 hover:shadow-glow",
-          inApp
-            ? "size-11 shadow-md"
-            : open
-              ? "size-14"
+          open
+            ? "size-14"
+            : inApp
+              ? "h-14 min-w-14 gap-2 px-4"
               : "size-14 sm:h-14 sm:w-auto sm:px-5 sm:gap-2.5",
         )}
       >
@@ -403,9 +470,11 @@ export function ChatWidget() {
             />
           </div>
         )}
-        <span className={cn(open || inApp ? "hidden" : "hidden sm:inline font-medium")}>
-          Chat with Findtern
-        </span>
+        {inApp ? (
+          <span className={cn(open ? "hidden" : "font-medium")}>Ask me</span>
+        ) : (
+          <span className={cn(open ? "hidden" : "hidden sm:inline font-medium")}>Chat with Findtern</span>
+        )}
       </button>
     </div>
   );
