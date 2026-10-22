@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { eq } from "drizzle-orm";
-import { ArrowLeft, ArrowUpRight, CircleGauge } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, CircleGauge, Download } from "lucide-react";
 
 import { getDb, schema } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
@@ -214,7 +214,42 @@ export default async function EmployerProposalDetail({
                 <Detail label="Timezone">{offer.timezone || "Asia/Kolkata"}</Detail>
               </dl>
             </section>
-          ) : null}
+          ) : (
+            // Old site parity (bug sheet R88): the full-time offer as sent,
+            // with the uploaded letter one click away.
+            <section className={`${card} p-6`}>
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h2 className="text-base font-semibold tracking-[-0.01em] text-ink-900">Full-time offer details</h2>
+                  <p className="mt-0.5 text-sm text-text-subtle">This is the full-time offer you sent to the candidate.</p>
+                </div>
+                {offer.fullTime.offerLetterKey || offer.fullTime.offerLetterUrl ? (
+                  <a
+                    href={`/api/proposals/${encodeURIComponent(proposal.id)}/offer-letter`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="apple-spring apple-pressable inline-flex min-h-11 items-center gap-2 rounded-[10px] bg-brand-700 px-4 text-sm font-semibold text-white hover:bg-brand-600"
+                  >
+                    <Download className="size-4" aria-hidden />
+                    Offer letter
+                  </a>
+                ) : null}
+              </div>
+              <dl className="mt-4 grid gap-x-6 gap-y-4 sm:grid-cols-3">
+                <Detail label="Job mode">
+                  <span className="capitalize">{offer.fullTime.jobMode || "-"}</span>
+                </Detail>
+                <Detail label="Location">{offer.fullTime.jobMode === "remote" ? "Remote" : offer.fullTime.location || "-"}</Detail>
+                <Detail label="Timezone">{offer.fullTime.timezone || offer.timezone || "-"}</Detail>
+                <Detail label="Shift">
+                  {offer.fullTime.shiftFrom && offer.fullTime.shiftTo ? `${offer.fullTime.shiftFrom}–${offer.fullTime.shiftTo}` : "-"}
+                </Detail>
+                <Detail label="Annual CTC">
+                  {offer.fullTime.annualCtcMinor ? formatMoney(offer.fullTime.annualCtcMinor, currency) : "-"}
+                </Detail>
+              </dl>
+            </section>
+          )}
 
           <section className={`${card} p-6`}>
             <h2 className="text-base font-semibold tracking-[-0.01em] text-ink-900">Work setup</h2>

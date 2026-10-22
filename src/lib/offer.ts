@@ -41,6 +41,9 @@ export type Offer = {
     offerLetterKey: string | null;
     jobMode: string;
     location: string;
+    timezone: string;
+    shiftFrom: string;
+    shiftTo: string;
   } | null;
 };
 
@@ -118,6 +121,9 @@ export function parseOffer(raw: unknown, rowCurrency?: string | null): Offer {
           offerLetterKey: str(ft.offerLetterKey) || null,
           jobMode: str(ft.jobMode),
           location: [str(ft.jobLocationCity), str(ft.jobLocationState)].filter(Boolean).join(", "),
+          timezone: str(ft.timezone),
+          shiftFrom: str(ft.shiftFrom),
+          shiftTo: str(ft.shiftTo),
         }
       : null,
   };
