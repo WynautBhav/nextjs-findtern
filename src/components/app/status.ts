@@ -56,13 +56,21 @@ export function proposalStatus(status: string | null): {
       return { label: "Withdrawn", tone: "closed", detail: "The company closed this one." };
     case "expired":
       return { label: "Expired", tone: "closed", detail: "This offer ran out of time." };
+    // Not stored: an offer the intern never answered, once its joining date
+    // has passed. Intern pages derive it (bug sheet 21 Oct wording).
+    case "lapsed":
+      return {
+        label: "Rejected · no response",
+        tone: "closed",
+        detail: "You did not respond before the joining date, so this offer was marked as rejected.",
+      };
     case "draft":
       return { label: "Not sent yet", tone: "neutral", detail: "The company has not sent this." };
     default:
       return {
         label: "Waiting on you",
         tone: "waiting",
-        detail: "Read it and decide when you are ready.",
+        detail: "Accept or turn it down before the joining date. If you do nothing, it is marked as rejected once the joining date passes.",
       };
   }
 }

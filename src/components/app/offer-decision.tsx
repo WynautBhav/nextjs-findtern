@@ -24,9 +24,12 @@
  */
 
 import { useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { AlertCircle, Check, Loader2, X } from "lucide-react";
+
+import { formatDate } from "@/lib/format";
 
 import { csrfFetch } from "@/lib/client-fetch";
 import { CountdownAgreement, FULL_TIME_ACCEPTANCE_TERMS } from "@/components/app/countdown-agreement";
@@ -147,6 +150,14 @@ export function OfferDecision({
                 : "Your timesheet and stipend start now. Your interview will be booked shortly and you will get the times to choose from."
               : "Nothing is lost and nothing was deleted. This stays in your thread so you remember what you turned down. You can apply again whenever you like."}
           </p>
+          {outcome.kind === "accepted" && !fullTime ? (
+            <Link
+              href="/intern/timesheets"
+              className="apple-spring apple-pressable mt-3 inline-flex min-h-11 items-center gap-2 rounded-[10px] bg-primary px-5 text-sm font-semibold text-white shadow-sm hover:bg-primary-hover"
+            >
+              Log your hours
+            </Link>
+          ) : null}
         </div>
       </motion.div>
     );
@@ -293,6 +304,10 @@ export function OfferDecision({
           : freeLeft > 0
             ? `Turning it down is fine and nothing is deleted. You can turn down ${freeLeft} more offer${freeLeft === 1 ? "" : "s"} and keep your guarantee.`
             : "You have turned down " + declinesUsed + " offers. Turning down another ends your placement guarantee."}
+      </p>
+      <p className="mt-2 text-sm text-ink-600">
+        If you do nothing, this offer stays open until the joining date
+        {startDate ? ` (${formatDate(startDate)})` : ""} and is marked as rejected once that date passes.
       </p>
     </div>
   );

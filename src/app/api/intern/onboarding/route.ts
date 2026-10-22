@@ -21,7 +21,7 @@ const qualification = z.object({
   id: z.string().max(80),
   name: z.string().max(160).default(""),
   issuer: z.string().max(160).default(""),
-  year: z.string().max(4).default(""),
+  completionDate: z.string().max(10).default(""),
   credentialUrl: z.string().max(500).default(""),
 });
 

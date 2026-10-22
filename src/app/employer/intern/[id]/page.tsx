@@ -23,7 +23,7 @@ import { requireRole } from "@/lib/auth";
 import { isAdminViewing } from "@/lib/employer-visibility";
 import { ShortlistToggle } from "@/components/employer/shortlist-toggle";
 import { bandFor } from "@/lib/score";
-import { formatMoney, formatRate } from "@/lib/format";
+import { formatDate, formatMoney, formatRate } from "@/lib/format";
 import {
   displayNameOf,
   toCandidateProfile,
@@ -478,7 +478,7 @@ export default async function EmployerInternDetail({
                   <li key={q.id} className="py-3 first:pt-0 last:pb-0">
                     <p className="text-sm font-medium text-ink-900">{q.name}</p>
                     <p className="mt-0.5 text-xs tabular-nums text-text-subtle">
-                      {[q.issuer, q.year].filter(Boolean).join(" · ") || "No further detail recorded"}
+                      {[q.issuer, q.completionDate && formatDate(q.completionDate)].filter(Boolean).join(" · ") || "No further detail recorded"}
                     </p>
                   </li>
                 ))}

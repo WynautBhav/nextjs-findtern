@@ -28,7 +28,6 @@ import Link from "next/link";
 
 import { NON_TECH_SKILLS, TECH_SKILLS, suggestSkills } from "@/lib/data/skills";
 import { STATES, stateForDistrict, suggestDistricts } from "@/lib/data/districts";
-import { BANKS } from "@/lib/data/banks";
 import { DIAL_CODES, DIAL_CODE_VALUES } from "@/lib/data/dial-codes";
 import { suggestColleges } from "@/lib/data/colleges";
 import { csrfFetch } from "@/lib/client-fetch";
@@ -37,7 +36,6 @@ import {
   EMERGENCY_RELATIONS,
   EXPERIENCE_TYPES,
   QUALIFICATION_LEVELS,
-  bankProblem,
   cascadeWorkModes,
   degreeOption,
   monthLabel,
@@ -85,9 +83,6 @@ type StepProps = {
   account: { countryCode: string; phoneNumber: string } | null;
   hasPanImage: boolean;
   hasAadhaarImage: boolean;
-  /** The "confirm account number" box; kept out of the draft. */
-  bankConfirm: string;
-  setBankConfirm: (value: string) => void;
   /** Skills are frozen: rated, or an AI interview is queued. */
   skillsLocked?: boolean;
   onUploaded: (kind: string) => void;
@@ -135,9 +130,6 @@ export function OnboardingForm({
   const [uploaded, setUploaded] = useState<string[]>([]);
   const hasPanImage = panOnFile || uploaded.includes("pan");
   const hasAadhaarImage = aadhaarOnFile || uploaded.includes("aadhaar");
-  // Starts as the stored number, so someone who already saved bank details
-  // does not have to type it twice to get past this step.
-  const [bankConfirm, setBankConfirm] = useState(initial.bank?.accountNumber ?? "");
   const hasPhoto = photoOnFile || uploaded.includes("profile_photo");
   const blurbRef = useRef<HTMLParagraphElement>(null);
 
@@ -181,7 +173,7 @@ export function OnboardingForm({
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  const ctx = { hasPanImage, hasAadhaarImage, hasPhoto, ownPhone: account, bankAccountConfirm: bankConfirm };
+  const ctx = { hasPanImage, hasAadhaarImage, hasPhoto, ownPhone: account };
 
   const errors = useMemo(() => {
     const keys = Object.keys(flagged);
@@ -191,12 +183,11 @@ export function OnboardingForm({
       hasAadhaarImage,
       hasPhoto,
       ownPhone: account,
-      bankAccountConfirm: bankConfirm,
     });
     const still: Record<string, string> = {};
     for (const k of keys) if (now[k]) still[k] = now[k];
     return still;
-  }, [flagged, values, step, hasPanImage, hasAadhaarImage, hasPhoto, account, bankConfirm]);
+  }, [flagged, values, step, hasPanImage, hasAadhaarImage, hasPhoto, account]);
 
   function showProblems(problems: Record<string, string>) {
     setErrors(problems);
@@ -235,16 +226,11 @@ export function OnboardingForm({
       const res = await csrfFetch("/api/intern/onboarding", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        // Bank details go only when this form touched them (or on the final
-        // submit, which has validated them), and only in full: the API
-        // refuses a half-filled bank, and an untouched copy could overwrite a
-        // newer one saved from Settings.
+        // Bank details are not part of this form any more (they are entered
+        // from Settings), so a stale copy in the draft is never sent.
         body: JSON.stringify({
           ...values,
-          bank:
-            final || (edits.bank && bankProblem(values.bank) === null)
-              ? { ...values.bank, ifscCode: values.bank.ifscCode.trim().toUpperCase(), accountNumber: values.bank.accountNumber.replace(/\s/g, "") }
-              : undefined,
+          bank: undefined,
           final,
         }),
       });
@@ -350,8 +336,6 @@ export function OnboardingForm({
               account={account}
               hasPanImage={hasPanImage}
               hasAadhaarImage={hasAadhaarImage}
-              bankConfirm={bankConfirm}
-              setBankConfirm={setBankConfirm}
               skillsLocked={skillsLocked}
               onUploaded={(kind) => setUploaded((prev) => (prev.includes(kind) ? prev : [...prev, kind]))}
             />
@@ -475,9 +459,7 @@ function StepRail({ step, onSelect }: { step: number; onSelect: (next: number) =
 
 /* ── Step 1: About Me (Personal + Passport Photo) ────────────────────────── */
 
-function PersonalStep({ values, update, errors, documents, account, onUploaded, bankConfirm, setBankConfirm }: StepProps) {
-  const bank = values.bank;
-  const setBank = (patch: Partial<OnboardingDraft["bank"]>) => update("bank", { ...bank, ...patch });
+function PersonalStep({ values, update, errors, documents, account, onUploaded }: StepProps) {
   // Legacy rows can hold a state spelled differently from the list; it stays selectable.
   const states = values.state && !STATES.includes(values.state) ? [values.state, ...STATES] : STATES;
   const onFile = (label: string) => (documents.find((d) => d.label === label) ? `${label} on file` : null);
@@ -532,7 +514,7 @@ function PersonalStep({ values, update, errors, documents, account, onUploaded, 
         />
         <Field
           id="linkedinUrl"
-          label="LinkedIn Profile *"
+          label="LinkedIn Profile (optional)"
           type="url"
           placeholder="https://linkedin.com/in/username"
           value={values.linkedinUrl}
@@ -582,7 +564,7 @@ function PersonalStep({ values, update, errors, documents, account, onUploaded, 
               onUploaded={() => onUploaded("pan")}
             />
           </UploadSlot>
-          <UploadSlot id="aadhaarImage" title="Aadhaar card image *" error={errors.aadhaarImage}>
+          <UploadSlot id="aadhaarImage" title="Aadhaar card image (optional)" error={errors.aadhaarImage}>
             <FileUpload
               kind="aadhaar"
               accept="image/jpeg,image/png,image/webp,application/pdf"
@@ -740,79 +722,6 @@ function PersonalStep({ values, update, errors, documents, account, onUploaded, 
           onNumber={(v) => update("secondPocPhone", v)}
           hint="Different from your own and your emergency contact's number."
         />
-      </Group>
-
-      <Group
-        title="Bank account"
-        hint="Where your stipend is paid. Use an account in your own name. Only Findtern sees this."
-      >
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field
-            id="bankAccountHolderName"
-            label="Account holder name *"
-            placeholder="As printed on your passbook"
-            value={bank.accountHolderName}
-            error={errors.bankAccountHolderName}
-            autoComplete="name"
-            onChange={(v) => setBank({ accountHolderName: v })}
-          />
-          <Field
-            id="bankName"
-            label="Bank name *"
-            placeholder="Start typing, e.g. State Bank of India"
-            hint="Pick from the list, or type the full name if your bank is not there."
-            value={bank.bankName}
-            error={errors.bankName}
-            list="bank-options"
-            autoComplete="off"
-            onChange={(v) => setBank({ bankName: v })}
-          />
-          <datalist id="bank-options">
-            {BANKS.map((b) => (
-              <option key={b} value={b} />
-            ))}
-          </datalist>
-          <Field
-            id="bankAccountNumber"
-            label="Account number *"
-            placeholder="9 to 18 digits"
-            inputMode="numeric"
-            autoComplete="off"
-            value={bank.accountNumber}
-            error={errors.bankAccountNumber}
-            onChange={(v) => setBank({ accountNumber: v.replace(/\D/g, "").slice(0, 18) })}
-          />
-          <Field
-            id="bankAccountConfirm"
-            label="Confirm account number *"
-            placeholder="Type it again"
-            inputMode="numeric"
-            autoComplete="off"
-            value={bankConfirm}
-            error={errors.bankAccountConfirm}
-            onChange={(v) => setBankConfirm(v.replace(/\D/g, "").slice(0, 18))}
-          />
-          <Field
-            id="bankIfscCode"
-            label="IFSC code *"
-            placeholder="e.g. SBIN0001234"
-            hint="11 characters, printed on your cheque book and passbook."
-            maxLength={11}
-            autoComplete="off"
-            value={bank.ifscCode}
-            error={errors.bankIfscCode}
-            onChange={(v) => setBank({ ifscCode: v.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 11) })}
-          />
-          <Field
-            id="bankUpiId"
-            label="UPI ID (optional)"
-            placeholder="e.g. name@okaxis"
-            autoComplete="off"
-            value={bank.upiId}
-            error={errors.bankUpiId}
-            onChange={(v) => setBank({ upiId: v.trim() })}
-          />
-        </div>
       </Group>
     </div>
   );
@@ -1056,8 +965,11 @@ function QualificationList({
 }) {
   const patch = (id: string, next: Partial<QualificationEntry>) =>
     onChange(rows.map((r) => (r.id === id ? { ...r, ...next } : r)));
+  // Local date, so the picker cannot offer tomorrow late in the evening.
+  const now = new Date();
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
   const add = () =>
-    onChange([...rows, { id: `${prefix}-${Date.now()}`, name: "", issuer: "", year: "", credentialUrl: "" }]);
+    onChange([...rows, { id: `${prefix}-${Date.now()}`, name: "", issuer: "", completionDate: "", credentialUrl: "" }]);
 
   return (
     <Group
@@ -1106,14 +1018,13 @@ function QualificationList({
                     onChange={(v) => patch(row.id, { issuer: v })}
                   />
                   <Field
-                    id={`${k}.year`}
-                    label="Year *"
-                    placeholder="e.g. 2024"
-                    inputMode="numeric"
-                    maxLength={4}
-                    value={row.year}
-                    error={errors[`${k}.year`]}
-                    onChange={(v) => patch(row.id, { year: v.replace(/\D/g, "") })}
+                    id={`${k}.completionDate`}
+                    label="Completion date *"
+                    type="date"
+                    max={today}
+                    value={row.completionDate}
+                    error={errors[`${k}.completionDate`]}
+                    onChange={(v) => patch(row.id, { completionDate: v })}
                   />
                   <Field
                     id={`${k}.credentialUrl`}
@@ -1364,6 +1275,27 @@ function SkillsStep({ values, update, errors, skillsLocked }: StepProps) {
 
   return (
     <div className="space-y-5">
+      {/* The old site's skills notice (bug sheet 21 Oct), word for word. */}
+      <div className="flex gap-2.5 rounded-[10px] border border-warning/30 bg-warning-soft px-4 py-3 text-sm text-ink-800">
+        <TriangleAlert className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden />
+        <div>
+          <p className="font-semibold">Important Note</p>
+          <p className="mt-1 text-pretty">
+            The self-evaluated skill ratings you provide will directly influence the difficulty level of your AI
+            interview. Giving honest and accurate ratings will ensure you are assessed fairly, helping you achieve a
+            better score and improving your chances of being shortlisted by employers.
+          </p>
+          <ol className="mt-2 list-decimal space-y-1 pl-5 text-pretty">
+            <li>Your AI interview questions are based on the skills you provide, allowing employers to assess you accurately.</li>
+            <li>
+              Once submitted, skills cannot be changed as this impacts your vetting status. To update skills after
+              completion of your AI Interview, please contact Findtern Support; note that additional charges and terms
+              apply.
+            </li>
+          </ol>
+        </div>
+      </div>
+
       <div>
         <label htmlFor="skills" className="block text-sm font-medium text-ink-800">
           Select Key Skills (4–7) *
@@ -1820,6 +1752,9 @@ function LocationPreferencesStep({ values, update, errors }: StepProps) {
         >
           {WORK_MODES.map((mode) => {
             const active = picked === mode;
+            // Onsite brings hybrid and remote with it, hybrid brings remote:
+            // those light up too, a step quieter than the one picked.
+            const included = !active && locationTypes.includes(mode);
             return (
               <button
                 key={mode}
@@ -1830,13 +1765,16 @@ function LocationPreferencesStep({ values, update, errors }: StepProps) {
                 className={`apple-spring apple-pressable inline-flex min-h-11 items-center gap-2 rounded-[10px] border px-4 py-2.5 text-sm font-semibold capitalize ${
                   active
                     ? "border-brand-600 bg-brand-50 text-brand-800 shadow-2xs ring-1 ring-brand-600/30"
-                    : "border-ink-200 bg-white text-ink-700 hover:bg-ink-50"
+                    : included
+                      ? "border-brand-300 bg-brand-50/60 text-brand-800"
+                      : "border-ink-200 bg-white text-ink-700 hover:bg-ink-50"
                 }`}
               >
                 <span
-                  className={`size-2 rounded-full ${active ? "bg-brand-600" : "bg-ink-300"}`}
+                  className={`size-2 rounded-full ${active ? "bg-brand-600" : included ? "bg-brand-400" : "bg-ink-300"}`}
                 />
                 <span>{mode}</span>
+                {included ? <span className="text-2xs font-medium normal-case text-brand-700">· included</span> : null}
               </button>
             );
           })}
@@ -2123,7 +2061,7 @@ function ProfilePreviewStep({ values, update, errors, email, onJumpStep }: StepP
                   <li key={q.id}>
                     <span className="font-semibold">{q.name || "Untitled"}</span>
                     {q.issuer ? <span className="text-text-subtle"> · {q.issuer}</span> : null}
-                    {q.year ? <span className="text-text-subtle"> · {q.year}</span> : null}
+                    {q.completionDate ? <span className="text-text-subtle"> · {formatDay(q.completionDate)}</span> : null}
                   </li>
                 ))}
               </ul>
@@ -2448,6 +2386,12 @@ const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Se
  * validation reads). A half-picked value is kept as "YYYY-" or "-MM" so the
  * other select does not reset; validation reports it as incomplete.
  */
+/** YYYY-MM-DD as DD/MM/YYYY, the format the rest of the form shows. */
+function formatDay(iso: string): string {
+  const [y, m, d] = iso.split("-");
+  return y && m && d ? `${d}/${m}/${y}` : iso;
+}
+
 function MonthYearField({
   id,
   label,

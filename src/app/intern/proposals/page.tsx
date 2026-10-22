@@ -34,11 +34,11 @@ export default async function InternProposals() {
   const data = await loadInternData(session.uid);
   const projects = await projectNames(data.proposals.map((p) => p.projectId ?? ""));
 
-  // An unanswered offer whose start date has arrived reads as expired.
+  // An unanswered offer whose start date has arrived reads as rejected.
   const shown = data.proposals.map((p) =>
     (p.status === "sent" || p.status === "interview_scheduled") &&
     offerPastStart(((p.offerDetails ?? {}) as Record<string, unknown>).startDate as string | undefined)
-      ? { ...p, status: "expired" }
+      ? { ...p, status: "lapsed" }
       : p,
   );
   const open = shown.filter((p) => p.status === "sent");

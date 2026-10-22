@@ -33,6 +33,7 @@ const STATUS_LABEL: Record<string, { label: string; tone: Tone }> = {
   hired: { label: "Hired", tone: "paid" },
   rejected: { label: "Rejected", tone: "closed" },
   expired: { label: "Withdrawn", tone: "closed" },
+  lapsed: { label: "Rejected · no response", tone: "closed" },
   withdrawn: { label: "Withdrawn", tone: "closed" },
 };
 
@@ -143,9 +144,9 @@ export default async function ProposalDetail({ params }: { params: Promise<{ id:
   ).length;
   const guaranteeEnded = typeof extra.guaranteeEndedAt === "string";
   const startDate = parsed.startDate;
-  // Unanswered on or after its start date: closed, shown as withdrawn.
+  // Unanswered on or after its start date: closed, shown as rejected.
   const lapsed = (proposal.status === "sent" || proposal.status === "interview_scheduled") && offerPastStart(startDate);
-  const statusKey = lapsed ? "expired" : (proposal.status ?? "sent");
+  const statusKey = lapsed ? "lapsed" : (proposal.status ?? "sent");
   const fallback = proposalStatus(statusKey);
   const status = STATUS_LABEL[statusKey] ?? { label: fallback.label, tone: fallback.tone };
   const decided = proposal.status !== "sent" || lapsed;

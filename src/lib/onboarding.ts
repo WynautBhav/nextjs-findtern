@@ -53,7 +53,9 @@ export type QualificationEntry = {
   id: string;
   name: string;
   issuer: string;
-  year: string;
+  /** YYYY-MM-DD. Professional rows store it as legacy `completionDate`,
+   *  certifications as legacy `endDate`. */
+  completionDate: string;
   credentialUrl: string;
 };
 
@@ -445,8 +447,20 @@ export function storedFromDraft(
  *                          level, scoreType, score, certificateUploads }]
  *   certifications      [{ id, certificateName, institution, startDate, endDate,
  *                          certificateUploads }]
- * This form edits name, issuer, year and a credential URL; `year` and
- * `credentialUrl` are new keys, and every legacy key on a row is kept. */
+ * This form edits name, issuer, completion date and a credential URL. The date
+ * is the legacy `completionDate` / `endDate`; `credentialUrl` is a new key,
+ * and every legacy key on a row is kept. Rows saved while this form asked
+ * for a bare `year` read as 1 January of that year. */
+
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+function readDate(raw: unknown, year: unknown): string {
+  const v = text(raw);
+  if (ISO_DATE.test(v.slice(0, 10))) return v.slice(0, 10);
+  if (/^\d{4}-\d{2}$/.test(v)) return `${v}-01`;
+  const y = text(year) || (/^\d{4}$/.test(v) ? v : "");
+  return /^\d{4}$/.test(y) ? `${y}-01-01` : "";
+}
 
 const PROFESSIONAL_PRESETS = ["CA", "CS", "CMA", "CFA"];
 
@@ -456,7 +470,7 @@ function readProfessional(c: Record<string, unknown>, i: number): QualificationE
     id: text(c.id) || `prof-${i}`,
     name: preset && preset !== "Other" ? preset : text(c.courseNameOther) || text(c.level),
     issuer: text(c.institution),
-    year: text(c.year) || text(c.completionDate).slice(0, 4),
+    completionDate: readDate(c.completionDate, c.year),
     credentialUrl: text(c.credentialUrl),
   };
 }
@@ -471,11 +485,10 @@ function writeProfessional(q: QualificationEntry, prev: Record<string, unknown>)
     courseNameOther: preset ? "" : name,
     institution: q.issuer.trim(),
     status: text(prev.status) || "Completed",
-    completionDate: text(prev.completionDate),
+    completionDate: q.completionDate.trim(),
     scoreType: text(prev.scoreType) || "percentage",
     score: text(prev.score),
     certificateUploads: arr(prev.certificateUploads),
-    year: q.year.trim(),
     credentialUrl: q.credentialUrl.trim(),
   };
 }
@@ -485,7 +498,7 @@ function readCertification(c: Record<string, unknown>, i: number): Qualification
     id: text(c.id) || `cert-${i}`,
     name: text(c.certificateName),
     issuer: text(c.institution),
-    year: text(c.year) || text(c.endDate || c.startDate).slice(0, 4),
+    completionDate: readDate(c.endDate || c.startDate, c.year),
     credentialUrl: text(c.credentialUrl),
   };
 }
@@ -497,9 +510,8 @@ function writeCertification(q: QualificationEntry, prev: Record<string, unknown>
     certificateName: q.name.trim(),
     institution: q.issuer.trim(),
     startDate: text(prev.startDate),
-    endDate: text(prev.endDate),
+    endDate: q.completionDate.trim(),
     certificateUploads: arr(prev.certificateUploads),
-    year: q.year.trim(),
     credentialUrl: q.credentialUrl.trim(),
   };
 }
@@ -514,7 +526,7 @@ function writeRows(
     const i = prevRows.findIndex((p) => text(p.id) === q.id);
     if (i === -1) return write(q, {});
     const before = read(prevRows[i], i);
-    const same = (["name", "issuer", "year", "credentialUrl"] as const).every((k) => before[k] === q[k]);
+    const same = (["name", "issuer", "completionDate", "credentialUrl"] as const).every((k) => before[k] === q[k]);
     return same ? prevRows[i] : write(q, prevRows[i]);
   });
 }
@@ -649,9 +661,6 @@ export type ValidationContext = {
   hasPanImage: boolean;
   /** An Aadhaar card image is on file (uploaded now or earlier). */
   hasAadhaarImage: boolean;
-  /** The "confirm account number" box. Browser only: the server never sees
-   *  it, so it is checked only when given. */
-  bankAccountConfirm?: string;
   /** The account's own number, so the emergency contact cannot repeat it. */
   ownPhone?: { countryCode: string; phoneNumber: string } | null;
   /** A profile photo is on file (uploaded now or earlier). */
@@ -680,14 +689,15 @@ export function scoreProblem(type: ScoreType, raw: string): string | null {
   return null;
 }
 
-function qualificationErrors(rows: QualificationEntry[], prefix: string, thisYear: number, out: ValidationErrors) {
+function qualificationErrors(rows: QualificationEntry[], prefix: string, today: string, out: ValidationErrors) {
   for (const q of rows) {
     const k = `${prefix}.${q.id}`;
     if (!q.name.trim()) out[`${k}.name`] = "Enter the name of the qualification.";
     if (!q.issuer.trim()) out[`${k}.issuer`] = "Enter who issued it.";
-    if (!YEAR.test(q.year.trim())) out[`${k}.year`] = "Enter the 4-digit year.";
-    else if (Number(q.year) > thisYear) out[`${k}.year`] = `The year cannot be after ${thisYear}.`;
-    else if (Number(q.year) < 1950) out[`${k}.year`] = "Check the year.";
+    const date = q.completionDate.trim();
+    if (!ISO_DATE.test(date)) out[`${k}.completionDate`] = "Pick the date you completed it.";
+    else if (date > today) out[`${k}.completionDate`] = "The completion date cannot be in the future.";
+    else if (date < "1950-01-01") out[`${k}.completionDate`] = "Check the completion date.";
     if (q.credentialUrl.trim() && !URL_RE.test(q.credentialUrl.trim())) {
       out[`${k}.credentialUrl`] = "Enter a full link starting with https://";
     }
@@ -699,6 +709,7 @@ export function validateStep(values: OnboardingDraft, step: number, ctx: Validat
   const now = ctx.now ?? new Date();
   const thisYear = now.getFullYear();
   const thisMonth = `${thisYear}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const today = `${thisMonth}-${String(now.getDate()).padStart(2, "0")}`;
 
   if (step === 0) {
     // Required again, as in legacy (onboarding.tsx:793): employers shortlist
@@ -708,8 +719,10 @@ export function validateStep(values: OnboardingDraft, step: number, ctx: Validat
     }
     if ((values.bio ?? "").trim().length < 20) errors.bio = "Write at least a sentence or two - 20 characters minimum.";
     const linkedin = (values.linkedinUrl ?? "").trim();
-    if (!linkedin) errors.linkedinUrl = "Add your LinkedIn profile link.";
-    else if (!URL_RE.test(linkedin)) errors.linkedinUrl = "Enter the full link, starting with https://";
+    // Optional (bug sheet 21 Oct); a link that is given must be a real one.
+    if (!linkedin) {
+      // nothing to check
+    } else if (!URL_RE.test(linkedin)) errors.linkedinUrl = "Enter the full link, starting with https://";
     else if (!/linkedin\.com\//i.test(linkedin)) errors.linkedinUrl = "This should be a linkedin.com profile link.";
     if (!(values.city ?? "").trim()) errors.city = "Enter the city you live in.";
     if (!(values.state ?? "").trim()) errors.state = "Enter the state you live in.";
@@ -725,7 +738,6 @@ export function validateStep(values: OnboardingDraft, step: number, ctx: Validat
     if (!pan) errors.panNumber = "PAN is required for stipend payouts.";
     else if (!PAN.test(pan)) errors.panNumber = "PAN must look like ABCDE1234F - 5 letters, 4 digits, 1 letter.";
     if (!ctx.hasPanImage) errors.panImage = "Upload a photo or scan of your PAN card.";
-    if (!ctx.hasAadhaarImage) errors.aadhaarImage = "Upload a photo or scan of your Aadhaar card.";
 
     if (!(values.emergencyName ?? "").trim()) errors.emergencyName = "Enter the name of someone we can call in an emergency.";
     const ePhone = (values.emergencyPhone ?? "").trim();
@@ -760,16 +772,8 @@ export function validateStep(values: OnboardingDraft, step: number, ctx: Validat
       }
     }
 
-    // Bank account: required here so the stipend can be paid (legacy key
-    // extra.bankDetails, the same one Settings writes).
-    Object.assign(errors, bankErrors(values.bank ?? {}));
-    if (
-      ctx.bankAccountConfirm !== undefined &&
-      !errors.bankAccountNumber &&
-      ctx.bankAccountConfirm.replace(/\s/g, "") !== (values.bank?.accountNumber ?? "").replace(/\s/g, "")
-    ) {
-      errors.bankAccountConfirm = "The account numbers do not match.";
-    }
+    // Bank details are not asked for here any more (bug sheet 21 Oct): they
+    // are entered from Settings once there is a stipend to pay.
   }
 
   if (step === 1) {
@@ -800,8 +804,8 @@ export function validateStep(values: OnboardingDraft, step: number, ctx: Validat
       errors.cgpa = completed ? `Enter your final ${which}.` : `Enter your ${which} so far (latest semester).`;
     }
 
-    qualificationErrors(a.professional ?? [], "professional", thisYear, errors);
-    qualificationErrors(a.certifications ?? [], "certifications", thisYear, errors);
+    qualificationErrors(a.professional ?? [], "professional", today, errors);
+    qualificationErrors(a.certifications ?? [], "certifications", today, errors);
   }
 
   if (step === 2) {
@@ -903,14 +907,14 @@ export type CompletionItem = { id: string; label: string; done: boolean; href: s
  */
 export type CompletionDocs = {
   hasPanImage: boolean;
-  /** An Aadhaar card image is on file. */
+  /** An Aadhaar card image is on file. Optional, so it no longer counts. */
   hasAadhaarImage?: boolean;
   /** A profile photo is on file. */
   hasPhoto?: boolean;
 };
 
 export function profileCompletion(row: OnboardingLike | null, docs: boolean | CompletionDocs): { items: CompletionItem[]; done: number; total: number; complete: boolean } {
-  const { hasPanImage, hasAadhaarImage = false, hasPhoto = false } = typeof docs === "boolean" ? { hasPanImage: docs } : docs;
+  const { hasPanImage, hasPhoto = false } = typeof docs === "boolean" ? { hasPanImage: docs } : docs;
   const d = row ? draftFromRecord(row) : null;
   const extra = obj(row?.extraData);
   const modes = d?.locationTypes ?? [];
@@ -920,16 +924,16 @@ export function profileCompletion(row: OnboardingLike | null, docs: boolean | Co
     { id: "photo", label: "Profile photo", done: hasPhoto, href: form },
     {
       id: "about",
-      label: "About you, LinkedIn and address",
-      done: Boolean(d && (d.bio ?? "").trim().length >= 20 && d.linkedinUrl && d.city && d.state && d.pinCode),
+      label: "About you and address",
+      done: Boolean(d && (d.bio ?? "").trim().length >= 20 && d.city && d.state && d.pinCode),
       href: form,
     },
-    // Identity: both numbers and both card images. A marksheet is optional
-    // and not part of this list.
+    // Identity: both numbers, and the PAN card is the only document asked for
+    // (bug sheet 21 Oct). The Aadhaar image and a marksheet are optional.
     {
       id: "identity",
-      label: "Aadhaar and PAN, with card images",
-      done: Boolean(d?.aadhaarNumber && d?.panNumber && hasPanImage && hasAadhaarImage),
+      label: "Aadhaar and PAN numbers, PAN card image",
+      done: Boolean(d?.aadhaarNumber && d?.panNumber && hasPanImage),
       href: form,
     },
     { id: "emergency", label: "Emergency contact", done: Boolean(d?.emergencyPhone), href: form },
@@ -951,7 +955,6 @@ export function profileCompletion(row: OnboardingLike | null, docs: boolean | Co
     },
     { id: "laptop", label: "Laptop availability", done: d?.hasLaptop === true || d?.hasLaptop === false, href: form },
     { id: "agreement", label: "Non-Bypass Agreement accepted", done: Boolean(extra.ndaAcceptedAt), href: form },
-    { id: "bank", label: "Bank account details", done: bankProblem(d?.bank ?? {}) === null, href: form },
   ];
   const done = items.filter((i) => i.done).length;
   return { items, done, total: items.length, complete: done === items.length };

@@ -51,11 +51,12 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Proposal not found or access denied" }, { status: 404 });
   }
 
-  // Legacy rules (routes.ts 13605-13678): hired placements only, never a
-  // full-time offer, one sheet for a one-month engagement, and the period
-  // clamped to the joining date and contract end.
-  if (proposal.status !== "hired") {
-    return NextResponse.json({ error: "Timesheets open once the employer confirms your hire." }, { status: 400 });
+  // Legacy rules (routes.ts 13605-13678): never a full-time offer, one sheet
+  // for a one-month engagement, and the period clamped to the joining date
+  // and contract end. Legacy waited for the hire; the bug sheet (22 Oct)
+  // opens logging as soon as the intern accepts.
+  if (proposal.status !== "accepted" && proposal.status !== "hired") {
+    return NextResponse.json({ error: "Timesheets open once you accept the offer." }, { status: 400 });
   }
   const offer = parseOffer(proposal.offerDetails, proposal.currency);
   if (offer.fullTime) {

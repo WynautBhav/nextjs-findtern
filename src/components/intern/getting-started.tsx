@@ -88,11 +88,7 @@ export function GettingStarted({
                   href={continueHref}
                   className="apple-spring apple-pressable mt-4 inline-flex min-h-11 items-center gap-2 rounded-[10px] bg-primary px-5 text-sm font-semibold text-white shadow-sm hover:bg-primary-hover"
                 >
-                  {completion.done === 0
-                    ? "Start your profile"
-                    : missing[0]?.id === "bank"
-                      ? "Add bank details"
-                      : "Continue your profile"}
+                  {completion.done === 0 ? "Start your profile" : "Continue your profile"}
                   <ArrowRight className="size-4" aria-hidden />
                 </Link>
               ) : null}

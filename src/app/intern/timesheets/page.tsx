@@ -38,9 +38,9 @@ export default async function InternTimesheets() {
   const data = await loadInternData(session.uid);
   const sheets = data.timesheets;
 
-  // Same gate as the create API: hired placements only, never a full-time offer.
+  // Same gate as the create API: accepted or hired, never a full-time offer.
   const acceptedProposals = data.proposals
-    .filter((p) => p.status === "hired" && !parseOffer(p.offerDetails, p.currency).fullTime)
+    .filter((p) => (p.status === "accepted" || p.status === "hired") && !parseOffer(p.offerDetails, p.currency).fullTime)
     .map((p) => ({
       id: p.id,
       companyName: data.names[p.employerId] || "Your Employer",

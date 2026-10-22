@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ArrowRight, Building2, Check, Coffee, GraduationCap, Pause, Play } from "lucide-react";
+import { ArrowRight, Building2, Check, Coffee, GraduationCap } from "lucide-react";
 
 import { ButtonLink } from "@/components/ui/button";
 import { TextReveal } from "@/components/motion/text-reveal";
@@ -58,41 +58,16 @@ export function HeroSplit() {
   const copy = audience === "employer" ? HOME_COPY : HOME_STUDENT_COPY;
   const [ready, setReady] = useState(false);
   const [shown, setShown] = useState(false);
-  const [paused, setPaused] = useState(true);
-  const userPaused = useRef(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const bandRef = useRef<HTMLDivElement>(null);
-
-  const togglePlayback = () => {
-    const v = videoRef.current;
-    if (!v) return;
-    const next = !paused;
-    userPaused.current = next;
-    if (next) {
-      v.pause();
-    } else {
-      // Under save-data or reduced motion nothing has been fetched yet.
-      if (v.networkState === HTMLMediaElement.NETWORK_EMPTY) v.load();
-      void v.play().catch(() => {});
-    }
-  };
 
   useEffect(() => {
     const v = videoRef.current;
     if (!v) return;
     const onCanPlay = () => setReady(true);
-    // The control mirrors what the element is actually doing, not intent.
-    const onPlay = () => setPaused(false);
-    const onPause = () => setPaused(true);
     v.addEventListener("canplay", onCanPlay);
-    v.addEventListener("play", onPlay);
-    v.addEventListener("pause", onPause);
     if (v.readyState >= 3) setReady(true);
-    return () => {
-      v.removeEventListener("canplay", onCanPlay);
-      v.removeEventListener("play", onPlay);
-      v.removeEventListener("pause", onPause);
-    };
+    return () => v.removeEventListener("canplay", onCanPlay);
   }, []);
 
   useEffect(() => {
@@ -104,8 +79,9 @@ export function HeroSplit() {
       (navigator as { connection?: { saveData?: boolean } }).connection?.saveData ??
       false;
 
-    // Reduced motion: the poster stands in until the visitor presses play.
-    if (prefersReducedMotion()) userPaused.current = true;
+    // Reduced motion: the poster stands in for the video. There is no play
+    // control on the band (bug sheet), so nothing is fetched either.
+    if (prefersReducedMotion()) return;
 
     let loaded = false;
     const load = () => {
@@ -128,7 +104,7 @@ export function HeroSplit() {
       ([entry]) => {
         if (entry.isIntersecting) setShown(true);
         if (!loaded) return;
-        if (entry.isIntersecting && !userPaused.current) {
+        if (entry.isIntersecting) {
           void v.play().catch(() => {});
         } else {
           v.pause();
@@ -358,16 +334,6 @@ export function HeroSplit() {
             </ul>
           </div>
 
-          {/* Looping motion longer than 5 s needs a way to stop it (WCAG
-              2.2.2). Kept small and out of the caption's corner. */}
-          <button
-            type="button"
-            onClick={togglePlayback}
-            aria-label={paused ? "Play background video" : "Pause background video"}
-            className="absolute right-4 top-4 grid size-11 place-items-center rounded-full border border-white/15 bg-brand-950/50 text-white/80 transition-colors hover:bg-brand-950/75 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white sm:right-5 sm:top-5"
-          >
-            {paused ? <Play className="size-4" aria-hidden /> : <Pause className="size-4" aria-hidden />}
-          </button>
         </div>
       </div>
     </section>

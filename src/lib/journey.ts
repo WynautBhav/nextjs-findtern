@@ -203,7 +203,7 @@ export function buildThread(src: ProofSource, now: Date = new Date()): ThreadNod
         tone: "action",
         at: p.createdAt,
         title: `Offer waiting on you: ${role}`,
-        detail: `${withName} sent you an offer. Nothing happens until you respond.`,
+        detail: `${withName} sent you an offer. If you do nothing, it is marked as rejected once the joining date passes.`,
         with: withName,
         href: `/intern/proposals/${p.id}`,
         action: "Read the offer",

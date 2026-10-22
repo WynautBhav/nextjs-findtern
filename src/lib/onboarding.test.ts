@@ -102,8 +102,8 @@ test("qualifications read from legacy rows and untouched rows are written back v
     },
   };
   const d = draftFromRecord(row);
-  assert.deepEqual(d.academics?.professional?.[0], { id: "p1", name: "CA", issuer: "ICAI", year: "2024", credentialUrl: "" });
-  assert.equal(d.academics?.certifications?.[0].year, "2023");
+  assert.deepEqual(d.academics?.professional?.[0], { id: "p1", name: "CA", issuer: "ICAI", completionDate: "2024-05-01", credentialUrl: "" });
+  assert.equal(d.academics?.certifications?.[0].completionDate, "2023-03-01");
 
   const out = storedFromDraft(d, row);
   const a = out.extraPatch.academics as Record<string, unknown[]>;
@@ -172,11 +172,11 @@ test("a complete profile passes every step", () => {
   assert.equal(validateProfile(complete(), ctx), null);
 });
 
-test("Aadhaar number, Aadhaar image and PAN image are required on the About step", () => {
+test("Aadhaar number and PAN image are required on the About step; the Aadhaar image is not", () => {
   const e = validateStep({ ...complete(), aadhaarNumber: "" }, 0, { ...ctx, hasPanImage: false, hasAadhaarImage: false });
   assert.ok(e.aadhaarNumber);
   assert.ok(e.panImage);
-  assert.ok(e.aadhaarImage);
+  assert.equal(e.aadhaarImage, undefined);
   assert.match(validateStep({ ...complete(), aadhaarNumber: "12345" }, 0, ctx).aadhaarNumber, /12 digits/);
   assert.ok(validateStep({ ...complete(), aadhaarNumber: "123456789012" }, 0, ctx).aadhaarNumber, "cannot start with 1");
 });
@@ -216,10 +216,11 @@ test("degree: Other needs a typed name", () => {
 
 test("an added qualification row must be complete", () => {
   const base = complete();
-  const row = { id: "q1", name: "CA", issuer: "", year: "2030", credentialUrl: "not a url" };
+  const row = { id: "q1", name: "CA", issuer: "", completionDate: "2030-01-01", credentialUrl: "not a url" };
   const e = validateStep({ ...base, academics: { ...base.academics, professional: [row] } }, 1, ctx);
   assert.ok(e["professional.q1.issuer"]);
-  assert.ok(e["professional.q1.year"]);
+  assert.match(e["professional.q1.completionDate"], /future/);
+  assert.ok(validateStep({ ...base, academics: { ...base.academics, professional: [{ ...row, completionDate: "" }] } }, 1, ctx)["professional.q1.completionDate"]);
   assert.ok(e["professional.q1.credentialUrl"]);
   assert.equal(e["professional.q1.name"], undefined);
 });
@@ -237,9 +238,9 @@ test("every field of an added experience is required", () => {
   assert.deepEqual(validateStep({ ...complete(), experiences: [] }, 2, ctx), {}, "experience itself stays optional");
 });
 
-test("LinkedIn, state and PIN are required on the About step", () => {
+test("state and PIN are required on the About step; LinkedIn is optional but checked", () => {
   const e = validateStep({ ...complete(), linkedinUrl: "", state: "", pinCode: "" }, 0, ctx);
-  assert.ok(e.linkedinUrl);
+  assert.equal(e.linkedinUrl, undefined);
   assert.ok(e.state);
   assert.ok(e.pinCode);
   assert.ok(validateStep({ ...complete(), linkedinUrl: "https://github.com/me" }, 0, ctx).linkedinUrl);
@@ -288,15 +289,10 @@ test("UPI ID is optional but must look like name@bank", () => {
   assert.ok(bankProblem({ ...bank, upiId: "not-a-upi" }));
 });
 
-test("bank details are required on the About step, field by field", () => {
+test("bank details are not asked for on the About step", () => {
   const base = complete();
-  assert.deepEqual(validateStep(base, 0, ctx), {});
-  const e = validateStep({ ...base, bank: { ...base.bank, bankName: "", ifscCode: "SBIN1" } }, 0, ctx);
-  assert.ok(e.bankName);
-  assert.ok(e.bankIfscCode);
-  assert.equal(e.bankAccountNumber, undefined);
-  assert.ok(validateStep(base, 0, { ...ctx, bankAccountConfirm: "123456789099" }).bankAccountConfirm);
-  assert.equal(validateStep(base, 0, { ...ctx, bankAccountConfirm: "123456789012" }).bankAccountConfirm, undefined);
+  const empty = { accountHolderName: "", bankName: "", accountNumber: "", ifscCode: "", upiId: "" };
+  assert.deepEqual(validateStep({ ...base, bank: empty }, 0, ctx), {});
 });
 
 test("one work mode is shown: the widest stored", () => {
@@ -306,7 +302,7 @@ test("one work mode is shown: the widest stored", () => {
   assert.equal(widestWorkMode([]), null);
 });
 
-test("profile completion: Aadhaar image counts, marksheet does not", () => {
+test("profile completion: only the PAN card image counts as a document", () => {
   const row = {
     bio: "Final-year student who builds things.",
     linkedinUrl: "https://www.linkedin.com/in/someone",
@@ -318,8 +314,11 @@ test("profile completion: Aadhaar image counts, marksheet does not", () => {
   };
   const ids = profileCompletion(row, { hasPanImage: true, hasAadhaarImage: true }).items.map((i) => i.id);
   assert.ok(!ids.includes("marksheet"));
-  const identity = (aadhaar: boolean) =>
-    profileCompletion(row, { hasPanImage: true, hasAadhaarImage: aadhaar }).items.find((i) => i.id === "identity")?.done;
-  assert.equal(identity(true), true);
-  assert.equal(identity(false), false);
+  assert.ok(!ids.includes("bank"));
+  const identity = (pan: boolean, aadhaar: boolean) =>
+    profileCompletion(row, { hasPanImage: pan, hasAadhaarImage: aadhaar }).items.find((i) => i.id === "identity")?.done;
+  assert.equal(identity(true, false), true);
+  assert.equal(identity(false, true), false);
+  const about = profileCompletion({ ...row, linkedinUrl: "" }, { hasPanImage: true }).items.find((i) => i.id === "about")?.done;
+  assert.equal(about, true, "LinkedIn is optional");
 });
