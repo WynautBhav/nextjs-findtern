@@ -165,7 +165,9 @@ export function ProposalOfferForm({
           <span className={label}>Start date</span>
           <input type="date" min={tomorrowIst()} value={startDate} onChange={(e) => setStartDate(e.target.value)} className={input} />
         </label>
-        <label className="block">
+        {/* Full width: the editor sits in a 20rem column, and the labels
+            ("Monday to Saturday") were cut off at half of it. */}
+        <label className="col-span-2 block">
           <span className={label}>Working week</span>
           <select value={schedule} onChange={(e) => setSchedule(e.target.value as WeeklySchedule)} className={input}>
             {(Object.keys(WEEKLY_SCHEDULES) as WeeklySchedule[]).map((k) => (
@@ -175,7 +177,7 @@ export function ProposalOfferForm({
             ))}
           </select>
         </label>
-        <label className="block">
+        <label className="col-span-2 block">
           <span className={label}>Paid leave / month</span>
           <select value={leaves} onChange={(e) => setLeaves(e.target.value)} className={input}>
             {PAID_LEAVE_OPTIONS.map((n) => (

@@ -335,7 +335,8 @@ export function SendProposalForm({
               value={schedule}
               options={(Object.keys(WEEKLY_SCHEDULES) as WeeklySchedule[]).map((k) => ({
                 value: k,
-                label: `${WEEKLY_SCHEDULES[k].label} (${WEEKLY_SCHEDULES[k].days} days a month)`,
+                // The day count is in the hours hint below; here it was cut off.
+                label: WEEKLY_SCHEDULES[k].label,
               }))}
               onChange={(v) => setSchedule(v as WeeklySchedule)}
             />

@@ -49,7 +49,9 @@ export function CheckoutSummary({
 
   return (
     <section className="rounded-[20px] border border-ink-200/70 bg-white p-5 shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)]">
-      <fieldset>
+      {/* min-w-0: a fieldset is min-content wide by default, which pushed the
+          amounts out of the 20rem column on long candidate labels. */}
+      <fieldset className="min-w-0">
         <legend className="text-2xs font-semibold uppercase tracking-[0.14em] text-text-subtle">Pay for</legend>
         <ul className="mt-3 space-y-1">
           {lines.map((l) => (
@@ -63,7 +65,7 @@ export function CheckoutSummary({
                   onChange={() => setSelectedId(l.id)}
                 />
                 <span className="min-w-0 flex-1 truncate">{l.label}</span>
-                <span className="tabular-nums text-ink-600">{formatMoney(amountOf(l, picked), l.currency, { zeroLabel: false })}</span>
+                <span className="shrink-0 tabular-nums text-ink-600">{formatMoney(amountOf(l, picked), l.currency, { zeroLabel: false })}</span>
               </label>
             </li>
           ))}
@@ -71,7 +73,7 @@ export function CheckoutSummary({
       </fieldset>
 
       {line && !line.due ? (
-        <fieldset className="mt-4 border-t border-ink-100 pt-4">
+        <fieldset className="mt-4 min-w-0 border-t border-ink-100 pt-4">
           <legend className="text-2xs font-semibold uppercase tracking-[0.14em] text-text-subtle">How to pay</legend>
           <div className="mt-3 space-y-1">
             <label className={`flex min-h-11 items-center gap-2.5 rounded-[10px] px-2 text-sm text-ink-800 ${canMonthly ? "cursor-pointer hover:bg-ink-50" : "opacity-60"}`}>

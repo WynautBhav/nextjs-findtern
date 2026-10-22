@@ -178,8 +178,8 @@ export function OfferDecision({
               Accept {roleTitle} at {company}?
             </p>
             <p className="mt-1.5 text-pretty text-sm leading-relaxed text-ink-700">
-              This tells {company} yes{startDate ? ` for a start on ${startDate}` : ""}. Once they complete the payment
-              you&apos;re hired and your timesheets open. Your other open offers from {company} close.
+              This tells {company} yes{startDate ? ` for a start on ${startDate}` : ""}. Your timesheets open straight
+              away, and you&apos;re hired once they complete the payment. Your other open offers from {company} close.
             </p>
             <label className="mt-3 flex items-start gap-2.5 text-sm text-ink-700">
               <input
