@@ -38,8 +38,8 @@ import {
   QUALIFICATION_LEVELS,
   cascadeWorkModes,
   degreeOption,
-  monthLabel,
-  toMonth,
+  dateLabel,
+  toDay,
   validateProfile,
   validateStep,
   widestWorkMode,
@@ -965,9 +965,7 @@ function QualificationList({
 }) {
   const patch = (id: string, next: Partial<QualificationEntry>) =>
     onChange(rows.map((r) => (r.id === id ? { ...r, ...next } : r)));
-  // Local date, so the picker cannot offer tomorrow late in the evening.
-  const now = new Date();
-  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  const today = localToday();
   const add = () =>
     onChange([...rows, { id: `${prefix}-${Date.now()}`, name: "", issuer: "", completionDate: "", credentialUrl: "" }]);
 
@@ -1047,7 +1045,14 @@ function QualificationList({
 
 /* ── Step 3: Experience ─────────────────────────────────────────────────── */
 
+/** Today as YYYY-MM-DD in local time, so a picker cannot offer tomorrow late in the evening. */
+function localToday(): string {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+}
+
 function ExperienceStep({ values, update, errors }: StepProps) {
+  const today = localToday();
   const experiences = values.experiences || [];
 
   function addExperience() {
@@ -1155,11 +1160,14 @@ function ExperienceStep({ values, update, errors }: StepProps) {
                 </div>
 
                 <div className="grid gap-3 sm:grid-cols-2">
-                  <MonthYearField
+                  <Field
                     id={`${k}.from`}
                     label="Start date *"
+                    type="date"
+                    max={today}
                     value={exp.from}
                     error={errors[`${k}.from`]}
+                    hint="DD/MM/YYYY"
                     onChange={(v) => updateExperience(exp.id, { from: v })}
                   />
                   <div>
@@ -1176,11 +1184,15 @@ function ExperienceStep({ values, update, errors }: StepProps) {
                         </p>
                       </div>
                     ) : (
-                      <MonthYearField
+                      <Field
                         id={`${k}.to`}
                         label="End date *"
+                        type="date"
+                        min={exp.from || undefined}
+                        max={today}
                         value={exp.to}
                         error={errors[`${k}.to`]}
+                        hint="DD/MM/YYYY"
                         onChange={(v) => updateExperience(exp.id, { to: v })}
                       />
                     )}
@@ -2061,7 +2073,7 @@ function ProfilePreviewStep({ values, update, errors, email, onJumpStep }: StepP
                   <li key={q.id}>
                     <span className="font-semibold">{q.name || "Untitled"}</span>
                     {q.issuer ? <span className="text-text-subtle"> · {q.issuer}</span> : null}
-                    {q.completionDate ? <span className="text-text-subtle"> · {formatDay(q.completionDate)}</span> : null}
+                    {q.completionDate ? <span className="text-text-subtle"> · {dateLabel(q.completionDate)}</span> : null}
                   </li>
                 ))}
               </ul>
@@ -2133,7 +2145,7 @@ function ProfilePreviewStep({ values, update, errors, email, onJumpStep }: StepP
                         <span className="text-text-subtle"> at {exp.company || "Project"}</span>
                       </div>
                       <span className="text-xs font-medium text-text-subtle">
-                        {monthLabel(exp.from)} – {exp.current ? "Present" : monthLabel(exp.to)}
+                        {dateLabel(exp.from)} – {exp.current ? "Present" : dateLabel(exp.to)}
                       </span>
                     </div>
                     {exp.description ? (
@@ -2379,84 +2391,6 @@ function FieldNote({ id, error, hint }: { id: string; error?: string; hint?: Rea
   ) : null;
 }
 
-const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-
-/**
- * Month + year as two selects, stored as `YYYY-MM` (the legacy shape and what
- * validation reads). A half-picked value is kept as "YYYY-" or "-MM" so the
- * other select does not reset; validation reports it as incomplete.
- */
-/** YYYY-MM-DD as DD/MM/YYYY, the format the rest of the form shows. */
-function formatDay(iso: string): string {
-  const [y, m, d] = iso.split("-");
-  return y && m && d ? `${d}/${m}/${y}` : iso;
-}
-
-function MonthYearField({
-  id,
-  label,
-  value,
-  onChange,
-  error,
-}: {
-  id: string;
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  error?: string;
-}) {
-  const match = /^(\d{4})?-(\d{2})?$/.exec(value);
-  const year = match?.[1] ?? "";
-  const month = match?.[2] ?? "";
-  const thisYear = new Date().getFullYear();
-  const years = Array.from({ length: 41 }, (_, i) => String(thisYear - i));
-  if (year && !years.includes(year)) years.push(year);
-  const set = (y: string, m: string) => onChange(y || m ? `${y}-${m}` : "");
-  const describedBy = error ? `${id}-error` : `${id}-hint`;
-  return (
-    <fieldset>
-      <legend className="block text-sm font-medium text-ink-800">{label}</legend>
-      <div className="mt-2 grid grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] gap-2">
-        <select
-          id={id}
-          aria-label={`${label.replace(/\s*\*$/, "")}: month`}
-          value={month}
-          onChange={(e) => set(year, e.target.value)}
-          aria-invalid={error ? true : undefined}
-          aria-describedby={describedBy}
-          className={`${CONTROL} w-full pr-7 ${error ? FIELD_BAD : FIELD_OK}`}
-        >
-          <option value="">MM</option>
-          {MONTH_NAMES.map((name, i) => {
-            const mm = String(i + 1).padStart(2, "0");
-            return (
-              <option key={mm} value={mm}>
-                {mm} · {name}
-              </option>
-            );
-          })}
-        </select>
-        <select
-          aria-label={`${label.replace(/\s*\*$/, "")}: year`}
-          value={year}
-          onChange={(e) => set(e.target.value, month)}
-          aria-invalid={error ? true : undefined}
-          aria-describedby={describedBy}
-          className={`${CONTROL} w-full pr-7 tabular-nums ${error ? FIELD_BAD : FIELD_OK}`}
-        >
-          <option value="">YYYY</option>
-          {years.map((y) => (
-            <option key={y} value={y}>
-              {y}
-            </option>
-          ))}
-        </select>
-      </div>
-      <FieldNote id={id} error={error} hint="MM / YYYY" />
-    </fieldset>
-  );
-}
-
 /** Country code + number, the same split the signup form uses. */
 function PhoneField({
   id,
@@ -2617,7 +2551,7 @@ function parseDraft(raw: string | null, serverUpdatedAt: string | null): Partial
     }
     // Drafts from before the month pickers held free text like "Jan 2025".
     if (Array.isArray(draft.experiences)) {
-      draft.experiences = draft.experiences.map((e) => ({ ...e, from: toMonth(e.from ?? ""), to: toMonth(e.to ?? "") }));
+      draft.experiences = draft.experiences.map((e) => ({ ...e, from: toDay(e.from ?? ""), to: toDay(e.to ?? "") }));
     }
     return draft;
   } catch {

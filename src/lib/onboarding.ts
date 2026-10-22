@@ -276,8 +276,8 @@ export function draftFromRecord(row: OnboardingLike): Partial<OnboardingDraft> {
         type: text(exp.type) || "Internship",
         company: text(exp.company),
         role: text(exp.role),
-        from: toMonth(text(exp.from)),
-        to: toMonth(text(exp.to)),
+        from: toDay(text(exp.from)),
+        to: toDay(text(exp.to)),
         current: Boolean(exp.current) || (!text(exp.to) && Boolean(text(exp.from))),
         description: text(exp.description),
       };
@@ -556,6 +556,24 @@ export function toMonth(raw: string): string {
   return v;
 }
 
+/**
+ * Experience dates are full days, YYYY-MM-DD (bug sheet: a calendar, shown
+ * DD/MM/YYYY). Rows saved as a month ("2025-01", "Jan 2025") read as the
+ * 1st of that month, so nobody has to enter them again.
+ */
+export function toDay(raw: string): string {
+  const v = raw.trim();
+  if (/^\d{4}-\d{2}-\d{2}/.test(v)) return v.slice(0, 10);
+  const month = toMonth(v);
+  return /^\d{4}-\d{2}$/.test(month) ? `${month}-01` : v;
+}
+
+/** "2025-01-15" → "15/01/2025", "2025-01" → "Jan 2025"; anything else as stored. */
+export function dateLabel(value: string): string {
+  const d = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  return d ? `${d[3]}/${d[2]}/${d[1]}` : monthLabel(value);
+}
+
 /** "2025-01" → "Jan 2025"; anything else is shown as stored. */
 export function monthLabel(value: string): string {
   const m = /^(\d{4})-(\d{2})$/.exec(value);
@@ -677,7 +695,7 @@ const AADHAAR = /^[2-9]\d{11}$/;
 const PAN = /^[A-Z]{5}\d{4}[A-Z]$/;
 const URL_RE = /^https?:\/\/\S+\.\S+/;
 const YEAR = /^\d{4}$/;
-const MONTH = /^\d{4}-(0[1-9]|1[0-2])$/;
+const DAY = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
 
 export function scoreProblem(type: ScoreType, raw: string): string | null {
   const v = raw.trim().replace(/%$/, "");
@@ -814,12 +832,12 @@ export function validateStep(values: OnboardingDraft, step: number, ctx: Validat
       if (!exp.type) errors[`${k}.type`] = "Choose the type of experience.";
       if (!exp.company.trim()) errors[`${k}.company`] = exp.type === "Project" ? "Enter the organisation, college or client." : "Enter the company name.";
       if (!exp.role.trim()) errors[`${k}.role`] = "Enter your role or title.";
-      if (!MONTH.test(exp.from)) errors[`${k}.from`] = "Choose the month you started.";
-      else if (exp.from > thisMonth) errors[`${k}.from`] = "The start month cannot be in the future.";
+      if (!DAY.test(exp.from)) errors[`${k}.from`] = "Pick the date you started.";
+      else if (exp.from > today) errors[`${k}.from`] = "The start date cannot be in the future.";
       if (!exp.current) {
-        if (!MONTH.test(exp.to)) errors[`${k}.to`] = "Choose the month you finished, or tick \"I currently work here\".";
-        else if (MONTH.test(exp.from) && exp.to < exp.from) errors[`${k}.to`] = "The end month cannot be before the start month.";
-        else if (exp.to > thisMonth) errors[`${k}.to`] = "The end month cannot be in the future. Tick \"I currently work here\" instead.";
+        if (!DAY.test(exp.to)) errors[`${k}.to`] = "Pick the date you finished, or tick \"I currently work here\".";
+        else if (DAY.test(exp.from) && exp.to < exp.from) errors[`${k}.to`] = "The end date cannot be before the start date.";
+        else if (exp.to > today) errors[`${k}.to`] = "The end date cannot be in the future. Tick \"I currently work here\" instead.";
       }
       if (exp.description.trim().length < 20) {
         errors[`${k}.description`] = "Describe what you did in a sentence or two - 20 characters minimum.";

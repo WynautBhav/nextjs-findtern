@@ -37,7 +37,7 @@ import { attachPhotos, canEmployerSeeIntern } from "@/lib/employer-pool";
 import { isBlockingInterview } from "@/lib/employer-interview-rules";
 import { notify } from "@/lib/notify";
 import { parseOffer } from "@/lib/offer";
-import { draftFromRecord, monthLabel, type OnboardingDraft } from "@/lib/onboarding";
+import { dateLabel, draftFromRecord, type OnboardingDraft } from "@/lib/onboarding";
 
 export const metadata: Metadata = {
   title: "Candidate",
@@ -453,7 +453,7 @@ export default async function EmployerInternDetail({
                     <p className="mt-0.5 text-xs tabular-nums text-text-subtle">
                       {[
                         exp.type,
-                        [monthLabel(exp.from), exp.current ? "Present" : monthLabel(exp.to)].filter(Boolean).join(" – "),
+                        [dateLabel(exp.from), exp.current ? "Present" : dateLabel(exp.to)].filter(Boolean).join(" – "),
                       ]
                         .filter(Boolean)
                         .join(" · ")}

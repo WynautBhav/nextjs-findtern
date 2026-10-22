@@ -12,6 +12,8 @@ import {
   profileCompletion,
   scoreProblem,
   storedFromDraft,
+  toDay,
+  dateLabel,
   toMonth,
   validateProfile,
   validateStep,
@@ -131,6 +133,15 @@ test("free-text experience months are read as YYYY-MM", () => {
   assert.equal(monthLabel("2025-01"), "Jan 2025");
 });
 
+test("experience dates are full days; month-only rows read as the 1st", () => {
+  assert.equal(toDay("2025-03-15"), "2025-03-15");
+  assert.equal(toDay("2025-01"), "2025-01-01");
+  assert.equal(toDay("Jan 2025"), "2025-01-01");
+  assert.equal(toDay(""), "");
+  assert.equal(dateLabel("2025-03-15"), "15/03/2025");
+  assert.equal(draftFromRecord(legacyRow).experiences?.[0].from, "2025-01-01");
+});
+
 test("degree dropdown recognises legacy spellings and falls back to Other", () => {
   assert.equal(degreeOption("BSc"), "B.Sc");
   assert.equal(degreeOption("B.Tech"), "B.Tech / B.E.");
@@ -230,10 +241,10 @@ test("every field of an added experience is required", () => {
   const e = validateStep({ ...complete(), experiences: [exp] }, 2, ctx);
   for (const f of ["company", "role", "from", "to", "description"]) assert.ok(e[`exp.e1.${f}`], f);
 
-  const ongoing = { ...exp, company: "Acme", role: "Intern", from: "2026-06", current: true, description: "Built the onboarding flow end to end." };
+  const ongoing = { ...exp, company: "Acme", role: "Intern", from: "2026-06-10", current: true, description: "Built the onboarding flow end to end." };
   assert.deepEqual(validateStep({ ...complete(), experiences: [ongoing] }, 2, ctx), {}, "no end month needed while current");
 
-  const backwards = { ...ongoing, current: false, to: "2026-01" };
+  const backwards = { ...ongoing, current: false, to: "2026-06-01" };
   assert.match(validateStep({ ...complete(), experiences: [backwards] }, 2, ctx)["exp.e1.to"], /before the start/);
   assert.deepEqual(validateStep({ ...complete(), experiences: [] }, 2, ctx), {}, "experience itself stays optional");
 });
