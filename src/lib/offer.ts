@@ -23,6 +23,8 @@ export type Offer = {
   duration: string;
   months: number;
   monthlyHours: number;
+  /** Legacy `weeklySchedule`; drives the working days in a month. */
+  weeklySchedule: WeeklySchedule;
   shiftFrom: string;
   shiftTo: string;
   timezone: string;
@@ -52,6 +54,31 @@ const toMinor = (major: unknown) => {
   return n != null && n > 0 ? Math.round(n * 100) : null;
 };
 
+/**
+ * Billable hours come from the working week, not from a typed number (bug
+ * sheet 22 Oct; legacy employer-send-proposal.tsx:533-659): working days in a
+ * month for the schedule, less paid leave, at 8 hours a day.
+ */
+export const WEEKLY_SCHEDULES = {
+  mon_fri: { label: "Monday to Friday", days: 22 },
+  mon_sat: { label: "Monday to Saturday", days: 26 },
+  sun_thu: { label: "Sunday to Thursday", days: 22 },
+} as const;
+export type WeeklySchedule = keyof typeof WEEKLY_SCHEDULES;
+export const HOURS_PER_DAY = 8;
+/** Paid leave choices a month, as in legacy (half days allowed). */
+export const PAID_LEAVE_OPTIONS = [0, 1, 1.5, 2, 2.5, 3] as const;
+
+export function weeklyScheduleOf(v: unknown): WeeklySchedule {
+  const s = String(v ?? "").trim().toLowerCase();
+  return s in WEEKLY_SCHEDULES ? (s as WeeklySchedule) : "mon_fri";
+}
+
+export function scheduledMonthlyHours(schedule: WeeklySchedule, paidLeavesPerMonth: number): number {
+  const leaves = Number.isFinite(paidLeavesPerMonth) ? Math.max(0, paidLeavesPerMonth) : 0;
+  return Math.max(0, Math.round((WEEKLY_SCHEDULES[schedule].days - leaves) * HOURS_PER_DAY));
+}
+
 export function monthsOf(duration: unknown): number {
   const m = /^(\d+)\s*m/i.exec(String(duration ?? ""));
   return m ? Math.max(1, Number(m[1])) : 1;
@@ -74,6 +101,7 @@ export function parseOffer(raw: unknown, rowCurrency?: string | null): Offer {
     duration,
     months: monthsOf(duration),
     monthlyHours: num(o.monthlyHours) ?? 0,
+    weeklySchedule: weeklyScheduleOf(o.weeklySchedule),
     shiftFrom: str(o.shiftFrom),
     shiftTo: str(o.shiftTo),
     timezone: str(o.timezone),
@@ -158,7 +186,9 @@ export type OfferInput = {
   homeDays?: number;
   startDate: string;
   duration: string;
+  /** From `scheduledMonthlyHours`; the composer never sends its own. */
   monthlyHours: number;
+  weeklySchedule?: WeeklySchedule;
   shiftFrom?: string;
   shiftTo?: string;
   timezone?: string;
@@ -166,8 +196,6 @@ export type OfferInput = {
   paidLeavesPerMonth?: number;
   hourlyRateMinor: number;
   perHireMinor: number;
-  /** Employer override of the monthly amount, minor units. */
-  monthlyOverrideMinor?: number | null;
   candidateScore?: number;
   projectSkills?: string[];
 };
@@ -175,7 +203,8 @@ export type OfferInput = {
 /** Legacy `offer_details` (major units), with the money computed here. */
 export function buildOffer(input: OfferInput): Record<string, unknown> {
   const months = monthsOf(input.duration);
-  const monthlyMinor = input.monthlyOverrideMinor ?? Math.round(input.monthlyHours * input.hourlyRateMinor);
+  // Always rate × hours: a typed monthly figure could undercut the band rate.
+  const monthlyMinor = Math.round(input.monthlyHours * input.hourlyRateMinor);
   const totalMinor = monthlyMinor * months + input.perHireMinor;
   const major = (minor: number) => Math.round(minor) / 100;
   return {
@@ -194,6 +223,7 @@ export function buildOffer(input: OfferInput): Record<string, unknown> {
     laptop: input.laptop ?? "",
     paidLeavesPerMonth: input.paidLeavesPerMonth ?? 0,
     monthlyHours: input.monthlyHours,
+    weeklySchedule: input.weeklySchedule ?? "mon_fri",
     monthlyAmount: major(monthlyMinor),
     totalPrice: major(totalMinor),
     hourlyRate: major(input.hourlyRateMinor),

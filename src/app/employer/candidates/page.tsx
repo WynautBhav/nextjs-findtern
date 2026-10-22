@@ -355,8 +355,13 @@ export default async function CandidatesPage({
       const have = p.skills.map((x) => x.toLowerCase());
       return lowered.filter((t) => have.some((h) => h.includes(t))).length;
     };
+    // A sort the employer picked leads; project skill and city matches then
+    // break ties. Before, a selected project's skill match always came first,
+    // so the chosen sort looked ignored (bug sheet 21 Oct).
+    const chosen = filters.sorts.length > 0;
     profiles.sort(
       (a, b) =>
+        (chosen ? compareBySortFields(a, b, filters.sorts, filters.dir) : 0) ||
         skillMatches(b) - skillMatches(a) ||
         cityMatches(b) - cityMatches(a) ||
         compareBySortFields(a, b, filters.sorts, filters.dir) ||

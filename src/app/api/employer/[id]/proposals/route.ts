@@ -1,5 +1,5 @@
 import { and, eq, inArray } from "drizzle-orm";
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 
 import { isHiredProposal } from "@/lib/hire-status";
 import { z } from "zod";
@@ -10,7 +10,7 @@ import { resolvePricing } from "@/lib/employer-pricing";
 import { requireMutation } from "@/lib/guards-mutation";
 import { emails } from "@/lib/emails";
 import { employerNames, notify } from "@/lib/notify";
-import { buildOffer, parseOffer, todayIst } from "@/lib/offer";
+import { buildOffer, parseOffer, PAID_LEAVE_OPTIONS, scheduledMonthlyHours, todayIst, WEEKLY_SCHEDULES, type WeeklySchedule } from "@/lib/offer";
 import { employerRegion } from "@/lib/employer-pricing";
 import { canEmployerSeeIntern } from "@/lib/employer-pool";
 import { isBlockingInterview } from "@/lib/employer-interview-rules";
@@ -38,14 +38,17 @@ const bodySchema = z
   homeDays: z.number().int().min(1).max(6).optional(),
   startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   duration: z.enum(["1m", "2m", "3m", "6m"]),
-  monthlyHours: z.number().int().min(1).max(300),
-  /** Employer's own monthly figure, major units. Omitted = hours × band rate. */
-  monthlyAmount: z.number().positive().max(10_000_000).optional(),
+  /** Ignored: hours follow the schedule and paid leave (scheduledMonthlyHours). */
+  monthlyHours: z.number().optional(),
+  weeklySchedule: z.enum(Object.keys(WEEKLY_SCHEDULES) as [WeeklySchedule, ...WeeklySchedule[]]).default("mon_fri"),
   shiftFrom: z.string().min(1, "Pick the working hours.").max(10),
   shiftTo: z.string().min(1, "Pick the working hours.").max(10),
   timezone: z.string().min(1, "Pick a timezone.").max(64),
   laptop: z.string().min(1, "Say who provides the laptop.").max(20),
-  paidLeavesPerMonth: z.number().int().min(0).max(10).default(0),
+  paidLeavesPerMonth: z
+    .number()
+    .refine((n) => (PAID_LEAVE_OPTIONS as readonly number[]).includes(n), "Paid leave is 0 to 3 days a month, in half days.")
+    .default(0),
   skills: z.array(z.string()).max(30).default([]),
 })
   .superRefine((b, ctx) => {
@@ -168,11 +171,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const rate = resolvePricing(score, plans, currency, null);
   const offerDetails = buildOffer({
     ...b,
+    // Hours and money are worked out here, never taken from the request.
+    monthlyHours: scheduledMonthlyHours(b.weeklySchedule, b.paidLeavesPerMonth),
     currency,
     hourlyRateMinor: rate.hourlyRateMinor,
     // Per-hire applies below a score of 6 only (legacy rule).
     perHireMinor: score < 6 ? rate.perHireMinor : 0,
-    monthlyOverrideMinor: b.monthlyAmount != null ? Math.round(b.monthlyAmount * 100) : null,
     candidateScore: score,
     projectSkills: b.skills,
   });
@@ -191,20 +195,21 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       status: "sent",
     })
     .returning();
-  await notify({
-    to: { type: "intern", id: b.internId },
-    type: "proposal_received",
-    title: "New proposal",
-    message: `You have a new internship proposal for ${b.roleTitle}.`,
-    data: { proposalId: proposal.id },
-    email: emails.proposalReceived({
-      internName: user.firstName,
-      // The company stays hidden from the intern until it hires them. This
-      // used to reveal it whenever any offer was merely open.
-      companyName: openOffers.some(isHiredProposal) ? (await employerNames(id)).company : "A company on Findtern",
-      role: b.roleTitle,
-      proposalId: proposal.id,
-    }),
-  });
+  // The company stays hidden from the intern until it hires them. This used
+  // to reveal it whenever any offer was merely open.
+  const companyName = openOffers.some(isHiredProposal) ? (await employerNames(id)).company : "A company on Findtern";
+  // The proposal is saved; tell the intern after responding, so the composer
+  // is not held on the SMTP round-trip (bug sheet 22 Oct: "kept me on send
+  // proposal page") and a mail failure cannot turn a sent offer into a 500.
+  after(() =>
+    notify({
+      to: { type: "intern", id: b.internId },
+      type: "proposal_received",
+      title: "New proposal",
+      message: `You have a new internship proposal for ${b.roleTitle}.`,
+      data: { proposalId: proposal.id },
+      email: emails.proposalReceived({ internName: user.firstName, companyName, role: b.roleTitle, proposalId: proposal.id }),
+    }).catch((e) => console.error("[employer/proposals] notify", e)),
+  );
   return NextResponse.json({ proposal }, { status: 201 });
 }

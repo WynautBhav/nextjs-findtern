@@ -27,9 +27,10 @@ export const metadata: Metadata = {
  * taking money for.
  *
  * ── Payment ─────────────────────────────────────────────────────────────
- * One hire per Razorpay order (legacy checkout), paid upfront in the
- * currency of the company's country. A monthly placement that is already
- * running shows up here when its next month is due. The totals come from
+ * One hire per Razorpay order (legacy checkout), in the currency of the
+ * company's country. A new hire is paid month by month where the offer allows
+ * it (score 6+, not full time), or upfront for the discount. A monthly
+ * placement that is already running shows up here when its next month is due. The totals come from
  * `payableCheckout` (lib/employer-payable), which the order route also calls
  * to recompute the charge server-side - the client only carries ids, so an
  * edited request cannot change the price. The verify route checks the HMAC
@@ -130,10 +131,15 @@ export default async function EmployerCheckout() {
                       <Line label="Upfront discount (10%)">−{formatMoney(line.charge.discountMinor, line.currency)}</Line>
                     ) : null}
                     <div className="border-t border-ink-100 pt-2">
-                      <Line label="Total" strong>
+                      <Line label={line.due ? "Due this month" : "Total upfront"} strong>
                         {formatMoney(line.charge.totalMinor, line.currency, { zeroLabel: false })}
                       </Line>
                     </div>
+                    {!line.due && !line.monthlyCharge.monthlyBlocked ? (
+                      <Line label="Or monthly">
+                        {formatMoney(line.monthlyCharge.totalMinor, line.currency, { zeroLabel: false })}/month
+                      </Line>
+                    ) : null}
                   </dl>
                 </div>
               </article>
@@ -148,14 +154,18 @@ export default async function EmployerCheckout() {
                 id: line.id,
                 label: `${displayNameOf({ fullName: line.internName, initials: line.internInitials }, line.nameUnlocked)} · ${line.roleTitle}`,
                 currency: line.currency,
-                // New hires pay upfront; a running monthly placement pays its due month.
-                amountMinor: line.charge.totalMinor,
+                // A running monthly placement is already priced as its due month.
+                upfrontMinor: line.charge.totalMinor,
+                monthlyMinor: line.due || !line.monthlyCharge.monthlyBlocked ? line.monthlyCharge.totalMinor : null,
+                monthlyBlocked: line.monthlyCharge.monthlyBlocked,
+                due: Boolean(line.due),
+                months: line.months,
               }))}
             />
 
             <p className="flex items-start gap-1.5 px-1 text-xs leading-relaxed text-text-subtle">
               <ShieldCheck className="mt-0.5 size-3.5 shrink-0" aria-hidden />
-              Paying upfront for more than a month takes 10% off for candidates scoring 6 or more.
+              Pay month by month, or the whole engagement upfront for 10% off (candidates scoring 6 or more).
               Amounts are recalculated on our side before you pay.
             </p>
           </aside>

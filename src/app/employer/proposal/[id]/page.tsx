@@ -10,7 +10,7 @@ import { canAccess } from "@/lib/security/guards";
 import { initialsOf } from "@/lib/employer-candidates";
 import { hiredInternIds } from "@/lib/employer-visibility";
 import { formatMoney } from "@/lib/format";
-import { offerPastStart, offerScore, parseOffer } from "@/lib/offer";
+import { offerPastStart, offerScore, parseOffer, WEEKLY_SCHEDULES } from "@/lib/offer";
 import { ProposalActions } from "@/components/employer/proposal-actions";
 import { ProposalOfferForm } from "@/components/employer/proposal-offer-form";
 
@@ -53,10 +53,14 @@ const MODE: Record<string, string> = { remote: "Remote", hybrid: "Hybrid", onsit
  */
 export default async function EmployerProposalDetail({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  /** `?edit=1` (the list's Edit button) opens the offer editor. */
+  searchParams: Promise<{ edit?: string }>;
 }) {
   const { id } = await params;
+  const { edit } = await searchParams;
   const session = await requireRole("employer");
 
   let proposal: Proposal | undefined;
@@ -203,6 +207,7 @@ export default async function EmployerProposalDetail({
                 <Detail label="Hourly rate">{offer.hourlyRateMinor ? `${formatMoney(offer.hourlyRateMinor, currency)}/h` : "-"}</Detail>
                 {offer.perHireMinor ? <Detail label="Per-hire charge">{formatMoney(offer.perHireMinor, currency)}</Detail> : null}
                 <Detail label="Paid leave">{offer.paidLeavesPerMonth ? `${offer.paidLeavesPerMonth} days a month` : "None"}</Detail>
+                <Detail label="Working week">{WEEKLY_SCHEDULES[offer.weeklySchedule].label}</Detail>
                 <Detail label="Working hours">
                   {offer.shiftFrom && offer.shiftFrom !== "flexible" ? `${offer.shiftFrom}–${offer.shiftTo}` : "Flexible"}
                 </Detail>
@@ -270,14 +275,15 @@ export default async function EmployerProposalDetail({
                 {editable ? (
                   <ProposalOfferForm
                     proposalId={proposal.id}
+                    defaultOpen={edit === "1"}
                     currency={currency}
                     shortOnly={score > 0 && score < 6}
                     initial={{
                       roleTitle: offer.roleTitle,
                       duration: offer.duration,
                       startDate: offer.startDate ?? undefined,
-                      monthlyHours: offer.monthlyHours || undefined,
-                      monthlyAmount: offer.monthlyMinor != null ? offer.monthlyMinor / 100 : undefined,
+                      weeklySchedule: offer.weeklySchedule,
+                      hourlyRateMinor: offer.hourlyRateMinor,
                       paidLeavesPerMonth: offer.paidLeavesPerMonth,
                       message: offer.jd,
                       mode: offer.mode,

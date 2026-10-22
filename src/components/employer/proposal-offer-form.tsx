@@ -5,15 +5,17 @@ import { useRouter } from "next/navigation";
 import { Loader2, Pencil } from "lucide-react";
 
 import { csrfFetch } from "@/lib/client-fetch";
+import { formatMoney } from "@/lib/format";
+import { PAID_LEAVE_OPTIONS, scheduledMonthlyHours, WEEKLY_SCHEDULES, weeklyScheduleOf, type WeeklySchedule } from "@/lib/offer";
 import { cn } from "@/lib/utils";
 
 export type EditableOffer = {
   roleTitle?: string;
   duration?: string;
   startDate?: string;
-  monthlyHours?: number;
-  /** Major units of the offer currency. */
-  monthlyAmount?: number;
+  weeklySchedule?: string;
+  /** Band rate the offer was priced on, minor units; hours × this is the month. */
+  hourlyRateMinor?: number | null;
   paidLeavesPerMonth?: number;
   message?: string;
   mode?: string;
@@ -38,28 +40,34 @@ function tomorrowIst(): string {
  * (project and candidate never change) and minus currency (set by the
  * company's country). Draft / sent internship offers only: the server rejects
  * anything later, and full-time offers, and the form does not render there.
- * A monthly figure typed here is kept; blank means hours × the band rate.
+ * Hours and the monthly figure are worked out from the working week and
+ * paid leave, as in the composer; the server does the same sum.
  */
 export function ProposalOfferForm({
   proposalId,
   initial,
   currency,
   shortOnly = false,
+  defaultOpen = false,
 }: {
   proposalId: string;
+  /** Open straight into the editor (the proposals list's Edit button). */
+  defaultOpen?: boolean;
   initial: EditableOffer;
   currency: "INR" | "USD";
   /** Score below 6: at most two months. */
   shortOnly?: boolean;
 }) {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
   const [roleTitle, setRoleTitle] = useState(initial.roleTitle ?? "");
   const [duration, setDuration] = useState(initial.duration ?? "3m");
   const [startDate, setStartDate] = useState(/^\d{4}-\d{2}-\d{2}$/.test(initial.startDate ?? "") ? initial.startDate! : "");
-  const [monthlyHours, setMonthlyHours] = useState(initial.monthlyHours ? String(initial.monthlyHours) : "");
-  const [monthlyAmount, setMonthlyAmount] = useState(initial.monthlyAmount ? String(initial.monthlyAmount) : "");
-  const [leaves, setLeaves] = useState(initial.paidLeavesPerMonth !== undefined ? String(initial.paidLeavesPerMonth) : "0");
+  const [schedule, setSchedule] = useState<WeeklySchedule>(weeklyScheduleOf(initial.weeklySchedule));
+  // Older offers could carry any leave count; snap to the half-day choices.
+  const [leaves, setLeaves] = useState(String(Math.min(3, Math.round((initial.paidLeavesPerMonth ?? 0) * 2) / 2)));
+  const hours = scheduledMonthlyHours(schedule, Number(leaves) || 0);
+  const monthlyMinor = initial.hourlyRateMinor ? Math.round(hours * initial.hourlyRateMinor) : null;
   const [mode, setMode] = useState(initial.mode || "remote");
   const [city, setCity] = useState(initial.city ?? "");
   const [state, setState] = useState(initial.state ?? "");
@@ -83,15 +91,14 @@ export function ProposalOfferForm({
       roleTitle: roleTitle.trim(),
       duration,
       startDate,
-      paidLeavesPerMonth: Math.max(0, Math.min(10, Number(leaves) || 0)),
+      weeklySchedule: schedule,
+      paidLeavesPerMonth: Number(leaves) || 0,
       message: message.trim(),
       mode,
       laptop,
       shiftFrom: shiftFrom || "flexible",
       shiftTo: shiftTo || "flexible",
     };
-    if (monthlyHours.trim() !== "") offer.monthlyHours = Math.max(1, Math.min(300, Number(monthlyHours) || 1));
-    if (monthlyAmount.trim() !== "" && Number(monthlyAmount) > 0) offer.monthlyAmount = Number(monthlyAmount);
     if (mode !== "remote") {
       offer.city = city.trim();
       offer.state = state.trim();
@@ -159,13 +166,29 @@ export function ProposalOfferForm({
           <input type="date" min={tomorrowIst()} value={startDate} onChange={(e) => setStartDate(e.target.value)} className={input} />
         </label>
         <label className="block">
-          <span className={label}>Hours / month</span>
-          <input value={monthlyHours} inputMode="numeric" onChange={(e) => setMonthlyHours(e.target.value.replace(/[^\d]/g, ""))} className={cn(input, "tabular-nums")} />
+          <span className={label}>Working week</span>
+          <select value={schedule} onChange={(e) => setSchedule(e.target.value as WeeklySchedule)} className={input}>
+            {(Object.keys(WEEKLY_SCHEDULES) as WeeklySchedule[]).map((k) => (
+              <option key={k} value={k}>
+                {WEEKLY_SCHEDULES[k].label}
+              </option>
+            ))}
+          </select>
         </label>
         <label className="block">
-          <span className={label}>Monthly ({currency})</span>
-          <input value={monthlyAmount} inputMode="decimal" placeholder="rate × hours" onChange={(e) => setMonthlyAmount(e.target.value.replace(/[^\d.]/g, ""))} className={cn(input, "tabular-nums")} />
+          <span className={label}>Paid leave / month</span>
+          <select value={leaves} onChange={(e) => setLeaves(e.target.value)} className={input}>
+            {PAID_LEAVE_OPTIONS.map((n) => (
+              <option key={n} value={String(n)}>
+                {n === 1 ? "1 day" : `${n} days`}
+              </option>
+            ))}
+          </select>
         </label>
+        <p className="col-span-2 text-xs tabular-nums text-ink-600">
+          {hours} h a month
+          {monthlyMinor != null ? ` · ${formatMoney(monthlyMinor, currency)} a month` : ""}
+        </p>
         <label className="block">
           <span className={label}>Work mode</span>
           <select value={mode} onChange={(e) => setMode(e.target.value)} className={input}>
@@ -212,10 +235,6 @@ export function ProposalOfferForm({
         <label className="block">
           <span className={label}>Shift to</span>
           <input type="time" value={shiftTo} onChange={(e) => setShiftTo(e.target.value)} className={input} />
-        </label>
-        <label className="block">
-          <span className={label}>Paid leave / month</span>
-          <input value={leaves} inputMode="numeric" onChange={(e) => setLeaves(e.target.value.replace(/[^\d]/g, ""))} className={cn(input, "tabular-nums")} />
         </label>
       </div>
       <label className="block">

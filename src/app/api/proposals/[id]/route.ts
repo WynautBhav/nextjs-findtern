@@ -5,7 +5,7 @@ import { z } from "zod";
 import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
 import { notify } from "@/lib/notify";
-import { offerScore, parseOffer, todayIst } from "@/lib/offer";
+import { offerScore, PAID_LEAVE_OPTIONS, parseOffer, scheduledMonthlyHours, todayIst, WEEKLY_SCHEDULES, type WeeklySchedule } from "@/lib/offer";
 
 // Same rules as the composer (api/employer/[id]/proposals), field by field.
 const offerSchema = z
@@ -13,10 +13,11 @@ const offerSchema = z
     roleTitle: z.string().trim().min(2).max(120).optional(),
     duration: z.enum(["1m", "2m", "3m", "6m"]).optional(),
     startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use a date like 2026-11-01.").optional(),
-    monthlyHours: z.number().int().min(1).max(300).optional(),
-    /** Employer's own monthly figure, major units. */
-    monthlyAmount: z.number().positive().max(10_000_000).optional(),
-    paidLeavesPerMonth: z.number().int().min(0).max(10).optional(),
+    weeklySchedule: z.enum(Object.keys(WEEKLY_SCHEDULES) as [WeeklySchedule, ...WeeklySchedule[]]).optional(),
+    paidLeavesPerMonth: z
+      .number()
+      .refine((n) => (PAID_LEAVE_OPTIONS as readonly number[]).includes(n), "Paid leave is 0 to 3 days a month, in half days.")
+      .optional(),
     message: z.string().trim().min(1, "Add a job description.").max(4000).optional(),
     mode: z.enum(["remote", "hybrid", "onsite"]).optional(),
     city: z.string().trim().max(80).optional(),
@@ -75,7 +76,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     return NextResponse.json({ error: "A full-time offer can't be edited. Withdraw it and send a new one." }, { status: 409 });
   }
 
-  const { message, monthlyAmount, ...edits } = parsed.data.offer;
+  const { message, ...edits } = parsed.data.offer;
   if (edits.startDate !== undefined && edits.startDate <= todayIst()) {
     return NextResponse.json({ error: "Pick a start date after today." }, { status: 400 });
   }
@@ -123,20 +124,14 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   delete next.officeDays;
   delete next.homeDays;
 
-  // Money: an explicit monthly figure wins. Otherwise a figure the employer
-  // typed before (not hours × rate) is kept as typed; a derived one follows
-  // the new hours.
+  // Money, as the composer works it out: hours from the schedule less paid
+  // leave, times the band rate the offer was priced on. An edit that touches
+  // neither keeps the stored hours (legacy rows may predate the schedule).
+  const touchesHours = edits.weeklySchedule !== undefined || edits.paidLeavesPerMonth !== undefined;
   const o = parseOffer(next, proposal.currency);
-  const derivedBefore = before.hourlyRateMinor ? Math.round(before.monthlyHours * before.hourlyRateMinor) : null;
-  const wasCustom = before.monthlyMinor != null && derivedBefore != null && before.monthlyMinor !== derivedBefore;
-  const monthlyMinor =
-    monthlyAmount !== undefined
-      ? Math.round(monthlyAmount * 100)
-      : wasCustom
-        ? (before.monthlyMinor ?? 0)
-        : o.hourlyRateMinor
-          ? Math.round(o.monthlyHours * o.hourlyRateMinor)
-          : (o.monthlyMinor ?? 0);
+  if (touchesHours) next.monthlyHours = scheduledMonthlyHours(o.weeklySchedule, o.paidLeavesPerMonth);
+  const hours = touchesHours ? Number(next.monthlyHours) : o.monthlyHours;
+  const monthlyMinor = o.hourlyRateMinor ? Math.round(hours * o.hourlyRateMinor) : (o.monthlyMinor ?? 0);
   next.monthlyAmount = monthlyMinor / 100;
   next.totalPrice = (monthlyMinor * o.months + (o.perHireMinor ?? 0)) / 100;
   const [updated] = await db

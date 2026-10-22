@@ -9,6 +9,7 @@ import { csrfFetch } from "@/lib/client-fetch";
 import { RATING_META, type CandidateSummary } from "@/lib/employer-candidates";
 import { type Currency, type Pricing } from "@/lib/employer-pricing";
 import { formatMoney, formatPerHire, formatRate } from "@/lib/format";
+import { PAID_LEAVE_OPTIONS, scheduledMonthlyHours, WEEKLY_SCHEDULES, type WeeklySchedule } from "@/lib/offer";
 import { CountdownAgreement, EMPLOYER_HIRING_POLICY } from "@/components/app/countdown-agreement";
 
 /**
@@ -21,9 +22,9 @@ import { CountdownAgreement, EMPLOYER_HIRING_POLICY } from "@/components/app/cou
  *
  * The one thing not typed by hand is compensation: the hourly rate and per-hire
  * charge come from the candidate's band, resolved server-side against the CMS
- * rate card. An employer can override the monthly figure, which is what the
- * legacy form allowed; they cannot decouple the rate from the score band
- * without editing `offer_details` directly.
+ * rate card, and the hours come from the working week less paid leave (legacy
+ * employer-send-proposal.tsx:533-716). Monthly = rate × hours; nothing here
+ * can undercut it.
  *
  * The server recomputes the rate and totals from the candidate's band; the
  * figures here are a preview. The currency is not a choice: it follows the
@@ -109,8 +110,7 @@ export function SendProposalForm({
   const shortOnly = candidate.scored && candidate.score > 0 && candidate.score < 6;
   const [duration, setDuration] = useState(shortOnly ? "2m" : "3m");
   const [startDate, setStartDate] = useState("");
-  const [monthlyHours, setMonthlyHours] = useState("120");
-  const [monthlyOverride, setMonthlyOverride] = useState("");
+  const [schedule, setSchedule] = useState<WeeklySchedule>("mon_fri");
   const [mode, setMode] = useState(firstProject?.locationType ?? "remote");
   const [city, setCity] = useState("");
   const [state, setState] = useState("");
@@ -130,20 +130,18 @@ export function SendProposalForm({
   // An offer lapses on its start date, so the earliest start is tomorrow (IST).
   const minStart = useMemo(() => tomorrowIst(), []);
 
+  // The same sum the server does: (working days − paid leave) × 8 h × rate.
+  const monthlyHours = scheduledMonthlyHours(schedule, Number(paidLeaves) || 0);
   const totals = useMemo(() => {
-    const hours = Number(monthlyHours) || 0;
-    const derivedMonthly = hours * (rate.hourlyRateMinor / 100);
-    const monthly = monthlyOverride.trim()
-      ? Number(monthlyOverride) || 0
-      : derivedMonthly;
+    const monthly = monthlyHours * (rate.hourlyRateMinor / 100);
     // Per-hire applies below a score of 6 only, once (not per month).
     const perHire = candidate.score < 6 ? rate.perHireMinor / 100 : 0;
     return { monthly, perHire };
-  }, [monthlyHours, monthlyOverride, rate, candidate.score]);
+  }, [monthlyHours, rate, candidate.score]);
 
   /** Validate first; the policy agreement only opens for a complete offer. */
   function review() {
-    const problems = validate({ projectId, roleTitle, duration, startDate, minStart, monthlyHours, monthlyOverride, mode, city, state, officeDays, homeDays, laptop, message });
+    const problems = validate({ projectId, roleTitle, duration, startDate, minStart, mode, city, state, officeDays, homeDays, laptop, message });
     setErrors(problems);
     if (Object.keys(problems).length > 0) {
       setNotice({ tone: "bad", text: "Some details need attention before this can be sent." });
@@ -155,6 +153,7 @@ export function SendProposalForm({
   }
 
   async function send() {
+    let leaving = false;
     setSending(true);
     setNotice(null);
     try {
@@ -175,8 +174,7 @@ export function SendProposalForm({
           timezone: selectedTimezone,
           startDate,
           duration,
-          monthlyHours: Number(monthlyHours) || 0,
-          ...(monthlyOverride.trim() ? { monthlyAmount: Number(monthlyOverride) } : {}),
+          weeklySchedule: schedule,
           shiftFrom: SHIFT_HOURS[shift]?.[0] || "flexible",
           shiftTo: SHIFT_HOURS[shift]?.[1] || "flexible",
           laptop,
@@ -188,7 +186,17 @@ export function SendProposalForm({
       setPolicyOpen(false);
       if (res.ok) {
         setNotice({ tone: "ok", text: "Proposal sent. Taking you to your proposals…" });
-        router.push("/employer/proposals");
+        // replace: Back must not land on a composer for an offer already sent.
+        router.replace("/employer/proposals");
+        router.refresh();
+        leaving = true;
+        return;
+      }
+      // Already sent (a retry, or a second tab): open the live offer instead.
+      if (res.status === 409 && typeof data.proposalId === "string") {
+        setNotice({ tone: "ok", text: "This candidate already has your offer. Opening it…" });
+        router.replace(`/employer/proposal/${encodeURIComponent(data.proposalId)}`);
+        leaving = true;
         return;
       }
       setNotice({ tone: "bad", text: data.error ?? "The proposal was not sent. Nothing has changed - try again." });
@@ -196,7 +204,8 @@ export function SendProposalForm({
       setPolicyOpen(false);
       setNotice({ tone: "bad", text: "You appear to be offline. Nothing was sent." });
     } finally {
-      setSending(false);
+      // Stay locked while the next page loads, so a second click cannot send.
+      if (!leaving) setSending(false);
     }
   }
 
@@ -320,24 +329,34 @@ export function SendProposalForm({
           </div>
 
           <div className="grid gap-5 sm:grid-cols-2">
-            <Field
+            <SelectField
+              id="weeklySchedule"
+              label="Working week"
+              value={schedule}
+              options={(Object.keys(WEEKLY_SCHEDULES) as WeeklySchedule[]).map((k) => ({
+                value: k,
+                label: `${WEEKLY_SCHEDULES[k].label} (${WEEKLY_SCHEDULES[k].days} days a month)`,
+              }))}
+              onChange={(v) => setSchedule(v as WeeklySchedule)}
+            />
+            <SelectField
+              id="paidLeaves"
+              label="Paid leave / month"
+              value={paidLeaves}
+              options={PAID_LEAVE_OPTIONS.map((n) => ({ value: String(n), label: n === 1 ? "1 day" : `${n} days` }))}
+              onChange={setPaidLeaves}
+            />
+            <ReadOnlyField
               id="monthlyHours"
               label="Hours per month"
-              inputMode="numeric"
-              value={monthlyHours}
-              error={errors.monthlyHours}
-              hint="Working hours, not calendar days."
-              onChange={(v) => setMonthlyHours(v.replace(/[^\d.]/g, ""))}
+              value={`${monthlyHours} h`}
+              hint={`(${WEEKLY_SCHEDULES[schedule].days} working days − ${Number(paidLeaves) || 0} leave) × 8 h`}
             />
-            <Field
+            <ReadOnlyField
               id="monthlyAmount"
               label={`Monthly amount (${currency})`}
-              inputMode="decimal"
-              value={monthlyOverride}
-              error={errors.monthlyAmount}
-              placeholder={totals.monthly.toFixed(0)}
-              hint="Leave blank to use rate × hours, or type a higher figure."
-              onChange={setMonthlyOverride}
+              value={formatMoney(Math.round(totals.monthly * 100), currency)}
+              hint={`${formatRate(rate.hourlyRateMinor, currency)} × ${monthlyHours} h. Worked out for you.`}
             />
           </div>
         </Step>
@@ -394,7 +413,7 @@ export function SendProposalForm({
             </div>
           ) : null}
 
-          <div className="grid gap-5 sm:grid-cols-3">
+          <div className="grid gap-5 sm:grid-cols-2">
             <SelectField
               id="shift"
               label="Working hours"
@@ -409,13 +428,6 @@ export function SendProposalForm({
               options={LAPTOP_OPTIONS.map((l) => ({ value: l.value, label: l.label }))}
               error={errors.laptop}
               onChange={setLaptop}
-            />
-            <Field
-              id="paidLeaves"
-              label="Paid leave / month"
-              inputMode="numeric"
-              value={paidLeaves}
-              onChange={(v) => setPaidLeaves(v.replace(/\D/g, ""))}
             />
           </div>
 
@@ -793,8 +805,6 @@ type Draft = {
   duration: string;
   startDate: string;
   minStart: string;
-  monthlyHours: string;
-  monthlyOverride: string;
   mode: string;
   city: string;
   state: string;
@@ -816,20 +826,6 @@ function validate(draft: Draft): Record<string, string> {
     errors.startDate = "That is not a date.";
   } else if (draft.startDate < draft.minStart) {
     errors.startDate = "Pick a date after today.";
-  }
-
-  const hours = Number(draft.monthlyHours);
-  if (!Number.isFinite(hours) || hours <= 0) {
-    errors.monthlyHours = "Enter the working hours for the month.";
-  } else if (hours > 240) {
-    errors.monthlyHours = "That is more than full time. Check the number.";
-  }
-
-  if (draft.monthlyOverride.trim()) {
-    const amount = Number(draft.monthlyOverride);
-    if (!Number.isFinite(amount) || amount <= 0) {
-      errors.monthlyAmount = "The override has to be a positive number.";
-    }
   }
 
   if (draft.mode !== "remote" && !draft.city.trim()) {

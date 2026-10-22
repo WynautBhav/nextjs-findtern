@@ -9,7 +9,7 @@ const bodySchema = z.object({
   code: z.string().trim().min(1),
   currency: z.enum(["INR", "USD"]).default("INR"),
   proposalIds: z.array(z.string().min(1)).length(1),
-  mode: z.enum(["upfront", "monthly"]).optional(),
+  mode: z.enum(["upfront", "monthly"]).default("upfront"),
 });
 
 /** Preview only: the order route re-prices the code against the same total. */
@@ -21,8 +21,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const parsed = bodySchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Invalid input" }, { status: 400 });
 
-  // Priced exactly as the order route prices it: one hire, upfront.
-  const { lines } = await payableCheckout(id, { proposalIds: parsed.data.proposalIds, mode: "upfront" });
+  // Priced exactly as the order route prices it: one hire, in the chosen mode.
+  const { lines } = await payableCheckout(id, { proposalIds: parsed.data.proposalIds, mode: parsed.data.mode });
   const orderMinor = lines.filter((l) => l.currency === parsed.data.currency).reduce((s, l) => s + l.charge.totalMinor, 0);
   if (orderMinor <= 0) return NextResponse.json({ error: "Nothing payable in this currency" }, { status: 400 });
 

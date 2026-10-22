@@ -44,7 +44,7 @@ const bodySchema = z.object({
   escalationContactEmail: requiredText("Escalation contact email").pipe(
     z.email("Enter a valid escalation contact email"),
   ),
-  escalationContactCountryCode: z.string().trim().min(1).nullable().optional(),
+  escalationContactCountryCode: z.string({ error: "Pick the escalation contact's country code" }).trim().min(1, "Pick the escalation contact's country code"),
   escalationContactPhone: requiredText("Escalation contact phone"),
   gstNumber: z.string().trim().toUpperCase().nullable().optional(),
   billingPincode: z
@@ -95,16 +95,21 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (d.escalationContactEmail?.trim() && isPersonalEmail(d.escalationContactEmail)) {
     return NextResponse.json({ error: "Use a company email for the escalation contact." }, { status: 400 });
   }
+  // A different person, so a different inbox from the company account's
+  // (bug sheet 22 Oct). Compared with the login on file, not the body.
+  if (d.escalationContactEmail.trim().toLowerCase() === (account.companyEmail ?? "").trim().toLowerCase()) {
+    return NextResponse.json({ error: "The escalation contact needs a different email from the company account email." }, { status: 400 });
+  }
   if (
     d.escalationContactPhone?.trim() &&
     normalizePhone(d.escalationContactPhone) === normalizePhone(d.phoneNumber) &&
-    (d.escalationContactCountryCode ?? "+91") === d.countryCode
+    d.escalationContactCountryCode === d.countryCode
   ) {
     return NextResponse.json({ error: "The escalation contact needs a different phone number from the primary contact." }, { status: 409 });
   }
   const phoneProblem =
     phoneError(d.countryCode, d.phoneNumber) ||
-    (d.escalationContactPhone && phoneError(d.escalationContactCountryCode ?? "+91", d.escalationContactPhone));
+    (d.escalationContactPhone && phoneError(d.escalationContactCountryCode, d.escalationContactPhone));
   if (phoneProblem) return NextResponse.json({ error: phoneProblem }, { status: 400 });
 
   // One phone per account across both roles, as at signup. Without this the

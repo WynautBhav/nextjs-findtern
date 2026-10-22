@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { buildOffer, internStipendInrMinor, parseOffer } from "./offer.ts";
+import { buildOffer, internStipendInrMinor, parseOffer, scheduledMonthlyHours, weeklyScheduleOf } from "./offer.ts";
 import { lineCharge } from "./checkout.ts";
 import { monthlyDues } from "./dues.ts";
 
@@ -110,4 +110,31 @@ test("an offer lapses on its start date (IST), not before", async () => {
   assert.equal(offerPastStart("2026-10-19", now), true);
   assert.equal(offerPastStart("2026-10-20", now), false);
   assert.equal(offerPastStart(null, now), false);
+});
+
+test("hours follow the working week less paid leave, at 8 h a day (legacy composer)", () => {
+  assert.equal(scheduledMonthlyHours("mon_fri", 0), 176);
+  assert.equal(scheduledMonthlyHours("mon_fri", 2), 160);
+  assert.equal(scheduledMonthlyHours("mon_sat", 1.5), 196);
+  assert.equal(scheduledMonthlyHours("sun_thu", 3), 152);
+  assert.equal(weeklyScheduleOf("bogus"), "mon_fri");
+  assert.equal(parseOffer({ weeklySchedule: "mon_sat" }, "INR").weeklySchedule, "mon_sat");
+});
+
+test("buildOffer prices the month as rate × hours, with no override", () => {
+  const raw = buildOffer({
+    currency: "INR",
+    roleTitle: "Ops intern",
+    mode: "remote",
+    startDate: "2026-11-01",
+    duration: "3m",
+    monthlyHours: scheduledMonthlyHours("mon_fri", 2),
+    weeklySchedule: "mon_fri",
+    hourlyRateMinor: 10_000,
+    perHireMinor: 0,
+  });
+  assert.equal(raw.monthlyHours, 160);
+  assert.equal(raw.monthlyAmount, 16_000);
+  assert.equal(raw.totalPrice, 48_000);
+  assert.equal(raw.weeklySchedule, "mon_fri");
 });

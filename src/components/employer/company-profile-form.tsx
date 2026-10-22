@@ -13,6 +13,7 @@ import { Loader2 } from "lucide-react";
 import { FileUpload } from "@/components/app/file-upload";
 import { CityField, CountrySelect, StateField } from "@/components/employer/location-fields";
 import { isIndiaCountry } from "@/lib/data/countries";
+import { DIAL_CODES } from "@/lib/data/dial-codes";
 
 import { csrfFetch } from "@/lib/client-fetch";
 import { phoneError } from "@/lib/phone";
@@ -98,7 +99,11 @@ function validate(v: Record<string, string>, savedWebsite = ""): Record<string, 
     const email = v.escalationContactEmail.trim();
     if (!EMAIL_RE.test(email)) errors.escalationContactEmail = "Enter a valid email address.";
     else if (isPersonalEmail(email)) errors.escalationContactEmail = "Use a company email for the escalation contact.";
+    else if (email.toLowerCase() === v.companyEmail.trim().toLowerCase()) {
+      errors.escalationContactEmail = "Use a different email from the company account email.";
+    }
   }
+  if (!v.escalationContactCountryCode?.trim()) errors.escalationContactCountryCode = "Country code is required.";
   if (!errors.escalationContactPhone) {
     const problem = phoneError(v.escalationContactCountryCode || "+91", v.escalationContactPhone);
     if (problem) errors.escalationContactPhone = problem;
@@ -118,9 +123,11 @@ export function CompanyProfileForm({
   hasLogo?: boolean;
 }) {
   const router = useRouter();
-  const [values, setValues] = useState<Record<string, string>>(() =>
-    Object.fromEntries(Object.entries(profile).map(([k, v]) => [k, v ?? ""])),
-  );
+  const [values, setValues] = useState<Record<string, string>>(() => ({
+    ...Object.fromEntries(Object.entries(profile).map(([k, v]) => [k, v ?? ""])),
+    // Older rows have no escalation code; the dropdown starts on India.
+    escalationContactCountryCode: profile.escalationContactCountryCode || "+91",
+  }));
   const [busy, setBusy] = useState(false);
   const [state, setState] = useState<"idle" | "saved">("idle");
   const [error, setError] = useState<string | null>(null);
@@ -294,14 +301,12 @@ export function CompanyProfileForm({
         <div className="grid gap-4 sm:grid-cols-2">
           <Text id="primaryContactName" label="Name" value={values.primaryContactName} onChange={set("primaryContactName")} error={errors.primaryContactName} required />
           <Text id="primaryContactRole" label="Role" value={values.primaryContactRole} onChange={set("primaryContactRole")} error={errors.primaryContactRole} required />
-          <Text
+          <DialCodeSelect
             id="countryCode"
             label="Country code"
             value={values.countryCode}
-            onChange={set("countryCode")}
-            placeholder="+91"
+            onChange={setValue("countryCode")}
             error={errors.countryCode}
-            required
           />
           <Text
             id="phoneNumber"
@@ -330,12 +335,12 @@ export function CompanyProfileForm({
             required
           />
           <div className="grid grid-cols-2 gap-3">
-            <Text
+            <DialCodeSelect
               id="escalationContactCountryCode"
               label="Code"
               value={values.escalationContactCountryCode}
-              onChange={set("escalationContactCountryCode")}
-              placeholder="+91"
+              onChange={setValue("escalationContactCountryCode")}
+              error={errors.escalationContactCountryCode}
             />
             <Text
               id="escalationContactPhone"
@@ -359,6 +364,54 @@ export function CompanyProfileForm({
         Save company details
       </button>
     </form>
+  );
+}
+
+/** The same dial-code list as signup and onboarding (bug sheet 22 Oct). */
+function DialCodeSelect({
+  id,
+  label,
+  value,
+  onChange,
+  error,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  error?: string;
+}) {
+  // A code saved before the list existed stays selectable rather than vanishing.
+  const known = DIAL_CODES.some((d) => d.code === value);
+  return (
+    <div>
+      <label htmlFor={id} className="block text-sm font-medium text-ink-800">
+        {label}
+        <span aria-hidden className="text-danger"> *</span>
+      </label>
+      <select
+        id={id}
+        name={id}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        required
+        aria-invalid={error ? true : undefined}
+        aria-describedby={error ? `${id}-error` : undefined}
+        className={`apple-spring mt-1.5 min-h-11 w-full rounded-[10px] border bg-white px-3 text-[14px] text-ink-900 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 ${error ? "border-danger" : "border-ink-200"}`}
+      >
+        {!known && value ? <option value={value}>{value}</option> : null}
+        {DIAL_CODES.map((d) => (
+          <option key={`${d.code}-${d.country}`} value={d.code}>
+            {d.code} · {d.country}
+          </option>
+        ))}
+      </select>
+      {error ? (
+        <p id={`${id}-error`} className="mt-1.5 text-xs text-danger">
+          {error}
+        </p>
+      ) : null}
+    </div>
   );
 }
 

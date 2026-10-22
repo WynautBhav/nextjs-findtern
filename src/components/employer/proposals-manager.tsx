@@ -9,6 +9,7 @@ import {
   CheckCircle2,
   Clock,
   Eye,
+  Pencil,
   IndianRupee,
   Laptop,
   Loader2,
@@ -357,6 +358,16 @@ export function ProposalsManager({
                       >
                         <CheckCircle2 className="size-3.5" aria-hidden />
                         <span>Proceed to hire</span>
+                      </Link>
+                    )}
+
+                    {isPending && (
+                      <Link
+                        href={`/employer/proposal/${item.proposal.id}?edit=1`}
+                        className="apple-spring apple-pressable inline-flex min-h-11 items-center justify-center gap-1.5 rounded-[10px] border border-ink-200 bg-white px-3.5 text-xs font-semibold text-ink-700 hover:border-ink-300 hover:bg-ink-50 hover:text-ink-900"
+                      >
+                        <Pencil className="size-3.5" aria-hidden />
+                        <span>Edit</span>
                       </Link>
                     )}
 
