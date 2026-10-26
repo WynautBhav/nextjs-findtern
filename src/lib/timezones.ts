@@ -1,3 +1,5 @@
+import { COUNTRY_TIMEZONES, STATE_TIMEZONES } from "./data/country-timezones.ts";
+
 /** Full IANA timezone list for interview scheduling, ported from the legacy dashboard.
  *
  * Labels are plain text (no flag emoji) per house style. Group headers render
@@ -109,6 +111,20 @@ export const TIMEZONES: TimezoneOption[] = [
   { id: "Africa/Tunis", label: "Africa/Tunis" },
 ];
 
+// Every zone a company's location can default to is selectable too, so a
+// derived zone never renders as a blank select.
+{
+  const listed = new Set(TIMEZONES.map((t) => t.id));
+  const more = Array.from(
+    new Set([...Object.values(COUNTRY_TIMEZONES), ...Object.values(STATE_TIMEZONES).flatMap((m) => Object.values(m))]),
+  )
+    .filter((id) => !listed.has(id))
+    .sort();
+  if (more.length > 0) {
+    TIMEZONES.push({ id: "group-more", label: "More", group: true }, ...more.map((id) => ({ id, label: id })));
+  }
+}
+
 /**
  * "2026-11-03T15:30" read as wall-clock time in `tz` → the UTC instant.
  * Uses Intl to find the zone's offset at that moment (DST-aware), then
@@ -138,4 +154,18 @@ export function wallTimeToUtc(local: string, tz: string): Date {
   let t = asUtc - offsetAt(asUtc);
   t = asUtc - offsetAt(t);
   return new Date(t);
+}
+
+/**
+ * The timezone an employer works in, from where the company is (bug sheet
+ * 26 Oct: "timezone will be automatically set by the employer location").
+ * Country first, refined by state for the countries that span several zones;
+ * India - almost every employer - when the country is missing or unknown.
+ */
+export function timezoneForLocation(loc: { country?: string | null; state?: string | null }): string {
+  const country = (loc.country ?? "").trim();
+  const match = Object.keys(COUNTRY_TIMEZONES).find((name) => name.toLowerCase() === country.toLowerCase());
+  if (!match) return "Asia/Kolkata";
+  const byState = STATE_TIMEZONES[match]?.[(loc.state ?? "").trim().toLowerCase()];
+  return byState ?? COUNTRY_TIMEZONES[match];
 }

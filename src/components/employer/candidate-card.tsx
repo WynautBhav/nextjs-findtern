@@ -475,6 +475,14 @@ export function CandidateCard({
                           View feedback report
                         </a>
                       ) : null}
+                      {candidate.scored ? (
+                        <Link
+                          href={`/employer/intern/${encodeURIComponent(candidate.id)}#ai-report`}
+                          className="mt-3 flex min-h-11 items-center text-[13px] font-medium text-brand-700 underline-offset-4 hover:underline"
+                        >
+                          Full AI interview report
+                        </Link>
+                      ) : null}
                     </QuickSection>
                   </div>
                 </div>

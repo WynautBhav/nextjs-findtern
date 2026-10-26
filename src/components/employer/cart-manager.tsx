@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   AlertCircle,
+  CalendarCheck,
   CheckCircle2,
   CreditCard,
   Loader2,
@@ -12,6 +13,7 @@ import {
   ShoppingCart,
   Sparkles,
   Trash2,
+  UserRound,
   Video,
 } from "lucide-react";
 
@@ -19,8 +21,8 @@ import { csrfFetch } from "@/lib/client-fetch";
 import { EmptyState } from "@/components/layout/page-header";
 import { formatPerHire, formatRate } from "@/lib/format";
 import { displayNameOf, type CandidateProfile } from "@/lib/employer-candidates";
-import { TIMEZONES } from "@/lib/timezones";
-import { isQuarterHourWall, suggestedSlots } from "@/lib/employer-interview-rules";
+import { isQuarterHourWall, meetingEndsAt, suggestedSlots } from "@/lib/employer-interview-rules";
+import { MeetingSlots, TimezoneSelect, type Slots } from "@/components/employer/meeting-slots";
 import type { Currency } from "@/lib/employer-pricing";
 import {
   Dialog,
@@ -40,6 +42,8 @@ export type CartLineItem = {
   perHireMinor: number;
   /** A proposal already out to this candidate (any project), if any. */
   openProposalId?: string | null;
+  /** An open meeting holds the candidate until this time (ISO); no new booking before. */
+  meetingUntil?: string | null;
 };
 
 export function CartManager({
@@ -49,6 +53,7 @@ export function CartManager({
   nameUnlockedIds = [],
   unlockAll = false,
   awaitingPayment = 0,
+  timezone: companyTimezone = "Asia/Kolkata",
 }: {
   employerId: string;
   initialCartLines: CartLineItem[];
@@ -59,6 +64,8 @@ export function CartManager({
   unlockAll?: boolean;
   /** Accepted offers waiting for payment at checkout. */
   awaitingPayment?: number;
+  /** The company's timezone, from its location; meetings default to it. */
+  timezone?: string;
 }) {
   const router = useRouter();
   const unlocked = new Set(nameUnlockedIds);
@@ -69,10 +76,9 @@ export function CartManager({
 
   // Meeting Dialog state
   const [meetingCandidate, setMeetingCandidate] = useState<CartLineItem | null>(null);
-  const [slot1, setSlot1] = useState("");
-  const [slot2, setSlot2] = useState("");
-  const [slot3, setSlot3] = useState("");
-  const [timezone, setTimezone] = useState("Asia/Kolkata");
+  const [slots, setSlots] = useState<Slots>(["", "", ""]);
+  const [slotsTouched, setSlotsTouched] = useState(false);
+  const [timezone, setTimezone] = useState(companyTimezone);
   const [meetingSuccess, setMeetingSuccess] = useState(false);
 
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -120,15 +126,16 @@ export function CartManager({
     e.preventDefault();
     if (!meetingCandidate) return;
 
+    const [slot1, slot2, slot3] = slots;
     if (!slot1 || !slot2 || !slot3) {
       setErrorMsg("Offer three time slots so the candidate can choose.");
       return;
     }
-    if (![slot1, slot2, slot3].every(isQuarterHourWall)) {
+    if (!slots.every(isQuarterHourWall)) {
       setErrorMsg("Slots start on the hour or at :15, :30 or :45.");
       return;
     }
-    if (new Set([slot1, slot2, slot3]).size !== 3) {
+    if (new Set(slots).size !== 3) {
       setErrorMsg("Offer three different times.");
       return;
     }
@@ -152,14 +159,22 @@ export function CartManager({
       });
 
       if (res.ok) {
+        // Lock "Book Meeting" for this candidate until the meeting is over.
+        const data = await res.json().catch(() => ({}));
+        const end = data.interview ? meetingEndsAt(data.interview) : null;
+        const internId = meetingCandidate.candidate.id;
+        if (end !== null) {
+          setCartLines((prev) =>
+            prev.map((l) => (l.candidate.id === internId ? { ...l, meetingUntil: new Date(end).toISOString() } : l)),
+          );
+        }
         setMeetingSuccess(true);
         setTimeout(() => {
           setMeetingCandidate(null);
           setMeetingSuccess(false);
-          setSlot1("");
-          setSlot2("");
-          setSlot3("");
+          setSlots(["", "", ""]);
         }, 1500);
+        router.refresh();
       } else {
         const data = await res.json().catch(() => ({}));
         setErrorMsg(data.error ?? "Failed to schedule interview");
@@ -280,24 +295,43 @@ export function CartManager({
 
                 <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-ink-100 pt-3.5">
                   <div className="flex flex-wrap items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        // Row 66: three suggested quarter-hour slots, an hour
-                        // apart, from the nearest quarter hour 15+ min out. Editable.
-                        const [a, b, c] = suggestedSlots(Date.now(), timezone);
-                        setSlot1(a);
-                        setSlot2(b);
-                        setSlot3(c);
-                        setMeetingCandidate(line);
-                        setErrorMsg("");
-                        setMeetingSuccess(false);
-                      }}
-                      className="apple-spring apple-pressable inline-flex min-h-11 items-center justify-center gap-1.5 rounded-[10px] border border-brand-200/80 bg-brand-50 px-3.5 text-xs font-semibold text-brand-800 hover:bg-brand-100"
+                    {meetingLocked(line) ? (
+                      // One open meeting per candidate: booking again waits
+                      // until the booked time is over (bug sheet 26 Oct).
+                      <span
+                        className="inline-flex min-h-11 cursor-not-allowed items-center justify-center gap-1.5 rounded-[10px] border border-ink-200 bg-ink-50 px-3.5 text-xs font-semibold text-ink-500"
+                        title="You can book another meeting once this one's time is over."
+                      >
+                        <CalendarCheck className="size-3.5" aria-hidden />
+                        <span>Meeting booked · until {untilLabel(line.meetingUntil!, companyTimezone)}</span>
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          // Row 66: three suggested quarter-hour slots, an hour
+                          // apart, from the nearest quarter hour 15+ min out. Editable.
+                          setTimezone(companyTimezone);
+                          setSlots(suggestedSlots(Date.now(), companyTimezone));
+                          setSlotsTouched(false);
+                          setMeetingCandidate(line);
+                          setErrorMsg("");
+                          setMeetingSuccess(false);
+                        }}
+                        className="apple-spring apple-pressable inline-flex min-h-11 items-center justify-center gap-1.5 rounded-[10px] border border-brand-200/80 bg-brand-50 px-3.5 text-xs font-semibold text-brand-800 hover:bg-brand-100"
+                      >
+                        <Video className="size-3.5" />
+                        <span>Book Meeting</span>
+                      </button>
+                    )}
+
+                    <Link
+                      href={`/employer/intern/${encodeURIComponent(line.candidate.id)}?project=${encodeURIComponent(line.projectId)}`}
+                      className="apple-spring apple-pressable inline-flex min-h-11 items-center justify-center gap-1.5 rounded-[10px] border border-ink-200 bg-white px-3.5 text-xs font-semibold text-ink-800 hover:bg-ink-50"
                     >
-                      <Video className="size-3.5" />
-                      <span>Book Meeting</span>
-                    </button>
+                      <UserRound className="size-3.5" aria-hidden />
+                      <span>View Profile</span>
+                    </Link>
 
                     {line.openProposalId ? (
                       <Link
@@ -375,70 +409,33 @@ export function CartManager({
             </div>
           ) : (
             <form onSubmit={handleBookMeeting} className="space-y-4 pt-2">
-              <div>
-                <label className="block text-xs font-semibold text-ink-800">
-                  Slot 1 *
-                </label>
-                <input
-                  type="datetime-local"
-                  required
-                  value={slot1}
-                  onChange={(e) => setSlot1(e.target.value)}
-                  step={900}
-                  className="apple-spring mt-1 min-h-11 w-full rounded-[10px] border border-ink-200 px-3 text-[14px] text-ink-900 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-ink-800">
-                  Slot 2 *
-                </label>
-                <input
-                  type="datetime-local"
-                  required
-                  value={slot2}
-                  onChange={(e) => setSlot2(e.target.value)}
-                  step={900}
-                  className="apple-spring mt-1 min-h-11 w-full rounded-[10px] border border-ink-200 px-3 text-[14px] text-ink-900 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-ink-800">
-                  Slot 3 *
-                </label>
-                <input
-                  type="datetime-local"
-                  required
-                  value={slot3}
-                  onChange={(e) => setSlot3(e.target.value)}
-                  step={900}
-                  className="apple-spring mt-1 min-h-11 w-full rounded-[10px] border border-ink-200 px-3 text-[14px] text-ink-900 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
-                />
-              </div>
+              <MeetingSlots
+                slots={slots}
+                timezone={timezone}
+                onChange={(next) => {
+                  setSlots(next);
+                  setSlotsTouched(true);
+                }}
+              />
 
               <div>
                 <label htmlFor="cart-timezone" className="block text-xs font-semibold text-ink-800">
                   Timezone
                 </label>
-                <select
-                  id="cart-timezone"
-                  value={timezone}
-                  onChange={(e) => setTimezone(e.target.value)}
-                  className="apple-spring mt-1 min-h-11 w-full rounded-[10px] border border-ink-200 bg-white px-3 text-[14px] text-ink-900 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
-                >
-                  {TIMEZONES.map((option) =>
-                    option.group ? (
-                      <option key={option.id} value={option.id} disabled>
-                        ── {option.label} ──
-                      </option>
-                    ) : (
-                      <option key={option.id} value={option.id}>
-                        {option.label}
-                      </option>
-                    ),
-                  )}
-                </select>
+                <div className="mt-1">
+                  <TimezoneSelect
+                    id="cart-timezone"
+                    value={timezone}
+                    onChange={(tz) => {
+                      setTimezone(tz);
+                      // Untouched suggestions move to the new zone's next quarter hour.
+                      if (!slotsTouched) setSlots(suggestedSlots(Date.now(), tz));
+                    }}
+                  />
+                </div>
+                <p className="mt-1 text-xs text-text-subtle">
+                  Set from your company&apos;s location. The candidate sees the times in their own timezone.
+                </p>
               </div>
 
               <div className="flex items-center justify-end gap-2 pt-3">
@@ -451,7 +448,7 @@ export function CartManager({
                 </button>
                 <button
                   type="submit"
-                  disabled={busyId === "booking-meeting" || !slot1 || !slot2 || !slot3}
+                  disabled={busyId === "booking-meeting" || slots.some((s) => !s)}
                   className="apple-spring apple-pressable inline-flex min-h-11 items-center justify-center gap-1.5 rounded-[10px] bg-brand-700 px-4 text-xs font-semibold text-white hover:bg-brand-800 disabled:opacity-50"
                 >
                   {busyId === "booking-meeting" && <Loader2 className="size-3.5 animate-spin" />}
@@ -464,4 +461,20 @@ export function CartManager({
       </Dialog>
     </div>
   );
+}
+
+/** An open meeting still holds this candidate. */
+function meetingLocked(line: CartLineItem): boolean {
+  return Boolean(line.meetingUntil && Date.parse(line.meetingUntil) > Date.now());
+}
+
+/** "3 Nov, 4:30 pm" in the company's timezone. */
+function untilLabel(iso: string, timeZone: string): string {
+  return new Date(iso).toLocaleString("en-IN", {
+    day: "numeric",
+    month: "short",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone,
+  });
 }

@@ -66,12 +66,12 @@ test("buildOffer writes the legacy shape and round-trips", () => {
   assert.equal(o.location, "Jaipur");
 });
 
-test("checkout: score 6+ multi-month upfront gets 10% off the engagement, plus the one-time hiring fee", () => {
+test("checkout: upfront is the whole engagement plus the one-time hiring fee, no discount", () => {
   const c = lineCharge(parseOffer(legacyRow, "INR"), 7);
   assert.equal(c.perHireMinor, 500_000);
   assert.equal(c.baseMinor, 3_600_000 + 500_000);
-  assert.equal(c.discountMinor, 360_000, "the fee is never discounted");
-  assert.equal(c.totalMinor, 3_240_000 + 500_000);
+  assert.equal(c.discountMinor, 0);
+  assert.equal(c.totalMinor, 3_600_000 + 500_000);
   assert.equal(c.monthlyBlocked, null);
 });
 

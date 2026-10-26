@@ -98,9 +98,12 @@ export function OrdersManager({
   buyer,
   employerId,
   fteStatus,
+  timezone,
 }: {
   employerId: string;
   fteStatus: string;
+  /** The company's timezone, from its location. */
+  timezone?: string;
   hiredCandidates: HiredInternItem[];
   upcomingDues: UpcomingDue[];
   /** proposalId → line label, to itemise each invoice. */
@@ -321,6 +324,7 @@ export function OrdersManager({
                           proposalId={item.proposal.id}
                           candidate={item.candidateName}
                           fteStatus={fteStatus}
+                          timezone={timezone}
                         />
                       ) : null}
                       <Link

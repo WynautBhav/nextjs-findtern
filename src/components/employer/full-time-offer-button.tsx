@@ -18,11 +18,14 @@ export function FullTimeOfferButton({
   proposalId,
   candidate,
   fteStatus: initialFte,
+  timezone = "Asia/Kolkata",
 }: {
   employerId: string;
   proposalId: string;
   candidate: string;
   fteStatus: string;
+  /** The company's timezone, from its location. */
+  timezone?: string;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -32,7 +35,7 @@ export function FullTimeOfferButton({
     jobMode: "remote",
     jobLocationCity: "",
     jobLocationState: "",
-    timezone: "Asia/Kolkata",
+    timezone,
     shiftFrom: "09:00",
     shiftTo: "18:00",
     ctcCurrency: "INR",

@@ -4,7 +4,7 @@ import { desc, eq, inArray } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
 import { requireEmployerSetup } from "@/lib/employer-setup";
-import { canMarkMissed, displayInterviewStatus, isMeetingLinkLive } from "@/lib/employer-interview-rules";
+import { canMarkMissed, displayInterviewStatus, isMeetingLinkLive, isMeetingOver } from "@/lib/employer-interview-rules";
 import { PageHeader, EmptyState } from "@/components/layout/page-header";
 import { Pill } from "@/components/app/primitives";
 import { ButtonLink } from "@/components/ui/button";
@@ -137,12 +137,14 @@ export default async function EmployerSchedule() {
                                   : "rounded-[10px] bg-ink-50 px-2.5 py-1.5 text-xs tabular-nums text-ink-600"
                               }
                             >
+                              {/* In the meeting's own zone: the server runs in UTC. */}
                               {slot.toLocaleString("en-IN", {
                                 weekday: "short",
                                 day: "numeric",
                                 month: "short",
                                 hour: "numeric",
                                 minute: "2-digit",
+                                timeZone: i.timezone || "Asia/Kolkata",
                               })}
                               {selected ? " · picked" : ""}
                             </li>
@@ -181,7 +183,14 @@ export default async function EmployerSchedule() {
                   </div>
                 </div>
 
-                <InterviewActions interviewId={i.id} past={past} status={i.status} timezone={i.timezone || "Asia/Kolkata"} />
+                <InterviewActions
+                  interviewId={i.id}
+                  past={past}
+                  status={i.status}
+                  timezone={i.timezone || "Asia/Kolkata"}
+                  meetingOver={isMeetingOver(i)}
+                  hasFeedback={(i.notes ?? "").includes("feedback_text:")}
+                />
               </li>
             );
           })}

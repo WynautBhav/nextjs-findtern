@@ -8,8 +8,9 @@ import type { Offer } from "./offer.ts";
  *   every internship hire, charged once with the first payment (bug sheet
  *   23 Oct; the rate card already showed it on every plan).
  * - Score below 6: no stipend-plan discount and no monthly plan.
- * - Score 6+: paying the engagement upfront for more than one month takes
- *   10% off the engagement (never off the hiring fee).
+ * - Paying the whole engagement upfront carries no discount (bug sheet
+ *   26 Oct removed the 10% upfront discount); upfront and monthly differ only
+ *   in when the money is paid.
  * - Full-time offer: 8.33% of annual CTC, upfront only, no separate fee.
  *
  * All amounts are minor units of the offer currency.
@@ -18,7 +19,6 @@ import type { Offer } from "./offer.ts";
 export type PayMode = "upfront" | "monthly";
 
 export const PER_HIRE_MINOR = { INR: 500_000, USD: 5_000 } as const;
-export const UPFRONT_DISCOUNT = 0.1;
 export const FULL_TIME_FEE = 0.0833;
 
 export type LineCharge = {
@@ -66,7 +66,6 @@ export function lineCharge(
     offer.totalMinor != null
       ? Math.max(0, offer.totalMinor - (offer.perHireMinor ?? 0))
       : (offer.monthlyMinor ?? 0) * offer.months;
-  const discountMinor = !lowScore && offer.months > 1 ? Math.round(engagement * UPFRONT_DISCOUNT) : 0;
   const base = engagement + perHireMinor;
-  return { baseMinor: base, discountMinor, totalMinor: base - discountMinor, perHireMinor, monthlyBlocked };
+  return { baseMinor: base, discountMinor: 0, totalMinor: base, perHireMinor, monthlyBlocked };
 }

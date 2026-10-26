@@ -77,6 +77,7 @@ export function SendProposalForm({
   internId,
   initialProjectId,
   preference,
+  companyTimezone = "Asia/Kolkata",
 }: {
   candidate: CandidateSummary;
   /** Where the candidate said they can work; the offer's location follows it. */
@@ -90,6 +91,8 @@ export function SendProposalForm({
   internId: string;
   /** The project the employer came from (shortlist, cart, candidates filter). */
   initialProjectId?: string;
+  /** Where the company is (its country): the timezone when a project sets none. */
+  companyTimezone?: string;
 }) {
   const router = useRouter();
   // The project the employer came from, not just the first one in the list:
@@ -100,9 +103,9 @@ export function SendProposalForm({
   // Row 64: no currency choice. Indian companies see INR, everyone else USD.
   const currency = defaultCurrency;
   const [projectId, setProjectId] = useState(firstProject?.id ?? "");
-  // The selected project owns the timezone; legacy sent it, the rewrite always
-  // fell back to Asia/Kolkata.
-  const projectTimezone = (id: string) => projects.find((p) => p.id === id)?.timezone || "Asia/Kolkata";
+  // The selected project owns the timezone (legacy sent it); without one, the
+  // company's own, from its location (bug sheet 26 Oct).
+  const projectTimezone = (id: string) => projects.find((p) => p.id === id)?.timezone || companyTimezone;
   const [timezone, setTimezone] = useState(projectTimezone(firstProject?.id ?? ""));
   const modes = MODES.filter((m) => offerableModes(preference).includes(m.value));
   const allowedMode = (m: string | null | undefined) => (m && modes.some((x) => x.value === m) ? m : null);

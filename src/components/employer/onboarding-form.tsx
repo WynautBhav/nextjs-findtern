@@ -11,6 +11,7 @@ import { csrfFetch } from "@/lib/client-fetch";
 import { phoneError } from "@/lib/phone";
 import { websiteDomainError } from "@/lib/company-domain";
 import { MAX_PROJECT_LOCATIONS, projectLocationsError } from "@/lib/project-locations";
+import { TIMEZONES, timezoneForLocation } from "@/lib/timezones";
 import {
   ArrowLeft,
   ArrowRight,
@@ -134,7 +135,18 @@ export function EmployerOnboardingForm({
   }, [values, dirty]);
 
   function setCompany(patch: Partial<CompanyDraft>) {
-    setEdits((prev) => ({ ...prev, company: { ...values.company, ...patch } }));
+    const company = { ...values.company, ...patch };
+    // The first project's timezone follows the company's country and state
+    // until the employer picks one themselves (bug sheet 26 Oct).
+    const followTimezone =
+      !hasExistingProject &&
+      ("country" in patch || "state" in patch) &&
+      values.project.timezone === timezoneForLocation(values.company);
+    setEdits((prev) => ({
+      ...prev,
+      company,
+      ...(followTimezone ? { project: { ...values.project, timezone: timezoneForLocation(company) } } : {}),
+    }));
     setDirty(true);
   }
 
@@ -639,7 +651,14 @@ function ProjectStage({
           id="timezone"
           label="Timezone"
           value={values.timezone}
-          options={TIMEZONE_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
+          options={[
+            ...TIMEZONE_OPTIONS.map((o) => ({ value: o.value, label: o.label })),
+            // Zones a company's country can default to that the legacy list lacks.
+            ...TIMEZONES.filter((t) => !t.group && !TIMEZONE_OPTIONS.some((o) => o.value === t.id)).map((t) => ({
+              value: t.id,
+              label: t.label,
+            })),
+          ]}
           error={errors.timezone}
           onChange={(v) => setProject({ timezone: v })}
         />

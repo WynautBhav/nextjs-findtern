@@ -24,7 +24,17 @@ import { suggestSkills } from "@/lib/data/skills";
 
 const MAX_SKILLS = 7;
 
-export function SkillFilter({ active, projectSkills = [] }: { active: string[]; projectSkills?: string[] }) {
+export function SkillFilter({
+  active,
+  projectSkills = [],
+  fromProject = false,
+}: {
+  /** The skills the list is filtered by right now. */
+  active: string[];
+  projectSkills?: string[];
+  /** `active` is the selected project's own skill list (nothing picked yet). */
+  fromProject?: boolean;
+}) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
@@ -37,9 +47,13 @@ export function SkillFilter({ active, projectSkills = [] }: { active: string[]; 
   // Legacy let an employer add a skill outside the list ("Add "X" (Press Enter)").
   const custom = typed && !options.some((o) => o.toLowerCase() === typed.toLowerCase()) ? typed : null;
 
-  function hrefWith(skills: string[]) {
+  /**
+   * `skills` in the URL - even empty - is the employer's own pick and wins
+   * over the project's list; `null` drops it so the project's skills apply.
+   */
+  function hrefWith(skills: string[] | null) {
     const next = new URLSearchParams(params.toString());
-    if (skills.length === 0) next.delete("skills");
+    if (skills === null) next.delete("skills");
     else next.set("skills", skills.join(","));
     next.delete("page"); // A new filter starts at page one.
     const qs = next.toString();
@@ -78,7 +92,7 @@ export function SkillFilter({ active, projectSkills = [] }: { active: string[]; 
               No skills selected.
               {projectSkills.length > 0 ? (
                 <Link
-                  href={hrefWith(projectSkills.slice(0, MAX_SKILLS))}
+                  href={hrefWith(null)}
                   scroll={false}
                   className="inline-flex min-h-9 items-center gap-1 font-medium text-brand-700 underline-offset-4 hover:underline"
                 >
@@ -147,7 +161,22 @@ export function SkillFilter({ active, projectSkills = [] }: { active: string[]; 
           ) : null}
         </div>
       </div>
-      <p className="mt-2 text-xs text-text-subtle">Up to {MAX_SKILLS}. Candidates with any of them are shown; more matches rank higher.</p>
+      <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-text-subtle">
+        <span>
+          {fromProject ? "Skills from the selected project. " : ""}Up to {MAX_SKILLS}. Candidates with any of them are
+          shown; more matches rank higher.
+        </span>
+        {!fromProject && active.length > 0 && projectSkills.length > 0 && !sameSkills(active, projectSkills) ? (
+          <Link href={hrefWith(null)} scroll={false} className="font-medium text-brand-700 underline-offset-4 hover:underline">
+            Restore project skills
+          </Link>
+        ) : null}
+      </p>
     </section>
   );
+}
+
+function sameSkills(a: string[], b: string[]): boolean {
+  const key = (list: string[]) => list.map((s) => s.toLowerCase()).sort().join("|");
+  return key(a) === key(b.slice(0, MAX_SKILLS));
 }

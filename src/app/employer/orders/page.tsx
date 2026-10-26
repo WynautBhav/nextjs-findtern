@@ -7,6 +7,7 @@ import { OrdersManager, type HiredInternItem, type UpcomingDue } from "@/compone
 import { monthlyDues } from "@/lib/dues";
 import type { InvoiceBuyerProfile } from "@/lib/gst";
 import { getInvoiceSeller } from "@/lib/invoice-seller";
+import { timezoneForLocation } from "@/lib/timezones";
 import { parseOffer } from "@/lib/offer";
 
 export const metadata: Metadata = {
@@ -25,6 +26,7 @@ export default async function EmployerOrdersPage() {
   const lineLabels: Record<string, string> = {};
   let buyer: InvoiceBuyerProfile = { name: "Customer" };
   let fteStatus = "none";
+  let timezone = "Asia/Kolkata";
 
   try {
     const db = getDb();
@@ -36,6 +38,7 @@ export default async function EmployerOrdersPage() {
       .limit(1);
     if (employer) {
       fteStatus = employer.internationalFteStatus;
+      timezone = timezoneForLocation(employer);
       buyer = {
         name: employer.companyName,
         email: employer.companyEmail,
@@ -137,6 +140,7 @@ export default async function EmployerOrdersPage() {
 
   return (
     <OrdersManager
+      timezone={timezone}
       hiredCandidates={hiredItems}
       upcomingDues={upcoming}
       lineLabels={lineLabels}

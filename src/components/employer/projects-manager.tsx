@@ -28,6 +28,7 @@ import {
 import { CityField, StateField } from "@/components/employer/location-fields";
 import { PageHeader } from "@/components/layout/page-header";
 import { csrfFetch } from "@/lib/client-fetch";
+import { TimezoneSelect } from "@/components/employer/meeting-slots";
 import { suggestSkills } from "@/lib/data/skills";
 import { scopeLabel, scopeOfWorkOptions, type Project } from "@/lib/db/schema";
 
@@ -38,11 +39,14 @@ export function ProjectsManager({
   employerId,
   initialProjects,
   india = true,
+  defaultTimezone = "Asia/Kolkata",
 }: {
   employerId: string;
   initialProjects: Project[];
   /** The company is in India: state/city pickers apply. */
   india?: boolean;
+  /** The company's own timezone (from its country), for a new project. */
+  defaultTimezone?: string;
 }) {
   const router = useRouter();
   const [projects, setProjects] = useState<Project[]>(initialProjects);
@@ -61,7 +65,7 @@ export function ProjectsManager({
   const [locationType, setLocationType] = useState("remote");
   const [city, setCity] = useState("");
   const [state, setState] = useState("");
-  const [timezone, setTimezone] = useState("Asia/Kolkata");
+  const [timezone, setTimezone] = useState(defaultTimezone);
   const [fullTimeOffer, setFullTimeOffer] = useState(false);
   const [saving, setSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
@@ -85,7 +89,7 @@ export function ProjectsManager({
     setLocationType("remote");
     setCity("");
     setState("");
-    setTimezone("Asia/Kolkata");
+    setTimezone(defaultTimezone);
     setFullTimeOffer(false);
     setErrorMsg("");
     setSheetOpen(true);
@@ -105,7 +109,7 @@ export function ProjectsManager({
     setLocationType(p.locationType ?? "remote");
     setCity(p.city ?? "");
     setState(p.state ?? "");
-    setTimezone(p.timezone ?? "Asia/Kolkata");
+    setTimezone(p.timezone ?? defaultTimezone);
     setFullTimeOffer(Boolean(p.fullTimeOffer));
     setErrorMsg("");
     setSheetOpen(true);
@@ -663,18 +667,9 @@ export function ProjectsManager({
                 <label htmlFor="tz" className="block text-xs font-semibold text-ink-800">
                   Timezone
                 </label>
-                <select
-                  id="tz"
-                  value={timezone}
-                  onChange={(e) => setTimezone(e.target.value)}
-                  className="apple-spring mt-1.5 min-h-11 w-full rounded-[10px] border border-ink-200 bg-white px-3 text-[14px] text-ink-900 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
-                >
-                  <option value="Asia/Kolkata">Asia/Kolkata (IST)</option>
-                  <option value="America/New_York">America/New_York (EST)</option>
-                  <option value="America/Los_Angeles">America/Los_Angeles (PST)</option>
-                  <option value="Europe/London">Europe/London (GMT/BST)</option>
-                  <option value="Asia/Singapore">Asia/Singapore (SGT)</option>
-                </select>
+                <div className="mt-1.5">
+                  <TimezoneSelect id="tz" value={timezone} onChange={setTimezone} />
+                </div>
               </div>
 
               <div className="flex items-center justify-between rounded-[10px] border border-ink-200/80 bg-ink-50/50 p-3.5">

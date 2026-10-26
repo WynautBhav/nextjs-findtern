@@ -30,7 +30,7 @@ export const metadata: Metadata = {
  * ── Payment ─────────────────────────────────────────────────────────────
  * One hire per Razorpay order (legacy checkout), in the currency of the
  * company's country. A new hire is paid month by month where the offer allows
- * it (score 6+, not full time), or upfront for the discount. A monthly
+ * it (score 6+, not full time), or all upfront (no discount). A monthly
  * placement that is already running shows up here when its next month is due. The totals come from
  * `payableCheckout` (lib/employer-payable), which the order route also calls
  * to recompute the charge server-side - the client only carries ids, so an
@@ -128,9 +128,6 @@ export default async function EmployerCheckout() {
                     {line.charge.perHireMinor > 0 ? (
                       <Line label="Hiring fee (one-time)">{formatMoney(line.charge.perHireMinor, line.currency)}</Line>
                     ) : null}
-                    {line.charge.discountMinor > 0 ? (
-                      <Line label="Upfront discount (10%)">−{formatMoney(line.charge.discountMinor, line.currency)}</Line>
-                    ) : null}
                     <div className="border-t border-ink-100 pt-2">
                       <Line label={line.due ? "Due this month" : "Total upfront"} strong>
                         {formatMoney(line.charge.totalMinor, line.currency, { zeroLabel: false })}
@@ -167,7 +164,7 @@ export default async function EmployerCheckout() {
 
             <p className="flex items-start gap-1.5 px-1 text-xs leading-relaxed text-text-subtle">
               <ShieldCheck className="mt-0.5 size-3.5 shrink-0" aria-hidden />
-              Pay month by month, or the whole engagement upfront for 10% off (candidates scoring 6 or more).
+              Pay month by month (candidates scoring 6 or more), or the whole engagement upfront.
               Amounts are recalculated on our side before you pay.
             </p>
           </aside>

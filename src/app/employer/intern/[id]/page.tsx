@@ -36,6 +36,8 @@ import { CandidateAvatar } from "@/components/employer/candidate-avatar";
 import { attachPhotos, canEmployerSeeIntern } from "@/lib/employer-pool";
 import { isBlockingInterview } from "@/lib/employer-interview-rules";
 import { notify } from "@/lib/notify";
+import { rememberedSelection } from "@/lib/employer-selection";
+import { aiInterviewLinks } from "@/lib/ai-interview-links";
 import { parseOffer } from "@/lib/offer";
 import { dateLabel, draftFromRecord, type OnboardingDraft } from "@/lib/onboarding";
 
@@ -110,7 +112,12 @@ export default async function EmployerInternDetail({
         .from(schema.projects)
         .where(and(eq(schema.projects.employerId, employerId), eq(schema.projects.status, "active")))
         .orderBy(desc(schema.projects.createdAt));
-      const project = projectRows.find((row) => row.id === requestedProject) ?? projectRows[0];
+      // Then the project picked on the candidates page, if it's still active.
+      const remembered = (await rememberedSelection(employerId)).project;
+      const project =
+        projectRows.find((row) => row.id === requestedProject) ??
+        projectRows.find((row) => row.id === remembered) ??
+        projectRows[0];
       if (project) {
         const [item] = await db
           .select({ id: schema.employerCartItems.id })
@@ -282,6 +289,10 @@ export default async function EmployerInternDetail({
     );
   }
 
+  const aiLinks = await aiInterviewLinks(profile.id, {
+    aiFeedbackLink: profile.aiFeedbackLink,
+    aiRecordingLink: profile.aiRecordingLink,
+  });
   const band = bandFor(profile.score);
   const pricing = resolvePricing(profile.score, plans, currency, null);
   const experiences = (details.experiences ?? []).filter((e) => e.company || e.role);
@@ -360,14 +371,24 @@ export default async function EmployerInternDetail({
                 </p>
               )}
             </div>
-            {shortlist ? (
-              <div className="mt-4 flex flex-wrap items-center gap-3">
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              {shortlist ? (
                 <ShortlistToggle internId={profile.id} projectId={shortlist.projectId} shortlisted={shortlist.on} />
+              ) : null}
+              {/* Bug sheet 26 Oct: "where can I see the candidate's AI interview report". */}
+              <a
+                href="#ai-report"
+                className="apple-spring apple-pressable inline-flex min-h-11 items-center gap-1.5 rounded-[10px] border border-brand-200 bg-brand-50 px-3.5 text-sm font-semibold text-brand-800 hover:bg-brand-100"
+              >
+                <Sparkles className="size-4" aria-hidden />
+                AI interview report
+              </a>
+              {shortlist ? (
                 <Link href="/employer/cart" className="text-sm font-medium text-brand-700 underline-offset-4 hover:underline">
                   Book an interview from your shortlist
                 </Link>
-              </div>
-            ) : null}
+              ) : null}
+            </div>
 
             {profile.skills.length > 0 ? (
               <div className="mt-6 border-t border-ink-100 pt-5">
@@ -386,6 +407,19 @@ export default async function EmployerInternDetail({
             ) : null}
           </section>
 
+          <div id="ai-report" className="scroll-mt-6">
+            <AiFeedbackReport
+              candidateName={displayName}
+              findternScore={profile.score}
+              ratings={profile.ratings}
+              skills={profile.skills}
+              bio={profile.bio}
+              aiFeedbackLink={aiLinks.feedbackLink}
+              // Recording only after hire; the written report before (legacy).
+              aiRecordingLink={nameUnlocked ? aiLinks.recordingLink : null}
+            />
+          </div>
+
           {profile.bio ? (
             <section className="rounded-[20px] border border-ink-200/70 bg-white p-6 shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)]">
               <h2 className="flex items-center gap-2 text-sm font-semibold text-ink-900">
@@ -397,17 +431,6 @@ export default async function EmployerInternDetail({
               </p>
             </section>
           ) : null}
-
-          <AiFeedbackReport
-            candidateName={displayName}
-            findternScore={profile.score}
-            ratings={profile.ratings}
-            skills={profile.skills}
-            bio={profile.bio}
-            aiFeedbackLink={profile.aiFeedbackLink}
-            // Recording only after hire; the written report before (legacy).
-            aiRecordingLink={nameUnlocked ? profile.aiRecordingLink : null}
-          />
 
           {academics ? (
             <section className="rounded-[20px] border border-ink-200/70 bg-white p-6 shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)]">

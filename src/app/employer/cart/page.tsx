@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 
 import { getDb, schema } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
@@ -8,6 +8,8 @@ import { redactForEmployer, toCandidateProfile } from "@/lib/employer-candidates
 import { hiredInternIds, isAdminViewing } from "@/lib/employer-visibility";
 import { employerRegion, resolvePricing, type Currency } from "@/lib/employer-pricing";
 import { visibleInternIds } from "@/lib/employer-pool";
+import { isBlockingInterview, meetingEndsAt } from "@/lib/employer-interview-rules";
+import { timezoneForLocation } from "@/lib/timezones";
 import { PageHeader } from "@/components/layout/page-header";
 import { CartManager, type CartLineItem } from "@/components/employer/cart-manager";
 
@@ -27,6 +29,7 @@ export default async function EmployerCartPage() {
   let plans: (typeof schema.pricingPlans.$inferSelect)[] = [];
   let nameUnlockedIds: string[] = [];
   let awaitingPayment = 0;
+  let timezone = "Asia/Kolkata";
   const unlockAll = await isAdminViewing();
 
   try {
@@ -41,6 +44,7 @@ export default async function EmployerCartPage() {
     const [employer] = await db
       .select({
         country: schema.employers.country,
+        state: schema.employers.state,
         countryCode: schema.employers.countryCode,
         phoneNumber: schema.employers.phoneNumber,
       })
@@ -49,6 +53,8 @@ export default async function EmployerCartPage() {
       .limit(1);
     region = employerRegion(employer ?? {});
     currency = region === "IN" ? "INR" : "USD";
+    // Meetings are offered in the company's own timezone (bug sheet 26 Oct).
+    timezone = timezoneForLocation(employer ?? {});
 
     awaitingPayment = (
       await db
@@ -61,7 +67,8 @@ export default async function EmployerCartPage() {
       .select()
       .from(schema.employerCartItems)
       .where(eq(schema.employerCartItems.employerId, uid))
-      .orderBy(asc(schema.employerCartItems.createdAt));
+      // Newest shortlist first (bug sheet 26 Oct).
+      .orderBy(desc(schema.employerCartItems.createdAt));
 
     try {
       plans = await db
@@ -105,6 +112,27 @@ export default async function EmployerCartPage() {
         .orderBy(desc(schema.proposals.createdAt));
       const openProposal = new Map<string, string>();
       for (const row of openRows) if (!openProposal.has(row.internId)) openProposal.set(row.internId, row.id);
+
+      // A meeting that is still open (booked, or slots offered) holds the
+      // candidate until its time is over - the same rule the booking route
+      // enforces - so "Book Meeting" stays disabled until then.
+      const meetingRows = await db
+        .select()
+        .from(schema.interviews)
+        .where(
+          and(
+            eq(schema.interviews.employerId, uid),
+            inArray(schema.interviews.internId, allInternIds),
+            inArray(schema.interviews.status, ["pending", "scheduled"]),
+          ),
+        );
+      const meetingUntil = new Map<string, string>();
+      for (const iv of meetingRows) {
+        const end = meetingEndsAt(iv);
+        if (!isBlockingInterview(iv) || end === null) continue;
+        const prev = meetingUntil.get(iv.internId);
+        if (!prev || Date.parse(prev) < end) meetingUntil.set(iv.internId, new Date(end).toISOString());
+      }
 
       const projectIds = Array.from(new Set(items.map((item) => item.projectId)));
 
@@ -152,6 +180,7 @@ export default async function EmployerCartPage() {
           hourlyRateMinor: pricing.hourlyRateMinor,
           perHireMinor: pricing.perHireMinor,
           openProposalId: openProposal.get(item.internId) ?? null,
+          meetingUntil: meetingUntil.get(item.internId) ?? null,
         };
       };
 
@@ -179,6 +208,7 @@ export default async function EmployerCartPage() {
         currency={currency}
         nameUnlockedIds={nameUnlockedIds}
         unlockAll={unlockAll}
+        timezone={timezone}
       />
     </div>
   );

@@ -33,6 +33,8 @@ export function FilterForm({
   const pathname = usePathname();
   const form = useRef<HTMLFormElement>(null);
   const timer = useRef<number | undefined>(undefined);
+  /** Set when the project select changed since the last apply. */
+  const projectChanged = useRef(false);
   const [open, setOpen] = useState(false);
 
   function apply() {
@@ -41,12 +43,21 @@ export function FilterForm({
     const next = new URLSearchParams();
     for (const [key, raw] of new FormData(el).entries()) {
       const value = String(raw).trim();
-      if (!value) continue;
+      // An empty `skills` is a choice ("no skills"), not a missing value.
+      if (!value && key !== "skills") continue;
       if (ZERO_IS_ANY.test(key) && Number(value) === 0) continue;
       next.append(key, value);
     }
     // The skill-match switch is on by default: only its "off" goes in the URL.
     if (next.getAll("sm").includes("1")) next.delete("sm");
+    // A new project brings its own skills (bug sheet 26 Oct: "when I change
+    // the project, skills are not changing") - and picking one means "match
+    // to it", so an earlier "Show everyone" is dropped too.
+    if (projectChanged.current) {
+      next.delete("skills");
+      next.delete("pf");
+    }
+    projectChanged.current = false;
     const qs = next.toString();
     router.push(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
   }
@@ -55,6 +66,7 @@ export function FilterForm({
     // Typing in a text box applies on Enter or on leaving it, not per key.
     const target = e.target as HTMLInputElement;
     if (target.type === "text" || target.type === "search") return;
+    if (target.name === "project") projectChanged.current = true;
     window.clearTimeout(timer.current);
     timer.current = window.setTimeout(apply, 300);
   }

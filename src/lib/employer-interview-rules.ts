@@ -19,6 +19,8 @@ const OPEN_STATUSES = ["pending", "scheduled", "waiting"];
 export const MISSED_GRACE_MINUTES = 15;
 /** The meeting link is hidden this long after the slot starts. */
 export const LINK_VISIBLE_MINUTES = 60;
+/** How long a meeting runs (legacy employer-schedule.tsx:898, start + 30 min). */
+export const MEETING_MINUTES = 30;
 
 function toTime(value: Date | string | null | undefined): number | null {
   if (!value) return null;
@@ -50,13 +52,44 @@ export function isStaleInterview(iv: SlotLike, now: number = Date.now()): boolea
   return times.length > 0 && times.every((t) => t < now);
 }
 
-/** Open and not stale: the interview still holds the candidate. */
-export function isBlockingInterview(iv: SlotLike, now: number = Date.now()): boolean {
-  return OPEN_STATUSES.includes(iv.status ?? "") && !isStaleInterview(iv, now);
+/**
+ * When the meeting is over: the picked slot plus the meeting length, or -
+ * while the candidate has not picked yet - the last offered slot plus it.
+ */
+export function meetingEndsAt(iv: SlotLike): number | null {
+  const times = iv.selectedSlot ? [meetingTime(iv)].filter((t): t is number => t !== null) : slotTimes(iv);
+  return times.length > 0 ? Math.max(...times) + MEETING_MINUTES * 60_000 : null;
 }
 
-/** Status to display: open interviews whose slots all passed show "expired". */
+/**
+ * Open and not over yet: the interview still holds the candidate, so a new
+ * meeting can't be booked until this one's time has run out (bug sheet 26 Oct).
+ */
+export function isBlockingInterview(iv: SlotLike, now: number = Date.now()): boolean {
+  if (!OPEN_STATUSES.includes(iv.status ?? "")) return false;
+  const end = meetingEndsAt(iv);
+  return end !== null && now < end;
+}
+
+/**
+ * The meeting has happened: marked completed, or a scheduled meeting whose
+ * time slot has run out. Feedback opens only then (bug sheet 26 Oct).
+ */
+export function isMeetingOver(iv: SlotLike, now: number = Date.now()): boolean {
+  const status = (iv.status ?? "").toLowerCase();
+  if (status === "completed") return true;
+  if (status !== "scheduled" || !iv.selectedSlot) return false;
+  const end = meetingEndsAt(iv);
+  return end !== null && now >= end;
+}
+
+/**
+ * Status to display: a booked meeting whose time is over reads "completed"
+ * (legacy isEffectivelyCompleted, employer-schedule.tsx:901); an invite whose
+ * slots all passed unpicked reads "expired".
+ */
 export function displayInterviewStatus(iv: SlotLike, now: number = Date.now()): string {
+  if ((iv.status ?? "") === "scheduled" && isMeetingOver(iv, now)) return "completed";
   return isStaleInterview(iv, now) ? "expired" : (iv.status ?? "");
 }
 
@@ -70,12 +103,6 @@ export function isMeetingLinkLive(iv: SlotLike, now: number = Date.now()): boole
 export function canMarkMissed(iv: SlotLike, now: number = Date.now()): boolean {
   const t = meetingTime(iv);
   return t !== null && now >= t + MISSED_GRACE_MINUTES * 60_000;
-}
-
-/** Feedback is allowed once the meeting time has passed. */
-export function meetingHasStarted(iv: SlotLike, now: number = Date.now()): boolean {
-  const t = meetingTime(iv);
-  return t !== null && now >= t;
 }
 
 /** Three proposed slots must be distinct instants. */
@@ -114,6 +141,11 @@ function wallEpoch(ms: number, timeZone: string): number {
 
 function wallString(epoch: number): string {
   return new Date(epoch).toISOString().slice(0, 16);
+}
+
+/** The current wall-clock time in `timeZone`, as "YYYY-MM-DDTHH:MM". */
+export function wallNow(timeZone: string, now: number = Date.now()): string {
+  return wallString(wallEpoch(now, timeZone));
 }
 
 /**

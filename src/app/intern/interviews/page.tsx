@@ -5,6 +5,7 @@ import { ArrowRight, Calendar, Sparkles } from "lucide-react";
 import { EmptyScene, PageHead, Pill, SectionHead, Surface } from "@/components/app/primitives";
 import { SlotPicker } from "@/components/app/slot-picker";
 import { AiFeedbackReport } from "@/components/employer/ai-feedback-report";
+import { aiInterviewLinks } from "@/lib/ai-interview-links";
 import { isMeetingLinkLive, isStaleInterview } from "@/lib/employer-interview-rules";
 import { AiInterviewJoinCard } from "@/components/intern/ai-interview-join-card";
 import { AiInterviewButton } from "@/components/intern/activation-card";
@@ -59,8 +60,8 @@ export default async function InternInterviews() {
   };
   const skills = readSkillRatings(data.onboarding?.skills, extra).map((s) => s.name);
 
-  const aiFeedbackLink = (extra.aiFeedbackLink as string) || null;
-  const aiRecordingLink = (extra.aiRecordingLink as string) || null;
+  // Legacy admin kept these on the AI interview row's notes only.
+  const { feedbackLink: aiFeedbackLink, recordingLink: aiRecordingLink } = await aiInterviewLinks(session.uid, extra);
 
   return (
     <div className="space-y-8">

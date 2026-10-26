@@ -12,6 +12,7 @@ import { hiredInternIds } from "@/lib/employer-visibility";
 import { employerRegion, resolvePricing, type Currency, type Pricing } from "@/lib/employer-pricing";
 import { PageHeader, EmptyState } from "@/components/layout/page-header";
 import { SendProposalForm } from "@/components/employer/send-proposal-form";
+import { timezoneForLocation } from "@/lib/timezones";
 import { workPreferenceOf, type WorkPreference } from "@/lib/work-preference";
 import { ButtonLink } from "@/components/ui/button";
 
@@ -58,6 +59,7 @@ export default async function SendProposal({
   let preference: WorkPreference = { modes: [], cities: [] };
   let pricing: Record<Currency, Pricing>;
   let currency: Currency = "INR";
+  let companyTimezone = "Asia/Kolkata";
   let hasPlans = false;
 
   try {
@@ -89,12 +91,14 @@ export default async function SendProposal({
     const [employer] = await db
       .select({
         country: schema.employers.country,
+        state: schema.employers.state,
         countryCode: schema.employers.countryCode,
         phoneNumber: schema.employers.phoneNumber,
       })
       .from(schema.employers)
       .where(eq(schema.employers.id, uid))
       .limit(1);
+    companyTimezone = timezoneForLocation(employer ?? {});
 
     // A +91 country code is the legacy signal for an India-based employer; the
     // legacy client used the same inference (inferEmployerIsIndia).
@@ -215,6 +219,7 @@ export default async function SendProposal({
         internId={internId}
         initialProjectId={projectId}
         preference={preference}
+        companyTimezone={companyTimezone}
       />
     </div>
   );

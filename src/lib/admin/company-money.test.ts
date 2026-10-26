@@ -14,9 +14,9 @@ test("last payment, upfront charge for an accepted offer, remaining monthly inst
   ];
   const m = companyMoney(["e1", "e2"], proposals, payments, () => 7).get("e1")!;
   assert.equal(m.lastPaymentInrMinor, 1_000_000);
-  // accepted: ₹10,000 × 2 months − 10% upfront discount + ₹5,000 hiring fee = ₹23,000;
+  // accepted: ₹10,000 × 2 months + ₹5,000 hiring fee = ₹25,000 (no upfront discount);
   // monthly: 2 later instalments × $100 → ₹20,000 (the fee was in the first)
-  assert.equal(m.amountLeftInrMinor, 2_300_000 + 2_000_000);
+  assert.equal(m.amountLeftInrMinor, 2_500_000 + 2_000_000);
   assert.equal(m.nextDueDate, "2026-10-15");
   assert.deepEqual(companyMoney(["e2"], proposals, payments, () => 7).get("e2"), {
     lastPaymentAt: null,

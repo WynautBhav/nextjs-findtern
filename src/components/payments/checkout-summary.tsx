@@ -9,7 +9,7 @@ export type SummaryLine = {
   id: string;
   label: string;
   currency: "INR" | "USD";
-  /** The whole engagement paid now, after any upfront discount. */
+  /** The whole engagement paid now. */
   upfrontMinor: number;
   /** The first month (plus any per-hire fee); null when monthly isn't offered. */
   monthlyMinor: number | null;
@@ -26,7 +26,7 @@ type Mode = "upfront" | "monthly";
  * Pay for one hire at a time (legacy checkout): each payment is one accepted
  * offer, so an invoice, a refund or a dispute always maps to exactly one
  * candidate. A new hire is paid month by month by default (bug sheet 22 Oct)
- * where the offer allows it, or upfront for the discount; a monthly placement
+ * where the offer allows it, or all upfront; a monthly placement
  * that is already running pays its due month.
  */
 export function CheckoutSummary({

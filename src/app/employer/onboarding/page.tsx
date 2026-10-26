@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { eq, desc } from "drizzle-orm";
 
 import { getDb, schema } from "@/lib/db";
+import { timezoneForLocation } from "@/lib/timezones";
 import { requireRole } from "@/lib/auth";
 import {
   companyFromRecord,
@@ -67,6 +68,8 @@ export default async function EmployerOnboarding({
       .limit(1);
 
     if (p) { project = p; draft.project = projectFromRecord(p); }
+    // A first project starts in the company's own timezone (bug sheet 26 Oct).
+    else if (employer) draft.project.timezone = timezoneForLocation(employer);
   } catch {
     // DB unavailable - render the blank two-stage form rather than crashing.
   }

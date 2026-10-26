@@ -29,6 +29,8 @@ import { CandidateAvatar } from "@/components/employer/candidate-avatar";
 import { employerRegion, resolvePricing } from "@/lib/employer-pricing";
 import { ShortlistToggle } from "@/components/employer/shortlist-toggle";
 import { PageHeader, EmptyState } from "@/components/layout/page-header";
+import { RememberSelection } from "@/components/employer/remember-selection";
+import { parseIds, rememberedSelection } from "@/lib/employer-selection";
 import { ButtonLink } from "@/components/ui/button";
 import { Pill } from "@/components/app/primitives";
 
@@ -47,17 +49,12 @@ export default async function CompareCandidates({
   const session = await requireRole("employer");
   await requireEmployerSetup(session.uid);
   const { ids: idsParam, project: projectParamRaw } = await searchParams;
-  const raw = Array.isArray(idsParam) ? idsParam.join(",") : (idsParam ?? "");
-  const projectParam = Array.isArray(projectParamRaw) ? projectParamRaw[0] : projectParamRaw;
+  // Opened from the sidebar (no `ids`), compare shows the candidates ticked
+  // on the candidates page, and benchmarks against the project picked there.
+  const remembered = await rememberedSelection(session.uid);
+  const projectParam = (Array.isArray(projectParamRaw) ? projectParamRaw[0] : projectParamRaw) || remembered.project || undefined;
 
-  const ids = Array.from(
-    new Set(
-      raw
-        .split(",")
-        .map((id) => id.trim())
-        .filter(Boolean),
-    ),
-  ).slice(0, MAX_COLUMNS);
+  const ids = (idsParam !== undefined ? parseIds(idsParam) : remembered.compare).slice(0, MAX_COLUMNS);
 
   let candidates: CandidateProfile[] = [];
   let currency: "INR" | "USD" = "INR";
@@ -172,6 +169,7 @@ export default async function CompareCandidates({
   if (candidates.length === 0) {
     return (
       <div className="space-y-6">
+        <RememberSelection employerId={session.uid} compare={ids} />
         <PageHeader title="Compare candidates" subtitle="Put up to four side by side." />
         <EmptyState
           title="Nothing to compare yet"
@@ -188,7 +186,8 @@ export default async function CompareCandidates({
   function removeCandidateHref(idToRemove: string): string {
     const nextIds = ids.filter((id) => id !== idToRemove);
     const search = new URLSearchParams();
-    if (nextIds.length > 0) search.set("ids", nextIds.join(","));
+    // Even empty: an emptied list must not fall back to the remembered one.
+    search.set("ids", nextIds.join(","));
     if (activeProject) search.set("project", activeProject.id);
     const q = search.toString();
     return q ? `/employer/compare?${q}` : "/employer/compare";
@@ -196,9 +195,10 @@ export default async function CompareCandidates({
 
   return (
     <div className="space-y-6">
+      <RememberSelection employerId={session.uid} compare={ids} project={activeProject?.id ?? null} />
       <div className="flex flex-wrap items-center justify-between gap-4">
         <ButtonLink
-          href={`/employer/candidates?ids=${encodeURIComponent(ids.join(","))}`}
+          href={`/employer/candidates?ids=${encodeURIComponent(ids.join(","))}${activeProject ? `&project=${encodeURIComponent(activeProject.id)}` : ""}`}
           variant="link"
           size="sm"
           className="min-h-11 px-0 text-sm font-medium"

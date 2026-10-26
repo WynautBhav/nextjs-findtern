@@ -7,6 +7,7 @@ import {
   hasDuplicateSlots,
   isBlockingInterview,
   isMeetingLinkLive,
+  isMeetingOver,
   isStaleInterview,
   meetingTime,
 } from "./employer-interview-rules.ts";
@@ -71,4 +72,23 @@ test("suggested slots: nearest quarter hour at least 15 min out, then +1h and +2
   // Exactly on a quarter, 15 minutes ahead stays on it; crosses midnight cleanly.
   const late = Date.UTC(2026, 9, 19, 18, 15); // 23:45 IST
   assert.deepEqual(suggestedSlots(late, "Asia/Kolkata"), ["2026-10-20T00:00", "2026-10-20T01:00", "2026-10-20T02:00"]);
+});
+
+test("a picked meeting blocks a new booking until its 30 minutes are over", () => {
+  const iv = { status: "scheduled", slot1: h(-0.25), slot2: h(1), slot3: h(2), selectedSlot: 1 };
+  assert.equal(isBlockingInterview(iv, NOW), true, "15 minutes in");
+  assert.equal(isBlockingInterview(iv, NOW + 20 * 60_000), false, "35 minutes in");
+});
+
+test("feedback opens only once the meeting is over", () => {
+  const scheduled = { status: "scheduled", slot1: h(-0.25), slot2: null, slot3: null, selectedSlot: 1 };
+  assert.equal(isMeetingOver(scheduled, NOW), false);
+  assert.equal(isMeetingOver(scheduled, NOW + 20 * 60_000), true);
+  assert.equal(isMeetingOver({ status: "pending", slot1: h(-5), slot2: null, slot3: null }, NOW), false);
+  assert.equal(isMeetingOver({ status: "completed", slot1: h(5), slot2: null, slot3: null }, NOW), true);
+});
+
+test("a booked meeting whose time is over reads completed, an unpicked one expired", () => {
+  assert.equal(displayInterviewStatus({ status: "scheduled", slot1: h(-2), slot2: null, slot3: null, selectedSlot: 1 }, NOW), "completed");
+  assert.equal(displayInterviewStatus({ status: "pending", slot1: h(-2), slot2: null, slot3: null }, NOW), "expired");
 });

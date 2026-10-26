@@ -52,7 +52,7 @@ export type PayableLine = {
 
 export type PayableCheckout = {
   lines: PayableLine[];
-  /** Per-currency order total, minor units, after the upfront discount. */
+  /** Per-currency order total, minor units. */
   totals: Map<Currency, number>;
   region: "IN" | null;
   defaultCurrency: Currency;

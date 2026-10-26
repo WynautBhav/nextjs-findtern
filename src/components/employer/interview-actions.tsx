@@ -19,6 +19,7 @@ import { Bell, CalendarClock, Check, Loader2, MessageSquare, X } from "lucide-re
 
 import { csrfFetch } from "@/lib/client-fetch";
 import { isQuarterHourWall, suggestedSlots } from "@/lib/employer-interview-rules";
+import { MeetingSlots, type Slots } from "@/components/employer/meeting-slots";
 
 type Panel = "none" | "reschedule" | "feedback";
 
@@ -27,10 +28,16 @@ export function InterviewActions({
   past,
   status,
   timezone = "Asia/Kolkata",
+  meetingOver = false,
+  hasFeedback = false,
 }: {
   interviewId: string;
   past: boolean;
   status: string;
+  /** The meeting has happened (completed, or its booked time is over). */
+  meetingOver?: boolean;
+  /** Feedback was already shared - it is given once. */
+  hasFeedback?: boolean;
   /** The interview's timezone; suggested slots are wall-clock times in it. */
   timezone?: string;
 }) {
@@ -40,7 +47,7 @@ export function InterviewActions({
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
-  const [slots, setSlots] = useState<[string, string, string]>(["", "", ""]);
+  const [slots, setSlots] = useState<Slots>(["", "", ""]);
   const [feedback, setFeedback] = useState("");
 
   async function post(path: string, body?: unknown, label = "action") {
@@ -115,6 +122,8 @@ export function InterviewActions({
   }
 
   const closed = status.toLowerCase() === "completed" || status.toLowerCase() === "cancelled";
+  // Feedback only for a completed interview (bug sheet 26 Oct), and once.
+  const canFeedback = meetingOver && !hasFeedback && status.toLowerCase() !== "cancelled";
 
   return (
     <div className="mt-4 border-t border-ink-100 pt-4">
@@ -138,10 +147,11 @@ export function InterviewActions({
         />
         <Action
           icon={<MessageSquare className="size-3.5" />}
-          label={panel === "feedback" ? "Cancel feedback" : "Leave feedback"}
+          label={hasFeedback ? "Feedback shared" : panel === "feedback" ? "Cancel feedback" : "Leave feedback"}
           onClick={() => setPanel(panel === "feedback" ? "none" : "feedback")}
           active={panel === "feedback"}
-          disabled={busy !== null || closed}
+          disabled={busy !== null || !canFeedback}
+          title={canFeedback || hasFeedback ? undefined : "Available once the interview is completed"}
         />
         {!closed ? (
           <Action
@@ -162,23 +172,8 @@ export function InterviewActions({
             The candidate picks one. Suggested: the next quarter hour and the two hours after it -
             change any of them. Times are read in the interview&apos;s timezone ({timezone}).
           </p>
-          <div className="mt-3 grid gap-2 sm:grid-cols-3">
-            {slots.map((value, idx) => (
-              <input
-                key={idx}
-                type="datetime-local"
-                step={900}
-                required
-                value={value}
-                onChange={(e) => {
-                  const next = [...slots] as [string, string, string];
-                  next[idx] = e.target.value;
-                  setSlots(next);
-                }}
-                aria-label={`Slot ${idx + 1}`}
-                className="apple-spring min-h-11 rounded-[10px] border border-ink-200 bg-white px-3 text-[14px] tabular-nums text-ink-900 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
-              />
-            ))}
+          <div className="mt-3">
+            <MeetingSlots slots={slots} onChange={setSlots} timezone={timezone} />
           </div>
           <div className="mt-3 flex items-center gap-3">
             <button

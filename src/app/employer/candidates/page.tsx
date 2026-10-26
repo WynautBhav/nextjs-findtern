@@ -46,6 +46,8 @@ import { CandidateAvatar } from "@/components/employer/candidate-avatar";
 import { PageHeader, EmptyState } from "@/components/layout/page-header";
 import { cn } from "@/lib/utils";
 import { compareBySortFields, parseSortFields } from "@/lib/candidate-sort";
+import { parseIds, rememberedSelection } from "@/lib/employer-selection";
+import { RememberSelection } from "@/components/employer/remember-selection";
 
 export const metadata: Metadata = {
   title: "Candidates",
@@ -57,6 +59,11 @@ type SortKey = "score" | keyof Ratings;
 type Filters = {
   q: string;
   skills: string[];
+  /**
+   * The employer set the skills themselves (`skills` is in the URL, even
+   * empty). Otherwise the selected project's skills apply and show as chips.
+   */
+  skillsSet: boolean;
   city: string;
   mode: string;
   minScore: number;
@@ -85,6 +92,8 @@ type Filters = {
   projectDefaults: boolean;
   /** Candidates ticked for Compare. Carried on every link so paging keeps them. */
   ids: string[];
+  /** `ids` was in the URL (even empty): it wins over the remembered picks. */
+  idsSet: boolean;
 };
 
 const SORT_OPTIONS: { value: SortKey; label: string }[] = [
@@ -133,6 +142,11 @@ export default async function CandidatesPage({
   const params = await searchParams;
 
   const filters = readFilters(params);
+  // The project and compare picks carry over from the last visit (cookie)
+  // unless the URL names them.
+  const remembered = await rememberedSelection(uid);
+  if (!filters.idsSet) filters.ids = remembered.compare;
+  if (!filters.project && remembered.project) filters.project = remembered.project;
   const compareIds = filters.ids;
 
   let candidates: CandidateProfile[] = [];
@@ -146,6 +160,8 @@ export default async function CandidatesPage({
   let shortlisted = new Set<string>();
   let activeProjectId: string | null = null;
   let activeProjectSkills: string[] = [];
+  /** The skills the list is filtered by: the employer's, or the project's. */
+  let effectiveSkills: string[] = filters.skills;
   /** What the selected project filled in (row 61), for the note above the list. */
   let projectApplied: { name: string; skills: string[]; city: string; onsite: boolean } | null = null;
   let nameUnlocked = new Set<string>();
@@ -191,9 +207,11 @@ export default async function CandidatesPage({
       .orderBy(asc(schema.projects.projectName));
     projects = projectRows.map((p) => ({ id: p.id, projectName: p.projectName }));
     activeProjectId =
-      (one(params.project) && projects.find((p) => p.id === one(params.project))?.id) ||
+      (filters.project && projects.find((p) => p.id === filters.project)?.id) ||
       projects[0]?.id ||
       null;
+    // A remembered project that was since deleted is not carried on links.
+    if (filters.project !== activeProjectId) filters.project = activeProjectId ?? "";
     if (activeProjectId) {
       const rows = await db
         .select({ internId: schema.employerCartItems.internId })
@@ -241,6 +259,7 @@ export default async function CandidatesPage({
     const project = projectRows.find((p) => p.id === activeProjectId);
     activeProjectSkills = (Array.isArray(project?.skills) ? project.skills : []).filter(Boolean).slice(0, 7);
     let skillTerms = filters.skills;
+    effectiveSkills = filters.skills;
     let cityText = filters.city;
     // Picking the Remote work mode means "remote candidates": a remote hire's
     // home city does not matter, so it behaves as "include remote" too.
@@ -248,7 +267,9 @@ export default async function CandidatesPage({
     if (project && filters.projectDefaults) {
       const projectSkills = (Array.isArray(project.skills) ? project.skills : []).filter(Boolean).slice(0, 7);
       const onsite = Boolean(project.locationType && project.locationType !== "remote");
-      if (skillTerms.length === 0) skillTerms = projectSkills;
+      // The employer's own pick (even "none") wins; otherwise the project's.
+      if (!filters.skillsSet) skillTerms = projectSkills;
+      effectiveSkills = skillTerms;
       if (!cityText && onsite && project.city) cityText = project.city;
       if (onsite && !filters.mode && !includeRemote) {
         clauses.push(
@@ -266,13 +287,19 @@ export default async function CandidatesPage({
     }
 
     // Any of the chosen skills (legacy rule): "React + Node" finds people with
-    // either, and those with more of them rank first.
+    // either, and those with more of them rank first. A skill matches by its
+    // whole name, case-insensitively, as legacy did (dashboard:2716). This was
+    // a substring match on the raw JSON, so "Java" pulled in every JavaScript
+    // candidate and "C" or "R" matched nearly everyone (bug sheet 26 Oct).
     if (skillTerms.length > 0) {
+      const wanted = Array.from(new Set(skillTerms.map((s) => s.trim().toLowerCase()).filter(Boolean)));
+      const skills = schema.internOnboarding.skills;
       clauses.push(
-        sql`(${sql.join(
-          skillTerms.map((skill) => sql`(${schema.internOnboarding.skills})::text ILIKE ${`%${skill}%`}`),
-          sql` OR `,
-        )})`,
+        sql`EXISTS (SELECT 1 FROM jsonb_array_elements(CASE WHEN jsonb_typeof(${skills}) = 'array' THEN ${skills} ELSE '[]'::jsonb END) AS s(e)
+          WHERE lower(trim(coalesce(e->>'name', e->>'skill', e->>'title', e #>> '{}'))) IN (${sql.join(
+            wanted.map((w) => sql`${w}`),
+            sql`, `,
+          )}))`,
       );
     }
 
@@ -360,11 +387,12 @@ export default async function CandidatesPage({
       const hay = [p.city, ...p.preferredLocations].join("|").toLowerCase();
       return cityList.filter((c) => hay.includes(c)).length;
     };
-    const lowered = skillTerms.map((t) => t.toLowerCase());
+    const lowered = skillTerms.map((t) => t.trim().toLowerCase());
     const skillMatches = (p: CandidateProfile) => {
       if (!filters.skillPriority || lowered.length < 2) return 0;
-      const have = p.skills.map((x) => x.toLowerCase());
-      return lowered.filter((t) => have.some((h) => h.includes(t))).length;
+      // `readSkills` appends " · level" to object skills; match the name.
+      const have = new Set(p.skills.map((x) => x.split(" · ")[0].trim().toLowerCase()));
+      return lowered.filter((t) => have.has(t)).length;
     };
     // A sort the employer picked leads; project skill and city matches then
     // break ties. Before, a selected project's skill match always came first,
@@ -429,7 +457,7 @@ export default async function CandidatesPage({
             {filters.pageSize !== 24 ? <input type="hidden" name="pageSize" value={filters.pageSize} /> : null}
             {!filters.projectDefaults ? <input type="hidden" name="pf" value="0" /> : null}
             {filters.q ? <input type="hidden" name="q" value={filters.q} /> : null}
-            {filters.skills.length > 0 ? <input type="hidden" name="skills" value={filters.skills.join(",")} /> : null}
+            {filters.skillsSet ? <input type="hidden" name="skills" value={filters.skills.join(",")} /> : null}
             {filters.mode ? <input type="hidden" name="mode" value={filters.mode} /> : null}
 
             <div className="rounded-[20px] border border-ink-200/70 bg-white/90 p-4 shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)]">
@@ -606,7 +634,12 @@ export default async function CandidatesPage({
         </aside>
 
         <div className="min-w-0">
-        <SkillFilter active={filters.skills} projectSkills={activeProjectSkills} />
+        <RememberSelection employerId={uid} project={activeProjectId} compare={compareIds} />
+        <SkillFilter
+          active={effectiveSkills}
+          projectSkills={activeProjectSkills}
+          fromProject={!filters.skillsSet && filters.projectDefaults && activeProjectSkills.length > 0}
+        />
 
 
       {projectApplied ? (
@@ -970,6 +1003,7 @@ function readFilters(params: SearchParams): Filters {
       .map((skill) => skill.trim())
       .filter(Boolean)
       .slice(0, 7),
+    skillsSet: params.skills !== undefined,
     city: (one(params.city) ?? "").trim().slice(0, 160),
     mode: (one(params.mode) ?? "").trim(),
     minScore: Number.isFinite(min) && min > 0 ? min : 0,
@@ -991,14 +1025,8 @@ function readFilters(params: SearchParams): Filters {
     page: Number.isFinite(page) && page > 0 ? Math.floor(page) : 1,
     project: (one(params.project) ?? "").trim(),
     projectDefaults: one(params.pf) !== "0",
-    ids: Array.from(
-      new Set(
-        (Array.isArray(params.ids) ? params.ids.join(",") : (params.ids ?? ""))
-          .split(",")
-          .map((id) => id.trim())
-          .filter(Boolean),
-      ),
-    ).slice(0, 4),
+    ids: parseIds(params.ids),
+    idsSet: params.ids !== undefined,
   };
 }
 
@@ -1026,7 +1054,9 @@ function withFilters(
   patch: Partial<Omit<Filters, "page">> & { page?: number | "" } = {},
 ): string {
   const page = patch.page === "" ? 1 : (patch.page ?? base.page);
-  const merged: Filters = { ...base, ...patch, page };
+  // Changing the compare picks is explicit, so an emptied list stays empty
+  // rather than falling back to the remembered one.
+  const merged: Filters = { ...base, ...patch, page, idsSet: base.idsSet || patch.ids !== undefined };
   return `/employer/candidates${queryOf(merged)}`;
 }
 
@@ -1039,7 +1069,7 @@ function queryOf(merged: Filters): string {
   const next = new URLSearchParams();
 
   if (merged.q) next.set("q", merged.q);
-  if (merged.skills.length > 0) next.set("skills", merged.skills.join(","));
+  if (merged.skillsSet) next.set("skills", merged.skills.join(","));
   if (merged.city) next.set("city", merged.city);
   if (merged.mode) next.set("mode", merged.mode);
   if (merged.minScore > 0) next.set("min", String(merged.minScore));
@@ -1057,7 +1087,7 @@ function queryOf(merged: Filters): string {
   if (merged.pageSize && merged.pageSize !== 24) next.set("pageSize", String(merged.pageSize));
   if (merged.project) next.set("project", merged.project);
   if (!merged.projectDefaults) next.set("pf", "0");
-  if (merged.ids.length > 0) next.set("ids", merged.ids.join(","));
+  if (merged.ids.length > 0 || merged.idsSet) next.set("ids", merged.ids.join(","));
   if (merged.page > 1) next.set("page", String(merged.page));
 
   const query = next.toString();
@@ -1086,7 +1116,7 @@ function activeFilterCount(filters: Filters): number {
     filters.sorts.length > 0,
     filters.dir === "asc",
     !filters.skillPriority,
-    filters.skills.length > 0,
+    filters.skillsSet && filters.skills.length > 0,
   ].filter(Boolean).length;
 }
 

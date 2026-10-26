@@ -14,7 +14,7 @@ import { getDb, schema } from "@/lib/db";
 import { eq } from "drizzle-orm";
 import { loadInternData, openProjects } from "@/lib/intern-data";
 import { isPast, nextAction, slotOf } from "@/lib/journey";
-import { formatMoney } from "@/lib/format";
+import { formatMoney, formatSlotTime } from "@/lib/format";
 import { isInternPaid } from "@/lib/payments";
 import { paymentsAreFree } from "@/lib/razorpay";
 import { getInternActivationFeeMinor } from "@/lib/platform-settings";
@@ -245,13 +245,8 @@ export default async function InternHome() {
                 {data.names[upcomingInterviewItem.interview.employerId] ?? "Employer interview"}
               </p>
               <p className="mt-0.5 text-sm text-ink-600">
-                {upcomingInterviewItem.when.toLocaleString("en-IN", {
-                  weekday: "short",
-                  day: "numeric",
-                  month: "short",
-                  hour: "numeric",
-                  minute: "2-digit",
-                })}
+                {/* In the meeting's zone, labelled: the server runs in UTC. */}
+                {formatSlotTime(upcomingInterviewItem.when, upcomingInterviewItem.interview.timezone || "Asia/Kolkata")}
               </p>
               {upcomingInterviewItem.interview.meetingLink ? (
                 <a
