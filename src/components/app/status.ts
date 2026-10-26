@@ -34,15 +34,15 @@ export function proposalStatus(status: string | null): {
   switch ((status ?? "").toLowerCase()) {
     case "accepted":
       return {
-        label: "You are doing this",
-        tone: "live",
-        detail: "Your timesheet and stipend are running.",
+        label: "Accepted · awaiting payment",
+        tone: "waiting",
+        detail: "You accepted this offer. Logging hours opens once the company completes the payment.",
       };
     case "hired":
       return {
-        label: "Converted to full time",
+        label: "Hired",
         tone: "paid",
-        detail: "This became a permanent role.",
+        detail: "The company completed the payment. Log your hours on Timesheets.",
       };
     case "rejected":
       return { label: "Not this time", tone: "closed", detail: "Nothing more is needed from you." };

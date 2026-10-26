@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import { and, eq, gte } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -5,9 +7,9 @@ import { z } from "zod";
 import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
 import { payableCheckout } from "@/lib/employer-payable";
-import { orderProposalIds } from "@/lib/payments";
+import { orderProposalIds, settleEmployerOrder } from "@/lib/payments";
 import { quotePromo } from "@/lib/promo";
-import { createOrder, razorpayKeyId } from "@/lib/razorpay";
+import { createOrder, paymentsAreFree, razorpayKeyId } from "@/lib/razorpay";
 
 const bodySchema = z.object({
   currency: z.enum(["INR", "USD"]).default("INR"),
@@ -82,6 +84,24 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     computedAmountMinor: computedMinor,
     discountAmountMinor: discountMinor,
   };
+  // Test mode: record the order as free and settle it straight away, through
+  // the same settlement as a real payment (hire, notifications, monthly dues).
+  if (paymentsAreFree()) {
+    const orderId = `free_test_${randomUUID()}`;
+    await getDb().insert(schema.employerPayments).values({
+      employerId: id,
+      gateway: "free",
+      orderId,
+      amountMinor: 0,
+      currency,
+      status: "created",
+      raw: { notes, testMode: true, ...(promo ? { promo } : {}) },
+    });
+    const settled = await settleEmployerOrder({ orderId, paymentId: orderId, employerId: id });
+    if (!settled.ok) return NextResponse.json({ error: settled.error }, { status: settled.status });
+    return NextResponse.json({ free: true });
+  }
+
   try {
     const order = await createOrder({ amountMinor, currency, receipt: `employer_${id.slice(0, 8)}_${Date.now().toString(36)}`, notes });
     await getDb().insert(schema.employerPayments).values({

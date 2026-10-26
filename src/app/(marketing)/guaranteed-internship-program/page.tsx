@@ -153,7 +153,7 @@ const FAQS = [
     category: "Process",
     question: "How does the program work step by step?",
     answer:
-      "You sign up, complete your evaluation and Incruiter AI interview, earn a verified score rubric, and get matched to active employer requirements. You apply, interview, and receive formal offers directly on the platform.",
+      "You sign up, complete your evaluation and AI interview, earn a verified score rubric, and get matched to active employer requirements. You apply, interview, and receive formal offers directly on the platform.",
   },
   {
     id: "g-eligible",

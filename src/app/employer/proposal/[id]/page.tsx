@@ -13,6 +13,7 @@ import { formatMoney } from "@/lib/format";
 import { offerPastStart, offerScore, parseOffer, WEEKLY_SCHEDULES } from "@/lib/offer";
 import { ProposalActions } from "@/components/employer/proposal-actions";
 import { ProposalOfferForm } from "@/components/employer/proposal-offer-form";
+import { workPreferenceOf, type WorkPreference } from "@/lib/work-preference";
 
 export const metadata: Metadata = {
   title: "Proposal",
@@ -23,13 +24,14 @@ type Proposal = typeof schema.proposals.$inferSelect;
 
 /** States an employer can still act on. */
 const ACTIONABLE = new Set(["draft", "sent", "accepted", "hired"]);
-const EDITABLE = new Set(["draft", "sent"]);
+/** Accepted stays editable until it is paid for; saving sends it back to the candidate. */
+const EDITABLE = new Set(["draft", "sent", "accepted"]);
 
 const STATUS: Record<string, { label: string; tone: string; next: string }> = {
   draft: { label: "Draft", tone: "bg-ink-100 text-ink-700", next: "Not sent yet." },
   sent: { label: "Waiting on candidate", tone: "bg-accent-100 text-accent-800", next: "The candidate reads the offer and decides. You can still edit or withdraw it." },
   interview_scheduled: { label: "Interview booked", tone: "bg-brand-50 text-brand-700", next: "The offer opens once the interview has happened." },
-  accepted: { label: "Accepted", tone: "bg-success-soft text-success", next: "Pay for this hire to confirm it. Names and contact details unlock on payment." },
+  accepted: { label: "Accepted", tone: "bg-success-soft text-success", next: "Pay for this hire to confirm it. Names and contact details unlock on payment. Until then you can still edit the offer (the candidate accepts it again) or withdraw it." },
   processing: { label: "Payment in progress", tone: "bg-accent-100 text-accent-800", next: "A payment is open for this hire." },
   hired: { label: "Hired", tone: "bg-success-soft text-success", next: "Timesheets run monthly from the start date." },
   rejected: { label: "Declined", tone: "bg-ink-100 text-ink-700", next: "The candidate declined. Nothing further is needed from you." },
@@ -79,6 +81,7 @@ export default async function EmployerProposalDetail({
   let internName = "Candidate";
   let unlocked = false;
   let projectName: string | null = null;
+  let preference: WorkPreference = { modes: [], cities: [] };
   try {
     const db = getDb();
     const [row] = await db
@@ -105,6 +108,12 @@ export default async function EmployerProposalDetail({
           : `Candidate ${initialsOf(first, last)}`;
     }
     projectName = row?.projectName ?? null;
+    const [pref] = await db
+      .select({ locationTypes: schema.internOnboarding.locationTypes, preferredLocations: schema.internOnboarding.preferredLocations })
+      .from(schema.internOnboarding)
+      .where(eq(schema.internOnboarding.userId, proposal.internId))
+      .limit(1);
+    preference = workPreferenceOf(pref);
   } catch {
     // Keep the defaults; the page reads fine without them.
   }
@@ -123,7 +132,7 @@ export default async function EmployerProposalDetail({
   // The Findtern Score shown is the one the offer was priced on, so it can
   // never disagree with the rate or the stipend rule beside it.
   const ratings: [string, number][] = score > 0 ? [["overall", score], ...snapshot] : snapshot;
-  const editable = EDITABLE.has(proposal.status) && !lapsed && !offer.fullTime;
+  const editable = EDITABLE.has(proposal.status) && !proposal.hiredAt && !lapsed && !offer.fullTime;
   const city = typeof raw.city === "string" ? raw.city : "";
   const state = typeof raw.state === "string" ? raw.state : "";
   const officeDays = Number(raw.wfoDays ?? raw.workFromOfficeDays ?? 0) || 0;
@@ -306,11 +315,13 @@ export default async function EmployerProposalDetail({
 
             {ACTIONABLE.has(proposal.status) && !lapsed ? (
               <div className="mt-4 grid gap-2">
-                <ProposalActions proposalId={proposal.id} status={proposal.status} />
+                <ProposalActions proposalId={proposal.id} status={proposal.status} fullTime={Boolean(offer.fullTime)} />
                 {editable ? (
                   <ProposalOfferForm
                     proposalId={proposal.id}
                     defaultOpen={edit === "1"}
+                    accepted={proposal.status === "accepted"}
+                    preference={preference}
                     currency={currency}
                     shortOnly={score > 0 && score < 6}
                     initial={{
@@ -328,6 +339,7 @@ export default async function EmployerProposalDetail({
                       homeDays: homeDays || undefined,
                       shiftFrom: offer.shiftFrom,
                       shiftTo: offer.shiftTo,
+                      timezone: offer.timezone,
                       laptop: offer.laptop,
                     }}
                   />

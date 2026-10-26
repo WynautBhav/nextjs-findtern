@@ -5,6 +5,7 @@ import { FileImage, FileText, Info, Video } from "lucide-react";
 import { getDb, schema } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
 import { EmptyScene, PageHead, Surface } from "@/components/app/primitives";
+import { certificateFiles } from "@/lib/onboarding";
 
 export const metadata: Metadata = {
   title: "Documents",
@@ -60,6 +61,18 @@ export default async function InternDocuments() {
         size: typeof m.size === "number" ? m.size : null,
         stampedAt: null,
         key: name,
+      });
+    });
+    certificateFiles(academics).forEach((c, i) => {
+      rows.push({
+        id: `certificate-${i}`,
+        href: "",
+        label: c.label,
+        fileName: c.originalName || c.name.split("/").pop() || c.name,
+        contentType: c.type || null,
+        size: c.size || null,
+        stampedAt: null,
+        key: c.name,
       });
     });
     rows = rows.map((r) => ({ ...r, href: `/intern/documents/open?key=${encodeURIComponent(r.key ?? r.fileName)}` }));

@@ -2,17 +2,25 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import {
+  ArrowUpDown,
   ArrowUpRight,
+  CheckCircle2,
+  ChevronDown,
   Filter,
   Laptop,
   LayoutGrid,
   List,
   MapPin,
+  MessageSquare,
+  Plus,
+  RotateCcw,
   Scale,
   Search,
-  SlidersHorizontal,
+  Shield,
+  ShoppingCart,
+  Sparkles,
+  Star,
   Table as TableIcon,
-  X,
 } from "lucide-react";
 
 import { getDb, schema } from "@/lib/db";
@@ -28,14 +36,16 @@ import { hiredInternIds, hiredProposalSql } from "@/lib/employer-visibility";
 import { attachPhotos, candidatePoolClauses, scoreExpr } from "@/lib/employer-pool";
 import { requireEmployerSetup } from "@/lib/employer-setup";
 import { employerRegion, resolvePricing, type Currency } from "@/lib/employer-pricing";
-import { BANDS, PLAN_NAME, type BandId } from "@/lib/score";
+import { BANDS, type BandId } from "@/lib/score";
+import { formatRate } from "@/lib/format";
 import { CityFilter } from "@/components/employer/city-filter";
 import { SkillFilter } from "@/components/employer/skill-filter";
 import { CandidateCard } from "@/components/employer/candidate-card";
+import { FilterForm, RatingSlider } from "@/components/employer/candidate-filters";
 import { CandidateAvatar } from "@/components/employer/candidate-avatar";
 import { PageHeader, EmptyState } from "@/components/layout/page-header";
 import { cn } from "@/lib/utils";
-import { MAX_SORT_FIELDS, compareBySortFields, parseSortFields } from "@/lib/candidate-sort";
+import { compareBySortFields, parseSortFields } from "@/lib/candidate-sort";
 
 export const metadata: Metadata = {
   title: "Candidates",
@@ -82,16 +92,15 @@ const SORT_OPTIONS: { value: SortKey; label: string }[] = [
   ...RATING_META.map((meta) => ({ value: meta.key, label: meta.label })),
 ];
 
-// Any whole-number floor 1-9, like the legacy 0-10 sliders.
-const RATING_FLOORS = [
-  { value: "", label: "Any" },
-  ...Array.from({ length: 9 }, (_, i) => ({ value: String(i + 1), label: `${i + 1}+` })),
-];
-const SCORE_HINT: Record<number, string> = { 4: " Top 70%", 6: " Top 40%", 8: " Top 10%" };
-const SCORE_FLOORS = [
-  { value: "", label: "Any score" },
-  ...Array.from({ length: 9 }, (_, i) => ({ value: String(i + 1), label: `${i + 1}.0+${SCORE_HINT[i + 1] ?? ""}` })),
-];
+const RATING_ICON: Record<keyof Ratings, React.ReactNode> = {
+  communication: <MessageSquare className="size-4" />,
+  coding: <Star className="size-4" />,
+  aptitude: <CheckCircle2 className="size-4" />,
+  interview: <Sparkles className="size-4" />,
+};
+
+const SELECT =
+  "apple-spring mt-2 min-h-11 w-full rounded-[10px] border border-ink-200/90 bg-white px-3 text-[14px] text-ink-900 shadow-2xs outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20";
 
 type SearchParams = {
   q?: string | string[];
@@ -136,6 +145,7 @@ export default async function CandidatesPage({
   let projects: { id: string; projectName: string }[] = [];
   let shortlisted = new Set<string>();
   let activeProjectId: string | null = null;
+  let activeProjectSkills: string[] = [];
   /** What the selected project filled in (row 61), for the note above the list. */
   let projectApplied: { name: string; skills: string[]; city: string; onsite: boolean } | null = null;
   let nameUnlocked = new Set<string>();
@@ -229,6 +239,7 @@ export default async function CandidatesPage({
     // project leaves out remote-only candidates. "Show everyone" (pf=0)
     // switches that off; typed filters always win.
     const project = projectRows.find((p) => p.id === activeProjectId);
+    activeProjectSkills = (Array.isArray(project?.skills) ? project.skills : []).filter(Boolean).slice(0, 7);
     let skillTerms = filters.skills;
     let cityText = filters.city;
     // Picking the Remote work mode means "remote candidates": a remote hire's
@@ -409,160 +420,194 @@ export default async function CandidatesPage({
         subtitle={`${total === 0 ? "No" : total} intern${total === 1 ? "" : "s"} in the pool, ranked by Findtern Score.`}
       />
 
-      <form method="get" className="mb-6 rounded-[20px] border border-ink-200/70 bg-white/90 p-5 shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)] backdrop-blur-sm">
-        {compareIds.length > 0 ? <input type="hidden" name="ids" value={compareIds.join(",")} /> : null}
-        {filters.view !== "grid" ? <input type="hidden" name="view" value={filters.view} /> : null}
-        {!filters.projectDefaults ? <input type="hidden" name="pf" value="0" /> : null}
-        <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-[minmax(0,1.2fr)_9.5rem_8rem_7.5rem_7.5rem_minmax(12rem,1fr)_auto]">
-          <TextQuery
-            defaultValue={filters.q}
-            label="Keyword"
-            placeholder="Skill, bio, or city…"
-          />
-          <CityFilter key={filters.city} defaultValue={filters.city} />
-          <SelectQuery
-            name="mode"
-            label="Work mode"
-            defaultValue={filters.mode}
-            options={[
-              { value: "", label: "Any mode" },
-              { value: "remote", label: "Remote" },
-              { value: "hybrid", label: "Hybrid" },
-              { value: "onsite", label: "On-site" },
-            ]}
-          />
-          <SelectQuery
-            name="min"
-            label="Min score"
-            defaultValue={filters.minScore > 0 ? String(filters.minScore) : ""}
-            options={SCORE_FLOORS}
-          />
-          <SelectQuery
-            name="laptop"
-            label="Laptop"
-            defaultValue={filters.laptop}
-            options={[
-              { value: "", label: "Any" },
-              { value: "yes", label: "Has laptop" },
-              { value: "no", label: "No laptop" },
-            ]}
-          />
-          {projects.length > 0 ? (
-            <SelectQuery
-              name="project"
-              label="Hiring project"
-              defaultValue={activeProjectId ?? ""}
-              options={[
-                { value: "", label: "Default Project" },
-                ...projects.map((p) => ({ value: p.id, label: p.projectName })),
-              ]}
-            />
-          ) : (
-            <div className="min-w-0" />
-          )}
-          <div className="flex min-w-0 items-end gap-2">
-            <button
-              type="submit"
-              className="apple-spring apple-pressable inline-flex min-h-11 items-center justify-center gap-2 rounded-[10px] bg-brand-700 px-5 text-sm font-semibold text-white shadow-xs hover:bg-brand-600"
-            >
-              <Search className="size-4" aria-hidden />
-              Filter
-            </button>
-            <ActiveFilters filters={filters} />
-          </div>
-        </div>
+      <div className="lg:grid lg:grid-cols-[18rem_minmax(0,1fr)] lg:items-start lg:gap-6">
+        {/* ── Filter sidebar (legacy employer dashboard layout) ─────────── */}
+        <aside className="mb-6 lg:sticky lg:top-6 lg:mb-0 lg:max-h-[calc(100vh-3rem)] lg:overflow-y-auto lg:pb-2">
+          <FilterForm key={queryOf(filters)} activeCount={activeFilterCount(filters)}>
+            {compareIds.length > 0 ? <input type="hidden" name="ids" value={compareIds.join(",")} /> : null}
+            {filters.view !== "grid" ? <input type="hidden" name="view" value={filters.view} /> : null}
+            {filters.pageSize !== 24 ? <input type="hidden" name="pageSize" value={filters.pageSize} /> : null}
+            {!filters.projectDefaults ? <input type="hidden" name="pf" value="0" /> : null}
+            {filters.q ? <input type="hidden" name="q" value={filters.q} /> : null}
+            {filters.skills.length > 0 ? <input type="hidden" name="skills" value={filters.skills.join(",")} /> : null}
+            {filters.mode ? <input type="hidden" name="mode" value={filters.mode} /> : null}
 
-        <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-2">
-          <label className="inline-flex min-h-11 cursor-pointer items-center gap-2.5 text-sm text-ink-700">
-            <input
-              type="checkbox"
-              name="remote"
-              value="1"
-              defaultChecked={filters.remote}
-              className="size-4 rounded border-ink-300 accent-brand-700"
-            />
-            <span>
-              <span className="font-medium text-ink-900">Include remote candidates</span>
-              <span className="block text-xs text-text-subtle">
-                With a city or an on-site project, also show interns open to remote work from anywhere.
-              </span>
-            </span>
-          </label>
-          <label className="inline-flex min-h-11 cursor-pointer items-center gap-2.5 text-sm text-ink-700">
-            {/* Unchecked boxes send nothing, so a hidden 0 marks "off"; a checked box adds sm=1 after it. */}
-            <input type="hidden" name="sm" value="0" />
-            <input
-              type="checkbox"
-              name="sm"
-              value="1"
-              defaultChecked={filters.skillPriority}
-              className="size-4 rounded border-ink-300 accent-brand-700"
-            />
-            <span>
-              <span className="font-medium text-ink-900">Maximum skill match first</span>
-              <span className="block text-xs text-text-subtle">Rank interns with more of the chosen skills higher.</span>
-            </span>
-          </label>
-        </div>
+            <div className="rounded-[20px] border border-ink-200/70 bg-white/90 p-4 shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)]">
+              {/* Project: not a filter, but it sets the defaults below (legacy sidebar top). */}
+              <div className="mb-4 border-b border-ink-100 pb-4">
+                <div className="flex items-center justify-between">
+                  <label htmlFor="filter-project" className="text-sm font-semibold text-ink-800">
+                    Project
+                  </label>
+                  <Link
+                    href="/employer/projects"
+                    className="apple-spring inline-flex min-h-9 items-center gap-1 rounded-[8px] px-2 text-xs font-semibold text-brand-700 hover:bg-brand-50"
+                  >
+                    <Plus className="size-3.5" aria-hidden />
+                    New
+                  </Link>
+                </div>
+                {projects.length > 0 ? (
+                  <select
+                    id="filter-project"
+                    name="project"
+                    defaultValue={activeProjectId ?? ""}
+                    className={SELECT}
+                  >
+                    {projects.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.projectName}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <p className="mt-2 text-xs text-text-subtle">No projects yet. Create one to shortlist and match candidates.</p>
+                )}
+                <Link
+                  href="/employer/projects"
+                  className="mt-1 inline-flex min-h-9 items-center text-xs font-medium text-ink-600 underline-offset-4 hover:text-brand-700 hover:underline"
+                >
+                  Manage all projects
+                </Link>
+              </div>
 
-        <details
-          className="group mt-4 border-t border-ink-100 pt-4"
-          open={hasAdvancedFilters(filters) || undefined}
-        >
-          <summary className="inline-flex min-h-11 cursor-pointer list-none items-center gap-2 text-sm font-semibold text-ink-700 hover:text-brand-700">
-            <SlidersHorizontal className="size-4" aria-hidden />
-            More filters
-            <span className="text-xs font-normal text-text-subtle">Plan, AI interview ratings, multi-field sort</span>
-          </summary>
-          <div className="mt-3 grid gap-4 sm:grid-cols-2 md:grid-cols-4 xl:grid-cols-5">
-            <SelectQuery
-              name="plan"
-              label="Plan"
-              defaultValue={filters.plan}
-              options={[
-                { value: "", label: "Any plan" },
-                ...BANDS.map((band) => ({
-                  value: band.id,
-                  label: `${PLAN_NAME[band.id]} (${band.min}-${band.max})`,
-                })),
-              ]}
-            />
-            {RATING_META.map((meta) => (
-              <SelectQuery
-                key={meta.key}
-                name={`r_${meta.key}`}
-                label={`Min ${meta.label.toLowerCase()}`}
-                defaultValue={filters.minRatings[meta.key] > 0 ? String(filters.minRatings[meta.key]) : ""}
-                options={RATING_FLOORS}
-              />
-            ))}
-            {Array.from({ length: MAX_SORT_FIELDS }, (_, i) => (
-              <SelectQuery
-                key={i}
-                name="sort"
-                id={`filter-sort-${i}`}
-                label={i === 0 ? "Sort by" : "Then by"}
-                defaultValue={filters.sorts[i] ?? ""}
-                options={[
-                  { value: "", label: i === 0 ? "Findtern Score" : "None" },
-                  ...SORT_OPTIONS.filter((o) => i > 0 || o.value !== "score"),
-                ]}
-              />
-            ))}
-            <SelectQuery
-              name="dir"
-              label="Order"
-              defaultValue={filters.dir === "asc" ? "asc" : ""}
-              options={[
-                { value: "", label: "Highest first" },
-                { value: "asc", label: "Lowest first" },
-              ]}
-            />
-          </div>
-        </details>
+              <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-ink-900">
+                <Filter className="size-4 text-brand-700" aria-hidden />
+                Candidate Filters
+              </h2>
 
-        <SkillFilter active={filters.skills} />
-      </form>
+              <div className="space-y-2">
+                <FilterSection title="Location" icon={<MapPin className="size-4" />} open>
+                  <CityFilter key={filters.city} defaultValue={filters.city} label="Work location" autoApply />
+                  <label className="mt-3 flex min-h-11 cursor-pointer items-start gap-2.5 text-sm text-ink-700">
+                    <input
+                      type="checkbox"
+                      name="remote"
+                      value="1"
+                      defaultChecked={filters.remote}
+                      className="mt-0.5 size-4 rounded border-ink-300 accent-brand-700"
+                    />
+                    <span>
+                      <span className="font-medium text-ink-900">Include Remote Candidates</span>
+                      <span className="block text-xs text-text-subtle">Also show interns open to remote work from anywhere.</span>
+                    </span>
+                  </label>
+                </FilterSection>
+
+                <FilterSection title="Device" icon={<Laptop className="size-4" />} open={filters.laptop === "yes"}>
+                  <label className="flex min-h-11 cursor-pointer items-center gap-2.5 text-sm font-medium text-ink-800">
+                    <input
+                      type="checkbox"
+                      name="laptop"
+                      value="yes"
+                      defaultChecked={filters.laptop === "yes"}
+                      className="size-4 rounded border-ink-300 accent-brand-700"
+                    />
+                    Has Laptop
+                  </label>
+                </FilterSection>
+
+                <FilterSection title="Price" icon={<ShoppingCart className="size-4" />} open={Boolean(filters.plan)}>
+                  <label htmlFor="filter-plan" className="sr-only">
+                    Hourly price
+                  </label>
+                  <select id="filter-plan" name="plan" defaultValue={filters.plan} className={SELECT}>
+                    <option value="">Any</option>
+                    {BANDS.map((band) => (
+                      <option key={band.id} value={band.id}>
+                        {formatRate(resolvePricing(band.min, plans, currency, region).hourlyRateMinor, currency)}
+                      </option>
+                    ))}
+                  </select>
+                </FilterSection>
+
+                <FilterSection title="Ratings" icon={<Star className="size-4" />} open>
+                  <div className="space-y-2.5">
+                    {RATING_META.map((meta) => (
+                      <RatingSlider
+                        key={meta.key}
+                        name={`r_${meta.key}`}
+                        label={meta.key === "interview" ? "AI Interview" : meta.label}
+                        icon={RATING_ICON[meta.key]}
+                        defaultValue={filters.minRatings[meta.key]}
+                      />
+                    ))}
+                    <RatingSlider
+                      name="min"
+                      label="Findtern Score"
+                      icon={<Shield className="size-4" />}
+                      defaultValue={filters.minScore}
+                    />
+                  </div>
+                </FilterSection>
+
+                <FilterSection
+                  title="Sorting"
+                  icon={<ArrowUpDown className="size-4" />}
+                  open={filters.sorts.length > 0 || filters.dir === "asc"}
+                >
+                  <div className="space-y-2">
+                    <label htmlFor="filter-sort" className="sr-only">
+                      Sort by
+                    </label>
+                    <select id="filter-sort" name="sort" defaultValue={filters.sorts[0] ?? ""} className={SELECT}>
+                      <option value="">Select field</option>
+                      {SORT_OPTIONS.map((o) => (
+                        <option key={o.value} value={o.value}>
+                          {o.value === "interview" ? "AI Interview" : o.label}
+                        </option>
+                      ))}
+                    </select>
+                    <label className="flex min-h-11 cursor-pointer items-center justify-between gap-3 rounded-[10px] border border-ink-200 px-3 py-2 text-sm text-ink-800">
+                      Maximum skill match
+                      {/* Unchecked sends only the hidden 0; checked adds sm=1 after it. */}
+                      <input type="hidden" name="sm" value="0" />
+                      <input
+                        type="checkbox"
+                        role="switch"
+                        name="sm"
+                        value="1"
+                        defaultChecked={filters.skillPriority}
+                        className="peer sr-only"
+                      />
+                      <span
+                        aria-hidden
+                        className="relative h-6 w-10 shrink-0 rounded-full bg-ink-200 transition-colors after:absolute after:left-0.5 after:top-0.5 after:size-5 after:rounded-full after:bg-white after:shadow-xs after:transition-transform peer-checked:bg-brand-700 peer-checked:after:translate-x-4 peer-focus-visible:ring-2 peer-focus-visible:ring-brand-500/40"
+                      />
+                    </label>
+                    <label htmlFor="filter-dir" className="sr-only">
+                      Order
+                    </label>
+                    <select id="filter-dir" name="dir" defaultValue={filters.dir === "asc" ? "asc" : ""} className={SELECT}>
+                      <option value="">High → Low</option>
+                      <option value="asc">Low → High</option>
+                    </select>
+                  </div>
+                </FilterSection>
+              </div>
+
+              <div className="mt-4 flex gap-2 border-t border-ink-100 pt-4">
+                <Link
+                  href="/employer/candidates"
+                  className="apple-spring apple-pressable inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-[10px] border border-ink-200 bg-white text-sm font-medium text-ink-700 hover:bg-ink-50"
+                >
+                  <RotateCcw className="size-3.5" aria-hidden />
+                  Reset
+                </Link>
+                <button
+                  type="submit"
+                  className="apple-spring apple-pressable inline-flex min-h-11 flex-1 items-center justify-center rounded-[10px] bg-brand-700 text-sm font-semibold text-white shadow-xs hover:bg-brand-600"
+                >
+                  Applied ({activeFilterCount(filters)})
+                </button>
+              </div>
+            </div>
+          </FilterForm>
+        </aside>
+
+        <div className="min-w-0">
+        <SkillFilter active={filters.skills} projectSkills={activeProjectSkills} />
+
 
       {projectApplied ? (
         <p className="mb-5 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-[14px] border border-brand-200 bg-brand-50 px-4 py-3 text-sm text-ink-700">
@@ -624,6 +669,98 @@ export default async function CandidatesPage({
         </div>
       ) : null}
 
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-ink-100 pb-3">
+          <div className="min-w-0">
+            <p className="flex items-center gap-2 text-sm font-semibold text-brand-700">
+              <span className="size-2 rounded-full bg-brand-600" aria-hidden />
+              {total} candidate{total === 1 ? "" : "s"} found
+            </p>
+            {candidates.length > 0 ? (
+              <p className="mt-0.5 text-xs tabular-nums text-text-subtle">
+                Showing {(Math.min(filters.page, pages) - 1) * filters.pageSize + 1}–
+                {(Math.min(filters.page, pages) - 1) * filters.pageSize + candidates.length}
+              </p>
+            ) : null}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Keyword search: skills, bio or city - never a name (the pool is redacted). */}
+            <form method="get" role="search" className="relative w-full sm:w-64">
+              {Array.from(new URLSearchParams(queryOf({ ...filters, q: "", page: 1 }).slice(1)).entries()).map(([k, v], i) => (
+                <input key={`${k}-${i}`} type="hidden" name={k} value={v} />
+              ))}
+              <label htmlFor="candidate-search" className="sr-only">
+                Search candidates
+              </label>
+              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-400" aria-hidden />
+              <input
+                id="candidate-search"
+                name="q"
+                type="search"
+                defaultValue={filters.q}
+                placeholder="Search candidates…"
+                className="apple-spring min-h-11 w-full rounded-full border border-ink-200 bg-white pl-9 pr-4 text-[14px] text-ink-900 outline-none placeholder:text-ink-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+              />
+            </form>
+            <div className="flex items-center gap-1 text-xs text-text-subtle">
+              <span>Per page:</span>
+              {[12, 24, 48].map((size) => (
+                <Link
+                  key={size}
+                  href={withFilters(filters, { pageSize: size, page: 1 })}
+                  className={cn(
+                    "apple-spring inline-flex min-h-11 min-w-11 items-center justify-center rounded-md px-2 text-xs font-medium",
+                    filters.pageSize === size
+                      ? "bg-brand-50 text-brand-700 font-semibold ring-1 ring-brand-600/20"
+                      : "text-ink-600 hover:bg-ink-100",
+                  )}
+                >
+                  {size}
+                </Link>
+              ))}
+            </div>
+
+            <div className="flex items-center rounded-lg border border-ink-200/80 bg-white p-0.5">
+              <Link
+                href={withFilters(filters, { view: "grid" })}
+                className={cn(
+                  "apple-spring inline-flex size-11 items-center justify-center rounded-md",
+                  filters.view === "grid"
+                    ? "bg-brand-50 text-brand-700 font-semibold"
+                    : "text-ink-600 hover:text-ink-900",
+                )}
+                title="Grid view"
+              >
+                <LayoutGrid className="size-3.5" />
+              </Link>
+              <Link
+                href={withFilters(filters, { view: "list" })}
+                className={cn(
+                  "apple-spring inline-flex size-11 items-center justify-center rounded-md",
+                  filters.view === "list"
+                    ? "bg-brand-50 text-brand-700 font-semibold"
+                    : "text-ink-600 hover:text-ink-900",
+                )}
+                title="List view"
+              >
+                <List className="size-3.5" />
+              </Link>
+              <Link
+                href={withFilters(filters, { view: "table" })}
+                className={cn(
+                  "apple-spring inline-flex size-11 items-center justify-center rounded-md",
+                  filters.view === "table"
+                    ? "bg-brand-50 text-brand-700 font-semibold"
+                    : "text-ink-600 hover:text-ink-900",
+                )}
+                title="Table view"
+              >
+                <TableIcon className="size-3.5" />
+              </Link>
+            </div>
+          </div>
+        </div>
+
       {candidates.length === 0 ? (
         <EmptyState
           title={loadFailed ? "Could not load the candidate pool" : "No candidates match"}
@@ -637,73 +774,6 @@ export default async function CandidatesPage({
         />
       ) : (
         <>
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-ink-100 pb-3">
-            <p className="flex items-center gap-1.5 text-xs tabular-nums text-text-subtle">
-              <Filter className="size-3.5" aria-hidden />
-              Showing {(Math.min(filters.page, pages) - 1) * filters.pageSize + 1}–
-              {(Math.min(filters.page, pages) - 1) * filters.pageSize + candidates.length} of {total}.
-            </p>
-
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-1 text-xs text-text-subtle">
-                <span>Per page:</span>
-                {[12, 24, 48].map((size) => (
-                  <Link
-                    key={size}
-                    href={withFilters(filters, { pageSize: size, page: 1 })}
-                    className={cn(
-                      "apple-spring inline-flex min-h-11 min-w-11 items-center justify-center rounded-md px-2 text-xs font-medium",
-                      filters.pageSize === size
-                        ? "bg-brand-50 text-brand-700 font-semibold ring-1 ring-brand-600/20"
-                        : "text-ink-600 hover:bg-ink-100",
-                    )}
-                  >
-                    {size}
-                  </Link>
-                ))}
-              </div>
-
-              <div className="flex items-center rounded-lg border border-ink-200/80 bg-white p-0.5">
-                <Link
-                  href={withFilters(filters, { view: "grid" })}
-                  className={cn(
-                    "apple-spring inline-flex size-11 items-center justify-center rounded-md",
-                    filters.view === "grid"
-                      ? "bg-brand-50 text-brand-700 font-semibold"
-                      : "text-ink-600 hover:text-ink-900",
-                  )}
-                  title="Grid view"
-                >
-                  <LayoutGrid className="size-3.5" />
-                </Link>
-                <Link
-                  href={withFilters(filters, { view: "list" })}
-                  className={cn(
-                    "apple-spring inline-flex size-11 items-center justify-center rounded-md",
-                    filters.view === "list"
-                      ? "bg-brand-50 text-brand-700 font-semibold"
-                      : "text-ink-600 hover:text-ink-900",
-                  )}
-                  title="List view"
-                >
-                  <List className="size-3.5" />
-                </Link>
-                <Link
-                  href={withFilters(filters, { view: "table" })}
-                  className={cn(
-                    "apple-spring inline-flex size-11 items-center justify-center rounded-md",
-                    filters.view === "table"
-                      ? "bg-brand-50 text-brand-700 font-semibold"
-                      : "text-ink-600 hover:text-ink-900",
-                  )}
-                  title="Table view"
-                >
-                  <TableIcon className="size-3.5" />
-                </Link>
-              </div>
-            </div>
-          </div>
-
           {filters.view === "table" ? (
             <div className="overflow-x-auto rounded-[20px] border border-ink-200/70 bg-white shadow-sm">
               <table className="w-full text-left text-xs">
@@ -871,6 +941,8 @@ export default async function CandidatesPage({
         </>
       )}
 
+        </div>
+      </div>
     </div>
   );
 }
@@ -928,15 +1000,6 @@ function readFilters(params: SearchParams): Filters {
       ),
     ).slice(0, 4),
   };
-}
-
-function hasAdvancedFilters(filters: Filters): boolean {
-  return (
-    Boolean(filters.plan) ||
-    filters.sorts.length > 0 ||
-    filters.dir === "asc" ||
-    RATING_META.some((meta) => filters.minRatings[meta.key] > 0)
-  );
 }
 
 function one(value: string | string[] | undefined): string | undefined {
@@ -1009,103 +1072,46 @@ function compareHref(filters: Filters): string {
   return `/employer/compare${queryOf({ ...filters, page: 1 })}`;
 }
 
-function ActiveFilters({ filters }: { filters: Filters }) {
-  const active =
-    filters.q ||
-    filters.city ||
-    filters.mode ||
-    filters.minScore > 0 ||
-    filters.skills.length > 0 ||
-    filters.laptop ||
-    filters.remote ||
-    !filters.skillPriority ||
-    hasAdvancedFilters(filters);
-  if (!active) return null;
-  return (
-    <Link
-      href="/employer/candidates"
-      className="apple-spring apple-pressable inline-flex min-h-11 items-center justify-center gap-1.5 rounded-[10px] border border-ink-200 bg-white px-3.5 text-sm font-medium text-ink-700 hover:bg-ink-50"
-    >
-      <X className="size-4" aria-hidden />
-      Clear
-    </Link>
-  );
+/** How many filters are set beyond the defaults (the sidebar's "Applied (N)"). */
+function activeFilterCount(filters: Filters): number {
+  return [
+    Boolean(filters.q),
+    Boolean(filters.city),
+    Boolean(filters.mode),
+    filters.remote,
+    filters.laptop === "yes",
+    Boolean(filters.plan),
+    filters.minScore > 0,
+    ...RATING_META.map((meta) => filters.minRatings[meta.key] > 0),
+    filters.sorts.length > 0,
+    filters.dir === "asc",
+    !filters.skillPriority,
+    filters.skills.length > 0,
+  ].filter(Boolean).length;
 }
 
-function TextQuery({
-  name = "q",
-  label,
-  defaultValue,
-  placeholder,
+function FilterSection({
+  title,
+  icon,
+  open,
+  children,
 }: {
-  name?: string;
-  label?: string;
-  defaultValue: string;
-  placeholder?: string;
+  title: string;
+  icon: React.ReactNode;
+  open?: boolean;
+  children: React.ReactNode;
 }) {
-  const isSearch = name === "q";
   return (
-    <div className="min-w-0">
-      <label htmlFor={`filter-${name}`} className="block text-xs font-semibold text-ink-700">
-        {label ?? "Keyword"}
-      </label>
-      <div className="relative mt-2">
-        <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-ink-600">
-          {isSearch ? (
-            <Search className="size-4" aria-hidden />
-          ) : (
-            <MapPin className="size-4" aria-hidden />
-          )}
+    <details open={open || undefined} className="group rounded-[12px] border border-ink-200/80 px-3">
+      <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 py-2 text-sm font-medium text-ink-800 [&::-webkit-details-marker]:hidden">
+        <span className="text-brand-600" aria-hidden>
+          {icon}
         </span>
-        <input
-          id={`filter-${name}`}
-          name={name}
-          type={isSearch ? "search" : "text"}
-          defaultValue={defaultValue}
-          placeholder={placeholder}
-          className="apple-spring min-h-11 w-full rounded-[10px] border border-ink-200/90 bg-white/90 pl-10 pr-3.5 text-[14px] text-ink-900 shadow-2xs outline-none placeholder:text-ink-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
-        />
-      </div>
-    </div>
-  );
-}
-
-function SelectQuery({
-  name,
-  id = `filter-${name}`,
-  label,
-  defaultValue,
-  options,
-}: {
-  name: string;
-  id?: string;
-  label: string;
-  defaultValue: string;
-  options: { value: string; label: string }[];
-}) {
-  return (
-    <div className="min-w-0">
-      <label htmlFor={id} className="block text-xs font-semibold text-ink-700">
-        {label}
-      </label>
-      <div className="relative mt-2">
-        <select
-          id={id}
-          name={name}
-          defaultValue={defaultValue}
-          className="apple-spring min-h-11 w-full appearance-none rounded-[10px] border border-ink-200/90 bg-white/90 px-3.5 pr-8 text-[14px] text-ink-900 shadow-2xs outline-none placeholder:text-ink-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
-        >
-          {options.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-ink-600">
-          <SlidersHorizontal className="size-3.5" aria-hidden />
-        </div>
-      </div>
-    </div>
+        <span className="flex-1">{title}</span>
+        <ChevronDown className="size-4 text-ink-400 transition-transform group-open:rotate-180" aria-hidden />
+      </summary>
+      <div className="pb-3">{children}</div>
+    </details>
   );
 }
 

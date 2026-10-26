@@ -63,7 +63,7 @@ export function companyMoney(
       const p = mine.find((x) => x.id === d.proposalId);
       if (!p) continue;
       const offer = parseOffer(p.offerDetails, p.currency);
-      const instalment = lineCharge(offer, scoreOf(p.internId), "monthly").totalMinor;
+      const instalment = lineCharge(offer, scoreOf(p.internId), "monthly", { firstPayment: false }).totalMinor;
       amountLeft += toInrMinor(instalment * (d.months - d.monthsPaid), offer.currency);
       const next = addMonthsIso(offer.startDate, d.monthsPaid);
       if (next) dueDates.push(next);

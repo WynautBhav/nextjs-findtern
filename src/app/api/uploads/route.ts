@@ -26,6 +26,9 @@ const KINDS: Record<string, { roles: SessionData["role"][]; types: string[]; max
   pan: { roles: ["intern"], types: DOCS, max: 10 * MB },
   intro_video: { roles: ["intern"], types: VIDEO, max: 50 * MB },
   marksheet: { roles: ["intern"], types: DOCS, max: 25 * MB },
+  // Professional course / certification files. Stored only: the onboarding
+  // save puts the key on its row (extra.academics …certificateUploads).
+  certificate: { roles: ["intern"], types: DOCS, max: 10 * MB },
   employer_logo: { roles: ["employer"], types: IMAGES, max: 2 * MB, isPublic: true },
   // PDF, PNG or JPG, as legacy accepted (employer-orders full-time dialog).
   offer_letter: { roles: ["employer"], types: ["application/pdf", "image/png", "image/jpeg"], max: 10 * MB },
@@ -45,6 +48,7 @@ const WEBP: Record<string, { maxPx: number; quality: number }> = {
   aadhaar: { maxPx: 2000, quality: 85 },
   pan: { maxPx: 2000, quality: 85 },
   marksheet: { maxPx: 2000, quality: 85 },
+  certificate: { maxPx: 2000, quality: 85 },
 };
 
 async function toWebp(bytes: Buffer, opts: { maxPx: number; quality: number }): Promise<Buffer> {

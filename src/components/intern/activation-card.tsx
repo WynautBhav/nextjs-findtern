@@ -31,7 +31,10 @@ export function ActivationCard({
   prefill,
   alreadyPaid = false,
   embedded = false,
+  testMode = false,
 }: {
+  /** PAYMENTS_MODE=free: activation completes without Razorpay. */
+  testMode?: boolean;
   internId: string;
   /** Admin-set activation fee (platform_settings), GST-inclusive. */
   feeMinor: number;
@@ -89,6 +92,14 @@ export function ActivationCard({
         },
       );
       const order = await orderRes.json().catch(() => ({}));
+      // 409: the server already has this profile as paid (an earlier click,
+      // another tab, or a webhook). That is the outcome we wanted, so show it
+      // instead of an error under a form that still asks for payment.
+      if (orderRes.status === 409) {
+        setState("paid");
+        router.refresh();
+        return;
+      }
       if (!orderRes.ok) throw new Error(order.error ?? "Could not create the payment order.");
 
       // Full-discount code: the server already wrote a paid row. No modal.
@@ -276,7 +287,11 @@ export function ActivationCard({
         ) : (
           <BadgeIndianRupee className="size-4" aria-hidden />
         )}
-        {payable === 0 ? "Activate free with code" : `Pay ${formatMoney(payable, "INR")} and go live`}
+        {testMode
+          ? "Activate free (test mode)"
+          : payable === 0
+            ? "Activate free with code"
+            : `Pay ${formatMoney(payable, "INR")} and go live`}
       </button>
 
       {error ? (

@@ -36,22 +36,17 @@ export default async function InternInterviews() {
 
   const [data, paid] = await Promise.all([loadInternData(session.uid), isInternPaid(session.uid)]);
 
-  // Partition AI interview assessment vs company interviews
-  const aiInterview = data.interviews.find(
-    (i) =>
-      i.employerId === "admin" ||
-      (data.names[i.employerId] && data.names[i.employerId].toLowerCase().includes("ai")) ||
-      (!i.slot1 && !i.slot2 && !i.slot3 && (i.status === "waiting" || i.notes?.toLowerCase().includes("ai"))),
-  );
+  // The AI interview is the row owned by Findtern's AI interviewer (newest
+  // first); everything else is a company round.
+  const isAi = (i: (typeof data.interviews)[number]) => data.aiEmployerIds.has(i.employerId);
+  const aiInterview = data.interviews.find(isAi);
 
   // An open invite whose slots have all passed is expired, not upcoming.
   const upcomingEmployerInterviews = data.interviews.filter(
-    (i) => i.id !== aiInterview?.id && (i.status === "scheduled" || i.status === "pending") && !isStaleInterview(i),
+    (i) => !isAi(i) && (i.status === "scheduled" || i.status === "pending") && !isStaleInterview(i),
   );
   const past = data.interviews.filter(
-    (i) =>
-      i.id !== aiInterview?.id &&
-      (i.status === "completed" || i.status === "missed" || isStaleInterview(i)),
+    (i) => !isAi(i) && (i.status === "completed" || i.status === "missed" || isStaleInterview(i)),
   );
 
   const extra = (data.onboarding?.extraData ?? {}) as Record<string, unknown>;
@@ -71,13 +66,13 @@ export default async function InternInterviews() {
     <div className="space-y-8">
       <PageHead
         title="Interviews & AI Evaluation"
-        lede="Your Incruiter AI assessment, verified score dossier, and upcoming company interview rounds."
+        lede="Your AI interview, your Findtern Score, and any interview rounds with companies."
       />
 
       {/* Assessment section */}
       <section className="space-y-4">
         <SectionHead
-          title="AI Technical & Behavioral Assessment"
+          title="AI interview"
           action={<Sparkles className="size-4 text-brand-600" aria-hidden />}
         />
 
@@ -115,8 +110,6 @@ export default async function InternInterviews() {
             interviewId={aiInterview.id}
             status={aiInterview.status}
             meetingLink={aiInterview.meetingLink}
-            feedbackLink={aiFeedbackLink}
-            recordingLink={aiRecordingLink}
           />
         )}
 
@@ -127,7 +120,7 @@ export default async function InternInterviews() {
             communication: ratings.communication,
             coding: ratings.coding,
             aptitude: ratings.aptitude,
-            overall: findternScore,
+            interview: ratings.interview,
           }}
           skills={skills}
           bio={data.onboarding?.bio}

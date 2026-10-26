@@ -33,12 +33,12 @@ export function formatMoney(
     const value = (minor / 100) * DISPLAY_RATES[upper];
     const fmt = (v: number, d: number) =>
       new Intl.NumberFormat("en", { style: "currency", currency: upper, maximumFractionDigits: d, minimumFractionDigits: 0 }).format(v);
-    if (value === 0) return opts.zeroLabel === false ? fmt(0, 0) : (opts.zeroLabel ?? fmt(0, 0));
+    if (value === 0) return opts.zeroLabel === false ? fmt(0, 0) : (opts.zeroLabel ?? "Free");
     return fmt(value, value < 10 ? 2 : 0);
   }
   const cur: Currency = upper === "USD" ? "USD" : "INR";
   const value = minor / 100;
-  if (value === 0 && opts.zeroLabel !== false) return opts.zeroLabel ?? (cur === "INR" ? "Free" : "$0");
+  if (value === 0 && opts.zeroLabel !== false) return opts.zeroLabel ?? "Free";
 
   if (opts.short && Math.abs(value) >= 1000) {
     if (cur === "INR") {

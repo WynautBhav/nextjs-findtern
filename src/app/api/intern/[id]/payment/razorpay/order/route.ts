@@ -7,7 +7,7 @@ import { getInternActivationFeeMinor } from "@/lib/platform-settings";
 import { quotePromo, recordPromoUse } from "@/lib/promo";
 import { isInternPaid, markInternPaidFlag } from "@/lib/payments";
 import { internProfileStatus } from "@/lib/profile-complete";
-import { createOrder, razorpayKeyId } from "@/lib/razorpay";
+import { createOrder, paymentsAreFree, razorpayKeyId } from "@/lib/razorpay";
 
 const bodySchema = z.object({ promoCode: z.string().trim().min(1).optional() }).partial();
 
@@ -74,6 +74,26 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       discountMinor,
     });
     await markInternPaidFlag(id, { orderId: `free_${promo.code}_${id}` });
+    return NextResponse.json({ free: true });
+  }
+
+  // Test mode: activation is free and nothing goes to Razorpay.
+  if (paymentsAreFree()) {
+    const orderId = `free_test_${id}`;
+    await db
+      .insert(schema.internPayments)
+      .values({
+        internId: id,
+        gateway: "free",
+        orderId,
+        amountMinor: 0,
+        currency: "INR",
+        status: "paid",
+        paidAt: new Date(),
+        raw: { testMode: true },
+      })
+      .onConflictDoNothing();
+    await markInternPaidFlag(id, { orderId });
     return NextResponse.json({ free: true });
   }
 

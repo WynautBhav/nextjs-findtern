@@ -35,6 +35,10 @@ export type InternData = ReturnType<typeof loadInternData>;
 /** What an intern sees in place of a company name before the hire. */
 export const HIDDEN_COMPANY = "Hidden company";
 
+/** The synthetic employer that owns AI interview rows, and what it is called. */
+export const AI_INTERVIEW_EMAIL = "ai-interview@findtern.ai";
+export const AI_INTERVIEW_NAME = "AI Interview";
+
 export async function loadInternData(uid: string) {
   const db = getDb();
 
@@ -54,9 +58,10 @@ export async function loadInternData(uid: string) {
 
   const employerIds = [...new Set([...p.map((x) => x.employerId), ...i.map((x) => x.employerId)])].filter(Boolean);
   const names: Record<string, string> = {};
+  const aiEmployerIds = new Set<string>();
   if (employerIds.length > 0) {
     const rows = await db
-      .select({ id: schema.employers.id, companyName: schema.employers.companyName })
+      .select({ id: schema.employers.id, companyName: schema.employers.companyName, email: schema.employers.companyEmail })
       .from(schema.employers)
       .where(inArray(schema.employers.id, employerIds));
     // Non-bypass masking (legacy routes.ts:14169): the company stays hidden
@@ -68,12 +73,23 @@ export async function loadInternData(uid: string) {
         .map((x) => x.employerId),
     );
     for (const row of rows) {
+      // The AI interview is Findtern's own, not a company to keep hidden.
+      if (row.email === AI_INTERVIEW_EMAIL) {
+        aiEmployerIds.add(row.id);
+        names[row.id] = AI_INTERVIEW_NAME;
+        continue;
+      }
       if (!row.companyName) continue;
       names[row.id] = revealed.has(row.id) ? row.companyName : HIDDEN_COMPANY;
     }
   }
+  // Legacy AI interviews sit on the employer id "admin", which has no row.
+  if (i.some((x) => x.employerId === "admin")) {
+    aiEmployerIds.add("admin");
+    names.admin = AI_INTERVIEW_NAME;
+  }
 
-  const source = { proposals: p, interviews: i, timesheets: t, payouts: r, names };
+  const source = { proposals: p, interviews: i, timesheets: t, payouts: r, names, aiEmployerIds };
 
   return {
     proposals: p,
@@ -83,6 +99,8 @@ export async function loadInternData(uid: string) {
     onboarding: onboarding[0] ?? null,
     document: document[0] ?? null,
     names,
+    /** Employer ids whose interviews are the AI interview, not a company round. */
+    aiEmployerIds,
     stage: deriveStage(p),
     engagement: activeEngagement(p),
     thread: buildThread(source),

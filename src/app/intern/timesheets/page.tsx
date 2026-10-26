@@ -7,6 +7,7 @@ import { sheetLabel, sheetTone } from "@/components/app/status";
 import { TimesheetGrid, type Entry } from "@/components/app/timesheet-grid";
 import { CreateTimesheetModal } from "@/components/intern/create-timesheet-modal";
 import { requireRole } from "@/lib/auth";
+import { isHiredProposal } from "@/lib/hire-status";
 import { parseOffer } from "@/lib/offer";
 import { loadInternData } from "@/lib/intern-data";
 import { formatDayLabel, formatMonth } from "@/lib/format";
@@ -38,9 +39,9 @@ export default async function InternTimesheets() {
   const data = await loadInternData(session.uid);
   const sheets = data.timesheets;
 
-  // Same gate as the create API: accepted or hired, never a full-time offer.
+  // Same gate as the create API: hired (the company has paid), never a full-time offer.
   const acceptedProposals = data.proposals
-    .filter((p) => (p.status === "accepted" || p.status === "hired") && !parseOffer(p.offerDetails, p.currency).fullTime)
+    .filter((p) => isHiredProposal(p) && !parseOffer(p.offerDetails, p.currency).fullTime)
     .map((p) => ({
       id: p.id,
       companyName: data.names[p.employerId] || "Your Employer",
@@ -85,7 +86,11 @@ export default async function InternTimesheets() {
           <EmptyScene
             art
             title="No timesheets open"
-            body="A timesheet opens once you have accepted an offer. You will get one for every month you work, and you can log hours as you go rather than at the end."
+            body={
+              data.proposals.some((p) => p.status === "accepted")
+                ? "You have accepted an offer. Logging hours opens once the company completes the payment, and you will get a notification when it does."
+                : "A timesheet opens once a company hires you: you accept the offer and they complete the payment. You can then log hours as you go rather than at the end."
+            }
             who="Your manager approves them"
             next={{ label: "See your offers", href: "/intern/proposals" }}
           />

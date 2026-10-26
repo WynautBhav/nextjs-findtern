@@ -57,7 +57,16 @@ export type QualificationEntry = {
    *  certifications as legacy `endDate`. */
   completionDate: string;
   credentialUrl: string;
+  /** Certificate files (legacy `certificateUploads`): stored keys, newest last.
+   *  Absent from an older client's save, which keeps what is stored. */
+  uploads?: CertificateUpload[];
 };
+
+/** One uploaded certificate, in the legacy `certificateUploads` shape. */
+export type CertificateUpload = { name: string; originalName?: string; type: string; size: number };
+
+/** At most this many files per qualification row. */
+export const MAX_CERTIFICATE_UPLOADS = 3;
 
 export type ScoreType = "cgpa" | "percentage";
 
@@ -472,6 +481,7 @@ function readProfessional(c: Record<string, unknown>, i: number): QualificationE
     issuer: text(c.institution),
     completionDate: readDate(c.completionDate, c.year),
     credentialUrl: text(c.credentialUrl),
+    uploads: readUploads(c.certificateUploads),
   };
 }
 
@@ -488,7 +498,7 @@ function writeProfessional(q: QualificationEntry, prev: Record<string, unknown>)
     completionDate: q.completionDate.trim(),
     scoreType: text(prev.scoreType) || "percentage",
     score: text(prev.score),
-    certificateUploads: arr(prev.certificateUploads),
+    certificateUploads: q.uploads ?? arr(prev.certificateUploads),
     credentialUrl: q.credentialUrl.trim(),
   };
 }
@@ -500,6 +510,7 @@ function readCertification(c: Record<string, unknown>, i: number): Qualification
     issuer: text(c.institution),
     completionDate: readDate(c.endDate || c.startDate, c.year),
     credentialUrl: text(c.credentialUrl),
+    uploads: readUploads(c.certificateUploads),
   };
 }
 
@@ -511,7 +522,7 @@ function writeCertification(q: QualificationEntry, prev: Record<string, unknown>
     institution: q.issuer.trim(),
     startDate: text(prev.startDate),
     endDate: q.completionDate.trim(),
-    certificateUploads: arr(prev.certificateUploads),
+    certificateUploads: q.uploads ?? arr(prev.certificateUploads),
     credentialUrl: q.credentialUrl.trim(),
   };
 }
@@ -526,9 +537,37 @@ function writeRows(
     const i = prevRows.findIndex((p) => text(p.id) === q.id);
     if (i === -1) return write(q, {});
     const before = read(prevRows[i], i);
-    const same = (["name", "issuer", "completionDate", "credentialUrl"] as const).every((k) => before[k] === q[k]);
+    const same =
+      (["name", "issuer", "completionDate", "credentialUrl"] as const).every((k) => before[k] === q[k]) &&
+      (q.uploads === undefined || JSON.stringify(before.uploads) === JSON.stringify(q.uploads));
     return same ? prevRows[i] : write(q, prevRows[i]);
   });
+}
+
+function readUploads(raw: unknown): CertificateUpload[] {
+  return arr(raw).flatMap((u) => {
+    if (!u || typeof u !== "object") return [];
+    const r = u as Record<string, unknown>;
+    const name = text(r.name);
+    if (!name) return [];
+    const originalName = text(r.originalName) || text(r.label);
+    return [{ name, ...(originalName ? { originalName } : {}), type: text(r.type), size: Number(r.size) || 0 }];
+  });
+}
+
+/** Every certificate file on a stored academics object, labelled by its row. */
+export function certificateFiles(academics: unknown): (CertificateUpload & { label: string })[] {
+  const a = obj(academics);
+  const out: (CertificateUpload & { label: string })[] = [];
+  arr(a.professionalCourses).map(obj).forEach((c, i) => {
+    const row = readProfessional(c, i);
+    for (const u of row.uploads ?? []) out.push({ ...u, label: `${row.name || "Professional course"} certificate` });
+  });
+  arr(a.certifications).map(obj).forEach((c, i) => {
+    const row = readCertification(c, i);
+    for (const u of row.uploads ?? []) out.push({ ...u, label: `${row.name || "Certification"} certificate` });
+  });
+  return out;
 }
 
 function readScoreType(academics: Record<string, unknown>): ScoreType {
@@ -665,8 +704,6 @@ export function cascadeWorkModes(current: string[], mode: string): string[] {
   return WORK_MODE_ORDER.slice(0, level + 1);
 }
 
-export const EMERGENCY_RELATIONS = ["Parent", "Guardian", "Sibling", "Spouse", "Relative", "Friend", "Other"] as const;
-
 /* ── Validation ─────────────────────────────────────────────────────────
  * One rule set for the browser (per step, on Continue) and the server (all
  * steps, on final submit). Keys are the form's field ids, so the client can
@@ -757,7 +794,8 @@ export function validateStep(values: OnboardingDraft, step: number, ctx: Validat
     else if (!PAN.test(pan)) errors.panNumber = "PAN must look like ABCDE1234F - 5 letters, 4 digits, 1 letter.";
     if (!ctx.hasPanImage) errors.panImage = "Upload a photo or scan of your PAN card.";
 
-    if (!(values.emergencyName ?? "").trim()) errors.emergencyName = "Enter the name of someone we can call in an emergency.";
+    // Only the number is asked for (bug sheet 23 Oct): no name, no relation,
+    // no second contact. Stored values from older saves are kept as they are.
     const ePhone = (values.emergencyPhone ?? "").trim();
     if (!ePhone) errors.emergencyPhone = "Enter an emergency contact number.";
     else {
@@ -773,23 +811,6 @@ export function validateStep(values: OnboardingDraft, step: number, ctx: Validat
       }
     }
 
-    // Second point of contact: optional, but a number that is given must be
-    // valid and reach a third person (legacy onboarding.tsx:726-742).
-    const sPhone = (values.secondPocPhone ?? "").trim();
-    const sCode = values.secondPocCountryCode || "+91";
-    const digits = (v: string) => v.replace(/\D/g, "");
-    if (sPhone) {
-      const p = phoneError(sCode, sPhone);
-      if (p) errors.secondPocPhone = `${p}.`;
-      else if (ctx.ownPhone && sCode === (ctx.ownPhone.countryCode || "+91") && digits(sPhone) === digits(ctx.ownPhone.phoneNumber)) {
-        errors.secondPocPhone = "This is your own number - add someone else's.";
-      } else if (ePhone && sCode === (values.emergencyCountryCode || "+91") && digits(sPhone) === digits(ePhone)) {
-        errors.secondPocPhone = "This is the same as your emergency contact - add a different person.";
-      } else if (!(values.secondPocName ?? "").trim()) {
-        errors.secondPocName = "Add the name of your second contact.";
-      }
-    }
-
     // Bank details are not asked for here any more (bug sheet 21 Oct): they
     // are entered from Settings once there is a stipend to pay.
   }
@@ -800,7 +821,7 @@ export function validateStep(values: OnboardingDraft, step: number, ctx: Validat
     const option = degreeOption(a.degree);
     if (!option) errors.degree = "Choose your degree.";
     else if (a.degree.trim().toLowerCase() === "other") errors.degree = "Type the name of your degree.";
-    if (!a.branch.trim()) errors.branch = "Enter your specialization or branch, like Computer Science.";
+    // Specialization is optional (bug sheet 23 Oct).
 
     const start = a.startYear.trim();
     const end = a.yearOfGraduation.trim();
@@ -958,7 +979,7 @@ export function profileCompletion(row: OnboardingLike | null, docs: boolean | Co
     {
       id: "academics",
       label: "Academics",
-      done: Boolean(d?.academics?.institution && d.academics.degree && d.academics.branch && d.academics.yearOfGraduation && d.academics.cgpa),
+      done: Boolean(d?.academics?.institution && d.academics.degree && d.academics.yearOfGraduation && d.academics.cgpa),
       href: form,
     },
     // Languages and laptop: legacy checklist items (dashboard.tsx:500-553).

@@ -1,10 +1,12 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
 import { notify } from "@/lib/notify";
+import { hasOpenOrderFor } from "@/lib/payments";
+import { modeProblem, workPreferenceOf } from "@/lib/work-preference";
 import { offerScore, PAID_LEAVE_OPTIONS, parseOffer, scheduledMonthlyHours, todayIst, WEEKLY_SCHEDULES, type WeeklySchedule } from "@/lib/offer";
 
 // Same rules as the composer (api/employer/[id]/proposals), field by field.
@@ -31,14 +33,18 @@ const offerSchema = z
   })
   .strict();
 
+/** Accepted counts until the employer pays (then it is hired). */
+const EDITABLE = ["draft", "sent", "accepted"];
+
 const bodySchema = z.object({ offer: offerSchema }).refine((b) => Object.keys(b.offer).length > 0, {
   message: "Nothing to update",
 });
 
 /**
- * Edit a live offer's terms. Draft / sent only - once the intern responds
- * (accepted / rejected) or the trail closes (hired / withdrawn / expired),
- * the terms are history and editing them would rewrite what both sides saw.
+ * Edit a live offer's terms: draft, sent, or accepted but not yet paid for
+ * (bug sheet 23 Oct). Editing an accepted offer sends it back to the intern
+ * to accept again - they agreed to the old terms, not the new ones. Once it
+ * is rejected, paid (hired), withdrawn or expired the terms are history.
  */
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const guard = await requireMutation({ req, roles: ["employer", "admin"] });
@@ -62,11 +68,15 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   if (session.role !== "admin" && proposal.employerId !== session.uid) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
-  if (!["draft", "sent"].includes(proposal.status)) {
+  if (!EDITABLE.includes(proposal.status) || proposal.hiredAt) {
     return NextResponse.json(
       { error: `A ${proposal.status} proposal can no longer be edited` },
       { status: 409 },
     );
+  }
+
+  if (proposal.status === "accepted" && (await hasOpenOrderFor(proposal.employerId, proposal.id))) {
+    return NextResponse.json({ error: "A payment for this offer is in progress. Try again in a few minutes." }, { status: 409 });
   }
 
   const current = (proposal.offerDetails ?? {}) as Record<string, unknown>;
@@ -77,6 +87,16 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   }
 
   const { message, ...edits } = parsed.data.offer;
+  // A mode the offer already had stays allowed; a change has to fit the candidate.
+  if (edits.mode !== undefined && edits.mode !== parseOffer(proposal.offerDetails ?? {}, proposal.currency).mode) {
+    const [pref] = await db
+      .select({ locationTypes: schema.internOnboarding.locationTypes, preferredLocations: schema.internOnboarding.preferredLocations })
+      .from(schema.internOnboarding)
+      .where(eq(schema.internOnboarding.userId, proposal.internId))
+      .limit(1);
+    const modeIssue = modeProblem(workPreferenceOf(pref), edits.mode);
+    if (modeIssue) return NextResponse.json({ error: modeIssue }, { status: 400 });
+  }
   if (edits.startDate !== undefined && edits.startDate <= todayIst()) {
     return NextResponse.json({ error: "Pick a start date after today." }, { status: 400 });
   }
@@ -95,6 +115,12 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   }
 
   const next: Record<string, unknown> = { ...current, ...edits, ...(message !== undefined ? { jd: message } : {}) };
+  // Back to the intern: the acceptance was of the old terms.
+  const reopen = proposal.status === "accepted";
+  if (reopen) {
+    delete next.termsAcceptedAt;
+    next.reopenedAfterEditAt = new Date().toISOString();
+  }
   // Logistics stay coherent with the mode, as the composer writes them.
   const mode = String(next.mode ?? "remote");
   if (mode === "remote") {
@@ -136,22 +162,25 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   next.totalPrice = (monthlyMinor * o.months + (o.perHireMinor ?? 0)) / 100;
   const [updated] = await db
     .update(schema.proposals)
-    .set({ offerDetails: next, updatedAt: new Date() })
-    // Still unanswered at write time, so an acceptance can't be overwritten.
-    .where(and(eq(schema.proposals.id, id), inArray(schema.proposals.status, ["draft", "sent"])))
+    .set({ offerDetails: next, updatedAt: new Date(), ...(reopen ? { status: "sent" } : {}) })
+    // Unchanged since it was read, so an acceptance or a payment in between
+    // is never overwritten.
+    .where(and(eq(schema.proposals.id, id), eq(schema.proposals.status, proposal.status)))
     .returning({ updatedAt: schema.proposals.updatedAt });
   if (!updated) {
-    return NextResponse.json({ error: "The candidate has already answered this offer." }, { status: 409 });
+    return NextResponse.json({ error: "This offer changed a moment ago. Refresh and try again." }, { status: 409 });
   }
 
   // Tell the intern to look again (legacy routes.ts:14392). A draft is not
   // visible to them yet, so there is nothing to re-review.
-  if (proposal.status === "sent") {
+  if (proposal.status === "sent" || reopen) {
     await notify({
       to: { type: "intern", id: proposal.internId },
       type: "proposal_updated",
-      title: "Proposal updated",
-      message: "The proposal has been updated, please review.",
+      title: reopen ? "Offer changed - accept again" : "Proposal updated",
+      message: reopen
+        ? "The company changed the offer you accepted. Review the new terms and accept again."
+        : "The proposal has been updated, please review.",
       data: { proposalId: id, employerId: proposal.employerId, projectId: proposal.projectId },
       dedupeKey: `proposal_updated:${id}:${updated.updatedAt?.getTime() ?? Date.now()}`,
     });

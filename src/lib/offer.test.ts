@@ -66,11 +66,12 @@ test("buildOffer writes the legacy shape and round-trips", () => {
   assert.equal(o.location, "Jaipur");
 });
 
-test("checkout: score 6+ multi-month upfront gets 10% off, no per-hire", () => {
+test("checkout: score 6+ multi-month upfront gets 10% off the engagement, plus the one-time hiring fee", () => {
   const c = lineCharge(parseOffer(legacyRow, "INR"), 7);
-  assert.equal(c.baseMinor, 3_600_000);
-  assert.equal(c.discountMinor, 360_000);
-  assert.equal(c.totalMinor, 3_240_000);
+  assert.equal(c.perHireMinor, 500_000);
+  assert.equal(c.baseMinor, 3_600_000 + 500_000);
+  assert.equal(c.discountMinor, 360_000, "the fee is never discounted");
+  assert.equal(c.totalMinor, 3_240_000 + 500_000);
   assert.equal(c.monthlyBlocked, null);
 });
 
@@ -80,9 +81,15 @@ test("checkout: below 6 pays flat per-hire, no discount, no monthly", () => {
   assert.ok(c.monthlyBlocked);
 });
 
-test("checkout: monthly mode is one month of the stipend", () => {
-  const c = lineCharge(parseOffer(legacyRow, "INR"), 8, "monthly");
-  assert.equal(c.totalMinor, 1_200_000);
+test("checkout: monthly mode is one month of the stipend, the hiring fee only on the first", () => {
+  assert.equal(lineCharge(parseOffer(legacyRow, "INR"), 8, "monthly").totalMinor, 1_200_000 + 500_000);
+  assert.equal(lineCharge(parseOffer(legacyRow, "INR"), 8, "monthly", { firstPayment: false }).totalMinor, 1_200_000);
+});
+
+test("checkout: a fee already inside the stored total is not charged twice", () => {
+  const c = lineCharge(parseOffer({ monthlyAmount: 10000, duration: "1m", totalPrice: 15000, perHireCharge: 5000 }, "INR"), 4);
+  assert.equal(c.totalMinor, 1_500_000);
+  assert.equal(c.perHireMinor, 500_000);
 });
 
 test("checkout: full-time offer is 8.33% of CTC", () => {

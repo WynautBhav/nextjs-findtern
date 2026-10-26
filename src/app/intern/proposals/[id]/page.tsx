@@ -12,6 +12,7 @@ import { ImportantInstructions } from "@/components/intern/offer/important-instr
 import { requireRole } from "@/lib/auth";
 import { canAccess } from "@/lib/security/guards";
 import { getDb, hasDb, schema } from "@/lib/db";
+import { isHiredProposal } from "@/lib/hire-status";
 import { HIDDEN_COMPANY, loadInternData } from "@/lib/intern-data";
 import { formatJoiningDate, formatMoney } from "@/lib/format";
 import { toArray } from "@/lib/journey";
@@ -146,7 +147,8 @@ export default async function ProposalDetail({ params }: { params: Promise<{ id:
   const startDate = parsed.startDate;
   // Unanswered on or after its start date: closed, shown as rejected.
   const lapsed = (proposal.status === "sent" || proposal.status === "interview_scheduled") && offerPastStart(startDate);
-  const statusKey = lapsed ? "lapsed" : (proposal.status ?? "sent");
+  // A row with hiredAt is hired whatever its status says (lib/hire-status).
+  const statusKey = lapsed ? "lapsed" : isHiredProposal(proposal) && !fullTime ? "hired" : (proposal.status ?? "sent");
   const fallback = proposalStatus(statusKey);
   const status = STATUS_LABEL[statusKey] ?? { label: fallback.label, tone: fallback.tone };
   const decided = proposal.status !== "sent" || lapsed;
@@ -252,7 +254,7 @@ export default async function ProposalDetail({ params }: { params: Promise<{ id:
         {decided ? (
           <>
             <p className="text-pretty text-sm leading-relaxed text-ink-600">{fallback.detail}</p>
-            {proposal.status === "accepted" || proposal.status === "hired" ? (
+            {isHiredProposal(proposal) && !fullTime ? (
               <Link
                 href="/intern/timesheets"
                 className="apple-spring apple-pressable mt-5 inline-flex min-h-11 items-center gap-2 rounded-[10px] bg-primary px-5 text-sm font-semibold text-white shadow-sm hover:bg-primary-hover active:scale-[0.98]"

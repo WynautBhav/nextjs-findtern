@@ -104,7 +104,14 @@ test("qualifications read from legacy rows and untouched rows are written back v
     },
   };
   const d = draftFromRecord(row);
-  assert.deepEqual(d.academics?.professional?.[0], { id: "p1", name: "CA", issuer: "ICAI", completionDate: "2024-05-01", credentialUrl: "" });
+  assert.deepEqual(d.academics?.professional?.[0], {
+    id: "p1",
+    name: "CA",
+    issuer: "ICAI",
+    completionDate: "2024-05-01",
+    credentialUrl: "",
+    uploads: [{ name: "k", type: "", size: 0 }],
+  });
   assert.equal(d.academics?.certifications?.[0].completionDate, "2023-03-01");
 
   const out = storedFromDraft(d, row);
@@ -116,6 +123,12 @@ test("qualifications read from legacy rows and untouched rows are written back v
   assert.equal(cert.certificateName, "AWS CCP");
   assert.equal(cert.startDate, "2023-01-01", "legacy keys survive an edit");
   assert.equal(cert.credentialUrl, "https://aws.example/c");
+
+  // A file added in the form lands in the legacy certificateUploads list.
+  const file = { name: "u1.abcdefghijklmnopqrstu.pdf", originalName: "ccp.pdf", type: "application/pdf", size: 1200 };
+  const withFile = { ...d, academics: { ...d.academics!, certifications: [{ ...d.academics!.certifications[0], uploads: [file] }] } };
+  const saved = (storedFromDraft(withFile, row).extraPatch.academics as Record<string, Record<string, unknown>[]>).certifications[0];
+  assert.deepEqual(saved.certificateUploads, [file]);
 });
 
 test("emergency contact and score type read from legacy keys", () => {
@@ -192,10 +205,17 @@ test("Aadhaar number and PAN image are required on the About step; the Aadhaar i
   assert.ok(validateStep({ ...complete(), aadhaarNumber: "123456789012" }, 0, ctx).aadhaarNumber, "cannot start with 1");
 });
 
-test("emergency contact needs a name and a valid number", () => {
+test("emergency contact needs only a valid number", () => {
   const e = validateStep({ ...complete(), emergencyName: "", emergencyPhone: "12345" }, 0, ctx);
-  assert.ok(e.emergencyName);
+  assert.equal(e.emergencyName, undefined);
   assert.ok(e.emergencyPhone);
+  assert.equal(validateStep({ ...complete(), emergencyName: "" }, 0, ctx).emergencyPhone, undefined);
+});
+
+test("specialization is optional", () => {
+  const base = complete();
+  const e = validateStep({ ...base, academics: { ...base.academics, branch: "" } }, 1, ctx);
+  assert.equal(e.branch, undefined);
 });
 
 test("CGPA is capped at 10 and percentage at 100", () => {
@@ -257,10 +277,10 @@ test("state and PIN are required on the About step; LinkedIn is optional but che
   assert.ok(validateStep({ ...complete(), linkedinUrl: "https://github.com/me" }, 0, ctx).linkedinUrl);
 });
 
-test("specialization and score are required even while pursuing", () => {
+test("score is required even while pursuing; specialization is not", () => {
   const base = complete();
   const e = validateStep({ ...base, academics: { ...base.academics, status: "Pursuing", branch: "", cgpa: "" } }, 1, ctx);
-  assert.ok(e.branch);
+  assert.equal(e.branch, undefined);
   assert.ok(e.cgpa);
 });
 

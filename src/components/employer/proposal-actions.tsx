@@ -17,9 +17,12 @@ import { csrfFetch } from "@/lib/client-fetch";
 export function ProposalActions({
   proposalId,
   status,
+  fullTime = false,
 }: {
   proposalId: string;
   status: string;
+  /** An accepted full-time offer is already the hire; it cannot be withdrawn. */
+  fullTime?: boolean;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -46,16 +49,17 @@ export function ProposalActions({
     }
   }
 
-  if (status === "accepted") {
-    return (
+  const checkout =
+    status === "accepted" ? (
       <Link
         href="/employer/checkout"
         className="apple-spring apple-pressable inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[10px] bg-emerald-700 px-4 text-sm font-semibold text-white shadow-2xs hover:bg-emerald-800"
       >
         Proceed to checkout - payment completes the hire
       </Link>
-    );
-  }
+    ) : null;
+
+  if (status === "accepted" && fullTime) return checkout;
 
   if (status === "hired") {
     return (
@@ -65,10 +69,12 @@ export function ProposalActions({
     );
   }
 
-  if (status !== "draft" && status !== "sent") return null;
+  if (status !== "draft" && status !== "sent" && status !== "accepted") return null;
 
   if (!confirming) {
     return (
+      <>
+      {checkout}
       <button
         type="button"
         onClick={() => setConfirming(true)}
@@ -76,13 +82,16 @@ export function ProposalActions({
       >
         Withdraw proposal
       </button>
+      </>
     );
   }
 
   return (
     <div className="space-y-2">
       <p className="text-xs leading-relaxed text-ink-600">
-        The candidate will no longer be able to accept it. This cannot be undone.
+        {status === "accepted"
+          ? "The candidate accepted this offer. Withdrawing tells them it will not go ahead. This cannot be undone."
+          : "The candidate will no longer be able to accept it. This cannot be undone."}
       </p>
       {error ? (
         <p role="alert" className="text-xs font-medium text-red-700">

@@ -9,6 +9,7 @@ import { emails } from "@/lib/emails";
 import { initialsOf } from "@/lib/employer-candidates";
 import { employerNames, internFirstName, notify, resolveOfferNotifications } from "@/lib/notify";
 import { FREE_DECLINES, offerPastStart, parseOffer } from "@/lib/offer";
+import { hasOpenOrderFor } from "@/lib/payments";
 
 /**
  * Which role may set which status.
@@ -93,12 +94,22 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   // State-machine guard. The legacy routes had none, which meant a withdrawn
   // offer could be accepted afterwards and both parties could be told it was
   // live.
-  // Staff cancelling an accepted offer before payment (the employer cannot
-  // back out once a candidate has accepted).
-  const adminCancel = session.role === "admin" && status === "withdrawn" && proposal.status === "accepted";
-  if (TERMINAL.includes(proposal.status) && !adminCancel) {
+  // Withdrawing an accepted offer before it is paid for: staff, and since the
+  // bug sheet of 23 Oct the employer too. A full-time acceptance is the hire
+  // itself, and a paid one is hired, so neither can be withdrawn.
+  const offerForCancel = parseOffer(proposal.offerDetails, proposal.currency);
+  const cancelBeforePayment =
+    (session.role === "admin" || session.role === "employer") &&
+    status === "withdrawn" &&
+    proposal.status === "accepted" &&
+    !proposal.hiredAt &&
+    !offerForCancel.fullTime;
+  if (cancelBeforePayment && (await hasOpenOrderFor(proposal.employerId, proposal.id))) {
+    return NextResponse.json({ error: "A payment for this offer is in progress. Try again in a few minutes." }, { status: 409 });
+  }
+  if (TERMINAL.includes(proposal.status) && !cancelBeforePayment) {
     return NextResponse.json(
-      { error: `Proposal is already ${proposal.status}` },
+      { error: proposal.hiredAt ? "This candidate is already hired, so the offer can't be changed." : `Proposal is already ${proposal.status}` },
       { status: 409 },
     );
   }
@@ -299,7 +310,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
       data: { proposalId: id },
       email: status === "expired" ? undefined : emails.proposalClosed({ internName, role }),
     });
-    if (adminCancel) {
+    if (cancelBeforePayment) {
       await notify({
         to: { type: "employer", id: proposal.employerId },
         type: "proposal_cancelled",

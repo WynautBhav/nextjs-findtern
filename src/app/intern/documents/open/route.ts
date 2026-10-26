@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { getDb, schema } from "@/lib/db";
 import { signedUrl } from "@/lib/security/sign";
+import { certificateFiles } from "@/lib/onboarding";
 import { legacyPath } from "@/lib/security/store";
 
 export const runtime = "nodejs";
@@ -52,5 +53,6 @@ async function ownsKey(uid: string, key: string): Promise<boolean> {
     .limit(1);
   const academics = ((onboarding?.extra ?? {}) as Record<string, unknown>).academics as Record<string, unknown> | undefined;
   const sheets = Array.isArray(academics?.marksheetUploads) ? (academics.marksheetUploads as Record<string, unknown>[]) : [];
-  return sheets.some((m) => String(m.name ?? "") === key);
+  if (sheets.some((m) => String(m.name ?? "") === key)) return true;
+  return certificateFiles(academics).some((c) => c.name === key);
 }

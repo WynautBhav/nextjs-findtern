@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { MapPin, X } from "lucide-react";
 
 import { districtOptions } from "@/components/employer/location-fields";
@@ -15,7 +15,17 @@ const MAX = 5;
  * filters submit with it unchanged. Typed text that was not turned into a chip
  * is sent too, so a city outside the list still filters.
  */
-export function CityFilter({ defaultValue }: { defaultValue: string }) {
+export function CityFilter({
+  defaultValue,
+  label = "Cities",
+  autoApply = false,
+}: {
+  defaultValue: string;
+  label?: string;
+  /** Submit the surrounding form when a chip is added or removed. */
+  autoApply?: boolean;
+}) {
+  const hidden = useRef<HTMLInputElement>(null);
   const [chips, setChips] = useState<string[]>(() =>
     Array.from(
       new Set(
@@ -26,7 +36,14 @@ export function CityFilter({ defaultValue }: { defaultValue: string }) {
       ),
     ).slice(0, MAX),
   );
+  const [initial] = useState(chips);
   const [draft, setDraft] = useState("");
+
+  // Chips change through state, which fires no form "change" event.
+  useEffect(() => {
+    if (!autoApply || chips.join("|") === initial.join("|")) return;
+    hidden.current?.form?.requestSubmit();
+  }, [autoApply, chips, initial]);
   const [open, setOpen] = useState(false);
   const full = chips.length >= MAX;
 
@@ -49,9 +66,9 @@ export function CityFilter({ defaultValue }: { defaultValue: string }) {
   return (
     <div className="min-w-0">
       <label htmlFor="filter-city" className="block text-xs font-semibold text-ink-700">
-        Cities
+        {label}
       </label>
-      <input type="hidden" name="city" value={value} />
+      <input ref={hidden} type="hidden" name="city" value={value} />
       <div className="relative mt-2">
         <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-ink-600">
           <MapPin className="size-4" aria-hidden />

@@ -280,6 +280,9 @@ export function ProposalsManager({
 
             const isPending = item.proposal.status === "sent";
             const isAccepted = item.proposal.status === "accepted";
+            // Accepted but unpaid stays editable and withdrawable (bug sheet 23 Oct);
+            // a full-time acceptance is the hire itself.
+            const changeable = isPending || (isAccepted && !item.proposal.hiredAt && !offer.fullTime);
 
             return (
               <div
@@ -361,7 +364,7 @@ export function ProposalsManager({
                       </Link>
                     )}
 
-                    {isPending && (
+                    {changeable && (
                       <Link
                         href={`/employer/proposal/${item.proposal.id}?edit=1`}
                         className="apple-spring apple-pressable inline-flex min-h-11 items-center justify-center gap-1.5 rounded-[10px] border border-ink-200 bg-white px-3.5 text-xs font-semibold text-ink-700 hover:border-ink-300 hover:bg-ink-50 hover:text-ink-900"
@@ -371,7 +374,7 @@ export function ProposalsManager({
                       </Link>
                     )}
 
-                    {isPending && (
+                    {changeable && (
                       <button
                         type="button"
                         onClick={() => setWithdrawTarget(item)}

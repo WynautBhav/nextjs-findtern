@@ -1,4 +1,4 @@
-import { and, eq, inArray, ne } from "drizzle-orm";
+import { and, eq, gte, inArray, ne } from "drizzle-orm";
 
 import { getDb, schema } from "@/lib/db";
 import { emails } from "@/lib/emails";
@@ -28,6 +28,25 @@ export function orderProposalIds(raw: Raw): string[] {
     }
   }
   return Array.isArray(ids) ? ids.map((v) => String(v ?? "").trim()).filter(Boolean) : [];
+}
+
+/**
+ * Is a payment for this proposal open right now? The checkout keeps an
+ * unpaid order for 30 minutes; changing the offer under it would bill (or
+ * hire on) terms the employer is no longer offering.
+ */
+export async function hasOpenOrderFor(employerId: string, proposalId: string): Promise<boolean> {
+  const rows = await getDb()
+    .select({ raw: schema.employerPayments.raw })
+    .from(schema.employerPayments)
+    .where(
+      and(
+        eq(schema.employerPayments.employerId, employerId),
+        eq(schema.employerPayments.status, "created"),
+        gte(schema.employerPayments.createdAt, new Date(Date.now() - 30 * 60_000)),
+      ),
+    );
+  return rows.some((r) => orderProposalIds(r.raw).includes(proposalId));
 }
 
 function promoOf(raw: Raw) {
@@ -62,7 +81,8 @@ export async function settleEmployerOrder(input: {
     .where(and(eq(schema.employerPayments.id, order.id), ne(schema.employerPayments.status, "paid")))
     .returning({ id: schema.employerPayments.id });
   if (claimed.length === 0) return { ok: true, hired: 0 };
-  await assignInvoiceNumber("employer", order.id);
+  // A free (test-mode) order is not a sale, so it takes no invoice number.
+  if (order.amountMinor > 0) await assignInvoiceNumber("employer", order.id);
 
   const promo = promoOf(order.raw);
   if (promo) {

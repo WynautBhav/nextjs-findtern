@@ -10,6 +10,8 @@ import { RATING_META, type CandidateSummary } from "@/lib/employer-candidates";
 import { type Currency, type Pricing } from "@/lib/employer-pricing";
 import { formatMoney, formatPerHire, formatRate } from "@/lib/format";
 import { PAID_LEAVE_OPTIONS, scheduledMonthlyHours, WEEKLY_SCHEDULES, type WeeklySchedule } from "@/lib/offer";
+import { TIMEZONES } from "@/lib/timezones";
+import { offerableModes, type WorkPreference } from "@/lib/work-preference";
 import { CountdownAgreement, EMPLOYER_HIRING_POLICY } from "@/components/app/countdown-agreement";
 
 /**
@@ -58,18 +60,11 @@ const LAPTOP_OPTIONS = [
   { value: "intern", label: "Intern provides" },
 ] as const;
 
-const SHIFT_HOURS: Record<string, [string, string]> = {
-  "full-day": ["09:00", "18:00"],
-  morning: ["09:00", "13:00"],
-  evening: ["17:00", "21:00"],
-  flexible: ["", ""],
-};
-
+/** Quick fills for the working hours; the times stay editable (bug sheet 23 Oct). */
 const SHIFT_PRESETS = [
-  { value: "full-day", label: "Full day, 9am–6pm" },
-  { value: "morning", label: "Morning, 9am–1pm" },
-  { value: "evening", label: "Evening, 5pm–9pm" },
-  { value: "flexible", label: "Flexible, set by the intern" },
+  { label: "9am–6pm", from: "09:00", to: "18:00" },
+  { label: "9am–1pm", from: "09:00", to: "13:00" },
+  { label: "5pm–9pm", from: "17:00", to: "21:00" },
 ] as const;
 
 export function SendProposalForm({
@@ -81,8 +76,11 @@ export function SendProposalForm({
   employerId,
   internId,
   initialProjectId,
+  preference,
 }: {
   candidate: CandidateSummary;
+  /** Where the candidate said they can work; the offer's location follows it. */
+  preference: WorkPreference;
   projects: ProjectOption[];
   pricing: Record<Currency, Pricing>;
   /** The company's billing currency, fixed by its country (India → INR). */
@@ -104,19 +102,26 @@ export function SendProposalForm({
   const [projectId, setProjectId] = useState(firstProject?.id ?? "");
   // The selected project owns the timezone; legacy sent it, the rewrite always
   // fell back to Asia/Kolkata.
-  const selectedTimezone = projects.find((p) => p.id === projectId)?.timezone || "Asia/Kolkata";
+  const projectTimezone = (id: string) => projects.find((p) => p.id === id)?.timezone || "Asia/Kolkata";
+  const [timezone, setTimezone] = useState(projectTimezone(firstProject?.id ?? ""));
+  const modes = MODES.filter((m) => offerableModes(preference).includes(m.value));
+  const allowedMode = (m: string | null | undefined) => (m && modes.some((x) => x.value === m) ? m : null);
   const [roleTitle, setRoleTitle] = useState(firstProject?.projectName ?? "");
   // Below a score of 6 the legacy rule caps offers at two months.
   const shortOnly = candidate.scored && candidate.score > 0 && candidate.score < 6;
   const [duration, setDuration] = useState(shortOnly ? "2m" : "3m");
   const [startDate, setStartDate] = useState("");
   const [schedule, setSchedule] = useState<WeeklySchedule>("mon_fri");
-  const [mode, setMode] = useState(firstProject?.locationType ?? "remote");
-  const [city, setCity] = useState("");
-  const [state, setState] = useState("");
+  const [mode, setMode] = useState(allowedMode(firstProject?.locationType) ?? modes[0]?.value ?? "remote");
+  // With preferred cities on file the city is picked from them; the first one
+  // is filled in so an on-site or hybrid offer starts complete.
+  const [city, setCity] = useState(preference.cities[0]?.city ?? "");
+  const [state, setState] = useState(preference.cities[0]?.state ?? "");
   const [officeDays, setOfficeDays] = useState("3");
   const [homeDays, setHomeDays] = useState("2");
-  const [shift, setShift] = useState("full-day");
+  const [shiftFrom, setShiftFrom] = useState("09:00");
+  const [shiftTo, setShiftTo] = useState("18:00");
+  const [flexibleHours, setFlexibleHours] = useState(false);
   const [laptop, setLaptop] = useState("company");
   const [paidLeaves, setPaidLeaves] = useState("2");
   const [message, setMessage] = useState("");
@@ -134,14 +139,14 @@ export function SendProposalForm({
   const monthlyHours = scheduledMonthlyHours(schedule, Number(paidLeaves) || 0);
   const totals = useMemo(() => {
     const monthly = monthlyHours * (rate.hourlyRateMinor / 100);
-    // Per-hire applies below a score of 6 only, once (not per month).
-    const perHire = candidate.score < 6 ? rate.perHireMinor / 100 : 0;
+    // The one-time hiring fee, charged once with the first payment.
+    const perHire = rate.perHireMinor / 100;
     return { monthly, perHire };
-  }, [monthlyHours, rate, candidate.score]);
+  }, [monthlyHours, rate]);
 
   /** Validate first; the policy agreement only opens for a complete offer. */
   function review() {
-    const problems = validate({ projectId, roleTitle, duration, startDate, minStart, mode, city, state, officeDays, homeDays, laptop, message });
+    const problems = validate({ projectId, roleTitle, duration, startDate, minStart, mode, city, state, officeDays, homeDays, laptop, message, shiftFrom, shiftTo, flexibleHours, timezone });
     setErrors(problems);
     if (Object.keys(problems).length > 0) {
       setNotice({ tone: "bad", text: "Some details need attention before this can be sent." });
@@ -171,12 +176,12 @@ export function SendProposalForm({
           location: [city.trim(), state.trim()].filter(Boolean).join(", "),
           ...(mode !== "remote" ? { city: city.trim(), state: state.trim() } : {}),
           ...(mode === "hybrid" ? { officeDays: Number(officeDays), homeDays: Number(homeDays) } : {}),
-          timezone: selectedTimezone,
+          timezone,
           startDate,
           duration,
           weeklySchedule: schedule,
-          shiftFrom: SHIFT_HOURS[shift]?.[0] || "flexible",
-          shiftTo: SHIFT_HOURS[shift]?.[1] || "flexible",
+          shiftFrom: flexibleHours ? "flexible" : shiftFrom,
+          shiftTo: flexibleHours ? "flexible" : shiftTo,
           laptop,
           paidLeavesPerMonth: Number(paidLeaves) || 0,
           skills: projects.find((p) => p.id === projectId)?.skills ?? [],
@@ -247,7 +252,9 @@ export function SendProposalForm({
                   if (!roleTitle.trim() || projects.some((p) => p.projectName === roleTitle)) {
                     setRoleTitle(project.projectName);
                   }
-                  if (project.locationType) setMode(project.locationType);
+                  const projectMode = allowedMode(project.locationType);
+                  if (projectMode) setMode(projectMode);
+                  setTimezone(projectTimezone(project.id));
                 }
               }}
             />
@@ -312,14 +319,8 @@ export function SendProposalForm({
             <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-brand-700">{rate.bandName} band</p>
             <p className="text-sm text-ink-700">
               <span className="font-semibold tabular-nums text-ink-900">{formatRate(rate.hourlyRateMinor, currency)}</span>
-              {candidate.score < 6 ? (
-                <>
-                  {" · "}
-                  <span className="tabular-nums">{formatPerHire(rate.perHireMinor, currency)}</span> per hire
-                </>
-              ) : (
-                " · no per-hire charge"
-              )}
+              {" · "}
+              <span className="tabular-nums">{formatPerHire(rate.perHireMinor, currency)}</span> one-time hiring fee
             </p>
             <p className="flex w-full items-start gap-1.5 text-xs text-ink-600">
               <Info className="mt-0.5 size-3.5 shrink-0 text-ink-400" aria-hidden />
@@ -363,11 +364,16 @@ export function SendProposalForm({
         </Step>
 
         {/* ── 3. Work setup ───────────────────────────────────────────── */}
-        <Step n={3} title="Work setup" hint="The constraints this offer places on the intern. Shown before they accept.">
+        <Step n={3} title="Work setup" hint="Based on where the candidate said they can work. Shown before they accept.">
           <fieldset>
             <legend className="text-sm font-medium text-ink-800">Work mode</legend>
+            <p className="mt-0.5 text-xs text-text-subtle">
+              {modes.length < MODES.length
+                ? `This candidate is open to ${modes.map((m) => m.label.toLowerCase()).join(" or ")} work.`
+                : "This candidate is open to remote, hybrid or on-site work."}
+            </p>
             <div className="mt-2 grid grid-cols-3 gap-1.5 sm:max-w-sm">
-              {MODES.map((option) => (
+              {modes.map((option) => (
                 <button
                   key={option.value}
                   type="button"
@@ -387,10 +393,34 @@ export function SendProposalForm({
           </fieldset>
 
           {mode !== "remote" ? (
-            <div className="grid gap-5 sm:grid-cols-2">
-              <Field id="city" label="City" value={city} error={errors.city} onChange={setCity} />
-              <Field id="state" label="State" value={state} error={errors.state} onChange={setState} />
-            </div>
+            preference.cities.length > 0 ? (
+              <div className="grid gap-5 sm:grid-cols-2">
+                <SelectField
+                  id="city"
+                  label="Work city"
+                  hint="From the candidate's preferred cities."
+                  value={preference.cities.find((c) => c.city === city && c.state === state)?.label ?? ""}
+                  options={[
+                    ...(preference.cities.some((c) => c.city === city && c.state === state) ? [] : [{ value: "", label: "Choose a city…" }]),
+                    ...preference.cities.map((c) => ({ value: c.label, label: c.label })),
+                  ]}
+                  error={errors.city ?? errors.state}
+                  onChange={(v) => {
+                    const pick = preference.cities.find((c) => c.label === v);
+                    setCity(pick?.city ?? "");
+                    setState(pick?.state ?? "");
+                  }}
+                />
+                {state || !city ? null : (
+                  <Field id="state" label="State" value={state} error={errors.state} onChange={setState} />
+                )}
+              </div>
+            ) : (
+              <div className="grid gap-5 sm:grid-cols-2">
+                <Field id="city" label="City" value={city} error={errors.city} hint="The candidate listed no preferred city." onChange={setCity} />
+                <Field id="state" label="State" value={state} error={errors.state} onChange={setState} />
+              </div>
+            )
           ) : null}
 
           {mode === "hybrid" ? (
@@ -414,13 +444,55 @@ export function SendProposalForm({
             </div>
           ) : null}
 
+          <fieldset>
+            <legend className="text-sm font-medium text-ink-800">Working hours</legend>
+            {!flexibleHours ? (
+              <>
+                <div className="mt-2 grid grid-cols-2 gap-3 sm:max-w-sm">
+                  <Field id="shiftFrom" label="From" type="time" value={shiftFrom} error={errors.shiftFrom} onChange={setShiftFrom} />
+                  <Field id="shiftTo" label="To" type="time" value={shiftTo} error={errors.shiftTo} onChange={setShiftTo} />
+                </div>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {SHIFT_PRESETS.map((p) => (
+                    <button
+                      key={p.label}
+                      type="button"
+                      onClick={() => {
+                        setShiftFrom(p.from);
+                        setShiftTo(p.to);
+                      }}
+                      className={[
+                        "apple-spring min-h-11 rounded-[10px] border px-3 text-xs font-medium tabular-nums",
+                        shiftFrom === p.from && shiftTo === p.to
+                          ? "border-brand-600 bg-brand-50 text-brand-800"
+                          : "border-ink-200 bg-white text-ink-700 hover:bg-ink-50",
+                      ].join(" ")}
+                    >
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
+              </>
+            ) : null}
+            <label className="mt-3 inline-flex min-h-11 cursor-pointer items-center gap-2.5 text-sm text-ink-700">
+              <input
+                type="checkbox"
+                checked={flexibleHours}
+                onChange={(e) => setFlexibleHours(e.target.checked)}
+                className="size-4 rounded border-ink-300 accent-brand-700"
+              />
+              Flexible hours, set by the intern
+            </label>
+          </fieldset>
+
           <div className="grid gap-5 sm:grid-cols-2">
             <SelectField
-              id="shift"
-              label="Working hours"
-              value={shift}
-              options={SHIFT_PRESETS.map((s) => ({ value: s.value, label: s.label }))}
-              onChange={setShift}
+              id="timezone"
+              label="Timezone"
+              hint="The working hours and interview slots use this zone."
+              value={timezone}
+              options={TIMEZONES.map((t) => ({ value: t.id, label: t.group ? `── ${t.label} ──` : t.label, disabled: t.group }))}
+              onChange={setTimezone}
             />
             <SelectField
               id="laptop"
@@ -431,13 +503,6 @@ export function SendProposalForm({
               onChange={setLaptop}
             />
           </div>
-
-          <ReadOnlyField
-            id="timezone"
-            label="Timezone"
-            value={selectedTimezone}
-            hint="Set on the project. Interview slots are offered in this zone."
-          />
         </Step>
 
         {/* ── 4. Message ──────────────────────────────────────────────── */}
@@ -511,7 +576,7 @@ export function SendProposalForm({
               </Row>
               <Row label="Duration">{durationLabel || "-"}</Row>
               {totals.perHire > 0 ? (
-                <Row label="Per-hire charge (one-time)">{formatPerHire(Math.round(totals.perHire * 100), currency)}</Row>
+                <Row label="Hiring fee (one-time)">{formatMoney(Math.round(totals.perHire * 100), currency)}</Row>
               ) : null}
             </dl>
             <p className="mt-3 text-xs leading-relaxed text-text-subtle">
@@ -717,7 +782,7 @@ function SelectField({
   id: string;
   label: string;
   value: string;
-  options: { value: string; label: string }[];
+  options: { value: string; label: string; disabled?: boolean }[];
   onChange: (value: string) => void;
   error?: string;
   hint?: string;
@@ -737,7 +802,7 @@ function SelectField({
         className={`${FIELD_BASE} ${error ? FIELD_BAD : FIELD_OK}`}
       >
         {options.map((option) => (
-          <option key={option.value} value={option.value}>
+          <option key={option.value} value={option.value} disabled={option.disabled}>
             {option.label}
           </option>
         ))}
@@ -813,6 +878,10 @@ type Draft = {
   homeDays: string;
   laptop: string;
   message: string;
+  shiftFrom: string;
+  shiftTo: string;
+  flexibleHours: boolean;
+  timezone: string;
 };
 
 function validate(draft: Draft): Record<string, string> {
@@ -843,6 +912,13 @@ function validate(draft: Draft): Record<string, string> {
     if (office + home > 7) errors.homeDays = "Office and home days add up to more than a week.";
   }
 
+  if (!draft.flexibleHours) {
+    const time = /^([01]\d|2[0-3]):[0-5]\d$/;
+    if (!time.test(draft.shiftFrom)) errors.shiftFrom = "Pick a start time.";
+    if (!time.test(draft.shiftTo)) errors.shiftTo = "Pick an end time.";
+    else if (draft.shiftFrom === draft.shiftTo) errors.shiftTo = "The end time must differ from the start.";
+  }
+  if (!draft.timezone || draft.timezone.startsWith("group-")) errors.timezone = "Pick a timezone.";
   if (!draft.laptop) errors.laptop = "Say who provides the laptop.";
   if (draft.message.trim().length < 30) {
     errors.message = "At least a couple of sentences - 30 characters minimum.";

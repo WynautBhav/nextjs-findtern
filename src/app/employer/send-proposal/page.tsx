@@ -12,6 +12,7 @@ import { hiredInternIds } from "@/lib/employer-visibility";
 import { employerRegion, resolvePricing, type Currency, type Pricing } from "@/lib/employer-pricing";
 import { PageHeader, EmptyState } from "@/components/layout/page-header";
 import { SendProposalForm } from "@/components/employer/send-proposal-form";
+import { workPreferenceOf, type WorkPreference } from "@/lib/work-preference";
 import { ButtonLink } from "@/components/ui/button";
 
 export const metadata: Metadata = {
@@ -54,6 +55,7 @@ export default async function SendProposal({
 
   let projects: ProjectOption[] = [];
   let candidate: CandidateSummary | null = null;
+  let preference: WorkPreference = { modes: [], cities: [] };
   let pricing: Record<Currency, Pricing>;
   let currency: Currency = "INR";
   let hasPlans = false;
@@ -115,6 +117,7 @@ export default async function SendProposal({
           .limit(1);
 
         const profile = toCandidateProfile(user, onboarding);
+        preference = workPreferenceOf(onboarding);
         let unlocked = false;
         try {
           unlocked = (await hiredInternIds(db, uid)).has(user.id);
@@ -211,6 +214,7 @@ export default async function SendProposal({
         employerId={uid}
         internId={internId}
         initialProjectId={projectId}
+        preference={preference}
       />
     </div>
   );

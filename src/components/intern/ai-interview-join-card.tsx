@@ -6,7 +6,6 @@ import {
   CheckCircle2,
   Clock,
   ExternalLink,
-  FileText,
   ShieldAlert,
   Sparkles,
   Video,
@@ -26,16 +25,12 @@ interface AiInterviewJoinCardProps {
   interviewId: string;
   status: string | null;
   meetingLink: string | null;
-  feedbackLink?: string | null;
-  recordingLink?: string | null;
   updatedAt?: string | null;
 }
 
 export function AiInterviewJoinCard({
   status,
   meetingLink,
-  feedbackLink,
-  recordingLink,
 }: AiInterviewJoinCardProps) {
   const [modalOpen, setModalOpen] = useState(false);
   const [agreed, setAgreed] = useState(false);
@@ -61,7 +56,7 @@ export function AiInterviewJoinCard({
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="text-base font-bold tracking-tight text-ink-900">
-                  AI Interview & Skills Benchmark (Incruiter)
+                  AI Interview
                 </h3>
               </div>
               <p className="mt-1 text-xs text-ink-600 leading-relaxed max-w-xl">
@@ -85,7 +80,7 @@ export function AiInterviewJoinCard({
             <div>
               <p className="font-semibold text-amber-950">Application registered in scheduling queue</p>
               <p className="mt-0.5 text-amber-800 leading-normal">
-                An administrator is provisioning your Incruiter AI session link. You will receive an instant notification
+                We are setting up your AI interview link. You will receive an instant notification
                 here the moment your interview link is unlocked.
               </p>
             </div>
@@ -96,7 +91,7 @@ export function AiInterviewJoinCard({
           <div className="mt-5 pt-4 border-t border-brand-200/60 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex items-center gap-2 text-xs font-medium text-brand-900">
               <CheckCircle2 className="size-4 text-brand-700" />
-              <span>Incruiter session link is unlocked and ready for your assessment.</span>
+              <span>Your AI interview link is ready.</span>
             </div>
 
             <button
@@ -113,36 +108,6 @@ export function AiInterviewJoinCard({
           </div>
         )}
 
-        {/* Feedback / Recording links if present */}
-        {(feedbackLink || recordingLink || isCompleted) && (
-          <div className="mt-4 pt-4 border-t border-ink-100 flex flex-wrap items-center gap-3">
-            {feedbackLink && (
-              <a
-                href={feedbackLink}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 rounded-lg border border-brand-200 bg-white px-3 py-1.5 text-xs font-semibold text-brand-700 hover:bg-brand-50"
-              >
-                <FileText className="size-3.5" />
-                <span>View Incruiter Report (PDF)</span>
-                <ExternalLink className="size-3 text-brand-500" />
-              </a>
-            )}
-
-            {recordingLink && (
-              <a
-                href={recordingLink}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 rounded-lg border border-ink-200 bg-white px-3 py-1.5 text-xs font-semibold text-ink-700 hover:bg-ink-50"
-              >
-                <Video className="size-3.5" />
-                <span>Watch Session Recording</span>
-                <ExternalLink className="size-3 text-ink-400" />
-              </a>
-            )}
-          </div>
-        )}
       </Surface>
 
       {/* Instructions & Agreement Modal */}
@@ -154,7 +119,7 @@ export function AiInterviewJoinCard({
               <span>AI Interview: Instructions & Terms</span>
             </DialogTitle>
             <DialogDescription className="text-xs text-text-subtle">
-              Please review these mandatory requirements before opening the Incruiter session.
+              Please review these requirements before you start the AI interview.
             </DialogDescription>
           </DialogHeader>
 
@@ -168,7 +133,7 @@ export function AiInterviewJoinCard({
                   <strong>Quiet Environment & Stable Internet:</strong> Use a quiet room with good lighting and minimum 5 Mbps stable connection.
                 </li>
                 <li>
-                  <strong>Microphone & Camera Enabled:</strong> Grant browser permissions for webcam and microphone when prompted by Incruiter.
+                  <strong>Microphone & Camera Enabled:</strong> Grant browser permissions for webcam and microphone when prompted.
                 </li>
                 <li>
                   <strong>No Tab Switching or Reloading:</strong> Proctored tracking detects window blur, page refreshes, and secondary screens.
@@ -188,7 +153,7 @@ export function AiInterviewJoinCard({
                 className="mt-0.5 size-4 rounded border-ink-300 text-brand-600 focus:ring-brand-500"
               />
               <label htmlFor="ai-terms-agreed" className="text-xs font-medium text-ink-800 cursor-pointer">
-                I have read the instructions and agree to proceed with the Incruiter AI interview session.
+                I have read the instructions and agree to proceed with the AI interview.
               </label>
             </div>
 

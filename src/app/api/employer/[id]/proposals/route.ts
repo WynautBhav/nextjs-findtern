@@ -14,6 +14,7 @@ import { buildOffer, parseOffer, PAID_LEAVE_OPTIONS, scheduledMonthlyHours, toda
 import { employerRegion } from "@/lib/employer-pricing";
 import { canEmployerSeeIntern } from "@/lib/employer-pool";
 import { isBlockingInterview } from "@/lib/employer-interview-rules";
+import { modeProblem, workPreferenceOf } from "@/lib/work-preference";
 
 const LIVE = ["draft", "sent", "accepted", "interview_scheduled", "processing"];
 
@@ -125,6 +126,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!user || !onboarding || user.role !== "intern" || !user.isActive) {
     return NextResponse.json({ error: "Unknown candidate" }, { status: 404 });
   }
+  // Work location follows the candidate's own preference (bug sheet 23 Oct).
+  const modeIssue = modeProblem(workPreferenceOf(onboarding), b.mode);
+  if (modeIssue) return NextResponse.json({ error: modeIssue }, { status: 400 });
   // A full-time offer that is still open blocks an internship proposal
   // (legacy R:12767).
   const openOffers = await db
@@ -176,7 +180,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     currency,
     hourlyRateMinor: rate.hourlyRateMinor,
     // Per-hire applies below a score of 6 only (legacy rule).
-    perHireMinor: score < 6 ? rate.perHireMinor : 0,
+    perHireMinor: rate.perHireMinor,
     candidateScore: score,
     projectSkills: b.skills,
   });

@@ -7,6 +7,8 @@ import { Loader2, Pencil } from "lucide-react";
 import { csrfFetch } from "@/lib/client-fetch";
 import { formatMoney } from "@/lib/format";
 import { PAID_LEAVE_OPTIONS, scheduledMonthlyHours, WEEKLY_SCHEDULES, weeklyScheduleOf, type WeeklySchedule } from "@/lib/offer";
+import { TIMEZONES } from "@/lib/timezones";
+import { offerableModes, type WorkPreference } from "@/lib/work-preference";
 import { cn } from "@/lib/utils";
 
 export type EditableOffer = {
@@ -25,8 +27,15 @@ export type EditableOffer = {
   homeDays?: number;
   shiftFrom?: string;
   shiftTo?: string;
+  timezone?: string;
   laptop?: string;
 };
+
+const MODE_OPTIONS = [
+  { value: "remote", label: "Remote" },
+  { value: "hybrid", label: "Hybrid" },
+  { value: "onsite", label: "On-site" },
+];
 
 const DURATIONS = ["1m", "2m", "3m", "6m"] as const;
 
@@ -38,8 +47,9 @@ function tomorrowIst(): string {
 /**
  * Offer editor on the proposal page. The composer's fields minus identity
  * (project and candidate never change) and minus currency (set by the
- * company's country). Draft / sent internship offers only: the server rejects
- * anything later, and full-time offers, and the form does not render there.
+ * company's country). Draft, sent or accepted-but-unpaid internship offers
+ * only; saving an accepted one sends it back to the candidate to accept
+ * again. The server rejects anything later, and full-time offers.
  * Hours and the monthly figure are worked out from the working week and
  * paid leave, as in the composer; the server does the same sum.
  */
@@ -49,8 +59,14 @@ export function ProposalOfferForm({
   currency,
   shortOnly = false,
   defaultOpen = false,
+  accepted = false,
+  preference = { modes: [], cities: [] },
 }: {
   proposalId: string;
+  /** The candidate already accepted: saving asks them to accept again. */
+  accepted?: boolean;
+  /** Where the candidate can work; mode and city follow it. */
+  preference?: WorkPreference;
   /** Open straight into the editor (the proposals list's Edit button). */
   defaultOpen?: boolean;
   initial: EditableOffer;
@@ -68,7 +84,9 @@ export function ProposalOfferForm({
   const [leaves, setLeaves] = useState(String(Math.min(3, Math.round((initial.paidLeavesPerMonth ?? 0) * 2) / 2)));
   const hours = scheduledMonthlyHours(schedule, Number(leaves) || 0);
   const monthlyMinor = initial.hourlyRateMinor ? Math.round(hours * initial.hourlyRateMinor) : null;
-  const [mode, setMode] = useState(initial.mode || "remote");
+  const modes = MODE_OPTIONS.filter((m) => offerableModes(preference).includes(m.value) || m.value === initial.mode);
+  const [mode, setMode] = useState(initial.mode || modes[0]?.value || "remote");
+  const [timezone, setTimezone] = useState(initial.timezone || "Asia/Kolkata");
   const [city, setCity] = useState(initial.city ?? "");
   const [state, setState] = useState(initial.state ?? "");
   const [officeDays, setOfficeDays] = useState(initial.officeDays ? String(initial.officeDays) : "3");
@@ -98,6 +116,7 @@ export function ProposalOfferForm({
       laptop,
       shiftFrom: shiftFrom || "flexible",
       shiftTo: shiftTo || "flexible",
+      timezone,
     };
     if (mode !== "remote") {
       offer.city = city.trim();
@@ -194,9 +213,11 @@ export function ProposalOfferForm({
         <label className="block">
           <span className={label}>Work mode</span>
           <select value={mode} onChange={(e) => setMode(e.target.value)} className={input}>
-            <option value="remote">Remote</option>
-            <option value="hybrid">Hybrid</option>
-            <option value="onsite">On-site</option>
+            {modes.map((m) => (
+              <option key={m.value} value={m.value}>
+                {m.label}
+              </option>
+            ))}
           </select>
         </label>
         <label className="block">
@@ -206,7 +227,29 @@ export function ProposalOfferForm({
             <option value="intern">Intern provides</option>
           </select>
         </label>
-        {mode !== "remote" ? (
+        {mode !== "remote" && preference.cities.length > 0 ? (
+          <label className="col-span-2 block">
+            <span className={label}>Work city (candidate&apos;s preference)</span>
+            <select
+              value={preference.cities.find((c) => c.city === city && c.state === state)?.label ?? ""}
+              onChange={(e) => {
+                const pick = preference.cities.find((c) => c.label === e.target.value);
+                setCity(pick?.city ?? "");
+                setState(pick?.state ?? "");
+              }}
+              className={input}
+            >
+              {preference.cities.some((c) => c.city === city && c.state === state) ? null : (
+                <option value="">{city ? `${city}${state ? `, ${state}` : ""} (current)` : "Choose a city…"}</option>
+              )}
+              {preference.cities.map((c) => (
+                <option key={c.label} value={c.label}>
+                  {c.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : mode !== "remote" ? (
           <>
             <label className="block">
               <span className={label}>City</span>
@@ -238,6 +281,22 @@ export function ProposalOfferForm({
           <span className={label}>Shift to</span>
           <input type="time" value={shiftTo} onChange={(e) => setShiftTo(e.target.value)} className={input} />
         </label>
+        <label className="col-span-2 block">
+          <span className={label}>Timezone</span>
+          <select value={timezone} onChange={(e) => setTimezone(e.target.value)} className={input}>
+            {TIMEZONES.map((t) =>
+              t.group ? (
+                <option key={t.id} value={t.id} disabled>
+                  ── {t.label} ──
+                </option>
+              ) : (
+                <option key={t.id} value={t.id}>
+                  {t.label}
+                </option>
+              ),
+            )}
+          </select>
+        </label>
       </div>
       <label className="block">
         <span className={label}>Job description</span>
@@ -266,7 +325,11 @@ export function ProposalOfferForm({
           Cancel
         </button>
       </div>
-      <p className="text-xs text-text-subtle">The candidate is told the offer changed and asked to review it again.</p>
+      <p className="text-xs text-text-subtle">
+        {accepted
+          ? "The candidate accepted the current terms. Saving sends the changed offer back to them to accept again before you can pay."
+          : "The candidate is told the offer changed and asked to review it again."}
+      </p>
     </div>
   );
 }

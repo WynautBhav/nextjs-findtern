@@ -58,7 +58,7 @@ export function FileUpload({
   maxBytes,
   preview,
 }: {
-  kind: "profile_photo" | "aadhaar" | "pan" | "intro_video" | "marksheet" | "employer_logo" | "offer_letter" | "cms_image" | "support";
+  kind: "profile_photo" | "aadhaar" | "pan" | "intro_video" | "marksheet" | "certificate" | "employer_logo" | "offer_letter" | "cms_image" | "support";
   accept: string;
   label: string;
   hint?: string;

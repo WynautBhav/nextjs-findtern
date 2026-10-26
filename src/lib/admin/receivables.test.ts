@@ -25,8 +25,8 @@ test("receivables and payables with INR totals", () => {
   };
   const r = computeReceivables(input, { receivables: "both", payables: "both" });
   assert.equal(r.totals.receivedMinor, 2_000_000 + 249_900);
-  // accepted USD offer $100 × 1 month → ₹10,000; two monthly instalments of ₹20,000 left
-  assert.equal(r.totals.dueMinor, 1_000_000 + 4_000_000);
+  // accepted USD offer $100 × 1 month + $50 hiring fee → ₹15,000; two monthly instalments of ₹20,000 left
+  assert.equal(r.totals.dueMinor, 1_500_000 + 4_000_000);
   assert.equal(r.totals.prospectMinor, 249_900);
   assert.equal(r.totals.paidOutMinor, 1_000_000);
   // two stipend months still owed at ₹10,000

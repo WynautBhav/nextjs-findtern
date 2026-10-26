@@ -9,6 +9,7 @@ import {
   draftFromRecord,
   emptyDraft,
   formatProblems,
+  MAX_CERTIFICATE_UPLOADS,
   MAX_SKILLS,
   storedFromDraft,
   validateProfile,
@@ -23,6 +24,17 @@ const qualification = z.object({
   issuer: z.string().max(160).default(""),
   completionDate: z.string().max(10).default(""),
   credentialUrl: z.string().max(500).default(""),
+  uploads: z
+    .array(
+      z.object({
+        name: z.string().min(1).max(300),
+        originalName: z.string().max(160).optional(),
+        type: z.string().max(80).default(""),
+        size: z.number().int().min(0).max(50 * 1024 * 1024).default(0),
+      }),
+    )
+    .max(MAX_CERTIFICATE_UPLOADS)
+    .optional(),
 });
 
 const bodySchema = z.object({
@@ -217,6 +229,18 @@ export async function POST(req: Request) {
     .where(eq(schema.internOnboarding.userId, session.uid))
     .limit(1);
 
+  // Certificate files: only keys this intern uploaded (the upload route names
+  // them after the uploader) or ones already on their record. Anything else
+  // would let a profile point at someone else's document.
+  if (parsed.data.academics) {
+    const known = storedCertificateNames(existing?.extraData);
+    const own = ownUploadKey(session.uid);
+    const rows = [...(parsed.data.academics.professional ?? []), ...(parsed.data.academics.certifications ?? [])];
+    if (rows.some((r) => (r.uploads ?? []).some((u) => !known.has(u.name) && !own.test(u.name)))) {
+      return NextResponse.json({ error: "A certificate file did not upload properly - upload it again." }, { status: 400 });
+    }
+  }
+
   // Skills freeze once rated or once an AI interview is queued (legacy rule).
   if (parsed.data.skills !== undefined && existing) {
     const current = draftFromRecord(existing).skills ?? [];
@@ -287,6 +311,11 @@ export async function POST(req: Request) {
     ...(parsed.data.photoUrl ? { photoUrl: parsed.data.photoUrl } : {}),
   };
 
+  // Cities are for onsite or hybrid work only; a remote-only profile keeps
+  // none (bug sheet 23 Oct), whatever an older client sends.
+  const modes = parsed.data.locationTypes ? workModes(parsed.data.locationTypes) : existing?.locationTypes ?? [];
+  const inPerson = modes.length === 0 || modes.includes("onsite") || modes.includes("hybrid");
+
   const values = {
     userId: session.uid,
     bio: parsed.data.bio ?? existing?.bio ?? null,
@@ -299,8 +328,8 @@ export async function POST(req: Request) {
     experienceJson: stored.experienceJson ?? existing?.experienceJson ?? [],
     previewSummary: parsed.data.previewSummary ?? existing?.previewSummary ?? null,
     skills: stored.skills ?? existing?.skills ?? [],
-    locationTypes: parsed.data.locationTypes ? workModes(parsed.data.locationTypes) : existing?.locationTypes ?? [],
-    preferredLocations: parsed.data.preferredLocations ?? existing?.preferredLocations ?? [],
+    locationTypes: modes,
+    preferredLocations: inPerson ? (parsed.data.preferredLocations ?? existing?.preferredLocations ?? []) : [],
     hasLaptop: parsed.data.hasLaptop ?? existing?.hasLaptop ?? null,
     extraData,
     updatedAt: new Date(),
@@ -312,4 +341,26 @@ export async function POST(req: Request) {
     await db.insert(schema.internOnboarding).values(values);
   }
   return NextResponse.json({ ok: true });
+}
+
+/** Upload keys the store mints for this intern: `<uid prefix>.<random>.<ext>` (security/sign.ts). */
+function ownUploadKey(uid: string): RegExp {
+  const prefix = uid.replace(/[^a-z0-9_-]/gi, "").slice(0, 32) || "x";
+  return new RegExp(`^${prefix}\\.[A-Za-z0-9_-]{20,32}\\.(jpg|png|webp|pdf)$`);
+}
+
+/** Certificate file names already stored on the record (legacy rows included). */
+function storedCertificateNames(extraData: unknown): Set<string> {
+  const academics = ((extraData ?? {}) as Record<string, unknown>).academics as Record<string, unknown> | undefined;
+  const rows = [academics?.professionalCourses, academics?.certifications].flatMap((v) => (Array.isArray(v) ? v : []));
+  const names = new Set<string>();
+  for (const row of rows) {
+    const uploads = (row as Record<string, unknown> | null)?.certificateUploads;
+    if (!Array.isArray(uploads)) continue;
+    for (const u of uploads) {
+      const name = (u as Record<string, unknown> | null)?.name;
+      if (typeof name === "string" && name) names.add(name);
+    }
+  }
+  return names;
 }

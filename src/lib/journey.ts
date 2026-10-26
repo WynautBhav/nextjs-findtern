@@ -107,12 +107,16 @@ export type DocumentRow = {
 /** Employer name lookup, `id -> name`. */
 export type CompanyNames = Record<string, string>;
 
+const AI_INTERVIEW_LABEL = "AI Interview";
+
 export type ProofSource = {
   proposals: ProposalRow[];
   interviews: InterviewRow[];
   timesheets: TimesheetRow[];
   payouts: PayoutRow[];
   names: CompanyNames;
+  /** Employer ids that own AI interview rows (intern-data); their rows read as the AI interview. */
+  aiEmployerIds?: Set<string>;
 };
 
 /* ── Stage ───────────────────────────────────────────────────────────────
@@ -208,14 +212,25 @@ export function buildThread(src: ProofSource, now: Date = new Date()): ThreadNod
         href: `/intern/proposals/${p.id}`,
         action: "Read the offer",
       });
-    } else if (p.hiredAt || p.status === "accepted" || p.status === "hired") {
+    } else if (p.hiredAt || p.status === "hired") {
       nodes.push({
         id: `p-accepted-${p.id}`,
         kind: "proposal",
         tone: "done",
         at: p.hiredAt ?? p.createdAt,
         title: `You started: ${role}`,
-        detail: `${withName} accepted you. Your timesheets and stipend started from here.`,
+        detail: `${withName} completed the payment. Log your hours on Timesheets.`,
+        with: withName,
+        href: `/intern/proposals/${p.id}`,
+      });
+    } else if (p.status === "accepted") {
+      nodes.push({
+        id: `p-accepted-${p.id}`,
+        kind: "proposal",
+        tone: "waiting",
+        at: p.createdAt,
+        title: `You accepted: ${role}`,
+        detail: `Waiting for ${withName} to complete the payment. Logging hours opens once they do.`,
         with: withName,
         href: `/intern/proposals/${p.id}`,
       });
@@ -234,6 +249,28 @@ export function buildThread(src: ProofSource, now: Date = new Date()): ThreadNod
 
   for (const i of src.interviews) {
     const withName = name(i.employerId);
+    if (src.aiEmployerIds?.has(i.employerId)) {
+      // Findtern's own AI interview: never "a company", never its raw notes
+      // (they carry the report and recording links).
+      const done = i.status === "completed";
+      const ready = !done && i.status === "scheduled" && Boolean(i.meetingLink);
+      nodes.push({
+        id: `i-ai-${i.id}`,
+        kind: "interview",
+        tone: done ? "done" : ready ? "action" : "waiting",
+        at: i.createdAt,
+        title: done ? "AI interview completed" : ready ? "Your AI interview link is ready" : "AI interview requested",
+        detail: done
+          ? "Your Findtern Score and ratings are on the interviews page."
+          : ready
+            ? "Open it from the interviews page when you are ready."
+            : "The link arrives here, usually within two working days.",
+        with: AI_INTERVIEW_LABEL,
+        href: "/intern/interviews",
+        action: ready ? "Open the interview" : undefined,
+      });
+      continue;
+    }
     if (i.status === "completed") {
       nodes.push({
         id: `i-done-${i.id}`,

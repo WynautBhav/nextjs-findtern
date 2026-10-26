@@ -11,6 +11,7 @@ import { payableCheckout, type PayableLine } from "@/lib/employer-payable";
 import { displayNameOf } from "@/lib/employer-candidates";
 import { PageHeader, EmptyState } from "@/components/layout/page-header";
 import { CheckoutSummary } from "@/components/payments/checkout-summary";
+import { paymentsAreFree } from "@/lib/razorpay";
 import { ButtonLink } from "@/components/ui/button";
 
 export const metadata: Metadata = {
@@ -125,7 +126,7 @@ export default async function EmployerCheckout() {
                   <dl className="w-full shrink-0 space-y-2 sm:w-56">
                     <Line label="Engagement">{formatMoney(line.charge.baseMinor - line.charge.perHireMinor, line.currency, { zeroLabel: false })}</Line>
                     {line.charge.perHireMinor > 0 ? (
-                      <Line label="Per-hire fee">{formatMoney(line.charge.perHireMinor, line.currency)}</Line>
+                      <Line label="Hiring fee (one-time)">{formatMoney(line.charge.perHireMinor, line.currency)}</Line>
                     ) : null}
                     {line.charge.discountMinor > 0 ? (
                       <Line label="Upfront discount (10%)">−{formatMoney(line.charge.discountMinor, line.currency)}</Line>
@@ -149,6 +150,7 @@ export default async function EmployerCheckout() {
           <aside className="min-w-0 space-y-4 xl:sticky xl:top-8 xl:self-start">
             <CheckoutSummary
               employerId={uid}
+              testMode={paymentsAreFree()}
               prefill={prefill}
               lines={lines.map((line) => ({
                 id: line.id,

@@ -111,7 +111,7 @@ export function computeReceivables(input: ReceivablesInput, filter: { receivable
       const p = input.proposals.find((x) => x.id === d.proposalId);
       if (!p) continue;
       const offer = parseOffer(p.offerDetails, p.currency);
-      const instalment = lineCharge(offer, input.scoreOf(p.internId), "monthly").totalMinor;
+      const instalment = lineCharge(offer, input.scoreOf(p.internId), "monthly", { firstPayment: false }).totalMinor;
       for (let i = d.monthsPaid; i < d.months; i++) {
         const date = addMonthsIso(offer.startDate, i);
         if (!inRange(date)) continue;

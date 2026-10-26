@@ -33,8 +33,10 @@ export function CheckoutSummary({
   employerId,
   lines,
   prefill,
+  testMode = false,
 }: {
   employerId: string;
+  testMode?: boolean;
   lines: SummaryLine[];
   prefill: { name?: string; email?: string; contact?: string };
 }) {
@@ -133,6 +135,7 @@ export function CheckoutSummary({
             prefill={prefill}
             proposalIds={[line.id]}
             mode={mode}
+            testMode={testMode}
           />
         </div>
       ) : null}

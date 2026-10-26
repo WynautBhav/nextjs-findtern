@@ -7,23 +7,25 @@ import {
   Check,
   Eye,
   ExternalLink,
-  GraduationCap,
+  FileText,
+  Globe,
   Laptop,
   MapPin,
   Scale,
   Send,
+  Star,
 } from "lucide-react";
 
 import { bandFor } from "@/lib/score";
 import { formatRate } from "@/lib/format";
 import {
+  MODE_LABEL,
   RATING_META,
   displayNameOf,
   type CandidateProfile,
 } from "@/lib/employer-candidates";
 import { resolvePricing, type Currency, type Pricing } from "@/lib/employer-pricing";
 import { ShortlistToggle } from "@/components/employer/shortlist-toggle";
-import { AiFeedbackReport } from "@/components/employer/ai-feedback-report";
 import { CandidateAvatar } from "@/components/employer/candidate-avatar";
 import { Pill } from "@/components/app/primitives";
 import { ButtonLink } from "@/components/ui/button";
@@ -261,162 +263,220 @@ export function CandidateCard({
 
             <SheetContent
               side="right"
-              className="w-full sm:max-w-xl md:max-w-2xl overflow-y-auto p-0 border-l border-ink-200/70 bg-surface-alt"
+              className="w-full overflow-y-auto border-l border-ink-200/70 bg-surface p-0 sm:max-w-xl md:max-w-3xl"
             >
-              <div className="p-6">
-                <SheetHeader className="text-left pb-4 border-b border-ink-200/70">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex items-start gap-4">
-                      <CandidateAvatar
-                        photoUrl={candidate.photoUrl}
-                        initials={candidate.initials}
-                        className="size-14 rounded-[10px] text-lg tabular-nums border border-brand-200"
-                      />
-                      <div>
-                        <SheetTitle className="text-xl font-bold text-ink-900">
-                          {displayName}
-                        </SheetTitle>
-                        <SheetDescription className="mt-0.5 text-xs text-text-subtle">
-                          {candidate.location || "Location not stated"}
-                          {candidate.workModes.length > 0
-                            ? ` · ${candidate.workModes.join(", ")}`
-                            : ""}
-                        </SheetDescription>
-                        <div className="mt-2 flex flex-wrap items-center gap-2">
-                          <Pill tone="live">{band.name}</Pill>
-                          <span className="text-xs font-semibold tabular-nums text-ink-800">
-                            {candidate.scored
-                              ? `${candidate.score.toFixed(1)}/10 Findtern Score`
-                              : "Unscored"}
-                          </span>
-                          <span className="text-xs font-semibold tabular-nums text-brand-700">
-                            · {formatRate(pricing.hourlyRateMinor, currency)}
-                          </span>
-                        </div>
+              {/* Laid out like the legacy candidate page (employer-intern-detail):
+                  summary card, actions, then two columns of sections. */}
+              <div className="space-y-4 p-4 sm:p-6">
+                <SheetHeader className="rounded-[20px] border border-ink-200/70 bg-white p-5 text-left shadow-2xs sm:p-6">
+                  <div className="flex items-start gap-4">
+                    <CandidateAvatar
+                      photoUrl={candidate.photoUrl}
+                      initials={candidate.initials}
+                      className="size-16 rounded-[16px] text-xl tabular-nums"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <SheetTitle className="text-2xl font-semibold tracking-[-0.01em] text-ink-900">{displayName}</SheetTitle>
+                      <SheetDescription className="mt-1 inline-flex items-center gap-1 text-sm text-ink-600">
+                        <MapPin className="size-3.5 text-danger/70" aria-hidden />
+                        {candidate.city || candidate.location || "Location not stated"}
+                      </SheetDescription>
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                        <span className="inline-flex items-center gap-1 rounded-full border border-brand-300 bg-brand-50 px-2.5 py-1 text-xs font-semibold tabular-nums text-brand-800">
+                          <Star className="size-3.5" aria-hidden />
+                          Findtern score: {candidate.scored ? candidate.score.toFixed(1) : "Not scored"}
+                        </span>
+                        <span className="inline-flex items-center rounded-full bg-ink-900 px-2.5 py-1 text-xs font-semibold tabular-nums text-white">
+                          Price: {formatRate(pricing.hourlyRateMinor, currency)}
+                        </span>
+                        <Pill tone="live">{band.name}</Pill>
                       </div>
                     </div>
                   </div>
                 </SheetHeader>
 
-                {/* Quick actions bar inside drawer */}
-                <div className="mt-4 flex flex-wrap items-center gap-2 rounded-[10px] bg-white p-3 border border-ink-200/70 shadow-2xs">
+                <div className="flex flex-wrap items-center gap-2">
                   <ProposalAction
                     candidateId={candidate.id}
                     projectId={projectId}
                     proposal={proposal}
-                    className="min-h-11 px-3.5 text-[13px] font-semibold"
+                    className="min-h-11 rounded-[12px] px-4 text-[13px] font-semibold"
                   />
+                  {comparable ? (
+                    <Link
+                      href={compareHref}
+                      scroll={false}
+                      aria-label={selected ? "Remove from compare" : "Add to compare"}
+                      className={[
+                        "apple-spring apple-pressable inline-flex min-h-11 items-center gap-1.5 rounded-[12px] border px-4 text-[13px] font-medium",
+                        selected
+                          ? "border-brand-600 bg-brand-50 font-semibold text-brand-700"
+                          : "border-ink-200 bg-white text-ink-700 hover:bg-ink-50",
+                      ].join(" ")}
+                    >
+                      {selected ? <Check className="size-3.5" aria-hidden /> : <Scale className="size-3.5 text-ink-400" aria-hidden />}
+                      {selected ? "In Compare" : "Add to Compare"}
+                    </Link>
+                  ) : null}
                   {projectId ? (
-                    <ShortlistToggle
-                      internId={candidate.id}
-                      projectId={projectId}
-                      shortlisted={shortlisted}
-                      size="sm"
-                    />
+                    <ShortlistToggle internId={candidate.id} projectId={projectId} shortlisted={shortlisted} size="sm" />
                   ) : null}
                   <ButtonLink
                     href={`/employer/intern/${encodeURIComponent(candidate.id)}`}
                     variant="outline"
                     size="sm"
-                    className="min-h-11 px-3 text-[13px] font-medium ml-auto"
+                    className="ml-auto min-h-11 rounded-[12px] px-4 text-[13px] font-medium"
                   >
                     <span>Full profile</span>
                     <ExternalLink className="size-3.5 text-ink-400" aria-hidden />
                   </ButtonLink>
                 </div>
 
-                {/* Candidate bio */}
-                {candidate.bio ? (
-                  <div className="mt-5 rounded-[10px] border border-ink-200/70 bg-white p-4">
-                    <h3 className="text-[13px] font-semibold text-ink-900">
-                      About candidate
-                    </h3>
-                    <p className="mt-2 text-[13px] leading-relaxed text-ink-700 whitespace-pre-wrap">
-                      {candidate.bio}
-                    </p>
-                  </div>
-                ) : null}
+                <div className="grid gap-4 md:grid-cols-[1.6fr_1.1fr]">
+                  <div className="min-w-0 space-y-4">
+                    <QuickSection title="Ratings">
+                      {assessed.length > 0 ? (
+                        <ul className="flex flex-wrap gap-2">
+                          {assessed.map((meta) => (
+                            <li
+                              key={meta.key}
+                              className="rounded-full border border-ink-200 bg-ink-50 px-2.5 py-1 text-xs font-medium tabular-nums text-ink-700"
+                            >
+                              {meta.key === "interview" ? "AI Interview" : meta.label}: {candidate.ratings[meta.key].toFixed(1)}
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="text-sm text-text-subtle">No ratings yet.</p>
+                      )}
+                    </QuickSection>
 
-                {/* Academics & Hardware */}
-                {candidate.academics ? (
-                  <div className="mt-4 rounded-[10px] border border-ink-200/70 bg-white p-4">
-                    <h3 className="flex items-center gap-1.5 text-[13px] font-semibold text-ink-900">
-                      <GraduationCap className="size-4 text-brand-600" aria-hidden />
-                      Academic background
-                    </h3>
-                    <div className="mt-3 grid gap-2 sm:grid-cols-2 text-xs">
-                      <div className="min-w-0">
-                        <span className="text-text-subtle block">Institution</span>
-                        <span className="font-semibold text-ink-900">
-                          {candidate.academics.institution || "-"}
-                        </span>
-                      </div>
-                      <div className="min-w-0">
-                        <span className="text-text-subtle block">Degree</span>
-                        <span className="font-semibold text-ink-900">
-                          {[candidate.academics.degree, candidate.academics.specialization]
+                    <QuickSection title="Skills & Tools">
+                      {candidate.skills.length > 0 ? (
+                        <ul className="flex flex-wrap gap-2">
+                          {candidate.skills.map((skill) => (
+                            <li
+                              key={skill}
+                              className="rounded-full border border-ink-200 bg-ink-50 px-2.5 py-1 text-xs font-medium text-ink-700"
+                            >
+                              {skill}
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="text-sm text-text-subtle">No skills listed.</p>
+                      )}
+                    </QuickSection>
+
+                    {candidate.academics ? (
+                      <QuickSection title="Academics">
+                        <p className="text-sm font-medium text-ink-900">
+                          {[candidate.academics.degree, candidate.academics.specialization].filter(Boolean).join(" · ") || "Degree not stated"}
+                        </p>
+                        {candidate.academics.institution ? (
+                          <p className="mt-0.5 text-sm text-ink-600">{candidate.academics.institution}</p>
+                        ) : null}
+                        <ul className="mt-2.5 flex flex-wrap gap-1.5">
+                          {[
+                            candidate.academics.startYear || candidate.academics.endYear
+                              ? `${candidate.academics.startYear || "?"} – ${candidate.academics.endYear || "?"}`
+                              : "",
+                            candidate.academics.status,
+                            candidate.academics.score
+                              ? `${candidate.academics.scoreType === "percentage" ? "Percentage" : "CGPA"}: ${candidate.academics.score}`
+                              : "",
+                          ]
                             .filter(Boolean)
-                            .join(" - ") || "-"}
-                        </span>
-                      </div>
-                      <div className="min-w-0">
-                        <span className="text-text-subtle block">Score / CGPA</span>
-                        <span className="font-semibold tabular-nums text-ink-900">
-                          {candidate.academics.score
-                            ? `${candidate.academics.score} ${candidate.academics.scoreType || ""}`
-                            : "-"}
-                        </span>
-                      </div>
-                      <div className="min-w-0">
-                        <span className="text-text-subtle block">Hardware</span>
-                        <span className="font-semibold text-ink-900 inline-flex items-center gap-1">
-                          <Laptop className="size-3.5 text-ink-500" aria-hidden />
-                          {candidate.hasLaptop === true
-                            ? "Dedicated Work Laptop"
-                            : candidate.hasLaptop === false
-                            ? "Requires Laptop Support"
-                            : "Not Specified"}
-                        </span>
-                      </div>
-                    </div>
+                            .map((badge) => (
+                              <li key={badge} className="rounded-full border border-ink-200 bg-white px-2.5 py-0.5 text-xs tabular-nums text-ink-700">
+                                {badge}
+                              </li>
+                            ))}
+                        </ul>
+                        {candidate.academics.courses.length > 0 ? (
+                          <div className="mt-4 border-t border-ink-100 pt-3">
+                            <p className="text-xs font-semibold text-ink-700">Professional courses</p>
+                            <ul className="mt-1.5 space-y-1">
+                              {candidate.academics.courses.map((course, i) => (
+                                <li key={`${course.name}-${i}`} className="text-sm text-ink-700">
+                                  {course.name}
+                                  {course.institution ? <span className="text-text-subtle"> · {course.institution}</span> : null}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        ) : null}
+                      </QuickSection>
+                    ) : null}
                   </div>
-                ) : null}
 
-                {/* Verified Skills */}
-                {candidate.skills.length > 0 ? (
-                  <div className="mt-4 rounded-[10px] border border-ink-200/70 bg-white p-4">
-                    <h3 className="text-[13px] font-semibold tabular-nums text-ink-900">
-                      Verified skills ({candidate.skills.length})
-                    </h3>
-                    <ul className="mt-3 flex flex-wrap gap-1">
-                      {candidate.skills.map((skill) => (
-                        <li
-                          key={skill}
-                          className="rounded-md bg-ink-100 px-2 py-0.5 text-xs font-medium text-ink-700 border border-ink-200/70"
+                  <div className="min-w-0 space-y-4">
+                    <QuickSection title="Location & Work Preferences">
+                      <dl className="space-y-3 text-sm">
+                        <div>
+                          <dt className="text-2xs font-semibold uppercase tracking-wide text-text-subtle">Preferred work mode</dt>
+                          <dd className="mt-1 flex flex-wrap gap-1.5">
+                            {candidate.workModes.length > 0
+                              ? candidate.workModes.map((m) => (
+                                  <span key={m} className="inline-flex items-center gap-1 rounded-full border border-ink-200 bg-ink-50 px-2.5 py-0.5 text-xs text-ink-700">
+                                    <Globe className="size-3" aria-hidden />
+                                    {MODE_LABEL[m] ?? m}
+                                  </span>
+                                ))
+                              : <span className="text-text-subtle">Not stated</span>}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="text-2xs font-semibold uppercase tracking-wide text-text-subtle">Preferred locations</dt>
+                          <dd className="mt-1 text-ink-700">
+                            {candidate.preferredLocations.length > 0
+                              ? candidate.preferredLocations.join(" · ")
+                              : candidate.workModes.length === 1 && candidate.workModes[0] === "remote"
+                                ? "Remote"
+                                : "Not stated"}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="text-2xs font-semibold uppercase tracking-wide text-text-subtle">Device</dt>
+                          <dd className="mt-1 inline-flex items-start gap-1.5 text-ink-700">
+                            <Laptop className="mt-0.5 size-3.5 shrink-0 text-ink-400" aria-hidden />
+                            {candidate.hasLaptop === true
+                              ? "Has personal laptop"
+                              : candidate.hasLaptop === false
+                                ? "Doesn't have a laptop, will require a laptop or desktop to work"
+                                : "Not stated"}
+                          </dd>
+                        </div>
+                      </dl>
+                    </QuickSection>
+
+                    <QuickSection title="AI Interview Results">
+                      <p className="flex items-center gap-2 text-sm">
+                        <span
+                          className={[
+                            "rounded-full px-2.5 py-0.5 text-xs font-semibold",
+                            candidate.scored ? "bg-success-soft text-success" : "bg-ink-100 text-ink-600",
+                          ].join(" ")}
                         >
-                          {skill}
-                        </li>
-                      ))}
-                    </ul>
+                          {candidate.scored ? "Completed" : "Pending"}
+                        </span>
+                        {candidate.scored ? (
+                          <span className="tabular-nums text-ink-700">Findtern Score {candidate.score.toFixed(1)}/10</span>
+                        ) : null}
+                      </p>
+                      {candidate.aiFeedbackLink ? (
+                        <a
+                          href={candidate.aiFeedbackLink}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="apple-spring apple-pressable mt-3 inline-flex min-h-11 items-center gap-1.5 rounded-full border border-brand-200 bg-brand-50 px-4 text-[13px] font-semibold text-brand-800 hover:bg-brand-100"
+                        >
+                          <FileText className="size-3.5" aria-hidden />
+                          View feedback report
+                        </a>
+                      ) : null}
+                    </QuickSection>
                   </div>
-                ) : null}
-
-                {/* AI Interview Assessment Report */}
-                <div className="mt-5">
-                  <AiFeedbackReport
-                    candidateName={displayName}
-                    findternScore={candidate.score}
-                    ratings={{
-                      communication: candidate.ratings.communication,
-                      coding: candidate.ratings.coding,
-                      aptitude: candidate.ratings.aptitude,
-                      overall: candidate.score,
-                    }}
-                    skills={candidate.skills}
-                    bio={candidate.bio}
-                    aiFeedbackLink={candidate.aiFeedbackLink}
-                    aiRecordingLink={candidate.aiRecordingLink}
-                  />
                 </div>
               </div>
             </SheetContent>
@@ -481,5 +541,14 @@ export function CandidateCard({
         </div>
       </div>
     </li>
+  );
+}
+
+function QuickSection({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section className="rounded-[20px] border border-ink-200/70 bg-white p-4 shadow-2xs md:p-5">
+      <h3 className="mb-3 text-sm font-semibold text-ink-900 md:text-base">{title}</h3>
+      {children}
+    </section>
   );
 }

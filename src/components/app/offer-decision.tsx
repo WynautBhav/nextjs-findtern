@@ -24,7 +24,6 @@
  */
 
 import { useState, useTransition } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { AlertCircle, Check, Loader2, X } from "lucide-react";
@@ -145,19 +144,9 @@ export function OfferDecision({
           </p>
           <p className="mt-1 text-pretty text-sm leading-relaxed text-ink-700">
             {outcome.kind === "accepted"
-              ? startDate
-                ? `Your timesheet and stipend start on ${startDate}. Your interview will be booked shortly and you will get the times to choose from.`
-                : "Your timesheet and stipend start now. Your interview will be booked shortly and you will get the times to choose from."
+              ? `${company} completes the payment next. Logging hours opens once they do${startDate ? `, and your internship starts on ${startDate}` : ""}. You will get a notification.`
               : "Nothing is lost and nothing was deleted. This stays in your thread so you remember what you turned down. You can apply again whenever you like."}
           </p>
-          {outcome.kind === "accepted" && !fullTime ? (
-            <Link
-              href="/intern/timesheets"
-              className="apple-spring apple-pressable mt-3 inline-flex min-h-11 items-center gap-2 rounded-[10px] bg-primary px-5 text-sm font-semibold text-white shadow-sm hover:bg-primary-hover"
-            >
-              Log your hours
-            </Link>
-          ) : null}
         </div>
       </motion.div>
     );
@@ -178,8 +167,8 @@ export function OfferDecision({
               Accept {roleTitle} at {company}?
             </p>
             <p className="mt-1.5 text-pretty text-sm leading-relaxed text-ink-700">
-              This tells {company} yes{startDate ? ` for a start on ${startDate}` : ""}. Your timesheets open straight
-              away, and you&apos;re hired once they complete the payment. Your other open offers from {company} close.
+              This tells {company} yes{startDate ? ` for a start on ${startDate}` : ""}. You&apos;re hired, and
+              logging hours opens, once they complete the payment. Your other open offers from {company} close.
             </p>
             <label className="mt-3 flex items-start gap-2.5 text-sm text-ink-700">
               <input

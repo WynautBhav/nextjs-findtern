@@ -36,6 +36,15 @@ export async function createOrder(input: {
   return { id: body.id, amount: body.amount ?? input.amountMinor, currency: body.currency ?? input.currency };
 }
 
+/**
+ * Test mode (PAYMENTS_MODE=free): checkout and activation complete without
+ * Razorpay and nothing is charged - for a staging copy with no gateway keys.
+ * Off unless set explicitly; never set it on the live site.
+ */
+export function paymentsAreFree(): boolean {
+  return (process.env.PAYMENTS_MODE ?? "").trim().toLowerCase() === "free";
+}
+
 export function razorpayKeyId(): string | undefined {
   return process.env.RAZORPAY_KEY_ID;
 }

@@ -9,6 +9,7 @@ import {
   Briefcase,
   Check,
   CheckCircle2,
+  FileText,
   GraduationCap,
   Languages,
   Loader2,
@@ -33,8 +34,8 @@ import { suggestColleges } from "@/lib/data/colleges";
 import { csrfFetch } from "@/lib/client-fetch";
 import {
   DEGREES,
-  EMERGENCY_RELATIONS,
   EXPERIENCE_TYPES,
+  MAX_CERTIFICATE_UPLOADS,
   QUALIFICATION_LEVELS,
   cascadeWorkModes,
   degreeOption,
@@ -43,6 +44,7 @@ import {
   validateProfile,
   validateStep,
   widestWorkMode,
+  type CertificateUpload,
   type ExtracurricularEntry,
   type ExperienceEntry,
   type LanguageEntry,
@@ -658,26 +660,8 @@ function PersonalStep({ values, update, errors, documents, account, onUploaded }
 
       <Group
         title="Emergency contact"
-        hint="Someone we can reach if we cannot reach you. Only Findtern sees this."
+        hint="A number we can call if we cannot reach you. Only Findtern sees this."
       >
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field
-            id="emergencyName"
-            label="Name *"
-            placeholder="e.g. Sunita Sharma"
-            value={values.emergencyName ?? ""}
-            error={errors.emergencyName}
-            autoComplete="off"
-            onChange={(v) => update("emergencyName", v)}
-          />
-          <SelectField
-            id="emergencyRelation"
-            label="Relationship"
-            value={values.emergencyRelation ?? ""}
-            onChange={(v) => update("emergencyRelation", v)}
-            options={[{ value: "", label: "Choose…" }, ...EMERGENCY_RELATIONS.map((r) => ({ value: r, label: r }))]}
-          />
-        </div>
         <PhoneField
           id="emergencyPhone"
           label="Emergency phone number *"
@@ -687,40 +671,6 @@ function PersonalStep({ values, update, errors, documents, account, onUploaded }
           onCode={(v) => update("emergencyCountryCode", v)}
           onNumber={(v) => update("emergencyPhone", v)}
           hint="Not your own number. Digits only, without the country code."
-        />
-      </Group>
-
-      <Group
-        title="Second contact (optional)"
-        hint="Another person we can try if your emergency contact does not answer. Only Findtern sees this."
-      >
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field
-            id="secondPocName"
-            label="Name"
-            placeholder="e.g. Arjun Mehta"
-            value={values.secondPocName ?? ""}
-            error={errors.secondPocName}
-            autoComplete="off"
-            onChange={(v) => update("secondPocName", v)}
-          />
-          <SelectField
-            id="secondPocRelation"
-            label="Relationship"
-            value={values.secondPocRelation ?? ""}
-            onChange={(v) => update("secondPocRelation", v)}
-            options={[{ value: "", label: "Choose…" }, ...EMERGENCY_RELATIONS.map((r) => ({ value: r, label: r }))]}
-          />
-        </div>
-        <PhoneField
-          id="secondPocPhone"
-          label="Phone number"
-          code={values.secondPocCountryCode || "+91"}
-          number={values.secondPocPhone ?? ""}
-          error={errors.secondPocPhone}
-          onCode={(v) => update("secondPocCountryCode", v)}
-          onNumber={(v) => update("secondPocPhone", v)}
-          hint="Different from your own and your emergency contact's number."
         />
       </Group>
     </div>
@@ -818,7 +768,7 @@ function AcademicsStep({ values, update, errors }: StepProps) {
         </div>
         <Field
           id="branch"
-          label="Specialization / Branch *"
+          label="Specialization / Branch (optional)"
           placeholder="e.g. Computer Science, Marketing"
           value={academics.branch}
           error={errors.branch}
@@ -967,7 +917,7 @@ function QualificationList({
     onChange(rows.map((r) => (r.id === id ? { ...r, ...next } : r)));
   const today = localToday();
   const add = () =>
-    onChange([...rows, { id: `${prefix}-${Date.now()}`, name: "", issuer: "", completionDate: "", credentialUrl: "" }]);
+    onChange([...rows, { id: `${prefix}-${Date.now()}`, name: "", issuer: "", completionDate: "", credentialUrl: "", uploads: [] }]);
 
   return (
     <Group
@@ -1034,12 +984,65 @@ function QualificationList({
                     onChange={(v) => patch(row.id, { credentialUrl: v })}
                   />
                 </div>
+                <CertificateFiles
+                  rowId={row.id}
+                  uploads={row.uploads ?? []}
+                  onChange={(uploads) => patch(row.id, { uploads })}
+                />
               </div>
             );
           })}
         </div>
       )}
     </Group>
+  );
+}
+
+/** Certificate files on one qualification row (optional, up to three). */
+function CertificateFiles({
+  rowId,
+  uploads,
+  onChange,
+}: {
+  rowId: string;
+  uploads: CertificateUpload[];
+  onChange: (uploads: CertificateUpload[]) => void;
+}) {
+  return (
+    <div className="space-y-2">
+      {uploads.length > 0 ? (
+        <ul className="space-y-1.5">
+          {uploads.map((u, i) => (
+            <li
+              key={u.name}
+              className="flex min-h-11 items-center gap-2 rounded-[10px] border border-ink-200 bg-white px-3 text-xs text-ink-700"
+            >
+              <FileText className="size-3.5 shrink-0 text-brand-600" aria-hidden />
+              <span className="min-w-0 flex-1 truncate">{u.originalName || `Certificate ${i + 1}`}</span>
+              <RemoveButton
+                label={`Remove ${u.originalName || `certificate ${i + 1}`}`}
+                onClick={() => onChange(uploads.filter((x) => x.name !== u.name))}
+              />
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {uploads.length < MAX_CERTIFICATE_UPLOADS ? (
+        <FileUpload
+          // Remount after each file so the button offers another upload, not a replace.
+          key={`${rowId}-${uploads.length}`}
+          kind="certificate"
+          accept="image/jpeg,image/png,image/webp,application/pdf"
+          label="Certificate"
+          noun={uploads.length === 0 ? "certificate (optional)" : "another certificate"}
+          maxBytes={10 * MB}
+          hint="Image or PDF, up to 10 MB. Saved with the rest of this step."
+          onUploaded={(r) =>
+            onChange([...uploads, { name: r.key, originalName: r.name, type: r.contentType, size: r.bytes }])
+          }
+        />
+      ) : null}
+    </div>
   );
 }
 
@@ -1727,7 +1730,10 @@ function LocationPreferencesStep({ values, update, errors }: StepProps) {
   const needsCities = picked === "onsite" || picked === "hybrid";
 
   function pickMode(mode: (typeof WORK_MODES)[number]) {
-    update("locationTypes", cascadeWorkModes([], mode));
+    const next = cascadeWorkModes([], mode);
+    update("locationTypes", next);
+    // Remote only: there is no city to work from, so none is kept (bug sheet 23 Oct).
+    if (!next.includes("onsite") && !next.includes("hybrid")) update("preferredLocations", []);
   }
 
   function addCity(city: string) {
@@ -1796,15 +1802,14 @@ function LocationPreferencesStep({ values, update, errors }: StepProps) {
         ) : null}
       </div>
 
-      {/* Preferred Locations (up to 5) */}
+      {/* Preferred Locations (up to 5): onsite or hybrid only. */}
+      {needsCities ? (
       <div>
         <label htmlFor="preferredLocations" className="block text-sm font-medium text-ink-800">
-          Preferred Work Cities {needsCities ? "* (1 to 5)" : "(Up to 5)"}
+          Preferred Work Cities * (1 to 5)
         </label>
         <p className="mt-0.5 text-xs text-text-subtle">
-          {needsCities
-            ? "Required for onsite or hybrid work: the cities you can work from in person."
-            : "Where you are open to relocating or working on-site/hybrid."}
+          Required for onsite or hybrid work: the cities you can work from in person.
         </p>
 
         <div className="mt-2.5 flex gap-2">
@@ -1880,6 +1885,9 @@ function LocationPreferencesStep({ values, update, errors }: StepProps) {
           </ul>
         ) : null}
       </div>
+      ) : picked === "remote" ? (
+        <p className="text-sm text-ink-600">Remote work needs no city. Pick hybrid or onsite to add cities you can work from.</p>
+      ) : null}
 
       {/* Hardware / Laptop Radio */}
       <div>
