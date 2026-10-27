@@ -16,7 +16,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const guard = await requireMutation({ req, roles: ["intern"], ownerId: id });
   if (!guard.ok) return guard.response;
   if (await isInternPaid(id)) {
-    return NextResponse.json({ error: "Your profile is already activated." }, { status: 409 });
+    return NextResponse.json({ error: "Your profile is already activated.", alreadyPaid: true }, { status: 409 });
   }
 
   // Profile first, then payment (dashboard order, now enforced here too).

@@ -3,6 +3,8 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Loader2 } from "lucide-react";
 
+import { buttonClass } from "@/components/ui/button";
+
 import {
   Dialog,
   DialogContent,
@@ -28,19 +30,25 @@ type AgreementProps = {
   title: string;
   description?: ReactNode;
   sections: AgreementSection[];
-  agreeLabel: string;
+  /** The tick-box sentence. Required unless `requireAgreement` is false. */
+  agreeLabel?: string;
   confirmLabel: string;
   onConfirm: () => void | Promise<void>;
   busy?: boolean;
   seconds?: number;
+  /**
+   * False for a read-and-wait gate with no tick box (legacy "Important
+   * Instructions" before joining a company meeting). Defaults to true.
+   */
+  requireAgreement?: boolean;
 };
 
 export function CountdownAgreement(props: AgreementProps) {
   const { open, onOpenChange, title, description, busy = false } = props;
   return (
     <Dialog open={open} onOpenChange={(next) => (!busy || next) && onOpenChange(next)}>
-      <DialogContent className="flex max-h-[90vh] flex-col gap-0 overflow-hidden rounded-[20px] p-0 sm:max-w-2xl">
-        <DialogHeader className="border-b border-ink-100 px-6 pt-6 pb-4 text-left">
+      <DialogContent className="flex max-h-[90vh] flex-col gap-0 overflow-hidden rounded-apple-xl p-0 sm:max-w-2xl">
+        <DialogHeader className="border-b border-ink-200/80 px-6 pt-6 pb-4 text-left">
           <DialogTitle className="text-lg font-semibold tracking-[-0.015em] text-ink-900">{title}</DialogTitle>
           {description ? (
             <DialogDescription className="text-pretty text-sm leading-relaxed text-ink-600">{description}</DialogDescription>
@@ -62,9 +70,11 @@ function AgreementBody({
   onConfirm,
   busy = false,
   seconds = 10,
+  requireAgreement = true,
 }: AgreementProps) {
   const [left, setLeft] = useState(seconds);
-  const [agreed, setAgreed] = useState(false);
+  const [ticked, setAgreed] = useState(false);
+  const agreed = ticked || !requireAgreement;
 
   useEffect(() => {
     const started = Date.now();
@@ -99,28 +109,34 @@ function AgreementBody({
           </section>
         ))}
 
-        <label className="flex cursor-pointer items-start gap-3 rounded-[14px] border border-ink-200 bg-ink-50 p-4">
-          <input
-            type="checkbox"
-            className="mt-0.5 size-4 shrink-0 accent-brand-700"
-            checked={agreed}
-            onChange={(e) => setAgreed(e.target.checked)}
-          />
-          <span>
-            <span className="block font-medium text-ink-900">{agreeLabel}</span>
-            <span className="mt-1 block text-xs text-ink-600" aria-live="polite">
-              {left > 0 ? `Please read for ${left}s before you can continue.` : "You can continue once you tick the box."}
+        {requireAgreement ? (
+          <label className="flex cursor-pointer items-start gap-3 rounded-apple-lg border border-ink-200/80 bg-ink-50 p-4">
+            <input
+              type="checkbox"
+              className="mt-0.5 size-4 shrink-0 accent-brand-700"
+              checked={ticked}
+              onChange={(e) => setAgreed(e.target.checked)}
+            />
+            <span>
+              <span className="block font-medium text-ink-900">{agreeLabel}</span>
+              <span className="mt-1 block text-xs text-ink-600" aria-live="polite">
+                {left > 0 ? `Please read for ${left}s before you can continue.` : "You can continue once you tick the box."}
+              </span>
             </span>
-          </span>
-        </label>
+          </label>
+        ) : (
+          <p className="text-xs text-ink-600" aria-live="polite">
+            {left > 0 ? `Please read for ${left}s before you can continue.` : "You can continue now."}
+          </p>
+        )}
       </div>
 
-      <DialogFooter className="border-t border-ink-100 px-6 py-4">
+      <DialogFooter className="border-t border-ink-200/80 px-6 py-4">
         <button
           type="button"
           onClick={() => onOpenChange(false)}
           disabled={busy}
-          className="apple-spring apple-pressable inline-flex min-h-11 items-center justify-center rounded-[10px] border border-ink-200 bg-white px-5 text-sm font-medium text-ink-700 hover:bg-ink-50 disabled:opacity-55"
+          className={buttonClass({ variant: "outline", size: "md", className: "text-sm" })}
         >
           Cancel
         </button>
@@ -128,7 +144,7 @@ function AgreementBody({
           type="button"
           disabled={!ready}
           onClick={() => void onConfirm()}
-          className="apple-spring apple-pressable inline-flex min-h-11 items-center justify-center gap-2 rounded-[10px] bg-primary px-5 text-sm font-semibold text-white shadow-sm hover:bg-primary-hover disabled:opacity-55"
+          className={buttonClass({ variant: "primary", size: "md", className: "text-sm font-semibold" })}
         >
           {busy ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
           {left > 0 ? `${confirmLabel} (${left}s)` : confirmLabel}

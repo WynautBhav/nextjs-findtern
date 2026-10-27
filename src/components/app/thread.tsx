@@ -34,6 +34,7 @@ import { motion, useInView, useReducedMotion } from "motion/react";
 import { ArrowRight, Check } from "lucide-react";
 
 import type { ThreadNode, ThreadTone } from "@/lib/journey";
+import { buttonClass } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 /** How many nodes from the top get the entry animation. */
@@ -122,7 +123,7 @@ export function Thread({
                 <h3 className={cn("text-[0.9375rem] font-semibold tracking-[-0.01em]", mark.text)}>
                   {node.title}
                 </h3>
-                <span className="text-xs text-ink-600">{node.at.toLocaleDateString("en-IN", { day: "numeric", month: "short" })}</span>
+                <span className="nums text-xs text-ink-600">{node.at.toLocaleDateString("en-IN", { day: "numeric", month: "short", timeZone: "Asia/Kolkata" })}</span>
               </div>
 
               <p className="mt-1 text-pretty text-sm leading-relaxed text-ink-600">{node.detail}</p>
@@ -134,7 +135,7 @@ export function Thread({
               {node.action && node.href ? (
                 <Link
                   href={node.href}
-                  className="apple-spring apple-pressable mt-3 inline-flex min-h-11 items-center gap-1.5 rounded-[10px] bg-primary px-4 text-sm font-semibold text-white shadow-sm hover:bg-primary-hover"
+                  className={buttonClass({ size: "sm", className: "mt-3 min-h-11" })}
                 >
                   {node.action}
                   <ArrowRight className="size-4" aria-hidden />
@@ -215,21 +216,21 @@ export function StatusStrip({
     return (
       <div
         className={cn(
-          "flex flex-wrap items-center gap-x-3 gap-y-2 rounded-[20px] border border-accent-300/50 bg-accent-100/50 px-4 py-3",
+          "flex flex-wrap items-center gap-x-4 gap-y-3 rounded-apple-xl border border-accent-300/60 bg-accent-100/50 px-5 py-4",
           className,
         )}
       >
         <span className="grid size-6 shrink-0 place-items-center rounded-full bg-accent-500">
           <span className="size-1.5 rounded-full bg-white" aria-hidden />
         </span>
-        <p className="min-w-0 flex-[1_1_16rem] text-pretty text-sm font-medium text-ink-900">
+        <p className="min-w-0 flex-[1_1_16rem] text-pretty text-[0.9375rem] font-semibold text-ink-900">
           {node.title}
           <span className="block text-sm font-normal text-ink-600">{node.detail}</span>
         </p>
         {node.href ? (
           <Link
             href={node.href}
-            className="apple-spring apple-pressable inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-[10px] bg-ink-900 px-4 text-sm font-semibold text-white hover:opacity-90"
+            className={buttonClass({ variant: "dark", className: "shrink-0" })}
           >
             {node.action ?? "Open"}
             <ArrowRight className="size-4" aria-hidden />
@@ -242,7 +243,7 @@ export function StatusStrip({
   return (
     <div
       className={cn(
-        "flex items-center gap-2.5 rounded-[20px] border border-brand-200/60 bg-brand-50/60 px-4 py-3",
+        "flex items-center gap-3 rounded-apple-xl border border-brand-200/60 bg-brand-50/60 px-5 py-4",
         className,
       )}
     >

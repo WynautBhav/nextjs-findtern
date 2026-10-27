@@ -1,37 +1,41 @@
 "use client";
 
 /**
- * Accept or decline an offer.
+ * Accept or turn down an offer, from the offer page or straight from the
+ * offers list (INW-28). Both places get the same steps:
  *
- * This component was broken and has been rebuilt. It used a raw `fetch` with
- * no CSRF header, so pressing Accept returned 403 and did nothing, with no
- * error shown. The button was `text-xs` at `px-3 py-1.5`, below the 44 pixel
- * target used everywhere else, and the status next to it rendered the literal
- * database enum `interview_scheduled` to the person deciding their internship.
+ * - Accepting an internship: one dialog that says what happens next (the
+ *   company pays, then logging hours opens) and the intern terms + NDA tick.
+ * - Accepting a full-time offer: the legacy binding agreement with its 10 s
+ *   read time (CountdownAgreement). Accepting it is the hire.
+ * - Turning one down: a confirm dialog, because it is final (INW-12, legacy
+ *   "This action can't be undone"). Past the free declines it also says the
+ *   refund under the guarantee is lost (INW-25) and sends the acknowledgement
+ *   the API asks for.
  *
- * ── Why declining is not a confirm dialog ──────────────────────────────
- *
- * Declining is reversible in the only way that matters here: nothing is
- * deleted, the offer stays in the thread with a plain explanation of what
- * happened, and a candidate can apply again in three months. A modal that says
- * "are you sure?" for a reversible, low consequence action is friction for
- * its own sake, and it trains people to click through modals.
- *
- * Accepting *is* a commitment, so accepting is where the confirmation belongs.
- * It states what is about to happen in one sentence, and it names the
- * alternative, and it does not use a countdown. If someone needs ten seconds
- * to read a sentence, a countdown is punishing them for reading.
+ * It used a raw `fetch` once, with no CSRF header, so Accept returned 403
+ * silently. Every call goes through `csrfFetch` and every failure says what
+ * happened and that nothing changed.
  */
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { motion, useReducedMotion } from "motion/react";
 import { AlertCircle, Check, Loader2, X } from "lucide-react";
 
-import { formatDate } from "@/lib/format";
-
-import { csrfFetch } from "@/lib/client-fetch";
 import { CountdownAgreement, FULL_TIME_ACCEPTANCE_TERMS } from "@/components/app/countdown-agreement";
+import { buttonClass } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { csrfFetch } from "@/lib/client-fetch";
+import { formatDate } from "@/lib/format";
+import { cn } from "@/lib/utils";
 
 type Outcome = { kind: "accepted" | "declined"; error?: string };
 
@@ -44,6 +48,7 @@ export function OfferDecision({
   declinesUsed = 0,
   freeDeclines = 3,
   guaranteeEnded = false,
+  layout = "rail",
 }: {
   proposalId: string;
   roleTitle: string;
@@ -55,23 +60,32 @@ export function OfferDecision({
   declinesUsed?: number;
   freeDeclines?: number;
   guaranteeEnded?: boolean;
+  /** "rail": the offer page's decision card. "row": a list card's footer. */
+  layout?: "rail" | "row";
 }) {
   const router = useRouter();
   const reduce = useReducedMotion();
-  const [confirming, setConfirming] = useState(false);
-  const [fullTimeOpen, setFullTimeOpen] = useState(false);
-  const [declineWarning, setDeclineWarning] = useState(false);
-  // Declining past the free allowance ends the placement guarantee; it is
-  // allowed, but only after the intern has seen that consequence.
-  const lastFreeUsed = declinesUsed >= freeDeclines && !guaranteeEnded;
-  const freeLeft = Math.max(0, freeDeclines - declinesUsed);
+  const [acceptOpen, setAcceptOpen] = useState(false);
+  const [declineOpen, setDeclineOpen] = useState(false);
   const [agreed, setAgreed] = useState(false);
   const [outcome, setOutcome] = useState<Outcome | null>(null);
   const [busy, setBusy] = useState<"accept" | "decline" | null>(null);
   const [, startTransition] = useTransition();
 
-  async function decide(kind: "accepted" | "declined", opts: { fullTimeAgreed?: boolean; acknowledgeGuaranteeEnd?: boolean } = {}) {
+  // Declining past the free allowance ends the refund under the guarantee;
+  // it is allowed, but only after the intern has seen that consequence.
+  const endsGuarantee = declinesUsed >= freeDeclines && !guaranteeEnded;
+  const freeLeft = Math.max(0, freeDeclines - declinesUsed);
+  const joining = startDate ? formatDate(startDate) : null;
+  const rail = layout === "rail";
+
+  async function decide(kind: "accepted" | "declined", opts: { fullTimeAgreed?: boolean } = {}) {
     setBusy(kind === "accepted" ? "accept" : "decline");
+    const close = () => {
+      setBusy(null);
+      setAcceptOpen(false);
+      setDeclineOpen(false);
+    };
     try {
       const res = await csrfFetch(`/api/proposals/${proposalId}/status`, {
         method: "PATCH",
@@ -81,71 +95,55 @@ export function OfferDecision({
           status: kind === "declined" ? "rejected" : kind,
           agreedToTerms: kind === "accepted" && (agreed || Boolean(opts.fullTimeAgreed)),
           agreedToFullTimeTerms: kind === "accepted" && Boolean(opts.fullTimeAgreed),
-          acknowledgeGuaranteeEnd: kind === "declined" && Boolean(opts.acknowledgeGuaranteeEnd),
+          acknowledgeGuaranteeEnd: kind === "declined" && endsGuarantee,
         }),
       });
       if (!res.ok) {
         const body = (await res.json().catch(() => ({}))) as { error?: string };
-        setOutcome({
-          kind,
-          error:
-            body.error ??
-            "That did not go through. Nothing has changed, so you can try again.",
-        });
-        setBusy(null);
-        setConfirming(false);
-        setFullTimeOpen(false);
-        setDeclineWarning(false);
+        setOutcome({ kind, error: body.error ?? "That did not go through. Nothing has changed, so you can try again." });
+        close();
         return;
       }
       setOutcome({ kind });
+      close();
       startTransition(() => router.refresh());
     } catch {
-      setOutcome({
-        kind,
-        error: "You appear to be offline. Nothing was sent, and your offer is still open.",
-      });
-      setBusy(null);
-      setConfirming(false);
+      setOutcome({ kind, error: "You appear to be offline. Nothing was sent, and your offer is still open." });
+      close();
     }
   }
 
   if (outcome && !outcome.error) {
+    const accepted = outcome.kind === "accepted";
     return (
       <motion.div
         initial={reduce ? false : { opacity: 0, y: 6 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-        className={
-          outcome.kind === "accepted"
-            ? "flex items-start gap-3 rounded-[20px] bg-success-soft px-4 py-4"
-            : "flex items-start gap-3 rounded-[20px] bg-ink-100 px-4 py-4"
-        }
+        className={cn(
+          "flex items-start gap-3 rounded-apple-lg px-4 py-4",
+          accepted ? "bg-success-soft" : "bg-ink-100",
+        )}
         role="status"
       >
         <span
-          className={
-            outcome.kind === "accepted"
-              ? "mt-0.5 grid size-5 shrink-0 place-items-center rounded-full bg-success text-white"
-              : "mt-0.5 grid size-5 shrink-0 place-items-center rounded-full bg-ink-500 text-white"
-          }
-        >
-          {outcome.kind === "accepted" ? (
-            <Check className="size-3" strokeWidth={3.5} />
-          ) : (
-            <X className="size-3" strokeWidth={3.5} />
+          className={cn(
+            "mt-0.5 grid size-5 shrink-0 place-items-center rounded-full text-white",
+            accepted ? "bg-success" : "bg-ink-500",
           )}
+        >
+          {accepted ? <Check className="size-3" strokeWidth={3.5} /> : <X className="size-3" strokeWidth={3.5} />}
         </span>
-        <div>
+        <div className="min-w-0">
           <p className="text-sm font-semibold text-ink-900">
-            {outcome.kind === "accepted"
-              ? `You are doing ${roleTitle} at ${company}`
-              : `Offer from ${company} declined`}
+            {accepted ? (fullTime ? "You're hired" : "Offer accepted") : "Offer turned down"}
           </p>
           <p className="mt-1 text-pretty text-sm leading-relaxed text-ink-700">
-            {outcome.kind === "accepted"
-              ? `${company} completes the payment next. Logging hours opens once they do${startDate ? `, and your internship starts on ${startDate}` : ""}. You will get a notification.`
-              : "Nothing is lost and nothing was deleted. This stays in your thread so you remember what you turned down. You can apply again whenever you like."}
+            {accepted
+              ? fullTime
+                ? `Accepting this full-time offer makes you hired${joining ? `. Join on ${joining}` : ""}.`
+                : `${company} completes the payment next. Logging hours opens once they do${joining ? `, and you start on ${joining}` : ""}.`
+              : "It stays in your offers as rejected. This can't be undone."}
           </p>
         </div>
       </motion.div>
@@ -154,26 +152,77 @@ export function OfferDecision({
 
   return (
     <div>
-      <AnimatePresence>
-        {confirming ? (
-          <motion.div
-            initial={reduce ? false : { opacity: 0, y: -6 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={reduce ? { opacity: 0 } : { opacity: 0, y: -6 }}
-            transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
-            className="mb-4 rounded-[20px] border border-brand-200 bg-brand-50/70 p-5"
-          >
-            <p className="text-sm font-semibold text-ink-900">
-              Accept {roleTitle} at {company}?
-            </p>
-            <p className="mt-1.5 text-pretty text-sm leading-relaxed text-ink-700">
-              This tells {company} yes{startDate ? ` for a start on ${startDate}` : ""}. You&apos;re hired, and
-              logging hours opens, once they complete the payment. Your other open offers from {company} close.
-            </p>
-            <label className="mt-3 flex items-start gap-2.5 text-sm text-ink-700">
+      {outcome?.error ? (
+        <p role="alert" className="mb-4 flex items-start gap-2 rounded-apple-sm bg-danger-soft px-4 py-3 text-sm text-danger">
+          <AlertCircle className="mt-px size-4 shrink-0" aria-hidden />
+          {outcome.error}
+        </p>
+      ) : null}
+
+      <div className={cn("flex gap-3", rail ? "flex-col" : "flex-wrap")}>
+        <button
+          type="button"
+          onClick={() => setAcceptOpen(true)}
+          disabled={busy !== null}
+          className={buttonClass({
+            variant: rail ? "accent" : "primary",
+            size: "md",
+            block: rail,
+            className: cn("text-sm font-semibold", !rail && "flex-1 sm:flex-none"),
+          })}
+        >
+          {busy === "accept" ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <Check className="size-4" aria-hidden />}
+          {fullTime ? "Accept the job offer" : "Accept this offer"}
+        </button>
+        <button
+          type="button"
+          onClick={() => setDeclineOpen(true)}
+          disabled={busy !== null}
+          className={buttonClass({
+            variant: "outline",
+            size: "md",
+            block: rail,
+            className: cn("text-sm", !rail && "flex-1 sm:flex-none"),
+          })}
+        >
+          {busy === "decline" ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
+          Turn it down
+        </button>
+      </div>
+
+      {rail ? (
+        <div className="mt-4 space-y-2 text-sm leading-relaxed text-ink-600">
+          <p>
+            <span className="font-medium text-ink-800">If you do nothing</span>, the offer stays open until the day before
+            the joining date{joining ? ` (${joining})` : ""}. On the joining date it closes and is marked as rejected.
+          </p>
+          <p>
+            {guaranteeEnded
+              ? "Your placement guarantee has ended, so declines no longer affect a refund."
+              : freeLeft > 0
+                ? `You can turn down ${freeLeft} more offer${freeLeft === 1 ? "" : "s"} and keep your guarantee. Turn down more than ${freeDeclines} and you are no longer eligible for a refund.`
+                : `You have turned down ${declinesUsed} offers. Turning down another means you are no longer eligible for a refund under the guarantee.`}
+          </p>
+        </div>
+      ) : null}
+
+      {/* ── Accept: internship ───────────────────────────────────── */}
+      {!fullTime ? (
+        <Dialog open={acceptOpen} onOpenChange={(open) => (busy ? null : setAcceptOpen(open))}>
+          <DialogContent className="rounded-apple-xl p-6 sm:max-w-lg">
+            <DialogHeader className="text-left">
+              <DialogTitle className="text-lg font-semibold leading-snug tracking-[-0.015em] text-ink-900">
+                Accept {roleTitle}?
+              </DialogTitle>
+              <DialogDescription className="text-pretty text-sm leading-relaxed text-ink-700">
+                This tells {company} yes{joining ? ` for a start on ${joining}` : ""}. They complete the payment next.
+                You&apos;re hired, and logging hours opens, once they do. Your other open offers from this company close.
+              </DialogDescription>
+            </DialogHeader>
+            <label className="flex cursor-pointer items-start gap-3 rounded-apple-lg border border-ink-200/80 bg-ink-50 p-4 text-sm text-ink-700">
               <input
                 type="checkbox"
-                className="mt-0.5 size-4 accent-brand-700"
+                className="mt-0.5 size-4 shrink-0 accent-brand-700"
                 checked={agreed}
                 onChange={(e) => setAgreed(e.target.checked)}
               />
@@ -189,115 +238,85 @@ export function OfferDecision({
                 .
               </span>
             </label>
-            <div className="mt-4 flex flex-wrap gap-3">
+            <DialogFooter>
+              <button
+                type="button"
+                onClick={() => setAcceptOpen(false)}
+                disabled={busy !== null}
+                className={buttonClass({ variant: "outline", size: "md", className: "text-sm" })}
+              >
+                Not yet
+              </button>
               <button
                 type="button"
                 onClick={() => decide("accepted")}
                 disabled={busy !== null || !agreed}
-                className="apple-spring apple-pressable inline-flex min-h-11 items-center gap-2 rounded-[10px] bg-primary px-5 text-sm font-semibold text-white shadow-sm hover:bg-primary-hover disabled:opacity-55"
+                className={buttonClass({ variant: "primary", size: "md", className: "text-sm font-semibold" })}
               >
-                {busy === "accept" ? (
-                  <Loader2 className="size-4 animate-spin" aria-hidden />
-                ) : (
-                  <Check className="size-4" aria-hidden />
-                )}
+                {busy === "accept" ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <Check className="size-4" aria-hidden />}
                 Yes, accept
               </button>
-              <button
-                type="button"
-                onClick={() => setConfirming(false)}
-                className="apple-spring apple-pressable inline-flex min-h-11 items-center gap-2 rounded-[10px] border border-ink-200 bg-white px-5 text-sm font-medium text-ink-700 hover:bg-ink-50"
-              >
-                Not yet
-              </button>
-            </div>
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
-
-      {outcome?.error ? (
-        <p
-          role="alert"
-          className="mb-4 flex items-start gap-2 rounded-[10px] bg-danger-soft px-4 py-3 text-sm text-danger"
-        >
-          <AlertCircle className="mt-px size-4 shrink-0" aria-hidden />
-          {outcome.error}
-        </p>
-      ) : null}
-
-      {declineWarning ? (
-        <div role="alertdialog" aria-label="Turning this down ends your guarantee" className="mb-4 rounded-[20px] border border-warning/40 bg-warning-soft p-5">
-          <p className="text-sm font-semibold text-ink-900">This would be offer number {declinesUsed + 1} you turn down</p>
-          <p className="mt-1.5 text-pretty text-sm leading-relaxed text-ink-700">
-            The placement guarantee covers up to {freeDeclines} declined offers. Turning this one down ends the
-            guarantee, so the fee is no longer refundable. You can still receive and accept offers.
-          </p>
-          <div className="mt-4 flex flex-wrap gap-3">
-            <button
-              type="button"
-              onClick={() => decide("declined", { acknowledgeGuaranteeEnd: true })}
-              disabled={busy !== null}
-              className="apple-spring apple-pressable inline-flex min-h-11 items-center gap-2 rounded-[10px] bg-ink-900 px-5 text-sm font-semibold text-white hover:bg-ink-800 disabled:opacity-55"
-            >
-              {busy === "decline" ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
-              Turn it down anyway
-            </button>
-            <button
-              type="button"
-              onClick={() => setDeclineWarning(false)}
-              className="apple-spring apple-pressable inline-flex min-h-11 items-center rounded-[10px] border border-ink-200 bg-white px-5 text-sm font-medium text-ink-700 hover:bg-ink-50"
-            >
-              Keep it open
-            </button>
-          </div>
-        </div>
-      ) : null}
-
-      {fullTime ? (
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      ) : (
         <CountdownAgreement
-          open={fullTimeOpen}
-          onOpenChange={setFullTimeOpen}
+          open={acceptOpen}
+          onOpenChange={setAcceptOpen}
           title="Full-time offer acceptance"
-          description="Before accepting this full-time employment offer, read and acknowledge the following terms."
+          description="Accepting this full-time offer is the hire. Before you accept, read and acknowledge the following terms."
           sections={FULL_TIME_ACCEPTANCE_TERMS}
           agreeLabel="I confirm that I have read, understood, and agreed to the above terms. I acknowledge that accepting this offer is a binding professional commitment."
           confirmLabel="Accept the offer"
           busy={busy === "accept"}
           onConfirm={() => decide("accepted", { fullTimeAgreed: true })}
         />
-      ) : null}
+      )}
 
-      <div className="flex flex-wrap gap-3">
-        <button
-          type="button"
-          onClick={() => (fullTime ? setFullTimeOpen(true) : setConfirming(true))}
-          disabled={busy !== null || confirming}
-          className="apple-spring apple-pressable inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-[10px] bg-primary px-5 text-sm font-semibold text-white shadow-sm hover:bg-primary-hover disabled:opacity-55 sm:flex-none"
-        >
-          {busy === "accept" ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
-          Accept this offer
-        </button>
-        <button
-          type="button"
-          onClick={() => (lastFreeUsed ? setDeclineWarning(true) : decide("declined"))}
-          disabled={busy !== null || confirming || declineWarning}
-          className="apple-spring apple-pressable inline-flex min-h-11 items-center justify-center gap-2 rounded-[10px] border border-ink-200 bg-white px-5 text-sm font-medium text-ink-700 hover:border-ink-300 hover:bg-ink-50 disabled:opacity-55"
-        >
-          {busy === "decline" ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
-          Turn this down
-        </button>
-      </div>
-      <p className="mt-3 text-sm text-ink-600">
-        {guaranteeEnded
-          ? "Turning it down is fine and nothing is deleted."
-          : freeLeft > 0
-            ? `Turning it down is fine and nothing is deleted. You can turn down ${freeLeft} more offer${freeLeft === 1 ? "" : "s"} and keep your guarantee.`
-            : "You have turned down " + declinesUsed + " offers. Turning down another ends your placement guarantee."}
-      </p>
-      <p className="mt-2 text-sm text-ink-600">
-        If you do nothing, this offer stays open until the joining date
-        {startDate ? ` (${formatDate(startDate)})` : ""} and is marked as rejected once that date passes.
-      </p>
+      {/* ── Turn down ────────────────────────────────────────────── */}
+      <Dialog open={declineOpen} onOpenChange={(open) => (busy ? null : setDeclineOpen(open))}>
+        <DialogContent className="rounded-apple-xl p-6 sm:max-w-md" role="alertdialog">
+          <DialogHeader className="text-left">
+            <DialogTitle className="text-lg font-semibold leading-snug tracking-[-0.015em] text-ink-900">
+              Turn down this offer?
+            </DialogTitle>
+            <DialogDescription className="text-pretty text-sm leading-relaxed text-ink-700">
+              This action can&apos;t be undone. {roleTitle} will be marked as rejected and the company is told.
+            </DialogDescription>
+          </DialogHeader>
+          {guaranteeEnded ? null : endsGuarantee ? (
+            <p className="rounded-apple-lg border border-warning/40 bg-warning-soft p-4 text-pretty text-sm leading-relaxed text-ink-800">
+              <span className="font-semibold">This would be offer number {declinesUsed + 1} you turn down.</span> The
+              guarantee covers up to {freeDeclines} declined offers. Turn down more than {freeDeclines} and you are no
+              longer eligible for a refund. You can still receive and accept offers.
+            </p>
+          ) : (
+            <p className="text-pretty text-sm leading-relaxed text-ink-600">
+              After this you can turn down {Math.max(0, freeLeft - 1)} more offer{freeLeft - 1 === 1 ? "" : "s"} and keep
+              your guarantee. More than {freeDeclines} declined offers means no refund under the guarantee.
+            </p>
+          )}
+          <DialogFooter>
+            <button
+              type="button"
+              onClick={() => setDeclineOpen(false)}
+              disabled={busy !== null}
+              className={buttonClass({ variant: "outline", size: "md", className: "text-sm" })}
+            >
+              Keep it open
+            </button>
+            <button
+              type="button"
+              onClick={() => decide("declined")}
+              disabled={busy !== null}
+              className={buttonClass({ variant: "dark", size: "md", className: "text-sm font-semibold" })}
+            >
+              {busy === "decline" ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
+              {endsGuarantee ? "Turn it down anyway" : "Yes, turn it down"}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

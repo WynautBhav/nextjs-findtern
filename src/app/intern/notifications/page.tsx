@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, BellOff } from "lucide-react";
 
-import { EmptyScene, PageHead, SectionHead, Surface } from "@/components/app/primitives";
-import { NotificationList } from "@/components/app/notification-list";
+import { EmptyScene, PageHead, SectionHead } from "@/components/app/primitives";
+import { NotificationList, type NotificationRow } from "@/components/app/notification-list";
 import { requireRole } from "@/lib/auth";
 import { notificationsFor } from "@/lib/intern-data";
+import { internNotificationHref } from "@/lib/notification-href";
+import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = {
   title: "Notifications",
@@ -15,124 +16,112 @@ export const metadata: Metadata = {
 /**
  * Notifications.
  *
- * ── Grouped by what they ask of you, not by date ────────────────────────
- *
- * The old list was one reverse chronological column where an update about a
- * stipend sat at the same weight as "your offer expires", so nothing stood out
- * and the reader had to read every line to find the one that mattered.
- *
- * Two groups. "Needs you" holds anything with a decision, a deadline or a
- * document attached. "Updates" holds everything else. Someone opening this
- * screen can stop reading after the first group and know they have caught up.
- *
- * ── Nothing here is urgent, loud, or repeats ────────────────────────────
- *
- * There is no red badge count anywhere in this product. A notification is a
- * fact that arrived once; it does not re announce itself, it does not expire,
- * and it does not pile up a number to create pressure. An unread marker on a
- * row is a fact about a row, not a score about a person.
+ * Two groups: "Needs you" (a decision, a deadline or a document, unread) and
+ * everything else. Legacy had an All / Unread switch with a count (INT-28);
+ * it is a link here, so the filter survives a reload and works without JS.
+ * Each row with a destination opens it and marks itself read (INT-15).
  */
-export default async function InternNotifications() {
+export default async function InternNotifications({
+  searchParams,
+}: {
+  searchParams: Promise<{ show?: string }>;
+}) {
   const session = await requireRole("intern");
+  const { show } = await searchParams;
+  const unreadOnly = show === "unread";
 
-  const rows = await notificationsFor(session.uid);
-  // Read rows have been dealt with: an offer that was answered, or an alert
-  // already opened, drops out of "Needs you" into the history below.
+  const all = await notificationsFor(session.uid, 100);
+  const unreadCount = all.filter((n) => !n.isRead).length;
+  const rows: NotificationRow[] = (unreadOnly ? all.filter((n) => !n.isRead) : all).map((n) => ({
+    id: n.id,
+    type: n.type,
+    title: n.title,
+    message: n.message,
+    isRead: n.isRead,
+    createdAt: n.createdAt,
+    href: internNotificationHref(n.type, n.data),
+  }));
+
   const needsYou = rows.filter((n) => NEEDS_ACTION.has(n.type) && !n.isRead);
-  const updates = rows.filter((n) => !(NEEDS_ACTION.has(n.type) && !n.isRead));
+  const rest = rows.filter((n) => !(NEEDS_ACTION.has(n.type) && !n.isRead));
 
   return (
     <div>
       <PageHead
         title="Notifications"
-        lede="Everything that has happened since you were last here. Read once, kept here, never repeated at you."
-        action={<NotificationList mode="mark-all" disabled={rows.every((n) => n.isRead)} />}
+        lede={
+          unreadCount > 0
+            ? `${unreadCount} unread. Open one to go straight to what it is about.`
+            : "You are all caught up. New offers, interviews and payments land here."
+        }
+        action={<NotificationList mode="mark-all" disabled={unreadCount === 0} />}
       />
 
+      <nav aria-label="Filter notifications" className="mb-6 inline-flex rounded-apple-md bg-ink-100 p-1">
+        {(
+          [
+            ["All", "/intern/notifications", !unreadOnly, all.length],
+            ["Unread", "/intern/notifications?show=unread", unreadOnly, unreadCount],
+          ] as const
+        ).map(([label, href, active, n]) => (
+          <Link
+            key={label}
+            href={href}
+            aria-current={active ? "page" : undefined}
+            className={cn(
+              "inline-flex min-h-10 items-center gap-2 rounded-apple-sm px-4 text-sm font-medium transition-colors",
+              active ? "bg-white text-ink-900 shadow-xs" : "text-ink-600 hover:text-ink-900",
+            )}
+          >
+            {label}
+            <span className={cn("nums rounded-full px-1.5 text-xs", active ? "bg-brand-50 text-brand-800" : "bg-white/70 text-ink-600")}>
+              {n}
+            </span>
+          </Link>
+        ))}
+      </nav>
+
       {rows.length === 0 ? (
-        <EmptyScene
-          art
-          title="Nothing has happened yet"
-          body="When a company sends you an offer, books an interview, or approves your hours, it appears here. You will not be pinged about anything you have already read."
-          who="You control what reaches you"
-        />
+        unreadOnly ? (
+          <EmptyScene
+            title="No unread notifications"
+            body="Everything that has arrived has been read. Switch to All to see the history."
+            next={{ label: "Show all", href: "/intern/notifications" }}
+          />
+        ) : (
+          <EmptyScene
+            art
+            title="Nothing has happened yet"
+            body="When a company sends you an offer, books an interview or approves your hours, it appears here and on your home screen."
+            next={{ label: "Back to home", href: "/intern/dashboard" }}
+          />
+        )
       ) : (
         <div className="space-y-10">
           {needsYou.length > 0 ? (
             <section>
-              <SectionHead
-                title="Needs you"
-                hint="A decision, a document, or something waiting on your side."
-              />
+              <SectionHead title="Needs you" hint="A decision, a document, or something waiting on your side." />
               <NotificationList rows={needsYou} />
-            </section>
-          ) : (
-            <Surface className="flex items-start gap-3 p-5">
-              <span className="mt-0.5 grid size-6 shrink-0 place-items-center rounded-full bg-brand-600 text-white">
-                <svg viewBox="0 0 16 16" className="size-3.5" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                  <path d="M3.5 8.5l3 3 6-7" />
-                </svg>
-              </span>
-              <div>
-                <p className="text-sm font-semibold text-ink-900">
-                  Nothing is waiting on you right now
-                </p>
-                <p className="mt-0.5 text-pretty text-sm leading-relaxed text-ink-600">
-                  Everything a company has sent has been dealt with. If something lands that needs
-                  an answer, it appears at the top of this list and on your home screen.
-                </p>
-              </div>
-            </Surface>
-          )}
-
-          {updates.length > 0 ? (
-            <section>
-              <SectionHead title="Updates" hint="Nothing here needs an answer." />
-              <NotificationList rows={updates} />
             </section>
           ) : null}
 
-          {/* ── The absence, stated ────────────────────────────────
-              Every product with notifications uses this space for a
-              reengagement pitch. Saying what is deliberately not here is
-              more useful, and it is a promise we can keep because the
-              notifier only ever writes on a real event. */}
-          <section>
-            <Surface className="flex items-start gap-3 p-5">
-              <BellOff className="mt-0.5 size-5 shrink-0 text-ink-400" aria-hidden />
-              <div>
-                <SectionHead title="What you will never get" />
-                <ul className="space-y-1.5 text-pretty text-sm leading-relaxed text-ink-600">
-                  {[
-                    "No streak reminders, and nothing that tells you your streak is at risk.",
-                    "No nudges to open the app. Nothing is sent because you were quiet.",
-                    "No re engagement after you have been away, however long that is.",
-                    "No message that dresses up a routine update as urgent.",
-                  ].map((line) => (
-                    <li key={line}>· {line}</li>
-                  ))}
-                </ul>
-                <Link
-                  href="/intern/settings"
-                  className="apple-spring apple-pressable mt-4 inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-primary underline-offset-4 hover:underline"
-                >
-                  Notification settings
-                  <ArrowRight className="size-3.5" aria-hidden />
-                </Link>
-              </div>
-            </Surface>
-          </section>
+          {rest.length > 0 ? (
+            <section>
+              {needsYou.length > 0 ? <SectionHead title="Everything else" /> : null}
+              <NotificationList rows={rest} />
+            </section>
+          ) : null}
+
+          <p className="text-sm text-ink-600">
+            Findtern only writes here when something real happens: no streak reminders and no nudges to open the app.
+          </p>
         </div>
       )}
     </div>
   );
 }
 
-/**
- * Notification types that put work on the candidate's side.
- *
- * Everything else is genuinely just an update and belongs below the fold.
- */
+/** Notification types that put work on the candidate's side. */
 const NEEDS_ACTION = new Set([
   "proposal_received",
   "proposal_updated",
@@ -140,6 +129,7 @@ const NEEDS_ACTION = new Set([
   "interview_pending",
   "interview_reschedule_requested_by_employer",
   "interview_rescheduled_by_employer",
+  "ai_interview_unlocked",
   "timesheet_rejected",
   "timesheet_updated_by_employer",
   "document_required",

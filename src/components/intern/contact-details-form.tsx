@@ -2,12 +2,14 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Loader2 } from "lucide-react";
 
+import { buttonClass } from "@/components/ui/button";
 import { csrfFetch } from "@/lib/client-fetch";
-import { phoneHint } from "@/lib/phone";
+import { DIAL_CODES, DIAL_CODE_VALUES } from "@/lib/data/dial-codes";
+import { phoneError, phoneHint } from "@/lib/phone";
 
-const input =
-  "mt-1.5 h-11 w-full rounded-[10px] border border-ink-200 bg-white px-3 text-sm text-ink-900 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20";
+import { Field, FieldNote, Grid, Label, Select, controlClass } from "./onboarding/fields";
 
 /** Name and phone on the account (email stays fixed: it's the sign-in). */
 export function ContactDetailsForm({
@@ -19,14 +21,30 @@ export function ContactDetailsForm({
 }) {
   const router = useRouter();
   const [v, setV] = useState(initial);
+  const [attempted, setAttempted] = useState(false);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
-  const set = (k: keyof typeof v) => (e: React.ChangeEvent<HTMLInputElement>) => setV((s) => ({ ...s, [k]: e.target.value }));
+  const set = (k: keyof typeof v) => (value: string) => setV((s) => ({ ...s, [k]: value }));
+
+  const live: Record<string, string> = {};
+  if (v.firstName.trim().length < 2) live.firstName = "Enter your first name.";
+  if (!v.lastName.trim()) live.lastName = "Enter your last name.";
+  const phone = phoneError(v.countryCode, v.phoneNumber);
+  if (phone) live.phoneNumber = `${phone}.`;
+  const errors = attempted ? live : {};
+
+  const codes = DIAL_CODE_VALUES.includes(v.countryCode) ? DIAL_CODES : [{ code: v.countryCode, country: "" }, ...DIAL_CODES];
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
-    setBusy(true);
+    setAttempted(true);
     setMsg(null);
+    const first = Object.keys(live)[0];
+    if (first) {
+      document.getElementById(first)?.focus();
+      return;
+    }
+    setBusy(true);
     try {
       const res = await csrfFetch(`/api/users/${encodeURIComponent(userId)}`, {
         method: "PATCH",
@@ -34,7 +52,7 @@ export function ContactDetailsForm({
         body: JSON.stringify(v),
       });
       const data = (await res.json().catch(() => ({}))) as { error?: string };
-      setMsg(res.ok ? { ok: true, text: "Saved." } : { ok: false, text: data.error ?? "Couldn't save." });
+      setMsg(res.ok ? { ok: true, text: "Saved." } : { ok: false, text: data.error ?? "Couldn't save. Try again." });
       if (res.ok) router.refresh();
     } catch {
       setMsg({ ok: false, text: "Couldn't save. Check your connection and try again." });
@@ -44,34 +62,38 @@ export function ContactDetailsForm({
   }
 
   return (
-    <form onSubmit={save} className="space-y-4">
-      <div className="grid gap-4 sm:grid-cols-2">
-        <label className="block text-sm font-medium text-ink-800">
-          First name
-          <input required minLength={2} value={v.firstName} onChange={set("firstName")} className={input} autoComplete="given-name" />
-        </label>
-        <label className="block text-sm font-medium text-ink-800">
-          Last name
-          <input required value={v.lastName} onChange={set("lastName")} className={input} autoComplete="family-name" />
-        </label>
+    <form onSubmit={save} noValidate className="space-y-6">
+      <Grid>
+        <Field id="firstName" label="First name" value={v.firstName} onChange={set("firstName")} autoComplete="given-name" error={errors.firstName} />
+        <Field id="lastName" label="Last name" value={v.lastName} onChange={set("lastName")} autoComplete="family-name" error={errors.lastName} />
+      </Grid>
+      <div className="min-w-0">
+        <Label htmlFor="phoneNumber">Mobile number</Label>
+        <div className="mt-2 grid grid-cols-[minmax(0,8.5rem)_minmax(0,1fr)] gap-2.5">
+          <Select
+            id="countryCode"
+            ariaLabel="Country code"
+            value={v.countryCode}
+            onChange={set("countryCode")}
+            options={codes.map((c) => ({ value: c.code, label: c.country ? `${c.code} ${c.country}` : c.code }))}
+          />
+          <input
+            id="phoneNumber"
+            name="phoneNumber"
+            inputMode="tel"
+            autoComplete="tel-national"
+            value={v.phoneNumber}
+            onChange={(e) => set("phoneNumber")(e.target.value.replace(/\D/g, "").slice(0, 15))}
+            aria-invalid={errors.phoneNumber ? true : undefined}
+            aria-describedby={errors.phoneNumber ? "phoneNumber-error" : "phoneNumber-hint"}
+            className={controlClass(errors.phoneNumber, "nums")}
+          />
+        </div>
+        <FieldNote id="phoneNumber" error={errors.phoneNumber} hint={phoneHint(v.countryCode)} />
       </div>
-      <div className="grid grid-cols-[6rem_1fr] gap-3 sm:gap-4">
-        <label className="block text-sm font-medium text-ink-800">
-          Code
-          <input required value={v.countryCode} onChange={set("countryCode")} className={input} />
-        </label>
-        <label className="block text-sm font-medium text-ink-800">
-          Phone
-          <input required inputMode="tel" value={v.phoneNumber} onChange={set("phoneNumber")} className={input} autoComplete="tel-national" />
-          <span className="mt-1 block text-xs font-normal text-text-subtle">{phoneHint(v.countryCode)}</span>
-        </label>
-      </div>
-      <div className="flex items-center gap-3">
-        <button
-          type="submit"
-          disabled={busy}
-          className="inline-flex min-h-11 items-center rounded-[10px] bg-primary px-5 text-sm font-semibold text-white hover:bg-primary-hover disabled:opacity-60"
-        >
+      <div className="flex flex-wrap items-center gap-3">
+        <button type="submit" disabled={busy} className={buttonClass({ variant: "primary", size: "md" })}>
+          {busy ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
           {busy ? "Saving…" : "Save details"}
         </button>
         {msg ? (

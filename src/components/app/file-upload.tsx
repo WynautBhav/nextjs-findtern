@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { Check, FileUp, Loader2 } from "lucide-react";
 
+import { buttonClass } from "@/components/ui/button";
 import { csrfFetch } from "@/lib/client-fetch";
 import { cn } from "@/lib/utils";
 
@@ -125,15 +126,21 @@ export function FileUpload({
 
   return (
     <div className={className}>
-      <div className="flex flex-wrap items-center gap-3">
+      {/* The file name sits on its own line under the button, so two uploads
+          side by side keep the same shape whatever the name's length. */}
+      <div className="flex flex-col items-start gap-2">
         <label
           htmlFor={id}
-          className={cn(
-            "inline-flex min-h-11 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-[10px] border border-ink-200 bg-white px-3 text-xs font-semibold text-ink-800 shadow-2xs hover:bg-ink-50 focus-within:ring-2 focus-within:ring-brand-500/30",
-            state === "busy" && "pointer-events-none opacity-60",
-          )}
+          className={buttonClass({
+            variant: "outline",
+            size: "sm",
+            className: cn(
+              "min-h-11 cursor-pointer focus-within:ring-[3px] focus-within:ring-brand-600/20",
+              state === "busy" && "pointer-events-none opacity-60",
+            ),
+          })}
         >
-          {state === "busy" ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : <FileUp className="size-3.5 text-brand-600" aria-hidden />}
+          {state === "busy" ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <FileUp className="size-4" aria-hidden />}
           {state === "busy" ? "Uploading…" : name ? `Replace ${word}` : `Upload ${word}`}
           <input
             ref={input}
@@ -149,8 +156,8 @@ export function FileUpload({
           />
         </label>
         {name ? (
-          <span className="inline-flex min-w-0 items-center gap-1 text-xs text-ink-600">
-            {state === "done" ? <Check className="size-3.5 text-brand-600" aria-hidden /> : null}
+          <span className="inline-flex min-w-0 max-w-full items-center gap-1.5 text-sm text-ink-700">
+            {state === "done" ? <Check className="size-4 shrink-0 text-brand-600" aria-hidden /> : null}
             <span className="truncate">{name}</span>
           </span>
         ) : null}
@@ -160,17 +167,17 @@ export function FileUpload({
           src={previewUrl}
           controls
           preload="metadata"
-          className="mt-3 aspect-video w-full max-w-sm rounded-[10px] border border-ink-200 bg-ink-900"
+          className="mt-3 aspect-video w-full max-w-sm rounded-apple-sm border border-ink-200 bg-ink-900"
         >
           <track kind="captions" />
         </video>
       ) : null}
       {error ? (
-        <p role="alert" className="mt-1.5 text-xs text-danger">
+        <p role="alert" className="mt-1.5 text-xs font-medium text-danger">
           {error}
         </p>
       ) : hint ? (
-        <p className="mt-1.5 text-xs text-text-subtle">{hint}</p>
+        <p className="mt-1.5 text-xs text-ink-500">{hint}</p>
       ) : null}
     </div>
   );

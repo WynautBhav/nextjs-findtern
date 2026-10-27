@@ -1,110 +1,173 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
-
-import { PageHead, SectionHead, Surface, WaitingNote } from "@/components/app/primitives";
-import { ReadinessMeter } from "@/components/app/readiness";
-import { ProfileCard } from "@/components/app/profile-card";
-import { requireRole } from "@/lib/auth";
-import { getDb, schema } from "@/lib/db";
+import { ArrowRight, PencilLine } from "lucide-react";
 import { eq } from "drizzle-orm";
+
+import { DetailRow, PageHead, Surface } from "@/components/app/primitives";
+import { ButtonLink } from "@/components/ui/button";
+import { CompletionList } from "@/components/intern/completion-list";
+import { OpenToWorkToggle } from "@/components/intern/open-to-work-toggle";
+import { ProfileView, type ProfileStatus } from "@/components/intern/profile-view";
+import { requireRole } from "@/lib/auth";
+import { aiInterviewLinks } from "@/lib/ai-interview-links";
+import { aiInterviewPhase, isScored, latestAiInterview } from "@/lib/ai-interview";
+import { getDb, schema } from "@/lib/db";
 import { loadInternData } from "@/lib/intern-data";
-import { draftFromRecord } from "@/lib/onboarding";
+import { draftFromRecord, emptyDraft, profileCompletion, type OnboardingDraft } from "@/lib/onboarding";
+import { isInternPaid } from "@/lib/payments";
+import { visibleAgainAt } from "@/lib/profile-hide";
 
 export const metadata: Metadata = {
   title: "Your profile",
   robots: { index: false, follow: false },
 };
 
+const RATING_LABELS: [key: string, label: string][] = [
+  ["coding", "Coding"],
+  ["aptitude", "Aptitude"],
+  ["interview", "AI interview"],
+  ["communication", "Communication"],
+  ["academic", "Academics"],
+];
+
 /**
- * The profile, as the candidate sees it.
- *
- * The same facts that power the card on the home screen, plus the full
- * readiness meter: what an employer can see, what is still hidden, and which
- * of those block payment. Nothing here duplicates a row, so a change made in
- * the onboarding editor shows up on the card and on this page the next time
- * the page renders.
+ * Your profile, as employers read it (INT-13), with the status legacy showed
+ * (INT-14): "Profile live" only once activation is paid and the score is
+ * published, "Profile pending" before that, "Profile hidden" while
+ * open-to-work is off. The rail holds what only the candidate sees:
+ * completeness, visibility and the private contact details.
  */
 export default async function InternProfile() {
   const session = await requireRole("intern");
 
   const data = await loadInternData(session.uid);
   const [user] = await getDb()
-    .select({ first: schema.users.firstName, last: schema.users.lastName })
+    .select({
+      first: schema.users.firstName,
+      last: schema.users.lastName,
+      email: schema.users.email,
+      countryCode: schema.users.countryCode,
+      phone: schema.users.phoneNumber,
+    })
     .from(schema.users)
     .where(eq(schema.users.id, session.uid))
     .limit(1);
+  const activated = await isInternPaid(session.uid);
 
   const name = `${user?.first ?? ""} ${user?.last ?? ""}`.trim() || "Candidate";
   const initials = `${(user?.first ?? "").charAt(0)}${(user?.last ?? "").charAt(0)}`.toUpperCase() || "?";
-  const draft = data.onboarding ? draftFromRecord(data.onboarding) : null;
-  const academics = draft?.academics;
+  // Stored rows can miss whole sections; fill them so every list is an array.
+  const draft: OnboardingDraft | null = data.onboarding
+    ? (() => {
+        const base = emptyDraft();
+        const stored = draftFromRecord(data.onboarding);
+        return { ...base, ...stored, academics: { ...base.academics, ...stored.academics } } as OnboardingDraft;
+      })()
+    : null;
+  const extra = (data.onboarding?.extraData ?? {}) as Record<string, unknown>;
+
+  const openToWork = extra.openToWork !== false;
+  const scored = aiInterviewPhase(latestAiInterview(data.interviews, data.aiEmployerIds), isScored(extra)) === "scored";
+  const status: ProfileStatus = !openToWork
+    ? {
+        tone: "closed",
+        label: "Profile hidden",
+        detail: "Open to work is off, so new employers can't find you. Companies you already work with still can.",
+      }
+    : activated && scored
+      ? { tone: "live", label: "Profile live", detail: "Employers can find you in search and send you offers." }
+      : {
+          tone: "waiting",
+          label: "Profile pending",
+          detail: activated
+            ? "Employers can find you once your AI interview score is published."
+            : "Employers can find you once your profile is complete, activated and scored.",
+        };
+
+  const rawScore = typeof extra.findternScore === "number" ? extra.findternScore : Number(extra.findternScore);
+  const score = extra.findternScore !== undefined && extra.findternScore !== null && Number.isFinite(rawScore) ? rawScore : null;
+  const ratingsBag = (extra.ratings && typeof extra.ratings === "object" ? extra.ratings : {}) as Record<string, unknown>;
+  const ratings = RATING_LABELS.flatMap(([key, label]) => {
+    const v = ratingsBag[key];
+    return typeof v === "number" && Number.isFinite(v) ? [[label, Math.max(0, Math.min(10, v))] as [string, number]] : [];
+  });
+
+  const completion = profileCompletion(data.onboarding, {
+    hasPanImage: Boolean(data.document?.panImageName),
+    hasAadhaarImage: Boolean(data.document?.aadhaarImageName),
+    hasPhoto: Boolean(data.document?.profilePhotoName),
+  });
+  const aiLinks = await aiInterviewLinks(session.uid, extra);
+  const visibleAgain = openToWork ? null : visibleAgainAt(extra.hiddenAt)?.toISOString() ?? null;
+
+  const emergency = draft?.emergencyPhone
+    ? [draft.emergencyName, draft.emergencyRelation && `(${draft.emergencyRelation})`, `${draft.emergencyCountryCode ?? "+91"} ${draft.emergencyPhone}`]
+        .filter(Boolean)
+        .join(" ")
+    : null;
 
   return (
     <div>
       <PageHead
-        title={name}
-        lede="What employers can see, what is still hidden from them, and the fastest way to complete it."
+        title="Your profile"
+        lede="This is what employers read when they consider you. Keep it current: it is the only thing they search."
         action={
-          <Link
-            href="/intern/onboarding"
-            className="apple-spring apple-pressable inline-flex min-h-11 items-center gap-2 rounded-[10px] bg-primary px-5 text-sm font-semibold text-white shadow-sm hover:bg-primary-hover"
-          >
+          <ButtonLink href="/intern/onboarding">
+            <PencilLine className="size-4" aria-hidden />
             Edit profile
-            <ArrowRight className="size-4" aria-hidden />
-          </Link>
+          </ButtonLink>
         }
       />
 
-      <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_20rem]">
-        <div className="min-w-0 space-y-8">
-          <SectionHead title="Your profile card" hint="This is the card an employer sees in search." />
-          <ProfileCard
+      <div className="grid gap-x-10 gap-y-8 xl:grid-cols-[minmax(0,1fr)_20rem]">
+        <div className="min-w-0">
+          <ProfileView
             name={name}
             initials={initials}
-            stage={data.stage}
-            city={data.onboarding?.city}
-            state={data.onboarding?.state}
-            bio={data.onboarding?.bio}
-            skills={draft?.skills ?? []}
-            degree={academics?.degree || null}
-            institution={academics?.institution || null}
-            yearOfGraduation={academics?.yearOfGraduation || null}
-            cgpa={academics?.cgpa || null}
+            photoUrl={data.document?.profilePhotoName ? "/api/intern/avatar" : null}
+            status={status}
+            score={score}
+            ratings={ratings}
+            draft={draft}
+            aiLinks={aiLinks}
           />
-
-          {data.onboarding?.bio ? (
-            <Surface className="p-6">
-              <SectionHead title="About you" />
-              <p className="text-pretty leading-relaxed text-ink-700">{data.onboarding.bio}</p>
-            </Surface>
-          ) : null}
-
-          {data.onboarding?.linkedinUrl ? (
-            <Surface className="p-6">
-              <SectionHead title="LinkedIn" />
-              <a
-                href={data.onboarding.linkedinUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="apple-spring apple-pressable inline-flex min-h-11 items-center text-sm font-medium text-primary underline-offset-4 hover:underline"
-              >
-                {data.onboarding.linkedinUrl}
-              </a>
-            </Surface>
-          ) : null}
         </div>
 
-        <aside className="space-y-5">
-          <ReadinessMeter readiness={data.readiness} />
+        <aside className="space-y-4">
+          {!completion.complete ? <CompletionList completion={completion} /> : null}
+
           <Surface className="p-5">
-            <WaitingNote who="Your record" typical="Dated, named, and exportable." />
+            <OpenToWorkToggle initial={openToWork} visibleAgainAt={visibleAgain} />
+          </Surface>
+
+          <Surface as="section" aria-labelledby="private-head" className="p-5">
+            <h2 id="private-head" className="text-base font-semibold tracking-[-0.01em] text-ink-900">
+              Only you and Findtern see this
+            </h2>
+            <p className="mt-1 text-sm text-ink-600">Shared with a company only after it hires you.</p>
+            <dl className="mt-2 divide-y divide-ink-100">
+              <DetailRow label="Email" value={<span className="break-all">{user?.email ?? "-"}</span>} />
+              <DetailRow label="Phone" mono value={user?.phone ? `${user.countryCode} ${user.phone}` : "Not added"} />
+              <DetailRow label="Emergency" value={emergency ?? "Not added"} />
+              <DetailRow
+                label="LinkedIn"
+                value={
+                  draft?.linkedinUrl ? (
+                    <a href={draft.linkedinUrl} target="_blank" rel="noopener noreferrer" className="font-medium text-primary underline-offset-4 hover:underline">
+                      Open
+                    </a>
+                  ) : (
+                    "Not added"
+                  )
+                }
+              />
+            </dl>
             <Link
-              href="/intern/record"
-              className="apple-spring apple-pressable mt-3 inline-flex min-h-11 items-center gap-1 text-sm font-medium text-primary underline-offset-4 hover:underline"
+              href="/intern/settings"
+              className="mt-2 inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-primary underline-offset-4 hover:underline"
             >
-              Open your record
-              <ArrowRight className="size-3.5" aria-hidden />
+              Change name or phone in Settings
+              <ArrowRight className="size-4" aria-hidden />
             </Link>
           </Surface>
         </aside>

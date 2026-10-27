@@ -83,7 +83,9 @@ export async function loadInternData(uid: string) {
       names[row.id] = revealed.has(row.id) ? row.companyName : HIDDEN_COMPANY;
     }
   }
-  // Legacy AI interviews sit on the employer id "admin", which has no row.
+  // Legacy AI interviews sit on the employer id "admin" (the shared database
+  // has that row, email ai-interview@findtern.ai, created by legacy
+  // ensureAiInterviewEmployer); a fresh database may not, so cover it here.
   if (i.some((x) => x.employerId === "admin")) {
     aiEmployerIds.add("admin");
     names.admin = AI_INTERVIEW_NAME;
@@ -142,7 +144,7 @@ export async function projectNames(ids: string[]): Promise<Record<string, string
  * "no roles open" state, so an empty list is a complete answer, not an
  * error masquerading as one.
  */
-export async function openProjects(limit = 60) {
+export async function openProjects(limit = 60, opts: { strict?: boolean } = {}) {
   if (!hasDb()) return [];
   try {
     const db = getDb();
@@ -166,12 +168,15 @@ export async function openProjects(limit = 60) {
     .where(and(eq(schema.projects.status, "active"), eq(schema.projects.employerId, schema.projects.employerId)))
     .orderBy(desc(schema.projects.createdAt))
     .limit(limit);
-  } catch {
+  } catch (e) {
+    // Signed-in screens pass `strict` so an outage shows the error state
+    // instead of "no roles open"; the public list keeps degrading quietly.
+    if (opts.strict) throw e;
     return [];
   }
 }
 
-export async function projectById(id: string) {
+export async function projectById(id: string, opts: { strict?: boolean } = {}) {
   if (!hasDb()) return null;
   try {
     const db = getDb();
@@ -195,7 +200,8 @@ export async function projectById(id: string) {
     .where(eq(schema.projects.id, id))
     .limit(1);
     return row ?? null;
-  } catch {
+  } catch (e) {
+    if (opts.strict) throw e;
     return null;
   }
 }

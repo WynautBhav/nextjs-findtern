@@ -1,7 +1,7 @@
-import Link from "next/link";
 import { ArrowRight, Check } from "lucide-react";
 
 import { Surface } from "@/components/app/primitives";
+import { ButtonLink } from "@/components/ui/button";
 import type { loadInternData } from "@/lib/intern-data";
 import { profileCompletion } from "@/lib/onboarding";
 import { isInternPaid } from "@/lib/payments";
@@ -46,35 +46,32 @@ export function LockedRoles({ complete, activated, done, total }: { complete: bo
   ];
   const next = steps.find((s) => !s.done) ?? steps[0];
   return (
-    <Surface className="p-6 sm:p-8">
-      <h2 className="text-lg font-semibold tracking-tight text-ink-900">Open roles unlock after two steps</h2>
-      <p className="mt-1 max-w-prose text-sm text-ink-600">
+    <Surface className="max-w-2xl p-6 sm:p-8">
+      <h2 className="text-lg font-semibold tracking-[-0.015em] text-ink-900">Open roles unlock after two steps</h2>
+      <p className="mt-1.5 max-w-prose text-pretty text-[0.9375rem] leading-relaxed text-ink-600">
         Companies only see profiles that are complete and active, so roles open up for you once both are done.
       </p>
-      <ol className="mt-5 space-y-3">
+      <ol className="mt-6 space-y-4">
         {steps.map((s, i) => (
           <li key={s.label} className="flex items-start gap-3">
             <span
-              className={`mt-0.5 grid size-6 shrink-0 place-items-center rounded-full text-xs font-semibold ${
-                s.done ? "bg-brand-100 text-brand-700" : "bg-ink-100 text-ink-600"
+              className={`nums mt-0.5 grid size-7 shrink-0 place-items-center rounded-full text-sm font-semibold ${
+                s.done ? "bg-brand-600 text-white" : s === next ? "bg-accent-400 text-brand-950" : "border border-ink-200 text-ink-500"
               }`}
             >
-              {s.done ? <Check className="size-3.5" aria-label="Done" /> : i + 1}
+              {s.done ? <Check className="size-4" strokeWidth={3} aria-label="Done" /> : i + 1}
             </span>
             <span className="min-w-0">
-              <span className="block text-sm font-medium text-ink-900">{s.label}</span>
-              <span className="block text-sm text-ink-600">{s.detail}</span>
+              <span className="block text-base font-semibold text-ink-900">{s.label}</span>
+              <span className="mt-0.5 block text-sm text-ink-600">{s.detail}</span>
             </span>
           </li>
         ))}
       </ol>
-      <Link
-        href={next.href}
-        className="apple-spring apple-pressable mt-6 inline-flex min-h-11 items-center gap-1.5 rounded-[10px] bg-primary px-5 text-sm font-semibold text-white shadow-sm hover:bg-primary-hover"
-      >
+      <ButtonLink href={next.href} className="mt-7">
         {next.cta}
         <ArrowRight className="size-4" aria-hidden />
-      </Link>
+      </ButtonLink>
     </Surface>
   );
 }

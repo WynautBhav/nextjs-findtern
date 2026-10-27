@@ -25,18 +25,26 @@ export function humanizeStatus(value: string): string {
   return spaced.charAt(0).toUpperCase() + spaced.slice(1);
 }
 
-/** Candidate-facing proposal state. Moved verbatim from proposal-status. */
+/**
+ * Candidate-facing proposal state. Takes the stored status or the derived
+ * intern key from lib/intern-offer-view (`lapsed`, `fulltime_hired`), which
+ * is what the intern offer screens pass.
+ */
 export function proposalStatus(status: string | null): {
   label: string;
   tone: Tone;
   detail: string;
 } {
   switch ((status ?? "").toLowerCase()) {
+    // "processing" is a legacy checkout in progress: the intern already
+    // accepted (INW-21). Logging hours waits for the payment (bug sheet 7,
+    // S1 r65 over r55).
     case "accepted":
+    case "processing":
       return {
         label: "Accepted · awaiting payment",
         tone: "waiting",
-        detail: "You accepted this offer. Logging hours opens once the company completes the payment.",
+        detail: "You accepted this offer. The company completes the payment next, and logging hours opens once they do.",
       };
     case "hired":
       return {
@@ -44,8 +52,16 @@ export function proposalStatus(status: string | null): {
         tone: "paid",
         detail: "The company completed the payment. Log your hours on Timesheets.",
       };
+    // Accepting a full-time offer is the hire itself (INW-13): no payment
+    // step on the intern's side and no timesheets.
+    case "fulltime_hired":
+      return {
+        label: "Hired · full-time",
+        tone: "paid",
+        detail: "You accepted this full-time offer, which makes you hired. Join the company on the joining date.",
+      };
     case "rejected":
-      return { label: "Not this time", tone: "closed", detail: "Nothing more is needed from you." };
+      return { label: "Rejected", tone: "closed", detail: "This offer is closed. Nothing more is needed from you." };
     case "interview_scheduled":
       return {
         label: "Interview booked",
@@ -53,16 +69,22 @@ export function proposalStatus(status: string | null): {
         detail: "Waiting on the interview to happen.",
       };
     case "withdrawn":
-      return { label: "Withdrawn", tone: "closed", detail: "The company closed this one." };
+      return { label: "Withdrawn", tone: "closed", detail: "The company withdrew this offer." };
+    // Legacy shows "expired" as Withdrawn (INW-16): it is set when another
+    // offer from the same company was accepted, or by Findtern staff.
     case "expired":
-      return { label: "Expired", tone: "closed", detail: "This offer ran out of time." };
+      return {
+        label: "Withdrawn",
+        tone: "closed",
+        detail: "This offer was closed, usually because you accepted another offer from the same company.",
+      };
     // Not stored: an offer the intern never answered, once its joining date
-    // has passed. Intern pages derive it (bug sheet 21 Oct wording).
+    // arrived (INW-17: it closes on that date).
     case "lapsed":
       return {
         label: "Rejected · no response",
         tone: "closed",
-        detail: "You did not respond before the joining date, so this offer was marked as rejected.",
+        detail: "You did not answer before the joining date, so the offer closed on that date and was marked as rejected.",
       };
     case "draft":
       return { label: "Not sent yet", tone: "neutral", detail: "The company has not sent this." };
@@ -70,7 +92,7 @@ export function proposalStatus(status: string | null): {
       return {
         label: "Waiting on you",
         tone: "waiting",
-        detail: "Accept or turn it down before the joining date. If you do nothing, it is marked as rejected once the joining date passes.",
+        detail: "Accept or turn it down before the joining date. If you do nothing, it closes on the joining date and is marked as rejected.",
       };
   }
 }

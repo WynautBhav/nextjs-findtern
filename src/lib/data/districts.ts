@@ -38,6 +38,15 @@ export function suggestDistricts(query: string, limit = 8): District[] {
   return [...districtHits, ...stateHits].slice(0, limit);
 }
 
+/** The districts of one state, by name, for the city dropdown. */
+export function districtsOf(state: string): string[] {
+  const s = state.trim().toLowerCase();
+  if (!s) return [];
+  return DISTRICTS.filter((d) => d.state.toLowerCase() === s)
+    .map((d) => d.district)
+    .sort((a, b) => a.localeCompare(b));
+}
+
 /** The state a named district belongs to - used to auto-fill the state field. */
 export function stateForDistrict(name: string): string | null {
   const q = name.trim().toLowerCase();

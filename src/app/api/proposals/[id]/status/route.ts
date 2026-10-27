@@ -170,7 +170,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
       if (!parsed.data.acknowledgeGuaranteeEnd) {
         return NextResponse.json(
           {
-            error: `You have already turned down ${previous.length} offers. Turning down another ends your placement guarantee.`,
+            error: `You have already turned down ${previous.length} offers. Turn down more than ${FREE_DECLINES} and you are no longer eligible for a refund under the guarantee.`,
             code: "guarantee_warning",
             declines: previous.length,
           },

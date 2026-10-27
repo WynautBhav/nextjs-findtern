@@ -3,19 +3,18 @@ import { eq, desc } from "drizzle-orm";
 
 import { getDb, schema } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
-import { emptyDraft, draftFromRecord, type OnboardingDraft, type StoredDocument } from "@/lib/onboarding";
+import { emptyDraft, draftFromRecord, isOnboarded, type OnboardingDraft, type StoredDocument } from "@/lib/onboarding";
 import { skillsLocked } from "@/lib/skills-lock";
-import { PageHead } from "@/components/app/primitives";
+import { EmptyScene, PageHead } from "@/components/app/primitives";
 import { OnboardingForm } from "@/components/intern/onboarding-form";
 
 export const metadata: Metadata = {
-  title: "Complete your profile",
+  title: "Your profile",
   robots: { index: false, follow: false },
 };
 
 /* Thin server shell. It reads what is already saved, hands the client form a
- * plain object, and gets out of the way - the 5,900-line legacy page was mostly
- * step state, and step state belongs on the client.
+ * plain object, and gets out of the way - step state belongs on the client.
  *
  * The form saves through `POST /api/intern/onboarding`. */
 
@@ -26,6 +25,7 @@ export default async function InternOnboarding() {
   let serverUpdatedAt: string | null = null;
   let account: { countryCode: string; phoneNumber: string } | null = null;
   let locked = false;
+  let onboarded = false;
   let hasPanImage = false;
   let hasAadhaarImage = false;
   let hasPhoto = false;
@@ -38,12 +38,6 @@ export default async function InternOnboarding() {
       .where(eq(schema.internOnboarding.userId, session.uid))
       .orderBy(desc(schema.internOnboarding.createdAt))
       .limit(1);
-
-    if (row) {
-      Object.assign(draft, draftFromRecord(row));
-      locked = await skillsLocked(db, session.uid, row.extraData);
-      serverUpdatedAt = (row.updatedAt ?? row.createdAt)?.toISOString() ?? null;
-    }
 
     const [record] = await db
       .select()
@@ -64,27 +58,53 @@ export default async function InternOnboarding() {
       hasPanImage = Boolean(record.panImageName);
       hasAadhaarImage = Boolean(record.aadhaarImageName);
       hasPhoto = Boolean(record.profilePhotoName);
-      // The upload writes intern_documents, not extra.photoUrl, so the form's
-      // photo is derived from the stored avatar and survives a reload.
-      if (record.profilePhotoName) {
-        const v = (record.updatedAt ?? record.createdAt)?.getTime() ?? 0;
-        draft.photoUrl = `/api/intern/avatar?v=${v}`;
-      }
       documents = [
         { label: "Profile photo", fileName: record.profilePhotoName ?? "" },
         { label: "Aadhaar", fileName: record.aadhaarImageName ?? "" },
         { label: "PAN", fileName: record.panImageName ?? "" },
+        { label: "Intro video", fileName: record.introVideoName ?? "" },
       ].filter((doc) => doc.fileName.length > 0);
     }
+
+    if (row) {
+      Object.assign(draft, draftFromRecord(row));
+      locked = await skillsLocked(db, session.uid, row.extraData);
+      serverUpdatedAt = (row.updatedAt ?? row.createdAt)?.toISOString() ?? null;
+      onboarded = isOnboarded(row, { hasPanImage, hasAadhaarImage, hasPhoto });
+    }
+
+    // The upload writes intern_documents, not extra.photoUrl, so the form's
+    // photo is derived from the stored avatar and survives a reload.
+    if (record?.profilePhotoName) {
+      const v = (record.updatedAt ?? record.createdAt)?.getTime() ?? 0;
+      draft.photoUrl = `/api/intern/avatar?v=${v}`;
+    }
   } catch {
-    // DB unavailable - render the blank form rather than crashing the page.
+    // A failed read must not look like an empty profile: saving that would
+    // overwrite what is stored. Show the error instead.
+    return (
+      <div>
+        <PageHead title="Your profile" />
+        <EmptyScene
+          title="We couldn't load your profile"
+          body="Nothing has been changed. Reload the page in a minute; if it keeps happening, write to communicate@findtern.in."
+          next={{ label: "Reload", href: "/intern/onboarding" }}
+          art
+        />
+      </div>
+    );
   }
 
   return (
     <div>
       <PageHead
-        title="Complete your profile"
-        lede="Employers shortlist on what is filled in here. Eight short steps."
+        eyebrow={onboarded ? "Your profile" : "Set up your profile"}
+        title={onboarded ? "Edit your profile" : "Complete your profile"}
+        lede={
+          onboarded
+            ? "Changes are checked in full before they are saved, so your live profile always stays complete."
+            : "Employers shortlist on what you fill in here. Eight short steps; your progress is kept as you go."
+        }
       />
       <OnboardingForm
         initial={draft}
@@ -93,6 +113,7 @@ export default async function InternOnboarding() {
         serverUpdatedAt={serverUpdatedAt}
         account={account}
         skillsLocked={locked}
+        onboarded={onboarded}
         hasPanImage={hasPanImage}
         hasAadhaarImage={hasAadhaarImage}
         hasPhoto={hasPhoto}

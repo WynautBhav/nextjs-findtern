@@ -4,33 +4,61 @@ import { NextResponse } from "next/server";
 import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
 import { isInternPaid } from "@/lib/payments";
+import { AI_EMPLOYER_ID, aiInterviewPhase, isScored, joinableLink } from "@/lib/ai-interview";
 
 /**
  * Apply for the AI interview.
  *
- * This is not a call to an external service. The legacy build created an
- * interview row against a synthetic employer (`ai-interview@findtern.ai`) with
- * status "waiting", and the actual interview happened over a link an admin sent
- * afterwards. That queue is the whole mechanism, and it needs no vendor - which
- * is why the feature can come back without waiting on anyone.
+ * Not a call to an external service. Legacy created an interview row against
+ * the AI employer (id "admin", email ai-interview@findtern.ai) with status
+ * "waiting", and the interview happened over a link an admin set afterwards.
+ * That queue is the whole mechanism.
  *
- * Two gates, both from the legacy behaviour and both load-bearing:
- *   1. Payment. The ₹2,499 activation is what makes the profile visible, and
- *      the interview is the thing that produces the score, so an unpaid profile
- *      cannot enter the queue.
- *   2. One in flight. A second application would put a duplicate in the admin's
- *      queue, so a pending/waiting/scheduled interview returns 409 with the
- *      existing row rather than creating another.
+ * Gates, all from legacy:
+ *   1. Payment. The activation is what makes the profile visible, and the
+ *      interview produces the score, so an unpaid profile can't queue.
+ *   2. One AI interview, ever. Legacy offered "apply" only while no AI row
+ *      existed (CandidateHeader: `if (!aiInterview) apply`), whatever its
+ *      status, so a completed, missed or cancelled interview never queues a
+ *      duplicate (INT-10). Staff re-open one from admin, not the candidate.
  */
 
 const AI_EMAIL = "ai-interview@findtern.ai";
-const IN_FLIGHT = ["waiting", "pending", "scheduled"];
 
 /**
- * Preflight: is an application already in the queue?
- *
- * Without this the button is a live-looking control that 409s for anyone who
- * already applied, which reads as a broken page rather than as "you are done".
+ * The AI employer ids. The shared database already has the legacy row with
+ * id "admin" (legacy ensureAiInterviewEmployer, routes.ts:1079), so it is
+ * looked up first; an email match covers a row created under another id.
+ */
+async function aiEmployerIds(): Promise<string[]> {
+  const db = getDb();
+  const byEmail = await db
+    .select({ id: schema.employers.id })
+    .from(schema.employers)
+    .where(eq(schema.employers.companyEmail, AI_EMAIL));
+  return [...new Set([AI_EMPLOYER_ID, ...byEmail.map((r) => r.id)])];
+}
+
+async function latestAiRow(internId: string, ids: string[]) {
+  const rows = await getDb()
+    .select({
+      id: schema.interviews.id,
+      employerId: schema.interviews.employerId,
+      status: schema.interviews.status,
+      meetingLink: schema.interviews.meetingLink,
+      createdAt: schema.interviews.createdAt,
+    })
+    .from(schema.interviews)
+    .where(and(eq(schema.interviews.internId, internId), inArray(schema.interviews.employerId, ids)))
+    .orderBy(desc(schema.interviews.createdAt))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+/**
+ * Where the candidate stands: the phase the home screen and the interviews
+ * page show, and the join link once an admin has set it. Polled while waiting
+ * so the link appears without a reload (legacy refreshed every 15 s).
  */
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -38,30 +66,21 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   if (!guard.ok) return guard.response;
 
   const db = getDb();
-  const [aiEmployer] = await db
-    .select({ id: schema.employers.id })
-    .from(schema.employers)
-    .where(eq(schema.employers.companyEmail, AI_EMAIL))
+  const [onboarding] = await db
+    .select({ extra: schema.internOnboarding.extraData })
+    .from(schema.internOnboarding)
+    .where(eq(schema.internOnboarding.userId, id))
     .limit(1);
-
-  if (!aiEmployer) return NextResponse.json({ pending: false });
-
-  const [existing] = await db
-    .select({ id: schema.interviews.id, status: schema.interviews.status })
-    .from(schema.interviews)
-    .where(
-      and(
-        eq(schema.interviews.internId, id),
-        eq(schema.interviews.employerId, aiEmployer.id),
-        inArray(schema.interviews.status, IN_FLIGHT),
-      ),
-    )
-    .limit(1);
+  const row = await latestAiRow(id, await aiEmployerIds());
+  const phase = aiInterviewPhase(row, isScored(onboarding?.extra));
 
   return NextResponse.json({
-    pending: Boolean(existing),
-    status: existing?.status ?? null,
-    message: existing ? "Your application is already in the queue." : null,
+    phase,
+    // Kept for older clients: "something is already in the queue".
+    pending: phase !== "apply",
+    status: row?.status ?? null,
+    interviewId: row?.id ?? null,
+    meetingLink: phase === "ready" ? joinableLink(row?.meetingLink) : null,
   });
 }
 
@@ -77,48 +96,39 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({ error: "Activate your profile before applying" }, { status: 402 });
   }
 
-  // The synthetic employer is a row like any other; create it if a fresh
-  // database has not been seeded with it yet.
-  let [aiEmployer] = await db
+  // Legacy shape on a fresh database: the AI employer is the row with id
+  // "admin". Created only when neither the id nor the email exists.
+  let ids = await aiEmployerIds();
+  const [known] = await db
     .select({ id: schema.employers.id })
     .from(schema.employers)
-    .where(eq(schema.employers.companyEmail, AI_EMAIL))
+    .where(inArray(schema.employers.id, ids))
     .limit(1);
-  if (!aiEmployer) {
-    const [created] = await db
+  if (!known) {
+    await db
       .insert(schema.employers)
       .values({
-        name: "Findtern AI Interview",
-        companyName: "Findtern AI Interview",
+        id: AI_EMPLOYER_ID,
+        name: "AI Interview",
+        companyName: "AI Interview",
         companyEmail: AI_EMAIL,
         emailVerified: true,
         countryCode: "+91",
         phoneNumber: "0000000000",
-        // Unusable credential: this account exists to own interview rows and
-        // must never be able to sign in.
+        // Unusable credential: this account owns interview rows and must
+        // never be able to sign in.
         password: "!ai-interview-account-cannot-sign-in",
         agreedToTerms: true,
       })
-      .returning({ id: schema.employers.id });
-    aiEmployer = created;
+      .onConflictDoNothing();
+    ids = await aiEmployerIds();
   }
 
-  // Gate 2 - one application in flight.
-  const [existing] = await db
-    .select({ id: schema.interviews.id, status: schema.interviews.status })
-    .from(schema.interviews)
-    .where(
-      and(
-        eq(schema.interviews.internId, id),
-        eq(schema.interviews.employerId, aiEmployer.id),
-        inArray(schema.interviews.status, IN_FLIGHT),
-      ),
-    )
-    .orderBy(desc(schema.interviews.createdAt))
-    .limit(1);
+  // Gate 2 - one AI interview, ever (any status).
+  const existing = await latestAiRow(id, ids);
   if (existing) {
     return NextResponse.json(
-      { error: "Your application is already in progress", interview: existing },
+      { error: "You have already applied for the AI interview.", interview: { id: existing.id, status: existing.status } },
       { status: 409 },
     );
   }
@@ -126,23 +136,27 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const [interview] = await db
     .insert(schema.interviews)
     .values({
-      employerId: aiEmployer.id,
+      employerId: AI_EMPLOYER_ID,
       internId: id,
       projectId: null,
       status: "waiting",
       timezone: "Asia/Kolkata",
-      notes: "AI interview - awaiting scheduling",
+      notes: null,
     })
     .returning({ id: schema.interviews.id });
 
-  await db.insert(schema.notifications).values({
-    recipientType: "intern",
-    recipientId: id,
-    type: "ai_interview_applied",
-    title: "AI interview requested",
-    message: "You are in the queue. The interview link arrives here, usually within two working days.",
-    dedupeKey: `ai_interview_applied:${interview.id}`,
-  });
+  await db
+    .insert(schema.notifications)
+    .values({
+      recipientType: "intern",
+      recipientId: id,
+      type: "ai_interview_applied",
+      title: "AI interview applied",
+      message: "Thanks for applying for the AI interview. Your interview link will be live in 24-48 hours.",
+      data: { interviewId: interview.id },
+      dedupeKey: `ai_interview_applied:${interview.id}`,
+    })
+    .onConflictDoNothing();
 
-  return NextResponse.json({ ok: true, interviewId: interview.id });
+  return NextResponse.json({ ok: true, interviewId: interview.id }, { status: 201 });
 }
