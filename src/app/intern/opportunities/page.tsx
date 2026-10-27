@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 import { EmptyScene, PageHead } from "@/components/app/primitives";
-import { RoleCard } from "@/components/marketing/role-card";
+import { InternRoleCard } from "@/components/intern/role-card";
 import { requireRole } from "@/lib/auth";
 import { loadInternData, openProjects } from "@/lib/intern-data";
 
@@ -38,14 +38,14 @@ export default async function InternOpportunities() {
       </div>
     );
   }
-  const rows = await openProjects();
+  const rows = await openProjects(60, { strict: true });
   const applied = new Set(data.proposals.map((p) => p.projectId).filter(Boolean));
 
   return (
     <div>
       <PageHead
         title="Open roles"
-        lede="What companies are hiring for right now. Every role here is accepting people today."
+        lede="What companies are hiring for right now. Companies send offers to the profiles they like, so there is nothing to apply to: keep your profile sharp."
       />
 
       {rows.length === 0 ? (
@@ -58,18 +58,14 @@ export default async function InternOpportunities() {
         />
       ) : (
         <>
-          <p className="mb-5 text-sm text-ink-600">
+          <p className="nums mb-5 text-sm font-medium text-ink-600">
             {rows.length} role{rows.length === 1 ? "" : "s"} open
-            {applied.size > 0 ? `, ${applied.size} you have already been considered for` : ""}
+            {applied.size > 0 ? ` · offers from ${applied.size}` : ""}
           </p>
-          <ul className="grid gap-3 lg:grid-cols-2">
+          <ul className="grid gap-4 lg:grid-cols-2">
             {rows.map((role) => (
               <li key={role.id}>
-                <RoleCard
-                  role={role}
-                  applied={applied.has(role.id)}
-                  hrefBase="/intern/opportunities"
-                />
+                <InternRoleCard role={role} considered={applied.has(role.id)} />
               </li>
             ))}
           </ul>

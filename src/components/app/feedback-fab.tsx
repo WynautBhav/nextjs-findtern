@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { CheckCircle2, Loader2, MessageCircleQuestion } from "lucide-react";
 
 import { FileUpload } from "@/components/app/file-upload";
+import { buttonClass } from "@/components/ui/button";
 import { csrfFetch } from "@/lib/client-fetch";
 import {
   Dialog,
@@ -20,6 +21,8 @@ const KINDS = [
   { value: "question", label: "Question" },
 ] as const;
 
+let deepLinkTaken = false;
+
 /**
  * Floating support entry. The legacy dashboards both had a report dialog
  * posting to /api/support/feedback; the route survived the rewrite with zero
@@ -31,6 +34,20 @@ export function FeedbackFab({ className, variant = "fab" }: { className?: string
   const [message, setMessage] = useState("");
   const [state, setState] = useState<"idle" | "sending" | "sent" | "error">("idle");
   const [attachment, setAttachment] = useState<string | null>(null);
+
+  // Legacy deep link (INT-37): ?support=feedback|report opens this dialog.
+  // The shell can mount the rail twice (desktop + drawer); only the first
+  // instance takes the link.
+  useEffect(() => {
+    const wanted = new URLSearchParams(window.location.search).get("support");
+    if ((wanted !== "feedback" && wanted !== "report") || deepLinkTaken) return;
+    deepLinkTaken = true;
+    const t = window.setTimeout(() => {
+      setKind(wanted === "report" ? "bug" : "idea");
+      setOpen(true);
+    }, 0);
+    return () => window.clearTimeout(t);
+  }, []);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -68,7 +85,7 @@ export function FeedbackFab({ className, variant = "fab" }: { className?: string
         className={cn(
           variant === "fab"
             ? "apple-spring apple-pressable fixed right-4 bottom-24 z-40 grid size-14 place-items-center rounded-full bg-brand-950 text-white shadow-[0_8px_24px_rgb(7_47_36/0.35)] ring-1 ring-white/15 lg:right-8 lg:bottom-8"
-            : "flex min-h-11 w-full items-center gap-2.5 rounded-[10px] px-3 text-sm text-on-dark-subtle hover:bg-white/6 hover:text-white",
+            : "flex min-h-11 w-full items-center gap-2.5 rounded-apple-sm px-3 text-sm text-on-dark-subtle hover:bg-white/6 hover:text-white",
           className,
         )}
       >
@@ -79,10 +96,10 @@ export function FeedbackFab({ className, variant = "fab" }: { className?: string
       <Dialog open={open} onOpenChange={(v) => (v ? setOpen(true) : close())}>
         <DialogContent className="apple-admin max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-[17px] font-semibold tracking-[-0.02em]">
+            <DialogTitle className="text-lg font-semibold tracking-[-0.02em]">
               Report a problem
             </DialogTitle>
-            <DialogDescription className="text-[13px]">
+            <DialogDescription className="text-sm">
               Goes straight to the Findtern team triage queue.
             </DialogDescription>
           </DialogHeader>
@@ -90,23 +107,23 @@ export function FeedbackFab({ className, variant = "fab" }: { className?: string
           {state === "sent" ? (
             <div className="flex flex-col items-center px-2 py-8 text-center">
               <CheckCircle2 className="size-10 text-brand-600" aria-hidden />
-              <p className="mt-3 text-[15px] font-semibold tracking-[-0.01em] text-ink-900">
+              <p className="mt-3 text-base font-semibold tracking-[-0.01em] text-ink-900">
                 Received
               </p>
-              <p className="mt-1 text-[14px] text-text-subtle">
+              <p className="mt-1 text-sm text-ink-600">
                 We read every report and reply where it helps.
               </p>
               <button
                 type="button"
                 onClick={close}
-                className="apple-spring apple-pressable mt-5 inline-flex min-h-11 items-center rounded-[10px] bg-brand-700 px-5 text-[14px] font-semibold text-white hover:bg-brand-600"
+                className={buttonClass({ className: "mt-5" })}
               >
                 Done
               </button>
             </div>
           ) : (
             <form onSubmit={submit} className="space-y-4 pt-2">
-              <div role="radiogroup" aria-label="What is this about" className="grid grid-cols-3 gap-1 rounded-[10px] bg-ink-100 p-1">
+              <div role="radiogroup" aria-label="What is this about" className="grid grid-cols-3 gap-1 rounded-apple-sm bg-ink-100 p-1">
                 {KINDS.map((k) => (
                   <button
                     key={k.value}
@@ -115,7 +132,7 @@ export function FeedbackFab({ className, variant = "fab" }: { className?: string
                     aria-checked={kind === k.value}
                     onClick={() => setKind(k.value)}
                     className={cn(
-                      "apple-spring inline-flex min-h-11 items-center justify-center rounded-[8px] px-2 text-[13px] font-medium",
+                      "apple-spring inline-flex min-h-11 items-center justify-center rounded-apple-sm px-2 text-sm font-medium",
                       kind === k.value
                         ? "bg-white text-ink-900 shadow-xs"
                         : "text-ink-600 hover:text-ink-800",
@@ -127,7 +144,7 @@ export function FeedbackFab({ className, variant = "fab" }: { className?: string
               </div>
 
               <div>
-                <label htmlFor="feedback-message" className="block text-[13px] font-semibold text-ink-800">
+                <label htmlFor="feedback-message" className="block text-sm font-semibold text-ink-800">
                   What happened?
                 </label>
                 <textarea
@@ -137,7 +154,7 @@ export function FeedbackFab({ className, variant = "fab" }: { className?: string
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
                   placeholder="One or two lines is plenty - what you did, what you expected."
-                  className="apple-spring mt-1.5 min-h-24 w-full rounded-[10px] border border-ink-200 bg-white p-3 text-[14px] text-ink-900 outline-none placeholder:text-ink-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+                  className="apple-spring mt-1.5 min-h-24 w-full rounded-apple-sm border border-ink-200 bg-white p-3 text-[0.9375rem] text-ink-900 outline-none placeholder:text-ink-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
                 />
               </div>
 
@@ -150,7 +167,7 @@ export function FeedbackFab({ className, variant = "fab" }: { className?: string
               />
 
               {state === "error" ? (
-                <p role="alert" className="rounded-[10px] border border-danger/30 bg-danger-soft p-3 text-[13px] font-medium text-danger">
+                <p role="alert" className="rounded-apple-sm border border-danger/30 bg-danger-soft p-3 text-sm font-medium text-danger">
                   That did not send. Check your connection and try again.
                 </p>
               ) : null}
@@ -159,14 +176,14 @@ export function FeedbackFab({ className, variant = "fab" }: { className?: string
                 <button
                   type="button"
                   onClick={close}
-                  className="apple-spring apple-pressable inline-flex min-h-11 items-center rounded-[10px] px-4 text-[14px] font-medium text-ink-700 hover:bg-ink-100"
+                  className={buttonClass({ variant: "ghost" })}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={state === "sending" || !message.trim()}
-                  className="apple-spring apple-pressable inline-flex min-h-11 items-center gap-1.5 rounded-[10px] bg-brand-700 px-5 text-[14px] font-semibold text-white hover:bg-brand-600 disabled:opacity-50"
+                  className={buttonClass({})}
                 >
                   {state === "sending" ? <Loader2 className="size-4 animate-spin" /> : null}
                   Send report

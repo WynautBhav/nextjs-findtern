@@ -36,6 +36,7 @@ import { ArrowUpRight, Check, Copy, Download } from "lucide-react";
 import { Pill, Surface } from "@/components/app/primitives";
 import { PROOF_META, proofAsText, type Proof } from "@/lib/journey";
 import { useSeenIds } from "@/components/app/thread";
+import { buttonClass } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 const KIND_TONE: Record<Proof["kind"], "live" | "paid" | "new" | "neutral" | "closed" | "waiting"> = {
@@ -71,7 +72,7 @@ export function ProofCard({
         ease: [0.16, 1, 0.3, 1],
       }}
       className={cn(
-        "apple-spring group relative overflow-hidden rounded-[20px] border border-ink-200/70 bg-white shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)] hover:border-ink-200",
+        "apple-spring group relative overflow-hidden rounded-apple-xl border border-ink-200/80 bg-white shadow-xs hover:border-ink-300",
         className,
       )}
     >
@@ -152,7 +153,7 @@ function CopyFact({ text, label }: { text: string; label: string }) {
           setCopied(false);
         }
       }}
-      className="apple-spring apple-pressable inline-flex min-h-11 items-center gap-1.5 rounded-[10px] px-2.5 text-sm font-medium text-ink-600 hover:bg-ink-100 hover:text-ink-900"
+      className={buttonClass({ variant: "ghost", size: "sm", className: "min-h-11 text-ink-600 hover:text-ink-900" })}
     >
       {copied ? <Check className="size-3.5 text-success" aria-hidden /> : <Copy className="size-3.5" aria-hidden />}
       <span className="sr-only">{copied ? "Copied" : label}</span>
@@ -206,7 +207,7 @@ export function RecordExport({
       <button
         type="button"
         onClick={download}
-        className="apple-spring apple-pressable inline-flex min-h-11 items-center gap-2 rounded-[10px] bg-primary px-5 text-sm font-semibold text-white shadow-sm hover:bg-primary-hover"
+        className={buttonClass({})}
       >
         {done ? <Check className="size-4" aria-hidden /> : <Download className="size-4" aria-hidden />}
         {done ? "Downloaded" : "Download your record"}

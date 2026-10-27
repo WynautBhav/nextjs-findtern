@@ -1,125 +1,145 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
+import { ArrowRight, LifeBuoy } from "lucide-react";
 
-import { PageHead, SectionHead, Surface, WaitingNote } from "@/components/app/primitives";
+import { DetailRow, PageHead, SectionHead, Surface } from "@/components/app/primitives";
 import { ChangePasswordForm } from "@/components/auth/change-password-form";
 import { BankDetailsForm, type BankDetails } from "@/components/intern/bank-details-form";
 import { ContactDetailsForm } from "@/components/intern/contact-details-form";
 import { requireRole } from "@/lib/auth";
 import { getDb, schema } from "@/lib/db";
+import { SITE } from "@/lib/content/site";
 
 export const metadata: Metadata = {
   title: "Settings",
   robots: { index: false, follow: false },
 };
 
+/** Legacy deep links (`/settings?view=…`, INT-37) land on the matching section. */
+const VIEW_ANCHOR: Record<string, string> = {
+  "bank-details": "bank",
+  bank: "bank",
+  "change-password": "password",
+  password: "password",
+};
+
 /**
- * Settings.
- *
- * Password change and bank payout preferences.
+ * Settings: contact details, stipend bank account, password, and the
+ * account facts support asks for. A failed read shows the error state
+ * (app/intern/error.tsx) rather than empty forms that would overwrite data.
  */
-export default async function InternSettings() {
+export default async function InternSettings({ searchParams }: { searchParams: Promise<{ view?: string }> }) {
   const session = await requireRole("intern");
+  const { view } = await searchParams;
+  if (view && VIEW_ANCHOR[view]) redirect(`/intern/settings#${VIEW_ANCHOR[view]}`);
+
   const uid = session.uid;
+  const db = getDb();
+  const [row] = await db
+    .select({ extra: schema.internOnboarding.extraData })
+    .from(schema.internOnboarding)
+    .where(eq(schema.internOnboarding.userId, uid))
+    .limit(1);
+  const extra = (row?.extra ?? {}) as Record<string, unknown>;
+  const initialBank = (extra.bankDetails ?? extra.bank ?? {}) as BankDetails;
 
-  let initialBank: BankDetails = {};
-  let contact = { firstName: "", lastName: "", countryCode: "+91", phoneNumber: "" };
-  try {
-    const db = getDb();
-    const [row] = await db
-      .select()
-      .from(schema.internOnboarding)
-      .where(eq(schema.internOnboarding.userId, uid))
-      .limit(1);
-
-    if (row?.extraData) {
-      const extra = row.extraData as Record<string, unknown>;
-      const bank = (extra.bankDetails ?? extra.bank ?? {}) as BankDetails;
-      initialBank = bank;
-    }
-    const [user] = await db
-      .select({ f: schema.users.firstName, l: schema.users.lastName, cc: schema.users.countryCode, p: schema.users.phoneNumber })
-      .from(schema.users)
-      .where(eq(schema.users.id, uid))
-      .limit(1);
-    if (user) contact = { firstName: user.f, lastName: user.l, countryCode: user.cc, phoneNumber: user.p };
-  } catch {}
+  const [user] = await db
+    .select({
+      f: schema.users.firstName,
+      l: schema.users.lastName,
+      cc: schema.users.countryCode,
+      p: schema.users.phoneNumber,
+      email: schema.users.email,
+      createdAt: schema.users.createdAt,
+    })
+    .from(schema.users)
+    .where(eq(schema.users.id, uid))
+    .limit(1);
+  const contact = user
+    ? { firstName: user.f, lastName: user.l, countryCode: user.cc, phoneNumber: user.p }
+    : { firstName: "", lastName: "", countryCode: "+91", phoneNumber: "" };
 
   return (
     <div>
-      <PageHead
-        title="Settings"
-        lede="Where to change what, and what is already handled for you."
-      />
+      <PageHead title="Settings" lede="Your contact details, where your stipend is paid, and your password." />
 
-      <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_22rem]">
-        <div className="min-w-0 space-y-8">
-          <section>
-            <SectionHead title="Your details" hint="Your email is your sign-in and can't be changed here." />
-            <Surface className="p-6">
+      <div className="grid gap-x-10 gap-y-10 xl:grid-cols-[minmax(0,1fr)_20rem]">
+        <div className="min-w-0 space-y-10">
+          <section id="details" className="scroll-mt-24">
+            <SectionHead title="Your details" hint="Your email is how you sign in, so it can't be changed here." />
+            <Surface className="p-5 sm:p-6">
               <ContactDetailsForm userId={uid} initial={contact} />
             </Surface>
           </section>
 
-          <section>
-            <SectionHead title="Password" hint="Changing it ends your other sessions." />
-            <Surface className="p-6">
-              <ChangePasswordForm endpoint={`/api/users/${encodeURIComponent(uid)}/change-password`} />
-            </Surface>
-          </section>
-
-          <section id="bank">
-            <SectionHead title="Bank Account" hint="For monthly stipend payouts and disbursements." />
+          <section id="bank" className="scroll-mt-24">
+            <SectionHead title="Bank account" hint="Your monthly stipend is paid into this account." />
             <BankDetailsForm initialBank={initialBank} />
           </section>
 
-          <section>
-            <SectionHead title="Your account" hint="The details on file." />
-            <Surface className="p-6">
-              <p className="text-sm leading-relaxed text-ink-600">
-                Sign-in email and password are managed from the account you used to register. To
-                update your personal details or skills, use the profile editor.
-              </p>
-              <Link
-                href="/intern/onboarding"
-                className="apple-spring apple-pressable mt-4 inline-flex min-h-11 items-center gap-2 rounded-[10px] bg-primary px-5 text-sm font-semibold text-white shadow-sm hover:bg-primary-hover"
-              >
-                Update your profile
-              </Link>
+          <section id="password" className="scroll-mt-24">
+            <SectionHead title="Password" hint="Used when you sign in with your email instead of Google." />
+            <Surface className="p-5 sm:p-6">
+              <ChangePasswordForm endpoint={`/api/users/${encodeURIComponent(uid)}/change-password`} />
             </Surface>
           </section>
         </div>
 
-        <aside className="space-y-8">
-          <section>
-            <SectionHead title="What this product does not send you" />
-            <Surface className="p-6">
-              <p className="text-sm leading-relaxed text-ink-600">
-                No streak reminders. No re-engagement emails after a quiet week. Notifications only
-                ever arrive when something a company did changes your state: a new offer, a booked
-                interview, an approved timesheet, a payment. The full list is on your{" "}
-                <Link
-                  href="/intern/notifications"
-                  className="font-medium text-primary underline-offset-4 hover:underline"
-                >
-                  notifications page
-                </Link>
-                .
-              </p>
-            </Surface>
-          </section>
+        <aside className="space-y-4">
+          <Surface as="section" aria-labelledby="account-head" className="p-5">
+            <h2 id="account-head" className="text-base font-semibold tracking-[-0.01em] text-ink-900">
+              Your account
+            </h2>
+            <dl className="mt-2 divide-y divide-ink-100">
+              <div className="py-3">
+                <dt className="text-sm text-ink-600">Sign-in email</dt>
+                <dd className="mt-0.5 break-all text-sm font-medium text-ink-900">{user?.email ?? session.email}</dd>
+              </div>
+              {/* Support finds you by this; quote it when you write in (INT-31). */}
+              <div className="py-3">
+                <dt className="text-sm text-ink-600">Findtern ID</dt>
+                <dd className="mt-0.5 break-all font-mono text-xs font-medium text-ink-900">{uid}</dd>
+              </div>
+              {user?.createdAt ? (
+                <DetailRow
+                  label="Member since"
+                  mono
+                  value={new Date(user.createdAt).toLocaleDateString("en-GB", { timeZone: "Asia/Kolkata" })}
+                />
+              ) : null}
+            </dl>
+            <Link
+              href="/intern/profile"
+              className="mt-2 inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-primary underline-offset-4 hover:underline"
+            >
+              See your profile as employers do
+              <ArrowRight className="size-4" aria-hidden />
+            </Link>
+          </Surface>
 
-          <section>
-            <SectionHead title="If something goes wrong" />
-            <Surface className="p-6">
-              <WaitingNote who="Support" typical="Replies within one working day." />
-              <p className="mt-2 text-sm leading-relaxed text-ink-600">
-                Use the contact link on the marketing page, and your Findtern ID is on your profile
-                so the team can find you without asking.
-              </p>
-            </Surface>
-          </section>
+          <Surface as="section" aria-labelledby="help-head" className="p-5">
+            <h2 id="help-head" className="flex items-center gap-2 text-base font-semibold tracking-[-0.01em] text-ink-900">
+              <LifeBuoy className="size-4 text-brand-700" aria-hidden />
+              Need help?
+            </h2>
+            <p className="mt-2 text-pretty text-sm leading-relaxed text-ink-600">
+              Write to{" "}
+              <a href={`mailto:${SITE.email}`} className="font-medium text-primary underline-offset-4 hover:underline">
+                {SITE.email}
+              </a>{" "}
+              with your Findtern ID. The team replies within one working day.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1">
+              <Link href="/faq#interns" className="inline-flex min-h-11 items-center text-sm font-medium text-primary underline-offset-4 hover:underline">
+                Intern FAQ
+              </Link>
+              <Link href="/contact" className="inline-flex min-h-11 items-center text-sm font-medium text-primary underline-offset-4 hover:underline">
+                Contact page
+              </Link>
+            </div>
+          </Surface>
         </aside>
       </div>
     </div>

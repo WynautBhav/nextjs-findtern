@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, ArrowRight, Check, MapPin } from "lucide-react";
 
 import { DetailRow, PageHead, Pill, SectionHead, Surface } from "@/components/app/primitives";
+import { ButtonLink } from "@/components/ui/button";
 import { CompanyInitials } from "@/components/marketing/role-card";
 import { requireRole } from "@/lib/auth";
 import { loadInternData, projectById } from "@/lib/intern-data";
@@ -36,7 +37,7 @@ export default async function RoleDetail({ params }: { params: Promise<{ id: str
   const { id } = await params;
   const session = await requireRole("intern");
 
-  const role = await projectById(id);
+  const role = await projectById(id, { strict: true });
   if (!role) notFound();
 
   const data = await loadInternData(session.uid);
@@ -61,7 +62,7 @@ export default async function RoleDetail({ params }: { params: Promise<{ id: str
     <div>
       <Link
         href="/intern/opportunities"
-        className="apple-spring apple-pressable mb-6 inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-ink-600 hover:text-ink-900"
+        className="mb-4 inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-ink-600 hover:text-ink-900"
       >
         <ArrowLeft className="size-4" aria-hidden />
         All open roles
@@ -71,35 +72,35 @@ export default async function RoleDetail({ params }: { params: Promise<{ id: str
         title={role.projectName}
         lede={
           existing
-            ? existing.status === "accepted" || existing.status === "hired"
+            ? existing.status === "hired"
               ? "You are doing this role now."
-              : "You already have an offer for this role."
+              : "You have an offer for this role."
             : "This company is hiring for this right now."
         }
         action={
           existing ? (
-            <Pill tone={existing.status === "sent" ? "waiting" : "live"}>
-              {existing.status === "sent" ? "Offer open" : "In progress"}
+            <Pill tone={existing.status === "sent" ? "waiting" : existing.status === "hired" ? "live" : "neutral"}>
+              {existing.status === "sent" ? "Offer waiting on you" : existing.status === "hired" ? "Hired" : "Offer received"}
             </Pill>
           ) : role.fullTimeOffer ? (
-            <Pill tone="waiting">Leads to full time</Pill>
+            <Pill tone="waiting">Can lead to full time</Pill>
           ) : null
         }
       />
 
       <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_18rem]">
-        <div>
+        <div className="min-w-0">
           {role.scopeOfWork ? (
-            <Surface className="p-6">
+            <Surface className="p-5 sm:p-6">
               <SectionHead title="What you would be doing" className="mb-0" />
-              <p className="mt-3 text-pretty leading-relaxed whitespace-pre-line text-ink-700">
+              <p className="mt-3 whitespace-pre-line text-pretty text-[0.9375rem] leading-relaxed text-ink-700">
                 {role.scopeOfWork}
               </p>
             </Surface>
           ) : null}
 
           {skills.length > 0 ? (
-            <Surface className="mt-4 p-6">
+            <Surface className="mt-4 p-5 sm:p-6">
               <SectionHead title="What they are looking for" className="mb-0" />
               <ul className="mt-3 flex flex-wrap gap-1.5">
                 {skills.map((skill) => (
@@ -114,8 +115,8 @@ export default async function RoleDetail({ params }: { params: Promise<{ id: str
           {/* ── The honest next step ──────────────────────────────────
               No button that pretends. What actually happens is written
               out, which is the thing a candidate is actually missing. */}
-            <Surface className="mt-4 p-6">
-              <SectionHead title="What happens next" className="mb-0" />
+          <Surface className="mt-4 p-5 sm:p-6">
+            <SectionHead title="What happens next" className="mb-0" />
             <ol className="mt-4 space-y-4">
               {[
                 {
@@ -124,15 +125,15 @@ export default async function RoleDetail({ params }: { params: Promise<{ id: str
                 },
                 {
                   done: true,
-                  text: "When a company is interested, they send you an offer rather than an application form.",
+                  text: "A company that likes your profile books an interview with you, then sends an offer.",
                 },
                 {
                   done: false,
-                  text: "You read the offer, and you decide. Companies here cannot apply on your behalf and cannot contact you directly until you accept.",
+                  text: "You read the offer and decide. The company's name and contact stay hidden until it hires you.",
                 },
                 {
                   done: false,
-                  text: "Accepting starts the interview booking, your timesheet, and your stipend.",
+                  text: "Once you accept and the company pays, you log your hours and your stipend runs.",
                 },
               ].map((step, i) => (
                 <li key={i} className="flex gap-3">
@@ -140,8 +141,8 @@ export default async function RoleDetail({ params }: { params: Promise<{ id: str
                     aria-hidden
                     className={
                       step.done
-                        ? "mt-0.5 grid size-5 shrink-0 place-items-center rounded-full bg-brand-600 text-white"
-                        : "mt-0.5 grid size-5 shrink-0 place-items-center rounded-full border-2 border-ink-200 text-xs font-bold text-ink-600"
+                        ? "mt-0.5 grid size-6 shrink-0 place-items-center rounded-full bg-brand-600 text-white"
+                        : "nums mt-0.5 grid size-6 shrink-0 place-items-center rounded-full border border-ink-200 text-xs font-semibold text-ink-600"
                     }
                   >
                     {step.done ? <Check className="size-3" strokeWidth={3.5} /> : i + 1}
@@ -153,27 +154,21 @@ export default async function RoleDetail({ params }: { params: Promise<{ id: str
 
             <div className="mt-6 border-t border-ink-100 pt-5">
               {existing ? (
-                <Link
-                  href={`/intern/proposals/${existing.id}`}
-                  className="apple-spring apple-pressable inline-flex min-h-11 items-center gap-2 rounded-[10px] bg-primary px-5 text-sm font-semibold text-white shadow-sm hover:bg-primary-hover active:scale-[0.98]"
-                >
+                <ButtonLink href={`/intern/proposals/${existing.id}`}>
                   Open your offer
                   <ArrowRight className="size-4" aria-hidden />
-                </Link>
+                </ButtonLink>
               ) : (
                 <div>
                   <p className="text-pretty text-sm leading-relaxed text-ink-600">
-                    There is no apply button on this page, and that is on purpose. Companies on
-                    Findtern search for candidates rather than collecting applications, so nobody is
-                    waiting on a submission from you. What gets you seen is the profile.
+                    There is no apply button, on purpose: companies on Findtern search for
+                    candidates rather than collecting applications. What gets you seen is your
+                    profile.
                   </p>
-                  <Link
-                    href="/intern/profile"
-                    className="apple-spring apple-pressable mt-4 inline-flex min-h-11 items-center gap-2 rounded-[10px] bg-primary px-5 text-sm font-semibold text-white shadow-sm hover:bg-primary-hover active:scale-[0.98]"
-                  >
-                    See what employers can see
+                  <ButtonLink href="/intern/profile" className="mt-4">
+                    See what employers see
                     <ArrowRight className="size-4" aria-hidden />
-                  </Link>
+                  </ButtonLink>
                 </div>
               )}
             </div>
@@ -188,8 +183,8 @@ export default async function RoleDetail({ params }: { params: Promise<{ id: str
                 label="Company"
                 value={
                   <span className="inline-flex items-center gap-2">
-                    <CompanyInitials name={role.companyName} className="size-7 text-[11px]" />
-                    <span className="text-ink-600">Name shared with an offer</span>
+                    <CompanyInitials name={role.companyName} className="size-8 text-xs" />
+                    <span className="text-ink-600">Name shared once hired</span>
                   </span>
                 }
               />
@@ -199,7 +194,7 @@ export default async function RoleDetail({ params }: { params: Promise<{ id: str
                   role.locationType ? (
                     <span className="inline-flex items-center gap-1.5">
                       <MapPin className="size-3.5 shrink-0 text-ink-400" aria-hidden />
-                      {role.locationType.charAt(0).toUpperCase() + role.locationType.slice(1)}
+                      {({ onsite: "On-site", hybrid: "Hybrid", remote: "Remote" } as Record<string, string>)[role.locationType.toLowerCase()] ?? role.locationType}
                     </span>
                   ) : (
                     "Not stated"
@@ -207,15 +202,15 @@ export default async function RoleDetail({ params }: { params: Promise<{ id: str
                 }
               />
               <DetailRow label="City" value={place || "Not stated"} />
-              <DetailRow label="Posted" value={formatDayLabel(role.createdAt)} />
+              <DetailRow label="Posted" mono value={formatDayLabel(role.createdAt)} />
             </dl>
           </Surface>
 
           <Surface className="p-5">
             <SectionHead title="How you are paid" className="mb-0" />
             <p className="mt-2 text-pretty text-sm leading-relaxed text-ink-600">
-              Stipend is agreed in the offer and shown to you before you accept. Nothing is
-              negotiated behind your back and there is no rate you cannot see.
+              The stipend is written in the offer, with the joining date and hours, and you see
+              all of it before you accept.
             </p>
           </Surface>
         </aside>

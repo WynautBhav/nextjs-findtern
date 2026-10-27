@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { EmptyScene, PageHead, Pill, SectionHead, Surface } from "@/components/app/primitives";
+import { EmptyScene, PageHead, Pill, SectionHead, StatTile } from "@/components/app/primitives";
 import { FreshProofGrid, RecordCount, RecordExport } from "@/components/app/proof";
 import { Thread } from "@/components/app/thread";
 import { CountUp } from "@/components/app/count-up";
@@ -85,10 +85,25 @@ export default async function InternRecord() {
           Not four identical stat cards. Each one answers a question a
           candidate actually has: how much work, how much money, how many
           people vouch for me. */}
-      <div className="mb-6 grid gap-3 sm:grid-cols-3">
-        <Figure label="Hours a manager approved" value={hoursTotal} unit="hours" />
-        <Figure label="Stipend paid to you" value={paidTotal} unit="rupees" money />
-        <Figure label="Times someone vouched" value={data.proofs.length} unit="records" />
+      <div className="mb-8 grid gap-3 sm:grid-cols-3">
+        <StatTile
+          label="Hours a manager approved"
+          value={hoursTotal > 0 ? <CountUp value={hoursTotal} /> : null}
+          empty="None approved yet"
+          hint={hoursTotal > 0 ? "hours" : undefined}
+        />
+        <StatTile
+          label="Stipend paid to you"
+          value={paidTotal > 0 ? <CountUp value={paidTotal} currency="INR" /> : null}
+          empty="Nothing paid yet"
+          href={paidTotal > 0 ? "/intern/earnings" : undefined}
+        />
+        <StatTile
+          label="Times someone vouched"
+          value={data.proofs.length > 0 ? <CountUp value={data.proofs.length} /> : null}
+          empty="Nothing yet"
+          hint={data.proofs.length > 0 ? "records" : undefined}
+        />
       </div>
 
       {data.proofs.length === 0 ? (
@@ -111,7 +126,7 @@ export default async function InternRecord() {
 
       {/* ── The full history ────────────────────────────────────── */}
       {data.thread.length > 0 ? (
-        <section className="mt-12 border-t border-ink-100 pt-8">
+        <section className="mt-12 border-t border-ink-200/80 pt-8">
           <SectionHead
             title="Everything that has happened"
             hint="Including the parts that are still in progress."
@@ -123,7 +138,7 @@ export default async function InternRecord() {
       {/* ── What is not here, and why ───────────────────────────────
           Stating the omissions is more honest than letting someone assume the
           record is a complete evaluation of them. */}
-      <section className="mt-12 border-t border-ink-100 pt-8">
+      <section className="mt-12 border-t border-ink-200/80 pt-8">
         <SectionHead title="What this record is not" />
         <ul className="grid gap-3 sm:grid-cols-2">
           {[
@@ -144,35 +159,3 @@ export default async function InternRecord() {
     </div>
   );
 }
-
-/**
- * One figure. Large number, unit underneath, one line saying what it counts.
- *
- * Built as a definition list rather than three identical cards with an icon and
- * a grey sentence, because the number is the content and the label is the
- * caption. Tabular numerals so a column of them lines up.
- */
-function Figure({
-  label,
-  value,
-  unit,
-  money,
-}: {
-  label: string;
-  value: number;
-  unit: string;
-  money?: boolean;
-}) {
-  return (
-    <Surface className="p-5">
-      <p className="text-balance text-sm leading-snug text-ink-600">{label}</p>
-      <p className="mt-2 flex flex-wrap items-baseline gap-x-1.5">
-        <span className="text-3xl font-semibold tabular-nums tracking-[-0.025em] text-ink-900">
-          <CountUp value={value} currency={money ? "INR" : undefined} />
-        </span>
-        <span className="text-sm text-ink-600">{unit}</span>
-      </p>
-    </Surface>
-  );
-}
-
