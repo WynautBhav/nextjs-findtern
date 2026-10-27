@@ -1,0 +1,2 @@
+# Server log, failure screenshots and test uploads from `npm run e2e`.
+.artifacts/
