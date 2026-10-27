@@ -87,7 +87,7 @@ export function ImportantInstructions() {
   return (
     <Surface as="section" className="p-6" aria-labelledby="offer-instructions">
       <div className="flex items-start gap-3">
-        <span className="grid size-10 shrink-0 place-items-center rounded-[10px] bg-accent-100 text-accent-700 ring-1 ring-inset ring-accent-300/70">
+        <span className="grid size-10 shrink-0 place-items-center rounded-apple-sm bg-accent-100 text-accent-700 ring-1 ring-inset ring-accent-300/70">
           <ShieldAlert className="size-5" aria-hidden />
         </span>
         <div className="min-w-0">
@@ -98,14 +98,14 @@ export function ImportantInstructions() {
         </div>
       </div>
 
-      <p className="mt-4 rounded-[10px] bg-ink-50 px-4 py-3 text-pretty text-sm leading-relaxed text-ink-700">
+      <p className="mt-4 rounded-apple-sm bg-ink-50 px-4 py-3 text-pretty text-sm leading-relaxed text-ink-700">
         By accepting an internship proposal through Findtern, you acknowledge and agree to the following restrictions and
         responsibilities:
       </p>
 
       <ul className="mt-4 space-y-3">
         {ITEMS.map(({ icon: Icon, title, lines, consequences, email, after }) => (
-          <li key={title} className="flex items-start gap-3 rounded-[10px] border border-ink-200/80 p-4">
+          <li key={title} className="flex items-start gap-3 rounded-apple-lg border border-ink-200/80 p-4">
             <Icon className="mt-0.5 size-4 shrink-0 text-brand-700" aria-hidden />
             <div className="min-w-0 space-y-1.5">
               <h3 className="text-sm font-semibold text-ink-900">{title}</h3>
@@ -115,7 +115,7 @@ export function ImportantInstructions() {
                 </p>
               ))}
               {consequences ? (
-                <div className="rounded-[10px] bg-warning-soft px-3 py-2.5">
+                <div className="rounded-apple-sm bg-warning-soft px-3 py-2.5">
                   <p className="text-sm font-medium text-ink-800">Failure to comply may result in:</p>
                   <ul className="mt-1 list-disc space-y-1 pl-5 text-sm leading-relaxed text-ink-700">
                     {consequences.map((c) => (
@@ -125,7 +125,7 @@ export function ImportantInstructions() {
                 </div>
               ) : null}
               {email ? (
-                <p className="rounded-[10px] bg-brand-50 px-3 py-2">
+                <p className="rounded-apple-sm bg-brand-50 px-3 py-2">
                   <a href={`mailto:${email}`} className="text-sm font-semibold text-brand-800 underline-offset-4 hover:underline">
                     {email}
                   </a>
