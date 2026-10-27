@@ -12,7 +12,7 @@
  * so existing pages keep working.
  */
 
-import { EmptyScene } from "@/components/app/primitives";
+import { EmptyScene, PageHead } from "@/components/app/primitives";
 
 export function PageHeader({
   title,
@@ -23,21 +23,7 @@ export function PageHeader({
   subtitle?: string;
   action?: React.ReactNode;
 }) {
-  return (
-    <header className="mb-7 flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
-      <div className="min-w-0 max-w-2xl">
-        <h1 className="text-balance text-2xl font-semibold tracking-[-0.02em] text-ink-900 md:text-3xl">
-          {title}
-        </h1>
-        {subtitle ? (
-          <p className="mt-2 text-pretty text-[0.9375rem] leading-relaxed text-ink-600">
-            {subtitle}
-          </p>
-        ) : null}
-      </div>
-      {action ? <div className="shrink-0">{action}</div> : null}
-    </header>
-  );
+  return <PageHead title={title} lede={subtitle} action={action} />;
 }
 
 export function EmptyState({

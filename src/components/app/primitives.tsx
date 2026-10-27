@@ -13,31 +13,124 @@ import { cn } from "@/lib/utils";
  */
 
 /* ── Page head ──────────────────────────────────────────────────────────
- * Title, one line of orientation, and one action slot. No eyebrow: with an
- * eyebrow on every page header the screen reads as a slide in a deck rather
- * than a place you are working. */
+ * The one page title for every role (AdminPageHeader and the employer
+ * PageHeader are thin wrappers). Set on the marketing site's display scale,
+ * so a signed-in page has the same voice as the page that sold it. The
+ * eyebrow is optional and meant for section landings, not every screen. */
 
 export function PageHead({
   title,
   lede,
+  eyebrow,
   action,
   className,
 }: {
-  title: string;
-  lede?: string;
+  title: React.ReactNode;
+  lede?: React.ReactNode;
+  eyebrow?: string;
   action?: React.ReactNode;
   className?: string;
 }) {
   return (
-    <header className={cn("mb-7 flex flex-wrap items-end justify-between gap-x-6 gap-y-3", className)}>
-      <div className="min-w-0 max-w-2xl">
-        <h1 className="text-balance text-2xl font-semibold tracking-[-0.02em] text-ink-900 md:text-3xl">
-          {title}
-        </h1>
-        {lede ? <p className="mt-2 text-pretty text-[0.9375rem] leading-relaxed text-ink-600">{lede}</p> : null}
+    <header className={cn("mb-8 flex flex-wrap items-end justify-between gap-x-8 gap-y-4", className)}>
+      <div className="min-w-0 max-w-3xl">
+        {eyebrow ? (
+          <p className="mb-2.5 text-xs font-semibold uppercase tracking-[0.16em] text-brand-700">{eyebrow}</p>
+        ) : null}
+        <h1 className="text-balance text-3xl font-semibold leading-[1.12] tracking-[-0.025em] text-ink-900">{title}</h1>
+        {lede ? <p className="mt-3 max-w-2xl text-pretty text-base leading-relaxed text-ink-600">{lede}</p> : null}
       </div>
-      {action ? <div className="w-full sm:w-auto shrink-0">{action}</div> : null}
+      {action ? <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:shrink-0">{action}</div> : null}
     </header>
+  );
+}
+
+/* ── Hero band ──────────────────────────────────────────────────────────
+ * The home page's dark green wash, for the top of a dashboard: one greeting,
+ * one sentence on what matters today, one or two actions, and (optionally)
+ * the handful of figures that answer "how am I doing". Used once per screen
+ * at most; more than one and it stops being the focal point. */
+
+export function HeroBand({
+  eyebrow,
+  title,
+  lede,
+  actions,
+  children,
+  className,
+}: {
+  eyebrow?: React.ReactNode;
+  title: React.ReactNode;
+  lede?: React.ReactNode;
+  actions?: React.ReactNode;
+  /** Figures under the copy, usually a row of `StatTile tone="onDark"`. */
+  children?: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <section className={cn("relative isolate mb-8 overflow-hidden rounded-apple-xl bg-brand-950 px-6 py-8 text-white sm:px-9 sm:py-10", className)}>
+      <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(ellipse_80%_70%_at_15%_-20%,rgb(22_107_84/0.6)_0%,transparent_70%)]" />
+      <div aria-hidden className="pointer-events-none absolute -right-24 -top-24 -z-10 size-72 rounded-full bg-accent-500/10 blur-3xl" />
+      <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-6">
+        <div className="min-w-0 max-w-2xl">
+          {eyebrow ? <p className="mb-3 text-xs font-semibold uppercase tracking-[0.16em] text-accent-300">{eyebrow}</p> : null}
+          <h1 className="text-balance text-3xl font-semibold leading-[1.1] tracking-[-0.025em] sm:text-4xl">{title}</h1>
+          {lede ? <p className="mt-3 max-w-xl text-pretty text-base leading-relaxed text-on-dark-subtle sm:text-lg">{lede}</p> : null}
+        </div>
+        {actions ? <div className="flex w-full flex-wrap gap-3 sm:w-auto">{actions}</div> : null}
+      </div>
+      {children ? <div className="mt-8">{children}</div> : null}
+    </section>
+  );
+}
+
+/* ── Stat tile ──────────────────────────────────────────────────────────
+ * A figure that matters, set large. "0" and "None" are facts too, but the
+ * caller should prefer a sentence ("No interviews yet") over a hero zero:
+ * pass `value={null}` and an `empty` line. */
+
+export function StatTile({
+  label,
+  value,
+  hint,
+  empty,
+  href,
+  tone = "default",
+  className,
+}: {
+  label: string;
+  value: React.ReactNode | null;
+  hint?: React.ReactNode;
+  /** Shown in place of the figure when `value` is null. */
+  empty?: string;
+  href?: string;
+  tone?: "default" | "onDark";
+  className?: string;
+}) {
+  const dark = tone === "onDark";
+  const body = (
+    <>
+      <p className={cn("text-sm font-medium", dark ? "text-on-dark-subtle" : "text-ink-600")}>{label}</p>
+      {value === null ? (
+        <p className={cn("mt-2 text-base font-medium", dark ? "text-white/80" : "text-ink-700")}>{empty ?? "-"}</p>
+      ) : (
+        <p className={cn("nums mt-1.5 text-3xl font-semibold leading-tight tracking-[-0.02em]", dark ? "text-white" : "text-ink-900")}>{value}</p>
+      )}
+      {hint ? <p className={cn("mt-1.5 text-sm", dark ? "text-on-dark-subtle" : "text-ink-600")}>{hint}</p> : null}
+    </>
+  );
+  const cls = cn(
+    "block min-w-0 rounded-apple-lg p-5",
+    dark ? "bg-white/[0.06] ring-1 ring-inset ring-white/10" : "border border-ink-200/80 bg-white shadow-xs",
+    href && (dark ? "apple-spring hover:bg-white/[0.1]" : "apple-spring hover:border-brand-300 hover:shadow-sm"),
+    className,
+  );
+  return href ? (
+    <Link href={href} className={cls}>
+      {body}
+    </Link>
+  ) : (
+    <div className={cls}>{body}</div>
   );
 }
 
@@ -83,8 +176,7 @@ export function Surface({
   return (
     <As
       className={cn(
-        "min-w-0 rounded-[14px] border border-ink-200/80 bg-white",
-        "shadow-[0_1px_2px_rgb(7_47_36/0.04)]",
+        "min-w-0 rounded-apple-xl border border-ink-200/80 bg-white shadow-xs",
         className,
       )}
       {...rest}

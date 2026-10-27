@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, Video } from "lucide-react";
 
-import { EmptyScene, PageHead, SectionHead, Surface } from "@/components/app/primitives";
+import { EmptyScene, HeroBand, SectionHead, StatTile, Surface } from "@/components/app/primitives";
+import { buttonClass } from "@/components/ui/button";
 import { ReadinessStrip } from "@/components/app/readiness";
 import { StatusStrip, Thread } from "@/components/app/thread";
 import { ActivationCard } from "@/components/intern/activation-card";
@@ -129,20 +130,84 @@ export default async function InternHome() {
   // The pending action is shown once, in the strip; the thread skips it.
   const history = action ? data.thread.filter((n) => n !== action) : data.thread;
 
+  const offersWaiting = data.proposals.filter((p) => p.status === "sent").length;
+  const lede = working
+    ? "Your internship, and anything waiting on you."
+    : gettingStarted
+      ? "Three steps, in order, before employers can find you."
+      : action
+        ? "One thing is waiting on you."
+        : openToWork
+          ? "Nothing is waiting on you. Employers can find your profile."
+          : "Nothing is waiting on you. Your profile is hidden from new employers.";
+
   return (
     <div>
-      <PageHead
+      <HeroBand
+        eyebrow={working ? "Your internship" : gettingStarted ? "Getting started" : "Your profile is live"}
         title={`Hello, ${user?.first ?? "there"}`}
-        lede={
-          working
-            ? "Your internship, and anything waiting on you."
-            : gettingStarted
-              ? "Three steps, in order, before employers can find you."
-              : action
-              ? "One thing is waiting on you."
-              : "Nothing is waiting on you. Employers can find your profile."
+        lede={lede}
+        actions={
+          action?.href ? (
+            <Link href={action.href} className={buttonClass({ variant: "accent" })}>
+              {action.action ?? "Open"}
+              <ArrowRight className="size-4" aria-hidden />
+            </Link>
+          ) : working ? (
+            <Link href="/intern/timesheets" className={buttonClass({ variant: "accent" })}>
+              Log your hours
+              <ArrowRight className="size-4" aria-hidden />
+            </Link>
+          ) : !gettingStarted ? (
+            <Link href="/intern/opportunities" className={buttonClass({ variant: "outlineLight" })}>
+              See open roles
+              <ArrowRight className="size-4" aria-hidden />
+            </Link>
+          ) : null
         }
-      />
+      >
+        <div className="grid gap-3 sm:grid-cols-3">
+          <StatTile
+            tone="onDark"
+            label="Findtern Score"
+            value={score === null ? null : <>{score.toFixed(1)}<span className="ml-0.5 text-base font-normal text-on-dark-subtle">/10</span></>}
+            empty="After your AI interview"
+            href="/intern/record"
+          />
+          {working ? (
+            <StatTile
+              tone="onDark"
+              label="Paid to you"
+              value={formatMoney(data.money.paidMinor, "INR")}
+              hint={
+                data.money.incomingMinor > 0
+                  ? `${formatMoney(data.money.incomingMinor, data.money.currency, { zeroLabel: false })} on its way`
+                  : undefined
+              }
+              href="/intern/earnings"
+            />
+          ) : (
+            <StatTile
+              tone="onDark"
+              label="Offers waiting on you"
+              value={offersWaiting > 0 ? offersWaiting : null}
+              empty="None right now"
+              href="/intern/proposals"
+            />
+          )}
+          <StatTile
+            tone="onDark"
+            label="Next interview"
+            value={null}
+            empty={
+              upcomingInterviewItem
+                ? formatSlotTime(upcomingInterviewItem.when, upcomingInterviewItem.interview.timezone || "Asia/Kolkata")
+                : "None booked"
+            }
+            href="/intern/interviews"
+          />
+        </div>
+      </HeroBand>
 
       <div className="grid gap-x-10 gap-y-8 xl:grid-cols-[minmax(0,1fr)_20rem]">
         {/* ── Main column ─────────────────────────────────────────── */}
@@ -222,10 +287,10 @@ export default async function InternHome() {
                     >
                       <CompanyInitials name={p.companyName} />
                       <span className="min-w-0">
-                        <span className="block truncate text-sm font-medium text-ink-900 group-hover:text-brand-700">
+                        <span className="block truncate text-[0.9375rem] font-medium text-ink-900 group-hover:text-brand-700">
                           {p.projectName}
                         </span>
-                        <span className="block truncate text-[13px] text-ink-600">
+                        <span className="block truncate text-sm text-ink-600">
                           {p.scopeOfWork}
                         </span>
                       </span>
@@ -242,8 +307,8 @@ export default async function InternHome() {
         <aside className="space-y-4">
           {upcomingInterviewItem ? (
             <Surface className="p-5">
-              <p className="text-[13px] font-medium text-ink-600">Next interview</p>
-              <p className="mt-1 text-[15px] font-semibold text-ink-900">
+              <p className="text-sm font-medium text-ink-600">Next interview</p>
+              <p className="mt-1 text-base font-semibold text-ink-900">
                 {data.names[upcomingInterviewItem.interview.employerId] ?? "Employer interview"}
               </p>
               <p className="mt-0.5 text-sm text-ink-600">
@@ -255,7 +320,7 @@ export default async function InternHome() {
                   href={upcomingInterviewItem.interview.meetingLink}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="mt-3 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-[10px] bg-primary px-4 text-sm font-medium text-white hover:bg-primary-hover"
+                  className={buttonClass({ size: "md", block: true, className: "mt-4" })}
                 >
                   <Video className="size-4" aria-hidden />
                   Join meeting
@@ -264,43 +329,38 @@ export default async function InternHome() {
             </Surface>
           ) : null}
 
-          <Surface className="p-5">
-            <div className="flex items-baseline justify-between">
-              <p className="text-[13px] font-medium text-ink-600">Findtern Score</p>
-              <Link href="/intern/record" className="text-xs font-medium text-primary hover:underline">
-                Details
-              </Link>
-            </div>
-            {score === null ? (
-              <p className="mt-2 text-sm text-ink-600">Your score appears after the AI interview.</p>
-            ) : (
-              <>
-                <p className="mt-1 text-3xl font-semibold tabular-nums tracking-tight text-ink-900">
-                  {score.toFixed(1)}
-                  <span className="ml-0.5 text-sm font-normal text-ink-600">/10</span>
-                </p>
-                {ratings ? (
-                  <dl className="mt-4 space-y-1.5 border-t border-ink-100 pt-4 text-[13px]">
-                    {(
-                      [
-                        ["Coding", ratings.coding],
-                        ["Aptitude", ratings.aptitude],
-                        ["Interview", ratings.interview],
-                        ["Communication", ratings.communication],
-                      ] as const
-                    )
-                      .filter(([, v]) => v > 0)
-                      .map(([label, v]) => (
-                        <div key={label} className="flex justify-between gap-2">
-                          <dt className="text-ink-600">{label}</dt>
-                          <dd className="font-medium tabular-nums text-ink-900">{v.toFixed(1)}</dd>
-                        </div>
-                      ))}
-                  </dl>
-                ) : null}
-              </>
-            )}
-          </Surface>
+          {ratings ? (
+            <Surface className="p-5">
+              <div className="flex items-baseline justify-between">
+                <h2 className="text-base font-semibold text-ink-900">How your score is made</h2>
+                <Link href="/intern/record" className="text-sm font-medium text-primary hover:underline">
+                  Details
+                </Link>
+              </div>
+              <dl className="mt-4 space-y-3">
+                {(
+                  [
+                    ["Coding", ratings.coding],
+                    ["Aptitude", ratings.aptitude],
+                    ["AI interview", ratings.interview],
+                    ["Communication", ratings.communication],
+                  ] as const
+                )
+                  .filter(([, v]) => v > 0)
+                  .map(([label, v]) => (
+                    <div key={label}>
+                      <div className="flex justify-between gap-2 text-sm">
+                        <dt className="text-ink-600">{label}</dt>
+                        <dd className="nums font-semibold text-ink-900">{v.toFixed(1)}</dd>
+                      </div>
+                      <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-ink-100" aria-hidden>
+                        <div className="h-full rounded-full bg-brand-600" style={{ width: `${Math.min(100, v * 10)}%` }} />
+                      </div>
+                    </div>
+                  ))}
+              </dl>
+            </Surface>
+          ) : null}
 
           <ReadinessStrip readiness={data.readiness} />
 
@@ -308,9 +368,9 @@ export default async function InternHome() {
             <OpenToWorkToggle initial={openToWork} visibleAgainAt={visibleAgain} />
           </Surface>
 
-          {working || data.money.paidMinor > 0 ? (
+          {!working && data.money.paidMinor > 0 ? (
             <Surface className="p-5">
-              <p className="text-[13px] font-medium text-ink-600">Paid to you</p>
+              <p className="text-sm font-medium text-ink-600">Paid to you</p>
               <p className="mt-1 text-2xl font-semibold tabular-nums tracking-tight text-ink-900">
                 {formatMoney(data.money.paidMinor, "INR")}
               </p>
@@ -330,7 +390,7 @@ export default async function InternHome() {
 
           <Link
             href="/intern/profile"
-            className="flex items-center justify-between rounded-[14px] border border-dashed border-ink-200 px-5 py-3.5 text-sm text-ink-700 transition-colors hover:border-ink-300 hover:bg-white"
+            className="apple-spring flex items-center justify-between rounded-apple-xl border border-dashed border-ink-200 px-5 py-4 text-sm font-medium text-ink-700 hover:border-brand-300 hover:bg-white"
           >
             See your profile as employers do
             <ArrowRight className="size-4 text-ink-400" aria-hidden />

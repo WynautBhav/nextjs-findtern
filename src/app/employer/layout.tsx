@@ -1,3 +1,5 @@
+import Link from "next/link";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { and, count, eq } from "drizzle-orm";
 import {
@@ -13,48 +15,42 @@ import {
   ShoppingBag,
   Clock,
   Send,
-  HelpCircle,
-  Mail,
+  KeyRound,
+  Receipt,
 } from "lucide-react";
 
-import { AppShell, type NavGroup } from "@/components/layout/app-shell";
+import { ConsoleShell, RAIL_COOKIE, type ConsoleNavGroup } from "@/components/layout/console-shell";
 import { ViewAsBanner } from "@/components/admin/view-as-banner";
 import { getSession } from "@/lib/auth";
 import { getDb, schema } from "@/lib/db";
+import { SITE } from "@/lib/content/site";
 
-const NAV_GROUPS: NavGroup[] = [
+const NAV_GROUPS: ConsoleNavGroup[] = [
   {
     title: "Talent & Pipeline",
     items: [
-      { href: "/employer/dashboard", label: "Dashboard", icon: <LayoutDashboard className="size-4" /> },
-      { href: "/employer/candidates", label: "Candidates", icon: <Users className="size-4" /> },
-      { href: "/employer/compare", label: "Compare", icon: <GitCompare className="size-4" /> },
-      { href: "/employer/projects", label: "Projects", icon: <FolderKanban className="size-4" /> },
+      { href: "/employer/dashboard", label: "Dashboard", icon: <LayoutDashboard /> },
+      { href: "/employer/candidates", label: "Candidates", icon: <Users /> },
+      { href: "/employer/compare", label: "Compare", icon: <GitCompare /> },
+      { href: "/employer/projects", label: "Projects", icon: <FolderKanban /> },
     ],
   },
   {
     title: "Proposals & Hiring",
     items: [
-      { href: "/employer/proposals", label: "Proposals", icon: <FileText className="size-4" /> },
-      { href: "/employer/send-proposal", label: "Send proposal", icon: <Send className="size-4" /> },
-      { href: "/employer/schedule", label: "Schedule", icon: <CalendarDays className="size-4" /> },
-      { href: "/employer/timesheets", label: "Timesheets", icon: <Clock className="size-4" /> },
+      { href: "/employer/proposals", label: "Proposals", icon: <FileText /> },
+      { href: "/employer/send-proposal", label: "Send proposal", icon: <Send /> },
+      { href: "/employer/schedule", label: "Schedule", icon: <CalendarDays /> },
+      { href: "/employer/timesheets", label: "Timesheets", icon: <Clock /> },
     ],
   },
   {
     title: "Billing & Account",
     items: [
-      { href: "/employer/cart", label: "Cart", icon: <ShoppingBag className="size-4" /> },
-      { href: "/employer/orders", label: "Orders", icon: <ShoppingCart className="size-4" /> },
-      { href: "/employer/alerts", label: "Alerts", icon: <Bell className="size-4" /> },
-      { href: "/employer/account", label: "Company Profile", icon: <Building2 className="size-4" /> },
-    ],
-  },
-  {
-    title: "Help",
-    items: [
-      { href: "/faq#employers", label: "FAQ", icon: <HelpCircle className="size-4" /> },
-      { href: "/contact", label: "Contact", icon: <Mail className="size-4" /> },
+      { href: "/employer/cart", label: "Cart", icon: <ShoppingBag /> },
+      { href: "/employer/orders", label: "Orders", icon: <ShoppingCart /> },
+      { href: "/employer/alerts", label: "Alerts", icon: <Bell /> },
+      { href: "/employer/account", label: "Company Profile", icon: <Building2 /> },
     ],
   },
 ];
@@ -65,6 +61,7 @@ export default async function EmployerLayout({ children }: { children: React.Rea
 
   let companyName = "Company Account";
   let unreadAlerts = 0;
+  let cartCount = 0;
   try {
     const db = getDb();
     const [emp] = await db
@@ -85,22 +82,60 @@ export default async function EmployerLayout({ children }: { children: React.Rea
         ),
       );
     unreadAlerts = Number(unread?.value ?? 0);
+
+    const [cart] = await db
+      .select({ value: count() })
+      .from(schema.employerCartItems)
+      .where(and(eq(schema.employerCartItems.employerId, session.uid), eq(schema.employerCartItems.listType, "cart")));
+    cartCount = Number(cart?.value ?? 0);
   } catch {
     // Keep fallback
   }
 
+  const groups = NAV_GROUPS.map((g) => ({
+    ...g,
+    items: g.items.map((i) =>
+      i.href === "/employer/cart" && cartCount > 0
+        ? { ...i, badge: cartCount }
+        : i.href === "/employer/alerts" && unreadAlerts > 0
+          ? { ...i, badge: unreadAlerts > 99 ? "99+" : unreadAlerts }
+          : i,
+    ),
+  }));
+
   return (
-    <AppShell
-      brand="Employer"
-      groups={NAV_GROUPS}
-      companyName={companyName}
-      email={session.email}
-      unreadAlerts={unreadAlerts}
+    <ConsoleShell
+      roleLabel="Employer"
+      homeHref="/employer/dashboard"
+      groups={groups}
+      account={{ name: companyName, email: session.email }}
+      menu={[
+        { href: "/employer/account", label: "Company profile", icon: <Building2 /> },
+        { href: "/employer/orders", label: "Orders & invoices", icon: <Receipt /> },
+        { href: "/employer/account#security", label: "Change password", icon: <KeyRound /> },
+      ]}
+      topActions={
+        <Link
+          href="/employer/cart"
+          aria-label={cartCount > 0 ? `Cart, ${cartCount} candidates` : "Cart"}
+          className="apple-spring relative grid size-11 place-items-center rounded-apple-sm text-ink-600 hover:bg-ink-100 hover:text-ink-900"
+        >
+          <ShoppingBag className="size-5" aria-hidden />
+          {cartCount > 0 ? (
+            <span className="nums absolute right-1.5 top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand-700 px-1 text-[0.625rem] font-bold text-white ring-2 ring-surface">
+              {cartCount > 99 ? "99+" : cartCount}
+            </span>
+          ) : null}
+        </Link>
+      }
+      alerts={{ href: "/employer/alerts", count: unreadAlerts, label: "Alerts" }}
+      help={{ faqHref: "/faq#employers", contactHref: "/contact", email: SITE.adminEmail }}
+      signOutTo="/employer/login"
+      initialCollapsed={(await cookies()).get(RAIL_COOKIE)?.value === "1"}
+      rootCrumb={{ label: "Home", href: "/employer/dashboard" }}
+      banner={session.impersonator ? <ViewAsBanner viewing={companyName} admin={session.impersonator.email} /> : null}
     >
       {children}
-      {session.impersonator ? (
-        <ViewAsBanner viewing={companyName} admin={session.impersonator.email} />
-      ) : null}
-    </AppShell>
+    </ConsoleShell>
   );
 }

@@ -1,6 +1,7 @@
 import type { LucideIcon } from "lucide-react";
 import Link from "next/link";
 
+import { PageHead } from "@/components/app/primitives";
 import { cn } from "@/lib/utils";
 
 /**
@@ -99,17 +100,7 @@ export function AdminPageHeader({
   subtitle?: string;
   action?: React.ReactNode;
 }) {
-  return (
-    <div className="apple-admin mb-6 flex flex-wrap items-end justify-between gap-4">
-      <div className="min-w-0">
-        <h1 className="apple-title text-[28px] font-bold leading-[34px] text-ink-900">{title}</h1>
-        {subtitle ? (
-          <p className="mt-1 text-[14px] leading-6 text-text-subtle">{subtitle}</p>
-        ) : null}
-      </div>
-      {action ? <div className="flex shrink-0 items-center gap-2">{action}</div> : null}
-    </div>
-  );
+  return <PageHead title={title} lede={subtitle} action={action} />;
 }
 
 /**

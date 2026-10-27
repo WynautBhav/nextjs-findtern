@@ -1,5 +1,58 @@
 # DESIGN.md — the logged-in surfaces, rebuilt as one system
 
+## 0. Rules in force (27 Oct 2026). Every signed-in screen follows these
+
+Owner's call, 27 Oct: the signed-in app **matches the marketing site**. One
+frame, one type scale, one set of primitives. Reference screen:
+`src/app/intern/dashboard/page.tsx`.
+
+**Frame.** `components/layout/console-shell.tsx` is the only shell (intern,
+employer and admin layouts). Pages never draw their own sidebar, top bar or
+outer padding.
+
+**Primitives** (`components/app/primitives.tsx` unless noted). Use these and
+don't re-implement them:
+- `PageHead`: the page title. `AdminPageHeader` and the employer
+  `PageHeader` wrap it.
+- `HeroBand`: dark green dashboard hero, at most one per screen.
+- `StatTile`: a figure set large, `tone="onDark"` inside `HeroBand`.
+- `Surface`: the card (`rounded-apple-xl`). Admin lists keep `Panel`
+  (`components/admin/panel.tsx`).
+- `SectionHead`, `Pill` (status), `EmptyScene` (every empty state, never
+  `EmptyState`), `DetailRow`.
+- Buttons and button-looking links: `buttonClass({ variant, size })`,
+  `ButtonLink` or `ButtonAnchor` from `components/ui/button`, with variants
+  `primary` / `accent` (amber, the hero CTA) / `outline` / `outlineLight`
+  (on dark) / `ghost` / `light`. No hand-written button class strings.
+
+**Type floor** (this is what made the app look barebones):
+- Body copy, table cells, form labels, list rows: `text-sm` (14px) minimum;
+  primary reading text `text-[0.9375rem]` or `text-base`.
+- `text-xs` only for meta (timestamps, helper text under a field, chips).
+  `text-2xs` only for uppercase eyebrows and badges.
+- No arbitrary pixel sizes (`text-[13px]` and the like). Use the scale.
+- Figures: `nums` utility, `font-semibold`; hero figures `text-3xl`.
+- Section titles `text-base`/`text-lg font-semibold`; page titles come only
+  from `PageHead` / `HeroBand`.
+
+**Shape:** radius tokens only, `rounded-apple-sm` (10px, controls),
+`-md` (12), `-lg` (14, tiles), `-xl` (20, cards). No `rounded-[Npx]`.
+Shadows `shadow-xs`/`shadow-sm`. Borders `border-ink-200/80`.
+
+**Colour:** brand green for primary actions and active states. Amber
+(`accent`) for the one thing to do now, and for highlights on dark. Status
+always through `Pill` tones, never ad-hoc colour classes.
+
+**States:** every list has an `EmptyScene` that says what to do next; a
+failed query shows an error state, never "no data" (`catch {}` returning an
+empty list is banned).
+
+**Dates and times:** DD/MM/YYYY for typed dates (bug sheet 7). Interns see
+times in IST (labelled); employers see their own zone.
+
+**Privacy rules that look like design:** employers see candidate initials,
+never photos or names before hire (bug sheet 7, NC r41).
+
 Plan for the design pass across `/intern`, `/employer` and `/admin`.
 Product truth: `PRODUCT.md`. Existing tokens and component contracts:
 `docs/design_system.md`, `docs/component_inventory.md`. Evidence:

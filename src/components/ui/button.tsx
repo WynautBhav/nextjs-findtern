@@ -121,4 +121,4 @@ export function ButtonAnchor({
   );
 }
 
-export { buttonVariants };
+export { buttonClass, buttonVariants };

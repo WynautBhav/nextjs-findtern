@@ -1,7 +1,33 @@
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { count, eq } from "drizzle-orm";
-import { AdminShell } from "@/components/admin/admin-shell";
-import type { NavGroup } from "@/components/admin/admin-nav";
+import {
+  ArrowLeftRight,
+  BarChart3,
+  Bell,
+  Briefcase,
+  Building2,
+  CircleUserRound,
+  CreditCard,
+  FileText,
+  Globe,
+  History,
+  LayoutDashboard,
+  MessageSquare,
+  Receipt,
+  ScrollText,
+  Send,
+  Settings,
+  Shield,
+  ShieldCheck,
+  ShoppingBag,
+  Tag,
+  UserCheck,
+  Users,
+} from "lucide-react";
+
+import { CommandPalette } from "@/components/admin/command-palette";
+import { ConsoleShell, RAIL_COOKIE, type ConsoleNavGroup } from "@/components/layout/console-shell";
 import { allows, requiredPermissions } from "@/lib/admin/permissions";
 import { getSession } from "@/lib/auth";
 import { getDb, schema } from "@/lib/db";
@@ -20,53 +46,53 @@ export const dynamic = "force-dynamic";
  * clubbed under Settings instead of being scattered across People and
  * Content. The one-item "Work" group is folded into People & Work.
  */
-const NAV: NavGroup[] = [
+const NAV: ConsoleNavGroup[] = [
   {
-    label: "Overview",
+    title: "Overview",
     items: [
-      { href: "/admin/dashboard", label: "Dashboard" },
-      { href: "/admin/proposal-tracker", label: "Proposal Pipeline" },
-      { href: "/admin/messages", label: "Inbound Messages" },
-      { href: "/admin/notification-history", label: "Notification History" },
+      { href: "/admin/dashboard", label: "Dashboard", icon: <LayoutDashboard /> },
+      { href: "/admin/proposal-tracker", label: "Proposal Pipeline", icon: <Send /> },
+      { href: "/admin/messages", label: "Inbound Messages", icon: <MessageSquare /> },
+      { href: "/admin/notification-history", label: "Notification History", icon: <History /> },
     ],
   },
   {
-    label: "People & Work",
+    title: "People & Work",
     items: [
-      { href: "/admin/interns", label: "Candidate Directory" },
-      { href: "/admin/users", label: "Registered Users" },
-      { href: "/admin/companies", label: "Hiring Partners" },
-      { href: "/admin/projects", label: "Work Projects" },
+      { href: "/admin/interns", label: "Candidate Directory", icon: <Users /> },
+      { href: "/admin/users", label: "Registered Users", icon: <UserCheck /> },
+      { href: "/admin/companies", label: "Hiring Partners", icon: <Building2 /> },
+      { href: "/admin/projects", label: "Work Projects", icon: <Briefcase /> },
     ],
   },
   {
-    label: "Finance",
+    title: "Finance",
     items: [
-      { href: "/admin/orders", label: "Employer Orders" },
-      { href: "/admin/intern-invoices", label: "Intern Invoices" },
-      { href: "/admin/transactions", label: "Financial Ledger" },
-      { href: "/admin/payouts", label: "Intern Disbursements" },
-      { href: "/admin/promo-codes", label: "Promotional Codes" },
-      { href: "/admin/reports", label: "Analytics Reports" },
+      { href: "/admin/orders", label: "Employer Orders", icon: <ShoppingBag /> },
+      { href: "/admin/intern-invoices", label: "Intern Invoices", icon: <Receipt /> },
+      { href: "/admin/transactions", label: "Financial Ledger", icon: <ArrowLeftRight /> },
+      { href: "/admin/payouts", label: "Intern Disbursements", icon: <CreditCard /> },
+      { href: "/admin/promo-codes", label: "Promotional Codes", icon: <Tag /> },
+      { href: "/admin/reports", label: "Analytics Reports", icon: <BarChart3 /> },
     ],
   },
   {
-    label: "Publishing",
+    title: "Publishing",
     items: [
-      { href: "/admin/cms", label: "Website Content" },
-      { href: "/admin/notifications", label: "Send Notification" },
+      { href: "/admin/cms", label: "Website Content", icon: <Globe /> },
+      { href: "/admin/notifications", label: "Send Notification", icon: <Bell /> },
     ],
   },
   {
-    label: "Settings",
+    title: "Settings",
     items: [
-      { href: "/admin/settings", label: "Pricing & Fees" },
-      { href: "/admin/cms/terms", label: "Platform Terms" },
-      { href: "/admin/interns/terms", label: "Intern Terms" },
-      { href: "/admin/interns/non-disclosure", label: "Intern NDA" },
-      { href: "/admin/companies/terms", label: "Company Terms" },
-      { href: "/admin/roles", label: "Roles and Access" },
-      { href: "/admin/account", label: "Your account" },
+      { href: "/admin/settings", label: "Pricing & Fees", icon: <Settings /> },
+      { href: "/admin/cms/terms", label: "Platform Terms", icon: <ScrollText /> },
+      { href: "/admin/interns/terms", label: "Intern Terms", icon: <FileText /> },
+      { href: "/admin/interns/non-disclosure", label: "Intern NDA", icon: <ShieldCheck /> },
+      { href: "/admin/companies/terms", label: "Company Terms", icon: <ScrollText /> },
+      { href: "/admin/roles", label: "Roles and Access", icon: <Shield /> },
+      { href: "/admin/account", label: "Your account", icon: <CircleUserRound /> },
     ],
   },
 ];
@@ -96,9 +122,30 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     unreadMessages = Number(unread?.value ?? 0);
   } catch {}
 
+  const withBadges = groups.map((g) => ({
+    ...g,
+    items: g.items.map((i) => (i.href === "/admin/messages" && unreadMessages > 0 ? { ...i, badge: unreadMessages > 99 ? "99+" : unreadMessages } : i)),
+  }));
+
   return (
-    <AdminShell groups={groups} labels={NAV_LABELS} email={session.email} role={session.role} unreadCount={unreadMessages}>
+    <ConsoleShell
+      roleLabel="Admin"
+      homeHref="/admin/dashboard"
+      groups={withBadges}
+      account={{ name: session.email.split("@")[0], email: session.email, subtitle: roleName(session.permissions) }}
+      menu={[{ href: "/admin/account", label: "Your account", icon: <CircleUserRound /> }]}
+      topActions={<CommandPalette />}
+      alerts={{ href: "/admin/messages", count: unreadMessages, label: "Inbound messages" }}
+      signOutTo="/admin/login"
+      initialCollapsed={(await cookies()).get(RAIL_COOKIE)?.value === "1"}
+      crumbLabels={NAV_LABELS}
+      rootCrumb={{ label: "Workspace", href: "/admin/dashboard" }}
+    >
       {children}
-    </AdminShell>
+    </ConsoleShell>
   );
+}
+
+function roleName(permissions: string[] | undefined): string {
+  return permissions?.includes("*") ? "Super admin" : "Staff";
 }

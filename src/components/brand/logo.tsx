@@ -48,3 +48,28 @@ export function Logo({
     />
   );
 }
+
+/**
+ * The cap on its own, cut from the same masters, for places too narrow for
+ * the wordmark (the collapsed sidebar). 256px square, transparent.
+ */
+export function LogoMark({
+  variant = "green",
+  className,
+  alt = "Findtern",
+}: {
+  variant?: "green" | "white";
+  className?: string;
+  alt?: string;
+}) {
+  return (
+    <img
+      src={`/media/findtern-mark-${variant}.png`}
+      alt={alt}
+      width={256}
+      height={256}
+      decoding="async"
+      className={cn("aspect-square object-contain", className)}
+    />
+  );
+}
