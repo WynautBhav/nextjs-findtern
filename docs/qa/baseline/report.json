@@ -1,0 +1,1283 @@
+[
+  {
+    "role": "intern",
+    "width": 390,
+    "route": "/intern/dashboard",
+    "finalUrl": "/intern/dashboard",
+    "problems": []
+  },
+  {
+    "role": "intern",
+    "width": 390,
+    "route": "/intern/opportunities",
+    "finalUrl": "/intern/opportunities",
+    "problems": []
+  },
+  {
+    "role": "intern",
+    "width": 390,
+    "route": "/intern/opportunities/57829cc3-8221-424c-9593-1c732a689dcd",
+    "finalUrl": "/intern/opportunities/57829cc3-8221-424c-9593-1c732a689dcd",
+    "problems": []
+  },
+  {
+    "role": "intern",
+    "width": 390,
+    "route": "/intern/proposals",
+    "finalUrl": "/intern/proposals",
+    "problems": []
+  },
+  {
+    "role": "intern",
+    "width": 390,
+    "route": "/intern/proposals/d061a8dc-c2e4-481f-85ce-bfe236e632b5",
+    "finalUrl": "/intern/proposals/d061a8dc-c2e4-481f-85ce-bfe236e632b5",
+    "problems": []
+  },
+  {
+    "role": "intern",
+    "width": 390,
+    "route": "/intern/interviews",
+    "finalUrl": "/intern/interviews",
+    "problems": []
+  },
+  {
+    "role": "intern",
+    "width": 390,
+    "route": "/intern/timesheets",
+    "finalUrl": "/intern/timesheets",
+    "problems": []
+  },
+  {
+    "role": "intern",
+    "width": 390,
+    "route": "/intern/earnings",
+    "finalUrl": "/intern/earnings",
+    "problems": []
+  },
+  {
+    "role": "intern",
+    "width": 390,
+    "route": "/intern/record",
+    "finalUrl": "/intern/record",
+    "problems": []
+  },
+  {
+    "role": "intern",
+    "width": 390,
+    "route": "/intern/documents",
+    "finalUrl": "/intern/documents",
+    "problems": []
+  },
+  {
+    "role": "intern",
+    "width": 390,
+    "route": "/intern/profile",
+    "finalUrl": "/intern/profile",
+    "problems": []
+  },
+  {
+    "role": "intern",
+    "width": 390,
+    "route": "/intern/college",
+    "finalUrl": "/intern/college",
+    "problems": []
+  },
+  {
+    "role": "intern",
+    "width": 390,
+    "route": "/intern/notifications",
+    "finalUrl": "/intern/notifications",
+    "problems": []
+  },
+  {
+    "role": "intern",
+    "width": 390,
+    "route": "/intern/settings",
+    "finalUrl": "/intern/settings",
+    "problems": []
+  },
+  {
+    "role": "intern",
+    "width": 390,
+    "route": "/intern/bank-details",
+    "finalUrl": "/intern/settings#bank",
+    "problems": []
+  },
+  {
+    "role": "intern",
+    "width": 768,
+    "route": "/intern/dashboard",
+    "finalUrl": "/intern/dashboard",
+    "problems": []
+  },
+  {
+    "role": "intern",
+    "width": 768,
+    "route": "/intern/opportunities",
+    "finalUrl": "/intern/opportunities",
+    "problems": []
+  },
+  {
+    "role": "intern",
+    "width": 768,
+    "route": "/intern/opportunities/57829cc3-8221-424c-9593-1c732a689dcd",
+    "finalUrl": "/intern/opportunities/57829cc3-8221-424c-9593-1c732a689dcd",
+    "problems": []
+  },
+  {
+    "role": "intern",
+    "width": 768,
+    "route": "/intern/proposals",
+    "finalUrl": "/intern/proposals",
+    "problems": []
+  },
+  {
+    "role": "intern",
+    "width": 768,
+    "route": "/intern/proposals/d061a8dc-c2e4-481f-85ce-bfe236e632b5",
+    "finalUrl": "/intern/proposals/d061a8dc-c2e4-481f-85ce-bfe236e632b5",
+    "problems": []
+  },
+  {
+    "role": "intern",
+    "width": 768,
+    "route": "/intern/interviews",
+    "finalUrl": "/intern/interviews",
+    "problems": []
+  },
+  {
+    "role": "intern",
+    "width": 768,
+    "route": "/intern/timesheets",
+    "finalUrl": "/intern/timesheets",
+    "problems": []
+  },
+  {
+    "role": "intern",
+    "width": 768,
+    "route": "/intern/earnings",
+    "finalUrl": "/intern/earnings",
+    "problems": []
+  },
+  {
+    "role": "intern",
+    "width": 768,
+    "route": "/intern/record",
+    "finalUrl": "/intern/record",
+    "problems": []
+  },
+  {
+    "role": "intern",
+    "width": 768,
+    "route": "/intern/documents",
+    "finalUrl": "/intern/documents",
+    "problems": []
+  },
+  {
+    "role": "intern",
+    "width": 768,
+    "route": "/intern/profile",
+    "finalUrl": "/intern/profile",
+    "problems": []
+  },
+  {
+    "role": "intern",
+    "width": 768,
+    "route": "/intern/college",
+    "finalUrl": "/intern/college",
+    "problems": []
+  },
+  {
+    "role": "intern",
+    "width": 768,
+    "route": "/intern/notifications",
+    "finalUrl": "/intern/notifications",
+    "problems": []
+  },
+  {
+    "role": "intern",
+    "width": 768,
+    "route": "/intern/settings",
+    "finalUrl": "/intern/settings",
+    "problems": []
+  },
+  {
+    "role": "intern",
+    "width": 768,
+    "route": "/intern/bank-details",
+    "finalUrl": "/intern/settings#bank",
+    "problems": []
+  },
+  {
+    "role": "intern",
+    "width": 1440,
+    "route": "/intern/dashboard",
+    "finalUrl": "/intern/dashboard",
+    "problems": []
+  },
+  {
+    "role": "intern",
+    "width": 1440,
+    "route": "/intern/opportunities",
+    "finalUrl": "/intern/opportunities",
+    "problems": []
+  },
+  {
+    "role": "intern",
+    "width": 1440,
+    "route": "/intern/opportunities/57829cc3-8221-424c-9593-1c732a689dcd",
+    "finalUrl": "/intern/opportunities/57829cc3-8221-424c-9593-1c732a689dcd",
+    "problems": []
+  },
+  {
+    "role": "intern",
+    "width": 1440,
+    "route": "/intern/proposals",
+    "finalUrl": "/intern/proposals",
+    "problems": []
+  },
+  {
+    "role": "intern",
+    "width": 1440,
+    "route": "/intern/proposals/d061a8dc-c2e4-481f-85ce-bfe236e632b5",
+    "finalUrl": "/intern/proposals/d061a8dc-c2e4-481f-85ce-bfe236e632b5",
+    "problems": []
+  },
+  {
+    "role": "intern",
+    "width": 1440,
+    "route": "/intern/interviews",
+    "finalUrl": "/intern/interviews",
+    "problems": []
+  },
+  {
+    "role": "intern",
+    "width": 1440,
+    "route": "/intern/timesheets",
+    "finalUrl": "/intern/timesheets",
+    "problems": []
+  },
+  {
+    "role": "intern",
+    "width": 1440,
+    "route": "/intern/earnings",
+    "finalUrl": "/intern/earnings",
+    "problems": []
+  },
+  {
+    "role": "intern",
+    "width": 1440,
+    "route": "/intern/record",
+    "finalUrl": "/intern/record",
+    "problems": []
+  },
+  {
+    "role": "intern",
+    "width": 1440,
+    "route": "/intern/documents",
+    "finalUrl": "/intern/documents",
+    "problems": []
+  },
+  {
+    "role": "intern",
+    "width": 1440,
+    "route": "/intern/profile",
+    "finalUrl": "/intern/profile",
+    "problems": []
+  },
+  {
+    "role": "intern",
+    "width": 1440,
+    "route": "/intern/college",
+    "finalUrl": "/intern/college",
+    "problems": []
+  },
+  {
+    "role": "intern",
+    "width": 1440,
+    "route": "/intern/notifications",
+    "finalUrl": "/intern/notifications",
+    "problems": []
+  },
+  {
+    "role": "intern",
+    "width": 1440,
+    "route": "/intern/settings",
+    "finalUrl": "/intern/settings",
+    "problems": []
+  },
+  {
+    "role": "intern",
+    "width": 1440,
+    "route": "/intern/bank-details",
+    "finalUrl": "/intern/settings#bank",
+    "problems": []
+  },
+  {
+    "role": "employer",
+    "width": 390,
+    "route": "/employer/dashboard",
+    "finalUrl": "/employer/dashboard",
+    "problems": []
+  },
+  {
+    "role": "employer",
+    "width": 390,
+    "route": "/employer/candidates",
+    "finalUrl": "/employer/candidates",
+    "problems": []
+  },
+  {
+    "role": "employer",
+    "width": 390,
+    "route": "/employer/intern/8c88eabd-fabb-4098-abdc-caa8dca7cc59",
+    "finalUrl": "/employer/intern/8c88eabd-fabb-4098-abdc-caa8dca7cc59",
+    "problems": []
+  },
+  {
+    "role": "employer",
+    "width": 390,
+    "route": "/employer/compare",
+    "finalUrl": "/employer/compare",
+    "problems": []
+  },
+  {
+    "role": "employer",
+    "width": 390,
+    "route": "/employer/drives",
+    "finalUrl": "/employer/drives",
+    "problems": []
+  },
+  {
+    "role": "employer",
+    "width": 390,
+    "route": "/employer/projects",
+    "finalUrl": "/employer/projects",
+    "problems": []
+  },
+  {
+    "role": "employer",
+    "width": 390,
+    "route": "/employer/proposals",
+    "finalUrl": "/employer/proposals",
+    "problems": []
+  },
+  {
+    "role": "employer",
+    "width": 390,
+    "route": "/employer/proposal/d061a8dc-c2e4-481f-85ce-bfe236e632b5",
+    "finalUrl": "/employer/proposal/d061a8dc-c2e4-481f-85ce-bfe236e632b5",
+    "problems": []
+  },
+  {
+    "role": "employer",
+    "width": 390,
+    "route": "/employer/send-proposal",
+    "finalUrl": "/employer/send-proposal",
+    "problems": []
+  },
+  {
+    "role": "employer",
+    "width": 390,
+    "route": "/employer/schedule",
+    "finalUrl": "/employer/schedule",
+    "problems": []
+  },
+  {
+    "role": "employer",
+    "width": 390,
+    "route": "/employer/timesheets",
+    "finalUrl": "/employer/timesheets",
+    "problems": []
+  },
+  {
+    "role": "employer",
+    "width": 390,
+    "route": "/employer/timesheets/c2a01aa8-cb5f-477f-8861-447829655d2d",
+    "finalUrl": "/employer/timesheets/c2a01aa8-cb5f-477f-8861-447829655d2d",
+    "problems": []
+  },
+  {
+    "role": "employer",
+    "width": 390,
+    "route": "/employer/cart",
+    "finalUrl": "/employer/cart",
+    "problems": []
+  },
+  {
+    "role": "employer",
+    "width": 390,
+    "route": "/employer/orders",
+    "finalUrl": "/employer/orders",
+    "problems": []
+  },
+  {
+    "role": "employer",
+    "width": 390,
+    "route": "/employer/alerts",
+    "finalUrl": "/employer/alerts",
+    "problems": []
+  },
+  {
+    "role": "employer",
+    "width": 390,
+    "route": "/employer/account",
+    "finalUrl": "/employer/account",
+    "problems": []
+  },
+  {
+    "role": "employer",
+    "width": 768,
+    "route": "/employer/dashboard",
+    "finalUrl": "/employer/dashboard",
+    "problems": []
+  },
+  {
+    "role": "employer",
+    "width": 768,
+    "route": "/employer/candidates",
+    "finalUrl": "/employer/candidates",
+    "problems": []
+  },
+  {
+    "role": "employer",
+    "width": 768,
+    "route": "/employer/intern/8c88eabd-fabb-4098-abdc-caa8dca7cc59",
+    "finalUrl": "/employer/intern/8c88eabd-fabb-4098-abdc-caa8dca7cc59",
+    "problems": []
+  },
+  {
+    "role": "employer",
+    "width": 768,
+    "route": "/employer/compare",
+    "finalUrl": "/employer/compare",
+    "problems": []
+  },
+  {
+    "role": "employer",
+    "width": 768,
+    "route": "/employer/drives",
+    "finalUrl": "/employer/drives",
+    "problems": []
+  },
+  {
+    "role": "employer",
+    "width": 768,
+    "route": "/employer/projects",
+    "finalUrl": "/employer/projects",
+    "problems": []
+  },
+  {
+    "role": "employer",
+    "width": 768,
+    "route": "/employer/proposals",
+    "finalUrl": "/employer/proposals",
+    "problems": []
+  },
+  {
+    "role": "employer",
+    "width": 768,
+    "route": "/employer/proposal/d061a8dc-c2e4-481f-85ce-bfe236e632b5",
+    "finalUrl": "/employer/proposal/d061a8dc-c2e4-481f-85ce-bfe236e632b5",
+    "problems": []
+  },
+  {
+    "role": "employer",
+    "width": 768,
+    "route": "/employer/send-proposal",
+    "finalUrl": "/employer/send-proposal",
+    "problems": []
+  },
+  {
+    "role": "employer",
+    "width": 768,
+    "route": "/employer/schedule",
+    "finalUrl": "/employer/schedule",
+    "problems": []
+  },
+  {
+    "role": "employer",
+    "width": 768,
+    "route": "/employer/timesheets",
+    "finalUrl": "/employer/timesheets",
+    "problems": []
+  },
+  {
+    "role": "employer",
+    "width": 768,
+    "route": "/employer/timesheets/c2a01aa8-cb5f-477f-8861-447829655d2d",
+    "finalUrl": "/employer/timesheets/c2a01aa8-cb5f-477f-8861-447829655d2d",
+    "problems": []
+  },
+  {
+    "role": "employer",
+    "width": 768,
+    "route": "/employer/cart",
+    "finalUrl": "/employer/cart",
+    "problems": []
+  },
+  {
+    "role": "employer",
+    "width": 768,
+    "route": "/employer/orders",
+    "finalUrl": "/employer/orders",
+    "problems": []
+  },
+  {
+    "role": "employer",
+    "width": 768,
+    "route": "/employer/alerts",
+    "finalUrl": "/employer/alerts",
+    "problems": []
+  },
+  {
+    "role": "employer",
+    "width": 768,
+    "route": "/employer/account",
+    "finalUrl": "/employer/account",
+    "problems": []
+  },
+  {
+    "role": "employer",
+    "width": 1440,
+    "route": "/employer/dashboard",
+    "finalUrl": "/employer/dashboard",
+    "problems": []
+  },
+  {
+    "role": "employer",
+    "width": 1440,
+    "route": "/employer/candidates",
+    "finalUrl": "/employer/candidates",
+    "problems": []
+  },
+  {
+    "role": "employer",
+    "width": 1440,
+    "route": "/employer/intern/8c88eabd-fabb-4098-abdc-caa8dca7cc59",
+    "finalUrl": "/employer/intern/8c88eabd-fabb-4098-abdc-caa8dca7cc59",
+    "problems": []
+  },
+  {
+    "role": "employer",
+    "width": 1440,
+    "route": "/employer/compare",
+    "finalUrl": "/employer/compare",
+    "problems": []
+  },
+  {
+    "role": "employer",
+    "width": 1440,
+    "route": "/employer/drives",
+    "finalUrl": "/employer/drives",
+    "problems": []
+  },
+  {
+    "role": "employer",
+    "width": 1440,
+    "route": "/employer/projects",
+    "finalUrl": "/employer/projects",
+    "problems": []
+  },
+  {
+    "role": "employer",
+    "width": 1440,
+    "route": "/employer/proposals",
+    "finalUrl": "/employer/proposals",
+    "problems": []
+  },
+  {
+    "role": "employer",
+    "width": 1440,
+    "route": "/employer/proposal/d061a8dc-c2e4-481f-85ce-bfe236e632b5",
+    "finalUrl": "/employer/proposal/d061a8dc-c2e4-481f-85ce-bfe236e632b5",
+    "problems": []
+  },
+  {
+    "role": "employer",
+    "width": 1440,
+    "route": "/employer/send-proposal",
+    "finalUrl": "/employer/send-proposal",
+    "problems": []
+  },
+  {
+    "role": "employer",
+    "width": 1440,
+    "route": "/employer/schedule",
+    "finalUrl": "/employer/schedule",
+    "problems": []
+  },
+  {
+    "role": "employer",
+    "width": 1440,
+    "route": "/employer/timesheets",
+    "finalUrl": "/employer/timesheets",
+    "problems": []
+  },
+  {
+    "role": "employer",
+    "width": 1440,
+    "route": "/employer/timesheets/c2a01aa8-cb5f-477f-8861-447829655d2d",
+    "finalUrl": "/employer/timesheets/c2a01aa8-cb5f-477f-8861-447829655d2d",
+    "problems": []
+  },
+  {
+    "role": "employer",
+    "width": 1440,
+    "route": "/employer/cart",
+    "finalUrl": "/employer/cart",
+    "problems": []
+  },
+  {
+    "role": "employer",
+    "width": 1440,
+    "route": "/employer/orders",
+    "finalUrl": "/employer/orders",
+    "problems": []
+  },
+  {
+    "role": "employer",
+    "width": 1440,
+    "route": "/employer/alerts",
+    "finalUrl": "/employer/alerts",
+    "problems": []
+  },
+  {
+    "role": "employer",
+    "width": 1440,
+    "route": "/employer/account",
+    "finalUrl": "/employer/account",
+    "problems": []
+  },
+  {
+    "role": "college",
+    "width": 390,
+    "route": "/college",
+    "finalUrl": "/college",
+    "problems": []
+  },
+  {
+    "role": "college",
+    "width": 390,
+    "route": "/college/drives",
+    "finalUrl": "/college/drives",
+    "problems": []
+  },
+  {
+    "role": "college",
+    "width": 390,
+    "route": "/college/drives/ca73b70e-e953-4e9b-ad72-7da6b00d8532",
+    "finalUrl": "/college/drives/ca73b70e-e953-4e9b-ad72-7da6b00d8532",
+    "problems": []
+  },
+  {
+    "role": "college",
+    "width": 390,
+    "route": "/college/drives/new",
+    "finalUrl": "/college/drives/new",
+    "problems": []
+  },
+  {
+    "role": "college",
+    "width": 390,
+    "route": "/college/roster",
+    "finalUrl": "/college/roster",
+    "problems": []
+  },
+  {
+    "role": "college",
+    "width": 390,
+    "route": "/college/students/8c88eabd-fabb-4098-abdc-caa8dca7cc59",
+    "finalUrl": "/college/students/8c88eabd-fabb-4098-abdc-caa8dca7cc59",
+    "problems": []
+  },
+  {
+    "role": "college",
+    "width": 768,
+    "route": "/college",
+    "finalUrl": "/college",
+    "problems": []
+  },
+  {
+    "role": "college",
+    "width": 768,
+    "route": "/college/drives",
+    "finalUrl": "/college/drives",
+    "problems": []
+  },
+  {
+    "role": "college",
+    "width": 768,
+    "route": "/college/drives/ca73b70e-e953-4e9b-ad72-7da6b00d8532",
+    "finalUrl": "/college/drives/ca73b70e-e953-4e9b-ad72-7da6b00d8532",
+    "problems": []
+  },
+  {
+    "role": "college",
+    "width": 768,
+    "route": "/college/drives/new",
+    "finalUrl": "/college/drives/new",
+    "problems": []
+  },
+  {
+    "role": "college",
+    "width": 768,
+    "route": "/college/roster",
+    "finalUrl": "/college/roster",
+    "problems": []
+  },
+  {
+    "role": "college",
+    "width": 768,
+    "route": "/college/students/8c88eabd-fabb-4098-abdc-caa8dca7cc59",
+    "finalUrl": "/college/students/8c88eabd-fabb-4098-abdc-caa8dca7cc59",
+    "problems": []
+  },
+  {
+    "role": "college",
+    "width": 1440,
+    "route": "/college",
+    "finalUrl": "/college",
+    "problems": []
+  },
+  {
+    "role": "college",
+    "width": 1440,
+    "route": "/college/drives",
+    "finalUrl": "/college/drives",
+    "problems": []
+  },
+  {
+    "role": "college",
+    "width": 1440,
+    "route": "/college/drives/ca73b70e-e953-4e9b-ad72-7da6b00d8532",
+    "finalUrl": "/college/drives/ca73b70e-e953-4e9b-ad72-7da6b00d8532",
+    "problems": []
+  },
+  {
+    "role": "college",
+    "width": 1440,
+    "route": "/college/drives/new",
+    "finalUrl": "/college/drives/new",
+    "problems": []
+  },
+  {
+    "role": "college",
+    "width": 1440,
+    "route": "/college/roster",
+    "finalUrl": "/college/roster",
+    "problems": []
+  },
+  {
+    "role": "college",
+    "width": 1440,
+    "route": "/college/students/8c88eabd-fabb-4098-abdc-caa8dca7cc59",
+    "finalUrl": "/college/students/8c88eabd-fabb-4098-abdc-caa8dca7cc59",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 390,
+    "route": "/admin/dashboard",
+    "finalUrl": "/admin/dashboard",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 390,
+    "route": "/admin/proposal-tracker",
+    "finalUrl": "/admin/proposal-tracker",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 390,
+    "route": "/admin/messages",
+    "finalUrl": "/admin/messages",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 390,
+    "route": "/admin/notification-history",
+    "finalUrl": "/admin/notification-history",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 390,
+    "route": "/admin/interns",
+    "finalUrl": "/admin/interns",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 390,
+    "route": "/admin/interns/8c88eabd-fabb-4098-abdc-caa8dca7cc59",
+    "finalUrl": "/admin/interns/8c88eabd-fabb-4098-abdc-caa8dca7cc59",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 390,
+    "route": "/admin/users",
+    "finalUrl": "/admin/users",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 390,
+    "route": "/admin/companies",
+    "finalUrl": "/admin/companies",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 390,
+    "route": "/admin/companies/de06841c-1444-4ff1-80f3-9ca4f3780462",
+    "finalUrl": "/admin/companies/de06841c-1444-4ff1-80f3-9ca4f3780462",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 390,
+    "route": "/admin/colleges",
+    "finalUrl": "/admin/colleges",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 390,
+    "route": "/admin/projects",
+    "finalUrl": "/admin/projects",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 390,
+    "route": "/admin/orders",
+    "finalUrl": "/admin/orders",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 390,
+    "route": "/admin/intern-invoices",
+    "finalUrl": "/admin/intern-invoices",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 390,
+    "route": "/admin/transactions",
+    "finalUrl": "/admin/transactions",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 390,
+    "route": "/admin/payouts",
+    "finalUrl": "/admin/payouts",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 390,
+    "route": "/admin/promo-codes",
+    "finalUrl": "/admin/promo-codes",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 390,
+    "route": "/admin/reports",
+    "finalUrl": "/admin/reports",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 390,
+    "route": "/admin/reports/money",
+    "finalUrl": "/admin/reports/money",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 390,
+    "route": "/admin/reports/analytics",
+    "finalUrl": "/admin/reports/analytics",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 390,
+    "route": "/admin/cms",
+    "finalUrl": "/admin/cms",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 390,
+    "route": "/admin/notifications",
+    "finalUrl": "/admin/notifications",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 390,
+    "route": "/admin/settings",
+    "finalUrl": "/admin/settings",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 390,
+    "route": "/admin/roles",
+    "finalUrl": "/admin/roles",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 390,
+    "route": "/admin/account",
+    "finalUrl": "/admin/account",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 768,
+    "route": "/admin/dashboard",
+    "finalUrl": "/admin/dashboard",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 768,
+    "route": "/admin/proposal-tracker",
+    "finalUrl": "/admin/proposal-tracker",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 768,
+    "route": "/admin/messages",
+    "finalUrl": "/admin/messages",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 768,
+    "route": "/admin/notification-history",
+    "finalUrl": "/admin/notification-history",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 768,
+    "route": "/admin/interns",
+    "finalUrl": "/admin/interns",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 768,
+    "route": "/admin/interns/8c88eabd-fabb-4098-abdc-caa8dca7cc59",
+    "finalUrl": "/admin/interns/8c88eabd-fabb-4098-abdc-caa8dca7cc59",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 768,
+    "route": "/admin/users",
+    "finalUrl": "/admin/users",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 768,
+    "route": "/admin/companies",
+    "finalUrl": "/admin/companies",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 768,
+    "route": "/admin/companies/de06841c-1444-4ff1-80f3-9ca4f3780462",
+    "finalUrl": "/admin/companies/de06841c-1444-4ff1-80f3-9ca4f3780462",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 768,
+    "route": "/admin/colleges",
+    "finalUrl": "/admin/colleges",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 768,
+    "route": "/admin/projects",
+    "finalUrl": "/admin/projects",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 768,
+    "route": "/admin/orders",
+    "finalUrl": "/admin/orders",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 768,
+    "route": "/admin/intern-invoices",
+    "finalUrl": "/admin/intern-invoices",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 768,
+    "route": "/admin/transactions",
+    "finalUrl": "/admin/transactions",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 768,
+    "route": "/admin/payouts",
+    "finalUrl": "/admin/payouts",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 768,
+    "route": "/admin/promo-codes",
+    "finalUrl": "/admin/promo-codes",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 768,
+    "route": "/admin/reports",
+    "finalUrl": "/admin/reports",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 768,
+    "route": "/admin/reports/money",
+    "finalUrl": "/admin/reports/money",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 768,
+    "route": "/admin/reports/analytics",
+    "finalUrl": "/admin/reports/analytics",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 768,
+    "route": "/admin/cms",
+    "finalUrl": "/admin/cms",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 768,
+    "route": "/admin/notifications",
+    "finalUrl": "/admin/notifications",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 768,
+    "route": "/admin/settings",
+    "finalUrl": "/admin/settings",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 768,
+    "route": "/admin/roles",
+    "finalUrl": "/admin/roles",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 768,
+    "route": "/admin/account",
+    "finalUrl": "/admin/account",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 1440,
+    "route": "/admin/dashboard",
+    "finalUrl": "/admin/dashboard",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 1440,
+    "route": "/admin/proposal-tracker",
+    "finalUrl": "/admin/proposal-tracker",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 1440,
+    "route": "/admin/messages",
+    "finalUrl": "/admin/messages",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 1440,
+    "route": "/admin/notification-history",
+    "finalUrl": "/admin/notification-history",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 1440,
+    "route": "/admin/interns",
+    "finalUrl": "/admin/interns",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 1440,
+    "route": "/admin/interns/8c88eabd-fabb-4098-abdc-caa8dca7cc59",
+    "finalUrl": "/admin/interns/8c88eabd-fabb-4098-abdc-caa8dca7cc59",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 1440,
+    "route": "/admin/users",
+    "finalUrl": "/admin/users",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 1440,
+    "route": "/admin/companies",
+    "finalUrl": "/admin/companies",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 1440,
+    "route": "/admin/companies/de06841c-1444-4ff1-80f3-9ca4f3780462",
+    "finalUrl": "/admin/companies/de06841c-1444-4ff1-80f3-9ca4f3780462",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 1440,
+    "route": "/admin/colleges",
+    "finalUrl": "/admin/colleges",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 1440,
+    "route": "/admin/projects",
+    "finalUrl": "/admin/projects",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 1440,
+    "route": "/admin/orders",
+    "finalUrl": "/admin/orders",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 1440,
+    "route": "/admin/intern-invoices",
+    "finalUrl": "/admin/intern-invoices",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 1440,
+    "route": "/admin/transactions",
+    "finalUrl": "/admin/transactions",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 1440,
+    "route": "/admin/payouts",
+    "finalUrl": "/admin/payouts",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 1440,
+    "route": "/admin/promo-codes",
+    "finalUrl": "/admin/promo-codes",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 1440,
+    "route": "/admin/reports",
+    "finalUrl": "/admin/reports",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 1440,
+    "route": "/admin/reports/money",
+    "finalUrl": "/admin/reports/money",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 1440,
+    "route": "/admin/reports/analytics",
+    "finalUrl": "/admin/reports/analytics",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 1440,
+    "route": "/admin/cms",
+    "finalUrl": "/admin/cms",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 1440,
+    "route": "/admin/notifications",
+    "finalUrl": "/admin/notifications",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 1440,
+    "route": "/admin/settings",
+    "finalUrl": "/admin/settings",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 1440,
+    "route": "/admin/roles",
+    "finalUrl": "/admin/roles",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 1440,
+    "route": "/admin/account",
+    "finalUrl": "/admin/account",
+    "problems": []
+  }
+]

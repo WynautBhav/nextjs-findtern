@@ -67,3 +67,12 @@ lines only.
   `/intern/record`, `/intern/earnings`, `/employer/dashboard`,
   `/admin/dashboard` at 390 and 1440, 0 page errors. The other
   `useReducedMotion` users only vary motion `initial` props, not text.
+- Status (builder, 28 Oct, QA-002b): fixed, awaiting retest (wp/opus,
+  fix(QA-002b)). No markup branches on `useReducedMotion()` any more:
+  Thread's action pulse is always rendered (`motion-reduce:hidden`, and its
+  animation doesn't run under reduce); Thread, ScoreBar and ProofCard start
+  states no longer depend on `reduce` (instant transitions instead), and a
+  `[data-reveal]` rule in globals.css shows the end state to reduced-motion
+  readers before hydration. ScoreBar grows by scaleX from a fixed width.
+  `npm run qa -- motion` on my build: 0 findings (was 6:
+  animation-not-reduced on the pulse after the first pass).
