@@ -18,6 +18,7 @@
     "lint": "eslint",
     "test": "node --test --experimental-strip-types \"src/lib/*.test.ts\" \"src/lib/**/*.test.ts\"",
     "test:security": "node --test --experimental-strip-types src/lib/security/",
+    "e2e": "node e2e/run.mjs",
     "shots": "PORT=3100 DATABASE_URL=postgresql://findtern:findtern_dev@localhost:5432/findtern SESSION_SECRET=verify-only-secret-at-least-32-characters node --experimental-strip-types scripts/shots.ts"
   },
   "dependencies": {
