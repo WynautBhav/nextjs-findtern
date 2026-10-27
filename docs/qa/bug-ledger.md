@@ -9,7 +9,7 @@ lines only.
 | ID | Sev | Role | Route | Width / browser | Status | Summary |
 |---|---|---|---|---|---|---|
 | QA-001 | P1 | employer, intern | /employer/drives/[id] (accept a drive call) | any | closed | Production build without the Google calendar token: `src/lib/college/meetings.ts` returns `link: null` (the Jitsi stand-in is dev-only), yet `requestMeeting` still accepts the call, so the student gets an accepted call with no join link. Expected: refuse with "Calendar not connected; ask Findtern to connect it" (and the admin sees it in attention), never a silent null. Found by the Opus session during WP1 (e2e 7/9 under `next start`). |
-| QA-002 | P2 | intern (also any CountUp user) | /intern/dashboard | any width, Chromium; only with `prefers-reduced-motion: reduce` | open | React error #418 (hydration mismatch, text) in the console on every load. `src/components/app/count-up.tsx`: the server renders `display` (state starts at 0), but under reduced motion the client's first render already returns the formatted final `value`, so the server HTML and the first client render differ. React recovers by client-rendering the subtree, so the user sees no wrong number, but it is a console error, a wasted re-render, and a flash of 0 on slower devices for exactly the users who asked for less motion. |
+| QA-002 | P2 | intern | /intern/dashboard, /intern/record (any page with a Thread "action" node) | any width, Chromium; only with `prefers-reduced-motion: reduce` | open (reopened 28 Oct: db3cafe fixed CountUp only; real cause is `Thread`'s NodeMark, below) | React error #418 (hydration mismatch) in the console on every load. `src/components/app/count-up.tsx`: the server renders `display` (state starts at 0), but under reduced motion the client's first render already returns the formatted final `value`, so the server HTML and the first client render differ. React recovers by client-rendering the subtree, so the user sees no wrong number, but it is a console error, a wasted re-render, and a flash of 0 on slower devices for exactly the users who asked for less motion. |
 
 ## Details
 
@@ -67,3 +67,27 @@ lines only.
   `/intern/record`, `/intern/earnings`, `/employer/dashboard`,
   `/admin/dashboard` at 390 and 1440, 0 page errors. The other
   `useReducedMotion` users only vary motion `initial` props, not text.
+
+- Retest (tester, 28 Oct): **reopened**. Production build of wp/qa on d207313 (includes
+  db3cafe), `npm run qa -- motion`: 4 findings, all React #418: `/intern/dashboard` and
+  `/intern/record` at 390 and 1440. `/intern/earnings`, `/employer/dashboard` and
+  `/admin/dashboard` are clean, and the CountUp figures are now in the server HTML, so
+  db3cafe did fix what it targeted. Repeat run (6 loads each, 390 and 1440, Chromium):
+  reduced motion 6/6 errors on dashboard and record, 0/6 on earnings; normal motion 0/36.
+  Not reproduced on `next dev` (no hydration message at all), so check on a production build.
+- Cause (confirmed by correlation, not by a patched build; the tester does not edit
+  `src/`): `src/components/app/thread.tsx` `NodeMark` renders
+  `{isAction && !reduce ? <motion.span aria-hidden .../> : null}`. `useReducedMotion()` is
+  `null` during SSR, so the server HTML contains the pulse span; a reduced-motion client's
+  first render omits it, so the child list differs. The pulse span (`bg-accent-400/50`) is in
+  the server HTML of exactly the two failing pages (dashboard 1, record 2) and of none of
+  `/intern/earnings`, `/timesheets`, `/interviews`, `/proposals`, which have no Thread.
+  The same file's `animated = !reduce && i < ANIMATED_NODES` and the `initial=` props in
+  `Thread`, `ScoreBar` and `ProofCard` branch on `reduce` too, but only change style attributes,
+  which React does not report in production; they do ship `opacity:0` in the server HTML to
+  reduced-motion users until hydration (a flash, the same class as the CountUp one).
+- Suggested fix: do not branch the markup on `reduce`. Always render the pulse span and hide
+  it with CSS (`motion-reduce:hidden`), and drive the other reveals from CSS or from state set
+  after mount, so the server and first client render are identical.
+- Re-run: `QA_REBUILD=1 npm run qa -- motion`; trace
+  `e2e/.artifacts/qa/motion/intern-hired-1440-reduced-trace.zip`.
