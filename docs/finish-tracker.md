@@ -152,3 +152,7 @@ branch, not to be touched: `feat/college-partners` (worktree
   .github/workflows/ci.yml; owner runs `gh auth refresh -s workflow`.
   Environment-only (not bugs): uploads 404 on local copies; admin login
   rate-limits after ~3 rapid logins per IP.
+- 28 Oct: the first tester session exited after WP3 (harness merged, QA-001
+  closed; its QA-002 retest check merged as `cc0b76b`). A new Sonnet session
+  (nextjs-findtern-48) took over as tester with a private QA Postgres on
+  :5436 (findtern_qa, migrated 27 Oct copy) prepared by the orchestrator.
