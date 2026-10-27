@@ -1,4 +1,4 @@
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
 import { getDb, schema } from "@/lib/db";
@@ -19,7 +19,9 @@ import { requireMutation } from "@/lib/guards-mutation";
       and(
         eq(schema.notifications.recipientType, recipientType),
         eq(schema.notifications.recipientId, session.uid),
-        isNull(schema.notifications.readAt),
+        // The flag, not the date: legacy can mark a row unread again and
+        // leave its old readAt behind.
+        eq(schema.notifications.isRead, false),
       ),
     );
 

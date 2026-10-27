@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { CheckCircle2, Loader2, MessageCircleQuestion } from "lucide-react";
 
 import { FileUpload } from "@/components/app/file-upload";
@@ -25,9 +25,30 @@ const KINDS = [
  * posting to /api/support/feedback; the route survived the rewrite with zero
  * UI calling it. One floating button per dashboard, above the mobile tab bar.
  */
-export function FeedbackFab({ className, variant = "fab" }: { className?: string; variant?: "fab" | "link" }) {
+export function FeedbackFab({
+  className,
+  variant = "fab",
+  deepLink = false,
+}: {
+  className?: string;
+  variant?: "fab" | "link";
+  /** Open on legacy `?support=feedback|report` links (EMB-28 / INT-37). One instance per page. */
+  deepLink?: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const [kind, setKind] = useState<string>("bug");
+
+  useEffect(() => {
+    if (!deepLink) return;
+    const support = new URLSearchParams(window.location.search).get("support");
+    if (support !== "feedback" && support !== "report") return;
+    // After the first paint, so the page is there behind the dialog.
+    const frame = requestAnimationFrame(() => {
+      setKind(support === "report" ? "bug" : "idea");
+      setOpen(true);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [deepLink]);
   const [message, setMessage] = useState("");
   const [state, setState] = useState<"idle" | "sending" | "sent" | "error">("idle");
   // Legacy shape (DB-14): up to five images / PDFs and one short video.

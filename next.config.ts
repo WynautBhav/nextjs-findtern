@@ -41,7 +41,7 @@ const LEGACY_REDIRECTS: { from: string; to: string }[] = [
   { from: "/employer/intern/:id/proposal", to: "/employer/send-proposal?intern=:id" },
   // The legacy typo alias, which was live long enough to be linked.
   { from: "/employer/shedule", to: "/employer/schedule" },
-  { from: "/employer/proposals/:id/edit", to: "/employer/proposal/:id" },
+  { from: "/employer/proposals/:id/edit", to: "/employer/proposal/:id?edit=1" },
   { from: "/employer/timesheet", to: "/employer/timesheets" },
   { from: "/employer/interns", to: "/employer/candidates" },
   { from: "/guaranteed-program", to: "/guaranteed-internship-program" },

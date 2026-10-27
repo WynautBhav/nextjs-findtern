@@ -314,16 +314,16 @@ export async function getInternNda(): Promise<CmsLegalDoc> {
       .from(schema.internNonDisclosureClauses)
       .where(eq(schema.internNonDisclosureClauses.isActive, true))
       .orderBy(asc(schema.internNonDisclosureClauses.sortOrder));
-    if (!rows.length) return INTERN_NDA;
-    const latest = rows.reduce<Date | null>((acc, r) => {
-      const t = r.updatedAt ?? r.createdAt;
-      return t && (!acc || t > acc) ? t : acc;
-    }, null);
+    // Legacy shows the first active clause only (ADP-14); older inactive
+    // or later rows are drafts the admin kept, not parts of one document.
+    const [first] = rows;
+    if (!first) return INTERN_NDA;
+    const updated = first.updatedAt ?? first.createdAt;
     return {
       ...INTERN_NDA,
-      title: rows.length === 1 ? rows[0].title || INTERN_NDA.title : INTERN_NDA.title,
-      html: rows.length === 1 ? rows[0].bodyHtml : rows.map((r) => `<h2>${r.title}</h2>${r.bodyHtml}`).join("\n"),
-      updated: latest?.toISOString().slice(0, 10) ?? INTERN_NDA.updated,
+      title: first.title || INTERN_NDA.title,
+      html: first.bodyHtml,
+      updated: updated?.toISOString().slice(0, 10) ?? INTERN_NDA.updated,
     };
   }, INTERN_NDA);
 }

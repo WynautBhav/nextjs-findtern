@@ -169,7 +169,7 @@ export function ConsoleShell({
       </nav>
 
       <div className="mt-4 shrink-0 space-y-1 border-t border-white/10 pt-3">
-        <FeedbackFab variant="link" className={cn("w-full", compact && "justify-center px-0 [&>span]:sr-only")} />
+        <FeedbackFab variant="link" deepLink={!onNavigate} className={cn("w-full", compact && "justify-center px-0 [&>span]:sr-only")} />
         <button
           type="button"
           onClick={signOut}
