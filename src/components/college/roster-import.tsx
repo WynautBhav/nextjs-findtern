@@ -32,7 +32,7 @@ export function RosterImport() {
     }
     setResult({
       ok: true,
-      text: `Imported ${body.imported} student${body.imported === 1 ? "" : "s"}.${body.verified ? ` ${body.verified} already on Findtern are now verified.` : ""}`,
+      text: `Imported ${body.imported} student${body.imported === 1 ? "" : "s"}.${body.verified ? ` ${body.verified} ${body.verified === 1 ? "student who had joined is" : "students who had joined are"} now verified.` : ""}`,
       errors: body.errors ?? [],
     });
     setCsv("");

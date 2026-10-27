@@ -141,17 +141,29 @@ export async function leaveCollege(userId: string): Promise<void> {
   });
 }
 
-/** After a roster import: members whose email is now on the roster become verified. */
+/**
+ * After a roster import: members whose email is now on the roster become
+ * verified (roster is the stronger proof, so domain-verified members are
+ * relabelled too, and pick up the roster's year and branch). Returns how many
+ * were *newly* verified: relabelling someone already verified by college email
+ * isn't news to the officer, and counting it said "60 now verified" when none were.
+ */
 export async function verifyFromRoster(collegeId: string): Promise<number> {
-  const res = await getDb().execute(sql`
+  const match = sql`m.user_id = u.id AND m.college_id = ${collegeId} AND m.left_at IS NULL
+      AND r.college_id = ${collegeId} AND r.email = lower(u.email)`;
+  const db = getDb();
+  const before = await db.execute(sql`
+    SELECT count(*)::int AS n FROM ${schema.collegeMemberships} m, ${schema.users} u, ${schema.collegeRoster} r
+    WHERE ${match} AND m.status <> 'verified'
+  `);
+  await db.execute(sql`
     UPDATE ${schema.collegeMemberships} m SET status = 'verified', verified_by = 'roster',
       year = coalesce(r.year, m.year), branch = coalesce(nullif(r.branch, ''), m.branch)
     FROM ${schema.users} u, ${schema.collegeRoster} r
-    WHERE m.user_id = u.id AND m.college_id = ${collegeId} AND m.left_at IS NULL
-      AND r.college_id = ${collegeId} AND r.email = lower(u.email)
+    WHERE ${match}
       AND (m.status <> 'verified' OR m.verified_by IS DISTINCT FROM 'roster')
   `);
-  return res.rowCount ?? 0;
+  return Number((before.rows[0] as { n?: number } | undefined)?.n ?? 0);
 }
 
 /** Search the college list for the student picker. */
