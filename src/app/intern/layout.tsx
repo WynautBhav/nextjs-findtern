@@ -8,6 +8,7 @@ import {
   CalendarCheck2,
   CircleUserRound,
   Compass,
+  GraduationCap,
   House,
   LayoutList,
   ReceiptIndianRupee,
@@ -18,8 +19,10 @@ import {
 import { ConsoleShell, type ConsoleNavItem } from "@/components/layout/console-shell";
 import { RAIL_COOKIE } from "@/lib/rail";
 import { ViewAsBanner } from "@/components/admin/view-as-banner";
+import { CollegeLive } from "@/components/intern/college-live";
 import { getSession } from "@/lib/auth";
 import { getDb, schema } from "@/lib/db";
+import { membershipOf } from "@/lib/college/membership";
 import { loadInternData } from "@/lib/intern-data";
 import { nextAction, type Stage } from "@/lib/journey";
 import { SITE } from "@/lib/content/site";
@@ -58,6 +61,7 @@ const MORE_NAV: ConsoleNavItem[] = [
   { href: "/intern/earnings", label: "Stipend", icon: <ReceiptIndianRupee /> },
   { href: "/intern/documents", label: "Documents", icon: <BadgeCheck /> },
   { href: "/intern/profile", label: "Your profile", icon: <CircleUserRound /> },
+  { href: "/intern/college", label: "College", icon: <GraduationCap /> },
   { href: "/intern/notifications", label: "Notifications", icon: <Bell /> },
   { href: "/intern/settings", label: "Settings", icon: <Settings2 /> },
 ];
@@ -115,6 +119,9 @@ export default async function InternLayout({ children }: { children: React.React
     i.href === "/intern/notifications" && unreadAlerts > 0 ? { ...i, badge: unreadAlerts > 99 ? "99+" : unreadAlerts } : i,
   );
 
+  // Only college members heartbeat; "View as" must not mark the student online.
+  const college = session.impersonator ? null : await membershipOf(session.uid).catch(() => null);
+
   return (
     <ConsoleShell
       homeHref="/intern/dashboard"
@@ -134,6 +141,12 @@ export default async function InternLayout({ children }: { children: React.React
       width="reading"
       banner={session.impersonator ? <ViewAsBanner viewing={name} admin={session.impersonator.email} /> : null}
     >
+      {college ? (
+        <CollegeLive
+          collegeName={college.name}
+          vapidKey={process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? ""}
+        />
+      ) : null}
       {children}
     </ConsoleShell>
   );
@@ -150,3 +163,4 @@ async function fullName(uid: string): Promise<string> {
   const name = `${row?.first ?? ""} ${row?.last ?? ""}`.trim();
   return name || "Candidate";
 }
+

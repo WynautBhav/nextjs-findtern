@@ -56,6 +56,8 @@ async function canRead(path: string, folder: string | null): Promise<true | stri
   if (!session) return "Sign in";
   if (session.role === "admin") return true;
   if (folder === "support") return "Forbidden";
+  // Placement officers read student data through src/lib/college only.
+  if (session.role === "college") return "Forbidden";
 
   const uid = session.uid;
   const owned =

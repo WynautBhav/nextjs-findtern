@@ -32,6 +32,15 @@ async function readStatus(role: string, uid: string): Promise<{ active: boolean;
     if (role === "admin") {
       const [row] = await getDb().select({ password: schema.admins.password }).from(schema.admins).where(eq(schema.admins.id, uid)).limit(1);
       status = { active: Boolean(row), pv: row ? passwordVersion(row.password) : null };
+    } else if (role === "college") {
+      // A placement officer is locked out when either they or their college is switched off.
+      const [row] = await getDb()
+        .select({ admin: schema.collegeAdmins.isActive, college: schema.colleges.isActive, password: schema.collegeAdmins.password })
+        .from(schema.collegeAdmins)
+        .innerJoin(schema.colleges, eq(schema.colleges.id, schema.collegeAdmins.collegeId))
+        .where(eq(schema.collegeAdmins.id, uid))
+        .limit(1);
+      status = { active: Boolean(row?.admin && row?.college), pv: row ? passwordVersion(row.password) : null };
     } else {
       const table = role === "intern" ? schema.users : schema.employers;
       const [row] = await getDb()
@@ -49,7 +58,7 @@ async function readStatus(role: string, uid: string): Promise<{ active: boolean;
 }
 
 export async function isAccountActive(role: string, uid: string): Promise<boolean> {
-  if (role !== "intern" && role !== "employer") return true;
+  if (role !== "intern" && role !== "employer" && role !== "college") return true;
   const status = await readStatus(role, uid);
   return status ? status.active : true;
 }

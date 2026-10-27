@@ -123,3 +123,15 @@ export type CmsLegalDoc = {
   updated?: string;
   href: string;
 };
+
+export type CmsCollegePartner = { id: string; name: string; city: string | null; logoUrl: string | null };
+
+export type CmsCollegePitch = {
+  eyebrow: string;
+  lead: string;
+  accent: string;
+  sub: string;
+  points: { title: string; body: string }[];
+  cta: { label: string; href: string };
+  loginHref: string;
+};

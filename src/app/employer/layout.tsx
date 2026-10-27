@@ -17,6 +17,7 @@ import {
   Send,
   KeyRound,
   Receipt,
+  GraduationCap,
 } from "lucide-react";
 
 import { ConsoleShell, type ConsoleNavGroup } from "@/components/layout/console-shell";
@@ -33,6 +34,7 @@ const NAV_GROUPS: ConsoleNavGroup[] = [
       { href: "/employer/dashboard", label: "Dashboard", icon: <LayoutDashboard /> },
       { href: "/employer/candidates", label: "Candidates", icon: <Users /> },
       { href: "/employer/compare", label: "Compare", icon: <GitCompare /> },
+      { href: "/employer/drives", label: "Campus drives", icon: <GraduationCap /> },
       { href: "/employer/projects", label: "Projects", icon: <FolderKanban /> },
     ],
   },
