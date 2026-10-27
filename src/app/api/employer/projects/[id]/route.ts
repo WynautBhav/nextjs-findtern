@@ -1,4 +1,4 @@
-import { and, eq, ne, sql } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, ne, or, sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -91,13 +91,32 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
   if (!project) return NextResponse.json({ error: "Not found" }, { status: 404 });
   if (project.employerId !== guard.session.uid) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
+  // Legacy rule (routes.ts:10810-10846): any offer blocks, but a meeting only
+  // while it is open or once a time was picked. Cancelled or expired invites
+  // that never got a slot don't keep a project alive.
   const [[interview], [proposal]] = await Promise.all([
-    db.select({ id: schema.interviews.id }).from(schema.interviews).where(eq(schema.interviews.projectId, id)).limit(1),
+    db
+      .select({ id: schema.interviews.id })
+      .from(schema.interviews)
+      .where(
+        and(
+          eq(schema.interviews.projectId, id),
+          or(
+            inArray(schema.interviews.status, ["pending", "scheduled", "waiting"]),
+            isNotNull(schema.interviews.selectedSlot),
+          ),
+        ),
+      )
+      .limit(1),
     db.select({ id: schema.proposals.id }).from(schema.proposals).where(eq(schema.proposals.projectId, id)).limit(1),
   ]);
   if (interview || proposal) {
     return NextResponse.json(
-      { error: "This project has interviews or proposals, so it can be closed but not deleted." },
+      {
+        error: proposal
+          ? "This project has offers linked to it, so it can be closed but not deleted."
+          : "This project has meetings linked to it, so it can be closed but not deleted.",
+      },
       { status: 409 },
     );
   }

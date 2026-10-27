@@ -1,7 +1,8 @@
-import { eq, inArray, isNotNull, and, sql, type SQL } from "drizzle-orm";
+import { eq, inArray, isNotNull, and, or, sql, type SQL } from "drizzle-orm";
 
 import { getDb, schema } from "./db";
 import type { CandidateProfile } from "./employer-candidates";
+import { hiredProposalSql } from "./employer-visibility";
 
 /**
  * Who an employer is allowed to browse.
@@ -43,9 +44,11 @@ export function scoreExpr(): SQL {
 
 /**
  * Of `internIds`, the ones this employer may open: in the pool today, or
- * already in a relationship with them (any proposal or interview). The
- * relationship exception keeps a hired intern who later hides their profile
- * reachable on the screens that manage that engagement.
+ * committed to this employer (offer accepted, being paid for, or hired).
+ * That exception keeps an intern who switches off open-to-work once placed
+ * reachable for checkout and the engagement (timesheets, full-time offer).
+ * A sent, declined or withdrawn offer or a meeting is not enough: an intern
+ * who hides their profile disappears for those employers, as on legacy.
  */
 export async function visibleInternIds(
   db: ReturnType<typeof getDb>,
@@ -54,7 +57,7 @@ export async function visibleInternIds(
 ): Promise<Set<string>> {
   const ids = [...new Set(internIds.filter(Boolean))];
   if (ids.length === 0) return new Set();
-  const [pool, proposed, interviewed] = await Promise.all([
+  const [pool, committed] = await Promise.all([
     db
       .select({ id: schema.users.id })
       .from(schema.users)
@@ -63,13 +66,15 @@ export async function visibleInternIds(
     db
       .select({ id: schema.proposals.internId })
       .from(schema.proposals)
-      .where(and(eq(schema.proposals.employerId, employerId), inArray(schema.proposals.internId, ids))),
-    db
-      .select({ id: schema.interviews.internId })
-      .from(schema.interviews)
-      .where(and(eq(schema.interviews.employerId, employerId), inArray(schema.interviews.internId, ids))),
+      .where(
+        and(
+          eq(schema.proposals.employerId, employerId),
+          inArray(schema.proposals.internId, ids),
+          or(inArray(schema.proposals.status, ["accepted", "processing"]), hiredProposalSql()),
+        ),
+      ),
   ]);
-  return new Set([...pool, ...proposed, ...interviewed].map((r) => r.id));
+  return new Set([...pool, ...committed].map((r) => r.id));
 }
 
 /** Single-intern form of `visibleInternIds`. */

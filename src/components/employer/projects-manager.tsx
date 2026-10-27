@@ -71,6 +71,9 @@ export function ProjectsManager({
   const [errorMsg, setErrorMsg] = useState("");
   // Row actions (close/reopen, delete) report here, outside the edit sheet.
   const [listError, setListError] = useState("");
+  // A failed delete is reported on its own card: the list banner sits above
+  // the fold once the employer has scrolled down to the row.
+  const [rowError, setRowError] = useState<{ id: string; message: string } | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
 
   // Skills suggestion state
@@ -226,17 +229,17 @@ export function ProjectsManager({
   async function deleteProject(project: Project) {
     if (!window.confirm(`Delete "${project.projectName}"? This can't be undone.`)) return;
     setBusyId(project.id);
-    setListError("");
+    setRowError(null);
     try {
       const res = await csrfFetch(`/api/employer/projects/${project.id}`, { method: "DELETE" });
       if (!res.ok) {
         const data = (await res.json().catch(() => ({}))) as { error?: string };
-        setListError(data.error ?? "Couldn't delete this project.");
+        setRowError({ id: project.id, message: data.error ?? "Couldn't delete this project." });
         return;
       }
       setProjects((prev) => prev.filter((item) => item.id !== project.id));
     } catch {
-      setListError("Couldn't reach the server. Check your connection and try again.");
+      setRowError({ id: project.id, message: "Couldn't reach the server. Check your connection and try again." });
     } finally {
       setBusyId(null);
     }
@@ -486,6 +489,11 @@ export function ProjectsManager({
                       Delete
                     </button>
                   </div>
+                  {rowError?.id === p.id ? (
+                    <p role="alert" className="mt-2 text-xs text-danger">
+                      {rowError.message}
+                    </p>
+                  ) : null}
                 </div>
               </div>
             );

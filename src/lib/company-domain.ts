@@ -58,3 +58,22 @@ export function websiteDomainError(
   if (websiteMatchesEmailDomain(website, email)) return null;
   return `The website must be on your company email's domain (${domain}), e.g. ${domain} or careers.${domain}.`;
 }
+
+/**
+ * The message for an escalation (secondary) contact email that is not on the
+ * company's domain, or null when it is fine (bug sheet 26 Oct). The domains
+ * may differ by a subdomain either way: hr@mail.acme.com and ops@acme.com are
+ * the same company. `skipDomainCheck` as for `websiteDomainError`.
+ */
+export function escalationEmailDomainError(
+  escalationEmail: string,
+  companyEmail: string,
+  { skipDomainCheck = false }: { skipDomainCheck?: boolean } = {},
+): string | null {
+  if (skipDomainCheck) return null;
+  const domain = emailDomain(companyEmail);
+  const other = emailDomain(escalationEmail);
+  if (!domain || !other) return null;
+  if (other === domain || other.endsWith(`.${domain}`) || domain.endsWith(`.${other}`)) return null;
+  return `Use an email on your company domain (${domain}) for the escalation contact.`;
+}

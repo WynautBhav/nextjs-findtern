@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { emailDomain, websiteDomainError, websiteHost, websiteMatchesEmailDomain } from "./company-domain.ts";
+import { emailDomain, escalationEmailDomainError, websiteDomainError, websiteHost, websiteMatchesEmailDomain } from "./company-domain.ts";
 
 test("websiteHost strips protocol, www, port, path and case", () => {
   assert.equal(websiteHost("acme.com"), "acme.com");
@@ -39,4 +39,16 @@ test("a parent domain does not satisfy a subdomain email", () => {
 test("websiteDomainError: malformed websites and the skip switch", () => {
   assert.match(websiteDomainError("acme", "owner@acme.com") ?? "", /does not look like a website/);
   assert.equal(websiteDomainError("anything.io", "someone@gmail.com", { skipDomainCheck: true }), null);
+});
+
+test("escalation email must be on the company email's domain", () => {
+  const company = "owner@acme.com";
+  for (const ok of ["ops@acme.com", "OPS@Acme.com", "hr@mail.acme.com"]) {
+    assert.equal(escalationEmailDomainError(ok, company), null, ok);
+  }
+  assert.equal(escalationEmailDomainError("ops@acme.com", "hr@mail.acme.com"), null);
+  for (const bad of ["ops@acme.io", "ops@notacme.com", "ops@acme.com.evil.io"]) {
+    assert.match(escalationEmailDomainError(bad, company) ?? "", /acme\.com/, bad);
+  }
+  assert.equal(escalationEmailDomainError("ops@other.com", "me@gmail.com", { skipDomainCheck: true }), null);
 });

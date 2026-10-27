@@ -9,7 +9,7 @@ import { isIndiaCountry } from "@/lib/data/countries";
 import { suggestSkills } from "@/lib/data/skills";
 import { csrfFetch } from "@/lib/client-fetch";
 import { phoneError } from "@/lib/phone";
-import { websiteDomainError } from "@/lib/company-domain";
+import { escalationEmailDomainError, websiteDomainError } from "@/lib/company-domain";
 import { MAX_PROJECT_LOCATIONS, projectLocationsError } from "@/lib/project-locations";
 import { TIMEZONES, timezoneForLocation } from "@/lib/timezones";
 import {
@@ -1150,6 +1150,9 @@ function validateStage(
       errors.escalationContactEmail = "Use a company email for the escalation contact.";
     } else if (escalationEmail.toLowerCase() === email.toLowerCase()) {
       errors.escalationContactEmail = "That is already the primary contact email.";
+    } else {
+      const problem = escalationEmailDomainError(escalationEmail, email, { skipDomainCheck: !companyDomainOf(email) });
+      if (problem) errors.escalationContactEmail = problem;
     }
     if (!c.escalationContactPhone.trim()) {
       errors.escalationContactPhone = "An escalation contact phone is required.";

@@ -144,7 +144,12 @@ export default async function EmployerOrdersPage() {
       hiredCandidates={hiredItems}
       upcomingDues={upcoming}
       lineLabels={lineLabels}
-      paymentHistory={paymentRows}
+      // The Invoices tab lists money received only: a cancelled, failed or
+      // abandoned checkout is not an invoice, and a ₹0 test order has nothing
+      // to bill.
+      paymentHistory={paymentRows.filter(
+        (p) => (p.status === "paid" || p.status === "captured") && p.amountMinor > 0,
+      )}
       seller={getInvoiceSeller()}
       buyer={buyer}
       employerId={employerId}

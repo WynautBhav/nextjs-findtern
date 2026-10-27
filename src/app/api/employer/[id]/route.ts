@@ -5,7 +5,7 @@ import { z } from "zod";
 import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
 import { normalizePhone, phoneError } from "@/lib/phone";
-import { websiteDomainError } from "@/lib/company-domain";
+import { escalationEmailDomainError, websiteDomainError } from "@/lib/company-domain";
 import { REQUIRED_COMPANY_FIELDS, isPersonalEmail, needsBillingPincode } from "@/lib/employer-onboarding";
 
 const LABEL = Object.fromEntries(REQUIRED_COMPANY_FIELDS) as Record<string, string>;
@@ -75,7 +75,11 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   // The website must sit on the login email's domain (owner@acme.com ->
   // acme.com or a subdomain). The email comes from the row, never the body.
   const [account] = await db
-    .select({ companyEmail: schema.employers.companyEmail, websiteUrl: schema.employers.websiteUrl })
+    .select({
+      companyEmail: schema.employers.companyEmail,
+      websiteUrl: schema.employers.websiteUrl,
+      escalationContactEmail: schema.employers.escalationContactEmail,
+    })
     .from(schema.employers)
     .where(eq(schema.employers.id, id))
     .limit(1);
@@ -100,6 +104,17 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (d.escalationContactEmail.trim().toLowerCase() === (account.companyEmail ?? "").trim().toLowerCase()) {
     return NextResponse.json({ error: "The escalation contact needs a different email from the company account email." }, { status: 400 });
   }
+  // Same company domain as the login (bug sheet 26 Oct). Checked when the
+  // email is entered or changed, like the website, so an older account with
+  // another domain on file can still save.
+  const escalationUnchanged =
+    (account.escalationContactEmail ?? "").trim().toLowerCase() === d.escalationContactEmail.trim().toLowerCase();
+  const escalationProblem = escalationUnchanged
+    ? null
+    : escalationEmailDomainError(d.escalationContactEmail, account.companyEmail ?? "", {
+        skipDomainCheck: !account.companyEmail || isPersonalEmail(account.companyEmail),
+      });
+  if (escalationProblem) return NextResponse.json({ error: escalationProblem }, { status: 400 });
   if (
     d.escalationContactPhone?.trim() &&
     normalizePhone(d.escalationContactPhone) === normalizePhone(d.phoneNumber) &&

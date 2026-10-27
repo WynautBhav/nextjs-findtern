@@ -82,7 +82,7 @@ export default async function EmployerCartPage() {
     if (items.length > 0) {
       const allInternIds = Array.from(new Set(items.map((item) => item.internId)));
       // Rows whose intern left the pool (hid their profile, deactivated) drop
-      // out, unless this employer already has a relationship with them -
+      // out, unless their offer from this employer is accepted or hired -
       // legacy purged them from cart and compare (employer-cart.tsx:1632).
       const visible = await visibleInternIds(db, uid, allInternIds);
       const internIds = allInternIds.filter((id) => visible.has(id));

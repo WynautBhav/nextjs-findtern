@@ -17,7 +17,7 @@ import { DIAL_CODES } from "@/lib/data/dial-codes";
 
 import { csrfFetch } from "@/lib/client-fetch";
 import { phoneError } from "@/lib/phone";
-import { websiteDomainError } from "@/lib/company-domain";
+import { escalationEmailDomainError, websiteDomainError } from "@/lib/company-domain";
 import { REQUIRED_COMPANY_FIELDS, isPersonalEmail, needsBillingPincode } from "@/lib/employer-onboarding";
 
 export type CompanyProfile = {
@@ -67,7 +67,7 @@ const ESCALATION_FIELDS = [
  * same rules (`PATCH /api/employer/:id`); this is so the employer sees which
  * field, not just the first error.
  */
-function validate(v: Record<string, string>, savedWebsite = ""): Record<string, string> {
+function validate(v: Record<string, string>, savedWebsite = "", savedEscalationEmail = ""): Record<string, string> {
   const errors: Record<string, string> = {};
   for (const [key, label] of REQUIRED_COMPANY_FIELDS) {
     if (!v[key]?.trim()) errors[key] = `${label} is required.`;
@@ -101,6 +101,12 @@ function validate(v: Record<string, string>, savedWebsite = ""): Record<string, 
     else if (isPersonalEmail(email)) errors.escalationContactEmail = "Use a company email for the escalation contact.";
     else if (email.toLowerCase() === v.companyEmail.trim().toLowerCase()) {
       errors.escalationContactEmail = "Use a different email from the company account email.";
+    } else if (email.toLowerCase() !== savedEscalationEmail.trim().toLowerCase()) {
+      // On the company domain, checked when entered or changed (as the website).
+      const problem = escalationEmailDomainError(email, v.companyEmail, {
+        skipDomainCheck: !companyDomainOf(v.companyEmail),
+      });
+      if (problem) errors.escalationContactEmail = problem;
     }
   }
   if (!v.escalationContactCountryCode?.trim()) errors.escalationContactCountryCode = "Country code is required.";
@@ -147,7 +153,7 @@ export function CompanyProfileForm({
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    const problems = validate(values, profile.websiteUrl ?? "");
+    const problems = validate(values, profile.websiteUrl ?? "", profile.escalationContactEmail ?? "");
     setErrors(problems);
     if (Object.keys(problems).length > 0) {
       setError("Some required details are missing - see the highlighted fields.");
