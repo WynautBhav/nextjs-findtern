@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createHash, randomBytes } from "node:crypto";
@@ -7,6 +7,7 @@ import { getDb, schema } from "@/lib/db";
 import { emails, renderEmail } from "@/lib/emails";
 import { sendSmtpMail } from "@/lib/mailer";
 import { limiters, bucketKey, clientIp } from "@/lib/security/rate-limit";
+import { publicOrigin } from "@/lib/google";
 
 const bodySchema = z.object({
   email: z.string().trim().toLowerCase().email(),
@@ -32,14 +33,14 @@ export async function POST(req: Request) {
         await db
           .select({ id: schema.employers.id, email: schema.employers.companyEmail })
           .from(schema.employers)
-          .where(eq(schema.employers.companyEmail, parsed.data.email))
+          .where(sql`lower(${schema.employers.companyEmail}) = ${parsed.data.email}`)
           .limit(1)
       )[0]
     : (
         await db
           .select({ id: schema.users.id, email: schema.users.email })
           .from(schema.users)
-          .where(eq(schema.users.email, parsed.data.email))
+          .where(sql`lower(${schema.users.email}) = ${parsed.data.email}`)
           .limit(1)
       )[0];
 
@@ -55,7 +56,7 @@ export async function POST(req: Request) {
     expiresAt: new Date(Date.now() + RESET_TTL_MINUTES * 60_000),
   });
 
-  const base = process.env.PUBLIC_ORIGIN ?? "http://localhost:3000";
+  const base = publicOrigin(req);
   const resetPath = isEmployer ? "/employer/reset-password" : "/reset-password";
   await sendSmtpMail({
     to: subject.email,

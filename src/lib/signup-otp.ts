@@ -2,6 +2,7 @@ import { and, desc, eq, gt, isNotNull } from "drizzle-orm";
 import type { NextResponse } from "next/server";
 
 import { getDb, schema } from "@/lib/db";
+import { isPersonalEmail } from "@/lib/employer-onboarding";
 import { readCookie } from "@/lib/security/session";
 import { sign, verify } from "@/lib/security/sign";
 
@@ -18,6 +19,17 @@ import { sign, verify } from "@/lib/security/sign";
  */
 
 export const SIGNUP_OTP_SUBJECTS = ["intern", "employer"] as const;
+
+/**
+ * Interns register with a personal mailbox (INT-06; legacy insertUserSchema
+ * refused anything else), so the account outlives a college or employer
+ * address. googlemail.com is Gmail, which the Google sign-in accepts too.
+ */
+export function isInternEmail(email: string): boolean {
+  return isPersonalEmail(email) || email.trim().toLowerCase().endsWith("@googlemail.com");
+}
+export const INTERN_EMAIL_MESSAGE =
+  "Please use a personal email address (Gmail, Yahoo, Outlook and the like). College and work addresses are not accepted.";
 export type SignupOtpSubject = (typeof SIGNUP_OTP_SUBJECTS)[number];
 
 /** How long after verifying the code the account must be created (legacy: 15 min). */

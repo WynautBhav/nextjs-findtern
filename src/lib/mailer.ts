@@ -22,13 +22,15 @@ export function mailMode(): "log" | "send" {
   return process.env.NODE_ENV === "production" ? "send" : "log";
 }
 
+export type MailResult = { ok: true; mode: "log" | "send" } | { ok: false; error: string };
+
 export async function sendSmtpMail(opts: {
   to: string | string[];
   subject: string;
   text: string;
   html?: string;
   attachments?: SmtpAttachment[];
-}) {
+}): Promise<MailResult> {
   if (mailMode() === "log") {
     const dir = join(process.cwd(), "logs", "mail");
     const entry = `--- ${new Date().toISOString()}\nTo: ${[opts.to].flat().join(", ")}\nSubject: ${opts.subject}\n${
@@ -42,7 +44,7 @@ export async function sendSmtpMail(opts: {
       console.info(entry);
     }
     console.info(`[mail:log] ${opts.subject} → ${[opts.to].flat().join(", ")}`);
-    return { ok: true };
+    return { ok: true, mode: "log" };
   }
 
   const from = (process.env.SMTP_FROM ?? "").trim();
@@ -54,7 +56,7 @@ export async function sendSmtpMail(opts: {
 
   if (!from || !host || !user || !pass) {
     console.warn("SMTP is not configured; email subject:", opts.subject);
-    return;
+    return { ok: false, error: "SMTP is not configured" };
   }
 
   const transporter = nodemailer.createTransport({
@@ -73,7 +75,7 @@ export async function sendSmtpMail(opts: {
       html: opts.html,
       attachments: opts.attachments,
     });
-    return { ok: true };
+    return { ok: true, mode: "send" };
   } catch (err) {
     console.error("Failed to send SMTP email to", opts.to, err);
     return { ok: false, error: err instanceof Error ? err.message : String(err) };

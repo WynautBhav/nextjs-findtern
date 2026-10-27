@@ -8,8 +8,13 @@ export async function GET(req: Request) {
   const role = url.searchParams.get("role") === "employer" ? "employer" : "intern";
   const next = safeNext(url.searchParams.get("next"), "");
 
-  const cfg = googleConfig();
-  if (!cfg) return NextResponse.json({ error: "Google sign-in is not configured" }, { status: 503 });
+  const cfg = googleConfig(req);
+  if (!cfg) {
+    // Back to the page the button was on, with a readable message, instead
+    // of a bare JSON error.
+    const back = role === "employer" ? "/employer/login" : "/login";
+    return NextResponse.redirect(new URL(`${back}?oauthError=not_configured`, req.url));
+  }
 
   // The nonce rides in the state and in an httpOnly cookie; the callback
   // requires both to match, so a login can't be started from another site.

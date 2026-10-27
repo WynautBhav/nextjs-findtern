@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -27,7 +27,9 @@ export async function POST(req: Request) {
   const [user] = await db
     .select()
     .from(schema.users)
-    .where(eq(schema.users.email, parsed.data.email))
+    // Legacy rows may hold mixed-case addresses; the input is lower-cased
+    // (INT-35, legacy compared LOWER(email)).
+    .where(sql`lower(${schema.users.email}) = ${parsed.data.email}`)
     .limit(1);
 
   if (!user || !(await verifyPassword(parsed.data.password, user.password))) {
@@ -40,11 +42,12 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Account deactivated" }, { status: 403 });
   }
 
+  let storedPassword = user.password;
   if (needsRehash(user.password)) {
-    const upgraded = await hashPassword(parsed.data.password);
+    storedPassword = await hashPassword(parsed.data.password);
     await db
       .update(schema.users)
-      .set({ password: upgraded })
+      .set({ password: storedPassword })
       .where(eq(schema.users.id, user.id));
   }
 
@@ -52,5 +55,5 @@ export async function POST(req: Request) {
     user: { id: user.id, email: user.email, firstName: user.firstName, lastName: user.lastName },
   });
   await issueCsrfCookie(res);
-  return withSession(res, { uid: user.id, role: "intern", email: user.email });
+  return withSession(res, { uid: user.id, role: "intern", email: user.email, password: storedPassword });
 }

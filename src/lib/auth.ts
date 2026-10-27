@@ -2,13 +2,14 @@ import { cookies, headers } from "next/headers";
 import { randomBytes } from "node:crypto";
 import { redirect } from "next/navigation";
 
-import { currentAdminPermissions, isAccountActive } from "@/lib/account-status";
+import { currentAdminPermissions, isAccountActive, isPasswordVersionCurrent } from "@/lib/account-status";
 import { NextResponse } from "next/server";
 
 import {
   createSession,
   readSession,
   clearCookie,
+  passwordVersion,
   type Role,
   type SessionData,
 } from "@/lib/security/session";
@@ -21,6 +22,7 @@ export async function getSession(): Promise<SessionData | null> {
   const session = readSession(store.get("ft_sid")?.value);
   if (!session) return null;
   if (!(await isAccountActive(session.role, session.uid))) return null;
+  if (!(await isPasswordVersionCurrent(session.role, session.uid, session.pv))) return null;
   if (session.role === "admin" && !session.impersonator) {
     const perms = await currentAdminPermissions(session.uid);
     if (perms === null) return null; // admin removed
@@ -36,9 +38,25 @@ export async function getSession(): Promise<SessionData | null> {
 export async function requireRole(role: "intern" | "employer" | "admin"): Promise<SessionData> {
   const session = await getSession();
   if (!session || session.role !== role) {
-    redirect(role === "intern" ? "/login" : `/${role}/login`);
+    redirect(await loginUrlFor(role));
   }
   return session;
+}
+
+/**
+ * The sign-in page for a role, carrying the page being opened as `?next=`
+ * so sign in returns there (INT-07 / EMH-37). The proxy stamps the path on
+ * the request as `x-ft-path`; without it this is the plain login page.
+ */
+export async function loginUrlFor(role: "intern" | "employer" | "admin"): Promise<string> {
+  const base = role === "intern" ? "/login" : `/${role}/login`;
+  let path: string | null = null;
+  try {
+    path = (await headers()).get("x-ft-path");
+  } catch {
+    // outside a request
+  }
+  return path && path.startsWith("/") && !path.startsWith("//") ? `${base}?next=${encodeURIComponent(path)}` : base;
 }
 
 /**
@@ -69,9 +87,17 @@ export async function withSession(
     email: string;
     permissions?: string[];
     impersonator?: { uid: string; email: string };
+    /** The account's stored password (hash). Sessions carry its version, so
+     *  a later password change ends them (INT-26). */
+    password?: string | null;
   },
 ): Promise<NextResponse> {
-  const { cookie } = createSession({ ...input, secure: await isHttps() });
+  const { password, ...rest } = input;
+  const { cookie } = createSession({
+    ...rest,
+    ...(password ? { pv: passwordVersion(password) } : {}),
+    secure: await isHttps(),
+  });
   res.headers.append("Set-Cookie", cookie);
   return res;
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { AlertCircle, Check } from "lucide-react";
 
@@ -9,10 +9,13 @@ const field =
 const button =
   "h-11 w-full rounded-lg bg-brand-700 px-4 text-sm font-semibold text-white transition-colors hover:bg-brand-600 disabled:pointer-events-none disabled:opacity-60";
 
-async function post(url: string, body: unknown) {
+type Answer = { error?: string; resendAfterSeconds?: number; remainingSeconds?: number; delivery?: string };
+
+async function post(url: string, body: unknown): Promise<Answer> {
   const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-  const data = (await res.json().catch(() => ({}))) as { error?: string };
-  if (!res.ok) throw new Error(data.error ?? "Something went wrong. Try again.");
+  const data = (await res.json().catch(() => ({}))) as Answer;
+  if (!res.ok) throw Object.assign(new Error(data.error ?? "Something went wrong. Try again."), { answer: data });
+  return data;
 }
 
 export function VerifyEmailForm({ role, initialEmail, loginHref }: { role: "intern" | "employer"; initialEmail: string; loginHref: string }) {
@@ -21,6 +24,15 @@ export function VerifyEmailForm({ role, initialEmail, loginHref }: { role: "inte
   const [step, setStep] = useState<"email" | "code" | "done">("email");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** Seconds until another code may be requested (INT-24). */
+  const [resendIn, setResendIn] = useState(0);
+  const [mailLogged, setMailLogged] = useState(false);
+
+  useEffect(() => {
+    if (resendIn <= 0) return;
+    const t = window.setTimeout(() => setResendIn((s) => s - 1), 1000);
+    return () => window.clearTimeout(t);
+  }, [resendIn]);
 
   async function run(fn: () => Promise<void>) {
     setBusy(true);
@@ -29,10 +41,32 @@ export function VerifyEmailForm({ role, initialEmail, loginHref }: { role: "inte
       await fn();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong. Try again.");
+      const remaining = (e as { answer?: Answer }).answer?.remainingSeconds;
+      if (typeof remaining === "number") setResendIn(remaining);
     } finally {
       setBusy(false);
     }
   }
+
+  function sendCode() {
+    void run(async () => {
+      const data = await post("/api/auth/signup/send-otp", { email, subjectType: role, purpose: "verify" });
+      setResendIn(data.resendAfterSeconds ?? 60);
+      setMailLogged(data.delivery === "log");
+      setStep("code");
+    });
+  }
+
+  // Arriving from "Verify it now" on the sign-in page, the address is already
+  // known: send the code straight away instead of asking for a second click.
+  const autoSent = useRef(false);
+  useEffect(() => {
+    if (autoSent.current || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(initialEmail)) return;
+    autoSent.current = true;
+    sendCode();
+    // Once, on arrival.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   if (step === "done") {
     return (
@@ -55,10 +89,7 @@ export function VerifyEmailForm({ role, initialEmail, loginHref }: { role: "inte
       onSubmit={(e) => {
         e.preventDefault();
         if (step === "email") {
-          void run(async () => {
-            await post("/api/auth/signup/send-otp", { email, subjectType: role, purpose: "verify" });
-            setStep("code");
-          });
+          sendCode();
         } else {
           void run(async () => {
             await post("/api/auth/signup/verify-otp", { email, otp: code, subjectType: role });
@@ -105,11 +136,26 @@ export function VerifyEmailForm({ role, initialEmail, loginHref }: { role: "inte
             className={`${field} tracking-[0.4em]`}
           />
           <p className="mt-1.5 text-xs text-text-subtle">
-            Sent to {email}. It expires in 10 minutes.{" "}
+            If {email} has an account waiting for verification, a code is on its way. It expires in
+            10 minutes.{" "}
             <button type="button" className="font-medium text-brand-700 hover:underline" onClick={() => setStep("email")}>
               Change email
             </button>
+            {" · "}
+            <button
+              type="button"
+              disabled={busy || resendIn > 0}
+              className="font-medium text-brand-700 hover:underline disabled:no-underline disabled:opacity-60"
+              onClick={sendCode}
+            >
+              {resendIn > 0 ? `Resend in 0:${String(resendIn).padStart(2, "0")}` : "Resend code"}
+            </button>
           </p>
+          {mailLogged ? (
+            <p role="status" className="mt-3 rounded-lg border border-warning/30 bg-warning-soft px-3.5 py-3 text-sm text-ink-800">
+              This is a test server: emails are written to its log instead of being sent.
+            </p>
+          ) : null}
         </div>
       ) : null}
       <button type="submit" disabled={busy || !email.includes("@") || (step === "code" && code.length !== 6)} className={button}>

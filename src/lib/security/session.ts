@@ -60,12 +60,34 @@ export type SessionData = {
    * present, and redaction lifts so the admin sees full names and contacts.
    */
   impersonator?: { uid: string; email: string };
+  /**
+   * Password version: a keyed fingerprint of the stored password at sign in
+   * (`passwordVersion`). A password change gives the account a new
+   * fingerprint, so every session minted before it stops being accepted
+   * (INT-26). Sessions minted before this field existed carry none and are
+   * not checked.
+   */
+  pv?: string;
+  /** Epoch ms of the original sign in. Caps how far sliding renewal can go. */
+  iat?: number;
 };
 
 /** "View as" sessions are short: an admin forgets to exit, not a user. */
 export const IMPERSONATION_TTL_MS = 1000 * 60 * 60;
 
-const TTL_MS = 1000 * 60 * 60 * 12; // 12h, matching the legacy maxAge
+/**
+ * Idle timeout. Sessions slide (INT-38, decided 27 Oct: "sessions extend
+ * while active"; the legacy cookie lasted until the browser closed): a
+ * request after the first few minutes re-issues the cookie with a fresh
+ * 12 hours, so an active user is never signed out mid-task, and an idle one
+ * is signed out 12 hours after their last request.
+ */
+export const SESSION_TTL_MS = 1000 * 60 * 60 * 12;
+const TTL_MS = SESSION_TTL_MS;
+/** No session lives longer than this from its sign in, however active. */
+export const SESSION_MAX_AGE_MS = 1000 * 60 * 60 * 24 * 30;
+/** Renew at most this often, so not every request sets a cookie. */
+export const SESSION_RENEW_AFTER_MS = 1000 * 60 * 5;
 
 function secret(): Buffer {
   const s = process.env.SESSION_SECRET ?? process.env.SIGNING_SECRET;
@@ -83,6 +105,8 @@ export function createSession(input: {
   permissions?: string[];
   /** The admin behind a "View as" session. */
   impersonator?: { uid: string; email: string };
+  /** Password version (`passwordVersion(stored)`), for revocation on change. */
+  pv?: string;
   ttlMs?: number;
   now?: number;
   /**
@@ -99,15 +123,49 @@ export function createSession(input: {
     email: input.email,
     ...(input.permissions ? { permissions: input.permissions } : {}),
     ...(input.impersonator ? { impersonator: input.impersonator } : {}),
+    ...(input.pv ? { pv: input.pv } : {}),
     exp: now + (input.ttlMs ?? (input.impersonator ? IMPERSONATION_TTL_MS : TTL_MS)),
     sid: randomBytes(12).toString("base64url"),
+    iat: now,
   };
 
+  return { cookie: serializeCookie(signData(data), data.exp, input.secure), data };
+}
+
+function signData(data: SessionData): string {
   const body = Buffer.from(JSON.stringify(data)).toString("base64url");
   const sig = createHmac("sha256", secret()).update(body).digest("base64url");
-  const token = `${body}.${sig}`;
+  return `${body}.${sig}`;
+}
 
-  return { cookie: serializeCookie(token, data.exp, input.secure), data };
+/**
+ * Sliding renewal: the same session (same sid, role, permissions, password
+ * version) with a fresh idle timeout. Returns null when there is nothing to
+ * do: a "View as" session (those stay short), one renewed in the last few
+ * minutes, or one at its absolute maximum age.
+ */
+export function renewSession(
+  data: SessionData,
+  opts: { now?: number; secure?: boolean } = {},
+): { cookie: string; data: SessionData } | null {
+  const now = opts.now ?? Date.now();
+  if (data.impersonator) return null;
+  if (data.exp - now > TTL_MS - SESSION_RENEW_AFTER_MS) return null;
+  const iat = typeof data.iat === "number" ? data.iat : data.exp - TTL_MS;
+  const exp = Math.min(now + TTL_MS, iat + SESSION_MAX_AGE_MS);
+  if (exp <= data.exp) return null;
+  const next: SessionData = { ...data, iat, exp };
+  return { cookie: serializeCookie(signData(next), exp, opts.secure), data: next };
+}
+
+/**
+ * The password version stored in a session: a keyed fingerprint of the
+ * account's stored password (a hash, or a legacy plaintext value). It
+ * reveals nothing about the password, and it changes whenever the stored
+ * value does, whichever app changed it.
+ */
+export function passwordVersion(storedPassword: string): string {
+  return createHmac("sha256", secret()).update(`pv:${storedPassword ?? ""}`).digest("base64url").slice(0, 16);
 }
 
 /** Verify a token and return its payload, or null. Never throws. */
@@ -144,6 +202,8 @@ export function readSession(
     if (!Array.isArray(data.permissions)) return null;
     if (!data.permissions.every((p) => typeof p === "string")) return null;
   }
+  if (data.pv !== undefined && typeof data.pv !== "string") return null;
+  if (data.iat !== undefined && typeof data.iat !== "number") return null;
   if (data.impersonator !== undefined) {
     const imp = data.impersonator as unknown as Record<string, unknown>;
     if (!imp || typeof imp.uid !== "string" || typeof imp.email !== "string") return null;

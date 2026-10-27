@@ -1,10 +1,11 @@
-import { and, eq, ne } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
 import { normalizePhone, phoneError } from "@/lib/phone";
+import { phoneInUseAnywhere } from "@/lib/phone-owner";
 
 const bodySchema = z.object({
   firstName: z.string().trim().min(2).max(60),
@@ -27,18 +28,12 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const phone = normalizePhone(b.phoneNumber);
 
   const db = getDb();
-  const [taken] = await db
-    .select({ id: schema.users.id })
-    .from(schema.users)
-    .where(and(eq(schema.users.phoneNumber, phone), ne(schema.users.id, id)))
-    .limit(1);
-  // An employer's number is taken too: one phone per person across roles.
-  const [employerOwner] = await db
-    .select({ id: schema.employers.id })
-    .from(schema.employers)
-    .where(and(eq(schema.employers.countryCode, b.countryCode), eq(schema.employers.phoneNumber, phone)))
-    .limit(1);
-  if (taken || employerOwner) return NextResponse.json({ error: "This phone number is already in use." }, { status: 409 });
+  // One phone per person across roles and contact numbers, country code
+  // included (INT-05, INT-36). The intern's own rows are skipped, so saving
+  // an unchanged number is fine.
+  if (await phoneInUseAnywhere(b.countryCode, phone, { userId: id })) {
+    return NextResponse.json({ error: "This phone number is already in use." }, { status: 409 });
+  }
 
   await db
     .update(schema.users)

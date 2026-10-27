@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -30,11 +30,15 @@ export async function POST(req: Request) {
   const db = getDb();
   const updated =
     role === "intern"
-      ? await db.update(schema.users).set({ emailVerified: true }).where(eq(schema.users.email, email)).returning({ id: schema.users.id })
+      ? await db
+          .update(schema.users)
+          .set({ emailVerified: true })
+          .where(and(sql`lower(${schema.users.email}) = ${email}`, eq(schema.users.emailVerified, false)))
+          .returning({ id: schema.users.id })
       : await db
           .update(schema.employers)
           .set({ emailVerified: true })
-          .where(eq(schema.employers.companyEmail, email))
+          .where(and(sql`lower(${schema.employers.companyEmail}) = ${email}`, eq(schema.employers.emailVerified, false)))
           .returning({ id: schema.employers.id });
   // Same answer whether or not the account exists, so this can't probe emails.
   void updated;

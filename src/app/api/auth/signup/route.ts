@@ -1,4 +1,4 @@
-import { and, eq, or, sql } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -7,7 +7,8 @@ import { hashPassword, isStrongPassword, WEAK_PASSWORD_MESSAGE } from "@/lib/sec
 import { withSession, issueCsrfCookie } from "@/lib/auth";
 import { limiters, bucketKey, clientIp } from "@/lib/security/rate-limit";
 import { normalizePhone, phoneError } from "@/lib/phone";
-import { hasVerifiedSignupOtp } from "@/lib/signup-otp";
+import { hasVerifiedSignupOtp, INTERN_EMAIL_MESSAGE, isInternEmail } from "@/lib/signup-otp";
+import { phoneInUseAnywhere } from "@/lib/phone-owner";
 
 const bodySchema = z.object({
   firstName: z.string().min(2),
@@ -32,6 +33,12 @@ export async function POST(req: Request) {
   if (!isStrongPassword(parsed.data.password)) {
     return NextResponse.json({ error: WEAK_PASSWORD_MESSAGE }, { status: 400 });
   }
+  // Interns register with a personal address (INT-06, legacy shared/schema.ts:
+  // "Please use a personal email address"), so the account outlives a
+  // college or employer mailbox.
+  if (!isInternEmail(parsed.data.email)) {
+    return NextResponse.json({ error: INTERN_EMAIL_MESSAGE }, { status: 400 });
+  }
   const phoneProblem = phoneError(parsed.data.countryCode, parsed.data.phoneNumber);
   if (phoneProblem) {
     return NextResponse.json({ error: phoneProblem }, { status: 400 });
@@ -42,40 +49,31 @@ export async function POST(req: Request) {
 
   const db = getDb();
   const [existing] = await db
-    .select()
+    .select({ id: schema.users.id })
     .from(schema.users)
-    .where(eq(schema.users.email, parsed.data.email))
+    .where(sql`lower(${schema.users.email}) = ${parsed.data.email}`)
     .limit(1);
   if (existing) {
     return NextResponse.json({ error: "Email already registered" }, { status: 409 });
   }
-  const phoneNumber = normalizePhone(parsed.data.phoneNumber);
-  const [phoneOwner] = await db
-    .select({ id: schema.users.id })
-    .from(schema.users)
-    .where(and(eq(schema.users.countryCode, parsed.data.countryCode), eq(schema.users.phoneNumber, phoneNumber)))
-    .limit(1);
-  if (phoneOwner) {
-    return NextResponse.json({ error: "Phone number already registered" }, { status: 409 });
-  }
-
-  // One person, one role: an email or phone already on an employer account
-  // cannot also open an intern account.
+  // One person, one role: an email already on an employer account cannot
+  // also open an intern account.
   const [employerOwner] = await db
     .select({ id: schema.employers.id })
     .from(schema.employers)
-    .where(
-      or(
-        sql`lower(${schema.employers.companyEmail}) = ${parsed.data.email}`,
-        and(eq(schema.employers.countryCode, parsed.data.countryCode), eq(schema.employers.phoneNumber, phoneNumber)),
-      ),
-    )
+    .where(sql`lower(${schema.employers.companyEmail}) = ${parsed.data.email}`)
     .limit(1);
   if (employerOwner) {
     return NextResponse.json(
-      { error: "This email or phone number is already registered as an employer account" },
+      { error: "This email is already registered as an employer account" },
       { status: 409 },
     );
+  }
+  // Own numbers, intern emergency / second contacts and employer escalation
+  // contacts, country code included (INT-05, INT-36).
+  const phoneNumber = normalizePhone(parsed.data.phoneNumber);
+  if (await phoneInUseAnywhere(parsed.data.countryCode, phoneNumber)) {
+    return NextResponse.json({ error: "Phone number already in use" }, { status: 409 });
   }
 
   const password = await hashPassword(parsed.data.password);
@@ -95,5 +93,5 @@ export async function POST(req: Request) {
 
   const res = NextResponse.json({ user: { id: user.id, email: user.email } });
   await issueCsrfCookie(res);
-  return withSession(res, { uid: user.id, role: "intern", email: user.email });
+  return withSession(res, { uid: user.id, role: "intern", email: user.email, password });
 }
