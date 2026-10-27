@@ -61,15 +61,20 @@ test("slots start on the quarter hour", async () => {
   assert.equal(isQuarterHourWall("2026-11-03T10:07"), false);
 });
 
-test("suggested slots: nearest quarter hour at least 15 min out, then +1h and +2h", async () => {
+test("suggested slots: the next quarter hour, then +1h and +2h", async () => {
   const { suggestedSlots } = await import("./employer-interview-rules.ts");
-  // 10:07 IST on 19 Oct 2026 = 04:37 UTC -> 10:22 rounds up to 10:30.
+  // Bug sheet 7 (Sheet2 r2): 12:34 -> 12:45, 13:45, 14:45.
+  // 12:34 IST on 19 Oct 2026 = 07:04 UTC.
+  assert.deepEqual(suggestedSlots(Date.UTC(2026, 9, 19, 7, 4), "Asia/Kolkata"), ["2026-10-19T12:45", "2026-10-19T13:45", "2026-10-19T14:45"]);
+  // 10:07 IST -> 10:15; 10:14 IST -> 10:15; 10:16 IST -> 10:30.
   const now = Date.UTC(2026, 9, 19, 4, 37);
-  assert.deepEqual(suggestedSlots(now, "Asia/Kolkata"), ["2026-10-19T10:30", "2026-10-19T11:30", "2026-10-19T12:30"]);
-  // 10:14 IST -> 10:29 rounds to 10:30; 10:16 IST -> 10:31 rounds to 10:45.
-  assert.equal(suggestedSlots(Date.UTC(2026, 9, 19, 4, 44), "Asia/Kolkata")[0], "2026-10-19T10:30");
-  assert.equal(suggestedSlots(Date.UTC(2026, 9, 19, 4, 46), "Asia/Kolkata")[0], "2026-10-19T10:45");
-  // Exactly on a quarter, 15 minutes ahead stays on it; crosses midnight cleanly.
+  assert.deepEqual(suggestedSlots(now, "Asia/Kolkata"), ["2026-10-19T10:15", "2026-10-19T11:15", "2026-10-19T12:15"]);
+  assert.equal(suggestedSlots(Date.UTC(2026, 9, 19, 4, 44), "Asia/Kolkata")[0], "2026-10-19T10:15");
+  assert.equal(suggestedSlots(Date.UTC(2026, 9, 19, 4, 46), "Asia/Kolkata")[0], "2026-10-19T10:30");
+  // New York, from the employer's own zone (Sheet2 r3): 12:34 EDT -> 12:45.
+  assert.equal(suggestedSlots(Date.UTC(2026, 9, 19, 16, 34), "America/New_York")[0], "2026-10-19T12:45");
+  // Exactly on a quarter moves to the next one; crosses midnight cleanly.
+  assert.equal(suggestedSlots(Date.UTC(2026, 9, 19, 18, 0), "Asia/Kolkata")[0], "2026-10-19T23:45"); // 23:30 IST
   const late = Date.UTC(2026, 9, 19, 18, 15); // 23:45 IST
   assert.deepEqual(suggestedSlots(late, "Asia/Kolkata"), ["2026-10-20T00:00", "2026-10-20T01:00", "2026-10-20T02:00"]);
 });
@@ -91,4 +96,24 @@ test("feedback opens only once the meeting is over", () => {
 test("a booked meeting whose time is over reads completed, an unpicked one expired", () => {
   assert.equal(displayInterviewStatus({ status: "scheduled", slot1: h(-2), slot2: null, slot3: null, selectedSlot: 1 }, NOW), "completed");
   assert.equal(displayInterviewStatus({ status: "pending", slot1: h(-2), slot2: null, slot3: null }, NOW), "expired");
+});
+
+test("interview stage drives the schedule's actions", async () => {
+  const { interviewStage, canLeaveFeedback, normalizeMeetingLink, stageRank } = await import("./employer-interview-rules.ts");
+  const at = (status: string, slot: Date, selectedSlot: number | null = 1) => ({ status, slot1: slot, slot2: null, slot3: null, selectedSlot });
+  assert.equal(interviewStage(at("pending", h(2), null), NOW), "awaiting_pick");
+  assert.equal(interviewStage(at("pending", h(-2), null), NOW), "expired");
+  assert.equal(interviewStage(at("scheduled", h(1)), NOW), "upcoming");
+  assert.equal(interviewStage(at("scheduled", h(-0.25)), NOW), "live");
+  assert.equal(interviewStage(at("scheduled", h(-1)), NOW), "over");
+  assert.equal(interviewStage(at("missed", h(-1)), NOW), "missed");
+  assert.equal(interviewStage(at("cancelled", h(-1)), NOW), "closed");
+  assert.equal(canLeaveFeedback(at("missed", h(-1)), NOW), true);
+  assert.equal(canLeaveFeedback(at("scheduled", h(1)), NOW), false);
+  assert.ok(stageRank("upcoming") < stageRank("awaiting_pick"));
+  assert.ok(stageRank("awaiting_pick") < stageRank("expired"));
+  assert.ok(stageRank("expired") < stageRank("over"));
+  assert.equal(normalizeMeetingLink("meet.google.com/abc"), "https://meet.google.com/abc");
+  assert.equal(normalizeMeetingLink("http://x.test"), "http://x.test");
+  assert.equal(normalizeMeetingLink("  "), null);
 });

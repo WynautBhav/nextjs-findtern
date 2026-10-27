@@ -1,56 +1,66 @@
 "use client";
 
 /**
- * The four things an interviewer does to an interview.
+ * What an interviewer can do to one interview, by stage.
  *
- * All four endpoints exist and were verified in the audit; the legacy page had
- * all four buttons and the rewrite had none, which made the schedule a read-only
- * list an employer could not act on. Reminder and mark-missed are one click;
- * reschedule and feedback open a small inline panel rather than a modal,
- * because there is no surrounding context worth dimming.
+ * The schedule used to show the same four buttons on every row, greyed out
+ * when they didn't apply. Now the row's stage (`interviewStage`) decides
+ * which actions exist at all (DESIGN.md §7.5):
  *
- * Guarded by the same rule the rest of the app follows: the button says what it
- * will do, and the server's answer is shown verbatim when it refuses.
+ *   awaiting_pick → Send reminder · Offer new times
+ *   expired       → Offer new times
+ *   upcoming      → Join meeting · Send reminder · Reschedule
+ *   live          → Join meeting · Mark missed (after the grace period)
+ *   over          → Leave feedback · Mark missed
+ *   missed        → Leave feedback
+ *
+ * Reschedule and feedback open an inline panel; reminder and mark-missed are
+ * one click (mark-missed asks once). The server's refusal is shown verbatim.
  */
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Bell, CalendarClock, Check, Loader2, MessageSquare, X } from "lucide-react";
+import { Bell, CalendarClock, Check, Loader2, MessageSquare, UserRound, X } from "lucide-react";
 
+import { buttonClass } from "@/components/ui/button";
 import { csrfFetch } from "@/lib/client-fetch";
-import { isQuarterHourWall, suggestedSlots } from "@/lib/employer-interview-rules";
+import { isQuarterHourWall, suggestedSlots, type InterviewStage } from "@/lib/employer-interview-rules";
 import { MeetingSlots, type Slots } from "@/components/employer/meeting-slots";
+import { JoinMeetingButton } from "@/components/employer/meeting-join";
 
-type Panel = "none" | "reschedule" | "feedback";
+type Panel = "none" | "reschedule" | "feedback" | "missed";
 
 export function InterviewActions({
   interviewId,
-  past,
-  status,
+  stage,
   timezone = "Asia/Kolkata",
-  meetingOver = false,
-  hasFeedback = false,
+  meetingLink = null,
+  canMarkMissed = false,
+  canFeedback = false,
+  internHref,
 }: {
   interviewId: string;
-  past: boolean;
-  status: string;
-  /** The meeting has happened (completed, or its booked time is over). */
-  meetingOver?: boolean;
-  /** Feedback was already shared - it is given once. */
-  hasFeedback?: boolean;
+  stage: InterviewStage;
   /** The interview's timezone; suggested slots are wall-clock times in it. */
   timezone?: string;
+  /** Live link (already hidden an hour after the start). */
+  meetingLink?: string | null;
+  /** Scheduled, and the start plus 15 minutes has passed. */
+  canMarkMissed?: boolean;
+  /** Over or missed, and no feedback yet (it is shared once). */
+  canFeedback?: boolean;
+  internHref: string;
 }) {
   const router = useRouter();
   const [panel, setPanel] = useState<Panel>("none");
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-
   const [slots, setSlots] = useState<Slots>(["", "", ""]);
   const [feedback, setFeedback] = useState("");
 
-  async function post(path: string, body?: unknown, label = "action") {
+  async function post(path: string, body: unknown, label: string) {
     setBusy(label);
     setError(null);
     setNotice(null);
@@ -72,124 +82,119 @@ export function InterviewActions({
   }
 
   async function remind() {
-    if (await post("send-reminder", undefined, "send a reminder")) {
+    if (await post("send-reminder", {}, "send a reminder")) {
       setNotice("Reminder sent to the candidate.");
       router.refresh();
     }
   }
 
   async function markMissed() {
-    if (await post("mark-missed", undefined, "mark it missed")) {
+    if (await post("mark-missed", {}, "mark it missed")) {
+      setPanel("none");
       setNotice("Marked as missed.");
       router.refresh();
     }
   }
 
   async function reschedule() {
-    if (slots.some((v) => !v)) {
-      setError("Offer three times.");
-      return;
-    }
-    if (!slots.every(isQuarterHourWall)) {
-      setError("Slots start on the hour or at :15, :30 or :45.");
-      return;
-    }
-    if (new Set(slots).size !== 3) {
-      setError("Offer three different times.");
-      return;
-    }
+    if (slots.some((v) => !v)) return setError("Offer three times.");
+    if (!slots.every(isQuarterHourWall)) return setError("Slots start on the hour or at :15, :30 or :45.");
+    if (new Set(slots).size !== 3) return setError("Offer three different times.");
     // Wall-clock; the server applies the interview's timezone.
-    const payload = { slot1: slots[0], slot2: slots[1], slot3: slots[2] };
-    if (await post("reschedule", payload, "reschedule")) {
-      setNotice("New slots offered.");
+    if (await post("reschedule", { slot1: slots[0], slot2: slots[1], slot3: slots[2] }, "reschedule")) {
+      setNotice("New times offered. The candidate has been told.");
       setPanel("none");
-      setSlots(["", "", ""]);
       router.refresh();
     }
   }
 
   async function sendFeedback() {
-    if (feedback.trim().length === 0) {
-      setError("Write the feedback first.");
-      return;
-    }
+    if (!feedback.trim()) return setError("Write the feedback first.");
     if (await post("feedback", { feedback: feedback.trim() }, "save the feedback")) {
-      setNotice("Feedback saved.");
+      setNotice("Feedback shared with the candidate.");
       setPanel("none");
       setFeedback("");
       router.refresh();
     }
   }
 
-  const closed = status.toLowerCase() === "completed" || status.toLowerCase() === "cancelled";
-  // Feedback only for a completed interview (bug sheet 26 Oct), and once.
-  const canFeedback = meetingOver && !hasFeedback && status.toLowerCase() !== "cancelled";
+  function toggle(next: Panel) {
+    setError(null);
+    if (next === "reschedule" && panel !== "reschedule") setSlots(suggestedSlots(Date.now(), timezone));
+    setPanel(panel === next ? "none" : next);
+  }
+
+  const canRemind = stage === "awaiting_pick" || stage === "upcoming";
+  const canReschedule = stage === "awaiting_pick" || stage === "expired" || stage === "upcoming";
+  const missedShown = canMarkMissed && (stage === "live" || stage === "over");
+  const linkShown = Boolean(meetingLink) && (stage === "upcoming" || stage === "live");
 
   return (
-    <div className="mt-4 border-t border-ink-100 pt-4">
+    <div className="mt-5 border-t border-ink-100 pt-4">
       <div className="flex flex-wrap items-center gap-2">
-        <Action
-          icon={<Bell className="size-3.5" />}
-          label="Send reminder"
-          onClick={remind}
-          busy={busy === "send a reminder"}
-          disabled={busy !== null || closed || past}
-        />
-        <Action
-          icon={<CalendarClock className="size-3.5" />}
-          label={panel === "reschedule" ? "Cancel reschedule" : "Reschedule"}
-          onClick={() => {
-            if (panel !== "reschedule") setSlots(suggestedSlots(Date.now(), timezone));
-            setPanel(panel === "reschedule" ? "none" : "reschedule");
-          }}
-          active={panel === "reschedule"}
-          disabled={busy !== null || closed}
-        />
-        <Action
-          icon={<MessageSquare className="size-3.5" />}
-          label={hasFeedback ? "Feedback shared" : panel === "feedback" ? "Cancel feedback" : "Leave feedback"}
-          onClick={() => setPanel(panel === "feedback" ? "none" : "feedback")}
-          active={panel === "feedback"}
-          disabled={busy !== null || !canFeedback}
-          title={canFeedback || hasFeedback ? undefined : "Available once the interview is completed"}
-        />
-        {!closed ? (
-          <Action
-            icon={<X className="size-3.5" />}
-            label="Mark missed"
-            onClick={markMissed}
-            busy={busy === "mark it missed"}
-            disabled={busy !== null || !past}
-            title={past ? undefined : "Only once the slot time has passed"}
-          />
+        {linkShown ? <JoinMeetingButton link={meetingLink!} /> : null}
+        {canFeedback ? (
+          <button
+            type="button"
+            onClick={() => toggle("feedback")}
+            aria-expanded={panel === "feedback"}
+            className={buttonClass({ variant: panel === "feedback" ? "outline" : "primary", size: "sm" })}
+          >
+            <MessageSquare className="size-4" aria-hidden />
+            Leave feedback
+          </button>
         ) : null}
+        {canRemind ? (
+          <button type="button" onClick={remind} disabled={busy !== null} className={buttonClass({ variant: "outline", size: "sm" })}>
+            {busy === "send a reminder" ? <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden /> : <Bell className="size-4" aria-hidden />}
+            Send reminder
+          </button>
+        ) : null}
+        {canReschedule ? (
+          <button
+            type="button"
+            onClick={() => toggle("reschedule")}
+            aria-expanded={panel === "reschedule"}
+            disabled={busy !== null}
+            className={buttonClass({ variant: stage === "expired" ? "primary" : "outline", size: "sm" })}
+          >
+            <CalendarClock className="size-4" aria-hidden />
+            {stage === "upcoming" ? "Reschedule" : "Offer new times"}
+          </button>
+        ) : null}
+        {missedShown ? (
+          <button
+            type="button"
+            onClick={() => toggle("missed")}
+            aria-expanded={panel === "missed"}
+            disabled={busy !== null}
+            className={buttonClass({ variant: "ghost", size: "sm" })}
+          >
+            <X className="size-4" aria-hidden />
+            Mark missed
+          </button>
+        ) : null}
+        <Link href={internHref} className={buttonClass({ variant: "ghost", size: "sm", className: "ml-auto" })}>
+          <UserRound className="size-4" aria-hidden />
+          Profile
+        </Link>
       </div>
 
       {panel === "reschedule" ? (
-        <div className="mt-4 rounded-[10px] border border-ink-200/70 bg-ink-50 p-4">
-          <p className="text-sm font-medium text-ink-800">Offer three new times</p>
-          <p className="mt-1 text-xs leading-relaxed text-ink-600">
-            The candidate picks one. Suggested: the next quarter hour and the two hours after it -
-            change any of them. Times are read in the interview&apos;s timezone ({timezone}).
+        <div className="mt-4 rounded-apple-lg border border-ink-200/80 bg-ink-50/70 p-4">
+          <p className="text-sm font-semibold text-ink-900">Offer three new times</p>
+          <p className="mt-1 text-sm leading-relaxed text-ink-600">
+            Suggested: the next quarter hour, then one and two hours after it. Change any of them. Times are in {timezone}.
           </p>
           <div className="mt-3">
             <MeetingSlots slots={slots} onChange={setSlots} timezone={timezone} />
           </div>
-          <div className="mt-3 flex items-center gap-3">
-            <button
-              type="button"
-              onClick={reschedule}
-              disabled={busy !== null}
-              className="apple-spring apple-pressable inline-flex min-h-11 items-center justify-center gap-2 rounded-[10px] bg-brand-700 px-4 text-sm font-semibold text-white hover:bg-brand-600 disabled:opacity-60"
-            >
-              {busy === "reschedule" ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : null}
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <button type="button" onClick={reschedule} disabled={busy !== null} className={buttonClass({ size: "sm" })}>
+              {busy === "reschedule" ? <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden /> : null}
               Offer these times
             </button>
-            <button
-              type="button"
-              onClick={() => setPanel("none")}
-              className="apple-spring inline-flex min-h-11 items-center text-xs font-medium text-ink-600 underline-offset-4 hover:underline"
-            >
+            <button type="button" onClick={() => setPanel("none")} className={buttonClass({ variant: "ghost", size: "sm" })}>
               Cancel
             </button>
           </div>
@@ -197,10 +202,11 @@ export function InterviewActions({
       ) : null}
 
       {panel === "feedback" ? (
-        <div className="mt-4 rounded-[10px] border border-ink-200/70 bg-ink-50 p-4">
-          <label htmlFor={`feedback-${interviewId}`} className="text-sm font-medium text-ink-800">
+        <div className="mt-4 rounded-apple-lg border border-ink-200/80 bg-ink-50/70 p-4">
+          <label htmlFor={`feedback-${interviewId}`} className="text-sm font-semibold text-ink-900">
             Feedback for the candidate
           </label>
+          <p className="mt-1 text-sm text-ink-600">Shared once, and the candidate reads it as written.</p>
           <textarea
             id={`feedback-${interviewId}`}
             value={feedback}
@@ -208,78 +214,50 @@ export function InterviewActions({
             rows={4}
             maxLength={2000}
             placeholder="What went well, what was missing, and what happens next."
-            className="apple-spring mt-2 min-h-11 w-full rounded-[10px] border border-ink-200 bg-white px-3.5 py-2.5 text-[14px] text-ink-900 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+            className="apple-spring mt-3 w-full rounded-apple-sm border border-ink-200 bg-white px-3.5 py-2.5 text-sm leading-relaxed text-ink-900 outline-none focus-visible:border-brand-500 focus-visible:ring-2 focus-visible:ring-brand-500/20"
           />
-          <div className="mt-3 flex items-center gap-3">
-            <button
-              type="button"
-              onClick={sendFeedback}
-              disabled={busy !== null}
-              className="apple-spring apple-pressable inline-flex min-h-11 items-center justify-center gap-2 rounded-[10px] bg-brand-700 px-4 text-sm font-semibold text-white hover:bg-brand-600 disabled:opacity-60"
-            >
-              {busy === "save the feedback" ? (
-                <Loader2 className="size-3.5 animate-spin" aria-hidden />
-              ) : null}
-              Save feedback
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <button type="button" onClick={sendFeedback} disabled={busy !== null} className={buttonClass({ size: "sm" })}>
+              {busy === "save the feedback" ? <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden /> : null}
+              Share feedback
             </button>
-            <button
-              type="button"
-              onClick={() => setPanel("none")}
-              className="apple-spring inline-flex min-h-11 items-center text-xs font-medium text-ink-600 underline-offset-4 hover:underline"
-            >
+            <button type="button" onClick={() => setPanel("none")} className={buttonClass({ variant: "ghost", size: "sm" })}>
               Cancel
             </button>
-            <span className="ml-auto text-xs tabular-nums text-ink-600">{feedback.length}/2000</span>
+            <span className="nums ml-auto text-xs text-ink-500">{feedback.length}/2000</span>
+          </div>
+        </div>
+      ) : null}
+
+      {panel === "missed" ? (
+        <div className="mt-4 rounded-apple-lg border border-ink-200/80 bg-ink-50/70 p-4">
+          <p className="text-sm font-semibold text-ink-900">Mark this interview missed?</p>
+          <p className="mt-1 text-sm leading-relaxed text-ink-600">
+            Use this when the candidate didn&apos;t join. You can still leave feedback afterwards.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button type="button" onClick={markMissed} disabled={busy !== null} className={buttonClass({ size: "sm" })}>
+              {busy === "mark it missed" ? <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden /> : null}
+              Mark missed
+            </button>
+            <button type="button" onClick={() => setPanel("none")} className={buttonClass({ variant: "ghost", size: "sm" })}>
+              Keep it
+            </button>
           </div>
         </div>
       ) : null}
 
       {error ? (
-        <p role="alert" className="mt-3 text-xs text-danger">
+        <p role="alert" className="mt-3 text-sm text-danger">
           {error}
         </p>
       ) : null}
       {notice ? (
-        <p role="status" className="mt-3 inline-flex items-center gap-1.5 text-xs text-brand-700">
-          <Check className="size-3.5" aria-hidden />
+        <p role="status" className="mt-3 inline-flex items-center gap-1.5 text-sm text-brand-700">
+          <Check className="size-4" aria-hidden />
           {notice}
         </p>
       ) : null}
     </div>
-  );
-}
-
-function Action({
-  icon,
-  label,
-  onClick,
-  busy,
-  disabled,
-  active,
-  title,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  onClick: () => void;
-  busy?: boolean;
-  disabled?: boolean;
-  active?: boolean;
-  title?: string;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      title={title}
-      className={
-        active
-          ? "apple-spring apple-pressable inline-flex min-h-11 items-center justify-center gap-1.5 rounded-[10px] border border-brand-300 bg-brand-50 px-3.5 text-sm font-medium text-brand-800"
-          : "apple-spring apple-pressable inline-flex min-h-11 items-center justify-center gap-1.5 rounded-[10px] border border-ink-200 bg-white px-3.5 text-sm font-medium text-ink-800 hover:bg-ink-50 disabled:cursor-not-allowed disabled:opacity-50"
-      }
-    >
-      {busy ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : icon}
-      {label}
-    </button>
   );
 }

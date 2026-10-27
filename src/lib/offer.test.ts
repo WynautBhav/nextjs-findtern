@@ -157,3 +157,69 @@ test("buildOffer prices the month as rate × hours, with no override", () => {
   assert.equal(raw.totalPrice, 48_000);
   assert.equal(raw.weeklySchedule, "mon_fri");
 });
+
+test("hybrid split is written under the legacy keys and read from either (EMH-02)", async () => {
+  const { hybridDaysOf } = await import("./offer.ts");
+  const raw = buildOffer({
+    currency: "INR", roleTitle: "Ops intern", mode: "hybrid", city: "Pune", state: "Maharashtra",
+    officeDays: 3, homeDays: 2, startDate: "2026-12-01", duration: "2m", monthlyHours: 160,
+    hourlyRateMinor: 10_000, perHireMinor: 500_000,
+  });
+  assert.equal(raw.workFromOfficeDays, 3);
+  assert.equal(raw.workFromHomeDays, 2);
+  assert.equal(raw.location, "Pune, Maharashtra");
+  assert.equal("wfoDays" in raw, false);
+  assert.deepEqual(hybridDaysOf({ wfoDays: 4, wfhDays: 1 }), { officeDays: 4, homeDays: 1 });
+  const o = parseOffer(raw, "INR");
+  assert.equal(o.officeDays, 3);
+  assert.equal(o.homeDays, 2);
+});
+
+test("laptop: legacy 'candidate' is written; the new app's old 'intern' reads as candidate (EMH-04)", async () => {
+  const { laptopLabel } = await import("./offer.ts");
+  assert.equal(parseOffer({ laptop: "intern" }).laptop, "candidate");
+  assert.equal(parseOffer({ laptop: "yes" }).laptop, "company");
+  assert.equal(laptopLabel("intern"), "Candidate's own laptop");
+  const raw = buildOffer({
+    currency: "INR", roleTitle: "x", mode: "remote", startDate: "2026-12-01", duration: "1m",
+    monthlyHours: 160, hourlyRateMinor: 10_000, perHireMinor: 0, laptop: "intern",
+  });
+  assert.equal(raw.laptop, "candidate");
+  assert.equal(raw.workFromOfficeDays, 0);
+});
+
+test("job description: stored as paragraph HTML for legacy, read back as text (EMH-28, EMH-44)", async () => {
+  const { jdToHtml, jdToText } = await import("./offer.ts");
+  assert.equal(jdToHtml("Build <APIs>.\nShip weekly.\n\nOwn the dashboard."), "<p>Build &lt;APIs&gt;.<br>Ship weekly.</p><p>Own the dashboard.</p>");
+  assert.equal(jdToText("<p>Build &lt;APIs&gt;.<br>Ship weekly.</p><p>Own the dashboard.</p>"), "Build <APIs>.\nShip weekly.\nOwn the dashboard.");
+  // An old Quill row reads without tags.
+  assert.equal(parseOffer({ jd: "<p><strong>Role</strong></p><ul><li>React</li><li>Node</li></ul>" }).jd, "Role\n• React\n• Node");
+  assert.equal(parseOffer({ jd: "Plain text\nstays" }).jd, "Plain text\nstays");
+  const raw = buildOffer({
+    currency: "INR", roleTitle: "x", mode: "remote", startDate: "2026-12-01", duration: "1m",
+    monthlyHours: 160, hourlyRateMinor: 10_000, perHireMinor: 0, jd: "Line one\nLine two",
+  });
+  assert.equal(raw.jd, "<p>Line one<br>Line two</p>");
+  assert.equal(parseOffer(raw).jd, "Line one\nLine two");
+});
+
+test("legacy 'City, State' location splits for editing (DB-10)", () => {
+  const o = parseOffer({ mode: "onsite", location: "Navi Mumbai, Maharashtra" });
+  assert.equal(o.city, "Navi Mumbai");
+  assert.equal(o.state, "Maharashtra");
+  assert.equal(parseOffer({ mode: "remote", location: "Remote" }).city, "");
+  assert.equal(parseOffer({ mode: "onsite", city: "Jaipur", state: "Rajasthan", location: "x" }).state, "Rajasthan");
+});
+
+test("flexible hours are stored as empty times plus a flag, read back as flexible (DB-19)", () => {
+  const raw = buildOffer({
+    currency: "INR", roleTitle: "x", mode: "remote", startDate: "2026-12-01", duration: "1m",
+    monthlyHours: 160, hourlyRateMinor: 10_000, perHireMinor: 0, shiftFrom: "flexible", shiftTo: "flexible",
+  });
+  assert.equal(raw.shiftFrom, "");
+  assert.equal(raw.flexibleHours, true);
+  assert.equal(parseOffer(raw).shiftFrom, "flexible");
+  // Rows the new app wrote before keep reading as flexible.
+  assert.equal(parseOffer({ shiftFrom: "flexible", shiftTo: "flexible" }).shiftTo, "flexible");
+  assert.equal(parseOffer({ shiftFrom: "09:00", shiftTo: "18:00" }).shiftFrom, "09:00");
+});

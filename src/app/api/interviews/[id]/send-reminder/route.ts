@@ -6,6 +6,7 @@ import { hiredProposalSql } from "@/lib/employer-visibility";
 import { formatSlotTime } from "@/lib/format";
 import { requireMutation } from "@/lib/guards-mutation";
 import { employerNames, internFirstName, notify } from "@/lib/notify";
+import { normalizeMeetingLink } from "@/lib/employer-interview-rules";
 
 /**
  * Employer nudges the candidate about a scheduled interview. At most one
@@ -40,6 +41,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     )
     .limit(1);
   const company = hire ? (await employerNames(interview.employerId)).company : "a company on Findtern";
+  // Typed links without a scheme open as https (legacy, EMB-19).
+  const link = normalizeMeetingLink(interview.meetingLink);
   const text = interview.status === "pending"
     ? `${company} is waiting for you to pick an interview slot.`
     : `Your interview with ${company} is on ${when}.`;
@@ -48,16 +51,28 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     type: "interview_reminder",
     title: "Interview reminder",
     message: text,
-    data: { interviewId: id, meetingLink: interview.meetingLink },
+    data: { interviewId: id, meetingLink: link },
     dedupeKey: `employer_reminder:${id}:${new Date().toISOString().slice(0, 10)}`,
     email: {
       subject: "Interview reminder | Findtern",
       heading: interview.status === "pending" ? "Pick your interview slot" : "Your interview is coming up",
       greeting: `Hi ${(await internFirstName(interview.internId)) || "there"},`,
       lines: [text],
-      facts: interview.meetingLink ? [["Meet link", interview.meetingLink]] : undefined,
+      facts: link ? [["Meet link", link]] : undefined,
       cta: { label: "Open interviews", url: `${process.env.PUBLIC_ORIGIN ?? "http://localhost:3000"}/intern/interviews` },
     },
   });
+  // A booked meeting reminds both sides (legacy routes.ts:11797): the
+  // employer gets an in-app note with the same once-a-day key.
+  if (interview.status === "scheduled" && interview.selectedSlot && interview.employerId !== "admin") {
+    await notify({
+      to: { type: "employer", id: interview.employerId },
+      type: "interview_reminder",
+      title: "Interview reminder",
+      message: when ? `Reminder: your interview is on ${when}.` : "Reminder: your interview is coming up.",
+      data: { interviewId: id, internId: interview.internId, meetingLink: link },
+      dedupeKey: `manual_interview_reminder:${id}:employer:${new Date().toISOString().slice(0, 10)}`,
+    });
+  }
   return NextResponse.json({ ok: true });
 }

@@ -169,3 +169,29 @@ export function timezoneForLocation(loc: { country?: string | null; state?: stri
   const byState = STATE_TIMEZONES[match]?.[(loc.state ?? "").trim().toLowerCase()];
   return byState ?? COUNTRY_TIMEZONES[match];
 }
+
+/**
+ * A working-hours window in the offer's zone, as the intern will read it in
+ * India (legacy composer's "IST (Asia/Kolkata): …" line; EMH-31). `day` is
+ * the date the conversion is taken on (the start date), so DST is right for
+ * it. Null when the zone is already IST or the times aren't HH:MM.
+ */
+export function shiftInIst(from: string, to: string, tz: string, day?: string | null): string | null {
+  if (!tz || tz === "Asia/Kolkata" || tz === "Asia/Calcutta") return null;
+  if (!/^\d{2}:\d{2}$/.test(from) || !/^\d{2}:\d{2}$/.test(to)) return null;
+  const date = day && /^\d{4}-\d{2}-\d{2}/.test(day) ? day.slice(0, 10) : new Date().toISOString().slice(0, 10);
+  let start: Date;
+  let end: Date;
+  try {
+    start = wallTimeToUtc(`${date}T${from}`, tz);
+    end = wallTimeToUtc(`${date}T${to}`, tz);
+  } catch {
+    return null;
+  }
+  if (end.getTime() <= start.getTime()) end = new Date(end.getTime() + 86_400_000);
+  const time = (d: Date) =>
+    new Intl.DateTimeFormat("en-IN", { hour: "numeric", minute: "2-digit", hour12: true, timeZone: "Asia/Kolkata" }).format(d);
+  const dayOf = (d: Date) => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(d);
+  const next = dayOf(end) !== dayOf(start) ? " (next day)" : "";
+  return `${time(start)} – ${time(end)}${next} IST`;
+}

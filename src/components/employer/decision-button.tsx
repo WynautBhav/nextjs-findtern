@@ -2,170 +2,106 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, AlertCircle } from "lucide-react";
+import { CheckCircle2, CircleSlash, Loader2 } from "lucide-react";
+
+import { buttonClass } from "@/components/ui/button";
 import { csrfFetch } from "@/lib/client-fetch";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog";
+import { cn } from "@/lib/utils";
 
-export function DecisionButton({
-  icon,
-  label,
-  timesheetId,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  timesheetId?: string;
-}) {
+/**
+ * Approve or send back a submitted timesheet, in place. Approving takes an
+ * optional note (legacy managerNote, EMH-24); sending back needs a reason
+ * the intern can act on. One textarea, two outcomes, no modal: this is the
+ * screen employers use most, and a dialog per click slowed it down.
+ */
+export function TimesheetDecision({ timesheetId }: { timesheetId: string }) {
   const router = useRouter();
-  const [loading, setLoading] = useState(false);
-  const [rejectModalOpen, setRejectModalOpen] = useState(false);
-  const [rejectReason, setRejectReason] = useState("");
-  const [errorMsg, setErrorMsg] = useState("");
+  const [mode, setMode] = useState<"approve" | "reject">("approve");
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
 
-  const isReject = label.toLowerCase().includes("reject");
-
-  async function handleApprove() {
-    setLoading(true);
-    setErrorMsg("");
-    try {
-      const id = timesheetId || window.location.pathname.split("/").pop();
-      const res = await csrfFetch(`/api/timesheets/${id}/decision`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ decision: "approved" }),
-      });
-      if (res.ok) {
-        router.refresh();
-      } else {
-        const data = await res.json().catch(() => ({}));
-        setErrorMsg(data.error ?? "Failed to approve timesheet");
-      }
-    } catch {
-      setErrorMsg("Network error occurred");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function handleRejectSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!rejectReason.trim()) {
-      setErrorMsg("Please provide a reason for the candidate to review.");
+  async function decide() {
+    if (mode === "reject" && !note.trim()) {
+      setError("Say what needs fixing. The intern sees this.");
       return;
     }
-    setLoading(true);
-    setErrorMsg("");
+    setBusy(true);
+    setError("");
     try {
-      const id = timesheetId || window.location.pathname.split("/").pop();
-      const res = await csrfFetch(`/api/timesheets/${id}/decision`, {
+      const res = await csrfFetch(`/api/timesheets/${encodeURIComponent(timesheetId)}/decision`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ decision: "rejected", reason: rejectReason.trim() }),
+        body: JSON.stringify({ decision: mode === "approve" ? "approved" : "rejected", reason: note.trim() || undefined }),
       });
-      if (res.ok) {
-        setRejectModalOpen(false);
-        router.refresh();
-      } else {
+      if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        setErrorMsg(data.error ?? "Failed to reject timesheet");
+        setError(data.error ?? "That didn't go through. Nothing changed - try again.");
+        return;
       }
+      router.refresh();
     } catch {
-      setErrorMsg("Network error occurred");
+      setError("You appear to be offline. Nothing changed.");
     } finally {
-      setLoading(false);
-    }
-  }
-
-  function handleClick() {
-    if (isReject) {
-      setErrorMsg("");
-      setRejectReason("");
-      setRejectModalOpen(true);
-    } else {
-      handleApprove();
+      setBusy(false);
     }
   }
 
   return (
-    <>
-      <button
-        type="button"
-        onClick={handleClick}
-        disabled={loading}
-        className={`apple-spring apple-pressable flex min-h-11 w-full items-center justify-center gap-2 rounded-[10px] px-4 text-xs font-semibold shadow-2xs ${
-          isReject
-            ? "border border-red-200 bg-red-50/50 text-red-700 hover:bg-red-100/70"
-            : "bg-brand-700 text-white hover:bg-brand-800"
-        } disabled:opacity-60`}
-      >
-        {loading ? <Loader2 className="size-4 animate-spin" /> : icon}
-        <span>{loading ? "Processing…" : label}</span>
-      </button>
-
-      {errorMsg && !rejectModalOpen && (
-        <p className="mt-1.5 flex items-center gap-1 text-xs text-red-600">
-          <AlertCircle className="size-3 shrink-0" />
-          <span>{errorMsg}</span>
-        </p>
-      )}
-
-      <Dialog open={rejectModalOpen} onOpenChange={setRejectModalOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Reject Timesheet</DialogTitle>
-            <DialogDescription>
-              State what needs correction. The intern will receive this feedback and can edit and resubmit their hours.
-            </DialogDescription>
-          </DialogHeader>
-
-          <form onSubmit={handleRejectSubmit} className="space-y-4 pt-2">
-            {errorMsg && (
-              <div className="flex items-center gap-2 rounded-[10px] bg-red-50 p-3 text-xs text-red-700 border border-red-200">
-                <AlertCircle className="size-4 shrink-0" />
-                <span>{errorMsg}</span>
-              </div>
+    <div className="space-y-3">
+      <div role="radiogroup" aria-label="Decision" className="grid grid-cols-2 gap-1 rounded-apple-md bg-ink-100 p-1">
+        {(
+          [
+            ["approve", "Approve", CheckCircle2],
+            ["reject", "Send back", CircleSlash],
+          ] as const
+        ).map(([value, label, Icon]) => (
+          <button
+            key={value}
+            type="button"
+            role="radio"
+            aria-checked={mode === value}
+            onClick={() => {
+              setMode(value);
+              setError("");
+            }}
+            className={cn(
+              "apple-spring inline-flex min-h-10 items-center justify-center gap-1.5 rounded-apple-sm text-sm font-medium",
+              mode === value ? "bg-white text-ink-900 shadow-xs" : "text-ink-600 hover:text-ink-900",
             )}
-
-            <div>
-              <label htmlFor="reason" className="block text-xs font-semibold text-ink-800">
-                Reason for Rejection *
-              </label>
-              <textarea
-                id="reason"
-                rows={4}
-                required
-                value={rejectReason}
-                onChange={(e) => setRejectReason(e.target.value)}
-                placeholder="e.g. Please correct the hours for Wednesday 12th - total should be 4 hours instead of 8."
-                className="apple-spring mt-1.5 min-h-11 w-full rounded-[10px] border border-ink-200 p-3 text-[14px] text-ink-900 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
-              />
-            </div>
-
-            <div className="flex items-center justify-end gap-2 pt-2">
-              <button
-                type="button"
-                onClick={() => setRejectModalOpen(false)}
-                className="apple-spring apple-pressable min-h-11 rounded-[10px] border border-ink-200 bg-white px-4 text-xs font-medium text-ink-700 hover:border-ink-300 hover:bg-ink-50"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={loading || !rejectReason.trim()}
-                className="apple-spring apple-pressable inline-flex min-h-11 items-center justify-center gap-1.5 rounded-[10px] bg-red-600 px-4 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-50"
-              >
-                {loading && <Loader2 className="size-3.5 animate-spin" />}
-                <span>Confirm Rejection</span>
-              </button>
-            </div>
-          </form>
-        </DialogContent>
-      </Dialog>
-    </>
+          >
+            <Icon className="size-4" aria-hidden />
+            {label}
+          </button>
+        ))}
+      </div>
+      <label className="block">
+        <span className="mb-1.5 block text-sm font-medium text-ink-800">
+          {mode === "approve" ? "Note to the intern (optional)" : "What needs fixing"}
+        </span>
+        <textarea
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          rows={3}
+          maxLength={1000}
+          placeholder={mode === "approve" ? "Thanks - great month." : "Wednesday 12th should be a fixed off, not present."}
+          className="apple-spring w-full rounded-apple-sm border border-ink-200 bg-white px-3 py-2.5 text-sm leading-relaxed text-ink-900 outline-none placeholder:text-ink-400 focus-visible:border-brand-500 focus-visible:ring-2 focus-visible:ring-brand-500/20"
+        />
+      </label>
+      {error ? (
+        <p role="alert" className="text-sm text-danger">
+          {error}
+        </p>
+      ) : null}
+      <button type="button" onClick={decide} disabled={busy} className={buttonClass({ variant: mode === "approve" ? "primary" : "dark", block: true })}>
+        {busy ? <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden /> : null}
+        {mode === "approve" ? "Approve timesheet" : "Send back to the intern"}
+      </button>
+      <p className="text-sm leading-relaxed text-ink-600">
+        {mode === "approve"
+          ? "Approving locks these days for billing and the stipend. It can't be undone."
+          : "The intern sees your reason, corrects the days and sends it again."}
+      </p>
+    </div>
   );
 }

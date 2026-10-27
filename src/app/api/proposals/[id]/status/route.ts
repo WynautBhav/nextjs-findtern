@@ -9,7 +9,7 @@ import { emails } from "@/lib/emails";
 import { initialsOf } from "@/lib/employer-candidates";
 import { employerNames, internFirstName, notify, resolveOfferNotifications } from "@/lib/notify";
 import { FREE_DECLINES, offerPastStart, parseOffer } from "@/lib/offer";
-import { hasOpenOrderFor } from "@/lib/payments";
+import { hasOpenOrderFor, OPEN_ORDER_MINUTES } from "@/lib/payments";
 
 /**
  * Which role may set which status.
@@ -22,7 +22,9 @@ import { hasOpenOrderFor } from "@/lib/payments";
 const ALLOWED: Record<string, string[]> = {
   // Only the intern accepts. An employer accepting their own offer would let
   // them pay and hire without the candidate ever agreeing.
-  employer: ["withdrawn", "rejected"],
+  // Withdraw only: "rejected" is the candidate's answer, never the
+  // company's (legacy had no employer reject; EMH-40).
+  employer: ["withdrawn"],
   intern: ["accepted", "rejected"],
   // Staff can close a stale offer ("expired"), reject on the candidate's
   // behalf, or cancel an accepted offer the employer has not paid for
@@ -34,8 +36,10 @@ const ALLOWED: Record<string, string[]> = {
 /** Statuses the intern can still answer. */
 const ANSWERABLE = ["sent", "interview_scheduled"];
 
-/** Statuses from which no further transition is meaningful. */
-const TERMINAL = ["accepted", "rejected", "withdrawn", "hired"];
+/** Statuses from which no further transition is meaningful. "expired" is
+ *  set when the intern accepted another offer; withdrawing it afterwards
+ *  would email them about an offer that was already closed (EMH-40). */
+const TERMINAL = ["accepted", "rejected", "withdrawn", "hired", "expired"];
 
 const bodySchema = z.object({
   status: z.enum(["withdrawn", "accepted", "rejected", "expired"]),
@@ -106,6 +110,15 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     !offerForCancel.fullTime;
   if (cancelBeforePayment && (await hasOpenOrderFor(proposal.employerId, proposal.id))) {
     return NextResponse.json({ error: "A payment for this offer is in progress. Try again in a few minutes." }, { status: 409 });
+  }
+  // EMH-35: "processing" is legacy's accepted-and-paying state. While that
+  // checkout is open (30 minutes) nothing may change the offer under it;
+  // after that it is an abandoned checkout and closes like an accepted offer.
+  if (proposal.status === "processing" && session.role !== "intern") {
+    const recent = proposal.updatedAt && Date.now() - new Date(proposal.updatedAt).getTime() < OPEN_ORDER_MINUTES * 60_000;
+    if (recent || status !== "withdrawn" || proposal.hiredAt || offerForCancel.fullTime) {
+      return NextResponse.json({ error: "A payment for this offer is in progress. Try again in a few minutes." }, { status: 409 });
+    }
   }
   if (TERMINAL.includes(proposal.status) && !cancelBeforePayment) {
     return NextResponse.json(

@@ -1,202 +1,208 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { desc, eq, inArray } from "drizzle-orm";
 import { ArrowRight } from "lucide-react";
 
 import { getDb, schema } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
-import { displayNameOf, toCandidateProfile, type CandidateProfile } from "@/lib/employer-candidates";
+import { requireEmployerSetup } from "@/lib/employer-setup";
+import { displayNameOf, initialsOf } from "@/lib/employer-candidates";
 import { hiredInternIds } from "@/lib/employer-visibility";
-import { formatPeriod, normaliseEntries } from "@/lib/employer-timesheets";
+import { dayDetails, formatDay, formatPeriod } from "@/lib/employer-timesheets";
 import { StatusPill } from "@/components/employer/timesheet-parts";
-import { EmptyScene } from "@/components/app/primitives";
-import { PageHeader } from "@/components/layout/page-header";
+import { EmptyScene, PageHead, SectionHead, StatTile, Surface } from "@/components/app/primitives";
+import { buttonClass } from "@/components/ui/button";
 
 export const metadata: Metadata = {
   title: "Timesheets",
   robots: { index: false, follow: false },
 };
 
-/** The only status an employer acts on. Everything else is informational. */
-const PENDING = new Set(["submitted"]);
-const CLOSED = new Set(["approved", "rejected"]);
-
-/**
- * Timesheet review queue.
- *
- * `timesheets.employer_id` is the scoping column. `intern_id` identifies whose
- * hours these are, but the review is the employer's, so the list is built from
- * `employer_id` - the same filter the legacy list used.
- */
-
 type Row = {
   id: string;
-  periodStart: Date | null;
-  periodEnd: Date | null;
+  internId: string;
+  name: string;
+  initials: string;
+  project: string | null;
+  period: string;
   status: string;
   submittedAt: Date | null;
-  approvedAt: Date | null;
-  rejectedAt: Date | null;
+  present: number;
+  hours: number;
+  days: number;
   internNote: string | null;
-  candidate: CandidateProfile | null;
-  loggedDays: number;
 };
 
+/**
+ * Timesheet review queue: the daily-use screen. What is waiting on you comes
+ * first, oldest submission first, with one button each; everything else
+ * follows newest first. Scoped by `timesheets.employer_id`, as legacy was.
+ */
 export default async function EmployerTimesheets() {
   const session = await requireRole("employer");
+  await requireEmployerSetup(session.uid);
   const uid = session.uid;
 
   let rows: Row[] = [];
-  let awaitingReview = 0;
-  let internCount = 0;
-  let nameUnlocked = new Set<string>();
-
   try {
     const db = getDb();
-
-    try {
-      nameUnlocked = await hiredInternIds(db, uid);
-    } catch {
-      nameUnlocked = new Set<string>();
-    }
-
-    const timesheets = await db
-      .select()
+    const sheets = await db
+      .select({ sheet: schema.timesheets, project: schema.projects.projectName })
       .from(schema.timesheets)
+      .leftJoin(schema.proposals, eq(schema.timesheets.proposalId, schema.proposals.id))
+      .leftJoin(schema.projects, eq(schema.proposals.projectId, schema.projects.id))
       .where(eq(schema.timesheets.employerId, uid))
-      .orderBy(desc(schema.timesheets.createdAt));
+      .orderBy(desc(schema.timesheets.periodStart), desc(schema.timesheets.createdAt));
 
-    if (timesheets.length > 0) {
-      const internIds = Array.from(new Set(timesheets.map((t) => t.internId)));
-
-      const [userRows, onboardingRows] = await Promise.all([
+    if (sheets.length > 0) {
+      const internIds = Array.from(new Set(sheets.map((t) => t.sheet.internId)));
+      const [unlocked, users] = await Promise.all([
+        hiredInternIds(db, uid),
         db
-          .select()
+          .select({ id: schema.users.id, firstName: schema.users.firstName, lastName: schema.users.lastName })
           .from(schema.users)
-          .where(and(inArray(schema.users.id, internIds), eq(schema.users.isActive, true))),
-        db.select().from(schema.internOnboarding).where(inArray(schema.internOnboarding.userId, internIds)),
+          .where(inArray(schema.users.id, internIds)),
       ]);
-
-      const usersById = new Map(userRows.map((row) => [row.id, row]));
-      const onboardingByUser = new Map(onboardingRows.map((row) => [row.userId, row]));
-      internCount = usersById.size;
-
-      rows = timesheets.map((timesheet) => {
-        const entries = normaliseEntries(
-          timesheet.entries,
-          timesheet.periodStart,
-          timesheet.periodEnd,
-        );
-        const user = usersById.get(timesheet.internId);
-
+      const byId = new Map(users.map((u) => [u.id, u]));
+      rows = sheets.map(({ sheet, project }) => {
+        const u = byId.get(sheet.internId);
+        const first = (u?.firstName ?? "").trim();
+        const last = (u?.lastName ?? "").trim();
+        const ini = initialsOf(first, last);
+        const days = dayDetails(sheet.entries, sheet.periodStart, sheet.periodEnd);
         return {
-          id: timesheet.id,
-          periodStart: timesheet.periodStart,
-          periodEnd: timesheet.periodEnd,
-          status: timesheet.status,
-          submittedAt: timesheet.submittedAt,
-          approvedAt: timesheet.approvedAt,
-          rejectedAt: timesheet.rejectedAt,
-          internNote: timesheet.internNote,
-          candidate: user ? toCandidateProfile(user, onboardingByUser.get(user.id)) : null,
-          loggedDays: entries.filter((entry) => entry.status).length,
+          id: sheet.id,
+          internId: sheet.internId,
+          name: displayNameOf({ fullName: `${first} ${last}`.trim() || "Intern", initials: ini }, unlocked.has(sheet.internId)),
+          initials: ini === "?" ? "I" : ini,
+          project,
+          period: formatPeriod(sheet.periodStart, sheet.periodEnd),
+          status: sheet.status,
+          submittedAt: sheet.submittedAt,
+          present: days.filter((d) => d.status === "Present").length,
+          hours: days.reduce((n, d) => n + d.hours, 0),
+          days: days.length,
+          internNote: sheet.internNote,
         };
       });
-
-      awaitingReview = rows.filter((row) => PENDING.has(row.status)).length;
     }
-  } catch {
-    // DB unavailable - render the empty queue rather than crashing.
+  } catch (err) {
+    console.error("[employer/timesheets] load failed", err);
+    return (
+      <div>
+        <PageHead title="Timesheets" />
+        <EmptyScene
+          art
+          title="Couldn't load timesheets"
+          body="Your interns' hours are safe; we just couldn't reach them right now. Reload the page in a moment."
+          who="Us - a connection problem"
+        />
+      </div>
+    );
   }
+
+  const queue = rows
+    .filter((r) => r.status === "submitted")
+    .sort((a, b) => (a.submittedAt?.getTime() ?? 0) - (b.submittedAt?.getTime() ?? 0));
+  const rest = rows.filter((r) => r.status !== "submitted");
+  const approved = rows.filter((r) => r.status === "approved");
+  const approvedHours = approved.reduce((n, r) => n + r.hours, 0);
 
   return (
     <div>
-      <PageHeader
+      <PageHead
         title="Timesheets"
-        subtitle="Review and approve the hours your interns have logged each month."
+        lede={
+          queue.length
+            ? `${queue.length} timesheet${queue.length === 1 ? " is" : "s are"} waiting for your review. Interns are paid on approved days only.`
+            : "Your interns log their days here each month. Approving locks them for billing and the stipend."
+        }
       />
-
-      <div className="mb-6 grid grid-cols-3 gap-2 sm:gap-4">
-        <Stat label="Awaiting review" value={awaitingReview} tone="warning" />
-        <Stat label="Total" value={rows.length} />
-        <Stat
-          label="Closed"
-          value={rows.filter((row) => CLOSED.has(row.status)).length}
-          tone="success"
-        />
-      </div>
 
       {rows.length === 0 ? (
         <EmptyScene
           art
           title="No timesheets yet"
-          body="Once an intern accepts an offer and starts work, they can submit timesheets here for your approval."
-          who={
-            internCount > 0
-              ? `${internCount} ${internCount === 1 ? "intern" : "interns"} on your account - none have submitted yet`
-              : "Your interns - nothing submitted yet"
-          }
+          body="Once a hire starts work, they send a timesheet for each month of the internship. It lands here for you to approve."
+          next={{ label: "See your hires", href: "/employer/orders" }}
+          who="Your interns - nothing submitted yet"
         />
       ) : (
-        <ul className="divide-y divide-ink-100 rounded-[20px] border border-ink-200/70 bg-white shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)]">
-          {rows.map((row) => (
-            <li key={row.id}>
-              <Link
-                href={`/employer/timesheets/${encodeURIComponent(row.id)}`}
-                className="apple-spring apple-pressable flex flex-wrap items-center gap-4 px-5 py-4 hover:bg-ink-50"
-              >
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-ink-900">
-                    {row.candidate
-                      ? displayNameOf(row.candidate, nameUnlocked.has(row.candidate.id))
-                      : "Intern"}
-                  </p>
-                  <p className="mt-0.5 text-xs text-text-subtle">
-                    {formatPeriod(row.periodStart, row.periodEnd)}
-                  </p>
-                  {row.internNote ? (
-                    <p className="mt-1.5 line-clamp-1 text-xs text-ink-600">&ldquo;{row.internNote}&rdquo;</p>
-                  ) : null}
-                </div>
+        <div className="space-y-8">
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+            <StatTile label="Waiting for review" value={queue.length > 0 ? queue.length : null} empty="Nothing waiting" />
+            <StatTile label="Approved" value={approved.length} />
+            <StatTile
+              label="Approved hours"
+              value={approvedHours > 0 ? approvedHours.toLocaleString("en-IN") : null}
+              empty="None yet"
+              className="col-span-2 lg:col-span-1"
+            />
+          </div>
 
-                <div className="flex w-full items-center justify-between gap-3 sm:w-auto sm:justify-end sm:gap-4">
-                  <p className="text-xs tabular-nums text-text-subtle">
-                    {row.loggedDays} day{row.loggedDays === 1 ? "" : "s"} logged
-                  </p>
+          {queue.length > 0 ? (
+            <section>
+              <SectionHead title="Waiting for your review" hint="Oldest first." />
+              <Surface as="ul" className="divide-y divide-ink-100 overflow-hidden">
+                {queue.map((r) => (
+                  <li key={r.id} className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:gap-5">
+                    <SheetSummary row={r} />
+                    <Link href={`/employer/timesheets/${encodeURIComponent(r.id)}`} className={buttonClass({ size: "sm", className: "self-start sm:self-auto" })}>
+                      Review
+                      <ArrowRight className="size-4" aria-hidden />
+                    </Link>
+                  </li>
+                ))}
+              </Surface>
+            </section>
+          ) : null}
 
-                  <span className="flex items-center gap-3">
-                    <StatusPill status={row.status} />
-                    <ArrowRight className="size-4 shrink-0 text-ink-400" aria-hidden />
-                  </span>
-                </div>
-              </Link>
-            </li>
-          ))}
-        </ul>
+          {rest.length > 0 ? (
+            <section>
+              <SectionHead title={queue.length ? "Everything else" : "All timesheets"} />
+              <Surface as="ul" className="divide-y divide-ink-100 overflow-hidden">
+                {rest.map((r) => (
+                  <li key={r.id}>
+                    <Link
+                      href={`/employer/timesheets/${encodeURIComponent(r.id)}`}
+                      className="group flex flex-col gap-3 p-5 transition-colors hover:bg-ink-50/70 sm:flex-row sm:items-center sm:gap-5"
+                    >
+                      <SheetSummary row={r} />
+                      <ArrowRight className="hidden size-4 shrink-0 text-ink-300 group-hover:text-brand-700 sm:block" aria-hidden />
+                    </Link>
+                  </li>
+                ))}
+              </Surface>
+            </section>
+          ) : null}
+        </div>
       )}
     </div>
   );
 }
 
-function Stat({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: number;
-  tone?: "warning" | "success";
-}) {
-  const valueTone =
-    tone === "warning" && value > 0
-      ? "text-warning"
-      : tone === "success" && value > 0
-        ? "text-success"
-        : "text-ink-900";
+function SheetSummary({ row }: { row: Row }) {
   return (
-    <div className="apple-spring rounded-[16px] border border-ink-200/70 bg-white p-3 shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)] sm:rounded-[20px] sm:p-5">
-      <p className="text-pretty text-[11px] leading-tight text-text-subtle sm:text-sm sm:leading-normal">{label}</p>
-      <p className={`mt-0.5 text-lg font-semibold tabular-nums tracking-tight sm:mt-1 sm:text-3xl ${valueTone}`}>{value}</p>
+    <div className="flex min-w-0 flex-1 items-start gap-3.5">
+      <span aria-hidden className="grid size-10 shrink-0 place-items-center rounded-full bg-brand-50 text-sm font-bold text-brand-800">
+        {row.initials}
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="text-[0.9375rem] font-semibold text-ink-900">{row.name}</p>
+          <StatusPill status={row.status} />
+        </div>
+        <p className="nums mt-0.5 text-sm text-ink-600">
+          {row.period}
+          {row.project ? ` · ${row.project}` : ""}
+        </p>
+        <p className="nums mt-1 text-sm text-ink-700">
+          <span className="font-semibold text-ink-900">{row.present}</span> of {row.days} days present ·{" "}
+          <span className="font-semibold text-ink-900">{row.hours}</span> h
+          {row.status === "submitted" && row.submittedAt ? <span className="text-ink-500"> · sent {formatDay(row.submittedAt)}</span> : null}
+        </p>
+        {row.internNote ? <p className="mt-1.5 line-clamp-1 text-sm text-ink-600">&ldquo;{row.internNote}&rdquo;</p> : null}
+      </div>
     </div>
   );
 }

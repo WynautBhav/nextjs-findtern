@@ -3,14 +3,16 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { CircleGauge, Info, Send, Sparkles, TriangleAlert } from "lucide-react";
+import { CircleGauge, Info, Send, TriangleAlert } from "lucide-react";
 
 import { csrfFetch } from "@/lib/client-fetch";
 import { RATING_META, type CandidateSummary } from "@/lib/employer-candidates";
 import { type Currency, type Pricing } from "@/lib/employer-pricing";
 import { formatMoney, formatPerHire, formatRate } from "@/lib/format";
-import { PAID_LEAVE_OPTIONS, scheduledMonthlyHours, WEEKLY_SCHEDULES, type WeeklySchedule } from "@/lib/offer";
-import { TIMEZONES } from "@/lib/timezones";
+import { PAID_LEAVE_OPTIONS, scheduledMonthlyHours, WEEKLY_SCHEDULES, workingDaysPerWeek, type WeeklySchedule } from "@/lib/offer";
+import { shiftInIst, TIMEZONES } from "@/lib/timezones";
+import { buttonClass } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { offerableModes, type WorkPreference } from "@/lib/work-preference";
 import { CountdownAgreement, EMPLOYER_HIRING_POLICY } from "@/components/app/countdown-agreement";
 
@@ -55,9 +57,13 @@ const MODES = [
   { value: "onsite", label: "On-site" },
 ] as const;
 
+/** Column heads for the four-axis meter in the summary card. */
+const SHORT_RATING: Record<string, string> = { communication: "Comms", coding: "Coding", aptitude: "Aptitude", interview: "Interview" };
+
+/** Legacy values (EMH-04): "company" or "candidate". */
 const LAPTOP_OPTIONS = [
   { value: "company", label: "Company provides" },
-  { value: "intern", label: "Intern provides" },
+  { value: "candidate", label: "Candidate's own laptop" },
 ] as const;
 
 /** Quick fills for the working hours; the times stay editable (bug sheet 23 Oct). */
@@ -78,6 +84,7 @@ export function SendProposalForm({
   initialProjectId,
   preference,
   companyTimezone = "Asia/Kolkata",
+  candidateHasLaptop = null,
 }: {
   candidate: CandidateSummary;
   /** Where the candidate said they can work; the offer's location follows it. */
@@ -93,6 +100,8 @@ export function SendProposalForm({
   initialProjectId?: string;
   /** Where the company is (its country): the timezone when a project sets none. */
   companyTimezone?: string;
+  /** False: the candidate has no laptop, so only "Company provides" is offered (EMH-18). */
+  candidateHasLaptop?: boolean | null;
 }) {
   const router = useRouter();
   // The project the employer came from, not just the first one in the list:
@@ -120,12 +129,16 @@ export function SendProposalForm({
   // is filled in so an on-site or hybrid offer starts complete.
   const [city, setCity] = useState(preference.cities[0]?.city ?? "");
   const [state, setState] = useState(preference.cities[0]?.state ?? "");
+  // Office + home = the working days in the week (legacy, EMH-27): the
+  // employer picks office days, home is the rest.
   const [officeDays, setOfficeDays] = useState("3");
-  const [homeDays, setHomeDays] = useState("2");
+  const week = workingDaysPerWeek(schedule);
+  const homeDays = String(Math.max(0, week - (Number(officeDays) || 0)));
   const [shiftFrom, setShiftFrom] = useState("09:00");
   const [shiftTo, setShiftTo] = useState("18:00");
   const [flexibleHours, setFlexibleHours] = useState(false);
-  const [laptop, setLaptop] = useState("company");
+  const laptopOptions = LAPTOP_OPTIONS.filter((l) => l.value !== "candidate" || candidateHasLaptop !== false);
+  const [laptop, setLaptop] = useState<string>("company");
   const [paidLeaves, setPaidLeaves] = useState("2");
   const [message, setMessage] = useState("");
   const [restrictions, setRestrictions] = useState("");
@@ -135,6 +148,8 @@ export function SendProposalForm({
   const [sending, setSending] = useState(false);
 
   const rate = pricing[currency];
+  // The intern reads the hours in India time (legacy composer; EMH-31).
+  const istHours = flexibleHours ? null : shiftInIst(shiftFrom, shiftTo, timezone, startDate || null);
   // An offer lapses on its start date, so the earliest start is tomorrow (IST).
   const minStart = useMemo(() => tomorrowIst(), []);
 
@@ -149,7 +164,7 @@ export function SendProposalForm({
 
   /** Validate first; the policy agreement only opens for a complete offer. */
   function review() {
-    const problems = validate({ projectId, roleTitle, duration, startDate, minStart, mode, city, state, officeDays, homeDays, laptop, message, shiftFrom, shiftTo, flexibleHours, timezone });
+    const problems = validate({ projectId, roleTitle, duration, startDate, minStart, mode, city, state, officeDays, homeDays, week, laptop, message, shiftFrom, shiftTo, flexibleHours, timezone });
     setErrors(problems);
     if (Object.keys(problems).length > 0) {
       setNotice({ tone: "bad", text: "Some details need attention before this can be sent." });
@@ -227,15 +242,15 @@ export function SendProposalForm({
           e.preventDefault();
           review();
         }}
-        className="min-w-0 overflow-hidden rounded-[20px] border border-ink-200/70 bg-white shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)]"
+        className="min-w-0 overflow-hidden rounded-apple-xl border border-ink-200/80 bg-white shadow-xs"
       >
         {/* ── 1. The role ─────────────────────────────────────────────── */}
         <Step n={1} title="The role" hint="What the candidate is being offered, and from when.">
           {projects.length === 0 ? (
-            <p className="rounded-[10px] border border-warning/25 bg-warning-soft px-3.5 py-3 text-sm text-ink-700">
-              You have no projects yet. A proposal has to attach to one -{" "}
+            <p className="rounded-apple-md border border-warning/25 bg-warning-soft px-3.5 py-3 text-sm text-ink-700">
+              You have no open project. A proposal has to attach to one, so{" "}
               <Link href="/employer/projects" className="font-medium text-brand-700 underline underline-offset-4">
-                create it first
+                open or create one first
               </Link>
               .
             </p>
@@ -287,12 +302,12 @@ export function SendProposalForm({
                       aria-checked={duration === d.value}
                       disabled={disabled}
                       onClick={() => setDuration(d.value)}
-                      className={[
-                        "apple-spring apple-pressable min-h-11 rounded-[10px] border text-sm font-medium tabular-nums disabled:cursor-not-allowed disabled:opacity-40",
+                      className={cn(
+                        "apple-spring apple-pressable nums min-h-11 rounded-apple-sm border text-sm font-medium disabled:cursor-not-allowed disabled:opacity-40",
                         duration === d.value
                           ? "border-brand-700 bg-brand-700 text-white"
                           : "border-ink-200 bg-white text-ink-700 hover:border-ink-300 hover:bg-ink-50",
-                      ].join(" ")}
+                      )}
                     >
                       {d.value.replace("m", "")} mo
                     </button>
@@ -300,7 +315,7 @@ export function SendProposalForm({
                 })}
               </div>
               {shortOnly ? (
-                <p className="mt-1.5 text-xs text-text-subtle">Candidates scoring below 6 can be offered up to 2 months.</p>
+                <p className="mt-1.5 text-xs text-ink-500">Candidates scoring below 6 can be offered up to 2 months.</p>
               ) : null}
             </div>
             <Field
@@ -318,14 +333,14 @@ export function SendProposalForm({
 
         {/* ── 2. Pay ──────────────────────────────────────────────────── */}
         <Step n={2} title="Pay" hint={`The hourly rate is fixed by the candidate's score band. Billed in ${currency}, set by your company's country.`}>
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-[14px] bg-brand-50 px-4 py-3.5">
-            <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-brand-700">{rate.bandName} band</p>
-            <p className="text-sm text-ink-700">
-              <span className="font-semibold tabular-nums text-ink-900">{formatRate(rate.hourlyRateMinor, currency)}</span>
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-apple-lg bg-brand-50 px-4 py-3.5">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-brand-700">{rate.bandName} band</p>
+            <p className="nums text-sm text-ink-700">
+              <span className="font-semibold text-ink-900">{formatRate(rate.hourlyRateMinor, currency)}</span>
               {" · "}
-              <span className="tabular-nums">{formatPerHire(rate.perHireMinor, currency)}</span> one-time hiring fee
+              <span>{formatPerHire(rate.perHireMinor, currency)}</span> one-time hiring fee
             </p>
-            <p className="flex w-full items-start gap-1.5 text-xs text-ink-600">
+            <p className="flex w-full items-start gap-1.5 text-sm text-ink-600">
               <Info className="mt-0.5 size-3.5 shrink-0 text-ink-400" aria-hidden />
               {rateCardSource === "plan" ? "Rates come from your plan." : "Standard published rates apply."}{" "}
               {rate.bandBlurb}
@@ -359,7 +374,7 @@ export function SendProposalForm({
             />
             <ReadOnlyField
               id="monthlyAmount"
-              label={`Monthly amount (${currency})`}
+              label={`Monthly amount (${currency})${currency === "INR" && totals.monthly > 0 ? " (includes GST)" : ""}`}
               value={formatMoney(Math.round(totals.monthly * 100), currency)}
               hint={`${formatRate(rate.hourlyRateMinor, currency)} × ${monthlyHours} h. Worked out for you.`}
             />
@@ -370,7 +385,7 @@ export function SendProposalForm({
         <Step n={3} title="Work setup" hint="Based on where the candidate said they can work. Shown before they accept.">
           <fieldset>
             <legend className="text-sm font-medium text-ink-800">Work mode</legend>
-            <p className="mt-0.5 text-xs text-text-subtle">
+            <p className="mt-0.5 text-sm text-ink-600">
               {modes.length < MODES.length
                 ? `This candidate is open to ${modes.map((m) => m.label.toLowerCase()).join(" or ")} work.`
                 : "This candidate is open to remote, hybrid or on-site work."}
@@ -382,12 +397,12 @@ export function SendProposalForm({
                   type="button"
                   aria-pressed={mode === option.value}
                   onClick={() => setMode(option.value)}
-                  className={[
-                    "apple-spring apple-pressable min-h-11 rounded-[10px] border text-sm font-medium",
+                  className={cn(
+                    "apple-spring apple-pressable min-h-11 rounded-apple-sm border text-sm font-medium",
                     mode === option.value
                       ? "border-brand-700 bg-brand-700 text-white"
                       : "border-ink-200 bg-white text-ink-700 hover:border-ink-300 hover:bg-ink-50",
-                  ].join(" ")}
+                  )}
                 >
                   {option.label}
                 </button>
@@ -428,22 +443,16 @@ export function SendProposalForm({
 
           {mode === "hybrid" ? (
             <div className="grid gap-5 sm:grid-cols-2">
-              <Field
+              <SelectField
                 id="officeDays"
                 label="Office days per week"
-                inputMode="numeric"
+                hint={`Office and home days add up to the ${week} working days.`}
                 value={officeDays}
+                options={Array.from({ length: week - 1 }, (_, i) => ({ value: String(i + 1), label: `${i + 1} day${i ? "s" : ""}` }))}
                 error={errors.officeDays}
-                onChange={(v) => setOfficeDays(v.replace(/\D/g, "").slice(0, 1))}
+                onChange={setOfficeDays}
               />
-              <Field
-                id="homeDays"
-                label="Work-from-home days per week"
-                inputMode="numeric"
-                value={homeDays}
-                error={errors.homeDays}
-                onChange={(v) => setHomeDays(v.replace(/\D/g, "").slice(0, 1))}
-              />
+              <ReadOnlyField id="homeDays" label="Work-from-home days per week" value={`${homeDays} day${homeDays === "1" ? "" : "s"}`} hint="The rest of the working week." />
             </div>
           ) : null}
 
@@ -464,12 +473,12 @@ export function SendProposalForm({
                         setShiftFrom(p.from);
                         setShiftTo(p.to);
                       }}
-                      className={[
-                        "apple-spring min-h-11 rounded-[10px] border px-3 text-xs font-medium tabular-nums",
+                      className={cn(
+                        "apple-spring nums min-h-11 rounded-apple-sm border px-3 text-sm font-medium",
                         shiftFrom === p.from && shiftTo === p.to
                           ? "border-brand-600 bg-brand-50 text-brand-800"
                           : "border-ink-200 bg-white text-ink-700 hover:bg-ink-50",
-                      ].join(" ")}
+                      )}
                     >
                       {p.label}
                     </button>
@@ -482,10 +491,15 @@ export function SendProposalForm({
                 type="checkbox"
                 checked={flexibleHours}
                 onChange={(e) => setFlexibleHours(e.target.checked)}
-                className="size-4 rounded border-ink-300 accent-brand-700"
+                className="size-4 rounded-sm border-ink-300 accent-brand-700"
               />
               Flexible hours, set by the intern
             </label>
+            {istHours ? (
+              <p className="nums mt-1 text-sm text-ink-600">
+                The intern sees these as <span className="font-medium text-ink-800">{istHours}</span>.
+              </p>
+            ) : null}
           </fieldset>
 
           <div className="grid gap-5 sm:grid-cols-2">
@@ -501,7 +515,8 @@ export function SendProposalForm({
               id="laptop"
               label="Laptop"
               value={laptop}
-              options={LAPTOP_OPTIONS.map((l) => ({ value: l.value, label: l.label }))}
+              options={laptopOptions.map((l) => ({ value: l.value, label: l.label }))}
+              hint={candidateHasLaptop === false ? "The candidate has no laptop, so the company provides one." : undefined}
               error={errors.laptop}
               onChange={setLaptop}
             />
@@ -530,11 +545,7 @@ export function SendProposalForm({
         </Step>
 
         <div className="flex flex-wrap items-center gap-3 border-t border-ink-100 bg-ink-50/60 px-6 py-4 lg:hidden">
-          <button
-            type="submit"
-            disabled={sending}
-            className="apple-spring apple-pressable inline-flex min-h-11 items-center gap-2 rounded-[10px] bg-brand-700 px-5 text-sm font-semibold text-white hover:bg-brand-600 disabled:opacity-55"
-          >
+          <button type="submit" disabled={sending || projects.length === 0} className={buttonClass({ block: true })}>
             <Send className="size-4" aria-hidden />
             Review and send
           </button>
@@ -543,38 +554,41 @@ export function SendProposalForm({
 
       {/* ── Summary ─────────────────────────────────────────────────── */}
       <aside className="space-y-4 lg:sticky lg:top-8 lg:self-start">
-        <section className="overflow-hidden rounded-[20px] border border-ink-200/70 bg-white shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)]">
+        <section className="overflow-hidden rounded-apple-xl border border-ink-200/80 bg-white shadow-xs">
           <div className="flex items-center gap-3 border-b border-ink-100 p-5">
-            <span aria-hidden className="grid size-11 shrink-0 place-items-center rounded-full bg-brand-100 text-sm font-semibold text-brand-700">
+            <span aria-hidden className="grid size-11 shrink-0 place-items-center rounded-full bg-brand-50 text-sm font-bold text-brand-800">
               {candidate.initials}
             </span>
             <div className="min-w-0 flex-1">
               <p className="truncate font-semibold text-ink-900">{candidate.name}</p>
-              <p className="flex items-center gap-1.5 text-xs tabular-nums text-text-subtle">
-                <CircleGauge className="size-3.5" aria-hidden />
-                {candidate.scored ? `${candidate.score.toFixed(1)}/10` : "Not scored"}
-                {RATING_META.filter((r) => candidate.ratings[r.key] > 0).length > 0 ? " · " : ""}
-                {RATING_META.filter((r) => candidate.ratings[r.key] > 0)
-                  .map((r) => `${r.label.slice(0, 4)} ${candidate.ratings[r.key]}`)
-                  .join(" · ")}
+              <p className="nums flex items-center gap-1.5 text-sm text-ink-600">
+                <CircleGauge className="size-4" aria-hidden />
+                {candidate.scored ? `${candidate.score.toFixed(1)}/10 Findtern Score` : "Not scored"}
               </p>
             </div>
             <Link
               href={`/employer/intern/${encodeURIComponent(candidate.id)}`}
-              className="apple-spring inline-flex min-h-11 items-center text-xs font-medium text-brand-700 underline-offset-4 hover:underline"
+              className="apple-spring inline-flex min-h-11 items-center text-sm font-medium text-brand-700 underline-offset-4 hover:underline"
             >
               Profile
             </Link>
           </div>
+          {RATING_META.some((r) => candidate.ratings[r.key] > 0) ? (
+            <dl className="grid grid-cols-4 border-b border-ink-100">
+              {RATING_META.map((r, i) => (
+                <div key={r.key} className={cn("px-3 py-3 text-center", i > 0 && "border-l border-ink-100")}>
+                  <dt className="truncate text-xs text-ink-500">{SHORT_RATING[r.key] ?? r.label}</dt>
+                  <dd className="nums mt-0.5 text-sm font-semibold text-ink-900">{candidate.ratings[r.key] > 0 ? candidate.ratings[r.key].toFixed(1) : "-"}</dd>
+                </div>
+              ))}
+            </dl>
+          ) : null}
 
           <div className="p-5">
-            <p className="flex items-center gap-1.5 text-2xs font-semibold uppercase tracking-[0.14em] text-text-subtle">
-              <Sparkles className="size-3.5" aria-hidden />
-              Offer amount
-            </p>
+            <h2 className="text-base font-semibold text-ink-900">Offer amount</h2>
             {/* One month's figure only (client QA), not monthly × months. */}
             <dl className="mt-4 space-y-2.5">
-              <Row label="Monthly amount" strong>
+              <Row label={currency === "INR" && totals.monthly > 0 ? "Monthly (incl. GST)" : "Monthly amount"} strong>
                 {formatMoney(Math.round(totals.monthly * 100), currency)}
               </Row>
               <Row label="Duration">{durationLabel || "-"}</Row>
@@ -582,17 +596,17 @@ export function SendProposalForm({
                 <Row label="Hiring fee (one-time)">{formatMoney(Math.round(totals.perHire * 100), currency)}</Row>
               ) : null}
             </dl>
-            <p className="mt-3 text-xs leading-relaxed text-text-subtle">
+            <p className="mt-3 text-sm leading-relaxed text-ink-600">
               Nothing is charged now. You pay once the candidate accepts.
             </p>
 
             {notice ? (
               <p
                 role="status"
-                className={[
-                  "mt-4 flex items-start gap-2 rounded-[10px] px-3 py-2.5 text-sm",
+                className={cn(
+                  "mt-4 flex items-start gap-2 rounded-apple-md px-3 py-2.5 text-sm",
                   notice.tone === "ok" ? "bg-success-soft text-ink-800" : "border border-warning/25 bg-warning-soft text-ink-700",
-                ].join(" ")}
+                )}
               >
                 {notice.tone === "bad" ? <TriangleAlert className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden /> : null}
                 <span>{notice.text}</span>
@@ -603,7 +617,7 @@ export function SendProposalForm({
               type="button"
               onClick={review}
               disabled={sending || projects.length === 0}
-              className="apple-spring apple-pressable mt-4 hidden min-h-11 w-full items-center justify-center gap-2 rounded-[10px] bg-brand-700 px-5 text-sm font-semibold text-white hover:bg-brand-600 disabled:opacity-55 lg:inline-flex"
+              className={buttonClass({ block: true, className: "mt-4 hidden lg:inline-flex" })}
             >
               <Send className="size-4" aria-hidden />
               Review and send
@@ -641,14 +655,14 @@ function Step({
   children: React.ReactNode;
 }) {
   return (
-    <section className={`grid gap-5 p-6 sm:grid-cols-[2rem_minmax(0,1fr)] sm:gap-x-4 ${last ? "" : "border-b border-ink-100"}`}>
-      <span aria-hidden className="hidden size-8 place-items-center rounded-full bg-ink-100 text-sm font-semibold tabular-nums text-ink-700 sm:grid">
+    <section className={cn("grid gap-5 p-6 sm:grid-cols-[2rem_minmax(0,1fr)] sm:gap-x-4", !last && "border-b border-ink-100")}>
+      <span aria-hidden className="nums hidden size-8 place-items-center rounded-full bg-brand-50 text-sm font-semibold text-brand-800 sm:grid">
         {n}
       </span>
       <div className="min-w-0 space-y-5">
         <div>
           <h2 className="text-base font-semibold tracking-[-0.01em] text-ink-900">{title}</h2>
-          {hint ? <p className="mt-0.5 text-sm text-text-subtle">{hint}</p> : null}
+          {hint ? <p className="mt-0.5 text-sm text-ink-600">{hint}</p> : null}
         </div>
         {children}
       </div>
@@ -672,14 +686,8 @@ function Row({
 }) {
   return (
     <div className="flex items-baseline justify-between gap-3">
-      <dt className="text-sm text-text-subtle">{label}</dt>
-      <dd
-        className={
-          strong
-            ? "text-lg font-semibold tabular-nums tracking-tight text-ink-900"
-            : "text-sm font-medium tabular-nums text-ink-800"
-        }
-      >
+      <dt className="text-sm text-ink-600">{label}</dt>
+      <dd className={strong ? "nums text-lg font-semibold tracking-tight text-ink-900" : "nums text-sm font-medium text-ink-800"}>
         {children}
       </dd>
     </div>
@@ -689,7 +697,7 @@ function Row({
 /* ── Form primitives ────────────────────────────────────────────────────── */
 
 const FIELD_BASE =
-  "apple-spring mt-2 min-h-11 w-full rounded-[10px] border bg-white px-3.5 text-[14px] text-ink-900 outline-none placeholder:text-ink-400 focus-visible:ring-2";
+  "apple-spring mt-2 min-h-11 w-full rounded-apple-sm border bg-white px-3.5 text-sm text-ink-900 outline-none placeholder:text-ink-400 focus-visible:ring-2";
 const FIELD_OK = "border-ink-200 focus-visible:border-brand-500 focus-visible:ring-brand-500/20";
 const FIELD_BAD = "border-danger focus-visible:border-danger focus-visible:ring-danger/20";
 
@@ -721,7 +729,7 @@ function Field({
       <label htmlFor={id} className="block text-sm font-medium text-ink-800">
         {label}
       </label>
-      {hint ? <p className="mt-0.5 text-xs text-text-subtle">{hint}</p> : null}
+      {hint ? <p className="mt-0.5 text-xs text-ink-500">{hint}</p> : null}
       <input
         id={id}
         name={id}
@@ -761,7 +769,7 @@ function ReadOnlyField({
       <label htmlFor={id} className="block text-sm font-medium text-ink-800">
         {label}
       </label>
-      {hint ? <p className="mt-0.5 text-xs text-text-subtle">{hint}</p> : null}
+      {hint ? <p className="mt-0.5 text-xs text-ink-500">{hint}</p> : null}
       <input
         id={id}
         name={id}
@@ -795,7 +803,7 @@ function SelectField({
       <label htmlFor={id} className="block text-sm font-medium text-ink-800">
         {label}
       </label>
-      {hint ? <p className="mt-0.5 text-xs text-text-subtle">{hint}</p> : null}
+      {hint ? <p className="mt-0.5 text-xs text-ink-500">{hint}</p> : null}
       <select
         id={id}
         name={id}
@@ -843,7 +851,7 @@ function TextArea({
       <label htmlFor={id} className="block text-sm font-medium text-ink-800">
         {label}
       </label>
-      {hint ? <p className="mt-0.5 text-xs text-text-subtle">{hint}</p> : null}
+      {hint ? <p className="mt-0.5 text-xs text-ink-500">{hint}</p> : null}
       <textarea
         id={id}
         name={id}
@@ -853,7 +861,7 @@ function TextArea({
         onChange={(e) => onChange(e.target.value)}
         aria-invalid={error ? true : undefined}
         aria-describedby={error ? `${id}-error` : undefined}
-        className={`mt-2 min-h-11 w-full rounded-[10px] border bg-white px-3.5 py-2.5 text-[14px] leading-relaxed text-ink-900 outline-none apple-spring placeholder:text-ink-400 focus-visible:ring-2 ${
+        className={`mt-2 min-h-11 w-full rounded-apple-sm border bg-white px-3.5 py-2.5 text-sm leading-relaxed text-ink-900 outline-none apple-spring placeholder:text-ink-400 focus-visible:ring-2 ${
           error ? FIELD_BAD : FIELD_OK
         }`}
       />
@@ -879,6 +887,8 @@ type Draft = {
   state: string;
   officeDays: string;
   homeDays: string;
+  /** Working days in the week: office + home must equal it (EMH-27). */
+  week: number;
   laptop: string;
   message: string;
   shiftFrom: string;
@@ -910,9 +920,9 @@ function validate(draft: Draft): Record<string, string> {
   if (draft.mode === "hybrid") {
     const office = Number(draft.officeDays);
     const home = Number(draft.homeDays);
-    if (!(office >= 1)) errors.officeDays = "At least one office day.";
-    if (!(home >= 1)) errors.homeDays = "At least one home day.";
-    if (office + home > 7) errors.homeDays = "Office and home days add up to more than a week.";
+    if (!(office >= 1) || !(home >= 1) || office + home !== draft.week) {
+      errors.officeDays = `Split the ${draft.week} working days between office and home, at least one each.`;
+    }
   }
 
   if (!draft.flexibleHours) {

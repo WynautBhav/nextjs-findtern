@@ -10,9 +10,21 @@ import { resolvePricing } from "@/lib/employer-pricing";
 import { requireMutation } from "@/lib/guards-mutation";
 import { emails } from "@/lib/emails";
 import { employerNames, notify } from "@/lib/notify";
-import { buildOffer, parseOffer, PAID_LEAVE_OPTIONS, scheduledMonthlyHours, todayIst, WEEKLY_SCHEDULES, type WeeklySchedule } from "@/lib/offer";
+import {
+  buildOffer,
+  normalizeLaptop,
+  offerPastStart,
+  parseOffer,
+  PAID_LEAVE_OPTIONS,
+  scheduledMonthlyHours,
+  todayIst,
+  WEEKLY_SCHEDULES,
+  workingDaysPerWeek,
+  type WeeklySchedule,
+} from "@/lib/offer";
 import { employerRegion } from "@/lib/employer-pricing";
 import { canEmployerSeeIntern } from "@/lib/employer-pool";
+import { isProjectOpen } from "@/lib/project-locations";
 import { isBlockingInterview } from "@/lib/employer-interview-rules";
 import { modeProblem, workPreferenceOf } from "@/lib/work-preference";
 
@@ -59,8 +71,12 @@ const bodySchema = z
     if (b.mode === "hybrid") {
       if (!b.officeDays || !b.homeDays) {
         ctx.addIssue({ code: "custom", message: "A hybrid role needs office and work-from-home days." });
-      } else if (b.officeDays + b.homeDays > 7) {
-        ctx.addIssue({ code: "custom", message: "Office and home days add up to more than a week." });
+      } else if (b.officeDays + b.homeDays !== workingDaysPerWeek(b.weeklySchedule)) {
+        // Legacy rule (EMH-27): the split covers the working week exactly.
+        ctx.addIssue({
+          code: "custom",
+          message: `Office and home days must add up to ${workingDaysPerWeek(b.weeklySchedule)}, the working days in a week.`,
+        });
       }
     }
   });
@@ -89,11 +105,15 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     .limit(1);
   const currency = employerRegion(employer ?? {}) === "IN" ? "INR" : "USD";
   const [project] = await db
-    .select({ id: schema.projects.id })
+    .select({ id: schema.projects.id, status: schema.projects.status })
     .from(schema.projects)
     .where(and(eq(schema.projects.id, b.projectId), eq(schema.projects.employerId, id)))
     .limit(1);
   if (!project) return NextResponse.json({ error: "Unknown project" }, { status: 404 });
+  // Offers go out on open projects only (legacy picker; EMH-15).
+  if (!isProjectOpen(project.status)) {
+    return NextResponse.json({ error: "This project is closed. Reopen it or pick an open project." }, { status: 409 });
+  }
 
   // Only a pool candidate, or one this employer already works with.
   if (!(await canEmployerSeeIntern(db, id, b.internId))) {
@@ -101,8 +121,15 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   }
 
   // One live offer per candidate per employer, across projects (legacy rule).
-  const [live] = await db
-    .select({ id: schema.proposals.id })
+  // An offer whose start date passed unanswered has lapsed: it no longer
+  // holds the candidate (EMH-17).
+  const liveRows = await db
+    .select({
+      id: schema.proposals.id,
+      status: schema.proposals.status,
+      offerDetails: schema.proposals.offerDetails,
+      currency: schema.proposals.currency,
+    })
     .from(schema.proposals)
     .where(
       and(
@@ -110,8 +137,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         eq(schema.proposals.internId, b.internId),
         inArray(schema.proposals.status, LIVE),
       ),
-    )
-    .limit(1);
+    );
+  const live = liveRows.find(
+    (row) =>
+      !((row.status === "sent" || row.status === "interview_scheduled") &&
+        offerPastStart(parseOffer(row.offerDetails, row.currency).startDate)),
+  );
   if (live) {
     return NextResponse.json(
       { error: "You already have a live offer with this candidate. Withdraw it or wait for their reply.", proposalId: live.id },
@@ -125,6 +156,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   ]);
   if (!user || !onboarding || user.role !== "intern" || !user.isActive) {
     return NextResponse.json({ error: "Unknown candidate" }, { status: 404 });
+  }
+  // No "candidate's own laptop" for someone who said they have none (legacy
+  // employer-send-proposal.tsx:719; EMH-18).
+  if (normalizeLaptop(b.laptop) === "candidate" && onboarding.hasLaptop === false) {
+    return NextResponse.json({ error: "This candidate doesn't have a laptop. The company needs to provide one." }, { status: 400 });
   }
   // Work location follows the candidate's own preference (bug sheet 23 Oct).
   const modeIssue = modeProblem(workPreferenceOf(onboarding), b.mode);
@@ -148,6 +184,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     );
   if (openOffers.some((o) => parseOffer(o.offerDetails, o.currency).fullTime)) {
     return NextResponse.json({ error: "A full-time offer has already been sent to this candidate." }, { status: 409 });
+  }
+  // EMB-26: once hired by this company (any project) the candidate is locked
+  // for further internships, as on legacy. A full-time offer has its own route.
+  const hiredHere = openOffers.find(isHiredProposal);
+  if (hiredHere) {
+    return NextResponse.json({ error: "Already hired. This candidate already works with you." }, { status: 409 });
   }
   const { ratings } = toCandidateProfile(user, onboarding);
   const score = scoreOf(onboarding);
