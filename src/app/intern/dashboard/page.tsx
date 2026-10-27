@@ -19,6 +19,7 @@ import { isMeetingLinkLive } from "@/lib/employer-interview-rules";
 import { nextAction, slotOf } from "@/lib/journey";
 import { formatMoney, formatSlotTime } from "@/lib/format";
 import { isInternPaid } from "@/lib/payments";
+import { isHiredProposal } from "@/lib/hire-status";
 import { paymentsAreFree } from "@/lib/razorpay";
 import { getInternActivationFeeMinor } from "@/lib/platform-settings";
 import { visibleAgainAt } from "@/lib/profile-hide";
@@ -148,8 +149,13 @@ export default async function InternHome() {
   const history = action ? data.thread.filter((n) => n !== action) : data.thread;
 
   const offersWaiting = data.proposals.filter((p) => p.status === "sent").length;
+  // Hours open only once the company has paid (bug sheet 7, S1 r65); an
+  // accepted, unpaid offer is "working" but has nothing to log yet.
+  const hired = data.proposals.some((p) => isHiredProposal(p));
   const lede = working
-    ? "Your internship, and anything waiting on you."
+    ? hired
+      ? "Your internship, and anything waiting on you."
+      : "You accepted an offer. Logging hours opens once the company completes its payment."
     : gettingStarted
       ? "Three steps, in order, before employers can find you."
       : action
@@ -168,6 +174,11 @@ export default async function InternHome() {
           action?.href ? (
             <Link href={action.href} className={buttonClass({ variant: "accent" })}>
               {action.action ?? "Open"}
+              <ArrowRight className="size-4" aria-hidden />
+            </Link>
+          ) : working && !hired && data.engagement ? (
+            <Link href={`/intern/proposals/${data.engagement.id}`} className={buttonClass({ variant: "outlineLight" })}>
+              See your offer
               <ArrowRight className="size-4" aria-hidden />
             </Link>
           ) : working ? (
@@ -195,7 +206,8 @@ export default async function InternHome() {
             <StatTile
               tone="onDark"
               label="Paid to you"
-              value={formatMoney(data.money.paidMinor, "INR")}
+              value={data.money.paidMinor > 0 ? formatMoney(data.money.paidMinor, "INR") : null}
+              empty="Nothing paid yet"
               hint={
                 data.money.incomingMinor > 0
                   ? `${formatMoney(data.money.incomingMinor, data.money.currency, { zeroLabel: false })} on its way`
