@@ -1,36 +1,21 @@
 "use client";
 
-import { useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import {
-  Loader2,
-  Plus,
-  Shield,
-  ShieldCheck,
-  Trash2,
-  UserPlus,
-  Users,
-} from "lucide-react";
+import { KeyRound, Loader2, Pencil, Plus, Trash2, UserPlus } from "lucide-react";
+
 import { PERMISSIONS } from "@/lib/admin/permissions";
-
 import { csrfFetch } from "@/lib/client-fetch";
-import { formatDate } from "@/lib/format";
 import type { Admin } from "@/lib/db/schema";
-import { Panel } from "@/components/admin/panel";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetDescription,
-} from "@/components/ui/sheet";
+import { Panel, PanelHeader } from "@/components/admin/panel";
+import { Pill } from "@/components/app/primitives";
+import { buttonClass } from "@/components/ui/button";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
-
-const ALL_PERMISSIONS = PERMISSIONS;
 
 const AREA_LABEL: Record<string, string> = {
   dashboard: "Dashboard",
-  users: "Users",
+  users: "Registered users",
   interns: "Candidates",
   companies: "Employers",
   transactions: "Finance",
@@ -41,640 +26,595 @@ const AREA_LABEL: Record<string, string> = {
   roles: "Staff and roles",
 };
 
+/** Permission rows grouped by area, in catalog order. */
+const AREAS: { area: string; perms: (typeof PERMISSIONS)[number][] }[] = (() => {
+  const out: { area: string; perms: (typeof PERMISSIONS)[number][] }[] = [];
+  for (const p of PERMISSIONS) {
+    const area = AREA_LABEL[p.key.split(":")[0]] ?? p.key.split(":")[0];
+    const group = out.find((g) => g.area === area);
+    if (group) group.perms.push(p);
+    else out.push({ area, perms: [p] });
+  }
+  return out;
+})();
+
 export interface RoleDef {
   key: string;
   name: string;
-  /** Only the built-in placeholder roles carry one; admin_roles has no column for it. */
-  description?: string;
   permissions: string[] | unknown;
 }
 
-/** "interns:write" → { area: "Candidates", verb: "Write" } */
-function splitPerm(perm: string): { area: string; verb: string } {
-  const [rawArea, rawVerb] = perm.split(":");
-  return {
-    area: AREA_LABEL[rawArea] ?? rawArea.charAt(0).toUpperCase() + rawArea.slice(1),
-    verb: rawVerb ? rawVerb.charAt(0).toUpperCase() + rawVerb.slice(1) : "",
-  };
+type Staff = Omit<Admin, "password">;
+
+const field =
+  "mt-1.5 min-h-11 w-full rounded-apple-sm border border-ink-200 bg-white px-3.5 text-sm text-ink-900 outline-none placeholder:text-ink-400 focus-visible:border-brand-600 focus-visible:ring-2 focus-visible:ring-brand-500/20";
+
+const permsOf = (r: RoleDef): string[] => (Array.isArray(r.permissions) ? (r.permissions as string[]) : []);
+
+async function call(url: string, method: string, body?: unknown): Promise<{ ok: boolean; error?: string; data?: Record<string, unknown> }> {
+  try {
+    const res = await csrfFetch(url, {
+      method,
+      headers: body === undefined ? undefined : { "Content-Type": "application/json" },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+    const data = (await res.json().catch(() => ({}))) as Record<string, unknown> & { error?: string };
+    return res.ok ? { ok: true, data } : { ok: false, error: data.error ?? `Not saved (HTTP ${res.status})` };
+  } catch {
+    return { ok: false, error: "Couldn't reach the server. Check your connection and try again." };
+  }
 }
 
-const inputClass =
-  "apple-spring mt-1.5 min-h-11 w-full rounded-[10px] border border-ink-200 bg-white px-3 text-[14px] text-ink-900 outline-none placeholder:text-ink-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20";
-
+/**
+ * Staff and roles (DESIGN.md §6.6): who can sign in, and an editable
+ * permissions matrix, one column per role. Ticks are staged locally and saved
+ * per role; the server refuses anything outside the editor's own access and
+ * its message is shown as is.
+ */
 export function StaffRolesManager({
   initialStaff,
   initialRoles,
+  currentAdminId,
 }: {
-  initialStaff: Omit<Admin, "password">[];
+  initialStaff: Staff[];
   initialRoles: RoleDef[];
+  currentAdminId: string | null;
 }) {
   const router = useRouter();
-  const [staffList, setStaffList] = useState<Omit<Admin, "password">[]>(initialStaff);
-  const [rolesList, setRolesList] = useState<RoleDef[]>(initialRoles);
+  const [staff, setStaff] = useState<Staff[]>(initialStaff);
+  const [roles, setRoles] = useState<RoleDef[]>(initialRoles);
+  const [seen, setSeen] = useState({ initialStaff, initialRoles });
+  if (seen.initialStaff !== initialStaff || seen.initialRoles !== initialRoles) {
+    setSeen({ initialStaff, initialRoles });
+    setStaff(initialStaff);
+    setRoles(initialRoles);
+  }
 
-  const [staffModalOpen, setStaffModalOpen] = useState(false);
-  const [roleModalOpen, setRoleModalOpen] = useState(false);
-
-  // Staff Form State
-  const [staffName, setStaffName] = useState("");
-  const [staffEmail, setStaffEmail] = useState("");
-  const [staffPassword, setStaffPassword] = useState("");
-  const [staffRole, setStaffRole] = useState(rolesList[0]?.key || "admin");
-  const [staffSaving, setStaffSaving] = useState(false);
-  const [staffError, setStaffError] = useState("");
-
-  // Role Form State
-  const [roleKey, setRoleKey] = useState("");
-  /** Set while the role sheet edits an existing role instead of creating one. */
-  const [editingRole, setEditingRole] = useState<string | null>(null);
-  const [roleName, setRoleName] = useState("");
-  const [selectedPerms, setSelectedPerms] = useState<string[]>([]);
-  const [roleSaving, setRoleSaving] = useState(false);
-  const [roleError, setRoleError] = useState("");
+  // Staged matrix edits: role key → permission list.
+  const [draft, setDraft] = useState<Record<string, string[]>>({});
+  const [matrixBusy, setMatrixBusy] = useState(false);
+  const [matrixError, setMatrixError] = useState<string | null>(null);
+  const [matrixSaved, setMatrixSaved] = useState<string | null>(null);
 
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [staffError, setStaffError] = useState<string | null>(null);
+  const [staffNote, setStaffNote] = useState<string | null>(null);
 
-  async function handleCreateStaff(e: React.FormEvent) {
-    e.preventDefault();
-    setStaffSaving(true);
-    setStaffError("");
-    try {
-      const res = await csrfFetch("/api/admin/staff", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: staffName.trim(),
-          email: staffEmail.trim(),
-          password: staffPassword,
-          role: staffRole,
-        }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || "Failed to create staff member");
-      if (data.staff) {
-        setStaffList((prev) => [data.staff, ...prev]);
-      }
-      setStaffModalOpen(false);
-      setStaffName("");
-      setStaffEmail("");
-      setStaffPassword("");
-      router.refresh();
-    } catch (err: unknown) {
-      setStaffError(err instanceof Error ? err.message : "Error creating staff");
-    } finally {
-      setStaffSaving(false);
+  const [staffSheet, setStaffSheet] = useState(false);
+  const [roleSheet, setRoleSheet] = useState<{ mode: "new" } | { mode: "rename"; key: string } | null>(null);
+
+  const editable = roles.filter((r) => r.key !== "super_admin");
+  const dirtyKeys = Object.keys(draft).filter((key) => {
+    const role = roles.find((r) => r.key === key);
+    if (!role) return false;
+    const a = [...permsOf(role)].sort().join(",");
+    const b = [...draft[key]].sort().join(",");
+    return a !== b;
+  });
+  const members = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const s of staff) m.set(s.role ?? "", (m.get(s.role ?? "") ?? 0) + 1);
+    return m;
+  }, [staff]);
+
+  function current(role: RoleDef): string[] {
+    return draft[role.key] ?? permsOf(role);
+  }
+
+  function toggle(role: RoleDef, perm: string) {
+    setMatrixSaved(null);
+    const list = current(role);
+    let next = list.includes(perm) ? list.filter((p) => p !== perm) : [...list, perm];
+    // Write implies read, as in legacy: ticking "Handle" ticks "Read" too.
+    if (!list.includes(perm) && perm.endsWith(":write")) {
+      const read = perm.replace(/:write$/, ":read");
+      if (PERMISSIONS.some((p) => p.key === read) && !next.includes(read)) next = [...next, read];
     }
+    setDraft((prev) => ({ ...prev, [role.key]: next }));
   }
 
-  async function handleDeleteStaff(id: string) {
-    if (!confirm("Are you sure you want to revoke access for this staff member?")) return;
-    setBusyId(id);
-    try {
-      const res = await csrfFetch("/api/admin/staff", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || "Failed to delete staff member");
-      setStaffList((prev) => prev.filter((s) => s.id !== id));
-      router.refresh();
-    } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : "Error deleting staff");
-    } finally {
-      setBusyId(null);
+  async function saveMatrix() {
+    setMatrixBusy(true);
+    setMatrixError(null);
+    const failed: string[] = [];
+    const saved: string[] = [];
+    for (const key of dirtyKeys) {
+      const result = await call(`/api/admin/roles/${encodeURIComponent(key)}`, "PUT", { permissions: draft[key] });
+      const name = roles.find((r) => r.key === key)?.name ?? key;
+      if (result.ok) saved.push(key);
+      else failed.push(`${name}: ${result.error}`);
     }
-  }
-
-  async function handleCreateRole(e: React.FormEvent) {
-    e.preventDefault();
-    setRoleSaving(true);
-    setRoleError("");
-    try {
-      const cleanKey = editingRole ?? roleKey.trim().toLowerCase().replace(/\s+/g, "_");
-      const res = editingRole
-        ? await csrfFetch(`/api/admin/roles/${encodeURIComponent(editingRole)}`, {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ name: roleName.trim(), permissions: selectedPerms }),
-          })
-        : await csrfFetch("/api/admin/roles", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              key: cleanKey,
-              name: roleName.trim(),
-              permissions: selectedPerms,
-            }),
-          });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || "Couldn't save the role. Try again.");
-      const newRole: RoleDef = {
-        key: cleanKey,
-        name: roleName.trim(),
-        permissions: selectedPerms,
-      };
-      setRolesList((prev) => (editingRole ? prev.map((r) => (r.key === editingRole ? newRole : r)) : [...prev, newRole]));
-      setEditingRole(null);
-      setRoleModalOpen(false);
-      setRoleKey("");
-      setRoleName("");
-      setSelectedPerms([]);
+    setRoles((prev) => prev.map((r) => (saved.includes(r.key) ? { ...r, permissions: draft[r.key] } : r)));
+    setDraft((prev) => Object.fromEntries(Object.entries(prev).filter(([k]) => !saved.includes(k))));
+    setMatrixBusy(false);
+    if (failed.length) setMatrixError(failed.join(" "));
+    if (saved.length) {
+      setMatrixSaved(`Saved ${saved.length} ${saved.length === 1 ? "role" : "roles"}. Staff get the change within a minute.`);
       router.refresh();
-    } catch (err: unknown) {
-      setRoleError(err instanceof Error ? err.message : "Couldn't save the role. Try again.");
-    } finally {
-      setRoleSaving(false);
     }
-  }
-
-  function editRole(role: RoleDef) {
-    setEditingRole(role.key);
-    setRoleKey(role.key);
-    setRoleName(role.name);
-    setSelectedPerms(Array.isArray(role.permissions) ? (role.permissions as string[]) : []);
-    setRoleError("");
-    setRoleModalOpen(true);
-  }
-
-  async function deleteRole(key: string) {
-    if (!window.confirm("Delete this role?")) return;
-    const res = await csrfFetch(`/api/admin/roles/${encodeURIComponent(key)}`, { method: "DELETE" });
-    const data = (await res.json().catch(() => ({}))) as { error?: string };
-    if (!res.ok) return window.alert(data.error ?? "Couldn't delete the role.");
-    setRolesList((prev) => prev.filter((r) => r.key !== key));
   }
 
   async function updateStaff(id: string, body: { role?: string; password?: string }) {
     setBusyId(id);
-    const res = await csrfFetch("/api/admin/staff", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, ...body }),
-    });
-    const data = (await res.json().catch(() => ({}))) as { error?: string };
+    setStaffError(null);
+    setStaffNote(null);
+    const result = await call("/api/admin/staff", "PATCH", { id, ...body });
     setBusyId(null);
-    if (!res.ok) return window.alert(data.error ?? "Couldn't update.");
-    if (body.role) setStaffList((prev) => prev.map((s) => (s.id === id ? { ...s, role: body.role! } : s)));
-    if (body.password) window.alert("Password updated. Share it with them securely.");
+    if (!result.ok) {
+      setStaffError(result.error ?? "Not saved.");
+      return;
+    }
+    if (body.role) setStaff((prev) => prev.map((s) => (s.id === id ? { ...s, role: body.role! } : s)));
+    if (body.password) setStaffNote("Password updated. Share it with them securely; they can change it under Your account.");
   }
 
-  function togglePerm(key: string) {
-    setSelectedPerms((prev) =>
-      prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key],
-    );
+  async function removeStaff(s: Staff) {
+    if (!window.confirm(`Revoke console access for ${s.email}? They are signed out at their next request.`)) return;
+    setBusyId(s.id);
+    setStaffError(null);
+    const result = await call("/api/admin/staff", "DELETE", { id: s.id });
+    setBusyId(null);
+    if (!result.ok) {
+      setStaffError(result.error ?? "Not removed.");
+      return;
+    }
+    setStaff((prev) => prev.filter((x) => x.id !== s.id));
+    router.refresh();
   }
 
-  const membersOf = (key: string) => staffList.filter((s) => s.role === key).length;
+  async function deleteRole(role: RoleDef) {
+    if (!window.confirm(`Delete the role "${role.name}"?`)) return;
+    setMatrixError(null);
+    const result = await call(`/api/admin/roles/${encodeURIComponent(role.key)}`, "DELETE");
+    if (!result.ok) {
+      setMatrixError(`${role.name}: ${result.error}`);
+      return;
+    }
+    setRoles((prev) => prev.filter((r) => r.key !== role.key));
+    router.refresh();
+  }
 
   return (
-    <div className="apple-admin space-y-4">
-      {/* Staff directory */}
-      <Panel className="bg-white">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-ink-100 px-5 py-4">
-          <div className="flex min-w-0 items-center gap-3">
-            <span
-              aria-hidden
-              className="grid size-8 shrink-0 place-items-center rounded-[10px] border border-brand-200/60 bg-brand-50 text-brand-700"
-            >
-              <Users className="size-4" />
-            </span>
-            <div className="min-w-0">
-              <h2 className="text-[17px] font-semibold tracking-[-0.02em] text-ink-900">
-                Staff
-              </h2>
-              <p className="text-[13px] text-text-subtle">
-                {staffList.length} {staffList.length === 1 ? "member" : "members"} with console access
-              </p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={() => setStaffModalOpen(true)}
-            className="apple-spring apple-pressable inline-flex min-h-11 items-center gap-1.5 rounded-[10px] bg-brand-700 px-4 text-[14px] font-semibold text-white hover:bg-brand-600"
-          >
-            <UserPlus className="size-4" />
-            Add staff
-          </button>
-        </div>
-
-        {staffList.length === 0 ? (
-          <p className="px-5 py-10 text-center text-[14px] text-text-subtle">
-            No staff accounts yet. Provision the first one to get started.
+    <div className="space-y-6">
+      {/* Staff */}
+      <Panel>
+        <PanelHeader
+          title="Staff"
+          description={`${staff.length} ${staff.length === 1 ? "person" : "people"} can sign in to this console. Change a role from the list; it applies within a minute.`}
+          action={
+            <button type="button" onClick={() => setStaffSheet(true)} className={buttonClass({ variant: "primary", size: "sm" })}>
+              <UserPlus className="size-4" aria-hidden />
+              Add staff
+            </button>
+          }
+        />
+        {staffError ? (
+          <p role="alert" className="border-b border-danger/20 bg-danger-soft px-5 py-2.5 text-sm font-medium text-danger">
+            {staffError}
           </p>
-        ) : (
-          <ul className="divide-y divide-ink-100">
-            {staffList.map((staff) => (
-              <li
-                key={staff.id}
-                className="apple-spring flex flex-wrap items-center gap-3 px-5 py-3 hover:bg-ink-50/70"
-              >
-                <span
-                  aria-hidden
-                  className="grid size-10 shrink-0 place-items-center rounded-full bg-brand-100 text-[13px] font-semibold text-brand-800"
-                >
-                  {(staff.name || staff.email).charAt(0).toUpperCase()}
+        ) : null}
+        {staffNote ? (
+          <p role="status" className="border-b border-brand-100 bg-brand-50 px-5 py-2.5 text-sm font-medium text-brand-800">
+            {staffNote}
+          </p>
+        ) : null}
+        <ul className="divide-y divide-ink-100">
+          {staff.map((s) => {
+            const self = s.id === currentAdminId;
+            return (
+              <li key={s.id} className="flex flex-wrap items-center gap-3 px-5 py-3">
+                <span aria-hidden className="grid size-9 shrink-0 place-items-center rounded-full bg-brand-100 text-sm font-semibold text-brand-800">
+                  {(s.name || s.email).charAt(0).toUpperCase()}
                 </span>
-                {/* On phones the name block takes the first line and the
-                    controls wrap to a second, so nothing is hidden. */}
-                <span className="min-w-0 flex-1 basis-[calc(100%-3.25rem)] sm:basis-auto">
-                  <span className="block truncate text-[15px] font-semibold tracking-[-0.01em] text-ink-900">
-                    {staff.name || "Staff member"}
+                <span className="min-w-0 flex-1 basis-[calc(100%-3rem)] sm:basis-auto">
+                  <span className="flex items-center gap-2">
+                    <span className="truncate text-[0.9375rem] font-medium text-ink-900">{s.name || "Staff member"}</span>
+                    {self ? <Pill tone="new">You</Pill> : null}
                   </span>
-                  <span className="mt-0.5 block truncate text-[13px] text-text-subtle">
-                    {staff.email}
-                    {staff.role ? ` · ${staff.role.replace(/_/g, " ")}` : ""}
-                    {staff.createdAt ? ` · since ${formatDate(staff.createdAt)}` : ""}
-                  </span>
+                  <span className="block truncate text-sm text-ink-600">{s.email}</span>
                 </span>
+                <label className="sr-only" htmlFor={`role-${s.id}`}>
+                  Role for {s.email}
+                </label>
                 <select
-                  aria-label={`Role for ${staff.email}`}
-                  value={staff.role ?? ""}
-                  disabled={busyId === staff.id}
-                  onChange={(e) => updateStaff(staff.id, { role: e.target.value })}
-                  className="block min-h-11 w-full min-w-0 flex-1 rounded-[10px] border border-ink-200 bg-white px-2 text-xs sm:w-auto sm:flex-none"
+                  id={`role-${s.id}`}
+                  value={s.role ?? ""}
+                  disabled={busyId === s.id || self}
+                  title={self ? "You can't change your own role" : undefined}
+                  onChange={(e) => updateStaff(s.id, { role: e.target.value })}
+                  className="h-9 min-w-0 flex-1 rounded-apple-sm border border-ink-200 bg-white px-2.5 text-sm text-ink-800 disabled:opacity-60 max-lg:h-11 sm:w-48 sm:flex-none"
                 >
-                  {rolesList.map((r) => (
+                  {roles.map((r) => (
                     <option key={r.key} value={r.key}>
                       {r.name}
                     </option>
                   ))}
                 </select>
-                <button
-                  type="button"
-                  disabled={busyId === staff.id}
-                  onClick={() => {
-                    const pw = window.prompt(`New password for ${staff.email} (8+ characters)`);
-                    if (pw) void updateStaff(staff.id, { password: pw });
-                  }}
-                  className="inline-flex min-h-11 items-center whitespace-nowrap rounded-[10px] px-2.5 text-xs font-medium text-ink-600 hover:bg-ink-100"
-                >
-                  Reset password
-                </button>
-                <button
-                  type="button"
-                  disabled={busyId === staff.id}
-                  onClick={() => handleDeleteStaff(staff.id)}
-                  title="Revoke access"
-                  aria-label={`Revoke access for ${staff.email}`}
-                  className="apple-spring apple-pressable inline-flex min-h-11 min-w-11 items-center justify-center rounded-[10px] text-ink-600 hover:bg-danger-soft hover:text-danger disabled:opacity-50"
-                >
-                  {busyId === staff.id ? (
-                    <Loader2 className="size-4 animate-spin" />
-                  ) : (
-                    <Trash2 className="size-4" />
-                  )}
-                </button>
+                {!self ? (
+                  <>
+                    <button
+                      type="button"
+                      disabled={busyId === s.id}
+                      onClick={() => {
+                        const pw = window.prompt(`New password for ${s.email} (8+ characters, upper and lower case and a number)`);
+                        if (pw) void updateStaff(s.id, { password: pw });
+                      }}
+                      className={buttonClass({ variant: "ghost", size: "sm" })}
+                    >
+                      <KeyRound className="size-4" aria-hidden />
+                      Reset password
+                    </button>
+                    <button
+                      type="button"
+                      disabled={busyId === s.id}
+                      onClick={() => removeStaff(s)}
+                      aria-label={`Revoke access for ${s.email}`}
+                      className={cn(buttonClass({ variant: "ghost", size: "iconSm" }), "text-ink-600 hover:bg-danger-soft hover:text-danger max-lg:size-11")}
+                    >
+                      {busyId === s.id ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <Trash2 className="size-4" aria-hidden />}
+                    </button>
+                  </>
+                ) : null}
               </li>
-            ))}
-          </ul>
-        )}
+            );
+          })}
+        </ul>
       </Panel>
 
-      {/* Roles */}
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h2 className="text-[17px] font-semibold tracking-[-0.02em] text-ink-900">
-            Roles
-          </h2>
-          <p className="mt-0.5 text-[13px] text-text-subtle">
-            What each access profile can touch.
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={() => {
-            setEditingRole(null);
-            setRoleKey("");
-            setRoleName("");
-            setSelectedPerms([]);
-            setRoleModalOpen(true);
-          }}
-          className="apple-spring apple-pressable inline-flex min-h-11 items-center gap-1.5 rounded-[10px] border border-ink-200 bg-white px-4 text-[14px] font-semibold text-ink-800 hover:bg-ink-50"
-        >
-          <Plus className="size-4" />
-          New role
-        </button>
-      </div>
-
-      <div className="grid gap-4 lg:grid-cols-2">
-        {rolesList.map((role) => {
-          const perms = Array.isArray(role.permissions) ? (role.permissions as string[]) : [];
-          // "*" is the super-admin wildcard, not an area; shown as one line
-          // rather than a literal asterisk row.
-          const fullAccess = perms.includes("*");
-          const byArea = new Map<string, string[]>();
-          for (const p of perms) {
-            if (p === "*") continue;
-            const { area, verb } = splitPerm(p);
-            if (!byArea.has(area)) byArea.set(area, []);
-            if (verb) byArea.get(area)?.push(verb);
+      {/* Permissions matrix */}
+      <Panel>
+        <PanelHeader
+          title="What each role can do"
+          description="Tick to grant, untick to take away, then save. Read lets staff see an area; Handle or Edit lets them change it. Super admin always has everything."
+          action={
+            <button type="button" onClick={() => setRoleSheet({ mode: "new" })} className={buttonClass({ variant: "outline", size: "sm" })}>
+              <Plus className="size-4" aria-hidden />
+              New role
+            </button>
           }
-          const count = membersOf(role.key);
-          return (
-            <Panel key={role.key} className="bg-white p-5">
-              <div className="flex items-start gap-3">
-                <span
-                  aria-hidden
-                  className="grid size-10 shrink-0 place-items-center rounded-[10px] border border-brand-200/60 bg-brand-50 text-brand-700"
-                >
-                  {role.key === "admin" ? (
-                    <ShieldCheck className="size-5" />
-                  ) : (
-                    <Shield className="size-5" />
-                  )}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <h3 className="truncate text-[17px] font-semibold tracking-[-0.02em] text-ink-900">
-                    {role.name}
-                  </h3>
-                  <p className="mt-0.5 text-[13px] tabular-nums text-text-subtle">
-                    {count} {count === 1 ? "member" : "members"} ·{" "}
-                    <span className="font-mono text-[12px]">{role.key}</span>
-                  </p>
-                </div>
-                {role.key !== "super_admin" ? (
-                  <span className="flex shrink-0 gap-1">
-                    <button type="button" onClick={() => editRole(role)} className="min-h-9 rounded-lg px-2.5 text-xs font-medium text-ink-700 hover:bg-ink-100 max-lg:min-h-11">
-                      Edit
-                    </button>
-                    <button type="button" onClick={() => deleteRole(role.key)} className="min-h-9 rounded-lg px-2.5 text-xs font-medium text-danger hover:bg-danger-soft max-lg:min-h-11">
-                      Delete
-                    </button>
-                  </span>
-                ) : null}
-              </div>
-
-              {role.description ? (
-                <p className="mt-3 text-[14px] leading-relaxed text-ink-700">
-                  {role.description}
-                </p>
-              ) : null}
-
-              <div className="mt-4 space-y-2 border-t border-ink-100 pt-4">
-                {fullAccess ? (
-                  <p className="flex items-center gap-2 text-[13px] font-medium tracking-[-0.01em] text-ink-700">
-                    <ShieldCheck className="size-4 text-brand-700" aria-hidden />
-                    Full access to everything
-                  </p>
-                ) : null}
-                {[...byArea.entries()].map(([area, verbs]) => (
-                  <div key={area} className="flex items-center justify-between gap-3">
-                    <span className="text-[13px] font-medium tracking-[-0.01em] text-ink-700">
-                      {area}
+        />
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[40rem] border-separate border-spacing-0 text-sm">
+            <caption className="sr-only">Permissions by role</caption>
+            <thead>
+              <tr>
+                <th scope="col" className="sticky left-0 z-10 border-b border-ink-100 bg-ink-50 px-4 py-2.5 text-left text-xs font-semibold text-ink-600">
+                  Permission
+                </th>
+                {roles.map((r) => (
+                  <th key={r.key} scope="col" className="min-w-36 border-b border-ink-100 bg-ink-50 px-3 py-2.5 text-center align-bottom">
+                    <span className="block text-sm font-semibold text-ink-900">{r.name}</span>
+                    <span className="nums block text-xs font-normal text-ink-600">
+                      {members.get(r.key) ?? 0} {(members.get(r.key) ?? 0) === 1 ? "person" : "people"}
                     </span>
-                    <span className="flex gap-1.5">
-                      {verbs.map((verb) => (
-                        <span
-                          key={verb}
-                          className={cn(
-                            "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[12px] font-semibold",
-                            verb === "Write"
-                              ? "bg-brand-50 text-brand-800"
-                              : "bg-ink-100 text-ink-600",
-                          )}
+                    {r.key !== "super_admin" ? (
+                      <span className="mt-1 flex justify-center gap-0.5">
+                        <button
+                          type="button"
+                          onClick={() => setRoleSheet({ mode: "rename", key: r.key })}
+                          aria-label={`Rename ${r.name}`}
+                          className={cn(buttonClass({ variant: "ghost", size: "iconSm" }), "size-8 max-lg:size-11")}
                         >
-                          <span
-                            aria-hidden
-                            className={cn(
-                              "size-1 rounded-full",
-                              verb === "Write" ? "bg-brand-600" : "bg-ink-400",
-                            )}
-                          />
-                          {verb}
-                        </span>
-                      ))}
-                    </span>
-                  </div>
+                          <Pencil className="size-3.5" aria-hidden />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => deleteRole(r)}
+                          aria-label={`Delete ${r.name}`}
+                          className={cn(buttonClass({ variant: "ghost", size: "iconSm" }), "size-8 text-ink-600 hover:bg-danger-soft hover:text-danger max-lg:size-11")}
+                        >
+                          <Trash2 className="size-3.5" aria-hidden />
+                        </button>
+                      </span>
+                    ) : null}
+                  </th>
                 ))}
-              </div>
-            </Panel>
-          );
-        })}
-      </div>
+              </tr>
+            </thead>
+            <tbody>
+              {AREAS.map((group) => (
+                <Fragment key={group.area}>
+                  <tr>
+                    <th
+                      scope="rowgroup"
+                      colSpan={roles.length + 1}
+                      className="border-b border-ink-100 bg-white px-4 pt-4 pb-1.5 text-left text-xs font-semibold text-ink-900"
+                    >
+                      {group.area}
+                    </th>
+                  </tr>
+                  {group.perms.map((perm) => (
+                    <tr key={perm.key} className="hover:bg-ink-50/60">
+                      <th scope="row" className="sticky left-0 z-10 border-b border-ink-100 bg-white px-4 py-2 text-left font-normal text-ink-700">
+                        {perm.label}
+                      </th>
+                      {roles.map((r) => {
+                        const all = permsOf(r).includes("*");
+                        const on = all || current(r).includes(perm.key);
+                        const changed = draft[r.key] !== undefined && permsOf(r).includes(perm.key) !== on;
+                        return (
+                          <td key={r.key} className={cn("border-b border-ink-100 px-3 py-1 text-center", changed && "bg-accent-100/60")}>
+                            <label className="inline-flex size-11 cursor-pointer items-center justify-center lg:size-9">
+                              <input
+                                type="checkbox"
+                                checked={on}
+                                disabled={all || matrixBusy}
+                                onChange={() => toggle(r, perm.key)}
+                                aria-label={`${r.name}: ${perm.label}`}
+                                className="size-4 accent-brand-700 disabled:opacity-60"
+                              />
+                            </label>
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </Fragment>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="sticky bottom-0 flex flex-wrap items-center gap-3 border-t border-ink-100 bg-white/95 px-5 py-3 backdrop-blur-sm">
+          <p className="min-w-0 flex-1 text-sm text-ink-600" role="status">
+            {matrixSaved ??
+              (dirtyKeys.length
+                ? `Unsaved changes on ${dirtyKeys.map((k) => roles.find((r) => r.key === k)?.name ?? k).join(", ")}.`
+                : editable.length
+                  ? "No unsaved changes."
+                  : "Only the super admin role exists. Add a role to give staff narrower access.")}
+          </p>
+          <button
+            type="button"
+            disabled={!dirtyKeys.length || matrixBusy}
+            onClick={() => {
+              setDraft({});
+              setMatrixError(null);
+            }}
+            className={buttonClass({ variant: "ghost", size: "sm" })}
+          >
+            Discard
+          </button>
+          <button type="button" disabled={!dirtyKeys.length || matrixBusy} onClick={saveMatrix} className={buttonClass({ variant: "primary", size: "sm" })}>
+            {matrixBusy ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
+            Save changes
+          </button>
+          {matrixError ? (
+            <p role="alert" className="w-full text-sm font-medium text-danger">
+              {matrixError}
+            </p>
+          ) : null}
+        </div>
+      </Panel>
 
-      {/* Provision staff sheet */}
-      <Sheet open={staffModalOpen} onOpenChange={setStaffModalOpen}>
-        <SheetContent side="right" className="apple-admin w-full overflow-y-auto bg-ink-50 p-0 sm:max-w-md">
-          <div className="space-y-4 p-4 sm:p-6">
-            <SheetHeader className="apple-panel bg-white p-5 text-left">
-              <SheetTitle className="text-[17px] font-semibold tracking-[-0.02em] text-ink-900">
-                Add staff
-              </SheetTitle>
-              <SheetDescription className="text-[13px] text-text-subtle">
-                They can sign in to this console immediately.
-              </SheetDescription>
-            </SheetHeader>
+      <AddStaffSheet
+        open={staffSheet}
+        onOpenChange={setStaffSheet}
+        roles={roles}
+        onCreated={(s) => {
+          setStaff((prev) => [s, ...prev]);
+          router.refresh();
+        }}
+      />
+      <RoleSheet
+        state={roleSheet}
+        roles={roles}
+        onClose={() => setRoleSheet(null)}
+        onSaved={(role, created) => {
+          setRoles((prev) => (created ? [...prev, role] : prev.map((r) => (r.key === role.key ? { ...r, name: role.name } : r))));
+          setRoleSheet(null);
+          router.refresh();
+        }}
+      />
+    </div>
+  );
+}
 
-            <form onSubmit={handleCreateStaff} className="apple-panel space-y-4 bg-white p-5">
-              {staffError ? (
-                <p role="alert" className="rounded-[10px] border border-danger/30 bg-danger-soft p-3 text-[13px] font-medium text-danger">
-                  {staffError}
-                </p>
-              ) : null}
+function AddStaffSheet({
+  open,
+  onOpenChange,
+  roles,
+  onCreated,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  roles: RoleDef[];
+  onCreated: (s: Staff) => void;
+}) {
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [role, setRole] = useState(roles.find((r) => r.key !== "super_admin")?.key ?? roles[0]?.key ?? "admin");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-              <div>
-                <label htmlFor="staff-name" className="block text-[13px] font-semibold text-ink-800">
-                  Full name
-                </label>
-                <input
-                  id="staff-name"
-                  type="text"
-                  required
-                  value={staffName}
-                  placeholder="Aarav Sharma"
-                  onChange={(e) => setStaffName(e.target.value)}
-                  className={inputClass}
-                />
-              </div>
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    const result = await call("/api/admin/staff", "POST", { name: name.trim(), email: email.trim(), password, role });
+    setBusy(false);
+    if (!result.ok) {
+      setError(result.error ?? "Not created.");
+      return;
+    }
+    onCreated(result.data?.staff as Staff);
+    setName("");
+    setEmail("");
+    setPassword("");
+    onOpenChange(false);
+  }
 
-              <div>
-                <label htmlFor="staff-email" className="block text-[13px] font-semibold text-ink-800">
-                  Email
-                </label>
-                <input
-                  id="staff-email"
-                  type="email"
-                  required
-                  value={staffEmail}
-                  placeholder="name@findtern.in"
-                  onChange={(e) => setStaffEmail(e.target.value)}
-                  className={inputClass}
-                />
-              </div>
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="right" className="w-full overflow-y-auto p-0 sm:max-w-md">
+        <form onSubmit={submit} className="space-y-4 p-5 sm:p-6">
+          <SheetHeader className="p-0 text-left">
+            <SheetTitle className="text-lg font-semibold text-ink-900">Add staff</SheetTitle>
+            <SheetDescription className="text-sm text-ink-600">They can sign in to this console straight away with the email and password below.</SheetDescription>
+          </SheetHeader>
+          <div>
+            <label htmlFor="staff-name" className="block text-sm font-medium text-ink-800">
+              Full name
+            </label>
+            <input id="staff-name" required minLength={2} value={name} onChange={(e) => setName(e.target.value)} className={field} />
+          </div>
+          <div>
+            <label htmlFor="staff-email" className="block text-sm font-medium text-ink-800">
+              Email
+            </label>
+            <input id="staff-email" type="email" required value={email} placeholder="name@findtern.in" onChange={(e) => setEmail(e.target.value)} className={field} />
+          </div>
+          <div>
+            <label htmlFor="staff-password" className="block text-sm font-medium text-ink-800">
+              Temporary password
+            </label>
+            <input id="staff-password" type="password" required minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} className={field} />
+            <p className="mt-1 text-xs text-ink-600">8 or more characters, with upper and lower case letters and a number.</p>
+          </div>
+          <div>
+            <label htmlFor="staff-role" className="block text-sm font-medium text-ink-800">
+              Role
+            </label>
+            <select id="staff-role" value={role} onChange={(e) => setRole(e.target.value)} className={field}>
+              {roles.map((r) => (
+                <option key={r.key} value={r.key}>
+                  {r.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          {error ? (
+            <p role="alert" className="text-sm font-medium text-danger">
+              {error}
+            </p>
+          ) : null}
+          <div className="flex justify-end gap-2 pt-2">
+            <button type="button" onClick={() => onOpenChange(false)} className={buttonClass({ variant: "ghost", size: "sm" })}>
+              Cancel
+            </button>
+            <button type="submit" disabled={busy} className={buttonClass({ variant: "primary", size: "sm" })}>
+              {busy ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <UserPlus className="size-4" aria-hidden />}
+              Add staff
+            </button>
+          </div>
+        </form>
+      </SheetContent>
+    </Sheet>
+  );
+}
 
-              <div>
-                <label htmlFor="staff-password" className="block text-[13px] font-semibold text-ink-800">
-                  Temporary password
-                </label>
-                <input
-                  id="staff-password"
-                  type="password"
-                  required
-                  minLength={8}
-                  value={staffPassword}
-                  placeholder="At least 8 characters"
-                  onChange={(e) => setStaffPassword(e.target.value)}
-                  className={inputClass}
-                />
-              </div>
+function RoleSheet({
+  state,
+  roles,
+  onClose,
+  onSaved,
+}: {
+  state: { mode: "new" } | { mode: "rename"; key: string } | null;
+  roles: RoleDef[];
+  onClose: () => void;
+  onSaved: (role: RoleDef, created: boolean) => void;
+}) {
+  const renaming = state?.mode === "rename" ? roles.find((r) => r.key === state.key) ?? null : null;
+  const [name, setName] = useState("");
+  const [copyFrom, setCopyFrom] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [opened, setOpened] = useState<typeof state>(null);
+  if (opened !== state) {
+    setOpened(state);
+    setName(renaming?.name ?? "");
+    setCopyFrom("");
+    setError(null);
+  }
 
-              <div>
-                <label htmlFor="staff-role" className="block text-[13px] font-semibold text-ink-800">
-                  Role
-                </label>
-                <select
-                  id="staff-role"
-                  value={staffRole}
-                  onChange={(e) => setStaffRole(e.target.value)}
-                  className={inputClass}
-                >
-                  {rolesList.map((r) => (
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    if (renaming) {
+      const result = await call(`/api/admin/roles/${encodeURIComponent(renaming.key)}`, "PUT", { name: name.trim() });
+      setBusy(false);
+      if (!result.ok) return setError(result.error ?? "Not saved.");
+      onSaved({ ...renaming, name: name.trim() }, false);
+      return;
+    }
+    const key = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+    const permissions = copyFrom ? permsOf(roles.find((r) => r.key === copyFrom) ?? { key: "", name: "", permissions: [] }).filter((p) => p !== "*") : [];
+    const result = await call("/api/admin/roles", "POST", { key, name: name.trim(), permissions });
+    setBusy(false);
+    if (!result.ok) return setError(result.error ?? "Not created.");
+    onSaved({ key, name: name.trim(), permissions }, true);
+  }
+
+  return (
+    <Sheet open={Boolean(state)} onOpenChange={(v) => !v && onClose()}>
+      <SheetContent side="right" className="w-full overflow-y-auto p-0 sm:max-w-md">
+        <form onSubmit={submit} className="space-y-4 p-5 sm:p-6">
+          <SheetHeader className="p-0 text-left">
+            <SheetTitle className="text-lg font-semibold text-ink-900">{renaming ? "Rename role" : "New role"}</SheetTitle>
+            <SheetDescription className="text-sm text-ink-600">
+              {renaming ? "Staff in this role keep their access." : "Name it, optionally copy another role's access, then adjust the ticks in the table."}
+            </SheetDescription>
+          </SheetHeader>
+          <div>
+            <label htmlFor="role-name" className="block text-sm font-medium text-ink-800">
+              Name
+            </label>
+            <input id="role-name" required minLength={2} maxLength={60} value={name} placeholder="Finance executive" onChange={(e) => setName(e.target.value)} className={field} />
+          </div>
+          {!renaming ? (
+            <div>
+              <label htmlFor="role-copy" className="block text-sm font-medium text-ink-800">
+                Start from
+              </label>
+              <select id="role-copy" value={copyFrom} onChange={(e) => setCopyFrom(e.target.value)} className={field}>
+                <option value="">No access (tick what it needs)</option>
+                {roles
+                  .filter((r) => r.key !== "super_admin")
+                  .map((r) => (
                     <option key={r.key} value={r.key}>
-                      {r.name}
+                      Same as {r.name}
                     </option>
                   ))}
-                </select>
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setStaffModalOpen(false)}
-                  className="apple-spring apple-pressable inline-flex min-h-11 items-center rounded-[10px] px-4 text-[14px] font-medium text-ink-700 hover:bg-ink-100"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={staffSaving}
-                  className="apple-spring apple-pressable inline-flex min-h-11 items-center gap-1.5 rounded-[10px] bg-brand-700 px-5 text-[14px] font-semibold text-white hover:bg-brand-600 disabled:opacity-50"
-                >
-                  {staffSaving ? (
-                    <Loader2 className="size-4 animate-spin" />
-                  ) : (
-                    <UserPlus className="size-4" />
-                  )}
-                  Add staff
-                </button>
-              </div>
-            </form>
+              </select>
+            </div>
+          ) : null}
+          {error ? (
+            <p role="alert" className="text-sm font-medium text-danger">
+              {error}
+            </p>
+          ) : null}
+          <div className="flex justify-end gap-2 pt-2">
+            <button type="button" onClick={onClose} className={buttonClass({ variant: "ghost", size: "sm" })}>
+              Cancel
+            </button>
+            <button type="submit" disabled={busy || name.trim().length < 2} className={buttonClass({ variant: "primary", size: "sm" })}>
+              {busy ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
+              {renaming ? "Save name" : "Create role"}
+            </button>
           </div>
-        </SheetContent>
-      </Sheet>
-
-      {/* Define role sheet */}
-      <Sheet open={roleModalOpen} onOpenChange={setRoleModalOpen}>
-        <SheetContent side="right" className="apple-admin w-full overflow-y-auto bg-ink-50 p-0 sm:max-w-lg">
-          <div className="space-y-4 p-4 sm:p-6">
-            <SheetHeader className="apple-panel bg-white p-5 text-left">
-              <SheetTitle className="text-[17px] font-semibold tracking-[-0.02em] text-ink-900">
-                {editingRole ? "Edit role" : "New role"}
-              </SheetTitle>
-              <SheetDescription className="text-[13px] text-text-subtle">
-                Pick exactly what this profile can touch.
-              </SheetDescription>
-            </SheetHeader>
-
-            <form onSubmit={handleCreateRole} className="apple-panel space-y-4 bg-white p-5">
-              {roleError ? (
-                <p role="alert" className="rounded-[10px] border border-danger/30 bg-danger-soft p-3 text-[13px] font-medium text-danger">
-                  {roleError}
-                </p>
-              ) : null}
-
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <label htmlFor="role-key" className="block text-[13px] font-semibold text-ink-800">
-                    Key
-                  </label>
-                  <input
-                    id="role-key"
-                    type="text"
-                    required
-                    value={roleKey}
-                    readOnly={Boolean(editingRole)}
-                    placeholder="audit_lead"
-                    onChange={(e) => setRoleKey(e.target.value)}
-                    className={`${inputClass} font-mono`}
-                  />
-                </div>
-                <div>
-                  <label htmlFor="role-name" className="block text-[13px] font-semibold text-ink-800">
-                    Display name
-                  </label>
-                  <input
-                    id="role-name"
-                    type="text"
-                    required
-                    value={roleName}
-                    placeholder="Financial Auditor"
-                    onChange={(e) => setRoleName(e.target.value)}
-                    className={inputClass}
-                  />
-                </div>
-              </div>
-
-              <fieldset>
-                <legend className="text-[13px] font-semibold text-ink-800">
-                  Permissions · {selectedPerms.length} selected
-                </legend>
-                <div className="apple-spring mt-1.5 max-h-64 space-y-1 overflow-y-auto rounded-[10px] border border-ink-200 bg-white p-2">
-                  {ALL_PERMISSIONS.map((perm) => {
-                    const on = selectedPerms.includes(perm.key);
-                    return (
-                      <label
-                        key={perm.key}
-                        className={cn(
-                          "apple-spring flex cursor-pointer items-start gap-3 rounded-[10px] p-2.5",
-                          on ? "bg-brand-50" : "hover:bg-ink-50",
-                        )}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={on}
-                          onChange={() => togglePerm(perm.key)}
-                          className="mt-0.5 size-5 shrink-0 accent-brand-700"
-                        />
-                        <span>
-                          <span className="block text-[14px] font-medium tracking-[-0.01em] text-ink-900">
-                            {perm.label}
-                          </span>
-                          <span className="block font-mono text-[12px] text-text-subtle">
-                            {perm.key}
-                          </span>
-                        </span>
-                      </label>
-                    );
-                  })}
-                </div>
-              </fieldset>
-
-              <div className="flex items-center justify-end gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setRoleModalOpen(false)}
-                  className="apple-spring apple-pressable inline-flex min-h-11 items-center rounded-[10px] px-4 text-[14px] font-medium text-ink-700 hover:bg-ink-100"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={roleSaving}
-                  className="apple-spring apple-pressable inline-flex min-h-11 items-center gap-1.5 rounded-[10px] bg-brand-700 px-5 text-[14px] font-semibold text-white hover:bg-brand-600 disabled:opacity-50"
-                >
-                  {roleSaving ? (
-                    <Loader2 className="size-4 animate-spin" />
-                  ) : (
-                    <Shield className="size-4" />
-                  )}
-                  Save role
-                </button>
-              </div>
-            </form>
-          </div>
-        </SheetContent>
-      </Sheet>
-    </div>
+        </form>
+      </SheetContent>
+    </Sheet>
   );
 }

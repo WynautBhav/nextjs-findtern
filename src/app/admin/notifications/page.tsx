@@ -1,11 +1,14 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { and, desc, count, eq, notInArray, sql } from "drizzle-orm";
 import { searchAny } from "@/lib/admin/params";
 import { AUTO_NOTIFICATION_TYPES } from "@/lib/admin/notification-types";
 import { realEmployers } from "@/lib/admin/scope";
 
 import { getDb, schema } from "@/lib/db";
-import { AdminEmpty, AdminPageHeader, Panel, PanelHeader, PanelBody } from "@/components/admin/panel";
+import { AdminEmpty, AdminLoadError, AdminPageHeader, Panel, PanelHeader, PanelBody } from "@/components/admin/panel";
+import { Pill } from "@/components/app/primitives";
+import { humanizeStatus } from "@/components/admin/status-badge";
 import { NotificationComposer } from "@/components/admin/notification-composer";
 
 export const metadata: Metadata = { title: "Notifications" };
@@ -32,6 +35,29 @@ export default async function AdminNotifications({
   const params = await searchParams;
   const query = Array.isArray(params.q) ? params.q[0] : (params.q ?? "");
 
+  const header = (
+    <AdminPageHeader
+      title="Send notification"
+      subtitle="One message to candidates, companies, or both. It shows in their bell; nothing is emailed."
+    />
+  );
+
+  try {
+    return await render(query, header);
+  } catch (error) {
+    console.error("admin notifications load failed", error);
+    return (
+      <div className="space-y-6">
+        {header}
+        <Panel>
+          <AdminLoadError what="the recipient lists" retryHref="/admin/notifications" />
+        </Panel>
+      </div>
+    );
+  }
+}
+
+async function render(query: string, header: React.ReactNode) {
   const db = getDb();
   // Names as well as emails, every word must match (legacy picker behaviour).
   const internSearch = searchAny([sql`${schema.users.firstName}`, sql`${schema.users.lastName}`, sql`${schema.users.email}`], query);
@@ -101,10 +127,7 @@ export default async function AdminNotifications({
 
   return (
     <div className="space-y-6">
-      <AdminPageHeader
-        title="Send Notification"
-        subtitle="Send one message to candidates, companies, or both. Every send is listed below."
-      />
+      {header}
 
       <NotificationComposer
         interns={interns.map((i) => ({ id: i.id, label: `${i.name} ${i.last}`.trim(), email: i.email }))}
@@ -116,7 +139,8 @@ export default async function AdminNotifications({
       <Panel>
         <PanelHeader
           title="Recently sent"
-          description={`${history.length} most recent notifications across every recipient.`}
+          description="The 15 newest notifications people sent (automatic reminders are left out)."
+          action={<Link href="/admin/notification-history" className="text-sm font-medium text-brand-700 underline-offset-4 hover:underline">Full history</Link>}
         />
         <PanelBody className="p-0">
           {history.length === 0 ? (
@@ -129,15 +153,18 @@ export default async function AdminNotifications({
               {history.map((n) => (
                 <li key={n.id} className="px-5 py-3">
                   <div className="flex flex-wrap items-baseline justify-between gap-2">
-                    <p className="text-sm font-medium text-ink-900">{n.title}</p>
-                    <p className="text-2xs text-ink-600">
-                      {n.recipientType} ·{" "}
+                    <p className="min-w-0 text-sm font-medium text-ink-900">{n.title}</p>
+                    <p className="nums flex items-center gap-2 text-xs text-ink-600">
+                      <Pill tone="closed">{n.recipientType === "employer" ? "Company" : "Candidate"}</Pill>
+                      <Pill tone="neutral">{humanizeStatus(n.type)}</Pill>
                       {n.createdAt
                         ? new Date(n.createdAt).toLocaleString("en-IN", {
-                            day: "numeric",
-                            month: "short",
+                            day: "2-digit",
+                            month: "2-digit",
+                            year: "numeric",
                             hour: "2-digit",
                             minute: "2-digit",
+                            timeZone: "Asia/Kolkata",
                           })
                         : "-"}
                     </p>
