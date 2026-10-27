@@ -79,6 +79,8 @@ export type TimesheetRow = {
 
 export type PayoutRow = {
   id: string;
+  /** Legacy bag: `proposalId` (which placement it pays), `scheduledFor`. */
+  raw?: unknown;
   amountMinor: number | null;
   currency: string | null;
   status: string | null;
@@ -127,26 +129,31 @@ export type ProofSource = {
 export type Stage = "seeking" | "working";
 
 /**
+ * Offer statuses the intern has said yes to. "processing" is legacy's mark
+ * for an accepted offer whose employer started checkout (abandoned
+ * checkouts stay there), so it reads as accepted on intern screens
+ * (INW-21). Money is a different question: only a hire (the company paid)
+ * earns, see `earningsEngagements` in earnings-view.
+ */
+export function isAcceptedStatus(status: string | null | undefined): boolean {
+  const s = (status ?? "").toLowerCase();
+  return s === "accepted" || s === "processing" || s === "hired";
+}
+
+/**
  * A candidate is `working` once an offer is accepted. `hiredAt` is checked
- * first because it is the strongest signal we have, then `accepted`, and
- * `hired` from the legacy status set is honoured so old rows still classify.
+ * first because it is the strongest signal we have, then `accepted` (or
+ * legacy's `processing`), and `hired` from the legacy status set is honoured
+ * so old rows still classify.
  */
 export function deriveStage(proposals: ProposalRow[]): Stage {
-  const live = proposals.some((p) => {
-    if (p.hiredAt) return true;
-    const status = (p.status ?? "").toLowerCase();
-    return status === "accepted" || status === "hired";
-  });
+  const live = proposals.some((p) => Boolean(p.hiredAt) || isAcceptedStatus(p.status));
   return live ? "working" : "seeking";
 }
 
 /** The accepted engagement, which is what the working stage is *about*. */
 export function activeEngagement(proposals: ProposalRow[]): ProposalRow | null {
-  const live = proposals.filter((p) => {
-    if (p.hiredAt) return true;
-    const status = (p.status ?? "").toLowerCase();
-    return status === "accepted" || status === "hired";
-  });
+  const live = proposals.filter((p) => Boolean(p.hiredAt) || isAcceptedStatus(p.status));
   if (live.length === 0) return null;
   return live.sort((a, b) => (b.hiredAt ?? b.createdAt).getTime() - (a.hiredAt ?? a.createdAt).getTime())[0];
 }
@@ -223,7 +230,7 @@ export function buildThread(src: ProofSource, now: Date = new Date()): ThreadNod
         with: withName,
         href: `/intern/proposals/${p.id}`,
       });
-    } else if (p.status === "accepted") {
+    } else if (p.status === "accepted" || p.status === "processing") {
       nodes.push({
         id: `p-accepted-${p.id}`,
         kind: "proposal",
@@ -367,7 +374,8 @@ export function buildThread(src: ProofSource, now: Date = new Date()): ThreadNod
   }
 
   for (const r of src.payouts) {
-    if (r.status === "paid" && r.paidAt) {
+    const payoutStatus = payoutState(r.status);
+    if (payoutStatus === "paid" && r.paidAt) {
       nodes.push({
         id: `r-paid-${r.id}`,
         kind: "payout",
@@ -377,7 +385,18 @@ export function buildThread(src: ProofSource, now: Date = new Date()): ThreadNod
         detail: r.referenceId ? `Reference ${r.referenceId}.` : "Paid in by bank transfer.",
         href: "/intern/earnings",
       });
-    } else {
+    } else if (payoutStatus === "failed") {
+      // INW-04: a failed transfer is not money on its way.
+      nodes.push({
+        id: `r-fail-${r.id}`,
+        kind: "payout",
+        tone: "info",
+        at: r.createdAt,
+        title: "A stipend payment did not go through",
+        detail: "Findtern's team follows up on failed transfers. Check that your bank details are right.",
+        href: "/intern/earnings",
+      });
+    } else if (payoutStatus === "pending") {
       const scheduled = readScheduledFor(r);
       nodes.push({
         id: `r-pend-${r.id}`,
@@ -455,7 +474,7 @@ export function deriveProofs(src: ProofSource): Proof[] {
         at: p.createdAt,
       });
     }
-    if (p.hiredAt || p.status === "accepted" || p.status === "hired") {
+    if (p.hiredAt || isAcceptedStatus(p.status)) {
       const offer = p.offerDetails ?? {};
       out.push({
         id: `pf-offer-${p.id}`,
@@ -595,10 +614,7 @@ export function deriveReadiness(
   const academics = draft?.academics ?? { institution: "", degree: "" };
   const bank = draft?.bank ?? { accountHolderName: "", bankName: "", accountNumber: "", ifscCode: "", upiId: "" };
   const skills = draft?.skills ?? [];
-  const live = proposals.some((p) => {
-    const s = (p.status ?? "").toLowerCase();
-    return s === "accepted" || s === "hired";
-  });
+  const live = proposals.some((p) => isAcceptedStatus(p.status));
 
   return [
     {
@@ -703,31 +719,52 @@ export function readinessFrom(items: ReadinessItem[]): Readiness {
 
 export type Money = {
   paidMinor: number;
+  /** Pending payouts only (legacy "Pending payout"); failed ones are not on their way. */
   incomingMinor: number;
+  /** Transfers that failed, kept apart from paid and pending (INW-04). */
+  failedMinor: number;
   currency: string;
   lastPaidAt: Date | null;
   nextExpectedAt: Date | null;
 };
 
+/**
+ * A payout row's state, as legacy reads it (routes.ts:13490): "paid",
+ * "pending" and "failed", case-insensitive. Anything else is none of the
+ * three and is left out of every total, as legacy did.
+ */
+export function payoutState(status: string | null | undefined): "paid" | "pending" | "failed" | null {
+  const s = (status ?? "").trim().toLowerCase();
+  return s === "paid" || s === "pending" || s === "failed" ? s : null;
+}
+
+/**
+ * Paid, pending and failed, kept apart (INT-01 / INW-04). Only a pending
+ * payout is "on its way"; a failed one used to be added to it.
+ */
 export function deriveMoney(payouts: PayoutRow[]): Money {
   const currency = payouts.find((p) => p.currency)?.currency ?? "INR";
   let paidMinor = 0;
   let incomingMinor = 0;
+  let failedMinor = 0;
   let lastPaidAt: Date | null = null;
   let nextExpectedAt: Date | null = null;
 
   for (const p of payouts) {
-    const amount = p.amountMinor ?? 0;
-    if (p.status === "paid") {
+    const amount = Math.max(0, p.amountMinor ?? 0);
+    const state = payoutState(p.status);
+    if (state === "paid") {
       paidMinor += amount;
       if (p.paidAt && (!lastPaidAt || p.paidAt > lastPaidAt)) lastPaidAt = p.paidAt;
-    } else {
+    } else if (state === "pending") {
       incomingMinor += amount;
       const when = readScheduledForDate(p);
       if (when && (!nextExpectedAt || when < nextExpectedAt)) nextExpectedAt = when;
+    } else if (state === "failed") {
+      failedMinor += amount;
     }
   }
-  return { paidMinor, incomingMinor, currency, lastPaidAt, nextExpectedAt };
+  return { paidMinor, incomingMinor, failedMinor, currency, lastPaidAt, nextExpectedAt };
 }
 
 /* ── Small helpers ─────────────────────────────────────────────────────── */
@@ -822,9 +859,9 @@ function readScheduledFor(r: PayoutRow): string | null {
   return d ? d.toLocaleDateString("en-IN", { day: "numeric", month: "long" }) : null;
 }
 
-function readScheduledForDate(r: PayoutRow): Date | null {
-  const raw = (r as { raw?: { scheduledFor?: unknown } }).raw;
-  const v = raw?.scheduledFor;
+export function readScheduledForDate(r: PayoutRow): Date | null {
+  const raw = r.raw && typeof r.raw === "object" ? (r.raw as { scheduledFor?: unknown; scheduled_for?: unknown }) : null;
+  const v = raw?.scheduledFor ?? raw?.scheduled_for;
   if (typeof v !== "string") return null;
   const d = new Date(v);
   return Number.isNaN(d.getTime()) ? null : d;

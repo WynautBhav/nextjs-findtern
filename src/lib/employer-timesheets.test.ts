@@ -105,3 +105,82 @@ test("without a month, the earliest unlogged started period opens", async () => 
   // Next period not started yet.
   assert.ok("error" in timesheetPeriod(null, "2026-09-10", 3, "2026-10-01", [{ start: "2026-09-10", end: "2026-10-09" }]));
 });
+
+test("the intern editor offers only the four legacy day statuses (INW-05)", async () => {
+  const { LEGACY_DAY_STATUSES, legacyDayStatus, editableDayStatus } = await import("./employer-timesheets.ts");
+  assert.deepEqual([...LEGACY_DAY_STATUSES], ["Present", "Absent", "Fixed off", "Holiday"]);
+  assert.equal(legacyDayStatus("present"), "Present");
+  assert.equal(legacyDayStatus(" Fixed off "), "Fixed off");
+  assert.equal(legacyDayStatus("Leave"), null);
+  // A stored "Leave" still reads, as time away.
+  assert.equal(editableDayStatus("Leave"), "Absent");
+  assert.equal(editableDayStatus("Holiday"), "Holiday");
+  assert.equal(editableDayStatus("Bogus"), "");
+  assert.equal(editableDayStatus(undefined), "");
+});
+
+test("a sheet is complete once every day has a legacy status, hours or not (INW-06/24)", async () => {
+  const { unfilledDays } = await import("./employer-timesheets.ts");
+  const days = ["2026-10-01", "2026-10-02", "2026-10-03"];
+  // No hours anywhere, and a future day marked: still complete.
+  assert.deepEqual(
+    unfilledDays(days, [
+      { date: "2026-10-01", status: "Present", hours: 0 },
+      { date: "2026-10-02T00:00:00.000Z", status: "absent" },
+      { date: "2026-10-03", status: "Holiday" },
+    ]),
+    [],
+  );
+  // Blank, unknown and "Leave" days are still to fill; a missing row too.
+  assert.deepEqual(
+    unfilledDays(days, [
+      { date: "2026-10-01", status: "" },
+      { date: "2026-10-02", status: "Leave" },
+    ]),
+    days,
+  );
+  assert.deepEqual(unfilledDays(days, null), days);
+});
+
+test("a legacy calendar-month sheet never strands days of new-app periods (INW-26)", async () => {
+  const { timesheetPeriod, uncoveredParts } = await import("./employer-timesheets.ts");
+  // Joined 18 Sep for 2 months: periods 18 Sep-17 Oct and 18 Oct-17 Nov.
+  // A legacy sheet for October (1-31 Oct) overlaps both.
+  const legacyOct = [{ start: "2026-10-01", end: "2026-10-31" }];
+  assert.deepEqual(uncoveredParts({ start: "2026-09-18", end: "2026-10-17" }, legacyOct), [
+    { start: "2026-09-18", end: "2026-09-30" },
+  ]);
+  assert.deepEqual(uncoveredParts({ start: "2026-10-18", end: "2026-11-17" }, legacyOct), [
+    { start: "2026-11-01", end: "2026-11-17" },
+  ]);
+  // The days before the legacy sheet open first...
+  assert.deepEqual(timesheetPeriod(null, "2026-09-18", 2, "2026-11-20", legacyOct), {
+    start: "2026-09-18",
+    end: "2026-09-30",
+  });
+  // ...then the days after it.
+  const afterFirst = [...legacyOct, { start: "2026-09-18", end: "2026-09-30" }];
+  assert.deepEqual(timesheetPeriod(null, "2026-09-18", 2, "2026-11-20", afterFirst), {
+    start: "2026-11-01",
+    end: "2026-11-17",
+  });
+  // Every day covered: nothing left to open.
+  const all = [...afterFirst, { start: "2026-11-01", end: "2026-11-17" }];
+  assert.ok("error" in timesheetPeriod(null, "2026-09-18", 2, "2026-11-20", all));
+  // A sheet inside a period splits it in two.
+  assert.deepEqual(uncoveredParts({ start: "2026-10-01", end: "2026-10-31" }, [{ start: "2026-10-10", end: "2026-10-12" }]), [
+    { start: "2026-10-01", end: "2026-10-09" },
+    { start: "2026-10-13", end: "2026-10-31" },
+  ]);
+  // By month: the uncovered part of the picked period.
+  assert.deepEqual(timesheetPeriod("2026-10", "2026-09-18", 2, "2026-11-20", legacyOct), {
+    start: "2026-11-01",
+    end: "2026-11-17",
+  });
+  // No joining date: the calendar month, less what a sheet holds.
+  assert.deepEqual(timesheetPeriod("2026-10", null, 1, "2026-11-20", [{ start: "2026-10-01", end: "2026-10-15" }]), {
+    start: "2026-10-16",
+    end: "2026-10-31",
+  });
+  assert.ok("error" in timesheetPeriod("2026-10", null, 1, "2026-11-20", legacyOct));
+});

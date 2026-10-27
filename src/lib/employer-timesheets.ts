@@ -15,6 +15,53 @@ export const DAY_STATUSES = ["Present", "Leave", "Absent", "Fixed off", "Holiday
 
 export type DayStatus = (typeof DAY_STATUSES)[number];
 
+/**
+ * The four day statuses legacy writes, submits and counts (INW-05). "Leave"
+ * was a new-app addition the legacy submit rejects, so the intern editor
+ * offers only these; a stored "Leave" still reads (see `editableDayStatus`).
+ */
+export const LEGACY_DAY_STATUSES = ["Present", "Absent", "Fixed off", "Holiday"] as const;
+
+export type LegacyDayStatus = (typeof LEGACY_DAY_STATUSES)[number];
+
+/** One of the four legacy statuses, matched case-insensitively as legacy submit did. */
+export function legacyDayStatus(value: unknown): LegacyDayStatus | null {
+  const v = typeof value === "string" ? value.trim().toLowerCase() : "";
+  return LEGACY_DAY_STATUSES.find((s) => s.toLowerCase() === v) ?? null;
+}
+
+/**
+ * The status an editable (draft / sent back) day starts with in the intern
+ * editor. A stored "Leave" was time away, so it becomes "Absent", which is
+ * what legacy and the employer summaries count it as; anything unknown is
+ * blank so the intern picks again.
+ */
+export function editableDayStatus(value: unknown): LegacyDayStatus | "" {
+  const known = legacyDayStatus(value);
+  if (known) return known;
+  return typeof value === "string" && value.trim().toLowerCase() === "leave" ? "Absent" : "";
+}
+
+/**
+ * Days of a period still without a status (INW-06 / INW-24, legacy
+ * routes.ts:13790). A sheet is complete, and can be sent, once every day
+ * carries one of the four legacy statuses. Hours play no part, and days
+ * after today count like any other: legacy let a sheet go once it was
+ * filled, not once the period was over.
+ */
+export function unfilledDays(days: string[], entries: unknown): string[] {
+  const filled = new Set<string>();
+  if (Array.isArray(entries)) {
+    for (const entry of entries) {
+      if (!entry || typeof entry !== "object") continue;
+      const record = entry as { date?: unknown; status?: unknown };
+      const date = typeof record.date === "string" ? record.date.slice(0, 10) : "";
+      if (date && legacyDayStatus(record.status)) filled.add(date);
+    }
+  }
+  return days.filter((day) => !filled.has(day));
+}
+
 export type DayEntry = { date: string; status: string };
 
 export function formatPeriod(start: Date | null, end: Date | null): string {
@@ -120,11 +167,39 @@ export function engagementPeriods(joiningIso: string, contractMonths: number): P
 }
 
 /**
+ * The parts of `period` no sheet in `taken` covers, earliest first.
+ *
+ * INW-26: legacy opened sheets by calendar month (1 Oct to 31 Oct) while
+ * new-app periods follow the joining date (18 Sep to 17 Oct). A legacy sheet
+ * overlaps two new periods, and treating each overlapped period as taken
+ * left 18-30 Sep and 1-17 Nov with no sheet that could ever hold them. The
+ * uncovered parts are what can still be opened.
+ */
+export function uncoveredParts(period: Period, taken: Period[]): Period[] {
+  let parts: Period[] = [period];
+  for (const t of taken) {
+    const next: Period[] = [];
+    for (const p of parts) {
+      if (t.end < p.start || t.start > p.end) {
+        next.push(p);
+        continue;
+      }
+      if (t.start > p.start) next.push({ start: p.start, end: addDaysIso(t.start, -1) });
+      if (t.end < p.end) next.push({ start: addDaysIso(t.end, 1), end: p.end });
+    }
+    parts = next;
+  }
+  return parts.sort((a, b) => a.start.localeCompare(b.start));
+}
+
+/**
  * The period a new timesheet covers. With `month` ("YYYY-MM"), the
  * engagement period that starts in that month, else the one running on its
- * 1st. Without, the earliest period that has started and is not in `taken`
- * (periods already holding a sheet). With no joining date on the offer it
- * falls back to the calendar month. Errors when nothing can be opened.
+ * 1st. Without, the earliest period that has started. Days already on a
+ * sheet in `taken` are cut out (see `uncoveredParts`), so a period that a
+ * legacy calendar-month sheet half covers opens for the other half. With no
+ * joining date on the offer it falls back to the calendar month. Errors when
+ * nothing can be opened.
  */
 export function timesheetPeriod(
   month: string | null,
@@ -134,16 +209,17 @@ export function timesheetPeriod(
   taken: Period[] = [],
 ): Period | { error: string } {
   const joining = joiningIso && /^\d{4}-\d{2}-\d{2}/.test(joiningIso) ? joiningIso.slice(0, 10) : null;
+  const firstStarted = (parts: Period[]) => parts.find((p) => p.start <= todayIso) ?? null;
   if (!joining) {
     const m = month ?? todayIso.slice(0, 7);
     const start = `${m}-01`;
     if (start > todayIso) return { error: "You can't log a month that hasn't started yet." };
-    return { start, end: addDaysIso(addMonthsIso(start, 1), -1) };
+    const open = firstStarted(uncoveredParts({ start, end: addDaysIso(addMonthsIso(start, 1), -1) }, taken));
+    return open ?? { error: "That month already has a timesheet." };
   }
   if (joining > todayIso) return { error: "Your internship hasn't started yet." };
 
   const periods = engagementPeriods(joining, contractMonths);
-  const overlaps = (p: Period) => taken.some((t) => t.start <= p.end && t.end >= p.start);
   if (month) {
     const pick =
       periods.find((p) => p.start.slice(0, 7) === month) ??
@@ -152,11 +228,12 @@ export function timesheetPeriod(
       return { error: month < joining.slice(0, 7) ? "That month is before your joining date." : "Your contract had ended by that month." };
     }
     if (pick.start > todayIso) return { error: "You can't log a period that hasn't started yet." };
-    return pick;
+    return firstStarted(uncoveredParts(pick, taken)) ?? { error: "That period already has a timesheet." };
   }
-  const open = periods.find((p) => p.start <= todayIso && !overlaps(p));
+  const parts = periods.flatMap((p) => uncoveredParts(p, taken));
+  const open = firstStarted(parts);
   if (open) return open;
-  return periods.every((p) => overlaps(p))
+  return parts.length === 0
     ? { error: "Every period of this internship already has a timesheet." }
     : { error: "The next period hasn't started yet." };
 }

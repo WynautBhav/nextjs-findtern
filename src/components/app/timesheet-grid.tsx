@@ -1,55 +1,42 @@
 "use client";
 
 /**
- * Logging hours.
+ * The timesheet editor.
  *
- * There was no hour entry UI at all. The timesheet page could display drafts
- * that something else had created and could submit them, which is a report,
- * not a timesheet. A candidate doing twenty hours a week had nowhere to
- * record the twenty hours.
+ * One row per day of the period. Each day gets one of the four legacy
+ * statuses (Present / Absent / Fixed off / Holiday, INW-05) as large tap
+ * targets, and a Present day that has happened can carry hours and a line
+ * on what was done. On a phone the row stacks (day, then the four
+ * statuses, then hours and note); on a wide screen it is one line.
  *
- * ── Shape of the interaction ───────────────────────────────────────────
+ * Rules, all legacy (INW-06 / INW-24): the sheet goes for approval once
+ * every day has a status. Hours are optional and the period does not have
+ * to be over, so days ahead can be marked too (a planned holiday, the
+ * weekend). Hours and notes stay with days that have happened.
  *
- * A month grid, one cell per weekday, hours typed straight in. The grid is
- * chosen over a form of one row per entry because the work being described is
- * a month of days, and a month is a grid. It also makes a gap visible at a
- * glance, which a list cannot: you can see the Wednesday you did not work
- * without counting rows.
- *
- * ── Autosave, and why it is not a lie ───────────────────────────────────
- *
- * Every change is written immediately and the indicator says which of three
- * things is true: saving, saved, or could not save. A timesheet tool that
- * says "Saved" and then silently fails is worse than one with no autosave,
- * because the candidate has stopped looking. The failure state is explicit and
- * it tells them their work is still on the device and offers a retry.
- *
- * Nothing here is a draft the candidate has to remember to submit. Save is
- * automatic; submit is a separate deliberate act, because submitting is what
- * starts the clock on their manager's review.
- *
- * ── Motion ──────────────────────────────────────────────────────────────
- *
- * The total counts up when it changes, and the submit button is the only
- * thing on the page that moves on its own. Neither is decoration: the first
- * tells them the entry landed, the second tells them the review has started.
+ * Autosave: every change is written after a short pause and the indicator
+ * says which of saving / saved / not saved is true. Sending always saves
+ * first, so what the manager gets is exactly what is on screen, including
+ * the weekend and holiday presets the intern never touched.
  */
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AlertCircle, Check, CloudUpload, Loader2, Minus, Plus } from "lucide-react";
-import { motion, useReducedMotion } from "motion/react";
+import { AlertCircle, Check, CloudUpload, Loader2 } from "lucide-react";
 
 import { csrfFetch } from "@/lib/client-fetch";
-import { DAY_STATUSES } from "@/lib/employer-timesheets";
+import { LEGACY_DAY_STATUSES, editableDayStatus, unfilledDays, type LegacyDayStatus } from "@/lib/employer-timesheets";
 import { defaultDayStatus, holidayName } from "@/lib/holidays";
-import { periodDays, todayIst, weekdayOf } from "@/lib/timesheet-days";
+import { dayParts, periodDays, todayIst, weekdayOf } from "@/lib/timesheet-days";
+import { Pill, Surface } from "@/components/app/primitives";
+import { dayTone } from "@/components/intern/day-status";
+import { buttonClass } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Surface } from "@/components/app/primitives";
 import { cn } from "@/lib/utils";
 
 export type Entry = { date: string; hours: number; note: string; status: string };
 
+type DayState = { date: string; status: LegacyDayStatus | ""; hours: number; note: string; wasLeave: boolean };
 type SaveState = "idle" | "saving" | "saved" | "error";
 
 const MAX_DAILY = 12;
@@ -62,7 +49,7 @@ export function TimesheetGrid({
   status,
   managerNote,
   internNote,
-  expectedHours,
+  backHref,
 }: {
   timesheetId: string;
   periodStart: string | null;
@@ -71,101 +58,53 @@ export function TimesheetGrid({
   status: string;
   managerNote: string | null;
   internNote: string | null;
-  expectedHours: number | null;
+  /** Where to go after the sheet is sent or deleted. */
+  backHref: string;
 }) {
   const router = useRouter();
-  const reduce = useReducedMotion();
-
-  // A sheet the manager sent back can be fixed and resent.
-  const readOnly = status !== "draft" && status !== "rejected";
-  // Today in India, the same clock the API uses for "no future days".
   const todayIso = useMemo(() => todayIst(), []);
-  const [entries, setEntries] = useState<Entry[]>(() =>
-    withDayDefaults(buildDays(periodStart, periodEnd), initialEntries, todayIso),
-  );
-  const [saveState, setSaveState] = useState<SaveState>("idle");
+  const dates = useMemo(() => periodDays(periodStart, periodEnd), [periodStart, periodEnd]);
+
+  const [days, setDays] = useState<DayState[]>(() => initialDays(dates, initialEntries));
   const [note, setNote] = useState(internNote ?? "");
-  const [submitState, setSubmitState] = useState<SaveState>("idle");
-  const [submitError, setSubmitError] = useState("");
-  const timer = useRef<number | null>(null);
-  const inFlight = useRef<Promise<boolean> | null>(null);
+  const [saveState, setSaveState] = useState<SaveState>("idle");
+  const [sendState, setSendState] = useState<"idle" | "sending" | "error">("idle");
+  const [sendError, setSendError] = useState("");
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState("");
+  const timer = useRef<number | null>(null);
+  const inFlight = useRef<Promise<boolean> | null>(null);
+  const dirty = useRef(false);
 
-  const days = useMemo(() => buildDays(periodStart, periodEnd), [periodStart, periodEnd]);
+  const missing = useMemo(() => unfilledDays(dates, days), [dates, days]);
+  const marked = dates.length - missing.length;
+  const counts = useMemo(() => {
+    const out: Record<string, number> = {};
+    for (const d of days) if (d.status) out[d.status] = (out[d.status] ?? 0) + 1;
+    return out;
+  }, [days]);
+  const totalHours = useMemo(() => days.reduce((sum, d) => sum + (Number.isFinite(d.hours) ? d.hours : 0), 0), [days]);
+  const sentBack = status === "rejected";
 
-  // A sheet goes for approval once its last day has arrived; before then the
-  // remaining days cannot be claimed, so it could never be complete.
-  const lastDay = days[days.length - 1]?.date ?? null;
-  const periodOpen = lastDay !== null && lastDay > todayIso;
-  const lastDayLabel = lastDay
-    ? new Date(`${lastDay}T12:00:00Z`).toLocaleDateString("en-IN", { day: "numeric", month: "long", timeZone: "UTC" })
-    : "";
-  const todayInPeriod = days.some((d) => d.date === todayIso);
-  const todayEntry = entries.find((e) => e.date === todayIso);
-  const todayHours = todayEntry?.hours ?? 0;
-  const todayLabel = new Date(`${todayIso}T12:00:00Z`).toLocaleDateString("en-IN", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    timeZone: "UTC",
-  });
-
-  function bumpToday(delta: number) {
-    const next = Math.max(0, Math.min(MAX_DAILY, Math.round((todayHours + delta) * 2) / 2));
+  function update(date: string, patch: Partial<DayState>) {
+    dirty.current = true;
     setSaveState("saving");
-    setHours(todayIso, String(next));
+    setDays((prev) => prev.map((d) => (d.date === date ? { ...d, ...patch, wasLeave: patch.status ? false : d.wasLeave } : d)));
   }
 
-  const total = useMemo(
-    () => entries.reduce((sum, e) => sum + (Number.isFinite(e.hours) ? e.hours : 0), 0),
-    [entries],
-  );
-
-  const knownStatuses = useMemo(() => new Set<string>(DAY_STATUSES), []);
-  /** Days still without a status - sending is blocked until this is zero. */
-  const missingStatus = useMemo(
-    () =>
-      days.filter((day) => !knownStatuses.has(entries.find((e) => e.date === day.date)?.status ?? ""))
-        .length,
-    [days, entries, knownStatuses],
-  );
-
-  const getEntry = (date: string) => entries.find((e) => e.date === date);
-
-  function setHours(date: string, raw: string) {
-    const value = raw === "" ? 0 : Math.max(0, Math.min(MAX_DAILY, Number(raw) || 0));
-    setEntries((prev) => {
-      const found = prev.find((e) => e.date === date);
-      if (!value && !found) return [...prev, { date, hours: value, note: "", status: defaultDayStatus(date) }];
-      if (!found) return [...prev, { date, hours: value, note: "", status: defaultDayStatus(date) }];
-      return prev.map((e) => (e.date === date ? { ...e, hours: value } : e));
-    });
-  }
-
-  function setDayNote(date: string, text: string) {
-    setEntries((prev) => {
-      const found = prev.find((e) => e.date === date);
-      if (!found) return [...prev, { date, hours: 0, note: text, status: defaultDayStatus(date) }];
-      return prev.map((e) => (e.date === date ? { ...e, note: text } : e));
-    });
-  }
-
-  function setDayStatus(date: string, dayStatus: string) {
+  /** Weekdays up to today with no status yet become Present; nothing else changes. */
+  function markWorkdaysPresent() {
+    dirty.current = true;
     setSaveState("saving");
-    setEntries((prev) => {
-      const found = prev.find((e) => e.date === date);
-      if (!found) return [...prev, { date, hours: 0, note: "", status: dayStatus }];
-      return prev.map((e) => (e.date === date ? { ...e, status: dayStatus } : e));
-    });
+    setDays((prev) =>
+      prev.map((d) => (!d.status && d.date <= todayIso && !isWeekend(d.date) ? { ...d, status: "Present" } : d)),
+    );
   }
+  const canBulkMark = days.some((d) => !d.status && d.date <= todayIso && !isWeekend(d.date));
 
-  // Debounced autosave. Long enough that typing "8" does not fire three
-  // requests, short enough that someone who closes the tab immediately after
-  // their last edit still has it.
+  // Debounced autosave: long enough that typing "7.5" is one request.
   useEffect(() => {
-    if (readOnly) return;
-    if (saveState === "idle") return;
+    if (!dirty.current) return;
     if (timer.current) window.clearTimeout(timer.current);
     timer.current = window.setTimeout(() => {
       timer.current = null;
@@ -175,13 +114,14 @@ export function TimesheetGrid({
       if (timer.current) window.clearTimeout(timer.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [entries, note, readOnly, timesheetId]);
+  }, [days, note]);
 
   async function persist(): Promise<boolean> {
+    const body = JSON.stringify({ entries: toEntries(days, todayIso), note });
     const request = csrfFetch(`/api/intern/timesheets/${timesheetId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ entries, note }),
+      body,
     })
       .then((res) => res.ok)
       .catch(() => false);
@@ -192,425 +132,356 @@ export function TimesheetGrid({
     return ok;
   }
 
-  async function submit() {
-    setSubmitState("saving");
-    setSubmitError("");
+  async function send() {
+    setSendState("sending");
+    setSendError("");
+    if (timer.current) {
+      window.clearTimeout(timer.current);
+      timer.current = null;
+    }
     try {
-      // Send exactly what is on screen: flush the pending autosave first.
-      const pendingEdit = timer.current !== null || saveState === "saving" || saveState === "error";
-      if (timer.current) {
-        window.clearTimeout(timer.current);
-        timer.current = null;
-      }
       if (inFlight.current) await inFlight.current;
-      if (pendingEdit && !(await persist())) {
-        setSubmitError("Your latest changes did not save, so nothing was sent.");
-        setSubmitState("error");
+      // Always save first: presets the intern never touched only exist on screen.
+      if (!(await persist())) {
+        setSendError("Your latest changes did not save, so nothing was sent.");
+        setSendState("error");
         return;
       }
-      const res = await csrfFetch(`/api/intern/timesheets/${timesheetId}/submit`, {
-        method: "POST",
-      });
+      const res = await csrfFetch(`/api/intern/timesheets/${timesheetId}/submit`, { method: "POST" });
       if (!res.ok) {
         const json = (await res.json().catch(() => null)) as { error?: string } | null;
-        setSubmitError(json?.error || "That did not send.");
-        setSubmitState("error");
-        setSaveState("error");
+        setSendError(json?.error || "That did not send.");
+        setSendState("error");
         return;
       }
-      setSubmitState("saved");
+      router.push(backHref);
       router.refresh();
     } catch {
-      setSubmitError("That did not send.");
-      setSubmitState("error");
+      setSendError("That did not send. Check your connection.");
+      setSendState("error");
     }
   }
 
+  async function remove() {
+    if (!window.confirm("Delete this timesheet? This cannot be undone.")) return;
+    setDeleting(true);
+    setDeleteError("");
+    try {
+      const res = await csrfFetch(`/api/intern/timesheets/${timesheetId}`, { method: "DELETE" });
+      if (!res.ok) {
+        const json = (await res.json().catch(() => null)) as { error?: string } | null;
+        setDeleteError(json?.error || "Could not delete this timesheet. Try again.");
+        return;
+      }
+      router.push(backHref);
+      router.refresh();
+    } catch {
+      setDeleteError("Could not delete this timesheet. Check your connection and try again.");
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  const firstMissing = missing[0] ?? null;
+  const pct = dates.length ? Math.round((marked / dates.length) * 100) : 0;
+
   return (
-    <Surface className="overflow-hidden">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-ink-100 px-5 py-4">
-        <div>
-          <h2 className="text-base font-semibold tracking-[-0.01em] text-ink-900">
-            {readOnly ? "Hours for this period" : "Log your hours"}
-          </h2>
-          <p className="mt-0.5 text-sm text-ink-600">
-            {readOnly
-              ? "These hours have already been sent, so they are read only."
-              : "Every change saves on its own. Mon–Fri are working days - weekends start as Fixed off and gazetted holidays come pre-marked. Pick a status for every day before sending."}
-          </p>
-        </div>
-        <SaveIndicator state={saveState} readOnly={readOnly} />
-      </div>
-
-      {/* ── Today ────────────────────────────────────────────────────
-          The daily entry point. Same entries state and autosave as the month
-          rows below, so logging today never touches a second code path. */}
-      {!readOnly && todayInPeriod ? (
-        <div className="border-b border-ink-100 bg-brand-50/40 px-5 py-5">
-          <div className="flex flex-wrap items-end justify-between gap-2">
-            <div>
-              <p className="text-[12px] font-semibold tracking-[0.02em] text-brand-700">
-                Today · {todayLabel}
-              </p>
-              <p className="mt-1 text-[17px] font-semibold tracking-[-0.02em] tabular-nums text-ink-900">
-                {todayHours > 0 ? `${todayHours}h logged` : "Log today's hours"}
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => bumpToday(-0.5)}
-                disabled={todayHours <= 0}
-                aria-label="Log half an hour less for today"
-                className="apple-spring apple-pressable grid size-11 place-items-center rounded-[10px] border border-ink-200 bg-white text-ink-700 hover:bg-ink-50 disabled:opacity-40"
-              >
-                <Minus className="size-4" aria-hidden />
-              </button>
-              <button
-                type="button"
-                onClick={() => bumpToday(0.5)}
-                disabled={todayHours >= MAX_DAILY}
-                aria-label="Log half an hour more for today"
-                className="apple-spring apple-pressable grid size-11 place-items-center rounded-[10px] border border-ink-200 bg-white text-ink-700 hover:bg-ink-50 disabled:opacity-40"
-              >
-                <Plus className="size-4" aria-hidden />
-              </button>
-            </div>
-          </div>
-          <label className="sr-only" htmlFor={`n-today-${timesheetId}`}>
-            What you worked on today
-          </label>
-          <input
-            id={`n-today-${timesheetId}`}
-            type="text"
-            value={todayEntry?.note ?? ""}
-            placeholder="What did you work on today?"
-            onChange={(e) => {
-              setSaveState("saving");
-              setDayNote(todayIso, e.target.value);
-            }}
-            className="apple-spring mt-3 h-11 w-full rounded-[10px] border border-ink-200 bg-white px-3 text-sm text-ink-900 placeholder:text-ink-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-200 focus:outline-none"
-          />
-        </div>
-      ) : null}
-
+    <div className="space-y-6">
       {managerNote ? (
-        <div className="border-b border-ink-100 bg-accent-100/40 px-5 py-4">
-          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-accent-700">
-            From your manager
+        <Surface className="border-accent-300/70 bg-accent-100/40 p-5">
+          <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-accent-700">
+            {sentBack ? "Sent back by your manager" : "Your manager's note from last time"}
           </p>
-          <p className="mt-1.5 text-pretty text-sm leading-relaxed text-ink-800">{managerNote}</p>
-        </div>
+          <p className="mt-2 text-pretty text-[0.9375rem] leading-relaxed text-ink-800">{managerNote}</p>
+          <p className="mt-2 text-sm text-ink-600">Fix what they asked for, then send it again.</p>
+        </Surface>
       ) : null}
 
-      {/* ── The grid ─────────────────────────────────────────────── */}
-      <ul className="divide-y divide-ink-100">
-        {days.map((day) => {
-          const entry = getEntry(day.date);
-          const hours = entry?.hours ?? 0;
-          const dayStatus = entry?.status ?? "";
-          const govtHoliday = holidayName(day.date);
-          const isWeekend = day.weekend;
-          const future = day.date > todayIso;
-          const locked = readOnly || future;
-          return (
-            <li key={day.date} className={cn("px-5 py-3", isWeekend && "bg-ink-50/60")}>
-              <div className="grid grid-cols-[4rem_minmax(0,1fr)_minmax(0,1fr)] gap-x-3 gap-y-2 sm:grid-cols-[4rem_6rem_8rem_minmax(0,1fr)] sm:items-center">
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-ink-900">{day.weekday}</p>
-                  <p className="text-xs tabular-nums text-ink-600">{day.label}</p>
-                  {govtHoliday ? (
-                    <p className="mt-0.5 text-2xs font-medium text-sky-700">{govtHoliday}</p>
-                  ) : null}
-                </div>
-
-                <div className="min-w-0">
-                  <label className="sr-only" htmlFor={`h-${day.date}`}>
-                    Hours on {day.weekday} {day.label}
-                  </label>
-                  <div className="relative">
-                    <input
-                      id={`h-${day.date}`}
-                      type="number"
-                      inputMode="decimal"
-                      min={0}
-                      max={MAX_DAILY}
-                      step={0.5}
-                      disabled={locked}
-                      value={hours === 0 ? "" : hours}
-                      placeholder="0"
-                      onChange={(e) => {
-                        setSaveState("saving");
-                        setHours(day.date, e.target.value);
-                      }}
-                      className={cn(
-                        "apple-spring h-11 w-full rounded-[10px] border bg-white pr-8 pl-3 text-sm tabular-nums text-ink-900",
-                        "placeholder:text-ink-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-200 focus:outline-none",
-                        locked && "cursor-not-allowed border-ink-200 bg-ink-50 text-ink-600",
-                      )}
-                    />
-                    <span className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-xs text-ink-600">
-                      h
-                    </span>
-                  </div>
-                </div>
-
-                <div className="min-w-0">
-                  <label className="sr-only" htmlFor={`s-${day.date}`}>
-                    Day status for {day.weekday} {day.label}
-                  </label>
-                  <select
-                    id={`s-${day.date}`}
-                    disabled={locked}
-                    value={dayStatus}
-                    onChange={(e) => setDayStatus(day.date, e.target.value)}
-                    className={cn(
-                      "apple-spring h-11 w-full rounded-[10px] border bg-white px-2 text-xs font-medium text-ink-900",
-                      "focus:border-brand-500 focus:ring-2 focus:ring-brand-200 focus:outline-none",
-                      !dayStatus && "text-ink-600",
-                      locked && "cursor-not-allowed border-ink-200 bg-ink-50 text-ink-600",
-                    )}
-                  >
-                    <option value="">Status…</option>
-                    {DAY_STATUSES.map((option) => (
-                      <option key={option} value={option}>
-                        {option}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="col-span-3 min-w-0 sm:col-span-1">
-                  <label className="sr-only" htmlFor={`n-${day.date}`}>
-                    What you worked on for {day.weekday} {day.label}
-                  </label>
-                  <input
-                    id={`n-${day.date}`}
-                    type="text"
-                    disabled={locked}
-                    value={entry?.note ?? ""}
-                    placeholder={future ? "Not yet" : isWeekend ? "Weekend" : "What did you work on"}
-                    onChange={(e) => {
-                      setSaveState("saving");
-                      setDayNote(day.date, e.target.value);
-                    }}
-                    className={cn(
-                      "apple-spring h-11 w-full rounded-[10px] border bg-white px-3 text-sm text-ink-900",
-                      "placeholder:text-ink-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-200 focus:outline-none",
-                      locked && "cursor-not-allowed border-ink-200 bg-ink-50 text-ink-600",
-                    )}
-                  />
-                </div>
-              </div>
-            </li>
-          );
-        })}
-      </ul>
-
-      {/* ── Total ────────────────────────────────────────────────── */}
-      <div className="flex flex-wrap items-center justify-between gap-4 border-t border-ink-100 bg-ink-50/60 px-5 py-4">
-        <div className="flex items-baseline gap-2">
-          <motion.span
-            key={Math.round(total * 2)}
-            initial={reduce ? false : { opacity: 0.4, y: 3 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-            className="text-2xl font-semibold tabular-nums tracking-[-0.02em] text-ink-900"
-          >
-            {total}
-          </motion.span>
-          <span className="text-sm text-ink-600">hours logged</span>
-          {expectedHours ? (
-            <span className="text-sm text-ink-600">of about {expectedHours}</span>
-          ) : null}
+      {/* ── Progress ─────────────────────────────────────────────── */}
+      <Surface className="p-5 sm:p-6">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-sm font-medium text-ink-600">Days marked</p>
+            <p className="nums mt-1 text-3xl font-semibold leading-tight tracking-[-0.02em] text-ink-900">
+              {marked}
+              <span className="ml-1 text-base font-normal text-ink-600">of {dates.length}</span>
+            </p>
+          </div>
+          <SaveIndicator state={saveState} />
         </div>
+        <div
+          className="mt-4 h-2 w-full overflow-hidden rounded-full bg-ink-100"
+          role="progressbar"
+          aria-label="Days marked"
+          aria-valuemin={0}
+          aria-valuemax={dates.length}
+          aria-valuenow={marked}
+        >
+          <div className="h-full rounded-full bg-brand-600 transition-[width] duration-300 motion-reduce:transition-none" style={{ width: `${pct}%` }} />
+        </div>
+        <ul className="mt-4 flex flex-wrap gap-2" aria-label="Days by status">
+          {LEGACY_DAY_STATUSES.map((s) => (
+            <li key={s}>
+              <Pill tone={dayTone(s)}>
+                {s} <span className="nums">{counts[s] ?? 0}</span>
+              </Pill>
+            </li>
+          ))}
+          {missing.length > 0 ? (
+            <li>
+              <Pill tone="waiting">
+                Not marked <span className="nums">{missing.length}</span>
+              </Pill>
+            </li>
+          ) : null}
+        </ul>
+        {canBulkMark ? (
+          <button type="button" onClick={markWorkdaysPresent} className={buttonClass({ variant: "outline", size: "sm", className: "mt-5 h-auto min-h-11 whitespace-normal py-2 text-left" })}>
+            Mark blank weekdays up to today as Present
+          </button>
+        ) : null}
+      </Surface>
 
-        {!readOnly ? (
-          <div className="flex w-full flex-wrap items-center justify-end gap-x-3 gap-y-2 sm:w-auto">
-            {status === "draft" ? (
-              <button
-                type="button"
-                disabled={deleting}
-                onClick={async () => {
-                  if (!window.confirm("Delete this draft timesheet?")) return;
-                  setDeleting(true);
-                  setDeleteError("");
-                  try {
-                    const res = await csrfFetch(`/api/intern/timesheets/${timesheetId}`, { method: "DELETE" });
-                    if (res.ok) {
-                      router.refresh();
-                    } else {
-                      const json = (await res.json().catch(() => null)) as { error?: string } | null;
-                      setDeleteError(json?.error || "Could not delete this draft. Try again.");
-                    }
-                  } catch {
-                    setDeleteError("Could not delete this draft. Check your connection and try again.");
-                  } finally {
-                    setDeleting(false);
-                  }
-                }}
-                className="inline-flex min-h-11 items-center rounded-[10px] px-3 text-sm font-medium text-danger hover:bg-danger-soft disabled:opacity-55"
+      {/* ── Days ─────────────────────────────────────────────────── */}
+      <Surface as="section" aria-label="Days of this period" className="overflow-hidden">
+        <ul className="divide-y divide-ink-100">
+          {days.map((day) => {
+            const parts = dayParts(day.date);
+            const holiday = holidayName(day.date);
+            const isToday = day.date === todayIso;
+            const future = day.date > todayIso;
+            const label = `${parts.weekday} ${parts.date}`;
+            return (
+              <li
+                key={day.date}
+                id={`day-${day.date}`}
+                className={cn(
+                  "scroll-mt-24 px-4 py-4 sm:px-5 lg:grid lg:grid-cols-[8.5rem_minmax(0,25rem)_minmax(0,1fr)] lg:items-center lg:gap-5",
+                  isWeekend(day.date) && "bg-ink-50/60",
+                  isToday && "bg-brand-50/60",
+                )}
               >
-                {deleting ? "Deleting…" : "Delete draft"}
-              </button>
-            ) : null}
-            {periodOpen ? (
-              <span className="basis-full text-right text-xs font-medium text-ink-600 sm:basis-auto">
-                You can send this from {lastDayLabel}
-              </span>
-            ) : missingStatus > 0 ? (
-              <span className="basis-full text-right text-xs font-medium text-amber-700 sm:basis-auto">
-                {missingStatus} day{missingStatus === 1 ? "" : "s"} still need{missingStatus === 1 ? "s" : ""} a status
-              </span>
-            ) : null}
+                <div className="flex items-baseline justify-between gap-3 lg:block">
+                  <p className="text-sm font-semibold text-ink-900">
+                    {parts.weekday} <span className="nums font-normal text-ink-700">{parts.date}</span>
+                  </p>
+                  <p className="text-xs text-ink-600">
+                    {[isToday ? "Today" : holiday ?? (future ? "Upcoming" : isWeekend(day.date) ? "Weekend" : ""), day.wasLeave ? "was Leave, now Absent" : ""]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </p>
+                </div>
+
+                <div role="group" aria-label={`Status for ${label}`} className="mt-2.5 grid grid-cols-4 gap-1.5 lg:mt-0">
+                  {LEGACY_DAY_STATUSES.map((s) => {
+                    const on = day.status === s;
+                    return (
+                      <button
+                        key={s}
+                        type="button"
+                        aria-pressed={on}
+                        onClick={() => update(day.date, { status: s })}
+                        className={cn(
+                          "apple-spring min-h-11 rounded-apple-sm border px-1 text-sm font-medium leading-tight",
+                          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-1",
+                          on
+                            ? "border-brand-700 bg-brand-700 text-white shadow-xs"
+                            : "border-ink-200/80 bg-white text-ink-700 hover:border-brand-300 hover:bg-brand-50",
+                        )}
+                      >
+                        {s}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {day.status === "Present" && !future ? (
+                  <div className="mt-2.5 flex gap-2 lg:mt-0">
+                    <label className="sr-only" htmlFor={`h-${day.date}`}>
+                      Hours on {label} (optional)
+                    </label>
+                    <div className="relative w-24 shrink-0">
+                      <input
+                        id={`h-${day.date}`}
+                        type="number"
+                        inputMode="decimal"
+                        min={0}
+                        max={MAX_DAILY}
+                        step={0.5}
+                        value={day.hours === 0 ? "" : day.hours}
+                        placeholder="Hours"
+                        onChange={(e) => update(day.date, { hours: clampHours(e.target.value) })}
+                        className="apple-spring nums h-11 w-full rounded-apple-sm border border-ink-200/80 bg-white pl-3 pr-7 text-sm text-ink-900 placeholder:text-ink-500 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200"
+                      />
+                      <span aria-hidden className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-ink-600">
+                        h
+                      </span>
+                    </div>
+                    <label className="sr-only" htmlFor={`n-${day.date}`}>
+                      What you worked on, {label} (optional)
+                    </label>
+                    <input
+                      id={`n-${day.date}`}
+                      type="text"
+                      maxLength={400}
+                      value={day.note}
+                      placeholder="What you did (optional)"
+                      onChange={(e) => update(day.date, { note: e.target.value })}
+                      className="apple-spring h-11 min-w-0 flex-1 rounded-apple-sm border border-ink-200/80 bg-white px-3 text-sm text-ink-900 placeholder:text-ink-500 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200"
+                    />
+                  </div>
+                ) : (
+                  <div className="hidden lg:block" />
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      </Surface>
+
+      {/* ── Note and send ────────────────────────────────────────── */}
+      <Surface className="p-5 sm:p-6">
+        <label htmlFor={`note-${timesheetId}`} className="block text-sm font-medium text-ink-800">
+          Anything your manager should know
+        </label>
+        <p className="mt-0.5 text-sm text-ink-600">Optional. Useful if this period does not fit the normal pattern.</p>
+        <Textarea
+          id={`note-${timesheetId}`}
+          value={note}
+          rows={3}
+          maxLength={2000}
+          placeholder="For example: the design handoff arrived late, so two of these days went on catching up."
+          onChange={(e) => {
+            dirty.current = true;
+            setSaveState("saving");
+            setNote(e.target.value);
+          }}
+          className="mt-2 min-h-24"
+        />
+
+        <div className="mt-6 flex flex-col-reverse gap-4 border-t border-ink-100 pt-5 sm:flex-row sm:items-center sm:justify-between">
+          {/* Legacy rule: a draft can be deleted; a sheet sent back stays on record. */}
+          {status === "draft" ? (
             <button
               type="button"
-              onClick={submit}
-              disabled={submitState === "saving" || total === 0 || missingStatus > 0 || periodOpen}
-              title={
-                periodOpen
-                  ? `This period runs to ${lastDayLabel}`
-                  : missingStatus > 0
-                    ? "Pick a status for every day first"
-                    : undefined
-              }
-              className="apple-spring apple-pressable inline-flex min-h-11 items-center justify-center gap-2 rounded-[10px] bg-primary px-5 text-sm font-semibold text-white shadow-sm hover:bg-primary-hover disabled:pointer-events-none disabled:opacity-55"
+              disabled={deleting}
+              onClick={remove}
+              className={buttonClass({ variant: "ghost", size: "md", className: "text-danger hover:bg-danger-soft" })}
             >
-              {submitState === "saving" ? (
-                <Loader2 className="size-4 animate-spin" aria-hidden />
-              ) : submitState === "saved" ? (
-                <Check className="size-4" aria-hidden />
-              ) : (
-                <CloudUpload className="size-4" aria-hidden />
-              )}
-              {submitState === "saved" ? "Sent for approval" : "Send for approval"}
+              {deleting ? "Deleting…" : "Delete this timesheet"}
+            </button>
+          ) : (
+            <span />
+          )}
+          <div className="flex flex-col items-stretch gap-2 sm:items-end">
+            {missing.length > 0 ? (
+              <p className="text-sm text-ink-600">
+                <span className="nums font-semibold text-ink-900">{missing.length}</span> day{missing.length === 1 ? "" : "s"} still need
+                {missing.length === 1 ? "s" : ""} a status.{" "}
+                {firstMissing ? (
+                  <a href={`#day-${firstMissing}`} className="font-medium text-primary underline-offset-4 hover:underline">
+                    Go to the first one
+                  </a>
+                ) : null}
+              </p>
+            ) : (
+              <p className="text-sm text-ink-600">
+                Every day is marked{totalHours > 0 ? <>, <span className="nums font-semibold text-ink-900">{totalHours}</span> hours logged</> : null}.
+              </p>
+            )}
+            <button
+              type="button"
+              onClick={send}
+              disabled={sendState === "sending" || missing.length > 0}
+              className={buttonClass({ variant: "primary", size: "md", className: "w-full sm:w-auto" })}
+            >
+              {sendState === "sending" ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <CloudUpload className="size-4" aria-hidden />}
+              {sentBack ? "Send again for approval" : "Send for approval"}
             </button>
           </div>
-        ) : null}
-      </div>
-
-      {/* ── Note and submit ─────────────────────────────────────── */}
-      {readOnly && status === "draft" ? null : (
-        <div className="border-t border-ink-100 px-5 py-4">
-          <label htmlFor={`note-${timesheetId}`} className="block text-sm font-medium text-ink-800">
-            Anything your manager should know
-          </label>
-          <p className="mt-0.5 text-sm text-ink-600">
-            Optional. Useful if something in this period does not fit the normal pattern.
-          </p>
-          <Textarea
-            id={`note-${timesheetId}`}
-            value={note}
-            disabled={readOnly}
-            rows={3}
-            placeholder="For example: the design handoff arrived late, so two of these days went on catching up."
-            onChange={(e) => {
-              setSaveState("saving");
-              setNote(e.target.value);
-            }}
-            className="mt-2 min-h-24"
-          />
         </div>
-      )}
 
-      {deleteError ? (
-        <p role="alert" className="flex items-start gap-2 border-t border-ink-100 bg-danger-soft px-5 py-3 text-sm text-danger">
-          <AlertCircle className="mt-px size-4 shrink-0" aria-hidden />
-          {deleteError}
-        </p>
-      ) : null}
-
-      {submitState === "error" ? (
-        <p role="alert" className="flex items-start gap-2 border-t border-ink-100 bg-danger-soft px-5 py-3 text-sm text-danger">
-          <AlertCircle className="mt-px size-4 shrink-0" aria-hidden />
-          {submitError || "That did not send."} Press send again when you are ready.
-        </p>
-      ) : null}
-    </Surface>
+        {sendState === "error" ? (
+          <p role="alert" className="mt-4 flex items-start gap-2 rounded-apple-md bg-danger-soft px-4 py-3 text-sm text-danger">
+            <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden />
+            {sendError} Press send again when you are ready.
+          </p>
+        ) : null}
+        {deleteError ? (
+          <p role="alert" className="mt-4 flex items-start gap-2 rounded-apple-md bg-danger-soft px-4 py-3 text-sm text-danger">
+            <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden />
+            {deleteError}
+          </p>
+        ) : null}
+      </Surface>
+    </div>
   );
 }
 
-function SaveIndicator({ state, readOnly }: { state: SaveState; readOnly: boolean }) {
-  if (readOnly) {
-    return (
-      <span className="inline-flex items-center gap-1.5 text-sm font-medium text-ink-600">
-        <Check className="size-4 text-brand-600" strokeWidth={2.5} aria-hidden />
-        Sent
-      </span>
-    );
-  }
+function SaveIndicator({ state }: { state: SaveState }) {
   if (state === "saving") {
     return (
       <span className="inline-flex items-center gap-1.5 text-sm text-ink-600" aria-live="polite">
-        <Loader2 className="size-4 animate-spin" aria-hidden />
+        <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden />
         Saving
       </span>
     );
   }
   if (state === "saved") {
     return (
-      <motion.span
-        initial={{ opacity: 0.4 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.25 }}
-        className="inline-flex items-center gap-1.5 text-sm font-medium text-success"
-        aria-live="polite"
-      >
+      <span className="inline-flex items-center gap-1.5 text-sm font-medium text-success" aria-live="polite">
         <Check className="size-4" strokeWidth={2.5} aria-hidden />
         Saved
-      </motion.span>
+      </span>
     );
   }
   if (state === "error") {
     return (
       <span className="inline-flex items-center gap-1.5 text-sm font-medium text-danger" aria-live="assertive">
         <AlertCircle className="size-4" aria-hidden />
-        Not saved, retrying
+        Not saved. Your changes are still here; the next edit retries.
       </span>
     );
   }
-  return <span className="text-sm text-ink-600">Autosaves</span>;
+  return <span className="text-sm text-ink-600">Saves as you go</span>;
 }
 
-type Day = { date: string; weekday: string; label: string; weekend: boolean };
+function isWeekend(iso: string): boolean {
+  const w = weekdayOf(iso);
+  return w === 0 || w === 6;
+}
+
+function clampHours(raw: string): number {
+  if (raw === "") return 0;
+  const n = Number(raw);
+  return Number.isFinite(n) ? Math.max(0, Math.min(MAX_DAILY, n)) : 0;
+}
 
 /**
- * Prefills statuses for days the intern never touched: gazetted holidays and
- * weekends get their default, weekdays stay blank to fill in. Runs once for
- * the initial state - it never overwrites a saved status, and nothing is
- * persisted until the next edit or submit.
+ * The editor's starting state: every day of the period, the saved status
+ * read through `editableDayStatus` (a stored "Leave" shows as Absent), and
+ * untouched days preset (weekends Fixed off, gazetted holidays Holiday).
  */
-function withDayDefaults(days: Day[], saved: Entry[], todayIso: string): Entry[] {
-  const byDate = new Map(saved.map((e) => [e.date, e]));
-  return days.map((day) => {
-    const existing = byDate.get(day.date);
-    if (existing) {
-      return { ...existing, status: existing.status ?? "" };
-    }
-    // Future days stay blank: the API refuses a status on a day not yet lived.
-    const preset = day.date > todayIso ? "" : defaultDayStatus(day.date);
-    if (!preset) return { date: day.date, hours: 0, note: "", status: "" };
-    return { date: day.date, hours: 0, note: "", status: preset };
+function initialDays(dates: string[], saved: Entry[]): DayState[] {
+  const byDate = new Map(saved.map((e) => [e.date.slice(0, 10), e]));
+  return dates.map((date) => {
+    const e = byDate.get(date);
+    const stored = editableDayStatus(e?.status);
+    const wasLeave = typeof e?.status === "string" && e.status.trim().toLowerCase() === "leave";
+    return {
+      date,
+      status: stored || defaultDayStatus(date),
+      hours: typeof e?.hours === "number" ? e.hours : 0,
+      note: typeof e?.note === "string" ? e.note : "",
+      wasLeave,
+    };
   });
 }
 
-/**
- * Every day between two dates, inclusive, as calendar days (UTC date math on
- * the stored bounds - see timesheet-days.ts for why local time added a day).
- *
- * Weekends are rendered too, dimmed. A grid with holes where the weekend is
- * hides the most common reason a month looks short, which is that someone
- * simply did not work Saturday, and that is not a gap worth feeling bad about.
- */
-function buildDays(startIso: string | null, endIso: string | null): Day[] {
-  return periodDays(startIso, endIso).map((date) => {
-    const weekdayIndex = weekdayOf(date);
-    const noonUtc = new Date(`${date}T12:00:00Z`);
-    return {
-      date,
-      weekday: noonUtc.toLocaleDateString("en-IN", { weekday: "short", timeZone: "UTC" }),
-      label: String(noonUtc.getUTCDate()),
-      weekend: weekdayIndex === 0 || weekdayIndex === 6,
-    };
+/** What is saved: hours and notes only on Present days that have happened. */
+function toEntries(days: DayState[], todayIso: string): Entry[] {
+  return days.map((d) => {
+    const keep = d.status === "Present" && d.date <= todayIso;
+    return { date: d.date, status: d.status, hours: keep ? d.hours : 0, note: keep ? d.note.slice(0, 400) : "" };
   });
 }

@@ -22,9 +22,9 @@ const bodySchema = z.object({
   internNote: z.string().max(2000).optional(),
 });
 
-/** One blank row per day, from the same walk the editor and submit use. */
+/** One blank row per day, legacy shape `{ date, status: "" }` plus the hours and note this app adds. */
 function generateMonthEntries(start: string, end: string) {
-  return periodDays(start, end).map((date) => ({ date, hours: 0, note: "" }));
+  return periodDays(start, end).map((date) => ({ date, status: "", hours: 0, note: "" }));
 }
 
 /** Create a draft timesheet for one engagement month of a hired placement. */
@@ -67,7 +67,9 @@ export async function POST(req: Request) {
 
   // Periods follow the engagement's own months from the joining date; with
   // no month given, the earliest started period without a sheet is opened.
-  // A one-month engagement therefore has exactly one period by construction.
+  // Days an existing sheet already holds (a legacy calendar-month sheet can
+  // cover half of two periods) are cut out, so no day is left unloggable
+  // (INW-26).
   const existingSheets = await db
     .select({ periodStart: schema.timesheets.periodStart, periodEnd: schema.timesheets.periodEnd })
     .from(schema.timesheets)

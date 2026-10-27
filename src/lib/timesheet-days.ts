@@ -49,3 +49,35 @@ export function todayIst(now: Date = new Date()): string {
     day: "2-digit",
   }).format(now);
 }
+
+/**
+ * A period by its calendar days: "18 Oct – 17 Nov 2026", "1 – 31 Oct 2026",
+ * "18 Dec 2026 – 17 Jan 2027". Read in UTC, like `periodDays`, so the
+ * stored end (23:59:59.999Z) never shows as the next day.
+ */
+export function formatPeriodDays(start: Date | string | null, end: Date | string | null): string {
+  if (!start || !end) return "";
+  const a = new Date(`${toDay(start)}T12:00:00Z`);
+  const b = new Date(`${toDay(end)}T12:00:00Z`);
+  if (Number.isNaN(a.getTime()) || Number.isNaN(b.getTime())) return "";
+  const sameYear = a.getUTCFullYear() === b.getUTCFullYear();
+  const sameMonth = sameYear && a.getUTCMonth() === b.getUTCMonth();
+  const left = sameMonth
+    ? String(a.getUTCDate())
+    : a.toLocaleDateString("en-IN", { day: "numeric", month: "short", ...(sameYear ? {} : { year: "numeric" }), timeZone: "UTC" });
+  const right = b.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+  return `${left} – ${right}`;
+}
+
+/** "Mon" and "12 Oct" for one `YYYY-MM-DD` day. */
+export function dayParts(iso: string): { weekday: string; date: string } {
+  const d = new Date(`${iso}T12:00:00Z`);
+  return {
+    weekday: d.toLocaleDateString("en-IN", { weekday: "short", timeZone: "UTC" }),
+    date: d.toLocaleDateString("en-IN", { day: "numeric", month: "short", timeZone: "UTC" }),
+  };
+}
+
+function toDay(value: Date | string): string {
+  return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : isoDay(value);
+}
