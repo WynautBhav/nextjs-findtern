@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { applyRatings, readRatingsSheet } from "./ratings.ts";
+import { aiInterviewToClose, applyRatings, readRatingsSheet } from "./ratings.ts";
 
 test("bulk sheet: legacy headers, quoted cells, bad values flagged", () => {
   const rows = readRatingsSheet('email,communication,coding,aptitude,ai interview,findternScore\r\n"A@x.com",8,7,6,7,7.5\r\nb@x.com,11,,,,\r\n');
@@ -37,4 +37,16 @@ test("headers match ignoring case, spaces, dashes and underscores", () => {
   assert.equal(rows[0].email, "x@y.com");
   assert.equal(rows[0].updates.interview, 7);
   assert.equal(rows[0].score, 7);
+});
+
+test("score going live closes only the latest AI interview (ADP-22)", () => {
+  const d = (s: string) => new Date(s);
+  const rows = [
+    { id: "old", status: "missed", createdAt: d("2026-01-01") },
+    { id: "new", status: "scheduled", createdAt: d("2026-03-01") },
+    { id: "mid", status: "cancelled", createdAt: d("2026-02-01") },
+  ];
+  assert.equal(aiInterviewToClose(rows)?.id, "new");
+  assert.equal(aiInterviewToClose([{ id: "a", status: "completed", createdAt: d("2026-03-01") }, rows[0]]), null);
+  assert.equal(aiInterviewToClose([]), null);
 });

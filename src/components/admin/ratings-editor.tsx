@@ -14,6 +14,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 
+import { buttonClass } from "@/components/ui/button";
 import { csrfFetch } from "@/lib/client-fetch";
 
 const AXES = [
@@ -90,14 +91,12 @@ export function RatingsEditor({
   }
 
   return (
-    <div className="border-t border-ink-100 pt-3">
+    <div>
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-text-subtle">
-          AI interview ratings & Incruiter reports
-        </p>
-        <p className="text-2xs text-ink-600">
+        <p className="text-sm font-medium text-ink-700">AI interview ratings and Incruiter report</p>
+        <p className="text-sm text-ink-600">
           Findtern Score{" "}
-          <span className="font-semibold tabular-nums text-ink-800">
+          <span className="nums font-semibold text-ink-900">
             {saved !== null ? saved.toFixed(1) : score !== null ? score.toFixed(1) : "-"}
           </span>
           {saved !== null ? " (just recalculated)" : ""}
@@ -107,7 +106,7 @@ export function RatingsEditor({
       <div className="mt-3 grid gap-3 sm:grid-cols-2">
         {AXES.map((axis) => (
           <div key={axis.key}>
-            <label htmlFor={`rating-${axis.key}`} className="block text-xs font-medium text-ink-700">
+            <label htmlFor={`rating-${axis.key}`} className="block text-sm font-medium text-ink-700">
               {axis.label}
             </label>
             <input
@@ -120,7 +119,7 @@ export function RatingsEditor({
               }}
               inputMode="decimal"
               placeholder="0–10"
-              className="mt-1 h-9 w-full rounded-lg border border-ink-200 bg-white px-3 text-sm text-ink-900 outline-none placeholder:text-ink-400 focus-visible:border-brand-600"
+              className="nums mt-1 h-11 w-full rounded-apple-sm border border-ink-200 bg-white px-3 text-sm text-ink-900 outline-none placeholder:text-ink-400 focus-visible:border-brand-600 focus-visible:ring-2 focus-visible:ring-brand-600/20"
             />
           </div>
         ))}
@@ -128,8 +127,8 @@ export function RatingsEditor({
 
       <div className="mt-3 grid gap-3 sm:grid-cols-2">
         <div>
-          <label htmlFor="ai-feedback-link" className="block text-xs font-medium text-ink-700">
-            Incruiter Report Link / PDF URL
+          <label htmlFor="ai-feedback-link" className="block text-sm font-medium text-ink-700">
+            Incruiter report link (PDF URL)
           </label>
           <input
             id="ai-feedback-link"
@@ -140,12 +139,12 @@ export function RatingsEditor({
               setSaved(null);
             }}
             placeholder="https://incruiter.com/reports/... or PDF URL"
-            className="mt-1 h-9 w-full rounded-lg border border-ink-200 bg-white px-3 text-xs text-ink-900 outline-none placeholder:text-ink-400 focus-visible:border-brand-600"
+            className="mt-1 h-11 w-full rounded-apple-sm border border-ink-200 bg-white px-3 text-sm text-ink-900 outline-none placeholder:text-ink-400 focus-visible:border-brand-600 focus-visible:ring-2 focus-visible:ring-brand-600/20"
           />
         </div>
         <div>
-          <label htmlFor="ai-recording-link" className="block text-xs font-medium text-ink-700">
-            Incruiter Interview Recording URL
+          <label htmlFor="ai-recording-link" className="block text-sm font-medium text-ink-700">
+            Incruiter recording link
           </label>
           <input
             id="ai-recording-link"
@@ -156,7 +155,7 @@ export function RatingsEditor({
               setSaved(null);
             }}
             placeholder="https://incruiter.com/recording/..."
-            className="mt-1 h-9 w-full rounded-lg border border-ink-200 bg-white px-3 text-xs text-ink-900 outline-none placeholder:text-ink-400 focus-visible:border-brand-600"
+            className="mt-1 h-11 w-full rounded-apple-sm border border-ink-200 bg-white px-3 text-sm text-ink-900 outline-none placeholder:text-ink-400 focus-visible:border-brand-600 focus-visible:ring-2 focus-visible:ring-brand-600/20"
           />
         </div>
       </div>
@@ -165,15 +164,15 @@ export function RatingsEditor({
         type="button"
         onClick={save}
         disabled={busy}
-        className="mt-3 inline-flex h-9 items-center gap-2 rounded-lg bg-brand-700 px-4 text-sm font-semibold text-white transition-colors hover:bg-brand-600 disabled:opacity-60"
+        className={buttonClass({ variant: "primary", size: "sm", className: "mt-4" })}
       >
         {busy ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : null}
-        Save ratings & links
+        Save ratings and links
       </button>
 
-      {error ? <p className="mt-2 text-xs text-danger">{error}</p> : null}
+      {error ? <p role="alert" className="mt-2 text-sm text-danger">{error}</p> : null}
       {saved !== null ? (
-        <p className="mt-2 text-xs text-brand-700">
+        <p role="status" className="mt-2 text-sm text-brand-700">
           Saved. Employers filtering by score and viewing dossier will see the updated report.
         </p>
       ) : null}
