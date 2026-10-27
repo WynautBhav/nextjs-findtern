@@ -5,7 +5,7 @@ import { z } from "zod";
 import { getDb, schema } from "@/lib/db";
 import { emails, icsInvite } from "@/lib/emails";
 import { initialsOf } from "@/lib/employer-candidates";
-import { formatSlotTime } from "@/lib/format";
+import { formatIst, formatSlotTime } from "@/lib/format";
 import { CALENDAR_TOKEN_OWNER, createMeetEvent } from "@/lib/google";
 import { requireMutation } from "@/lib/guards-mutation";
 import { employerNames, notify } from "@/lib/notify";
@@ -77,7 +77,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     .set({ selectedSlot: parsed.data.slot, status: "scheduled", meetingLink, calendarEventId, updatedAt: new Date() })
     .where(eq(schema.interviews.id, id));
 
+  // Each side reads the time in its own zone: the company in the zone it
+  // booked in, the intern always in India time, labelled IST (INW-09).
   const when = formatSlotTime(start, tz);
+  const whenIst = formatIst(start, { year: true });
   // The intern sees the company's name only once it has hired them.
   const [hire] = await db
     .select({ id: schema.proposals.id })
@@ -118,9 +121,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       to: { type: "intern", id: interview.internId },
       type: "meeting_scheduled",
       title: "Interview scheduled",
-      message: `Your interview with ${companyForIntern} is on ${when}.`,
+      message: `Your interview with ${companyForIntern} is on ${whenIst}.`,
       data: { interviewId: id },
-      email: emails.meetingScheduled({ name: intern?.firstName ?? "", other: companyForIntern, when, link: meetingLink, forEmployer: false }),
+      email: emails.meetingScheduled({ name: intern?.firstName ?? "", other: companyForIntern, when: whenIst, link: meetingLink, forEmployer: false }),
       attachments: [internInvite],
     }),
     notify({

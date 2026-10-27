@@ -1,89 +1,92 @@
 import type { Metadata } from "next";
-import Link from "next/link";
-import { ArrowRight, Calendar, Sparkles } from "lucide-react";
+import { ArrowRight, CalendarClock } from "lucide-react";
+import { eq } from "drizzle-orm";
 
-import { EmptyScene, PageHead, Pill, SectionHead, Surface } from "@/components/app/primitives";
+import { EmptyScene, PageHead, Pill, SectionHead, Surface, type Tone } from "@/components/app/primitives";
 import { SlotPicker } from "@/components/app/slot-picker";
 import { AiFeedbackReport } from "@/components/employer/ai-feedback-report";
-import { aiInterviewLinks } from "@/lib/ai-interview-links";
-import { isMeetingLinkLive, isStaleInterview } from "@/lib/employer-interview-rules";
 import { AiInterviewJoinCard } from "@/components/intern/ai-interview-join-card";
 import { AiInterviewButton } from "@/components/intern/activation-card";
-import { isInternPaid } from "@/lib/payments";
+import { ButtonLink } from "@/components/ui/button";
+import { aiInterviewLinks } from "@/lib/ai-interview-links";
 import { requireRole } from "@/lib/auth";
 import { getDb, schema } from "@/lib/db";
-import { eq } from "drizzle-orm";
-import { loadInternData } from "@/lib/intern-data";
-import { formatDayLabel, formatSlotTime } from "@/lib/format";
-import { slotOf } from "@/lib/journey";
+import { isMeetingLinkLive, isStaleInterview } from "@/lib/employer-interview-rules";
+import { formatIst } from "@/lib/format";
+import { HIDDEN_COMPANY, loadInternData, projectNames } from "@/lib/intern-data";
+import { isPast, slotOf, type InterviewRow } from "@/lib/journey";
 import { readSkillRatings } from "@/lib/onboarding";
+import { isInternPaid } from "@/lib/payments";
 
 export const metadata: Metadata = {
   title: "Interviews & Assessment",
   robots: { index: false, follow: false },
 };
 
+/**
+ * The AI interview and its report first (it is Findtern's, and labelled
+ * "AI Interview", never "Hidden company": bug sheet 7, S1 r63), then company
+ * rounds: the ones to pick a time for or join, then past ones. Every time an
+ * intern reads here is in India time, labelled IST (INW-09, S2 r7).
+ */
 export default async function InternInterviews() {
   const session = await requireRole("intern");
 
   const db = getDb();
-  const [user] = await db
-    .select({ firstName: schema.users.firstName, lastName: schema.users.lastName })
-    .from(schema.users)
-    .where(eq(schema.users.id, session.uid))
-    .limit(1);
+  const [[user], data, paid] = await Promise.all([
+    db
+      .select({ firstName: schema.users.firstName, lastName: schema.users.lastName })
+      .from(schema.users)
+      .where(eq(schema.users.id, session.uid))
+      .limit(1),
+    loadInternData(session.uid),
+    isInternPaid(session.uid),
+  ]);
 
   const candidateName = user ? `${user.firstName || ""} ${user.lastName || ""}`.trim() || "Candidate" : "Candidate";
 
-  const [data, paid] = await Promise.all([loadInternData(session.uid), isInternPaid(session.uid)]);
-
   // The AI interview is the row owned by Findtern's AI interviewer (newest
   // first); everything else is a company round.
-  const isAi = (i: (typeof data.interviews)[number]) => data.aiEmployerIds.has(i.employerId);
+  const isAi = (i: InterviewRow) => data.aiEmployerIds.has(i.employerId);
   const aiInterview = data.interviews.find(isAi);
+  const company = data.interviews.filter((i) => !isAi(i));
+  const projects = await projectNames(company.map((i) => i.projectId ?? ""));
 
-  // An open invite whose slots have all passed is expired, not upcoming. A
-  // booked meeting stays upcoming, with its Join link, until the link window
-  // closes (legacy: slot + 60 min), not the moment it starts.
-  const joinable = (i: (typeof data.interviews)[number]) => Boolean(i.selectedSlot) && isMeetingLinkLive(i);
-  const upcomingEmployerInterviews = data.interviews.filter(
-    (i) => !isAi(i) && (i.status === "scheduled" || i.status === "pending") && (!isStaleInterview(i) || joinable(i)),
+  // A booked meeting stays upcoming, with its Join button, until the link
+  // window closes (legacy: slot + 60 min), not the moment it starts. An open
+  // invite whose times have all passed is over.
+  const joinable = (i: InterviewRow) => Boolean(i.selectedSlot) && isMeetingLinkLive(i);
+  const upcoming = company.filter(
+    (i) => (i.status === "scheduled" || i.status === "pending") && (!isStaleInterview(i) || joinable(i)),
   );
-  const past = data.interviews.filter(
-    (i) => !isAi(i) && (i.status === "completed" || i.status === "missed" || (isStaleInterview(i) && !joinable(i))),
-  );
+  const past = company.filter((i) => !upcoming.includes(i) && i.status !== "draft");
 
   const extra = (data.onboarding?.extraData ?? {}) as Record<string, unknown>;
   const findternScore = Number(extra.findternScore ?? 0);
-  const ratings = (extra.ratings ?? {}) as {
-    communication?: number;
-    coding?: number;
-    aptitude?: number;
-    interview?: number;
-  };
+  const ratings = (extra.ratings ?? {}) as { communication?: number; coding?: number; aptitude?: number; interview?: number };
   const skills = readSkillRatings(data.onboarding?.skills, extra).map((s) => s.name);
-
   // Legacy admin kept these on the AI interview row's notes only.
   const { feedbackLink: aiFeedbackLink, recordingLink: aiRecordingLink } = await aiInterviewLinks(session.uid, extra);
 
+  const companyLine = (i: InterviewRow) => {
+    const name = data.names[i.employerId];
+    return name && name !== HIDDEN_COMPANY ? name : "Company shared after hire";
+  };
+  const titleOf = (i: InterviewRow) => (i.projectId && projects[i.projectId]) || "Company interview";
+
   return (
-    <div className="space-y-8">
+    <div className="space-y-10">
       <PageHead
-        title="Interviews & AI Evaluation"
-        lede="Your AI interview, your Findtern Score, and any interview rounds with companies."
+        title="Interviews"
+        lede="Your AI interview and Findtern Score, and the interview rounds companies book with you. Times are in India time (IST)."
       />
 
-      {/* Assessment section */}
+      {/* ── AI interview ───────────────────────────────────────────── */}
       <section className="space-y-4">
-        <SectionHead
-          title="AI interview"
-          action={<Sparkles className="size-4 text-brand-600" aria-hidden />}
-        />
+        <SectionHead title="AI Interview" hint="Findtern's own interview. It produces the score companies see." />
 
-        {/* No AI interview yet and no score: this page is where a candidate
-            looks for it, so the request lives here as well as on Home. */}
         {!aiInterview && !(findternScore > 0) ? (
-          <Surface className="p-5 sm:p-6">
+          <Surface className="p-6">
             <h3 className="text-base font-semibold tracking-[-0.01em] text-ink-900">Your AI interview</h3>
             {paid ? (
               <>
@@ -97,25 +100,23 @@ export default async function InternInterviews() {
                 <p className="mt-1 text-sm leading-relaxed text-ink-600">
                   The AI interview opens once the one-time activation is paid. It produces your Findtern Score.
                 </p>
-                <Link
-                  href="/intern/dashboard"
-                  className="apple-spring apple-pressable mt-4 inline-flex min-h-11 items-center gap-2 rounded-[10px] bg-primary px-5 text-sm font-semibold text-white hover:bg-primary-hover"
-                >
+                <ButtonLink href="/intern/dashboard" variant="primary" className="mt-4 text-sm font-semibold">
                   Go to activation
                   <ArrowRight className="size-4" aria-hidden />
-                </Link>
+                </ButtonLink>
               </>
             )}
           </Surface>
         ) : null}
 
-        {aiInterview && (
+        {aiInterview ? (
           <AiInterviewJoinCard
             interviewId={aiInterview.id}
             status={aiInterview.status}
             meetingLink={aiInterview.meetingLink}
+            updatedAt={toIso((aiInterview as InterviewRow & { updatedAt?: Date | null }).updatedAt)}
           />
-        )}
+        ) : null}
 
         <AiFeedbackReport
           candidateName={candidateName}
@@ -133,110 +134,85 @@ export default async function InternInterviews() {
         />
       </section>
 
-      {/* Company Interviews */}
-      <section className="space-y-6">
-        <SectionHead
-          title="Employer interview rounds"
-          action={<Calendar className="size-4 text-brand-600" aria-hidden />}
-        />
+      {/* ── Company rounds ─────────────────────────────────────────── */}
+      <section className="space-y-4">
+        <SectionHead title="Company interviews" hint="Pick a time when a company invites you. Join from here when it is time." />
 
-        {upcomingEmployerInterviews.length === 0 ? (
+        {upcoming.length === 0 ? (
           <EmptyScene
             art
-            title="No employer interviews scheduled yet"
-            body="When companies review your Findtern scorecard and send proposals, their interview time options will appear right here."
-            who="Offers come first"
-            next={{ label: "Browse open roles", href: "/intern/opportunities" }}
+            title="No company interviews right now"
+            body="When a company wants to talk before sending an offer, it sends up to three times here. You pick one, in India time, and join from this page."
+            who="Companies invite you"
+            next={{ label: "Look at open roles", href: "/intern/opportunities" }}
           />
         ) : (
-          <div className="space-y-6">
-            {upcomingEmployerInterviews.map((interview) => {
-              // Keep each slot's column number (1..3): select-slot reads by
-              // position, so an empty slot 1 must not renumber slot 2 as 1.
-              const slots = [interview.slot1, interview.slot2, interview.slot3].flatMap((d, i) =>
-                d instanceof Date ? [{ index: i + 1, iso: d.toISOString() }] : [],
+          <ul className="space-y-4">
+            {upcoming.map((i) => {
+              const slots = [i.slot1, i.slot2, i.slot3].flatMap((d, n) =>
+                // Keep each slot's column number (1..3): select-slot reads by
+                // position, so an empty slot 1 must not renumber slot 2.
+                d instanceof Date ? [{ index: n + 1, iso: d.toISOString(), passed: isPast(d) }] : [],
               );
-              const company = data.names[interview.employerId] ?? "the company";
+              const booked = Boolean(i.selectedSlot);
               return (
-                <Surface key={interview.id} className="p-6">
-                  <div className="mb-4 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-                    <div>
-                      <Pill tone="live">Coming up</Pill>
-                      <h3 className="mt-1.5 text-base font-semibold tracking-[-0.01em] text-ink-900">
-                        Interview with {company}
-                      </h3>
+                <li key={i.id}>
+                  <Surface as="article" className="p-5 sm:p-6">
+                    <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <h3 className="text-pretty text-base font-semibold tracking-[-0.01em] text-ink-900">{titleOf(i)}</h3>
+                        <p className="mt-0.5 text-sm text-ink-600">{companyLine(i)}</p>
+                      </div>
+                      {booked ? <Pill tone="live">Booked</Pill> : slots.length > 0 ? <Pill tone="waiting">Pick a time</Pill> : <Pill tone="neutral">Times to follow</Pill>}
                     </div>
-                    {interview.status === "pending" ? (
-                      <Pill tone="waiting">Waiting on their time slots</Pill>
+                    {slots.length > 0 ? (
+                      <SlotPicker
+                        interviewId={i.id}
+                        slots={slots}
+                        timezone={i.timezone}
+                        chosen={i.selectedSlot}
+                        meetUrl={isMeetingLinkLive(i) ? i.meetingLink : null}
+                      />
                     ) : (
-                      <Pill tone="live">Scheduled</Pill>
+                      <p className="text-pretty text-sm leading-relaxed text-ink-600">
+                        The company has not sent its times yet. Nothing to do now; they appear here as soon as they are set.
+                      </p>
                     )}
-                  </div>
-
-                  {slots.length > 0 ? (
-                    <SlotPicker
-                      interviewId={interview.id}
-                      slots={slots}
-                      timezone={interview.timezone}
-                      chosen={interview.selectedSlot}
-                      meetUrl={isMeetingLinkLive(interview) ? interview.meetingLink : null}
-                    />
-                  ) : (
-                    <p className="text-pretty text-xs leading-relaxed text-ink-600">
-                      {company} has not sent the times yet. There is nothing to do, and they will
-                      appear here the moment they are set.
-                    </p>
-                  )}
-                </Surface>
+                  </Surface>
+                </li>
               );
             })}
-          </div>
+          </ul>
         )}
 
-        {/* Past rounds and feedback show whether or not anything is upcoming. */}
         {past.length > 0 ? (
-          <div className="mt-6 space-y-3">
-            <SectionHead title="Completed & past rounds" />
+          <div className="pt-4">
+            <SectionHead title={`Past interviews · ${past.length}`} />
             <ul className="space-y-3">
-              {past.map((interview) => {
-                const company = data.names[interview.employerId] ?? "the company";
-                const when = slotOf(interview) ?? interview.createdAt;
-                const missed = interview.status === "missed";
-                const expired = isStaleInterview(interview);
+              {past.map((i) => {
+                const outcome = pastOutcome(i);
+                const feedback = feedbackText(i.notes);
                 return (
-                  <li key={interview.id}>
-                    <Surface className="p-5">
-                      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-                        <h3 className="text-sm font-semibold tracking-[-0.01em] text-ink-900">
-                          {company}
-                        </h3>
-                        <p className="text-xs text-ink-600">
-                          {formatDayLabel(when)} at{" "}
-                          {formatSlotTime(when, interview.timezone).split(", ").slice(-1)[0]}
-                        </p>
+                  <li key={i.id}>
+                    <Surface as="article" className="p-5">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <h3 className="text-pretty text-sm font-semibold text-ink-900">{titleOf(i)}</h3>
+                          <p className="mt-0.5 text-sm text-ink-600">{companyLine(i)}</p>
+                        </div>
+                        <Pill tone={outcome.tone}>{outcome.label}</Pill>
                       </div>
-
-                      {expired ? (
-                        <p className="mt-3 text-pretty text-xs leading-relaxed text-ink-600">
-                          Every proposed time passed before a slot was confirmed, so this invite expired.
-                        </p>
-                      ) : missed ? (
-                        <p className="mt-3 text-pretty text-xs leading-relaxed text-ink-600">
-                          This round was marked as missed. Message the company directly if you want to reschedule.
-                        </p>
-                      ) : feedbackText(interview.notes) ? (
-                        <div className="mt-3 rounded-xl border border-brand-200 bg-brand-50/50 p-4">
-                          <p className="text-xs font-semibold text-brand-800">
-                            Feedback from the company
-                          </p>
-                          <p className="mt-1 text-xs leading-relaxed text-ink-800">
-                            {feedbackText(interview.notes)}
-                          </p>
+                      <p className="nums mt-3 flex items-center gap-1.5 text-sm text-ink-700">
+                        <CalendarClock className="size-4 text-ink-500" aria-hidden />
+                        {i.selectedSlot || outcome.label !== "Expired" ? formatIst(slotOf(i) ?? i.createdAt, { year: true }) : "No time was picked"}
+                      </p>
+                      {outcome.label === "Interview done" && feedback ? (
+                        <div className="mt-3 rounded-apple-lg bg-brand-50/70 p-4 ring-1 ring-inset ring-brand-200/70">
+                          <p className="text-xs font-semibold text-brand-800">Feedback from the company</p>
+                          <p className="mt-1 text-pretty text-sm leading-relaxed text-ink-800">{feedback}</p>
                         </div>
                       ) : (
-                        <p className="mt-3 text-pretty text-xs leading-relaxed text-ink-600">
-                          Interview done. No written feedback yet.
-                        </p>
+                        <p className="mt-2 text-pretty text-sm leading-relaxed text-ink-600">{outcome.detail}</p>
                       )}
                     </Surface>
                   </li>
@@ -247,24 +223,50 @@ export default async function InternInterviews() {
         ) : null}
       </section>
 
-      {/* Tips */}
-      <Surface className="p-5">
-        <SectionHead title="Preparing for an interview" />
-        <p className="mt-1 text-xs leading-relaxed text-ink-600">
-          Review your assessment results before a technical round - they show your scores across coding, communication, and problem-solving, which is exactly what the interviewer has seen.
-        </p>
-        <div className="mt-3">
-          <Link
-            href="/intern/record"
-            className="apple-spring apple-pressable inline-flex min-h-11 items-center gap-1.5 rounded-[10px] border border-ink-200 bg-ink-50 px-3.5 text-xs font-semibold text-ink-800 hover:bg-ink-100"
-          >
-            <span>View your verified record</span>
-            <ArrowRight className="size-3" />
-          </Link>
+      <Surface className="flex flex-col items-start gap-4 p-6 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <h2 className="text-base font-semibold tracking-[-0.01em] text-ink-900">Preparing for a company interview</h2>
+          <p className="mt-1 max-w-xl text-pretty text-sm leading-relaxed text-ink-600">
+            Companies see your AI interview scores before they meet you. Look over your record so you know what they have seen.
+          </p>
         </div>
+        <ButtonLink href="/intern/record" variant="outline" className="text-sm">
+          Your verified record
+          <ArrowRight className="size-4" aria-hidden />
+        </ButtonLink>
       </Surface>
     </div>
   );
+}
+
+function toIso(d: Date | string | null | undefined): string | null {
+  if (!d) return null;
+  const date = typeof d === "string" ? new Date(d) : d;
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+
+/**
+ * How a finished company round reads (INW-20): a picked time that has passed
+ * is an interview that happened; an invite nobody picked a time for expired.
+ */
+function pastOutcome(i: InterviewRow): { label: string; tone: Tone; detail: string } {
+  const status = (i.status ?? "").toLowerCase();
+  if (status === "missed") {
+    return {
+      label: "Missed",
+      tone: "closed",
+      // INW-22: no off-platform contact; support handles it.
+      detail: "This round was marked as missed. If that is wrong, write to communicate@findtern.in and we will look into it.",
+    };
+  }
+  if (status === "cancelled") return { label: "Cancelled", tone: "neutral", detail: "This interview was cancelled." };
+  if (status === "completed" || i.selectedSlot) {
+    return { label: "Interview done", tone: "paid", detail: "No written feedback yet. Any offer that follows lands in Offers." };
+  }
+  if (isStaleInterview(i)) {
+    return { label: "Expired", tone: "closed", detail: "Every offered time passed before one was picked, so this invite expired." };
+  }
+  return { label: "Closed", tone: "neutral", detail: "This interview is closed." };
 }
 
 /**
