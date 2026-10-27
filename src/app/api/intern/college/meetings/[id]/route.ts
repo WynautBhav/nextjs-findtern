@@ -25,6 +25,10 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   if (effectiveStatus(m) !== "requested") {
     return NextResponse.json({ error: "This request has already closed" }, { status: 409 });
   }
+  // Rows made before QA-001 could have no link; accepting one leads nowhere.
+  if (parsed.data.action === "accept" && !m.meetingLink) {
+    return NextResponse.json({ error: "This call has no meeting link. Ask the employer to send a new request." }, { status: 409 });
+  }
   const [row] = await db
     .update(schema.collegeDriveMeetings)
     .set({ status: parsed.data.action === "accept" ? "accepted" : "declined", respondedAt: new Date() })

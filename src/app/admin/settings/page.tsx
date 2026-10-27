@@ -5,7 +5,7 @@ import { CalendarDays } from "lucide-react";
 import { AdminLoadError, AdminPageHeader, Panel, PanelHeader } from "@/components/admin/panel";
 import { StatusBadge } from "@/components/admin/status-badge";
 import { buttonClass } from "@/components/ui/button";
-import { CALENDAR_TOKEN_OWNER } from "@/lib/google";
+import { calendarConnected as checkCalendar } from "@/lib/calendar-status";
 import { AdminPricingEditor, type EditablePlan } from "@/components/admin/admin-pricing-editor";
 import { getDb, schema } from "@/lib/db";
 import { getInternActivationFeeMinor } from "@/lib/platform-settings";
@@ -48,23 +48,8 @@ async function loadPricing(): Promise<{ plans: EditablePlan[]; activationFeeMino
   }
 }
 
-/** null = couldn't check (shown as such, never as "not connected"). */
-async function calendarState(): Promise<boolean | null> {
-  try {
-    const [token] = await getDb()
-      .select({ refresh: schema.employerGoogleTokens.refreshToken })
-      .from(schema.employerGoogleTokens)
-      .where(eq(schema.employerGoogleTokens.employerId, CALENDAR_TOKEN_OWNER))
-      .limit(1);
-    return Boolean(token?.refresh);
-  } catch (e) {
-    console.error("[admin/settings] calendar token check failed", e);
-    return null;
-  }
-}
-
 export default async function AdminSettingsPage() {
-  const [pricing, calendarConnected] = await Promise.all([loadPricing(), calendarState()]);
+  const [pricing, calendarConnected] = await Promise.all([loadPricing(), checkCalendar()]);
 
   return (
     <div className="space-y-8">

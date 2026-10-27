@@ -19,3 +19,12 @@ lines only.
 - Actual: `drive_meetings.meeting_link` is null; the student's card shows
   no Join button.
 - Trace: not yet (tester to attach on retest).
+- Status (builder, 28 Oct): fixed, awaiting retest (wp/opus, fix(QA-001)).
+  `requestMeeting` refuses with "Calendar not connected; ask Findtern to
+  connect it." when no link can be made (no row is written, so no
+  notification goes out); accepting a call that has no link is refused (409)
+  for older rows; the admin dashboard lists "Google calendar not connected"
+  first when Google is configured with no `CALENDAR_TOKEN_OWNER` token, or
+  when production has no Google config. college-partners.e2e under
+  `next start` now asserts the refusal and skips accept/join/cancel with a
+  reason (7 pass, 2 skipped); on `next dev`, 9/9.

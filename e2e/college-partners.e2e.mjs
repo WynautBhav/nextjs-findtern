@@ -5,6 +5,10 @@
  *   2. Employer opens the link signed out, signs in, enters, shortlists Sana
  *      and asks for a call now.
  *   3. Sana (phone-sized screen) sees the call, accepts, gets the join link.
+ *      Without a meeting link source (a production build with no Google
+ *      calendar connected) the request is refused instead (QA-001): the suite
+ *      asserts the refusal, checks Sana gets no call, and skips the accept,
+ *      join and cancel steps, saying why.
  *   4. Officer sees the call and Sana online, then closes the link; the
  *      employer is locked out at once.
  *
@@ -25,6 +29,9 @@ const BASE = process.env.E2E_BASE ?? "http://localhost:3200";
 const DB = process.env.E2E_DATABASE_URL ?? "postgresql://findtern:findtern_dev@localhost:5433/findtern";
 const PASSWORD = "Findtern@2026";
 const T = 30_000;
+/** False once the server refuses the call for want of a calendar (QA-001). */
+let calendar = true;
+const NO_CALENDAR = "no meeting link source: the server refused the call (QA-001), as it should without a calendar";
 
 let browser;
 let tpo; // officer page
@@ -111,7 +118,10 @@ test("employer: shortlists and asks for a call now", async () => {
   await card.getByRole("button", { name: /from shortlist$/ }).waitFor();
   await card.getByRole("button", { name: /Call/ }).click();
   await emp.getByRole("menuitem", { name: "Now" }).click();
-  await emp.getByRole("status").filter({ hasText: "Call request sent" }).waitFor();
+  const sent = emp.getByRole("status").filter({ hasText: "Call request sent" });
+  const refused = emp.getByRole("alert").filter({ hasText: "Calendar not connected; ask Findtern to connect it." });
+  await sent.or(refused).first().waitFor();
+  calendar = await sent.isVisible();
 });
 
 test("student: sees the call on a phone and accepts", async () => {
@@ -120,6 +130,12 @@ test("student: sees the call on a phone and accepts", async () => {
   await stu.goto(`${BASE}/intern/dashboard`);
   await stu.getByText(/E2E campus drive is live/).waitFor();
   const call = stu.getByRole("alertdialog");
+  if (!calendar) {
+    // A refused request leaves nothing for the student to accept.
+    await stu.waitForTimeout(1500);
+    assert.equal(await call.count(), 0, "no call card without a meeting link");
+    return;
+  }
   await call.waitFor();
   assert.match(await call.innerText(), /now/i);
   await call.getByRole("button", { name: "Accept" }).click();
@@ -130,13 +146,15 @@ test("student: sees the call on a phone and accepts", async () => {
   assert.equal(overflow, false, "no sideways scroll on the phone");
 });
 
-test("employer: the call shows as accepted with a join link", async () => {
+test("employer: the call shows as accepted with a join link", async (t) => {
+  if (!calendar) return t.skip(NO_CALENDAR);
   await emp.reload();
   await emp.getByText("Accepted").first().waitFor();
   await emp.getByRole("link", { name: "Join call" }).first().waitFor();
 });
 
-test("employer: can cancel the call; the student's card goes away", async () => {
+test("employer: can cancel the call; the student's card goes away", async (t) => {
+  if (!calendar) return t.skip(NO_CALENDAR);
   const calls = emp.locator('section[aria-labelledby="calls-title"]');
   await calls.getByRole("button", { name: "Cancel" }).first().click();
   await emp.getByRole("status").filter({ hasText: "Call cancelled" }).waitFor();
@@ -151,7 +169,7 @@ test("officer: sees Sana online and the employer inside; closes the link", async
   await tpo.goto(`${BASE}${drivePath}`);
   const main = tpo.locator("main");
   await main.getByText("Northwind Labs").waitFor();
-  assert.match(await main.innerText(), /1 shortlisted · 1 call/);
+  assert.match(await main.innerText(), calendar ? /1 shortlisted · 1 call\b/ : /1 shortlisted · 0 calls/);
   await main.getByText(/^1\s*\/1$/).waitFor(); // presence: 1 of 1 eligible online
   tpo.once("dialog", (d) => d.accept());
   await tpo.getByRole("button", { name: "Close link now" }).click();
