@@ -199,11 +199,14 @@ export function splitGst(
   return { baseMinor, cgstMinor: 0, sgstMinor: 0, igstMinor: taxMinor, totalMinor, mode: "inter" };
 }
 
-/** Seller GSTIN from env; null when unset so invoices say so instead of
- *  printing a made-up number. */
+/** Findtern's registered GSTIN (legacy invoices; owner-confirmed 26 Oct). */
+export const DEFAULT_SELLER_GSTIN = "08AAGCF2512F1Z0";
+
+/** Seller GSTIN: env, else the registered one; null only when malformed, so
+ *  invoices say so instead of printing a bad number. */
 export function sellerGstin(): string | null {
-  const v = (typeof process !== "undefined" ? process.env.FINDTERN_GSTIN : undefined)?.trim();
-  return v && /^[0-9]{2}[A-Z0-9]{13}$/.test(v) ? v : null;
+  const v = (typeof process !== "undefined" ? process.env.FINDTERN_GSTIN : undefined)?.trim() || DEFAULT_SELLER_GSTIN;
+  return /^[0-9]{2}[A-Z0-9]{13}$/.test(v) ? v : null;
 }
 
 export function sellerStateCode(): string {

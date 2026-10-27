@@ -173,7 +173,9 @@ export async function payableCheckout(
         charge: dues.has(proposal.id)
           ? lineCharge(offer, score, "monthly", { firstPayment: false })
           : lineCharge(offer, score, opts.mode),
-        monthlyCharge: lineCharge(offer, score, "monthly"),
+        // What one month costs here: no hiring fee on a later instalment, or
+        // the summary shows more than the order route charges.
+        monthlyCharge: lineCharge(offer, score, "monthly", { firstPayment: !dues.has(proposal.id) }),
         due: dues.get(proposal.id) ?? null,
         currency: offer.currency,
       };

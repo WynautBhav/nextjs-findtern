@@ -190,60 +190,61 @@ export default async function InternInterviews() {
                 </Surface>
               );
             })}
-
-            {past.length > 0 ? (
-              <div className="space-y-3 pt-2">
-                <SectionHead title="Completed & past rounds" />
-                <ul className="space-y-3">
-                  {past.map((interview) => {
-                    const company = data.names[interview.employerId] ?? "the company";
-                    const when = slotOf(interview) ?? interview.createdAt;
-                    const missed = interview.status === "missed";
-                    const expired = isStaleInterview(interview);
-                    return (
-                      <li key={interview.id}>
-                        <Surface className="p-5">
-                          <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-                            <h3 className="text-sm font-semibold tracking-[-0.01em] text-ink-900">
-                              {company}
-                            </h3>
-                            <p className="text-xs text-ink-600">
-                              {formatDayLabel(when)} at{" "}
-                              {formatSlotTime(when, interview.timezone).split(", ").slice(-1)[0]}
-                            </p>
-                          </div>
-
-                          {expired ? (
-                            <p className="mt-3 text-pretty text-xs leading-relaxed text-ink-600">
-                              Every proposed time passed before a slot was confirmed, so this invite expired.
-                            </p>
-                          ) : missed ? (
-                            <p className="mt-3 text-pretty text-xs leading-relaxed text-ink-600">
-                              This round was marked as missed. Message the company directly if you want to reschedule.
-                            </p>
-                          ) : feedbackText(interview.notes) ? (
-                            <div className="mt-3 rounded-xl border border-brand-200 bg-brand-50/50 p-4">
-                              <p className="text-xs font-semibold text-brand-800">
-                                Feedback from the company
-                              </p>
-                              <p className="mt-1 text-xs leading-relaxed text-ink-800">
-                                {feedbackText(interview.notes)}
-                              </p>
-                            </div>
-                          ) : (
-                            <p className="mt-3 text-pretty text-xs leading-relaxed text-ink-600">
-                              Interview done. No written feedback yet.
-                            </p>
-                          )}
-                        </Surface>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            ) : null}
           </div>
         )}
+
+        {/* Past rounds and feedback show whether or not anything is upcoming. */}
+        {past.length > 0 ? (
+          <div className="mt-6 space-y-3">
+            <SectionHead title="Completed & past rounds" />
+            <ul className="space-y-3">
+              {past.map((interview) => {
+                const company = data.names[interview.employerId] ?? "the company";
+                const when = slotOf(interview) ?? interview.createdAt;
+                const missed = interview.status === "missed";
+                const expired = isStaleInterview(interview);
+                return (
+                  <li key={interview.id}>
+                    <Surface className="p-5">
+                      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                        <h3 className="text-sm font-semibold tracking-[-0.01em] text-ink-900">
+                          {company}
+                        </h3>
+                        <p className="text-xs text-ink-600">
+                          {formatDayLabel(when)} at{" "}
+                          {formatSlotTime(when, interview.timezone).split(", ").slice(-1)[0]}
+                        </p>
+                      </div>
+
+                      {expired ? (
+                        <p className="mt-3 text-pretty text-xs leading-relaxed text-ink-600">
+                          Every proposed time passed before a slot was confirmed, so this invite expired.
+                        </p>
+                      ) : missed ? (
+                        <p className="mt-3 text-pretty text-xs leading-relaxed text-ink-600">
+                          This round was marked as missed. Message the company directly if you want to reschedule.
+                        </p>
+                      ) : feedbackText(interview.notes) ? (
+                        <div className="mt-3 rounded-xl border border-brand-200 bg-brand-50/50 p-4">
+                          <p className="text-xs font-semibold text-brand-800">
+                            Feedback from the company
+                          </p>
+                          <p className="mt-1 text-xs leading-relaxed text-ink-800">
+                            {feedbackText(interview.notes)}
+                          </p>
+                        </div>
+                      ) : (
+                        <p className="mt-3 text-pretty text-xs leading-relaxed text-ink-600">
+                          Interview done. No written feedback yet.
+                        </p>
+                      )}
+                    </Surface>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        ) : null}
       </section>
 
       {/* Tips */}

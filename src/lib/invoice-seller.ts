@@ -2,15 +2,16 @@ import { sellerGstin } from "@/lib/gst";
 import type { InvoiceSeller } from "@/lib/invoice";
 
 /**
- * The supplier block on every invoice, from env so the real GSTIN and
- * registered address never live in source. Server-only: client invoice
- * views receive this as a prop.
+ * The supplier block on every invoice. Env overrides; the defaults are the
+ * legacy invoice's details (owner-confirmed 26 Oct), so a missed env var
+ * can't put "GSTIN: not configured" on a tax invoice. Server-only: client
+ * invoice views receive this as a prop.
  */
 export function getInvoiceSeller(): InvoiceSeller {
   return {
     name: process.env.FINDTERN_LEGAL_NAME?.trim() || "Findtern Private Limited",
-    address: process.env.FINDTERN_BILLING_ADDRESS?.trim() || "Rajasthan, India",
+    address: process.env.FINDTERN_BILLING_ADDRESS?.trim() || "386, Jagatpura, Jaipur, Rajasthan (302017)",
     gstin: sellerGstin(),
-    email: process.env.FINDTERN_BILLING_EMAIL?.trim() || "billing@findtern.in",
+    email: process.env.FINDTERN_BILLING_EMAIL?.trim() || "admin@findtern.in",
   };
 }
