@@ -21,7 +21,10 @@
     "e2e": "node e2e/run.mjs",
     "shots": "PORT=3100 DATABASE_URL=postgresql://findtern:findtern_dev@localhost:5432/findtern SESSION_SECRET=verify-only-secret-at-least-32-characters node --experimental-strip-types scripts/shots.ts",
     "db:seed-colleges": "DATABASE_URL=${DATABASE_URL:-postgresql://findtern:findtern_dev@localhost:5432/findtern} node --experimental-strip-types scripts/seed-colleges.ts",
-    "test:e2e:college": "node --test e2e/college-partners.e2e.mjs"
+    "test:e2e:college": "node --test e2e/college-partners.e2e.mjs",
+    "qa": "node e2e/qa.mjs",
+    "qa:serve": "node e2e/qa-serve.mjs",
+    "qa:seed": "node e2e/seed-situations.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1152.0",
@@ -43,6 +46,8 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.14.0",
+    "@lhci/cli": "^0.15.1",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/nodemailer": "^8.0.2",
