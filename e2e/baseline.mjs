@@ -3,7 +3,7 @@
  * Baseline screenshots of every route at 390 / 768 / 1440, jpeg q60, so a
  * redesign can be diffed against what shipped before it.
  *
- *   node e2e/baseline.mjs                    -> docs/qa/baseline/
+ *   node e2e/baseline.mjs                    -> docs/qa/current/
  *   node e2e/baseline.mjs --out=docs/qa/after   (same set, for the after side)
  *
  * Signed in as the three main personas (the QA copy is scrubbed: no real
@@ -24,7 +24,7 @@ import { loginState } from "./lib/session.mjs";
 import { execFileSync } from "node:child_process";
 
 const arg = (n) => process.argv.find((a) => a.startsWith(`--${n}=`))?.split("=")[1];
-const OUT = join(ROOT, arg("out") ?? "docs/qa/baseline");
+const OUT = join(ROOT, arg("out") ?? "docs/qa/current");
 const WIDTHS = (arg("widths") ?? "390,768,1440").split(",").map(Number);
 const MAX_H = 6000;
 const QUALITY = 60;

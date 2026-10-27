@@ -14,7 +14,7 @@ carry a real person, an address, a port, or a credential.
 | `e2e/motion.e2e.mjs` | `prefers-reduced-motion` run of the dashboards |
 | `e2e/slow3g.e2e.mjs` | slow-3G + 4x CPU run of the dashboards |
 | `e2e/lighthouse.mjs` | Lighthouse CI (mobile preset) on the dashboards → `docs/qa/lighthouse.md` |
-| `e2e/baseline.mjs` | screenshots of every route at 390 / 768 / 1440 → `docs/qa/baseline/` |
+| `e2e/baseline.mjs` | screenshots of every route at 390 / 768 / 1440 → `docs/qa/current/` (the builder keeps the pre-redesign set in `docs/qa/baseline/`; this never writes there) |
 | `docs/qa/bug-ledger.md` | every defect, with ID, severity, steps, trace, screenshot |
 | `docs/qa/bug-sheet-7-results.md` | pass / fail for every row of bug sheet 7 |
 | `.github/workflows/ci.yml` | tsc, lint, test, test:security, migrate, seed, build, e2e on a Postgres service |
@@ -65,7 +65,7 @@ QA_REBUILD=1 npm run qa          # rebuild first; do this after any src/ change
 npm run qa -- crawl --quick      # one step; --quick = 375 and 1440 only
 npm run qa -- crawl --browsers=chromium --only=/admin/ --personas=admin
 npm run qa -- lighthouse         # LH_RUNS=3 by default
-npm run qa -- baseline --out=docs/qa/after
+npm run qa -- baseline --out=docs/qa/after   # default output is docs/qa/current
 ```
 
 The server listens on `QA_PORT` (3500). Its environment is fixed: `MAIL_MODE=log`
