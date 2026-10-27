@@ -134,3 +134,10 @@ branch, not to be touched: `feat/college-partners` (worktree
   (nextjs-findtern-6a) does WP1 college merge + WP2 design on `wp/opus`;
   Sonnet session (nextjs-findtern-1a) does WP3 harness, WP4 test pass and
   WP6 CI on `wp/qa`.
+- 28 Oct: WP1 merged (`a2b8de1`): College Partners is in, the college role
+  runs on ConsoleShell, migrations 0000–0007 (both 0007 files) rehearsed on
+  a fresh 27 Oct copy. Found by Opus: `src/lib/college/meetings.ts` hands out
+  a Jitsi stand-in link only when NODE_ENV != production, so a production
+  build without the Google calendar token gives accepted campus-drive calls
+  NO join link. Launch-day item: connect the calendar (`CALENDAR_TOKEN_OWNER`)
+  before the first drive, and QA-log it as P1 if the UI shows an empty link.
