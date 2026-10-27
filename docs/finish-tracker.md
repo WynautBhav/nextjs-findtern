@@ -87,3 +87,42 @@ branch, not to be touched: `feat/college-partners` (worktree
   security 79/79, build green. Waiting on the intern worker and the peer's
   e2e suite (C). The admin worker's out-of-scope list is in
   docs/handoff/HANDOFF-nextjs-findtern-9a.md §3.
+- 27 Oct: **end-to-end suite green on the merged, restyled build.** `npm run e2e`
+  against `findtern_live` (447 users, migrated 0000–0007): 19/19, every step
+  asserting DB rows and emails. Seven suite assumptions were stale, not product
+  bugs — all corrected in the suite:
+  - intern signup needs a personal domain (legacy allowlist, `shared/schema.ts:9`);
+  - a project needs 4–7 skills (legacy);
+  - onboarding has two steppers (desktop + `lg:hidden`), so `.first()` was hidden;
+  - Aadhaar image is mandatory (bug sheet 7, NC r18);
+  - "Request my AI interview" is now "Apply for the AI interview";
+  - "Choose this" is now "Pick this time";
+  - payout create takes `scheduledFor` as `YYYY-MM-DD` and `opsNote`.
+  Verified by the run: password stored as argon2 (never plaintext), OTP consumed,
+  uploads re-encoded to WebP, score 8.0 → ₹200/hr, monthly amount in rupees not
+  paise, offer email never names the company, no company name reaches the intern
+  before hire, timesheet approval notifies, stipend email sent.
+- 27 Oct: **working hours now come from the calendar** (`workingDaysInMonth`,
+  `scheduledMonthlyHours(schedule, leaves, monthRef)`). Mon–Sat October 2026 is
+  27 working days (216 h), February 2026 is 24 (192 h); the flat 26-average
+  charged both 208 h. Wired to the offer's start month in offer creation, offer
+  edits, and both composer previews; no date → published average (unchanged).
+  Deliberate limit: later instalments still bill the figure in the accepted
+  offer (legacy reads the same field); month-by-month instalments are a policy
+  change, not done.
+- 27 Oct: reviewed the owner's follow-up list (book meeting, timezone, sidebar,
+  open-roles initials, "ask for a new one", IST/DST, calendar hours, redirect
+  after send, proposal gate during interview). Nine of ten were already shipped
+  by the area merges; only calendar hours was missing. Evidence per item above
+  in the code: `suggestedSlots`, `timezoneForLocation`, `ConsoleShell`,
+  `CompanyInitials`, `slot-picker`, `format.test.ts` DST pins,
+  `send-proposal-form` redirect, candidate page + cart + API 409 gate.
+
+## Open findings from the e2e pass
+- [ ] **`pricing_plans` is empty on the migrated live DB** (legacy never had the
+      table; only `scripts/seed.ts` fills it). Pricing correctly falls back to
+      the published bands (`lib/score.ts`), but Admin → "Pricing and fees" will
+      render empty until the rate card is seeded on production. Decide whether
+      to seed it at cutover or leave the bands as the only rate card.
+- [ ] A local `.env` still points at the production database; the e2e refuses it, but any
+      `next start` must override env in-process.

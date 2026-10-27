@@ -47,7 +47,9 @@ const PASSWORD = "E2e-Pass#2026";
 const INTERN = {
   firstName: "Ira",
   lastName: `Testwala${letters(NOW, 4).toLowerCase()}`,
-  email: `e2e-intern-${RUN}@e2e-mail.test`,
+  // Personal mailbox: intern signup enforces legacy's personal-domain list
+  // (shared/schema.ts:9 in FindTern), and .test is not on it.
+  email: `e2e-intern-${RUN}@gmail.com`,
   phone: phone(9),
   emergencyPhone: phone(6),
   aadhaar: `2${String(NOW).slice(-11)}`,
@@ -126,7 +128,7 @@ async function shot(name) {
 /** A nav link only that role's area has (several names: the UI is being restyled). */
 const INTERN_NAV = /\b(offers|interviews|stipend|timesheets)\b/i;
 const EMPLOYER_NAV = /\b(proposals|candidates|schedule)\b/i;
-const ADMIN_NAV = /candidate directory|hiring partners|intern disbursements|\binterns\b/i;
+const ADMIN_NAV = /\b(candidates|payouts|companies|proposals)\b/i;
 
 /** The role area renders for this role (no bounce to a login page). */
 async function assertRoleArea(page, path, navName) {
@@ -192,17 +194,20 @@ step("intern: signs up through the form, code read from the mail log [UI]", [], 
   state.internId = user.id;
 });
 
-step("intern: completes onboarding (photo + PAN uploads, final submit) [API]", ["internId"], async () => {
+step("intern: completes onboarding (photo + Aadhaar + PAN uploads, final submit) [API]", ["internId"], async () => {
   const page = pages.intern;
   await visit(page, "/intern/onboarding");
-  await page.getByText(/step 1 of/i).first().waitFor();
+  // The page renders the stepper twice (desktop header, lg:hidden phones);
+  // .first() picks the hidden one.
+  await page.getByText(/step 1 of/i).filter({ visible: true }).first().waitFor();
 
-  for (const kind of ["profile_photo", "pan"]) {
+  // Aadhaar image is mandatory (bug sheet 7, NEW CHANGES r18).
+  for (const kind of ["profile_photo", "aadhaar", "pan"]) {
     const res = await upload(page, { kind, base64: pngBase64(), type: "image/png", name: `${kind}.png` });
     expectOk(`POST /api/uploads (${kind})`, res, [201]);
   }
-  const docs = await one(`SELECT profile_photo_name, pan_image_name, pan_image_type FROM intern_document WHERE user_id = $1`, [state.internId]);
-  assert.ok(docs?.profile_photo_name && docs.pan_image_name, "photo and PAN stored on intern_document");
+  const docs = await one(`SELECT profile_photo_name, aadhaar_image_name, pan_image_name, pan_image_type FROM intern_document WHERE user_id = $1`, [state.internId]);
+  assert.ok(docs?.profile_photo_name && docs.aadhaar_image_name && docs.pan_image_name, "photo, Aadhaar and PAN stored on intern_document");
   assert.equal(docs.pan_image_type, "image/webp", "uploaded images are re-encoded to WebP");
 
   const skills = ["Python", "SQL", "React", "Data Analysis"];
@@ -292,7 +297,7 @@ step("intern: requests the AI interview [UI]", ["internActivated"], async (t) =>
     '"Request my AI interview"',
     async () => {
       await visit(page, "/intern/dashboard");
-      const res = await clickFor(page, page.getByRole("button", { name: /request my ai interview/i }), { path: applyPath, method: "POST" });
+      const res = await clickFor(page, page.getByRole("button", { name: /apply for the ai interview/i }), { path: applyPath, method: "POST" });
       expectOk(`POST ${applyPath}`, res);
     },
     async () => expectOk(`POST ${applyPath}`, await api(page, "POST", applyPath)),
@@ -411,7 +416,8 @@ step("employer: company setup + first project (onboarding) [API]", ["employerId"
 
   const project = await api(page, "POST", `/api/employer/${state.employerId}/projects`, {
     projectName: `Ops dashboards ${RUN}`,
-    skills: ["Python", "SQL"],
+    // Legacy: a project needs at least 4 skills and at most 7.
+    skills: ["Python", "SQL", "React", "Data Analysis"],
     scopeOfWork: "upto-60",
     fullTimeOffer: false,
     locationType: "remote",
@@ -473,7 +479,7 @@ step("intern: picks a slot on /intern/interviews [UI]", ["interviewId"], async (
       await visit(page, "/intern/interviews");
       const body = await page.locator("body").innerText();
       assert.ok(!body.includes(EMPLOYER.companyName), "interviews page hides the company before hire");
-      const res = await clickFor(page, page.getByRole("button", { name: /choose this/i }).first(), { path, method: "POST" });
+      const res = await clickFor(page, page.getByRole("button", { name: /pick this time/i }).first(), { path, method: "POST" });
       expectOk(`POST ${path}`, res);
     },
     async () => expectOk(`POST ${path}`, await api(page, "POST", path, { slot: 1 })),
@@ -539,7 +545,17 @@ step("employer: sends an offer (proposal; offer_details money in rupees) [API]",
   assert.equal(p.currency, "INR", "an Indian company is billed in INR");
   const o = p.offer_details;
   const plans = (await rows(`SELECT price_hourly_minor FROM pricing_plans WHERE is_active AND currency = 'INR'`)).map((r) => r.price_hourly_minor);
-  assert.ok(plans.includes(Math.round(o.hourlyRate * 100)), `hourlyRate ${o.hourlyRate} is rupees of an active INR plan (${plans.join(", ")} paise)`);
+  // The rate card is admin-authored; a migrated live DB has no rows (legacy
+  // never had the table), so the published bands in lib/score.ts price it:
+  // under 6 -> ₹0, under 8 -> ₹100, else ₹200 an hour.
+  if (plans.length) {
+    assert.ok(plans.includes(Math.round(o.hourlyRate * 100)), `hourlyRate ${o.hourlyRate} is rupees of an active INR plan (${plans.join(", ")} paise)`);
+  } else {
+    const scored = await one(`SELECT extra_data FROM intern_onboarding WHERE user_id = $1`, [state.internId]);
+    const score = scored.extra_data.findternScore;
+    const bandRate = score < 6 ? 0 : score < 8 ? 100 : 200;
+    assert.equal(o.hourlyRate, bandRate, `no rate-card rows: ${score} scores ₹${bandRate}/hr from the published bands`);
+  }
   assert.equal(o.monthlyAmount, Math.round(o.hourlyRate * o.monthlyHours * 100) / 100, "monthlyAmount = hourlyRate x monthlyHours, in rupees");
   assert.ok(o.monthlyAmount < 1_000_000, `monthlyAmount ${o.monthlyAmount} looks like rupees, not paise`);
   const mail = await waitForMail(INTERN.email, { since: SINCE, subject: /new internship proposal/i });
@@ -661,7 +677,9 @@ step("employer: approves the timesheet on /employer/timesheets/[id] [UI]", ["tim
     '"Approve"',
     async () => {
       await visit(page, `/employer/timesheets/${state.timesheetId}`);
-      const res = await clickFor(page, page.getByRole("button", { name: "Approve", exact: true }), { path, method: "PATCH" });
+      // The decision is a radiogroup that defaults to Approve; the PATCH fires
+      // from the confirm button, not the radio.
+      const res = await clickFor(page, page.getByRole("button", { name: "Approve timesheet" }), { path, method: "PATCH" });
       expectOk(`PATCH ${path}`, res);
     },
     async () => expectOk(`PATCH ${path}`, await api(page, "PATCH", path, { decision: "approved" })),
@@ -683,12 +701,11 @@ step("admin: creates a payout and marks it paid [API]", ["approved", "adminReady
   const created = await api(page, "POST", base, {
     amountMinor: PAYOUT_MINOR,
     currency: "INR",
-    status: "pending",
     method: "bank",
     proposalId: state.proposalId,
-    employerId: state.employerId,
-    scheduledFor: new Date().toISOString(),
-    notes: `e2e ${RUN}`,
+    // Business date, not a timestamp (the route takes YYYY-MM-DD).
+    scheduledFor: new Date().toISOString().slice(0, 10),
+    opsNote: `e2e ${RUN}`,
   });
   const payout = expectOk(`POST ${base}`, created, [201]).payout;
   const ref = `E2E-UTR-${RUN}`;
