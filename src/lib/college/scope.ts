@@ -93,13 +93,16 @@ function cgpaSql() {
  * the per-student counts are correlated subqueries on indexed intern ids.
  */
 async function loadMembers(collegeId: string): Promise<CollegeStudent[]> {
+  // Raw rows: node-postgres reads a plain `timestamp` as *local* time, which
+  // made "last seen" 5h30 stale on an IST server. Every timestamp below is
+  // converted to timestamptz (AT TIME ZONE 'UTC') so it parses as the instant.
   const m = schema.collegeMemberships;
   const u = schema.users;
   const o = schema.internOnboarding;
   const res = await getDb().execute(sql`
     SELECT
       ${m.userId} AS user_id, ${m.collegeId} AS college_id, ${m.status} AS status, ${m.verifiedBy} AS verified_by,
-      ${m.joinedAt} AS joined_at, ${m.leftAt} AS left_at,
+      (${m.joinedAt} AT TIME ZONE 'UTC') AS joined_at, (${m.leftAt} AT TIME ZONE 'UTC') AS left_at,
       coalesce(r.year, ${m.year}) AS year,
       coalesce(nullif(r.branch, ''), nullif(${m.branch}, ''), ${o.extraData}->'academics'->>'specialization') AS branch,
       r.roll_no AS roll_no,
@@ -108,13 +111,13 @@ async function loadMembers(collegeId: string): Promise<CollegeStudent[]> {
       ${cgpaSql()} AS cgpa,
       ${findternScoreSql()} AS score,
       ${aiInterviewStatus()} AS ai_status,
-      p.last_seen_at AS last_seen_at,
+      (p.last_seen_at AT TIME ZONE 'UTC') AS last_seen_at,
       (SELECT count(*) FROM ${schema.proposals} pr WHERE pr.intern_id = ${m.userId} AND ${realEmployerId(sql`pr.employer_id`)}) AS proposals,
       (SELECT count(*) FROM ${schema.proposals} pr WHERE pr.intern_id = ${m.userId} AND pr.status = 'sent' AND ${realEmployerId(sql`pr.employer_id`)}) AS offers_pending,
       (SELECT count(*) FROM ${schema.interviews} iv WHERE iv.intern_id = ${m.userId} AND iv.status = 'scheduled' AND ${realEmployerId(sql`iv.employer_id`)}) AS interviews_scheduled,
       (SELECT count(*) FROM ${schema.collegeDriveMeetings} dm WHERE dm.user_id = ${m.userId}) AS drive_meetings,
-      greatest(p.last_seen_at, ${o.updatedAt},
-        (SELECT max(pr.updated_at) FROM ${schema.proposals} pr WHERE pr.intern_id = ${m.userId})) AS last_activity_at
+      (greatest(p.last_seen_at, ${o.updatedAt},
+        (SELECT max(pr.updated_at) FROM ${schema.proposals} pr WHERE pr.intern_id = ${m.userId})) AT TIME ZONE 'UTC') AS last_activity_at
     FROM ${m}
     JOIN ${u} ON ${u.id} = ${m.userId}
     LEFT JOIN ${o} ON ${o.userId} = ${m.userId}

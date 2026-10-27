@@ -555,7 +555,7 @@ function CallsPanel({
             return (
               <li key={m.id} className="flex items-center gap-3 px-4 py-3">
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold text-ink-900">{nameOf.get(m.userId) ?? "Student"}</p>
+                  <p className="text-sm font-semibold text-ink-900">{nameOf.get(m.userId) ?? "Student"}</p>
                   <p className="nums text-xs text-ink-600">{clock(m.startsAt)}</p>
                 </div>
                 {m.status === "requested" || m.status === "accepted" ? (
