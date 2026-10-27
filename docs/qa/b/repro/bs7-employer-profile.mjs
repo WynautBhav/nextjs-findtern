@@ -1,0 +1,13 @@
+import { open, shot } from "./lib.mjs";
+import { NEHA, body } from "./bs7-employer-lib.mjs";
+const s = await open({ port: 3502, ...NEHA, width: 1440, height: 900, name: "bs7-emp-profile" });
+const p = s.page;
+await p.goto(s.url("/employer/intern/1111f088-9503-4fee-9f9f-f27a18db40a2?project=3ec5cc1b-f14f-4ad2-af2b-962528b989b3"), { waitUntil: "networkidle" });
+console.log((await body(p)).slice(250, 3800));
+console.log(JSON.stringify(await p.$$eval("main a, main button", (e) => e.map((x) => (x.getAttribute("aria-label") || x.innerText || "").replace(/\s+/g, " ").trim().slice(0, 30) + "→" + (x.getAttribute("href") || "")))));
+await shot(s, "bs7-emp-profile-1440", { fullPage: true });
+await p.goto(s.url("/employer/schedule"), { waitUntil: "networkidle" });
+console.log("SCHEDULE:", (await body(p)).slice(250, 2500));
+await shot(s, "bs7-emp-schedule-1440", { fullPage: true });
+console.log(s.errors);
+await s.close();

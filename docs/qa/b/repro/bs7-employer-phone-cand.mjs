@@ -1,0 +1,18 @@
+import { open, shot } from "./lib.mjs";
+import { loadState, body, small, hscroll } from "./bs7-employer-lib.mjs";
+const ENGINE = process.argv[2] ?? "chromium";
+const st = loadState();
+const s = await open({ port: 3502, role: "employer", email: st.email, password: "Qa#Tester2026", width: 375, height: 812, engine: ENGINE, name: "bs7-emp-phone-cand-" + ENGINE });
+const p = s.page;
+await p.goto(s.url("/employer/candidates"), { waitUntil: "networkidle" });
+console.log("hscroll", await hscroll(p));
+console.log((await body(p)).slice(0, 700));
+await shot(s, `bs7-emp-phone-cand-top-${ENGINE}`, { fullPage: false });
+console.log("small:", JSON.stringify(await small(p)));
+console.log("filter controls:", JSON.stringify(await p.$$eval("main input, main select", (e) => e.filter(x=>x.getBoundingClientRect().width>0 && x.getBoundingClientRect().top<3000).slice(0,16).map((x) => `${x.name}:${x.type}:im=${x.inputMode||""}:${Math.round(x.getBoundingClientRect().width)}x${Math.round(x.getBoundingClientRect().height)}`))));
+await p.evaluate(() => window.scrollTo(0, 1400)); await p.waitForTimeout(400);
+await shot(s, `bs7-emp-phone-cand-mid-${ENGINE}`, { fullPage: false });
+const card = await p.$$eval("main article", (a) => a.slice(0, 1).map((x) => [...x.querySelectorAll("a,button")].map((b) => `${(b.getAttribute("aria-label")||b.innerText).trim().slice(0,25)} ${Math.round(b.getBoundingClientRect().width)}x${Math.round(b.getBoundingClientRect().height)}`)));
+console.log("first card controls:", JSON.stringify(card));
+console.log(s.errors);
+await s.close();

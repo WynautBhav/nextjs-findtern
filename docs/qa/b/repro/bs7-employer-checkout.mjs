@@ -1,0 +1,10 @@
+import { open, shot } from "./lib.mjs";
+import { NEHA, body, errsOf } from "./bs7-employer-lib.mjs";
+const s = await open({ port: 3502, ...NEHA, width: 1440, height: 900, name: "bs7-emp-checkout" });
+const p = s.page;
+await p.goto(s.url("/employer/checkout"), { waitUntil: "networkidle" });
+console.log((await body(p)).slice(250, 3500));
+console.log(JSON.stringify(await p.$$eval("main input, main select, main button, main a", (e) => e.filter(x=>x.getBoundingClientRect().width>0).map((x) => `${x.tagName}:${x.type||""}:${x.name||""}:${(x.labels?.[0]?.innerText||x.getAttribute("aria-label")||x.innerText||"").replace(/\s+/g," ").trim().slice(0,45)}${x.disabled?":DIS":""}`))));
+await shot(s, "bs7-emp-checkout-1440", { fullPage: true });
+console.log(s.errors);
+await s.close();

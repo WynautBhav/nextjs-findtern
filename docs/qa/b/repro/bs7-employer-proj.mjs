@@ -1,0 +1,40 @@
+import { open, shot } from "./lib.mjs";
+import { loadState, body, small, hscroll, errsOf } from "./bs7-employer-lib.mjs";
+import { step1 } from "./bs7-employer-onb-lib.mjs";
+const ENGINE = process.argv[2] ?? "chromium";
+const st = loadState();
+const s = await open({ port: 3502, role: "employer", email: st.email, password: "Qa#Tester2026", width: 375, height: 812, engine: ENGINE, name: "bs7-emp-proj" });
+const p = s.page;
+await p.goto(s.url("/employer/onboarding"), { waitUntil: "networkidle" });
+console.log("step1 values after reload:", await p.locator("input[name=companyName]").inputValue(), "|", await p.locator("input[name=escalationContactEmail]").inputValue());
+await step1(p, st.email);
+const wrap = p.locator("main");
+console.log(JSON.stringify(await p.evaluate(() => [...document.querySelectorAll("main input,main select,main textarea")].filter(e=>e.getBoundingClientRect().width>0).map(e=>`${e.tagName}:${e.type}:${e.name||e.id}:role=${e.getAttribute("role")}:im=${e.inputMode}`))));
+await shot(s, "bs7-emp-proj-form-375", { fullPage: false });
+await p.locator("main input:visible").first().fill("QA Robotics Intern");
+const sk = p.locator("input[role=combobox]").first();
+const skills = ["React","Python","SQL","Figma","Excel","Java","Node.js"];
+for (const k of skills) {
+  await sk.click().catch(()=>{});
+  await sk.fill(k); await p.waitForTimeout(500);
+  const opts = await p.$$eval("[role=listbox] [role=option]", (o) => o.map((x) => x.textContent.trim()).slice(0, 4));
+  console.log("skill", k, "→ opts", JSON.stringify(opts));
+  await p.keyboard.press("ArrowDown"); await p.keyboard.press("Enter"); await p.waitForTimeout(300);
+}
+console.log("added text:", (await body(p)).match(/\d+ added[^.]{0,60}/)?.[0]);
+console.log("input disabled after max?", await sk.isDisabled(), await sk.getAttribute("placeholder"));
+await shot(s, "bs7-emp-proj-skills-375", { fullPage: false });
+await p.getByText("Up to 90 days", { exact: true }).click();
+// submit without work mode
+await p.getByRole("button", { name: /create project and finish/i }).click(); await p.waitForTimeout(1200);
+console.log("no work mode ->", JSON.stringify(await errsOf(p)));
+await p.getByText("Remote", { exact: true }).first().click();
+console.log("tz:", await p.locator("select#onboard-tz").inputValue());
+console.log("small (step2):", await small(p));
+await p.getByRole("button", { name: /create project and finish/i }).click(); await p.waitForTimeout(4000);
+console.log("landed", new URL(p.url()).pathname);
+console.log((await body(p)).slice(0, 600));
+await shot(s, "bs7-emp-after-project-375", { fullPage: false });
+console.log(await small(p), await hscroll(p));
+console.log(s.errors);
+await s.close();

@@ -1,0 +1,24 @@
+import { open, shot } from "./lib.mjs";
+import { NEHA, loadState, body } from "./bs7-employer-lib.mjs";
+const st = loadState();
+const QT = "d3cfce82-7f94-494d-9416-8c3ab740f78b";
+const intern = await open({ port: 3502, role: "intern", email: "qa.b.intern.941877@gmail.com", password: "Qa#Tester2026", width: 1280, height: 900, name: "bs7-otw-intern" });
+const ip = intern.page;
+await ip.goto(intern.url("/intern/dashboard"), { waitUntil: "domcontentloaded" }); await ip.waitForTimeout(3000);
+console.log("toggle candidates:", JSON.stringify(await ip.$$eval("main button, main [role=switch], main input[type=checkbox]", (e) => e.filter(x=>x.getBoundingClientRect().width>0).map((x) => (x.getAttribute("aria-label")||x.innerText||x.name||"").trim().slice(0, 40) + ":" + (x.getAttribute("aria-checked")||"")))));
+const sw = ip.locator("[role=switch], button:has-text('Hide'), input[type=checkbox]").first();
+console.log("switch html:", (await sw.evaluate((e) => e.outerHTML.slice(0, 200))));
+await sw.click(); await ip.waitForTimeout(2000);
+console.log("after toggle:", (await body(ip)).match(/Profile status.{0,300}/)?.[0]);
+await shot(intern, "bs7-otw-intern-off", { fullPage: false });
+const check = async (label, creds, path) => {
+  const e = await open({ port: 3502, ...creds, width: 1280, height: 900, name: "bs7-otw-" + label });
+  const res = await e.page.goto(e.url(path), { waitUntil: "domcontentloaded" }); await e.page.waitForTimeout(2500);
+  console.log(label, path.slice(0, 40), "->", res.status(), (await body(e.page)).slice(200, 420));
+  await e.close();
+};
+const acct1 = { role: "employer", email: st.email, password: "Qa#Tester2026" };
+await check("acct1-profile", acct1, `/employer/intern/${QT}`);
+await check("neha-profile", NEHA, `/employer/intern/${QT}`);
+await check("acct1-list", acct1, `/employer/candidates?pf=0&q=Ajmer`);
+await intern.close();

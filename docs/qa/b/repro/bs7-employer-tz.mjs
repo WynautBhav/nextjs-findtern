@@ -1,0 +1,34 @@
+import { open, shot } from "./lib.mjs";
+import { NEHA, body } from "./bs7-employer-lib.mjs";
+let s = await open({ port: 3502, ...NEHA, width: 1440, height: 900, name: "bs7-emp-tz" });
+let p = s.page;
+const QT = "d3cfce82-7f94-494d-9416-8c3ab740f78b";
+await p.goto(s.url(`/employer/intern/${QT}?project=3ec5cc1b-f14f-4ad2-af2b-962528b989b3`), { waitUntil: "networkidle" });
+console.log("QT profile buttons:", JSON.stringify(await p.$$eval("main a, main button", (e) => e.filter(x=>x.getBoundingClientRect().width>0).map((x) => (x.innerText||"").trim().slice(0, 30)))));
+console.log((await body(p)).slice(250, 700));
+await p.getByRole("button", { name: /^Shortlist$/ }).click().catch((e) => console.log("shortlist:", e.message.slice(0, 80))); await p.waitForTimeout(1500);
+await p.goto(s.url("/employer/cart"), { waitUntil: "networkidle" });
+const cards = p.locator("main ul > li");
+const qtCard = cards.filter({ hasText: "QT" }).first();
+console.log("QT in cart:", await qtCard.count(), (await qtCard.innerText().catch(()=> "")).replace(/\s+/g, " ").slice(0, 200));
+await qtCard.getByRole("button", { name: "Book meeting" }).click();
+await p.waitForTimeout(1000);
+const dlg = p.locator("[data-slot=dialog-content]");
+// choose Dubai tz, see time suggestions
+await dlg.locator("select[name=cart-timezone], select").last().selectOption("Asia/Dubai"); await p.waitForTimeout(600);
+console.log("Dubai defaults:", await dlg.locator("input[type=date]").evaluateAll(e=>e.map(x=>x.value)), await dlg.locator("select").evaluateAll(e=>e.map(x=>x.value)));
+console.log("Dubai helper text:", (await dlg.innerText()).match(/Set from[^.]*\.[^.]*\./)?.[0]);
+await shot(s, "bs7-emp-book-dubai-1440", { fullPage: false });
+await dlg.getByRole("button", { name: "Send meeting request" }).click(); await p.waitForTimeout(2500);
+console.log("booked:", (await dlg.innerText().catch(() => "closed")).replace(/\s+/g, " ").slice(-120));
+await p.goto(s.url("/employer/schedule"), { waitUntil: "networkidle" });
+console.log((await body(p)).match(/QT.{0,420}/)?.[0]);
+await s.close();
+// intern side
+s = await open({ port: 3502, role: "intern", email: "qa.b.intern.941877@gmail.com", password: "Qa#Tester2026", width: 1280, height: 900, name: "bs7-emp-tz-intern" });
+p = s.page;
+await p.goto(s.url("/intern/interviews"), { waitUntil: "domcontentloaded" }); await p.waitForTimeout(3000);
+console.log("INTERN INTERVIEWS:", (await body(p)).slice(0, 2500));
+console.log(JSON.stringify(await p.$$eval("main button, main a", (e) => e.filter(x=>x.getBoundingClientRect().width>0).map((x) => (x.innerText||"").trim().slice(0, 40)))));
+await shot(s, "bs7-intern-interviews-1280", { fullPage: true });
+await s.close();

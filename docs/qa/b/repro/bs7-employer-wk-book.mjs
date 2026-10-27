@@ -1,0 +1,18 @@
+import { open, shot } from "./lib.mjs";
+import { loadState, saveState, body, small, hscroll, errsOf } from "./bs7-employer-lib.mjs";
+const st = loadState();
+const s = await open({ port: 3502, role: "employer", email: st.emailW, password: "Qa#Tester2026", width: 375, height: 812, engine: "webkit", name: "bs7-emp-wk-book" });
+const p = s.page;
+await p.goto(s.url("/employer/cart"), { waitUntil: "domcontentloaded" }); await p.waitForTimeout(3500);
+await p.getByRole("button", { name: "Book meeting" }).first().waitFor({ timeout: 15000 });
+console.log("cart:", (await body(p)).slice(0, 500));
+await p.getByRole("button", { name: "Book meeting" }).first().click(); await p.waitForTimeout(1200);
+const dlg = p.locator("[data-slot=dialog-content]");
+console.log("tz:", await dlg.locator("select").last().inputValue(), "| defaults:", await dlg.locator("select").evaluateAll(e => e.map(x => x.value)));
+console.log("dialog hint:", (await dlg.innerText()).match(/Set from[^.]*\.[^.]*\./)?.[0]);
+await shot(s, "bs7-emp-wk-book-dialog", { fullPage: false });
+await dlg.getByRole("button", { name: "Send meeting request" }).click(); await p.waitForTimeout(2500);
+console.log("result:", (await dlg.innerText().catch(() => "closed")).replace(/\s+/g, " ").slice(-200));
+await shot(s, "bs7-emp-wk-booked", { fullPage: false });
+console.log(s.errors);
+await s.close();

@@ -1,0 +1,16 @@
+import { open, shot, text } from "./lib.mjs";
+const PORT = process.env.PORT ?? 3502;
+const s = await open({ port: PORT, width: 1440, name: "bs7-home" });
+await s.page.goto(s.url("/"), { waitUntil: "networkidle" });
+console.log("title:", await s.page.title());
+console.log("videos:", await s.page.$$eval("video", (v) => v.map((x) => ({ controls: x.controls, autoplay: x.autoplay, muted: x.muted, loop: x.loop, src: (x.currentSrc || x.src || "").split("/").pop(), poster: !!x.poster, w: Math.round(x.getBoundingClientRect().width), h: Math.round(x.getBoundingClientRect().height) }))));
+console.log("iframes:", await s.page.$$eval("iframe", (v) => v.map((x) => x.src.slice(0, 80))));
+console.log("header logo:", await s.page.$$eval("header img, header svg", (v) => v.slice(0, 3).map((x) => ({ alt: x.getAttribute("alt"), w: Math.round(x.getBoundingClientRect().width), h: Math.round(x.getBoundingClientRect().height), src: (x.getAttribute("src") || "").slice(-40) }))));
+console.log("mailto links:", await s.page.$$eval("a[href^='mailto:']", (a) => [...new Set(a.map((x) => x.getAttribute("href")))]));
+const t = await text(s);
+console.log("emails as plain text:", [...new Set(t.match(/[\w.+-]+@[\w-]+\.[\w.]+/g) ?? [])]);
+const headings = await s.page.$$eval("h1,h2", (h) => h.map((x) => x.innerText.replace(/\s+/g, " ").trim()).slice(0, 25));
+console.log(headings);
+await shot(s, "bs7-home-1440", { fullPage: true });
+console.log(s.errors);
+await s.close();

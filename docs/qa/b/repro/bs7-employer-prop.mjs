@@ -1,0 +1,11 @@
+import { open, shot } from "./lib.mjs";
+import { NEHA, body, errsOf } from "./bs7-employer-lib.mjs";
+const s = await open({ port: 3502, ...NEHA, width: 1440, height: 900, name: "bs7-emp-prop" });
+const p = s.page;
+const DA = "3ec5cc1b-f14f-4ad2-af2b-962528b989b3";
+await p.goto(s.url(`/employer/send-proposal?intern=bf5e910d-6439-4691-9d51-edb7d2293ac1&project=${DA}`), { waitUntil: "networkidle" });
+console.log(new URL(p.url()).pathname);
+console.log((await body(p)).slice(250, 3500));
+console.log(JSON.stringify(await p.$$eval("main input, main select, main textarea, main button", (e) => e.filter(x=>x.getBoundingClientRect().width>0).map((x) => `${x.tagName}:${x.type||""}:${x.name||x.id||""}:[${(x.labels?.[0]?.innerText||x.getAttribute("aria-label")||x.innerText||"").replace(/\s+/g," ").slice(0,40)}]:val=${(x.value||"").slice(0,20)}:min=${x.min||""}:max=${x.max||""}:im=${x.inputMode||""}`))));
+await shot(s, "bs7-emp-sendprop-1440", { fullPage: true });
+await s.close();

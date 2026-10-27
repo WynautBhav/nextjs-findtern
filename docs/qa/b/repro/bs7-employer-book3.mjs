@@ -1,0 +1,30 @@
+import { open, shot } from "./lib.mjs";
+import { NEHA, body, errsOf } from "./bs7-employer-lib.mjs";
+const s = await open({ port: 3502, ...NEHA, width: 1440, height: 900, name: "bs7-emp-book3" });
+const p = s.page;
+await p.goto(s.url("/employer/cart"), { waitUntil: "networkidle" });
+const dlg = p.locator("[data-slot=dialog-content]");
+// 1) past date attempt on first candidate
+await p.getByRole("button", { name: "Book meeting" }).first().click(); await p.waitForTimeout(800);
+const d1 = dlg.locator("input[type=date]").first();
+console.log("date min attr:", await d1.getAttribute("min"));
+await d1.fill("2026-10-27"); await p.waitForTimeout(400);
+console.log("slot1 time options after past date:", await dlg.locator("select").first().locator("option").evaluateAll(o=>o.length), (await dlg.locator("select").first().inputValue()));
+await dlg.getByRole("button", { name: "Send meeting request" }).click(); await p.waitForTimeout(1500);
+console.log("past-date submit ->", (await dlg.innerText().catch(()=>"closed")).replace(/\s+/g," ").slice(-250));
+await shot(s, "bs7-emp-book-pastdate-1440", { fullPage: false });
+await p.keyboard.press("Escape"); await p.waitForTimeout(500);
+// 2) real booking with defaults
+await p.reload({ waitUntil: "networkidle" });
+await p.getByRole("button", { name: "Book meeting" }).first().click(); await p.waitForTimeout(800);
+console.log("defaults:", await dlg.locator("input[type=date]").evaluateAll(e=>e.map(x=>x.value)), await dlg.locator("select").evaluateAll(e=>e.map(x=>x.value)));
+await dlg.getByRole("button", { name: "Send meeting request" }).click(); await p.waitForTimeout(2500);
+console.log("booked ->", (await dlg.innerText().catch(()=>"closed")).replace(/\s+/g," ").slice(-200));
+await p.goto(s.url("/employer/cart"), { waitUntil: "networkidle" });
+console.log("cart after booking:", (await body(p)).match(/4 shortlisted.*?Remove.*?Remove/)?.[0]?.slice(0,700));
+const cards = await p.$$eval("main article, main li", (e) => e.filter(x=>/Profile/.test(x.innerText)).map((x) => [...x.querySelectorAll("button,a")].map(b=>b.innerText.trim()+(b.disabled?"[disabled]":"")).join(" | ")));
+console.log(cards);
+await shot(s, "bs7-emp-cart-after-booking-1440", { fullPage: false });
+await p.goto(s.url("/employer/schedule"), { waitUntil: "networkidle" });
+console.log((await body(p)).match(/Showing \d+ of \d+ interviews.{0,700}/)?.[0]);
+await s.close();
