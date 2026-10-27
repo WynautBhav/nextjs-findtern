@@ -866,3 +866,234 @@ export const promoCodeUsages = pgTable("promo_code_usages", {
 
 export type PromoCodeUsage = typeof promoCodeUsages.$inferSelect;
 export type InsertPromoCodeUsage = typeof promoCodeUsages.$inferInsert;
+// --------------------------------------------------
+// College partners + virtual drives
+//
+// New tables only. The legacy app never reads them, and nothing here writes a
+// legacy table except `notifications` (same row shape, new `type` values).
+// Access rules live in src/lib/college/access.ts; every read goes through
+// src/lib/college/scope.ts.
+// --------------------------------------------------
+
+/** AISHE institutions plus colleges added by hand. A partner college has admins. */
+export const colleges = pgTable("colleges", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  city: text("city"),
+  state: text("state"),
+  /** AISHE code (C-12345 college, U-0123 university, S-1234 standalone). */
+  aisheCode: text("aishe_code"),
+  /** URL-safe name for the co-branded drive page. */
+  slug: text("slug").notNull(),
+  /** Lower-case domains whose verified inboxes prove membership, e.g. ["jklu.edu.in"]. */
+  emailDomains: jsonb("email_domains").$type<string[]>().notNull().default([]),
+  logoUrl: text("logo_url"),
+  /** Paying college with a dashboard. Students of other colleges can still pick them. */
+  isPartner: boolean("is_partner").notNull().default(false),
+  /** Listed in the marketing "College partners" strip. */
+  showOnWebsite: boolean("show_on_website").notNull().default(false),
+  sortOrder: integer("sort_order").notNull().default(0),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => ({
+  collegesSlugUnique: uniqueIndex("colleges_slug_unique").on(t.slug),
+  collegesAisheUnique: uniqueIndex("colleges_aishe_unique").on(t.aisheCode).where(sql`${t.aisheCode} is not null`),
+  collegesNameIdx: index("colleges_name_idx").on(t.name),
+}));
+
+export type College = typeof colleges.$inferSelect;
+
+/** Placement officers. Read-only on student data; may run drives, roster and nudges. */
+export const collegeAdmins = pgTable("college_admins", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  collegeId: varchar("college_id").notNull(),
+  name: text("name").notNull(),
+  email: text("email").notNull(),
+  /** argon2id, via src/lib/security/password.ts. Never plaintext. */
+  password: text("password").notNull(),
+  isActive: boolean("is_active").notNull().default(true),
+  lastLoginAt: timestamp("last_login_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => ({
+  collegeAdminsEmailUnique: uniqueIndex("college_admins_email_unique").on(t.email),
+}));
+
+export type CollegeAdmin = typeof collegeAdmins.$inferSelect;
+
+/** The college's own list of students. A match by email verifies membership. */
+export const collegeRoster = pgTable("college_roster", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  collegeId: varchar("college_id").notNull(),
+  /** Lower-cased. */
+  email: text("email").notNull(),
+  name: text("name").notNull().default(""),
+  rollNo: text("roll_no"),
+  /** Year of study, 1–5. */
+  year: integer("year"),
+  branch: text("branch"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => ({
+  collegeRosterUnique: uniqueIndex("college_roster_college_email_unique").on(t.collegeId, t.email),
+}));
+
+export type CollegeRosterRow = typeof collegeRoster.$inferSelect;
+
+/**
+ * A student's college. One per student. `claimed` = picked from the list;
+ * `verified` = roster email match or a verified inbox on the college domain.
+ * Only verified (or hand-included) students are shown to drive employers.
+ */
+export const collegeMemberships = pgTable("college_memberships", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  collegeId: varchar("college_id").notNull(),
+  status: text("status").notNull().default("claimed"), // claimed | verified
+  verifiedBy: text("verified_by"), // roster | email_domain
+  year: integer("year"),
+  branch: text("branch"),
+  consentId: varchar("consent_id"),
+  joinedAt: timestamp("joined_at").notNull().defaultNow(),
+  /** Set when consent is withdrawn; the row stays for the audit trail. */
+  leftAt: timestamp("left_at"),
+}, (t) => ({
+  collegeMembershipsUserUnique: uniqueIndex("college_memberships_user_unique").on(t.userId),
+  collegeMembershipsCollegeIdx: index("college_memberships_college_idx").on(t.collegeId),
+}));
+
+export type CollegeMembership = typeof collegeMemberships.$inferSelect;
+
+/**
+ * DPDP consent ledger. Append-only: withdrawing sets `withdrawnAt`, a new
+ * grant is a new row. `noticeHash` pins the exact notice text shown.
+ */
+export const collegeConsents = pgTable("college_consents", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  collegeId: varchar("college_id").notNull(),
+  noticeVersion: text("notice_version").notNull(),
+  noticeHash: text("notice_hash").notNull(),
+  /** Subset of CONSENT_PURPOSES in src/lib/college/consent.ts. */
+  purposes: jsonb("purposes").$type<string[]>().notNull().default([]),
+  /** Student declared they are 18 or older. Under-18 needs a guardian (not built). */
+  declaredAdult: boolean("declared_adult").notNull().default(false),
+  grantedAt: timestamp("granted_at").notNull().defaultNow(),
+  withdrawnAt: timestamp("withdrawn_at"),
+  userAgent: text("user_agent"),
+}, (t) => ({
+  collegeConsentsUserIdx: index("college_consents_user_idx").on(t.userId),
+}));
+
+export type CollegeConsent = typeof collegeConsents.$inferSelect;
+
+/** A virtual placement drive and its share link. Only the token's SHA-256 is stored. */
+export const collegeDrives = pgTable("college_drives", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  collegeId: varchar("college_id").notNull(),
+  title: text("title").notNull(),
+  kind: text("kind").notNull().default("internship"), // internship | full_time
+  description: text("description"),
+  startsAt: timestamp("starts_at").notNull(),
+  endsAt: timestamp("ends_at").notNull(),
+  /** { minCgpa?, minScore?, years?: number[], branches?: string[] } */
+  eligibility: jsonb("eligibility").$type<Record<string, unknown>>().notNull().default({}),
+  includeUserIds: jsonb("include_user_ids").$type<string[]>().notNull().default([]),
+  excludeUserIds: jsonb("exclude_user_ids").$type<string[]>().notNull().default([]),
+  tokenHash: text("token_hash").notNull(),
+  revokedAt: timestamp("revoked_at"),
+  createdBy: varchar("created_by").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (t) => ({
+  collegeDrivesTokenUnique: uniqueIndex("college_drives_token_unique").on(t.tokenHash),
+  collegeDrivesCollegeIdx: index("college_drives_college_idx").on(t.collegeId),
+}));
+
+export type CollegeDrive = typeof collegeDrives.$inferSelect;
+
+/** An employer who opened a valid drive link while signed in. Their pass into the drive. */
+export const collegeDriveEmployers = pgTable("college_drive_employers", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  driveId: varchar("drive_id").notNull(),
+  employerId: varchar("employer_id").notNull(),
+  joinedAt: timestamp("joined_at").notNull().defaultNow(),
+}, (t) => ({
+  collegeDriveEmployersUnique: uniqueIndex("college_drive_employers_unique").on(t.driveId, t.employerId),
+}));
+
+export const collegeDriveShortlist = pgTable("college_drive_shortlist", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  driveId: varchar("drive_id").notNull(),
+  employerId: varchar("employer_id").notNull(),
+  userId: varchar("user_id").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => ({
+  collegeDriveShortlistUnique: uniqueIndex("college_drive_shortlist_unique").on(t.driveId, t.employerId, t.userId),
+}));
+
+/** "Meet now / in 5 / in 10 minutes" requests inside a drive. */
+export const collegeDriveMeetings = pgTable("college_drive_meetings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  driveId: varchar("drive_id").notNull(),
+  employerId: varchar("employer_id").notNull(),
+  userId: varchar("user_id").notNull(),
+  startsAt: timestamp("starts_at").notNull(),
+  status: text("status").notNull().default("requested"), // requested | accepted | declined | expired | cancelled
+  meetingLink: text("meeting_link"),
+  calendarEventId: text("calendar_event_id"),
+  respondedAt: timestamp("responded_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => ({
+  collegeDriveMeetingsUserIdx: index("college_drive_meetings_user_idx").on(t.userId, t.status),
+  collegeDriveMeetingsDriveIdx: index("college_drive_meetings_drive_idx").on(t.driveId),
+}));
+
+export type CollegeDriveMeeting = typeof collegeDriveMeetings.$inferSelect;
+
+/** Last heartbeat per student. Online = seen within ONLINE_WINDOW_MS. */
+export const collegePresence = pgTable("college_presence", {
+  userId: varchar("user_id").primaryKey(),
+  collegeId: varchar("college_id").notNull(),
+  lastSeenAt: timestamp("last_seen_at").notNull().defaultNow(),
+}, (t) => ({
+  collegePresenceCollegeIdx: index("college_presence_college_idx").on(t.collegeId, t.lastSeenAt),
+}));
+
+/** A placement officer's chase. Rate-limited per student and kind. */
+export const collegeNudges = pgTable("college_nudges", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  collegeId: varchar("college_id").notNull(),
+  adminId: varchar("admin_id").notNull(),
+  userId: varchar("user_id").notNull(),
+  kind: text("kind").notNull(), // online | offer | interview
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => ({
+  collegeNudgesUserIdx: index("college_nudges_user_idx").on(t.userId, t.kind, t.createdAt),
+}));
+
+/** Who opened a student's recording or report, and when. Append-only. */
+export const collegeAuditLog = pgTable("college_audit_log", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  collegeId: varchar("college_id").notNull(),
+  actorType: text("actor_type").notNull(), // college_admin | admin
+  actorId: varchar("actor_id").notNull(),
+  action: text("action").notNull(), // view_recording | view_report | export_roster | ...
+  subjectUserId: varchar("subject_user_id"),
+  meta: jsonb("meta").$type<Record<string, unknown>>().notNull().default({}),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => ({
+  collegeAuditLogCollegeIdx: index("college_audit_log_college_idx").on(t.collegeId, t.createdAt),
+}));
+
+/** Web Push subscriptions (students accept instant meetings from their phone). */
+export const pushSubscriptions = pgTable("push_subscriptions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  role: text("role").notNull(),
+  endpoint: text("endpoint").notNull(),
+  p256dh: text("p256dh").notNull(),
+  auth: text("auth").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => ({
+  pushSubscriptionsEndpointUnique: uniqueIndex("push_subscriptions_endpoint_unique").on(t.endpoint),
+  pushSubscriptionsUserIdx: index("push_subscriptions_user_idx").on(t.userId),
+}));

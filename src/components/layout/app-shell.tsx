@@ -56,6 +56,8 @@ export interface AppShellProps {
   companyName?: string;
   email?: string;
   unreadAlerts?: number;
+  /** Placement officers reuse the shell without the employer's cart, alerts and account links. */
+  area?: "employer" | "college";
   children: React.ReactNode;
 }
 
@@ -71,15 +73,18 @@ export function AppShell({
   companyName = "Employer Console",
   email,
   unreadAlerts = 0,
+  area = "employer",
   children,
 }: AppShellProps) {
+  const home = area === "college" ? "/college" : "/employer/dashboard";
+  const commerce = area === "employer";
   const pathname = usePathname();
   const router = useRouter();
   const [open, setOpen] = useState(false);
 
   async function handleSignOut() {
     await csrfFetch("/api/auth/logout", { method: "POST" });
-    router.replace("/employer/login");
+    router.replace(area === "college" ? "/college/login" : "/employer/login");
     router.refresh();
   }
 
@@ -108,7 +113,7 @@ export function AppShell({
             {group.items.map((item) => {
               const active =
                 pathname === item.href ||
-                (item.href !== "/employer/dashboard" && pathname.startsWith(item.href + "/"));
+                (item.href !== home && pathname.startsWith(item.href + "/"));
               return (
                 <Link
                   key={item.href}
@@ -149,7 +154,7 @@ export function AppShell({
     <div className="apple-admin flex min-h-[100dvh] overflow-x-clip bg-ink-50">
       {/* Desktop sticky sidebar */}
       <aside aria-label="Sidebar" className="sticky top-0 hidden h-[100dvh] w-64 shrink-0 flex-col bg-brand-950 px-4 py-6 lg:flex border-r border-white/5">
-        <Link href="/employer/dashboard" className="px-3 flex items-center justify-between gap-2.5">
+        <Link href={home} className="px-3 flex items-center justify-between gap-2.5">
           <Logo variant="white" priority className="h-7" />
           <span className="text-2xs font-bold uppercase tracking-wider text-accent-400 bg-accent-500/15 border border-accent-400/30 px-2 py-0.5 rounded-full">
             {brand}
@@ -238,12 +243,12 @@ export function AppShell({
               </SheetContent>
             </Sheet>
 
-            <Link href="/employer/dashboard" className="text-sm font-semibold tracking-tight text-ink-900">
+            <Link href={home} className="text-sm font-semibold tracking-tight text-ink-900">
               Findtern <span className="text-brand-700">{brand}</span>
             </Link>
           </div>
 
-          <div className="flex items-center gap-2">
+          {commerce ? <div className="flex items-center gap-2">
             <Link
               href="/employer/cart"
               aria-label="View Cart"
@@ -263,14 +268,14 @@ export function AppShell({
                 </span>
               ) : null}
             </Link>
-          </div>
+          </div> : null}
         </header>
 
         {/* Desktop top bar with breadcrumbs and user shortcuts */}
         <header className="sticky top-0 z-20 hidden items-center justify-between border-b border-ink-200/80 bg-white/95 px-8 py-3.5 backdrop-blur-md lg:flex shadow-2xs">
           <nav aria-label="Breadcrumb navigation" className="flex min-w-0 items-center gap-1.5 text-[13px] text-text-subtle">
             <Link
-              href="/employer/dashboard"
+              href={home}
               className="apple-spring inline-flex min-h-7 shrink-0 items-center font-medium text-ink-600 hover:text-brand-700"
             >
               Console
@@ -294,6 +299,7 @@ export function AppShell({
           </nav>
 
           <div className="flex shrink-0 items-center gap-3">
+            {commerce ? <>
             <Link
               href="/employer/cart"
               className="apple-spring apple-pressable inline-flex min-h-11 items-center gap-1.5 rounded-[10px] border border-ink-200 bg-white px-3 text-[13px] font-medium text-ink-700 shadow-2xs hover:border-ink-300 hover:bg-ink-50"
@@ -314,6 +320,7 @@ export function AppShell({
                 </span>
               ) : null}
             </Link>
+            </> : null}
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -333,6 +340,7 @@ export function AppShell({
                     <p className="text-2xs text-text-subtle truncate font-normal">{email}</p>
                   ) : null}
                 </DropdownMenuLabel>
+                {commerce ? <>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
                   <Link href="/employer/account" className="flex items-center gap-2 cursor-pointer">
@@ -352,6 +360,7 @@ export function AppShell({
                     <span>Change Password</span>
                   </Link>
                 </DropdownMenuItem>
+                </> : null}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
                   <a

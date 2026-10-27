@@ -99,6 +99,15 @@ const nextConfig: NextConfig = {
           { key: "Permissions-Policy", value: "camera=*, microphone=*, geolocation=()" },
         ],
       },
+      {
+        // The push service worker must never be cached, or a fix never reaches phones.
+        source: "/sw.js",
+        headers: [
+          { key: "Content-Type", value: "application/javascript; charset=utf-8" },
+          { key: "Cache-Control", value: "no-cache, no-store, must-revalidate" },
+          { key: "Content-Security-Policy", value: "default-src 'self'; script-src 'self'" },
+        ],
+      },
     ];
   },
 };

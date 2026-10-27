@@ -29,6 +29,7 @@ import {
   CalendarCheck2,
   CircleUserRound,
   Compass,
+  GraduationCap,
   House,
   CircleQuestionMark,
   LayoutList,
@@ -88,6 +89,7 @@ export const SECONDARY_NAV: NavItem[] = [
   { href: "/intern/earnings", label: "Stipend", icon: <ReceiptIndianRupee className="size-4" /> },
   { href: "/intern/documents", label: "Documents", icon: <BadgeCheck className="size-4" /> },
   { href: "/intern/profile", label: "Your profile", icon: <CircleUserRound className="size-4" /> },
+  { href: "/intern/college", label: "College", icon: <GraduationCap className="size-4" /> },
   { href: "/intern/notifications", label: "Notifications", icon: <Bell className="size-4" /> },
   { href: "/intern/settings", label: "Settings", icon: <Settings2 className="size-4" /> },
 ];

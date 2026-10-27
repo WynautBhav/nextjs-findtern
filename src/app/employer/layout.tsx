@@ -15,6 +15,7 @@ import {
   Send,
   HelpCircle,
   Mail,
+  GraduationCap,
 } from "lucide-react";
 
 import { AppShell, type NavGroup } from "@/components/layout/app-shell";
@@ -29,6 +30,7 @@ const NAV_GROUPS: NavGroup[] = [
       { href: "/employer/dashboard", label: "Dashboard", icon: <LayoutDashboard className="size-4" /> },
       { href: "/employer/candidates", label: "Candidates", icon: <Users className="size-4" /> },
       { href: "/employer/compare", label: "Compare", icon: <GitCompare className="size-4" /> },
+      { href: "/employer/drives", label: "Campus drives", icon: <GraduationCap className="size-4" /> },
       { href: "/employer/projects", label: "Projects", icon: <FolderKanban className="size-4" /> },
     ],
   },

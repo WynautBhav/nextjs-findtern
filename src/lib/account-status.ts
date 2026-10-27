@@ -11,12 +11,24 @@ const TTL_MS = 30_000;
 const cache = new Map<string, { active: boolean; at: number }>();
 
 export async function isAccountActive(role: string, uid: string): Promise<boolean> {
-  if (role !== "intern" && role !== "employer") return true;
+  if (role !== "intern" && role !== "employer" && role !== "college") return true;
   const key = `${role}:${uid}`;
   const hit = cache.get(key);
   if (hit && Date.now() - hit.at < TTL_MS) return hit.active;
   let active = true;
   try {
+    if (role === "college") {
+      // A placement officer is locked out when either they or their college is switched off.
+      const [row] = await getDb()
+        .select({ admin: schema.collegeAdmins.isActive, college: schema.colleges.isActive })
+        .from(schema.collegeAdmins)
+        .innerJoin(schema.colleges, eq(schema.colleges.id, schema.collegeAdmins.collegeId))
+        .where(eq(schema.collegeAdmins.id, uid))
+        .limit(1);
+      active = Boolean(row?.admin && row?.college);
+      cache.set(key, { active, at: Date.now() });
+      return active;
+    }
     const table = role === "intern" ? schema.users : schema.employers;
     const [row] = await getDb().select({ isActive: table.isActive }).from(table).where(eq(table.id, uid)).limit(1);
     active = Boolean(row?.isActive);

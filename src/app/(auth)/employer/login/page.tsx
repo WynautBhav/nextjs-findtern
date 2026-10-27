@@ -5,7 +5,7 @@ import { AlertCircle } from "lucide-react";
 
 import { AuthShell } from "@/components/auth/auth-shell";
 import { LoginForm } from "@/components/auth/login-form";
-import { oauthErrorMessage } from "@/lib/google";
+import { oauthErrorMessage, safeNext } from "@/lib/google";
 
 export const metadata: Metadata = {
   title: "Employer sign in | Findtern",
@@ -17,8 +17,12 @@ export default async function EmployerLoginPage({
 }: {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
-  const raw = (await searchParams).oauthError;
+  const params = await searchParams;
+  const raw = params.oauthError;
   const oauthError = oauthErrorMessage(Array.isArray(raw) ? raw[0] : raw);
+  // Where to land after sign in, e.g. back on a campus drive link. Same-site paths only.
+  const rawNext = Array.isArray(params.next) ? params.next[0] : params.next;
+  const next = safeNext(rawNext, "/employer/dashboard");
 
   return (
     <AuthShell
@@ -56,7 +60,7 @@ export default async function EmployerLoginPage({
       <div className="mt-8">
         <LoginForm
           endpoint="/api/auth/employer/login"
-          redirectTo="/employer/dashboard"
+          redirectTo={next}
           forgotHref="/employer/forgot-password"
           googleHref="/api/auth/google/start?role=employer"
           verifyHref="/employer/verify-email"

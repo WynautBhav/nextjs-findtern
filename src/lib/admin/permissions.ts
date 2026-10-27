@@ -62,6 +62,8 @@ const RULES: Rule[] = [
   ["/admin/users", ["users:read"]],
   ["/admin/companies/terms", COMPANY_LEGAL_R, COMPANY_LEGAL_W],
   ["/admin/companies", ["companies:read"], ["companies:write"]],
+  // College partners are customers like companies; issuing a placement officer's login is a company-side write.
+  ["/admin/colleges", ["companies:read"], ["companies:write"]],
   ["/admin/roles", ["roles:write"]],
   ["/admin/projects", ["companies:read"]],
   ["/admin/orders", ["transactions:read"]],
@@ -85,6 +87,7 @@ const RULES: Rule[] = [
   ["/api/admin/interviews", ["interns:read"], ["interns:write"]],
   ["/api/admin/company", COMPANY_LEGAL_R, COMPANY_LEGAL_W],
   ["/api/admin/companies", ["companies:read"], ["companies:write"]],
+  ["/api/admin/colleges", ["companies:read"], ["companies:write"]],
   ["/api/admin/users", ["users:read"], ["interns:write"]],
   ["/api/admin/contact", ["users:read"], ["interns:write", "companies:write"]],
   // /api/admin/impersonate has no rule on purpose: no rule = super admin only.

@@ -3,8 +3,10 @@ import { and, count, eq } from "drizzle-orm";
 
 import { AppShell } from "@/components/app/shell";
 import { ViewAsBanner } from "@/components/admin/view-as-banner";
+import { CollegeLive } from "@/components/intern/college-live";
 import { getSession } from "@/lib/auth";
 import { getDb, schema } from "@/lib/db";
+import { membershipOf } from "@/lib/college/membership";
 import { loadInternData } from "@/lib/intern-data";
 import { nextAction } from "@/lib/journey";
 
@@ -55,6 +57,9 @@ export default async function InternLayout({ children }: { children: React.React
     );
   const unreadAlerts = Number(unread?.value ?? 0);
 
+  // Only college members heartbeat; "View as" must not mark the student online.
+  const college = session.impersonator ? null : await membershipOf(session.uid).catch(() => null);
+
   return (
     <AppShell
       stage={data.stage}
@@ -64,6 +69,12 @@ export default async function InternLayout({ children }: { children: React.React
       photoUrl={photoUrl}
       unreadAlerts={unreadAlerts}
     >
+      {college ? (
+        <CollegeLive
+          collegeName={college.name}
+          vapidKey={process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? ""}
+        />
+      ) : null}
       {children}
       {session.impersonator ? <ViewAsBanner viewing={name} admin={session.impersonator.email} /> : null}
     </AppShell>
@@ -81,3 +92,4 @@ async function fullName(uid: string): Promise<string> {
   const name = `${row?.first ?? ""} ${row?.last ?? ""}`.trim();
   return name || "Candidate";
 }
+

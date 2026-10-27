@@ -18,7 +18,9 @@
     "lint": "eslint",
     "test": "node --test --experimental-strip-types \"src/lib/*.test.ts\" \"src/lib/**/*.test.ts\"",
     "test:security": "node --test --experimental-strip-types src/lib/security/",
-    "shots": "PORT=3100 DATABASE_URL=postgresql://findtern:findtern_dev@localhost:5432/findtern SESSION_SECRET=verify-only-secret-at-least-32-characters node --experimental-strip-types scripts/shots.ts"
+    "shots": "PORT=3100 DATABASE_URL=postgresql://findtern:findtern_dev@localhost:5432/findtern SESSION_SECRET=verify-only-secret-at-least-32-characters node --experimental-strip-types scripts/shots.ts",
+    "db:seed-colleges": "DATABASE_URL=${DATABASE_URL:-postgresql://findtern:findtern_dev@localhost:5432/findtern} node --experimental-strip-types scripts/seed-colleges.ts",
+    "test:e2e:college": "node --test e2e/college-partners.e2e.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1152.0",
@@ -36,6 +38,7 @@
     "radix-ui": "^1.6.7",
     "react": "19.2.8",
     "react-dom": "19.2.8",
+    "web-push": "^3.6.7",
     "zod": "^4.6.5"
   },
   "devDependencies": {
@@ -45,6 +48,7 @@
     "@types/pg": "^8.23.1",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/web-push": "^3.6.4",
     "drizzle-kit": "^0.31.11",
     "eslint": "^9",
     "eslint-config-next": "16.3.8",

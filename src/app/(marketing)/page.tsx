@@ -6,6 +6,7 @@ import { HeroSplit } from "@/components/home/hero-split";
 import { ContactCta } from "@/components/home/marketing-sections";
 import { PopularTimeline } from "@/components/home/popular-timeline";
 import { StatsBand } from "@/components/home/stats-band";
+import { CollegePartners } from "@/components/home/college-partners";
 import { PricingTable } from "@/components/home/pricing-table";
 import {
   HappyFaces,
@@ -15,6 +16,7 @@ import {
 import {
   getHappyFaces,
   getPartners,
+  getCollegePartners,
   getPlans,
   getPopularSteps,
   getFeaturedSkills,
@@ -44,7 +46,7 @@ const HOME_HOWTO = howToJsonLd({
 });
 
 export default async function HomePage() {
-  const [partners, skills, faces, steps, plansInr, plansUsd] = await Promise.all([
+  const [partners, skills, faces, steps, plansInr, plansUsd, colleges] = await Promise.all([
     getPartners(),
     getFeaturedSkills(),
     getHappyFaces(),
@@ -55,6 +57,7 @@ export default async function HomePage() {
     // for visitors abroad. Exactly three plans per set - never six.
     getPlans(true),
     getPlans(false),
+    getCollegePartners(),
   ]);
 
   return (
@@ -91,6 +94,9 @@ export default async function HomePage() {
 
       {/* 6 - Why we are most popular, seven-step timeline */}
       <PopularTimeline steps={steps} />
+
+      {/* 6b - College partners: the pitch to placement cells */}
+      <CollegePartners pitch={colleges.pitch} partners={colleges.partners} />
 
       {/* 7 - Pricing, the coffee comparison table */}
       <PricingTable plansInr={plansInr} plansUsd={plansUsd} />

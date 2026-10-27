@@ -36,6 +36,7 @@ const NAV: NavGroup[] = [
       { href: "/admin/interns", label: "Candidate Directory" },
       { href: "/admin/users", label: "Registered Users" },
       { href: "/admin/companies", label: "Hiring Partners" },
+      { href: "/admin/colleges", label: "College Partners" },
       { href: "/admin/projects", label: "Work Projects" },
     ],
   },

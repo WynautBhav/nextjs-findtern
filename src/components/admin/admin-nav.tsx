@@ -27,6 +27,7 @@ import {
   X,
   UserCheck,
   Settings,
+  GraduationCap,
   type LucideIcon,
 } from "lucide-react";
 
@@ -52,6 +53,7 @@ const ICON_MAP: Record<string, LucideIcon> = {
   "/admin/interns/terms": FileText,
   "/admin/interns/non-disclosure": ShieldCheck,
   "/admin/companies": Building2,
+  "/admin/colleges": GraduationCap,
   "/admin/companies/terms": ScrollText,
   "/admin/roles": Shield,
   "/admin/projects": Briefcase,
