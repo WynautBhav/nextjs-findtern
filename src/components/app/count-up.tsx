@@ -7,6 +7,11 @@
  * it never re-runs on re-render, because a number that keeps moving stops
  * being a fact and starts being a slot machine. Under reduced motion it
  * renders the final value immediately.
+ *
+ * The server and the first client render both show the final value (QA-002:
+ * the server used to render 0 while a reduced-motion client rendered the
+ * value, a hydration mismatch). The count from 0 starts only after mount, so
+ * no-JS readers and screen readers get the real figure, never 0.
  */
 
 import { useEffect, useRef, useState } from "react";
@@ -31,7 +36,7 @@ export function CountUp({
         }).format(n)
     : undefined;
   const reduce = useReducedMotion();
-  const [display, setDisplay] = useState(0);
+  const [display, setDisplay] = useState(value);
   const raf = useRef<number | null>(null);
 
   useEffect(() => {
@@ -49,6 +54,6 @@ export function CountUp({
     };
   }, [value, duration, reduce]);
 
-  if (reduce) return <>{format ? format(value) : Math.round(value).toLocaleString("en-IN")}</>;
-  return <>{format ? format(display) : Math.round(display).toLocaleString("en-IN")}</>;
+  const shown = reduce ? value : display;
+  return <>{format ? format(shown) : Math.round(shown).toLocaleString("en-IN")}</>;
 }

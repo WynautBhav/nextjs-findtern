@@ -58,3 +58,12 @@ lines only.
   `value` unconditionally on the server and only animate after mount).
 - Trace / screenshot: `e2e/.artifacts/qa/motion/intern-hired-1440-reduced-trace.zip`
   and `…-reduced.png` (written by `npm run qa -- motion`).
+- Status (builder, 28 Oct): fixed, awaiting retest (wp/opus, fix(QA-002)).
+  `CountUp` now starts `display` at the final value, so the server and the
+  first client render agree whatever the motion setting; the count from 0
+  starts after mount (motion allowed only). Same root cause also threw #418
+  on `/intern/record` (768/1440), which renders two `CountUp`s. Checked on a
+  production build with `reducedMotion: "reduce"`: `/intern/dashboard`,
+  `/intern/record`, `/intern/earnings`, `/employer/dashboard`,
+  `/admin/dashboard` at 390 and 1440, 0 page errors. The other
+  `useReducedMotion` users only vary motion `initial` props, not text.
