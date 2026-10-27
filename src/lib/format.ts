@@ -268,3 +268,62 @@ export function companyInitials(name: string | null | undefined): string {
   const letters = words.length === 1 ? words[0].slice(0, 2) : words[0][0] + words[1][0];
   return letters.toUpperCase();
 }
+
+/* ── India time for interns ──────────────────────────────────────────────
+ * Interns always read times in IST, labelled, whatever zone the company
+ * booked in (bug sheet 7, S2 r7). Slots are stored as UTC instants that the
+ * employer's wall time was converted from with `wallTimeToUtc` (DST-aware),
+ * so showing them in India time is a plain re-format in Asia/Kolkata, which
+ * has no DST of its own. Built from parts so the output does not depend on
+ * the runtime's locale data ("pm" vs "PM", "Sept" vs "Sep"). */
+
+export const IST_ZONE = "Asia/Kolkata";
+
+function istParts(date: Date) {
+  const p = Object.fromEntries(
+    new Intl.DateTimeFormat("en-US", {
+      timeZone: IST_ZONE,
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+      hourCycle: "h23",
+    })
+      .formatToParts(date)
+      .map((x) => [x.type, x.value]),
+  ) as Record<string, string>;
+  const hour = Number(p.hour) % 24;
+  const clock = `${hour % 12 || 12}:${p.minute} ${hour < 12 ? "AM" : "PM"}`;
+  return { weekday: p.weekday, day: p.day, month: p.month, year: p.year, clock };
+}
+
+function asDate(value: Date | string | null | undefined): Date | null {
+  if (!value) return null;
+  const date = typeof value === "string" ? new Date(value) : value;
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+/** "Fri 10 Jul, 7:30 PM IST" (with `year`: "Fri 10 Jul 2026, 7:30 PM IST"). */
+export function formatIst(value: Date | string | null | undefined, opts: { year?: boolean } = {}): string {
+  const date = asDate(value);
+  if (!date) return "Time to be confirmed";
+  const p = istParts(date);
+  return `${p.weekday} ${p.day} ${p.month}${opts.year ? ` ${p.year}` : ""}, ${p.clock} IST`;
+}
+
+/** Day only, in India: "Fri 10 Jul". */
+export function formatIstDay(value: Date | string | null | undefined): string {
+  const date = asDate(value);
+  if (!date) return "To be confirmed";
+  const p = istParts(date);
+  return `${p.weekday} ${p.day} ${p.month}`;
+}
+
+/** Clock only, in India and labelled: "7:30 PM IST". */
+export function formatIstClock(value: Date | string | null | undefined): string {
+  const date = asDate(value);
+  if (!date) return "Time to be confirmed";
+  return `${istParts(date).clock} IST`;
+}
