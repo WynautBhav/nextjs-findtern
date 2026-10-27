@@ -205,12 +205,22 @@ export async function getBlogPosts(): Promise<CmsBlogPost[]> {
   }, FALLBACK_POSTS);
 }
 
+/**
+ * One post by slug, published only (SYS-01; legacy 404'd anything else). A
+ * draft in the CMS hides the post even when the TS fallback has a copy of
+ * it, so unpublishing in the admin takes it off the site.
+ */
 export async function getBlogPost(slug: string): Promise<CmsBlogPost | null> {
   return tryDb(async () => {
     const db = getDb();
     const [row] = await db.select(blogColumns).from(t).where(eq(t.slug, slug)).limit(1);
-    return row ? withImageRoutes(row) : (FALLBACK_POSTS.find((p) => p.slug === slug) ?? null);
+    if (row) return isPublished(row.status) ? withImageRoutes(row) : null;
+    return FALLBACK_POSTS.find((p) => p.slug === slug) ?? null;
   }, FALLBACK_POSTS.find((p) => p.slug === slug) ?? null);
+}
+
+function isPublished(status: string | null | undefined): boolean {
+  return String(status ?? "").trim().toLowerCase() === "published";
 }
 
 /** Raw stored value of a partner logo or happy-face avatar. */
@@ -235,11 +245,13 @@ export async function getBlogImage(slug: string, kind: "cover" | "banner"): Prom
   return tryDb(async () => {
     const db = getDb();
     const [row] = await db
-      .select({ cover: t.coverImageUrl, banner: t.bannerImageUrl })
+      .select({ cover: t.coverImageUrl, banner: t.bannerImageUrl, status: t.status })
       .from(t)
       .where(eq(t.slug, slug))
       .limit(1);
     if (!row) return fromFallback;
+    // A draft's images are as private as its text (SYS-01).
+    if (!isPublished(row.status)) return null;
     return (kind === "banner" ? row.banner || row.cover : row.cover) || null;
   }, fromFallback);
 }

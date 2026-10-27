@@ -4,7 +4,11 @@
 #
 #   LIVE_SSH=user@kvm-host            ssh target (required)
 #   LIVE_DB=findtern                  database name on the server
-#   LIVE_PG_USER=postgres             role pg_dump connects as on the server
+#   LIVE_PG_USER=postgres             OS user (and role) pg_dump runs as on the
+#                                     server. Postgres there uses peer auth, so
+#                                     pg_dump runs through "sudo -u" (SYS-19);
+#                                     set LIVE_PG_SUDO=0 if the ssh user is
+#                                     already that user.
 #   LIVE_UPLOADS=/srv/findtern/uploads  legacy uploads dir (optional; skipped if unset)
 #   LOCAL_DB_URL=postgresql://findtern:findtern_dev@localhost:5432/findtern_live
 #
@@ -27,7 +31,11 @@ dump="$(mktemp -t findtern-live.XXXXXX.dump)"
 trap 'rm -f "$dump"' EXIT
 
 echo "dumping $LIVE_DB from $LIVE_SSH …"
-ssh "$LIVE_SSH" "pg_dump -U '$LIVE_PG_USER' -Fc --no-owner --no-privileges '$LIVE_DB'" > "$dump"
+if [[ "${LIVE_PG_SUDO:-1}" == "1" ]]; then
+  ssh "$LIVE_SSH" "sudo -n -u '$LIVE_PG_USER' pg_dump -Fc --no-owner --no-privileges '$LIVE_DB'" > "$dump"
+else
+  ssh "$LIVE_SSH" "pg_dump -Fc --no-owner --no-privileges '$LIVE_DB'" > "$dump"
+fi
 
 echo "recreating local database $local_db …"
 psql "$admin_url" -v ON_ERROR_STOP=1 -q \
