@@ -126,3 +126,11 @@ branch, not to be touched: `feat/college-partners` (worktree
       to seed it at cutover or leave the bands as the only rate card.
 - [ ] A local `.env` still points at the production database; the e2e refuses it, but any
       `next start` must override env in-process.
+- 28 Oct: owner decisions: merge into master with close to 0 bugs on every
+  screen size, redesign the dashboards, no Hostinger DB access (local copy +
+  Neon only), no ftss screenshots, flat 22/26-day working hours (calendar
+  billing reverted). Orchestration moved to docs/handoff/PLAN-master-merge.md:
+  Fable orchestrates on `release/master-merge`; Opus session
+  (nextjs-findtern-6a) does WP1 college merge + WP2 design on `wp/opus`;
+  Sonnet session (nextjs-findtern-1a) does WP3 harness, WP4 test pass and
+  WP6 CI on `wp/qa`.
