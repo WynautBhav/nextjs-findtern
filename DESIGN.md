@@ -95,8 +95,10 @@ state; the same component for the same job on every screen; and copy a
 person at Findtern would write.
 
 Process: before every screen-group handover, run `/impeccable-critique`
-and `/impeccable-audit` on the screens and fix what they find; take the
-390 / 768 / 1440 shots; then a reviewer who did not build it (the
+and `/impeccable-audit` on the screens and fix what they find; then, once
+the group feels finished, run `/impeccable-polish` as the last pass and
+take its changes too (alignment, spacing, consistency, micro-detail); then
+the 390 / 768 / 1440 shots; then a reviewer who did not build it (the
 orchestrator or a fresh agent) checks the shots against this list. A fail
 goes back; it is never merged with a "polish later".
 
