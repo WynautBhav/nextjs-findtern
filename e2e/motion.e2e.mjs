@@ -77,6 +77,7 @@ async function main() {
       const where = `${d.path} @${width}`;
       const mk = (reducedMotion) => browser.newContext({ storageState: state, viewport: { width, height: 900 }, reducedMotion });
       const [normalCtx, reducedCtx] = [await mk("no-preference"), await mk("reduce")];
+      await reducedCtx.tracing.start({ screenshots: true, snapshots: true });
       const n = await load(normalCtx, d.path);
       const r = await load(reducedCtx, d.path);
       const ni = await inspect(n.page);
@@ -88,13 +89,22 @@ async function main() {
       if (ri.smooth) findings.push({ where, kind: "smooth-scroll-not-reduced", detail: "document scroll-behavior is smooth / Lenis is active" });
       if (ni.textLen > 200 && ri.textLen < ni.textLen * 0.85) findings.push({ where, kind: "content-missing-with-reduced-motion", detail: `${ri.textLen} characters vs ${ni.textLen} with motion` });
       for (const e of r.errors) findings.push({ where, kind: "console-error", detail: e });
+      const before = findings.length;
+      if (findings.some((f) => f.where === where)) {
+        const trace = join(OUT, `${d.key}-${width}-reduced-trace.zip`);
+        await reducedCtx.tracing.stop({ path: trace }).catch(() => {});
+        for (const f of findings.filter((x) => x.where === where)) f.trace = trace.replace(`${ARTIFACTS}/`, "e2e/.artifacts/");
+      } else {
+        await reducedCtx.tracing.stop().catch(() => {});
+      }
+      void before;
       await normalCtx.close();
       await reducedCtx.close();
     }
   }
   await browser.close();
   writeFileSync(join(OUT, "results.json"), JSON.stringify({ findings, notes }, null, 2));
-  writeFileSync(join(OUT, "report.md"), ["# prefers-reduced-motion", "", ...notes.map((n) => `- ${n}`), "", findings.length ? "## Findings" : "No findings.", ...findings.map((f) => `- **${f.where}** ${f.kind}: ${f.detail}`)].join("\n") + "\n");
+  writeFileSync(join(OUT, "report.md"), ["# prefers-reduced-motion", "", ...notes.map((n) => `- ${n}`), "", findings.length ? "## Findings" : "No findings.", ...findings.map((f) => `- **${f.where}** ${f.kind}: ${f.detail}${f.trace ? ` (trace: ${f.trace})` : ""}`)].join("\n") + "\n");
   for (const n of notes) log(n);
   log(`${findings.length} findings; report ${join(OUT, "report.md")}`);
   process.exit(findings.length ? 1 : 0);
