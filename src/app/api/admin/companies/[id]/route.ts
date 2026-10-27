@@ -10,11 +10,16 @@ import { notify } from "@/lib/notify";
 const bodySchema = z
   .object({
     isActive: z.boolean().optional(),
-    internationalFteStatus: z.enum(["none", "applied", "approved", "rejected"]).optional(),
+    // Legacy values only: none / applied / approved. "rejected" (an older
+    // client's "Decline") is stored as "none", like legacy's Remove FTE (ADP-03).
+    internationalFteStatus: z
+      .enum(["none", "applied", "approved", "rejected"])
+      .transform((v) => (v === "rejected" ? "none" : v))
+      .optional(),
   })
   .refine((b) => b.isActive !== undefined || b.internationalFteStatus !== undefined, "Nothing to change");
 
-/** Activate / deactivate an employer, or decide their International FTE request. */
+/** Activate / deactivate an employer, or set their International FTE status (approve, revoke). */
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const guard = await requireMutation({ req, roles: ["admin"] });
@@ -24,6 +29,12 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
   const b = parsed.data;
   const db = getDb();
+  const [before] = await db
+    .select({ fte: schema.employers.internationalFteStatus })
+    .from(schema.employers)
+    .where(eq(schema.employers.id, id))
+    .limit(1);
+  if (!before) return NextResponse.json({ error: "Not found" }, { status: 404 });
   const updated = await db
     .update(schema.employers)
     .set({
@@ -31,7 +42,10 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       ...(b.internationalFteStatus
         ? {
             internationalFteStatus: b.internationalFteStatus,
-            internationalFteApprovedAt: b.internationalFteStatus === "approved" ? new Date() : null,
+            // Same timestamps legacy writes (routes.ts 10430-10445).
+            ...(b.internationalFteStatus === "approved" ? { internationalFteApprovedAt: new Date() } : {}),
+            ...(b.internationalFteStatus === "applied" ? { internationalFteAppliedAt: new Date(), internationalFteApprovedAt: null } : {}),
+            ...(b.internationalFteStatus === "none" ? { internationalFteAppliedAt: null, internationalFteApprovedAt: null } : {}),
           }
         : {}),
     })
@@ -40,15 +54,22 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (updated.length === 0) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   if (b.isActive !== undefined) forgetAccountStatus("employer", id);
-  if (b.internationalFteStatus === "approved" || b.internationalFteStatus === "rejected") {
+  const was = String(before.fte ?? "none");
+  const now = b.internationalFteStatus;
+  if (now === "approved" && was !== "approved") {
     await notify({
       to: { type: "employer", id },
-      type: `international_fte_${b.internationalFteStatus}`,
-      title: b.internationalFteStatus === "approved" ? "International FTE approved" : "International FTE declined",
-      message:
-        b.internationalFteStatus === "approved"
-          ? "You can now send full-time offers in USD."
-          : "Your International FTE request wasn't approved. Contact us for details.",
+      type: "international_fte_approved",
+      title: "International FTE approved",
+      message: "You can now send full-time offers in USD.",
+    });
+  } else if (now === "none" && was === "applied") {
+    // Declining a request: the status goes back to none so they can apply again.
+    await notify({
+      to: { type: "employer", id },
+      type: "international_fte_rejected",
+      title: "International FTE declined",
+      message: "Your International FTE request wasn't approved. Contact us for details.",
     });
   }
   return NextResponse.json({ ok: true });

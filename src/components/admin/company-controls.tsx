@@ -2,64 +2,88 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Trash2 } from "lucide-react";
 
-import { csrfFetch } from "@/lib/client-fetch";
+import { InlineSelect, InlineToggle, sendInline } from "@/components/admin/inline-control";
+import { buttonClass } from "@/components/ui/button";
+import { fteOf } from "@/lib/admin/fte";
+import { cn } from "@/lib/utils";
 
-/** Account status, International FTE decision and delete, for one employer. */
-export function CompanyControls({ id, isActive, fteStatus }: { id: string; isActive: boolean; fteStatus: string }) {
+/**
+ * Company controls, all on PATCH/DELETE /api/admin/companies/[id].
+ *
+ * International FTE uses legacy's three values only (none / applied /
+ * approved, ADP-03): Approve and Revoke are always available, and declining
+ * a request sets it back to "none" so the company can apply again. A stored
+ * "rejected" (written by an earlier build) reads as none.
+ */
+
+
+const FTE_OPTIONS = [
+  { value: "none", label: "Not approved" },
+  { value: "applied", label: "Applied" },
+  { value: "approved", label: "Approved" },
+] as const;
+
+export function CompanyFteSelect({ id, value, refresh = false }: { id: string; value: string; refresh?: boolean }) {
+  return (
+    <InlineSelect
+      label="International FTE status"
+      value={fteOf(value)}
+      options={FTE_OPTIONS}
+      refresh={refresh}
+      request={{ url: `/api/admin/companies/${id}`, method: "PATCH", valueKey: "internationalFteStatus" }}
+    />
+  );
+}
+
+export function CompanyActiveToggle({ id, isActive, refresh = false }: { id: string; isActive: boolean; refresh?: boolean }) {
+  return (
+    <InlineToggle
+      on={isActive}
+      onLabel="Active"
+      offLabel="Inactive"
+      turnOnLabel="Activate"
+      turnOffLabel="Deactivate"
+      confirmOff="Deactivate this company? They won't be able to sign in until reactivated."
+      refresh={refresh}
+      request={{ url: `/api/admin/companies/${id}`, method: "PATCH", valueKey: "isActive" }}
+    />
+  );
+}
+
+/** Delete, only for an employer with no proposals, interviews or payments (the API refuses otherwise). */
+export function CompanyDeleteButton({ id }: { id: string }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function call(method: "PATCH" | "DELETE", body?: unknown) {
+  async function remove() {
+    if (!window.confirm("Delete this employer permanently? This can't be undone.")) return;
     setBusy(true);
     setError(null);
-    const res = await csrfFetch(`/api/admin/companies/${id}`, {
-      method,
-      headers: { "Content-Type": "application/json" },
-      body: body ? JSON.stringify(body) : undefined,
-    });
-    const data = (await res.json().catch(() => ({}))) as { error?: string };
+    const result = await sendInline({ url: `/api/admin/companies/${id}`, method: "DELETE" });
     setBusy(false);
-    if (!res.ok) return setError(data.error ?? "That didn't work.");
-    if (method === "DELETE") router.push("/admin/companies");
-    else router.refresh();
+    if (!result.ok) return setError(result.error);
+    router.push("/admin/companies");
   }
 
-  const btn =
-    "apple-spring apple-pressable inline-flex min-h-11 items-center whitespace-nowrap rounded-[10px] border px-3.5 text-[14px] font-medium disabled:opacity-50";
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <span className="inline-flex flex-col gap-1">
       <button
         type="button"
         disabled={busy}
-        onClick={() => call("PATCH", { isActive: !isActive })}
-        className={`${btn} ${isActive ? "border-danger/30 text-danger hover:bg-danger-soft" : "border-brand-200 text-brand-700 hover:bg-brand-50"}`}
+        onClick={remove}
+        className={cn(buttonClass({ variant: "ghost", size: "sm" }), "text-danger hover:bg-danger-soft")}
       >
-        {isActive ? "Deactivate" : "Activate"}
-      </button>
-      {fteStatus === "applied" ? (
-        <>
-          <button type="button" disabled={busy} onClick={() => call("PATCH", { internationalFteStatus: "approved" })} className={`${btn} border-brand-200 text-brand-700 hover:bg-brand-50`}>
-            Approve International FTE
-          </button>
-          <button type="button" disabled={busy} onClick={() => call("PATCH", { internationalFteStatus: "rejected" })} className={`${btn} border-ink-200 text-ink-700 hover:bg-ink-50`}>
-            Decline FTE
-          </button>
-        </>
-      ) : (
-        <span className="text-[13px] text-text-subtle">International FTE: {fteStatus}</span>
-      )}
-      {/* Destructive action sits last and at the far end of the row. */}
-      <button
-        type="button"
-        disabled={busy}
-        onClick={() => window.confirm("Delete this employer permanently?") && call("DELETE")}
-        className={`${btn} border-transparent text-danger hover:bg-danger-soft sm:ml-auto`}
-      >
+        <Trash2 className="size-4" aria-hidden />
         Delete
       </button>
-      {error ? <span role="alert" className="text-xs text-danger">{error}</span> : null}
-    </div>
+      {error ? (
+        <span role="alert" className="max-w-xs text-xs font-medium text-danger">
+          {error}
+        </span>
+      ) : null}
+    </span>
   );
 }

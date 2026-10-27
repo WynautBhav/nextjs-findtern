@@ -4,171 +4,119 @@ import { desc, eq, getTableColumns, inArray } from "drizzle-orm";
 
 import { ContactEditor } from "@/components/admin/contact-editor";
 import { ViewAsButton } from "@/components/admin/view-as-button";
+import { AdminLoadError, Panel } from "@/components/admin/panel";
+import { Company360View, type Company360Tab } from "@/components/admin/company-360-view";
 import { getSession } from "@/lib/auth";
 import { canViewAs } from "@/lib/admin/impersonation";
-import { CompanyControls } from "@/components/admin/company-controls";
+import { flattenParams } from "@/lib/admin/params";
+import { companyLedger } from "@/lib/admin/company-ledger";
 import { getDb, schema, withoutPassword } from "@/lib/db";
-import { Company360View } from "@/components/admin/company-360-view";
-import { monthlyDues } from "@/lib/dues";
-import { parseOffer } from "@/lib/offer";
 
-export async function generateMetadata({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}): Promise<Metadata> {
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;
-  const db = getDb();
-  const [company] = await db
-    .select({ companyName: schema.employers.companyName })
-    .from(schema.employers)
-    .where(eq(schema.employers.id, id))
-    .limit(1);
-
-  return {
-    title: company ? `${company.companyName} · Company 360` : "Company Not Found",
-  };
+  try {
+    const [company] = await getDb()
+      .select({ companyName: schema.employers.companyName })
+      .from(schema.employers)
+      .where(eq(schema.employers.id, id))
+      .limit(1);
+    return { title: company ? `${company.companyName} · Company 360` : "Company not found" };
+  } catch {
+    return { title: "Company 360" };
+  }
 }
 
-export default async function AdminCompanyDetailPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
-  const { id } = await params;
-  const db = getDb();
-  const session = await getSession();
-  const viewAs = await canViewAs(session?.uid, session?.permissions);
+const TABS: Company360Tab[] = ["profile", "projects", "proposals", "interviews", "payments", "dues", "hired"];
 
+async function load(id: string) {
+  const db = getDb();
   const [company] = await db
     .select(withoutPassword(getTableColumns(schema.employers)))
     .from(schema.employers)
     .where(eq(schema.employers.id, id))
     .limit(1);
+  if (!company) return null;
 
-  if (!company) {
-    notFound();
-  }
-
-  // Fetch projects, proposals, interviews, payments in parallel
-  const [projects, rawProposals, rawInterviews, payments] = await Promise.all([
-    db
-      .select()
-      .from(schema.projects)
-      .where(eq(schema.projects.employerId, id))
-      .orderBy(desc(schema.projects.createdAt)),
-    db
-      .select()
-      .from(schema.proposals)
-      .where(eq(schema.proposals.employerId, id))
-      .orderBy(desc(schema.proposals.createdAt)),
-    db
-      .select()
-      .from(schema.interviews)
-      .where(eq(schema.interviews.employerId, id))
-      .orderBy(desc(schema.interviews.createdAt)),
-    db
-      .select()
-      .from(schema.employerPayments)
-      .where(eq(schema.employerPayments.employerId, id))
-      .orderBy(desc(schema.employerPayments.createdAt)),
+  const [projects, proposals, interviews, payments] = await Promise.all([
+    db.select().from(schema.projects).where(eq(schema.projects.employerId, id)).orderBy(desc(schema.projects.createdAt)),
+    db.select().from(schema.proposals).where(eq(schema.proposals.employerId, id)).orderBy(desc(schema.proposals.createdAt)),
+    db.select().from(schema.interviews).where(eq(schema.interviews.employerId, id)).orderBy(desc(schema.interviews.createdAt)),
+    db.select().from(schema.employerPayments).where(eq(schema.employerPayments.employerId, id)).orderBy(desc(schema.employerPayments.createdAt)),
   ]);
 
-  // Collect intern IDs across proposals and interviews
-  const internIds = Array.from(
-    new Set([
-      ...rawProposals.map((p) => p.internId),
-      ...rawInterviews.map((i) => i.internId),
-    ].filter(Boolean))
-  );
+  const internIds = [...new Set([...proposals.map((p) => p.internId), ...interviews.map((i) => i.internId)].filter(Boolean))];
+  const [interns, onboarding] = internIds.length
+    ? await Promise.all([
+        db
+          .select({ id: schema.users.id, firstName: schema.users.firstName, lastName: schema.users.lastName, email: schema.users.email })
+          .from(schema.users)
+          .where(inArray(schema.users.id, internIds)),
+        db
+          .select({ userId: schema.internOnboarding.userId, extraData: schema.internOnboarding.extraData })
+          .from(schema.internOnboarding)
+          .where(inArray(schema.internOnboarding.userId, internIds)),
+      ])
+    : [[], []];
 
-  const internMap = new Map<string, typeof schema.users.$inferSelect>();
-  if (internIds.length > 0) {
-    const users = await db
-      .select()
-      .from(schema.users)
-      .where(inArray(schema.users.id, internIds));
-    for (const u of users) {
-      internMap.set(u.id, u);
-    }
+  return { company, projects, proposals, interviews, payments, interns, onboarding };
+}
+
+export default async function AdminCompanyDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const { id } = await params;
+  const query = flattenParams(await searchParams);
+  const tab = (TABS as string[]).includes(query.tab ?? "") ? (query.tab as Company360Tab) : "profile";
+
+  let data: Awaited<ReturnType<typeof load>>;
+  try {
+    data = await load(id);
+  } catch (error) {
+    console.error("[admin/companies/[id]]", error);
+    return (
+      <Panel>
+        <AdminLoadError what="this company" retryHref={`/admin/companies/${id}`} />
+      </Panel>
+    );
   }
+  if (!data) notFound();
 
-  // Map project names
-  const projectMap = new Map<string, string>();
-  for (const p of projects) {
-    projectMap.set(p.id, p.projectName);
-  }
+  const session = await getSession();
+  const viewAs = await canViewAs(session?.uid, session?.permissions);
 
-  // Augment proposals with intern info
-  const proposals = rawProposals.map((prop) => {
-    const intern = internMap.get(prop.internId);
-    return {
-      ...prop,
-      internName: intern ? `${intern.firstName} ${intern.lastName}`.trim() : undefined,
-      internEmail: intern?.email || undefined,
-    };
-  });
-
-  // Augment interviews with intern info
-  const interviews = rawInterviews.map((intv) => {
-    const intern = internMap.get(intv.internId);
-    return {
-      ...intv,
-      internName: intern ? `${intern.firstName} ${intern.lastName}`.trim() : undefined,
-      internEmail: intern?.email || undefined,
-    };
-  });
-
-  // Hired = status "hired" (paid for). "Accepted" is not yet a hire.
-  const hiredProposals = rawProposals.filter(
-    (p) => p.status === "hired"
+  const scores = new Map(
+    data.onboarding.map((r) => [r.userId, Number(((r.extraData ?? {}) as Record<string, unknown>).findternScore) || 0]),
   );
-
-  const hiredInterns = hiredProposals.map((prop) => {
-    const intern = internMap.get(prop.internId) || null;
-    return {
-      proposal: prop,
-      intern,
-      projectName: projectMap.get(prop.projectId) || "Assigned Project",
-    };
-  });
-
-  const dues = monthlyDues(rawProposals, payments).map((d) => {
-    const prop = rawProposals.find((p) => p.id === d.proposalId)!;
-    const offer = parseOffer(prop.offerDetails, prop.currency);
-    const intern = internMap.get(prop.internId);
-    return {
-      ...d,
-      internName: intern ? `${intern.firstName} ${intern.lastName}`.trim() : "Intern",
-      role: offer.roleTitle || "Internship",
-      nextMinor: offer.monthlyMinor,
-      currency: offer.currency,
-    };
-  });
+  const ledger = companyLedger(data.proposals, data.payments, (internId) => scores.get(internId) ?? 0);
 
   return (
     <Company360View
-      company={company}
-      projects={projects}
-      proposals={proposals}
-      interviews={interviews}
-      payments={payments}
-      dues={dues}
-      hiredInterns={hiredInterns}
+      tab={tab}
+      params={query}
+      company={data.company}
+      projects={data.projects}
+      proposals={data.proposals}
+      interviews={data.interviews}
+      payments={data.payments}
+      interns={data.interns}
+      ledger={ledger}
       actions={
         <>
           <ContactEditor
             targetType="employer"
-            targetId={company.id}
+            targetId={data.company.id}
             initial={{
-              name: company.name,
-              email: company.companyEmail,
-              countryCode: company.countryCode,
-              phoneNumber: company.phoneNumber,
+              name: data.company.name,
+              email: data.company.companyEmail,
+              countryCode: data.company.countryCode,
+              phoneNumber: data.company.phoneNumber,
             }}
           />
-          {viewAs ? <ViewAsButton targetType="employer" targetId={company.id} label="View as company" /> : null}
-          <CompanyControls id={company.id} isActive={company.isActive} fteStatus={company.internationalFteStatus} />
+          {viewAs ? <ViewAsButton targetType="employer" targetId={data.company.id} label="View as company" /> : null}
         </>
       }
     />

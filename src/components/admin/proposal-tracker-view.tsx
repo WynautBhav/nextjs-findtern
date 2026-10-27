@@ -1,996 +1,669 @@
-"use client";
-
-import { useState, useMemo } from "react";
 import Link from "next/link";
-import {
-  Building2,
-  Clock,
-  ExternalLink,
-  Eye,
-  FileText,
-  Mail,
-  MapPin,
-  Search,
-  Send,
-  Users,
-  Video,
-  X,
-} from "lucide-react";
 
-import { formatDate, formatMoney } from "@/lib/format";
-import { AdminEmpty } from "@/components/admin/panel";
+import { DataTable, parseSort } from "@/components/admin/data-table";
+import { InterviewNotesButton, MeetingLinkCell, ProposalDetailsButton } from "@/components/admin/proposal-tracker-dialogs";
 import { StatusBadge } from "@/components/admin/status-badge";
-import { ProposalStatusEditor } from "@/components/admin/proposal-status-editor";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog";
+import type { ToolbarFilter } from "@/components/admin/table-toolbar";
+import { toQueryString } from "@/lib/admin/params";
+import { matchesSearch, paginate, proposalTimezone, sortBy } from "@/lib/admin/tracker";
+import { formatDate, formatMoney, formatSlotTime } from "@/lib/format";
 import { parseOffer } from "@/lib/offer";
+import { acceptanceRate, proposalOutcome } from "@/lib/proposals";
+import { cn } from "@/lib/utils";
 
-export type TrackerCompany = {
-  id: string;
-  companyName: string;
-  companyEmail: string;
-  city?: string | null;
-  state?: string | null;
-  isActive: boolean;
-  proposalsCount: number;
-  interviewsCount: number;
-  /** Accepted or hired (lib/proposals `won`). */
-  hiredCount: number;
-  /** Rejected, withdrawn or expired. */
-  rejectedCount: number;
-  /** Won share of decided proposals; null until one is decided. */
-  acceptanceRate: number | null;
-};
+/**
+ * The proposal pipeline's five lists. Server-rendered from rows the page has
+ * already filtered by date, company, candidate and timezone; this applies
+ * the per-tab search, status filters, sort and page, all from the URL.
+ */
 
-/** One candidate's proposal history across companies. */
-export type TrackerCandidate = {
-  internId: string;
-  name: string;
-  email: string | null;
-  phone: string | null;
-  received: number;
-  won: number;
-  lost: number;
-  open: number;
-  companies: string[];
-  lastReceivedAt: string | null;
-};
+export const TRACKER_TABS = ["companies", "proposals", "candidates", "interviews", "hired"] as const;
+export type TrackerTab = (typeof TRACKER_TABS)[number];
 
-type Tab = "companies" | "candidates" | "proposals" | "interviews";
-
-export type TrackerProposal = {
+type ProposalItem = {
   id: string;
   status: string;
   flowType: string | null;
   currency: string | null;
-  offerDetails: Record<string, unknown> | null;
-  createdAt: string | null;
-  hiredAt: string | null;
+  offerDetails: unknown;
+  createdAt: Date | null;
+  hiredAt: Date | null;
   internId: string;
   internFirstName: string | null;
   internLastName: string | null;
   internEmail: string | null;
-  internPhone?: string | null;
+  internPhone: string | null;
   employerId: string;
-  companyName: string;
+  companyName: string | null;
   projectId: string;
-  projectName: string;
-  /** Full-time offer (legacy "Full-time Hired" label and filter). */
-  fullTime?: boolean;
+  projectName: string | null;
+  projectTimezone: string | null;
 };
 
-export type TrackerInterview = {
+type InterviewItem = {
   id: string;
   status: string;
-  slot1: string | null;
-  slot2: string | null;
-  slot3: string | null;
+  slot1: Date | null;
+  slot2: Date | null;
+  slot3: Date | null;
   selectedSlot: number | null;
   timezone: string | null;
   meetingLink: string | null;
   notes: string | null;
-  createdAt: string | null;
+  createdAt: Date | null;
   internId: string;
   internFirstName: string | null;
   internLastName: string | null;
   internEmail: string | null;
   employerId: string;
-  companyName: string;
+  companyName: string | null;
   projectId: string | null;
   projectName: string | null;
 };
 
+type EmployerItem = { id: string; companyName: string; companyEmail: string; city: string | null; country: string | null; isActive: boolean };
+type Option = { value: string; label: string };
+
+const BASE = "/admin/proposal-tracker";
+const FINISHED_INTERVIEW = ["completed", "expired", "cancelled", "canceled"];
+
+const nameOf = (r: { internFirstName: string | null; internLastName: string | null; internEmail: string | null }) =>
+  `${r.internFirstName ?? ""} ${r.internLastName ?? ""}`.trim() || r.internEmail || "Candidate";
+const time = (d: Date | null) => (d ? d.getTime() : null);
+const chosenSlot = (i: InterviewItem) => (i.selectedSlot === 1 ? i.slot1 : i.selectedSlot === 2 ? i.slot2 : i.selectedSlot === 3 ? i.slot3 : null);
+
 export function ProposalTrackerView({
-  companies,
+  tab,
+  params,
+  page,
+  perPage,
+  search,
+  employers,
   proposals,
   interviews,
-  candidates,
-  initialTab = "companies",
+  options,
 }: {
-  companies: TrackerCompany[];
-  proposals: TrackerProposal[];
-  interviews: TrackerInterview[];
-  candidates: TrackerCandidate[];
-  initialTab?: Tab;
+  tab: TrackerTab;
+  params: Record<string, string>;
+  page: number;
+  perPage: number;
+  search: string;
+  employers: EmployerItem[];
+  proposals: ProposalItem[];
+  interviews: InterviewItem[];
+  options: { companies: Option[]; interns: Option[]; timezones: Option[] };
 }) {
-  const [activeTab, setActiveTab] = useState<Tab>(initialTab);
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [flowFilter, setFlowFilter] = useState("all");
-  const [kindFilter, setKindFilter] = useState<"all" | "fulltime" | "internship">("all");
+  const hired = proposals.filter((p) => p.status === "hired");
+  const candidateIds = new Set(proposals.map((p) => p.internId));
+  const activeCompanies = employers.filter((e) => proposals.some((p) => p.employerId === e.id) || interviews.some((i) => i.employerId === e.id));
 
-  // Dialog States
-  const [selectedProposal, setSelectedProposal] = useState<TrackerProposal | null>(null);
-  const [selectedInterview, setSelectedInterview] = useState<TrackerInterview | null>(null);
-  const [companyModalType, setCompanyModalType] = useState<"proposals" | "interviews" | null>(null);
-  const [selectedCompany, setSelectedCompany] = useState<TrackerCompany | null>(null);
+  const tabs: { key: TrackerTab; label: string; count: number }[] = [
+    { key: "companies", label: "Companies", count: activeCompanies.length },
+    { key: "proposals", label: "Proposals", count: proposals.length },
+    { key: "candidates", label: "Candidates", count: candidateIds.size },
+    { key: "interviews", label: "Interviews", count: interviews.length },
+    { key: "hired", label: "Hired", count: hired.length },
+  ];
 
-  // Filtered Companies
-  const filteredCompanies = useMemo(() => {
-    if (!search.trim()) return companies;
-    const q = search.toLowerCase();
-    return companies.filter(
-      (c) =>
-        c.companyName.toLowerCase().includes(q) ||
-        c.companyEmail.toLowerCase().includes(q) ||
-        (c.city && c.city.toLowerCase().includes(q))
-    );
-  }, [companies, search]);
-
-  const filteredCandidates = useMemo(() => {
-    const q = search.toLowerCase().trim();
-    if (!q) return candidates;
-    return candidates.filter(
-      (c) =>
-        c.name.toLowerCase().includes(q) ||
-        (c.email && c.email.toLowerCase().includes(q)) ||
-        (c.phone && c.phone.includes(q)) ||
-        c.companies.some((name) => name.toLowerCase().includes(q)),
-    );
-  }, [candidates, search]);
-
-  // Filtered Proposals
-  const filteredProposals = useMemo(() => {
-    return proposals.filter((p) => {
-      const q = search.toLowerCase().trim();
-      const matchSearch =
-        !q ||
-        (p.internFirstName && p.internFirstName.toLowerCase().includes(q)) ||
-        (p.internLastName && p.internLastName.toLowerCase().includes(q)) ||
-        (p.internEmail && p.internEmail.toLowerCase().includes(q)) ||
-        p.companyName.toLowerCase().includes(q) ||
-        p.projectName.toLowerCase().includes(q);
-
-      const matchStatus = statusFilter === "all" || p.status === statusFilter;
-      const matchFlow = flowFilter === "all" || p.flowType === flowFilter;
-      const matchKind = kindFilter === "all" || (kindFilter === "fulltime" ? Boolean(p.fullTime) : !p.fullTime);
-
-      return matchSearch && matchStatus && matchFlow && matchKind;
-    });
-  }, [proposals, search, statusFilter, flowFilter, kindFilter]);
-
-  // Filtered Interviews
-  const filteredInterviews = useMemo(() => {
-    return interviews.filter((i) => {
-      const q = search.toLowerCase().trim();
-      const matchSearch =
-        !q ||
-        (i.internFirstName && i.internFirstName.toLowerCase().includes(q)) ||
-        (i.internLastName && i.internLastName.toLowerCase().includes(q)) ||
-        (i.internEmail && i.internEmail.toLowerCase().includes(q)) ||
-        i.companyName.toLowerCase().includes(q) ||
-        (i.projectName && i.projectName.toLowerCase().includes(q));
-
-      const matchStatus = statusFilter === "all" || i.status === statusFilter;
-
-      return matchSearch && matchStatus;
-    });
-  }, [interviews, search, statusFilter]);
-
-  // Modals data for selected company
-  const companyProposals = useMemo(() => {
-    if (!selectedCompany) return [];
-    return proposals.filter((p) => p.employerId === selectedCompany.id);
-  }, [proposals, selectedCompany]);
-
-  const companyInterviews = useMemo(() => {
-    if (!selectedCompany) return [];
-    return interviews.filter((i) => i.employerId === selectedCompany.id);
-  }, [interviews, selectedCompany]);
+  // Shared pickers (ADP-12): exact company, exact candidate, timezone.
+  const pickers: ToolbarFilter[] = [
+    { key: "company", label: "Company", allLabel: "All companies", options: options.companies },
+    { key: "intern", label: "Candidate", allLabel: "All candidates", options: options.interns },
+    { key: "tz", label: "Timezone", allLabel: "All timezones", options: options.timezones },
+  ];
+  // Tab changes keep the pickers and dates, and drop the per-tab state.
+  const keep = { from: params.from ?? "", to: params.to ?? "", company: params.company ?? "", intern: params.intern ?? "", tz: params.tz ?? "" };
 
   return (
-    <div className="space-y-6">
-      {/* Main tabs - the ink-100 segmented control shared with payouts and messages */}
-      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-ink-100 pb-3">
-        <div
-          role="tablist"
-          aria-label="Pipeline view"
-          className="flex max-w-full gap-0.5 overflow-x-auto rounded-[10px] bg-ink-100 p-1"
-        >
-          {(
-            [
-              { key: "companies", label: "Company List", Icon: Building2, count: companies.length },
-              { key: "proposals", label: "Proposals", Icon: Send, count: proposals.length },
-              { key: "candidates", label: "Candidates", Icon: Users, count: candidates.length },
-              { key: "interviews", label: "Interviews", Icon: Clock, count: interviews.length },
-            ] as const
-          ).map((tab) => (
-            <button
-              key={tab.key}
-              type="button"
-              role="tab"
-              aria-selected={activeTab === tab.key}
-              onClick={() => {
-                setActiveTab(tab.key);
-                setSearch("");
-                setStatusFilter("all");
-              }}
-              className={`apple-spring apple-pressable inline-flex min-h-11 shrink-0 items-center gap-2 whitespace-nowrap rounded-[8px] px-4 text-[14px] font-medium tracking-[-0.01em] ${
-                activeTab === tab.key ? "bg-white text-ink-900 shadow-xs" : "text-ink-600 hover:text-ink-800"
-              }`}
-            >
-              <tab.Icon className="size-4" aria-hidden />
-              <span>{tab.label}</span>
-              <span
-                className={`rounded-full px-2 py-0.5 text-xs tabular-nums ${
-                  activeTab === tab.key ? "bg-brand-50 text-brand-800" : "bg-ink-200/70 text-ink-600"
-                }`}
-              >
-                {tab.count}
-              </span>
-            </button>
-          ))}
-        </div>
-
-        {/* Global Search & Filters */}
-        <div className="flex w-full flex-wrap items-center gap-2 lg:w-auto">
-          <div className="relative w-full min-w-[12rem] flex-1 sm:w-auto sm:max-w-xs">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-ink-400" />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder={
-                activeTab === "companies"
-                  ? "Search companies, email..."
-                  : activeTab === "candidates"
-                  ? "Search candidate, email, phone, company..."
-                  : activeTab === "proposals"
-                  ? "Search candidate, company, project..."
-                  : "Search candidate, company..."
-              }
-              className="min-h-11 w-full rounded-[10px] border border-ink-200 bg-white pl-9 pr-8 text-sm focus:border-brand-500 focus:outline-hidden focus:ring-2 focus:ring-brand-500/20"
-            />
-            {search && (
-              <button
-                type="button"
-                onClick={() => setSearch("")}
-                aria-label="Clear search"
-                className="absolute right-1 top-1/2 flex min-h-11 min-w-11 -translate-y-1/2 items-center justify-center rounded-[10px] text-ink-600 hover:text-ink-700"
-              >
-                <X className="size-3.5" />
-              </button>
-            )}
-          </div>
-
-          {activeTab === "proposals" && (
-            <>
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                aria-label="Filter proposals by status"
-                className="min-h-11 rounded-[10px] border border-ink-200 bg-white px-3 text-sm text-ink-700 focus:border-brand-500 focus:outline-hidden"
-              >
-                <option value="all">All Status</option>
-                <option value="sent">Sent</option>
-                <option value="accepted">Accepted</option>
-                <option value="hired">Hired</option>
-                <option value="rejected">Rejected</option>
-                <option value="expired">Expired</option>
-                <option value="withdrawn">Withdrawn</option>
-              </select>
-
-              <select
-                value={flowFilter}
-                onChange={(e) => setFlowFilter(e.target.value)}
-                aria-label="Filter proposals by flow type"
-                className="min-h-11 rounded-[10px] border border-ink-200 bg-white px-3 text-sm text-ink-700 focus:border-brand-500 focus:outline-hidden"
-              >
-                <option value="all">All Flows</option>
-                <option value="direct">Direct Offer</option>
-                <option value="interview_first">Interview First</option>
-              </select>
-
-              <select
-                value={kindFilter}
-                onChange={(e) => setKindFilter(e.target.value as typeof kindFilter)}
-                aria-label="Filter proposals by offer type"
-                className="min-h-11 rounded-[10px] border border-ink-200 bg-white px-3 text-sm text-ink-700 focus:border-brand-500 focus:outline-hidden"
-              >
-                <option value="all">Internship &amp; full-time</option>
-                <option value="internship">Internship</option>
-                <option value="fulltime">Full-time</option>
-              </select>
-            </>
-          )}
-
-          {activeTab === "interviews" && (
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              aria-label="Filter interviews by status"
-              className="min-h-11 rounded-[10px] border border-ink-200 bg-white px-3 text-sm text-ink-700 focus:border-brand-500 focus:outline-hidden"
-            >
-              <option value="all">All Status</option>
-              <option value="scheduled">Scheduled</option>
-              <option value="pending">Pending</option>
-              <option value="completed">Completed</option>
-              <option value="expired">Expired</option>
-              <option value="missed">Missed</option>
-            </select>
-          )}
-        </div>
-      </div>
-
-      {/* Tab 1: Company List View */}
-      {activeTab === "companies" && (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {filteredCompanies.length === 0 ? (
-            <div className="col-span-full rounded-2xl border border-dashed border-ink-200 bg-white">
-              <AdminEmpty
-                title="No companies match"
-                body={search ? `Nothing matches "${search}". Try a shorter search.` : "No companies have sent proposals in this range."}
-              />
-            </div>
-          ) : (
-            filteredCompanies.map((c) => (
-              <div
-                key={c.id}
-                className="group flex flex-col justify-between rounded-2xl border border-ink-200/80 bg-white p-5 shadow-2xs hover:border-brand-300 hover:shadow-md transition-all"
-              >
-                <div>
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex min-w-0 flex-1 items-center gap-3">
-                      <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-brand-50 text-base font-bold text-brand-800 border border-brand-200/50">
-                        {c.companyName.charAt(0).toUpperCase()}
-                      </div>
-                      <div className="min-w-0">
-                        <h3 className="truncate text-sm font-bold text-ink-900 group-hover:text-brand-800 transition-colors">
-                          {c.companyName}
-                        </h3>
-                        <p className="flex min-w-0 items-center gap-1 text-2xs text-text-subtle">
-                          <Mail className="size-3 shrink-0" />
-                          <span className="truncate">{c.companyEmail}</span>
-                        </p>
-                      </div>
-                    </div>
-                    <span className="shrink-0">
-                      <StatusBadge value={c.isActive ? "active" : "inactive"} />
-                    </span>
-                  </div>
-
-                  {c.city && (
-                    <div className="mt-3 flex items-center gap-1 text-2xs text-ink-600">
-                      <MapPin className="size-3" />
-                      <span>
-                        {c.city}
-                        {c.state ? `, ${c.state}` : ""}
-                      </span>
-                    </div>
+    <div className="space-y-4">
+      <nav aria-label="Pipeline view" className="-mx-1 overflow-x-auto px-1">
+        <ul className="flex min-w-max gap-1 border-b border-ink-200/80">
+          {tabs.map((t) => {
+            const active = t.key === tab;
+            return (
+              <li key={t.key}>
+                <Link
+                  href={`${BASE}${toQueryString({ ...keep, tab: t.key })}`}
+                  scroll={false}
+                  aria-current={active ? "page" : undefined}
+                  className={cn(
+                    "-mb-px inline-flex min-h-11 items-center gap-2 border-b-2 px-3 text-sm font-medium focus-visible:outline-2 focus-visible:outline-brand-600",
+                    active ? "border-brand-700 text-ink-900" : "border-transparent text-ink-600 hover:text-ink-900",
                   )}
-
-                  {/* Stats Grid */}
-                  <div className="mt-4 grid grid-cols-2 gap-2 rounded-xl bg-ink-50/70 p-3 text-center xl:grid-cols-4">
-                    <div className="min-w-0">
-                      <p className="truncate text-2xs text-text-subtle">Proposals</p>
-                      <p className="text-base font-bold tabular-nums text-ink-900">{c.proposalsCount}</p>
-                    </div>
-                    <div className="min-w-0">
-                      <p className="truncate text-2xs text-text-subtle">Interviews</p>
-                      <p className="text-base font-bold tabular-nums text-ink-900">{c.interviewsCount}</p>
-                    </div>
-                    <div className="min-w-0">
-                      <p className="truncate text-2xs text-text-subtle">Hired</p>
-                      <p className="text-base font-bold tabular-nums text-emerald-700">{c.hiredCount}</p>
-                    </div>
-                    <div className="min-w-0">
-                      <p className="truncate text-2xs text-text-subtle">Rejected</p>
-                      <p className="text-base font-bold tabular-nums text-ink-700">{c.rejectedCount}</p>
-                    </div>
-                  </div>
-                  <p className="mt-2 text-2xs text-text-subtle">
-                    {c.acceptanceRate === null
-                      ? "No decided proposals yet"
-                      : `${c.acceptanceRate}% acceptance on decided proposals`}
-                  </p>
-                </div>
-
-                {/* Actions */}
-                <div className="mt-5 flex flex-wrap items-center justify-between gap-2 border-t border-ink-100 pt-3">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSelectedCompany(c);
-                        setCompanyModalType("proposals");
-                      }}
-                      className="apple-spring inline-flex min-h-9 items-center gap-1 whitespace-nowrap rounded-lg border border-ink-200 bg-white px-2.5 text-2xs font-medium text-ink-700 hover:bg-ink-50 hover:text-ink-900 max-lg:min-h-11"
-                    >
-                      <FileText className="size-3 text-brand-600" />
-                      <span>Proposals ({c.proposalsCount})</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSelectedCompany(c);
-                        setCompanyModalType("interviews");
-                      }}
-                      className="apple-spring inline-flex min-h-9 items-center gap-1 whitespace-nowrap rounded-lg border border-ink-200 bg-white px-2.5 text-2xs font-medium text-ink-700 hover:bg-ink-50 hover:text-ink-900 max-lg:min-h-11"
-                    >
-                      <Clock className="size-3 text-amber-600" />
-                      <span>Interviews ({c.interviewsCount})</span>
-                    </button>
-                  </div>
-
-                  <Link
-                    href={`/admin/companies/${c.id}`}
-                    className="inline-flex min-h-9 items-center gap-1 whitespace-nowrap text-2xs font-semibold text-brand-700 hover:underline max-lg:min-h-11"
-                  >
-                    <span>360 View</span>
-                    <ExternalLink className="size-3" />
-                  </Link>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-      )}
-
-      {/* Candidates: who received proposals, from whom, and the outcome */}
-      {activeTab === "candidates" && (
-        <div className="overflow-hidden rounded-2xl border border-ink-200/80 bg-white shadow-2xs">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[52rem] text-left text-xs">
-              <thead className="border-b border-ink-100 bg-ink-50/70 text-2xs uppercase tracking-wider text-text-subtle">
-                <tr>
-                  <th scope="col" className="px-4 py-3 font-semibold">Candidate</th>
-                  <th scope="col" className="px-4 py-3 font-semibold">Contact</th>
-                  <th scope="col" className="px-4 py-3 text-right font-semibold">Received</th>
-                  <th scope="col" className="px-4 py-3 text-right font-semibold">Accepted / hired</th>
-                  <th scope="col" className="px-4 py-3 text-right font-semibold">Rejected</th>
-                  <th scope="col" className="px-4 py-3 text-right font-semibold">Open</th>
-                  <th scope="col" className="px-4 py-3 font-semibold">From</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-ink-100">
-                {filteredCandidates.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="px-4 py-12 text-center text-sm text-ink-600">
-                      No candidates received proposals in this range.
-                    </td>
-                  </tr>
-                ) : (
-                  filteredCandidates.map((c) => (
-                    <tr key={c.internId} className="hover:bg-ink-50/50">
-                      <td className="px-4 py-3">
-                        <Link href={`/admin/interns/${c.internId}`} className="font-semibold text-ink-900 hover:text-brand-700 hover:underline">
-                          {c.name}
-                        </Link>
-                        {c.lastReceivedAt ? (
-                          <p className="text-2xs text-text-subtle">Last: {formatDate(c.lastReceivedAt)}</p>
-                        ) : null}
-                      </td>
-                      <td className="px-4 py-3 text-ink-600">
-                        <p>{c.email ?? "-"}</p>
-                        <p className="tabular-nums">{c.phone ?? "-"}</p>
-                      </td>
-                      <td className="px-4 py-3 text-right font-semibold tabular-nums text-ink-900">{c.received}</td>
-                      <td className="px-4 py-3 text-right tabular-nums text-emerald-700">{c.won}</td>
-                      <td className="px-4 py-3 text-right tabular-nums text-ink-700">{c.lost}</td>
-                      <td className="px-4 py-3 text-right tabular-nums text-ink-600">{c.open}</td>
-                      <td className="max-w-[16rem] px-4 py-3 text-ink-600">{c.companies.join(", ")}</td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* Tab 2: Proposals Table View */}
-      {activeTab === "proposals" && (
-        <div className="overflow-hidden rounded-2xl border border-ink-200/80 bg-white shadow-2xs">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="border-b border-ink-100 bg-ink-50/70 font-semibold text-ink-700">
-                <tr>
-                  <th className="px-5 py-3">Candidate</th>
-                  <th className="px-5 py-3">Company & Project</th>
-                  <th className="px-5 py-3">Monthly Offer</th>
-                  <th className="px-5 py-3">Flow & Status</th>
-                  <th className="px-5 py-3">Sent Date</th>
-                  <th className="px-5 py-3 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-ink-100">
-                {filteredProposals.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="py-10 text-center text-ink-600">
-                      No proposals match current filters.
-                    </td>
-                  </tr>
-                ) : (
-                  filteredProposals.map((p) => {
-                    const internName = `${p.internFirstName || ""} ${p.internLastName || ""}`.trim() || "Candidate";
-                    const offer = parseOffer(p.offerDetails, p.currency);
-
-                    return (
-                      <tr key={p.id} className="hover:bg-ink-50/50 transition-colors">
-                        <td className="px-5 py-3.5">
-                          <Link
-                            href={`/admin/interns/${p.internId}`}
-                            className="font-semibold text-ink-900 hover:text-brand-700 hover:underline"
-                          >
-                            {internName}
-                          </Link>
-                          <p className="text-2xs text-text-subtle">{p.internEmail || "-"}</p>
-                        </td>
-                        <td className="px-5 py-3.5">
-                          <Link
-                            href={`/admin/companies/${p.employerId}`}
-                            className="font-medium text-ink-800 hover:underline"
-                          >
-                            {p.companyName}
-                          </Link>
-                          <p className="text-2xs text-text-subtle">{p.projectName}</p>
-                        </td>
-                        <td className="px-5 py-3.5 font-semibold text-ink-900">
-                          {offer.monthlyMinor != null ? `${formatMoney(offer.monthlyMinor, offer.currency)}/mo` : "—"}
-                        </td>
-                        <td className="px-5 py-3.5">
-                          <div className="flex items-center gap-2">
-                            {p.fullTime && p.status === "hired" ? (
-                              <StatusBadge tone="success" label="Full-time Hired" />
-                            ) : (
-                              <StatusBadge value={p.status} />
-                            )}
-                            <span className="rounded-md bg-ink-100 px-1.5 py-0.5 text-2xs text-ink-600">
-                              {p.flowType === "direct" ? "Direct" : "Interview"}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="px-5 py-3.5 tabular-nums text-text-subtle">
-                          {p.createdAt ? formatDate(p.createdAt) : "-"}
-                        </td>
-                        <td className="px-5 py-3.5 text-right">
-                          <button
-                            type="button"
-                            onClick={() => setSelectedProposal(p)}
-                            className="inline-flex items-center gap-1 rounded-lg border border-ink-200 bg-white px-2.5 py-1 text-xs font-semibold text-ink-700 shadow-2xs hover:bg-brand-50 hover:text-brand-800 hover:border-brand-300 transition-colors"
-                          >
-                            <Eye className="size-3.5" />
-                            <span>View Details</span>
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* Tab 3: Interviews Table View */}
-      {activeTab === "interviews" && (
-        <div className="overflow-hidden rounded-2xl border border-ink-200/80 bg-white shadow-2xs">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="border-b border-ink-100 bg-ink-50/70 font-semibold text-ink-700">
-                <tr>
-                  <th className="px-5 py-3">Candidate</th>
-                  <th className="px-5 py-3">Company & Project</th>
-                  <th className="px-5 py-3">Scheduled Slots</th>
-                  <th className="px-5 py-3">Status</th>
-                  <th className="px-5 py-3">Meeting</th>
-                  <th className="px-5 py-3 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-ink-100">
-                {filteredInterviews.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="py-10 text-center text-ink-600">
-                      No interviews match current filters.
-                    </td>
-                  </tr>
-                ) : (
-                  filteredInterviews.map((i) => {
-                    const internName = `${i.internFirstName || ""} ${i.internLastName || ""}`.trim() || "Candidate";
-                    const slots = [i.slot1, i.slot2, i.slot3].filter(Boolean);
-
-                    return (
-                      <tr key={i.id} className="hover:bg-ink-50/50 transition-colors">
-                        <td className="px-5 py-3.5">
-                          <Link
-                            href={`/admin/interns/${i.internId}`}
-                            className="font-semibold text-ink-900 hover:text-brand-700 hover:underline"
-                          >
-                            {internName}
-                          </Link>
-                          <p className="text-2xs text-text-subtle">{i.internEmail || "-"}</p>
-                        </td>
-                        <td className="px-5 py-3.5">
-                          <Link
-                            href={`/admin/companies/${i.employerId}`}
-                            className="font-medium text-ink-800 hover:underline"
-                          >
-                            {i.companyName}
-                          </Link>
-                          <p className="text-2xs text-text-subtle">{i.projectName || "General Interview"}</p>
-                        </td>
-                        <td className="px-5 py-3.5">
-                          {slots.length === 0 ? (
-                            <span className="text-text-subtle">No slots specified</span>
-                          ) : (
-                            <div className="space-y-0.5">
-                              {slots.map((s, idx) => (
-                                <p
-                                  key={idx}
-                                  className={`text-2xs ${
-                                    i.selectedSlot === idx + 1
-                                      ? "font-bold text-brand-700"
-                                      : "text-text-subtle"
-                                  }`}
-                                >
-                                  {i.selectedSlot === idx + 1 ? "✓ " : "• "}
-                                  {new Date(s!).toLocaleString("en-IN", {
-                                    day: "numeric",
-                                    month: "short",
-                                    hour: "2-digit",
-                                    minute: "2-digit",
-                                  })}
-                                </p>
-                              ))}
-                            </div>
-                          )}
-                        </td>
-                        <td className="px-5 py-3.5">
-                          <StatusBadge value={i.status} />
-                        </td>
-                        <td className="px-5 py-3.5">
-                          {i.meetingLink ? (
-                            <a
-                              href={i.meetingLink}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 text-2xs font-semibold text-brand-700 hover:underline"
-                            >
-                              <Video className="size-3" />
-                              <span>Join Link</span>
-                            </a>
-                          ) : (
-                            <span className="text-2xs text-text-subtle">-</span>
-                          )}
-                        </td>
-                        <td className="px-5 py-3.5 text-right">
-                          <button
-                            type="button"
-                            onClick={() => setSelectedInterview(i)}
-                            className="inline-flex items-center gap-1 rounded-lg border border-ink-200 bg-white px-2.5 py-1 text-xs font-semibold text-ink-700 shadow-2xs hover:bg-brand-50 hover:text-brand-800 hover:border-brand-300 transition-colors"
-                          >
-                            <Eye className="size-3.5" />
-                            <span>View Details</span>
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* 1. Proposal Details Modal */}
-      <Dialog
-        open={selectedProposal !== null}
-        onOpenChange={(open) => !open && setSelectedProposal(null)}
-      >
-        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-lg font-bold text-ink-900">
-              <FileText className="size-5 text-brand-600" />
-              <span>Proposal Terms & Details</span>
-            </DialogTitle>
-            <DialogDescription className="text-xs text-text-subtle">
-              Full offer parameters submitted between employer and candidate.
-            </DialogDescription>
-          </DialogHeader>
-
-          {selectedProposal && (
-            <div className="space-y-5 pt-3">
-              {/* Header Box */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl bg-ink-50 p-4 border border-ink-100">
-                <div>
-                  <h4 className="text-base font-bold text-ink-900">{selectedProposal.projectName}</h4>
-                  <p className="text-xs text-text-subtle mt-0.5">
-                    Offered by <span className="font-semibold text-ink-800">{selectedProposal.companyName}</span>
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <StatusBadge value={selectedProposal.status} />
-                  <ProposalStatusEditor
-                    proposalId={selectedProposal.id}
-                    status={selectedProposal.status}
-                  />
-                </div>
-              </div>
-
-              {/* Candidate Info */}
-              <div className="grid grid-cols-2 gap-3 text-xs">
-                <div className="rounded-xl border border-ink-100 p-3">
-                  <p className="text-2xs font-semibold uppercase text-text-subtle">Candidate</p>
-                  <p className="mt-1 font-semibold text-ink-900">
-                    {selectedProposal.internFirstName} {selectedProposal.internLastName}
-                  </p>
-                  <p className="text-2xs text-text-subtle">{selectedProposal.internEmail}</p>
-                </div>
-                <div className="rounded-xl border border-ink-100 p-3">
-                  <p className="text-2xs font-semibold uppercase text-text-subtle">Flow Type</p>
-                  <p className="mt-1 font-semibold text-ink-900 capitalize">
-                    {selectedProposal.flowType === "direct" ? "Direct Offer" : "Interview First"}
-                  </p>
-                  <p className="text-2xs text-text-subtle">
-                    Sent: {selectedProposal.createdAt ? formatDate(selectedProposal.createdAt) : "-"}
-                  </p>
-                </div>
-              </div>
-
-              {/* Offer Details Grid */}
-              <div>
-                <h5 className="text-xs font-bold uppercase tracking-wider text-ink-600 mb-2">
-                  Agreed Offer Terms
-                </h5>
-                {selectedProposal.offerDetails && Object.keys(selectedProposal.offerDetails).length > 0 ? (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                    {Object.entries(selectedProposal.offerDetails).map(([key, val]) => (
-                      <div key={key} className="rounded-lg bg-ink-50/70 p-2.5 border border-ink-100/60">
-                        <p className="text-2xs font-medium uppercase text-text-subtle">
-                          {key.replace(/([A-Z])/g, " $1").replace(/_/g, " ")}
-                        </p>
-                        <p className="mt-0.5 font-semibold text-xs text-ink-900 break-words">
-                          {typeof val === "object" ? JSON.stringify(val) : String(val || "-")}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-xs text-ink-600 italic">No custom terms recorded on this proposal.</p>
-                )}
-              </div>
-
-              <div className="flex justify-end gap-2 border-t border-ink-100 pt-3">
-                <button
-                  type="button"
-                  onClick={() => setSelectedProposal(null)}
-                  className="rounded-xl border border-ink-200 px-4 py-2 text-xs font-semibold text-ink-700 hover:bg-ink-50"
                 >
-                  Close
-                </button>
-              </div>
+                  {t.label}
+                  <span className={cn("nums rounded-full px-2 py-0.5 text-xs", active ? "bg-brand-50 text-brand-800" : "bg-ink-100 text-ink-600")}>
+                    {t.count}
+                  </span>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      </nav>
+
+      {tab === "companies" ? <CompaniesTab {...{ params, page, perPage, search, pickers, proposals, interviews }} employers={activeCompanies} /> : null}
+      {tab === "proposals" ? <ProposalsTab {...{ params, page, perPage, search, pickers }} rows={proposals} /> : null}
+      {tab === "candidates" ? <CandidatesTab {...{ params, page, perPage, search, pickers, proposals }} /> : null}
+      {tab === "interviews" ? <InterviewsTab {...{ params, page, perPage, search, pickers }} rows={interviews} /> : null}
+      {tab === "hired" ? <HiredTab {...{ params, page, perPage, search, pickers }} rows={hired} /> : null}
+    </div>
+  );
+}
+
+type TabProps = { params: Record<string, string>; page: number; perPage: number; search: string; pickers: ToolbarFilter[] };
+
+const filteredEmpty = (params: Record<string, string>, tab: TrackerTab) => ({
+  title: "Nothing matches",
+  body: "No row matches this search and these filters. Clear them to see everything in this tab.",
+  action: { href: `${BASE}?tab=${tab}`, label: "Clear filters" },
+});
+
+function CompaniesTab({
+  params,
+  page,
+  perPage,
+  search,
+  pickers,
+  employers,
+  proposals,
+  interviews,
+}: TabProps & { employers: EmployerItem[]; proposals: ProposalItem[]; interviews: InterviewItem[] }) {
+  const rows = employers
+    .filter((e) => matchesSearch([e.companyName, e.companyEmail, e.city, e.country], search))
+    .map((e) => {
+      const mine = proposals.filter((p) => p.employerId === e.id);
+      const won = mine.filter((p) => proposalOutcome(p.status) === "won").length;
+      const lost = mine.filter((p) => proposalOutcome(p.status) === "lost").length;
+      return {
+        ...e,
+        proposals: mine.length,
+        interviews: interviews.filter((i) => i.employerId === e.id).length,
+        hired: mine.filter((p) => p.status === "hired").length,
+        won,
+        lost,
+        rate: acceptanceRate(won, lost),
+      };
+    });
+  const sort = parseSort(params, ["name", "proposals", "interviews", "hired", "rate"] as const, { key: "proposals", dir: "desc" });
+  const sorted = sortBy(rows, (r) => (sort.key === "name" ? r.companyName.toLowerCase() : r[sort.key]), sort.dir);
+  const pg = paginate(sorted, page, perPage);
+  const q = (company: string, tab: TrackerTab) => `${BASE}${toQueryString({ from: params.from ?? "", to: params.to ?? "", company, tab })}`;
+
+  return (
+    <DataTable
+      basePath={BASE}
+      params={params}
+      page={pg.page}
+      pages={pg.pages}
+      total={pg.total}
+      perPage={perPage}
+      rows={pg.rows}
+      noun="companies"
+      caption="Companies in the pipeline"
+      searchPlaceholder="Search company, email, city…"
+      filters={pickers.filter((f) => f.key !== "intern")}
+      empty={search || params.company || params.tz ? filteredEmpty(params, "companies") : { title: "No hiring activity", body: "Companies appear here once they send a proposal or ask for an interview." }}
+      columns={[
+        {
+          header: "Company",
+          sort: "name",
+          cell: (r) => (
+            <Link href={`/admin/companies/${r.id}`} className="group block min-w-0 max-w-64">
+              <p className="truncate font-medium text-ink-900 group-hover:text-brand-700 group-hover:underline">{r.companyName}</p>
+              <p className="truncate text-xs text-ink-600">{[r.city, r.country].filter(Boolean).join(", ") || r.companyEmail}</p>
+            </Link>
+          ),
+        },
+        {
+          header: "Proposals",
+          sort: "proposals",
+          align: "right",
+          cell: (r) => (
+            <Link href={q(r.id, "proposals")} className="font-medium hover:text-brand-700 hover:underline">
+              {r.proposals}
+            </Link>
+          ),
+        },
+        {
+          header: "Interviews",
+          sort: "interviews",
+          align: "right",
+          cell: (r) => (
+            <Link href={q(r.id, "interviews")} className="font-medium hover:text-brand-700 hover:underline">
+              {r.interviews}
+            </Link>
+          ),
+        },
+        { header: "Accepted or hired", align: "right", cell: (r) => r.won },
+        { header: "Hired", sort: "hired", align: "right", cell: (r) => r.hired },
+        { header: "Declined", align: "right", cell: (r) => r.lost },
+        { header: "Acceptance", sort: "rate", align: "right", cell: (r) => (r.rate === null ? <span className="text-ink-400">-</span> : `${r.rate}%`) },
+        { header: "Account", cell: (r) => <StatusBadge value={r.isActive ? "active" : "inactive"} /> },
+      ]}
+    />
+  );
+}
+
+function ProposalsTab({ params, page, perPage, search, pickers, rows }: TabProps & { rows: ProposalItem[] }) {
+  const filtered = rows.filter((p) => {
+    const offer = parseOffer(p.offerDetails, p.currency);
+    return (
+      matchesSearch([nameOf(p), p.internEmail, p.companyName, p.projectName, offer.roleTitle], search) &&
+      (!params.status || p.status === params.status) &&
+      (!params.flow || p.flowType === params.flow) &&
+      (!params.kind || (params.kind === "fulltime" ? Boolean(offer.fullTime) : !offer.fullTime))
+    );
+  });
+  const sort = parseSort(params, ["candidate", "company", "start", "sent"] as const, { key: "sent", dir: "desc" });
+  const sorted = sortBy(
+    filtered,
+    (p) =>
+      sort.key === "candidate"
+        ? nameOf(p).toLowerCase()
+        : sort.key === "company"
+          ? (p.companyName ?? "").toLowerCase()
+          : sort.key === "start"
+            ? parseOffer(p.offerDetails, p.currency).startDate
+            : time(p.createdAt),
+    sort.dir,
+  );
+  const pg = paginate(sorted, page, perPage);
+  const filtersOn = Boolean(search || params.status || params.flow || params.kind || params.company || params.intern || params.tz);
+
+  return (
+    <DataTable
+      basePath={BASE}
+      params={params}
+      page={pg.page}
+      pages={pg.pages}
+      total={pg.total}
+      perPage={perPage}
+      rows={pg.rows}
+      noun="proposals"
+      caption="Proposals"
+      searchPlaceholder="Search candidate, company, project, role…"
+      filters={[
+        ...pickers,
+        {
+          key: "status",
+          label: "Status",
+          options: [
+            { value: "sent", label: "Sent" },
+            { value: "interview_scheduled", label: "Interview scheduled" },
+            { value: "accepted", label: "Accepted" },
+            { value: "processing", label: "Processing" },
+            { value: "hired", label: "Hired" },
+            { value: "rejected", label: "Rejected" },
+            { value: "expired", label: "Expired" },
+            { value: "withdrawn", label: "Withdrawn" },
+          ],
+        },
+        { key: "flow", label: "Flow", options: [{ value: "direct", label: "Direct offer" }, { value: "interview_first", label: "Interview first" }] },
+        { key: "kind", label: "Offer type", options: [{ value: "internship", label: "Internship" }, { value: "fulltime", label: "Full-time" }] },
+      ]}
+      empty={filtersOn ? filteredEmpty(params, "proposals") : { title: "No proposals yet", body: "Offers appear here the moment a company sends one." }}
+      columns={[
+        {
+          header: "Candidate",
+          sort: "candidate",
+          cell: (p) => (
+            <div className="min-w-0 max-w-56">
+              <Link href={`/admin/interns/${p.internId}`} className="block truncate font-medium text-ink-900 hover:text-brand-700 hover:underline">
+                {nameOf(p)}
+              </Link>
+              <p className="truncate text-xs text-ink-600">{p.internEmail ?? "-"}</p>
             </div>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      {/* 2. Interview Details Modal */}
-      <Dialog
-        open={selectedInterview !== null}
-        onOpenChange={(open) => !open && setSelectedInterview(null)}
-      >
-        <DialogContent className="max-w-xl">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-lg font-bold text-ink-900">
-              <Clock className="size-5 text-amber-600" />
-              <span>Interview Session Details</span>
-            </DialogTitle>
-            <DialogDescription className="text-xs text-text-subtle">
-              Evaluation interview time slots, video link and status.
-            </DialogDescription>
-          </DialogHeader>
-
-          {selectedInterview && (
-            <div className="space-y-4 pt-3">
-              <div className="flex items-center justify-between rounded-xl bg-ink-50 p-3.5 border border-ink-100">
-                <div>
-                  <h4 className="font-bold text-ink-900">
-                    {selectedInterview.internFirstName} {selectedInterview.internLastName}
-                  </h4>
-                  <p className="text-2xs text-text-subtle">
-                    Company: <span className="font-semibold text-ink-800">{selectedInterview.companyName}</span>
-                  </p>
-                </div>
-                <StatusBadge value={selectedInterview.status} />
-              </div>
-
-              {/* Slots List */}
-              <div className="space-y-2">
-                <p className="text-2xs font-bold uppercase tracking-wider text-ink-600">Offered Time Slots</p>
-                {[
-                  { num: 1, val: selectedInterview.slot1 },
-                  { num: 2, val: selectedInterview.slot2 },
-                  { num: 3, val: selectedInterview.slot3 },
-                ].map((s) => (
-                  <div
-                    key={s.num}
-                    className={`flex items-center justify-between rounded-xl p-3 border text-xs ${
-                      selectedInterview.selectedSlot === s.num
-                        ? "border-brand-500 bg-brand-50/60 font-semibold text-brand-900"
-                        : "border-ink-100 bg-white text-ink-700"
-                    }`}
-                  >
-                    <span>Slot {s.num}: {s.val ? new Date(s.val).toLocaleString("en-IN") : "Not provided"}</span>
-                    {selectedInterview.selectedSlot === s.num && (
-                      <span className="rounded-full bg-brand-600 px-2 py-0.5 text-2xs text-white">
-                        Selected
-                      </span>
-                    )}
-                  </div>
-                ))}
-              </div>
-
-              {/* Meeting Link & Notes */}
-              <div className="space-y-2">
-                {selectedInterview.meetingLink && (
-                  <div className="rounded-xl border border-brand-200 bg-brand-50/50 p-3">
-                    <p className="text-2xs font-semibold text-brand-800 uppercase">Video Meeting URL</p>
-                    <a
-                      href={selectedInterview.meetingLink}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="mt-1 inline-flex items-center gap-1.5 font-medium text-xs text-brand-700 hover:underline break-all"
-                    >
-                      <Video className="size-4 shrink-0" />
-                      <span>{selectedInterview.meetingLink}</span>
-                    </a>
-                  </div>
-                )}
-
-                {selectedInterview.notes && (
-                  <div className="rounded-xl border border-ink-100 bg-ink-50/50 p-3 text-xs text-ink-700">
-                    <p className="text-2xs font-semibold uppercase text-text-subtle mb-1">Session Notes</p>
-                    <p>{selectedInterview.notes}</p>
-                  </div>
-                )}
-              </div>
-
-              <div className="flex justify-end border-t border-ink-100 pt-3">
-                <button
-                  type="button"
-                  onClick={() => setSelectedInterview(null)}
-                  className="rounded-xl border border-ink-200 px-4 py-2 text-xs font-semibold text-ink-700 hover:bg-ink-50"
-                >
-                  Close
-                </button>
-              </div>
+          ),
+        },
+        {
+          header: "Company and project",
+          sort: "company",
+          cell: (p) => (
+            <div className="min-w-0 max-w-60">
+              <Link href={`/admin/companies/${p.employerId}`} className="block truncate font-medium text-ink-800 hover:underline">
+                {p.companyName ?? "Company"}
+              </Link>
+              <p className="truncate text-xs text-ink-600">{p.projectName ?? "Project"}</p>
             </div>
-          )}
-        </DialogContent>
-      </Dialog>
+          ),
+        },
+        {
+          header: "Offer",
+          align: "right",
+          cell: (p) => {
+            const o = parseOffer(p.offerDetails, p.currency);
+            return (
+              <div className="whitespace-nowrap">
+                <p className="font-medium text-ink-900">
+                  {o.fullTime
+                    ? `${o.fullTime.annualCtcMinor != null ? formatMoney(o.fullTime.annualCtcMinor, o.currency) : "-"} CTC`
+                    : o.monthlyMinor != null
+                      ? `${formatMoney(o.monthlyMinor, o.currency)}/mo`
+                      : "-"}
+                </p>
+                <p className="text-xs text-ink-600">{o.fullTime ? "Full-time" : `${o.months} mo internship`}</p>
+              </div>
+            );
+          },
+        },
+        {
+          header: "Start",
+          sort: "start",
+          cell: (p) => {
+            const o = parseOffer(p.offerDetails, p.currency);
+            const tz = proposalTimezone(p);
+            return (
+              <div className="whitespace-nowrap">
+                <p className="nums">{formatDate(o.startDate)}</p>
+                {tz ? <p className="text-xs text-ink-600">{tz}</p> : null}
+              </div>
+            );
+          },
+        },
+        {
+          header: "Status",
+          cell: (p) => (
+            <div className="flex flex-col items-start gap-1">
+              {p.status === "hired" && parseOffer(p.offerDetails, p.currency).fullTime ? <StatusBadge tone="success" label="Full-time hired" /> : <StatusBadge value={p.status} />}
+              <span className="text-xs text-ink-600">{p.flowType === "interview_first" ? "Interview first" : "Direct offer"}</span>
+            </div>
+          ),
+        },
+        { header: "Sent", sort: "sent", cell: (p) => <span className="nums whitespace-nowrap">{formatDate(p.createdAt)}</span> },
+        {
+          header: "",
+          cell: (p) => (
+            <ProposalDetailsButton
+              proposal={{
+                id: p.id,
+                status: p.status,
+                currency: p.currency,
+                offerDetails: p.offerDetails,
+                candidate: nameOf(p),
+                companyName: p.companyName ?? "Company",
+                projectName: p.projectName ?? "Project",
+                flow: p.flowType === "interview_first" ? "Interview first" : "Direct offer",
+                sentAt: formatDate(p.createdAt),
+              }}
+            />
+          ),
+        },
+      ]}
+    />
+  );
+}
 
-      {/* 3. Company Proposals Modal */}
-      <Dialog
-        open={companyModalType === "proposals"}
-        onOpenChange={(open) => !open && setCompanyModalType(null)}
-      >
-        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-lg font-bold text-ink-900">
-              <FileText className="size-5 text-brand-600" />
-              <span>Proposals for {selectedCompany?.companyName}</span>
-            </DialogTitle>
-            <DialogDescription className="text-xs text-text-subtle">
-              All offers and candidates linked to this employer.
-            </DialogDescription>
-          </DialogHeader>
+function CandidatesTab({ params, page, perPage, search, pickers, proposals }: TabProps & { proposals: ProposalItem[] }) {
+  const byIntern = new Map<string, { internId: string; name: string; email: string | null; phone: string | null; received: number; won: number; lost: number; open: number; companies: string[]; last: Date | null }>();
+  for (const p of proposals) {
+    const row = byIntern.get(p.internId) ?? { internId: p.internId, name: nameOf(p), email: p.internEmail, phone: p.internPhone, received: 0, won: 0, lost: 0, open: 0, companies: [], last: null };
+    row.received += 1;
+    row[proposalOutcome(p.status)] += 1;
+    const company = p.companyName ?? "Company";
+    if (!row.companies.includes(company)) row.companies.push(company);
+    if (p.createdAt && (!row.last || p.createdAt > row.last)) row.last = p.createdAt;
+    byIntern.set(p.internId, row);
+  }
+  const rows = [...byIntern.values()].filter((c) => matchesSearch([c.name, c.email, c.phone, ...c.companies], search));
+  const sort = parseSort(params, ["name", "received", "won", "last"] as const, { key: "received", dir: "desc" });
+  const sorted = sortBy(rows, (r) => (sort.key === "name" ? r.name.toLowerCase() : sort.key === "last" ? time(r.last) : r[sort.key]), sort.dir);
+  const pg = paginate(sorted, page, perPage);
 
-          <div className="mt-3 space-y-2">
-            {companyProposals.length === 0 ? (
-              <p className="py-6 text-center text-xs text-ink-600">No proposals sent yet.</p>
-            ) : (
-              companyProposals.map((p) => (
-                <div
-                  key={p.id}
-                  className="flex items-center justify-between rounded-xl border border-ink-100 p-3.5 hover:bg-ink-50/50 transition-colors"
-                >
-                  <div>
-                    <h5 className="font-semibold text-xs text-ink-900">
-                      {p.internFirstName} {p.internLastName}
-                    </h5>
-                    <p className="text-2xs text-text-subtle">
-                      {p.projectName} · {p.createdAt ? formatDate(p.createdAt) : "-"}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <StatusBadge value={p.status} />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setCompanyModalType(null);
-                        setSelectedProposal(p);
-                      }}
-                      className="rounded-lg border border-ink-200 bg-white px-2.5 py-1 text-2xs font-semibold text-ink-700 hover:bg-brand-50 hover:text-brand-800"
-                    >
-                      Inspect
-                    </button>
-                  </div>
+  return (
+    <DataTable
+      basePath={BASE}
+      params={params}
+      page={pg.page}
+      pages={pg.pages}
+      total={pg.total}
+      perPage={perPage}
+      rows={pg.rows}
+      noun="candidates"
+      caption="Candidates who received proposals"
+      searchPlaceholder="Search candidate, email, phone, company…"
+      filters={pickers}
+      empty={search || params.company || params.intern || params.tz ? filteredEmpty(params, "candidates") : { title: "No candidates yet", body: "Candidates appear here once a company sends them an offer." }}
+      columns={[
+        {
+          header: "Candidate",
+          sort: "name",
+          cell: (c) => (
+            <div className="min-w-0 max-w-56">
+              <Link href={`/admin/interns/${c.internId}`} className="block truncate font-medium text-ink-900 hover:text-brand-700 hover:underline">
+                {c.name}
+              </Link>
+              <p className="truncate text-xs text-ink-600">{c.email ?? "-"}</p>
+            </div>
+          ),
+        },
+        { header: "Phone", cell: (c) => <span className="nums whitespace-nowrap">{c.phone ?? "-"}</span> },
+        { header: "Received", sort: "received", align: "right", cell: (c) => c.received },
+        { header: "Accepted or hired", sort: "won", align: "right", cell: (c) => c.won },
+        { header: "Declined", align: "right", cell: (c) => c.lost },
+        { header: "Open", align: "right", cell: (c) => c.open },
+        {
+          header: "From",
+          cell: (c) => (
+            <span className="block max-w-64 truncate" title={c.companies.join(", ")}>
+              {c.companies.join(", ")}
+            </span>
+          ),
+        },
+        { header: "Last offer", sort: "last", cell: (c) => <span className="nums whitespace-nowrap">{formatDate(c.last)}</span> },
+      ]}
+    />
+  );
+}
+
+function InterviewsTab({ params, page, perPage, search, pickers, rows }: TabProps & { rows: InterviewItem[] }) {
+  const filtered = rows.filter(
+    (i) => matchesSearch([nameOf(i), i.internEmail, i.companyName, i.projectName], search) && (!params.status || i.status === params.status),
+  );
+  const sort = parseSort(params, ["candidate", "slot", "created"] as const, { key: "created", dir: "desc" });
+  const sorted = sortBy(
+    filtered,
+    (i) => (sort.key === "candidate" ? nameOf(i).toLowerCase() : sort.key === "slot" ? time(chosenSlot(i) ?? i.slot1) : time(i.createdAt)),
+    sort.dir,
+  );
+  const pg = paginate(sorted, page, perPage);
+
+  return (
+    <DataTable
+      basePath={BASE}
+      params={params}
+      page={pg.page}
+      pages={pg.pages}
+      total={pg.total}
+      perPage={perPage}
+      rows={pg.rows}
+      noun="interviews"
+      caption="Interviews"
+      searchPlaceholder="Search candidate, company, project…"
+      filters={[
+        ...pickers,
+        {
+          key: "status",
+          label: "Status",
+          options: [
+            { value: "pending", label: "Pending" },
+            { value: "scheduled", label: "Scheduled" },
+            { value: "completed", label: "Completed" },
+            { value: "missed", label: "Missed" },
+            { value: "expired", label: "Expired" },
+            { value: "cancelled", label: "Cancelled" },
+          ],
+        },
+      ]}
+      empty={search || params.status || params.company || params.intern || params.tz ? filteredEmpty(params, "interviews") : { title: "No interviews yet", body: "Interviews appear here once a company proposes slots to a candidate." }}
+      columns={[
+        {
+          header: "Candidate",
+          sort: "candidate",
+          cell: (i) => (
+            <div className="min-w-0 max-w-56">
+              <Link href={`/admin/interns/${i.internId}`} className="block truncate font-medium text-ink-900 hover:text-brand-700 hover:underline">
+                {nameOf(i)}
+              </Link>
+              <p className="truncate text-xs text-ink-600">{i.internEmail ?? "-"}</p>
+            </div>
+          ),
+        },
+        {
+          header: "Company and project",
+          cell: (i) => (
+            <div className="min-w-0 max-w-60">
+              <Link href={`/admin/companies/${i.employerId}?tab=interviews`} className="block truncate font-medium text-ink-800 hover:underline">
+                {i.companyName ?? "Company"}
+              </Link>
+              <p className="truncate text-xs text-ink-600">{i.projectName ?? "No project"}</p>
+            </div>
+          ),
+        },
+        {
+          header: "Slot",
+          sort: "slot",
+          cell: (i) => {
+            const chosen = chosenSlot(i);
+            const tz = i.timezone || "Asia/Kolkata";
+            if (chosen) {
+              return (
+                <div className="whitespace-nowrap">
+                  <p className="nums font-medium text-ink-900">{formatSlotTime(chosen, tz)}</p>
+                  <p className="text-xs text-ink-600">{tz} · picked slot {i.selectedSlot}</p>
                 </div>
-              ))
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* 4. Company Interviews Modal */}
-      <Dialog
-        open={companyModalType === "interviews"}
-        onOpenChange={(open) => !open && setCompanyModalType(null)}
-      >
-        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-lg font-bold text-ink-900">
-              <Clock className="size-5 text-amber-600" />
-              <span>Interviews for {selectedCompany?.companyName}</span>
-            </DialogTitle>
-            <DialogDescription className="text-xs text-text-subtle">
-              All scheduled sessions and candidate evaluations for this employer.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="mt-3 space-y-2">
-            {companyInterviews.length === 0 ? (
-              <p className="py-6 text-center text-xs text-ink-600">No interviews scheduled yet.</p>
+              );
+            }
+            const offered = [i.slot1, i.slot2, i.slot3].filter((s): s is Date => Boolean(s));
+            return offered.length ? (
+              <div className="whitespace-nowrap">
+                <ul className="nums space-y-0.5 text-ink-700">
+                  {offered.map((s, n) => (
+                    <li key={n}>{formatSlotTime(s, tz)}</li>
+                  ))}
+                </ul>
+                <p className="text-xs text-ink-600">{tz} · not picked yet</p>
+              </div>
             ) : (
-              companyInterviews.map((i) => (
-                <div
-                  key={i.id}
-                  className="flex items-center justify-between rounded-xl border border-ink-100 p-3.5 hover:bg-ink-50/50 transition-colors"
-                >
-                  <div>
-                    <h5 className="font-semibold text-xs text-ink-900">
-                      {i.internFirstName} {i.internLastName}
-                    </h5>
-                    <p className="text-2xs text-text-subtle">
-                      {i.projectName || "General"} · {i.createdAt ? formatDate(i.createdAt) : "-"}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <StatusBadge value={i.status} />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setCompanyModalType(null);
-                        setSelectedInterview(i);
-                      }}
-                      className="rounded-lg border border-ink-200 bg-white px-2.5 py-1 text-2xs font-semibold text-ink-700 hover:bg-brand-50 hover:text-brand-800"
-                    >
-                      Inspect
-                    </button>
-                  </div>
+              <span className="text-ink-500">No slot offered</span>
+            );
+          },
+        },
+        { header: "Status", cell: (i) => <StatusBadge value={i.status} /> },
+        {
+          header: "Meeting link",
+          cell: (i) => <MeetingLinkCell interviewId={i.id} link={i.meetingLink} locked={FINISHED_INTERVIEW.includes(i.status.toLowerCase())} />,
+        },
+        { header: "Created", sort: "created", cell: (i) => <span className="nums whitespace-nowrap">{formatDate(i.createdAt)}</span> },
+        {
+          header: "",
+          cell: (i) => (i.notes?.trim() ? <InterviewNotesButton title={`${nameOf(i)} · ${i.companyName ?? "Company"}`} notes={i.notes} /> : null),
+        },
+      ]}
+    />
+  );
+}
+
+function HiredTab({ params, page, perPage, search, pickers, rows }: TabProps & { rows: ProposalItem[] }) {
+  const filtered = rows.filter((p) => {
+    const offer = parseOffer(p.offerDetails, p.currency);
+    return (
+      matchesSearch([nameOf(p), p.internEmail, p.internPhone, p.companyName, p.projectName, offer.roleTitle], search) &&
+      (!params.kind || (params.kind === "fulltime" ? Boolean(offer.fullTime) : !offer.fullTime))
+    );
+  });
+  const sort = parseSort(params, ["candidate", "company", "start", "hired"] as const, { key: "hired", dir: "desc" });
+  const sorted = sortBy(
+    filtered,
+    (p) =>
+      sort.key === "candidate"
+        ? nameOf(p).toLowerCase()
+        : sort.key === "company"
+          ? (p.companyName ?? "").toLowerCase()
+          : sort.key === "start"
+            ? parseOffer(p.offerDetails, p.currency).startDate
+            : time(p.hiredAt ?? p.createdAt),
+    sort.dir,
+  );
+  const pg = paginate(sorted, page, perPage);
+  const fullTime = rows.filter((p) => parseOffer(p.offerDetails, p.currency).fullTime).length;
+
+  return (
+    <div className="space-y-3">
+      <p className="text-sm text-ink-600">
+        <span className="nums font-medium text-ink-900">{rows.length}</span> hired: <span className="nums">{rows.length - fullTime}</span> internship,{" "}
+        <span className="nums">{fullTime}</span> full-time. Export downloads exactly the rows this filter shows.
+      </p>
+      <DataTable
+        basePath={BASE}
+        params={params}
+        page={pg.page}
+        pages={pg.pages}
+        total={pg.total}
+        perPage={perPage}
+        rows={pg.rows}
+        noun="hires"
+        caption="Hired candidates"
+        searchPlaceholder="Search candidate, company, project, role…"
+        filters={[...pickers, { key: "kind", label: "Type", allLabel: "Internship and full-time", options: [{ value: "internship", label: "Internship" }, { value: "fulltime", label: "Full-time" }] }]}
+        empty={search || params.kind || params.company || params.intern || params.tz ? filteredEmpty(params, "hired") : { title: "No hires yet", body: "A candidate shows here once the company has paid for an accepted offer." }}
+        columns={[
+          {
+            header: "Candidate",
+            sort: "candidate",
+            cell: (p) => (
+              <div className="min-w-0 max-w-56">
+                <Link href={`/admin/interns/${p.internId}`} className="block truncate font-medium text-ink-900 hover:text-brand-700 hover:underline">
+                  {nameOf(p)}
+                </Link>
+                <p className="truncate text-xs text-ink-600">{p.internEmail ?? "-"}</p>
+              </div>
+            ),
+          },
+          {
+            header: "Company and project",
+            sort: "company",
+            cell: (p) => (
+              <div className="min-w-0 max-w-60">
+                <Link href={`/admin/companies/${p.employerId}?tab=hired`} className="block truncate font-medium text-ink-800 hover:underline">
+                  {p.companyName ?? "Company"}
+                </Link>
+                <p className="truncate text-xs text-ink-600">{p.projectName ?? "Project"}</p>
+              </div>
+            ),
+          },
+          {
+            header: "Role",
+            cell: (p) => {
+              const o = parseOffer(p.offerDetails, p.currency);
+              return (
+                <div className="min-w-0 max-w-52">
+                  <p className="truncate">{o.roleTitle || "-"}</p>
+                  <p className="text-xs text-ink-600">{o.fullTime ? "Full-time" : `Internship · ${o.months} mo`}</p>
                 </div>
-              ))
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
+              );
+            },
+          },
+          {
+            header: "Pay",
+            align: "right",
+            cell: (p) => {
+              const o = parseOffer(p.offerDetails, p.currency);
+              return (
+                <span className="whitespace-nowrap">
+                  {o.fullTime
+                    ? `${o.fullTime.annualCtcMinor != null ? formatMoney(o.fullTime.annualCtcMinor, o.currency) : "-"} CTC`
+                    : o.monthlyMinor != null
+                      ? `${formatMoney(o.monthlyMinor, o.currency)}/mo`
+                      : "-"}
+                </span>
+              );
+            },
+          },
+          { header: "Start", sort: "start", cell: (p) => <span className="nums whitespace-nowrap">{formatDate(parseOffer(p.offerDetails, p.currency).startDate)}</span> },
+          { header: "Hired on", sort: "hired", cell: (p) => <span className="nums whitespace-nowrap">{formatDate(p.hiredAt ?? p.createdAt)}</span> },
+        ]}
+      />
     </div>
   );
 }
