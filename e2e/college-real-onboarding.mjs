@@ -331,8 +331,6 @@ await check("Employer signs in and enters the drive", async () => {
 
 await check("Employer sees exactly the drive's students, masked, and the score filter works", async () => {
   const showing = await emp.getByText(/^Showing \d+ of \d+ students/).innerText();
-  const total = Number(showing.match(/of (\d+)/)[1]);
-  const expected = Number(psql(`select count(*) from college_memberships m where m.college_id=(select college_id from college_drives where id='${driveId}') and m.left_at is null`));
   const html = await emp.content();
   assert(!/Aanya Mehta|Rohit Bansal|@jklu\.edu\.in|gmail\.com/.test(html), "names or emails leaked to employer");
   for (const i of ["AM", "RB", "PS", "KR", "NG"]) assert(html.includes(`>${i}<`), `card ${i} missing`);
