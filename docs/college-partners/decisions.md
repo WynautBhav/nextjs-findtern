@@ -31,6 +31,8 @@
 8. **College picker inside onboarding.** Today it's a dashboard card plus `/intern/college`. The founder pictured a dropdown in the signup flow; adding it to the onboarding wizard's academics step is a small follow-up.
 9. **AISHE list licence.** The AISHE site says reuse needs permission; the IndiaAI mirror is labelled OGL-India. Get written OK from the Ministry of Education before importing all ~73k institutions commercially. Until then: seed partners + a short Jaipur list.
 
+10. **Do drives require a complete profile?** Found in the 27 Oct real-onboarding run (`e2e/college-real-onboarding.mjs`). A college student is visible in drives once they join and consent, while their own dashboard still says "1 of 3 done before employers can find you". The usual pay → profile → visible gate doesn't apply, because the college pays. Decide whether drives also need a minimum profile (photo, skills, academics), and change the dashboard copy for drive students either way.
+
 ## Questions for Incruiter (send before selling "500 interviews in one hour")
 1. **Throughput:** can 500 candidates start an AI interview in the same 60-minute window? What are the hard limits on concurrent sessions per account, and the rate limits on invite/creation APIs?
 2. **Time to result:** how long after a candidate finishes do the score, report PDF and recording become available, and does the webhook fire for each? (We promise "results the next hour".)
