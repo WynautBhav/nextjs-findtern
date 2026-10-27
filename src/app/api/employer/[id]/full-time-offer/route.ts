@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import { and, eq, inArray } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -69,9 +71,23 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({ error: "You've already sent this intern a full-time offer." }, { status: 409 });
   }
 
+  // EMH-05: legacy and the admin read the letter from `offerLetterUrl`. The
+  // file is private, so the URL is the access-checked letter route (parties
+  // and admins only), never a public /uploads path.
+  const proposalId = randomUUID();
+  const origin = (process.env.PUBLIC_ORIGIN ?? "https://findtern.in").replace(/\/+$/, "");
+  const offerLetterUrl = `${origin}/api/proposals/${proposalId}/offer-letter`;
+  const [intern] = await db
+    .select({ first: schema.users.firstName, last: schema.users.lastName, email: schema.users.email })
+    .from(schema.users)
+    .where(eq(schema.users.id, base.internId))
+    .limit(1);
+  const internName = `${intern?.first ?? ""} ${intern?.last ?? ""}`.trim() || "Candidate";
+
   const [proposal] = await db
     .insert(schema.proposals)
     .values({
+      id: proposalId,
       employerId: id,
       internId: base.internId,
       projectId: base.projectId,
@@ -91,6 +107,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
           ctcCurrency: b.ctcCurrency,
           annualCtc: b.annualCtc,
           offerLetterKey: b.offerLetterKey,
+          offerLetterUrl,
           createdAt: new Date().toISOString(),
         },
         currency: b.ctcCurrency,
@@ -122,7 +139,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const companyName = (employer?.companyName ?? "").trim() || "Employer";
   const summary = [
     `employer: ${companyName} (${id})`,
-    `candidate: ${base.internId}`,
+    `candidate: ${internName} (${base.internId})`,
+    ...(intern?.email ? [`candidateEmail: ${intern.email}`] : []),
     `proposal: ${proposal.id}`,
     `jobTitle: ${b.jobTitle}`,
     `jobMode: ${b.jobMode}`,
@@ -130,6 +148,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     `timezone: ${b.timezone}`,
     `shift: ${b.shiftFrom} - ${b.shiftTo}`,
     `annualCtc: ${b.ctcCurrency} ${b.annualCtc}`,
+    `offerLetter: ${offerLetterUrl}`,
   ].join("\n");
   try {
     await db.insert(schema.contactMessages).values({

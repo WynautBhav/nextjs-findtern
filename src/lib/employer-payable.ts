@@ -47,8 +47,23 @@ export type PayableLine = {
   monthlyCharge: LineCharge;
   /** Set for a hired monthly-plan placement: the next month is due. */
   due: { monthsPaid: number; months: number } | null;
+  /** YYYY-MM-DD the due month falls due (start + months paid); null when not a due line or no start. */
+  dueOn: string | null;
+  /** Offer start date (YYYY-MM-DD) or null. */
+  startDate: string | null;
+  /** Set on a full-time offer: the annual CTC the 8.33% fee is on. */
+  fullTimeCtcMinor: number | null;
+  fullTime: boolean;
   currency: Currency;
 };
+
+function addMonthsDay(isoDay: string | null, months: number): string | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(isoDay ?? ""));
+  if (!m) return null;
+  const mo = Number(m[2]) - 1 + months;
+  const last = new Date(Date.UTC(Number(m[1]), mo + 1, 0)).getUTCDate();
+  return new Date(Date.UTC(Number(m[1]), mo, Math.min(Number(m[3]), last))).toISOString().slice(0, 10);
+}
 
 export type PayableCheckout = {
   lines: PayableLine[];
@@ -163,9 +178,12 @@ export async function payableCheckout(
         internId: proposal.internId,
         projectName: projectsById.get(proposal.projectId) ?? null,
         roleTitle: offer.roleTitle || projectsById.get(proposal.projectId) || "Internship",
-        durationLabel: dues.has(proposal.id)
-          ? `Month ${dues.get(proposal.id)!.monthsPaid + 1} of ${offer.months}`
-          : (DURATION_LABEL[offer.duration] ?? `${offer.months} month${offer.months === 1 ? "" : "s"}`),
+        // EMH-23: a full-time offer has no duration; it is a one-time fee.
+        durationLabel: offer.fullTime
+          ? "Full-time role"
+          : dues.has(proposal.id)
+            ? `Month ${dues.get(proposal.id)!.monthsPaid + 1} of ${offer.months}`
+            : (DURATION_LABEL[offer.duration] ?? `${offer.months} month${offer.months === 1 ? "" : "s"}`),
         months: offer.months,
         monthlyMinor: offer.monthlyMinor,
         score,
@@ -177,6 +195,10 @@ export async function payableCheckout(
         // the summary shows more than the order route charges.
         monthlyCharge: lineCharge(offer, score, "monthly", { firstPayment: !dues.has(proposal.id) }),
         due: dues.get(proposal.id) ?? null,
+        dueOn: dues.has(proposal.id) ? addMonthsDay(offer.startDate, dues.get(proposal.id)!.monthsPaid) : null,
+        startDate: offer.startDate,
+        fullTimeCtcMinor: offer.fullTime?.annualCtcMinor ?? null,
+        fullTime: Boolean(offer.fullTime),
         currency: offer.currency,
       };
     });

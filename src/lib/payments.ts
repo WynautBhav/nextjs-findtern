@@ -1,4 +1,4 @@
-import { and, eq, gte, inArray, ne } from "drizzle-orm";
+import { and, eq, gte, inArray, lt, ne } from "drizzle-orm";
 
 import { getDb, schema } from "@/lib/db";
 import { emails } from "@/lib/emails";
@@ -37,6 +37,9 @@ export function orderDueIds(raw: Raw): string[] {
   return Array.isArray(due) ? due.map((v) => String(v ?? "").trim()).filter(Boolean) : [];
 }
 
+/** How long an unpaid checkout order stays open. */
+export const OPEN_ORDER_MINUTES = 30;
+
 /**
  * Is a payment for this proposal open right now? The checkout keeps an
  * unpaid order for 30 minutes; changing the offer under it would bill (or
@@ -50,10 +53,40 @@ export async function hasOpenOrderFor(employerId: string, proposalId: string): P
       and(
         eq(schema.employerPayments.employerId, employerId),
         eq(schema.employerPayments.status, "created"),
-        gte(schema.employerPayments.createdAt, new Date(Date.now() - 30 * 60_000)),
+        gte(schema.employerPayments.createdAt, new Date(Date.now() - OPEN_ORDER_MINUTES * 60_000)),
       ),
     );
   return rows.some((r) => orderProposalIds(r.raw).includes(proposalId));
+}
+
+/**
+ * DB-05: legacy never stores an unpaid order, and its admin counts every
+ * "created" row as billed. An order still unpaid after 30 minutes is closed
+ * as "failed", a status legacy knows ("cancelled" is not one). Settlement
+ * still accepts a late capture: it flips any unpaid row to paid.
+ */
+export async function expireStaleEmployerOrders(employerId?: string): Promise<number> {
+  const rows = await getDb()
+    .update(schema.employerPayments)
+    .set({ status: "failed" })
+    .where(
+      and(
+        employerId ? eq(schema.employerPayments.employerId, employerId) : undefined,
+        eq(schema.employerPayments.status, "created"),
+        lt(schema.employerPayments.createdAt, new Date(Date.now() - OPEN_ORDER_MINUTES * 60_000)),
+      ),
+    )
+    .returning({ id: schema.employerPayments.id });
+  return rows.length;
+}
+
+/**
+ * DB-04: the legacy admin Companies list reads the order from `raw.order`
+ * alone; without it a new-app order counts against every hire of the company.
+ * Same keys the legacy order route stores (Razorpay's order object).
+ */
+export function legacyOrderRaw(order: { id: string; amountMinor: number; currency: string; notes: Record<string, unknown> }) {
+  return { id: order.id, amount: order.amountMinor, currency: order.currency, notes: order.notes };
 }
 
 function promoOf(raw: Raw) {
@@ -122,6 +155,18 @@ export async function settleEmployerOrder(input: {
       .set({ raw: { ...((order.raw ?? {}) as Record<string, unknown>), needsReview: { reason: "not_all_hired", expected: hireIds.length, hired: hired.length } } })
       .where(eq(schema.employerPayments.id, order.id));
     console.error(`[payments] order ${input.orderId}: paid for ${hireIds.length} hires, hired ${hired.length} - needs review`);
+  }
+  // EMB-26: once hired, the candidate leaves every shortlist of this company
+  // (legacy removed them from all its carts), so the cart count stays true.
+  if (hired.length > 0) {
+    await db
+      .delete(schema.employerCartItems)
+      .where(
+        and(
+          eq(schema.employerCartItems.employerId, order.employerId),
+          inArray(schema.employerCartItems.internId, hired.map((p) => p.internId)),
+        ),
+      );
   }
   // Legacy routes.ts:15658: a hired intern's onboarding status moves to
   // "Onboarding" until they are set up with the company.

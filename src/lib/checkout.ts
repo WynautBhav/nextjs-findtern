@@ -21,6 +21,11 @@ export type PayMode = "upfront" | "monthly";
 export const PER_HIRE_MINOR = { INR: 500_000, USD: 5_000 } as const;
 export const FULL_TIME_FEE = 0.0833;
 
+/** 8.33% of the annual CTC, rounded to whole major units (legacy rounding). */
+export function fullTimeFeeMinor(annualCtcMinor: number): number {
+  return Math.max(0, Math.round((annualCtcMinor * FULL_TIME_FEE) / 100) * 100);
+}
+
 export type LineCharge = {
   /** Engagement plus the hiring fee, before any discount. */
   baseMinor: number;
@@ -47,7 +52,9 @@ export function lineCharge(
       : null;
 
   if (offer.fullTime) {
-    const base = Math.round((offer.fullTime.annualCtcMinor ?? 0) * FULL_TIME_FEE);
+    // Whole rupees / dollars, as legacy rounds it (EMH-39): the quote on the
+    // offer and the charge must be the same figure, and legacy dues read it.
+    const base = fullTimeFeeMinor(offer.fullTime.annualCtcMinor ?? 0);
     return { baseMinor: base, discountMinor: 0, totalMinor: base, perHireMinor: 0, monthlyBlocked };
   }
 
