@@ -138,3 +138,60 @@ export function suggestSkills(query: string, limit = 8): string[] {
   }
   return [...exact, ...prefix, ...contains].slice(0, limit);
 }
+
+/**
+ * One-tap picks as one list, technical and non-technical interleaved (bug
+ * sheet 7, NC r19: "a mix of tech and non-tech, not only non-tech"). Two
+ * technical, one non-technical, repeating, so the first screenful reads as a
+ * mix whichever kind of candidate is looking.
+ */
+export const SUGGESTED_SKILLS: string[] = (() => {
+  const out: string[] = [];
+  const tech = [...TECH_SKILLS];
+  const non = [...NON_TECH_SKILLS];
+  while (tech.length || non.length) {
+    if (tech.length) out.push(tech.shift()!);
+    if (non.length) out.push(non.shift()!);
+    if (tech.length) out.push(tech.shift()!);
+  }
+  return out;
+})();
+
+/** Edit distance, two rows at a time. */
+function distance(a: string, b: string): number {
+  let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    const row = [i];
+    for (let j = 1; j <= b.length; j++) {
+      row[j] = Math.min(prev[j] + 1, row[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    }
+    prev = row;
+  }
+  return prev[b.length];
+}
+
+/**
+ * "Did you mean …?" for a typed skill that is close to, but not, a known one
+ * (legacy onboarding.tsx StepSkills). Null when the text is short, already
+ * known, or nothing is close. `taken` skills are never suggested.
+ */
+export function didYouMean(typed: string, taken: string[] = []): string | null {
+  const normalize = (v: string) => v.toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
+  const q = normalize(typed);
+  if (q.length < 3) return null;
+  const takenSet = new Set(taken.map(normalize));
+  if (takenSet.has(q)) return null;
+  if (POOL.some((s) => normalize(s) === q)) return null;
+  const max = Math.min(4, Math.max(1, Math.floor(q.length / 3)));
+  let best: { value: string; d: number } | null = null;
+  for (const skill of POOL) {
+    const s = normalize(skill);
+    if (takenSet.has(s) || Math.abs(s.length - q.length) > max) continue;
+    const d = distance(q, s);
+    if (d <= max && (!best || d < best.d)) {
+      best = { value: skill, d };
+      if (d === 1) break;
+    }
+  }
+  return best?.value ?? null;
+}
