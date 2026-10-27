@@ -6,7 +6,7 @@ import { getDb, schema } from "@/lib/db";
 import { emails } from "@/lib/emails";
 import { requireMutation } from "@/lib/guards-mutation";
 import { employerNames, internFirstName, notify } from "@/lib/notify";
-import { wallTimeToUtc } from "@/lib/timezones";
+import { timezoneForLocation, wallTimeToUtc } from "@/lib/timezones";
 import { canEmployerSeeIntern } from "@/lib/employer-pool";
 import { hiredProposalSql } from "@/lib/employer-visibility";
 import { hasDuplicateSlots, isBlockingInterview, isQuarterHourWall } from "@/lib/employer-interview-rules";
@@ -20,7 +20,8 @@ const bodySchema = z.object({
   slot1: wall,
   slot2: wall,
   slot3: wall,
-  timezone: z.string().min(1).default("Asia/Kolkata"),
+  /** Missing: the company's own zone, from its location (bug sheet 7, S2 r3). */
+  timezone: z.string().min(1).optional(),
 });
 
 const OPEN = ["pending", "scheduled"];
@@ -32,7 +33,17 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   const parsed = bodySchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Offer three time slots." }, { status: 400 });
-  const b = parsed.data;
+  const db = getDb();
+  let timezone = parsed.data.timezone;
+  if (!timezone) {
+    const [employer] = await db
+      .select({ country: schema.employers.country, state: schema.employers.state })
+      .from(schema.employers)
+      .where(eq(schema.employers.id, id))
+      .limit(1);
+    timezone = timezoneForLocation(employer ?? {});
+  }
+  const b = { ...parsed.data, timezone };
   if (![b.slot1, b.slot2, b.slot3].every(isQuarterHourWall)) {
     return NextResponse.json({ error: "Slots start on the hour or at :15, :30 or :45." }, { status: 400 });
   }
@@ -50,7 +61,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({ error: "Offer different times - two slots are the same." }, { status: 400 });
   }
 
-  const db = getDb();
   // Only a pool candidate, or one this employer already works with.
   if (!(await canEmployerSeeIntern(db, id, b.internId))) {
     return NextResponse.json({ error: "Unknown candidate" }, { status: 404 });

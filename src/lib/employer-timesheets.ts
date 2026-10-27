@@ -17,19 +17,108 @@ export type DayStatus = (typeof DAY_STATUSES)[number];
 
 export type DayEntry = { date: string; status: string };
 
-export function formatPeriod(start: Date | null, end: Date | null): string {
-  const fmt = (value: Date | null) =>
-    value ? new Date(value).toLocaleDateString("en-IN", { day: "numeric", month: "short" }) : "-";
-  return `${fmt(start)} – ${fmt(end)}`;
+/**
+ * Period bounds are calendar dates stored as UTC timestamps (the end as
+ * T23:59:59.999), so they are read in UTC. Read in IST, a 1-30 Sept sheet
+ * printed as "1 Sept – 1 Oct" (DB-36).
+ */
+export function formatPeriodDay(value: Date | null, withYear = true): string {
+  if (!value) return "-";
+  return new Date(value).toLocaleDateString("en-IN", {
+    day: "numeric",
+    month: "short",
+    ...(withYear ? { year: "numeric" } : {}),
+    timeZone: "UTC",
+  });
 }
 
+export function formatPeriod(start: Date | null, end: Date | null): string {
+  const sameYear = start && end && new Date(start).getUTCFullYear() === new Date(end).getUTCFullYear();
+  return `${formatPeriodDay(start, !sameYear)} – ${formatPeriodDay(end)}`;
+}
+
+/** A real instant (submitted, approved), in India time. */
 export function formatDay(value: Date | null): string {
   if (!value) return "-";
   return new Date(value).toLocaleDateString("en-IN", {
     day: "numeric",
     month: "short",
     year: "numeric",
+    timeZone: "Asia/Kolkata",
   });
+}
+
+/** One-letter codes for the review grid. */
+export const DAY_CODE: Record<string, string> = {
+  Present: "P",
+  Absent: "A",
+  "Fixed off": "F",
+  Holiday: "H",
+  Leave: "L",
+};
+
+/**
+ * Statuses an employer can set. No "Leave": legacy has no such day status
+ * (finish tracker, INW-05); an old "Leave" row still displays as itself.
+ */
+export const EMPLOYER_DAY_STATUSES = DAY_STATUSES.filter((s) => s !== "Leave");
+
+/** Billable-day hours when a row carries none (legacy 8-hour day). */
+export const DEFAULT_DAY_HOURS = 8;
+
+export type DayDetail = DayEntry & { hours: number; note: string };
+
+/** `normaliseEntries` plus each day's hours and note, for the review grid. */
+export function dayDetails(entries: unknown, periodStart: Date | null, periodEnd: Date | null): DayDetail[] {
+  const extra = new Map<string, { hours: number | null; note: string }>();
+  if (Array.isArray(entries)) {
+    for (const entry of entries) {
+      if (!entry || typeof entry !== "object") continue;
+      const r = entry as { date?: unknown; hours?: unknown; note?: unknown };
+      if (typeof r.date !== "string") continue;
+      const h = typeof r.hours === "number" ? r.hours : Number(r.hours);
+      extra.set(r.date.slice(0, 10), {
+        hours: Number.isFinite(h) ? h : null,
+        note: typeof r.note === "string" ? r.note.trim() : "",
+      });
+    }
+  }
+  return normaliseEntries(entries, periodStart, periodEnd).map((d) => {
+    const x = extra.get(d.date);
+    const hours = x?.hours ?? (d.status === "Present" ? DEFAULT_DAY_HOURS : 0);
+    return { ...d, hours: d.status === "Present" ? hours : 0, note: x?.note ?? "" };
+  });
+}
+
+export type WeekTally = {
+  /** Monday of the week, YYYY-MM-DD (may fall before the period). */
+  weekOf: string;
+  days: DayDetail[];
+  present: number;
+  absent: number;
+  off: number;
+  unclaimed: number;
+  hours: number;
+};
+
+/** The period cut into Monday-to-Sunday weeks, with counts and hours for each. */
+export function weeklyTallies(days: DayDetail[]): WeekTally[] {
+  const weeks = new Map<string, WeekTally>();
+  for (const d of days) {
+    const t = new Date(`${d.date}T00:00:00Z`);
+    const back = (t.getUTCDay() + 6) % 7; // Monday = 0
+    t.setUTCDate(t.getUTCDate() - back);
+    const weekOf = t.toISOString().slice(0, 10);
+    const w = weeks.get(weekOf) ?? { weekOf, days: [], present: 0, absent: 0, off: 0, unclaimed: 0, hours: 0 };
+    w.days.push(d);
+    if (d.status === "Present") w.present += 1;
+    else if (d.status === "Absent") w.absent += 1;
+    else if (d.status === "Fixed off" || d.status === "Holiday" || d.status === "Leave") w.off += 1;
+    else w.unclaimed += 1;
+    w.hours += d.hours;
+    weeks.set(weekOf, w);
+  }
+  return [...weeks.values()].sort((a, b) => a.weekOf.localeCompare(b.weekOf));
 }
 
 /**

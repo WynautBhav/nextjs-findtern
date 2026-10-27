@@ -185,7 +185,7 @@ export function toCandidateProfile(
     linkedinUrl: text(onboarding?.linkedinUrl),
     skills: readSkills(onboarding?.skills),
     score: readScore(extra),
-    scored: typeof extra.findternScore === "number",
+    scored: rawScore(extra) !== null,
     ratings: readRatings(extra),
     academics: readAcademics(extra),
     workModes: stringArray(onboarding?.locationTypes).map((mode) =>
@@ -246,10 +246,25 @@ export function skillOverlap(candidateSkills: string[], wanted: string[]): strin
 
 /* ── Internals ───────────────────────────────────────────────────────────── */
 
-function readScore(extra: Record<string, unknown>): number {
+/**
+ * `findternScore` as a number, or null when there is none. Legacy wrote it as
+ * a number or a numeric string and read it with Number() (EMB-02), so both
+ * count; anything else is "not scored".
+ */
+export function rawScore(extra: Record<string, unknown>): number | null {
   const raw = extra.findternScore;
-  if (typeof raw !== "number" || !Number.isFinite(raw)) return 0;
-  return Math.max(0, Math.min(10, raw));
+  const value =
+    typeof raw === "number"
+      ? raw
+      : typeof raw === "string" && /^\s*\d+(\.\d+)?\s*$/.test(raw)
+        ? Number(raw)
+        : NaN;
+  return Number.isFinite(value) ? value : null;
+}
+
+function readScore(extra: Record<string, unknown>): number {
+  const raw = rawScore(extra);
+  return raw === null ? 0 : Math.max(0, Math.min(10, raw));
 }
 
 function readRatings(extra: Record<string, unknown>): Ratings {

@@ -15,9 +15,10 @@
  */
 
 import { useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion } from "motion/react";
-import { AlertCircle, Check, CheckCheck } from "lucide-react";
+import { AlertCircle, ArrowRight, Check, CheckCheck } from "lucide-react";
 
 import { csrfFetch } from "@/lib/client-fetch";
 import { cn } from "@/lib/utils";
@@ -29,6 +30,8 @@ export type NotificationRow = {
   message: string;
   isRead: boolean;
   createdAt: Date | null;
+  /** Optional: where this alert leads (employer alerts). Opening it marks it read. */
+  href?: string | null;
 };
 
 export function NotificationList({
@@ -64,13 +67,14 @@ export function NotificationList({
             setBusy(false);
           }
         }}
+        title={error ?? undefined}
         className={cn(
-          "apple-spring apple-pressable inline-flex min-h-11 items-center gap-2 rounded-[10px] border border-ink-200 bg-white px-4 text-sm font-medium text-ink-700 hover:border-ink-300 hover:bg-ink-50 disabled:opacity-45",
-          error && "text-danger",
+          "apple-spring apple-pressable inline-flex min-h-11 items-center gap-2 rounded-apple-sm border border-ink-200 bg-white px-4 text-sm font-medium text-ink-700 hover:border-ink-300 hover:bg-ink-50 disabled:opacity-45",
+          error && "border-danger/40 text-danger",
         )}
       >
-        <CheckCheck className="size-4" aria-hidden />
-        {busy ? "Marking" : "Mark everything read"}
+        {error ? <AlertCircle className="size-4" aria-hidden /> : <CheckCheck className="size-4" aria-hidden />}
+        {busy ? "Marking" : error ? "Didn't save - try again" : "Mark everything read"}
       </button>
     );
   }
@@ -95,13 +99,13 @@ export function NotificationList({
   return (
     <div>
       {error ? (
-        <p role="alert" className="mb-3 flex items-center gap-2 rounded-[10px] bg-danger-soft px-4 py-2.5 text-sm text-danger">
+        <p role="alert" className="mb-3 flex items-center gap-2 rounded-apple-sm bg-danger-soft px-4 py-2.5 text-sm text-danger">
           <AlertCircle className="size-4 shrink-0" aria-hidden />
           {error}
         </p>
       ) : null}
 
-      <ul className="divide-y divide-ink-100 overflow-hidden rounded-[20px] border border-ink-200/70 bg-white shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)]">
+      <ul className="divide-y divide-ink-100 overflow-hidden rounded-apple-xl border border-ink-200/80 bg-white shadow-xs">
         {(rows ?? []).map((n) => {
           const isRead = n.isRead || read.has(n.id);
           return (
@@ -128,7 +132,19 @@ export function NotificationList({
                     isRead ? "text-sm font-medium text-ink-600" : "text-sm font-semibold text-ink-900",
                   )}
                 >
-                  {n.title}
+                  {n.href ? (
+                    <Link
+                      href={n.href}
+                      onClick={() => {
+                        if (!isRead) void markOne(n.id);
+                      }}
+                      className="hover:text-brand-700 hover:underline"
+                    >
+                      {n.title}
+                    </Link>
+                  ) : (
+                    n.title
+                  )}
                 </p>
                 <p className="mt-1 text-pretty text-sm leading-relaxed text-ink-600">{n.message}</p>
                 <p className="mt-1.5 text-xs tabular-nums text-ink-600">
@@ -144,15 +160,33 @@ export function NotificationList({
                 </p>
               </div>
 
-              {!isRead ? (
-                <button
-                  type="button"
-                  onClick={() => markOne(n.id)}
-                  className="apple-spring apple-pressable inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-1.5 rounded-[10px] px-2.5 text-sm font-medium text-ink-600 hover:bg-ink-100 hover:text-ink-900"
-                >
-                  <Check className="size-3.5" aria-hidden />
-                  <span className="sr-only sm:not-sr-only">Read</span>
-                </button>
+              {n.href || !isRead ? (
+                <div className="flex shrink-0 flex-col items-end gap-1 sm:flex-row sm:items-center">
+                  {!isRead ? (
+                    <button
+                      type="button"
+                      onClick={() => markOne(n.id)}
+                      aria-label={`Mark "${n.title}" as read`}
+                      className="apple-spring apple-pressable inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-apple-sm px-2.5 text-sm font-medium text-ink-600 hover:bg-ink-100 hover:text-ink-900"
+                    >
+                      <Check className="size-3.5" aria-hidden />
+                      <span className="hidden sm:inline">Mark read</span>
+                    </button>
+                  ) : null}
+                  {n.href ? (
+                    <Link
+                      href={n.href}
+                      onClick={() => {
+                        if (!isRead) void markOne(n.id);
+                      }}
+                      aria-label={`Open: ${n.title}`}
+                      className="apple-spring inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-apple-sm px-2.5 text-sm font-medium text-brand-700 hover:bg-brand-50"
+                    >
+                      <span className="hidden sm:inline">Open</span>
+                      <ArrowRight className="size-4" aria-hidden />
+                    </Link>
+                  ) : null}
+                </div>
               ) : null}
             </motion.li>
           );

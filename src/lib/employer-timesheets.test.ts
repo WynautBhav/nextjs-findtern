@@ -105,3 +105,34 @@ test("without a month, the earliest unlogged started period opens", async () => 
   // Next period not started yet.
   assert.ok("error" in timesheetPeriod(null, "2026-09-10", 3, "2026-10-01", [{ start: "2026-09-10", end: "2026-10-09" }]));
 });
+
+test("period ends stored at T23:59:59.999Z print as the same calendar day (DB-36)", async () => {
+  const { formatPeriod } = await import("./employer-timesheets.ts");
+  assert.equal(formatPeriod(new Date("2026-09-01T00:00:00Z"), new Date("2026-09-30T23:59:59.999Z")), "1 Sept – 30 Sept 2026");
+});
+
+test("review grid: hours default to 8 for a present day, weeks run Monday to Sunday", async () => {
+  const { dayDetails, weeklyTallies, EMPLOYER_DAY_STATUSES } = await import("./employer-timesheets.ts");
+  const days = dayDetails(
+    [
+      { date: "2026-09-01", status: "Present", hours: 6, note: "Sprint" },
+      { date: "2026-09-02", status: "Present" },
+      { date: "2026-09-05", status: "Fixed off", hours: 8 },
+      { date: "2026-09-07", status: "Absent" },
+    ],
+    new Date("2026-09-01T00:00:00Z"),
+    new Date("2026-09-07T23:59:59.999Z"),
+  );
+  assert.equal(days.length, 7);
+  assert.deepEqual(days[0], { date: "2026-09-01", status: "Present", hours: 6, note: "Sprint" });
+  assert.equal(days[1].hours, 8);
+  assert.equal(days[4].hours, 0, "an off day bills nothing even if hours were typed");
+  const weeks = weeklyTallies(days);
+  assert.deepEqual(weeks.map((w) => w.weekOf), ["2026-08-31", "2026-09-07"]);
+  assert.equal(weeks[0].present, 2);
+  assert.equal(weeks[0].hours, 14);
+  assert.equal(weeks[0].off, 1);
+  assert.equal(weeks[0].unclaimed, 3);
+  assert.equal(weeks[1].absent, 1);
+  assert.equal(EMPLOYER_DAY_STATUSES.includes("Leave" as never), false);
+});

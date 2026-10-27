@@ -28,12 +28,18 @@ export function SkillFilter({
   active,
   projectSkills = [],
   fromProject = false,
+  title = "Required skills",
+  note,
 }: {
   /** The skills the list is filtered by right now. */
   active: string[];
   projectSkills?: string[];
   /** `active` is the selected project's own skill list (nothing picked yet). */
   fromProject?: boolean;
+  /** Heading over the chips. */
+  title?: string;
+  /** Replaces the line under the chips that explains how they filter. */
+  note?: string;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -70,9 +76,9 @@ export function SkillFilter({
   return (
     <section aria-labelledby="skills-heading" className="mb-5">
       <h2 id="skills-heading" className="mb-3 text-base font-semibold tracking-[-0.01em] text-ink-900">
-        Select Required Skills
+        {title}
       </h2>
-      <div className="flex flex-col gap-3 rounded-[14px] border border-ink-200/80 bg-white p-3 sm:p-4 md:flex-row md:items-start">
+      <div className="flex flex-col gap-3 rounded-apple-lg border border-ink-200/80 bg-white p-3 sm:p-4 md:flex-row md:items-start">
         <ul className="flex min-w-0 flex-1 flex-wrap gap-2" aria-label="Selected skills">
           {active.map((skill) => (
             <li key={skill}>
@@ -88,7 +94,7 @@ export function SkillFilter({
             </li>
           ))}
           {active.length === 0 ? (
-            <li className="flex min-h-9 items-center gap-3 text-sm text-text-subtle">
+            <li className="flex min-h-9 items-center gap-3 text-sm text-ink-500">
               No skills selected.
               {projectSkills.length > 0 ? (
                 <Link
@@ -124,10 +130,10 @@ export function SkillFilter({
             }}
             placeholder={full ? `${MAX_SKILLS} skills max` : "Search & add skills…"}
             aria-label="Search skills to filter by"
-            className="apple-spring min-h-11 w-full rounded-[10px] border border-ink-200 bg-ink-50 pl-9 pr-3.5 text-[14px] text-ink-900 outline-none placeholder:text-ink-400 focus:border-brand-500 focus:bg-white focus:ring-2 focus:ring-brand-500/20 disabled:opacity-60"
+            className="apple-spring min-h-11 w-full rounded-apple-sm border border-ink-200 bg-ink-50 pl-9 pr-3.5 text-sm text-ink-900 outline-none placeholder:text-ink-400 focus:border-brand-500 focus:bg-white focus:ring-2 focus:ring-brand-500/20 disabled:opacity-60"
           />
           {open && (options.length > 0 || custom) ? (
-            <ul className="absolute left-0 right-0 z-20 mt-1 max-h-64 overflow-y-auto rounded-[10px] border border-ink-200 bg-white shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)]">
+            <ul className="absolute left-0 right-0 z-20 mt-1 max-h-64 overflow-y-auto rounded-apple-sm border border-ink-200 bg-white shadow-sm">
               {options.map((skill) => (
                 <li key={skill}>
                   <button
@@ -136,7 +142,7 @@ export function SkillFilter({
                       e.preventDefault();
                       add(skill);
                     }}
-                    className="apple-spring flex min-h-11 w-full items-center px-3 py-1.5 text-left text-[13px] text-ink-800 hover:bg-brand-50"
+                    className="apple-spring flex min-h-11 w-full items-center px-3 py-1.5 text-left text-sm text-ink-800 hover:bg-brand-50"
                   >
                     {skill}
                   </button>
@@ -150,7 +156,7 @@ export function SkillFilter({
                       e.preventDefault();
                       add(custom);
                     }}
-                    className="apple-spring flex min-h-11 w-full items-center gap-1.5 px-3 py-1.5 text-left text-[13px] text-brand-700 hover:bg-brand-50"
+                    className="apple-spring flex min-h-11 w-full items-center gap-1.5 px-3 py-1.5 text-left text-sm text-brand-700 hover:bg-brand-50"
                   >
                     <Plus className="size-3.5" aria-hidden />
                     Add &ldquo;{custom}&rdquo; (Press Enter)
@@ -161,10 +167,10 @@ export function SkillFilter({
           ) : null}
         </div>
       </div>
-      <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-text-subtle">
+      <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-500">
         <span>
-          {fromProject ? "Skills from the selected project. " : ""}Up to {MAX_SKILLS}. Candidates with any of them are
-          shown; more matches rank higher.
+          {fromProject ? "Skills from the selected project. " : ""}
+          {note ?? `Up to ${MAX_SKILLS}. Candidates with any of them are shown; more matches rank higher.`}
         </span>
         {!fromProject && active.length > 0 && projectSkills.length > 0 && !sameSkills(active, projectSkills) ? (
           <Link href={hrefWith(null)} scroll={false} className="font-medium text-brand-700 underline-offset-4 hover:underline">

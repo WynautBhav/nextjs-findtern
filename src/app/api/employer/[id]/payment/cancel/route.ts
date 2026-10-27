@@ -7,7 +7,11 @@ import { requireMutation } from "@/lib/guards-mutation";
 
 const bodySchema = z.object({ orderId: z.string() });
 
-/** The employer closed the payment window: drop their own unpaid order. */
+/**
+ * The employer closed the payment window: close their own unpaid order.
+ * Written as "failed", the status legacy knows for an unpaid order; it reads
+ * "cancelled" as still open and counts it as billed (DB-05).
+ */
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const guard = await requireMutation({ req, roles: ["employer"], ownerId: id });
@@ -18,7 +22,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   const updated = await getDb()
     .update(schema.employerPayments)
-    .set({ status: "cancelled" })
+    .set({ status: "failed" })
     .where(
       and(
         eq(schema.employerPayments.orderId, parsed.data.orderId),

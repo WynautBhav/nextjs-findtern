@@ -11,7 +11,7 @@ import {
   projectFromRecord,
   type OnboardingDraft,
 } from "@/lib/employer-onboarding";
-import { PageHeader } from "@/components/layout/page-header";
+import { EmptyScene, PageHead } from "@/components/app/primitives";
 import { EmployerOnboardingForm } from "@/components/employer/onboarding-form";
 
 export const metadata: Metadata = {
@@ -70,15 +70,29 @@ export default async function EmployerOnboarding({
     if (p) { project = p; draft.project = projectFromRecord(p); }
     // A first project starts in the company's own timezone (bug sheet 26 Oct).
     else if (employer) draft.project.timezone = timezoneForLocation(employer);
-  } catch {
-    // DB unavailable - render the blank two-stage form rather than crashing.
+  } catch (err) {
+    console.error("Failed to load employer onboarding:", err);
+    // Not a blank form: saving one would overwrite the profile we couldn't read.
+    return (
+      <div className="mx-auto max-w-4xl">
+        <PageHead eyebrow="Getting set up" title="Set up your hiring account" />
+        <EmptyScene
+          art
+          title="Couldn't load your company details"
+          body="Something went wrong on our side. Nothing is lost - reload the page in a moment and carry on where you left off."
+          who="Us - a connection issue"
+        />
+      </div>
+    );
   }
 
   return (
     <div>
-      <PageHeader
+      <PageHead
+        className="mx-auto max-w-4xl"
+        eyebrow="Getting set up"
         title="Set up your hiring account"
-        subtitle="Two short stages - finish both to start browsing candidates. Candidates only ever see what you fill in here."
+        lede="Two short steps: your company, then the first role you're hiring for. Then you can browse scored candidates."
       />
       <EmployerOnboardingForm
         initial={draft}

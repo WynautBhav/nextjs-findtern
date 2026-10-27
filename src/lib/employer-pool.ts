@@ -27,19 +27,31 @@ export function candidatePoolClauses(): SQL[] {
     // score. Only an intern with an AI interview rating has interviewed.
     // One CASE, not two ANDed clauses: Postgres may evaluate the cast before
     // the type check, and a stray string would fail the whole query.
-    sql`(CASE WHEN jsonb_typeof(${schema.internOnboarding.extraData}->'ratings'->'interview') = 'number' THEN (${schema.internOnboarding.extraData}->'ratings'->>'interview')::float8 ELSE 0 END) > 0`,
+    sql`${numericJson(sql`${schema.internOnboarding.extraData}->'ratings'->'interview'`)} > 0`,
     // Only interns staff have approved. A live score approves automatically
-    // (lib/admin/score-live.ts); Rejected and Pending stay out.
-    sql`${schema.internOnboarding.extraData}->>'approvalStatus' = 'Approved'`,
+    // (lib/admin/score-live.ts); Rejected and Pending stay out. A row with no
+    // approval status at all was scored in the legacy admin, which never
+    // wrote one: the score is its approval there (EMB-02), so it counts.
+    sql`COALESCE(${schema.internOnboarding.extraData}->>'approvalStatus', 'Approved') = 'Approved'`,
   ];
 }
 
 /**
- * `extra_data.findternScore` as a number, 0 when absent. Guarded on the jsonb
- * type so a stray string in one row cannot fail the cast for the whole query.
+ * A jsonb value as a float, 0 when it is neither a number nor a numeric
+ * string. Legacy wrote `findternScore` either way and read it with Number()
+ * (EMB-02). One CASE, so Postgres never casts a non-numeric string.
+ */
+function numericJson(value: SQL): SQL {
+  return sql`(CASE WHEN jsonb_typeof(${value}) = 'number' THEN (${value} #>> '{}')::float8 WHEN jsonb_typeof(${value}) = 'string' AND btrim(${value} #>> '{}') ~ '^[0-9]+([.][0-9]+)?$' THEN btrim(${value} #>> '{}')::float8 ELSE 0 END)`;
+}
+
+/**
+ * `extra_data.findternScore` as a number, 0 when absent. A numeric string
+ * (legacy) counts; any other string is 0 rather than failing the cast for the
+ * whole query.
  */
 export function scoreExpr(): SQL {
-  return sql`(CASE WHEN jsonb_typeof(${schema.internOnboarding.extraData}->'findternScore') = 'number' THEN (${schema.internOnboarding.extraData}->>'findternScore')::float8 ELSE 0 END)`;
+  return numericJson(sql`${schema.internOnboarding.extraData}->'findternScore'`);
 }
 
 /**

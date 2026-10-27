@@ -1,13 +1,13 @@
 import { randomUUID } from "node:crypto";
 
-import { and, eq, gte } from "drizzle-orm";
+import { and, eq, gte, inArray } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
 import { payableCheckout } from "@/lib/employer-payable";
-import { orderProposalIds, settleEmployerOrder } from "@/lib/payments";
+import { expireStaleEmployerOrders, legacyOrderRaw, OPEN_ORDER_MINUTES, orderProposalIds, settleEmployerOrder } from "@/lib/payments";
 import { quotePromo } from "@/lib/promo";
 import { createOrder, paymentsAreFree, razorpayKeyId } from "@/lib/razorpay";
 
@@ -42,8 +42,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (paying.some((l) => l.charge.totalMinor <= 0)) {
     return NextResponse.json({ error: "One of these offers has no amount to pay. Edit it before checking out." }, { status: 400 });
   }
+  // Abandoned orders older than 30 minutes close as "failed" (DB-05), for
+  // every company: one small UPDATE, and nobody else sweeps them.
+  await expireStaleEmployerOrders();
   // An unpaid order from the last 30 minutes already covers one of these:
-  // finish or close that one first, so the same hire can't be paid twice.
+  // finish or close that one first, so the same hire, or the same due month
+  // from a second tab (EMH-26), can't be paid twice.
   const recent = await getDb()
     .select({ raw: schema.employerPayments.raw })
     .from(schema.employerPayments)
@@ -51,17 +55,31 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       and(
         eq(schema.employerPayments.employerId, id),
         eq(schema.employerPayments.status, "created"),
-        gte(schema.employerPayments.createdAt, new Date(Date.now() - 30 * 60_000)),
+        gte(schema.employerPayments.createdAt, new Date(Date.now() - OPEN_ORDER_MINUTES * 60_000)),
       ),
     );
   const busy = new Set(recent.flatMap((r) => orderProposalIds(r.raw)));
-  if (paying.some((l) => busy.has(l.id) && !l.due)) {
+  // EMH-35: "processing" is legacy's mark for an offer whose checkout is
+  // open on the legacy site; a recent one is a payment in flight there.
+  const inFlight = await getDb()
+    .select({ id: schema.proposals.id })
+    .from(schema.proposals)
+    .where(
+      and(
+        eq(schema.proposals.employerId, id),
+        inArray(schema.proposals.id, paying.map((l) => l.id)),
+        eq(schema.proposals.status, "processing"),
+        gte(schema.proposals.updatedAt, new Date(Date.now() - OPEN_ORDER_MINUTES * 60_000)),
+      ),
+    );
+  if (paying.some((l) => busy.has(l.id)) || inFlight.length > 0) {
     return NextResponse.json({ error: "A payment for this is already open. Finish it or wait a few minutes." }, { status: 409 });
   }
 
-  const computedMinor = paying.reduce((s, l) => s + l.charge.totalMinor, 0);
+  // What the offers cost before any promo; the charge itself is `amountMinor`.
+  const listMinor = paying.reduce((s, l) => s + l.charge.totalMinor, 0);
   const discountMinor = paying.reduce((s, l) => s + l.charge.discountMinor, 0);
-  let amountMinor = computedMinor;
+  let amountMinor = listMinor;
   let promo: { promoCode: string; discountMinor: number } | null = null;
   if (parsed.data.promoCode) {
     // The one-time hiring fee is never discounted (bug sheet 23 Oct).
@@ -85,8 +103,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     // still owing and would offer to charge the months again (EMH-25).
     paymentMode: mode === "monthly" ? "monthly" : "total",
     dueProposalIds: paying.filter((l) => l.due).map((l) => l.id),
-    computedAmountMinor: computedMinor,
-    discountAmountMinor: discountMinor,
+    // DB-07: legacy admin shows computedAmountMinor as the order amount, so
+    // it is what is charged (0 for a free test order, net of any promo).
+    computedAmountMinor: paymentsAreFree() ? 0 : amountMinor,
+    listAmountMinor: listMinor,
+    discountAmountMinor: discountMinor + (promo?.discountMinor ?? 0),
   };
   // Test mode: record the order as free and settle it straight away, through
   // the same settlement as a real payment (hire, notifications, monthly dues).
@@ -99,7 +120,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       amountMinor: 0,
       currency,
       status: "created",
-      raw: { notes, testMode: true, ...(promo ? { promo } : {}) },
+      raw: { notes, order: legacyOrderRaw({ id: orderId, amountMinor: 0, currency, notes }), testMode: true, ...(promo ? { promo } : {}) },
     });
     const settled = await settleEmployerOrder({ orderId, paymentId: orderId, employerId: id });
     if (!settled.ok) return NextResponse.json({ error: settled.error }, { status: settled.status });
@@ -114,7 +135,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       amountMinor,
       currency,
       status: "created",
-      raw: { notes, ...(promo ? { promo } : {}) },
+      raw: { notes, order: legacyOrderRaw({ id: order.id, amountMinor, currency, notes }), ...(promo ? { promo } : {}) },
     });
     return NextResponse.json({ orderId: order.id, amount: amountMinor, currency, keyId: razorpayKeyId() });
   } catch (e: unknown) {

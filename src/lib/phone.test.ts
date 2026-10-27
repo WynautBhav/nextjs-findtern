@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { isValidPhone, phoneError } from "./phone.ts";
+import { isValidPhone, phoneChangeError, phoneError } from "./phone.ts";
 
 test("Indian mobiles are 10 digits starting 6-9", () => {
   assert.equal(isValidPhone("+91", "9876543211"), true);
@@ -28,6 +28,15 @@ test("other countries take 6 to 15 digits", () => {
   assert.equal(isValidPhone("+971", "501234568"), true);
   assert.equal(isValidPhone("+44", "12345"), false);
   assert.equal(isValidPhone("+44", "1234567890123456"), false);
+});
+
+test("an unchanged number on file passes; a changed one is checked (EMH-46)", () => {
+  const stored = { countryCode: "+91", phone: "4123456789" };
+  assert.equal(phoneChangeError("+91", "4123456789", stored), null);
+  assert.equal(phoneChangeError("+91", "41234 56789", stored), null);
+  assert.notEqual(phoneChangeError("+91", "4123456788", stored), null);
+  assert.notEqual(phoneChangeError("+1", "12345", { countryCode: "+1", phone: "2015550123" }), null);
+  assert.notEqual(phoneChangeError("+91", "4123456789", { countryCode: "+91", phone: "" }), null);
 });
 
 test("bad country codes are rejected", () => {

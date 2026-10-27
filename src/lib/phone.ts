@@ -39,6 +39,23 @@ export function phoneError(countryCode: string, raw: string): string | null {
   return null;
 }
 
+/**
+ * `phoneError` for a number being saved over one already on file: an
+ * unchanged number passes, so an account created under an older rule (an
+ * Indian number starting 0-5, say) can still save the rest of its profile
+ * (EMH-46). A new or edited number gets the full check.
+ */
+export function phoneChangeError(
+  countryCode: string,
+  raw: string,
+  stored: { countryCode?: string | null; phone?: string | null },
+): string | null {
+  const sameCode = String(countryCode ?? "").trim() === String(stored.countryCode ?? "").trim();
+  const storedDigits = normalizePhone(stored.phone ?? "");
+  if (sameCode && storedDigits && normalizePhone(raw) === storedDigits) return null;
+  return phoneError(countryCode, raw);
+}
+
 export function isValidPhone(countryCode: string, raw: string): boolean {
   return phoneError(countryCode, raw) === null;
 }

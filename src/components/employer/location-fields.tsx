@@ -1,24 +1,23 @@
 "use client";
 
 import { useState } from "react";
+import { ChevronDown } from "lucide-react";
 
 import { COUNTRIES } from "@/lib/data/countries";
 import { DISTRICTS, STATES, suggestDistricts, type District } from "@/lib/data/districts";
+import { controlClass, FieldError, FieldHint, FieldLabel, NativeSelect } from "@/components/employer/company-fields";
+import { cn } from "@/lib/utils";
 
 /**
- * Country / state / city pickers for the employer forms (QA rows 37, 38).
+ * Country / state / city pickers for the employer forms (bug sheet 7, NC r37
+ * and r38: dropdowns for every place).
  *
- * Country and state are selects; the city is a text field with district
- * suggestions. Free text stays possible everywhere it has to: a stored value
- * that is not in a list (legacy rows were typed by hand) is kept as an extra
- * option so it loads and saves unchanged, and outside India state and city
- * are plain text because the district list is Indian only.
+ * Country and state are selects. In India the city is a dropdown of the
+ * chosen state's districts that also filters as you type; picking one fills
+ * the state. A stored value that is not in a list (legacy rows were typed by
+ * hand) is kept as an extra option so it loads and saves unchanged. Outside
+ * India state and city are plain text, because the district list is Indian.
  */
-
-const CONTROL =
-  "apple-spring w-full min-h-11 rounded-[10px] border bg-white px-3.5 text-[14px] text-ink-900 outline-none placeholder:text-ink-400 focus:ring-2";
-const OK = "border-ink-200 focus:border-brand-500 focus:ring-brand-500/20";
-const BAD = "border-danger focus:border-danger focus:ring-danger/20";
 
 type Common = {
   id: string;
@@ -26,40 +25,23 @@ type Common = {
   value: string;
   onChange: (value: string) => void;
   error?: string;
+  hint?: string;
   required?: boolean;
-  /** Smaller label, as in the project drawer. */
+  /** Kept for older callers; every field now uses one label size. */
   compact?: boolean;
 };
 
-function Label({ id, label, required, compact }: Pick<Common, "id" | "label" | "required" | "compact">) {
-  return (
-    <label
-      htmlFor={id}
-      className={compact ? "block text-xs font-semibold text-ink-800" : "block text-sm font-medium text-ink-800"}
-    >
-      {label}
-      {required ? <span aria-hidden className="text-danger"> *</span> : null}
-    </label>
-  );
-}
-
-function ErrorText({ id, error }: { id: string; error?: string }) {
-  return error ? (
-    <p id={`${id}-error`} className="mt-1.5 text-xs text-danger">
-      {error}
-    </p>
-  ) : null;
-}
-
-function control(error: string | undefined, compact: boolean | undefined) {
-  return `${CONTROL} ${compact ? "mt-1.5" : "mt-2"} ${error ? BAD : OK}`;
-}
-
-function aria(id: string, error?: string) {
+function aria(id: string, error?: string, hint?: string) {
   return {
     "aria-invalid": error ? true : undefined,
-    "aria-describedby": error ? `${id}-error` : undefined,
+    "aria-describedby": error ? `${id}-error` : hint ? `${id}-hint` : undefined,
   } as const;
+}
+
+function Below({ id, error, hint }: { id: string; error?: string; hint?: string }) {
+  if (error) return <FieldError id={`${id}-error`}>{error}</FieldError>;
+  if (hint) return <FieldHint id={`${id}-hint`}>{hint}</FieldHint>;
+  return null;
 }
 
 /** A select over `options`, keeping an unlisted stored value selectable. */
@@ -67,14 +49,17 @@ function ListSelect({ options, placeholder, ...p }: Common & { options: string[]
   const extra = p.value && !options.includes(p.value) ? [p.value] : [];
   return (
     <div>
-      <Label {...p} />
-      <select
+      <FieldLabel htmlFor={p.id} required={p.required}>
+        {p.label}
+      </FieldLabel>
+      <NativeSelect
         id={p.id}
         name={p.id}
         value={p.value}
         onChange={(e) => p.onChange(e.target.value)}
-        {...aria(p.id, p.error)}
-        className={control(p.error, p.compact)}
+        {...aria(p.id, p.error, p.hint)}
+        error={Boolean(p.error)}
+        wrapperClassName="mt-2"
       >
         <option value="">{placeholder}</option>
         {extra.map((o) => (
@@ -87,8 +72,8 @@ function ListSelect({ options, placeholder, ...p }: Common & { options: string[]
             {o}
           </option>
         ))}
-      </select>
-      <ErrorText id={p.id} error={p.error} />
+      </NativeSelect>
+      <Below id={p.id} error={p.error} hint={p.hint} />
     </div>
   );
 }
@@ -96,7 +81,9 @@ function ListSelect({ options, placeholder, ...p }: Common & { options: string[]
 function PlainText(p: Common & { placeholder?: string }) {
   return (
     <div>
-      <Label {...p} />
+      <FieldLabel htmlFor={p.id} required={p.required}>
+        {p.label}
+      </FieldLabel>
       <input
         id={p.id}
         name={p.id}
@@ -104,10 +91,10 @@ function PlainText(p: Common & { placeholder?: string }) {
         value={p.value}
         placeholder={p.placeholder}
         onChange={(e) => p.onChange(e.target.value)}
-        {...aria(p.id, p.error)}
-        className={control(p.error, p.compact)}
+        {...aria(p.id, p.error, p.hint)}
+        className={controlClass(Boolean(p.error), "mt-2")}
       />
-      <ErrorText id={p.id} error={p.error} />
+      <Below id={p.id} error={p.error} hint={p.hint} />
     </div>
   );
 }
@@ -125,17 +112,24 @@ export function StateField({ india, ...p }: Common & { india: boolean }) {
   );
 }
 
-/** Districts matching `query`, limited to `state` when one is chosen. */
+/**
+ * Districts for the city dropdown: those matching `query`, limited to
+ * `state` when one is chosen. With a state and no query, the whole state's
+ * list (a dropdown, not a guessing game).
+ */
 export function districtOptions(query: string, state?: string, limit = 8): District[] {
   const q = query.trim().toLowerCase();
-  if (!q) return [];
-  if (!state || !STATES.includes(state)) return suggestDistricts(q, limit);
-  return DISTRICTS.filter((d) => d.state === state && d.district.toLowerCase().startsWith(q)).slice(0, limit);
+  const inState = state && STATES.includes(state);
+  if (!q) return inState ? DISTRICTS.filter((d) => d.state === state).sort((a, b) => a.district.localeCompare(b.district)) : [];
+  if (!inState) return suggestDistricts(q, limit);
+  return DISTRICTS.filter((d) => d.state === state && d.district.toLowerCase().includes(q))
+    .sort((a, b) => Number(!a.district.toLowerCase().startsWith(q)) - Number(!b.district.toLowerCase().startsWith(q)))
+    .slice(0, Math.max(limit, 12));
 }
 
 /**
- * City: in India a text field that suggests districts (of the chosen state,
- * if any); picking one also fills the state. Anything typed is still kept.
+ * City: in India a combobox over the districts (of the chosen state, if
+ * any); picking one also fills the state. Anything typed is still kept.
  */
 export function CityField({
   india,
@@ -149,68 +143,83 @@ export function CityField({
   onStateChange?: (state: string) => void;
   placeholder?: string;
 }) {
-  const [focused, setFocused] = useState(false);
+  const [open, setOpen] = useState(false);
   const [active, setActive] = useState(-1);
   if (!india) return <PlainText {...p} placeholder={placeholder ?? "City"} />;
 
-  const options = focused ? districtOptions(p.value, state).filter((d) => d.district !== p.value) : [];
+  // While the field holds a picked city, opening it lists the whole state
+  // again rather than only the one exact match.
+  const picked = DISTRICTS.some((d) => d.district === p.value && (!state || d.state === state));
+  const options = open ? districtOptions(picked ? "" : p.value, state) : [];
   const listId = `${p.id}-options`;
 
   function pick(d: District) {
     p.onChange(d.district);
     if (onStateChange && d.state !== state) onStateChange(d.state);
     setActive(-1);
-    setFocused(false);
+    setOpen(false);
   }
 
   return (
     <div className="relative">
-      <Label {...p} />
-      <input
-        id={p.id}
-        name={p.id}
-        type="text"
-        role="combobox"
-        aria-expanded={options.length > 0}
-        aria-controls={listId}
-        aria-autocomplete="list"
-        aria-activedescendant={active >= 0 && options[active] ? `${listId}-${active}` : undefined}
-        autoComplete="off"
-        value={p.value}
-        placeholder={placeholder ?? "Start typing a city"}
-        onChange={(e) => {
-          p.onChange(e.target.value);
-          setActive(-1);
-          setFocused(true);
-        }}
-        onFocus={() => setFocused(true)}
-        onBlur={() => window.setTimeout(() => setFocused(false), 120)}
-        onKeyDown={(e) => {
-          if (options.length === 0) return;
-          if (e.key === "ArrowDown") {
-            e.preventDefault();
-            setActive((i) => (i + 1) % options.length);
-          } else if (e.key === "ArrowUp") {
-            e.preventDefault();
-            setActive((i) => (i <= 0 ? options.length - 1 : i - 1));
-          } else if (e.key === "Enter" && active >= 0) {
-            e.preventDefault();
-            pick(options[active]);
-          } else if (e.key === "Escape") {
-            setFocused(false);
-          }
-        }}
-        {...aria(p.id, p.error)}
-        className={control(p.error, p.compact)}
-      />
+      <FieldLabel htmlFor={p.id} required={p.required}>
+        {p.label}
+      </FieldLabel>
+      <div className="relative mt-2">
+        <input
+          id={p.id}
+          name={p.id}
+          type="text"
+          role="combobox"
+          aria-expanded={options.length > 0}
+          aria-controls={listId}
+          aria-autocomplete="list"
+          aria-activedescendant={active >= 0 && options[active] ? `${listId}-${active}` : undefined}
+          autoComplete="off"
+          value={p.value}
+          placeholder={placeholder ?? (state && STATES.includes(state) ? `Pick a city in ${state}` : "Start typing a city")}
+          onChange={(e) => {
+            p.onChange(e.target.value);
+            setActive(-1);
+            setOpen(true);
+          }}
+          onFocus={() => setOpen(true)}
+          onClick={() => setOpen(true)}
+          onBlur={() => window.setTimeout(() => setOpen(false), 120)}
+          onKeyDown={(e) => {
+            if (e.key === "ArrowDown" && !open) {
+              e.preventDefault();
+              setOpen(true);
+              return;
+            }
+            if (options.length === 0) return;
+            if (e.key === "ArrowDown") {
+              e.preventDefault();
+              setActive((i) => (i + 1) % options.length);
+            } else if (e.key === "ArrowUp") {
+              e.preventDefault();
+              setActive((i) => (i <= 0 ? options.length - 1 : i - 1));
+            } else if (e.key === "Enter" && active >= 0) {
+              e.preventDefault();
+              pick(options[active]);
+            } else if (e.key === "Escape") {
+              setOpen(false);
+            }
+          }}
+          {...aria(p.id, p.error, p.hint)}
+          className={controlClass(Boolean(p.error), "pr-9")}
+        />
+        <ChevronDown aria-hidden className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-ink-400" />
+      </div>
       {options.length > 0 ? (
         <ul
           id={listId}
           role="listbox"
-          className="absolute inset-x-0 z-20 mt-1 max-h-64 overflow-auto rounded-[10px] border border-ink-200 bg-white shadow-md"
+          aria-label={`${p.label} options`}
+          className="absolute inset-x-0 z-30 mt-1 max-h-64 overflow-auto rounded-apple-md border border-ink-200 bg-white py-1 shadow-md"
         >
           {options.map((d, i) => (
-            <li key={`${d.district}-${d.state}`} id={`${listId}-${i}`} role="option" aria-selected={i === active}>
+            <li key={`${d.district}-${d.state}`} id={`${listId}-${i}`} role="option" aria-selected={i === active || d.district === p.value}>
               <button
                 type="button"
                 tabIndex={-1}
@@ -219,18 +228,19 @@ export function CityField({
                   e.preventDefault();
                   pick(d);
                 }}
-                className={`apple-spring flex min-h-11 w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm text-ink-800 hover:bg-ink-50 ${
-                  i === active ? "bg-ink-50" : ""
-                }`}
+                className={cn(
+                  "flex min-h-11 w-full items-center justify-between gap-3 px-3.5 py-2 text-left text-sm text-ink-800 hover:bg-ink-50",
+                  (i === active || d.district === p.value) && "bg-brand-50 text-brand-800",
+                )}
               >
                 <span>{d.district}</span>
-                <span className="text-xs text-text-subtle">{d.state}</span>
+                {state && STATES.includes(state) ? null : <span className="text-xs text-ink-500">{d.state}</span>}
               </button>
             </li>
           ))}
         </ul>
       ) : null}
-      <ErrorText id={p.id} error={p.error} />
+      <Below id={p.id} error={p.error} hint={p.hint} />
     </div>
   );
 }

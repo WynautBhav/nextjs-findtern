@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { getDb, schema } from "@/lib/db";
@@ -8,6 +8,7 @@ import { requireMutation } from "@/lib/guards-mutation";
 import { employerNames, internFirstName, notify } from "@/lib/notify";
 import { wallTimeToUtc } from "@/lib/timezones";
 import { hasDuplicateSlots, isQuarterHourWall } from "@/lib/employer-interview-rules";
+import { CALENDAR_TOKEN_OWNER, calendarConfig, refreshAccessToken } from "@/lib/google";
 
 const wall = z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/);
 const bodySchema = z.object({ slot1: wall.optional(), slot2: wall.optional(), slot3: wall.optional() });
@@ -67,6 +68,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     })
     .where(eq(schema.interviews.id, id));
 
+  // The old Google Calendar / Meet event goes too, or it lingers on
+  // Findtern's calendar with a dead link (EMB-23). Best effort, after the
+  // response: a Google outage must not block a reschedule.
+  if (interview.calendarEventId) {
+    const eventId = interview.calendarEventId;
+    after(() => deleteCalendarEvent(eventId).catch((e) => console.error("[reschedule] calendar delete", e)));
+  }
+
   // An AI interview's "employer" is the synthetic `admin` row - nobody to
   // tell (legacy R:11717 skipped it too).
   if (!byEmployer && interview.employerId === "admin") return NextResponse.json({ ok: true });
@@ -114,4 +123,24 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         },
   );
   return NextResponse.json({ ok: true });
+}
+
+/** Remove an event from Findtern's calendar (the one select-slot created). */
+async function deleteCalendarEvent(eventId: string): Promise<void> {
+  const cfg = calendarConfig();
+  if (!cfg) return;
+  const [token] = await getDb()
+    .select({ refreshToken: schema.employerGoogleTokens.refreshToken })
+    .from(schema.employerGoogleTokens)
+    .where(eq(schema.employerGoogleTokens.employerId, CALENDAR_TOKEN_OWNER))
+    .limit(1);
+  if (!token?.refreshToken) return;
+  const access = await refreshAccessToken(cfg, token.refreshToken);
+  const calendarId = encodeURIComponent(process.env.MEET_CALENDAR_ID || "primary");
+  const res = await fetch(
+    `https://www.googleapis.com/calendar/v3/calendars/${calendarId}/events/${encodeURIComponent(eventId)}?sendUpdates=none`,
+    { method: "DELETE", headers: { Authorization: `Bearer ${access}` } },
+  );
+  // 404/410: already gone, which is the outcome we wanted.
+  if (!res.ok && res.status !== 404 && res.status !== 410) throw new Error(`Google Calendar delete failed (${res.status})`);
 }

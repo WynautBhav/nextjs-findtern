@@ -423,27 +423,45 @@ export const companySizes = [
   { value: "1000+", label: "1000+ employees" },
 ] as const;
 
-// Sheet row 60: three options. Older rows may still hold "short-term",
-// "medium-term", "long-term" or "not-sure" - `scopeLabel` reads those too.
+// Bug sheet 7, S1 r81: three options, labelled "Up to 60/90/180 days".
+// Stored under the legacy keys (DB-09): the legacy employer select, its
+// scope normaliser and the legacy admin scope filter only know
+// short-term / medium-term / long-term / not-sure, so writing those keeps a
+// rollback readable. Rows this build wrote before (upto-60/90/180) and the
+// legacy "not-sure" still display and edit through `scopeValue`.
 export const scopeOfWorkOptions = [
-  { value: "upto-60", label: "Up to 60 days" },
-  { value: "upto-90", label: "Up to 90 days" },
-  { value: "upto-180", label: "Up to 180 days" },
+  { value: "short-term", label: "Up to 60 days" },
+  { value: "medium-term", label: "Up to 90 days" },
+  { value: "long-term", label: "Up to 180 days" },
 ] as const;
 
-const LEGACY_SCOPE_LABEL: Record<string, string> = {
-  "short-term": "Up to 60 days",
-  "medium-term": "Up to 90 days",
-  "long-term": "Up to 180 days",
-  "not-sure": "Not decided",
-  "Short-term": "Up to 90 days",
-  "Long-term": "Up to 180 days",
+const SCOPE_ALIASES: Record<string, string> = {
+  "upto-60": "short-term",
+  "upto-90": "medium-term",
+  "upto-180": "long-term",
+  short: "short-term",
+  medium: "medium-term",
+  long: "long-term",
 };
+
+/**
+ * The option value for any stored scope (current, earlier-build or legacy
+ * spelling), or "" when it maps to none of the three (blank, "not-sure", free
+ * text). An edit form starts on this, so "not decided" must be picked again.
+ */
+export function scopeValue(value: string | null | undefined): string {
+  const v = String(value ?? "").trim().toLowerCase();
+  if (!v) return "";
+  const key = SCOPE_ALIASES[v] ?? v;
+  return scopeOfWorkOptions.some((o) => o.value === key) ? key : "";
+}
 
 /** Display label for any stored scope value, current or legacy. */
 export function scopeLabel(value: string | null | undefined): string {
   if (!value) return "Not set";
-  return scopeOfWorkOptions.find((o) => o.value === value)?.label ?? LEGACY_SCOPE_LABEL[value] ?? value;
+  const key = scopeValue(value);
+  if (key) return scopeOfWorkOptions.find((o) => o.value === key)!.label;
+  return /^not[-_ ]?sure$/i.test(value.trim()) ? "Not decided" : value;
 }
 
 export const timezones = [

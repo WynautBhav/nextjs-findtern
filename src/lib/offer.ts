@@ -18,6 +18,12 @@ export type Offer = {
   jd: string;
   mode: string;
   location: string;
+  /** Off-remote only. Legacy rows store just `location: "City, State"`; split here (DB-10). */
+  city: string;
+  state: string;
+  /** Hybrid split. Legacy keys `workFromOfficeDays`/`workFromHomeDays`, older new-app rows `wfoDays`/`wfhDays` (EMH-02). */
+  officeDays: number | null;
+  homeDays: number | null;
   startDate: string | null;
   /** "1m" | "2m" | "3m" | "6m" */
   duration: string;
@@ -25,9 +31,11 @@ export type Offer = {
   monthlyHours: number;
   /** Legacy `weeklySchedule`; drives the working days in a month. */
   weeklySchedule: WeeklySchedule;
+  /** "HH:MM", or "flexible" when the intern sets the hours (stored as `flexibleHours`). */
   shiftFrom: string;
   shiftTo: string;
   timezone: string;
+  /** "company" | "candidate" (legacy values; the new app once wrote "intern"). */
   laptop: string;
   paidLeavesPerMonth: number;
   /** Minor units (paise/cents) of `currency`; null when the offer has none. */
@@ -101,6 +109,112 @@ function perHireOf(o: Record<string, unknown>, months: number): number | null {
   return total != null && monthly != null ? toMinor(total - monthly * months) : null;
 }
 
+/**
+ * Who provides the laptop, in legacy's words: "company" or "candidate"
+ * (EMH-04). The new app wrote "intern" for a while; legacy "yes"/"own" mean
+ * the same two things.
+ */
+export function normalizeLaptop(v: unknown): string {
+  const s = String(v ?? "").trim().toLowerCase();
+  if (!s) return "";
+  if (s === "company" || s === "yes") return "company";
+  if (s === "candidate" || s === "intern" || s === "own" || s === "no") return "candidate";
+  return s;
+}
+
+/** "Company provides" / "Candidate's own laptop", for display. */
+export function laptopLabel(v: unknown): string {
+  const s = normalizeLaptop(v);
+  if (s === "company") return "Company provides";
+  if (s === "candidate") return "Candidate's own laptop";
+  return s ? s : "Not specified";
+}
+
+/**
+ * City and state of an on-site or hybrid offer. Legacy writes only
+ * `location: "City, State"` (DB-10); the new app also stores `city`/`state`.
+ */
+export function placeOf(o: Record<string, unknown>): { city: string; state: string } {
+  const city = str(o.city);
+  const state = str(o.state);
+  if (city || state) return { city, state };
+  const loc = str(o.location);
+  if (!loc || loc.toLowerCase() === "remote") return { city: "", state: "" };
+  const parts = loc.split(",").map((p) => p.trim()).filter(Boolean);
+  if (parts.length < 2) return { city: parts[0] ?? "", state: "" };
+  return { city: parts.slice(0, -1).join(", "), state: parts[parts.length - 1] };
+}
+
+/** Hybrid split, from the legacy keys or the older new-app ones (EMH-02). */
+export function hybridDaysOf(o: Record<string, unknown>): { officeDays: number | null; homeDays: number | null } {
+  const pick = (...vs: unknown[]) => {
+    for (const v of vs) {
+      const n = num(v);
+      if (n != null && n > 0) return n;
+    }
+    return null;
+  };
+  return {
+    officeDays: pick(o.workFromOfficeDays, o.wfoDays),
+    homeDays: pick(o.workFromHomeDays, o.wfhDays),
+  };
+}
+
+const ENTITIES: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', "#39": "'", apos: "'", nbsp: " " };
+
+/**
+ * The job description as plain text. Legacy's Quill editor stored HTML
+ * (`<p>…</p>`), and since EMH-44 the new app stores simple paragraphs too,
+ * so every new-app reader gets text with its line breaks and never a raw tag
+ * (EMH-28). Not a sanitiser: the output is text, rendered as text.
+ */
+export function jdToText(v: string): string {
+  if (!/<[a-z!/]/i.test(v)) return v;
+  return v
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<li[^>]*>/gi, "• ")
+    .replace(/<\/(p|div|li|h[1-6]|blockquote|ul|ol)>/gi, "\n")
+    .replace(/<[^>]*>/g, "")
+    .replace(/&(amp|lt|gt|quot|#39|apos|nbsp);/g, (_, e: string) => ENTITIES[e] ?? "")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+/**
+ * Plain text → the paragraph HTML legacy pages render (`<p>` per paragraph,
+ * `<br>` per line), escaped, so line breaks survive on the legacy site (EMH-44).
+ */
+export function jdToHtml(text: string): string {
+  const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  return text
+    .replace(/\r\n?/g, "\n")
+    .split(/\n{2,}/)
+    .map((p) => p.trim())
+    .filter(Boolean)
+    .map((p) => `<p>${p.split("\n").map(esc).join("<br>")}</p>`)
+    .join("");
+}
+
+/** Working days a week for a schedule (office + home must add up to it; legacy rule, EMH-27). */
+export function workingDaysPerWeek(schedule: WeeklySchedule): number {
+  return schedule === "mon_sat" ? 6 : 5;
+}
+
+/**
+ * Shift keys as stored. Flexible hours are written as empty times plus
+ * `flexibleHours: true`, so legacy pages read "Not specified" instead of a
+ * time they can't parse and a legacy edit has nothing to blank (DB-19).
+ */
+export function shiftFields(from: string | undefined, to: string | undefined): Record<string, unknown> {
+  const f = String(from ?? "").trim();
+  const t = String(to ?? "").trim();
+  if (!f || !t || f.toLowerCase() === "flexible" || t.toLowerCase() === "flexible") {
+    return { shiftFrom: "", shiftTo: "", flexibleHours: true };
+  }
+  return { shiftFrom: f, shiftTo: t, flexibleHours: false };
+}
+
 export function parseOffer(raw: unknown, rowCurrency?: string | null): Offer {
   const o = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
   const currency: OfferCurrency =
@@ -108,21 +222,28 @@ export function parseOffer(raw: unknown, rowCurrency?: string | null): Offer {
   const duration = str(o.duration) || "1m";
   const ft = o.fullTimeOffer && typeof o.fullTimeOffer === "object" ? (o.fullTimeOffer as Record<string, unknown>) : null;
 
+  const place = placeOf(o);
+  const days = hybridDaysOf(o);
+  const flexible = o.flexibleHours === true || str(o.shiftFrom).toLowerCase() === "flexible";
   return {
     currency,
     roleTitle: str(o.roleTitle) || (ft ? str(ft.jobTitle) : ""),
-    jd: str(o.jd) || str(o.message),
+    jd: jdToText(str(o.jd) || str(o.message)),
     mode: str(o.mode),
     location: str(o.location) || str(o.city),
+    city: place.city,
+    state: place.state,
+    officeDays: days.officeDays,
+    homeDays: days.homeDays,
     startDate: str(o.startDate) || null,
     duration,
     months: monthsOf(duration),
     monthlyHours: num(o.monthlyHours) ?? 0,
     weeklySchedule: weeklyScheduleOf(o.weeklySchedule),
-    shiftFrom: str(o.shiftFrom),
-    shiftTo: str(o.shiftTo),
+    shiftFrom: flexible ? "flexible" : str(o.shiftFrom),
+    shiftTo: flexible ? "flexible" : str(o.shiftTo),
     timezone: str(o.timezone),
-    laptop: str(o.laptop),
+    laptop: normalizeLaptop(o.laptop),
     paidLeavesPerMonth: num(o.paidLeavesPerMonth) ?? 0,
     monthlyMinor: toMinor(o.monthlyAmount ?? o.monthly_amount),
     totalMinor: toMinor(o.totalPrice),
@@ -229,18 +350,22 @@ export function buildOffer(input: OfferInput): Record<string, unknown> {
   const major = (minor: number) => Math.round(minor) / 100;
   return {
     roleTitle: input.roleTitle,
-    jd: input.jd ?? "",
+    jd: jdToHtml(jdToText(input.jd ?? "")),
     mode: input.mode,
     currency: input.currency,
-    location: input.mode === "remote" ? "Remote" : (input.location ?? ""),
+    location:
+      input.mode === "remote"
+        ? "Remote"
+        : [input.city, input.state].map((s) => (s ?? "").trim()).filter(Boolean).join(", ") || (input.location ?? ""),
     ...(input.mode !== "remote" ? { city: input.city ?? "", state: input.state ?? "" } : {}),
-    ...(input.mode === "hybrid" ? { wfoDays: input.officeDays ?? null, wfhDays: input.homeDays ?? null } : {}),
+    // Legacy keys (EMH-02): legacy writes 0/0 for non-hybrid offers.
+    workFromOfficeDays: input.mode === "hybrid" ? (input.officeDays ?? 0) : 0,
+    workFromHomeDays: input.mode === "hybrid" ? (input.homeDays ?? 0) : 0,
     startDate: input.startDate,
     duration: input.duration,
-    shiftFrom: input.shiftFrom ?? "",
-    shiftTo: input.shiftTo ?? "",
+    ...shiftFields(input.shiftFrom, input.shiftTo),
     timezone: input.timezone ?? "Asia/Kolkata",
-    laptop: input.laptop ?? "",
+    laptop: normalizeLaptop(input.laptop),
     paidLeavesPerMonth: input.paidLeavesPerMonth ?? 0,
     monthlyHours: input.monthlyHours,
     weeklySchedule: input.weeklySchedule ?? "mon_fri",

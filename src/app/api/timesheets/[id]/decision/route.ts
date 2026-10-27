@@ -4,9 +4,11 @@ import { z } from "zod";
 
 import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
+import { notify } from "@/lib/notify";
 
 const bodySchema = z.object({
   decision: z.enum(["approved", "rejected"]),
+  /** Required to reject; optional note on approve (legacy managerNote, EMH-24). */
   reason: z.string().max(1000).optional(),
 });
 
@@ -64,7 +66,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
       status: decision,
       approvedAt: decision === "approved" ? now : null,
       rejectedAt: decision === "rejected" ? now : null,
-      managerNote: reason ?? null,
+      managerNote: reason?.trim() || null,
       updatedAt: now,
     })
     // Guarded on the status read above: two decisions racing on the same
@@ -75,16 +77,19 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     return NextResponse.json({ error: "Timesheet was already decided" }, { status: 409 });
   }
 
-  await db.insert(schema.notifications).values({
-    recipientType: "intern",
-    recipientId: sheet.internId,
+  // Legacy's types and dedupe keys (routes.ts:14069, 14124), so a double
+  // click or the other app can't notify twice. A rejection after a
+  // resubmission is a new event, so its key carries the decision time.
+  await notify({
+    to: { type: "intern", id: sheet.internId },
     type: `timesheet_${decision}`,
-    title: `Timesheet ${decision}`,
+    title: decision === "approved" ? "Timesheet approved" : "Timesheet needs changes",
     message:
       decision === "approved"
-        ? "Your timesheet was approved."
+        ? `Your timesheet has been approved by the company.${reason?.trim() ? ` Note: ${reason.trim()}` : ""}`
         : `Your timesheet was rejected: ${reason}`,
     data: { timesheetId: id },
+    dedupeKey: decision === "approved" ? `timesheet_approved:${id}` : `timesheet_rejected:${id}:${now.getTime()}`,
   });
 
   return NextResponse.json({ timesheet: updated });

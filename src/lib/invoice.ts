@@ -15,6 +15,17 @@ export type InvoiceSeller = {
   address: string;
   gstin: string | null;
   email: string;
+  /** "Send payments to" block (legacy invoices carried it, EMH-08). */
+  bank?: { bankName: string; accountName: string; accountNumber: string; ifsc: string } | null;
+};
+
+/** One billed line: a hire ("Name - Role") or a full-time fee, with its price when known. */
+export type InvoiceLine = {
+  label: string;
+  /** Second line under the label, e.g. the CTC the full-time fee is on. */
+  detail?: string | null;
+  /** Gross amount of this line (incl. GST), minor units; null when the order can't split it. */
+  amountMinor?: number | null;
 };
 
 export type InvoiceBuyer = {
@@ -38,6 +49,11 @@ export type InvoiceInput = {
   sac?: string;
   /** Placements this payment covers, listed under the service line (legacy did). */
   items?: string[];
+  /**
+   * One table row per hire, each with its own price (legacy invoice). When
+   * given, replaces the single service line and `items`.
+   */
+  lines?: InvoiceLine[];
   /** Promo applied; the total above is already net of it. */
   promo?: { code: string; discountMinor?: number | null } | null;
 };
@@ -51,6 +67,56 @@ export function invoiceNumberOf(row: { id: string; invoiceNumber?: string | null
   return row.invoiceNumber || `${fallbackPrefix}-${row.id.slice(0, 8).toUpperCase()}`;
 }
 
+/* ── Legacy invoice numbers (EMH-09) ────────────────────────────────────
+ * Legacy never stored a number: it printed DDMMYY-NN when the invoice was
+ * opened, NN being the payment's place among ALL employer payments paid that
+ * day (by paid time, then order id). Customers already hold those numbers,
+ * so a payment settled before the cutover (or settled by legacy after a
+ * rollback, which leaves no stored number) keeps showing its legacy number;
+ * everything the new app settles shows its stored FT/YYYY-YY/NNNN. */
+
+/** First instant served by the new app. Payments paid before it were invoiced by legacy. */
+export const LEGACY_INVOICE_CUTOFF = new Date("2026-10-28T00:00:00+05:30");
+/** The legacy server's clock. Assumed IST; change here if accounts' copies disagree. */
+export const LEGACY_INVOICE_TZ = "Asia/Kolkata";
+
+type PaidRef = { orderId: string; paidAt: Date | string | null };
+
+function dayKey(at: Date, timeZone: string): string {
+  const parts = new Intl.DateTimeFormat("en-GB", { timeZone, day: "2-digit", month: "2-digit", year: "2-digit" }).formatToParts(at);
+  const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "00";
+  return `${get("day")}${get("month")}${get("year")}`;
+}
+
+/** "281026-02": legacy's number for `row`, given every employer payment paid that day. */
+export function legacyInvoiceNumber(row: PaidRef, sameDayPaid: readonly PaidRef[], timeZone = LEGACY_INVOICE_TZ): string | null {
+  if (!row.paidAt) return null;
+  const at = new Date(row.paidAt);
+  if (Number.isNaN(at.getTime())) return null;
+  const key = dayKey(at, timeZone);
+  const sorted = sameDayPaid
+    .filter((p) => p.paidAt && !Number.isNaN(new Date(p.paidAt).getTime()) && dayKey(new Date(p.paidAt), timeZone) === key)
+    .sort((a, b) => new Date(a.paidAt!).getTime() - new Date(b.paidAt!).getTime() || a.orderId.localeCompare(b.orderId));
+  const idx = sorted.findIndex((p) => p.orderId === row.orderId);
+  const seq = idx >= 0 ? idx + 1 : sorted.length + 1;
+  return `${key}-${String(seq).padStart(2, "0")}`;
+}
+
+/** The number this payment's customer knows it by. */
+export function displayInvoiceNumber(
+  row: PaidRef & { id: string; invoiceNumber?: string | null },
+  allPaid: readonly PaidRef[],
+  cutoff: Date = LEGACY_INVOICE_CUTOFF,
+): string {
+  const paidAt = row.paidAt ? new Date(row.paidAt) : null;
+  const legacyEra = paidAt && !Number.isNaN(paidAt.getTime()) && paidAt < cutoff;
+  if (legacyEra || (!row.invoiceNumber && paidAt)) {
+    const legacy = legacyInvoiceNumber(row, allPaid);
+    if (legacy) return legacy;
+  }
+  return invoiceNumberOf(row);
+}
+
 function esc(value: unknown): string {
   return String(value ?? "")
     .replace(/&/g, "&amp;")
@@ -62,6 +128,33 @@ function esc(value: unknown): string {
 
 function money(minor: number, currency: string): string {
   return formatMoney(minor, currency, { zeroLabel: false, decimals: 2 });
+}
+
+/**
+ * Taxable value per line: each line's share of the order's taxable value, by
+ * its gross price; the last priced line takes the rounding so the rows add up
+ * to the total exactly. Lines without a price print "Included".
+ */
+export function lineRows(
+  lines: readonly InvoiceLine[],
+  baseMinor: number,
+  grossMinor: number,
+): { label: string; detail?: string | null; baseMinor: number | null }[] {
+  const priced = lines.filter((l) => l.amountMinor != null && l.amountMinor > 0);
+  const pricedGross = priced.reduce((s, l) => s + (l.amountMinor ?? 0), 0);
+  // Prices that don't add up to what was paid (a promo, a partial split)
+  // can't be shown per line without inventing figures.
+  const split = priced.length > 0 && pricedGross === grossMinor;
+  let left = baseMinor;
+  let pricedSeen = 0;
+  return lines.map((l) => {
+    if (lines.length === 1) return { label: l.label, detail: l.detail, baseMinor };
+    if (!split || l.amountMinor == null || l.amountMinor <= 0) return { label: l.label, detail: l.detail, baseMinor: null };
+    pricedSeen += 1;
+    const share = pricedSeen === priced.length ? left : Math.round((baseMinor * l.amountMinor) / grossMinor);
+    left -= share;
+    return { label: l.label, detail: l.detail, baseMinor: share };
+  });
 }
 
 export function placeLabel(place: PlaceOfSupply): string {
@@ -115,6 +208,7 @@ export function taxInvoiceHtml(input: InvoiceInput): string {
     .row { display: flex; justify-content: space-between; padding: 6px 0; font-size: 13px; }
     .row.final { font-size: 16px; font-weight: bold; border-top: 2px solid #0f172a; padding-top: 12px; margin-top: 4px; color: #047857; }
     .note { font-size: 12px; color: #475569; margin-top: 16px; }
+    .bank { margin-top: 32px; padding: 16px; border: 1px solid #e2e8f0; border-radius: 8px; max-width: 360px; }
     .footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid #e2e8f0; font-size: 11px; color: #94a3b8; text-align: center; }
   </style>
 </head>
@@ -165,7 +259,20 @@ export function taxInvoiceHtml(input: InvoiceInput): string {
       </tr>
     </thead>
     <tbody>
-      <tr>
+      ${
+        input.lines?.length
+          ? lineRows(input.lines, split.baseMinor, input.amountMinor)
+              .map(
+                (row, i) => `<tr>
+        <td><strong>${esc(row.label)}</strong>${row.detail ? `<br /><span class="muted">${esc(row.detail)}</span>` : ""}${
+          i === 0 ? `<br /><span class="muted">Order ref: ${esc(input.orderId)}</span>` : ""
+        }</td>
+        <td>${esc(input.sac ?? "998519")}</td>
+        <td style="text-align: right">${row.baseMinor == null ? "Included" : m(row.baseMinor)}</td>
+      </tr>`,
+              )
+              .join("")
+          : `<tr>
         <td><strong>${esc(input.description)}</strong><br /><span class="muted">Order ref: ${esc(input.orderId)}</span>${
           input.items?.length
             ? `<br /><span class="muted">${input.items.map((item) => `• ${esc(item)}`).join("<br />")}</span>`
@@ -173,7 +280,8 @@ export function taxInvoiceHtml(input: InvoiceInput): string {
         }</td>
         <td>${esc(input.sac ?? "998519")}</td>
         <td style="text-align: right">${m(split.baseMinor)}</td>
-      </tr>
+      </tr>`
+      }
     </tbody>
   </table>
 
@@ -190,6 +298,19 @@ export function taxInvoiceHtml(input: InvoiceInput): string {
     <div class="row final"><span>Total paid</span><span>${m(split.totalMinor)}</span></div>
   </div>
   ${exportNote}
+  ${
+    seller.bank
+      ? `<div class="bank">
+    <div class="label">Send payments to</div>
+    <div class="box">
+      ${esc(seller.bank.accountName)}<br />
+      ${esc(seller.bank.bankName)}<br />
+      Account number: ${esc(seller.bank.accountNumber)}<br />
+      IFSC: ${esc(seller.bank.ifsc)}
+    </div>
+  </div>`
+      : ""
+  }
 
   <div class="footer">
     This is an electronically generated tax invoice. No signature required.<br />

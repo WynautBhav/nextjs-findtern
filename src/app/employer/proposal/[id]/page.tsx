@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { eq } from "drizzle-orm";
-import { ArrowLeft, ArrowUpRight, CircleGauge, Download } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, CreditCard, Download } from "lucide-react";
 
 import { getDb, schema } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
@@ -10,9 +10,15 @@ import { canAccess } from "@/lib/security/guards";
 import { initialsOf } from "@/lib/employer-candidates";
 import { hiredInternIds } from "@/lib/employer-visibility";
 import { formatMoney } from "@/lib/format";
-import { offerPastStart, offerScore, parseOffer, WEEKLY_SCHEDULES } from "@/lib/offer";
+import { fullTimeFeeMinor } from "@/lib/checkout";
+import { laptopLabel, offerScore, parseOffer, WEEKLY_SCHEDULES } from "@/lib/offer";
+import { shiftInIst } from "@/lib/timezones";
+import { DetailRow, Pill, SectionHead, Surface } from "@/components/app/primitives";
+import { buttonClass } from "@/components/ui/button";
 import { ProposalActions } from "@/components/employer/proposal-actions";
 import { ProposalOfferForm } from "@/components/employer/proposal-offer-form";
+import { offerState } from "@/components/employer/proposal-state";
+import { MeetingRulesBlock } from "@/components/employer/meeting-rules";
 import { workPreferenceOf, type WorkPreference } from "@/lib/work-preference";
 
 export const metadata: Metadata = {
@@ -21,23 +27,6 @@ export const metadata: Metadata = {
 };
 
 type Proposal = typeof schema.proposals.$inferSelect;
-
-/** States an employer can still act on. */
-const ACTIONABLE = new Set(["draft", "sent", "accepted", "hired"]);
-/** Accepted stays editable until it is paid for; saving sends it back to the candidate. */
-const EDITABLE = new Set(["draft", "sent", "accepted"]);
-
-const STATUS: Record<string, { label: string; tone: string; next: string }> = {
-  draft: { label: "Draft", tone: "bg-ink-100 text-ink-700", next: "Not sent yet." },
-  sent: { label: "Waiting on candidate", tone: "bg-accent-100 text-accent-800", next: "The candidate reads the offer and decides. You can still edit or withdraw it." },
-  interview_scheduled: { label: "Interview booked", tone: "bg-brand-50 text-brand-700", next: "The offer opens once the interview has happened." },
-  accepted: { label: "Accepted", tone: "bg-success-soft text-success", next: "Pay for this hire to confirm it. Names and contact details unlock on payment. Until then you can still edit the offer (the candidate accepts it again) or withdraw it." },
-  processing: { label: "Payment in progress", tone: "bg-accent-100 text-accent-800", next: "A payment is open for this hire." },
-  hired: { label: "Hired", tone: "bg-success-soft text-success", next: "Timesheets run monthly from the start date." },
-  rejected: { label: "Declined", tone: "bg-ink-100 text-ink-700", next: "The candidate declined. Nothing further is needed from you." },
-  withdrawn: { label: "Withdrawn", tone: "bg-ink-100 text-ink-700", next: "This offer is closed." },
-  expired: { label: "Expired", tone: "bg-ink-100 text-ink-700", next: "The start date passed without an answer." },
-};
 
 const MODE: Record<string, string> = { remote: "Remote", hybrid: "Hybrid", onsite: "On-site" };
 
@@ -48,17 +37,17 @@ const MODE: Record<string, string> = { remote: "Remote", hybrid: "Hybrid", onsit
  * yours. Checking only the first is the legacy IDOR. A proposal belonging to
  * another employer is a `notFound()`, not a 403.
  *
- * Layout: the four numbers an employer decides on (monthly, hours, start,
- * length) sit in one strip under the title; the terms the candidate reads
- * follow in the order they read them; status and the next action stay in the
- * side column.
+ * Layout: the four numbers an employer decides on sit in one strip under the
+ * title; the terms follow in the order the candidate reads them; status, the
+ * next step and every action stay in the side column. `offerState` is shared
+ * with the list, so the two never disagree about what can still be done.
  */
 export default async function EmployerProposalDetail({
   params,
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  /** `?edit=1` (the list's Edit button) opens the offer editor. */
+  /** `?edit=1` (the list's Edit button, and old /proposals/:id/edit links) opens the editor. */
   searchParams: Promise<{ edit?: string }>;
 }) {
   const { id } = await params;
@@ -67,11 +56,12 @@ export default async function EmployerProposalDetail({
 
   let proposal: Proposal | undefined;
   try {
-    const db = getDb();
-    const [row] = await db.select().from(schema.proposals).where(eq(schema.proposals.id, id)).limit(1);
+    const [row] = await getDb().select().from(schema.proposals).where(eq(schema.proposals.id, id)).limit(1);
     proposal = row;
-  } catch {
-    // DB unavailable - fall through to notFound() rather than throwing.
+  } catch (err) {
+    // A real outage is an error page, not a 404 that says the offer is gone.
+    console.error("[employer/proposal] load failed", err);
+    throw new Error("Couldn't load this proposal. Try again in a moment.");
   }
 
   if (!proposal || !session || !canAccess(session, proposal.employerId)) notFound();
@@ -79,9 +69,11 @@ export default async function EmployerProposalDetail({
   // Names are decoration: a missing lookup must not 404 a proposal the
   // employer is entitled to read.
   let internName = "Candidate";
+  let initials = "C";
   let unlocked = false;
   let projectName: string | null = null;
   let preference: WorkPreference = { modes: [], cities: [] };
+  let hasLaptop: boolean | null = null;
   try {
     const db = getDb();
     const [row] = await db
@@ -98,214 +90,233 @@ export default async function EmployerProposalDetail({
     if (row) {
       const first = (row.firstName || "").trim();
       const last = (row.lastName || "").trim();
-      // Unmasked once this employer hired them on any project (or admin
-      // "View as" - `hiredInternIds` covers both).
+      const ini = initialsOf(first, last);
+      initials = ini === "?" ? "C" : ini;
+      // Unmasked once this employer hired them on any project.
       unlocked = (await hiredInternIds(db, proposal.employerId)).has(proposal.internId);
-      internName = unlocked
-        ? `${first} ${last}`.trim() || "Candidate"
-        : initialsOf(first, last) === "?"
-          ? "Candidate"
-          : `Candidate ${initialsOf(first, last)}`;
+      internName = unlocked ? `${first} ${last}`.trim() || "Candidate" : ini === "?" ? "Candidate" : `Candidate ${ini}`;
     }
     projectName = row?.projectName ?? null;
     const [pref] = await db
-      .select({ locationTypes: schema.internOnboarding.locationTypes, preferredLocations: schema.internOnboarding.preferredLocations })
+      .select({
+        locationTypes: schema.internOnboarding.locationTypes,
+        preferredLocations: schema.internOnboarding.preferredLocations,
+        hasLaptop: schema.internOnboarding.hasLaptop,
+      })
       .from(schema.internOnboarding)
       .where(eq(schema.internOnboarding.userId, proposal.internId))
       .limit(1);
     preference = workPreferenceOf(pref);
-  } catch {
-    // Keep the defaults; the page reads fine without them.
+    hasLaptop = typeof pref?.hasLaptop === "boolean" ? pref.hasLaptop : null;
+  } catch (err) {
+    console.error("[employer/proposal] names", err);
   }
 
   const raw = (proposal.offerDetails ?? {}) as Record<string, unknown>;
   const offer = parseOffer(raw, proposal.currency);
   const currency = offer.currency;
+  const state = offerState(proposal, offer);
   const skills = Array.isArray(proposal.skills) ? proposal.skills.filter(Boolean) : [];
   const snapshot = Object.entries(proposal.aiRatings ?? {}).filter(
     (entry): entry is [string, number] => typeof entry[1] === "number" && entry[0] !== "overall",
   );
-  const lapsed = (proposal.status === "sent" || proposal.status === "interview_scheduled") && offerPastStart(offer.startDate);
-  const statusKey = lapsed ? "expired" : proposal.status;
-  const status = STATUS[statusKey] ?? { label: statusKey.replace(/_/g, " "), tone: "bg-ink-100 text-ink-700", next: "" };
   const score = offerScore(raw) ?? 0;
-  // The Findtern Score shown is the one the offer was priced on, so it can
-  // never disagree with the rate or the stipend rule beside it.
+  // The score shown is the one the offer was priced on, so it can never
+  // disagree with the rate beside it.
   const ratings: [string, number][] = score > 0 ? [["overall", score], ...snapshot] : snapshot;
-  const editable = EDITABLE.has(proposal.status) && !proposal.hiredAt && !lapsed && !offer.fullTime;
-  const city = typeof raw.city === "string" ? raw.city : "";
-  const state = typeof raw.state === "string" ? raw.state : "";
-  const officeDays = Number(raw.wfoDays ?? raw.workFromOfficeDays ?? 0) || 0;
-  const homeDays = Number(raw.wfhDays ?? raw.workFromHomeDays ?? 0) || 0;
+  const flexible = offer.shiftFrom === "flexible" || !offer.shiftFrom;
+  const ist = flexible ? null : shiftInIst(offer.shiftFrom, offer.shiftTo, offer.timezone, offer.startDate);
+  const ft = offer.fullTime;
 
-  const strip: [string, string][] = offer.fullTime
+  const strip: [string, string][] = ft
     ? [
-        ["Annual CTC", offer.fullTime.annualCtcMinor ? formatMoney(offer.fullTime.annualCtcMinor, currency) : "-"],
-        ["Hiring fee", offer.fullTime.annualCtcMinor ? formatMoney(Math.round(offer.fullTime.annualCtcMinor * 0.0833), currency) : "-"],
-        ["Joining", offer.startDate ? formatDate(offer.startDate) : "-"],
+        ["Annual CTC", ft.annualCtcMinor ? formatMoney(ft.annualCtcMinor, currency) : "-"],
+        ["Hiring fee", ft.annualCtcMinor ? formatMoney(fullTimeFeeMinor(ft.annualCtcMinor), currency) : "-"],
+        ["Joining", formatDate(offer.startDate)],
         ["Type", "Full-time"],
       ]
     : [
-        ["Monthly", offer.monthlyMinor != null ? formatMoney(offer.monthlyMinor, currency) : "-"],
         // One month's amount only (client QA) - no monthly × months total.
-        ["Hours / month", offer.monthlyHours ? `${offer.monthlyHours} h` : "-"],
-        ["Starts", offer.startDate ? formatDate(offer.startDate) : "-"],
+        ["Monthly", offer.monthlyMinor != null ? formatMoney(offer.monthlyMinor, currency) : "-"],
+        ["Hours a month", offer.monthlyHours ? `${offer.monthlyHours} h` : "-"],
+        ["Starts", formatDate(offer.startDate)],
         ["Length", `${offer.months} month${offer.months === 1 ? "" : "s"}`],
       ];
-
-  const card = "rounded-[20px] border border-ink-200/70 bg-white shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)]";
 
   return (
     <div>
       <Link
         href="/employer/proposals"
-        className="apple-spring inline-flex min-h-11 items-center gap-1.5 rounded-[10px] text-sm font-medium text-brand-700 hover:underline"
+        className="apple-spring mb-3 inline-flex min-h-11 items-center gap-1.5 rounded-apple-sm text-sm font-medium text-brand-700 hover:underline"
       >
         <ArrowLeft className="size-4" aria-hidden />
         All proposals
       </Link>
 
       {/* ── Header: who, what, and the numbers ───────────────────────── */}
-      <section className={`${card} mt-2 overflow-hidden`}>
-        <div className="flex flex-wrap items-start justify-between gap-4 p-6">
-          <div className="min-w-0">
-            <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-text-subtle">
-              {offer.fullTime ? "Full-time offer" : "Internship offer"}
-              {projectName ? ` · ${projectName}` : ""}
-            </p>
-            <h1 className="mt-1.5 text-balance text-2xl font-semibold tracking-[-0.02em] text-ink-900 sm:text-3xl">
-              {offer.roleTitle || projectName || "Proposal"}
-            </h1>
-            <p className="mt-1.5 text-sm text-ink-600">
-              To{" "}
-              <Link
-                href={`/employer/intern/${encodeURIComponent(proposal.internId)}`}
-                className="font-medium text-ink-900 underline-offset-4 hover:underline"
-              >
-                {internName}
-              </Link>
-              {score > 0 ? (
-                <span className="ml-2 inline-flex items-center gap-1 tabular-nums text-text-subtle">
-                  <CircleGauge className="size-3.5" aria-hidden />
-                  {score.toFixed(1)}/10
-                </span>
-              ) : null}
-            </p>
+      <Surface as="section" className="overflow-hidden">
+        <div className="flex flex-wrap items-start justify-between gap-4 p-6 sm:p-7">
+          <div className="flex min-w-0 items-start gap-4">
+            <span aria-hidden className="grid size-12 shrink-0 place-items-center rounded-full bg-brand-50 text-base font-bold text-brand-800">
+              {initials}
+            </span>
+            <div className="min-w-0">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-ink-500">
+                {ft ? "Full-time offer" : "Internship offer"}
+                {projectName ? ` · ${projectName}` : ""}
+              </p>
+              <h1 className="mt-1.5 text-balance text-2xl font-semibold tracking-[-0.02em] text-ink-900 sm:text-3xl">
+                {offer.roleTitle || projectName || "Proposal"}
+              </h1>
+              <p className="mt-1.5 text-sm text-ink-600">
+                To{" "}
+                <Link href={`/employer/intern/${encodeURIComponent(proposal.internId)}`} className="font-medium text-ink-900 underline-offset-4 hover:underline">
+                  {internName}
+                </Link>
+                {score > 0 ? <span className="nums ml-2">· Findtern Score {score.toFixed(1)}/10</span> : null}
+              </p>
+            </div>
           </div>
-          <span className={`inline-flex min-h-8 items-center rounded-full px-3 text-xs font-semibold ${status.tone}`}>
-            {status.label}
-          </span>
+          <Pill tone={state.tone}>{state.label}</Pill>
         </div>
-        <dl className="grid grid-cols-2 border-t border-ink-100 bg-ink-50/50 sm:grid-cols-4">
+        <dl className="grid grid-cols-2 border-t border-ink-100 bg-ink-50/60 sm:grid-cols-4">
           {strip.map(([label, value], i) => (
-            <div key={label} className={`px-6 py-4 ${i % 2 === 1 ? "border-l border-ink-100" : ""} ${i >= 2 ? "border-t border-ink-100 sm:border-t-0" : ""} ${i === 2 ? "sm:border-l" : ""}`}>
-              <dt className="text-xs text-text-subtle">{label}</dt>
-              <dd className="mt-1 text-lg font-semibold tabular-nums tracking-[-0.01em] text-ink-900">{value}</dd>
+            <div
+              key={label}
+              className={[
+                "px-6 py-4",
+                i % 2 === 1 ? "border-l border-ink-100" : "",
+                i >= 2 ? "border-t border-ink-100 sm:border-t-0" : "",
+                i === 2 ? "sm:border-l" : "",
+              ].join(" ")}
+            >
+              <dt className="text-sm text-ink-600">{label}</dt>
+              <dd className="nums mt-1 text-xl font-semibold tracking-[-0.01em] text-ink-900">{value}</dd>
             </div>
           ))}
         </dl>
-      </section>
+      </Surface>
 
-      <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
-        <div className="min-w-0 space-y-4">
-          {!offer.fullTime ? (
-            <section className={`${card} p-6`}>
-              <h2 className="text-base font-semibold tracking-[-0.01em] text-ink-900">Terms</h2>
-              <dl className="mt-4 grid gap-x-6 gap-y-4 sm:grid-cols-3">
-                <Detail label="Hours per month">{offer.monthlyHours ? `${offer.monthlyHours} h` : "-"}</Detail>
-                <Detail label="Hourly rate">{offer.hourlyRateMinor ? `${formatMoney(offer.hourlyRateMinor, currency)}/h` : "-"}</Detail>
-                {offer.perHireMinor ? <Detail label="Per-hire charge">{formatMoney(offer.perHireMinor, currency)}</Detail> : null}
-                <Detail label="Paid leave">{offer.paidLeavesPerMonth ? `${offer.paidLeavesPerMonth} days a month` : "None"}</Detail>
-                <Detail label="Working week">{WEEKLY_SCHEDULES[offer.weeklySchedule].label}</Detail>
-                <Detail label="Working hours">
-                  {offer.shiftFrom && offer.shiftFrom !== "flexible" ? `${offer.shiftFrom}–${offer.shiftTo}` : "Flexible"}
-                </Detail>
-                <Detail label="Timezone">{offer.timezone || "Asia/Kolkata"}</Detail>
+      <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_21rem]">
+        <div className="min-w-0 space-y-6">
+          {!ft ? (
+            <Surface as="section" className="px-6 pb-2 pt-5">
+              <SectionHead title="Terms" />
+              <dl className="divide-y divide-ink-100">
+                <DetailRow label="Hourly rate" value={offer.hourlyRateMinor ? `${formatMoney(offer.hourlyRateMinor, currency)} an hour` : "-"} mono />
+                <DetailRow
+                  label="Monthly amount"
+                  value={
+                    offer.monthlyMinor != null ? (
+                      <>
+                        {formatMoney(offer.monthlyMinor, currency)}
+                        {currency === "INR" ? <span className="ml-1 text-xs font-normal text-ink-500">(includes GST)</span> : null}
+                      </>
+                    ) : (
+                      "-"
+                    )
+                  }
+                  mono
+                />
+                {offer.perHireMinor ? <DetailRow label="One-time hiring fee" value={formatMoney(offer.perHireMinor, currency)} mono /> : null}
+                <DetailRow label="Working week" value={WEEKLY_SCHEDULES[offer.weeklySchedule].label} />
+                <DetailRow label="Paid leave" value={offer.paidLeavesPerMonth ? `${offer.paidLeavesPerMonth} days a month` : "None"} />
+                <DetailRow
+                  label="Working hours"
+                  value={
+                    flexible ? (
+                      "Flexible, set by the intern"
+                    ) : (
+                      <>
+                        {offer.shiftFrom}–{offer.shiftTo}
+                        {ist ? <span className="block text-xs font-normal text-ink-500">{ist} for the intern</span> : null}
+                      </>
+                    )
+                  }
+                  mono
+                />
+                <DetailRow label="Timezone" value={offer.timezone || "Asia/Kolkata"} />
               </dl>
-            </section>
+            </Surface>
           ) : (
-            // Old site parity (bug sheet R88): the full-time offer as sent,
-            // with the uploaded letter one click away.
-            <section className={`${card} p-6`}>
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <h2 className="text-base font-semibold tracking-[-0.01em] text-ink-900">Full-time offer details</h2>
-                  <p className="mt-0.5 text-sm text-text-subtle">This is the full-time offer you sent to the candidate.</p>
-                </div>
-                {offer.fullTime.offerLetterKey || offer.fullTime.offerLetterUrl ? (
-                  <a
-                    href={`/api/proposals/${encodeURIComponent(proposal.id)}/offer-letter`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="apple-spring apple-pressable inline-flex min-h-11 items-center gap-2 rounded-[10px] bg-brand-700 px-4 text-sm font-semibold text-white hover:bg-brand-600"
-                  >
-                    <Download className="size-4" aria-hidden />
-                    Offer letter
-                  </a>
-                ) : null}
-              </div>
-              <dl className="mt-4 grid gap-x-6 gap-y-4 sm:grid-cols-3">
-                <Detail label="Job mode">
-                  <span className="capitalize">{offer.fullTime.jobMode || "-"}</span>
-                </Detail>
-                <Detail label="Location">{offer.fullTime.jobMode === "remote" ? "Remote" : offer.fullTime.location || "-"}</Detail>
-                <Detail label="Timezone">{offer.fullTime.timezone || offer.timezone || "-"}</Detail>
-                <Detail label="Shift">
-                  {offer.fullTime.shiftFrom && offer.fullTime.shiftTo ? `${offer.fullTime.shiftFrom}–${offer.fullTime.shiftTo}` : "-"}
-                </Detail>
-                <Detail label="Annual CTC">
-                  {offer.fullTime.annualCtcMinor ? formatMoney(offer.fullTime.annualCtcMinor, currency) : "-"}
-                </Detail>
+            <Surface as="section" className="px-6 pb-2 pt-5">
+              <SectionHead
+                title="Full-time offer"
+                hint="As sent to the candidate."
+                action={
+                  ft.offerLetterKey || ft.offerLetterUrl ? (
+                    <a
+                      href={`/api/proposals/${encodeURIComponent(proposal.id)}/offer-letter`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className={buttonClass({ size: "sm" })}
+                    >
+                      <Download className="size-4" aria-hidden />
+                      Offer letter
+                    </a>
+                  ) : null
+                }
+              />
+              <dl className="divide-y divide-ink-100">
+                <DetailRow label="Job mode" value={MODE[ft.jobMode] ?? (ft.jobMode || "-")} />
+                <DetailRow label="Location" value={ft.jobMode === "remote" ? "Remote" : ft.location || "-"} />
+                <DetailRow label="Timezone" value={ft.timezone || offer.timezone || "-"} />
+                <DetailRow label="Shift" value={ft.shiftFrom && ft.shiftTo ? `${ft.shiftFrom}–${ft.shiftTo}` : "-"} mono />
+                <DetailRow label="Annual CTC" value={ft.annualCtcMinor ? formatMoney(ft.annualCtcMinor, currency) : "-"} mono />
+                <DetailRow
+                  label="Hiring fee"
+                  value={ft.annualCtcMinor ? `${formatMoney(fullTimeFeeMinor(ft.annualCtcMinor), currency)} (8.33% of CTC, separate from it)` : "-"}
+                  mono
+                />
               </dl>
-            </section>
+            </Surface>
           )}
 
-          <section className={`${card} p-6`}>
-            <h2 className="text-base font-semibold tracking-[-0.01em] text-ink-900">Work setup</h2>
-            <dl className="mt-4 grid gap-x-6 gap-y-4 sm:grid-cols-3">
-              <Detail label="Mode">{MODE[offer.mode] ?? (offer.fullTime?.jobMode || "-")}</Detail>
-              <Detail label="Location">
-                {offer.mode === "remote" ? "Remote" : [city, state].filter(Boolean).join(", ") || offer.location || offer.fullTime?.location || "-"}
-              </Detail>
-              <Detail label="Laptop">
-                {offer.laptop === "company" || offer.laptop === "yes" ? "Company provides" : offer.laptop ? "Intern provides" : "-"}
-              </Detail>
-              {offer.mode === "hybrid" ? (
-                <Detail label="Hybrid split">
-                  {officeDays} office · {homeDays} home
-                </Detail>
-              ) : null}
-            </dl>
-          </section>
+          {!ft ? (
+            <Surface as="section" className="px-6 pb-2 pt-5">
+              <SectionHead title="Work setup" />
+              <dl className="divide-y divide-ink-100">
+                <DetailRow label="Mode" value={MODE[offer.mode] ?? "-"} />
+                {offer.mode !== "remote" ? (
+                  <DetailRow label="Location" value={[offer.city, offer.state].filter(Boolean).join(", ") || offer.location || "-"} />
+                ) : null}
+                {offer.mode === "hybrid" ? (
+                  <DetailRow label="Hybrid split" value={`${offer.officeDays ?? 0} office · ${offer.homeDays ?? 0} home days a week`} />
+                ) : null}
+                <DetailRow label="Laptop" value={laptopLabel(offer.laptop)} />
+              </dl>
+            </Surface>
+          ) : null}
 
           {offer.jd ? (
-            <section className={`${card} p-6`}>
-              <h2 className="text-base font-semibold tracking-[-0.01em] text-ink-900">What the intern will do</h2>
-              {/* Plain text. The legacy composer stored HTML, so older rows
-                  render as text rather than being injected. */}
-              <p className="mt-3 whitespace-pre-line text-pretty text-sm leading-relaxed text-ink-700">{offer.jd}</p>
-            </section>
+            <Surface as="section" className="p-6">
+              <SectionHead title="What the intern will do" />
+              {/* Text: legacy Quill HTML is read back as plain text (EMH-28). */}
+              <p className="whitespace-pre-line text-pretty text-[0.9375rem] leading-relaxed text-ink-700 [overflow-wrap:anywhere]">{offer.jd}</p>
+            </Surface>
           ) : null}
 
           {skills.length > 0 ? (
-            <section className={`${card} p-6`}>
-              <h2 className="text-base font-semibold tracking-[-0.01em] text-ink-900">Skills</h2>
-              <ul className="mt-3 flex flex-wrap gap-1.5">
+            <Surface as="section" className="p-6">
+              <SectionHead title="Skills" />
+              <ul className="flex flex-wrap gap-1.5">
                 {skills.map((skill) => (
-                  <li key={skill} className="rounded-full bg-brand-50 px-2.5 py-1 text-xs font-medium text-brand-700">
+                  <li key={skill} className="rounded-full bg-brand-50 px-3 py-1 text-sm font-medium text-brand-800">
                     {skill}
                   </li>
                 ))}
               </ul>
-            </section>
+            </Surface>
           ) : null}
+
+          <MeetingRulesBlock />
         </div>
 
-        <aside className="space-y-4 lg:sticky lg:top-8 lg:self-start">
-          <section className={`${card} p-5`}>
-            <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-text-subtle">What happens next</p>
-            <p className="mt-2 text-pretty text-sm leading-relaxed text-ink-700">{status.next}</p>
-            <ol className="mt-4 space-y-2 border-t border-ink-100 pt-4 text-xs tabular-nums text-text-subtle">
+        <aside className="order-first space-y-4 lg:order-none lg:sticky lg:top-24 lg:self-start">
+          <Surface as="section" className="p-5">
+            <h2 className="text-base font-semibold text-ink-900">What happens next</h2>
+            <p className="mt-2 text-pretty text-sm leading-relaxed text-ink-700">{state.next}</p>
+            <ol className="nums mt-4 space-y-1.5 border-t border-ink-100 pt-4 text-sm text-ink-600">
               <li>Sent {formatDate(proposal.createdAt)}</li>
               {proposal.updatedAt && proposal.updatedAt.getTime() - (proposal.createdAt?.getTime() ?? 0) > 60_000 ? (
                 <li>Updated {formatDate(proposal.updatedAt)}</li>
@@ -313,10 +324,15 @@ export default async function EmployerProposalDetail({
               {proposal.hiredAt ? <li>Hired {formatDate(proposal.hiredAt)}</li> : null}
             </ol>
 
-            {ACTIONABLE.has(proposal.status) && !lapsed ? (
+            {state.canPay || state.canWithdraw || state.canEdit || proposal.status === "hired" ? (
               <div className="mt-4 grid gap-2">
-                <ProposalActions proposalId={proposal.id} status={proposal.status} fullTime={Boolean(offer.fullTime)} />
-                {editable ? (
+                {state.canPay ? (
+                  <Link href="/employer/checkout" className={buttonClass({ block: true })}>
+                    <CreditCard className="size-4" aria-hidden />
+                    Proceed to checkout
+                  </Link>
+                ) : null}
+                {state.canEdit ? (
                   <ProposalOfferForm
                     proposalId={proposal.id}
                     defaultOpen={edit === "1"}
@@ -324,6 +340,7 @@ export default async function EmployerProposalDetail({
                     preference={preference}
                     currency={currency}
                     shortOnly={score > 0 && score < 6}
+                    hasLaptop={hasLaptop}
                     initial={{
                       roleTitle: offer.roleTitle,
                       duration: offer.duration,
@@ -333,10 +350,10 @@ export default async function EmployerProposalDetail({
                       paidLeavesPerMonth: offer.paidLeavesPerMonth,
                       message: offer.jd,
                       mode: offer.mode,
-                      city,
-                      state,
-                      officeDays: officeDays || undefined,
-                      homeDays: homeDays || undefined,
+                      city: offer.city,
+                      state: offer.state,
+                      officeDays: offer.officeDays ?? undefined,
+                      homeDays: offer.homeDays ?? undefined,
                       shiftFrom: offer.shiftFrom,
                       shiftTo: offer.shiftTo,
                       timezone: offer.timezone,
@@ -344,27 +361,30 @@ export default async function EmployerProposalDetail({
                     }}
                   />
                 ) : null}
+                <ProposalActions proposalId={proposal.id} status={proposal.status} canPay={false} canWithdraw={state.canWithdraw} />
               </div>
             ) : null}
-          </section>
+          </Surface>
 
           {ratings.length > 0 ? (
-            <section className={`${card} p-5`}>
-              <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-text-subtle">Assessment at sending</p>
-              <ul className="mt-3 space-y-2">
+            <Surface as="section" className="px-5 pb-1 pt-4">
+              <h2 className="text-base font-semibold text-ink-900">Assessment at sending</h2>
+              <dl className="mt-1 divide-y divide-ink-100">
                 {ratings.map(([key, value]) => (
-                  <li key={key} className="flex items-center justify-between text-sm">
-                    <span className="capitalize text-ink-700">{key === "overall" ? "Findtern Score" : key}</span>
-                    <span className="font-medium tabular-nums text-ink-900">{value}/10</span>
-                  </li>
+                  <DetailRow
+                    key={key}
+                    label={key === "overall" ? "Findtern Score" : key.charAt(0).toUpperCase() + key.slice(1)}
+                    value={`${value}/10`}
+                    mono
+                  />
                 ))}
-              </ul>
-            </section>
+              </dl>
+            </Surface>
           ) : null}
 
           <Link
             href={`/employer/intern/${encodeURIComponent(proposal.internId)}`}
-            className="apple-spring apple-pressable flex min-h-11 items-center justify-between gap-2 rounded-[14px] border border-ink-200/70 bg-white px-5 py-3.5 text-sm font-medium text-ink-800 hover:border-brand-300 hover:text-brand-800"
+            className="apple-spring flex min-h-11 items-center justify-between gap-2 rounded-apple-xl border border-dashed border-ink-200 px-5 py-4 text-sm font-medium text-ink-700 hover:border-brand-300 hover:bg-white"
           >
             {unlocked ? `${internName}'s profile` : "Candidate profile"}
             <ArrowUpRight className="size-4 text-ink-400" aria-hidden />
@@ -375,18 +395,10 @@ export default async function EmployerProposalDetail({
   );
 }
 
-function Detail({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <dt className="text-xs text-text-subtle">{label}</dt>
-      <dd className="mt-1 text-sm font-medium tabular-nums text-ink-900">{children}</dd>
-    </div>
-  );
-}
-
+/** DD/MM/YYYY (bug sheet 7), in India time. */
 function formatDate(value: Date | string | null): string {
   if (!value) return "-";
   const d = typeof value === "string" ? new Date(`${value.slice(0, 10)}T00:00:00+05:30`) : new Date(value);
   if (Number.isNaN(d.getTime())) return String(value);
-  return d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Kolkata" });
+  return d.toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "Asia/Kolkata" });
 }

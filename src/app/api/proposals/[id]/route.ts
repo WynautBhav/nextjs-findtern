@@ -7,7 +7,21 @@ import { requireMutation } from "@/lib/guards-mutation";
 import { notify } from "@/lib/notify";
 import { hasOpenOrderFor } from "@/lib/payments";
 import { modeProblem, workPreferenceOf } from "@/lib/work-preference";
-import { offerScore, PAID_LEAVE_OPTIONS, parseOffer, scheduledMonthlyHours, todayIst, WEEKLY_SCHEDULES, type WeeklySchedule } from "@/lib/offer";
+import {
+  hybridDaysOf,
+  jdToHtml,
+  normalizeLaptop,
+  offerScore,
+  PAID_LEAVE_OPTIONS,
+  parseOffer,
+  placeOf,
+  scheduledMonthlyHours,
+  shiftFields,
+  todayIst,
+  WEEKLY_SCHEDULES,
+  workingDaysPerWeek,
+  type WeeklySchedule,
+} from "@/lib/offer";
 
 // Same rules as the composer (api/employer/[id]/proposals), field by field.
 const offerSchema = z
@@ -33,8 +47,9 @@ const offerSchema = z
   })
   .strict();
 
-/** Accepted counts until the employer pays (then it is hired). */
-const EDITABLE = ["draft", "sent", "accepted"];
+/** Accepted counts until the employer pays (then it is hired). An offer
+ *  waiting on its interview can be edited too (legacy; EMH-30). */
+const EDITABLE = ["draft", "sent", "interview_scheduled", "accepted"];
 
 const bodySchema = z.object({ offer: offerSchema }).refine((b) => Object.keys(b.offer).length > 0, {
   message: "Nothing to update",
@@ -87,6 +102,17 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   }
 
   const { message, ...edits } = parsed.data.offer;
+  // No "candidate's own laptop" for someone without one (EMH-18).
+  if (edits.laptop !== undefined && normalizeLaptop(edits.laptop) === "candidate") {
+    const [ob] = await db
+      .select({ hasLaptop: schema.internOnboarding.hasLaptop })
+      .from(schema.internOnboarding)
+      .where(eq(schema.internOnboarding.userId, proposal.internId))
+      .limit(1);
+    if (ob?.hasLaptop === false) {
+      return NextResponse.json({ error: "This candidate doesn't have a laptop. The company needs to provide one." }, { status: 400 });
+    }
+  }
   // A mode the offer already had stays allowed; a change has to fit the candidate.
   if (edits.mode !== undefined && edits.mode !== parseOffer(proposal.offerDetails ?? {}, proposal.currency).mode) {
     const [pref] = await db
@@ -114,7 +140,15 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     return NextResponse.json({ error: "Candidates scoring below 6 can be offered up to 2 months." }, { status: 400 });
   }
 
-  const next: Record<string, unknown> = { ...current, ...edits, ...(message !== undefined ? { jd: message } : {}) };
+  // Paragraph HTML, which legacy pages render (EMH-44); new pages read it back as text.
+  const next: Record<string, unknown> = { ...current, ...edits, ...(message !== undefined ? { jd: jdToHtml(message) } : {}) };
+  // Legacy rows hold only "City, State" (DB-10): split it so an edit that
+  // doesn't touch the place keeps it instead of failing.
+  if (next.city === undefined && next.state === undefined) Object.assign(next, placeOf(current));
+  if (edits.laptop !== undefined) next.laptop = normalizeLaptop(edits.laptop);
+  if (edits.shiftFrom !== undefined || edits.shiftTo !== undefined) {
+    Object.assign(next, shiftFields(String(next.shiftFrom ?? ""), String(next.shiftTo ?? "")));
+  }
   // Back to the intern: the acceptance was of the old terms.
   const reopen = proposal.status === "accepted";
   if (reopen) {
@@ -129,22 +163,38 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     delete next.state;
     delete next.wfoDays;
     delete next.wfhDays;
+    next.workFromOfficeDays = 0;
+    next.workFromHomeDays = 0;
   } else {
     if (!String(next.city ?? "").trim() || !String(next.state ?? "").trim()) {
       return NextResponse.json({ error: "An on-site or hybrid role needs a city and state." }, { status: 400 });
     }
     next.location = [next.city, next.state].filter(Boolean).join(", ");
     if (mode === "hybrid") {
-      const office = edits.officeDays ?? Number(current.wfoDays ?? 0);
-      const home = edits.homeDays ?? Number(current.wfhDays ?? 0);
-      if (!(office >= 1) || !(home >= 1) || office + home > 7) {
-        return NextResponse.json({ error: "A hybrid role needs office and home days that fit in a week." }, { status: 400 });
+      const stored = hybridDaysOf(current);
+      const office = edits.officeDays ?? stored.officeDays ?? 0;
+      const home = edits.homeDays ?? stored.homeDays ?? 0;
+      const week = workingDaysPerWeek(parseOffer(next, proposal.currency).weeklySchedule);
+      // Legacy rule (EMH-27): the split covers the working week exactly. An
+      // edit that leaves the split and the week alone keeps an older row's.
+      const touchesSplit =
+        edits.officeDays !== undefined || edits.homeDays !== undefined || edits.weeklySchedule !== undefined || edits.mode !== undefined;
+      if (!(office >= 1) || !(home >= 1) || (touchesSplit ? office + home !== week : office + home > 7)) {
+        return NextResponse.json(
+          { error: `A hybrid role needs office and home days adding up to ${week}, the working days in a week.` },
+          { status: 400 },
+        );
       }
-      next.wfoDays = office;
-      next.wfhDays = home;
+      // Legacy keys (EMH-02); the older new-app keys go.
+      next.workFromOfficeDays = office;
+      next.workFromHomeDays = home;
+      delete next.wfoDays;
+      delete next.wfhDays;
     } else {
       delete next.wfoDays;
       delete next.wfhDays;
+      next.workFromOfficeDays = 0;
+      next.workFromHomeDays = 0;
     }
   }
   delete next.officeDays;
@@ -173,7 +223,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
 
   // Tell the intern to look again (legacy routes.ts:14392). A draft is not
   // visible to them yet, so there is nothing to re-review.
-  if (proposal.status === "sent" || reopen) {
+  if (proposal.status === "sent" || proposal.status === "interview_scheduled" || reopen) {
     await notify({
       to: { type: "intern", id: proposal.internId },
       type: "proposal_updated",

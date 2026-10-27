@@ -21,6 +21,9 @@ import { CreditCard, Loader2, Tag } from "lucide-react";
 import { csrfFetch } from "@/lib/client-fetch";
 import { formatMoney } from "@/lib/format";
 import { loadRazorpay, RAZORPAY_THEME_COLOR } from "./razorpay-client";
+import { buttonClass } from "@/components/ui/button";
+import { fieldClass } from "@/components/employer/ui-tokens";
+import { cn } from "@/lib/utils";
 
 type Props = {
   employerId: string;
@@ -155,8 +158,8 @@ export function CheckoutPay({ employerId, currency, amountMinor, prefill, propos
 
   if (state === "paid") {
     return (
-      <div className="rounded-[10px] border border-brand-200 bg-brand-50 p-4 text-sm leading-relaxed text-brand-800">
-        Payment received. It is listed under{" "}
+      <div role="status" className="rounded-apple-md border border-brand-200 bg-brand-50 p-4 text-sm leading-relaxed text-brand-800">
+        Payment received. The hire and its invoice are under{" "}
         <a href="/employer/orders" className="font-semibold underline underline-offset-4">
           Orders
         </a>
@@ -183,14 +186,14 @@ export function CheckoutPay({ employerId, currency, amountMinor, prefill, propos
               }}
               placeholder="Promo code"
               autoComplete="off"
-              className="min-h-10 w-full rounded-[10px] border border-ink-200 bg-white pl-8 pr-3 text-sm uppercase text-ink-900 outline-none placeholder:normal-case placeholder:text-ink-400 focus-visible:border-brand-600 focus-visible:ring-[3px] focus-visible:ring-brand-600/20"
+              className={cn(fieldClass, "pl-8 uppercase placeholder:normal-case")}
             />
           </div>
           <button
             type="button"
             onClick={applyCode}
             disabled={!code.trim() || checking || state === "busy"}
-            className="min-h-10 rounded-[10px] border border-ink-200 bg-white px-4 text-sm font-medium text-ink-700 hover:bg-ink-50 disabled:opacity-50"
+            className={buttonClass({ variant: "outline", size: "sm", className: "min-h-11" })}
           >
             {checking ? <Loader2 className="size-4 animate-spin" aria-hidden /> : "Apply"}
           </button>
@@ -209,7 +212,7 @@ export function CheckoutPay({ employerId, currency, amountMinor, prefill, propos
         type="button"
         onClick={pay}
         disabled={state === "busy"}
-        className="apple-spring apple-pressable inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[10px] bg-brand-700 text-sm font-semibold tabular-nums text-white hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-60"
+        className={buttonClass({ variant: "primary", block: true, className: "nums" })}
       >
         {state === "busy" ? (
           <Loader2 className="size-4 animate-spin" aria-hidden />
@@ -226,11 +229,11 @@ export function CheckoutPay({ employerId, currency, amountMinor, prefill, propos
       {error ? (
         <p className="mt-2 text-pretty text-xs leading-relaxed text-danger">{error}</p>
       ) : testMode ? (
-        <p className="mt-2 text-xs leading-relaxed text-text-subtle">
+        <p className="mt-2 text-xs leading-relaxed text-ink-500">
           Test mode: no payment is taken. The hire completes as if it were paid.
         </p>
       ) : (
-        <p className="mt-2 text-xs leading-relaxed text-text-subtle">
+        <p className="mt-2 text-xs leading-relaxed text-ink-500">
           Razorpay handles the card details; this site never sees them. The signature is verified
           server-side before the payment counts.
         </p>

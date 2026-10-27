@@ -149,14 +149,73 @@ export function wallNow(timeZone: string, now: number = Date.now()): string {
 }
 
 /**
- * Suggested slots (sheet row 66): the nearest upcoming quarter hour (:00, :15,
- * :30, :45) that is at least 15 minutes from now in the interview's timezone,
- * then one and two hours after it. Wall-clock strings, editable by the
- * employer.
+ * Suggested slots (bug sheet 7, Sheet2 r2): the next quarter hour (:00, :15,
+ * :30, :45) after now in the interview's timezone, then one and two hours
+ * after it: 12:34 → 12:45, 13:45, 14:45. Wall-clock strings, editable by the
+ * employer. Exactly on a quarter moves to the next one, so a slot is never
+ * "now".
  */
 export function suggestedSlots(now: number, timeZone: string): [string, string, string] {
-  const base = wallEpoch(now + 15 * 60_000, timeZone);
+  const base = wallEpoch(now, timeZone);
   const quarter = 15 * 60_000;
-  const first = Math.ceil(base / quarter) * quarter;
+  const first = (Math.floor(base / quarter) + 1) * quarter;
   return [wallString(first), wallString(first + 60 * 60_000), wallString(first + 120 * 60_000)];
+}
+
+/**
+ * Where an interview is in its life, from the employer's side. The schedule
+ * shows only the actions that mean something at each stage (DESIGN.md §7.5):
+ *
+ *   awaiting_pick  invite sent, candidate hasn't picked  → remind, reschedule
+ *   expired        every offered slot passed unpicked     → reschedule
+ *   upcoming       a slot is booked and still ahead       → join, remind, reschedule
+ *   live           the booked half hour is running         → join, mark missed (after grace)
+ *   over           the meeting is done                     → feedback, mark missed
+ *   missed         marked missed                           → feedback (legacy allowed it, EMB-22)
+ *   closed         cancelled or otherwise finished         → read feedback only
+ */
+export type InterviewStage = "awaiting_pick" | "expired" | "upcoming" | "live" | "over" | "missed" | "closed";
+
+export function interviewStage(iv: SlotLike, now: number = Date.now()): InterviewStage {
+  const status = (iv.status ?? "").toLowerCase();
+  if (status === "missed") return "missed";
+  if (status === "completed") return "over";
+  if (status === "pending" || status === "waiting") return isStaleInterview(iv, now) ? "expired" : "awaiting_pick";
+  if (status === "scheduled") {
+    const t = meetingTime(iv);
+    if (!iv.selectedSlot || t === null) return "upcoming";
+    if (now < t) return "upcoming";
+    return now < t + MEETING_MINUTES * 60_000 ? "live" : "over";
+  }
+  return "closed";
+}
+
+/** Sort rank for the schedule list (legacy employer-schedule.tsx:363): booked, waiting, expired, done. */
+export function stageRank(stage: InterviewStage): number {
+  switch (stage) {
+    case "live":
+    case "upcoming":
+      return 0;
+    case "awaiting_pick":
+      return 1;
+    case "expired":
+      return 2;
+    case "over":
+    case "missed":
+      return 3;
+    default:
+      return 4;
+  }
+}
+
+/** Feedback can be written once the meeting is over, or after it was marked missed (EMB-22). */
+export function canLeaveFeedback(iv: SlotLike, now: number = Date.now()): boolean {
+  return (iv.status ?? "").toLowerCase() === "missed" || isMeetingOver(iv, now);
+}
+
+/** Legacy opened links typed without a scheme as https (employer-schedule.tsx:102). */
+export function normalizeMeetingLink(raw: string | null | undefined): string | null {
+  const link = String(raw ?? "").trim();
+  if (!link) return null;
+  return /^https?:\/\//i.test(link) ? link : `https://${link}`;
 }

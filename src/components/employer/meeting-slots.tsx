@@ -30,7 +30,7 @@ function timeLabel(hhmm: string): string {
 }
 
 const FIELD =
-  "apple-spring min-h-11 w-full rounded-[10px] border border-ink-200 bg-white px-3 text-[14px] tabular-nums text-ink-900 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20";
+  "apple-spring min-h-11 w-full rounded-apple-sm border border-ink-200 bg-white px-3 text-sm tabular-nums text-ink-900 outline-none focus-visible:border-brand-500 focus-visible:ring-2 focus-visible:ring-brand-500/20";
 
 export function MeetingSlots({
   slots,
@@ -62,7 +62,7 @@ export function MeetingSlots({
         const others = slots.filter((_, i) => i !== idx);
         return (
           <fieldset key={idx} disabled={disabled} className="min-w-0">
-            <legend className="mb-1 text-xs font-semibold text-ink-800">Slot {idx + 1} *</legend>
+            <legend className="mb-1.5 text-sm font-medium text-ink-800">Slot {idx + 1} *</legend>
             <div className="grid grid-cols-2 gap-2">
               <input
                 type="date"

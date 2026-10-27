@@ -1,443 +1,294 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import {
-  AlertCircle,
-  Calendar,
-  CheckCircle2,
-  Clock,
-  Eye,
-  Pencil,
-  IndianRupee,
-  Laptop,
-  Loader2,
-  Search,
-  Send,
-  X,
-} from "lucide-react";
+import { ArrowRight, CreditCard, Loader2, Pencil, Search, X } from "lucide-react";
 
 import { csrfFetch } from "@/lib/client-fetch";
-import { formatCurrency } from "@/lib/format";
+import { formatMoney } from "@/lib/format";
 import { displayNameOf, initialsOf } from "@/lib/employer-candidates";
-import { Pill } from "@/components/app/primitives";
-import { EmptyScene } from "@/components/app/primitives";
-import { ButtonLink } from "@/components/ui/button";
-import { employerProposalPill } from "@/components/app/status";
-import type { Proposal, Project } from "@/lib/db/schema";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog";
+import { EmptyScene, Pill, StatTile, Surface } from "@/components/app/primitives";
+import { buttonClass } from "@/components/ui/button";
+import type { Proposal } from "@/lib/db/schema";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { parseOffer } from "@/lib/offer";
+import { offerState } from "@/components/employer/proposal-state";
+import { cn } from "@/lib/utils";
 
 export type ProposalItem = {
   proposal: Proposal;
-  /** Identity only. `email` is null unless this employer has hired them. */
-  user: { firstName: string; lastName: string; email: string | null } | null;
-  project: Project | null;
+  /** Identity only; initials until this employer has hired them. */
+  user: { firstName: string; lastName: string } | null;
+  project: { id: string; projectName: string } | null;
   /** Hired by this employer on any project - the unmasking rule. */
   internHired: boolean;
 };
 
-/**
- * Redacted identity for one proposal row. Full name shows once this employer
- * has hired the intern on any project - same rule as the pool.
- */
 function nameOf(item: ProposalItem): string {
   const first = item.user?.firstName?.trim() || "";
   const last = item.user?.lastName?.trim() || "";
-  return displayNameOf(
-    {
-      fullName: `${first} ${last}`.trim() || "Candidate",
-      initials: initialsOf(first, last),
-    },
-    item.internHired,
-  );
+  return displayNameOf({ fullName: `${first} ${last}`.trim() || "Candidate", initials: initialsOf(first, last) }, item.internHired);
 }
 
-export function ProposalsManager({
-  initialProposals,
-}: {
-  initialProposals: ProposalItem[];
-  employerId?: string;
-}) {
+/** Status filter buckets (the raw enums never reach the select). */
+const FILTERS: { value: string; label: string; match: (status: string, lapsed: boolean) => boolean }[] = [
+  { value: "open", label: "Waiting on candidate", match: (s, l) => !l && (s === "sent" || s === "interview_scheduled" || s === "draft") },
+  { value: "accepted", label: "Accepted · payment due", match: (s) => s === "accepted" || s === "processing" },
+  { value: "hired", label: "Hired", match: (s) => s === "hired" },
+  { value: "closed", label: "Declined, withdrawn or expired", match: (s, l) => l || ["rejected", "withdrawn", "expired"].includes(s) },
+];
+
+function formatStart(iso: string | null): string | null {
+  if (!iso || !/^\d{4}-\d{2}-\d{2}/.test(iso)) return null;
+  const [y, m, d] = iso.slice(0, 10).split("-");
+  return `${d}/${m}/${y}`;
+}
+
+export function ProposalsManager({ initialProposals }: { initialProposals: ProposalItem[] }) {
   const router = useRouter();
   const [proposals, setProposals] = useState<ProposalItem[]>(initialProposals);
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [projectFilter, setProjectFilter] = useState<string>("all");
-
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [projectFilter, setProjectFilter] = useState("all");
   const [withdrawTarget, setWithdrawTarget] = useState<ProposalItem | null>(null);
-  const [busyId, setBusyId] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
-  // Projects list for filter
-  const projectsMap = new Map<string, string>();
-  proposals.forEach((p) => {
-    if (p.project) projectsMap.set(p.project.id, p.project.projectName);
+  const rows = useMemo(
+    () =>
+      proposals.map((item) => {
+        const offer = parseOffer(item.proposal.offerDetails, item.proposal.currency);
+        return { item, offer, state: offerState(item.proposal, offer) };
+      }),
+    [proposals],
+  );
+
+  const projectOptions = Array.from(new Map(proposals.filter((p) => p.project).map((p) => [p.project!.id, p.project!.projectName])).entries());
+
+  const counts = {
+    open: rows.filter((r) => FILTERS[0].match(r.item.proposal.status, r.state.lapsed)).length,
+    accepted: rows.filter((r) => FILTERS[1].match(r.item.proposal.status, r.state.lapsed)).length,
+    hired: rows.filter((r) => r.item.proposal.status === "hired").length,
+    closed: rows.filter((r) => FILTERS[3].match(r.item.proposal.status, r.state.lapsed)).length,
+  };
+
+  const needle = search.trim().toLowerCase();
+  const filter = FILTERS.find((f) => f.value === statusFilter);
+  const filtered = rows.filter(({ item, offer, state }) => {
+    // Project, role or the initials shown - never a hidden name.
+    const hay = `${item.project?.projectName ?? ""} ${offer.roleTitle} ${nameOf(item)}`.toLowerCase();
+    if (needle && !hay.includes(needle)) return false;
+    if (filter && !filter.match(item.proposal.status, state.lapsed)) return false;
+    if (projectFilter !== "all" && item.proposal.projectId !== projectFilter) return false;
+    return true;
   });
-  const projectOptions = Array.from(projectsMap.entries());
-
-  // Metrics
-  const totalSent = proposals.length;
-  const pendingCount = proposals.filter((p) => p.proposal.status === "sent" || p.proposal.status === "interview_scheduled").length;
-  const acceptedCount = proposals.filter((p) => p.proposal.status === "accepted").length;
-  const closedCount = proposals.filter((p) => ["rejected", "withdrawn", "expired"].includes(p.proposal.status)).length;
-
-  const filtered = proposals.filter((item) => {
-    const projectName = (item.project?.projectName || "").toLowerCase();
-    const roleTitle = String(
-      (item.proposal.offerDetails as Record<string, unknown>)?.roleTitle || ""
-    ).toLowerCase();
-
-    // Project / role only - names are redacted, so matching on them would both
-    // leak existence and return nothing useful.
-    const matchesSearch =
-      !search.trim() ||
-      projectName.includes(search.toLowerCase()) ||
-      roleTitle.includes(search.toLowerCase());
-
-    const matchesStatus =
-      statusFilter === "all" || item.proposal.status === statusFilter;
-
-    const matchesProject =
-      projectFilter === "all" || item.proposal.projectId === projectFilter;
-
-    return matchesSearch && matchesStatus && matchesProject;
-  });
+  const filtering = Boolean(needle) || statusFilter !== "all" || projectFilter !== "all";
 
   async function handleWithdraw() {
     if (!withdrawTarget) return;
-    setBusyId(withdrawTarget.proposal.id);
+    setBusy(true);
     setErrorMsg("");
-
     try {
       const res = await csrfFetch(`/api/proposals/${withdrawTarget.proposal.id}/status`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: "withdrawn" }),
       });
-
       if (res.ok) {
+        const id = withdrawTarget.proposal.id;
         setProposals((prev) =>
-          prev.map((item) =>
-            item.proposal.id === withdrawTarget.proposal.id
-              ? {
-                  ...item,
-                  proposal: { ...item.proposal, status: "withdrawn", updatedAt: new Date() },
-                }
-              : item
-          )
+          prev.map((p) => (p.proposal.id === id ? { ...p, proposal: { ...p.proposal, status: "withdrawn", updatedAt: new Date() } } : p)),
         );
         setWithdrawTarget(null);
         router.refresh();
       } else {
         const data = await res.json().catch(() => ({}));
-        setErrorMsg(data.error ?? "Failed to withdraw proposal");
+        setErrorMsg(data.error ?? "The offer wasn't withdrawn. Try again.");
       }
     } catch {
-      setErrorMsg("Network error occurred");
+      setErrorMsg("You appear to be offline. Nothing changed.");
     } finally {
-      setBusyId(null);
+      setBusy(false);
     }
   }
 
-  function getStatusBadge(status: string) {
-    const s = employerProposalPill(status);
-    return <Pill tone={s.tone}>{s.label}</Pill>;
+  if (proposals.length === 0) {
+    return (
+      <EmptyScene
+        art
+        title="No proposals yet"
+        body="Open a candidate, then use Send proposal. The offer is priced from their Findtern Score, and you pay only once they accept."
+        next={{ label: "Browse candidates", href: "/employer/candidates" }}
+        who="You - send the first offer"
+      />
+    );
   }
+
+  const field =
+    "apple-spring min-h-11 rounded-apple-sm border border-ink-200 bg-white px-3 text-sm text-ink-900 outline-none focus-visible:border-brand-500 focus-visible:ring-2 focus-visible:ring-brand-500/20";
 
   return (
     <div className="space-y-6">
-      {/* Metrics - one quiet strip, not four tinted cards. The numbers
-          differ; the chrome must not. */}
-      <div className="grid grid-cols-2 gap-px overflow-hidden rounded-[20px] border border-ink-200/70 bg-ink-100 sm:grid-cols-4">
-        {[
-          { label: "Total proposals", value: totalSent, hint: "All time offers sent" },
-          { label: "Pending response", value: pendingCount, hint: "Awaiting candidate reply" },
-          { label: "Accepted offers", value: acceptedCount, hint: "Ready to complete hire" },
-          { label: "Closed", value: closedCount, hint: "Declined or retracted" },
-        ].map((m) => (
-          <div key={m.label} className="bg-white p-4">
-            <p className="text-[13px] text-text-subtle">{m.label}</p>
-            <p className="mt-1 text-2xl font-semibold tracking-tight text-ink-900 tabular-nums">
-              {m.value}
-            </p>
-            <p className="text-xs text-text-subtle">{m.hint}</p>
-          </div>
-        ))}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <StatTile label="Waiting on candidate" value={counts.open} />
+        <StatTile label="Accepted · payment due" value={counts.accepted} hint={counts.accepted ? "Pay to confirm the hire" : undefined} href={counts.accepted ? "/employer/checkout" : undefined} />
+        <StatTile label="Hired" value={counts.hired} />
+        <StatTile label="Closed" value={counts.closed} />
       </div>
 
-      {errorMsg && (
-        <div className="flex items-center gap-2 rounded-[10px] border border-red-200 bg-red-50 p-3 text-xs text-red-700">
-          <AlertCircle className="size-4 shrink-0" />
-          <span>{errorMsg}</span>
-        </div>
-      )}
-
-      {/* Filter and Search Bar */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-        <div className="relative min-w-[14rem] max-w-md flex-1 basis-64">
-          <Search className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-ink-400" />
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+        <label className="relative min-w-0 flex-1 sm:max-w-md">
+          <span className="sr-only">Search proposals</span>
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-400" aria-hidden />
           <input
-            type="text"
+            type="search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by project or role…"
-            className="apple-spring min-h-11 w-full rounded-[10px] border border-ink-200 bg-white pl-9.5 pr-4 text-[14px] text-ink-900 outline-none placeholder:text-ink-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+            placeholder="Role, project or initials"
+            className={cn(field, "w-full pl-9")}
           />
-          {search && (
-            <button
-              type="button"
-              onClick={() => setSearch("")}
-              className="apple-spring absolute right-1 top-1/2 grid min-h-11 min-w-11 -translate-y-1/2 place-items-center rounded-[10px] text-ink-600 hover:text-ink-700"
-            >
-              <X className="size-3.5" />
-            </button>
-          )}
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          {projectOptions.length > 0 && (
-            <select
-              value={projectFilter}
-              onChange={(e) => setProjectFilter(e.target.value)}
-              className="apple-spring min-h-11 rounded-[10px] border border-ink-200 bg-white px-3 text-[14px] font-medium text-ink-800 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
-            >
-              <option value="all">All Projects</option>
+        </label>
+        <div className="grid grid-cols-2 gap-2 sm:flex">
+          {projectOptions.length > 1 ? (
+            <select value={projectFilter} onChange={(e) => setProjectFilter(e.target.value)} className={field} aria-label="Project">
+              <option value="all">All projects</option>
               {projectOptions.map(([id, name]) => (
                 <option key={id} value={id}>
                   {name}
                 </option>
               ))}
             </select>
-          )}
-
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="apple-spring min-h-11 rounded-[10px] border border-ink-200 bg-white px-3 text-[14px] font-medium text-ink-800 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
-          >
-            <option value="all">All Statuses</option>
-            <option value="sent">Under Review</option>
-            <option value="interview_scheduled">Interview booked</option>
-            <option value="accepted">Accepted (Ready to Hire)</option>
-            <option value="processing">Payment processing</option>
-            <option value="rejected">Declined</option>
-            <option value="withdrawn">Withdrawn</option>
-            <option value="expired">Expired</option>
-            <option value="hired">Hired</option>
+          ) : null}
+          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className={field} aria-label="Status">
+            <option value="all">All statuses</option>
+            {FILTERS.map((f) => (
+              <option key={f.value} value={f.value}>
+                {f.label}
+              </option>
+            ))}
           </select>
-
-          <ButtonLink
-            href="/employer/candidates"
-            variant="primary"
-            size="sm"
-            className="min-h-11 px-4 text-[13px] font-semibold"
-          >
-            <Send className="size-3.5" aria-hidden />
-            <span>Send proposal</span>
-          </ButtonLink>
         </div>
       </div>
 
-      {/* Proposals List */}
+      {errorMsg ? (
+        <p role="alert" className="rounded-apple-md border border-danger/25 bg-danger-soft px-4 py-3 text-sm text-ink-800">
+          {errorMsg}
+        </p>
+      ) : null}
+
       {filtered.length === 0 ? (
         <EmptyScene
-          art
-          title="No proposals found"
-          body={
-            search || statusFilter !== "all"
-              ? "Try adjusting your search query or status filter."
-              : "You haven't sent any proposals to candidates yet. Browse the pool and send the first one."
-          }
-          next={
-            search || statusFilter !== "all"
-              ? undefined
-              : { label: "Browse candidates", href: "/employer/candidates" }
-          }
-          who={search || statusFilter !== "all" ? "You - loosen the filters" : "You - send the first proposal"}
+          title="No proposals match"
+          body="Nothing fits this search and status. Clear the filters to see every offer."
+          who="You - loosen the filters"
         />
       ) : (
-        <div className="space-y-3.5">
-          {filtered.map((item) => {
-            const offer = parseOffer(item.proposal.offerDetails, item.proposal.currency);
-            const candidateName = nameOf(item);
-            const candidateInitials = initialsOf(
-              item.user?.firstName?.trim() || "",
-              item.user?.lastName?.trim() || "",
-            );
-            const roleTitle = offer.roleTitle || "Internship";
-            const stipendMinor = offer.monthlyMinor;
-            const duration = `${offer.months} month${offer.months === 1 ? "" : "s"}`;
-            const startDate = offer.startDate;
-            const hasLaptop = offer.laptop === "company" || offer.laptop === "yes";
-
-            const isPending = item.proposal.status === "sent";
-            const isAccepted = item.proposal.status === "accepted";
-            // Accepted but unpaid stays editable and withdrawable (bug sheet 23 Oct);
-            // a full-time acceptance is the hire itself.
-            const changeable = isPending || (isAccepted && !item.proposal.hiredAt && !offer.fullTime);
-
+        <Surface as="ul" className="divide-y divide-ink-100 overflow-hidden">
+          {filtered.map(({ item, offer, state }) => {
+            const ini = initialsOf(item.user?.firstName?.trim() || "", item.user?.lastName?.trim() || "");
+            const ft = offer.fullTime;
+            // Full-time rows: annual CTC, not "—/month" (EMH-19).
+            const money = ft
+              ? ft.annualCtcMinor
+                ? `${formatMoney(ft.annualCtcMinor, offer.currency)} a year`
+                : "Annual CTC not set"
+              : offer.monthlyMinor != null
+                ? `${formatMoney(offer.monthlyMinor, offer.currency)} a month`
+                : null;
+            const start = formatStart(offer.startDate);
             return (
-              <div
-                key={item.proposal.id}
-                className="apple-spring overflow-hidden rounded-[20px] border border-ink-200/70 bg-white p-5 shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)] hover:border-brand-200"
-              >
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                  <div className="flex items-start gap-3.5">
-                    <span className="grid size-11 place-items-center rounded-[10px] bg-brand-100 text-sm font-bold text-brand-800 shrink-0">
-                      {candidateInitials === "?" ? "C" : candidateInitials}
-                    </span>
-
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="text-sm font-bold text-ink-900" title={candidateName}>{candidateName}</h3>
-                        {getStatusBadge(item.proposal.status)}
-                      </div>
-
-                      <p className="mt-0.5 text-xs font-medium text-brand-800">
-                        {roleTitle}
-                        {item.project ? (
-                          <span className="text-ink-600 font-normal"> · Project: {item.project.projectName}</span>
-                        ) : null}
-                      </p>
-
-                      <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs tabular-nums text-text-subtle">
-                        <span className="flex items-center gap-1">
-                          <IndianRupee className="size-3 text-ink-500" />
-                          <strong className="text-ink-800 font-semibold tabular-nums">
-                            {stipendMinor != null ? formatCurrency(stipendMinor, offer.currency) : "—"}
-                          </strong>
-                          <span>/ month</span>
-                        </span>
-
-                        <span className="flex items-center gap-1">
-                          <Clock className="size-3 text-ink-500" />
-                          <span>{duration}</span>
-                        </span>
-
-                        {startDate && (
-                          <span className="flex items-center gap-1">
-                            <Calendar className="size-3 text-ink-500" />
-                            <span>Starts {startDate}</span>
-                          </span>
-                        )}
-
-                        {hasLaptop && (
-                          <span className="flex items-center gap-1 text-brand-700">
-                            <Laptop className="size-3" />
-                            <span>Laptop provided</span>
-                          </span>
-                        )}
-                      </div>
+              <li key={item.proposal.id} className="flex flex-col gap-4 p-5 lg:flex-row lg:items-center lg:gap-6">
+                <div className="flex min-w-0 flex-1 items-start gap-3.5">
+                  <span aria-hidden className="grid size-11 shrink-0 place-items-center rounded-full bg-brand-50 text-sm font-bold text-brand-800">
+                    {ini === "?" ? "C" : ini}
+                  </span>
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Link
+                        href={`/employer/proposal/${item.proposal.id}`}
+                        className="text-[0.9375rem] font-semibold text-ink-900 hover:text-brand-700 hover:underline"
+                      >
+                        {offer.roleTitle || item.project?.projectName || "Internship"}
+                      </Link>
+                      <Pill tone={state.tone}>{state.label}</Pill>
                     </div>
-                  </div>
-
-                  {/* Actions Column */}
-                  <div className="flex flex-wrap items-center gap-2 sm:self-center shrink-0">
-                    {/* The full page carries every term (start date, hours,
-                        rate, total, shift, leave, skills); a summary sheet here
-                        showed a subset and hid the rest. */}
-                    <Link
-                      href={`/employer/proposal/${item.proposal.id}`}
-                      className="apple-spring apple-pressable inline-flex min-h-11 items-center justify-center gap-1.5 rounded-[10px] border border-ink-200 bg-white px-3.5 text-xs font-semibold text-ink-700 hover:border-ink-300 hover:bg-ink-50 hover:text-ink-900"
-                    >
-                      <Eye className="size-3.5" />
-                      <span>View Details</span>
-                    </Link>
-
-                    {isAccepted && (
-                      // Accepted offers are billed straight from checkout - the
-                      // shortlist cart is not involved, so no staging step.
-                      <Link
-                        href="/employer/checkout"
-                        className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-[10px] bg-primary px-4 text-xs font-semibold text-white shadow-2xs hover:bg-primary-hover"
-                      >
-                        <CheckCircle2 className="size-3.5" aria-hidden />
-                        <span>Proceed to hire</span>
-                      </Link>
-                    )}
-
-                    {changeable && (
-                      <Link
-                        href={`/employer/proposal/${item.proposal.id}?edit=1`}
-                        className="apple-spring apple-pressable inline-flex min-h-11 items-center justify-center gap-1.5 rounded-[10px] border border-ink-200 bg-white px-3.5 text-xs font-semibold text-ink-700 hover:border-ink-300 hover:bg-ink-50 hover:text-ink-900"
-                      >
-                        <Pencil className="size-3.5" aria-hidden />
-                        <span>Edit</span>
-                      </Link>
-                    )}
-
-                    {changeable && (
-                      <button
-                        type="button"
-                        onClick={() => setWithdrawTarget(item)}
-                        disabled={busyId === item.proposal.id}
-                        className="apple-spring apple-pressable inline-flex min-h-11 items-center justify-center gap-1.5 rounded-[10px] border border-rose-200 bg-rose-50/50 px-3.5 text-xs font-semibold text-rose-700 hover:bg-rose-100/70 disabled:opacity-60"
-                      >
-                        <X className="size-3.5" />
-                        <span>Withdraw</span>
-                      </button>
-                    )}
+                    <p className="mt-0.5 text-sm text-ink-600">
+                      {nameOf(item)}
+                      {item.project ? ` · ${item.project.projectName}` : ""}
+                      {ft ? " · Full-time" : ""}
+                    </p>
+                    <p className="nums mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-sm text-ink-700">
+                      {money ? <span className="font-semibold text-ink-900">{money}</span> : null}
+                      {!ft ? <span>{offer.months} month{offer.months === 1 ? "" : "s"}</span> : null}
+                      {start ? <span>{ft ? "Joins" : "Starts"} {start}</span> : null}
+                    </p>
                   </div>
                 </div>
-              </div>
+
+                <div className="flex flex-wrap items-center gap-2 lg:shrink-0 lg:justify-end">
+                  {state.canPay ? (
+                    <Link href="/employer/checkout" className={buttonClass({ size: "sm" })}>
+                      <CreditCard className="size-4" aria-hidden />
+                      Proceed to hire
+                    </Link>
+                  ) : null}
+                  {state.canEdit ? (
+                    <Link href={`/employer/proposal/${item.proposal.id}?edit=1`} className={buttonClass({ variant: "outline", size: "sm" })}>
+                      <Pencil className="size-4" aria-hidden />
+                      Edit
+                    </Link>
+                  ) : null}
+                  {state.canWithdraw ? (
+                    <button type="button" onClick={() => setWithdrawTarget(item)} className={buttonClass({ variant: "ghost", size: "sm" })}>
+                      <X className="size-4" aria-hidden />
+                      Withdraw
+                    </button>
+                  ) : null}
+                  <Link href={`/employer/proposal/${item.proposal.id}`} className={buttonClass({ variant: "ghost", size: "sm" })}>
+                    View
+                    <ArrowRight className="size-4" aria-hidden />
+                  </Link>
+                </div>
+              </li>
             );
           })}
-        </div>
+        </Surface>
       )}
+      {filtering && filtered.length > 0 ? (
+        <p className="text-sm text-ink-600">
+          Showing <span className="nums font-semibold text-ink-900">{filtered.length}</span> of <span className="nums">{proposals.length}</span>
+        </p>
+      ) : null}
 
-      {/* Withdraw Confirmation Dialog */}
-      <Dialog
-        open={Boolean(withdrawTarget)}
-        onOpenChange={(open) => !open && setWithdrawTarget(null)}
-      >
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Withdraw Proposal</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to retract this offer? The candidate will no longer be able to accept it.
+      <Dialog open={Boolean(withdrawTarget)} onOpenChange={(open) => !open && !busy && setWithdrawTarget(null)}>
+        <DialogContent className="rounded-apple-xl sm:max-w-md">
+          <DialogHeader className="text-left">
+            <DialogTitle className="text-lg font-semibold text-ink-900">Withdraw this offer?</DialogTitle>
+            <DialogDescription className="text-sm leading-relaxed text-ink-600">
+              {withdrawTarget?.proposal.status === "accepted"
+                ? "The candidate already accepted. Withdrawing tells them it won't go ahead. This can't be undone."
+                : "The candidate can no longer accept it, and they are told. This can't be undone."}
             </DialogDescription>
           </DialogHeader>
-
-          {withdrawTarget && (
-            <div className="rounded-[10px] border border-ink-200/70 bg-ink-50/50 p-3.5 text-xs space-y-1">
-              <p className="font-semibold text-ink-900">
-                {withdrawTarget ? nameOf(withdrawTarget) : ""}
-              </p>
-              <p className="text-text-subtle">
-                Role: {String((withdrawTarget.proposal.offerDetails as Record<string, unknown>)?.roleTitle || "Internship")}
-              </p>
-            </div>
-          )}
-
-          <div className="flex items-center justify-end gap-2 pt-3">
-            <button
-              type="button"
-              onClick={() => setWithdrawTarget(null)}
-              className="apple-spring apple-pressable min-h-11 rounded-[10px] border border-ink-200 bg-white px-4 text-xs font-medium text-ink-700 hover:border-ink-300 hover:bg-ink-50"
-            >
-              Keep Proposal
+          {withdrawTarget ? (
+            <p className="rounded-apple-md bg-ink-50 px-4 py-3 text-sm text-ink-800">
+              <span className="font-semibold">{parseOffer(withdrawTarget.proposal.offerDetails).roleTitle || "Internship"}</span>
+              {" · "}
+              {nameOf(withdrawTarget)}
+            </p>
+          ) : null}
+          <DialogFooter className="gap-2">
+            <button type="button" onClick={() => setWithdrawTarget(null)} disabled={busy} className={buttonClass({ variant: "outline", size: "sm" })}>
+              Keep it
             </button>
-            <button
-              type="button"
-              onClick={handleWithdraw}
-              disabled={Boolean(busyId)}
-              className="apple-spring apple-pressable inline-flex min-h-11 items-center justify-center gap-1.5 rounded-[10px] bg-red-600 px-4 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-60"
-            >
-              {busyId && <Loader2 className="size-3.5 animate-spin" />}
-              <span>Confirm Withdrawal</span>
+            <button type="button" onClick={handleWithdraw} disabled={busy} className={buttonClass({ variant: "dark", size: "sm" })}>
+              {busy ? <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden /> : null}
+              Withdraw offer
             </button>
-          </div>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
-
     </div>
   );
 }

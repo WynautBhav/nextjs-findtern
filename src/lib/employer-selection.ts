@@ -14,8 +14,12 @@
 
 import { cookies } from "next/headers";
 
+import { isProjectOpen } from "@/lib/project-locations";
+
 export const PROJECT_COOKIE = "ft_emp_project";
 export const COMPARE_COOKIE = "ft_emp_compare";
+/** Last filter query per project (EMB-05). Written by RememberSelection. */
+export const FILTERS_COOKIE = "ft_emp_filters";
 /** Compare shows at most four columns. */
 export const MAX_COMPARE = 4;
 
@@ -40,4 +44,35 @@ export async function rememberedSelection(employerId: string): Promise<{ project
     return value.startsWith(prefix) ? value.slice(prefix.length) : "";
   };
   return { project: own(PROJECT_COOKIE) || null, compare: parseIds(own(COMPARE_COOKIE)) };
+}
+
+/**
+ * The filters this employer last applied on `projectId`, as a query string
+ * (no `?`, no project, page or compare picks), or "" when none were saved.
+ * Legacy kept applied filters per project in localStorage and restored them
+ * on every visit (EMB-05). The cookie holds `employerId:` + a JSON map of
+ * project id → query, capped client-side to a handful of projects.
+ */
+export async function rememberedFilters(employerId: string, projectId: string | null): Promise<string> {
+  if (!projectId) return "";
+  const raw = (await cookies()).get(FILTERS_COOKIE)?.value ?? "";
+  const prefix = `${employerId}:`;
+  if (!raw.startsWith(prefix)) return "";
+  try {
+    const map = JSON.parse(raw.slice(prefix.length)) as Record<string, unknown>;
+    const value = map?.[projectId];
+    return typeof value === "string" ? value.slice(0, 1500) : "";
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * Is this project open for hiring? Legacy writes "inactive" on close, the new
+ * app wrote "closed" for a while and "archived" exists in old rows. Anything
+ * else (normally "active") is open (EMH-03 / EMH-15).
+ */
+export function isOpenProject(status: string | null | undefined): boolean {
+  // One rule: lib/project-locations owns the closed-status list.
+  return isProjectOpen(status);
 }

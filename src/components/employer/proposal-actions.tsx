@@ -3,26 +3,26 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Loader2 } from "lucide-react";
+import { CreditCard, Loader2 } from "lucide-react";
 
+import { buttonClass } from "@/components/ui/button";
 import { csrfFetch } from "@/lib/client-fetch";
 
 /**
- * Live actions on a proposal detail page.
- *
- * Withdraw posts to the status route (employer-owned, state-machine guarded
- * server-side). Accepted offers move to checkout - that payment is what flips
- * the proposal to hired. Edit is handled by the sibling `ProposalOfferForm`.
+ * Pay and withdraw on the proposal page. What is allowed comes from
+ * `offerState` (shared with the list), so the page never offers an action
+ * the server refuses. Edit is the sibling `ProposalOfferForm`.
  */
 export function ProposalActions({
   proposalId,
   status,
-  fullTime = false,
+  canPay,
+  canWithdraw,
 }: {
   proposalId: string;
   status: string;
-  /** An accepted full-time offer is already the hire; it cannot be withdrawn. */
-  fullTime?: boolean;
+  canPay: boolean;
+  canWithdraw: boolean;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -40,82 +40,58 @@ export function ProposalActions({
       });
       const json = (await res.json().catch(() => null)) as { error?: string } | null;
       if (!res.ok) {
-        setError(json?.error ?? "Could not withdraw - try again.");
+        setError(json?.error ?? "The offer wasn't withdrawn. Try again.");
         return;
       }
+      setConfirming(false);
       router.refresh();
+    } catch {
+      setError("You appear to be offline. Nothing changed.");
     } finally {
       setBusy(false);
     }
   }
 
-  const checkout =
-    status === "accepted" ? (
-      <Link
-        href="/employer/checkout"
-        className="apple-spring apple-pressable inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[10px] bg-emerald-700 px-4 text-sm font-semibold text-white shadow-2xs hover:bg-emerald-800"
-      >
-        Proceed to checkout - payment completes the hire
-      </Link>
-    ) : null;
-
-  if (status === "accepted" && fullTime) return checkout;
-
   if (status === "hired") {
-    return (
-      <p className="text-sm leading-relaxed text-ink-700">
-        Hired - payment cleared and the candidate&apos;s name is now visible to you.
-      </p>
-    );
-  }
-
-  if (status !== "draft" && status !== "sent" && status !== "accepted") return null;
-
-  if (!confirming) {
-    return (
-      <>
-      {checkout}
-      <button
-        type="button"
-        onClick={() => setConfirming(true)}
-        className="apple-spring apple-pressable inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[10px] border border-ink-200/70 bg-white px-4 text-sm font-medium text-ink-700 hover:border-red-300 hover:text-red-700"
-      >
-        Withdraw proposal
-      </button>
-      </>
-    );
+    return <p className="text-sm leading-relaxed text-ink-700">Payment cleared. The candidate&apos;s name and contact details are visible to you.</p>;
   }
 
   return (
-    <div className="space-y-2">
-      <p className="text-xs leading-relaxed text-ink-600">
-        {status === "accepted"
-          ? "The candidate accepted this offer. Withdrawing tells them it will not go ahead. This cannot be undone."
-          : "The candidate will no longer be able to accept it. This cannot be undone."}
-      </p>
-      {error ? (
-        <p role="alert" className="text-xs font-medium text-red-700">
-          {error}
-        </p>
+    <>
+      {canPay ? (
+        <Link href="/employer/checkout" className={buttonClass({ block: true })}>
+          <CreditCard className="size-4" aria-hidden />
+          Proceed to checkout
+        </Link>
       ) : null}
-      <div className="grid gap-2">
-        <button
-          type="button"
-          onClick={withdraw}
-          disabled={busy}
-          className="apple-spring apple-pressable inline-flex min-h-11 items-center justify-center gap-2 rounded-[10px] bg-red-600 px-4 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60"
-        >
-          {busy ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
-          Confirm withdrawal
+      {canWithdraw && !confirming ? (
+        <button type="button" onClick={() => setConfirming(true)} className={buttonClass({ variant: "outline", block: true })}>
+          Withdraw offer
         </button>
-        <button
-          type="button"
-          onClick={() => setConfirming(false)}
-          className="inline-flex min-h-11 items-center justify-center rounded-[10px] border border-ink-200/70 bg-white px-4 text-xs font-medium text-ink-600 hover:bg-ink-50"
-        >
-          Keep proposal
-        </button>
-      </div>
-    </div>
+      ) : null}
+      {canWithdraw && confirming ? (
+        <div className="space-y-2 rounded-apple-lg border border-ink-200/80 bg-ink-50/70 p-4">
+          <p className="text-sm leading-relaxed text-ink-700">
+            {status === "accepted"
+              ? "The candidate accepted this offer. Withdrawing tells them it won't go ahead. This can't be undone."
+              : "The candidate can no longer accept it, and they are told. This can't be undone."}
+          </p>
+          {error ? (
+            <p role="alert" className="text-sm font-medium text-danger">
+              {error}
+            </p>
+          ) : null}
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
+            <button type="button" onClick={withdraw} disabled={busy} className={buttonClass({ variant: "dark", size: "sm" })}>
+              {busy ? <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden /> : null}
+              Withdraw offer
+            </button>
+            <button type="button" onClick={() => setConfirming(false)} disabled={busy} className={buttonClass({ variant: "ghost", size: "sm" })}>
+              Keep it
+            </button>
+          </div>
+        </div>
+      ) : null}
+    </>
   );
 }
