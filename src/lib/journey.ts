@@ -1,5 +1,5 @@
 import { formatMoney } from "./format.ts";
-import { draftFromRecord } from "./onboarding.ts";
+import { draftFromRecord, MIN_SKILLS } from "./onboarding.ts";
 /**
  * The journey derivation.
  *
@@ -635,7 +635,8 @@ export function deriveReadiness(
       id: "skills",
       label: "Skills you will be hired for",
       unlocks: "Without these, a search for your role never returns you.",
-      done: skills.length >= 2,
+      // Same minimum as the onboarding step and the payment gate (INT-20).
+      done: skills.length >= MIN_SKILLS,
       href: "/intern/onboarding",
     },
     {
@@ -663,15 +664,16 @@ export function deriveReadiness(
       id: "bio",
       label: "A line about what you do well",
       unlocks: "Optional, but it is the part a recruiter reads out loud.",
-      done: (onboarding?.bio ?? "").trim().length > 20,
+      // Optional here and in the payment gate alike (INT-20; legacy had no bio).
+      done: (onboarding?.bio ?? "").trim().length > 0,
       href: "/intern/onboarding",
     },
     {
-      // The only document image required; Aadhaar is the number alone.
+      // Both card images are required, as in the payment gate (bug sheet 7, NC r18).
       id: "pan",
-      label: "PAN card image",
+      label: "PAN and Aadhaar card images",
       unlocks: "Needed before the first stipend is released.",
-      done: Boolean(doc?.panImageName),
+      done: Boolean(doc?.panImageName && doc?.aadhaarImageName),
       href: "/intern/onboarding",
       blocking: live,
     },

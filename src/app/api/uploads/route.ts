@@ -170,7 +170,8 @@ async function attach(kind: string, session: SessionData, f: StoredFile, fileNam
     const list = Array.isArray(academics.marksheetUploads) ? academics.marksheetUploads : [];
     const extraData = {
       ...extra,
-      academics: { ...academics, marksheetUploads: [...list, { name: f.key, label: fileName, type: f.contentType, size: f.bytes }] },
+      // `originalName` is the legacy key (INT-23); `label` is what the documents page reads.
+      academics: { ...academics, marksheetUploads: [...list, { name: f.key, originalName: fileName, label: fileName, type: f.contentType, size: f.bytes }] },
     };
     if (row) await db.update(schema.internOnboarding).set({ extraData }).where(eq(schema.internOnboarding.id, row.id));
     else await db.insert(schema.internOnboarding).values({ userId: session.uid, extraData });
