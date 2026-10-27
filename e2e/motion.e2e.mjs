@@ -20,7 +20,10 @@ import { join } from "node:path";
 import { chromium } from "playwright";
 
 import { ARTIFACTS, baseUrl } from "./lib/env.mjs";
-import { DASHBOARDS, loginState, persona } from "./lib/session.mjs";
+import { DASHBOARDS, cookieHeader, loginState, persona } from "./lib/session.mjs";
+
+/** The three dashboards plus the intern pages whose figures also animate (QA-002). */
+const PAGES = [...DASHBOARDS, { key: "intern-hired", path: "/intern/record" }, { key: "intern-hired", path: "/intern/earnings" }];
 
 const OUT = join(ARTIFACTS, "qa", "motion");
 const findings = [];
@@ -71,8 +74,10 @@ async function load(ctx, path) {
 async function main() {
   mkdirSync(OUT, { recursive: true });
   const browser = await chromium.launch();
-  for (const d of DASHBOARDS) {
-    const state = await loginState(browser, persona(d.key));
+  const states = {};
+  for (const d of PAGES) {
+    states[d.key] ??= await loginState(browser, persona(d.key));
+    const state = states[d.key];
     for (const width of [390, 1440]) {
       const where = `${d.path} @${width}`;
       const mk = (reducedMotion) => browser.newContext({ storageState: state, viewport: { width, height: 900 }, reducedMotion });
@@ -80,6 +85,13 @@ async function main() {
       await reducedCtx.tracing.start({ screenshots: true, snapshots: true });
       const n = await load(normalCtx, d.path);
       const r = await load(reducedCtx, d.path);
+      // The figures in the server HTML must be the real ones, not the animation's starting 0 (QA-002).
+      const ssr = await (await fetch(new URL(d.path, baseUrl()), { headers: { cookie: cookieHeader(state) } })).text();
+      const ssrText = ssr.replace(/<script[\s\S]*?<\/script>/g, " ").replace(/<style[\s\S]*?<\/style>/g, " ").replace(/<[^>]+>/g, " ").replace(/&#x27;|&amp;|&nbsp;/g, " ");
+      const shown = await r.page.evaluate(() => (document.querySelector("main")?.innerText ?? ""));
+      const figures = [...new Set(shown.match(/[₹$]\s?[\d,]+(?:\.\d+)?|\b\d{1,3}(?:,\d{2,3})+\b/g) ?? [])];
+      const missing = figures.filter((f) => !ssrText.includes(f.replace(/\s/g, "")) && !ssrText.includes(f));
+      if (missing.length) findings.push({ where, kind: "figure-not-in-server-html", detail: `shown after hydration but absent from the server HTML: ${missing.slice(0, 6).join(", ")}` });
       const ni = await inspect(n.page);
       const ri = await inspect(r.page);
       await r.page.screenshot({ path: join(OUT, `${d.key}-${width}-reduced.png`), fullPage: true }).catch(() => {});
