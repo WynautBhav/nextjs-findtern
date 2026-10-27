@@ -5,16 +5,19 @@ import { usePathname } from "next/navigation";
 import { Analytics } from "@/components/marketing/analytics";
 
 /**
- * Trackers belong on the public site and the sign-up/sign-in funnel, not on
- * the signed-in dashboards: there they only add three third-party requests to
- * every page, and on networks that silently drop googletagmanager.com
- * (common on office firewalls) each one hangs until it times out.
+ * Where the trackers (GA4, GTM, Meta Pixel) run.
+ *
+ * Decided 27 Oct (SYS-04, bug sheet 7 parity): on the signed-in intern and
+ * employer pages too, as on the legacy site, so the conversion events that
+ * fire there (signup complete, onboarding done, payment success) still reach
+ * GTM and the Pixel. The scripts load `afterInteractive`, so a network that
+ * blocks googletagmanager.com delays nothing on the page.
+ *
+ * The admin workspace is the one exception: staff traffic is not marketing
+ * traffic, and counting it skews every report the trackers feed.
  */
-const APP_PREFIXES = ["/admin", "/intern/", "/employer/"];
-const FUNNEL = /^\/employer\/(login|signup|forgot-password|reset-password|verify-email)(\/|$)/;
-
 export function AnalyticsGate() {
   const path = usePathname() ?? "/";
-  const inApp = APP_PREFIXES.some((p) => path === p.replace(/\/$/, "") || path.startsWith(p)) && !FUNNEL.test(path);
-  return inApp ? null : <Analytics />;
+  const inAdmin = path === "/admin" || path.startsWith("/admin/");
+  return inAdmin ? null : <Analytics />;
 }

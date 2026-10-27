@@ -18,11 +18,10 @@ import { ButtonLink } from "@/components/ui/button";
 import { SectionHeading } from "@/components/ui/section-heading";
 import { EmployerPlanCards } from "@/components/marketing/employer-plan-cards";
 import { PricingCalculator } from "@/components/marketing/pricing-calculator";
-import { getPlans } from "@/lib/content";
+import { getHappyFaces, getPlans } from "@/lib/content";
 import { TiltCard } from "@/components/motion/tilt-card";
 import { CountUp } from "@/components/motion/count-up";
 import { FaqExplorer } from "@/components/marketing/faq-explorer";
-import { HAPPY_FACES } from "@/lib/content/proof";
 import { SITE } from "@/lib/content/site";
 import { TestimonialCarousel } from "@/components/marketing/testimonial-carousel";
 import { JsonLd } from "@/components/seo/json-ld";
@@ -126,7 +125,7 @@ const EMPLOYER_FAQ = [
 ];
 
 export default async function EmployersPage() {
-  const [plansInr, plansUsd] = await Promise.all([getPlans(true), getPlans(false)]);
+  const [plansInr, plansUsd, faces] = await Promise.all([getPlans(true), getPlans(false), getHappyFaces()]);
   return (
     <>
       <JsonLd
@@ -352,11 +351,11 @@ export default async function EmployersPage() {
         <SectionHeading
           lead="What employers"
           accent="say"
-          sub="Three teams that have hired through Findtern."
+          sub="Teams that have hired through Findtern, in their own words."
         />
         <div className="mt-12">
           <TestimonialCarousel
-            testimonials={HAPPY_FACES.map((f) => ({
+            testimonials={faces.map((f) => ({
               id: f.id,
               name: f.name,
               role: f.company ? `${f.title} · ${f.company}` : f.title,

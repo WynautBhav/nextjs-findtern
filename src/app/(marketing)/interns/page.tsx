@@ -35,31 +35,31 @@ const STEPS = [
     Icon: GraduationCap,
     title: "Sign up and register",
     body: "Your details, academics, experience and the skills you want to be hired for.",
-    time: "15 min",
+    time: "About 15 minutes",
   },
   {
     Icon: UserCheck,
     title: "Get assessed",
     body: "One AI interview on the skills you picked, plus an aptitude test. Laptop, webcam and microphone, in one sitting.",
-    time: "30–60 min",
+    time: "30 to 60 minutes",
   },
   {
     Icon: Star,
     title: "See your score",
     body: "One score out of 10, with each part shown: communication, aptitude, coding and the interview. Employers see the same report you do.",
-    time: "After review",
+    time: "Once your results are reviewed",
   },
   {
     Icon: MessageSquare,
     title: "Get matched",
     body: "Verified employers see your profile against live requirements. Your contact details stay closed until you respond.",
-    time: "Until placed",
+    time: "Within the 18-month window",
   },
   {
     Icon: BadgeCheck,
     title: "Get placed and paid",
     body: "Signed engagement, approved timesheet, stipend through the platform. Every hour logged.",
-    time: "Monthly",
+    time: "Stipend paid monthly",
   },
 ];
 
@@ -196,7 +196,7 @@ export default async function InternsPage() {
           sub="Your own time adds up to 45 to 75 minutes. Everything after the assessment is us doing the work."
         />
         <ol className="mt-14 space-y-4">
-          {STEPS.map(({ Icon, title, body, time }) => (
+          {STEPS.map(({ Icon, title, body, time }, i) => (
             <li key={title}>
               <TiltCard max={3} className="rounded-2xl">
                 <article className="flex flex-wrap items-start gap-5 rounded-2xl border border-ink-200 bg-white p-6">
@@ -204,11 +204,15 @@ export default async function InternsPage() {
                     <Icon className="size-5" aria-hidden />
                   </span>
                   <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-baseline gap-x-3">
+                    <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-ink-600">
+                      Stage {i + 1}
+                    </p>
+                    <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1.5">
                       <h3 className="text-lg font-semibold tracking-tight text-ink-900">
                         {title}
                       </h3>
-                      <span className="rounded-full bg-ink-100 px-2.5 py-0.5 text-2xs font-medium text-ink-600">
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-50 px-3 py-1 text-xs font-medium text-brand-800">
+                        <Clock className="size-3.5" aria-hidden />
                         {time}
                       </span>
                     </div>
@@ -225,12 +229,16 @@ export default async function InternsPage() {
 
       {/* ── Guarantees ──────────────────────────────────────────────── */}
       <PageSection tone="brand">
-        <SectionHeading
-          tone="dark"
-          lead="The Findtern"
-          accent="guarantee"
-          sub="Placed within 18 months of your score, or every rupee of the fee comes back."
-        />
+        {/* "Findtern" is the accented word, as on the legacy page ("The
+            <Findtern> Guarantee"); bug sheet 7, S1 r16. */}
+        <div className="mx-auto max-w-3xl text-center">
+          <h2 className="text-3xl font-bold leading-[1.4] tracking-[-0.02em] text-white sm:text-4xl sm:leading-tight">
+            The <span className="smile is-revealed !text-accent-300">Findtern</span> Guarantee
+          </h2>
+          <p className="mx-auto mt-6 max-w-2xl text-lg text-on-dark-subtle">
+            Placed within 18 months of your score, or every rupee of the fee comes back.
+          </p>
+        </div>
         <div className="mt-14 grid gap-5 md:grid-cols-3">
           {GUARANTEES.map(({ Icon, title, body }) => (
             <TiltCard key={title} max={4} className="rounded-2xl">

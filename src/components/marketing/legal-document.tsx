@@ -45,7 +45,10 @@ export function LegalDocument({
   // read the headings back out of the string that actually gets rendered.
   // Reading them before the ids exist produces a table of contents whose
   // links all point at nothing.
-  const clean = useMemo(() => withSubsections(withHeadingIds(sanitizeRichText(html))), [html]);
+  const clean = useMemo(
+    () => withSubsections(withClauseNumbers(withHeadingIds(polishLegal(sanitizeRichText(html))))),
+    [html],
+  );
   const headings = useMemoHeadings(clean);
   const [active, setActive] = useState<string | null>(headings[0]?.id ?? null);
   const articleRef = useRef<HTMLElement>(null);
@@ -94,8 +97,8 @@ export function LegalDocument({
             <ArrowLeft className="size-4" aria-hidden />
             {backLabel}
           </Link>
-          <h1 className="mt-8 max-w-3xl text-balance text-[clamp(2rem,4vw,3rem)] font-semibold leading-[1.1] tracking-[-0.03em] text-ink-900">
-            {title}
+          <h1 className="mt-8 max-w-4xl text-balance text-[clamp(2rem,4vw,3rem)] font-semibold leading-[1.1] tracking-[-0.03em] text-ink-900">
+            <KeepHyphenated text={title} />
           </h1>
           {updated ? (
             <p className="mt-3 text-sm text-ink-600">Last updated {updated}</p>
@@ -156,14 +159,129 @@ export function LegalDocument({
         ) : null}
 
         {/* ── Body ──────────────────────────────────────────────────── */}
+        {/* The rt-* additions below come from polishLegal / withClauseNumbers:
+            run-in labels ("Interns:"), clause titles inside numbered lists,
+            the "Important" callout and the section numbers. Plain wrapping
+            for clause text: text-wrap: pretty pulled single words onto a
+            new line early, which read as broken lines in a legal list. */}
         <article
           ref={articleRef}
-          className="prose-rt prose-legal min-w-0 max-w-3xl scroll-mt-28"
+          className={cn(
+            "prose-rt prose-legal min-w-0 max-w-3xl scroll-mt-28",
+            "[&_.rt-p]:[text-wrap:wrap]!",
+            "[&_.rt-label]:mb-1 [&_.rt-label]:mt-6 [&_.rt-label]:font-semibold [&_.rt-label]:text-ink-900",
+            "[&_.rt-clause]:mb-1 [&_.rt-clause]:block [&_.rt-clause]:text-base [&_.rt-clause]:text-ink-900",
+            "[&_.rt-callout]:rounded-apple-lg [&_.rt-callout]:border [&_.rt-callout]:border-accent/30 [&_.rt-callout]:bg-accent/10 [&_.rt-callout]:px-5 [&_.rt-callout]:py-4 [&_.rt-callout]:text-ink-800",
+            "[&_.rt-num]:mr-2 [&_.rt-num]:tabular-nums [&_.rt-num]:text-primary",
+          )}
         >
           <div dangerouslySetInnerHTML={{ __html: clean }} />
         </article>
       </div>
     </>
+  );
+}
+
+/**
+ * Words joined by a hyphen ("Non-Bypass") stay on one line in the title;
+ * the browser otherwise breaks after the hyphen ("Non-" / "Bypass").
+ */
+function KeepHyphenated({ text }: { text: string }) {
+  const parts = text.split(/(\S+-\S+)/g);
+  return (
+    <>
+      {parts.map((part, i) =>
+        /\S-\S/.test(part) ? (
+          <span key={i} className="whitespace-nowrap">
+            {part}
+          </span>
+        ) : (
+          part
+        ),
+      )}
+    </>
+  );
+}
+
+/**
+ * Tidies documents pasted into the CMS from Google Docs and Word, on the
+ * sanitised string (it only ever adds classes and links):
+ *  - a paragraph that is only a label ("Interns:") becomes a run-in
+ *    sub-heading, grouped and indented like a "2.1" clause;
+ *  - a numbered clause that starts with a bold title and a line break
+ *    (the Non-Bypass Agreement) gets the title on its own line, without
+ *    the extra blank line the <br> left;
+ *  - a document that opens with a bold "Important" line gets it as a
+ *    callout instead of a stray bold sentence;
+ *  - bare email addresses become mailto links (bug sheet 7, S1 r10).
+ */
+function polishLegal(clean: string): string {
+  const out = clean
+    .replace(
+      /<p class="rt-p">([A-Z][\w &/,()-]{0,46}?)\s*:(?:\s|&nbsp;)*<\/p>/g,
+      '<p class="rt-p rt-label">$1</p>',
+    )
+    .replace(
+      /<li class="rt-li"><p class="rt-p"><strong class="rt-strong">([^<]+)<\/strong>\s*<br>/g,
+      '<li class="rt-li"><p class="rt-p"><strong class="rt-strong rt-clause">$1</strong>',
+    )
+    .replace(/^<p class="rt-p">(<(?:b|strong) class="rt-strong">[^<]*Important)/, '<p class="rt-p rt-callout">$1');
+  return linkEmails(out);
+}
+
+/** Wrap bare addresses in text (never inside a tag or an existing link). */
+function linkEmails(html: string): string {
+  let inLink = 0;
+  return html
+    .split(/(<[^>]+>)/g)
+    .map((chunk) => {
+      if (chunk.startsWith("<")) {
+        if (/^<a\b/i.test(chunk)) inLink++;
+        else if (/^<\/a>/i.test(chunk)) inLink = Math.max(0, inLink - 1);
+        return chunk;
+      }
+      if (inLink) return chunk;
+      return chunk.replace(
+        /\b([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})\b/g,
+        '<a class="rt-a" href="mailto:$1">$1</a>',
+      );
+    })
+    .join("");
+}
+
+/**
+ * Clause numbers. A sub-heading under "5. Services" is shown as "5.1", the
+ * next as "5.2" (bug sheet 7, NC r12/r13: the terms read "2" then "2.1",
+ * set slightly in). Headings that already carry a number keep it. When no
+ * clause heading is numbered at all (the Non-Bypass Agreement), the clauses
+ * are numbered 1, 2, 3. The number is a span inside the heading, so the ids
+ * withHeadingIds made from the text (and any shared #links) do not change.
+ */
+function withClauseNumbers(clean: string): string {
+  const h2Texts = [...clean.matchAll(/<h2 class="rt-h2"[^>]*>([\s\S]*?)<\/h2>/g)].map((m) =>
+    m[1].replace(/<[^>]*>/g, "").trim(),
+  );
+  const numberAll = h2Texts.length > 2 && h2Texts.every((t) => !/^\d/.test(t));
+  let major = 0;
+  let current: string | null = null;
+  let minor = 0;
+  return clean.replace(
+    /<(h[23]) class="(rt-h[23])"( id="[^"]+")?>([\s\S]*?)<\/h[23]>/g,
+    (match, tag: string, cls: string, id: string | undefined, inner: string) => {
+      const text = inner.replace(/<[^>]*>/g, "").trim();
+      if (!text) return match;
+      if (tag === "h2") {
+        major++;
+        minor = 0;
+        const own = /^(\d+)[.)]?\s/.exec(text);
+        current = own ? own[1] : numberAll ? String(major) : null;
+        if (own || !current) return match;
+        return `<h2 class="${cls}"${id ?? ""}><span class="rt-num">${current}.</span>${inner}</h2>`;
+      }
+      if (/^\d/.test(text) || !current) return match;
+      minor++;
+      return `<h3 class="${cls}"${id ?? ""}><span class="rt-num">${current}.${minor}</span>${inner}</h3>`;
+    },
   );
 }
 
@@ -183,7 +301,9 @@ function useMemoHeadings(clean: string) {
     let m: RegExpExecArray | null;
     while ((m = re.exec(clean))) {
       // The TOC renders as text, so entities the sanitiser kept ("&amp;") are decoded.
-      const text = decodeEntities(m[3].replace(/<[^>]*>/g, "")).trim();
+      const text = decodeEntities(
+        m[3].replace(/<span class="rt-num">([^<]*)<\/span>/, "$1 ").replace(/<[^>]*>/g, ""),
+      ).trim();
       if (!text) continue;
       out.push({ id: m[2], text, level: Number(m[1]) });
     }
@@ -240,7 +360,7 @@ function withHeadingIds(clean: string): string {
  */
 function withSubsections(clean: string): string {
   return clean.replace(
-    /<h3 class="rt-h3"[^>]*>[\s\S]*?<\/h3>[\s\S]*?(?=<h[23] class=|$)/g,
+    /(?:<h3 class="rt-h3"[^>]*>[\s\S]*?<\/h3>|<p class="rt-p rt-label">[^<]*<\/p>)[\s\S]*?(?=<h[23] class=|<p class="rt-p rt-label">|$)/g,
     (run) => (isBalanced(run) ? `<div class="rt-sub">${run}</div>` : run),
   );
 }

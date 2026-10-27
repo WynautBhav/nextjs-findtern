@@ -78,16 +78,53 @@ async function interviewReminders() {
     // interview booked 5 hours out does not get "in 12 hours".
     const left = timeLeft(hoursLeft);
     for (const who of ["intern", "employer"] as const) {
+      const recipientId = who === "intern" ? i.internId : i.employerId;
+      const dedupeKey = await reminderKey(`interview_reminder:${i.id}:${who}:${hours}h`, who, recipientId, start, hours);
       await notify({
-        to: { type: who, id: who === "intern" ? i.internId : i.employerId },
+        to: { type: who, id: recipientId },
         type: "interview_reminder",
         title: `Interview in ${left}`,
         message: `Reminder: your interview starts in ${left}.`,
-        data: { interviewId: i.id, hours, meetingLink: i.meetingLink },
-        dedupeKey: `interview_reminder:${i.id}:${who}:${hours}h`,
+        data: { interviewId: i.id, hours, meetingLink: i.meetingLink, slotAt: start.toISOString() },
+        dedupeKey,
       });
     }
   }
+}
+
+/**
+ * The dedupe key for one reminder (SYS-06).
+ *
+ * The legacy key (`interview_reminder:<id>:<who>:<h>h`) has no slot time, so
+ * once an interview was rescheduled its reminders never went out again. The
+ * legacy key is still used, byte for byte, whenever it is free or was used
+ * for this slot, so the two apps keep sharing one key per reminder. Only
+ * when that key was already spent before this slot's window opened (i.e. on
+ * an earlier slot) does the reminder get a key with the slot time in it.
+ */
+async function reminderKey(
+  legacyKey: string,
+  recipientType: "intern" | "employer",
+  recipientId: string,
+  start: Date,
+  hours: number,
+): Promise<string> {
+  const [prior] = await getDb()
+    .select({ at: schema.notifications.createdAt })
+    .from(schema.notifications)
+    .where(
+      and(
+        eq(schema.notifications.recipientType, recipientType),
+        eq(schema.notifications.recipientId, recipientId),
+        eq(schema.notifications.dedupeKey, legacyKey),
+      ),
+    )
+    .limit(1);
+  if (!prior?.at) return legacyKey;
+  // Sent before this slot's window opened (with a few minutes of slack for
+  // the 5-minute tick): that reminder was for the old time.
+  const windowOpens = start.getTime() - hours * 3_600_000 - 10 * 60_000;
+  return prior.at.getTime() < windowOpens ? `${legacyKey}:${start.toISOString()}` : legacyKey;
 }
 
 function timeLeft(hours: number): string {
@@ -295,31 +332,60 @@ async function employerProfileNudges(now: Date) {
   }
 }
 
+/**
+ * Daily talent spotlight (SYS-07), the legacy job (notificationScheduler.ts
+ * 100-195): for each onboarded employer, the top 5 candidates by skill
+ * overlap with their projects, then by Findtern Score. Two deliberate
+ * differences: only active projects of active employers count, and the
+ * notification carries candidate ids only. Legacy also put the interns'
+ * full names in it, which showed identities before hire. Hidden profiles
+ * are never spotlighted.
+ */
 async function talentSpotlight(now: Date) {
   const db = getDb();
   const projects = await db
     .select({ employerId: schema.projects.employerId, skills: schema.projects.skills })
     .from(schema.projects)
-    // Deactivated employers get nothing.
+    // Deactivated or not-yet-onboarded employers get nothing.
     .innerJoin(schema.employers, eq(schema.employers.id, schema.projects.employerId))
-    .where(and(eq(schema.projects.status, "active"), eq(schema.employers.isActive, true)));
+    .where(
+      and(
+        eq(schema.projects.status, "active"),
+        eq(schema.employers.isActive, true),
+        eq(schema.employers.onboardingCompleted, true),
+      ),
+    );
   if (projects.length === 0) return;
   const pool = (await db.select().from(schema.internOnboarding))
-    .map((o) => ({ score: scoreOf(o), skills: new Set(readSkills(o.skills).map((s) => s.toLowerCase())) }))
-    .filter((c) => c.score >= 6);
+    .filter((o) => ((o.extraData ?? {}) as Record<string, unknown>).openToWork !== false)
+    .map((o) => ({
+      internId: o.userId,
+      score: scoreOf(o) ?? 0,
+      skills: new Set(readSkills(o.skills).map((s) => s.trim().toLowerCase())),
+    }));
   const wanted = new Map<string, Set<string>>();
   for (const p of projects) {
     const set = wanted.get(p.employerId) ?? new Set<string>();
-    for (const s of (p.skills as string[] | null) ?? []) set.add(s.toLowerCase());
+    for (const s of (p.skills as string[] | null) ?? []) {
+      const k = String(s ?? "").trim().toLowerCase();
+      if (k) set.add(k);
+    }
     wanted.set(p.employerId, set);
   }
   for (const [employerId, skills] of wanted) {
-    if (!pool.some((c) => [...skills].some((s) => c.skills.has(s)))) continue;
+    if (skills.size === 0) continue;
+    const top = pool
+      .map((c) => ({ ...c, overlap: [...skills].filter((s) => c.skills.has(s)).length }))
+      .filter((c) => c.overlap > 0)
+      .sort((a, b) => b.overlap - a.overlap || b.score - a.score)
+      .slice(0, 5);
+    if (top.length === 0) continue;
     await notify({
       to: { type: "employer", id: employerId },
       type: "talent_spotlight",
       title: "Talent spotlight",
-      message: "New high-scoring candidates match your open projects.",
+      message: `Today's top ${top.length === 1 ? "candidate" : `${top.length} candidates`} for your projects, matched on skills and Findtern Score.`,
+      data: { skills: [...skills].slice(0, 25), candidateIds: top.map((c) => c.internId) },
       dedupeKey: `talent_spotlight:${employerId}:${dayKey(now)}`,
     });
   }

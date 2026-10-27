@@ -5,6 +5,7 @@ import { createHash } from "node:crypto";
 
 import { getDb, schema } from "@/lib/db";
 import { hashPassword, isStrongPassword, WEAK_PASSWORD_MESSAGE } from "@/lib/security/password";
+import { forgetAccountStatus } from "@/lib/account-status";
 
 const bodySchema = z.object({
   token: z.string().min(1),
@@ -36,5 +37,7 @@ export async function POST(req: Request) {
     await db.update(schema.users).set({ password }).where(eq(schema.users.id, row.subjectId));
   }
   await db.update(schema.passwordResetTokens).set({ usedAt: new Date() }).where(eq(schema.passwordResetTokens.id, row.id));
+  // A reset ends every existing session on the account (INT-26).
+  forgetAccountStatus(row.subjectType === "employer" ? "employer" : "intern", row.subjectId);
   return NextResponse.json({ ok: true });
 }

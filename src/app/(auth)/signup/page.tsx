@@ -6,7 +6,7 @@ import { AlertCircle } from "lucide-react";
 import { AuthShell } from "@/components/auth/auth-shell";
 import { GoogleButton } from "@/components/auth/login-form";
 import { SignupForm } from "@/components/auth/signup-form";
-import { oauthErrorMessage } from "@/lib/google";
+import { oauthErrorMessage, safeNext } from "@/lib/google";
 
 export const metadata: Metadata = {
   title: "Create your account",
@@ -22,6 +22,9 @@ export default async function SignupPage({
 }) {
   const params = await searchParams;
   const oauthError = oauthErrorMessage(one(params.oauthError));
+  // Carried through from sign in (INT-07), so a new account still lands on
+  // the page that sent them.
+  const next = safeNext(one(params.next), "");
   // Back from Google with a verified address and no account yet. The values
   // only prefill the form; the signup API checks the verification itself.
   const google =
@@ -64,7 +67,10 @@ export default async function SignupPage({
 
       {google ? null : (
         <div className="mt-8 space-y-5">
-          <GoogleButton href="/api/auth/google/start?role=intern" label="Sign up with Google" />
+          <GoogleButton
+            href={`/api/auth/google/start?role=intern${next ? `&next=${encodeURIComponent(next)}` : ""}`}
+            label="Sign up with Google"
+          />
           <div className="relative py-1">
             <span className="absolute inset-0 flex items-center" aria-hidden>
               <span className="w-full border-t border-ink-100" />
@@ -77,14 +83,14 @@ export default async function SignupPage({
       )}
 
       <div className={google ? "mt-8" : "mt-5"}>
-        <SignupForm google={google} />
+        <SignupForm google={google} next={next || undefined} />
       </div>
 
       {/* Both doors, so neither audience is a dead end. */}
       <p className="mt-7 text-center text-sm text-text-subtle">
         Already have an account?{" "}
         <Link
-          href="/login"
+          href={next ? `/login?next=${encodeURIComponent(next)}` : "/login"}
           className="font-semibold text-brand-700 underline-offset-4 hover:underline"
         >
           Sign in

@@ -13,13 +13,64 @@ export const NONCE_COOKIE = "ft_goauth";
 
 export type GoogleConfig = { clientId: string; clientSecret: string; redirectUri: string };
 
-export function googleConfig(): GoogleConfig | null {
+/**
+ * The origin this request was made to, as the browser saw it: the forwarded
+ * host and scheme behind nginx or Vercel, else the Host header.
+ */
+export function requestOrigin(req: Request): string | null {
+  const h = req.headers;
+  const host = (h.get("x-forwarded-host") ?? h.get("host") ?? "").split(",")[0].trim();
+  if (!host || !/^[a-z0-9.:[\]-]+$/i.test(host)) return null;
+  let proto = (h.get("x-forwarded-proto") ?? "").split(",")[0].trim().toLowerCase();
+  if (proto !== "http" && proto !== "https") {
+    try {
+      proto = new URL(req.url).protocol.replace(":", "");
+    } catch {
+      proto = "https";
+    }
+  }
+  return `${proto}://${host}`;
+}
+
+/** Absolute origin for links in emails: PUBLIC_ORIGIN, else the request's. */
+export function publicOrigin(req?: Request): string {
+  const env = process.env.PUBLIC_ORIGIN?.trim();
+  if (env) return env.replace(/\/+$/, "");
+  return (req && requestOrigin(req)) || "http://localhost:3000";
+}
+
+/**
+ * The OAuth redirect URI for this request.
+ *
+ * It has to be on the origin the person is using: the sign-in nonce cookie
+ * is set there, and a callback on another host never sees it. Fixed
+ * GOOGLE_OAUTH_REDIRECT_URI values (https://findtern.in/...) therefore broke
+ * every other deployment with redirect_uri_mismatch or an expired sign-in
+ * (bug sheet 7, NC r16 on the Vercel staging). The configured value is used
+ * as-is on its own origin; anywhere else the same path is used on the
+ * request's origin. That URI still has to be registered on the Google OAuth
+ * client (Console > Credentials > Authorized redirect URIs), once per
+ * deployment.
+ */
+function redirectUriFor(configured: string | undefined, defaultPath: string, req?: Request): string {
+  const origin = req ? requestOrigin(req) : null;
+  if (configured) {
+    try {
+      const u = new URL(configured);
+      if (!origin || u.origin === origin) return configured;
+      return `${origin}${u.pathname}`;
+    } catch {
+      // fall through to the default
+    }
+  }
+  return `${origin ?? publicOrigin()}${defaultPath}`;
+}
+
+export function googleConfig(req?: Request): GoogleConfig | null {
   const clientId = process.env.GOOGLE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
   if (!clientId || !clientSecret) return null;
-  const redirectUri =
-    process.env.GOOGLE_OAUTH_REDIRECT_URI ??
-    `${process.env.PUBLIC_ORIGIN ?? "http://localhost:3000"}/api/auth/google/callback`;
+  const redirectUri = redirectUriFor(process.env.GOOGLE_OAUTH_REDIRECT_URI?.trim() || undefined, "/api/auth/google/callback", req);
   return { clientId, clientSecret, redirectUri };
 }
 

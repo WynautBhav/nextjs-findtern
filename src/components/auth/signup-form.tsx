@@ -7,6 +7,7 @@ import { AlertCircle, ArrowLeft, ArrowRight, Loader2, MailCheck } from "lucide-r
 
 import { isValidPhone, phoneError, phoneHint } from "@/lib/phone";
 import { DIAL_CODES } from "@/lib/data/dial-codes";
+import { isPersonalEmail } from "@/lib/employer-onboarding";
 
 /**
  * Intern signup: three real API calls, in order.
@@ -34,10 +35,16 @@ const PASSWORD_RULES = [
   { test: (v: string) => /[^A-Za-z0-9]/.test(v), label: "One special character" },
 ];
 
+/** Resend is allowed once a minute (the API refuses sooner). */
+const RESEND_SECONDS = 60;
+
 export function SignupForm({
   google = null,
+  next,
 }: {
   google?: { email: string; firstName: string; lastName: string } | null;
+  /** Where to go after the account exists (from ?next=), else onboarding. */
+  next?: string;
 } = {}) {
   const router = useRouter();
 
@@ -54,6 +61,16 @@ export function SignupForm({
   const [password, setPassword] = useState("");
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [otp, setOtp] = useState("");
+  /** Seconds until "Resend code" is allowed again (INT-24). */
+  const [resendIn, setResendIn] = useState(0);
+  /** The server logs emails instead of sending them (a test deployment). */
+  const [mailLogged, setMailLogged] = useState(false);
+
+  useEffect(() => {
+    if (resendIn <= 0) return;
+    const t = window.setTimeout(() => setResendIn((s) => s - 1), 1000);
+    return () => window.clearTimeout(t);
+  }, [resendIn]);
 
   const [verified, setVerified] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -63,10 +80,14 @@ export function SignupForm({
   const [otpRejected, setOtpRejected] = useState(false);
 
   const passwordOk = PASSWORD_RULES.every((rule) => rule.test(password));
+  const emailShapeOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+  // Interns sign up with a personal address (INT-06); googlemail.com is Gmail.
+  const emailPersonal = isPersonalEmail(email) || email.trim().toLowerCase().endsWith("@googlemail.com");
   const detailsOk =
     firstName.trim().length >= 2 &&
     lastName.trim().length >= 2 &&
-    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()) &&
+    emailShapeOk &&
+    emailPersonal &&
     isValidPhone(countryCode, phoneNumber) &&
     !phoneTaken &&
     passwordOk &&
@@ -86,12 +107,21 @@ export function SignupForm({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: email.trim().toLowerCase() }),
       });
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        remainingSeconds?: number;
+        resendAfterSeconds?: number;
+        delivery?: string;
+      };
       if (!res.ok) {
-        setError(await readError(res, "Could not send the code. Try again in a minute."));
+        setError(data.error ?? "Could not send the code. Try again in a minute.");
+        if (typeof data.remainingSeconds === "number") setResendIn(data.remainingSeconds);
         setOtpRejected(false);
         setLoading(false);
         return;
       }
+      setResendIn(data.resendAfterSeconds ?? RESEND_SECONDS);
+      setMailLogged(data.delivery === "log");
       setStage("otp");
       setOtpRejected(false);
       setLoading(false);
@@ -156,7 +186,7 @@ export function SignupForm({
         return;
       }
       // Session cookie is set by the response; a refresh picks it up server-side.
-      router.push("/intern/onboarding");
+      router.push(next || "/intern/onboarding");
       router.refresh();
     } catch {
       setError("Network error. Nothing was created.");
@@ -232,6 +262,12 @@ export function SignupForm({
               placeholder="you@gmail.com"
             />
           )}
+          {!google && emailShapeOk && !emailPersonal ? (
+            <p role="alert" className="-mt-3 text-xs text-danger">
+              Use a personal email (Gmail, Yahoo, Outlook and the like). College and work
+              addresses are not accepted.
+            </p>
+          ) : null}
 
           <div>
             <label htmlFor="phoneNumber" className="block text-sm font-medium text-ink-800">
@@ -376,9 +412,16 @@ export function SignupForm({
             <MailCheck className="mt-0.5 size-4 shrink-0 text-brand-700" aria-hidden />
             <span>
               We sent a 6-digit code to <strong className="font-semibold">{email}</strong>. It
-              expires in 10 minutes.
+              expires in 10 minutes. Check your spam folder if it is not in your inbox.
             </span>
           </p>
+          {mailLogged ? (
+            <p role="status" className="rounded-lg border border-warning/30 bg-warning-soft px-3.5 py-3 text-sm text-ink-800">
+              This is a test server: emails are written to its log instead of being sent, so the
+              code will not arrive in your inbox. Ask the Findtern team for it, or sign up on
+              findtern.in.
+            </p>
+          ) : null}
 
           <div>
             <label htmlFor="otp" className="block text-sm font-medium text-ink-800">
@@ -443,10 +486,16 @@ export function SignupForm({
               <button
                 type="button"
                 onClick={() => void sendOtp()}
-                disabled={loading}
-                className="font-medium text-brand-700 underline-offset-4 hover:underline disabled:opacity-60"
+                disabled={loading || resendIn > 0}
+                className="font-medium text-brand-700 underline-offset-4 hover:underline disabled:no-underline disabled:opacity-60"
               >
-                Resend code
+                {resendIn > 0 ? (
+                  <>
+                    Resend code in <span className="tabular-nums">0:{String(resendIn).padStart(2, "0")}</span>
+                  </>
+                ) : (
+                  "Resend code"
+                )}
               </button>
             ) : null}
           </div>

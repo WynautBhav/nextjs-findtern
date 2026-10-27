@@ -25,6 +25,19 @@ function authorised(req: Request): boolean {
  * what employers pay, so an unauthenticated caller must never reach them.
  * Only scores Incruiter actually sends are written; nothing is defaulted.
  */
+/**
+ * Adds the result under whatever the notes already hold (SYS-15): the admin's
+ * feedback and recording-link lines live in the same field and used to be
+ * wiped by every webhook call. A repeat delivery of the same text is a no-op.
+ */
+function appendNote(existing: string | null, line: string): string {
+  const text = line.trim().slice(0, 4000);
+  const prev = (existing ?? "").trimEnd();
+  if (!prev) return text;
+  if (prev.includes(text)) return prev;
+  return `${prev}\n${text}`.slice(0, 8000);
+}
+
 export async function POST(req: Request) {
   if (!authorised(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -37,17 +50,28 @@ export async function POST(req: Request) {
   const scores = raw.scores ?? raw.ratings ?? raw.result;
 
   if (interviewId && (raw.status === "completed" || raw.status === "passed")) {
-    // Only AI interviews (the synthetic ai-interview@findtern.ai employer) are touched.
+    // Only AI interviews are touched: the synthetic ai-interview@findtern.ai
+    // employer, or the legacy AI rows whose employer id is "admin" (SYS-15;
+    // there is no employers row behind those, hence the left join).
     const [iv] = await db
-      .select({ id: schema.interviews.id, email: schema.employers.companyEmail })
+      .select({
+        id: schema.interviews.id,
+        employerId: schema.interviews.employerId,
+        notes: schema.interviews.notes,
+        email: schema.employers.companyEmail,
+      })
       .from(schema.interviews)
-      .innerJoin(schema.employers, eq(schema.employers.id, schema.interviews.employerId))
+      .leftJoin(schema.employers, eq(schema.employers.id, schema.interviews.employerId))
       .where(eq(schema.interviews.id, String(interviewId)))
       .limit(1);
-    if (iv && iv.email === "ai-interview@findtern.ai") {
+    if (iv && (iv.employerId === "admin" || iv.email === "ai-interview@findtern.ai")) {
       await db
         .update(schema.interviews)
-        .set({ notes: String(raw.feedback ?? scores?.summary ?? "AI interview completed").slice(0, 4000), status: "completed", updatedAt: new Date() })
+        .set({
+          notes: appendNote(iv.notes, String(raw.feedback ?? scores?.summary ?? "AI interview completed")),
+          status: "completed",
+          updatedAt: new Date(),
+        })
         .where(eq(schema.interviews.id, iv.id));
     }
   }

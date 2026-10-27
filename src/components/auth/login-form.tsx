@@ -12,12 +12,15 @@ export function LoginForm({
   redirectTo,
   forgotHref,
   googleHref,
+  googleLabel,
   verifyHref,
 }: {
   endpoint: string;
   redirectTo: string;
   forgotHref?: string;
   googleHref?: string;
+  /** New accounts can start from the same button (bug sheet 7, S1 r21). */
+  googleLabel?: string;
   /** Where an unverified account goes to verify; shown with that error. */
   verifyHref?: string;
 }) {
@@ -85,7 +88,7 @@ export function LoginForm({
           type="email"
           autoComplete="email"
           required
-          placeholder="you@company.com"
+          placeholder={endpoint.includes("/employer/") || endpoint.includes("/admin/") ? "you@company.com" : "you@gmail.com"}
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           className="h-11 border-ink-200 bg-white px-3.5 placeholder:text-ink-400"
@@ -160,7 +163,7 @@ export function LoginForm({
               or
             </span>
           </div>
-          <GoogleButton href={googleHref} />
+          <GoogleButton href={googleHref} label={googleLabel} />
         </>
       ) : null}
     </form>

@@ -46,7 +46,7 @@ export async function GET(req: Request) {
   const nonce = (await cookies()).get(NONCE_COOKIE)?.value;
   if (!nonce || nonce !== state.nonce) return fail(req, loginPath, "bad_state");
 
-  const cfg = googleConfig();
+  const cfg = googleConfig(req);
   if (!cfg) return fail(req, loginPath, "not_configured");
 
   let email: string | undefined;
@@ -96,13 +96,14 @@ export async function GET(req: Request) {
     const res = NextResponse.redirect(new URL(safeNext(state.next, "/employer/dashboard"), req.url));
     res.cookies.delete({ name: NONCE_COOKIE, path: "/" });
     await issueCsrfCookie(res);
-    return withSession(res, { uid: employer.id, role: "employer", email: employer.companyEmail });
+    return withSession(res, { uid: employer.id, role: "employer", email: employer.companyEmail, password: employer.password });
   }
 
   // Interns sign in with Gmail only (legacy rule).
   // googlemail.com is the same Gmail service (legacy routes.ts:3166 accepted both).
   if (!email.endsWith("@gmail.com") && !email.endsWith("@googlemail.com")) return fail(req, "/login", "gmail_only");
-  const [user] = await db.select().from(schema.users).where(eq(schema.users.email, email)).limit(1);
+  // Case-insensitive, like the password sign in (INT-35).
+  const [user] = await db.select().from(schema.users).where(sql`lower(${schema.users.email}) = ${email}`).limit(1);
   if (!user) {
     /* New candidate. The account is not created here: `users.phone_number` is
      * NOT NULL and unique per country code, and Google does not give us a
@@ -133,5 +134,5 @@ export async function GET(req: Request) {
   const res = NextResponse.redirect(new URL(safeNext(state.next, "/intern/dashboard"), req.url));
   res.cookies.delete({ name: NONCE_COOKIE, path: "/" });
   await issueCsrfCookie(res);
-  return withSession(res, { uid: user.id, role: "intern", email: user.email });
+  return withSession(res, { uid: user.id, role: "intern", email: user.email, password: user.password });
 }

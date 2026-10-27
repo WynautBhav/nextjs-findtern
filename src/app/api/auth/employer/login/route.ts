@@ -42,11 +42,12 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "This account has been deactivated. Contact admin@findtern.in." }, { status: 403 });
   }
 
+  let storedPassword = employer.password;
   if (needsRehash(employer.password)) {
-    const upgraded = await hashPassword(parsed.data.password);
+    storedPassword = await hashPassword(parsed.data.password);
     await db
       .update(schema.employers)
-      .set({ password: upgraded })
+      .set({ password: storedPassword })
       .where(eq(schema.employers.id, employer.id));
   }
 
@@ -54,5 +55,5 @@ export async function POST(req: Request) {
     employer: { id: employer.id, email: employer.companyEmail, companyName: employer.companyName },
   });
   await issueCsrfCookie(res);
-  return withSession(res, { uid: employer.id, role: "employer", email: employer.companyEmail });
+  return withSession(res, { uid: employer.id, role: "employer", email: employer.companyEmail, password: storedPassword });
 }

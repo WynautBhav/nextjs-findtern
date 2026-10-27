@@ -65,10 +65,11 @@ const nextConfig: NextConfig = {
   devIndicators: false,
   async redirects() {
     return [
-      // OAuth bridges were client-side redirects into API routes on the legacy
-      // site; the equivalents are real pages here.
-      { source: "/auth/google/callback/auth", destination: "/login", permanent: false },
-      { source: "/google/auth", destination: "/login", permanent: false },
+      // The legacy admin "reconnect Meet calendar" links (SYS-12). Both start
+      // the Findtern calendar connect; the admin proxy signs a non-admin in
+      // first.
+      { source: "/auth/google/callback/auth", destination: "/api/admin/google/connect", permanent: false },
+      { source: "/google/auth", destination: "/api/admin/google/connect", permanent: false },
       // `/opportunities` is deliberately absent: it is a real route now (the
       // public browser), and it keeps the one legacy URL that should survive.
       ...LEGACY_REDIRECTS.map((r) => ({

@@ -10,7 +10,7 @@ import { CountUp } from "@/components/motion/count-up";
 import { TiltCard } from "@/components/motion/tilt-card";
 import { CirclePhoto } from "@/components/home/sections";
 import { ABOUT_COPY, PROOF_STATS } from "@/lib/content/site";
-import { PARTNERS, HAPPY_FACES } from "@/lib/content/proof";
+import { getHappyFaces, getPartners } from "@/lib/content";
 import { TestimonialCarousel } from "@/components/marketing/testimonial-carousel";
 import { VelocityMarquee } from "@/components/motion/velocity-marquee";
 import { JsonLd } from "@/components/seo/json-ld";
@@ -41,7 +41,9 @@ const METHOD = [
   },
 ];
 
-export default function AboutPage() {
+export default async function AboutPage() {
+  // CMS rows (admin-editable), with the TS copy as fallback (SYS-03).
+  const [partners, faces] = await Promise.all([getPartners(), getHappyFaces()]);
   return (
     <>
       <JsonLd
@@ -155,7 +157,7 @@ export default function AboutPage() {
           <span className="text-primary">leading companies</span> across India
         </p>
         <VelocityMarquee duration={40} className="mt-8">
-          {PARTNERS.map((p) => (
+          {partners.map((p) => (
             <div
               key={p.id}
               className="flex h-12 w-40 shrink-0 items-center justify-center"
@@ -183,7 +185,7 @@ export default function AboutPage() {
         />
         <div className="mt-12">
           <TestimonialCarousel
-            testimonials={HAPPY_FACES.map((f) => ({
+            testimonials={faces.map((f) => ({
               id: f.id,
               name: f.name,
               role: f.company ? `${f.title} · ${f.company}` : f.title,

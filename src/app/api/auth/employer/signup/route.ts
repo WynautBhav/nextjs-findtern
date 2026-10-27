@@ -1,4 +1,4 @@
-import { and, eq, or, sql } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -9,6 +9,7 @@ import { limiters, bucketKey, clientIp } from "@/lib/security/rate-limit";
 import { isPersonalEmail } from "@/lib/employer-onboarding";
 import { normalizePhone, phoneError } from "@/lib/phone";
 import { hasVerifiedSignupOtp } from "@/lib/signup-otp";
+import { phoneInUseAnywhere } from "@/lib/phone-owner";
 
 const bodySchema = z.object({
   name: z.string().min(2),
@@ -42,31 +43,21 @@ export async function POST(req: Request) {
   const db = getDb();
   const [existing] = await db.select().from(schema.employers).where(sql`lower(${schema.employers.companyEmail}) = ${parsed.data.companyEmail}`).limit(1);
   if (existing) return NextResponse.json({ error: "Email already registered" }, { status: 409 });
-  const phoneNumber = normalizePhone(parsed.data.phoneNumber);
-  const [phoneOwner] = await db
-    .select({ id: schema.employers.id })
-    .from(schema.employers)
-    .where(and(eq(schema.employers.countryCode, parsed.data.countryCode), eq(schema.employers.phoneNumber, phoneNumber)))
-    .limit(1);
-  if (phoneOwner) return NextResponse.json({ error: "Phone number already registered" }, { status: 409 });
-
-  // One person, one role: an email or phone already on an intern account
-  // cannot also open an employer account.
+  // One person, one role: an email already on an intern account cannot also
+  // open an employer account.
   const [internOwner] = await db
     .select({ id: schema.users.id })
     .from(schema.users)
-    .where(
-      or(
-        sql`lower(${schema.users.email}) = ${parsed.data.companyEmail}`,
-        and(eq(schema.users.countryCode, parsed.data.countryCode), eq(schema.users.phoneNumber, phoneNumber)),
-      ),
-    )
+    .where(sql`lower(${schema.users.email}) = ${parsed.data.companyEmail}`)
     .limit(1);
   if (internOwner) {
-    return NextResponse.json(
-      { error: "This email or phone number is already registered as an intern account" },
-      { status: 409 },
-    );
+    return NextResponse.json({ error: "This email is already registered as an intern account" }, { status: 409 });
+  }
+  // Any account's own number or contact number, country code included
+  // (INT-05 / EMH-32, legacy routes.ts:3860-3890).
+  const phoneNumber = normalizePhone(parsed.data.phoneNumber);
+  if (await phoneInUseAnywhere(parsed.data.countryCode, phoneNumber)) {
+    return NextResponse.json({ error: "Phone number already in use" }, { status: 409 });
   }
 
   const password = await hashPassword(parsed.data.password);
@@ -86,5 +77,5 @@ export async function POST(req: Request) {
 
   const res = NextResponse.json({ employer: { id: employer.id, companyEmail: employer.companyEmail } });
   await issueCsrfCookie(res);
-  return withSession(res, { uid: employer.id, role: "employer", email: employer.companyEmail });
+  return withSession(res, { uid: employer.id, role: "employer", email: employer.companyEmail, password });
 }

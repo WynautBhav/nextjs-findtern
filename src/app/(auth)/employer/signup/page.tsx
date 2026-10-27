@@ -6,7 +6,7 @@ import { AlertCircle } from "lucide-react";
 import { AuthShell } from "@/components/auth/auth-shell";
 import { GoogleButton } from "@/components/auth/login-form";
 import { EmployerSignupForm } from "@/components/employer/employer-signup-form";
-import { oauthErrorMessage } from "@/lib/google";
+import { oauthErrorMessage, safeNext } from "@/lib/google";
 
 export const metadata: Metadata = {
   title: "Employer sign up | Findtern",
@@ -22,6 +22,7 @@ export default async function EmployerSignupPage({
 }) {
   const params = await searchParams;
   const oauthError = oauthErrorMessage(one(params.oauthError));
+  const next = safeNext(one(params.next), "");
   // Back from Google with a verified company address and no account yet. The
   // values only prefill the form; the signup API checks the verification.
   const google =
@@ -64,7 +65,10 @@ export default async function EmployerSignupPage({
 
       {google ? null : (
         <div className="mt-8 space-y-5">
-          <GoogleButton href="/api/auth/google/start?role=employer" label="Sign up with Google" />
+          <GoogleButton
+            href={`/api/auth/google/start?role=employer${next ? `&next=${encodeURIComponent(next)}` : ""}`}
+            label="Sign up with Google"
+          />
           <div className="relative py-1">
             <span className="absolute inset-0 flex items-center" aria-hidden>
               <span className="w-full border-t border-ink-100" />

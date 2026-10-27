@@ -1,7 +1,6 @@
-import { and, eq, inArray } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
-import { getDb, schema } from "@/lib/db";
+import { phoneInUseAnywhere } from "@/lib/phone-owner";
 import { bucketKey, clientIp, limiters } from "@/lib/security/rate-limit";
 
 /**
@@ -10,9 +9,10 @@ import { bucketKey, clientIp, limiters } from "@/lib/security/rate-limit";
  * the role would let anyone map numbers to interns and employers. The signup
  * POST - rate limited and the real guard - gives the specific reason.
  *
- * `?cc=+44` narrows the match to that country code, the same pair the unique
- * indexes are on, so +1 5551234567 does not clash with +91 5551234567.
- * Without it (older clients) any country code matches, as before.
+ * `?cc=+44` is the country code, so +1 5551234567 does not clash with
+ * +91 5551234567 (INT-36). Without it the number is read as Indian, which is
+ * what the legacy pre-check assumed. Contact numbers count as taken too
+ * (INT-05): the same check the signup POST makes.
  */
 export async function GET(req: Request, { params }: { params: Promise<{ phone: string }> }) {
   if (!limiters.phoneLookup.take(bucketKey(clientIp(req.headers)))) {
@@ -23,19 +23,6 @@ export async function GET(req: Request, { params }: { params: Promise<{ phone: s
   if (!digits) return NextResponse.json({ exists: false });
   const rawCc = new URL(req.url).searchParams.get("cc")?.trim() ?? "";
   const ccDigits = rawCc.replace(/\D/g, "");
-  const cc = /^\d{1,4}$/.test(ccDigits) ? `+${ccDigits}` : null;
-  // Legacy rows may hold the code without its "+".
-  const ccForms = cc ? [cc, cc.slice(1)] : [];
-  const db = getDb();
-  const [u] = await db
-    .select({ id: schema.users.id })
-    .from(schema.users)
-    .where(cc ? and(eq(schema.users.phoneNumber, digits), inArray(schema.users.countryCode, ccForms)) : eq(schema.users.phoneNumber, digits))
-    .limit(1);
-  const [e] = await db
-    .select({ id: schema.employers.id })
-    .from(schema.employers)
-    .where(cc ? and(eq(schema.employers.phoneNumber, digits), inArray(schema.employers.countryCode, ccForms)) : eq(schema.employers.phoneNumber, digits))
-    .limit(1);
-  return NextResponse.json({ exists: Boolean(u || e) });
+  const cc = /^\d{1,4}$/.test(ccDigits) ? `+${ccDigits}` : "+91";
+  return NextResponse.json({ exists: await phoneInUseAnywhere(cc, digits) });
 }

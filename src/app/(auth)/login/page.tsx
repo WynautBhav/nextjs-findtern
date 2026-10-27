@@ -5,7 +5,7 @@ import { AlertCircle } from "lucide-react";
 
 import { AuthShell } from "@/components/auth/auth-shell";
 import { LoginForm } from "@/components/auth/login-form";
-import { oauthErrorMessage } from "@/lib/google";
+import { oauthErrorMessage, safeNext } from "@/lib/google";
 
 export const metadata: Metadata = {
   title: "Sign in | Findtern",
@@ -17,8 +17,12 @@ export default async function LoginPage({
 }: {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
-  const raw = (await searchParams).oauthError;
-  const oauthError = oauthErrorMessage(Array.isArray(raw) ? raw[0] : raw);
+  const params = await searchParams;
+  const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) ?? "";
+  const oauthError = oauthErrorMessage(one(params.oauthError));
+  // Where sign in returns to (INT-07): the page that sent them here.
+  const next = safeNext(one(params.next), "");
+  const withNext = (path: string) => (next ? `${path}${path.includes("?") ? "&" : "?"}next=${encodeURIComponent(next)}` : path);
 
   return (
     <AuthShell
@@ -50,9 +54,10 @@ export default async function LoginPage({
       <div className="mt-8">
         <LoginForm
           endpoint="/api/auth/login"
-          redirectTo="/intern/dashboard"
+          redirectTo={next || "/intern/dashboard"}
           forgotHref="/forgot-password"
-          googleHref="/api/auth/google/start?role=intern"
+          googleHref={withNext("/api/auth/google/start?role=intern")}
+          googleLabel="Sign in or sign up with Google"
           verifyHref="/verify-email"
         />
       </div>
@@ -64,7 +69,7 @@ export default async function LoginPage({
       <p className="mt-7 text-center text-sm text-text-subtle">
         New to Findtern?{" "}
         <Link
-          href="/signup"
+          href={withNext("/signup")}
           className="font-semibold text-brand-700 underline-offset-4 hover:underline"
         >
           Create an account

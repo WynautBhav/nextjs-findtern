@@ -129,15 +129,12 @@ export function PopularTimeline({ steps }: { steps: PopularStep[] }) {
                     <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-ink-600">
                       Step {i + 1}
                     </p>
-                    <h3
-                      className={cn(
-                        "mt-1 text-lg font-semibold tracking-tight transition-colors duration-300",
-                        isActive ? "text-ink-900" : "text-ink-700",
-                      )}
-                    >
+                    {/* One size and colour for every step: a colour shift on the
+                        active title read as a size change (bug sheet 7, NC r4). */}
+                    <h3 className="mt-1 text-lg font-semibold tracking-tight text-ink-900">
                       {step.title}
                     </h3>
-                    <p className="mt-1.5 max-w-prose text-[15px] leading-relaxed text-muted-foreground">
+                    <p className="mt-1.5 max-w-prose text-base leading-relaxed text-muted-foreground">
                       {step.description}
                     </p>
                     {/* Mobile thumbnail */}

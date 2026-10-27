@@ -1,7 +1,8 @@
 "use client";
 
 /**
- * Change password, shared by intern settings and the employer account page.
+ * Change password, shared by intern settings, the employer account page and
+ * the admin account page.
  *
  * Both roles have a working endpoint (`/api/users/:id/change-password` and
  * `/api/employer/:id/change-password`) that verifies the current password
@@ -15,6 +16,13 @@ import { useRouter } from "next/navigation";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 
 import { csrfFetch } from "@/lib/client-fetch";
+
+/** Where to sign in again if this browser could not keep its session. */
+function loginPathFor(endpoint: string): string {
+  if (endpoint.startsWith("/api/admin")) return "/admin/login";
+  if (endpoint.startsWith("/api/employer")) return "/employer/login";
+  return "/login";
+}
 
 export function ChangePasswordForm({
   endpoint,
@@ -50,6 +58,18 @@ export function ChangePasswordForm({
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body.error ?? "Could not change the password.");
+      // The change ended every session on the account, this one included
+      // (INT-26). Re-issue this browser's session with the new password so
+      // only the other devices are signed out.
+      const kept = await csrfFetch("/api/auth/reauth", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ password: next }),
+      }).catch(() => null);
+      if (!kept?.ok) {
+        window.location.assign(loginPathFor(endpoint));
+        return;
+      }
       setState("done");
       setCurrent("");
       setNext("");

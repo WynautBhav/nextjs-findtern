@@ -40,9 +40,8 @@ export const POPULAR_STEPS: PopularStep[] = [
     icon: "file-text",
   },
   {
-    title: "Skill Based AI Interview",
-    description:
-      "Candidates choose the skills they want to be hired for, and our AI interviews them on exactly those skills.",
+    title: "AI Interview",
+    description: "Candidates pick the skills they want to be hired for, and our AI interviews them on exactly those skills.",
     image: "/media/AIinterview.jpg",
     imageAlt: "A structured interview in progress",
     icon: "user-check",
@@ -55,16 +54,15 @@ export const POPULAR_STEPS: PopularStep[] = [
     icon: "clipboard-check",
   },
   {
-    title: "Coding test",
-    description: "Candidates from coding background undergo a live coding test.",
+    title: "Coding Test",
+    description: "Candidates from a coding background take a live coding test.",
     image: "/media/coding.jpeg",
     imageAlt: "A live coding test",
     icon: "laptop",
   },
   {
-    title: "Performance Scoring",
-    description:
-      "Each intern receives one Findtern Score out of 10, built from their AI interview, aptitude and coding results.",
+    title: "Findtern Score",
+    description: "Every intern gets one score out of 10, built from the AI interview, aptitude and coding results.",
     image: "/media/PerformanceScoring.jpg",
     imageAlt: "Performance scoring across assessment dimensions",
     icon: "trending-up",

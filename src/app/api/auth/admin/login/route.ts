@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -27,15 +27,18 @@ export async function POST(req: Request) {
   const [admin] = await db
     .select()
     .from(schema.admins)
-    .where(eq(schema.admins.email, parsed.data.email))
+    // Case-insensitive, like the other sign ins (INT-35).
+    .where(sql`lower(${schema.admins.email}) = ${parsed.data.email}`)
     .limit(1);
 
   if (!admin || !(await verifyPassword(parsed.data.password, admin.password))) {
     return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
   }
 
+  let storedPassword = admin.password;
   if (needsRehash(admin.password)) {
     const upgraded = await hashPassword(parsed.data.password);
+    storedPassword = upgraded;
     await db
       .update(schema.admins)
       .set({ password: upgraded })
@@ -88,5 +91,6 @@ export async function POST(req: Request) {
     role: "admin",
     email: admin.email,
     permissions,
+    password: storedPassword,
   });
 }
