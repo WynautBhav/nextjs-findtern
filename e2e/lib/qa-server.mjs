@@ -36,8 +36,10 @@ export function qaEnv() {
     SMTP_USER: "",
     SMTP_PASS: "",
     SMTP_FROM: "",
-    GOOGLE_CLIENT_ID: "",
-    GOOGLE_CLIENT_SECRET: "",
+    // QA_GOOGLE=1: a non-empty placeholder, so "Sign in with Google" renders and the
+    // calendar-not-connected paths run (nothing can reach Google with these values).
+    GOOGLE_CLIENT_ID: process.env.QA_GOOGLE === "1" ? "qa-placeholder.apps.googleusercontent.com" : "",
+    GOOGLE_CLIENT_SECRET: process.env.QA_GOOGLE === "1" ? "qa-placeholder-secret" : "",
     DEEPSEEK_API_KEY: "",
     INCRUITER_WEBHOOK_SECRET: "",
     STORAGE_BUCKET: "",
