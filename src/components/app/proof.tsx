@@ -64,10 +64,10 @@ export function ProofCard({
 
   return (
     <motion.article
-      initial={reduce || !fresh ? false : { opacity: 0, y: 14 }}
+      initial={!fresh ? false : { opacity: 0, y: 14 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{
-        duration: 0.5,
+        duration: reduce ? 0 : 0.5,
         delay: reduce ? 0 : Math.min(index, 5) * 0.07,
         ease: [0.16, 1, 0.3, 1],
       }}
@@ -102,9 +102,9 @@ export function ProofCard({
           {proof.facts.map((fact, i) => (
             <motion.div
               key={fact.label}
-              initial={reduce || !fresh ? false : { opacity: 0 }}
+              initial={!fresh ? false : { opacity: 0 }}
               animate={{ opacity: 1 }}
-              transition={{ duration: 0.3, delay: reduce ? 0 : 0.16 + i * 0.05 }}
+              transition={{ duration: reduce ? 0 : 0.3, delay: reduce ? 0 : 0.16 + i * 0.05 }}
               className="flex items-baseline justify-between gap-5 py-2.5"
             >
               <dt className="shrink-0 text-sm text-ink-600">{fact.label}</dt>

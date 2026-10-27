@@ -17,10 +17,15 @@ export function ScoreBar({ value, max = 10 }: { value: number; max?: number }) {
 
   return (
     <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-ink-200">
+      {/* Grows by scaleX from a fixed width, so the start state is the same on
+          the server and the client and `data-reveal` can show the end state
+          to reduced-motion readers before hydration (QA-002b). */}
       <motion.div
-        initial={reduce ? false : { width: 0 }}
-        animate={{ width: `${pct}%` }}
-        transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
+        data-reveal
+        initial={{ scaleX: 0 }}
+        animate={{ scaleX: 1 }}
+        transition={{ duration: reduce ? 0 : 0.7, ease: [0.16, 1, 0.3, 1] }}
+        style={{ width: `${pct}%`, transformOrigin: "left" }}
         className="h-full rounded-full bg-brand-600"
       />
     </div>

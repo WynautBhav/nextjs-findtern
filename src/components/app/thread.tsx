@@ -90,11 +90,16 @@ export function Thread({
           single continuous record rather than a stack of rows. It fades out at
           the bottom so it reads as continuing rather than as a list that
           happens to end. */}
+      {/* Start states never depend on `reduce` (null on the server), or the
+          server HTML and a reduced-motion client disagree (QA-002b). Under
+          reduced motion the transition is instant, and `data-reveal` shows
+          the end state before hydration (globals.css). */}
       <motion.span
         aria-hidden
-        initial={reduce ? false : { scaleY: 0 }}
+        data-reveal
+        initial={{ scaleY: 0 }}
         animate={reduce || inView ? { scaleY: 1 } : { scaleY: 0 }}
-        transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
+        transition={{ duration: reduce ? 0 : 0.7, ease: [0.16, 1, 0.3, 1] }}
         style={{ transformOrigin: "top" }}
         className="absolute bottom-3 left-[0.4375rem] top-3 w-px bg-gradient-to-b from-brand-200 via-brand-100 to-transparent"
       />
@@ -103,14 +108,15 @@ export function Thread({
         // Only the first screenful rises in. Anything below is visible from the
         // start, so a long record still reads in print, in reader mode and in
         // any context where the observer never fires.
-        const animated = !reduce && i < ANIMATED_NODES;
+        const animated = i < ANIMATED_NODES;
         return (
           <motion.li
             key={node.id}
+            data-reveal={animated ? "" : undefined}
             initial={animated ? { opacity: 0, y: 10 } : false}
-            animate={!animated || inView ? { opacity: 1, y: 0 } : { opacity: 0, y: 10 }}
+            animate={!animated || reduce || inView ? { opacity: 1, y: 0 } : { opacity: 0, y: 10 }}
             transition={{
-              duration: 0.34,
+              duration: reduce ? 0 : 0.34,
               delay: reduce ? 0 : Math.min(i, 6) * 0.045,
               ease: [0.16, 1, 0.3, 1],
             }}
@@ -168,6 +174,7 @@ function NodeMark({
   dot: string;
   ring: string;
   label: string;
+  /** Only decides whether the pulse runs; never what is rendered. */
   reduce: boolean;
 }) {
   const isAction = tone === "action";
@@ -175,12 +182,14 @@ function NodeMark({
   return (
     <span className="relative mt-0.5 grid size-3.5 shrink-0 place-items-center">
       <span className={cn("absolute size-3.5 rounded-full ring-4", ring, dot)} aria-hidden />
-      {isAction && !reduce ? (
+      {/* Always in the markup, hidden by CSS under reduced motion: branching
+          on useReducedMotion() here was React #418 (QA-002b). */}
+      {isAction ? (
         <motion.span
           aria-hidden
-          className="absolute size-3.5 rounded-full bg-accent-400/50"
+          className="absolute size-3.5 rounded-full bg-accent-400/50 motion-reduce:hidden"
           initial={{ scale: 1, opacity: 0.55 }}
-          animate={{ scale: 2.1, opacity: 0 }}
+          animate={reduce ? undefined : { scale: 2.1, opacity: 0 }}
           transition={{ duration: 2.4, repeat: 1, ease: "easeOut" }}
         />
       ) : null}
