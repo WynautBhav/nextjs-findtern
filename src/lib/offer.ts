@@ -92,11 +92,16 @@ export function scheduledMonthlyHours(
   monthRef?: string | null,
 ): number {
   const leaves = Number.isFinite(paidLeavesPerMonth) ? Math.max(0, paidLeavesPerMonth) : 0;
-  // A real month, not the average: Mon-Sat in a 31-day month with four Sundays
-  // is 27 working days, and February is 24. The average of 26 overcharged or
-  // undercharged every month (bug sheet 7). Without a date, keep the average.
-  const days = (monthRef ? workingDaysInMonth(monthRef, schedule) : null) ?? WEEKLY_SCHEDULES[schedule].days;
-  return Math.max(0, Math.round((days - leaves) * HOURS_PER_DAY));
+  return Math.max(0, Math.round((billableWorkingDays(schedule, monthRef) - leaves) * HOURS_PER_DAY));
+}
+
+/**
+ * The day count the month is billed on: the calendar's, or the published
+ * average when there is no date yet. The composer quotes this in its working,
+ * so the sum shown and the sum charged cannot disagree.
+ */
+export function billableWorkingDays(schedule: WeeklySchedule, monthRef?: string | null): number {
+  return (monthRef ? workingDaysInMonth(monthRef, schedule) : null) ?? WEEKLY_SCHEDULES[schedule].days;
 }
 
 /** Weekday numbers (0 = Sunday) that count as working days. */

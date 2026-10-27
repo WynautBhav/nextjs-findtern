@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { buildOffer, internStipendInrMinor, parseOffer, scheduledMonthlyHours, weeklyScheduleOf, workingDaysInMonth } from "./offer.ts";
+import { billableWorkingDays, buildOffer, internStipendInrMinor, parseOffer, scheduledMonthlyHours, weeklyScheduleOf, workingDaysInMonth } from "./offer.ts";
 import { lineCharge } from "./checkout.ts";
 import { monthlyDues } from "./dues.ts";
 
@@ -156,6 +156,9 @@ test("hours come from that month's calendar, not a 26-day average (bug sheet 7)"
   assert.equal(workingDaysInMonth("next month", "mon_sat"), null);
   assert.equal(scheduledMonthlyHours("mon_sat", 0, null), 208);
   assert.equal(scheduledMonthlyHours("mon_sat", 0, "nonsense"), 208);
+  // The day count the composer quotes is the same one it bills.
+  assert.equal(billableWorkingDays("mon_sat", "2026-10"), 27);
+  assert.equal(billableWorkingDays("mon_sat", null), 26);
 });
 
 test("buildOffer prices the month as rate × hours, with no override", () => {

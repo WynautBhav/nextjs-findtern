@@ -15,7 +15,8 @@ import {
   Settings2,
 } from "lucide-react";
 
-import { ConsoleShell, RAIL_COOKIE, type ConsoleNavItem } from "@/components/layout/console-shell";
+import { ConsoleShell, type ConsoleNavItem } from "@/components/layout/console-shell";
+import { RAIL_COOKIE } from "@/lib/rail";
 import { ViewAsBanner } from "@/components/admin/view-as-banner";
 import { getSession } from "@/lib/auth";
 import { getDb, schema } from "@/lib/db";

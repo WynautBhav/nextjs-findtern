@@ -27,7 +27,8 @@ import {
 } from "lucide-react";
 
 import { CommandPalette } from "@/components/admin/command-palette";
-import { ConsoleShell, RAIL_COOKIE, type ConsoleNavGroup } from "@/components/layout/console-shell";
+import { ConsoleShell, type ConsoleNavGroup } from "@/components/layout/console-shell";
+import { RAIL_COOKIE } from "@/lib/rail";
 import { allows, requiredPermissions } from "@/lib/admin/permissions";
 import { getSession } from "@/lib/auth";
 import { getDb, schema } from "@/lib/db";

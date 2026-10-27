@@ -8,6 +8,7 @@ import { buttonClass } from "@/components/ui/button";
 import { csrfFetch } from "@/lib/client-fetch";
 import { formatMoney } from "@/lib/format";
 import {
+  billableWorkingDays,
   normalizeLaptop,
   PAID_LEAVE_OPTIONS,
   scheduledMonthlyHours,
@@ -98,6 +99,7 @@ export function ProposalOfferForm({
   // Older offers could carry any leave count; snap to the half-day choices.
   const [leaves, setLeaves] = useState(String(Math.min(3, Math.round((initial.paidLeavesPerMonth ?? 0) * 2) / 2)));
   const hours = scheduledMonthlyHours(schedule, Number(leaves) || 0, startDate || null);
+  const days = billableWorkingDays(schedule, startDate || null);
   const monthlyMinor = initial.hourlyRateMinor ? Math.round(hours * initial.hourlyRateMinor) : null;
   const modes = MODE_OPTIONS.filter((m) => offerableModes(preference).includes(m.value) || m.value === initial.mode);
   const [mode, setMode] = useState(initial.mode || modes[0]?.value || "remote");
@@ -232,11 +234,16 @@ export function ProposalOfferForm({
             ))}
           </select>
         </label>
-        <p className="nums col-span-2 text-sm text-ink-700">
-          {hours} h a month
-          {monthlyMinor != null ? ` · ${formatMoney(monthlyMinor, currency)} a month` : ""}
-          {monthlyMinor != null && currency === "INR" ? <span className="text-ink-500"> (includes GST)</span> : null}
-        </p>
+        <div className="col-span-2 space-y-0.5">
+          <p className="nums text-sm font-medium text-ink-800">
+            {hours} h a month
+            {monthlyMinor != null ? ` · ${formatMoney(monthlyMinor, currency)} a month` : ""}
+            {monthlyMinor != null && currency === "INR" ? <span className="text-ink-500"> (includes GST)</span> : null}
+          </p>
+          <p className="text-xs text-ink-500">
+            ({days} working days − {Number(leaves) || 0} leave) × 8 h
+          </p>
+        </div>
         <label className="block">
           <span className={LABEL}>Work mode</span>
           <select value={mode} onChange={(e) => setMode(e.target.value)} className={INPUT}>

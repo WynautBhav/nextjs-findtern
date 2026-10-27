@@ -18,6 +18,8 @@
  */
 
 import Link from "next/link";
+
+import { RAIL_COOKIE } from "@/lib/rail";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { motion } from "motion/react";
@@ -52,7 +54,9 @@ export type ConsoleNavGroup = { title?: string; items: ConsoleNavItem[] };
 
 export type ConsoleMenuLink = { href: string; label: string; icon: React.ReactNode };
 
-export const RAIL_COOKIE = "ft_rail";
+// The cookie name lives in `@/lib/rail`: this file is `"use client"`, and a
+// server layout importing a constant from it would receive a client reference
+// instead of the string (which is why the collapsed rail never persisted).
 
 export function ConsoleShell({
   roleLabel,

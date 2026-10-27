@@ -9,7 +9,7 @@ import { csrfFetch } from "@/lib/client-fetch";
 import { RATING_META, type CandidateSummary } from "@/lib/employer-candidates";
 import { type Currency, type Pricing } from "@/lib/employer-pricing";
 import { formatMoney, formatPerHire, formatRate } from "@/lib/format";
-import { PAID_LEAVE_OPTIONS, scheduledMonthlyHours, WEEKLY_SCHEDULES, workingDaysPerWeek, type WeeklySchedule } from "@/lib/offer";
+import { billableWorkingDays, PAID_LEAVE_OPTIONS, scheduledMonthlyHours, WEEKLY_SCHEDULES, workingDaysPerWeek, type WeeklySchedule } from "@/lib/offer";
 import { shiftInIst, TIMEZONES } from "@/lib/timezones";
 import { buttonClass } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -156,6 +156,8 @@ export function SendProposalForm({
   // The same sum the server does: (working days in the start month − paid
   // leave) × 8 h × rate.
   const monthlyHours = scheduledMonthlyHours(schedule, Number(paidLeaves) || 0, startDate || null);
+  // The day count behind that figure, quoted in the working so the two match.
+  const monthlyDays = billableWorkingDays(schedule, startDate || null);
   const totals = useMemo(() => {
     const monthly = monthlyHours * (rate.hourlyRateMinor / 100);
     // The one-time hiring fee, charged once with the first payment.
@@ -371,7 +373,7 @@ export function SendProposalForm({
               id="monthlyHours"
               label="Hours per month"
               value={`${monthlyHours} h`}
-              hint={`(${WEEKLY_SCHEDULES[schedule].days} working days − ${Number(paidLeaves) || 0} leave) × 8 h`}
+              hint={`(${monthlyDays} working days − ${Number(paidLeaves) || 0} leave) × 8 h`}
             />
             <ReadOnlyField
               id="monthlyAmount"
