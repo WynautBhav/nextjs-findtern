@@ -161,12 +161,12 @@ export function SkillsStep({ values, update, errors, skillsLocked }: StepProps) 
           <p className="text-sm font-medium text-ink-800">Rate each skill</p>
           <ol className="mt-3 divide-y divide-ink-200/70 overflow-hidden rounded-apple-lg border border-ink-200/80 bg-white">
             {skills.map((skill, i) => (
-              <li key={skill} className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex min-w-0 items-center gap-3">
+              <li key={skill} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 gap-y-2 px-4 py-3 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
+                <div className="order-1 flex min-w-0 items-center gap-3">
                   <span className="nums grid size-7 shrink-0 place-items-center rounded-full bg-brand-50 text-xs font-semibold text-brand-700">{i + 1}</span>
                   <span className="truncate text-[0.9375rem] font-medium text-ink-900">{skill}</span>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="order-3 col-span-2 flex sm:order-2 sm:col-span-1">
                   <div role="radiogroup" aria-label={`How good are you at ${skill}?`} className="flex flex-1 rounded-apple-sm bg-ink-100 p-1 sm:flex-none">
                     {RATINGS.map((r) => {
                       const on = ratingOf(skill) === r;
@@ -178,7 +178,7 @@ export function SkillsStep({ values, update, errors, skillsLocked }: StepProps) 
                           aria-checked={on}
                           onClick={() => rate(skill, r)}
                           className={cn(
-                            "apple-spring min-h-9 flex-1 rounded-apple-sm px-2.5 text-xs font-semibold sm:flex-none",
+                            "apple-spring min-h-10 flex-1 rounded-apple-sm px-2.5 text-xs font-semibold sm:min-h-8 sm:flex-none",
                             on ? "bg-white text-brand-800 shadow-xs" : "text-ink-600 hover:text-ink-900",
                           )}
                         >
@@ -187,15 +187,16 @@ export function SkillsStep({ values, update, errors, skillsLocked }: StepProps) 
                       );
                     })}
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => remove(skill)}
-                    aria-label={`Remove ${skill}`}
-                    className="apple-spring grid size-11 shrink-0 place-items-center rounded-apple-sm text-ink-500 hover:bg-danger-soft hover:text-danger"
-                  >
-                    <X className="size-4" aria-hidden />
-                  </button>
                 </div>
+                {/* Beside the name on phones, after the rating from sm up. */}
+                <button
+                  type="button"
+                  onClick={() => remove(skill)}
+                  aria-label={`Remove ${skill}`}
+                  className="apple-spring order-2 grid size-11 shrink-0 place-items-center rounded-apple-sm text-ink-500 hover:bg-danger-soft hover:text-danger sm:order-3"
+                >
+                  <X className="size-4" aria-hidden />
+                </button>
               </li>
             ))}
           </ol>

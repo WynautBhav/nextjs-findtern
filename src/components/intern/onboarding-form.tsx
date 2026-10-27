@@ -348,7 +348,7 @@ export function OnboardingForm({
 
             {/* ── Actions ─────────────────────────────────────────────── */}
             <footer className="flex flex-col-reverse gap-3 rounded-b-apple-xl border-t border-ink-200/70 bg-ink-50/60 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-8">
-              <div className="grid grid-cols-2 gap-3 sm:flex sm:items-center">
+              <div className={cn("grid gap-3 sm:flex sm:items-center", onboarded && step === LAST ? "grid-cols-1" : "grid-cols-2")}>
                 <button
                   type="button"
                   onClick={() => goTo(step - 1)}
@@ -358,15 +358,18 @@ export function OnboardingForm({
                   <ArrowLeft className="size-4" aria-hidden />
                   Back
                 </button>
-                <button
-                  type="button"
-                  onClick={() => void save(onboarded)}
-                  disabled={saving || submitted}
-                  className={buttonClass({ variant: "ghost", size: "md", className: "w-full sm:w-auto" })}
-                >
-                  {saving && step !== LAST ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
-                  {onboarded ? "Save changes" : "Save draft"}
-                </button>
+                {/* On the review step of a live profile the main button already saves. */}
+                {onboarded && step === LAST ? null : (
+                  <button
+                    type="button"
+                    onClick={() => void save(onboarded)}
+                    disabled={saving || submitted}
+                    className={buttonClass({ variant: "ghost", size: "md", className: "w-full sm:w-auto" })}
+                  >
+                    {saving && step !== LAST ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
+                    {onboarded ? "Save changes" : "Save draft"}
+                  </button>
+                )}
               </div>
               {step < LAST ? (
                 <button type="button" onClick={onContinue} className={buttonClass({ variant: "primary", size: "md", className: "w-full sm:w-auto" })}>
