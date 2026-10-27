@@ -5,30 +5,35 @@
  *
  * The legacy employer flow was browse → shortlist → compare → checkout, and the
  * shortlist was the hinge: nothing else in that chain means anything without it.
- * The rewrite had the `employer_cart_items` table and no way to write to it, so
- * candidates could be read but never kept.
  *
  * One component covers both directions so the button and its "remove" twin can
- * never disagree about what is currently shortlisted.
+ * never disagree about what is currently shortlisted. Before shortlisting it
+ * is the card's one primary action (`emphasis="primary"`); once shortlisted it
+ * steps back to an outline "Shortlisted" that removes on press.
  */
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Loader2, Plus } from "lucide-react";
 
+import { buttonClass } from "@/components/ui/button";
 import { csrfFetch } from "@/lib/client-fetch";
+import { cn } from "@/lib/utils";
 
 export function ShortlistToggle({
   internId,
   projectId,
   shortlisted,
   size = "md",
+  emphasis = "quiet",
   className,
 }: {
   internId: string;
   projectId: string;
   shortlisted: boolean;
   size?: "sm" | "md";
+  /** "primary" while not shortlisted: the filled brand button. */
+  emphasis?: "primary" | "quiet";
   /** Applied to the wrapper; the button always fills it. */
   className?: string;
 }) {
@@ -68,31 +73,32 @@ export function ShortlistToggle({
     }
   }
 
-  const pad = size === "sm" ? "min-h-11 px-3 text-[13px]" : "min-h-11 px-4 text-sm";
+  const variant = state ? "outline" : emphasis === "primary" ? "primary" : "outline";
 
   return (
-    <span className={`inline-flex min-w-0 flex-col items-stretch gap-1 ${className ?? ""}`}>
+    <span className={cn("inline-flex min-w-0 flex-col items-stretch gap-1", className)}>
       <button
         type="button"
         onClick={toggle}
         disabled={busy}
         aria-pressed={state}
-        className={
-          state
-            ? `apple-spring apple-pressable inline-flex w-full ${pad} items-center justify-center gap-1.5 rounded-[10px] border border-brand-300 bg-brand-50 font-medium text-brand-800 disabled:opacity-60`
-            : `apple-spring apple-pressable inline-flex w-full ${pad} items-center justify-center gap-1.5 rounded-[10px] border border-ink-200 bg-white font-medium text-ink-800 hover:bg-ink-50 disabled:opacity-60`
-        }
+        title={state ? "Remove from your shortlist" : "Add to your shortlist for this project"}
+        className={buttonClass({ variant, size: size === "sm" ? "sm" : "md", block: true, className: size === "sm" ? "min-h-10" : undefined })}
       >
         {busy ? (
-          <Loader2 className="size-3.5 animate-spin" aria-hidden />
+          <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden />
         ) : state ? (
-          <Check className="size-3.5" aria-hidden />
+          <Check className="size-4" aria-hidden />
         ) : (
-          <Plus className="size-3.5" aria-hidden />
+          <Plus className="size-4" aria-hidden />
         )}
         {state ? "Shortlisted" : "Shortlist"}
       </button>
-      {error ? <span className="text-xs text-danger">{error}</span> : null}
+      {error ? (
+        <span role="alert" className="text-xs text-danger">
+          {error}
+        </span>
+      ) : null}
     </span>
   );
 }

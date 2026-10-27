@@ -2,44 +2,32 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
-import {
-  ArrowLeft,
-  Award,
-  BookOpen,
-  Briefcase,
-  GraduationCap,
-  Languages,
-  Medal,
-  Sparkles,
-  Laptop,
-  Link2,
-  MapPin,
-  Send,
-  UserRound,
-} from "lucide-react";
+import { ArrowLeft, Laptop, Link2, MapPin, Send, Sparkles } from "lucide-react";
 
 import { getDb, schema } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
-import { isAdminViewing } from "@/lib/employer-visibility";
+import { candidateRelations, isAdminViewing, type CandidateRelation } from "@/lib/employer-visibility";
 import { ShortlistToggle } from "@/components/employer/shortlist-toggle";
 import { bandFor } from "@/lib/score";
 import { formatDate, formatMoney, formatRate } from "@/lib/format";
-import {
-  displayNameOf,
-  toCandidateProfile,
-  type CandidateProfile,
-} from "@/lib/employer-candidates";
+import { displayNameOf, toCandidateProfile, type CandidateProfile } from "@/lib/employer-candidates";
 import { employerRegion, resolvePricing } from "@/lib/employer-pricing";
-import { PageHeader, EmptyState } from "@/components/layout/page-header";
 import { AiFeedbackReport } from "@/components/employer/ai-feedback-report";
 import { CandidateAvatar } from "@/components/employer/candidate-avatar";
+import { candidateStatusPill } from "@/components/employer/candidate-status";
+import { CompareToggle } from "@/components/employer/compare-toggle";
+import { FullTimeOfferButton } from "@/components/employer/full-time-offer-button";
 import { attachPhotos, canEmployerSeeIntern } from "@/lib/employer-pool";
 import { isBlockingInterview } from "@/lib/employer-interview-rules";
 import { notify } from "@/lib/notify";
-import { rememberedSelection } from "@/lib/employer-selection";
+import { isOpenProject, rememberedSelection } from "@/lib/employer-selection";
 import { aiInterviewLinks } from "@/lib/ai-interview-links";
 import { parseOffer } from "@/lib/offer";
+import { timezoneForLocation } from "@/lib/timezones";
 import { dateLabel, draftFromRecord, type OnboardingDraft } from "@/lib/onboarding";
+import { employerProposalPill } from "@/components/app/status";
+import { DetailRow, EmptyScene, PageHead, Pill, SectionHead, Surface } from "@/components/app/primitives";
+import { ButtonLink } from "@/components/ui/button";
 
 export const metadata: Metadata = {
   title: "Candidate",
@@ -50,12 +38,12 @@ export const metadata: Metadata = {
  * A candidate, as one employer is allowed to see them.
  *
  * Visible when the intern is in the candidate pool today (`candidatePoolClauses`:
- * live, open to work, AI-interviewed) or this employer already has a proposal
- * or interview with them. Anyone else 404s, as legacy did for interns outside
- * the open-to-work list.
+ * live, open to work, AI-interviewed, approved) or is committed to this
+ * employer (offer accepted, being paid for, or hired). An intern who switched
+ * off open-to-work disappears for everyone else, as on legacy (bug sheet r134).
  *
- * Names (and LinkedIn, which leaks the name) stay redacted until this employer
- * hires the intern - see `displayNameOf` in `lib/employer-candidates`.
+ * Names, photo and LinkedIn stay redacted until this employer hires the
+ * intern - see `displayNameOf` in `lib/employer-candidates`.
  */
 
 /** What the "Send proposal" control should do for this candidate. */
@@ -79,7 +67,8 @@ export default async function EmployerInternDetail({
   let profile: CandidateProfile | null = null;
   let appliedProjects: { id: string; projectName: string | null; status: string }[] = [];
   let currency: "INR" | "USD" = "INR";
-  /** Full name + LinkedIn show only after this employer hired the intern. */
+  let region: "IN" | null = null;
+  /** Full name, photo and LinkedIn show only after this employer hired the intern. */
   let nameUnlocked = false;
   /** Admin "View as" only: the candidate's own contact details. */
   let adminContact: { email: string; phone: string } | null = null;
@@ -87,11 +76,15 @@ export default async function EmployerInternDetail({
   let visible = false;
   /** True when a query could not run. Rendered, not hidden. */
   let lookupFailed = false;
-  /** The selected (or newest active) project and whether this candidate is on its shortlist. */
+  /** The selected (or newest open) project and whether this candidate is on its shortlist. */
   let shortlist: { projectId: string; on: boolean } | null = null;
   let plans: (typeof schema.pricingPlans.$inferSelect)[] = [];
   let action: ProposalAction = { kind: "send" };
   let details: Partial<OnboardingDraft> = {};
+  let relation: CandidateRelation | null = null;
+  let comparePicks: string[] = [];
+  let employerFte = "none";
+  let employerZone = "Asia/Kolkata";
 
   try {
     const db = getDb();
@@ -105,18 +98,21 @@ export default async function EmployerInternDetail({
     const adminViewing = await isAdminViewing();
     if (user && (adminViewing || (await canEmployerSeeIntern(db, employerId, id)))) {
       visible = true;
+      const remembered = await rememberedSelection(employerId);
+      comparePicks = remembered.compare;
       // `?project=` keeps the shortlist on the project the employer was
-      // browsing; otherwise the newest active one.
-      const projectRows = await db
-        .select({ id: schema.projects.id })
-        .from(schema.projects)
-        .where(and(eq(schema.projects.employerId, employerId), eq(schema.projects.status, "active")))
-        .orderBy(desc(schema.projects.createdAt));
-      // Then the project picked on the candidates page, if it's still active.
-      const remembered = (await rememberedSelection(employerId)).project;
+      // browsing; then the one picked on the candidates page; then the
+      // newest open one (EMH-15).
+      const projectRows = (
+        await db
+          .select({ id: schema.projects.id, status: schema.projects.status })
+          .from(schema.projects)
+          .where(eq(schema.projects.employerId, employerId))
+          .orderBy(desc(schema.projects.createdAt))
+      ).filter((row) => isOpenProject(row.status));
       const project =
         projectRows.find((row) => row.id === requestedProject) ??
-        projectRows.find((row) => row.id === remembered) ??
+        projectRows.find((row) => row.id === remembered.project) ??
         projectRows[0];
       if (project) {
         const [item] = await db
@@ -127,6 +123,7 @@ export default async function EmployerInternDetail({
               eq(schema.employerCartItems.employerId, employerId),
               eq(schema.employerCartItems.internId, id),
               eq(schema.employerCartItems.projectId, project.id),
+              eq(schema.employerCartItems.listType, "cart"),
             ),
           )
           .limit(1);
@@ -158,7 +155,7 @@ export default async function EmployerInternDetail({
             message: `🚀 Spotlight's on you${name ? `, ${name}` : ""} - ${views} profile view${views === 1 ? "" : "s"} and counting!`,
             data: { employerId, monthViews: views },
             dedupeKey: `profile_view:${id}:${employerId}:${now.toISOString().slice(0, 10)}`,
-          }).catch(() => undefined);
+          }).catch((e) => console.error("[employer/intern] view notice", e));
         }
       }
       if (adminViewing) {
@@ -178,36 +175,25 @@ export default async function EmployerInternDetail({
           currency: schema.proposals.currency,
         })
         .from(schema.proposals)
-        .where(
-          and(
-            eq(schema.proposals.employerId, employerId),
-            eq(schema.proposals.internId, id),
-          ),
-        )
+        .where(and(eq(schema.proposals.employerId, employerId), eq(schema.proposals.internId, id)))
         .orderBy(desc(schema.proposals.createdAt));
+      relation = (await candidateRelations(db, employerId, [id])).get(id) ?? null;
 
       if (proposals.length > 0) {
         // Redaction lifts only on hire - sent / accepted / in-cart stays initials.
-        nameUnlocked = nameUnlocked || proposals.some((proposal) => proposal.status === "hired");
+        nameUnlocked = nameUnlocked || Boolean(relation?.hired);
 
         // Collapse to one row per project, keeping the most recent status.
         const latest = new Map<string, string>();
         for (const proposal of proposals) {
           if (!latest.has(proposal.projectId)) latest.set(proposal.projectId, proposal.status);
         }
-
         const projectIds = Array.from(latest.keys());
-        const projectRows = await db
+        const named = await db
           .select({ id: schema.projects.id, projectName: schema.projects.projectName })
           .from(schema.projects)
-          .where(
-            and(
-              eq(schema.projects.employerId, employerId),
-              inArray(schema.projects.id, projectIds),
-            ),
-          );
-        const projectNameById = new Map(projectRows.map((row) => [row.id, row.projectName]));
-
+          .where(and(eq(schema.projects.employerId, employerId), inArray(schema.projects.id, projectIds)));
+        const projectNameById = new Map(named.map((row) => [row.id, row.projectName]));
         appliedProjects = projectIds.map((projectId) => ({
           id: projectId,
           projectName: projectNameById.get(projectId) ?? null,
@@ -222,22 +208,17 @@ export default async function EmployerInternDetail({
         .where(and(eq(schema.interviews.employerId, employerId), eq(schema.interviews.internId, id)));
       const CLOSED = ["rejected", "withdrawn", "expired"];
       // One live offer per candidate across all projects (the send route
-      // enforces it), so an open offer on any project is "View proposal" -
-      // matching only the selected project hid offers filed under another one.
+      // enforces it), so an open offer on any project is "View proposal".
       const isOpen = (p: (typeof proposals)[number]) => !CLOSED.includes(p.status) && p.status !== "hired";
-      const openForProject =
-        proposals.find((p) => p.projectId === project?.id && isOpen(p)) ?? proposals.find(isOpen);
-      if (proposals.some((p) => p.status === "hired")) {
-        action = { kind: "blocked", reason: "Already hired - see Orders." };
-      } else if (
-        proposals.some((p) => !CLOSED.includes(p.status) && parseOffer(p.offerDetails, p.currency).fullTime)
-      ) {
+      const openForProject = proposals.find((p) => p.projectId === project?.id && isOpen(p)) ?? proposals.find(isOpen);
+      if (relation?.hired) {
+        // EMB-26: hired on any project locks the candidate for a second internship.
+        action = { kind: "blocked", reason: "Already hired. See Orders for the placement." };
+      } else if (proposals.some((p) => !CLOSED.includes(p.status) && parseOffer(p.offerDetails, p.currency).fullTime)) {
         action = { kind: "blocked", reason: "A full-time offer is already out." };
       } else if (openForProject) {
         action = { kind: "view", proposalId: openForProject.id };
-      } else if (
-        interviews.some((iv) => (!project || !iv.projectId || iv.projectId === project.id) && isBlockingInterview(iv))
-      ) {
+      } else if (interviews.some((iv) => (!project || !iv.projectId || iv.projectId === project.id) && isBlockingInterview(iv))) {
         action = { kind: "blocked", reason: "Finish the booked interview first." };
       }
 
@@ -245,26 +226,33 @@ export default async function EmployerInternDetail({
         .select()
         .from(schema.internOnboarding)
         .where(eq(schema.internOnboarding.userId, user.id))
+        .orderBy(desc(schema.internOnboarding.updatedAt))
         .limit(1);
 
       profile = toCandidateProfile(user, onboarding);
-      // Photo follows the name: initials until hired.
-      await attachPhotos(db, [profile], { has: () => nameUnlocked }).catch(() => undefined);
+      // Photo follows the name: initials until hired (bug sheet NC r41).
+      await attachPhotos(db, [profile], { has: () => nameUnlocked });
       if (onboarding) details = draftFromRecord(onboarding);
       plans = await db.select().from(schema.pricingPlans).where(eq(schema.pricingPlans.isActive, true));
 
       const [employer] = await db
         .select({
           country: schema.employers.country,
+          state: schema.employers.state,
           countryCode: schema.employers.countryCode,
           phoneNumber: schema.employers.phoneNumber,
+          fteStatus: schema.employers.internationalFteStatus,
         })
         .from(schema.employers)
         .where(eq(schema.employers.id, employerId))
         .limit(1);
-      currency = employerRegion(employer ?? {}) === "IN" ? "INR" : "USD";
+      region = employerRegion(employer ?? {});
+      currency = region === "IN" ? "INR" : "USD";
+      employerFte = employer?.fteStatus ?? "none";
+      employerZone = timezoneForLocation(employer ?? {});
     }
-  } catch {
+  } catch (err) {
+    console.error("[employer/intern] load failed", err);
     lookupFailed = true;
   }
 
@@ -276,14 +264,13 @@ export default async function EmployerInternDetail({
   if (!profile) {
     return (
       <div>
-        <PageHeader title="Candidate" subtitle="Profile not available." />
-        <EmptyState
-          title="Could not load this profile"
-          body={
-            lookupFailed
-              ? "We couldn't load this profile right now. Nothing is wrong with the link - try again in a moment."
-              : "That profile could not be assembled."
-          }
+        <PageHead title="Candidate" />
+        <EmptyScene
+          art
+          title="Couldn't load this profile"
+          body="Something went wrong on our side. The link is fine; try again in a moment."
+          next={{ label: "Try again", href: `/employer/intern/${encodeURIComponent(id)}` }}
+          who="Us - we're on it"
         />
       </div>
     );
@@ -294,30 +281,32 @@ export default async function EmployerInternDetail({
     aiRecordingLink: profile.aiRecordingLink,
   });
   const band = bandFor(profile.score);
-  const pricing = resolvePricing(profile.score, plans, currency, null);
+  const pricing = resolvePricing(profile.score, plans, currency, region);
   const experiences = (details.experiences ?? []).filter((e) => e.company || e.role);
-  const qualifications = [
-    ...(details.academics?.professional ?? []),
-    ...(details.academics?.certifications ?? []),
-  ].filter((q) => q.name);
+  const qualifications = [...(details.academics?.professional ?? []), ...(details.academics?.certifications ?? [])].filter((q) => q.name);
   const languages = (details.languages ?? []).filter((l) => l.language);
   const activities = (details.extracurriculars ?? []).filter((a) => a.activity);
   const academics = profile.academics;
   const displayName = displayNameOf(profile, nameUnlocked);
+  const status = candidateStatusPill(relation?.proposal ?? null);
+  const compareBlocked = relation?.hired
+    ? "Hired - not compared"
+    : relation?.proposal?.fullTime
+      ? "Full-time offer out"
+      : null;
 
   return (
     <div>
       <Link
         href="/employer/candidates"
-        className="apple-spring inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-brand-700 hover:underline"
+        className="mb-4 inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-brand-700 underline-offset-4 hover:underline"
       >
         <ArrowLeft className="size-4" aria-hidden />
         Back to candidates
       </Link>
 
-      <PageHeader title={displayName} subtitle={profile.location || "Location not stated"} />
       {adminContact ? (
-        <p className="mb-4 rounded-[10px] border border-accent-300 bg-accent-100/60 px-4 py-2.5 text-sm text-ink-800">
+        <p className="mb-4 rounded-apple-md border border-accent-300 bg-accent-100/60 px-4 py-2.5 text-sm text-ink-800">
           <span className="font-semibold">Admin view:</span>{" "}
           <a href={`mailto:${adminContact.email}`} className="underline underline-offset-4">
             {adminContact.email}
@@ -326,304 +315,251 @@ export default async function EmployerInternDetail({
         </p>
       ) : null}
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_19rem]">
-        <div className="min-w-0 space-y-4">
-          <section className="rounded-[20px] border border-ink-200/70 bg-white p-6 shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)]">
-            <div className="flex flex-wrap items-start gap-5">
-              <CandidateAvatar
-                photoUrl={profile.photoUrl}
-                initials={profile.initials}
-                className="size-16 rounded-[10px] text-xl font-semibold tabular-nums"
-              />
-              <div className="min-w-[14rem] flex-1 basis-56">
-                <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-text-subtle">
-                  Findtern Score
-                </p>
-                <p className="mt-1 flex items-baseline gap-1.5">
-                  <span className="text-4xl font-semibold tabular-nums tracking-tight text-ink-900">
-                    {profile.scored ? profile.score.toFixed(1) : "-"}
+      {/* ── Identity and the score, the one thing an employer decides on ── */}
+      <Surface className="mb-8 p-6 sm:p-8">
+        <div className="flex flex-wrap items-start gap-x-8 gap-y-6">
+          <div className="flex min-w-0 flex-1 basis-80 items-start gap-5">
+            <CandidateAvatar
+              photoUrl={profile.photoUrl}
+              initials={profile.initials}
+              className="size-16 rounded-apple-lg text-xl ring-1 ring-inset ring-brand-200/70"
+            />
+            <div className="min-w-0">
+              <h1 className="truncate text-3xl font-semibold leading-tight tracking-[-0.025em] text-ink-900">{displayName}</h1>
+              <p className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-[0.9375rem] text-ink-600">
+                <span className="inline-flex items-center gap-1.5">
+                  <MapPin className="size-4 text-ink-400" aria-hidden />
+                  {profile.location || "Location not stated"}
+                </span>
+                {profile.hasLaptop !== null ? (
+                  <span className="inline-flex items-center gap-1.5">
+                    <Laptop className="size-4 text-ink-400" aria-hidden />
+                    {profile.hasLaptop ? "Has a laptop" : "Needs a laptop"}
                   </span>
-                  <span className="text-sm tabular-nums text-text-subtle">/10</span>
-                  <span className="ml-2 inline-flex rounded-full bg-brand-50 px-2.5 py-0.5 text-xs font-medium text-brand-700">
-                    {band.name}
-                  </span>
-                </p>
-                <p className="mt-1.5 text-sm text-text-subtle">{band.blurb}</p>
-              </div>
-              {action.kind === "send" ? (
-                <Link
-                  href={`/employer/send-proposal?intern=${encodeURIComponent(profile.id)}${shortlist ? `&project=${encodeURIComponent(shortlist.projectId)}` : ""}`}
-                  className="apple-spring apple-pressable inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[10px] bg-brand-700 px-4 text-sm font-semibold text-white hover:bg-brand-600 sm:w-auto"
-                >
-                  <Send className="size-4" aria-hidden />
-                  Send proposal
-                </Link>
-              ) : action.kind === "view" ? (
-                <Link
-                  href={`/employer/proposal/${encodeURIComponent(action.proposalId)}`}
-                  className="apple-spring apple-pressable inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[10px] border border-ink-200 bg-white px-4 text-sm font-semibold text-ink-800 hover:bg-ink-50 sm:w-auto"
-                >
-                  View sent proposal
-                </Link>
-              ) : (
-                <p className="w-full rounded-[10px] bg-ink-50 px-4 py-2.5 text-sm text-ink-600 sm:w-auto">
-                  {action.reason}
-                </p>
-              )}
-            </div>
-            <div className="mt-4 flex flex-wrap items-center gap-3">
-              {shortlist ? (
-                <ShortlistToggle internId={profile.id} projectId={shortlist.projectId} shortlisted={shortlist.on} />
-              ) : null}
-              {/* Bug sheet 26 Oct: "where can I see the candidate's AI interview report". */}
-              <a
-                href="#ai-report"
-                className="apple-spring apple-pressable inline-flex min-h-11 items-center gap-1.5 rounded-[10px] border border-brand-200 bg-brand-50 px-3.5 text-sm font-semibold text-brand-800 hover:bg-brand-100"
-              >
-                <Sparkles className="size-4" aria-hidden />
-                AI interview report
-              </a>
-              {shortlist ? (
-                <Link href="/employer/cart" className="text-sm font-medium text-brand-700 underline-offset-4 hover:underline">
-                  Book an interview from your shortlist
-                </Link>
+                ) : null}
+              </p>
+              {profile.workModes.length > 0 ? <p className="mt-1 text-sm text-ink-600">Open to {profile.workModes.join(", ").toLowerCase()}</p> : null}
+              {status ? (
+                <div className="mt-3">
+                  <Pill tone={status.tone}>{status.label}</Pill>
+                </div>
               ) : null}
             </div>
+          </div>
 
-            {profile.skills.length > 0 ? (
-              <div className="mt-6 border-t border-ink-100 pt-5">
-                <h2 className="text-sm font-semibold text-ink-900">Skills &amp; tools</h2>
-                <ul className="mt-3 flex flex-wrap gap-1.5">
-                  {profile.skills.map((skill) => (
-                    <li
-                      key={skill}
-                      className="rounded-full bg-brand-50 px-2.5 py-1 text-xs font-medium text-brand-700"
-                    >
-                      {skill}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ) : null}
-          </section>
+          <div className="flex shrink-0 gap-8">
+            <div>
+              <p className="text-sm font-medium text-ink-600">Findtern Score</p>
+              <p className="nums mt-1 text-4xl font-semibold leading-none tracking-[-0.03em] text-brand-700">
+                {profile.scored ? profile.score.toFixed(1) : "-"}
+                <span className="ml-0.5 text-base font-medium text-ink-500">/10</span>
+              </p>
+              <p className="mt-1.5 text-sm text-ink-600">{band.name}</p>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-ink-600">Price</p>
+              <p className="nums mt-2.5 text-2xl font-semibold leading-none tracking-[-0.02em] text-ink-900">
+                {formatRate(pricing.hourlyRateMinor, currency)}
+              </p>
+              <p className="mt-2.5 text-sm text-ink-600">
+                {pricing.perHireMinor > 0 ? `+ ${formatMoney(pricing.perHireMinor, currency)} per hire` : "Set by the score band"}
+              </p>
+            </div>
+          </div>
+        </div>
 
-          <div id="ai-report" className="scroll-mt-6">
+        <div className="mt-6 flex flex-wrap items-center gap-2 border-t border-ink-100 pt-5">
+          {action.kind === "send" ? (
+            <ButtonLink
+              href={`/employer/send-proposal?intern=${encodeURIComponent(profile.id)}${shortlist ? `&project=${encodeURIComponent(shortlist.projectId)}` : ""}`}
+              variant="primary"
+            >
+              <Send className="size-4" aria-hidden />
+              Send proposal
+            </ButtonLink>
+          ) : action.kind === "view" ? (
+            <ButtonLink href={`/employer/proposal/${encodeURIComponent(action.proposalId)}`} variant="primary">
+              View sent proposal
+            </ButtonLink>
+          ) : relation?.hired ? null : (
+            <p className="rounded-apple-sm bg-ink-100 px-4 py-2.5 text-sm text-ink-700">{action.reason}</p>
+          )}
+          {relation?.hired && relation.proposal ? (
+            <ButtonLink href={`/employer/proposal/${encodeURIComponent(relation.proposal.id)}`} variant="primary">
+              View placement
+            </ButtonLink>
+          ) : null}
+          {relation?.fullTimeFrom ? (
+            <FullTimeOfferButton
+              employerId={employerId}
+              proposalId={relation.fullTimeFrom}
+              candidate={displayName}
+              fteStatus={employerFte}
+              timezone={employerZone}
+            />
+          ) : null}
+          {shortlist && action.kind === "send" ? (
+            <ShortlistToggle internId={profile.id} projectId={shortlist.projectId} shortlisted={shortlist.on} />
+          ) : null}
+          {/* EMB-12: hires and full-time offers are not compared (legacy). */}
+          {compareBlocked ? null : <CompareToggle employerId={employerId} internId={profile.id} picked={comparePicks} />}
+          <a href="#ai-report" className="inline-flex min-h-11 items-center gap-1.5 px-2 text-sm font-medium text-brand-700 underline-offset-4 hover:underline">
+            <Sparkles className="size-4" aria-hidden />
+            AI interview report
+          </a>
+        </div>
+      </Surface>
+
+      <div className="grid gap-x-10 gap-y-8 xl:grid-cols-[minmax(0,1fr)_20rem]">
+        <div className="min-w-0 space-y-8">
+          {profile.skills.length > 0 ? (
+            <section>
+              <SectionHead title="Skills and tools" />
+              <ul className="flex flex-wrap gap-2">
+                {profile.skills.map((skill) => (
+                  <li key={skill} className="rounded-full bg-brand-50 px-3 py-1.5 text-sm font-medium text-brand-800 ring-1 ring-inset ring-brand-200/70">
+                    {skill}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
+
+          <section id="ai-report" className="scroll-mt-24">
             <AiFeedbackReport
               candidateName={displayName}
               findternScore={profile.score}
               ratings={profile.ratings}
-              skills={profile.skills}
-              bio={profile.bio}
               aiFeedbackLink={aiLinks.feedbackLink}
               // Recording only after hire; the written report before (legacy).
               aiRecordingLink={nameUnlocked ? aiLinks.recordingLink : null}
             />
-          </div>
+          </section>
 
           {profile.bio ? (
-            <section className="rounded-[20px] border border-ink-200/70 bg-white p-6 shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)]">
-              <h2 className="flex items-center gap-2 text-sm font-semibold text-ink-900">
-                <UserRound className="size-4 text-ink-400" aria-hidden />
-                About
-              </h2>
-              <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-ink-700">
-                {profile.bio}
-              </p>
+            <section>
+              <SectionHead title="About" />
+              <Surface className="p-6">
+                <p className="whitespace-pre-line text-[0.9375rem] leading-relaxed text-ink-700">{profile.bio}</p>
+              </Surface>
             </section>
           ) : null}
 
           {academics ? (
-            <section className="rounded-[20px] border border-ink-200/70 bg-white p-6 shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)]">
-              <h2 className="flex items-center gap-2 text-sm font-semibold text-ink-900">
-                <GraduationCap className="size-4 text-ink-400" aria-hidden />
-                Academics
-              </h2>
-              <dl className="mt-4 grid gap-4 sm:grid-cols-2">
-                <Detail label="Institution">{academics.institution || "Not stated"}</Detail>
-                <Detail label="Degree">
-                  {[academics.degree, academics.specialization].filter(Boolean).join(", ") ||
-                    "Not stated"}
-                </Detail>
-                <Detail label="Level">
-                  {academics.level ? humanise(academics.level) : "Not stated"}
-                </Detail>
-                <Detail label="Years">
-                  {[academics.startYear, academics.endYear].filter(Boolean).join(" – ") ||
-                    "Not stated"}
-                </Detail>
-                <Detail label="Score">
-                  {academics.score
-                    ? `${academics.score}${academics.scoreType ? ` ${academics.scoreType}` : ""}`
-                    : "Not stated"}
-                </Detail>
-                <Detail label="Status">{academics.status ? humanise(academics.status) : "Not stated"}</Detail>
-              </dl>
+            <section>
+              <SectionHead title="Academics" />
+              <Surface className="px-6 py-2">
+                <dl className="divide-y divide-ink-100">
+                  <DetailRow label="Institution" value={academics.institution || "Not stated"} />
+                  <DetailRow label="Degree" value={[academics.degree, academics.specialization].filter(Boolean).join(", ") || "Not stated"} />
+                  <DetailRow label="Level" value={academics.level ? humanise(academics.level) : "Not stated"} />
+                  <DetailRow label="Years" value={[academics.startYear, academics.endYear].filter(Boolean).join(" – ") || "Not stated"} mono />
+                  <DetailRow
+                    label="Score"
+                    value={academics.score ? `${academics.score}${academics.scoreType ? ` ${academics.scoreType}` : ""}` : "Not stated"}
+                    mono
+                  />
+                  <DetailRow label="Status" value={academics.status ? humanise(academics.status) : "Not stated"} />
+                </dl>
+              </Surface>
             </section>
           ) : null}
 
           {experiences.length > 0 ? (
-            <section className="rounded-[20px] border border-ink-200/70 bg-white p-6 shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)]">
-              <h2 className="flex items-center gap-2 text-sm font-semibold text-ink-900">
-                <Briefcase className="size-4 text-ink-400" aria-hidden />
-                Experience &amp; projects
-              </h2>
-              <ul className="mt-4 divide-y divide-ink-100">
+            <section>
+              <SectionHead title="Experience and projects" />
+              <Surface as="ul" className="divide-y divide-ink-100">
                 {experiences.map((exp) => (
-                  <li key={exp.id} className="py-3 first:pt-0 last:pb-0">
-                    <p className="text-sm font-medium text-ink-900">
-                      {[exp.role, exp.company].filter(Boolean).join(" · ")}
-                    </p>
-                    <p className="mt-0.5 text-xs tabular-nums text-text-subtle">
-                      {[
-                        exp.type,
-                        [dateLabel(exp.from), exp.current ? "Present" : dateLabel(exp.to)].filter(Boolean).join(" – "),
-                      ]
+                  <li key={exp.id} className="px-6 py-4">
+                    <p className="text-[0.9375rem] font-medium text-ink-900">{[exp.role, exp.company].filter(Boolean).join(" · ")}</p>
+                    <p className="nums mt-0.5 text-sm text-ink-600">
+                      {[exp.type, [dateLabel(exp.from), exp.current ? "Present" : dateLabel(exp.to)].filter(Boolean).join(" – ")]
                         .filter(Boolean)
                         .join(" · ")}
                     </p>
-                    {exp.description ? (
-                      <p className="mt-1.5 whitespace-pre-line text-sm text-ink-700">{exp.description}</p>
-                    ) : null}
+                    {exp.description ? <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-ink-700">{exp.description}</p> : null}
                   </li>
                 ))}
-              </ul>
+              </Surface>
             </section>
           ) : null}
 
-          {qualifications.length > 0 ? (
-            <section className="rounded-[20px] border border-ink-200/70 bg-white p-6 shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)]">
-              <h2 className="flex items-center gap-2 text-sm font-semibold text-ink-900">
-                <Medal className="size-4 text-ink-400" aria-hidden />
-                Certifications &amp; qualifications
-              </h2>
-              <ul className="mt-4 divide-y divide-ink-100">
+          {qualifications.length > 0 || (academics && academics.courses.length > 0) ? (
+            <section>
+              <SectionHead title="Courses and certifications" />
+              <Surface as="ul" className="divide-y divide-ink-100">
                 {qualifications.map((q) => (
-                  <li key={q.id} className="py-3 first:pt-0 last:pb-0">
-                    <p className="text-sm font-medium text-ink-900">{q.name}</p>
-                    <p className="mt-0.5 text-xs tabular-nums text-text-subtle">
+                  <li key={q.id} className="px-6 py-4">
+                    <p className="text-[0.9375rem] font-medium text-ink-900">{q.name}</p>
+                    <p className="nums mt-0.5 text-sm text-ink-600">
                       {[q.issuer, q.completionDate && formatDate(q.completionDate)].filter(Boolean).join(" · ") || "No further detail recorded"}
                     </p>
                   </li>
                 ))}
-              </ul>
+                {(academics?.courses ?? []).map((course, i) => (
+                  <li key={`${course.name}-${i}`} className="px-6 py-4">
+                    <p className="text-[0.9375rem] font-medium text-ink-900">{course.name}</p>
+                    <p className="nums mt-0.5 text-sm text-ink-600">
+                      {[course.institution, course.level, course.completed, course.score].filter(Boolean).join(" · ") || "No further detail recorded"}
+                    </p>
+                  </li>
+                ))}
+              </Surface>
             </section>
           ) : null}
 
           {languages.length > 0 || activities.length > 0 ? (
-            <section className="grid gap-6 rounded-[20px] border border-ink-200/70 bg-white p-6 shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)] sm:grid-cols-2">
+            <section className="grid gap-8 sm:grid-cols-2">
               {languages.length > 0 ? (
                 <div className="min-w-0">
-                  <h2 className="flex items-center gap-2 text-sm font-semibold text-ink-900">
-                    <Languages className="size-4 text-ink-400" aria-hidden />
-                    Languages
-                  </h2>
-                  <ul className="mt-3 space-y-2 text-sm text-ink-700">
+                  <SectionHead title="Languages" />
+                  <Surface as="ul" className="divide-y divide-ink-100">
                     {languages.map((l) => (
-                      <li key={l.id}>
+                      <li key={l.id} className="px-5 py-3 text-sm">
                         <span className="font-medium text-ink-900">{l.language}</span>
-                        <span className="text-text-subtle">
-                          {" "}
-                          · {[l.level, l.read && "Read", l.write && "Write", l.speak && "Speak"].filter(Boolean).join(", ")}
+                        <span className="block text-ink-600">
+                          {[l.level, l.read && "Read", l.write && "Write", l.speak && "Speak"].filter(Boolean).join(", ")}
                         </span>
                       </li>
                     ))}
-                  </ul>
+                  </Surface>
                 </div>
               ) : null}
               {activities.length > 0 ? (
                 <div className="min-w-0">
-                  <h2 className="flex items-center gap-2 text-sm font-semibold text-ink-900">
-                    <Sparkles className="size-4 text-ink-400" aria-hidden />
-                    Extracurriculars
-                  </h2>
-                  <ul className="mt-3 space-y-2 text-sm text-ink-700">
+                  <SectionHead title="Extracurriculars" />
+                  <Surface as="ul" className="divide-y divide-ink-100">
                     {activities.map((a) => (
-                      <li key={a.id}>
+                      <li key={a.id} className="px-5 py-3 text-sm">
                         <span className="font-medium text-ink-900">{a.activity}</span>
-                        <span className="text-text-subtle"> · {[a.category, a.level].filter(Boolean).join(", ")}</span>
+                        <span className="block text-ink-600">{[a.category, a.level].filter(Boolean).join(", ")}</span>
                       </li>
                     ))}
-                  </ul>
+                  </Surface>
                 </div>
               ) : null}
-            </section>
-          ) : null}
-
-          {academics && academics.courses.length > 0 ? (
-            <section className="rounded-[20px] border border-ink-200/70 bg-white p-6 shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)]">
-              <h2 className="flex items-center gap-2 text-sm font-semibold text-ink-900">
-                <BookOpen className="size-4 text-ink-400" aria-hidden />
-                Professional courses
-              </h2>
-                <ul className="mt-4 divide-y divide-ink-100">
-                {academics.courses.map((course, i) => (
-                  <li key={`${course.name}-${i}`} className="py-3 first:pt-0 last:pb-0">
-                    <p className="text-sm font-medium text-ink-900">{course.name}</p>
-                    <p className="mt-0.5 text-xs tabular-nums text-text-subtle">
-                      {[course.institution, course.level, course.completed, course.score]
-                        .filter(Boolean)
-                        .join(" · ") || "No further detail recorded"}
-                    </p>
-                  </li>
-                ))}
-              </ul>
             </section>
           ) : null}
         </div>
 
         <aside className="min-w-0 space-y-4">
-          <section className="rounded-[20px] border border-ink-200/70 bg-white p-5 shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)]">
-            <p className="flex items-center gap-1.5 text-2xs font-semibold uppercase tracking-[0.14em] text-text-subtle">
-              <Award className="size-3.5" aria-hidden />
-              What hiring them costs
-            </p>
-            <p className="mt-3 text-lg font-semibold tabular-nums tracking-tight text-ink-900">
-              {formatRate(pricing.hourlyRateMinor, currency)}
-            </p>
-            {pricing.perHireMinor > 0 ? (
-              <p className="mt-1 text-xs tabular-nums text-text-subtle">
-                plus {formatMoney(pricing.perHireMinor, currency)} per hire
-              </p>
-            ) : null}
-            <p className="mt-4 text-xs leading-relaxed text-ink-600">
-              Fixed by the band, not negotiable in the composer. You set hours and can pay above
-              the band.
-            </p>
-          </section>
-
-          <section className="rounded-[20px] border border-ink-200/70 bg-white p-5 shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)]">
-            <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-text-subtle">
-              Practicalities
-            </p>
-            <ul className="mt-3 space-y-2.5 text-sm text-ink-700">
-              <li className="flex items-start gap-2">
-                <MapPin className="mt-0.5 size-3.5 shrink-0 text-ink-400" aria-hidden />
-                <span>{profile.location || "Location not stated"}</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <Laptop className="mt-0.5 size-3.5 shrink-0 text-ink-400" aria-hidden />
-                <span>
-                  {profile.hasLaptop === null
-                    ? "Has not said whether they have a laptop"
-                    : profile.hasLaptop
-                      ? "Has a laptop"
-                      : "Needs one provided"}
-                </span>
-              </li>
-              <li className="flex items-start gap-2">
-                <UserRound className="mt-0.5 size-3.5 shrink-0 text-ink-400" aria-hidden />
-                <span>
-                  {profile.workModes.length > 0
-                    ? `Open to ${profile.workModes.join(", ").toLowerCase()}`
-                    : "No work mode stated"}
-                </span>
-              </li>
-            </ul>
-            {profile.preferredLocations.length > 0 ? (
-              <p className="mt-3 border-t border-ink-100 pt-3 text-xs text-text-subtle">
-                Prefers: {profile.preferredLocations.join(", ")}
-              </p>
-            ) : null}
+          <Surface className="px-5 py-2">
+            <h2 className="pt-3 text-base font-semibold text-ink-900">Practicalities</h2>
+            <dl className="divide-y divide-ink-100">
+              <DetailRow label="City" value={profile.city || "Not stated"} />
+              <DetailRow label="Work mode" value={profile.workModes.join(", ") || "Not stated"} />
+              <DetailRow
+                label="Prefers"
+                value={
+                  profile.preferredLocations.map((l) => l.split(",")[0].trim()).join(", ") ||
+                  (profile.workModes.length === 1 && profile.workModes[0] === "Remote" ? "Remote only" : "Not stated")
+                }
+              />
+              <DetailRow
+                label="Laptop"
+                value={profile.hasLaptop === null ? "Not stated" : profile.hasLaptop ? "Has one" : "Needs one provided"}
+              />
+            </dl>
             {/* LinkedIn URLs usually contain the real name, so the link stays
                 hidden until the hire unmasks the candidate. */}
             {nameUnlocked && profile.linkedinUrl ? (
@@ -631,44 +567,43 @@ export default async function EmployerInternDetail({
                 href={profile.linkedinUrl}
                 target="_blank"
                 rel="noreferrer noopener"
-                className="apple-spring mt-3 inline-flex min-h-11 items-center gap-1.5 text-[13px] font-medium text-brand-700 underline-offset-4 hover:underline"
+                className="mb-2 inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-brand-700 underline-offset-4 hover:underline"
               >
-                <Link2 className="size-3.5" aria-hidden />
+                <Link2 className="size-4" aria-hidden />
                 LinkedIn profile
               </a>
             ) : null}
-          </section>
+          </Surface>
+
+          <Surface className="p-5">
+            <h2 className="text-base font-semibold text-ink-900">What hiring costs</h2>
+            <p className="nums mt-3 text-2xl font-semibold tracking-[-0.02em] text-ink-900">{formatRate(pricing.hourlyRateMinor, currency)}</p>
+            <p className="mt-1 text-sm text-ink-600">
+              {pricing.perHireMinor > 0 ? `plus ${formatMoney(pricing.perHireMinor, currency)} per hire. ` : ""}
+              Fixed by the score band. You choose the hours and can pay above the band.
+            </p>
+          </Surface>
 
           {appliedProjects.length > 0 ? (
-          <section className="rounded-[20px] border border-ink-200/70 bg-white p-5 shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)]">
-            <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-text-subtle">
-              Your proposals to them
-            </p>
-            <ul className="mt-3 space-y-2.5">
-              {appliedProjects.map((entry) => (
-                <li key={entry.id} className="min-w-0 text-sm">
-                  <p className="font-medium text-ink-900">
-                    {entry.projectName ?? "Project no longer listed"}
-                  </p>
-                  <p className="mt-0.5 text-xs tabular-nums text-text-subtle">
-                    {humanise(entry.status)}
-                  </p>
-                </li>
-              ))}
-            </ul>
-          </section>
+            <Surface className="p-5">
+              <h2 className="text-base font-semibold text-ink-900">Your proposals to them</h2>
+              <ul className="mt-3 space-y-3">
+                {appliedProjects.map((entry) => {
+                  const pill = employerProposalPill(entry.status);
+                  return (
+                    <li key={entry.id} className="flex min-w-0 items-start justify-between gap-3 text-sm">
+                      <span className="min-w-0 font-medium text-ink-900">{entry.projectName ?? "Project no longer listed"}</span>
+                      <Pill tone={pill.tone} className="shrink-0">
+                        {pill.label}
+                      </Pill>
+                    </li>
+                  );
+                })}
+              </ul>
+            </Surface>
           ) : null}
         </aside>
       </div>
-    </div>
-  );
-}
-
-function Detail({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="min-w-0">
-      <dt className="text-xs tabular-nums text-text-subtle">{label}</dt>
-      <dd className="mt-1 text-sm font-medium tabular-nums text-ink-900">{children}</dd>
     </div>
   );
 }

@@ -1,16 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { cn } from "@/lib/utils";
 
 /**
- * A candidate's photo, falling back to the initials tile.
+ * A candidate's initials tile, or their photo once this employer has hired
+ * them (`photoUrl` is only ever set for a hire - see `attachPhotos`). Before
+ * hire employers see initials only (bug sheet 7, NC r41: a photo can be
+ * reverse-searched to a name).
  *
- * Employer screens used to render initials only, so an intern who uploaded a
- * photo never had it shown. The fallback also covers a photo that fails to
- * load (a deleted file, an external URL that went away), so a broken image
- * icon never reaches the card.
+ * A photo that fails to load falls back to the initials. The browser can
+ * report that failure before React hydrates, when `onError` is not attached
+ * yet, so the mount effect also checks a finished-but-empty image.
  */
 export function CandidateAvatar({
   photoUrl,
@@ -23,6 +25,12 @@ export function CandidateAvatar({
   className?: string;
 }) {
   const [failed, setFailed] = useState(false);
+  const img = useRef<HTMLImageElement>(null);
+
+  useEffect(() => {
+    const el = img.current;
+    if (el && el.complete && el.naturalWidth === 0) setFailed(true);
+  }, [photoUrl]);
 
   if (photoUrl && !failed) {
     // A private, auth-gated route (`/api/intern/avatar`) - next/image's
@@ -30,9 +38,9 @@ export function CandidateAvatar({
     return (
       // eslint-disable-next-line @next/next/no-img-element
       <img
+        ref={img}
         src={photoUrl}
         alt=""
-        loading="lazy"
         onError={() => setFailed(true)}
         className={cn("shrink-0 bg-brand-50 object-cover", className)}
       />
@@ -40,7 +48,7 @@ export function CandidateAvatar({
   }
 
   return (
-    <span aria-hidden className={cn("grid shrink-0 place-items-center bg-brand-50 font-bold text-brand-800", className)}>
+    <span aria-hidden className={cn("grid shrink-0 place-items-center bg-brand-50 font-semibold text-brand-800 nums", className)}>
       {initials}
     </span>
   );

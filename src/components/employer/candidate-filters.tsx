@@ -14,6 +14,7 @@ import { useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { SlidersHorizontal } from "lucide-react";
 
+import { buttonClass } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 /** Range filters at zero mean "any" and are left out of the URL. */
@@ -51,13 +52,19 @@ export function FilterForm({
     // The skill-match switch is on by default: only its "off" goes in the URL.
     if (next.getAll("sm").includes("1")) next.delete("sm");
     // A new project brings its own skills (bug sheet 26 Oct: "when I change
-    // the project, skills are not changing") - and picking one means "match
-    // to it", so an earlier "Show everyone" is dropped too.
+    // the project, skills are not changing") and its own remembered filters
+    // (EMB-05, as legacy kept them per project): only the project and the
+    // compare picks travel, and the page restores the rest for that project.
     if (projectChanged.current) {
-      next.delete("skills");
-      next.delete("pf");
+      projectChanged.current = false;
+      const fresh = new URLSearchParams();
+      for (const key of ["project", "ids", "view", "pageSize"]) {
+        const value = next.get(key);
+        if (value) fresh.set(key, value);
+      }
+      router.push(`${pathname}?${fresh.toString()}`, { scroll: false });
+      return;
     }
-    projectChanged.current = false;
     const qs = next.toString();
     router.push(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
   }
@@ -78,12 +85,12 @@ export function FilterForm({
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-controls="candidate-filters"
-        className="apple-spring apple-pressable mb-3 inline-flex min-h-11 items-center gap-2 rounded-[10px] border border-ink-200 bg-white px-4 text-sm font-semibold text-ink-800 hover:bg-ink-50 lg:hidden"
+        className={buttonClass({ variant: "outline", size: "md", className: "mb-3 lg:hidden" })}
       >
         <SlidersHorizontal className="size-4" aria-hidden />
         Filters
         {activeCount > 0 ? (
-          <span className="rounded-full border border-brand-200 bg-brand-50 px-2 py-0.5 text-xs font-semibold tabular-nums text-brand-700">
+          <span className="nums rounded-full bg-brand-700 px-2 py-0.5 text-xs font-semibold text-white">
             {activeCount}
           </span>
         ) : null}
@@ -116,21 +123,23 @@ export function RatingSlider({
 }: {
   name: string;
   label: string;
-  icon: React.ReactNode;
+  icon?: React.ReactNode;
   defaultValue: number;
 }) {
   const [value, setValue] = useState(defaultValue);
   const id = `filter-${name}`;
   return (
-    <div className="rounded-[12px] border border-ink-200/80 bg-white px-3 py-3">
-      <div className="flex items-center justify-between gap-2 text-xs font-medium text-ink-700">
+    <div className="py-1.5">
+      <div className="flex items-center justify-between gap-2 text-sm text-ink-700">
         <label htmlFor={id} className="inline-flex items-center gap-1.5">
-          <span className="text-brand-600" aria-hidden>
-            {icon}
-          </span>
+          {icon ? (
+            <span className="text-brand-600" aria-hidden>
+              {icon}
+            </span>
+          ) : null}
           {label}
         </label>
-        <span className="font-semibold tabular-nums text-brand-700">{value > 0 ? `${value.toFixed(1)}+` : "Any"}</span>
+        <span className="nums text-sm font-semibold text-brand-700">{value > 0 ? `${value.toFixed(1)}+` : "Any"}</span>
       </div>
       <input
         id={id}
@@ -142,7 +151,7 @@ export function RatingSlider({
         value={value}
         onChange={(e) => setValue(Number(e.target.value))}
         aria-valuetext={value > 0 ? `${value.toFixed(1)} or more` : "Any"}
-        className="mt-2.5 h-6 w-full cursor-pointer accent-brand-700"
+        className="mt-1 h-6 w-full cursor-pointer accent-brand-700"
       />
     </div>
   );
