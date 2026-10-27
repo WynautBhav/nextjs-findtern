@@ -93,7 +93,7 @@ export function PushToggle({ vapidKey, tone = "light", className }: { vapidKey: 
   }
 
   const muted = tone === "dark" ? "text-white/80" : "text-ink-600";
-  const note = (text: string) => <p className={cn("text-[13px] leading-relaxed", muted, className)}>{text}</p>;
+  const note = (text: string) => <p className={cn("text-sm leading-relaxed", muted, className)}>{text}</p>;
 
   switch (state) {
     case "checking":
@@ -106,7 +106,7 @@ export function PushToggle({ vapidKey, tone = "light", className }: { vapidKey: 
       return note("Notifications are blocked for Findtern. Allow them in your browser's site settings to get call alerts.");
     case "on":
       return (
-        <p className={cn("inline-flex items-center gap-1.5 text-[13px] font-medium", tone === "dark" ? "text-white" : "text-brand-800", className)}>
+        <p className={cn("inline-flex items-center gap-1.5 text-sm font-medium", tone === "dark" ? "text-white" : "text-brand-800", className)}>
           <Check className="size-4" aria-hidden />
           Call alerts are on for this device
         </p>
@@ -119,7 +119,7 @@ export function PushToggle({ vapidKey, tone = "light", className }: { vapidKey: 
             onClick={subscribe}
             disabled={state === "busy"}
             className={cn(
-              "inline-flex min-h-11 items-center gap-2 rounded-[10px] px-3.5 text-sm font-medium transition-colors disabled:opacity-60",
+              "inline-flex min-h-11 items-center gap-2 rounded-apple-sm px-3.5 text-sm font-medium transition-colors disabled:opacity-60",
               "focus-visible:outline-2 focus-visible:outline-offset-2",
               tone === "dark"
                 ? "bg-white/12 text-white hover:bg-white/20 focus-visible:outline-white"
@@ -129,7 +129,7 @@ export function PushToggle({ vapidKey, tone = "light", className }: { vapidKey: 
             <BellRing className="size-4" aria-hidden />
             {state === "busy" ? "Turning on…" : "Get call alerts on this phone"}
           </button>
-          {state === "error" ? <span className={cn("text-[13px]", muted)} role="status">That didn&apos;t work. Try again.</span> : null}
+          {state === "error" ? <span className={cn("text-sm", muted)} role="status">That didn&apos;t work. Try again.</span> : null}
         </div>
       );
   }

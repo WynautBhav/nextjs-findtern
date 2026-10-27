@@ -7,6 +7,7 @@ import { Search } from "lucide-react";
 import { ONLINE_WINDOW_MS } from "@/lib/college/constants";
 import { COHORTS, aiStatusLabel, ago, yearLabel } from "@/lib/college/labels";
 import { cn } from "@/lib/utils";
+import { Pill } from "@/components/app/primitives";
 import { NudgeButton } from "./nudge-button";
 import type { StudentRow } from "./types";
 
@@ -59,10 +60,10 @@ export function StudentTable({ students, now }: { students: StudentRow[]; now: n
       <header className="flex flex-col gap-4 border-b border-ink-100 px-5 py-4">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h2 id="students-heading" className="text-[17px] font-semibold tracking-[-0.02em] text-ink-900">
+            <h2 id="students-heading" className="text-lg font-semibold tracking-[-0.02em] text-ink-900">
               Students
             </h2>
-            <p className="mt-0.5 text-[13px] text-text-subtle">
+            <p className="mt-0.5 text-sm text-text-subtle">
               Everyone who picked your college and agreed to share their progress.
             </p>
           </div>
@@ -74,7 +75,7 @@ export function StudentTable({ students, now }: { students: StudentRow[]; now: n
               value={q}
               onChange={(e) => setQ(e.target.value)}
               placeholder="Name, roll number, branch"
-              className="h-11 w-full rounded-[10px] border border-ink-200 bg-white pl-9 pr-3 text-[14px] text-ink-900 placeholder:text-ink-500 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+              className="h-11 w-full rounded-apple-sm border border-ink-200 bg-white pl-9 pr-3 text-sm text-ink-900 placeholder:text-ink-500 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
             />
           </label>
         </div>
@@ -91,14 +92,14 @@ export function StudentTable({ students, now }: { students: StudentRow[]; now: n
                 type="button"
                 onClick={() => setCohort(c.year)}
                 className={cn(
-                  "apple-spring flex min-h-11 shrink-0 flex-col items-start justify-center rounded-[10px] px-3 py-1.5 text-left",
+                  "apple-spring flex min-h-11 shrink-0 flex-col items-start justify-center rounded-apple-sm px-3 py-1.5 text-left",
                   active ? "bg-brand-950 text-white" : "text-ink-700 hover:bg-ink-100",
                 )}
               >
-                <span className="text-[13px] font-semibold">
+                <span className="text-sm font-semibold">
                   {c.label} <span className={cn("nums font-medium", active ? "text-white/80" : "text-ink-600")}>{n}</span>
                 </span>
-                {c.goal ? <span className={cn("text-[11px]", active ? "text-white/70" : "text-text-subtle")}>{c.goal}</span> : null}
+                {c.goal ? <span className={cn("text-xs", active ? "text-white/70" : "text-text-subtle")}>{c.goal}</span> : null}
               </button>
             );
           })}
@@ -112,7 +113,7 @@ export function StudentTable({ students, now }: { students: StudentRow[]; now: n
               aria-pressed={filter === f.id}
               onClick={() => setFilter(f.id)}
               className={cn(
-                "min-h-11 rounded-full border px-3 text-[13px] font-medium",
+                "min-h-11 rounded-full border px-3 text-sm font-medium",
                 filter === f.id
                   ? "border-brand-700 bg-brand-50 text-brand-800"
                   : "border-ink-200 text-ink-700 hover:border-ink-300 hover:bg-ink-50",
@@ -135,7 +136,7 @@ export function StudentTable({ students, now }: { students: StudentRow[]; now: n
       </header>
 
       {rows.length === 0 ? (
-        <p className="px-5 py-12 text-center text-[14px] text-text-subtle">
+        <p className="px-5 py-12 text-center text-sm text-text-subtle">
           {students.length === 0
             ? "No students have joined yet. Share the invite from the Roster page."
             : "No students match these filters."}
@@ -144,9 +145,9 @@ export function StudentTable({ students, now }: { students: StudentRow[]; now: n
         <>
           {/* Desktop table */}
           <div className="hidden overflow-x-auto md:block">
-            <table className="w-full text-left text-[14px]">
+            <table className="w-full text-left text-sm">
               <caption className="sr-only">Students, {rows.length} shown</caption>
-              <thead className="border-b border-ink-100 bg-ink-50/60 text-[13px] font-semibold text-ink-700">
+              <thead className="border-b border-ink-100 bg-ink-50/60 text-sm font-semibold text-ink-700">
                 <tr>
                   <th scope="col" className="px-5 py-2.5">Student</th>
                   <th scope="col" className="px-3 py-2.5">AI interview</th>
@@ -178,13 +179,13 @@ export function StudentTable({ students, now }: { students: StudentRow[]; now: n
           <button
             type="button"
             onClick={() => setShowAll(true)}
-            className="inline-flex min-h-11 items-center rounded-[10px] px-3 text-[14px] font-medium text-brand-700 hover:bg-brand-50"
+            className="inline-flex min-h-11 items-center rounded-apple-sm px-3 text-sm font-medium text-brand-700 hover:bg-brand-50"
           >
             Show all {rows.length}
           </button>
         </div>
       ) : null}
-      <p className="border-t border-ink-100 px-5 py-3 text-[12px] text-text-subtle">
+      <p className="border-t border-ink-100 px-5 py-3 text-xs text-text-subtle">
         Showing <span className="nums">{shown.length}</span> of <span className="nums">{students.length}</span>. Read-only: you
         can chase students, but their profiles, scores and offers are theirs to change.
       </p>
@@ -207,8 +208,8 @@ function Ai({ s }: { s: StudentRow }) {
   if (st.done && s.score !== null) {
     return (
       <span className="inline-flex items-baseline gap-1.5">
-        <span className="nums text-[15px] font-semibold text-ink-900">{s.score.toFixed(1)}</span>
-        <span className="text-[12px] text-text-subtle">/ 10</span>
+        <span className="nums text-[0.9375rem] font-semibold text-ink-900">{s.score.toFixed(1)}</span>
+        <span className="text-xs text-text-subtle">/ 10</span>
       </span>
     );
   }
@@ -222,24 +223,24 @@ function Row({ s, now }: { s: StudentRow; now: number }) {
         <Link href={`/college/students/${s.userId}`} className="font-medium text-ink-900 hover:text-brand-700">
           {s.name || s.email}
         </Link>
-        <p className="mt-0.5 text-[12px] text-text-subtle">
+        <p className="mt-0.5 text-xs text-text-subtle">
           {[s.rollNo, yearLabel(s.year), s.branch].filter(Boolean).join(" · ")}
-          {s.status !== "verified" ? <span className="ml-1.5 text-amber-700">· not on roster</span> : null}
+          {s.status !== "verified" ? <span className="ml-1.5 font-medium text-accent-700">· not on roster</span> : null}
         </p>
       </td>
       <td className="px-3 py-3">
         <Ai s={s} />
       </td>
       <td className="nums px-3 py-3 text-right text-ink-800">{s.cgpa?.toFixed(1) ?? "—"}</td>
-      <td className="px-3 py-3 text-[13px]">
+      <td className="px-3 py-3 text-sm">
         <Online at={s.lastSeenAt ?? s.lastActivityAt} now={now} />
       </td>
       <td className="px-3 py-3">
         {s.offersPending > 0 ? (
           <span className="inline-flex flex-wrap items-center gap-2">
-            <span className="nums rounded-full bg-amber-50 px-2 py-0.5 text-[12px] font-semibold text-amber-800">
+            <Pill tone="waiting" className="nums">
               {s.offersPending} waiting
-            </span>
+            </Pill>
             <NudgeButton kind="offer" userIds={[s.userId]} size="xs" />
           </span>
         ) : (
@@ -260,24 +261,24 @@ function MobileRow({ s, now }: { s: StudentRow; now: number }) {
         <Link href={`/college/students/${s.userId}`} className="font-medium text-ink-900">
           {s.name || s.email}
         </Link>
-        <p className="mt-0.5 truncate text-[12px] text-text-subtle">
+        <p className="mt-0.5 truncate text-xs text-text-subtle">
           {[s.rollNo, yearLabel(s.year), s.branch].filter(Boolean).join(" · ")}
         </p>
-        <p className="mt-1.5 text-[13px]">
+        <p className="mt-1.5 text-sm">
           <Online at={s.lastSeenAt ?? s.lastActivityAt} now={now} />
         </p>
         {s.offersPending > 0 ? (
           <div className="mt-2 flex items-center gap-2">
-            <span className="nums rounded-full bg-amber-50 px-2 py-0.5 text-[12px] font-semibold text-amber-800">
+            <Pill tone="waiting" className="nums">
               {s.offersPending} offer waiting
-            </span>
+            </Pill>
             <NudgeButton kind="offer" userIds={[s.userId]} size="xs" />
           </div>
         ) : null}
       </div>
       <div className="shrink-0 text-right">
         <Ai s={s} />
-        <p className="nums mt-0.5 text-[12px] text-text-subtle">CGPA {s.cgpa?.toFixed(1) ?? "—"}</p>
+        <p className="nums mt-0.5 text-xs text-text-subtle">CGPA {s.cgpa?.toFixed(1) ?? "—"}</p>
       </div>
     </div>
   );

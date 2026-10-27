@@ -99,7 +99,7 @@ export function CollegeLive({ collegeName, vapidKey }: { collegeName: string; va
       {drive ? (
         <div
           role="status"
-          className="mb-6 flex flex-col gap-3 rounded-[14px] border border-brand-200 bg-brand-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+          className="mb-6 flex flex-col gap-3 rounded-apple-lg border border-brand-200 bg-brand-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
         >
           <div className="flex min-w-0 items-start gap-2.5">
             <span className="relative mt-1.5 flex size-2.5 shrink-0" aria-hidden>
@@ -197,7 +197,7 @@ function CallCard({
       aria-describedby={`${ids}-desc`}
       className={cn(
         // Above the chat launcher (z-80): an incoming call outranks it.
-        "fixed inset-x-3 z-[90] rounded-[18px] border bg-white p-4 shadow-[0_12px_40px_rgb(7_47_36/0.18)]",
+        "fixed inset-x-3 z-[90] rounded-apple-xl border bg-white p-4 shadow-[0_12px_40px_rgb(7_47_36/0.18)]",
         "bottom-[calc(5.25rem+env(safe-area-inset-bottom))] lg:bottom-6 lg:left-auto lg:right-6 lg:w-[24rem]",
         "motion-safe:animate-[ft-call-in_240ms_cubic-bezier(0.16,1,0.3,1)]",
         accepted ? "border-brand-300" : "border-accent-300",
@@ -215,10 +215,10 @@ function CallCard({
           {accepted ? <Video className="size-5" /> : <Radio className="size-5" />}
         </span>
         <div className="min-w-0 flex-1">
-          <p id={`${ids}-title`} className="text-[15px] font-semibold leading-snug text-ink-900">
+          <p id={`${ids}-title`} className="text-[0.9375rem] font-semibold leading-snug text-ink-900">
             {accepted ? `Call with ${company}` : `${company} wants to talk ${whenLabel(meeting.startsAt, now)}`}
           </p>
-          <p id={`${ids}-desc`} className="mt-0.5 text-[13px] leading-relaxed text-ink-600">
+          <p id={`${ids}-desc`} className="mt-0.5 text-sm leading-relaxed text-ink-600">
             {accepted
               ? `Starts ${whenLabel(meeting.startsAt, now) === "now" ? "now" : `at ${clock(meeting.startsAt)}`}. About 20 minutes on video.`
               : `${meeting.driveTitle ?? "Campus drive"}. A short video call. Reply by ${clock(new Date(new Date(meeting.startsAt).getTime() + 10 * 60_000).toISOString())} or it lapses.`}
@@ -229,7 +229,7 @@ function CallCard({
             type="button"
             onClick={() => onDismiss(meeting.id)}
             aria-label="Close"
-            className="-mr-1 -mt-1 grid size-11 shrink-0 place-items-center rounded-[10px] text-ink-400 hover:bg-ink-100 hover:text-ink-700"
+            className="-mr-1 -mt-1 grid size-11 shrink-0 place-items-center rounded-apple-sm text-ink-400 hover:bg-ink-100 hover:text-ink-700"
           >
             <X className="size-4" />
           </button>
@@ -249,7 +249,7 @@ function CallCard({
               href={meeting.meetingLink}
               target="_blank"
               rel="noopener noreferrer"
-              className="col-span-2 inline-flex min-h-12 items-center justify-center gap-2 rounded-[12px] bg-primary px-4 text-[15px] font-semibold text-white hover:bg-primary-hover"
+              className="col-span-2 inline-flex min-h-12 items-center justify-center gap-2 rounded-apple-md bg-primary px-4 text-[0.9375rem] font-semibold text-white hover:bg-primary-hover"
             >
               <Video className="size-4" aria-hidden />
               Join call
@@ -263,7 +263,7 @@ function CallCard({
               type="button"
               onClick={() => answer("decline")}
               disabled={busy !== null}
-              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-[12px] border border-ink-200 bg-white px-4 text-[15px] font-medium text-ink-800 hover:bg-ink-50 disabled:opacity-60"
+              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-apple-md border border-ink-200 bg-white px-4 text-[0.9375rem] font-medium text-ink-800 hover:bg-ink-50 disabled:opacity-60"
             >
               <PhoneOff className="size-4" aria-hidden />
               {busy === "decline" ? "Declining…" : "Decline"}
@@ -273,7 +273,7 @@ function CallCard({
               type="button"
               onClick={() => answer("accept")}
               disabled={busy !== null}
-              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-[12px] bg-primary px-4 text-[15px] font-semibold text-white hover:bg-primary-hover disabled:opacity-60"
+              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-apple-md bg-primary px-4 text-[0.9375rem] font-semibold text-white hover:bg-primary-hover disabled:opacity-60"
             >
               <Phone className="size-4" aria-hidden />
               {busy === "accept" ? "Accepting…" : "Accept"}
@@ -283,7 +283,7 @@ function CallCard({
       </div>
 
       {more > 0 ? (
-        <p className="mt-3 text-center text-[13px] text-ink-600">
+        <p className="mt-3 text-center text-sm text-ink-600">
           {more} more request{more === 1 ? "" : "s"} after this one
         </p>
       ) : null}

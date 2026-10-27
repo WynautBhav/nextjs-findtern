@@ -4,8 +4,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Radio } from "lucide-react";
 
+import { Pill } from "@/components/app/primitives";
 import { NudgeButton } from "./nudge-button";
-import { cn } from "@/lib/utils";
 
 type Snapshot = {
   total: number;
@@ -61,41 +61,37 @@ export function PresenceLive({
     <section aria-labelledby="live-drive" className="apple-panel overflow-hidden bg-white">
       <div className="flex flex-wrap items-start justify-between gap-4 border-b border-ink-100 px-5 py-4">
         <div className="min-w-0">
-          <p className="flex items-center gap-2 text-[13px] font-semibold text-brand-700">
+          <p className="flex items-center gap-2 text-sm font-semibold text-brand-700">
             <span className="relative flex size-2" aria-hidden>
               <span className="absolute inline-flex size-full rounded-full bg-brand-500 opacity-60 motion-safe:animate-ping" />
               <span className="relative inline-flex size-2 rounded-full bg-brand-600" />
             </span>
             Drive live
           </p>
-          <h2 id="live-drive" className="mt-1 text-[17px] font-semibold tracking-[-0.02em] text-ink-900">
+          <h2 id="live-drive" className="mt-1 text-lg font-semibold tracking-[-0.02em] text-ink-900">
             <Link href={`/college/drives/${driveId}`} className="hover:text-brand-700">
               {driveTitle}
             </Link>
           </h2>
-          <p className="mt-0.5 text-[13px] text-text-subtle">
+          <p className="mt-0.5 text-sm text-text-subtle">
             Open until {ends.toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}
           </p>
         </div>
-        <span
-          className={cn(
-            "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] font-medium",
-            conn === "live" ? "bg-brand-50 text-brand-800" : "bg-amber-50 text-amber-800",
-          )}
-          aria-live="polite"
-        >
+        <Pill tone={conn === "live" ? "live" : "waiting"}>
+          <span aria-live="polite" className="inline-flex items-center gap-1.5">
           <Radio className="size-3.5" aria-hidden />
           {conn === "live" ? "Updating live" : "Reconnecting…"}
-        </span>
+          </span>
+        </Pill>
       </div>
 
       <div className="grid gap-6 px-5 py-5 md:grid-cols-[minmax(0,15rem)_minmax(0,1fr)]">
         <div>
-          <p className="nums text-[40px] font-bold leading-none tracking-[-0.03em] text-ink-900" aria-live="polite">
+          <p className="nums text-4xl font-bold leading-none tracking-[-0.03em] text-ink-900" aria-live="polite">
             {snap.online}
-            <span className="text-[22px] font-semibold text-ink-600">/{snap.total}</span>
+            <span className="text-2xl font-semibold text-ink-600">/{snap.total}</span>
           </p>
-          <p className="mt-2 text-[13px] text-text-subtle">eligible students with Findtern open now</p>
+          <p className="mt-2 text-sm text-text-subtle">eligible students with Findtern open now</p>
           <div
             className="mt-3 h-2 overflow-hidden rounded-full bg-ink-100"
             role="meter"
@@ -107,7 +103,7 @@ export function PresenceLive({
             <div className="h-full rounded-full bg-brand-600 transition-[width] duration-500 motion-reduce:transition-none" style={{ width: `${pct}%` }} />
           </div>
           {snap.offline.length > 0 ? (
-            <p className="mt-3 text-[13px] text-ink-700">
+            <p className="mt-3 text-sm text-ink-700">
               <span className="nums font-semibold">{snap.alertable}</span> more can get a phone alert;{" "}
               <span className="nums font-semibold">{snap.offline.length - snap.alertable}</span> only see a nudge when they next open Findtern.
             </p>
@@ -116,7 +112,7 @@ export function PresenceLive({
 
         <div className="min-w-0">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <h3 className="text-[14px] font-semibold text-ink-900">
+            <h3 className="text-sm font-semibold text-ink-900">
               {snap.offline.length === 0 ? "Everyone is online" : `Offline (${snap.offline.length})`}
             </h3>
             {snap.offline.length > 0 ? (
@@ -133,7 +129,7 @@ export function PresenceLive({
                 <li key={o.userId}>
                   <Link
                     href={`/college/students/${o.userId}`}
-                    className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-ink-200 bg-ink-50 px-3 text-[13px] text-ink-800 hover:border-ink-300 hover:bg-white"
+                    className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-ink-200 bg-ink-50 px-3 text-sm text-ink-800 hover:border-ink-300 hover:bg-white"
                     title={o.alertable ? "Has phone alerts on" : "No phone alerts"}
                   >
                     {o.name || "Unnamed student"}
@@ -147,7 +143,7 @@ export function PresenceLive({
                   <button
                     type="button"
                     onClick={() => setShowAll((v) => !v)}
-                    className="inline-flex min-h-11 items-center rounded-full px-3 text-[13px] font-medium text-brand-700 hover:bg-brand-50"
+                    className="inline-flex min-h-11 items-center rounded-full px-3 text-sm font-medium text-brand-700 hover:bg-brand-50"
                   >
                     {showAll ? "Show fewer" : `+${snap.offline.length - SHOW_OFFLINE} more`}
                   </button>
@@ -155,7 +151,7 @@ export function PresenceLive({
               ) : null}
             </ul>
           ) : (
-            <p className="mt-2 text-[13px] text-text-subtle">Nobody to chase right now.</p>
+            <p className="mt-2 text-sm text-text-subtle">Nobody to chase right now.</p>
           )}
         </div>
       </div>

@@ -42,7 +42,7 @@ export function LinkActions(props: {
           type="button"
           disabled={busy}
           onClick={() => call("POST")}
-          className="apple-spring apple-pressable inline-flex min-h-11 items-center rounded-[10px] border border-ink-200 bg-white px-4 text-[14px] font-medium text-ink-800 shadow-2xs hover:bg-ink-50"
+          className="apple-spring apple-pressable inline-flex min-h-11 items-center rounded-apple-sm border border-ink-200 bg-white px-4 text-sm font-medium text-ink-800 shadow-2xs hover:bg-ink-50"
         >
           {props.revoked ? "Reopen with a new link" : "Issue a new link"}
         </button>
@@ -51,12 +51,12 @@ export function LinkActions(props: {
             type="button"
             disabled={busy}
             onClick={() => call("DELETE")}
-            className="apple-spring apple-pressable inline-flex min-h-11 items-center rounded-[10px] px-4 text-[14px] font-medium text-danger hover:bg-danger-soft"
+            className="apple-spring apple-pressable inline-flex min-h-11 items-center rounded-apple-sm px-4 text-sm font-medium text-danger hover:bg-danger-soft"
           >
             Close link now
           </button>
         ) : null}
-        <span role="status" aria-live="polite" className="text-[14px] text-danger">
+        <span role="status" aria-live="polite" className="text-sm text-danger">
           {error}
         </span>
       </div>

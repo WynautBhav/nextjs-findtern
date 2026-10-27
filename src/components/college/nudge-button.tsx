@@ -70,8 +70,8 @@ export function NudgeButton({
         onClick={send}
         disabled={state === "sending" || done || userIds.length === 0}
         className={cn(
-          "apple-spring apple-pressable inline-flex items-center gap-1.5 rounded-[10px] border font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 disabled:cursor-default",
-          size === "sm" ? "min-h-11 px-3 text-[13px]" : "min-h-11 px-2.5 text-[12px]",
+          "apple-spring apple-pressable inline-flex items-center gap-1.5 rounded-apple-sm border font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 disabled:cursor-default",
+          size === "sm" ? "min-h-11 px-3 text-sm" : "min-h-11 px-2.5 text-xs",
           done
             ? "border-brand-200 bg-brand-50 text-brand-800"
             : "border-ink-200 bg-white text-ink-800 shadow-2xs hover:border-ink-300 hover:bg-ink-50",
@@ -81,7 +81,7 @@ export function NudgeButton({
         {done ? <Check className="size-3.5" aria-hidden /> : <BellRing className="size-3.5 text-brand-700" aria-hidden />}
         {state === "sending" ? "Sending…" : done ? "Nudged" : label}
       </button>
-      <span role="status" aria-live="polite" className={cn("text-[12px]", state === "error" ? "text-danger" : "text-text-subtle")}>
+      <span role="status" aria-live="polite" className={cn("text-xs", state === "error" ? "text-danger" : "text-text-subtle")}>
         {note}
       </span>
     </span>

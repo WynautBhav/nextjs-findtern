@@ -19,16 +19,16 @@ export function CollegePartners({ pitch, partners }: { pitch: CmsCollegePitch; p
         <ol className="mt-10 grid gap-8 md:grid-cols-3">
           {pitch.points.map((p, i) => (
             <li key={p.title} className="border-t border-ink-200 pt-5">
-              <span className="nums text-[13px] font-semibold text-brand-700">0{i + 1}</span>
+              <span className="nums text-sm font-semibold text-brand-700">0{i + 1}</span>
               <h3 className="mt-2 text-lg font-semibold tracking-tight text-ink-900">{p.title}</h3>
-              <p className="mt-2 text-[15px] leading-relaxed text-text-subtle">{p.body}</p>
+              <p className="mt-2 text-[0.9375rem] leading-relaxed text-text-subtle">{p.body}</p>
             </li>
           ))}
         </ol>
 
         {partners.length ? (
           <div className="mt-12">
-            <h3 className="text-[15px] font-semibold text-ink-900">Placement partners</h3>
+            <h3 className="text-[0.9375rem] font-semibold text-ink-900">Placement partners</h3>
             <ul className="mt-4 flex flex-wrap gap-3">
               {partners.map((c) => (
                 <li key={c.id} className="flex min-h-14 items-center gap-3 rounded-xl border border-ink-200 bg-ink-50/60 px-4 py-2.5">
@@ -37,7 +37,7 @@ export function CollegePartners({ pitch, partners }: { pitch: CmsCollegePitch; p
                   ) : (
                     <GraduationCap className="size-5 text-brand-700" aria-hidden />
                   )}
-                  <span className="text-[15px] font-medium text-ink-900">
+                  <span className="text-[0.9375rem] font-medium text-ink-900">
                     {c.name}
                     {c.city ? <span className="font-normal text-text-subtle">, {c.city}</span> : null}
                   </span>
@@ -54,7 +54,7 @@ export function CollegePartners({ pitch, partners }: { pitch: CmsCollegePitch; p
           >
             {pitch.cta.label} <ArrowRight className="size-4" aria-hidden />
           </Link>
-          <Link href={pitch.loginHref} className="text-[15px] font-medium text-brand-700 underline-offset-4 hover:underline">
+          <Link href={pitch.loginHref} className="text-[0.9375rem] font-medium text-brand-700 underline-offset-4 hover:underline">
             Placement officer? Sign in
           </Link>
         </div>

@@ -34,7 +34,7 @@ const YEARS = [
 ];
 
 const FIELD =
-  "min-h-11 w-full rounded-[10px] border border-ink-200 bg-white px-3.5 text-[15px] text-ink-900 placeholder:text-ink-400 focus-visible:border-brand-600 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand-600/30";
+  "min-h-11 w-full rounded-apple-sm border border-ink-200 bg-white px-3.5 text-[0.9375rem] text-ink-900 placeholder:text-ink-400 focus-visible:border-brand-600 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand-600/30";
 
 export function CollegeForm({
   initial,
@@ -102,7 +102,7 @@ function Membership({
       <div className="min-w-0 space-y-8">
         <Surface className="p-5 sm:p-6">
           <div className="flex items-start gap-4">
-            <span aria-hidden className="grid size-11 shrink-0 place-items-center rounded-[12px] bg-brand-50 text-brand-700">
+            <span aria-hidden className="grid size-11 shrink-0 place-items-center rounded-apple-md bg-brand-50 text-brand-700">
               <Building2 className="size-5" />
             </span>
             <div className="min-w-0 flex-1">
@@ -150,7 +150,7 @@ function Membership({
                   <span
                     aria-hidden
                     className={cn(
-                      "mt-0.5 grid size-5 shrink-0 place-items-center rounded-full text-[11px] font-bold",
+                      "mt-0.5 grid size-5 shrink-0 place-items-center rounded-full text-xs font-bold",
                       on ? "bg-brand-700 text-white" : "bg-ink-100 text-ink-500",
                     )}
                   >
@@ -161,7 +161,7 @@ function Membership({
                       {p.label}
                       <span className="sr-only">{on ? ": agreed" : ": not agreed"}</span>
                     </p>
-                    <p className="mt-0.5 text-[13px] leading-relaxed text-ink-600">{p.detail}</p>
+                    <p className="mt-0.5 text-sm leading-relaxed text-ink-600">{p.detail}</p>
                   </div>
                 </li>
               );
@@ -208,7 +208,7 @@ function Membership({
 
       <aside className="space-y-4">
         <Surface className="p-5">
-          <p className="text-[13px] font-medium text-ink-600">Call alerts</p>
+          <p className="text-sm font-medium text-ink-600">Call alerts</p>
           <p className="mt-1 text-sm leading-relaxed text-ink-700">
             During a drive, employers can ask you to a short video call at a few minutes&apos; notice. Alerts make sure you
             don&apos;t miss one.
@@ -291,12 +291,12 @@ function JoinForm({
         <SectionHead title="College" hint="Search by name, city or AISHE code." />
         {chosen ? (
           <Surface className="flex items-center gap-3 p-4">
-            <span aria-hidden className="grid size-10 shrink-0 place-items-center rounded-[10px] bg-brand-50 text-brand-700">
+            <span aria-hidden className="grid size-10 shrink-0 place-items-center rounded-apple-sm bg-brand-50 text-brand-700">
               <Building2 className="size-5" />
             </span>
             <div className="min-w-0 flex-1">
-              <p className="text-[15px] font-medium leading-snug text-ink-900">{chosen.name}</p>
-              <p className="text-[13px] text-ink-600">
+              <p className="text-[0.9375rem] font-medium leading-snug text-ink-900">{chosen.name}</p>
+              <p className="text-sm text-ink-600">
                 {[chosen.city, chosen.state].filter(Boolean).join(", ")}
                 {chosen.isPartner ? (chosen.city ? " · " : "") + "Runs drives on Findtern" : ""}
               </p>
@@ -304,7 +304,7 @@ function JoinForm({
             <button
               type="button"
               onClick={() => setChosen(null)}
-              className="inline-flex min-h-11 shrink-0 items-center rounded-[10px] px-3 text-sm font-medium text-primary hover:bg-brand-50 focus-visible:outline-2 focus-visible:outline-brand-700"
+              className="inline-flex min-h-11 shrink-0 items-center rounded-apple-sm px-3 text-sm font-medium text-primary hover:bg-brand-50 focus-visible:outline-2 focus-visible:outline-brand-700"
             >
               Change
             </button>
@@ -347,7 +347,7 @@ function JoinForm({
             className={FIELD}
           />
         </div>
-        <p className="text-[13px] leading-relaxed text-ink-600 sm:col-span-2">
+        <p className="text-sm leading-relaxed text-ink-600 sm:col-span-2">
           If your college has you on its student list, the year and branch on that list are used instead.
         </p>
       </section>
@@ -363,7 +363,7 @@ function JoinForm({
               key={p.id}
               htmlFor={`${ids}-${p.id}`}
               className={cn(
-                "flex cursor-pointer items-start gap-3 rounded-[14px] border bg-white p-4 transition-colors",
+                "flex cursor-pointer items-start gap-3 rounded-apple-lg border bg-white p-4 transition-colors",
                 agreed[p.id] ? "border-brand-300 bg-brand-50/40" : "border-ink-200/80 hover:border-ink-300",
               )}
             >
@@ -375,23 +375,23 @@ function JoinForm({
               />
               <span className="min-w-0">
                 <span className="block text-sm font-medium text-ink-900">{p.label}</span>
-                <span className="mt-0.5 block text-[13px] leading-relaxed text-ink-600">{p.detail}</span>
+                <span className="mt-0.5 block text-sm leading-relaxed text-ink-600">{p.detail}</span>
               </span>
             </label>
           ))}
         </div>
         {chosenPurposes.length === 0 ? (
-          <p className="mt-2 flex items-start gap-1.5 text-[13px] leading-relaxed text-ink-600">
+          <p className="mt-2 flex items-start gap-1.5 text-sm leading-relaxed text-ink-600">
             <CircleHelp className="mt-0.5 size-3.5 shrink-0" aria-hidden />
             With neither ticked, your college is saved on your profile but its placement team can&apos;t see you and you won&apos;t
             appear in its drives.
           </p>
         ) : null}
-        <details className="group mt-4 rounded-[10px] text-sm">
+        <details className="group mt-4 rounded-apple-sm text-sm">
           <summary className="inline-flex min-h-11 cursor-pointer list-none items-center font-medium text-primary hover:underline focus-visible:outline-2 focus-visible:outline-brand-700">
             Read the full notice (version {notice.version})
           </summary>
-          <div className="mt-2 whitespace-pre-line rounded-[10px] border border-ink-200/80 bg-ink-50 p-4 text-[13px] leading-relaxed text-ink-700">
+          <div className="mt-2 whitespace-pre-line rounded-apple-sm border border-ink-200/80 bg-ink-50 p-4 text-sm leading-relaxed text-ink-700">
             {notice.text}
           </div>
         </details>
@@ -515,7 +515,7 @@ function CollegeSearch({ initialQuery, onPick }: { initialQuery: string; onPick:
             type="button"
             aria-label="Clear search"
             onClick={() => setQuery("")}
-            className="absolute right-1 top-1/2 grid size-10 -translate-y-1/2 place-items-center rounded-[8px] text-ink-400 hover:text-ink-700 focus-visible:outline-2 focus-visible:outline-brand-700"
+            className="absolute right-1 top-1/2 grid size-10 -translate-y-1/2 place-items-center rounded-apple-sm text-ink-400 hover:text-ink-700 focus-visible:outline-2 focus-visible:outline-brand-700"
           >
             <X className="size-4" />
           </button>
@@ -527,7 +527,7 @@ function CollegeSearch({ initialQuery, onPick }: { initialQuery: string; onPick:
         role="listbox"
         aria-label="Colleges"
         hidden={!showList}
-        className="mt-2 max-h-80 overflow-y-auto rounded-[14px] border border-ink-200/80 bg-white p-1 shadow-[0_6px_24px_rgb(7_47_36/0.08)]"
+        className="mt-2 max-h-80 overflow-y-auto rounded-apple-lg border border-ink-200/80 bg-white p-1 shadow-[0_6px_24px_rgb(7_47_36/0.08)]"
       >
         {options.map((o, i) => (
           <li
@@ -539,13 +539,13 @@ function CollegeSearch({ initialQuery, onPick }: { initialQuery: string; onPick:
             onClick={() => onPick(o)}
             onMouseEnter={() => setActive(i)}
             className={cn(
-              "flex min-h-12 cursor-pointer items-center justify-between gap-3 rounded-[10px] px-3 py-2",
+              "flex min-h-12 cursor-pointer items-center justify-between gap-3 rounded-apple-sm px-3 py-2",
               i === active ? "bg-brand-50" : "",
             )}
           >
             <span className="min-w-0">
-              <span className="block truncate text-[15px] text-ink-900">{o.name}</span>
-              <span className="block truncate text-[13px] text-ink-600">{[o.city, o.state].filter(Boolean).join(", ")}</span>
+              <span className="block truncate text-[0.9375rem] text-ink-900">{o.name}</span>
+              <span className="block truncate text-sm text-ink-600">{[o.city, o.state].filter(Boolean).join(", ")}</span>
             </span>
             {o.isPartner ? (
               <Pill tone="live" className="shrink-0">
@@ -556,7 +556,7 @@ function CollegeSearch({ initialQuery, onPick }: { initialQuery: string; onPick:
         ))}
       </ul>
 
-      <p className="mt-2 text-[13px] text-ink-600" role="status" aria-live="polite">
+      <p className="mt-2 text-sm text-ink-600" role="status" aria-live="polite">
         {loading
           ? "Searching…"
           : query.trim().length >= 2 && options.length === 0

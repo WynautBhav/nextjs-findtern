@@ -61,14 +61,14 @@ export default async function AdminCollegesPage() {
             title={r.name}
             description={[r.city, r.aisheCode ? `AISHE ${r.aisheCode}` : null, r.emailDomains.length ? `@${r.emailDomains.join(", @")}` : null].filter(Boolean).join(" · ")}
             action={
-              <span className="nums text-[13px] text-text-subtle">
+              <span className="nums text-sm text-text-subtle">
                 {r.members} students · {r.roster} on roster · {r.drives} drives
               </span>
             }
           />
           <PanelBody className="space-y-3">
             {r.officers.length ? (
-              <ul className="text-[14px] text-ink-800">
+              <ul className="text-sm text-ink-800">
                 {r.officers.map((o) => (
                   <li key={o.email}>
                     {o.name} · {o.email}
@@ -77,7 +77,7 @@ export default async function AdminCollegesPage() {
                 ))}
               </ul>
             ) : (
-              <p className="text-[14px] text-text-subtle">No placement officer login yet.</p>
+              <p className="text-sm text-text-subtle">No placement officer login yet.</p>
             )}
             <CollegeRowControls row={r} />
           </PanelBody>

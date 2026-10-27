@@ -43,10 +43,10 @@ export default async function RosterPage() {
         <Panel>
           <PanelHeader title="Invite message" description="Send it on your class groups or by email." />
           <PanelBody className="space-y-3">
-            <pre tabIndex={0} aria-label="Invite message" className="max-h-64 overflow-auto whitespace-pre-wrap rounded-[10px] border border-ink-200 bg-ink-50 p-3 font-sans text-[13px] leading-relaxed text-ink-800 focus-visible:outline-2 focus-visible:outline-brand-600">{invite}</pre>
+            <pre tabIndex={0} aria-label="Invite message" className="max-h-64 overflow-auto whitespace-pre-wrap rounded-apple-sm border border-ink-200 bg-ink-50 p-3 font-sans text-sm leading-relaxed text-ink-800 focus-visible:outline-2 focus-visible:outline-brand-600">{invite}</pre>
             <CopyText text={invite} label="Copy message" />
             {coverage.claimed > 0 ? (
-              <p className="text-[13px] text-text-subtle">
+              <p className="text-sm text-text-subtle">
                 {coverage.claimed} student{coverage.claimed === 1 ? " has" : "s have"} picked your college but {coverage.claimed === 1 ? "isn't" : "aren't"} on this list or using a college email. Add them to the roster to verify them.
               </p>
             ) : null}
@@ -62,7 +62,7 @@ export default async function RosterPage() {
         />
         {coverage.notJoined.length === 0 ? (
           <PanelBody>
-            <p className="text-[14px] text-text-subtle">{coverage.rosterSize ? "Everyone on your roster has joined." : "No roster uploaded yet."}</p>
+            <p className="text-sm text-text-subtle">{coverage.rosterSize ? "Everyone on your roster has joined." : "No roster uploaded yet."}</p>
           </PanelBody>
         ) : (
           <ul className="divide-y divide-ink-100">
@@ -70,9 +70,9 @@ export default async function RosterPage() {
               <li key={s.email} className="flex flex-wrap items-center justify-between gap-2 px-5 py-3">
                 <div className="min-w-0">
                   <p className="font-medium text-ink-900">{s.name || s.email}</p>
-                  <p className="text-[13px] text-text-subtle">{[s.rollNo, s.year ? yearLabel(s.year) : null, s.branch].filter(Boolean).join(" · ")}</p>
+                  <p className="text-sm text-text-subtle">{[s.rollNo, s.year ? yearLabel(s.year) : null, s.branch].filter(Boolean).join(" · ")}</p>
                 </div>
-                <span className="truncate text-[13px] text-ink-600">{s.email}</span>
+                <span className="truncate text-sm text-ink-600">{s.email}</span>
               </li>
             ))}
           </ul>

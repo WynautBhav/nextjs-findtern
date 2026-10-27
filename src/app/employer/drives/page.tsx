@@ -84,7 +84,7 @@ export default async function EmployerDrivesPage() {
                 {open ? (
                   <Link
                     href={`/employer/drives/${drive.id}`}
-                    className="apple-spring block rounded-[14px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
+                    className="apple-spring block rounded-apple-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
                   >
                     <Surface className="transition-shadow hover:shadow-md">{body}</Surface>
                   </Link>

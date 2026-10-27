@@ -115,7 +115,7 @@ export default async function CollegeDashboard() {
       </div>
 
       {!liveDrive ? (
-        <p className="text-[14px] text-text-subtle">
+        <p className="text-sm text-text-subtle">
           No drive is live right now.{" "}
           <Link href="/college/drives/new" className="font-medium text-brand-700 hover:underline">
             Set one up

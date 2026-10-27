@@ -40,7 +40,7 @@ export default async function DrivePage({ params }: { params: Promise<{ id: stri
 
   return (
     <div className="space-y-6">
-      <Link href="/college/drives" className="inline-flex min-h-11 items-center gap-1.5 text-[14px] font-medium text-ink-600 hover:text-brand-700">
+      <Link href="/college/drives" className="inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-ink-600 hover:text-brand-700">
         <ArrowLeft className="size-4" aria-hidden /> All drives
       </Link>
       <AdminPageHeader
@@ -78,14 +78,14 @@ export default async function DrivePage({ params }: { params: Promise<{ id: stri
           <PanelHeader title="Employers inside" description="Companies that opened your link while signed in." />
           {employers.length === 0 ? (
             <PanelBody>
-              <p className="text-[14px] text-text-subtle">Nobody yet. Once you share the link, companies appear here as they join.</p>
+              <p className="text-sm text-text-subtle">Nobody yet. Once you share the link, companies appear here as they join.</p>
             </PanelBody>
           ) : (
             <ul className="divide-y divide-ink-100">
               {employers.map((em) => (
                 <li key={em.employerId} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3">
                   <span className="font-medium text-ink-900">{em.company ?? "Employer"}</span>
-                  <span className="nums text-[13px] text-text-subtle">
+                  <span className="nums text-sm text-text-subtle">
                     {em.shortlisted} shortlisted · {em.calls} call{em.calls === 1 ? "" : "s"}
                   </span>
                 </li>

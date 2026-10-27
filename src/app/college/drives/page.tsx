@@ -6,7 +6,8 @@ import { driveWindow } from "@/lib/college/access";
 import { drivesOverview } from "@/lib/college/drives";
 import { DRIVE_KIND_LABEL, WINDOW_LABEL } from "@/lib/college/labels";
 import { requireCollegeContext } from "@/lib/college/scope";
-import { cn } from "@/lib/utils";
+import { Pill } from "@/components/app/primitives";
+import { ButtonLink } from "@/components/ui/button";
 
 export const dynamic = "force-dynamic";
 
@@ -22,9 +23,9 @@ export default async function DrivesPage() {
         title="Drives"
         subtitle="A drive is a dated link you send to employers. They sign in and see only your eligible students."
         action={
-          <Link href="/college/drives/new" className="apple-spring apple-pressable inline-flex min-h-11 items-center gap-1.5 rounded-[10px] bg-brand-700 px-4 text-[14px] font-semibold text-white hover:bg-brand-600">
+          <ButtonLink href="/college/drives/new">
             <Plus className="size-4" aria-hidden /> New drive
-          </Link>
+          </ButtonLink>
         }
       />
       <Panel as="div">
@@ -45,20 +46,13 @@ export default async function DrivesPage() {
                     <div className="min-w-0">
                       <p className="flex items-center gap-2">
                         <span className="font-semibold text-ink-900">{drive.title}</span>
-                        <span
-                          className={cn(
-                            "rounded-full px-2 py-0.5 text-[12px] font-semibold",
-                            w === "live" ? "bg-brand-50 text-brand-800" : w === "upcoming" ? "bg-blue-50 text-blue-800" : "bg-ink-100 text-ink-600",
-                          )}
-                        >
-                          {WINDOW_LABEL[w]}
-                        </span>
+                        <Pill tone={w === "live" ? "live" : w === "upcoming" ? "new" : "closed"}>{WINDOW_LABEL[w]}</Pill>
                       </p>
-                      <p className="mt-0.5 text-[13px] text-text-subtle">
+                      <p className="mt-0.5 text-sm text-text-subtle">
                         {DRIVE_KIND_LABEL[drive.kind] ?? drive.kind} · {fmt(drive.startsAt)} to {fmt(drive.endsAt)}
                       </p>
                     </div>
-                    <dl className="nums flex gap-6 text-[13px]">
+                    <dl className="nums flex gap-6 text-sm">
                       <div><dt className="text-text-subtle">Employers</dt><dd className="font-semibold text-ink-900">{employers}</dd></div>
                       <div><dt className="text-text-subtle">Shortlisted</dt><dd className="font-semibold text-ink-900">{shortlisted}</dd></div>
                       <div><dt className="text-text-subtle">Calls answered</dt><dd className="font-semibold text-ink-900">{calls ? `${accepted} of ${calls}` : "—"}</dd></div>
