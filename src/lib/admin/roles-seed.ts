@@ -2,6 +2,8 @@ import { eq, inArray } from "drizzle-orm";
 
 import { getDb, hasDb, schema } from "@/lib/db";
 
+import { ROLE_GRANTS, withGrant } from "./roles-grants";
+
 /**
  * Legacy's default roles (same keys as the live `admin_roles` rows), plus
  * `transactions:write` on Admin and Accounts. That permission is new in this
@@ -38,12 +40,7 @@ export const DEFAULT_ROLES: { key: string; name: string; permissions: string[] }
 ];
 
 /** One-time role updates, each recorded in `platform_settings` once applied. */
-const MIGRATIONS: { key: string; grant: { roles: string[]; permissions: string[] } }[] = [
-  {
-    key: "admin_roles_migration:transactions_write_v1",
-    grant: { roles: ["admin", "exec_accounts"], permissions: ["transactions:write"] },
-  },
-];
+const MIGRATIONS = ROLE_GRANTS;
 
 /**
  * Create missing default roles and apply each one-time grant exactly once.
@@ -67,9 +64,8 @@ export async function ensureAdminRoles(db: ReturnType<typeof getDb> = getDb()): 
         .from(schema.adminRoles)
         .where(inArray(schema.adminRoles.key, m.grant.roles));
       for (const row of rows) {
-        const current = Array.isArray(row.permissions) ? row.permissions : [];
-        const next = [...new Set([...current, ...m.grant.permissions])];
-        if (next.length === current.length) continue;
+        const next = withGrant(row.permissions, m.grant.permissions);
+        if (!next) continue;
         await tx
           .update(schema.adminRoles)
           .set({ permissions: next, updatedAt: new Date() })

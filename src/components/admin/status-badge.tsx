@@ -1,40 +1,24 @@
 import { cn } from "@/lib/utils";
+import { Pill, type Tone } from "@/components/app/primitives";
 import { humanizeStatus } from "@/components/app/status";
 
 export { humanizeStatus };
 
 export type StatusTone = "success" | "warning" | "danger" | "info" | "neutral";
 
-const TONES: Record<
-  StatusTone,
-  { pill: string; dot: string; pulse: boolean }
-> = {
-  success: {
-    pill: "bg-emerald-50/90 text-emerald-800 ring-emerald-600/25 border border-emerald-200/50",
-    dot: "bg-emerald-600",
-    pulse: true,
-  },
-  warning: {
-    pill: "bg-amber-50/90 text-amber-800 ring-amber-600/25 border border-amber-200/50",
-    dot: "bg-amber-600",
-    pulse: true,
-  },
-  danger: {
-    pill: "bg-rose-50/90 text-rose-800 ring-rose-600/25 border border-rose-200/50",
-    dot: "bg-rose-600",
-    pulse: false,
-  },
-  info: {
-    pill: "bg-blue-50/90 text-blue-800 ring-blue-600/25 border border-blue-200/50",
-    dot: "bg-blue-600",
-    pulse: false,
-  },
-  neutral: {
-    pill: "bg-sand-100/90 text-ink-700 ring-sand-300/50 border border-sand-200/60",
-    dot: "bg-ink-400",
-    pulse: false,
-  },
+/**
+ * Admin tones render through the one `Pill` (DESIGN.md §0: status always via
+ * Pill tones). `danger` is the only tone Pill has no slot for: failures and
+ * rejections keep a red pill so a failed payout never reads like a closed one.
+ */
+const PILL_TONE: Record<StatusTone, Tone> = {
+  success: "live",
+  warning: "waiting",
+  danger: "neutral",
+  info: "new",
+  neutral: "closed",
 };
+const DANGER = "bg-danger-soft text-danger ring-danger/25";
 
 const TONE_BY_STATUS: Record<string, StatusTone> = {
   // accounts / visibility
@@ -108,29 +92,14 @@ export function StatusBadge({
   const val = value ?? status;
   const resolved = tone ?? toneForStatus(val);
   const text = label ?? (val ? humanizeStatus(val) : "None");
-  const style = TONES[resolved];
 
   return (
-    <span
-      className={cn(
-        "apple-admin inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] font-semibold ring-1 ring-inset shadow-2xs",
-        style.pill,
-        className
-      )}
+    <Pill
+      tone={!tone && val?.toLowerCase() === "paid" ? "paid" : PILL_TONE[resolved]}
+      className={cn("shrink-0 whitespace-nowrap", resolved === "danger" && DANGER, className)}
     >
-      <span aria-hidden className="relative flex size-1.5 items-center justify-center">
-        {style.pulse ? (
-          <span
-            className={cn(
-              "absolute inline-flex size-full animate-ping rounded-full opacity-40",
-              style.dot
-            )}
-          />
-        ) : null}
-        <span className={cn("relative inline-flex size-1.5 rounded-full", style.dot)} />
-      </span>
-      <span>{text}</span>
-    </span>
+      {text}
+    </Pill>
   );
 }
 

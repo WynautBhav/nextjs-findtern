@@ -30,7 +30,9 @@ export function FeedbackFab({ className, variant = "fab" }: { className?: string
   const [kind, setKind] = useState<string>("bug");
   const [message, setMessage] = useState("");
   const [state, setState] = useState<"idle" | "sending" | "sent" | "error">("idle");
-  const [attachment, setAttachment] = useState<string | null>(null);
+  // Legacy shape (DB-14): up to five images / PDFs and one short video.
+  const [attachments, setAttachments] = useState<{ key: string; name: string }[]>([]);
+  const [video, setVideo] = useState<string | null>(null);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -40,7 +42,10 @@ export function FeedbackFab({ className, variant = "fab" }: { className?: string
       const form = new FormData();
       form.set("kind", kind);
       form.set("message", message.trim());
-      if (attachment) form.set("attachmentKey", attachment);
+      // The page the report came from, so the team can reproduce it.
+      form.set("pageUrl", window.location.href);
+      for (const a of attachments) form.append("attachmentKey", a.key);
+      if (video) form.set("videoKey", video);
       const res = await csrfFetch("/api/support/feedback", { method: "POST", body: form });
       setState(res.ok ? "sent" : "error");
     } catch {
@@ -55,6 +60,8 @@ export function FeedbackFab({ className, variant = "fab" }: { className?: string
       setState("idle");
       setMessage("");
       setKind("bug");
+      setAttachments([]);
+      setVideo(null);
     }, 200);
   }
 
@@ -141,12 +148,39 @@ export function FeedbackFab({ className, variant = "fab" }: { className?: string
                 />
               </div>
 
+              {attachments.length ? (
+                <ul className="space-y-1 text-sm text-ink-700">
+                  {attachments.map((a) => (
+                    <li key={a.key} className="flex items-center justify-between gap-2">
+                      <span className="min-w-0 truncate">{a.name}</span>
+                      <button
+                        type="button"
+                        onClick={() => setAttachments((list) => list.filter((x) => x.key !== a.key))}
+                        className="shrink-0 text-xs font-medium text-ink-600 underline-offset-4 hover:underline"
+                      >
+                        Remove
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+              {attachments.length < 5 ? (
+                <FileUpload
+                  key={attachments.length}
+                  kind="support"
+                  accept="image/jpeg,image/png,image/webp,application/pdf"
+                  label="Screenshot"
+                  hint={`Optional. Up to 5 images or PDFs, 10 MB each${attachments.length ? ` (${5 - attachments.length} left)` : ""}.`}
+                  onUploaded={(r) => setAttachments((list) => [...list, { key: r.key, name: r.name }].slice(0, 5))}
+                />
+              ) : null}
               <FileUpload
                 kind="support"
-                accept="image/jpeg,image/png,image/webp,application/pdf,video/mp4,video/webm"
-                label="Screenshot"
-                hint="Optional. An image, PDF or short video, up to 10 MB."
-                onUploaded={(r) => setAttachment(r.key)}
+                accept="video/mp4,video/webm,video/quicktime"
+                label="Screen recording"
+                noun="video"
+                hint="Optional. One short video, up to 10 MB."
+                onUploaded={(r) => setVideo(r.key)}
               />
 
               {state === "error" ? (

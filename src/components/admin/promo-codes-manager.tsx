@@ -18,6 +18,8 @@ import { csrfFetch } from "@/lib/client-fetch";
 import { formatDate } from "@/lib/format";
 import type { PromoCode } from "@/lib/db/schema";
 import { AdminEmpty } from "@/components/admin/panel";
+import { StatusBadge } from "@/components/admin/status-badge";
+import { buttonClass } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -30,7 +32,7 @@ import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 
 const inputClass =
-  "apple-spring mt-1.5 min-h-11 w-full rounded-[10px] border border-ink-200 bg-white px-3 text-[14px] text-ink-900 outline-none placeholder:text-ink-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20";
+  "mt-1.5 min-h-11 w-full rounded-apple-sm border border-ink-200 bg-white px-3 text-sm text-ink-900 outline-none placeholder:text-ink-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20";
 
 /** Fixed amounts are stored as major rupees (the form takes "₹"), not minor units. */
 function benefitLabel(promo: PromoCode): string {
@@ -76,6 +78,8 @@ export function PromoCodesManager({
 
   // Copy feedback
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
+  // A refused toggle / delete, shown on the card it belongs to.
+  const [rowError, setRowError] = useState<{ id: string; message: string } | null>(null);
 
   function openCreateModal() {
     setEditingPromo(null);
@@ -219,6 +223,7 @@ export function PromoCodesManager({
 
   async function handleToggleActive(promo: PromoCode) {
     const nextActive = !promo.isActive;
+    setRowError(null);
     // Optimistic update
     setPromos((prev) =>
       prev.map((p) => (p.id === promo.id ? { ...p, isActive: nextActive } : p))
@@ -231,18 +236,19 @@ export function PromoCodesManager({
         body: JSON.stringify({ isActive: nextActive }),
       });
       if (!res.ok) {
-        // revert on error
+        const data = (await res.json().catch(() => null)) as { error?: string } | null;
         setPromos((prev) =>
           prev.map((p) => (p.id === promo.id ? { ...p, isActive: promo.isActive } : p))
         );
+        setRowError({ id: promo.id, message: data?.error || `Not saved (HTTP ${res.status})` });
       } else {
         router.refresh();
       }
     } catch {
-      // revert on error
       setPromos((prev) =>
         prev.map((p) => (p.id === promo.id ? { ...p, isActive: promo.isActive } : p))
       );
+      setRowError({ id: promo.id, message: "Not saved: the network request failed." });
     }
   }
 
@@ -264,7 +270,8 @@ export function PromoCodesManager({
       setDeleteTarget(null);
       router.refresh();
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : "Failed to delete");
+      setRowError({ id: deleteTarget.id, message: err instanceof Error ? err.message : "Failed to delete" });
+      setDeleteTarget(null);
     } finally {
       setDeleting(false);
     }
@@ -310,14 +317,14 @@ export function PromoCodesManager({
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search codes…"
             aria-label="Search promo codes"
-            className="apple-spring min-h-11 w-full rounded-[10px] border border-ink-200 bg-ink-50 pr-10 pl-9 text-[15px] tracking-[-0.01em] text-ink-900 placeholder:text-ink-400 focus:border-brand-500 focus:bg-white focus:ring-2 focus:ring-brand-500/20 focus:outline-none [&::-webkit-search-cancel-button]:hidden"
+            className="min-h-11 w-full rounded-apple-sm border border-ink-200 bg-ink-50 pr-10 pl-9 text-[0.9375rem] text-ink-900 placeholder:text-ink-400 focus:border-brand-500 focus:bg-white focus:ring-2 focus:ring-brand-500/20 focus:outline-none [&::-webkit-search-cancel-button]:hidden"
           />
           {search ? (
             <button
               type="button"
               onClick={() => setSearch("")}
               aria-label="Clear search"
-              className="apple-spring absolute top-1/2 right-2 flex min-h-11 min-w-11 -translate-y-1/2 items-center justify-center rounded-[10px] text-ink-600 hover:text-ink-700"
+              className="absolute top-1/2 right-0 flex min-h-11 min-w-11 -translate-y-1/2 items-center justify-center rounded-apple-sm text-ink-600 hover:text-ink-800"
             >
               <X className="size-4" />
             </button>
@@ -329,7 +336,7 @@ export function PromoCodesManager({
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value as "all" | "active" | "inactive")}
             aria-label="Filter by status"
-            className="apple-spring min-h-11 cursor-pointer rounded-[10px] border border-ink-200 bg-white px-3 text-[14px] text-ink-700 focus:border-brand-500 focus:outline-none"
+            className="min-h-11 cursor-pointer rounded-apple-sm border border-ink-200 bg-white px-3 text-sm text-ink-700 focus:border-brand-500 focus:outline-none"
           >
             <option value="all">All statuses</option>
             <option value="active">Active only</option>
@@ -339,7 +346,7 @@ export function PromoCodesManager({
             value={typeFilter}
             onChange={(e) => setTypeFilter(e.target.value as "all" | "percentage" | "fixed")}
             aria-label="Filter by discount type"
-            className="apple-spring min-h-11 cursor-pointer rounded-[10px] border border-ink-200 bg-white px-3 text-[14px] text-ink-700 focus:border-brand-500 focus:outline-none"
+            className="min-h-11 cursor-pointer rounded-apple-sm border border-ink-200 bg-white px-3 text-sm text-ink-700 focus:border-brand-500 focus:outline-none"
           >
             <option value="all">All types</option>
             <option value="percentage">Percentage</option>
@@ -350,7 +357,7 @@ export function PromoCodesManager({
         <button
           type="button"
           onClick={openCreateModal}
-          className="apple-spring apple-pressable inline-flex min-h-11 items-center justify-center gap-1.5 rounded-[10px] bg-brand-700 px-4 text-[14px] font-semibold text-white hover:bg-brand-600 lg:ml-auto"
+          className={buttonClass({ variant: "primary", size: "md", className: "lg:ml-auto" })}
         >
           <Plus className="size-4" />
           New code
@@ -387,7 +394,7 @@ export function PromoCodesManager({
                 )}
               >
                 <div className="flex items-center gap-2">
-                  <span className="min-w-0 flex-1 truncate font-mono text-[17px] font-bold tracking-[0.04em] text-ink-900">
+                  <span className="min-w-0 flex-1 truncate font-mono text-lg font-bold tracking-[0.04em] text-ink-900">
                     {promo.code}
                   </span>
                   <button
@@ -395,10 +402,10 @@ export function PromoCodesManager({
                     onClick={() => copyToClipboard(promo.code)}
                     title="Copy code"
                     aria-label={`Copy code ${promo.code}`}
-                    className="apple-spring apple-pressable inline-flex min-h-11 min-w-11 items-center justify-center rounded-[10px] text-ink-600 hover:bg-ink-100 hover:text-ink-700"
+                    className={buttonClass({ variant: "ghost", size: "icon", className: "text-ink-600" })}
                   >
                     {isCopied ? (
-                      <Check className="size-4 text-emerald-600" />
+                      <Check className="size-4 text-success" />
                     ) : (
                       <Copy className="size-4" />
                     )}
@@ -410,25 +417,26 @@ export function PromoCodesManager({
                   />
                 </div>
 
-                <p className="mt-2 text-[28px] font-bold leading-[34px] tracking-[-0.02em] tabular-nums text-brand-800">
-                  {benefitLabel(promo)}
-                </p>
-                <p className="mt-1 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink-600">
+                <div className="mt-2 flex flex-wrap items-baseline justify-between gap-2">
+                  <p className="nums text-3xl font-semibold tracking-[-0.02em] text-brand-800">{benefitLabel(promo)}</p>
+                  <StatusBadge value={promo.isActive ? "active" : "inactive"} />
+                </div>
+                <p className="mt-1 text-sm font-medium text-ink-700">
                   {promo.appliesTo === "intern" ? "Interns only" : promo.appliesTo === "employer" ? "Companies only" : "Interns and companies"}
                 </p>
                 {promo.description ? (
-                  <p className="mt-1 truncate text-[13px] text-text-subtle">
+                  <p className="mt-1 truncate text-sm text-ink-600">
                     {promo.description}
                   </p>
                 ) : null}
 
                 <div className="mt-4 border-t border-dashed border-ink-200 pt-4">
                   <div className="flex items-baseline justify-between gap-3">
-                    <span className="text-[13px] tabular-nums text-text-subtle">
+                    <span className="nums text-sm text-ink-600">
                       {used.toLocaleString("en-IN")}
                       {max ? ` of ${max.toLocaleString("en-IN")} used` : " used · unlimited"}
                     </span>
-                    <span className="shrink-0 text-[12px] text-text-subtle">
+                    <span className="shrink-0 text-xs text-ink-600">
                       {promo.validUntil
                         ? `Until ${formatDate(new Date(promo.validUntil).toISOString())}`
                         : "No expiry"}
@@ -449,7 +457,7 @@ export function PromoCodesManager({
                     <button
                       type="button"
                       onClick={() => openEditModal(promo)}
-                      className="apple-spring apple-pressable inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-[10px] border border-ink-200 bg-white px-3 text-[13px] font-semibold text-ink-700 hover:bg-ink-50"
+                      className={buttonClass({ variant: "outline", size: "sm", className: "flex-1 max-lg:h-11" })}
                     >
                       <Edit2 className="size-4" />
                       Edit
@@ -458,11 +466,16 @@ export function PromoCodesManager({
                       type="button"
                       onClick={() => setDeleteTarget(promo)}
                       aria-label={`Delete ${promo.code}`}
-                      className="apple-spring apple-pressable inline-flex min-h-11 min-w-11 items-center justify-center rounded-[10px] text-ink-600 hover:bg-danger-soft hover:text-danger"
+                      className={buttonClass({ variant: "ghost", size: "iconSm", className: "text-ink-600 hover:bg-danger-soft hover:text-danger max-lg:size-11" })}
                     >
                       <Trash2 className="size-4" />
                     </button>
                   </div>
+                  {rowError?.id === promo.id ? (
+                    <p role="alert" className="mt-2 text-sm font-medium text-danger">
+                      {rowError.message}
+                    </p>
+                  ) : null}
                 </div>
               </li>
             );
@@ -474,11 +487,11 @@ export function PromoCodesManager({
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
         <DialogContent className="apple-admin max-w-md sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-[17px] font-semibold tracking-[-0.02em]">
+            <DialogTitle className="flex items-center gap-2 text-lg font-semibold tracking-[-0.02em]">
               <Tag className="size-5 text-brand-600" />
               {editingPromo ? "Edit code" : "New code"}
             </DialogTitle>
-            <DialogDescription className="text-[13px]">
+            <DialogDescription className="text-sm">
               {editingPromo
                 ? "Update terms, limits or discount."
                 : "A voucher employers or interns apply at checkout."}
@@ -487,13 +500,13 @@ export function PromoCodesManager({
 
           <form onSubmit={handleSavePromo} className="space-y-4 pt-2">
             {errorMsg && (
-              <div role="alert" className="rounded-[10px] border border-danger/30 bg-danger-soft p-3 text-[13px] font-medium text-danger">
+              <div role="alert" className="rounded-apple-sm border border-danger/30 bg-danger-soft p-3 text-sm font-medium text-danger">
                 {errorMsg}
               </div>
             )}
 
             <div>
-              <label htmlFor="promo-code" className="block text-[13px] font-semibold text-ink-800">
+              <label htmlFor="promo-code" className="block text-sm font-semibold text-ink-800">
                 Code
               </label>
               <input
@@ -508,8 +521,8 @@ export function PromoCodesManager({
             </div>
 
             <div>
-              <label htmlFor="promo-desc" className="block text-[13px] font-semibold text-ink-800">
-                Description <span className="font-normal text-text-subtle">(optional)</span>
+              <label htmlFor="promo-desc" className="block text-sm font-semibold text-ink-800">
+                Description <span className="font-normal text-ink-600">(optional)</span>
               </label>
               <input
                 id="promo-desc"
@@ -523,7 +536,7 @@ export function PromoCodesManager({
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label htmlFor="promo-type" className="block text-[13px] font-semibold text-ink-800">
+                <label htmlFor="promo-type" className="block text-sm font-semibold text-ink-800">
                   Type
                 </label>
                 <select
@@ -537,7 +550,7 @@ export function PromoCodesManager({
                 </select>
               </div>
               <div>
-                <label htmlFor="promo-value" className="block text-[13px] font-semibold text-ink-800">
+                <label htmlFor="promo-value" className="block text-sm font-semibold text-ink-800">
                   {discountType === "percentage" ? "Percent" : "Rupees"}
                 </label>
                 <input
@@ -555,8 +568,8 @@ export function PromoCodesManager({
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label htmlFor="promo-max" className="block text-[13px] font-semibold text-ink-800">
-                  Max uses <span className="font-normal text-text-subtle">(blank ∞)</span>
+                <label htmlFor="promo-max" className="block text-sm font-semibold text-ink-800">
+                  Max uses <span className="font-normal text-ink-600">(blank ∞)</span>
                 </label>
                 <input
                   id="promo-max"
@@ -569,8 +582,8 @@ export function PromoCodesManager({
                 />
               </div>
               <div>
-                <label htmlFor="promo-min" className="block text-[13px] font-semibold text-ink-800">
-                  Min order ₹ <span className="font-normal text-text-subtle">(optional)</span>
+                <label htmlFor="promo-min" className="block text-sm font-semibold text-ink-800">
+                  Min order ₹ <span className="font-normal text-ink-600">(optional)</span>
                 </label>
                 <input
                   id="promo-min"
@@ -586,33 +599,33 @@ export function PromoCodesManager({
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label htmlFor="promo-from" className="block text-[13px] font-semibold text-ink-800">
-                  From <span className="font-normal text-text-subtle">(optional)</span>
+                <label htmlFor="promo-from" className="block text-sm font-semibold text-ink-800">
+                  From <span className="font-normal text-ink-600">(optional)</span>
                 </label>
                 <input
                   id="promo-from"
                   type="datetime-local"
                   value={validFrom}
                   onChange={(e) => setValidFrom(e.target.value)}
-                  className={`${inputClass} text-[13px]`}
+                  className={inputClass}
                 />
               </div>
               <div>
-                <label htmlFor="promo-until" className="block text-[13px] font-semibold text-ink-800">
-                  Until <span className="font-normal text-text-subtle">(optional)</span>
+                <label htmlFor="promo-until" className="block text-sm font-semibold text-ink-800">
+                  Until <span className="font-normal text-ink-600">(optional)</span>
                 </label>
                 <input
                   id="promo-until"
                   type="datetime-local"
                   value={validUntil}
                   onChange={(e) => setValidUntil(e.target.value)}
-                  className={`${inputClass} text-[13px]`}
+                  className={inputClass}
                 />
               </div>
             </div>
 
             <div>
-              <label htmlFor="promo-applies" className="block text-[13px] font-semibold text-ink-800">
+              <label htmlFor="promo-applies" className="block text-sm font-semibold text-ink-800">
                 Who can use it
               </label>
               <select
@@ -627,8 +640,8 @@ export function PromoCodesManager({
               </select>
             </div>
 
-            <div className="flex items-center justify-between rounded-[10px] bg-ink-50 px-3 py-2">
-              <span className="text-[14px] font-medium text-ink-800">
+            <div className="flex items-center justify-between rounded-apple-sm bg-ink-50 px-3 py-2">
+              <span className="text-sm font-medium text-ink-800">
                 Active{isActive ? "" : " · disabled"}
               </span>
               <Switch
@@ -642,14 +655,14 @@ export function PromoCodesManager({
               <button
                 type="button"
                 onClick={() => setModalOpen(false)}
-                className="apple-spring apple-pressable inline-flex min-h-11 items-center rounded-[10px] px-4 text-[14px] font-medium text-ink-700 hover:bg-ink-100"
+                className={buttonClass({ variant: "ghost", size: "md" })}
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={saving}
-                className="apple-spring apple-pressable inline-flex min-h-11 items-center gap-1.5 rounded-[10px] bg-brand-700 px-5 text-[14px] font-semibold text-white hover:bg-brand-600 disabled:opacity-50"
+                className={buttonClass({ variant: "primary", size: "md" })}
               >
                 {saving && <Loader2 className="size-4 animate-spin" />}
                 {editingPromo ? "Save changes" : "Create code"}
@@ -663,10 +676,10 @@ export function PromoCodesManager({
       <Dialog open={deleteTarget !== null} onOpenChange={(open) => !open && setDeleteTarget(null)}>
         <DialogContent className="apple-admin max-w-sm">
           <DialogHeader>
-            <DialogTitle className="text-[17px] font-semibold tracking-[-0.02em] text-danger">
+            <DialogTitle className="text-lg font-semibold tracking-[-0.02em] text-danger">
               Delete {deleteTarget?.code}?
             </DialogTitle>
-            <DialogDescription className="text-[13px]">
+            <DialogDescription className="text-sm">
               This removes the voucher permanently. Orders already placed keep their discount.
             </DialogDescription>
           </DialogHeader>
@@ -675,7 +688,7 @@ export function PromoCodesManager({
               type="button"
               disabled={deleting}
               onClick={() => setDeleteTarget(null)}
-              className="apple-spring apple-pressable inline-flex min-h-11 items-center rounded-[10px] px-4 text-[14px] font-medium text-ink-700 hover:bg-ink-100"
+              className={buttonClass({ variant: "ghost", size: "md" })}
             >
               Keep
             </button>
@@ -683,7 +696,7 @@ export function PromoCodesManager({
               type="button"
               disabled={deleting}
               onClick={handleDeleteConfirm}
-              className="apple-spring apple-pressable inline-flex min-h-11 items-center gap-1.5 rounded-[10px] bg-danger px-4 text-[14px] font-semibold text-white disabled:opacity-50"
+              className={buttonClass({ variant: "primary", size: "md", className: "bg-danger hover:bg-danger/90" })}
             >
               {deleting && <Loader2 className="size-4 animate-spin" />}
               Delete

@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useId, useRef, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Search, X } from "lucide-react";
+import { Search, SlidersHorizontal, X } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
@@ -48,6 +48,10 @@ export function TableToolbar({
   const [, startTransition] = useTransition();
 
   const [term, setTerm] = useState(searchParams.get(searchKey) ?? "");
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const filtersId = useId();
+  const foldable = filters.length > 3;
+  const activeFilterCount = filters.filter((f) => searchParams.get(f.key)).length;
   const inputRef = useRef<HTMLInputElement>(null);
   const firstRender = useRef(true);
 
@@ -143,7 +147,7 @@ export function TableToolbar({
             }}
             placeholder={searchPlaceholder}
             aria-label={searchPlaceholder}
-            className="h-9 w-full rounded-[10px] border border-ink-200 bg-white pr-8 pl-9 text-sm text-ink-900 placeholder:text-ink-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 focus:outline-none max-lg:min-h-11 [&::-webkit-search-cancel-button]:hidden"
+            className="h-9 w-full rounded-apple-sm border border-ink-200 bg-white pr-8 pl-9 text-sm text-ink-900 placeholder:text-ink-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 focus:outline-none max-lg:min-h-11 [&::-webkit-search-cancel-button]:hidden"
           />
           {term ? (
             <button
@@ -153,7 +157,7 @@ export function TableToolbar({
                 inputRef.current?.focus();
               }}
               aria-label="Clear search"
-              className="apple-spring absolute top-1/2 right-2 flex min-h-11 min-w-11 -translate-y-1/2 items-center justify-center rounded-[10px] p-1 text-ink-600 hover:text-ink-700"
+              className="apple-spring absolute top-1/2 right-2 flex min-h-11 min-w-11 -translate-y-1/2 items-center justify-center rounded-apple-sm p-1 text-ink-600 hover:text-ink-700"
             >
               <X className="size-3.5" />
             </button>
@@ -161,6 +165,25 @@ export function TableToolbar({
         </div>
 
         {/* Facet filters ------------------------------------------------ */}
+        {/* Below lg, more than three filters fold behind one toggle so the
+            table is not pushed a screen down by a column of selects. */}
+        {foldable ? (
+          <button
+            type="button"
+            onClick={() => setFiltersOpen((o) => !o)}
+            aria-expanded={filtersOpen}
+            aria-controls={filtersId}
+            className="apple-spring inline-flex min-h-11 items-center gap-1.5 rounded-apple-sm border border-ink-200 bg-white px-3 text-sm font-medium text-ink-700 hover:bg-ink-50 lg:hidden"
+          >
+            <SlidersHorizontal className="size-4" aria-hidden />
+            Filters
+            {activeFilterCount ? <span className="nums rounded-full bg-brand-50 px-1.5 text-xs text-brand-800">{activeFilterCount}</span> : null}
+          </button>
+        ) : null}
+        <div
+          id={filtersId}
+          className={cn("contents", foldable && !filtersOpen && "max-lg:hidden", foldable && filtersOpen && "max-lg:flex max-lg:w-full max-lg:flex-wrap max-lg:gap-2.5")}
+        >
         {filters.map((filter) => {
           const value = searchParams.get(filter.key) ?? "";
           const id = `filter-${filter.key}`;
@@ -177,13 +200,13 @@ export function TableToolbar({
                 value={value}
                 onChange={(e) => setParam(filter.key, e.target.value || null)}
                 className={cn(
-                  "apple-spring h-9 cursor-pointer rounded-[10px] border bg-white px-2.5 pr-7 text-sm focus:ring-2 focus:ring-brand-500/20 focus:outline-none max-lg:min-h-11",
+                  "apple-spring h-9 cursor-pointer rounded-apple-sm border bg-white px-2.5 pr-7 text-sm focus:ring-2 focus:ring-brand-500/20 focus:outline-none max-lg:min-h-11",
                   value
                     ? "border-brand-300 font-medium text-brand-800"
                     : "border-ink-200 text-ink-700",
                 )}
               >
-                <option value="">{filter.allLabel ?? `All ${filter.label.toLowerCase()}`}</option>
+                <option value="">{filter.allLabel ?? `All ${lowerFirst(filter.label)}`}</option>
                 {filter.options.map((option) => (
                   <option key={option.value} value={option.value}>
                     {option.label}
@@ -193,13 +216,14 @@ export function TableToolbar({
             </div>
           );
         })}
+        </div>
 
         {extra}
 
         {exportHref ? (
           <a
             href={exportHref}
-            className="apple-spring apple-pressable ml-auto inline-flex h-9 items-center gap-1.5 rounded-[10px] border border-ink-200 bg-white px-3 text-sm font-medium text-ink-700 hover:bg-ink-50 max-lg:min-h-11"
+            className="apple-spring apple-pressable ml-auto inline-flex h-9 items-center gap-1.5 rounded-apple-sm border border-ink-200 bg-white px-3 text-sm font-medium text-ink-700 hover:bg-ink-50 max-lg:min-h-11"
           >
             CSV
           </a>
@@ -237,4 +261,9 @@ export function TableToolbar({
       ) : null}
     </>
   );
+}
+
+/** "Offer type" → "offer type", but "AI interview" stays "AI interview". */
+function lowerFirst(label: string): string {
+  return /^[A-Z][a-z]/.test(label) ? label.charAt(0).toLowerCase() + label.slice(1) : label;
 }

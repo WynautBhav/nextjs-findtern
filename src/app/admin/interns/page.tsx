@@ -1,61 +1,35 @@
 import Link from "next/link";
-import { count, desc, eq, sql, type SQL } from "drizzle-orm";
 import { Download } from "lucide-react";
-import { RatingsImport } from "@/components/admin/ratings-import";
 
-import { getDb, schema } from "@/lib/db";
-import { formatDate } from "@/lib/format";
-import { flattenParams, parsePageRequest, searchAny, toPage } from "@/lib/admin/params";
-import { aiInterviewStatus, findternScoreSql, meaningfulProfile } from "@/lib/admin/scope";
+import { RatingsImport } from "@/components/admin/ratings-import";
+import { formatDate, formatMoney } from "@/lib/format";
+import { flattenParams, parsePageRequest, toPage } from "@/lib/admin/params";
+import { INTERN_SORTS as SORTS, loadInterns, type InternRow as Row } from "@/lib/admin/intern-query";
+import { matchesDue, todayIstIso } from "@/lib/admin/intern-list";
+import { AdminLoadError, AdminPageHeader, AttentionBanner } from "@/components/admin/panel";
+import { DataTable, type Column } from "@/components/admin/data-table";
+import type { ToolbarFilter } from "@/components/admin/table-toolbar";
+import { StatusBadge, humanizeStatus } from "@/components/admin/status-badge";
+import { BulkSelectProvider, RowCheckbox, SelectAllCheckbox, type BulkActionSpec } from "@/components/admin/bulk-select";
 import {
-  AdminEmpty,
-  AdminPageHeader,
-  AttentionBanner,
-  Panel,
-} from "@/components/admin/panel";
-import { Pagination } from "@/components/admin/pagination";
-import { PageSizeSelect } from "@/components/admin/page-size-select.tsx";
-import { TableToolbar, type ToolbarFilter } from "@/components/admin/table-toolbar.tsx";
-import { StatusBadge } from "@/components/admin/status-badge";
-import {
-  BulkSelectProvider,
-  RowCheckbox,
-  SelectAllCheckbox,
-  type BulkActionSpec,
-} from "@/components/admin/bulk-select.tsx";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+  AccountActiveCell,
+  InternApprovalCell,
+  InternRatingsCell,
+  InternVisibilityCell,
+} from "@/components/admin/intern-row-controls";
+import { buttonClass } from "@/components/ui/button";
+import { TableCell, TableRow } from "@/components/ui/table";
+import { cn } from "@/lib/utils";
 
 /**
- * Intern management - the screen an admin actually lives in.
+ * Candidate directory - the screen an admin actually lives in.
  *
- * Carries more surface than any other admin page: search across four fields,
- * three facets, a profile-completeness signal, admin-controlled directory
- * visibility, and bulk actions.
- *
- * **Architecture note.** The table body is a server component; only the
- * checkboxes and the action bar are client components, wired together by
- * `BulkSelectProvider`. The obvious alternative - a client table taking a
- * `columns` array of render functions - cannot work here: React refuses to
- * serialise a function across the server/client boundary. See bulk-select.tsx.
+ * Every row is editable in place (review status, ratings, visibility,
+ * account), and carries the money and offer facts legacy showed (ADP-02):
+ * offer type and status, internship status, activation fee, what is owed and
+ * when the next stipend falls due. Bulk show / hide / activate stay in the
+ * selection bar.
  */
-
-type InternRow = {
-  id: string;
-  firstName: string;
-  lastName: string;
-  email: string;
-  countryCode: string;
-  phoneNumber: string;
-  isActive: boolean;
-  visibility: string;
-  createdAt: string;
-  proposalCount: number;
-  interviewCount: number;
-  hasProfile: boolean;
-  openToWork: boolean;
-  aiStatus: string;
-  score: number | null;
-};
 
 const AI_STATUS_LABEL: Record<string, string> = {
   not_applied: "Not applied",
@@ -66,13 +40,63 @@ const AI_STATUS_LABEL: Record<string, string> = {
   completed: "Completed",
 };
 
+
 const FILTERS: ToolbarFilter[] = [
   {
-    key: "status",
-    label: "Status",
+    key: "approval",
+    label: "Review",
     options: [
-      { value: "active", label: "Active" },
-      { value: "inactive", label: "Inactive" },
+      { value: "Pending", label: "Pending" },
+      { value: "Approved", label: "Approved" },
+      { value: "Rejected", label: "Rejected" },
+    ],
+  },
+  {
+    key: "hired",
+    label: "Hired",
+    options: [
+      { value: "yes", label: "Hired" },
+      { value: "no", label: "Not hired" },
+    ],
+  },
+  {
+    key: "offer",
+    label: "Offer type",
+    options: [
+      { value: "internship", label: "Internship" },
+      { value: "full_time", label: "Full-time" },
+    ],
+  },
+  {
+    key: "due",
+    label: "Next payout",
+    options: [
+      { value: "overdue", label: "Overdue" },
+      { value: "week", label: "Due this week" },
+      { value: "month", label: "Due this month" },
+      { value: "has", label: "Has a date" },
+      { value: "none", label: "No date" },
+    ],
+  },
+  {
+    key: "payment",
+    label: "Activation fee",
+    options: [
+      { value: "paid", label: "Paid" },
+      { value: "unpaid", label: "Unpaid" },
+    ],
+  },
+  {
+    key: "ai",
+    label: "AI interview",
+    options: Object.entries(AI_STATUS_LABEL).map(([value, label]) => ({ value, label })),
+  },
+  {
+    key: "score",
+    label: "Score",
+    options: [
+      { value: "scored", label: "Scored" },
+      { value: "none", label: "Not scored" },
     ],
   },
   {
@@ -89,13 +113,28 @@ const FILTERS: ToolbarFilter[] = [
     options: [
       { value: "live", label: "Live" },
       { value: "hidden", label: "Hidden by admin" },
-      { value: "intern_hidden", label: "Hidden by intern" },
+      { value: "intern_hidden", label: "Hidden by candidate" },
     ],
   },
   {
-    key: "ai",
-    label: "AI interview",
-    options: Object.entries(AI_STATUS_LABEL).map(([value, label]) => ({ value, label })),
+    key: "status",
+    label: "Account",
+    options: [
+      { value: "active", label: "Active" },
+      { value: "inactive", label: "Inactive" },
+    ],
+  },
+  {
+    key: "sort",
+    label: "Sort",
+    allLabel: "Newest first",
+    options: [
+      { value: "name", label: "Name" },
+      { value: "email", label: "Email" },
+      { value: "score", label: "Score" },
+      { value: "owed", label: "Left to pay" },
+      { value: "next", label: "Next payout date" },
+    ],
   },
 ];
 
@@ -138,293 +177,213 @@ export default async function AdminInterns({
 }) {
   const params = flattenParams(await searchParams);
   const req = parsePageRequest(params);
-  const db = getDb();
-
-  const profileFilled = meaningfulProfile();
-  const aiStatus = aiInterviewStatus();
-  // The intern's own "open to work" switch; missing means on.
-  const openToWork = sql<boolean>`coalesce(${schema.internOnboarding.extraData}->>'openToWork', 'true') <> 'false'`;
-  const conditions: (SQL | undefined)[] = [
-    eq(schema.users.role, "intern"),
-    searchAny(
-      [
-        sql`${schema.users.firstName}`,
-        sql`${schema.users.lastName}`,
-        sql`${schema.users.email}`,
-        sql`${schema.users.phoneNumber}`,
-      ],
-      req.search,
-    ),
-    params.status ? eq(schema.users.isActive, params.status === "active") : undefined,
-    params.visibility === "intern_hidden"
-      ? sql`not ${openToWork}`
-      : params.visibility
-        ? eq(schema.users.profileVisibility, params.visibility)
-        : undefined,
-    params.profile === "complete" ? profileFilled : undefined,
-    params.profile === "incomplete" ? sql`not ${profileFilled}` : undefined,
-    params.ai ? sql`${aiStatus} = ${params.ai}` : undefined,
-  ].filter(Boolean) as SQL[];
-
-  const where = conditions.length
-    ? sql`${conditions.reduce((acc, c) => sql`${acc} and ${c}`)}`
-    : undefined;
-
-  // Correlated subqueries rather than a second round trip per intern: the old
-  // dashboard ran 2N additional queries to draw one screen.
-  const proposalCount = sql<number>`(
-    select count(*)::int from ${schema.proposals} p where p.intern_id = ${schema.users.id}
-  )`;
-  const interviewCount = sql<number>`(
-    select count(*)::int from ${schema.interviews} i where i.intern_id = ${schema.users.id}
-  )`;
-
-  const [rawRows, [totalRow], [signupsRow], [incompleteRow]] = await Promise.all([
-    db
-      .select({
-        id: schema.users.id,
-        firstName: schema.users.firstName,
-        lastName: schema.users.lastName,
-        email: schema.users.email,
-        countryCode: schema.users.countryCode,
-        phoneNumber: schema.users.phoneNumber,
-        isActive: schema.users.isActive,
-        visibility: schema.users.profileVisibility,
-        createdAt: schema.users.createdAt,
-        proposalCount,
-        interviewCount,
-        hasProfile: profileFilled,
-        openToWork,
-        aiStatus,
-        score: findternScoreSql(),
-      })
-      .from(schema.users)
-      .leftJoin(schema.internOnboarding, eq(schema.internOnboarding.userId, schema.users.id))
-      .where(where)
-      .orderBy(desc(schema.users.createdAt))
-      .limit(req.perPage)
-      .offset(req.offset),
-    db
-      .select({ c: count() })
-      .from(schema.users)
-      .leftJoin(schema.internOnboarding, eq(schema.internOnboarding.userId, schema.users.id))
-      .where(where),
-    db.select({ c: count() }).from(schema.users).where(eq(schema.users.role, "intern")),
-    db
-      .select({ c: count() })
-      .from(schema.users)
-      .leftJoin(schema.internOnboarding, eq(schema.internOnboarding.userId, schema.users.id))
-      .where(sql`${schema.users.role} = 'intern' and not ${profileFilled}`),
-  ]);
-
-  // Dates cross into the client boundary for `SelectAllCheckbox`, which receives
-  // the id list - the ids are strings, and the rows stay on the server.
-  const rows: InternRow[] = rawRows.map((row) => ({
-    ...row,
-    createdAt: row.createdAt?.toISOString() ?? "",
-  }));
-
-  const page = toPage(rows, Number(totalRow?.c ?? 0), req.page, req.perPage);
+  const sortKey = SORTS.find((k) => k === params.sort) ?? "created";
+  const dir: "asc" | "desc" = params.dir === "asc" || params.dir === "desc" ? params.dir : sortKey === "name" || sortKey === "email" || sortKey === "next" ? "asc" : "desc";
   const exportHref = `/api/admin/export?type=interns&${new URLSearchParams(params).toString()}`;
 
-  return (
-    <div>
-      <AdminPageHeader
-        title="Candidate Directory"
-        subtitle="Every registered intern, their profile state, and directory visibility."
-        action={
-          <div className="flex flex-wrap items-center gap-2">
+  const header = (
+    <AdminPageHeader
+      title="Candidates"
+      subtitle="Every registered candidate: review status, scores, offers, stipends and visibility, editable in the row."
+      action={
+        <div className="flex flex-wrap items-center gap-2">
           <RatingsImport />
-          <a
-            href={exportHref}
-            className="apple-spring apple-pressable inline-flex min-h-11 cursor-pointer items-center gap-1.5 rounded-[10px] border border-ink-200 bg-white px-3.5 text-[14px] font-medium text-ink-700 hover:bg-ink-50"
-          >
+          <a href={exportHref} className={buttonClass({ variant: "outline" })}>
             <Download className="size-4" aria-hidden />
             Export CSV
           </a>
+        </div>
+      }
+    />
+  );
+
+  let data: Awaited<ReturnType<typeof loadInterns>>;
+  try {
+    data = await loadInterns(params, { search: req.search, limit: req.perPage, offset: req.offset }, sortKey, dir);
+  } catch (err) {
+    console.error("[admin/interns] list query failed", err);
+    return (
+      <div>
+        {header}
+        <div className="apple-panel bg-white">
+          <AdminLoadError what="the candidate list" retryHref="/admin/interns" />
+        </div>
+      </div>
+    );
+  }
+
+  const { rows, total, signups, incomplete } = data;
+  const page = toPage(rows, total, req.page, req.perPage);
+  const today = todayIstIso();
+
+  const columns: Column<Row>[] = [
+    {
+      header: <SelectAllCheckbox ids={rows.map((r) => r.id)} noun="candidates" />,
+      headerClassName: "w-10",
+      cell: (row) => <RowCheckbox id={row.id} />,
+      className: "w-10",
+    },
+    {
+      header: "Candidate",
+      sort: "name",
+      cell: (row) => (
+        <div className="flex min-w-56 items-center gap-3">
+          <span aria-hidden className="grid size-9 shrink-0 place-items-center rounded-full bg-brand-100 text-xs font-semibold text-brand-800">
+            {row.firstName.charAt(0)}
+            {row.lastName.charAt(0)}
+          </span>
+          <div className="min-w-0">
+            <Link
+              href={`/admin/interns/${row.id}`}
+              className="block max-w-64 truncate font-semibold text-ink-900 underline-offset-4 hover:underline"
+              title={`${row.firstName} ${row.lastName}`}
+            >
+              {row.firstName} {row.lastName}
+            </Link>
+            <p className="max-w-64 truncate text-sm text-ink-600" title={row.email}>
+              {row.email}
+            </p>
           </div>
-        }
-      />
+        </div>
+      ),
+    },
+    {
+      header: "Joined",
+      sort: "created",
+      cell: (row) => <span className="nums whitespace-nowrap text-ink-600">{row.createdAt ? formatDate(row.createdAt) : "-"}</span>,
+    },
+    {
+      header: "Score",
+      sort: "score",
+      cell: (row) => (
+        <div className="flex min-w-32 flex-col items-start gap-1">
+          {row.hasOnboarding ? (
+            <InternRatingsCell
+              internId={row.id}
+              name={`${row.firstName} ${row.lastName}`.trim()}
+              ratings={row.ratings ?? {}}
+              score={row.score}
+            />
+          ) : (
+            <span className="text-ink-600">No profile</span>
+          )}
+          <span className="text-xs text-ink-600">AI interview: {AI_STATUS_LABEL[row.aiStatus] ?? humanizeStatus(row.aiStatus)}</span>
+        </div>
+      ),
+    },
+    {
+      header: "Review",
+      cell: (row) =>
+        row.hasOnboarding ? <InternApprovalCell internId={row.id} value={row.approval ?? "Pending"} /> : <span className="text-ink-500">-</span>,
+    },
+    {
+      header: "Offer",
+      cell: (row) =>
+        row.offerStatus ? (
+          <div className="flex flex-col items-start gap-1 whitespace-nowrap">
+            <StatusBadge value={row.hired ? "hired" : row.offerStatus} />
+            {row.hired || row.fullTime ? (
+              <span className="text-xs text-ink-600">
+                {row.fullTime ? "Full-time" : "Internship"}
+                {row.hired ? ` · ${row.projectStatus === "completed" ? "Completed" : "Ongoing"}` : ""}
+              </span>
+            ) : null}
+          </div>
+        ) : (
+          <span className="text-ink-500">No offers</span>
+        ),
+    },
+    {
+      header: "Next payout",
+      sort: "next",
+      cell: (row) =>
+        row.money?.nextDate ? (
+          <div className="flex flex-col items-start gap-1 whitespace-nowrap">
+            <span className="nums text-ink-800">{formatDate(row.money.nextDate)}</span>
+            {matchesDue(row.money.nextDate, "overdue", today) ? (
+              <StatusBadge tone="danger" label="Overdue" />
+            ) : null}
+          </div>
+        ) : (
+          <span className="text-ink-500">-</span>
+        ),
+    },
+    {
+      header: "Left to pay",
+      sort: "owed",
+      align: "right",
+      cell: (row) =>
+        row.money && (row.money.owedMinor > 0 || row.money.pendingPayoutMinor > 0) ? (
+          <div className="whitespace-nowrap">
+            <span className="font-semibold text-ink-900">{formatMoney(row.money.owedMinor, "INR", { zeroLabel: "₹0" })}</span>
+            {row.money.pendingPayoutMinor > 0 ? (
+              <span className="block text-xs text-ink-600">{formatMoney(row.money.pendingPayoutMinor, "INR")} pending</span>
+            ) : null}
+          </div>
+        ) : (
+          <span className="text-ink-500">-</span>
+        ),
+    },
+    {
+      header: "Visibility",
+      cell: (row) => (
+        <div className="flex flex-col items-start gap-1">
+          <InternVisibilityCell internId={row.id} live={row.visibility !== "hidden"} />
+          {!row.openToWork && row.visibility !== "hidden" ? <span className="text-xs text-ink-600">Hidden by candidate</span> : null}
+        </div>
+      ),
+    },
+    {
+      header: "Account",
+      cell: (row) => (
+        <div className="flex flex-col items-start gap-1">
+          <AccountActiveCell id={row.id} kind="intern" active={row.isActive} />
+          <span className="whitespace-nowrap text-xs text-ink-600">
+            {row.hasProfile ? "Profile complete" : <span className="text-accent-700">Profile incomplete</span>} ·{" "}
+            {row.feePaid ? "fee paid" : "fee unpaid"}
+          </span>
+        </div>
+      ),
+    },
+  ];
 
+  return (
+    <div>
+      {header}
       <div className="space-y-4">
-        <AttentionBanner
-          count={Number(incompleteRow?.c ?? 0)}
-          total={Number(signupsRow?.c ?? 0)}
-          noun="interns"
-          href="/admin/interns?profile=incomplete"
-        />
-
+        <AttentionBanner count={incomplete} total={signups} noun="interns" href="/admin/interns?profile=incomplete" />
         <BulkSelectProvider actions={ACTIONS} noun="interns">
-          <Panel className="overflow-visible">
-            <div className="flex flex-wrap items-end justify-between gap-3 border-b border-ink-100 px-5 py-3.5">
-              <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2.5">
-                <TableToolbar
-                  searchPlaceholder="Search interns…"
-                  filters={FILTERS}
-                />
-              </div>
-              <PageSizeSelect />
-            </div>
-
-            {rows.length === 0 ? (
-              <AdminEmpty
-                title="No interns match"
-                body="Try a different search term, or clear the filters to see everyone."
-              />
-            ) : (
-              <>
-                <Table>
-                  <TableHeader className="apple-material-bar">
-                    <TableRow className="group/row hover:bg-transparent">
-                      <TableHead scope="col" className="w-10 px-3 py-3">
-                        <SelectAllCheckbox
-                          ids={rows.map((row) => row.id)}
-                          noun="interns"
-                        />
-                      </TableHead>
-                      <TableHead scope="col" className="px-3 py-3 text-[12px] font-semibold tracking-[0.02em] text-ink-600 capitalize">
-                        Candidate
-                      </TableHead>
-                      <TableHead
-                        scope="col"
-                        className="hidden px-3 py-3 text-[12px] font-semibold tracking-[0.02em] text-ink-600 capitalize md:table-cell"
-                      >
-                        Pipeline
-                      </TableHead>
-                      <TableHead scope="col" className="px-3 py-3 text-[12px] font-semibold tracking-[0.02em] text-ink-600 capitalize">
-                        AI interview
-                      </TableHead>
-                      <TableHead scope="col" className="px-3 py-3 text-[12px] font-semibold tracking-[0.02em] text-ink-600 capitalize">
-                        State
-                      </TableHead>
-                    </TableRow>
-                  </TableHeader>
-
-                  <TableBody>
-                    {rows.map((row) => (
-                      <TableRow key={row.id} className="apple-spring group/row hover:bg-ink-50/70">
-                        <TableCell className="px-3 py-3">
-                          <RowCheckbox id={row.id} />
-                        </TableCell>
-                        <TableCell className="px-3 py-3">
-                          <div className="flex items-center gap-3">
-                            <span
-                              aria-hidden
-                              className="grid size-11 shrink-0 place-items-center rounded-full bg-brand-100 text-[13px] font-semibold text-brand-800"
-                            >
-                              {row.firstName.charAt(0)}
-                              {row.lastName.charAt(0)}
-                            </span>
-                            <div className="min-w-0">
-                              <Link
-                                href={`/admin/interns/${row.id}`}
-                                className="apple-spring block truncate text-[15px] font-semibold tracking-[-0.01em] text-ink-900 underline-offset-4 hover:underline"
-                              >
-                                {row.firstName} {row.lastName}
-                              </Link>
-                              <p className="mt-0.5 truncate text-[13px] text-text-subtle">
-                                {row.email} · Joined{" "}
-                                {row.createdAt ? formatDate(row.createdAt) : "-"}
-                              </p>
-                              {/* The Pipeline column is hidden below md; the same
-                                  numbers ride along here so phones still see them. */}
-                              <p className="mt-0.5 text-[12px] tabular-nums text-text-subtle md:hidden">
-                                <span className="font-semibold text-ink-800">{row.proposalCount}</span> proposals
-                                <span aria-hidden className="mx-1.5 text-ink-300">→</span>
-                                <span className="font-semibold text-ink-800">{row.interviewCount}</span> interviews
-                              </p>
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell className="hidden px-3 py-3 md:table-cell">
-                          <span className="inline-flex items-center gap-4">
-                            <span>
-                              <span className="block text-[17px] font-semibold tabular-nums text-ink-900">
-                                {row.proposalCount}
-                              </span>
-                              <span className="block text-[12px] text-text-subtle">
-                                Proposals
-                              </span>
-                            </span>
-                            <span aria-hidden className="text-ink-300">→</span>
-                            <span>
-                              <span className="block text-[17px] font-semibold tabular-nums text-ink-900">
-                                {row.interviewCount}
-                              </span>
-                              <span className="block text-[12px] text-text-subtle">
-                                Interviews
-                              </span>
-                            </span>
-                          </span>
-                        </TableCell>
-                        <TableCell className="px-3 py-3">
-                          <span className="flex flex-col items-start gap-1">
-                            <StatusBadge
-                              tone={row.aiStatus === "completed" ? "success" : row.aiStatus === "not_applied" ? "neutral" : "info"}
-                              label={AI_STATUS_LABEL[row.aiStatus] ?? row.aiStatus}
-                            />
-                            <span className="text-[12px] tabular-nums text-text-subtle">
-                              {row.score != null ? `Score ${row.score.toFixed(1)}` : "No score"}
-                            </span>
-                          </span>
-                        </TableCell>
-                        <TableCell className="px-3 py-3">
-                          <span className="flex flex-col items-start gap-1.5">
-                            <StatusBadge
-                              tone={row.hasProfile ? "success" : "warning"}
-                              label={row.hasProfile ? "Complete" : "Incomplete"}
-                            />
-                            <span className="inline-flex items-center gap-2 text-[12px] text-text-subtle">
-                              <span className="inline-flex items-center gap-1">
-                                <span
-                                  aria-hidden
-                                  className={
-                                    row.isActive
-                                      ? "size-1.5 rounded-full bg-emerald-600"
-                                      : "size-1.5 rounded-full bg-ink-300"
-                                  }
-                                />
-                                {row.isActive ? "Active" : "Inactive"}
-                              </span>
-                              <span aria-hidden className="text-ink-300">·</span>
-                              <span className="inline-flex items-center gap-1 capitalize">
-                                <span
-                                  aria-hidden
-                                  className={
-                                    row.visibility === "live"
-                                      ? "size-1.5 rounded-full bg-emerald-600"
-                                      : "size-1.5 rounded-full bg-ink-300"
-                                  }
-                                />
-                                {row.visibility}
-                              </span>
-                              {!row.openToWork ? (
-                                <>
-                                  <span aria-hidden className="text-ink-300">·</span>
-                                  <span>Hidden by intern</span>
-                                </>
-                              ) : null}
-                            </span>
-                          </span>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-
-                <Pagination
-                  page={page.page}
-                  pages={page.pages}
-                  total={page.total}
-                  perPage={page.perPage}
-                  rowsShown={rows.length}
-                  params={params}
-                  basePath="/admin/interns"
-                  noun="interns"
-                />
-              </>
+          <DataTable<Row>
+            basePath="/admin/interns"
+            params={params}
+            page={page.page}
+            pages={page.pages}
+            total={page.total}
+            perPage={page.perPage}
+            rows={rows}
+            columns={columns}
+            noun="candidates"
+            caption="Candidates"
+            searchPlaceholder="Search name, email or phone…"
+            filters={FILTERS}
+            renderRow={(row) => (
+              <TableRow key={row.id} className="group/row border-ink-100 align-top hover:bg-ink-50/60">
+                {columns.map((column, i) => (
+                  <TableCell
+                    key={i}
+                    className={cn("px-3 py-3 text-sm text-ink-700", column.align === "right" && "nums text-right", column.className)}
+                  >
+                    {column.cell(row, i)}
+                  </TableCell>
+                ))}
+              </TableRow>
             )}
-          </Panel>
+            empty={{
+              title: "No candidates match",
+              body: "Try a different search, or clear the filters to see everyone.",
+              action: { href: "/admin/interns", label: "Clear filters" },
+            }}
+          />
         </BulkSelectProvider>
       </div>
     </div>

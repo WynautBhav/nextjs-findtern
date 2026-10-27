@@ -1,5 +1,6 @@
 "use client";
 
+import { buttonClass } from "@/components/ui/button";
 /**
  * Edit the skills an admin can vouch for.
  *
@@ -81,8 +82,8 @@ export function InternSkillsEditor({
   }
 
   return (
-    <div className="border-t border-ink-100 pt-3">
-      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-text-subtle">
+    <div>
+      <p className="text-sm font-medium text-ink-700">
         Vouched skills ({list.length}/{MAX})
       </p>
 
@@ -91,7 +92,7 @@ export function InternSkillsEditor({
           {list.map((skill) => (
             <li
               key={skill.name}
-              className="inline-flex items-center gap-1.5 rounded-full bg-ink-100 py-1 pl-2.5 pr-2 text-xs font-medium text-ink-700"
+              className="inline-flex items-center gap-1.5 rounded-full bg-ink-100 py-1 pl-3 pr-2 text-sm font-medium text-ink-800"
             >
               {skill.name}
               <select
@@ -101,7 +102,7 @@ export function InternSkillsEditor({
                   setSaved(false);
                 }}
                 aria-label={`Level for ${skill.name}`}
-                className="rounded-md border border-ink-200 bg-white px-1 py-0.5 text-[11px] text-ink-700"
+                className="rounded-apple-sm border border-ink-200 bg-white px-1.5 py-0.5 text-xs text-ink-700"
               >
                 {LEVELS.map((l) => (
                   <option key={l} value={l}>
@@ -124,7 +125,7 @@ export function InternSkillsEditor({
           ))}
         </ul>
       ) : (
-        <p className="mt-2 text-xs text-ink-600">
+        <p className="mt-2 text-sm text-ink-600">
           None recorded. Employers filtering on skills will not find this candidate.
         </p>
       )}
@@ -143,12 +144,12 @@ export function InternSkillsEditor({
             }
           }}
           placeholder="Add a skill"
-          className="h-9 min-w-0 flex-1 rounded-lg border border-ink-200 bg-white px-3 text-sm text-ink-900 outline-none placeholder:text-ink-400 focus-visible:border-brand-600"
+          className="h-11 min-w-0 flex-1 rounded-apple-sm border border-ink-200 bg-white px-3 text-sm text-ink-900 outline-none placeholder:text-ink-400 focus-visible:border-brand-600 focus-visible:ring-2 focus-visible:ring-brand-600/20"
         />
         <button
           type="button"
           onClick={add}
-          className="h-9 rounded-lg border border-ink-200 bg-white px-3.5 text-sm font-medium text-ink-800 transition-colors hover:bg-ink-50"
+          className={buttonClass({ variant: "outline", size: "sm" })}
         >
           Add
         </button>
@@ -156,15 +157,15 @@ export function InternSkillsEditor({
           type="button"
           onClick={save}
           disabled={busy || !dirty}
-          className="inline-flex h-9 items-center gap-2 rounded-lg bg-brand-700 px-4 text-sm font-semibold text-white transition-colors hover:bg-brand-600 disabled:opacity-60"
+          className={buttonClass({ variant: "primary", size: "sm" })}
         >
           {busy ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : null}
           Save
         </button>
       </div>
 
-      {error ? <p className="mt-2 text-xs text-danger">{error}</p> : null}
-      {saved ? <p className="mt-2 text-xs text-brand-700">Skills saved.</p> : null}
+      {error ? <p role="alert" className="mt-2 text-sm text-danger">{error}</p> : null}
+      {saved ? <p role="status" className="mt-2 text-sm text-brand-700">Skills saved.</p> : null}
     </div>
   );
 }

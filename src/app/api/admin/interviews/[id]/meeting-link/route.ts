@@ -5,6 +5,7 @@ import { z } from "zod";
 import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
 import { notify } from "@/lib/notify";
+import { mergeInterviewNotes, noteTag, statusAfterMeetingLink } from "@/lib/admin/interview-notes";
 
 const AI_EMAIL = "ai-interview@findtern.ai";
 
@@ -15,16 +16,20 @@ const AI_EMAIL = "ai-interview@findtern.ai";
  * Matching legacy route: PUT /api/admin/interviews/:id/meeting-link
  *
  * Side effects depend on the interview kind:
- *  - AI interview (synthetic ai-interview@findtern.ai employer): advances status
- *    to "scheduled" unless terminal, emits the deduplicated
- *    `ai_interview_unlocked` notification, and persists aiFeedbackLink /
- *    aiRecordingLink to the candidate's extraData.
- *  - Any other interview: only the link (and notes) change; status is left
- *    alone and both parties are told the meeting link was set.
+ *  - Every interview that isn't finished moves to "scheduled" (legacy rule,
+ *    ADP-07).
+ *  - AI interview (synthetic ai-interview@findtern.ai employer): emits the
+ *    deduplicated `ai_interview_unlocked` notification and persists
+ *    aiFeedbackLink / aiRecordingLink to the candidate's extraData.
+ *  - Any other interview: both parties are told the meeting link was set.
  */
 
 const bodySchema = z.object({
-  meetingLink: z.string().min(1, "Meeting link is required"),
+  meetingLink: z
+    .string({ message: "Enter the meeting link." })
+    .trim()
+    .min(1, "Enter the meeting link.")
+    .regex(/^https?:\/\/\S+$/i, "Enter a full link starting with https://"),
   feedbackLink: z.string().optional().nullable(),
   recordingLink: z.string().optional().nullable(),
   notes: z.string().optional().nullable(),
@@ -42,7 +47,7 @@ export async function PUT(
   const parsed = bodySchema.safeParse(bodyRaw);
   if (!parsed.success) {
     return NextResponse.json(
-      { error: "Invalid payload", issues: parsed.error.issues },
+      { error: parsed.error.issues[0]?.message ?? "Invalid payload", issues: parsed.error.issues },
       { status: 400 },
     );
   }
@@ -60,21 +65,11 @@ export async function PUT(
     return NextResponse.json({ error: "Interview not found" }, { status: 404 });
   }
 
-  // Notes carry the feedback & recording tags (legacy storage). Fields sent
-  // empty clear their part instead of silently keeping the old value; fields
-  // not sent at all keep what was there.
-  const oldLines = String(existing.notes ?? "").split("\n");
-  const oldTag = (tag: string) => oldLines.find((l) => l.startsWith(`${tag}: `))?.slice(tag.length + 2) ?? "";
-  const oldFree = oldLines.filter((l) => !/^(feedback|recording): /.test(l)).join("\n").trim();
-  const pick = (given: string | null | undefined, old: string) => (given === undefined ? old : (given ?? "").trim());
-  const nextFree = pick(notes, oldFree);
-  const nextFeedback = pick(feedbackLink, oldTag("feedback"));
-  const nextRecording = pick(recordingLink, oldTag("recording"));
-  const noteParts: string[] = [];
-  if (nextFree) noteParts.push(nextFree);
-  if (nextFeedback) noteParts.push(`feedback: ${nextFeedback}`);
-  if (nextRecording) noteParts.push(`recording: ${nextRecording}`);
-  const combinedNotes = noteParts.length > 0 ? noteParts.join("\n") : null;
+  // Notes carry the feedback & recording tags plus the employer's own
+  // `feedback_text:` line, which is always kept (ADP-33).
+  const combinedNotes = mergeInterviewNotes(existing.notes, { notes, feedbackLink, recordingLink });
+  const nextFeedback = noteTag(combinedNotes, "feedback");
+  const nextRecording = noteTag(combinedNotes, "recording");
 
   const [employer] = await db
     .select({ email: schema.employers.companyEmail })
@@ -85,8 +80,9 @@ export async function PUT(
   const isAi = existing.employerId === "admin" || employer?.email === AI_EMAIL;
 
   const currentStatus = String(existing.status ?? "").toLowerCase();
-  const isTerminal = ["completed", "expired", "cancelled", "canceled"].includes(currentStatus);
-  const nextStatus = isAi && !isTerminal ? "scheduled" : existing.status;
+  // Legacy rule (ADP-07, decided): any unfinished interview, employer or AI,
+  // becomes "scheduled" once it has a link.
+  const nextStatus = statusAfterMeetingLink(existing.status);
 
   const [updated] = await db
     .update(schema.interviews)

@@ -1,7 +1,7 @@
-import type { LucideIcon } from "lucide-react";
-import Link from "next/link";
+import { AlertTriangle, ArrowRight, type LucideIcon } from "lucide-react";
 
-import { PageHead } from "@/components/app/primitives";
+import { PageHead, ThreadMark } from "@/components/app/primitives";
+import { ButtonLink } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 /**
@@ -58,9 +58,9 @@ export function PanelHeader({
       <div className="flex min-w-0 items-start gap-3">
         {Icon ? <Icon className="mt-0.5 size-4 shrink-0 text-brand-700" aria-hidden /> : null}
         <div className="min-w-0">
-          <h2 className="text-[17px] font-semibold tracking-[-0.02em] text-ink-900">{title}</h2>
+          <h2 className="text-base font-semibold tracking-[-0.01em] text-ink-900">{title}</h2>
           {description ? (
-            <p className="mt-0.5 text-[13px] leading-relaxed text-text-subtle">
+            <p className="mt-0.5 text-sm leading-relaxed text-ink-600">
               {description}
             </p>
           ) : null}
@@ -121,24 +121,50 @@ export function AdminEmpty({
   icon?: LucideIcon;
 }) {
   return (
-    <div className="apple-admin flex flex-col items-center px-6 py-14 text-center">
+    <div className="flex flex-col items-center px-6 py-14 text-center">
       {Icon ? (
-        <span
-          aria-hidden
-          className="mb-3 grid size-11 place-items-center rounded-full bg-ink-100 text-ink-400"
-        >
+        <span aria-hidden className="mb-4 grid size-11 place-items-center rounded-full bg-brand-50 text-brand-700">
           <Icon className="size-5" />
         </span>
-      ) : null}
-      <p className="text-[15px] font-semibold tracking-[-0.01em] text-ink-800">{title}</p>
-      <p className="mt-1 max-w-sm text-[14px] leading-relaxed text-text-subtle">{body}</p>
+      ) : (
+        <ThreadMark className="mb-4" />
+      )}
+      <p className="text-balance text-base font-semibold tracking-[-0.01em] text-ink-900">{title}</p>
+      <p className="mt-1.5 max-w-md text-pretty text-sm leading-relaxed text-ink-600">{body}</p>
       {action ? (
-        <Link
-          href={action.href}
-          className="apple-spring apple-pressable mt-4 inline-flex min-h-11 items-center rounded-[10px] bg-brand-700 px-4 text-[14px] font-medium text-white hover:bg-brand-600"
-        >
+        <ButtonLink href={action.href} variant="primary" size="sm" className="mt-5">
           {action.label}
-        </Link>
+        </ButtonLink>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * A failed query, said plainly (DESIGN.md §0: an outage is never "no data").
+ * Pages catch their own load error and render this in place of the table.
+ */
+export function AdminLoadError({
+  what,
+  retryHref,
+}: {
+  /** What failed to load, e.g. "the candidate list". */
+  what: string;
+  retryHref?: string;
+}) {
+  return (
+    <div role="alert" className="flex flex-col items-center px-6 py-14 text-center">
+      <span aria-hidden className="mb-4 grid size-11 place-items-center rounded-full bg-danger-soft text-danger">
+        <AlertTriangle className="size-5" />
+      </span>
+      <p className="text-base font-semibold text-ink-900">Couldn&apos;t load {what}</p>
+      <p className="mt-1.5 max-w-md text-sm leading-relaxed text-ink-600">
+        The database didn&apos;t answer. Nothing was changed. Try again in a moment; if it keeps failing, check the server logs.
+      </p>
+      {retryHref ? (
+        <ButtonLink href={retryHref} variant="outline" size="sm" className="mt-5">
+          Try again
+        </ButtonLink>
       ) : null}
     </div>
   );
@@ -167,35 +193,23 @@ export function AttentionBanner({
   return (
     <div
       role="status"
-      className="flex flex-col gap-3 rounded-xl border border-amber-500/25 bg-amber-500/5 px-4 py-3 text-sm text-amber-950 backdrop-blur-xs sm:flex-row sm:items-center sm:justify-between dark:text-amber-200"
+      className="flex flex-col gap-3 rounded-apple-lg border border-accent-300/70 bg-accent-100/60 px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between"
     >
       <div className="flex min-w-0 items-start gap-2.5">
-        <span className="relative mt-1.5 flex size-2 shrink-0">
-          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75" />
-          <span className="relative inline-flex size-2 rounded-full bg-amber-500" />
-        </span>
+        <span aria-hidden className="mt-2 size-2 shrink-0 rounded-full bg-accent-500" />
         {/* One paragraph, not three spans: the count used to wrap onto its own
             line at tablet widths. Inline <strong>s wrap with the sentence. */}
-        <p className="min-w-0 leading-relaxed text-amber-800 dark:text-amber-300">
-          <strong className="font-semibold text-amber-900 dark:text-amber-100">Action Required:</strong>{" "}
-          <strong className="font-bold tabular-nums text-amber-900 dark:text-amber-100">
-            {count.toLocaleString("en-IN")}
-          </strong>{" "}
-          {noun} {count === 1 ? "has" : "have"} incomplete onboarding profiles out of{" "}
-          <strong className="font-semibold tabular-nums text-amber-900 dark:text-amber-100">
-            {total.toLocaleString("en-IN")}
-          </strong>{" "}
-          total registered signups.
+        <p className="min-w-0 leading-relaxed text-ink-800">
+          <strong className="nums font-semibold text-ink-900">{count.toLocaleString("en-IN")}</strong> of{" "}
+          <strong className="nums font-semibold text-ink-900">{total.toLocaleString("en-IN")}</strong> {noun}{" "}
+          {count === 1 ? "has" : "have"} not finished onboarding, so employers can&apos;t see them yet.
         </p>
       </div>
       {href ? (
-        <Link
-          href={href}
-          className="apple-spring apple-pressable inline-flex min-h-11 shrink-0 items-center gap-1.5 self-start whitespace-nowrap rounded-[10px] bg-amber-500/15 px-3 py-1.5 text-xs font-semibold text-amber-900 hover:bg-amber-500/25 sm:self-auto dark:text-amber-100"
-        >
-          <span>Review Triage Queue</span>
-          <span aria-hidden>→</span>
-        </Link>
+        <ButtonLink href={href} variant="outline" size="sm" className="shrink-0 self-start sm:self-auto">
+          Review list
+          <ArrowRight className="size-4" aria-hidden />
+        </ButtonLink>
       ) : null}
     </div>
   );

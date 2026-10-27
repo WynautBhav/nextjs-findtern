@@ -4,30 +4,34 @@ import { z } from "zod";
 
 import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
-import { notifyStipendPaid } from "@/lib/payments";
+import { cycleFor, payoutRefusal } from "@/lib/admin/stipend-dues";
+import { loadPlacementDue, lockPlacement } from "@/lib/admin/stipend-queue";
 
-const isoDate = z.string().refine((v) => !Number.isNaN(Date.parse(v)), "Invalid date");
+const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Pick a payout date");
 
-const bodySchema = z
-  .object({
-    amountMinor: z.number().int().positive(),
-    // Legacy accepted these two only; anything else broke totals and the email.
-    currency: z.enum(["INR", "USD"]).default("INR"),
-    status: z.enum(["pending", "paid", "failed"]).default("pending"),
-    method: z.string().default("bank"),
-    referenceId: z.string().optional(),
-    notes: z.string().optional(),
-    /** Which placement and month this pays; legacy groups payouts by these. */
-    proposalId: z.string().optional(),
-    employerId: z.string().optional(),
-    /** Required, as in legacy: when the transfer is due. */
-    scheduledFor: isoDate,
-    paidAt: isoDate.optional(),
-    source: z.string().max(40).optional(),
-  })
-  .refine((b) => b.status !== "paid" || (b.referenceId ?? "").trim().length > 0, {
-    message: "A bank reference is required to record a paid payout",
-  });
+/**
+ * Create a stipend payout (pending).
+ *
+ * Guarded like legacy (ADP-29): a payout belongs to a hired placement, is in
+ * INR, is at most one month's share and never more than is still owed, and is
+ * refused while another payout for the placement is pending or when the
+ * intern's share is ₹0 (Findtern Score below 6). The checks run under a
+ * per-placement lock, so two admins cannot both create the same month.
+ *
+ * `notes` keeps its legacy meaning, the role name the stipend email quotes
+ * (DB-17); staff notes go to `raw.opsNote`. `raw.cycle` is written as legacy
+ * does, so marking the payout paid in either app queues the next month (DB-18).
+ */
+const bodySchema = z.object({
+  amountMinor: z.number().int().positive(),
+  currency: z.literal("INR").default("INR"),
+  method: z.enum(["bank", "upi"]).default("bank"),
+  proposalId: z.string().min(1, "Create payouts from a placement's dues row"),
+  scheduledFor: isoDate,
+  /** Months this series runs for, this one included (legacy "Months"). */
+  months: z.number().int().min(1).max(24).default(1),
+  opsNote: z.string().trim().max(500).optional(),
+});
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -47,26 +51,40 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid input" }, { status: 400 });
   }
+  const body = parsed.data;
 
   const db = getDb();
-  const { proposalId, employerId, scheduledFor, paidAt, source, ...row } = parsed.data;
-  if (proposalId) {
-    const [proposal] = await db
-      .select({ internId: schema.proposals.internId, employerId: schema.proposals.employerId })
-      .from(schema.proposals)
-      .where(eq(schema.proposals.id, proposalId))
-      .limit(1);
-    if (!proposal || proposal.internId !== id) return NextResponse.json({ error: "That placement is not this intern's" }, { status: 400 });
-  }
-  const [payout] = await db
-    .insert(schema.internPayouts)
-    .values({
-      internId: id,
-      ...row,
-      paidAt: row.status === "paid" ? (paidAt ? new Date(paidAt) : new Date()) : null,
-      raw: { proposalId, employerId, scheduledFor, source: source ?? "admin" },
-    })
-    .returning();
-  await notifyStipendPaid(payout.id);
-  return NextResponse.json({ payout }, { status: 201 });
+  const result = await db.transaction(async (tx) => {
+    await lockPlacement(tx, body.proposalId);
+    const { due, proposal } = await loadPlacementDue(tx, id, body.proposalId);
+    if (!proposal) return { error: "That placement is not this intern's", status: 400 } as const;
+    const refusal = payoutRefusal(due, body.amountMinor);
+    if (refusal || !due) return { error: refusal ?? "Nothing is left to pay on this placement.", status: 409 } as const;
+
+    const months = Math.min(body.months, due.remainingMonths);
+    const [payout] = await tx
+      .insert(schema.internPayouts)
+      .values({
+        internId: id,
+        amountMinor: body.amountMinor,
+        currency: "INR",
+        status: "pending",
+        method: body.method,
+        notes: proposal.roleTitle || null,
+        raw: {
+          proposalId: body.proposalId,
+          employerId: proposal.employerId,
+          scheduledFor: body.scheduledFor,
+          source: "employer_due",
+          // Later months follow at the full share, whatever this one was.
+          cycle: cycleFor(months, due.monthlyShareMinor, body.method),
+          ...(body.opsNote ? { opsNote: body.opsNote } : {}),
+        },
+      })
+      .returning();
+    return { payout } as const;
+  });
+
+  if ("error" in result) return NextResponse.json({ error: result.error }, { status: result.status });
+  return NextResponse.json({ payout: result.payout }, { status: 201 });
 }

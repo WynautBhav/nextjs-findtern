@@ -72,7 +72,7 @@ export function TrendChart({
 
   if (data.length < 2) {
     return (
-      <p className="py-12 text-center text-sm text-text-subtle">
+      <p className="py-12 text-center text-sm text-ink-600">
         Not enough activity to chart yet - at least two months are needed.
       </p>
     );
@@ -128,7 +128,7 @@ export function TrendChart({
         {/* Y axis ------------------------------------------------------- */}
         <div
           aria-hidden
-          className="flex shrink-0 flex-col justify-between py-px text-right text-2xs text-ink-600 tabular-nums"
+          className="flex shrink-0 flex-col justify-between py-px text-right text-xs text-ink-600 tabular-nums"
           style={{ height }}
         >
           {ticks.map((tick) => (
@@ -241,10 +241,10 @@ export function TrendChart({
             <span
               key={point.label}
               className={cn(
-                "flex-1 text-center text-2xs whitespace-nowrap transition-colors lg:text-xs",
+                "flex-1 text-center text-xs whitespace-nowrap transition-colors",
                 index % 3 !== 0 && "max-sm:invisible",
                 index % 2 !== 0 && "max-lg:sm:invisible",
-                active === index ? "font-semibold text-ink-900" : "text-text-subtle",
+                active === index ? "font-semibold text-ink-900" : "text-ink-600",
               )}
             >
               {shortLabel(point.label)}
@@ -295,7 +295,7 @@ function Tooltip({ point, xPercent }: { point: TrendPoint; xPercent: number }) {
       )}
       style={{ left: `${xPercent}%` }}
     >
-      <p className="text-2xs font-semibold tracking-wide text-ink-600 uppercase">
+      <p className="text-xs font-semibold tracking-wide text-ink-600 uppercase">
         {point.label}
       </p>
       <dl className="mt-1 flex flex-col gap-0.5">
@@ -337,26 +337,33 @@ function niceCeil(value: number): number {
 export function PipelineBars({
   items,
   className,
+  percentOf = "total",
 }: {
   items: { status: string; count: number; label?: string }[];
   className?: string;
+  /**
+   * What the percentage is of: the sum of all bars (a status breakdown), the
+   * first bar (a funnel: share of the people who started), or nothing.
+   */
+  percentOf?: "total" | "first" | "none";
 }) {
-  const total = items.reduce((sum, item) => sum + item.count, 0);
+  const base =
+    percentOf === "first" ? (items[0]?.count ?? 0) : percentOf === "total" ? items.reduce((sum, item) => sum + item.count, 0) : 0;
   const max = Math.max(1, ...items.map((item) => item.count));
 
   return (
     <ul className={cn("flex flex-col gap-3", className)}>
       {items.map((item) => (
         <li key={item.status}>
-          <div className="flex items-baseline justify-between gap-3">
-            <span className="text-xs font-medium text-ink-700">
+          <div className="flex items-baseline justify-between gap-3 text-sm">
+            <span className="font-medium text-ink-800">
               {item.label ?? item.status}
             </span>
-            <span className="text-xs text-text-subtle tabular-nums">
+            <span className="nums shrink-0 font-semibold text-ink-900">
               {item.count.toLocaleString("en-IN")}
-              {total > 0 ? (
-                <span className="ml-1.5 text-ink-600">
-                  {Math.round((item.count / total) * 100)}%
+              {base > 0 ? (
+                <span className="ml-1.5 font-normal text-ink-600">
+                  {Math.round((item.count / base) * 100)}%
                 </span>
               ) : null}
             </span>

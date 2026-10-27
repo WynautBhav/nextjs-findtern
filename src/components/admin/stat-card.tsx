@@ -5,40 +5,18 @@ import { cn } from "@/lib/utils";
 
 export type StatTone = "brand" | "accent" | "info" | "success" | "warning" | "neutral";
 
-const TONE_CLASS: Record<
-  StatTone,
-  { icon: string; topBorder: string; deltaBadge: string }
-> = {
-  brand: {
-    icon: "bg-brand-50 text-brand-700 border-brand-200/60",
-    topBorder: "bg-brand-600",
-    deltaBadge: "bg-brand-50 text-brand-700 border-brand-200/60",
-  },
-  accent: {
-    icon: "bg-accent-100 text-accent-800 border-accent-200/60",
-    topBorder: "bg-accent-500",
-    deltaBadge: "bg-accent-50 text-accent-800 border-accent-200/60",
-  },
-  info: {
-    icon: "bg-blue-50 text-blue-700 border-blue-200/60",
-    topBorder: "bg-blue-600",
-    deltaBadge: "bg-blue-50 text-blue-700 border-blue-200/60",
-  },
-  success: {
-    icon: "bg-emerald-50 text-emerald-700 border-emerald-200/60",
-    topBorder: "bg-emerald-600",
-    deltaBadge: "bg-emerald-50 text-emerald-700 border-emerald-200/60",
-  },
-  warning: {
-    icon: "bg-amber-50 text-amber-700 border-amber-200/60",
-    topBorder: "bg-amber-500",
-    deltaBadge: "bg-amber-50 text-amber-800 border-amber-200/60",
-  },
-  neutral: {
-    icon: "bg-sand-100 text-ink-700 border-sand-200",
-    topBorder: "bg-sand-400",
-    deltaBadge: "bg-sand-100 text-ink-700 border-sand-200",
-  },
+/**
+ * A KPI tile. Admin tiles are monochrome with one accent (DESIGN.md, 8 Oct):
+ * the tone only tints the small icon chip, so six tiles on one screen never
+ * compete with the figure. Same type ramp as the shared `StatTile`.
+ */
+const ICON_TONE: Record<StatTone, string> = {
+  brand: "bg-brand-50 text-brand-700",
+  accent: "bg-accent-100 text-accent-700",
+  info: "bg-brand-50 text-brand-700",
+  success: "bg-brand-50 text-brand-700",
+  warning: "bg-accent-100 text-accent-700",
+  neutral: "bg-ink-100 text-ink-600",
 };
 
 export function StatCard({
@@ -46,67 +24,42 @@ export function StatCard({
   value,
   hint,
   icon: Icon,
-  tone = "brand",
+  tone = "neutral",
   delta,
   href,
 }: {
-  /** Short uppercase micro-label, e.g. "Total interns". */
   label: string;
   value: string | number;
   /** Required context: the denominator or what the number counts. */
   hint?: string;
   icon?: LucideIcon;
   tone?: StatTone;
-  /** Signed change vs a comparison period, e.g. "+12%". */
+  /** Signed change with its window, e.g. "+12 this week". */
   delta?: string;
   /** Makes the whole tile a link. */
   href?: string;
 }) {
-  const styles = TONE_CLASS[tone];
   const body = (
     <>
       <div className="flex items-start justify-between gap-3">
-        <p className="text-[13px] leading-5 text-text-subtle">
-          {label}
-        </p>
+        <p className="text-sm font-medium text-ink-600">{label}</p>
         {Icon ? (
-          <span
-            aria-hidden
-            className={cn(
-              "apple-spring grid size-8 shrink-0 place-items-center rounded-[10px] border text-ink-400 group-hover:text-brand-700",
-              styles.icon
-            )}
-          >
+          <span aria-hidden className={cn("grid size-8 shrink-0 place-items-center rounded-apple-sm", ICON_TONE[tone])}>
             <Icon className="size-4" />
           </span>
         ) : null}
       </div>
-
-      <div className="mt-3 flex items-baseline gap-2">
-        <span className="text-[28px] font-bold leading-[34px] tracking-[-0.02em] text-ink-900 tabular-nums">
-          {value}
-        </span>
-        {delta ? (
-          <span
-            className={cn(
-              "rounded-full px-2 py-0.5 text-[12px] font-semibold border tabular-nums",
-              styles.deltaBadge
-            )}
-          >
-            {delta}
-          </span>
-        ) : null}
+      <div className="mt-1.5 flex flex-wrap items-baseline gap-x-2 gap-y-1">
+        <span className="nums text-3xl font-semibold leading-tight tracking-[-0.02em] text-ink-900">{value}</span>
+        {delta ? <span className="nums text-sm font-semibold text-brand-700">{delta}</span> : null}
       </div>
-
-      {hint ? (
-        <p className="mt-1 text-[13px] leading-relaxed text-text-subtle">{hint}</p>
-      ) : null}
+      {hint ? <p className="mt-1.5 text-sm text-ink-600">{hint}</p> : null}
     </>
   );
 
   const className = cn(
-    "apple-panel apple-spring group relative block overflow-hidden bg-white p-5",
-    href && "apple-pressable hover:border-brand-300 focus-visible:outline-2"
+    "block min-w-0 rounded-apple-lg border border-ink-200/80 bg-white p-5 shadow-xs",
+    href && "apple-spring hover:border-brand-300 hover:shadow-sm focus-visible:outline-2 focus-visible:outline-brand-600",
   );
 
   if (href) {

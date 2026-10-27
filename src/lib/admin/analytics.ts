@@ -35,7 +35,7 @@ export type AnalyticsInput = {
     hiredAt: Date | null;
   }[];
   interviews: { internId: string; employerId: string; status: string; createdAt: Date | null }[];
-  employerPayments: { amountMinor: number; currency: string; status: string; paidAt: Date | null; createdAt: Date | null }[];
+  employerPayments: { employerId?: string; amountMinor: number; currency: string; status: string; paidAt: Date | null; createdAt: Date | null }[];
   internPayments: { amountMinor: number; currency: string; status: string; paidAt: Date | null; createdAt: Date | null }[];
 };
 
@@ -88,12 +88,27 @@ export function computeAnalytics(input: AnalyticsInput) {
     monthlyGrowth = prev > 0 ? pct(signups - prev, prev) : null;
   }
 
+  // Employer behaviour (legacy routes.ts:6226-6270): active = posted a
+  // project or sent an offer in the range; repeat = paid two or more orders
+  // in the range.
+  const activeEmployerIds = new Set([...projectsIn.map((p) => p.employerId), ...proposalsIn.map((p) => p.employerId)]);
+  const paidOrders = new Map<string, number>();
+  const realEmployer = new Set(input.employers.map((e) => e.id));
+  for (const pay of input.employerPayments) {
+    if (!pay.employerId || !realEmployer.has(pay.employerId) || pay.status !== "paid" || !inRange(pay.paidAt ?? pay.createdAt)) continue;
+    paidOrders.set(pay.employerId, (paidOrders.get(pay.employerId) ?? 0) + 1);
+  }
+  const repeatEmployers = [...paidOrders.values()].filter((n) => n >= 2).length;
+  const activeProjects = projectsIn.filter((p) => !p.status || p.status.toLowerCase() === "active").length;
+
   const totals = {
     signups,
     activeUsers,
     companies,
     projects: projectsIn.length,
-    activeProjects: projectsIn.filter((p) => (p.status ?? "active").toLowerCase() === "active" || !p.status).length,
+    activeProjects,
+    activeEmployers: activeEmployerIds.size,
+    repeatEmployers,
     proposals: proposalsIn.length,
     internshipProposals: proposalsIn.length - fullTimeProposals,
     fullTimeProposals,
@@ -116,6 +131,12 @@ export function computeAnalytics(input: AnalyticsInput) {
     applicationSuccessRate: pct(hiresIn.length, applied.size),
     avgHireTimeDays: hireDays.length ? Number((hireDays.reduce((a, b) => a + b, 0) / hireDays.length).toFixed(1)) : null,
     monthlyGrowth,
+    /** Share of all real companies that were active in the range. */
+    activeEmployerRate: pct(activeEmployerIds.size, input.employers.length),
+    /** Share of active companies that paid two or more orders. */
+    repeatEmployerRate: pct(repeatEmployers, activeEmployerIds.size),
+    /** Share of projects posted in the range that are still open. */
+    activeProjectRate: pct(activeProjects, projectsIn.length),
   };
 
   const base = Math.max(1, signups);
@@ -200,8 +221,9 @@ export function computeAnalytics(input: AnalyticsInput) {
       };
     })
     .filter((c) => c.proposals > 0 || c.projects > 0)
-    .sort((a, b) => b.hires - a.hires || b.proposals - a.proposals || b.projects - a.projects)
-    .slice(0, 5);
+    // Legacy status: a company with a project is active.
+    .map((c) => ({ ...c, status: c.projects > 0 ? ("active" as const) : ("inactive" as const) }))
+    .sort((a, b) => b.hires - a.hires || b.proposals - a.proposals || b.projects - a.projects);
 
   const internName = new Map(input.interns.map((u) => [u.id, `${u.firstName ?? ""} ${u.lastName ?? ""}`.trim() || "Candidate"]));
   const byIntern = new Map<string, { applications: number; offers: number }>();
@@ -242,3 +264,18 @@ export function computeAnalytics(input: AnalyticsInput) {
 }
 
 export type Analytics = ReturnType<typeof computeAnalytics>;
+
+export type HireFilter = { kind: "" | "internship" | "full-time"; from: string; to: string; q: string };
+
+/** The hires list filters (legacy: type, hired-date range, search). Dates are `YYYY-MM-DD`, inclusive. */
+export function filterHires(list: Analytics["hiredList"], f: HireFilter): Analytics["hiredList"] {
+  const q = f.q.trim().toLowerCase();
+  return list.filter((h) => {
+    if (f.kind && h.kind !== f.kind) return false;
+    const day = h.hiredAt ? h.hiredAt.slice(0, 10) : "";
+    if (f.from && (!day || day < f.from)) return false;
+    if (f.to && (!day || day > f.to)) return false;
+    if (q && !`${h.internName} ${h.companyName}`.toLowerCase().includes(q)) return false;
+    return true;
+  });
+}

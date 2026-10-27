@@ -17,7 +17,7 @@ export async function POST(req: Request) {
   if (!guard.ok) return guard.response;
 
   const parsed = bodySchema.safeParse(await req.json().catch(() => null));
-  if (!parsed.success) return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+  if (!parsed.success) return NextResponse.json({ error: "Give the role a name of 2 or more letters (A-Z, 0-9)." }, { status: 400 });
 
   if (parsed.data.key.toLowerCase() === "super_admin" || !canGrant(guard.session.permissions, parsed.data.permissions)) {
     return NextResponse.json({ error: "You can only grant permissions you have yourself." }, { status: 403 });

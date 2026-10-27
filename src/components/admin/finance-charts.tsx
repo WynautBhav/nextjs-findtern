@@ -28,7 +28,7 @@ export function RevenueChart({ data }: { data: RevenuePoint[] }) {
   // the same empty state as a too-short one.
   if (data.length < 2 || data.every((d) => d.totalMinor === 0)) {
     return (
-      <p className="py-12 text-center text-sm text-text-subtle">
+      <p className="py-12 text-center text-sm text-ink-600">
         Not enough revenue history to chart yet.
       </p>
     );
@@ -44,7 +44,7 @@ export function RevenueChart({ data }: { data: RevenuePoint[] }) {
   return (
     <figure className="w-full">
       <div className="flex gap-2.5">
-        <div aria-hidden className="flex h-52 shrink-0 flex-col justify-between py-px text-right text-2xs text-ink-600 tabular-nums">
+        <div aria-hidden className="flex h-52 shrink-0 flex-col justify-between py-px text-right text-xs text-ink-600 tabular-nums">
           {ticks.map((tick) => (
             <span key={tick.at}>{formatMoney(tick.value, "INR", { short: true, zeroLabel: false })}</span>
           ))}
@@ -88,7 +88,7 @@ export function RevenueChart({ data }: { data: RevenuePoint[] }) {
           </div>
           {active !== null ? (
             <div role="status" className={cn("pointer-events-none absolute -top-1 z-10 w-max max-w-44 -translate-y-full rounded-lg border border-ink-200 bg-white px-2.5 py-2 shadow-md", x(active) > 62 ? "-translate-x-full" : "-translate-x-1/2")} style={{ left: `${x(active)}%` }}>
-              <p className="text-2xs font-semibold tracking-wide text-ink-600 uppercase">{data[active].label}</p>
+              <p className="text-xs font-semibold tracking-wide text-ink-600 uppercase">{data[active].label}</p>
               <p className="mt-0.5 text-sm font-bold text-ink-900 tabular-nums">{formatMoney(data[active].totalMinor, "INR", { short: true, zeroLabel: false })}</p>
             </div>
           ) : null}
@@ -97,7 +97,7 @@ export function RevenueChart({ data }: { data: RevenuePoint[] }) {
       <div className="mt-2 flex">
         <div className="flex flex-1">
           {data.map((point, index) => (
-            <span key={point.label} className={cn("flex-1 text-center text-xs", active === index ? "font-semibold text-ink-900" : "text-text-subtle")}>
+            <span key={point.label} className={cn("flex-1 text-center text-xs", active === index ? "font-semibold text-ink-900" : "text-ink-600")}>
               {point.label}
             </span>
           ))}
@@ -124,7 +124,7 @@ export function VolumeBars({ data }: { data: VolumePoint[] }) {
 
   if (data.length === 0 || data.every((d) => d.count === 0)) {
     return (
-      <p className="py-12 text-center text-sm text-text-subtle">
+      <p className="py-12 text-center text-sm text-ink-600">
         Not enough transaction history to chart yet.
       </p>
     );
@@ -144,7 +144,7 @@ export function VolumeBars({ data }: { data: VolumePoint[] }) {
             aria-label={`${point.label}: ${point.count} transactions, ${formatMoney(point.totalMinor, "INR", { short: true, zeroLabel: false })}`}
             className="group flex h-full flex-1 flex-col items-center justify-end gap-1.5 rounded focus-visible:outline-2"
           >
-            <span className={cn("text-2xs font-bold tabular-nums", active === index ? "text-ink-900" : "text-ink-600")}>
+            <span className={cn("text-xs font-bold tabular-nums", active === index ? "text-ink-900" : "text-ink-600")}>
               {point.count}
             </span>
             <span
@@ -152,7 +152,7 @@ export function VolumeBars({ data }: { data: VolumePoint[] }) {
               className={cn("w-full max-w-9 rounded-t-md motion-safe:transition-[height] motion-safe:duration-500", active === index ? "bg-brand-600" : "bg-brand-200")}
               style={{ height: `${Math.max(point.count > 0 ? 6 : 2, (point.count / max) * 100)}%` }}
             />
-            <span className={cn("text-2xs", active === index ? "font-semibold text-ink-900" : "text-text-subtle")}>
+            <span className={cn("text-xs", active === index ? "font-semibold text-ink-900" : "text-ink-600")}>
               {point.label}
             </span>
           </button>

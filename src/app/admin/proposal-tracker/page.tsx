@@ -1,50 +1,38 @@
 import { desc, eq } from "drizzle-orm";
-import { Send, CheckCircle2, Clock, Download, Sparkles } from "lucide-react";
+import { Download } from "lucide-react";
 
 import { getDb, schema } from "@/lib/db";
-import { flattenParams } from "@/lib/admin/params";
+import { flattenParams, parsePageRequest, toQueryString } from "@/lib/admin/params";
 import { isTestEmployer } from "@/lib/admin/scope";
-import { parseOffer } from "@/lib/offer";
+import { filterInterviews, filterProposals, parseIstDay, proposalTimezone, type TrackerFilters } from "@/lib/admin/tracker";
 import { acceptanceRate, proposalOutcome } from "@/lib/proposals";
-import { AdminPageHeader } from "@/components/admin/panel";
-import { StatCard, StatGrid } from "@/components/admin/stat-card";
-import {
-  ProposalTrackerView,
-  type TrackerCompany,
-  type TrackerProposal,
-  type TrackerInterview,
-  type TrackerCandidate,
-} from "@/components/admin/proposal-tracker-view";
 import { formatNumber } from "@/lib/format";
+import { AdminLoadError, AdminPageHeader, Panel } from "@/components/admin/panel";
+import { StatCard, StatGrid } from "@/components/admin/stat-card";
+import { ProposalTrackerView, TRACKER_TABS, type TrackerTab } from "@/components/admin/proposal-tracker-view";
+import { ButtonAnchor, buttonClass } from "@/components/ui/button";
 
-/** `YYYY-MM-DD` → Date, or null. `endOfDay` makes the "to" bound inclusive. */
-function parseDay(value: string | undefined, endOfDay = false): Date | null {
-  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
-  const d = new Date(`${value}T${endOfDay ? "23:59:59.999" : "00:00:00"}+05:30`);
-  return Number.isNaN(d.getTime()) ? null : d;
-}
+/**
+ * Proposal pipeline (legacy admin-proposal-tracker.tsx): companies,
+ * proposals, candidates, interviews and hires, all filtered by the same URL
+ * (date range, exact company, exact candidate, timezone), so the figures and
+ * the tables never disagree.
+ */
 
-export default async function AdminProposalTrackerPage({
-  searchParams,
-}: {
-  searchParams?: Promise<Record<string, string | string[] | undefined>>;
-}) {
-  const params = flattenParams(await searchParams);
-  const initialTab =
-    params.tab === "proposals" ||
-    params.tab === "interviews" ||
-    params.tab === "companies" ||
-    params.tab === "candidates"
-      ? (params.tab as "companies" | "proposals" | "interviews" | "candidates")
-      : "companies";
-  const from = parseDay(params.from);
-  const to = parseDay(params.to, true);
-  const inRange = (d: Date | null) => (!from || (d !== null && d >= from)) && (!to || (d !== null && d <= to));
-
+async function load() {
   const db = getDb();
-
-  const [employersList, allProposals, allInterviews] = await Promise.all([
-    db.select().from(schema.employers).orderBy(desc(schema.employers.createdAt)),
+  const [employers, proposals, interviews] = await Promise.all([
+    db
+      .select({
+        id: schema.employers.id,
+        companyName: schema.employers.companyName,
+        companyEmail: schema.employers.companyEmail,
+        city: schema.employers.city,
+        country: schema.employers.country,
+        isActive: schema.employers.isActive,
+      })
+      .from(schema.employers)
+      .orderBy(desc(schema.employers.createdAt)),
     db
       .select({
         id: schema.proposals.id,
@@ -63,6 +51,7 @@ export default async function AdminProposalTrackerPage({
         companyName: schema.employers.companyName,
         projectId: schema.proposals.projectId,
         projectName: schema.projects.projectName,
+        projectTimezone: schema.projects.timezone,
       })
       .from(schema.proposals)
       .leftJoin(schema.users, eq(schema.users.id, schema.proposals.internId))
@@ -96,227 +85,163 @@ export default async function AdminProposalTrackerPage({
       .leftJoin(schema.projects, eq(schema.projects.id, schema.interviews.projectId))
       .orderBy(desc(schema.interviews.createdAt)),
   ]);
+  return { employers, proposals, interviews };
+}
 
-  // Every figure below is computed from the same date-filtered rows, so the
-  // stat cards, company cards and tables always agree with each other.
+type TrackerData = Awaited<ReturnType<typeof load>>;
+
+export default async function AdminProposalTrackerPage({
+  searchParams,
+}: {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const params = flattenParams(await searchParams);
+  const tab: TrackerTab = (TRACKER_TABS as readonly string[]).includes(params.tab ?? "") ? (params.tab as TrackerTab) : "companies";
+  const filters: TrackerFilters = {
+    from: parseIstDay(params.from),
+    to: parseIstDay(params.to, true),
+    company: params.company ?? "",
+    intern: params.intern ?? "",
+    tz: params.tz ?? "",
+  };
+
+  const header = (
+    <AdminPageHeader
+      title="Proposal pipeline"
+      subtitle="Every offer and interview between companies and candidates, from first proposal to hire."
+      action={
+        <ButtonAnchor
+          href={
+            tab === "hired"
+              ? `/api/admin/export/hired${toQueryString({ ...params, tab: "", page: "", per: "" })}`
+              : `/api/admin/export${toQueryString({ ...params, type: "proposals", tab: "", page: "", per: "" })}`
+          }
+          variant="outline"
+          size="sm"
+        >
+          <Download className="size-4" aria-hidden />
+          {tab === "hired" ? "Export hires" : "Export CSV"}
+        </ButtonAnchor>
+      }
+    />
+  );
+
+  let data: TrackerData;
+  try {
+    data = await load();
+  } catch (error) {
+    console.error("[admin/proposal-tracker]", error);
+    return (
+      <div className="space-y-6">
+        {header}
+        <Panel>
+          <AdminLoadError what="the proposal pipeline" retryHref="/admin/proposal-tracker" />
+        </Panel>
+      </div>
+    );
+  }
+
   // The internal "admin" and AI-interview employers are not hiring activity.
-  const testIds = new Set(employersList.filter((e) => isTestEmployer(e)).map((e) => e.id));
+  const testIds = new Set(data.employers.filter((e) => isTestEmployer(e)).map((e) => e.id));
   testIds.add("admin");
-  const realEmployersList = employersList.filter((e) => !testIds.has(e.id));
-  const rawProposals = allProposals.filter((p) => inRange(p.createdAt) && !testIds.has(p.employerId));
-  const rawInterviews = allInterviews.filter((i) => inRange(i.createdAt) && !testIds.has(i.employerId));
+  const realProposals = data.proposals.filter((p) => !testIds.has(p.employerId));
+  const realInterviews = data.interviews.filter((i) => !testIds.has(i.employerId));
 
-  const totalCount = rawProposals.length;
-  const wonTotal = rawProposals.filter((p) => proposalOutcome(p.status) === "won").length;
-  const lostTotal = rawProposals.filter((p) => proposalOutcome(p.status) === "lost").length;
-  const directTotal = rawProposals.filter((p) => p.flowType === "direct").length;
-  const interviewTotal = rawProposals.filter((p) => p.flowType === "interview_first").length;
-  const overallRate = acceptanceRate(wonTotal, lostTotal);
+  const proposals = filterProposals(realProposals, filters);
+  const interviews = filterInterviews(realInterviews, filters);
 
-  // Group metrics per employer
-  const proposalsByEmployer = new Map<string, number>();
-  const hiredByEmployer = new Map<string, number>();
-  const lostByEmployer = new Map<string, number>();
-  const bump = (m: Map<string, number>, k: string) => m.set(k, (m.get(k) ?? 0) + 1);
-  for (const p of rawProposals) {
-    if (p.employerId) {
-      bump(proposalsByEmployer, p.employerId);
-      const outcome = proposalOutcome(p.status);
-      if (outcome === "won") bump(hiredByEmployer, p.employerId);
-      if (outcome === "lost") bump(lostByEmployer, p.employerId);
-    }
+  // Picker options come from the unfiltered rows, so a pick never hides itself.
+  const name = (first: string | null, last: string | null, email: string | null) => `${first ?? ""} ${last ?? ""}`.trim() || email || "Candidate";
+  const companyOptions = data.employers
+    .filter((e) => !testIds.has(e.id) && (realProposals.some((p) => p.employerId === e.id) || realInterviews.some((i) => i.employerId === e.id)))
+    .map((e) => ({ value: e.id, label: e.companyName }))
+    .sort((a, b) => a.label.localeCompare(b.label));
+  const interns = new Map<string, string>();
+  for (const r of [...realProposals, ...realInterviews]) interns.set(r.internId, name(r.internFirstName, r.internLastName, r.internEmail));
+  const internOptions = [...interns].map(([value, label]) => ({ value, label })).sort((a, b) => a.label.localeCompare(b.label));
+  const zones = new Set<string>();
+  for (const p of realProposals) {
+    const z = proposalTimezone(p);
+    if (z) zones.add(z);
   }
+  for (const i of realInterviews) zones.add(i.timezone || "Asia/Kolkata");
+  const tzOptions = [...zones].sort().map((z) => ({ value: z, label: z }));
 
-  // Per candidate: who received proposals, from whom, and what they decided.
-  const byIntern = new Map<string, TrackerCandidate>();
-  for (const p of rawProposals) {
-    const row =
-      byIntern.get(p.internId) ??
-      ({
-        internId: p.internId,
-        name: `${p.internFirstName ?? ""} ${p.internLastName ?? ""}`.trim() || "Candidate",
-        email: p.internEmail,
-        phone: p.internPhone,
-        received: 0,
-        won: 0,
-        lost: 0,
-        open: 0,
-        companies: [],
-        lastReceivedAt: null,
-      } satisfies TrackerCandidate);
-    row.received += 1;
-    row[proposalOutcome(p.status)] += 1;
-    const company = p.companyName ?? "Unknown Company";
-    if (!row.companies.includes(company)) row.companies.push(company);
-    const at = p.createdAt?.toISOString() ?? null;
-    if (at && (!row.lastReceivedAt || at > row.lastReceivedAt)) row.lastReceivedAt = at;
-    byIntern.set(p.internId, row);
-  }
-  const trackerCandidates = Array.from(byIntern.values()).sort((a, b) => b.received - a.received);
-
-  const interviewsByEmployer = new Map<string, number>();
-  for (const i of rawInterviews) {
-    if (i.employerId) {
-      interviewsByEmployer.set(i.employerId, (interviewsByEmployer.get(i.employerId) ?? 0) + 1);
-    }
-  }
-
-  const trackerCompanies: TrackerCompany[] = realEmployersList.map((emp) => ({
-    id: emp.id,
-    companyName: emp.companyName,
-    companyEmail: emp.companyEmail,
-    city: emp.city,
-    state: emp.state,
-    isActive: emp.isActive,
-    proposalsCount: proposalsByEmployer.get(emp.id) ?? 0,
-    interviewsCount: interviewsByEmployer.get(emp.id) ?? 0,
-    hiredCount: hiredByEmployer.get(emp.id) ?? 0,
-    rejectedCount: lostByEmployer.get(emp.id) ?? 0,
-    acceptanceRate: acceptanceRate(hiredByEmployer.get(emp.id) ?? 0, lostByEmployer.get(emp.id) ?? 0),
-  }));
-
-  const trackerProposals: TrackerProposal[] = rawProposals.map((p) => ({
-    id: p.id,
-    status: p.status,
-    flowType: p.flowType,
-    currency: p.currency,
-    offerDetails: (p.offerDetails as Record<string, unknown>) || null,
-    createdAt: p.createdAt ? p.createdAt.toISOString() : null,
-    hiredAt: p.hiredAt ? p.hiredAt.toISOString() : null,
-    internId: p.internId,
-    internFirstName: p.internFirstName,
-    internLastName: p.internLastName,
-    internEmail: p.internEmail,
-    internPhone: p.internPhone,
-    employerId: p.employerId ?? "",
-    companyName: p.companyName ?? "Unknown Company",
-    projectId: p.projectId,
-    projectName: p.projectName ?? "Project",
-    fullTime: parseOffer(p.offerDetails, p.currency).fullTime !== null,
-  }));
-
-  const trackerInterviews: TrackerInterview[] = rawInterviews.map((i) => ({
-    id: i.id,
-    status: i.status,
-    slot1: i.slot1 ? i.slot1.toISOString() : null,
-    slot2: i.slot2 ? i.slot2.toISOString() : null,
-    slot3: i.slot3 ? i.slot3.toISOString() : null,
-    selectedSlot: i.selectedSlot,
-    timezone: i.timezone,
-    meetingLink: i.meetingLink,
-    notes: i.notes,
-    createdAt: i.createdAt ? i.createdAt.toISOString() : null,
-    internId: i.internId,
-    internFirstName: i.internFirstName,
-    internLastName: i.internLastName,
-    internEmail: i.internEmail,
-    employerId: i.employerId,
-    companyName: i.companyName ?? "Unknown Company",
-    projectId: i.projectId,
-    projectName: i.projectName,
-  }));
-
-  const exportHref = `/api/admin/export?type=proposals`;
-  const rangeLabel =
-    from || to
-      ? `${params.from ?? "start"} to ${params.to ?? "today"}`
-      : "All time";
+  const won = proposals.filter((p) => proposalOutcome(p.status) === "won").length;
+  const lost = proposals.filter((p) => proposalOutcome(p.status) === "lost").length;
+  const hired = proposals.filter((p) => p.status === "hired").length;
+  const rate = acceptanceRate(won, lost);
+  const now = new Date().getTime();
+  const upcoming = interviews.filter((i) => {
+    const s = i.selectedSlot === 1 ? i.slot1 : i.selectedSlot === 2 ? i.slot2 : i.selectedSlot === 3 ? i.slot3 : null;
+    return i.status === "scheduled" && s && s.getTime() > now;
+  }).length;
+  const rangeLabel = filters.from || filters.to ? `${params.from ?? "start"} to ${params.to ?? "today"}` : "All time";
+  const req = parsePageRequest(params);
 
   return (
     <div className="space-y-6">
-      <AdminPageHeader
-        title="Proposal Pipeline"
-        subtitle="End to end proposal pipeline between employers and student candidates."
-        action={
-          <a
-            href={exportHref}
-            className="apple-spring apple-pressable inline-flex min-h-11 cursor-pointer items-center gap-1.5 rounded-[10px] border border-ink-200 bg-white px-3.5 text-[14px] font-medium text-ink-700 hover:bg-ink-50"
-          >
-            <Download className="size-4" aria-hidden />
-            Export CSV
-          </a>
-        }
-      />
+      {header}
 
-      {/* The date range lives in its own row: beside the title it was wider
-          than a phone screen and pushed the Export button off the edge. */}
-      <form
-        method="get"
-        className="grid grid-cols-2 items-end gap-2 sm:flex sm:flex-wrap"
-        aria-label="Date range"
-      >
-        <input type="hidden" name="tab" value={initialTab} />
-        <label className="min-w-0 text-2xs font-medium text-ink-600">
+      {/* Date range: its own row, because beside the title it overflowed a phone. */}
+      <form method="get" aria-label="Date range" className="flex flex-wrap items-end gap-3">
+        {Object.entries(params)
+          .filter(([k]) => !["from", "to", "page"].includes(k))
+          .map(([k, v]) => (
+            <input key={k} type="hidden" name={k} value={v} />
+          ))}
+        <label className="text-sm font-medium text-ink-700">
           From
           <input
             type="date"
             name="from"
             defaultValue={params.from ?? ""}
-            className="mt-1 block min-h-11 w-full min-w-0 rounded-[10px] border border-ink-200 bg-white px-2.5 text-[13px] text-ink-800 sm:w-auto"
+            className="mt-1 block h-11 rounded-apple-sm border border-ink-200 bg-white px-3 text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-brand-600"
           />
         </label>
-        <label className="min-w-0 text-2xs font-medium text-ink-600">
+        <label className="text-sm font-medium text-ink-700">
           To
           <input
             type="date"
             name="to"
             defaultValue={params.to ?? ""}
-            className="mt-1 block min-h-11 w-full min-w-0 rounded-[10px] border border-ink-200 bg-white px-2.5 text-[13px] text-ink-800 sm:w-auto"
+            className="mt-1 block h-11 rounded-apple-sm border border-ink-200 bg-white px-3 text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-brand-600"
           />
         </label>
-        <button
-          type="submit"
-          className="apple-spring apple-pressable col-span-2 min-h-11 rounded-[10px] bg-brand-700 px-3.5 text-[14px] font-medium text-white hover:bg-brand-600 sm:col-span-1"
-        >
+        <button type="submit" className={buttonClass({ variant: "primary", size: "md" })}>
           Apply
         </button>
-        <span className="col-span-2 self-center text-[13px] text-text-subtle sm:col-span-1 sm:ml-1 sm:self-end sm:pb-3">
-          {rangeLabel}
-        </span>
+        <span className="pb-3 text-sm text-ink-600">{rangeLabel}</span>
       </form>
 
       <StatGrid cols={4}>
-        <StatCard
-          label="Total proposals"
-          value={formatNumber(totalCount)}
-          hint={rangeLabel}
-          icon={Send}
-          tone="brand"
-        />
+        <StatCard label="Proposals" value={formatNumber(proposals.length)} hint={rangeLabel} tone="neutral" href="/admin/proposal-tracker?tab=proposals" />
         <StatCard
           label="Accepted or hired"
-          value={formatNumber(wonTotal)}
-          hint={
-            overallRate === null
-              ? `${rangeLabel} · nothing decided yet`
-              : `${rangeLabel} · ${overallRate}% of decided (${formatNumber(lostTotal)} rejected)`
-          }
-          icon={CheckCircle2}
-          tone="success"
+          value={formatNumber(won)}
+          hint={rate === null ? "Nothing decided yet" : `${rate}% of decided offers (${formatNumber(lost)} declined)`}
+          tone="neutral"
         />
+        <StatCard label="Hired" value={formatNumber(hired)} hint="Paid for by the company" tone="neutral" href="/admin/proposal-tracker?tab=hired" />
         <StatCard
-          label="Direct hiring path"
-          value={formatNumber(directTotal)}
-          hint="Instant project offers"
-          icon={Sparkles}
-          tone="accent"
-        />
-        <StatCard
-          label="Interview first path"
-          value={formatNumber(interviewTotal)}
-          hint="Evaluated via interview"
-          icon={Clock}
-          tone="info"
+          label="Interviews"
+          value={formatNumber(interviews.length)}
+          hint={upcoming ? `${formatNumber(upcoming)} upcoming` : "None upcoming"}
+          tone="neutral"
+          href="/admin/proposal-tracker?tab=interviews"
         />
       </StatGrid>
 
-      {/* 3 Tabs + Interactive Modals */}
       <ProposalTrackerView
-        companies={trackerCompanies}
-        proposals={trackerProposals}
-        interviews={trackerInterviews}
-        candidates={trackerCandidates}
-        initialTab={initialTab}
+        tab={tab}
+        params={params}
+        page={req.page}
+        perPage={req.perPage}
+        search={req.search}
+        employers={data.employers.filter((e) => !testIds.has(e.id))}
+        proposals={proposals}
+        interviews={interviews}
+        options={{ companies: companyOptions, interns: internOptions, timezones: tzOptions }}
       />
     </div>
   );

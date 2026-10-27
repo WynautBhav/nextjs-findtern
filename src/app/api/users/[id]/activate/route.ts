@@ -10,7 +10,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const guard = await requireMutation({ req, roles: ["admin"] });
   if (!guard.ok) return guard.response;
   const db = getDb();
-  await db.update(schema.users).set({ isActive: true }).where(eq(schema.users.id, id));
+  const updated = await db
+    .update(schema.users)
+    .set({ isActive: true })
+    .where(eq(schema.users.id, id))
+    .returning({ id: schema.users.id });
+  if (!updated.length) return NextResponse.json({ error: "No candidate account with that id." }, { status: 404 });
   forgetAccountStatus("intern", id);
   return NextResponse.json({ ok: true });
 }

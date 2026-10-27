@@ -1,4 +1,4 @@
-import { eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
 import { applyRatings, RATINGS_TEMPLATE, RATINGS_TEMPLATE_ROWS, readRatingsRows, readRatingsSheet, type RatingsRow } from "@/lib/admin/ratings";
@@ -48,7 +48,7 @@ export async function POST(req: Request) {
     ? await db
         .select({ id: schema.users.id, email: schema.users.email })
         .from(schema.users)
-        .where(inArray(sql<string>`lower(${schema.users.email})`, emails))
+        .where(and(eq(schema.users.role, "intern"), inArray(sql<string>`lower(${schema.users.email})`, emails)))
     : [];
   const byEmail = new Map(users.map((u) => [u.email.toLowerCase(), u.id]));
 
@@ -60,17 +60,22 @@ export async function POST(req: Request) {
       continue;
     }
     const uid = byEmail.get(r.email);
-    const [onb] = uid
-      ? await db.select().from(schema.internOnboarding).where(eq(schema.internOnboarding.userId, uid)).limit(1)
-      : [];
-    if (!onb) {
-      failures.push({ row: r.row, email: r.email, reason: uid ? "No profile yet" : "User not found" });
+    if (!uid) {
+      failures.push({ row: r.row, email: r.email, reason: "User not found" });
       continue;
     }
-    const prevExtra = (onb.extraData as Record<string, unknown>) ?? {};
+    const [onb] = await db.select().from(schema.internOnboarding).where(eq(schema.internOnboarding.userId, uid)).limit(1);
+    const prevExtra = (onb?.extraData as Record<string, unknown>) ?? {};
     const nextExtra = applyRatings(prevExtra, r.updates, r.score);
-    await db.update(schema.internOnboarding).set({ extraData: nextExtra }).where(eq(schema.internOnboarding.id, onb.id));
-    await afterRatingsSaved(onb.userId, prevExtra, nextExtra);
+    if (onb) {
+      await db.update(schema.internOnboarding).set({ extraData: nextExtra }).where(eq(schema.internOnboarding.id, onb.id));
+    } else {
+      // Legacy created the onboarding row when it was missing (routes.ts
+      // bulk ratings upload: userId + extraData only), so a scored intern who
+      // never opened onboarding still gets their ratings (ADP-06).
+      await db.insert(schema.internOnboarding).values({ userId: uid, extraData: nextExtra });
+    }
+    await afterRatingsSaved(uid, prevExtra, nextExtra);
     updated++;
   }
   return NextResponse.json({ updated, failures });

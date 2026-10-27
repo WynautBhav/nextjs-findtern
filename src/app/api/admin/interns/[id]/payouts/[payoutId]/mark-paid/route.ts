@@ -12,11 +12,11 @@ import { queueNextMonth } from "@/lib/admin/stipend-queue";
  *
  * `referenceId` - the bank reference - is required here rather than being a
  * separate write. A payout row that says "paid" with no reference cannot be
- * reconciled against a bank statement later, and the whole point of recording
- * the payout at all is that reconciliation. One call, one row, no intermediate
- * state where a payout is marked paid but the reference is missing.
+ * reconciled against a bank statement later. Only a pending payout can be
+ * marked paid (legacy offered the button on pending rows only, ADP-31): a
+ * failed transfer is re-tried as a new payout, not flipped to paid.
  */
-const bodySchema = z.object({ referenceId: z.string().trim().min(1) });
+const bodySchema = z.object({ referenceId: z.string().trim().min(1).max(64) });
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string; payoutId: string }> }) {
   const { id, payoutId } = await params;
@@ -29,39 +29,32 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   }
 
   const db = getDb();
-  const [existing] = await db
-    .select({
-      status: schema.internPayouts.status,
+  // Conditional on the row still being pending, so a double click or two
+  // admins cannot both mark it (and both queue a next month).
+  const updated = await db
+    .update(schema.internPayouts)
+    .set({ status: "paid", paidAt: new Date(), referenceId: parsed.data.referenceId, updatedAt: new Date() })
+    .where(and(eq(schema.internPayouts.id, payoutId), eq(schema.internPayouts.internId, id), eq(schema.internPayouts.status, "pending")))
+    .returning({
+      amountMinor: schema.internPayouts.amountMinor,
+      currency: schema.internPayouts.currency,
       method: schema.internPayouts.method,
       notes: schema.internPayouts.notes,
       raw: schema.internPayouts.raw,
-    })
-    .from(schema.internPayouts)
-    .where(and(eq(schema.internPayouts.id, payoutId), eq(schema.internPayouts.internId, id)))
-    .limit(1);
-  if (!existing) return NextResponse.json({ error: "Unknown payout" }, { status: 404 });
-  // Legacy answered "Already paid"; overwriting would restamp the date and
-  // swap the bank reference on money that already left.
-  if (existing.status === "paid") return NextResponse.json({ error: "Already paid" }, { status: 409 });
+    });
 
-  const updated = await db
-    .update(schema.internPayouts)
-    .set({
-      status: "paid",
-      paidAt: new Date(),
-      referenceId: parsed.data.referenceId,
-      updatedAt: new Date(),
-    })
-    .where(
-      and(
-        eq(schema.internPayouts.id, payoutId),
-        eq(schema.internPayouts.internId, id),
-      ),
-    )
-    .returning({ id: schema.internPayouts.id });
+  if (updated.length === 0) {
+    const [existing] = await db
+      .select({ status: schema.internPayouts.status })
+      .from(schema.internPayouts)
+      .where(and(eq(schema.internPayouts.id, payoutId), eq(schema.internPayouts.internId, id)))
+      .limit(1);
+    if (!existing) return NextResponse.json({ error: "Unknown payout" }, { status: 404 });
+    if (existing.status === "paid") return NextResponse.json({ error: "Already paid" }, { status: 409 });
+    return NextResponse.json({ error: "Only a pending payout can be marked paid" }, { status: 409 });
+  }
 
-  if (updated.length === 0) return NextResponse.json({ error: "Unknown payout" }, { status: 404 });
   await notifyStipendPaid(payoutId);
-  const next = await queueNextMonth(db, id, existing);
+  const next = await queueNextMonth(db, id, updated[0]);
   return NextResponse.json({ ok: true, next });
 }

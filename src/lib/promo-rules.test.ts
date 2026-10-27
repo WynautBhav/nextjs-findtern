@@ -44,7 +44,7 @@ test("validity checks", () => {
 
 test("minimum order converts for USD", () => {
   const min = { ...base, minOrderAmountMinor: 1000000 }; // ₹10,000
-  assert.notEqual(promoProblem(min, 999999, "INR"), null);
+  assert.match(promoProblem(min, 999999, "INR") ?? "", /at least ₹10,000/);
   assert.equal(promoProblem(min, 1000000, "INR"), null);
   assert.notEqual(promoProblem(min, 9999, "USD"), null); // $99.99
   assert.equal(promoProblem(min, 10000, "USD"), null); // $100

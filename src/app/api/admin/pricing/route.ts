@@ -7,6 +7,8 @@ import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
 import { PRICING_PLANS } from "@/lib/content/home";
 import { setSetting } from "@/lib/platform-settings";
+import { legacyBandChange } from "@/lib/admin/plan-band";
+import { inrMinorToUsdMinor } from "@/lib/currency";
 
 /**
  * Admin rate card. Only INR rows are edited - USD is derived at ₹100 = $1
@@ -53,7 +55,36 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: "Unknown plan" }, { status: 404 });
   }
 
+  // DB-26: legacy prices candidates from features[1]; never let a reword
+  // break a band it can read.
+  if (fields.features) {
+    const change = legacyBandChange((plan.features ?? [])[1], fields.features[1]);
+    if (change?.block) return NextResponse.json({ error: change.message }, { status: 400 });
+  }
+
   await db.update(schema.pricingPlans).set({ ...fields, updatedAt: new Date() }).where(eq(schema.pricingPlans.id, id));
+
+  // ADM-17: the new app derives USD from INR, but the legacy site (rollback
+  // target) still reads its own USD rows. Keep them in step at ₹100 = $1.
+  const usd = (v: number | null | undefined) => (v == null ? v : inrMinorToUsdMinor(v));
+  const mirror = Object.fromEntries(
+    Object.entries({
+      displayName: fields.displayName,
+      priceHourlyMinor: usd(fields.priceHourlyMinor),
+      perHireChargeMinor: usd(fields.perHireChargeMinor),
+      compareAtHourlyMinor: usd(fields.compareAtHourlyMinor),
+      compareAtPerHireMinor: usd(fields.compareAtPerHireMinor),
+      internshipDuration: fields.internshipDuration,
+      features: fields.features,
+      isActive: fields.isActive,
+    }).filter(([, v]) => v !== undefined),
+  );
+  if (Object.keys(mirror).length) {
+    await db
+      .update(schema.pricingPlans)
+      .set({ ...mirror, updatedAt: new Date() })
+      .where(and(eq(schema.pricingPlans.slug, plan.slug), eq(schema.pricingPlans.currency, "USD")));
+  }
   // One "Most popular" at a time.
   if (fields.isFeatured) {
     await db

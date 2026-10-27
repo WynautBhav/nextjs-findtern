@@ -28,19 +28,19 @@ type CommandItem = {
 };
 
 const COMMANDS: CommandItem[] = [
-  { title: "Dashboard Overview", category: "Navigation", href: "/admin/dashboard", icon: LayoutDashboard },
-  { title: "Intern Candidates Directory", category: "People", href: "/admin/interns", icon: Users },
-  { title: "Hiring Partners and Companies", category: "People", href: "/admin/companies", icon: Building2 },
-  { title: "Financial Transactions and Ledger", category: "Finance", href: "/admin/transactions", icon: ArrowLeftRight },
-  { title: "Intern Payout Disbursements", category: "Finance", href: "/admin/payouts", icon: CreditCard },
-  { title: "Analytics and Placement Reports", category: "Finance", href: "/admin/reports", icon: BarChart3 },
-  { title: "Roles and Team Governance", category: "People", href: "/admin/roles", icon: Shield },
-  { title: "Promotional Discount Codes", category: "Finance", href: "/admin/promo-codes", icon: Tag },
-  { title: "Inbound Support Messages", category: "Overview", href: "/admin/messages", icon: MessageSquare },
-  { title: "Marketing Website CMS", category: "Content", href: "/admin/cms", icon: Globe },
-  { title: "Active Employer Projects", category: "Work", href: "/admin/projects", icon: Briefcase },
-  { title: "Proposal Pipeline Tracker", category: "Work", href: "/admin/proposal-tracker", icon: Send },
-  { title: "Send Broadcast Notification", category: "Content", href: "/admin/notifications", icon: Bell },
+  { title: "Dashboard", category: "Overview", href: "/admin/dashboard", icon: LayoutDashboard },
+  { title: "Proposal pipeline", category: "Overview", href: "/admin/proposal-tracker", icon: Send },
+  { title: "Messages", category: "Overview", href: "/admin/messages", icon: MessageSquare },
+  { title: "Candidates", category: "People and work", href: "/admin/interns", icon: Users },
+  { title: "Companies", category: "People and work", href: "/admin/companies", icon: Building2 },
+  { title: "Projects", category: "People and work", href: "/admin/projects", icon: Briefcase },
+  { title: "Transactions", category: "Finance", href: "/admin/transactions", icon: ArrowLeftRight },
+  { title: "Payouts", category: "Finance", href: "/admin/payouts", icon: CreditCard },
+  { title: "Promo codes", category: "Finance", href: "/admin/promo-codes", icon: Tag },
+  { title: "Reports", category: "Finance", href: "/admin/reports", icon: BarChart3 },
+  { title: "Website content", category: "Publishing", href: "/admin/cms", icon: Globe },
+  { title: "Send notification", category: "Publishing", href: "/admin/notifications", icon: Bell },
+  { title: "Roles and access", category: "Settings", href: "/admin/roles", icon: Shield },
 ];
 
 export function CommandPalette() {
@@ -81,7 +81,7 @@ export function CommandPalette() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="apple-spring flex min-h-11 items-center gap-2.5 rounded-[10px] border border-ink-200 bg-white px-3 py-1.5 text-[13px] text-ink-600 shadow-xs hover:border-brand-500 hover:text-ink-800"
+        className="apple-spring flex min-h-11 items-center gap-2.5 rounded-apple-sm border border-ink-200 bg-white px-3 py-1.5 text-sm text-ink-600 shadow-xs hover:border-brand-500 hover:text-ink-800"
         aria-label="Search navigation"
       >
         <Search className="size-3.5" aria-hidden />
@@ -132,9 +132,9 @@ export function CommandPalette() {
                       key={item.href}
                       type="button"
                       onClick={() => navigateTo(item.href)}
-                      className="apple-spring apple-pressable flex min-h-11 w-full items-center gap-3 rounded-[10px] px-3 py-2 text-left text-[13px] font-medium text-ink-700 hover:bg-brand-50 hover:text-brand-800"
+                      className="apple-spring apple-pressable flex min-h-11 w-full items-center gap-3 rounded-apple-sm px-3 py-2 text-left text-sm font-medium text-ink-700 hover:bg-brand-50 hover:text-brand-800"
                     >
-                      <span className="grid size-6 place-items-center rounded-[8px] bg-ink-100 text-ink-600">
+                      <span className="grid size-6 place-items-center rounded-apple-sm bg-ink-100 text-ink-600">
                         <Icon className="size-3.5" />
                       </span>
                       <span className="flex-1 truncate text-ink-900">{item.title}</span>

@@ -12,12 +12,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { buttonClass } from "@/components/ui/button";
 import { csrfFetch } from "@/lib/client-fetch";
 import { isValidPhone, phoneError, phoneHint } from "@/lib/phone";
 import { DIAL_CODE_VALUES } from "@/lib/data/dial-codes";
 
 const inputClass =
-  "apple-spring mt-1.5 min-h-10 w-full rounded-[10px] border border-ink-200 bg-white px-3 text-[14px] text-ink-900 outline-none placeholder:text-ink-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20";
+  "mt-1.5 h-11 w-full rounded-apple-sm border border-ink-200 bg-white px-3 text-sm text-ink-900 outline-none placeholder:text-ink-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20";
 
 const CODES = DIAL_CODE_VALUES;
 
@@ -75,7 +76,7 @@ export function ContactEditor({
           setError(null);
           setOpen(true);
         }}
-        className="apple-spring apple-pressable inline-flex min-h-11 items-center gap-1.5 whitespace-nowrap rounded-[10px] border border-ink-200 bg-white px-3.5 text-[14px] font-medium text-ink-700 hover:bg-ink-50"
+        className={buttonClass({ variant: "outline", size: "sm" })}
       >
         <Pencil className="size-4" aria-hidden />
         Edit contact
@@ -90,28 +91,28 @@ export function ContactEditor({
           </DialogHeader>
           <div className="space-y-4">
             {targetType === "intern" ? (
-              <div className="grid grid-cols-2 gap-3">
-                <label className="block text-xs font-medium text-ink-700">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="block text-sm font-medium text-ink-800">
                   First name
                   <input value={draft.firstName ?? ""} onChange={(e) => set({ firstName: e.target.value })} className={inputClass} />
                 </label>
-                <label className="block text-xs font-medium text-ink-700">
+                <label className="block text-sm font-medium text-ink-800">
                   Last name
                   <input value={draft.lastName ?? ""} onChange={(e) => set({ lastName: e.target.value })} className={inputClass} />
                 </label>
               </div>
             ) : (
-              <label className="block text-xs font-medium text-ink-700">
+              <label className="block text-sm font-medium text-ink-800">
                 Contact name
                 <input value={draft.name ?? ""} onChange={(e) => set({ name: e.target.value })} className={inputClass} />
               </label>
             )}
-            <label className="block text-xs font-medium text-ink-700">
+            <label className="block text-sm font-medium text-ink-800">
               Email {targetType === "employer" ? "(login)" : ""}
               <input type="email" value={draft.email} onChange={(e) => set({ email: e.target.value })} className={inputClass} />
             </label>
             <div>
-              <span className="block text-xs font-medium text-ink-700">Phone</span>
+              <span className="block text-sm font-medium text-ink-800">Phone</span>
               <div className="flex gap-2">
                 <select
                   aria-label="Country code"
@@ -134,18 +135,18 @@ export function ContactEditor({
                   className={inputClass}
                 />
               </div>
-              <p className={`mt-1 text-2xs ${phoneOk ? "text-text-subtle" : "text-danger"}`}>
+              <p className={`mt-1 text-xs ${phoneOk ? "text-ink-600" : "text-danger"}`}>
                 {phoneOk ? phoneHint(draft.countryCode) : phoneError(draft.countryCode, draft.phoneNumber)}
               </p>
             </div>
-            {error ? <p className="text-xs text-danger">{error}</p> : null}
+            {error ? <p role="alert" className="text-sm text-danger">{error}</p> : null}
           </div>
           <DialogFooter>
             <button
               type="button"
               onClick={save}
               disabled={saving || !phoneOk}
-              className="inline-flex min-h-10 items-center gap-1.5 rounded-[10px] bg-brand-700 px-4 text-sm font-semibold text-white hover:bg-brand-600 disabled:opacity-60"
+              className={buttonClass({ variant: "primary", size: "sm" })}
             >
               {saving ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
               Save changes

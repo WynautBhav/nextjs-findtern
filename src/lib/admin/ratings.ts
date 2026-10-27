@@ -42,6 +42,19 @@ export function firstLiveScore(prev: Record<string, unknown>, next: Record<strin
   return !live(prev) && live(next);
 }
 
+/**
+ * Which AI interview a newly live score closes (ADP-22). Legacy closed only
+ * the intern's latest AI interview, and only when it was not already
+ * completed; older rows (missed, cancelled, expired attempts) keep their
+ * status so the history stays true. `rows` must be AI interviews only.
+ */
+export function aiInterviewToClose<T extends { id: string; status: string | null; createdAt: Date | null }>(rows: T[]): T | null {
+  const latest = [...rows].sort((a, b) => (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0))[0];
+  if (!latest) return null;
+  const status = String(latest.status ?? "").trim().toLowerCase();
+  return status && status !== "completed" ? latest : null;
+}
+
 /** Minimal RFC 4180 CSV reader: quoted fields, escaped quotes, CRLF. */
 export function parseCsv(text: string): string[][] {
   const rows: string[][] = [];

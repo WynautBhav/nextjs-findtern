@@ -72,6 +72,8 @@ const RULES: Rule[] = [
   ["/admin/reports", ["reports:read"]],
   ["/admin/cms", ["cms:read"]],
   ["/admin/settings", ["cms:read"]],
+  // Legacy /admin/website?tab=… links; the page only redirects into /admin/cms.
+  ["/admin/website", ["cms:read"]],
   ["/admin/no-access", []],
   // admin APIs
   ["/api/admin/reports", ["reports:read"]],

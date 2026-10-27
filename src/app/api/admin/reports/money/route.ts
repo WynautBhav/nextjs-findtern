@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { analyticsRange } from "@/lib/admin/analytics-load";
 import { toCsv } from "@/lib/admin/csv";
 import { loadReceivables, moneyFilter } from "@/lib/admin/receivables-load";
-import type { MoneyRow } from "@/lib/admin/receivables";
+import { moneyRowFilter, narrowReceivables, type MoneyRow } from "@/lib/admin/receivables";
 import { requireRole } from "@/lib/security/guards";
 
 /** Money in / money out: JSON, or CSV with `?format=csv`. */
@@ -12,10 +12,12 @@ export async function GET(req: Request) {
   const guard = requireRole(req.headers.get("cookie"), ["admin"]);
   if (!guard.ok) return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
   const params = Object.fromEntries(new URL(req.url).searchParams);
-  const data = await loadReceivables(analyticsRange(params), {
+  const loaded = await loadReceivables(analyticsRange(params), {
     receivables: moneyFilter(params.receivables),
     payables: moneyFilter(params.payables),
   });
+  // The same company / candidate / status filters as the page (ADM-15).
+  const data = narrowReceivables(loaded, moneyRowFilter(params));
   if (params.format !== "csv") return NextResponse.json(data);
 
   const rows = [

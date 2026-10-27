@@ -1,9 +1,9 @@
-import { and, eq, ne, or } from "drizzle-orm";
+import { and, eq, or } from "drizzle-orm";
 
 import { getDb, schema } from "@/lib/db";
 import { notify } from "@/lib/notify";
 
-import { firstLiveScore } from "./ratings";
+import { aiInterviewToClose, firstLiveScore } from "./ratings";
 
 const AI_EMAIL = "ai-interview@findtern.ai";
 
@@ -60,19 +60,21 @@ export async function afterRatingsSaved(
 
     // Legacy AI interviews sit on employer id "admin"; ours on the synthetic
     // ai-interview employer. Either counts.
+    // Only the latest one, as legacy did: older missed / cancelled attempts
+    // are history and must not be rewritten as "completed" (ADP-22).
     const aiInterviews = await db
-      .select({ id: schema.interviews.id })
+      .select({ id: schema.interviews.id, status: schema.interviews.status, createdAt: schema.interviews.createdAt })
       .from(schema.interviews)
       .leftJoin(schema.employers, eq(schema.employers.id, schema.interviews.employerId))
       .where(
         and(
           eq(schema.interviews.internId, internId),
           or(eq(schema.interviews.employerId, "admin"), eq(schema.employers.companyEmail, AI_EMAIL)),
-          ne(schema.interviews.status, "completed"),
         ),
       );
-    for (const iv of aiInterviews) {
-      await db.update(schema.interviews).set({ status: "completed", updatedAt: new Date() }).where(eq(schema.interviews.id, iv.id));
+    const toClose = aiInterviewToClose(aiInterviews);
+    if (toClose) {
+      await db.update(schema.interviews).set({ status: "completed", updatedAt: new Date() }).where(eq(schema.interviews.id, toClose.id));
     }
   } catch (err) {
     console.error("[ratings] score-live follow-up failed", err);

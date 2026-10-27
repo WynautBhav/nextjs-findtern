@@ -13,7 +13,7 @@ export default function AdminInternTermsPage() {
   return (
     <div className="space-y-6">
       <AdminPageHeader
-        title="Intern Terms"
+        title="Intern terms"
         subtitle="Edit the Intern Terms & Conditions page content."
       />
 
@@ -23,6 +23,7 @@ export default function AdminInternTermsPage() {
         documentKey="intern_terms"
         initialContent={INTERN_TERMS.html}
         apiEndpoint="/api/admin/intern/terms"
+        publicHref="/intern-terms-and-conditions"
       />
     </div>
   );

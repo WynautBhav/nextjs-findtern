@@ -82,6 +82,7 @@ export async function loadAnalytics(range: { since: Date | null; until: Date | n
       .where(realEmployerId(schema.interviews.employerId)),
     db
       .select({
+        employerId: schema.employerPayments.employerId,
         amountMinor: schema.employerPayments.amountMinor,
         currency: schema.employerPayments.currency,
         status: schema.employerPayments.status,

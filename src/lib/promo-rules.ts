@@ -6,6 +6,7 @@
  * same ₹100 = $1 rule as every price, so one code works for both regions.
  */
 import { inrMinorToUsdMinor } from "./currency.ts";
+import { formatMoney } from "./format.ts";
 
 export type PromoRow = {
   code: string;
@@ -54,7 +55,8 @@ export function promoProblem(
   if (row.validUntil && row.validUntil < now) return "Promo code expired";
   if (row.maxUsages && row.usedCount >= row.maxUsages) return "Promo code exhausted";
   if (row.minOrderAmountMinor && orderMinor < inCurrency(row.minOrderAmountMinor, currency)) {
-    return "Promo code does not apply to this order";
+    // ADM-14: say what the minimum is, in the order's currency.
+    return `This code needs an order of at least ${formatMoney(inCurrency(row.minOrderAmountMinor, currency), currency)}`;
   }
   return null;
 }

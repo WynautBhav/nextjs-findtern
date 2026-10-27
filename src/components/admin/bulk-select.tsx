@@ -140,7 +140,7 @@ export function BulkSelectProvider({
       {error ? (
         <div
           role="alert"
-          className="apple-admin fixed inset-x-0 bottom-20 z-40 mx-auto flex w-fit max-w-[calc(100%-2rem)] items-start gap-2 rounded-[10px] border border-danger/25 bg-white px-3.5 py-2.5 text-sm text-danger shadow-lg"
+          className="apple-admin fixed inset-x-0 bottom-20 z-40 mx-auto flex w-fit max-w-[calc(100%-2rem)] items-start gap-2 rounded-apple-sm border border-danger/25 bg-white px-3.5 py-2.5 text-sm text-danger shadow-lg"
         >
           <span className="flex-1">{error}</span>
           <button
@@ -159,7 +159,7 @@ export function BulkSelectProvider({
           <div
             role="region"
             aria-label={`Actions for ${selected.size} selected ${noun}`}
-            className="apple-admin pointer-events-auto flex max-w-full flex-wrap items-center gap-1.5 rounded-[14px] border border-ink-200 bg-white py-2 pr-2 pl-4 shadow-lg"
+            className="apple-admin pointer-events-auto flex max-w-full flex-wrap items-center gap-1.5 rounded-apple-lg border border-ink-200 bg-white py-2 pr-2 pl-4 shadow-lg"
           >
             <p className="text-sm font-medium whitespace-nowrap text-ink-800">
               <span className="tabular-nums">{selected.size}</span> selected
@@ -176,7 +176,7 @@ export function BulkSelectProvider({
                   disabled={running !== null}
                   onClick={() => run(action)}
                   className={cn(
-                    "apple-spring inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-[10px] px-2.5 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50",
+                    "apple-spring inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-apple-sm px-2.5 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50",
                     action.tone === "danger"
                       ? "text-danger hover:bg-danger-soft"
                       : "text-ink-700 hover:bg-ink-100",
@@ -192,7 +192,7 @@ export function BulkSelectProvider({
               type="button"
               onClick={clear}
               aria-label="Clear selection"
-              className="apple-spring cursor-pointer rounded-[10px] p-1.5 text-ink-600 hover:bg-ink-100 hover:text-ink-700"
+              className="apple-spring cursor-pointer rounded-apple-sm p-1.5 text-ink-600 hover:bg-ink-100 hover:text-ink-700"
             >
               <X className="size-4" />
             </button>

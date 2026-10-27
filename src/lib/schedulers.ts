@@ -258,6 +258,9 @@ async function profileHideLimit(now: Date) {
     .where(sql`${schema.internOnboarding.extraData}->>'openToWork' = 'false'`);
   for (const r of rows) {
     const extra = (r.extra ?? {}) as Record<string, unknown>;
+    // An admin hide (DB-11) is not the candidate's 30-day pause: it stays
+    // until staff un-hide, with no reminder and no automatic return.
+    if (extra.hiddenByAdmin === true) continue;
     let hiddenAt = typeof extra.hiddenAt === "string" ? extra.hiddenAt : null;
     if (!hiddenAt) {
       // Hidden before the limit existed: the clock starts now, never backdated.
