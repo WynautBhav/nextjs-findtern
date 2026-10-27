@@ -4,7 +4,6 @@ import { redirect } from "next/navigation";
 import { and, desc, eq, sql } from "drizzle-orm";
 import {
   ArrowUpDown,
-  ArrowUpRight,
   ChevronDown,
   Laptop,
   LayoutGrid,
@@ -15,7 +14,6 @@ import {
   Scale,
   Search,
   Star,
-  Table as TableIcon,
   Wallet,
 } from "lucide-react";
 
@@ -33,7 +31,7 @@ import { candidateRelations, hiredInternIds, type CandidateRelation } from "@/li
 import { attachPhotos, candidatePoolClauses, scoreExpr } from "@/lib/employer-pool";
 import { requireEmployerSetup } from "@/lib/employer-setup";
 import { employerRegion, resolvePricing, type Currency } from "@/lib/employer-pricing";
-import { BANDS, bandFor, type BandId } from "@/lib/score";
+import { BANDS, PLAN_NAME, bandFor, type BandId } from "@/lib/score";
 import { formatRate } from "@/lib/format";
 import { timezoneForLocation } from "@/lib/timezones";
 import { CityFilter } from "@/components/employer/city-filter";
@@ -49,6 +47,10 @@ import { cn } from "@/lib/utils";
 import { compareBySortFields, parseSortFields } from "@/lib/candidate-sort";
 import { MAX_COMPARE, isOpenProject, parseIds, rememberedFilters, rememberedSelection } from "@/lib/employer-selection";
 import { RememberSelection } from "@/components/employer/remember-selection";
+
+/** Candidate · skills · score · AI interview · actions. */
+const CANDIDATE_GRID =
+  "grid-cols-[minmax(0,1fr)_auto] lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_6.5rem_10rem] 2xl:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_6.5rem_5.5rem_10rem]";
 
 export const metadata: Metadata = {
   title: "Candidates",
@@ -84,7 +86,8 @@ type Filters = {
   remote: boolean | null;
   /** Legacy "Maximum skill match": rank candidates with more of the chosen skills first. */
   skillPriority: boolean;
-  view: "grid" | "list" | "table";
+  /** "table" is the dense ranked rows (the default); "grid" the cards. */
+  view: "grid" | "table";
   pageSize: number;
   page: number;
   project?: string;
@@ -468,7 +471,7 @@ export default async function CandidatesPage({
         <aside className="mb-6 lg:sticky lg:top-20 lg:mb-0 lg:max-h-[calc(100dvh-6rem)] lg:overflow-y-auto lg:pb-2">
           <FilterForm key={queryOf(filters)} activeCount={activeFilterCount(filters)}>
             {compareIds.length > 0 ? <input type="hidden" name="ids" value={compareIds.join(",")} /> : null}
-            {filters.view !== "grid" ? <input type="hidden" name="view" value={filters.view} /> : null}
+            {filters.view !== "table" ? <input type="hidden" name="view" value={filters.view} /> : null}
             {filters.pageSize !== 24 ? <input type="hidden" name="pageSize" value={filters.pageSize} /> : null}
             {!filters.projectDefaults ? <input type="hidden" name="pf" value="0" /> : null}
             {filters.q ? <input type="hidden" name="q" value={filters.q} /> : null}
@@ -688,7 +691,7 @@ export default async function CandidatesPage({
                   type="search"
                   defaultValue={filters.q}
                   placeholder="Skill, city or keyword"
-                  className="apple-spring min-h-11 w-full rounded-apple-sm border border-ink-200 bg-white pl-9 pr-3 text-sm text-ink-900 outline-none placeholder:text-ink-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+                  className="apple-spring min-h-11 w-full rounded-apple-sm border border-ink-200 bg-white pl-9 pr-3 text-sm text-ink-900 outline-none placeholder:text-text-subtle focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
                 />
               </form>
               <Segmented label="Per page">
@@ -699,14 +702,11 @@ export default async function CandidatesPage({
                 ))}
               </Segmented>
               <Segmented label="View">
-                <SegmentLink href={withFilters(filters, { view: "grid" })} active={filters.view === "grid"} label="Grid view">
-                  <LayoutGrid className="size-4" aria-hidden />
-                </SegmentLink>
-                <SegmentLink href={withFilters(filters, { view: "list" })} active={filters.view === "list"} label="List view">
+                <SegmentLink href={withFilters(filters, { view: "table" })} active={filters.view === "table"} label="Rows">
                   <List className="size-4" aria-hidden />
                 </SegmentLink>
-                <SegmentLink href={withFilters(filters, { view: "table" })} active={filters.view === "table"} label="Table view">
-                  <TableIcon className="size-4" aria-hidden />
+                <SegmentLink href={withFilters(filters, { view: "grid" })} active={filters.view === "grid"} label="Cards">
+                  <LayoutGrid className="size-4" aria-hidden />
                 </SegmentLink>
               </Segmented>
             </div>
@@ -755,110 +755,110 @@ export default async function CandidatesPage({
           ) : (
             <>
               {filters.view === "table" ? (
-                <Surface className="overflow-x-auto">
-                  <table className="w-full min-w-[44rem] text-left text-sm">
-                    <caption className="sr-only">Candidates, ranked</caption>
-                    <thead className="whitespace-nowrap border-b border-ink-100 text-xs font-medium text-ink-600">
-                      <tr>
-                        <th scope="col" className="px-4 py-3 font-medium">Candidate</th>
-                        <th scope="col" className="px-4 py-3 text-right font-medium">Score · price</th>
-                        <th scope="col" className="px-4 py-3 text-right font-medium"><abbr title="AI interview rating" className="no-underline">AI int.</abbr></th>
-                        <th scope="col" className="px-4 py-3 font-medium">City</th>
-                        <th scope="col" className="px-4 py-3 text-right font-medium">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-ink-100">
-                      {candidates.map((c) => {
-                        const rel = relations.get(c.id);
-                        const status = candidateStatusPill(rel?.proposal ?? null);
-                        const selected = compareIds.includes(c.id);
-                        const link = compareLink(c.id);
-                        const rate = resolvePricing(c.score, plans, currency, region);
-                        return (
-                          <tr key={c.id} className="hover:bg-ink-50/60">
-                            <td className="px-4 py-3">
-                              <div className="flex items-center gap-3">
-                                <CandidateAvatar photoUrl={c.photoUrl} initials={c.initials} className="size-9 rounded-apple-sm text-xs" />
-                                <div className="min-w-0">
-                                  <Link href={`/employer/intern/${c.id}?project=${encodeURIComponent(activeProjectId ?? "")}`} className="font-semibold text-ink-900 hover:text-brand-700 hover:underline">
-                                    {displayNameOf(c, nameUnlocked.has(c.id))}
-                                  </Link>
-                                  <span className="block max-w-40 truncate text-xs text-ink-600" title={c.skills.join(", ")}>
-                                    {c.skills.join(" · ") || "No skills listed"}
-                                  </span>
-                                  {status ? (
-                                    <Pill tone={status.tone} className="mt-1.5">
-                                      {status.label}
-                                    </Pill>
-                                  ) : null}
-                                </div>
-                              </div>
-                            </td>
-                            <td className="px-4 py-3 text-right">
-                              <span className="nums text-base font-semibold text-brand-700">{c.scored ? c.score.toFixed(1) : "-"}</span>
-                              <span className="nums block whitespace-nowrap text-xs text-ink-600">
-                                {bandFor(c.score).name} · {formatRate(rate.hourlyRateMinor, currency)}
-                              </span>
-                            </td>
-                            <td className="nums px-4 py-3 text-right font-medium text-ink-900">
-                              {c.ratings.interview > 0 ? c.ratings.interview.toFixed(1) : "-"}
-                            </td>
-                            <td className="px-4 py-3">
-                              <span className="text-ink-900">{c.city || "-"}</span>
-                              <span className="block max-w-36 text-xs text-ink-600">
-                                {[c.workModes.join(", "), c.hasLaptop === true ? "Own laptop" : c.hasLaptop === false ? "Needs a laptop" : ""]
-                                  .filter(Boolean)
-                                  .join(" · ") || "Mode not stated"}
-                              </span>
-                            </td>
-                            <td className="px-4 py-3">
-                              <div className="flex items-center justify-end gap-1.5">
-                                {rel?.hired ? null : link ? (
-                                  <Link
-                                    href={link}
-                                    scroll={false}
-                                    aria-label={selected ? "Remove from compare" : "Add to compare"}
-                                    title={selected ? "In compare" : "Compare"}
-                                    className={buttonClass({
-                                      variant: "ghost",
-                                      size: "iconSm",
-                                      className: selected ? "bg-brand-50 text-brand-800" : "text-ink-600",
-                                    })}
-                                  >
-                                    <Scale className="size-4" aria-hidden />
-                                  </Link>
-                                ) : null}
-                                {rel?.proposal ? (
-                                  <ButtonLink
-                                    href={`/employer/proposal/${encodeURIComponent(rel.proposal.id)}`}
-                                    variant="outline"
-                                    size="sm"
-                                    aria-label={proposalActionLabel(rel.proposal)}
-                                    title={proposalActionLabel(rel.proposal)}
-                                  >
-                                    {rel.proposal.status === "hired" ? "Placement" : "Proposal"}
-                                  </ButtonLink>
-                                ) : activeProjectId ? (
-                                  <ShortlistToggle internId={c.id} projectId={activeProjectId} shortlisted={shortlisted.has(c.id)} size="sm" emphasis="primary" />
-                                ) : null}
+                <Surface className="overflow-hidden">
+                  {/* Column labels for scanning; each row also names its figures. */}
+                  <div aria-hidden className={cn(CANDIDATE_GRID, "hidden gap-x-6 border-b border-ink-100 px-5 py-2.5 text-xs font-medium text-text-subtle lg:grid")}>
+                    <span>Candidate</span>
+                    <span>Skills</span>
+                    <span className="text-right">Findtern Score</span>
+                    <span className="hidden text-right 2xl:block">AI interview</span>
+                    <span />
+                  </div>
+                  <ul className="divide-y divide-ink-100">
+                    {candidates.map((c) => {
+                      const rel = relations.get(c.id);
+                      const status = candidateStatusPill(rel?.proposal ?? null);
+                      const selected = compareIds.includes(c.id);
+                      const link = compareLink(c.id);
+                      const rate = resolvePricing(c.score, plans, currency, region);
+                      const name = displayNameOf(c, nameUnlocked.has(c.id));
+                      const wanted = new Set(effectiveSkills.map((k) => k.toLowerCase()));
+                      // The project's skills first, so the match is what you read.
+                      const skills = [...c.skills].sort((a, b) => Number(wanted.has(b.toLowerCase())) - Number(wanted.has(a.toLowerCase())));
+                      const meta = [c.city, c.workModes.join(", "), c.hasLaptop === false ? "Needs a laptop" : c.hasLaptop ? "Own laptop" : ""].filter(Boolean).join(" · ");
+                      return (
+                        <li key={c.id} className={cn(CANDIDATE_GRID, "relative grid items-center gap-x-6 gap-y-2 px-5 py-3.5 transition-colors hover:bg-ink-50/70")}>
+                          <div className="flex min-w-0 items-center gap-3">
+                            <CandidateAvatar photoUrl={c.photoUrl} initials={c.initials} className="size-10 shrink-0 rounded-full text-xs" />
+                            <div className="min-w-0">
+                              <div className="flex min-w-0 items-center gap-2">
+                                {/* The row opens the profile; the link is stretched over it. */}
                                 <Link
-                                  href={`/employer/intern/${c.id}`}
-                                  aria-label="Open profile"
-                                  title="Profile"
-                                  className={buttonClass({ variant: "ghost", size: "iconSm", className: "text-ink-600" })}
+                                  href={`/employer/intern/${c.id}${activeProjectId ? `?project=${encodeURIComponent(activeProjectId)}` : ""}`}
+                                  className="truncate text-[0.9375rem] font-semibold text-ink-900 outline-none after:absolute after:inset-0 after:content-[''] focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-brand-500"
                                 >
-                                  <ArrowUpRight className="size-4" aria-hidden />
+                                  {name}
                                 </Link>
+                                {status ? <Pill tone={status.tone} className="shrink-0 whitespace-nowrap">{status.label}</Pill> : null}
                               </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+                              <p className="truncate text-sm text-ink-600">{meta || "Location not stated"}</p>
+                            </div>
+                          </div>
+                          <p className="min-w-0 truncate text-sm text-ink-600 max-lg:col-span-2 max-lg:pl-[3.25rem]" title={c.skills.join(", ")}>
+                            {skills.length === 0 ? (
+                              "No skills listed"
+                            ) : (
+                              <>
+                                {skills.slice(0, 3).map((k, i) => (
+                                  <span key={k}>
+                                    {i > 0 ? " · " : ""}
+                                    <span className={wanted.has(k.toLowerCase()) ? "font-semibold text-ink-900" : undefined}>{k}</span>
+                                  </span>
+                                ))}
+                                {skills.length > 3 ? <span className="text-text-subtle"> +{skills.length - 3}</span> : null}
+                              </>
+                            )}
+                          </p>
+                          <div className="text-right max-lg:col-start-2 max-lg:row-start-1">
+                            <p className="nums text-xl font-semibold tracking-[-0.01em] text-ink-900">
+                              {c.scored ? c.score.toFixed(1) : "-"}
+                              <span className="sr-only"> Findtern Score</span>
+                            </p>
+                            <p className="nums whitespace-nowrap text-xs text-ink-600">
+                              {PLAN_NAME[bandFor(c.score).id]} · {formatRate(rate.hourlyRateMinor, currency)}
+                            </p>
+                          </div>
+                          <p className="nums hidden text-right text-sm font-medium text-ink-900 2xl:block">
+                            {c.ratings.interview > 0 ? c.ratings.interview.toFixed(1) : <span className="text-text-subtle">-</span>}
+                            <span className="sr-only"> AI interview rating</span>
+                          </p>
+                          <div className="relative z-10 flex items-center justify-end gap-1.5 max-lg:col-span-2 max-lg:justify-start max-lg:pl-[3.25rem]">
+                            {rel?.proposal ? (
+                              <ButtonLink
+                                href={`/employer/proposal/${encodeURIComponent(rel.proposal.id)}`}
+                                variant="outline"
+                                size="sm"
+                                aria-label={proposalActionLabel(rel.proposal)}
+                              >
+                                {rel.proposal.status === "hired" ? "Placement" : "Proposal"}
+                              </ButtonLink>
+                            ) : activeProjectId ? (
+                              <ShortlistToggle internId={c.id} projectId={activeProjectId} shortlisted={shortlisted.has(c.id)} size="sm" emphasis="primary" />
+                            ) : null}
+                            {rel?.hired ? null : link ? (
+                              <Link
+                                href={link}
+                                scroll={false}
+                                aria-label={selected ? `Remove ${name} from compare` : `Add ${name} to compare`}
+                                className={buttonClass({
+                                  variant: "ghost",
+                                  size: "sm",
+                                  className: selected ? "bg-brand-50 text-brand-800" : "text-ink-600",
+                                })}
+                              >
+                                <Scale className="size-4" aria-hidden />
+                                {/* Icon-only beside the row's main action at desktop; named on phones. */}
+                                <span className="lg:sr-only">{selected ? "In compare" : "Compare"}</span>
+                              </Link>
+                            ) : null}
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
                 </Surface>
               ) : (
-                <ul className={cn("grid gap-4", filters.view === "list" ? "grid-cols-1" : "xl:grid-cols-2")}>
+                <ul className="grid gap-4 xl:grid-cols-2">
                   {candidates.map((candidate) => {
                     const rel = relations.get(candidate.id);
                     return (
@@ -953,7 +953,9 @@ function readFilters(params: SearchParams): Filters {
   const ps = Number(one(params.pageSize) ?? "24");
   const pageSize = ps === 12 || ps === 48 ? ps : 24;
   const viewRaw = (one(params.view) ?? "").trim().toLowerCase();
-  const view: "grid" | "list" | "table" = viewRaw === "list" || viewRaw === "table" ? viewRaw : "grid";
+  // Rows by default: results are scanned and compared, and two-up cards made
+  // 24 results 6,400px tall. "list" (old full-width cards) folds into rows.
+  const view: "grid" | "table" = viewRaw === "grid" ? "grid" : "table";
   const planRaw = (one(params.plan) ?? "").trim();
   const floor = (raw: string | string[] | undefined) => {
     const n = Number(one(raw) ?? "0");
@@ -1067,7 +1069,7 @@ function filterParams(merged: Filters): URLSearchParams {
   if (merged.dir === "asc") next.set("dir", "asc");
   if (merged.remote !== null) next.set("remote", merged.remote ? "1" : "0");
   if (!merged.skillPriority) next.set("sm", "0");
-  if (merged.view && merged.view !== "grid") next.set("view", merged.view);
+  if (merged.view && merged.view !== "table") next.set("view", merged.view);
   if (merged.pageSize && merged.pageSize !== 24) next.set("pageSize", String(merged.pageSize));
   if (!merged.projectDefaults) next.set("pf", "0");
   return next;

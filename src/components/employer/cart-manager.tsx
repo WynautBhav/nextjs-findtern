@@ -283,7 +283,7 @@ export function CartManager({
                     }}
                   />
                 </div>
-                <p className="mt-1.5 text-xs text-ink-500">Set from your company&apos;s location. The candidate sees the times in IST.</p>
+                <p className="mt-1.5 text-xs text-text-subtle">Set from your company&apos;s location. The candidate sees the times in IST.</p>
               </div>
               {meetingError ? (
                 <p role="alert" className="text-sm text-danger">
@@ -342,7 +342,7 @@ function CartLine({
         </span>
         <div className="min-w-0">
           <p className="flex flex-wrap items-center gap-2">
-            <Link href={profileHref} className="text-[0.9375rem] font-semibold text-ink-900 underline-offset-4 hover:text-brand-700 hover:underline">
+            <Link href={profileHref} className="inline-flex min-h-6 min-w-6 items-center text-[0.9375rem] font-semibold text-ink-900 underline-offset-4 hover:text-brand-700 hover:underline">
               {name}
             </Link>
             {line.acceptedProposalId ? (
@@ -382,11 +382,11 @@ function CartLine({
         <div className="col-span-2 flex flex-wrap items-baseline gap-x-3 sm:col-span-1 sm:block sm:text-right">
           <p className="nums text-3xl font-semibold leading-none tracking-[-0.02em] text-brand-700">
             {c.scored ? c.score.toFixed(1) : "-"}
-            <span className="ml-0.5 text-sm font-normal text-ink-500">/10</span>
+            <span className="ml-0.5 text-sm font-normal text-text-subtle">/10</span>
           </p>
           <p className="mt-1 text-xs font-medium text-ink-600">{PLAN_NAME[band.id]}</p>
           <p className="nums mt-2 text-sm font-semibold text-ink-900">{formatRate(line.hourlyRateMinor, currency)}</p>
-          {line.perHireMinor > 0 ? <p className="nums text-xs text-ink-500">{formatPerHire(line.perHireMinor, currency)}</p> : null}
+          {line.perHireMinor > 0 ? <p className="nums text-xs text-text-subtle">{formatPerHire(line.perHireMinor, currency)}</p> : null}
         </div>
       </div>
 
@@ -455,7 +455,7 @@ function CartLine({
         </button>
       </div>
       {locked && !line.openProposalId && !line.acceptedProposalId ? (
-        <p className="mt-2 text-xs text-ink-500">Send a proposal once the meeting is completed.</p>
+        <p className="mt-2 text-xs text-text-subtle">Send a proposal once the meeting is completed.</p>
       ) : null}
     </Surface>
   );

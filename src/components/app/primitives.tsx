@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 
+import { buttonClass } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 /**
@@ -256,7 +257,7 @@ export function EmptyScene({
   return (
     <div
       className={cn(
-        "flex flex-col items-center rounded-[20px] border border-dashed border-ink-200 bg-white/60 px-6 py-12 text-center",
+        "flex flex-col items-center rounded-apple-xl border border-dashed border-ink-200 bg-white/60 px-6 py-12 text-center",
         className,
       )}
     >
@@ -264,15 +265,20 @@ export function EmptyScene({
       <h2 className="text-balance text-lg font-semibold tracking-[-0.01em] text-ink-900">{title}</h2>
       <p className="mt-2 max-w-md text-pretty text-sm leading-relaxed text-ink-600">{body}</p>
       {who ? (
-        <p className="mt-3 rounded-full bg-ink-100 px-3 py-1 text-xs font-medium text-ink-600">
-          {who}
+        // "You - send the first offer" reads as "You: send the first offer";
+        // plain meta, not one more pill.
+        <p className="mt-3 text-xs text-text-subtle">
+          {who.includes(" - ") ? (
+            <>
+              <span className="font-semibold text-ink-700">{who.split(" - ")[0]}:</span> {who.split(" - ").slice(1).join(" - ")}
+            </>
+          ) : (
+            who
+          )}
         </p>
       ) : null}
       {next ? (
-        <Link
-          href={next.href}
-          className="apple-spring apple-pressable mt-6 inline-flex min-h-11 items-center gap-2 rounded-[10px] bg-primary px-5 text-sm font-semibold text-white shadow-sm hover:bg-primary-hover hover:shadow-md"
-        >
+        <Link href={next.href} className={buttonClass({ className: "mt-6" })}>
           {next.label}
           <ArrowRight className="size-4" aria-hidden />
         </Link>
@@ -357,6 +363,70 @@ export function DetailRow({
       <dd className={cn("min-w-0 text-right text-sm font-medium text-ink-900", mono && "tabular-nums")}>
         {value}
       </dd>
+    </div>
+  );
+}
+
+/* ── Filter tabs ─────────────────────────────────────────────────────────
+ * Status filters with counts, in place of a row of tiles repeating the
+ * numbers the list could be filtered by. Links when the filter lives in the
+ * URL (server pages), toggle buttons when the list filters in the browser.
+ * Not role="tablist": these narrow one list, they don't switch panels, so a
+ * group of pressed/current controls is the honest semantics. */
+
+export type FilterTab = { key: string; label: string; count?: number };
+
+export function FilterTabs({
+  label,
+  tabs,
+  value,
+  hrefFor,
+  onChange,
+  className,
+}: {
+  /** Names the group for screen readers: "Show proposals". */
+  label: string;
+  tabs: FilterTab[];
+  value: string;
+  /** URL filters: each tab is a link. */
+  hrefFor?: (key: string) => string;
+  /** In-browser filters: each tab is a toggle button. */
+  onChange?: (key: string) => void;
+  className?: string;
+}) {
+  return (
+    <div
+      role="group"
+      aria-label={label}
+      className={cn(
+        "-mx-1 flex max-w-full gap-1 overflow-x-auto px-1 pb-1 [scrollbar-width:none]",
+        className,
+      )}
+    >
+      {tabs.map((t) => {
+        const on = t.key === value;
+        const cls = cn(
+          "apple-spring inline-flex min-h-10 shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-3.5 text-sm font-medium",
+          on ? "bg-brand-700 text-white" : "text-ink-600 hover:bg-ink-100 hover:text-ink-900",
+        );
+        const inner = (
+          <>
+            {t.label}
+            {t.count !== undefined ? (
+              <span className={cn("nums text-xs", on ? "text-white/75" : "text-text-subtle")}>{t.count}</span>
+            ) : null}
+          </>
+        );
+        return hrefFor ? (
+          <Link key={t.key} href={hrefFor(t.key)} scroll={false} aria-current={on ? "true" : undefined} className={cls}>
+            {inner}
+          </Link>
+        ) : (
+          <button key={t.key} type="button" aria-pressed={on} onClick={() => onChange?.(t.key)} className={cls}>
+            {inner}
+          </button>
+        );
+      })}
     </div>
   );
 }

@@ -95,7 +95,7 @@ export function CityFilter({
               setChips(chips.slice(0, -1));
             }
           }}
-          className="apple-spring min-h-11 w-full rounded-apple-sm border border-ink-200/90 bg-white/90 pl-10 pr-3.5 text-sm text-ink-900 shadow-2xs outline-none placeholder:text-ink-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 disabled:bg-ink-50"
+          className="apple-spring min-h-11 w-full rounded-apple-sm border border-ink-200/90 bg-white/90 pl-10 pr-3.5 text-sm text-ink-900 shadow-2xs outline-none placeholder:text-text-subtle focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 disabled:bg-ink-50"
         />
         {options.length > 0 ? (
           <ul className="absolute left-0 z-20 mt-1 w-max min-w-full max-w-[18rem] overflow-hidden rounded-apple-sm border border-ink-200 bg-white shadow-sm">
@@ -110,7 +110,7 @@ export function CityFilter({
                   className="apple-spring flex min-h-11 w-full items-center justify-between gap-3 px-3 py-1.5 text-left text-sm text-ink-800 hover:bg-ink-50"
                 >
                   <span>{d.district}</span>
-                  <span className="text-xs text-ink-500">{d.state}</span>
+                  <span className="text-xs text-text-subtle">{d.state}</span>
                 </button>
               </li>
             ))}

@@ -24,6 +24,28 @@ don't re-implement them:
   `ButtonLink` or `ButtonAnchor` from `components/ui/button`, with variants
   `primary` / `accent` (amber, the hero CTA) / `outline` / `outlineLight`
   (on dark) / `ghost` / `light`. No hand-written button class strings.
+  `size: "sm"` is 36px with a mouse and 44px on touch (`pointer-coarse`).
+- `FilterTabs`: status filters with counts, in place of a row of tiles that
+  repeat the numbers. Links for URL filters, toggle buttons for in-browser
+  ones; `role="group"`, not a tablist. Panels that genuinely switch (Orders)
+  keep real tabs, styled the same (`tabClass`).
+- Lists people work in are aligned rows, not cards: one grid per list
+  (a header row of column labels at `lg`, `aria-hidden`; each row also
+  names its figures), figures right-aligned with `nums`, status as `Pill`,
+  **one** visible action chosen by state, everything else in `RowMenu`
+  (`components/app/row-menu.tsx`, the Radix menu: arrow keys, Esc). The
+  row's title is a real `<a>` stretched over the row (`after:inset-0`) with
+  its own focus ring. On phones the same row stacks into 2–3 lines.
+- Filter rows apply on change (`components/app/auto-submit-form.tsx`): no
+  Filter / Apply button. Typed dates are a DD/MM/YYYY text field.
+- Detail pages pass `crumbParents` to the shell, so a crumb reads
+  "Proposals", never "Proposal / Details".
+- Help: on desktop the customer consoles open chat from the top bar's
+  "Ask me" button; phones keep the labelled floating button above the tab
+  bar (bug sheet 7 asked for it bigger, so it stays labelled). It hides
+  while a dialog or sheet is open.
+- Secondary text and placeholders use `text-text-subtle` (5.2:1), not
+  `ink-500`/`ink-400`, which fail AA on white.
 
 **Type floor** (this is what made the app look barebones):
 - Body copy, table cells, form labels, list rows: `text-sm` (14px) minimum;

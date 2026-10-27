@@ -155,7 +155,7 @@ export function CandidateCard({
       {selected ? "In compare" : "Compare"}
     </Link>
   ) : (
-    <span className="inline-flex min-h-10 items-center gap-2 px-2.5 text-sm text-ink-500" title="Compare shows up to four candidates. Remove one to add another.">
+    <span className="inline-flex min-h-10 items-center gap-2 px-2.5 text-sm text-text-subtle" title="Compare shows up to four candidates. Remove one to add another.">
       <Scale className="size-4" aria-hidden />
       Compare full (4)
     </span>
@@ -202,7 +202,7 @@ export function CandidateCard({
             title={candidate.scored ? `Findtern Score ${candidate.score.toFixed(1)} out of 10` : "Not scored yet"}
           >
             {candidate.scored ? candidate.score.toFixed(1) : "-"}
-            <span className="ml-0.5 text-sm font-medium text-ink-500">/10</span>
+            <span className="ml-0.5 text-sm font-medium text-text-subtle">/10</span>
           </p>
           <p className="nums mt-1.5 text-sm font-semibold text-ink-900">{formatRate(pricing.hourlyRateMinor, currency)}</p>
         </div>
@@ -284,7 +284,7 @@ export function CandidateCard({
                 <p className="text-sm font-medium text-ink-600">Findtern Score</p>
                 <p className="nums mt-1 text-3xl font-semibold tracking-[-0.02em] text-brand-700">
                   {candidate.scored ? candidate.score.toFixed(1) : "-"}
-                  <span className="ml-0.5 text-sm font-medium text-ink-500">/10</span>
+                  <span className="ml-0.5 text-sm font-medium text-text-subtle">/10</span>
                 </p>
                 <p className="mt-1 text-sm text-ink-600">{band.name}</p>
               </div>

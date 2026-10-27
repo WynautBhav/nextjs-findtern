@@ -19,7 +19,7 @@ import { cn } from "@/lib/utils";
 export function controlClass(error?: boolean, className?: string) {
   return cn(
     "apple-spring block min-h-11 w-full rounded-apple-sm border bg-white px-3.5 text-[0.9375rem] text-ink-900 shadow-xs outline-none",
-    "placeholder:text-ink-400 focus:ring-2 disabled:cursor-not-allowed disabled:bg-ink-50 disabled:text-ink-500",
+    "placeholder:text-text-subtle focus:ring-2 disabled:cursor-not-allowed disabled:bg-ink-50 disabled:text-text-subtle",
     // aria-readonly, not :read-only - a <select> always matches :read-only.
     "aria-readonly:cursor-default aria-readonly:bg-ink-50 aria-readonly:text-ink-600 aria-readonly:shadow-none",
     error
@@ -73,7 +73,7 @@ export function FieldLabel({
           {" "}*
         </span>
       ) : null}
-      {optional ? <span className="font-normal text-ink-500"> (optional)</span> : null}
+      {optional ? <span className="font-normal text-text-subtle"> (optional)</span> : null}
     </As>
   );
 }
@@ -270,7 +270,7 @@ export function ChoiceGroup({
               )}
             >
               {o.label}
-              {o.detail ? <span className={cn("text-xs", active ? "text-white/80" : "text-ink-500")}>{o.detail}</span> : null}
+              {o.detail ? <span className={cn("text-xs", active ? "text-white/80" : "text-text-subtle")}>{o.detail}</span> : null}
             </button>
           );
         })}

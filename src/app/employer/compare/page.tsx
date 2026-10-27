@@ -177,7 +177,6 @@ export default async function CompareCandidates({ searchParams }: { searchParams
         <RememberSelection employerId={session.uid} compare={ids} />
         <PageHead title="Compare candidates" lede={`Put up to ${MAX_COMPARE} candidates side by side.`} />
         <EmptyScene
-          art
           title="Nothing to compare yet"
           body="Tick Compare on two to four candidates in the candidate list, then open them here side by side."
           next={{ label: "Browse candidates", href: "/employer/candidates" }}
@@ -291,7 +290,7 @@ export default async function CompareCandidates({ searchParams }: { searchParams
                         href={removeHref(c.id)}
                         aria-label={`Remove ${name} from the comparison`}
                         title="Remove"
-                        className={buttonClass({ variant: "ghost", size: "iconSm", className: "-mr-1 -mt-1 text-ink-500" })}
+                        className={buttonClass({ variant: "ghost", size: "iconSm", className: "-mr-1 -mt-1 text-text-subtle" })}
                       >
                         <X className="size-4" aria-hidden />
                       </Link>
@@ -361,7 +360,7 @@ export default async function CompareCandidates({ searchParams }: { searchParams
               render={(c) => (
                 <>
                   <span className="nums text-2xl font-semibold tracking-[-0.02em] text-brand-700">{c.scored ? c.score.toFixed(1) : "-"}</span>
-                  <span className="text-sm text-ink-500">/10</span>
+                  <span className="text-sm text-text-subtle">/10</span>
                   <span className="mt-0.5 block text-sm text-ink-600">{bandFor(c.score).name}</span>
                 </>
               )}
@@ -399,13 +398,13 @@ export default async function CompareCandidates({ searchParams }: { searchParams
                   c.ratings[meta.key] > 0 ? (
                     <>
                       <span className="nums text-base font-semibold text-ink-900">{c.ratings[meta.key].toFixed(1)}</span>
-                      <span className="text-sm text-ink-500">/10</span>
+                      <span className="text-sm text-text-subtle">/10</span>
                       <span className="mt-1.5 block h-1 overflow-hidden rounded-full bg-ink-100" aria-hidden>
                         <span className="block h-full rounded-full bg-brand-600" style={{ width: `${c.ratings[meta.key] * 10}%` }} />
                       </span>
                     </>
                   ) : (
-                    <span className="text-ink-500">Not rated</span>
+                    <span className="text-text-subtle">Not rated</span>
                   )
                 }
               />
@@ -419,7 +418,7 @@ export default async function CompareCandidates({ searchParams }: { searchParams
                 return (
                   <Cell key={c.id}>
                     {ordered.length === 0 ? (
-                      <span className="text-ink-500">None listed</span>
+                      <span className="text-text-subtle">None listed</span>
                     ) : (
                       <ul className="space-y-1">
                         {ordered.map((skill) => (
@@ -441,7 +440,7 @@ export default async function CompareCandidates({ searchParams }: { searchParams
 
             <MatrixRow label="Work mode">
               {candidates.map((c) => (
-                <Cell key={c.id}>{c.workModes.join(", ") || <span className="text-ink-500">Not stated</span>}</Cell>
+                <Cell key={c.id}>{c.workModes.join(", ") || <span className="text-text-subtle">Not stated</span>}</Cell>
               ))}
             </MatrixRow>
 
@@ -451,7 +450,7 @@ export default async function CompareCandidates({ searchParams }: { searchParams
                   {c.preferredLocations.length > 0 ? (
                     c.preferredLocations.map((l) => l.split(",")[0].trim()).join(", ")
                   ) : (
-                    <span className="text-ink-500">{c.workModes.length === 1 && c.workModes[0] === "Remote" ? "Remote only" : "Not stated"}</span>
+                    <span className="text-text-subtle">{c.workModes.length === 1 && c.workModes[0] === "Remote" ? "Remote only" : "Not stated"}</span>
                   )}
                 </Cell>
               ))}
@@ -460,7 +459,7 @@ export default async function CompareCandidates({ searchParams }: { searchParams
             <MatrixRow label="Laptop">
               {candidates.map((c) => (
                 <Cell key={c.id}>
-                  {c.hasLaptop === null ? <span className="text-ink-500">Not stated</span> : c.hasLaptop ? "Has a laptop" : "Needs one provided"}
+                  {c.hasLaptop === null ? <span className="text-text-subtle">Not stated</span> : c.hasLaptop ? "Has a laptop" : "Needs one provided"}
                 </Cell>
               ))}
             </MatrixRow>

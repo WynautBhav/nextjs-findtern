@@ -158,7 +158,7 @@ export function FullTimeOfferButton({
                     onStateChange={(state) => setV((s) => ({ ...s, jobLocationState: state }))}
                   />
                 </div>
-                <p className="mt-1.5 text-xs text-ink-500">Only Indian locations: candidates are India-based.</p>
+                <p className="mt-1.5 text-xs text-text-subtle">Only Indian locations: candidates are India-based.</p>
               </div>
             ) : null}
             <div className="grid gap-3 sm:grid-cols-3">
@@ -208,7 +208,7 @@ export function FullTimeOfferButton({
                 <span className="text-ink-600">One-time hiring fee (8.33% of annual CTC)</span>
                 <span className="nums font-semibold text-ink-900">{feeMinor > 0 ? formatMoney(feeMinor, v.ctcCurrency, { zeroLabel: false }) : "-"}</span>
               </p>
-              <p className="mt-1 text-xs leading-relaxed text-ink-500">
+              <p className="mt-1 text-xs leading-relaxed text-text-subtle">
                 The recruitment fee charged by Findtern is separate from the candidate&apos;s CTC and is not included within the offered compensation package. It is payable independently by the hiring organization.
               </p>
             </div>

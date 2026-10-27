@@ -54,7 +54,7 @@ function tomorrowIst(): string {
 }
 
 const INPUT =
-  "apple-spring min-h-11 w-full rounded-apple-sm border border-ink-200 bg-white px-3 text-sm text-ink-900 outline-none placeholder:text-ink-400 focus-visible:border-brand-500 focus-visible:ring-2 focus-visible:ring-brand-500/20";
+  "apple-spring min-h-11 w-full rounded-apple-sm border border-ink-200 bg-white px-3 text-sm text-ink-900 outline-none placeholder:text-text-subtle focus-visible:border-brand-500 focus-visible:ring-2 focus-visible:ring-brand-500/20";
 const LABEL = "mb-1.5 block text-sm font-medium text-ink-800";
 
 /**
@@ -238,9 +238,9 @@ export function ProposalOfferForm({
           <p className="nums text-sm font-medium text-ink-800">
             {hours} h a month
             {monthlyMinor != null ? ` · ${formatMoney(monthlyMinor, currency)} a month` : ""}
-            {monthlyMinor != null && currency === "INR" ? <span className="text-ink-500"> (includes GST)</span> : null}
+            {monthlyMinor != null && currency === "INR" ? <span className="text-text-subtle"> (includes GST)</span> : null}
           </p>
-          <p className="text-xs text-ink-500">
+          <p className="text-xs text-text-subtle">
             ({days} working days − {Number(leaves) || 0} leave) × 8 h
           </p>
         </div>
@@ -261,7 +261,7 @@ export function ProposalOfferForm({
             {noLaptop ? null : <option value="candidate">Candidate&apos;s own</option>}
           </select>
         </label>
-        {noLaptop ? <p className="col-span-2 -mt-1 text-xs text-ink-500">The candidate has no laptop, so the company provides one.</p> : null}
+        {noLaptop ? <p className="col-span-2 -mt-1 text-xs text-text-subtle">The candidate has no laptop, so the company provides one.</p> : null}
         {mode !== "remote" && preference.cities.length > 0 ? (
           <label className="col-span-2 block">
             <span className={LABEL}>Work city (candidate&apos;s preference)</span>
@@ -345,7 +345,7 @@ export function ProposalOfferForm({
               ),
             )}
           </select>
-          {ist ? <span className="nums mt-1.5 block text-xs text-ink-500">For the intern: {ist}</span> : null}
+          {ist ? <span className="nums mt-1.5 block text-xs text-text-subtle">For the intern: {ist}</span> : null}
         </label>
       </div>
       <label className="block">

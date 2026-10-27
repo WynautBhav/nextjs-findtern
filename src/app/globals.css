@@ -828,6 +828,12 @@
      never generated at all. Nothing to suppress here. */
 }
 
+/* The chat launcher steps aside while any dialog or sheet is open, so it never
+   sits on top of a modal's own buttons (it is z-80, above the overlays). */
+body:has([data-slot="dialog-content"][data-state="open"], [data-slot="sheet-content"][data-state="open"]) [data-chat-root] {
+  display: none;
+}
+
 /* ==========================================================================
    REDUCED MOTION - the single switch
    --------------------------------------------------------------------------

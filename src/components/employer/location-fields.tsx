@@ -234,7 +234,7 @@ export function CityField({
                 )}
               >
                 <span>{d.district}</span>
-                {state && STATES.includes(state) ? null : <span className="text-xs text-ink-500">{d.state}</span>}
+                {state && STATES.includes(state) ? null : <span className="text-xs text-text-subtle">{d.state}</span>}
               </button>
             </li>
           ))}

@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { MessageCircle, Send, X } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 
+import { OPEN_CHAT_EVENT } from "@/lib/chat-events";
 import { cn } from "@/lib/utils";
 
 type Msg = { role: "user" | "assistant"; content: string };
@@ -213,6 +214,16 @@ export function ChatWidget() {
     }
   }
 
+  // The signed-in consoles open the chat from their top bar on desktop.
+  useEffect(() => {
+    const openChat = () => {
+      setTeaser(false);
+      setOpen(true);
+    };
+    window.addEventListener(OPEN_CHAT_EVENT, openChat);
+    return () => window.removeEventListener(OPEN_CHAT_EVENT, openChat);
+  }, []);
+
   useEffect(() => {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight });
   }, [messages, busy, open]);
@@ -263,20 +274,23 @@ export function ChatWidget() {
     return null;
   }
 
-  // Intern portal on mobile renders a fixed bottom navigation bar (min-h-16).
-  // Position chat cleanly above the tab bar so the 5th tab is never blocked.
-  // "/intern-nda" and "/intern-terms-and-conditions" are public pages, so
-  // match the app segments exactly rather than by prefix.
-  const inApp = /^\/(intern|employer)(\/|$)/.test(pathname ?? "");
-  const hasBottomNav = /^\/intern(\/|$)/.test(pathname ?? "");
+  // The intern and college consoles have a phone tab bar (min-h-16), so the
+  // launcher sits above it; it used to cover the college Roster tab. Inside
+  // the signed-in consoles on desktop the launcher is the top bar's "Ask me"
+  // button instead, so nothing floats over tables and rails; the prompt and
+  // the panel drop from there. "/intern-nda" and
+  // "/intern-terms-and-conditions" are public pages, so match the app
+  // segments exactly rather than by prefix.
+  const inApp = /^\/(intern|employer|college)(\/|$)/.test(pathname ?? "");
+  const hasBottomNav = /^\/(intern|college)(\/|$)/.test(pathname ?? "");
 
   return (
     <div
+      data-chat-root
       className={cn(
         "pointer-events-none fixed z-[80] flex flex-col items-end gap-3",
-        hasBottomNav
-          ? "bottom-20 right-4 lg:bottom-6 lg:right-6"
-          : "bottom-5 right-4 lg:bottom-6 lg:right-6"
+        hasBottomNav ? "bottom-20 right-4" : "bottom-5 right-4",
+        inApp ? "lg:bottom-auto lg:right-6 lg:top-[4.5rem]" : "lg:bottom-6 lg:right-6",
       )}
     >
       {/* ── Panel ─────────────────────────────────────────── */}
@@ -300,7 +314,7 @@ export function ChatWidget() {
           <div className="min-w-0 flex-1">
             <p className="text-sm font-semibold leading-tight">Findtern</p>
             <p className="flex items-center gap-1.5 text-xs text-on-dark-subtle">
-              <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse-dot" aria-hidden />
+              <span className="size-1.5 rounded-full bg-brand-300" aria-hidden />
               Online · replies instantly
             </p>
           </div>
@@ -435,7 +449,11 @@ export function ChatWidget() {
           </button>
           <span
             aria-hidden
-            className="absolute -bottom-1.5 right-8 size-3 rotate-45 border-r border-b border-ink-200 bg-white"
+            className={cn(
+              "absolute -bottom-1.5 right-8 size-3 rotate-45 border-r border-b border-ink-200 bg-white",
+              // Under the top bar's button, the arrow points up at it.
+              inApp && "lg:-top-1.5 lg:bottom-auto lg:rotate-[225deg]",
+            )}
           />
         </motion.div>
       ) : null}
@@ -450,22 +468,19 @@ export function ChatWidget() {
         aria-expanded={open}
         aria-label={open ? "Hide Findtern chat" : "Ask me - chat with Findtern"}
         className={cn(
-          "relative pointer-events-auto group flex items-center justify-center rounded-full text-sm font-semibold text-white shadow-lg transition-all duration-[180ms] ease-out-expo motion-reduce:transition-none",
-          "bg-gradient-to-br from-primary to-brand-900 hover:shadow-glow",
-          // Bigger, and labelled on every screen size (bug sheet 7, NC r30/r40:
-          // the icon-only launcher was too small to notice).
-          open ? "size-16" : "h-16 min-w-16 gap-2.5 pl-5 pr-6 text-base",
+          "relative pointer-events-auto group flex items-center justify-center rounded-full font-semibold text-white shadow-md transition-colors duration-[180ms] ease-out-expo motion-reduce:transition-none",
+          "bg-brand-800 hover:bg-brand-900",
+          // Labelled on every screen size (bug sheet 7, NC r30/r40: the
+          // icon-only launcher was too small to notice).
+          open ? "size-14" : "h-14 min-w-14 gap-2 pl-4 pr-5 text-[0.9375rem]",
+          inApp && "lg:hidden",
         )}
       >
         {open ? (
-          <X className="size-6 shrink-0" aria-hidden />
+          <X className="size-5 shrink-0" aria-hidden />
         ) : (
           <div className="relative flex shrink-0 items-center justify-center">
-            <MessageCircle className="size-7 shrink-0" aria-hidden />
-            <span
-              className="absolute -top-0.5 -right-0.5 size-3 rounded-full border-2 border-brand-900 bg-emerald-400"
-              aria-hidden
-            />
+            <MessageCircle className="size-6 shrink-0" aria-hidden />
           </div>
         )}
         <span className={cn(open ? "hidden" : "font-semibold")}>Ask me</span>

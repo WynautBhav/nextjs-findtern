@@ -317,7 +317,7 @@ export function SendProposalForm({
                 })}
               </div>
               {shortOnly ? (
-                <p className="mt-1.5 text-xs text-ink-500">Candidates scoring below 6 can be offered up to 2 months.</p>
+                <p className="mt-1.5 text-xs text-text-subtle">Candidates scoring below 6 can be offered up to 2 months.</p>
               ) : null}
             </div>
             <Field
@@ -579,7 +579,7 @@ export function SendProposalForm({
             <dl className="grid grid-cols-4 border-b border-ink-100">
               {RATING_META.map((r, i) => (
                 <div key={r.key} className={cn("px-3 py-3 text-center", i > 0 && "border-l border-ink-100")}>
-                  <dt className="truncate text-xs text-ink-500">{SHORT_RATING[r.key] ?? r.label}</dt>
+                  <dt className="truncate text-xs text-text-subtle">{SHORT_RATING[r.key] ?? r.label}</dt>
                   <dd className="nums mt-0.5 text-sm font-semibold text-ink-900">{candidate.ratings[r.key] > 0 ? candidate.ratings[r.key].toFixed(1) : "-"}</dd>
                 </div>
               ))}
@@ -699,7 +699,7 @@ function Row({
 /* ── Form primitives ────────────────────────────────────────────────────── */
 
 const FIELD_BASE =
-  "apple-spring mt-2 min-h-11 w-full rounded-apple-sm border bg-white px-3.5 text-sm text-ink-900 outline-none placeholder:text-ink-400 focus-visible:ring-2";
+  "apple-spring mt-2 min-h-11 w-full rounded-apple-sm border bg-white px-3.5 text-sm text-ink-900 outline-none placeholder:text-text-subtle focus-visible:ring-2";
 const FIELD_OK = "border-ink-200 focus-visible:border-brand-500 focus-visible:ring-brand-500/20";
 const FIELD_BAD = "border-danger focus-visible:border-danger focus-visible:ring-danger/20";
 
@@ -731,7 +731,7 @@ function Field({
       <label htmlFor={id} className="block text-sm font-medium text-ink-800">
         {label}
       </label>
-      {hint ? <p className="mt-0.5 text-xs text-ink-500">{hint}</p> : null}
+      {hint ? <p className="mt-0.5 text-xs text-text-subtle">{hint}</p> : null}
       <input
         id={id}
         name={id}
@@ -771,7 +771,7 @@ function ReadOnlyField({
       <label htmlFor={id} className="block text-sm font-medium text-ink-800">
         {label}
       </label>
-      {hint ? <p className="mt-0.5 text-xs text-ink-500">{hint}</p> : null}
+      {hint ? <p className="mt-0.5 text-xs text-text-subtle">{hint}</p> : null}
       <input
         id={id}
         name={id}
@@ -805,7 +805,7 @@ function SelectField({
       <label htmlFor={id} className="block text-sm font-medium text-ink-800">
         {label}
       </label>
-      {hint ? <p className="mt-0.5 text-xs text-ink-500">{hint}</p> : null}
+      {hint ? <p className="mt-0.5 text-xs text-text-subtle">{hint}</p> : null}
       <select
         id={id}
         name={id}
@@ -853,7 +853,7 @@ function TextArea({
       <label htmlFor={id} className="block text-sm font-medium text-ink-800">
         {label}
       </label>
-      {hint ? <p className="mt-0.5 text-xs text-ink-500">{hint}</p> : null}
+      {hint ? <p className="mt-0.5 text-xs text-text-subtle">{hint}</p> : null}
       <textarea
         id={id}
         name={id}
@@ -863,7 +863,7 @@ function TextArea({
         onChange={(e) => onChange(e.target.value)}
         aria-invalid={error ? true : undefined}
         aria-describedby={error ? `${id}-error` : undefined}
-        className={`mt-2 min-h-11 w-full rounded-apple-sm border bg-white px-3.5 py-2.5 text-sm leading-relaxed text-ink-900 outline-none apple-spring placeholder:text-ink-400 focus-visible:ring-2 ${
+        className={`mt-2 min-h-11 w-full rounded-apple-sm border bg-white px-3.5 py-2.5 text-sm leading-relaxed text-ink-900 outline-none apple-spring placeholder:text-text-subtle focus-visible:ring-2 ${
           error ? FIELD_BAD : FIELD_OK
         }`}
       />

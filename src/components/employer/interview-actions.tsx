@@ -224,7 +224,7 @@ export function InterviewActions({
             <button type="button" onClick={() => setPanel("none")} className={buttonClass({ variant: "ghost", size: "sm" })}>
               Cancel
             </button>
-            <span className="nums ml-auto text-xs text-ink-500">{feedback.length}/2000</span>
+            <span className="nums ml-auto text-xs text-text-subtle">{feedback.length}/2000</span>
           </div>
         </div>
       ) : null}

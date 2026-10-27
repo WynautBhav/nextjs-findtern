@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Briefcase, Clock3, FolderPlus, Globe2, MapPin, Pencil, Search, Sparkles, Trash2, Users, X } from "lucide-react";
+import { Briefcase, FolderPlus, Pencil, Search, Trash2, Users, X } from "lucide-react";
 
-import { EmptyScene, Pill, Surface } from "@/components/app/primitives";
+import { EmptyScene, FilterTabs, Pill, Surface } from "@/components/app/primitives";
 import { PageHeader } from "@/components/layout/page-header";
 import { buttonClass, ButtonLink } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -15,6 +15,7 @@ import { scopeLabel, scopeValue, type Project } from "@/lib/db/schema";
 import { emptyProject, projectFromRecord, type ProjectDraft } from "@/lib/employer-onboarding";
 import { CLOSED_PROJECT_STATUS, isProjectOpen } from "@/lib/project-locations";
 import { cn } from "@/lib/utils";
+import { RowMenu } from "@/components/app/row-menu";
 
 type Filter = "all" | "open" | "closed";
 
@@ -252,30 +253,16 @@ export function ProjectsManager({
       ) : (
         <>
           <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div role="tablist" aria-label="Show projects" className="inline-flex self-start rounded-apple-md border border-ink-200/80 bg-white p-1 shadow-xs">
-              {(
-                [
-                  ["all", "All", projects.length],
-                  ["open", "Open", openCount],
-                  ["closed", "Closed", closedCount],
-                ] as const
-              ).map(([key, label, n]) => (
-                <button
-                  key={key}
-                  type="button"
-                  role="tab"
-                  aria-selected={filter === key}
-                  onClick={() => setFilter(key)}
-                  className={cn(
-                    "apple-spring inline-flex min-h-10 items-center gap-1.5 rounded-apple-sm px-3.5 text-sm font-medium",
-                    filter === key ? "bg-brand-700 text-white shadow-xs" : "text-ink-600 hover:bg-ink-50 hover:text-ink-900",
-                  )}
-                >
-                  {label}
-                  <span className={cn("nums text-xs", filter === key ? "text-white/80" : "text-ink-500")}>{n}</span>
-                </button>
-              ))}
-            </div>
+            <FilterTabs
+              label="Show projects"
+              value={filter}
+              onChange={(k) => setFilter(k as typeof filter)}
+              tabs={[
+                { key: "all", label: "All", count: projects.length },
+                { key: "open", label: "Open", count: openCount },
+                { key: "closed", label: "Closed", count: closedCount },
+              ]}
+            />
 
             <div className="relative min-w-0 sm:w-72">
               <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-ink-400" aria-hidden />
@@ -292,7 +279,7 @@ export function ProjectsManager({
                   type="button"
                   onClick={() => setQuery("")}
                   aria-label="Clear search"
-                  className="absolute right-1 top-1/2 grid size-9 -translate-y-1/2 place-items-center rounded-apple-sm text-ink-500 hover:bg-ink-100 hover:text-ink-800"
+                  className="absolute right-1 top-1/2 grid size-9 -translate-y-1/2 place-items-center rounded-apple-sm text-text-subtle hover:bg-ink-100 hover:text-ink-800"
                 >
                   <X className="size-4" aria-hidden />
                 </button>
@@ -320,108 +307,71 @@ export function ProjectsManager({
               </button>
             </Surface>
           ) : (
-            <ul className="grid gap-4 xl:grid-cols-2">
-              {filtered.map((p) => {
-                const skills = (p.skills as string[] | null) ?? [];
-                const open = isProjectOpen(p.status);
-                const mode = MODE_LABEL[p.locationType ?? ""] ?? "Work mode not set";
-                const place = [p.city, p.state].filter(Boolean).join(", ");
-                return (
-                  <Surface as="li" key={p.id} className={cn("flex flex-col p-5 sm:p-6", !open && "bg-ink-50/40")}>
-                    <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
-                      <h2 className="min-w-0 text-lg font-semibold tracking-[-0.01em] text-ink-900">{p.projectName}</h2>
-                      <div className="flex flex-wrap gap-1.5">
-                        {p.fullTimeOffer ? (
-                          <Pill tone="new">
-                            <Sparkles className="size-3" aria-hidden />
-                            Full-time path
-                          </Pill>
-                        ) : null}
+            <Surface className="overflow-hidden">
+              <ul className="divide-y divide-ink-100">
+                {filtered.map((p) => {
+                  const skills = (p.skills as string[] | null) ?? [];
+                  const open = isProjectOpen(p.status);
+                  const mode = MODE_LABEL[p.locationType ?? ""] ?? "Work mode not set";
+                  const place = [p.city, p.state].filter(Boolean).join(", ");
+                  const meta = [
+                    `${mode}${place && p.locationType !== "remote" ? ` · ${place}` : ""}`,
+                    scopeLabel(p.scopeOfWork),
+                    p.fullTimeOffer ? "Full-time path" : "",
+                  ].filter(Boolean);
+                  return (
+                    <li
+                      key={p.id}
+                      className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-6 gap-y-2 px-5 py-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_5.5rem_12rem]"
+                    >
+                      <div className="min-w-0">
+                        <h2 className={cn("truncate text-[0.9375rem] font-semibold", open ? "text-ink-900" : "text-ink-600")}>{p.projectName}</h2>
+                        <p className="truncate text-sm text-ink-600">{meta.join(" · ")}</p>
+                      </div>
+                      <p className="min-w-0 truncate text-sm text-ink-600 max-lg:col-span-2" title={skills.join(", ")}>
+                        {skills.length ? (
+                          <>
+                            {skills.slice(0, 4).join(" · ")}
+                            {skills.length > 4 ? <span className="text-text-subtle"> +{skills.length - 4}</span> : null}
+                          </>
+                        ) : (
+                          <span className="text-accent-700">No skills yet, so no matches</span>
+                        )}
+                      </p>
+                      <div className="max-lg:col-start-2 max-lg:row-start-1">
                         <Pill tone={open ? "live" : "closed"}>{open ? "Open" : "Closed"}</Pill>
                       </div>
-                    </div>
-
-                    <dl className="mt-3 flex flex-wrap gap-x-5 gap-y-1.5 text-sm text-ink-600">
-                      <div className="flex items-center gap-1.5">
-                        <dt className="sr-only">Scope</dt>
-                        <Clock3 className="size-4 text-ink-400" aria-hidden />
-                        <dd>{scopeLabel(p.scopeOfWork)}</dd>
+                      <div className="flex items-center justify-end gap-1 max-lg:col-span-2 max-lg:justify-start">
+                        {open ? (
+                          <ButtonLink href={`/employer/candidates?project=${encodeURIComponent(p.id)}`} variant="outline" size="sm">
+                            <Users className="size-4" aria-hidden />
+                            Find candidates
+                          </ButtonLink>
+                        ) : null}
+                        <RowMenu
+                          label={`More actions for ${p.projectName}`}
+                          items={[
+                            { label: "Edit project", onSelect: () => openEdit(p), icon: <Pencil /> },
+                            {
+                              label: open ? "Close project" : "Reopen project",
+                              onSelect: () => toggleStatus(p),
+                              icon: <Briefcase />,
+                              disabled: busyId === p.id,
+                            },
+                            { label: "Delete project", onSelect: () => deleteProject(p), icon: <Trash2 />, destructive: true, disabled: busyId === p.id },
+                          ]}
+                        />
                       </div>
-                      <div className="flex items-center gap-1.5">
-                        <dt className="sr-only">Work mode</dt>
-                        <MapPin className="size-4 text-ink-400" aria-hidden />
-                        <dd>
-                          {mode}
-                          {place && p.locationType !== "remote" ? ` · ${place}` : ""}
-                        </dd>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <dt className="sr-only">Timezone</dt>
-                        <Globe2 className="size-4 text-ink-400" aria-hidden />
-                        <dd>{p.timezone || "Asia/Kolkata"}</dd>
-                      </div>
-                    </dl>
-
-                    {skills.length > 0 ? (
-                      <ul className="mt-4 flex flex-wrap gap-1.5" aria-label="Skills">
-                        {skills.map((s) => (
-                          <li key={s} className="rounded-full bg-ink-100 px-2.5 py-1 text-xs font-medium text-ink-700">
-                            {s}
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p className="mt-4 text-sm text-ink-600">No skills listed yet. Add some so candidates can be matched.</p>
-                    )}
-
-                    <div aria-hidden className="flex-1" />
-                    <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-ink-100 pt-4">
-                      {open ? (
-                        <ButtonLink
-                          href={`/employer/candidates?project=${encodeURIComponent(p.id)}`}
-                          variant="outline"
-                          size="sm"
-                        >
-                          <Users className="size-4" aria-hidden />
-                          Find candidates
-                        </ButtonLink>
+                      {rowError?.id === p.id ? (
+                        <FormNotice tone="error" className="col-span-full">
+                          {rowError.message}
+                        </FormNotice>
                       ) : null}
-                      <button type="button" onClick={() => openEdit(p)} className={buttonClass({ variant: "ghost", size: "sm" })}>
-                        <Pencil className="size-4" aria-hidden />
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => toggleStatus(p)}
-                        disabled={busyId === p.id}
-                        className={buttonClass({ variant: "ghost", size: "sm", className: "text-ink-700 hover:bg-ink-100" })}
-                      >
-                        <Briefcase className="size-4" aria-hidden />
-                        {open ? "Close" : "Reopen"}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => deleteProject(p)}
-                        disabled={busyId === p.id}
-                        className={buttonClass({
-                          variant: "ghost",
-                          size: "sm",
-                          className: "ml-auto text-danger hover:bg-danger-soft",
-                        })}
-                      >
-                        <Trash2 className="size-4" aria-hidden />
-                        Delete
-                      </button>
-                    </div>
-                    {rowError?.id === p.id ? (
-                      <FormNotice tone="error" className="mt-3">
-                        {rowError.message}
-                      </FormNotice>
-                    ) : null}
-                  </Surface>
-                );
-              })}
-            </ul>
+                    </li>
+                  );
+                })}
+              </ul>
+            </Surface>
           )}
         </>
       )}
@@ -440,9 +390,9 @@ export function ProjectsManager({
           <form onSubmit={handleSave} noValidate className="px-6 pb-6 pt-5">
             {saveError ? <FormNotice tone="error" className="mb-5">{saveError}</FormNotice> : null}
             <ProjectFields values={form} set={setField} errors={errors} companyPlace={companyPlace} idPrefix="sheet" />
-            {/* Left-aligned, primary first: the "Ask me" launcher floats
-                over the bottom-right corner of every screen. */}
-            <div className="sticky bottom-0 -mx-6 mt-8 flex items-center gap-2 border-t border-ink-100 bg-white py-4 pl-6 pr-36">
+            {/* Left-aligned, primary first. (The chat launcher steps aside
+                while a sheet is open, so no right padding is needed for it.) */}
+            <div className="sticky bottom-0 -mx-6 mt-8 flex items-center gap-2 border-t border-ink-100 bg-white px-6 py-4">
               <button type="submit" disabled={saving} className={buttonClass({ variant: "primary", size: "md" })}>
                 {saving ? "Saving…" : editing ? "Save changes" : "Create project"}
               </button>

@@ -146,7 +146,7 @@ export default async function EmployerAlerts({
               )}
             >
               {label}
-              <span className={cn("nums text-xs", active ? "text-white/80" : "text-ink-500")}>{n}</span>
+              <span className={cn("nums text-xs", active ? "text-white/80" : "text-text-subtle")}>{n}</span>
             </Link>
           ))}
         </nav>
