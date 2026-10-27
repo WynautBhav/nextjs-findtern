@@ -12,6 +12,55 @@ import * as schema from "./schema.ts";
  */
 let _db: ReturnType<typeof createDb> | null = null;
 
+const TIMESTAMP = pg.types.builtins.TIMESTAMP;
+const parseTimestamptz = pg.types.getTypeParser(pg.types.builtins.TIMESTAMPTZ, "text") as (v: string) => Date;
+
+/**
+ * Pool type parsers: `timestamp without time zone` (OID 1114) read as UTC.
+ *
+ * Every timestamp column holds UTC wall time (the session is pinned to UTC
+ * below), but node-postgres's default parser reads 1114 as *local* time, 5h30
+ * off on an IST machine. This covers direct `pg` use of the pool. Drizzle
+ * installs its own per-query parsers, so it does not change what the select
+ * builder or `db.execute()` return; for those raw rows use `dbTimestamp`.
+ */
+export const utcTypes = {
+  getTypeParser(oid: number, format?: "text" | "binary") {
+    if (oid === TIMESTAMP && format !== "binary") return (v: string) => parseUtc(v);
+    return pg.types.getTypeParser(oid, format as "text");
+  },
+} as pg.CustomTypesConfig;
+
+function parseUtc(value: string): Date {
+  return value === "infinity" || value === "-infinity" ? parseTimestamptz(value) : parseTimestamptz(`${value}+00`);
+}
+
+/**
+ * A timestamp read from a raw `db.execute(sql…)` row, as the right instant.
+ *
+ * Use this for every timestamp that comes out of `db.execute()`. Drizzle hands
+ * those back as zone-less strings ("2026-10-27 10:15:36.905882"), and
+ * `new Date(thatString)` reads them as *local* time: 5h30 off on an IST server,
+ * or in an IST browser if the string is sent to the client. The select builder
+ * already returns correct Dates and doesn't need this.
+ *
+ * Accepts that string, a string with an explicit zone ("…+00", ISO "…Z"), or a
+ * Date; returns null for null/undefined/unparseable input.
+ */
+export function dbTimestamp(value: unknown): Date | null {
+  if (value === null || value === undefined) return null;
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
+  if (typeof value !== "string" || !value.trim()) return null;
+  const v = value.trim();
+  if (!/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}/.test(v)) return null;
+  const d = /Z$/i.test(v)
+    ? new Date(v.replace(" ", "T"))
+    : /[+-]\d{2}(:?\d{2})?$/.test(v)
+      ? parseTimestamptz(v.replace("T", " ")) // explicit offset ("+00", "+05:30"): Postgres's own parser
+      : parseUtc(v.replace("T", " "));
+  return d && !Number.isNaN(d.getTime()) ? d : null;
+}
+
 function createDb() {
   const connectionString = process.env.DATABASE_URL;
   if (!connectionString) {
@@ -30,7 +79,7 @@ function createDb() {
   // set to Asia/Kolkata that stored local wall time, read back 5h30 late (an
   // OTP cooldown of ~19,850 s). Pinning the session to UTC at connection
   // startup makes now() and JS agree, with no per-connection query to race.
-  const pool = new pg.Pool({ connectionString, ssl, max: 10, options: "-c TimeZone=UTC" });
+  const pool = new pg.Pool({ connectionString, ssl, max: 10, options: "-c TimeZone=UTC", types: utcTypes });
   return drizzle(pool, { schema });
 }
 
