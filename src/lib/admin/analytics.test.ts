@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { computeAnalytics, type AnalyticsInput } from "./analytics.ts";
+import { computeAnalytics, filterHires, type AnalyticsInput } from "./analytics.ts";
 
 const d = (s: string) => new Date(s);
 
@@ -39,4 +39,56 @@ test("rates, funnel and INR revenue from a small dataset", () => {
   assert.equal(a.highestPayingSkills[0].avgMonthlyMinor, Math.round((2_000_000 + 1_000_000) / 2));
   assert.equal(a.hiredList[0].internName, "Asha K");
   assert.equal(a.trend.length, 3);
+});
+
+test("employer behaviour ratios, company status and hire filters (ADM-15, ADM-16)", () => {
+  const input: AnalyticsInput = {
+    since: d("2026-01-01"),
+    until: d("2026-04-01"),
+    interns: [{ id: "i1", firstName: "Asha", lastName: "K", createdAt: d("2026-01-05") }],
+    onboarding: [],
+    employers: [
+      { id: "e1", companyName: "Acme", createdAt: d("2025-01-02") },
+      { id: "e2", companyName: "Beta", createdAt: d("2025-01-02") },
+      { id: "e3", companyName: "Idle", createdAt: d("2025-01-02") },
+      { id: "e4", companyName: "Offers only", createdAt: d("2025-01-02") },
+    ],
+    projects: [
+      { id: "p1", employerId: "e1", status: "active", skills: [], city: null, state: null, createdAt: d("2026-01-03") },
+      { id: "p2", employerId: "e2", status: "closed", skills: [], city: null, state: null, createdAt: d("2026-02-03") },
+      { id: "p3", employerId: "e2", status: null, skills: [], city: null, state: null, createdAt: d("2026-02-04") },
+    ],
+    proposals: [
+      { id: "x1", employerId: "e4", internId: "i1", projectId: "p1", status: "hired", currency: "INR", offerDetails: { fullTimeOffer: { ctc: 600000 } }, createdAt: d("2026-02-01"), hiredAt: d("2026-02-11") },
+      { id: "x2", employerId: "e1", internId: "i1", projectId: "p1", status: "hired", currency: "INR", offerDetails: { monthlyAmount: 10000, duration: "1m" }, createdAt: d("2026-02-01"), hiredAt: d("2026-03-05") },
+    ],
+    interviews: [],
+    employerPayments: [
+      { employerId: "e1", amountMinor: 100, currency: "INR", status: "paid", paidAt: d("2026-02-11"), createdAt: null },
+      { employerId: "e1", amountMinor: 100, currency: "INR", status: "paid", paidAt: d("2026-03-11"), createdAt: null },
+      { employerId: "e2", amountMinor: 100, currency: "INR", status: "paid", paidAt: d("2026-03-11"), createdAt: null },
+      { employerId: "test-employer", amountMinor: 100, currency: "INR", status: "paid", paidAt: d("2026-03-11"), createdAt: null },
+      { employerId: "test-employer", amountMinor: 100, currency: "INR", status: "paid", paidAt: d("2026-03-12"), createdAt: null },
+    ],
+    internPayments: [],
+  };
+  const a = computeAnalytics(input);
+  assert.equal(a.totals.activeEmployers, 3); // e1, e2 (projects), e4 (offer)
+  assert.equal(a.totals.repeatEmployers, 1); // e1 only; test employers never count
+  assert.equal(a.rates.activeEmployerRate, 75);
+  assert.equal(a.rates.repeatEmployerRate, 33.3);
+  assert.equal(a.totals.activeProjects, 2); // "active" and blank status
+  assert.equal(a.rates.activeProjectRate, 66.7);
+  assert.deepEqual(
+    a.topCompanies.map((c) => [c.name, c.status]),
+    [
+      ["Acme", "active"],
+      ["Offers only", "inactive"],
+      ["Beta", "active"],
+    ],
+  );
+
+  assert.deepEqual(filterHires(a.hiredList, { kind: "full-time", from: "", to: "", q: "" }).map((h) => h.companyName), ["Offers only"]);
+  assert.deepEqual(filterHires(a.hiredList, { kind: "", from: "2026-03-01", to: "2026-03-31", q: "" }).map((h) => h.companyName), ["Acme"]);
+  assert.equal(filterHires(a.hiredList, { kind: "", from: "", to: "", q: "acme" }).length, 1);
 });

@@ -228,20 +228,53 @@ export function computeReceivables(input: ReceivablesInput, filter: { receivable
   receivables.sort(byDate);
   payables.sort(byDate);
 
+  return { receivables, payables, totals: moneyTotals(receivables, payables) };
+}
+
+/** INR totals for the four report tiles, from whichever rows are shown. */
+export function moneyTotals(receivables: MoneyRow[], payables: MoneyRow[]) {
   const total = (rows: MoneyRow[], statuses: MoneyRow["status"][]) =>
     rows.filter((r) => statuses.includes(r.status)).reduce((s, r) => s + r.inrMinor, 0);
-
   return {
-    receivables,
-    payables,
-    totals: {
-      receivedMinor: total(receivables, ["received"]),
-      dueMinor: total(receivables, ["due", "upcoming"]),
-      prospectMinor: total(receivables, ["unpaid"]),
-      paidOutMinor: total(payables, ["paid"]),
-      owedMinor: total(payables, ["pending", "upcoming"]),
-    },
+    receivedMinor: total(receivables, ["received"]),
+    dueMinor: total(receivables, ["due", "upcoming"]),
+    prospectMinor: total(receivables, ["unpaid"]),
+    paidOutMinor: total(payables, ["paid"]),
+    owedMinor: total(payables, ["pending", "upcoming"]),
   };
 }
 
 export type Receivables = ReturnType<typeof computeReceivables>;
+
+export type MoneyRowFilter = { company: string; candidate: string; status: string };
+
+export const MONEY_STATUSES: MoneyRow["status"][] = ["received", "due", "upcoming", "unpaid", "paid", "pending"];
+
+/** Reads the report's row filters from the query (`company`, `candidate`, `status`). */
+export function moneyRowFilter(params: Record<string, string | undefined>): MoneyRowFilter {
+  const status = MONEY_STATUSES.find((s) => s === params.status) ?? "";
+  return { company: (params.company ?? "").trim(), candidate: (params.candidate ?? "").trim(), status };
+}
+
+/**
+ * Candidate / company / status filters on the money report (legacy had all
+ * three on receivables, ADM-15). Names match by "contains", case-insensitive.
+ */
+export function filterMoneyRows(rows: MoneyRow[], f: MoneyRowFilter): MoneyRow[] {
+  const company = f.company.toLowerCase();
+  const candidate = f.candidate.toLowerCase();
+  return rows.filter(
+    (r) =>
+      (!company || (r.companyName ?? "").toLowerCase().includes(company)) &&
+      (!candidate || (r.candidateName ?? "").toLowerCase().includes(candidate)) &&
+      (!f.status || r.status === f.status),
+  );
+}
+
+/** Applies the row filters to a computed report and re-totals it. */
+export function narrowReceivables(data: Receivables, f: MoneyRowFilter): Receivables {
+  if (!f.company && !f.candidate && !f.status) return data;
+  const receivables = filterMoneyRows(data.receivables, f);
+  const payables = filterMoneyRows(data.payables, f);
+  return { receivables, payables, totals: moneyTotals(receivables, payables) };
+}

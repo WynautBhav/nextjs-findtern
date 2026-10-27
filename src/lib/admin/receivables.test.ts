@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { computeReceivables, type ReceivablesInput } from "./receivables.ts";
+import { computeReceivables, moneyRowFilter, narrowReceivables, type ReceivablesInput } from "./receivables.ts";
 
 test("receivables and payables with INR totals", () => {
   const input: ReceivablesInput = {
@@ -38,4 +38,15 @@ test("receivables and payables with INR totals", () => {
   const companyOnly = computeReceivables(input, { receivables: "company", payables: "company" });
   assert.equal(companyOnly.receivables.every((x) => x.source === "company"), true);
   assert.equal(companyOnly.payables.length, 0);
+
+  // Candidate / company / status filters, re-totalled (ADM-15).
+  assert.equal(narrowReceivables(r, moneyRowFilter({})), r);
+  const asha = narrowReceivables(r, moneyRowFilter({ candidate: "asha" }));
+  assert.equal(asha.receivables.every((x) => x.candidateName === "Asha K"), true);
+  assert.equal(asha.totals.receivedMinor, 249_900); // her fee; the order has no candidate
+  assert.equal(asha.totals.paidOutMinor, 1_000_000);
+  const due = narrowReceivables(r, moneyRowFilter({ status: "due", company: "ACME" }));
+  assert.deepEqual(due.receivables.map((x) => x.status), ["due"]);
+  assert.equal(due.totals.dueMinor, 1_500_000);
+  assert.equal(moneyRowFilter({ status: "bogus" }).status, "");
 });

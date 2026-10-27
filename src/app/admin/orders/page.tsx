@@ -2,16 +2,18 @@ import type { Metadata } from "next";
 import { desc, eq, inArray } from "drizzle-orm";
 
 import { getDb, schema } from "@/lib/db";
-import { AdminPageHeader } from "@/components/admin/panel";
+import { AdminLoadError, AdminPageHeader, Panel } from "@/components/admin/panel";
 import { getInvoiceSeller } from "@/lib/invoice-seller";
 import { orderProposalIds } from "@/lib/payments";
 import { AdminInvoicesView, type AdminInvoiceRow } from "@/components/admin/admin-invoices-view";
+import { discountLabel, paymentPromo } from "@/lib/admin/payment-promo";
+import { flattenParams, type RawSearchParams } from "@/lib/admin/params";
 
 export const metadata: Metadata = {
   title: "Employer Orders · Admin Ledger",
 };
 
-export default async function AdminOrdersPage() {
+async function loadOrders(): Promise<AdminInvoiceRow[]> {
   const db = getDb();
 
   const rawOrders = await db
@@ -20,6 +22,7 @@ export default async function AdminOrdersPage() {
       invoiceNumber: schema.employerPayments.invoiceNumber,
       orderId: schema.employerPayments.orderId,
       paymentId: schema.employerPayments.paymentId,
+      gateway: schema.employerPayments.gateway,
       amountMinor: schema.employerPayments.amountMinor,
       currency: schema.employerPayments.currency,
       status: schema.employerPayments.status,
@@ -49,44 +52,63 @@ export default async function AdminOrdersPage() {
       .where(inArray(schema.proposals.id, proposalIds));
     for (const p of named) internByProposal.set(p.id, `${p.first ?? ""} ${p.last ?? ""}`.trim() || "Candidate");
   }
-  const rawOf = (o: (typeof rawOrders)[number]) =>
-    (o.raw ?? {}) as { promoCode?: string; discountMinor?: number; promo?: { promoCode?: string; discountMinor?: number }; needsReview?: unknown };
 
-  const rows: AdminInvoiceRow[] = rawOrders.map((o) => ({
-    id: o.id,
-    invoiceNumber: o.invoiceNumber,
-    orderId: o.orderId,
-    paymentId: o.paymentId,
-    amountMinor: o.amountMinor,
-    currency: o.currency || "INR",
-    status: o.status,
-    paidAt: o.paidAt ? o.paidAt.toISOString() : null,
-    createdAt: o.createdAt ? o.createdAt.toISOString() : null,
-    partyId: o.employerId,
-    interns: orderProposalIds(o.raw).map((id) => internByProposal.get(id) ?? "Candidate").join("; "),
-    promoCode: rawOf(o).promo?.promoCode ?? rawOf(o).promoCode ?? null,
-    discountMinor: rawOf(o).promo?.discountMinor ?? rawOf(o).discountMinor ?? null,
-    needsReview: Boolean(rawOf(o).needsReview),
-    partyName: o.companyName || "Unknown employer",
-    partyEmail: o.companyEmail || "-",
-    buyer: {
-      name: o.companyName || "Unknown Employer",
-      email: o.companyEmail,
-      gstin: o.gstNumber,
-      country: o.country,
-      state: o.state,
-      pincode: o.billingPincode,
-    },
-  }));
+  return rawOrders.map((o) => {
+    // New-app promo objects and legacy order notes (ADM-02/13).
+    const promo = paymentPromo(o.raw, undefined, o.amountMinor);
+    return {
+      id: o.id,
+      invoiceNumber: o.invoiceNumber,
+      orderId: o.orderId,
+      paymentId: o.paymentId,
+      gateway: o.gateway,
+      amountMinor: o.amountMinor,
+      currency: o.currency || "INR",
+      status: o.status,
+      paidAt: o.paidAt ? o.paidAt.toISOString() : null,
+      createdAt: o.createdAt ? o.createdAt.toISOString() : null,
+      partyId: o.employerId,
+      interns: orderProposalIds(o.raw).map((id) => internByProposal.get(id) ?? "Candidate").join("; "),
+      promoCode: promo.code,
+      discountMinor: promo.discountMinor,
+      discountLabel: discountLabel(promo, o.amountMinor),
+      needsReview: Boolean((o.raw as { needsReview?: unknown } | null)?.needsReview),
+      partyName: o.companyName || "Unknown employer",
+      partyEmail: o.companyEmail || "-",
+      buyer: {
+        name: o.companyName || "Unknown employer",
+        email: o.companyEmail,
+        gstin: o.gstNumber,
+        country: o.country,
+        state: o.state,
+        pincode: o.billingPincode,
+      },
+    };
+  });
+}
+
+export default async function AdminOrdersPage({ searchParams }: { searchParams?: Promise<RawSearchParams> }) {
+  const params = flattenParams(await searchParams);
+  let rows: AdminInvoiceRow[] | null = null;
+  try {
+    rows = await loadOrders();
+  } catch (error) {
+    console.error("[admin/orders] load failed", error);
+  }
 
   return (
-    <div className="space-y-6">
+    <div>
       <AdminPageHeader
-        title="Employer Orders"
-        subtitle="Manage employer checkout orders, settlement transactions and invoices."
+        title="Orders"
+        subtitle="Every employer checkout: who paid, for which interns, GST, discounts and the tax invoice."
       />
-
-      <AdminInvoicesView kind="employer" rows={rows} seller={getInvoiceSeller()} />
+      {rows ? (
+        <AdminInvoicesView kind="employer" rows={rows} seller={getInvoiceSeller()} params={params} basePath="/admin/orders" />
+      ) : (
+        <Panel>
+          <AdminLoadError what="employer orders" retryHref="/admin/orders" />
+        </Panel>
+      )}
     </div>
   );
 }

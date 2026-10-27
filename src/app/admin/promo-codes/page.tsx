@@ -1,8 +1,9 @@
-import { count, desc, eq, sql } from "drizzle-orm";
-import { Tag, Sparkles, Percent, CheckCircle2 } from "lucide-react";
+import { desc } from "drizzle-orm";
+import { CheckCircle2, Percent, Sparkles, Tag } from "lucide-react";
 
 import { getDb, schema } from "@/lib/db";
-import { AdminPageHeader } from "@/components/admin/panel";
+import type { PromoCode } from "@/lib/db/schema";
+import { AdminLoadError, AdminPageHeader, Panel } from "@/components/admin/panel";
 import { StatCard, StatGrid } from "@/components/admin/stat-card";
 import { PromoCodesManager } from "@/components/admin/promo-codes-manager";
 import { formatNumber } from "@/lib/format";
@@ -12,68 +13,50 @@ export const metadata = {
 };
 
 export default async function AdminPromoCodesPage() {
-  const db = getDb();
+  let rows: PromoCode[] | null = null;
+  try {
+    rows = await getDb().select().from(schema.promoCodes).orderBy(desc(schema.promoCodes.createdAt));
+  } catch (error) {
+    console.error("[admin/promo-codes] load failed", error);
+  }
 
-  const [
-    rows,
-    [activeCountRow],
-    [totalRedemptionsRow],
-  ] = await Promise.all([
-    db
-      .select()
-      .from(schema.promoCodes)
-      .orderBy(desc(schema.promoCodes.createdAt)),
-    db.select({ c: count() }).from(schema.promoCodes).where(eq(schema.promoCodes.isActive, true)),
-    db
-      .select({
-        totalUsed: sql<number>`coalesce(sum(${schema.promoCodes.usedCount}), 0)::int`,
-      })
-      .from(schema.promoCodes),
-  ]);
+  const header = (
+    <AdminPageHeader
+      title="Promo codes"
+      subtitle="Discount codes for the intern activation fee and employer checkout: value, who can use them, limits and dates."
+    />
+  );
 
-  const activeCount = Number(activeCountRow?.c ?? 0);
-  const totalRedemptions = Number(totalRedemptionsRow?.totalUsed ?? 0);
+  if (!rows) {
+    return (
+      <div>
+        {header}
+        <Panel>
+          <AdminLoadError what="promo codes" retryHref="/admin/promo-codes" />
+        </Panel>
+      </div>
+    );
+  }
+
+  const activeCount = rows.filter((r) => r.isActive).length;
+  const totalRedemptions = rows.reduce((s, r) => s + (r.usedCount ?? 0), 0);
   const totalCodes = rows.length;
-  const activeShare = totalCodes > 0 ? Math.round((activeCount / totalCodes) * 100) : 0;
-  const avgRedemptions = totalCodes > 0 ? (totalRedemptions / totalCodes).toFixed(1) : "0";
-
+  const exhausted = rows.filter((r) => r.maxUsages && r.usedCount >= r.maxUsages).length;
 
   return (
     <div className="space-y-6">
-      <AdminPageHeader
-        title="Promotional Codes"
-        subtitle="Incentive discounts, campaign vouchers and redemption limits."
-      />
+      {header}
 
       <StatGrid cols={4}>
+        <StatCard label="Active codes" value={formatNumber(activeCount)} hint={`${formatNumber(totalCodes)} codes in all`} icon={Tag} />
+        <StatCard label="Total redemptions" value={formatNumber(totalRedemptions)} hint="Paid orders and fees that used a code" icon={Sparkles} />
         <StatCard
-          label="Active promo codes"
-          value={formatNumber(activeCount)}
-          hint="Usable at checkout"
-          icon={Tag}
-          tone="brand"
-        />
-        <StatCard
-          label="Total redemptions"
-          value={formatNumber(totalRedemptions)}
-          hint="Completed orders applied"
-          icon={Sparkles}
-          tone="info"
-        />
-        <StatCard
-          label="Active share"
-          value={`${activeShare}%`}
-          hint={`${formatNumber(activeCount)} of ${formatNumber(totalCodes)} codes live`}
+          label="Uses per code"
+          value={totalCodes ? (totalRedemptions / totalCodes).toFixed(1) : "-"}
+          hint="Average across every code"
           icon={Percent}
-          tone="accent"
         />
-        <StatCard
-          label="Avg. redemptions"
-          value={avgRedemptions}
-          hint="Uses per code"
-          icon={CheckCircle2}
-          tone="success"
-        />
+        <StatCard label="Used up" value={formatNumber(exhausted)} hint="Codes at their usage limit" icon={CheckCircle2} />
       </StatGrid>
 
       <PromoCodesManager initialPromoCodes={rows} />

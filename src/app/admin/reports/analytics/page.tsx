@@ -2,120 +2,162 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeft, Download, IndianRupee, Timer, TrendingUp, Users } from "lucide-react";
 
-import { AdminPageHeader, Panel, PanelBody, PanelHeader } from "@/components/admin/panel";
-import { ReportRange } from "@/components/admin/report-range";
+import { AdminLoadError, AdminPageHeader, Panel, PanelBody, PanelHeader } from "@/components/admin/panel";
+import { ChipLinks, ReportRange } from "@/components/admin/report-range";
 import { StatCard, StatGrid } from "@/components/admin/stat-card";
+import { StatusBadge } from "@/components/admin/status-badge";
 import { PipelineBars } from "@/components/admin/trend-chart";
+import { buttonClass } from "@/components/ui/button";
+import { filterHires, type Analytics, type HireFilter } from "@/lib/admin/analytics";
 import { analyticsRange, loadAnalytics } from "@/lib/admin/analytics-load";
-import { flattenParams } from "@/lib/admin/params";
+import { flattenParams, type RawSearchParams } from "@/lib/admin/params";
 import { formatDate, formatMoney, formatNumber } from "@/lib/format";
+import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Hiring analytics" };
 
+const BASE = "/admin/reports/analytics";
+
 /** Legacy's analytics report (routes.ts:5455-6400), ported with USD converted and test employers excluded. */
-export default async function AdminAnalyticsPage({
-  searchParams,
-}: {
-  searchParams?: Promise<Record<string, string | string[] | undefined>>;
-}) {
+export default async function AdminAnalyticsPage({ searchParams }: { searchParams?: Promise<RawSearchParams> }) {
   const params = flattenParams(await searchParams);
   const range = analyticsRange(params);
-  const a = await loadAnalytics(range);
+  let a: Analytics | null = null;
+  try {
+    a = await loadAnalytics(range);
+  } catch (error) {
+    console.error("[admin/reports/analytics] load failed", error);
+  }
   const query = new URLSearchParams(params).toString();
   const rate = (v: number | null, suffix = "%") => (v == null ? "-" : `${v}${suffix}`);
+  const link = (patch: Record<string, string>) => {
+    const q = new URLSearchParams({ ...params, ...patch });
+    for (const [k, v] of [...q.entries()]) if (!v) q.delete(k);
+    const s = q.toString();
+    return s ? `${BASE}?${s}` : BASE;
+  };
+
+  const header = (
+    <AdminPageHeader
+      title="Hiring analytics"
+      subtitle="Conversion, hiring speed, demand and leaders. Money in INR (USD at ₹100/$); test employers excluded."
+      action={
+        <>
+          <Link href="/admin/reports" className={buttonClass({ variant: "outline", size: "sm" })}>
+            <ArrowLeft className="size-4" aria-hidden />
+            Reports
+          </Link>
+          <a href={`/api/admin/reports/analytics?${query}${query ? "&" : ""}download=1`} className={buttonClass({ variant: "outline", size: "sm" })}>
+            <Download className="size-4" aria-hidden />
+            Export JSON
+          </a>
+        </>
+      }
+    />
+  );
+
+  if (!a) {
+    return (
+      <div className="space-y-8">
+        {header}
+        <Panel>
+          <AdminLoadError what="hiring analytics" retryHref={BASE} />
+        </Panel>
+      </div>
+    );
+  }
+
+  // Top companies: legacy "active" = has a project (ADM-15).
+  const companyStatus = params.companies === "active" || params.companies === "inactive" ? params.companies : "";
+  const companies = a.topCompanies.filter((c) => !companyStatus || c.status === companyStatus).slice(0, 10);
+
+  const hireFilter: HireFilter = {
+    kind: params.hired === "internship" || params.hired === "full-time" ? params.hired : "",
+    from: /^\d{4}-\d{2}-\d{2}$/.test(params.hiredFrom ?? "") ? params.hiredFrom! : "",
+    to: /^\d{4}-\d{2}-\d{2}$/.test(params.hiredTo ?? "") ? params.hiredTo! : "",
+    q: params.hq ?? "",
+  };
+  const hires = filterHires(a.hiredList, hireFilter);
 
   return (
-    <div className="apple-admin space-y-4">
-      <AdminPageHeader
-        title="Hiring analytics"
-        subtitle="Conversion, hiring speed, demand and leaders. Money in INR (USD at ₹100/$); test employers excluded."
-        action={
-          <>
-            <Link
-              href="/admin/reports"
-              className="inline-flex min-h-11 items-center gap-1.5 rounded-[10px] border border-ink-200 bg-white px-3.5 text-[14px] font-medium text-ink-700 hover:bg-ink-50"
-            >
-              <ArrowLeft className="size-4" aria-hidden />
-              Reports
-            </Link>
-            <a
-              href={`/api/admin/reports/analytics?${query}${query ? "&" : ""}download=1`}
-              className="inline-flex min-h-11 items-center gap-1.5 rounded-[10px] border border-ink-200 bg-white px-3.5 text-[14px] font-medium text-ink-700 hover:bg-ink-50"
-            >
-              <Download className="size-4" aria-hidden />
-              Export JSON
-            </a>
-          </>
-        }
-      />
-      <ReportRange basePath="/admin/reports/analytics" params={params} defaultLabel="Last 18 months" />
+    <div className="space-y-8">
+      {header}
+      <ReportRange basePath={BASE} params={params} defaultLabel="Last 18 months" />
 
       <StatGrid cols={4}>
-        <StatCard label="Signups" value={formatNumber(a.totals.signups)} hint={`${a.totals.activeUsers} with a real profile`} icon={Users} delta={a.rates.monthlyGrowth == null ? undefined : `${a.rates.monthlyGrowth > 0 ? "+" : ""}${a.rates.monthlyGrowth}%`} />
-        <StatCard label="Hires" value={formatNumber(a.totals.hires)} hint={`${a.totals.fullTimeHires} full-time · ${a.totals.proposals} offers sent`} icon={TrendingUp} tone="success" />
-        <StatCard label="Revenue" value={formatMoney(a.totals.revenueMinor, "INR", { zeroLabel: "₹0" })} hint={`Companies ${formatMoney(a.totals.revenueEmployersMinor, "INR", { zeroLabel: "₹0" })} · Fees ${formatMoney(a.totals.revenueInternsMinor, "INR", { zeroLabel: "₹0" })}`} icon={IndianRupee} tone="accent" />
-        <StatCard label="Avg time to hire" value={a.rates.avgHireTimeDays == null ? "-" : `${a.rates.avgHireTimeDays} days`} hint="Offer sent to employer paid" icon={Timer} tone="info" />
+        <StatCard
+          label="Signups"
+          value={formatNumber(a.totals.signups)}
+          hint={`${a.totals.activeUsers} with a real profile`}
+          icon={Users}
+          delta={a.rates.monthlyGrowth == null ? undefined : `${a.rates.monthlyGrowth > 0 ? "+" : ""}${a.rates.monthlyGrowth}% vs previous period`}
+        />
+        <StatCard label="Hires" value={formatNumber(a.totals.hires)} hint={`${a.totals.fullTimeHires} full-time · ${a.totals.proposals} offers sent`} icon={TrendingUp} />
+        <StatCard
+          label="Revenue"
+          value={formatMoney(a.totals.revenueMinor, "INR", { zeroLabel: "₹0" })}
+          hint={`Companies ${formatMoney(a.totals.revenueEmployersMinor, "INR", { zeroLabel: "₹0" })} · Fees ${formatMoney(a.totals.revenueInternsMinor, "INR", { zeroLabel: "₹0" })}`}
+          icon={IndianRupee}
+        />
+        <StatCard label="Avg time to hire" value={a.rates.avgHireTimeDays == null ? "-" : `${a.rates.avgHireTimeDays} days`} hint="Offer sent to employer paid" icon={Timer} />
       </StatGrid>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <Panel className="bg-white">
-          <PanelHeader title="Rates" description="Within the selected range." />
+        <Panel>
+          <PanelHeader
+            title="Conversion funnel"
+            description="Interns who signed up in the range, by the furthest step they reached. Percentages are of signups; the biggest step down is the leak."
+          />
           <PanelBody>
-            <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm sm:grid-cols-3">
-              {[
-                ["Offer success", rate(a.rates.successRate)],
-                ["Placement", rate(a.rates.placementRate)],
-                ["Interview", rate(a.rates.interviewRate)],
-                ["Profile completion", rate(a.rates.profileCompletionRate)],
-                ["Offer → hire per intern", rate(a.rates.applicationSuccessRate)],
-                ["Offers per signup", rate(a.rates.avgAppsPerUser, "")],
-                ["Projects per company", rate(a.rates.projectsPerCompany, "")],
-                ["Hires per company", rate(a.rates.hiresPerCompany, "")],
-                ["Signup growth", a.rates.monthlyGrowth == null ? "-" : `${a.rates.monthlyGrowth}%`],
-              ].map(([k, v]) => (
-                <div key={k}>
-                  <dt className="text-2xs uppercase tracking-[0.08em] text-ink-600">{k}</dt>
-                  <dd className="mt-0.5 font-semibold tabular-nums text-ink-900">{v}</dd>
-                </div>
-              ))}
-            </dl>
+            <PipelineBars percentOf="first" items={a.funnel.map((f) => ({ status: f.stage, label: f.stage, count: f.value }))} />
           </PanelBody>
         </Panel>
 
-        <Panel className="bg-white">
-          <PanelHeader title="Conversion funnel" description="Interns who signed up in the range, by furthest step." />
+        <Panel>
+          <PanelHeader
+            title="Employer behaviour"
+            description="Active: posted a project or sent an offer in the range. Repeat: paid two or more orders in the range."
+          />
           <PanelBody>
-            <PipelineBars items={a.funnel.map((f) => ({ status: f.stage, label: `${f.stage} (${f.percentage}%)`, count: f.value }))} />
+            <dl className="grid gap-4 sm:grid-cols-3">
+              <Ratio label="Active employers" value={rate(a.rates.activeEmployerRate)} note={`${a.totals.activeEmployers} companies`} />
+              <Ratio label="Repeat employers" value={rate(a.rates.repeatEmployerRate)} note={`${a.totals.repeatEmployers} of the active ones`} />
+              <Ratio label="Active projects" value={rate(a.rates.activeProjectRate)} note={`${a.totals.activeProjects} of ${a.totals.projects} posted`} />
+            </dl>
           </PanelBody>
         </Panel>
       </div>
 
-      <Panel className="bg-white">
-        <PanelHeader title="Monthly performance" description="Offers sent, hires, offer success and interview rate per month." />
-        <PanelBody className="overflow-x-auto">
-          <table className="w-full min-w-[520px] text-left text-sm">
-            <thead className="text-2xs uppercase tracking-[0.08em] text-ink-600">
-              <tr>
-                <th scope="col" className="py-2 pr-4 font-semibold">Month</th>
-                <th scope="col" className="py-2 pr-4 text-right font-semibold">Offers</th>
-                <th scope="col" className="py-2 pr-4 text-right font-semibold">Hires</th>
-                <th scope="col" className="py-2 pr-4 text-right font-semibold">Success</th>
-                <th scope="col" className="py-2 text-right font-semibold">Interview rate</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-ink-100 tabular-nums">
-              {a.trend.map((t) => (
-                <tr key={t.month}>
-                  <td className="py-2 pr-4 text-ink-800">{t.month}</td>
-                  <td className="py-2 pr-4 text-right">{t.proposals}</td>
-                  <td className="py-2 pr-4 text-right">{t.hires}</td>
-                  <td className="py-2 pr-4 text-right">{t.successRate}%</td>
-                  <td className="py-2 text-right">{t.interviewRate}%</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      <Panel>
+        <PanelHeader title="Rates" description="Within the selected range." />
+        <PanelBody>
+          <dl className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3 xl:grid-cols-5">
+            {[
+              ["Offer success", rate(a.rates.successRate)],
+              ["Placement", rate(a.rates.placementRate)],
+              ["Interview", rate(a.rates.interviewRate)],
+              ["Profile completion", rate(a.rates.profileCompletionRate)],
+              ["Offer → hire per intern", rate(a.rates.applicationSuccessRate)],
+              ["Offers per signup", rate(a.rates.avgAppsPerUser, "")],
+              ["Projects per company", rate(a.rates.projectsPerCompany, "")],
+              ["Hires per company", rate(a.rates.hiresPerCompany, "")],
+              ["Signup growth", a.rates.monthlyGrowth == null ? "-" : `${a.rates.monthlyGrowth}%`],
+            ].map(([k, v]) => (
+              <Ratio key={k} label={k} value={v} />
+            ))}
+          </dl>
         </PanelBody>
+      </Panel>
+
+      <Panel>
+        <PanelHeader title="Monthly performance" description="Offers sent, hires, offer success (hires ÷ offers) and interview rate per month." />
+        <SimpleTable
+          minWidth="min-w-[32rem]"
+          head={["Month", "Offers", "Hires", "Success", "Interview rate"]}
+          right={[1, 2, 3, 4]}
+          rows={a.trend.map((t) => [t.month, String(t.proposals), String(t.hires), `${t.successRate}%`, `${t.interviewRate}%`])}
+          empty="No months in this range."
+        />
       </Panel>
 
       <div className="grid gap-4 lg:grid-cols-3">
@@ -124,110 +166,176 @@ export default async function AdminAnalyticsPage({
         <RankList title="Demand by region" note="Projects by state or city" rows={a.regionDemand.map((r) => [r.region, `${r.count}`])} />
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Panel className="bg-white">
-          <PanelHeader title="Top companies" description="By hires in the range, then offers sent." />
-          <PanelBody className="overflow-x-auto">
-            <table className="w-full min-w-[480px] text-left text-sm">
-              <thead className="text-2xs uppercase tracking-[0.08em] text-ink-600">
-                <tr>
-                  <th scope="col" className="py-2 pr-3 font-semibold">Company</th>
-                  <th scope="col" className="py-2 pr-3 text-right font-semibold">Projects</th>
-                  <th scope="col" className="py-2 pr-3 text-right font-semibold">Offers</th>
-                  <th scope="col" className="py-2 pr-3 text-right font-semibold">Internship / FT hires</th>
-                  <th scope="col" className="py-2 text-right font-semibold">Conversion</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-ink-100 tabular-nums">
-                {a.topCompanies.map((c) => (
-                  <tr key={c.id}>
-                    <td className="py-2 pr-3">
-                      <Link href={`/admin/companies/${c.id}`} className="font-medium text-ink-900 hover:text-brand-700 hover:underline">
-                        {c.name}
-                      </Link>
-                    </td>
-                    <td className="py-2 pr-3 text-right">{c.projects}</td>
-                    <td className="py-2 pr-3 text-right">{c.proposals}</td>
-                    <td className="py-2 pr-3 text-right">
-                      {c.internshipHires} / {c.fullTimeHires}
-                    </td>
-                    <td className="py-2 text-right">{c.conversion}%</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </PanelBody>
+      <div className="grid gap-4 xl:grid-cols-2">
+        <Panel>
+          <PanelHeader
+            title="Top companies"
+            description="By hires in the range, then offers sent. Active means the company has posted a project."
+            action={
+              <ChipLinks
+                label="Company status"
+                items={[
+                  { href: link({ companies: "" }), label: "All", current: !companyStatus },
+                  { href: link({ companies: "active" }), label: "Active", current: companyStatus === "active" },
+                  { href: link({ companies: "inactive" }), label: "Inactive", current: companyStatus === "inactive" },
+                ]}
+              />
+            }
+          />
+          <SimpleTable
+            minWidth="min-w-[34rem]"
+            head={["Company", "Status", "Projects", "Offers", "Internship / FT hires", "Conversion"]}
+            right={[2, 3, 4, 5]}
+            rows={companies.map((c) => [
+              <Link key="n" href={`/admin/companies/${c.id}`} className="font-medium text-ink-900 hover:text-brand-700 hover:underline">
+                {c.name}
+              </Link>,
+              <StatusBadge key="s" value={c.status} />,
+              String(c.projects),
+              String(c.proposals),
+              `${c.internshipHires} / ${c.fullTimeHires}`,
+              `${c.conversion}%`,
+            ])}
+            empty={companyStatus ? `No ${companyStatus} companies with activity in this range.` : "No company activity in this range."}
+          />
         </Panel>
 
-        <Panel className="bg-white">
-          <PanelHeader title="Top candidates" description="By offers, then interviews, then applications." />
-          <PanelBody className="overflow-x-auto">
-            <table className="w-full min-w-[420px] text-left text-sm">
-              <thead className="text-2xs uppercase tracking-[0.08em] text-ink-600">
-                <tr>
-                  <th scope="col" className="py-2 pr-3 font-semibold">Candidate</th>
-                  <th scope="col" className="py-2 pr-3 text-right font-semibold">Offers received</th>
-                  <th scope="col" className="py-2 pr-3 text-right font-semibold">Interviews</th>
-                  <th scope="col" className="py-2 pr-3 text-right font-semibold">Placed</th>
-                  <th scope="col" className="py-2 font-semibold">Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-ink-100 tabular-nums">
-                {a.topInterns.map((i) => (
-                  <tr key={i.id}>
-                    <td className="py-2 pr-3">
-                      <Link href={`/admin/interns/${i.id}`} className="font-medium text-ink-900 hover:text-brand-700 hover:underline">
-                        {i.name}
-                      </Link>
-                    </td>
-                    <td className="py-2 pr-3 text-right">{i.applications}</td>
-                    <td className="py-2 pr-3 text-right">{i.interviews}</td>
-                    <td className="py-2 pr-3 text-right">{i.offers}</td>
-                    <td className="py-2 capitalize text-ink-700">{i.status}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </PanelBody>
+        <Panel>
+          <PanelHeader title="Top candidates" description="By hires, then interviews, then offers received (all time)." />
+          <SimpleTable
+            minWidth="min-w-[30rem]"
+            head={["Candidate", "Offers received", "Interviews", "Placed", "Status"]}
+            right={[1, 2, 3]}
+            rows={a.topInterns.map((i) => [
+              <Link key="n" href={`/admin/interns/${i.id}`} className="font-medium text-ink-900 hover:text-brand-700 hover:underline">
+                {i.name}
+              </Link>,
+              String(i.applications),
+              String(i.interviews),
+              String(i.offers),
+              <StatusBadge key="s" value={i.status === "placed" ? "hired" : i.status === "interviewing" ? "scheduled" : "sent"} label={i.status[0].toUpperCase() + i.status.slice(1)} />,
+            ])}
+            empty="No candidate activity yet."
+          />
         </Panel>
       </div>
 
-      <Panel className="bg-white">
-        <PanelHeader title="Hires in this range" description="Internship and full-time, newest first." />
-        <PanelBody className="overflow-x-auto">
-          {a.hiredList.length === 0 ? (
-            <p className="text-sm text-ink-600">No hires in this range.</p>
-          ) : (
-            <table className="w-full min-w-[480px] text-left text-sm">
-              <thead className="text-2xs uppercase tracking-[0.08em] text-ink-600">
-                <tr>
-                  <th scope="col" className="py-2 pr-3 font-semibold">Candidate</th>
-                  <th scope="col" className="py-2 pr-3 font-semibold">Company</th>
-                  <th scope="col" className="py-2 pr-3 font-semibold">Type</th>
-                  <th scope="col" className="py-2 font-semibold">Hired</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-ink-100">
-                {a.hiredList.map((h) => (
-                  <tr key={`${h.internId}:${h.companyId}:${h.hiredAt}`}>
-                    <td className="py-2 pr-3 text-ink-900">{h.internName}</td>
-                    <td className="py-2 pr-3 text-ink-700">{h.companyName}</td>
-                    <td className="py-2 pr-3 capitalize text-ink-700">{h.kind}</td>
-                    <td className="py-2 tabular-nums text-ink-700">{formatDate(h.hiredAt)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </PanelBody>
+      <Panel>
+        <PanelHeader
+          title={`Hires in this range (${hires.length})`}
+          description="Internship and full-time, newest first. Filter by type, hire date or name."
+        />
+        <div className="flex flex-wrap items-end justify-between gap-3 border-b border-ink-100 px-5 py-3.5">
+          <ChipLinks
+            label="Hire type"
+            items={[
+              { href: link({ hired: "" }), label: "All", current: !hireFilter.kind },
+              { href: link({ hired: "internship" }), label: "Internship", current: hireFilter.kind === "internship" },
+              { href: link({ hired: "full-time" }), label: "Full-time", current: hireFilter.kind === "full-time" },
+            ]}
+          />
+          <form method="get" className="flex flex-wrap items-end gap-2">
+            <input
+              type="search"
+              name="hq"
+              defaultValue={hireFilter.q}
+              placeholder="Candidate or company"
+              aria-label="Search hires"
+              className="h-9 w-52 rounded-apple-sm border border-ink-200 bg-white px-2.5 text-sm max-lg:h-11"
+            />
+            {Object.entries(params)
+              .filter(([k, v]) => v && !["hq", "hiredFrom", "hiredTo"].includes(k))
+              .map(([k, v]) => (
+                <input key={k} type="hidden" name={k} value={v} />
+              ))}
+            <label className="flex flex-col gap-1 text-xs font-medium text-ink-600">
+              Hired from
+              <input type="date" name="hiredFrom" defaultValue={hireFilter.from} className="h-9 rounded-apple-sm border border-ink-200 bg-white px-2.5 text-sm text-ink-800 max-lg:h-11" />
+            </label>
+            <label className="flex flex-col gap-1 text-xs font-medium text-ink-600">
+              To
+              <input type="date" name="hiredTo" defaultValue={hireFilter.to} className="h-9 rounded-apple-sm border border-ink-200 bg-white px-2.5 text-sm text-ink-800 max-lg:h-11" />
+            </label>
+            <button type="submit" className={cn(buttonClass({ variant: "outline", size: "sm" }), "max-lg:h-11")}>
+              Filter
+            </button>
+          </form>
+        </div>
+        <SimpleTable
+          minWidth="min-w-[30rem]"
+          head={["Candidate", "Company", "Type", "Hired"]}
+          right={[3]}
+          rows={hires.map((h) => [
+            <Link key="n" href={`/admin/interns/${h.internId}`} className="font-medium text-ink-900 hover:text-brand-700 hover:underline">
+              {h.internName}
+            </Link>,
+            h.companyName,
+            h.kind === "full-time" ? "Full-time" : "Internship",
+            formatDate(h.hiredAt),
+          ])}
+          empty={a.hiredList.length ? "No hires match these filters." : "No hires in this range."}
+        />
       </Panel>
+    </div>
+  );
+}
+
+function Ratio({ label, value, note }: { label: string; value: string; note?: string }) {
+  return (
+    <div>
+      <dt className="text-sm text-ink-600">{label}</dt>
+      <dd className="nums mt-0.5 text-xl font-semibold text-ink-900">{value}</dd>
+      {note ? <dd className="text-xs text-ink-600">{note}</dd> : null}
+    </div>
+  );
+}
+
+/** A small read-only table in the DataTable treatment (sticky sentence-case header, right-aligned figures, no zebra). */
+function SimpleTable({
+  head,
+  rows,
+  right = [],
+  empty,
+  minWidth,
+}: {
+  head: string[];
+  rows: React.ReactNode[][];
+  right?: number[];
+  empty: string;
+  minWidth: string;
+}) {
+  if (rows.length === 0) return <p className="px-5 py-8 text-center text-sm text-ink-600">{empty}</p>;
+  return (
+    <div className="max-h-[32rem] overflow-auto">
+      <table className={cn("w-full text-left text-sm", minWidth)}>
+        <thead>
+          <tr className="border-b border-ink-100">
+            {head.map((h, i) => (
+              <th key={h} scope="col" className={cn("sticky top-0 z-10 bg-ink-50 px-3 py-2.5 text-xs font-semibold text-ink-600 first:pl-5 last:pr-5", right.includes(i) && "text-right")}>
+                {h}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r, ri) => (
+            <tr key={ri} className="border-b border-ink-100 last:border-0 hover:bg-ink-50/60">
+              {r.map((cell, i) => (
+                <td key={i} className={cn("px-3 py-2.5 text-ink-700 first:pl-5 last:pr-5", right.includes(i) && "nums text-right")}>
+                  {cell}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
 
 function RankList({ title, note, rows }: { title: string; note: string; rows: [string, string][] }) {
   return (
-    <Panel className="bg-white">
+    <Panel>
       <PanelHeader title={title} description={note} />
       <PanelBody>
         {rows.length === 0 ? (
@@ -237,10 +345,10 @@ function RankList({ title, note, rows }: { title: string; note: string; rows: [s
             {rows.map(([label, value], i) => (
               <li key={label} className="flex items-baseline justify-between gap-3">
                 <span className="min-w-0 truncate text-ink-800">
-                  <span className="mr-2 tabular-nums text-ink-600">{i + 1}.</span>
+                  <span className="nums mr-2 text-ink-600">{i + 1}.</span>
                   {label}
                 </span>
-                <span className="shrink-0 font-semibold tabular-nums text-ink-900">{value}</span>
+                <span className="nums shrink-0 font-semibold text-ink-900">{value}</span>
               </li>
             ))}
           </ol>
