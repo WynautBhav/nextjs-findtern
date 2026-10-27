@@ -193,7 +193,9 @@ export async function fetchProfile(accessToken: string): Promise<GoogleProfile> 
  * falls back.
  */
 export function safeNext(next: unknown, fallback: string): string {
-  if (typeof next !== "string" || !next.startsWith("/") || next.startsWith("//") || next.includes("\\")) {
+  // Browsers strip tabs/newlines from URLs, so "/\t/evil.com" would become
+  // "//evil.com": refuse control characters as well as "//" and "\\".
+  if (typeof next !== "string" || !next.startsWith("/") || next.startsWith("//") || next.includes("\\") || /[\u0000-\u001f\u007f]/.test(next)) {
     return fallback;
   }
   return next;
