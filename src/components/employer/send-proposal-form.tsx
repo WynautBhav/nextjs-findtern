@@ -153,11 +153,10 @@ export function SendProposalForm({
   // An offer lapses on its start date, so the earliest start is tomorrow (IST).
   const minStart = useMemo(() => tomorrowIst(), []);
 
-  // The same sum the server does: (working days in the start month − paid
-  // leave) × 8 h × rate.
-  const monthlyHours = scheduledMonthlyHours(schedule, Number(paidLeaves) || 0, startDate || null);
+  // The same sum the server does: (working days − paid leave) × 8 h × rate.
+  const monthlyHours = scheduledMonthlyHours(schedule, Number(paidLeaves) || 0);
   // The day count behind that figure, quoted in the working so the two match.
-  const monthlyDays = billableWorkingDays(schedule, startDate || null);
+  const monthlyDays = billableWorkingDays(schedule);
   const totals = useMemo(() => {
     const monthly = monthlyHours * (rate.hourlyRateMinor / 100);
     // The one-time hiring fee, charged once with the first payment.

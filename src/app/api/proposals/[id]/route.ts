@@ -202,11 +202,10 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
 
   // Money, as the composer works it out: hours from the schedule less paid
   // leave, times the band rate the offer was priced on. An edit that touches
-  // none of them keeps the stored hours (legacy rows may predate the schedule).
-  const touchesHours =
-    edits.weeklySchedule !== undefined || edits.paidLeavesPerMonth !== undefined || edits.startDate !== undefined;
+  // neither keeps the stored hours (legacy rows may predate the schedule).
+  const touchesHours = edits.weeklySchedule !== undefined || edits.paidLeavesPerMonth !== undefined;
   const o = parseOffer(next, proposal.currency);
-  if (touchesHours) next.monthlyHours = scheduledMonthlyHours(o.weeklySchedule, o.paidLeavesPerMonth, o.startDate);
+  if (touchesHours) next.monthlyHours = scheduledMonthlyHours(o.weeklySchedule, o.paidLeavesPerMonth);
   const hours = touchesHours ? Number(next.monthlyHours) : o.monthlyHours;
   const monthlyMinor = o.hourlyRateMinor ? Math.round(hours * o.hourlyRateMinor) : (o.monthlyMinor ?? 0);
   next.monthlyAmount = monthlyMinor / 100;

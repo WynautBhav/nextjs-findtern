@@ -85,52 +85,20 @@ export function weeklyScheduleOf(v: unknown): WeeklySchedule {
   return s in WEEKLY_SCHEDULES ? (s as WeeklySchedule) : "mon_fri";
 }
 
-export function scheduledMonthlyHours(
-  schedule: WeeklySchedule,
-  paidLeavesPerMonth: number,
-  /** The month being billed: `YYYY-MM` or the offer's `YYYY-MM-DD` start. */
-  monthRef?: string | null,
-): number {
+export function scheduledMonthlyHours(schedule: WeeklySchedule, paidLeavesPerMonth: number): number {
   const leaves = Number.isFinite(paidLeavesPerMonth) ? Math.max(0, paidLeavesPerMonth) : 0;
-  return Math.max(0, Math.round((billableWorkingDays(schedule, monthRef) - leaves) * HOURS_PER_DAY));
+  return Math.max(0, Math.round((billableWorkingDays(schedule) - leaves) * HOURS_PER_DAY));
 }
 
 /**
- * The day count the month is billed on: the calendar's, or the published
- * average when there is no date yet. The composer quotes this in its working,
- * so the sum shown and the sum charged cannot disagree.
+ * The day count a month is billed on: the published average for the
+ * schedule (22 for Mon–Fri and Sun–Thu, 26 for Mon–Sat), never the calendar.
+ * Owner decision, 28 Oct 2026: legacy and the marketing calculator both bill
+ * a flat month, so every month of an engagement costs the same and the quote
+ * matches the rate card.
  */
-export function billableWorkingDays(schedule: WeeklySchedule, monthRef?: string | null): number {
-  return (monthRef ? workingDaysInMonth(monthRef, schedule) : null) ?? WEEKLY_SCHEDULES[schedule].days;
-}
-
-/** Weekday numbers (0 = Sunday) that count as working days. */
-const WORKING_DAYS: Record<WeeklySchedule, readonly number[]> = {
-  mon_fri: [1, 2, 3, 4, 5],
-  mon_sat: [1, 2, 3, 4, 5, 6],
-  sun_thu: [0, 1, 2, 3, 4],
-};
-
-/**
- * Working days in one calendar month, from the calendar rather than a monthly
- * average. The date's own day is ignored: an offer bills whole months, so
- * `2026-10-19` and `2026-10` both mean October. Null when the reference is not
- * a date, so callers can fall back to the published average.
- */
-export function workingDaysInMonth(monthRef: string, schedule: WeeklySchedule): number | null {
-  const m = /^(\d{4})-(\d{2})(?:-\d{2})?$/.exec(monthRef.trim());
-  if (!m) return null;
-  const year = Number(m[1]);
-  const month = Number(m[2]) - 1;
-  if (month < 0 || month > 11) return null;
-  // Day 0 of the next month is the last day of this one.
-  const lastDay = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
-  const working = new Set(WORKING_DAYS[schedule]);
-  let count = 0;
-  for (let day = 1; day <= lastDay; day += 1) {
-    if (working.has(new Date(Date.UTC(year, month, day)).getUTCDay())) count += 1;
-  }
-  return count;
+export function billableWorkingDays(schedule: WeeklySchedule): number {
+  return WEEKLY_SCHEDULES[schedule].days;
 }
 
 export function monthsOf(duration: unknown): number {

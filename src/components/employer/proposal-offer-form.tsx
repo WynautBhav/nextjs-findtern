@@ -98,8 +98,8 @@ export function ProposalOfferForm({
   const [schedule, setSchedule] = useState<WeeklySchedule>(weeklyScheduleOf(initial.weeklySchedule));
   // Older offers could carry any leave count; snap to the half-day choices.
   const [leaves, setLeaves] = useState(String(Math.min(3, Math.round((initial.paidLeavesPerMonth ?? 0) * 2) / 2)));
-  const hours = scheduledMonthlyHours(schedule, Number(leaves) || 0, startDate || null);
-  const days = billableWorkingDays(schedule, startDate || null);
+  const hours = scheduledMonthlyHours(schedule, Number(leaves) || 0);
+  const days = billableWorkingDays(schedule);
   const monthlyMinor = initial.hourlyRateMinor ? Math.round(hours * initial.hourlyRateMinor) : null;
   const modes = MODE_OPTIONS.filter((m) => offerableModes(preference).includes(m.value) || m.value === initial.mode);
   const [mode, setMode] = useState(initial.mode || modes[0]?.value || "remote");

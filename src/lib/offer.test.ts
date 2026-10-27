@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { billableWorkingDays, buildOffer, internStipendInrMinor, parseOffer, scheduledMonthlyHours, weeklyScheduleOf, workingDaysInMonth } from "./offer.ts";
+import { billableWorkingDays, buildOffer, internStipendInrMinor, parseOffer, scheduledMonthlyHours, weeklyScheduleOf } from "./offer.ts";
 import { lineCharge } from "./checkout.ts";
 import { monthlyDues } from "./dues.ts";
 
@@ -140,25 +140,17 @@ test("hours follow the working week less paid leave, at 8 h a day (legacy compos
   assert.equal(parseOffer({ weeklySchedule: "mon_sat" }, "INR").weeklySchedule, "mon_sat");
 });
 
-test("hours come from that month's calendar, not a 26-day average (bug sheet 7)", () => {
-  // October 2026 has four Sundays, so Mon-Sat is 27 working days (216 h);
-  // February 2026 has 24 (192 h). The old flat 26 charged both months 208 h.
-  assert.equal(workingDaysInMonth("2026-10", "mon_sat"), 27);
-  assert.equal(workingDaysInMonth("2026-02", "mon_sat"), 24);
-  assert.equal(workingDaysInMonth("2026-10", "mon_fri"), 22);
-  assert.equal(workingDaysInMonth("2026-02", "mon_fri"), 20);
-  assert.equal(workingDaysInMonth("2026-10", "sun_thu"), 21);
-  assert.equal(scheduledMonthlyHours("mon_sat", 0, "2026-10"), 216);
-  assert.equal(scheduledMonthlyHours("mon_sat", 0, "2026-02"), 192);
-  assert.equal(scheduledMonthlyHours("mon_sat", 2, "2026-02"), 176);
-  // The offer's start date means its month; an unparseable one falls back.
-  assert.equal(scheduledMonthlyHours("mon_sat", 0, "2026-10-19"), 216);
-  assert.equal(workingDaysInMonth("next month", "mon_sat"), null);
-  assert.equal(scheduledMonthlyHours("mon_sat", 0, null), 208);
-  assert.equal(scheduledMonthlyHours("mon_sat", 0, "nonsense"), 208);
-  // The day count the composer quotes is the same one it bills.
-  assert.equal(billableWorkingDays("mon_sat", "2026-10"), 27);
-  assert.equal(billableWorkingDays("mon_sat", null), 26);
+test("hours are a flat month: 22 or 26 working days, whatever the calendar says (owner, 28 Oct)", () => {
+  // Legacy employer-send-proposal.tsx:533 and the marketing calculator bill
+  // {mon_fri: 22, mon_sat: 26, sun_thu: 22} days × 8 h, less paid leave.
+  assert.equal(billableWorkingDays("mon_fri"), 22);
+  assert.equal(billableWorkingDays("mon_sat"), 26);
+  assert.equal(billableWorkingDays("sun_thu"), 22);
+  assert.equal(scheduledMonthlyHours("mon_fri", 0), 176);
+  assert.equal(scheduledMonthlyHours("mon_sat", 0), 208);
+  assert.equal(scheduledMonthlyHours("mon_sat", 2), 192);
+  assert.equal(scheduledMonthlyHours("mon_fri", 1.5), 164);
+  assert.equal(scheduledMonthlyHours("mon_fri", -3), 176, "negative leave never adds hours");
 });
 
 test("buildOffer prices the month as rate × hours, with no override", () => {

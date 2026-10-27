@@ -218,7 +218,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const offerDetails = buildOffer({
     ...b,
     // Hours and money are worked out here, never taken from the request.
-    monthlyHours: scheduledMonthlyHours(b.weeklySchedule, b.paidLeavesPerMonth, b.startDate),
+    monthlyHours: scheduledMonthlyHours(b.weeklySchedule, b.paidLeavesPerMonth),
     currency,
     hourlyRateMinor: rate.hourlyRateMinor,
     // Per-hire applies below a score of 6 only (legacy rule).
