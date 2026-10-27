@@ -65,6 +65,41 @@ this pass**.
 
 ---
 
+**No AI slop. The standard every redesigned screen is judged against**
+(owner, 28 Oct: "professional, clean, top notch, premium, cohesive,
+impeccable"). A screen fails review if it shows any of these:
+
+- *Template tells:* three equal cards in a row with an icon each; a hero
+  with a gradient blob; "stat tile wallpaper" (six identical tiles); an
+  emoji or a lucide icon in front of every heading; sparkles / rocket /
+  magic-wand icons; purple-to-blue gradients; glassmorphism blur cards.
+- *Copy tells:* "Unlock", "Elevate", "Seamless", "Supercharge", "Welcome
+  back, 👋", exclamation marks, a tagline under every heading, empty
+  states that say "Nothing here yet!", labels that explain the obvious.
+  Copy is specific to this product and this user's situation, or absent.
+- *Shape tells:* every element at the same radius and the same shadow;
+  pills on everything; borders AND shadows on the same card; centred text
+  on data screens; uniform `space-y-6` with no rhythm between sections.
+- *Hierarchy tells:* no focal point (everything the same weight); a page
+  title set like a card title; numbers that aren't aligned; more than one
+  accent colour per screen; CTAs that all look primary.
+- *Density tells:* one fact per card on a desktop screen; 40 px of padding
+  around a two-word label; tables that could be lists, lists that should be
+  tables; a modal for something a row could show inline.
+
+What passes instead: one focal point per screen; type doing the work
+(weight and size, not boxes); real data density where the user works
+(tables, grids) and air where they read; the brand green for structure,
+amber for exactly one thing to do; motion only to explain a change of
+state; the same component for the same job on every screen; and copy a
+person at Findtern would write.
+
+Process: before every screen-group handover, run `/impeccable-critique`
+and `/impeccable-audit` on the screens and fix what they find; take the
+390 / 768 / 1440 shots; then a reviewer who did not build it (the
+orchestrator or a fresh agent) checks the shots against this list. A fail
+goes back; it is never merged with a "polish later".
+
 ## 1. The diagnosis, honestly
 
 45 login-required pages. They do not look like one product.
