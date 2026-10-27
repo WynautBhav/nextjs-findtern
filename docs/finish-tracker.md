@@ -44,7 +44,7 @@ branch, not to be touched: `feat/college-partners` (worktree
 ## Phases
 - [ ] **F0 Foundations**: one card, one status map, `ui/button`, delete the
       local primitives, tokens, empty states (DESIGN.md §2)
-- [ ] **F1 One shell**: intern / employer / admin on one shell; real logo;
+- [x] **F1 One shell** (`8ea52ba`): intern / employer / admin on one shell; real logo;
       collapsible sidebar; one breakpoint (lg); marketing-matched header
 - [ ] **F2 Loading / empty / error**: `loading.tsx` per segment, no bare
       `catch {}`
@@ -60,3 +60,9 @@ branch, not to be touched: `feat/college-partners` (worktree
 ## Log
 - 27 Oct: tracker created. Bug sheet 7 parsed (S1 135 rows, S2 6, NC 40,
   13 screenshots mapped).
+- 27 Oct: F1 done in `8ea52ba`: ConsoleShell for all roles (real logo,
+  collapsible rail, one top bar, help links, cart badge), LogoMark, PageHead
+  / HeroBand / StatTile, intern home rebuilt as the reference, DESIGN.md §0
+  rules. Four workers then started in parallel worktrees: intern, employer,
+  admin, public+auth+system. Each does its area's screens, parity items and
+  bug-sheet rows. I merge, review and verify.
