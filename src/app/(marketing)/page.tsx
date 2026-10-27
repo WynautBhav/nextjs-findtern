@@ -35,7 +35,7 @@ const HOME_HOWTO = howToJsonLd({
   steps: [
     { name: "Candidate onboarding", text: "Interns create a profile and join the platform." },
     { name: "Personal verification", text: "Personal details and identity documents are added and verified for authenticity." },
-    { name: "Skill based AI interview", text: "Candidates choose the skills they want to be hired for and complete a structured AI interview on exactly those skills." },
+    { name: "AI interview", text: "Candidates choose the skills they want to be hired for and complete a structured AI interview on exactly those skills." },
     { name: "Aptitude test", text: "Every candidate sits a structured aptitude test." },
     { name: "Coding test", text: "Candidates from a coding background complete a live coding test." },
     { name: "Findtern Score", text: "Each intern receives one Findtern Score out of 10, built from their AI interview, aptitude and coding results." },

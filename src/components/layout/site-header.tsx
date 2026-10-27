@@ -107,7 +107,7 @@ export function SiteHeader() {
           <Logo
             alt="Findtern - Internship Simplified"
             priority
-            className={cn("transition-all duration-200", scrolled ? "h-10" : "h-11")}
+            className={cn("transition-all duration-200", scrolled ? "h-11 sm:h-12" : "h-12 sm:h-14")}
           />
         </Link>
 

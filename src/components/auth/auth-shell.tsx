@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { GraduationCap } from "lucide-react";
+
+import { Logo } from "@/components/brand/logo";
 
 /**
  * Split auth shell.
@@ -43,11 +44,9 @@ export function AuthShell({
           className="pointer-events-none absolute inset-0 -z-10 opacity-[0.07] [background-image:linear-gradient(to_right,white_1px,transparent_1px),linear-gradient(to_bottom,white_1px,transparent_1px)] [background-size:56px_56px] [mask-image:radial-gradient(ellipse_70%_60%_at_50%_35%,black,transparent)]"
         />
 
-        <Link href="/" className="inline-flex items-center gap-2.5 text-lg font-semibold tracking-tight">
-          <span className="grid size-9 place-items-center rounded-full bg-white/10">
-            <GraduationCap className="size-4 text-accent-300" aria-hidden />
-          </span>
-          Findtern
+        {/* The real logo, not a cap icon beside the word (bug sheet 7, NC r31). */}
+        <Link href="/" aria-label="Findtern - home" className="inline-flex w-fit">
+          <Logo variant="white" priority alt="Findtern - Internship Simplified" className="h-14" />
         </Link>
 
         <div className="max-w-md">
@@ -92,11 +91,8 @@ export function AuthShell({
       <main id="main" tabIndex={-1} className="outline-none flex flex-col justify-center px-6 py-12 sm:px-10 lg:px-16">
         <div className="mx-auto w-full max-w-sm">
           {/* Compact brand lockup, mobile only. */}
-          <Link href="/" className="mb-10 inline-flex items-center gap-2.5 lg:hidden">
-            <span className="grid size-9 place-items-center rounded-full bg-brand-700">
-              <GraduationCap className="size-4 text-white" aria-hidden />
-            </span>
-            <span className="text-lg font-semibold tracking-tight text-ink-900">Findtern</span>
+          <Link href="/" aria-label="Findtern - home" className="mb-10 inline-flex lg:hidden">
+            <Logo priority alt="Findtern - Internship Simplified" className="h-12" />
           </Link>
 
           {children}

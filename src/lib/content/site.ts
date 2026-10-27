@@ -175,7 +175,7 @@ export const FOOTER_SECTIONS: { heading: string; links: NavLink[] }[] = [
     links: [
       { label: "Terms and Conditions", href: "/terms-and-conditions" },
       { label: "Intern Terms", href: "/intern-terms-and-conditions" },
-      { label: "Intern Non-Bypass Agreement", href: "/intern-nda" },
+      { label: "Non-Bypass Agreement", href: "/intern-nda" },
       { label: "Employer Terms", href: "/employer-terms-and-conditions" },
       { label: "Privacy Policy", href: "/privacy" },
     ],

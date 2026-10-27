@@ -37,7 +37,7 @@ export function SiteFooter() {
           {/* Brand */}
           <div className="max-w-sm">
             <Link href="/" aria-label="Findtern - home" className="inline-block">
-              <Logo variant="white" className="h-14" />
+              <Logo variant="white" className="h-16" />
             </Link>
             <p className="mt-5 text-base leading-relaxed text-on-dark-subtle">
               Your gateway to skilled interns, effortlessly. Verified
@@ -68,9 +68,10 @@ export function SiteFooter() {
               Each link is an at-least-44px row rather than bare text - the previous
               inline links measured 21px and failed WCAG 2.5.8. Negative margin
               pulls the visual rhythm back to the original 12px pitch without
-              shrinking the target. min-h + py rather than a fixed h-11, so a
-              label that wraps ("Intern Non-Bypass Agreement") grows its row
-              evenly instead of crowding its neighbours. */}
+              shrinking the target. Every row is exactly h-11 and labels never
+              wrap, so the column keeps one even pitch (bug sheet 7, NC r14:
+              "Intern Non-Bypass Agreement" used to wrap onto two lines and
+              break the rhythm; its footer label is now the short form). */}
           {FOOTER_SECTIONS.map((section) => (
             <nav key={section.heading} aria-label={section.heading}>
               <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-on-dark-accent">
@@ -81,7 +82,7 @@ export function SiteFooter() {
                   <li key={link.href}>
                     <Link
                       href={link.href}
-                      className="flex min-h-11 items-center py-2 text-base leading-snug text-on-dark-subtle transition-colors hover:text-white"
+                      className="flex h-11 items-center whitespace-nowrap text-base text-on-dark-subtle transition-colors hover:text-white"
                     >
                       {link.label}
                     </Link>

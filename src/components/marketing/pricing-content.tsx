@@ -26,9 +26,12 @@ import { cn } from "@/lib/utils";
 export function PricingContent({
   plansInr,
   plansUsd,
+  beforeFaq,
 }: {
   plansInr: CmsPlan[];
   plansUsd: CmsPlan[];
+  /** Server-rendered section placed above the FAQ (the testimonials). */
+  beforeFaq?: React.ReactNode;
 }) {
   const { isIndia, currency, bands } = useRegionBands();
   const plans = isIndia ? plansInr : plansUsd;
@@ -299,6 +302,8 @@ export function PricingContent({
         </div>
         <WhereMoneyGoes plansInr={plansInr} plansUsd={plansUsd} />
       </PageSection>
+
+      {beforeFaq}
 
       {/* ── FAQ ────────────────────────────────────────────────────── */}
       <PageSection>

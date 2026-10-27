@@ -4,7 +4,10 @@ import { PageHero } from "@/components/marketing/page-hero";
 import { ButtonLink } from "@/components/ui/button";
 import { PricingCta, PricingContent } from "@/components/marketing/pricing-content";
 import { JsonLd } from "@/components/seo/json-ld";
-import { getPlans } from "@/lib/content";
+import { getHappyFaces, getPlans } from "@/lib/content";
+import { PageSection } from "@/components/marketing/page-hero";
+import { SectionHeading } from "@/components/ui/section-heading";
+import { TestimonialCarousel } from "@/components/marketing/testimonial-carousel";
 import { pricingFaq } from "@/lib/content/pricing-faq";
 import { formatMoney } from "@/lib/format";
 import { breadcrumbJsonLd, faqJsonLd, pricingJsonLd, webPageJsonLd } from "@/lib/seo";
@@ -23,7 +26,7 @@ export const metadata: Metadata = {
    visitors abroad. Exactly three plans per region, never six. */
 
 export default async function PricingPage() {
-  const [plansInr, plansUsd] = await Promise.all([getPlans(true), getPlans(false)]);
+  const [plansInr, plansUsd, faces] = await Promise.all([getPlans(true), getPlans(false), getHappyFaces()]);
   const perHire = formatMoney(plansInr[0]?.perHireChargeMinor ?? 500000, "INR");
 
   return (
@@ -55,7 +58,28 @@ export default async function PricingPage() {
       <div className="flex justify-center bg-ink-50/70 pt-10">
         <CurrencyPicker />
       </div>
-      <PricingContent plansInr={plansInr} plansUsd={plansUsd} />
+      <PricingContent
+        plansInr={plansInr}
+        plansUsd={plansUsd}
+        beforeFaq={
+          faces.length ? (
+            <PageSection tone="muted">
+              <SectionHeading lead="Teams that" accent="hired" sub="What employers say after the first placement." />
+              <div className="mt-12">
+                <TestimonialCarousel
+                  testimonials={faces.map((f) => ({
+                    id: f.id,
+                    name: f.name,
+                    role: f.company ? `${f.title} · ${f.company}` : f.title,
+                    quote: f.quote,
+                    avatarUrl: f.avatarUrl,
+                  }))}
+                />
+              </div>
+            </PageSection>
+          ) : null
+        }
+      />
     </>
   );
 }

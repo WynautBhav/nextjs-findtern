@@ -198,7 +198,7 @@ export function ChatWidget() {
     } catch {
       // ignore
     }
-    const t = window.setTimeout(() => setTeaser(true), 4000);
+    const t = window.setTimeout(() => setTeaser(true), 2500);
     return () => window.clearTimeout(t);
     // Once per mount; the widget lives in the root layout.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -265,10 +265,10 @@ export function ChatWidget() {
 
   // Intern portal on mobile renders a fixed bottom navigation bar (min-h-16).
   // Position chat cleanly above the tab bar so the 5th tab is never blocked.
-  const hasBottomNav = pathname?.startsWith("/intern");
-  // Inside the signed-in app the launcher is a small icon, not a marketing
-  // pill sitting on top of tables and buttons.
-  const inApp = Boolean(pathname?.startsWith("/intern") || pathname?.startsWith("/employer"));
+  // "/intern-nda" and "/intern-terms-and-conditions" are public pages, so
+  // match the app segments exactly rather than by prefix.
+  const inApp = /^\/(intern|employer)(\/|$)/.test(pathname ?? "");
+  const hasBottomNav = /^\/intern(\/|$)/.test(pathname ?? "");
 
   return (
     <div
@@ -413,7 +413,7 @@ export function ChatWidget() {
           initial={reduceMotion ? false : { opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
-          className="pointer-events-auto relative flex items-center gap-1 rounded-2xl border border-ink-200 bg-white py-1.5 pl-3.5 pr-1.5 text-sm font-medium text-ink-800 shadow-lg"
+          className="pointer-events-auto relative flex max-w-[min(18rem,80vw)] items-center gap-1 rounded-2xl border border-ink-200 bg-white py-2 pl-4 pr-1.5 text-[0.9375rem] font-medium text-ink-800 shadow-lg"
         >
           <button
             type="button"
@@ -423,7 +423,7 @@ export function ChatWidget() {
             }}
             className="rounded-lg py-1 text-left hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
           >
-            Questions? Ask me
+            {inApp ? "Stuck somewhere? Ask me" : "Questions about Findtern? Ask me"}
           </button>
           <button
             type="button"
@@ -435,7 +435,7 @@ export function ChatWidget() {
           </button>
           <span
             aria-hidden
-            className="absolute -bottom-1.5 right-6 size-3 rotate-45 border-r border-b border-ink-200 bg-white"
+            className="absolute -bottom-1.5 right-8 size-3 rotate-45 border-r border-b border-ink-200 bg-white"
           />
         </motion.div>
       ) : null}
@@ -448,33 +448,27 @@ export function ChatWidget() {
           setOpen((v) => !v);
         }}
         aria-expanded={open}
-        aria-label={open ? "Hide Findtern chat" : inApp ? "Ask me - chat with Findtern" : "Chat with Findtern"}
+        aria-label={open ? "Hide Findtern chat" : "Ask me - chat with Findtern"}
         className={cn(
           "relative pointer-events-auto group flex items-center justify-center rounded-full text-sm font-semibold text-white shadow-lg transition-all duration-[180ms] ease-out-expo motion-reduce:transition-none",
           "bg-gradient-to-br from-primary to-brand-900 hover:shadow-glow",
-          open
-            ? "size-14"
-            : inApp
-              ? "h-14 min-w-14 gap-2 px-4"
-              : "size-14 sm:h-14 sm:w-auto sm:px-5 sm:gap-2.5",
+          // Bigger, and labelled on every screen size (bug sheet 7, NC r30/r40:
+          // the icon-only launcher was too small to notice).
+          open ? "size-16" : "h-16 min-w-16 gap-2.5 pl-5 pr-6 text-base",
         )}
       >
         {open ? (
-          <X className="size-5 shrink-0" aria-hidden />
+          <X className="size-6 shrink-0" aria-hidden />
         ) : (
           <div className="relative flex shrink-0 items-center justify-center">
-            <MessageCircle className="size-6 shrink-0" aria-hidden />
+            <MessageCircle className="size-7 shrink-0" aria-hidden />
             <span
-              className="absolute -top-0.5 -right-0.5 size-2.5 rounded-full border-2 border-brand-900 bg-emerald-400"
+              className="absolute -top-0.5 -right-0.5 size-3 rounded-full border-2 border-brand-900 bg-emerald-400"
               aria-hidden
             />
           </div>
         )}
-        {inApp ? (
-          <span className={cn(open ? "hidden" : "font-medium")}>Ask me</span>
-        ) : (
-          <span className={cn(open ? "hidden" : "hidden sm:inline font-medium")}>Chat with Findtern</span>
-        )}
+        <span className={cn(open ? "hidden" : "font-semibold")}>Ask me</span>
       </button>
     </div>
   );

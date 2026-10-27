@@ -43,7 +43,11 @@ export function FaqAudienceTabs({ intern, employer }: { intern: CmsFaqItem[]; em
   const items = audience === "intern" ? intern : employer;
 
   return (
-    <div>
+    <div className="relative">
+      {/* Targets for /faq#interns and /faq#employers (the in-app FAQ links),
+          so the browser lands on the tabs, not the top of the hero. */}
+      <span id="interns" aria-hidden className="absolute top-0 scroll-mt-28" />
+      <span id="employers" aria-hidden className="absolute top-0 scroll-mt-28" />
       <div role="tablist" aria-label="Who is asking" className="grid gap-3 sm:grid-cols-2">
         {(Object.keys(COPY) as Audience[]).map((a) => {
           const { label, hint, Icon } = COPY[a];

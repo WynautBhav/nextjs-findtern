@@ -153,7 +153,7 @@ export function FaqExplorer({
               </AccordionTrigger>
               <AccordionContent className="px-5 pb-6 sm:px-7">
                 <p className="max-w-3xl whitespace-pre-line text-base leading-relaxed text-muted-foreground">
-                  {item.answer}
+                  <WithEmailLinks text={item.answer} />
                 </p>
               </AccordionContent>
             </AccordionItem>
@@ -166,5 +166,29 @@ export function FaqExplorer({
         <EmailLink email={email} />
       </p>
     </div>
+  );
+}
+
+const EMAIL = /([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})/g;
+
+/** Addresses in an answer are links, not text to copy by hand (bug sheet 7, S1 r10). */
+function WithEmailLinks({ text }: { text: string }) {
+  const parts = text.split(EMAIL);
+  return (
+    <>
+      {parts.map((part, i) =>
+        i % 2 === 1 ? (
+          <a
+            key={i}
+            href={`mailto:${part}`}
+            className="font-medium text-primary underline decoration-accent decoration-[1.5px] underline-offset-[3px] hover:decoration-primary"
+          >
+            {part}
+          </a>
+        ) : (
+          part
+        ),
+      )}
+    </>
   );
 }

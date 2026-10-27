@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ArrowRight, Building2, Check, Coffee, GraduationCap } from "lucide-react";
+import { ArrowRight, Building2, Check, GraduationCap } from "lucide-react";
 
 import { ButtonLink } from "@/components/ui/button";
 import { TextReveal } from "@/components/motion/text-reveal";
@@ -47,6 +47,7 @@ import { cn } from "@/lib/utils";
  *  - A small "I'm hiring / I'm a student" switch above the headline. Employer
  *    stays the default; the student side swaps only the headline, subhead
  *    and CTAs, so a student landing here is not told to "hire an intern".
+ *    Below the fold of the hero, one card per audience with equal weight.
  */
 
 type Audience = "employer" | "student";
@@ -225,26 +226,26 @@ export function HeroSplit() {
           </div>
         </div>
 
-        {/* ── Two employer arguments ───────────────────────────────
-            Both cards speak to the company hiring. The candidate pitch used
-            to sit in the second slot, which put "get your deposit back"
-            beside "start hiring" on a page whose headline, stats and pricing
-            table are all addressed to employers. Candidates still have the
-            secondary CTA above and their own page at /interns. */}
+        {/* ── One card per audience ─────────────────────────────────
+            Bug sheet 7 (NC r3) asked why the home starts from the hiring
+            side only. The switch above still defaults to employers, but the
+            two cards below now give each audience its own door with equal
+            weight, so a student does not have to find a toggle to see that
+            the site is for them too. */}
         <div className="mt-14 grid gap-4 sm:mt-16 lg:grid-cols-2 lg:gap-5">
           <AudienceCard
-            kicker="Screened for you"
+            kicker="For employers"
             Icon={Building2}
             title="Hire someone who has already been screened"
-            body="Browse candidates who are interviewed, tested, and scored. Filter by Findtern Score, skills, and interests."
+            body="Browse candidates who are interviewed, tested and scored. Filter by Findtern Score, skills and interests, and pay only for approved hours."
             cta={{ label: "Start hiring", href: "/employers" }}
           />
           <AudienceCard
-            kicker="Priced by score"
-            Icon={Coffee}
-            title="A published price for every score band"
-            body="Espresso, Cappuccino and Latte: three plans, one per score band, each with a fixed hourly rate and a flat ₹5,000 per hire. Espresso is free through 2026."
-            cta={{ label: "See pricing", href: "/pricing" }}
+            kicker="For students"
+            Icon={GraduationCap}
+            title="Get placed, or get your fee back"
+            body="One AI interview and an aptitude test give you a Findtern Score that verified employers hire on. Not placed within 18 months? The fee comes back."
+            cta={{ label: "Find my internship", href: "/interns" }}
           />
         </div>
       </div>
