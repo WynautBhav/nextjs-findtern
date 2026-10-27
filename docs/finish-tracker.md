@@ -141,3 +141,7 @@ branch, not to be touched: `feat/college-partners` (worktree
   build without the Google calendar token gives accepted campus-drive calls
   NO join link. Launch-day item: connect the calendar (`CALENDAR_TOKEN_OWNER`)
   before the first drive, and QA-log it as P1 if the UI shows an empty link.
+- 28 Oct: QA-001 fixed (`b981263`, merged): a drive call is refused when no
+  Meet link can be made; the admin dashboard's attention band shows
+  "Google calendar not connected". On Vercel staging (no Google config, prod
+  mode) that warning is permanent and expected.
