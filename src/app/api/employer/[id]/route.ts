@@ -1,10 +1,10 @@
-import { and, eq, ne } from "drizzle-orm";
+import { and, eq, ne, sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
-import { normalizePhone, phoneError } from "@/lib/phone";
+import { normalizePhone, phoneChangeError } from "@/lib/phone";
 import { escalationEmailDomainError, websiteDomainError } from "@/lib/company-domain";
 import { REQUIRED_COMPANY_FIELDS, isPersonalEmail, needsBillingPincode } from "@/lib/employer-onboarding";
 
@@ -79,6 +79,10 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       companyEmail: schema.employers.companyEmail,
       websiteUrl: schema.employers.websiteUrl,
       escalationContactEmail: schema.employers.escalationContactEmail,
+      countryCode: schema.employers.countryCode,
+      phoneNumber: schema.employers.phoneNumber,
+      escalationContactCountryCode: schema.employers.escalationContactCountryCode,
+      escalationContactPhone: schema.employers.escalationContactPhone,
     })
     .from(schema.employers)
     .where(eq(schema.employers.id, id))
@@ -122,9 +126,15 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   ) {
     return NextResponse.json({ error: "The escalation contact needs a different phone number from the primary contact." }, { status: 409 });
   }
+  // A number already on file passes unchanged, so an account made under an
+  // older rule can still save the rest of its profile (EMH-46).
   const phoneProblem =
-    phoneError(d.countryCode, d.phoneNumber) ||
-    (d.escalationContactPhone && phoneError(d.escalationContactCountryCode, d.escalationContactPhone));
+    phoneChangeError(d.countryCode, d.phoneNumber, { countryCode: account.countryCode, phone: account.phoneNumber }) ||
+    (d.escalationContactPhone &&
+      phoneChangeError(d.escalationContactCountryCode, d.escalationContactPhone, {
+        countryCode: account.escalationContactCountryCode,
+        phone: account.escalationContactPhone,
+      }));
   if (phoneProblem) return NextResponse.json({ error: phoneProblem }, { status: 400 });
 
   // One phone per account across both roles, as at signup. Without this the
@@ -144,6 +154,52 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   ]);
   if (employerOwner || internOwner) {
     return NextResponse.json({ error: "This phone number is already in use." }, { status: 409 });
+  }
+
+  // The escalation number belongs to one person too (legacy R:4146-4186,
+  // EMH-32): not another company's primary or escalation number, not an
+  // intern's phone, not an intern's emergency contact. Checked when entered
+  // or changed, so an older account whose number collides can still save.
+  const escalationPhone = normalizePhone(d.escalationContactPhone);
+  const escalationPhoneChanged =
+    escalationPhone !== normalizePhone(account.escalationContactPhone ?? "") ||
+    d.escalationContactCountryCode !== (account.escalationContactCountryCode ?? "");
+  if (escalationPhone && escalationPhoneChanged) {
+    const code = d.escalationContactCountryCode;
+    const [[asPrimary], [asEscalation], [asIntern], [asEmergency]] = await Promise.all([
+      db
+        .select({ id: schema.employers.id })
+        .from(schema.employers)
+        .where(and(eq(schema.employers.countryCode, code), eq(schema.employers.phoneNumber, escalationPhone), ne(schema.employers.id, id)))
+        .limit(1),
+      db
+        .select({ id: schema.employers.id })
+        .from(schema.employers)
+        .where(
+          and(
+            eq(schema.employers.escalationContactCountryCode, code),
+            sql`regexp_replace(coalesce(${schema.employers.escalationContactPhone}, ''), '\\D', '', 'g') = ${escalationPhone}`,
+            ne(schema.employers.id, id),
+          ),
+        )
+        .limit(1),
+      db
+        .select({ id: schema.users.id })
+        .from(schema.users)
+        .where(and(eq(schema.users.countryCode, code), eq(schema.users.phoneNumber, escalationPhone)))
+        .limit(1),
+      db
+        .select({ id: schema.internOnboarding.id })
+        .from(schema.internOnboarding)
+        .where(
+          sql`coalesce(${schema.internOnboarding.extraData} ->> 'emergencyCountryCode', '') = ${code}
+            and regexp_replace(coalesce(${schema.internOnboarding.extraData} ->> 'emergencyPhone', ''), '\\D', '', 'g') = ${escalationPhone}`,
+        )
+        .limit(1),
+    ]);
+    if (asPrimary || asEscalation || asIntern || asEmergency) {
+      return NextResponse.json({ error: "The escalation contact's phone number is already in use." }, { status: 409 });
+    }
   }
 
   // Every required field passed validation above, so the company profile is

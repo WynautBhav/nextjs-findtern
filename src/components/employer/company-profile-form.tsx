@@ -3,22 +3,26 @@
 /**
  * Company profile editor.
  *
- * Writes to `PATCH /api/employer/:id`, which takes exactly the fields below.
- * The logo uploads on its own (FileUpload attaches it server-side).
+ * Writes to `PATCH /api/employer/:id`, which takes exactly the fields below
+ * and applies the same rules. The logo uploads on its own (FileUpload
+ * attaches it server-side).
  */
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2 } from "lucide-react";
-import { FileUpload } from "@/components/app/file-upload";
-import { CityField, CountrySelect, StateField } from "@/components/employer/location-fields";
-import { isIndiaCountry } from "@/lib/data/countries";
-import { DIAL_CODES } from "@/lib/data/dial-codes";
+import { Globe2, Loader2 } from "lucide-react";
 
+import { FileUpload } from "@/components/app/file-upload";
+import { buttonClass } from "@/components/ui/button";
+import { FormNotice, FormSection, SelectField, TextField } from "@/components/employer/company-fields";
+import { CityField, CountrySelect, StateField } from "@/components/employer/location-fields";
+import { PhoneField } from "@/components/employer/phone-field";
 import { csrfFetch } from "@/lib/client-fetch";
-import { phoneError } from "@/lib/phone";
 import { escalationEmailDomainError, websiteDomainError } from "@/lib/company-domain";
-import { REQUIRED_COMPANY_FIELDS, isPersonalEmail, needsBillingPincode } from "@/lib/employer-onboarding";
+import { isIndiaCountry } from "@/lib/data/countries";
+import { COMPANY_SIZE_OPTIONS, REQUIRED_COMPANY_FIELDS, isPersonalEmail, needsBillingPincode } from "@/lib/employer-onboarding";
+import { phoneChangeError } from "@/lib/phone";
+import { timezoneForLocation } from "@/lib/timezones";
 
 export type CompanyProfile = {
   companyName: string;
@@ -43,6 +47,8 @@ export type CompanyProfile = {
   billingPincode: string | null;
 };
 
+type Values = Record<keyof CompanyProfile, string>;
+
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /** The company domain the website must match, or "" for a personal-mailbox login. */
@@ -60,28 +66,25 @@ const ESCALATION_FIELDS = [
 ] as const;
 
 /**
- * Everything is mandatory except what the form labels Optional: the logo and
- * the GST number. The escalation contact (name, role, email, phone) is
- * mandatory, and the website must sit on the login email's domain.
- * The billing PIN is mandatory for an Indian address. The server applies the
- * same rules (`PATCH /api/employer/:id`); this is so the employer sees which
- * field, not just the first error.
+ * Everything is mandatory except the logo and the GST number. The escalation
+ * contact is mandatory (bug sheet 7 S1 r92) with a company email that is not
+ * the sign-in email (r103, r136); the website must sit on the sign-in
+ * email's domain (r91). Rules already satisfied by what's on file (an older
+ * website, an older phone) are not re-applied, so an older account can still
+ * save the rest. The server applies the same rules.
  */
-function validate(v: Record<string, string>, savedWebsite = "", savedEscalationEmail = ""): Record<string, string> {
+function validate(v: Values, saved: CompanyProfile): Record<string, string> {
   const errors: Record<string, string> = {};
   for (const [key, label] of REQUIRED_COMPANY_FIELDS) {
-    if (!v[key]?.trim()) errors[key] = `${label} is required.`;
+    if (!v[key as keyof Values]?.trim()) errors[key] = `${label} is required.`;
   }
-  // A website already on file is kept as is: the domain rule applies when it
-  // is entered or changed, so older accounts can still save other fields.
-  if (!errors.websiteUrl && v.websiteUrl.trim() !== savedWebsite.trim()) {
+  if (!errors.websiteUrl && v.websiteUrl.trim() !== (saved.websiteUrl ?? "").trim()) {
     const domain = companyDomainOf(v.companyEmail);
     const problem = websiteDomainError(v.websiteUrl, v.companyEmail, { skipDomainCheck: !domain });
     if (problem) errors.websiteUrl = problem;
   }
-  if (!v.countryCode?.trim()) errors.countryCode = "Country code is required.";
   if (!errors.phoneNumber) {
-    const problem = phoneError(v.countryCode, v.phoneNumber);
+    const problem = phoneChangeError(v.countryCode, v.phoneNumber, { countryCode: saved.countryCode, phone: saved.phoneNumber });
     if (problem) errors.phoneNumber = problem;
   }
   if (needsBillingPincode(v.country) && !/^[1-9]\d{5}$/.test(v.billingPincode?.trim() ?? "")) {
@@ -100,24 +103,27 @@ function validate(v: Record<string, string>, savedWebsite = "", savedEscalationE
     if (!EMAIL_RE.test(email)) errors.escalationContactEmail = "Enter a valid email address.";
     else if (isPersonalEmail(email)) errors.escalationContactEmail = "Use a company email for the escalation contact.";
     else if (email.toLowerCase() === v.companyEmail.trim().toLowerCase()) {
-      errors.escalationContactEmail = "Use a different email from the company account email.";
-    } else if (email.toLowerCase() !== savedEscalationEmail.trim().toLowerCase()) {
-      // On the company domain, checked when entered or changed (as the website).
-      const problem = escalationEmailDomainError(email, v.companyEmail, {
-        skipDomainCheck: !companyDomainOf(v.companyEmail),
-      });
+      errors.escalationContactEmail = "Use a different email from the company sign-in email.";
+    } else if (email.toLowerCase() !== (saved.escalationContactEmail ?? "").trim().toLowerCase()) {
+      const problem = escalationEmailDomainError(email, v.companyEmail, { skipDomainCheck: !companyDomainOf(v.companyEmail) });
       if (problem) errors.escalationContactEmail = problem;
     }
   }
-  if (!v.escalationContactCountryCode?.trim()) errors.escalationContactCountryCode = "Country code is required.";
   if (!errors.escalationContactPhone) {
-    const problem = phoneError(v.escalationContactCountryCode || "+91", v.escalationContactPhone);
+    const problem = phoneChangeError(v.escalationContactCountryCode || "+91", v.escalationContactPhone, {
+      countryCode: saved.escalationContactCountryCode,
+      phone: saved.escalationContactPhone,
+    });
     if (problem) errors.escalationContactPhone = problem;
+    else if (
+      v.escalationContactCountryCode === v.countryCode &&
+      v.escalationContactPhone.replace(/\D/g, "") === v.phoneNumber.replace(/\D/g, "")
+    ) {
+      errors.escalationContactPhone = "Use a different number from the primary contact's.";
+    }
   }
   return errors;
 }
-
-const COMPANY_SIZES = ["1-10", "11-50", "51-200", "201-500", "501-1000", "1000+"];
 
 export function CompanyProfileForm({
   employerId,
@@ -129,44 +135,45 @@ export function CompanyProfileForm({
   hasLogo?: boolean;
 }) {
   const router = useRouter();
-  const [values, setValues] = useState<Record<string, string>>(() => ({
-    ...Object.fromEntries(Object.entries(profile).map(([k, v]) => [k, v ?? ""])),
+  const [values, setValues] = useState<Values>(() => ({
+    ...(Object.fromEntries(Object.entries(profile).map(([k, v]) => [k, v ?? ""])) as Values),
+    countryCode: profile.countryCode || "+91",
     // Older rows have no escalation code; the dropdown starts on India.
     escalationContactCountryCode: profile.escalationContactCountryCode || "+91",
   }));
   const [busy, setBusy] = useState(false);
-  const [state, setState] = useState<"idle" | "saved">("idle");
+  const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const set = (key: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
-    setValue(key)(e.target.value);
-  const setValue = (key: string) => (value: string) => {
-    setState("idle");
-    setValues((v) => ({ ...v, [key]: value }));
+  // Functional merge: picking a city sets the city and then the state in the
+  // same tick.
+  const set = (patch: Partial<Values>) => {
+    setSaved(false);
+    setValues((v) => ({ ...v, ...patch }));
     setErrors((prev) => {
       const next = { ...prev };
-      delete next[key];
+      for (const k of Object.keys(patch)) delete next[k];
       return next;
     });
   };
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    const problems = validate(values, profile.websiteUrl ?? "", profile.escalationContactEmail ?? "");
+    const problems = validate(values, profile);
     setErrors(problems);
     if (Object.keys(problems).length > 0) {
-      setError("Some required details are missing - see the highlighted fields.");
-      setState("idle");
+      setError("Some details need a look - see the highlighted fields.");
+      setSaved(false);
       document.getElementById(Object.keys(problems)[0])?.focus();
       return;
     }
     setBusy(true);
     setError(null);
-    setState("idle");
+    setSaved(false);
     try {
       // A cleared optional field is sent as null so it actually clears. The
-      // login email is read-only (the route ignores it).
+      // sign-in email is read-only (the route ignores it).
       const body = Object.fromEntries(
         Object.entries(values)
           .filter(([k]) => k !== "companyEmail")
@@ -177,302 +184,183 @@ export function CompanyProfileForm({
         headers: { "content-type": "application/json" },
         body: JSON.stringify(body),
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error ?? "Could not save the profile.");
-      setState("saved");
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) throw new Error(data.error ?? "Couldn't save the profile.");
+      setSaved(true);
       router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not save the profile.");
+      setError(err instanceof Error ? err.message : "Couldn't save the profile.");
     } finally {
       setBusy(false);
     }
   }
 
-  return (
-    <form className="space-y-6" noValidate onSubmit={submit}>
-      {error ? (
-        <p role="alert" className="rounded-[10px] border border-danger/25 bg-danger-soft px-3.5 py-3 text-sm text-danger">
-          {error}
-        </p>
-      ) : null}
-      {state === "saved" ? (
-        <p role="status" className="rounded-[10px] border border-brand-200 bg-brand-50 px-3.5 py-3 text-sm text-brand-800">
-          Company details saved.
-        </p>
-      ) : null}
+  const india = isIndiaCountry(values.country);
+  const domain = companyDomainOf(values.companyEmail);
 
-      <fieldset className="space-y-4">
-        <legend className="text-sm font-semibold text-ink-900">Company</legend>
+  return (
+    <form className="space-y-10" noValidate onSubmit={submit}>
+      <FormSection title="Company">
         <FileUpload
           kind="employer_logo"
           accept="image/jpeg,image/png,image/webp"
-          label="Logo"
-          hint="Optional. PNG, JPG or WebP up to 2 MB."
+          label="Logo (optional)"
+          noun="logo"
+          hint="PNG, JPG or WebP up to 2 MB."
           current={hasLogo ? "Logo on file" : null}
           onUploaded={() => router.refresh()}
         />
-        <Text id="companyName" label="Company name" value={values.companyName} onChange={set("companyName")} error={errors.companyName} required />
-        <Text
-          id="companyEmail"
-          label="Company email"
-          type="email"
-          value={values.companyEmail}
-          onChange={() => {}}
-          readOnly
-          hint="Your sign-up email. It cannot be changed here."
-        />
-        <Text
-          id="websiteUrl"
-          label="Website"
-          value={values.websiteUrl}
-          onChange={set("websiteUrl")}
-          placeholder={companyDomainOf(values.companyEmail) || "acme.com"}
-          error={errors.websiteUrl}
-          hint={
-            companyDomainOf(values.companyEmail)
-              ? `Must be on ${companyDomainOf(values.companyEmail)} (subdomains are fine).`
-              : undefined
-          }
-          required
-        />
-        <div>
-          <label htmlFor="companySize" className="block text-sm font-medium text-ink-800">
-            Company size <span aria-hidden className="text-danger">*</span>
-          </label>
-          <select
+        <div className="grid gap-5 sm:grid-cols-2">
+          <TextField id="companyName" label="Company name" required value={values.companyName} onChange={(v) => set({ companyName: v })} error={errors.companyName} />
+          <SelectField
             id="companySize"
-            value={values.companySize}
-            onChange={set("companySize")}
+            label="Company size"
             required
-            aria-invalid={errors.companySize ? true : undefined}
-            className={`apple-spring mt-1.5 min-h-11 w-full rounded-[10px] border bg-white px-3 text-[14px] text-ink-900 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 ${errors.companySize ? "border-danger" : "border-ink-200"}`}
-          >
-            <option value="">Select a size</option>
-            {COMPANY_SIZES.map((s) => (
-              <option key={s} value={s}>
-                {s} people
-              </option>
-            ))}
-          </select>
-          {errors.companySize ? <p className="mt-1.5 text-xs text-danger">{errors.companySize}</p> : null}
+            value={values.companySize}
+            options={COMPANY_SIZE_OPTIONS}
+            onChange={(v) => set({ companySize: v })}
+            error={errors.companySize}
+          />
+          <TextField
+            id="companyEmail"
+            label="Sign-in email"
+            type="email"
+            value={values.companyEmail}
+            onChange={() => {}}
+            readOnly
+            hint="Your sign-in email can't be changed here. Write to us if it has to change."
+          />
+          <TextField
+            id="websiteUrl"
+            label="Website"
+            required
+            type="url"
+            inputMode="url"
+            value={values.websiteUrl}
+            onChange={(v) => set({ websiteUrl: v })}
+            placeholder={domain || "acme.com"}
+            error={errors.websiteUrl}
+            hint={domain ? `Must be on ${domain} (subdomains are fine).` : undefined}
+          />
         </div>
-        <Text
-          id="gstNumber"
-          label="GST number"
-          value={values.gstNumber}
-          onChange={set("gstNumber")}
-          error={errors.gstNumber}
-          hint="Optional. Needed for a GST invoice if you are hiring in India."
-        />
-        <Text
-          id="billingPincode"
-          label="Billing PIN code"
-          value={values.billingPincode}
-          onChange={set("billingPincode")}
-          error={errors.billingPincode}
-          required={needsBillingPincode(values.country)}
-          hint="Required for companies in India - it sets CGST + SGST or IGST on your invoice."
-        />
-      </fieldset>
+      </FormSection>
 
-      <fieldset className="space-y-4">
-        <legend className="text-sm font-semibold text-ink-900">Location</legend>
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          <CountrySelect id="country" label="Country" value={values.country} onChange={setValue("country")} error={errors.country} required />
+      <FormSection title="Location and billing">
+        <div className="grid gap-5 sm:grid-cols-3">
+          <CountrySelect
+            id="country"
+            label="Country"
+            required
+            value={values.country}
+            onChange={(v) => set({ country: v, state: "", city: "" })}
+            error={errors.country}
+          />
           <StateField
             id="state"
             label="State"
-            india={isIndiaCountry(values.country)}
-            value={values.state}
-            onChange={setValue("state")}
-            error={errors.state}
             required
+            india={india}
+            value={values.state}
+            onChange={(v) => set({ state: v, ...(v !== values.state ? { city: "" } : {}) })}
+            error={errors.state}
           />
           <CityField
             id="city"
             label="City"
-            india={isIndiaCountry(values.country)}
+            required
+            india={india}
             state={values.state}
-            onStateChange={setValue("state")}
+            onStateChange={(v) => set({ state: v })}
             value={values.city}
-            onChange={setValue("city")}
+            onChange={(v) => set({ city: v })}
             error={errors.city}
-            required
           />
         </div>
-      </fieldset>
-
-      <fieldset className="space-y-4">
-        <legend className="text-sm font-semibold text-ink-900">Primary contact</legend>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Text id="primaryContactName" label="Name" value={values.primaryContactName} onChange={set("primaryContactName")} error={errors.primaryContactName} required />
-          <Text id="primaryContactRole" label="Role" value={values.primaryContactRole} onChange={set("primaryContactRole")} error={errors.primaryContactRole} required />
-          <DialCodeSelect
-            id="countryCode"
-            label="Country code"
-            value={values.countryCode}
-            onChange={setValue("countryCode")}
-            error={errors.countryCode}
+        {values.country ? (
+          <p className="flex items-start gap-2 text-sm text-ink-600">
+            <Globe2 className="mt-0.5 size-4 shrink-0 text-brand-700" aria-hidden />
+            <span>
+              Your timezone for meetings and offers:{" "}
+              <span className="font-medium text-ink-900">{timezoneForLocation(values)}</span>
+            </span>
+          </p>
+        ) : null}
+        <div className="grid gap-5 sm:grid-cols-2">
+          <TextField
+            id="billingPincode"
+            label="Billing PIN code"
+            required={needsBillingPincode(values.country)}
+            inputMode="numeric"
+            maxLength={6}
+            value={values.billingPincode}
+            onChange={(v) => set({ billingPincode: v.replace(/\D/g, "").slice(0, 6) })}
+            error={errors.billingPincode}
+            hint={india ? "Sets CGST + SGST or IGST on your invoice." : "Only needed for an Indian billing address."}
           />
-          <Text
-            id="phoneNumber"
-            label="Phone"
-            type="tel"
-            value={values.phoneNumber}
-            onChange={set("phoneNumber")}
-            error={errors.phoneNumber}
-            required
+          <TextField
+            id="gstNumber"
+            label="GST number"
+            optional
+            value={values.gstNumber}
+            onChange={(v) => set({ gstNumber: v.toUpperCase() })}
+            error={errors.gstNumber}
+            hint="For a GST invoice if you're registered in India."
           />
         </div>
-      </fieldset>
+      </FormSection>
 
-      <fieldset className="space-y-4">
-        <legend className="text-sm font-semibold text-ink-900">Escalation contact</legend>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Text id="escalationContactName" label="Name" value={values.escalationContactName} onChange={set("escalationContactName")} error={errors.escalationContactName} required />
-          <Text id="escalationContactRole" label="Role" value={values.escalationContactRole} onChange={set("escalationContactRole")} error={errors.escalationContactRole} required />
-          <Text
-            id="escalationContactEmail"
-            label="Email"
-            type="email"
-            value={values.escalationContactEmail}
-            onChange={set("escalationContactEmail")}
-            error={errors.escalationContactEmail}
-            required
-          />
-          <div className="grid grid-cols-2 gap-3">
-            <DialCodeSelect
-              id="escalationContactCountryCode"
-              label="Code"
-              value={values.escalationContactCountryCode}
-              onChange={setValue("escalationContactCountryCode")}
-              error={errors.escalationContactCountryCode}
-            />
-            <Text
-              id="escalationContactPhone"
-              label="Phone"
-              type="tel"
-              value={values.escalationContactPhone}
-              onChange={set("escalationContactPhone")}
-              error={errors.escalationContactPhone}
-              required
-            />
-          </div>
+      <FormSection title="Primary contact" hint="The first person an intern or a Findtern coordinator calls.">
+        <div className="grid gap-5 sm:grid-cols-2">
+          <TextField id="primaryContactName" label="Name" required value={values.primaryContactName} onChange={(v) => set({ primaryContactName: v })} error={errors.primaryContactName} />
+          <TextField id="primaryContactRole" label="Role" required value={values.primaryContactRole} onChange={(v) => set({ primaryContactRole: v })} error={errors.primaryContactRole} />
         </div>
-      </fieldset>
+        <PhoneField
+          id="phoneNumber"
+          required
+          code={values.countryCode}
+          onCodeChange={(v) => set({ countryCode: v })}
+          number={values.phoneNumber}
+          onNumberChange={(v) => set({ phoneNumber: v })}
+          error={errors.phoneNumber}
+        />
+      </FormSection>
 
-      <button
-        type="submit"
-        disabled={busy}
-        className="apple-spring apple-pressable inline-flex min-h-11 items-center justify-center gap-2 rounded-[10px] bg-brand-700 px-5 text-sm font-semibold text-white hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-60"
-      >
-        {busy ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
-        Save company details
-      </button>
+      <FormSection title="Escalation contact" hint="A second person, for when the primary contact can't be reached.">
+        <div className="grid gap-5 sm:grid-cols-2">
+          <TextField id="escalationContactName" label="Name" required value={values.escalationContactName} onChange={(v) => set({ escalationContactName: v })} error={errors.escalationContactName} />
+          <TextField id="escalationContactRole" label="Role" required value={values.escalationContactRole} onChange={(v) => set({ escalationContactRole: v })} error={errors.escalationContactRole} />
+        </div>
+        <TextField
+          id="escalationContactEmail"
+          label="Email"
+          required
+          type="email"
+          inputMode="email"
+          value={values.escalationContactEmail}
+          onChange={(v) => set({ escalationContactEmail: v })}
+          error={errors.escalationContactEmail}
+          placeholder={domain ? `name@${domain}` : undefined}
+          hint={domain ? `On ${domain}, and not your sign-in email.` : undefined}
+        />
+        <PhoneField
+          id="escalationContactPhone"
+          required
+          code={values.escalationContactCountryCode}
+          onCodeChange={(v) => set({ escalationContactCountryCode: v })}
+          number={values.escalationContactPhone}
+          onNumberChange={(v) => set({ escalationContactPhone: v })}
+          error={errors.escalationContactPhone}
+        />
+      </FormSection>
+
+      <div className="space-y-4 border-t border-ink-100 pt-6">
+        {error ? <FormNotice tone="error">{error}</FormNotice> : null}
+        {saved ? <FormNotice tone="success">Company details saved.</FormNotice> : null}
+        <button type="submit" disabled={busy} className={buttonClass({ variant: "primary", size: "md" })}>
+          {busy ? <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden /> : null}
+          Save company details
+        </button>
+      </div>
     </form>
-  );
-}
-
-/** The same dial-code list as signup and onboarding (bug sheet 22 Oct). */
-function DialCodeSelect({
-  id,
-  label,
-  value,
-  onChange,
-  error,
-}: {
-  id: string;
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  error?: string;
-}) {
-  // A code saved before the list existed stays selectable rather than vanishing.
-  const known = DIAL_CODES.some((d) => d.code === value);
-  return (
-    <div>
-      <label htmlFor={id} className="block text-sm font-medium text-ink-800">
-        {label}
-        <span aria-hidden className="text-danger"> *</span>
-      </label>
-      <select
-        id={id}
-        name={id}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        required
-        aria-invalid={error ? true : undefined}
-        aria-describedby={error ? `${id}-error` : undefined}
-        className={`apple-spring mt-1.5 min-h-11 w-full rounded-[10px] border bg-white px-3 text-[14px] text-ink-900 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 ${error ? "border-danger" : "border-ink-200"}`}
-      >
-        {!known && value ? <option value={value}>{value}</option> : null}
-        {DIAL_CODES.map((d) => (
-          <option key={`${d.code}-${d.country}`} value={d.code}>
-            {d.code} · {d.country}
-          </option>
-        ))}
-      </select>
-      {error ? (
-        <p id={`${id}-error`} className="mt-1.5 text-xs text-danger">
-          {error}
-        </p>
-      ) : null}
-    </div>
-  );
-}
-
-function Text({
-  id,
-  label,
-  value,
-  onChange,
-  type = "text",
-  required,
-  readOnly,
-  placeholder,
-  error,
-  hint,
-}: {
-  id: string;
-  label: string;
-  value: string;
-  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  type?: string;
-  required?: boolean;
-  readOnly?: boolean;
-  placeholder?: string;
-  error?: string;
-  hint?: string;
-}) {
-  const describedBy = error ? `${id}-error` : hint ? `${id}-hint` : undefined;
-  return (
-    <div>
-      <label htmlFor={id} className="block text-sm font-medium text-ink-800">
-        {label}
-        {required ? <span aria-hidden className="text-danger"> *</span> : null}
-      </label>
-      <input
-        id={id}
-        name={id}
-        type={type}
-        required={required}
-        readOnly={readOnly}
-        placeholder={placeholder}
-        value={value}
-        onChange={onChange}
-        aria-invalid={error ? true : undefined}
-        aria-describedby={describedBy}
-        className={`apple-spring mt-1.5 min-h-11 w-full rounded-[10px] border bg-white px-3.5 text-[14px] text-ink-900 outline-none placeholder:text-ink-400 read-only:bg-ink-50 read-only:text-ink-600 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 ${error ? "border-danger" : "border-ink-200"}`}
-      />
-      {error ? (
-        <p id={`${id}-error`} className="mt-1.5 text-xs text-danger">
-          {error}
-        </p>
-      ) : hint ? (
-        <p id={`${id}-hint`} className="mt-1.5 text-xs text-text-subtle">
-          {hint}
-        </p>
-      ) : null}
-    </div>
   );
 }

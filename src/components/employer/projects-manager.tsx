@@ -1,208 +1,172 @@
 "use client";
 
-import { useState } from "react";
-import Link from "next/link";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import {
-  Briefcase,
-  FolderPlus,
-  Globe2,
-  MapPin,
-  Pencil,
-  Plus,
-  Search,
-  Sparkles,
-  ToggleLeft,
-  ToggleRight,
-  Users,
-  X,
-} from "lucide-react";
+import { Briefcase, Clock3, FolderPlus, Globe2, MapPin, Pencil, Search, Sparkles, Trash2, Users, X } from "lucide-react";
 
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
-import { CityField, StateField } from "@/components/employer/location-fields";
+import { EmptyScene, Pill, Surface } from "@/components/app/primitives";
 import { PageHeader } from "@/components/layout/page-header";
+import { buttonClass, ButtonLink } from "@/components/ui/button";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { FormNotice, controlClass } from "@/components/employer/company-fields";
+import { ProjectFields, projectFormErrors, type ProjectBaseline } from "@/components/employer/project-fields";
 import { csrfFetch } from "@/lib/client-fetch";
-import { TimezoneSelect } from "@/components/employer/meeting-slots";
-import { suggestSkills } from "@/lib/data/skills";
-import { scopeLabel, scopeOfWorkOptions, type Project } from "@/lib/db/schema";
+import { scopeLabel, scopeValue, type Project } from "@/lib/db/schema";
+import { emptyProject, projectFromRecord, type ProjectDraft } from "@/lib/employer-onboarding";
+import { CLOSED_PROJECT_STATUS, isProjectOpen } from "@/lib/project-locations";
+import { cn } from "@/lib/utils";
 
-/** Sheet row 59: a project lists at most 7 skills (the API enforces it too). */
-const MAX_SKILLS = 7;
+type Filter = "all" | "open" | "closed";
 
+const MODE_LABEL: Record<string, string> = { remote: "Remote", hybrid: "Hybrid", onsite: "On-site" };
+
+/**
+ * Projects: what you're hiring for.
+ *
+ * A project is the unit candidates are matched against, so the list leads
+ * with what decides the match (skills, mode, place) and one action that uses
+ * it, "Find candidates". Editing opens a drawer with the same fields as
+ * onboarding (`ProjectFields`). Closing writes the legacy "inactive"
+ * (EMH-03), and at least one project stays open (the API enforces it).
+ */
 export function ProjectsManager({
   employerId,
   initialProjects,
-  india = true,
   defaultTimezone = "Asia/Kolkata",
+  companyPlace,
+  openNew = false,
 }: {
   employerId: string;
   initialProjects: Project[];
-  /** The company is in India: state/city pickers apply. */
-  india?: boolean;
-  /** The company's own timezone (from its country), for a new project. */
+  /** The company's own timezone (from its location), for a new project. */
   defaultTimezone?: string;
+  /** The company's city and state, offered when a role is on-site. */
+  companyPlace?: { city?: string | null; state?: string | null };
+  /** Open the "New project" drawer on arrival (`?new=1`). */
+  openNew?: boolean;
 }) {
   const router = useRouter();
   const [projects, setProjects] = useState<Project[]>(initialProjects);
-  const [filterTab, setFilterTab] = useState<"all" | "active" | "closed">("all");
-  const [searchQuery, setSearchQuery] = useState("");
+  const [filter, setFilter] = useState<Filter>("all");
+  const [query, setQuery] = useState("");
 
-  // Sheet drawer state for Create / Edit
   const [sheetOpen, setSheetOpen] = useState(false);
-  const [editingProject, setEditingProject] = useState<Project | null>(null);
-
-  // Form inputs
-  const [projectName, setProjectName] = useState("");
-  const [skills, setSkills] = useState<string[]>([]);
-  const [skillDraft, setSkillDraft] = useState("");
-  const [scopeOfWork, setScopeOfWork] = useState<string>(scopeOfWorkOptions[0].value);
-  const [locationType, setLocationType] = useState("remote");
-  const [city, setCity] = useState("");
-  const [state, setState] = useState("");
-  const [timezone, setTimezone] = useState(defaultTimezone);
-  const [fullTimeOffer, setFullTimeOffer] = useState(false);
+  const [editing, setEditing] = useState<Project | null>(null);
+  const [form, setForm] = useState<ProjectDraft>(() => ({ ...emptyProject(), timezone: defaultTimezone }));
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
-  const [errorMsg, setErrorMsg] = useState("");
-  // Row actions (close/reopen, delete) report here, outside the edit sheet.
+  const [saveError, setSaveError] = useState("");
+
   const [listError, setListError] = useState("");
-  // A failed delete is reported on its own card: the list banner sits above
-  // the fold once the employer has scrolled down to the row.
   const [rowError, setRowError] = useState<{ id: string; message: string } | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
 
-  // Skills suggestion state
-  const [skillFocused, setSkillFocused] = useState(false);
-  const skillSuggestions =
-    skillFocused && skillDraft.trim()
-      ? suggestSkills(skillDraft, 6).filter((s) => !skills.includes(s))
-      : [];
+  // `?new=1` (the dashboard's "New project") opens the drawer straight away.
+  useEffect(() => {
+    if (!openNew) return;
+    openCreate();
+    router.replace("/employer/projects", { scroll: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openNew]);
+
+  const baseline: ProjectBaseline | null = editing
+    ? {
+        skills: (editing.skills as string[] | null) ?? [],
+        preferredLocations: (editing.preferredLocations as string[] | null) ?? [],
+        scopeOfWork: editing.scopeOfWork ?? "",
+        city: editing.city ?? "",
+        state: editing.state ?? "",
+        locationType: editing.locationType ?? "",
+      }
+    : null;
+
+  function setField(patch: Partial<ProjectDraft>) {
+    setForm((prev) => ({ ...prev, ...patch }));
+    setErrors((prev) => {
+      const next = { ...prev };
+      for (const key of Object.keys(patch)) delete next[key];
+      return next;
+    });
+  }
 
   function openCreate() {
-    setEditingProject(null);
-    setProjectName("");
-    setSkills([]);
-    setSkillDraft("");
-    setScopeOfWork(scopeOfWorkOptions[0].value);
-    setLocationType("remote");
-    setCity("");
-    setState("");
-    setTimezone(defaultTimezone);
-    setFullTimeOffer(false);
-    setErrorMsg("");
+    setEditing(null);
+    // Scope and work mode start unchosen (EMH-47).
+    setForm({ ...emptyProject(), timezone: defaultTimezone });
+    setErrors({});
+    setSaveError("");
     setSheetOpen(true);
   }
 
   function openEdit(p: Project) {
-    setEditingProject(p);
-    setProjectName(p.projectName);
-    setSkills((p.skills as string[]) ?? []);
-    setSkillDraft("");
-    // An older value maps to the nearest current option on edit.
-    setScopeOfWork(
-      scopeOfWorkOptions.find((o) => o.value === p.scopeOfWork)?.value ??
-        scopeOfWorkOptions.find((o) => o.label === scopeLabel(p.scopeOfWork))?.value ??
-        scopeOfWorkOptions[0].value,
-    );
-    setLocationType(p.locationType ?? "remote");
-    setCity(p.city ?? "");
-    setState(p.state ?? "");
-    setTimezone(p.timezone ?? defaultTimezone);
-    setFullTimeOffer(Boolean(p.fullTimeOffer));
-    setErrorMsg("");
+    setEditing(p);
+    const draft = projectFromRecord(p);
+    setForm({ ...draft, scopeOfWork: scopeValue(draft.scopeOfWork) || draft.scopeOfWork, timezone: draft.timezone || defaultTimezone });
+    setErrors({});
+    setSaveError("");
     setSheetOpen(true);
-  }
-
-  function addSkill(s: string) {
-    const trimmed = s.trim();
-    if (!trimmed || skills.some((e) => e.toLowerCase() === trimmed.toLowerCase())) return;
-    if (skills.length >= MAX_SKILLS) return;
-    setSkills([...skills, trimmed]);
-    setSkillDraft("");
-  }
-
-  function removeSkill(s: string) {
-    setSkills(skills.filter((e) => e !== s));
   }
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
-    if (projectName.trim().length < 2) {
-      setErrorMsg("Project name must be at least 2 characters.");
+    const problems = projectFormErrors(form, baseline);
+    setErrors(problems);
+    if (Object.keys(problems).length > 0) {
+      setSaveError("Some details need a look - see the highlighted fields.");
       return;
     }
-    if (skills.length === 0) {
-      setErrorMsg("Add at least one required skill.");
-      return;
-    }
-
     setSaving(true);
-    setErrorMsg("");
-
+    setSaveError("");
+    const remote = form.locationType === "remote";
     const payload = {
-      projectName: projectName.trim(),
-      skills,
-      scopeOfWork,
-      locationType,
-      // Remote roles have no city; null clears one left over from an edit.
-      city: locationType === "remote" ? null : city.trim() || null,
-      state: locationType === "remote" ? null : state.trim() || null,
-      timezone,
-      fullTimeOffer,
+      projectName: form.projectName.trim(),
+      skills: form.skills,
+      scopeOfWork: form.scopeOfWork,
+      locationType: form.locationType,
+      // A remote role has no place; null clears one left over from an edit.
+      city: remote ? null : form.city.trim() || null,
+      state: remote ? null : form.state.trim() || null,
+      preferredLocations: remote ? [] : form.preferredLocations,
+      timezone: form.timezone,
+      fullTimeOffer: form.fullTimeOffer,
     };
-
     try {
-      if (editingProject) {
-        // Update project
-        const res = await csrfFetch(`/api/employer/projects/${editingProject.id}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          throw new Error(err.error || "Failed to update project");
-        }
-        setProjects((prev) =>
-          prev.map((item) =>
-            item.id === editingProject.id ? { ...item, ...payload } : item,
-          ),
-        );
-      } else {
-        // Create project
-        const res = await csrfFetch(`/api/employer/${employerId}/projects`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          throw new Error(err.error || "Failed to create project");
-        }
-        const data = await res.json();
-        if (data.project) {
-          setProjects((prev) => [data.project, ...prev]);
-        }
+      const res = editing
+        ? await csrfFetch(`/api/employer/projects/${editing.id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          })
+        : await csrfFetch(`/api/employer/${employerId}/projects`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+      const data = (await res.json().catch(() => ({}))) as { error?: string; project?: Project };
+      if (!res.ok) {
+        setSaveError(data.error ?? "Couldn't save this project. Try again.");
+        return;
       }
-
+      if (editing) {
+        setProjects((prev) => prev.map((item) => (item.id === editing.id ? { ...item, ...payload } : item)));
+      } else if (data.project) {
+        setProjects((prev) => [data.project!, ...prev]);
+      }
       setSheetOpen(false);
       router.refresh();
-    } catch (err: unknown) {
-      setErrorMsg(err instanceof Error ? err.message : "An error occurred");
+    } catch {
+      setSaveError("Couldn't reach the server. Your answers are still here; try again.");
     } finally {
       setSaving(false);
     }
   }
 
   async function toggleStatus(project: Project) {
-    const nextStatus = project.status === "active" ? "closed" : "active";
+    const open = isProjectOpen(project.status);
+    const nextStatus = open ? CLOSED_PROJECT_STATUS : "active";
     setBusyId(project.id);
     setListError("");
+    setRowError(null);
     try {
       const res = await csrfFetch(`/api/employer/projects/${project.id}`, {
         method: "PUT",
@@ -211,16 +175,13 @@ export function ProjectsManager({
       });
       if (!res.ok) {
         const data = (await res.json().catch(() => ({}))) as { error?: string };
-        setListError(data.error ?? "Couldn't update this project. Try again.");
+        setRowError({ id: project.id, message: data.error ?? "Couldn't update this project. Try again." });
         return;
       }
-      setProjects((prev) =>
-        prev.map((item) =>
-          item.id === project.id ? { ...item, status: nextStatus } : item,
-        ),
-      );
+      setProjects((prev) => prev.map((item) => (item.id === project.id ? { ...item, status: nextStatus } : item)));
+      router.refresh();
     } catch {
-      setListError("Couldn't reach the server. Check your connection and try again.");
+      setRowError({ id: project.id, message: "Couldn't reach the server. Check your connection and try again." });
     } finally {
       setBusyId(null);
     }
@@ -238,6 +199,7 @@ export function ProjectsManager({
         return;
       }
       setProjects((prev) => prev.filter((item) => item.id !== project.id));
+      router.refresh();
     } catch {
       setRowError({ id: project.id, message: "Couldn't reach the server. Check your connection and try again." });
     } finally {
@@ -245,477 +207,252 @@ export function ProjectsManager({
     }
   }
 
-  // Filter projects
-  const filtered = projects.filter((p) => {
-    if (filterTab === "active" && p.status !== "active") return false;
-    if (filterTab === "closed" && p.status === "active") return false;
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      const inName = p.projectName.toLowerCase().includes(q);
-      const inSkills = ((p.skills as string[]) ?? []).some((s) => s.toLowerCase().includes(q));
-      return inName || inSkills;
-    }
-    return true;
-  });
-
-  const activeCount = projects.filter((p) => p.status === "active").length;
-  const closedCount = projects.filter((p) => p.status !== "active").length;
+  const openCount = projects.filter((p) => isProjectOpen(p.status)).length;
+  const closedCount = projects.length - openCount;
+  const q = query.trim().toLowerCase();
+  const filtered = projects
+    .filter((p) => (filter === "open" ? isProjectOpen(p.status) : filter === "closed" ? !isProjectOpen(p.status) : true))
+    .filter(
+      (p) =>
+        !q ||
+        p.projectName.toLowerCase().includes(q) ||
+        ((p.skills as string[] | null) ?? []).some((s) => s.toLowerCase().includes(q)),
+    )
+    // Open projects first, newest first within each group.
+    .sort((a, b) => Number(isProjectOpen(b.status)) - Number(isProjectOpen(a.status)));
 
   return (
-    <div className="space-y-6">
+    <div>
       <PageHeader
         title="Projects"
-        subtitle="Manage your internship postings, scopes of work, and matching criteria."
+        subtitle="What you're hiring for. Candidates are matched on each project's skills, work mode and place."
         action={
-          <button
-            type="button"
-            onClick={openCreate}
-            className="apple-spring apple-pressable inline-flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-[10px] bg-brand-700 px-4 text-sm font-semibold text-white shadow-xs hover:bg-brand-600"
-          >
-            <FolderPlus className="size-4" />
-            <span>New Project</span>
+          <button type="button" onClick={openCreate} className={buttonClass({ variant: "primary", size: "md" })}>
+            <FolderPlus className="size-4" aria-hidden />
+            New project
           </button>
         }
       />
 
-      {/* Tabs and Search Controls */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="inline-flex rounded-[10px] border border-ink-200/80 bg-white p-1 shadow-2xs">
-          <button
-            type="button"
-            onClick={() => setFilterTab("all")}
-            className={`apple-spring apple-pressable inline-flex min-h-11 items-center rounded-[10px] px-3 text-xs font-medium tabular-nums ${
-              filterTab === "all"
-                ? "bg-brand-700 text-white shadow-2xs font-semibold"
-                : "text-ink-600 hover:text-ink-900"
-            }`}
-          >
-            All Projects ({projects.length})
-          </button>
-          <button
-            type="button"
-            onClick={() => setFilterTab("active")}
-            className={`apple-spring apple-pressable inline-flex min-h-11 items-center rounded-[10px] px-3 text-xs font-medium tabular-nums ${
-              filterTab === "active"
-                ? "bg-brand-700 text-white shadow-2xs font-semibold"
-                : "text-ink-600 hover:text-ink-900"
-            }`}
-          >
-            Active ({activeCount})
-          </button>
-          <button
-            type="button"
-            onClick={() => setFilterTab("closed")}
-            className={`apple-spring apple-pressable inline-flex min-h-11 items-center rounded-[10px] px-3 text-xs font-medium tabular-nums ${
-              filterTab === "closed"
-                ? "bg-brand-700 text-white shadow-2xs font-semibold"
-                : "text-ink-600 hover:text-ink-900"
-            }`}
-          >
-            Closed ({closedCount})
-          </button>
-        </div>
-
-        <div className="relative min-w-0 sm:w-64">
-          <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-ink-400" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search projects or skills..."
-            className="apple-spring min-h-11 w-full rounded-[10px] border border-ink-200 bg-white pl-9 pr-3 text-[14px] text-ink-900 outline-none placeholder:text-ink-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+      {projects.length === 0 ? (
+        <div className="space-y-4">
+          <EmptyScene
+            art
+            title="No projects yet"
+            body="A project tells us the skills and work mode you need, so candidates are matched to it. It takes about two minutes."
+            who="You - about two minutes"
           />
-          {searchQuery ? (
-            <button
-              type="button"
-              onClick={() => setSearchQuery("")}
-              aria-label="Clear search"
-              className="apple-spring apple-pressable absolute right-1.5 top-1/2 flex min-h-11 min-w-11 -translate-y-1/2 items-center justify-center rounded-[10px] text-ink-600 hover:text-ink-600"
-            >
-              <X className="size-3" />
+          <div className="flex justify-center">
+            <button type="button" onClick={openCreate} className={buttonClass({ variant: "primary", size: "md" })}>
+              <FolderPlus className="size-4" aria-hidden />
+              Create your first project
             </button>
-          ) : null}
-        </div>
-      </div>
-
-      {listError ? (
-        <div role="alert" className="rounded-[10px] border border-danger/30 bg-danger-soft p-3 text-sm text-danger">
-          {listError}
-        </div>
-      ) : null}
-
-      {/* Projects List / Table */}
-      {filtered.length === 0 ? (
-        <div className="rounded-[20px] border border-dashed border-ink-200/70 bg-white/60 p-12 text-center shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)]">
-          <div className="mx-auto grid size-12 place-items-center rounded-[20px] bg-brand-50 text-brand-700">
-            <Briefcase className="size-6" />
           </div>
-          <h3 className="mt-4 text-base font-semibold text-ink-900">
-            {projects.length === 0 ? "No projects created yet" : "No matching projects found"}
-          </h3>
-          <p className="mx-auto mt-1 max-w-sm text-sm text-text-subtle">
-            {projects.length === 0
-              ? "Create your first internship project to start matching with pre-vetted interns."
-              : "Try clearing your search query or switching filters to see other projects."}
-          </p>
-          {projects.length === 0 ? (
-            <button
-              type="button"
-              onClick={openCreate}
-              className="apple-spring apple-pressable mt-5 inline-flex min-h-11 items-center justify-center gap-1.5 rounded-[10px] bg-brand-700 px-4 text-sm font-semibold text-white hover:bg-brand-600"
-            >
-              <Plus className="size-3.5" />
-              <span>Create Project</span>
-            </button>
-          ) : null}
         </div>
       ) : (
-        <div className="space-y-3">
-          {filtered.map((p) => {
-            const projectSkills = (p.skills as string[]) ?? [];
-            const isActive = p.status === "active";
-            const skillsHref =
-              projectSkills.length > 0
-                ? `/employer/candidates?skills=${encodeURIComponent(projectSkills.join(","))}`
-                : "/employer/candidates";
+        <>
+          <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div role="tablist" aria-label="Show projects" className="inline-flex self-start rounded-apple-md border border-ink-200/80 bg-white p-1 shadow-xs">
+              {(
+                [
+                  ["all", "All", projects.length],
+                  ["open", "Open", openCount],
+                  ["closed", "Closed", closedCount],
+                ] as const
+              ).map(([key, label, n]) => (
+                <button
+                  key={key}
+                  type="button"
+                  role="tab"
+                  aria-selected={filter === key}
+                  onClick={() => setFilter(key)}
+                  className={cn(
+                    "apple-spring inline-flex min-h-10 items-center gap-1.5 rounded-apple-sm px-3.5 text-sm font-medium",
+                    filter === key ? "bg-brand-700 text-white shadow-xs" : "text-ink-600 hover:bg-ink-50 hover:text-ink-900",
+                  )}
+                >
+                  {label}
+                  <span className={cn("nums text-xs", filter === key ? "text-white/80" : "text-ink-500")}>{n}</span>
+                </button>
+              ))}
+            </div>
 
-            return (
-              <div
-                key={p.id}
-                className="apple-spring group relative rounded-[20px] border border-ink-200/70 bg-white p-5 shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)] hover:border-ink-300"
+            <div className="relative min-w-0 sm:w-72">
+              <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-ink-400" aria-hidden />
+              <input
+                type="search"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search projects or skills"
+                aria-label="Search projects or skills"
+                className={controlClass(false, "pl-10 pr-10")}
+              />
+              {query ? (
+                <button
+                  type="button"
+                  onClick={() => setQuery("")}
+                  aria-label="Clear search"
+                  className="absolute right-1 top-1/2 grid size-9 -translate-y-1/2 place-items-center rounded-apple-sm text-ink-500 hover:bg-ink-100 hover:text-ink-800"
+                >
+                  <X className="size-4" aria-hidden />
+                </button>
+              ) : null}
+            </div>
+          </div>
+
+          {listError ? <FormNotice tone="error" className="mb-4">{listError}</FormNotice> : null}
+
+          {filtered.length === 0 ? (
+            <Surface className="px-6 py-10 text-center">
+              <p className="text-base font-semibold text-ink-900">No projects match</p>
+              <p className="mt-1 text-sm text-ink-600">
+                {q ? `Nothing matches "${query.trim()}"` : `No ${filter} projects`}. Clear the search or show all projects.
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  setQuery("");
+                  setFilter("all");
+                }}
+                className={buttonClass({ variant: "outline", size: "sm", className: "mt-4" })}
               >
-                <div className="min-w-0">
-                  <div className="space-y-2">
-                    <div className="flex flex-wrap items-center gap-2.5">
-                      <h2 className="text-base font-semibold text-ink-900">{p.projectName}</h2>
-                      <span
-                        className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                          isActive
-                            ? "bg-brand-50 text-brand-700 border border-brand-200/60"
-                            : "bg-ink-100 text-ink-600 border border-ink-200"
-                        }`}
-                      >
-                        {isActive ? "Active" : "Closed"}
-                      </span>
-                      {p.fullTimeOffer ? (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-accent-100/60 px-2.5 py-0.5 text-xs font-medium text-accent-700 border border-accent-300/50">
-                          <Sparkles className="size-3" />
-                          <span>FTE Conversion</span>
-                        </span>
-                      ) : null}
-                    </div>
-
-                    {/* Metadata tags */}
-                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-text-subtle">
-                      <span className="flex items-center gap-1">
-                        <Briefcase className="size-3.5 text-ink-400" />
-                        <span>{scopeLabel(p.scopeOfWork)}</span>
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <MapPin className="size-3.5 text-ink-400" />
-                        <span className="capitalize">{p.locationType || "Remote"}</span>
-                        {p.city ? <span>({p.city})</span> : null}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Globe2 className="size-3.5 text-ink-400" />
-                        <span>{p.timezone || "Asia/Kolkata"}</span>
-                      </span>
-                    </div>
-
-                    {/* Required skills chips */}
-                    {projectSkills.length > 0 ? (
-                      <div className="flex flex-wrap items-center gap-1.5 pt-1">
-                        <span className="text-2xs font-semibold uppercase tracking-wider text-ink-600">
-                          Skills:
-                        </span>
-                        {projectSkills.map((s) => (
-                          <span
-                            key={s}
-                            className="rounded-[10px] bg-ink-50 px-2.5 py-0.5 text-xs font-medium text-ink-700 border border-ink-200/60"
-                          >
-                            {s}
-                          </span>
-                        ))}
+                Show all projects
+              </button>
+            </Surface>
+          ) : (
+            <ul className="grid gap-4 xl:grid-cols-2">
+              {filtered.map((p) => {
+                const skills = (p.skills as string[] | null) ?? [];
+                const open = isProjectOpen(p.status);
+                const mode = MODE_LABEL[p.locationType ?? ""] ?? "Work mode not set";
+                const place = [p.city, p.state].filter(Boolean).join(", ");
+                return (
+                  <Surface as="li" key={p.id} className={cn("flex flex-col p-5 sm:p-6", !open && "bg-ink-50/40")}>
+                    <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+                      <h2 className="min-w-0 text-lg font-semibold tracking-[-0.01em] text-ink-900">{p.projectName}</h2>
+                      <div className="flex flex-wrap gap-1.5">
+                        {p.fullTimeOffer ? (
+                          <Pill tone="new">
+                            <Sparkles className="size-3" aria-hidden />
+                            Full-time path
+                          </Pill>
+                        ) : null}
+                        <Pill tone={open ? "live" : "closed"}>{open ? "Open" : "Closed"}</Pill>
                       </div>
+                    </div>
+
+                    <dl className="mt-3 flex flex-wrap gap-x-5 gap-y-1.5 text-sm text-ink-600">
+                      <div className="flex items-center gap-1.5">
+                        <dt className="sr-only">Scope</dt>
+                        <Clock3 className="size-4 text-ink-400" aria-hidden />
+                        <dd>{scopeLabel(p.scopeOfWork)}</dd>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <dt className="sr-only">Work mode</dt>
+                        <MapPin className="size-4 text-ink-400" aria-hidden />
+                        <dd>
+                          {mode}
+                          {place && p.locationType !== "remote" ? ` · ${place}` : ""}
+                        </dd>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <dt className="sr-only">Timezone</dt>
+                        <Globe2 className="size-4 text-ink-400" aria-hidden />
+                        <dd>{p.timezone || "Asia/Kolkata"}</dd>
+                      </div>
+                    </dl>
+
+                    {skills.length > 0 ? (
+                      <ul className="mt-4 flex flex-wrap gap-1.5" aria-label="Skills">
+                        {skills.map((s) => (
+                          <li key={s} className="rounded-full bg-ink-100 px-2.5 py-1 text-xs font-medium text-ink-700">
+                            {s}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="mt-4 text-sm text-ink-600">No skills listed yet. Add some so candidates can be matched.</p>
+                    )}
+
+                    <div aria-hidden className="flex-1" />
+                    <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-ink-100 pt-4">
+                      {open ? (
+                        <ButtonLink
+                          href={`/employer/candidates?project=${encodeURIComponent(p.id)}`}
+                          variant="outline"
+                          size="sm"
+                        >
+                          <Users className="size-4" aria-hidden />
+                          Find candidates
+                        </ButtonLink>
+                      ) : null}
+                      <button type="button" onClick={() => openEdit(p)} className={buttonClass({ variant: "ghost", size: "sm" })}>
+                        <Pencil className="size-4" aria-hidden />
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => toggleStatus(p)}
+                        disabled={busyId === p.id}
+                        className={buttonClass({ variant: "ghost", size: "sm", className: "text-ink-700 hover:bg-ink-100" })}
+                      >
+                        <Briefcase className="size-4" aria-hidden />
+                        {open ? "Close" : "Reopen"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => deleteProject(p)}
+                        disabled={busyId === p.id}
+                        className={buttonClass({
+                          variant: "ghost",
+                          size: "sm",
+                          className: "ml-auto text-danger hover:bg-danger-soft",
+                        })}
+                      >
+                        <Trash2 className="size-4" aria-hidden />
+                        Delete
+                      </button>
+                    </div>
+                    {rowError?.id === p.id ? (
+                      <FormNotice tone="error" className="mt-3">
+                        {rowError.message}
+                      </FormNotice>
                     ) : null}
-                  </div>
-
-                  {/* Actions: a full-width footer row, so the buttons never
-                      fight the title for horizontal space. */}
-                  <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-ink-100 pt-3">
-                    <Link
-                      href={skillsHref}
-                      className="apple-spring apple-pressable inline-flex min-h-11 items-center justify-center gap-1.5 rounded-[10px] border border-brand-200 bg-brand-50/60 px-3 text-xs font-semibold text-brand-700 hover:bg-brand-50"
-                      title="Find candidates matching this project's skills"
-                    >
-                      <Users className="size-3.5" />
-                      <span>Candidates</span>
-                    </Link>
-
-                    <button
-                      type="button"
-                      onClick={() => openEdit(p)}
-                      className="apple-spring apple-pressable inline-flex min-h-11 items-center justify-center gap-1.5 rounded-[10px] border border-ink-200 bg-white px-3 text-xs font-medium text-ink-700 hover:bg-ink-50"
-                    >
-                      <Pencil className="size-3.5 text-ink-500" />
-                      <span>Edit</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => toggleStatus(p)}
-                      disabled={busyId === p.id}
-                      className="apple-spring apple-pressable inline-flex min-h-11 items-center justify-center gap-1.5 rounded-[10px] border border-ink-200 bg-white px-3 text-xs font-medium text-ink-700 hover:bg-ink-50 disabled:opacity-50"
-                      title={isActive ? "Close this project" : "Reopen project"}
-                    >
-                      {isActive ? (
-                        <>
-                          <ToggleRight className="size-3.5 text-brand-700" />
-                          <span>Close</span>
-                        </>
-                      ) : (
-                        <>
-                          <ToggleLeft className="size-3.5 text-ink-400" />
-                          <span>Reopen</span>
-                        </>
-                      )}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => deleteProject(p)}
-                      disabled={busyId === p.id}
-                      className="inline-flex min-h-11 items-center justify-center rounded-[10px] px-3 text-xs font-medium text-danger hover:bg-danger-soft disabled:opacity-50"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                  {rowError?.id === p.id ? (
-                    <p role="alert" className="mt-2 text-xs text-danger">
-                      {rowError.message}
-                    </p>
-                  ) : null}
-                </div>
-              </div>
-            );
-          })}
-        </div>
+                  </Surface>
+                );
+              })}
+            </ul>
+          )}
+        </>
       )}
 
-      {/* Slide-out Create / Edit Drawer */}
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-        <SheetContent side="right" className="w-full sm:max-w-xl overflow-y-auto p-6">
-          <SheetHeader className="pb-4 border-b border-ink-100">
-            <SheetTitle className="text-lg font-semibold text-ink-900">
-              {editingProject ? "Edit Project" : "Create New Project"}
+        <SheetContent side="right" className="w-full overflow-y-auto p-0 sm:max-w-xl">
+          <SheetHeader className="border-b border-ink-100 px-6 py-5">
+            <SheetTitle className="text-xl font-semibold tracking-[-0.015em] text-ink-900">
+              {editing ? "Edit project" : "New project"}
             </SheetTitle>
-            <SheetDescription className="text-xs text-text-subtle">
-              Define the requirements and preferred skill profile for this role.
+            <SheetDescription className="text-sm text-ink-600">
+              Candidates are matched on the skills, work mode and place you set here.
             </SheetDescription>
           </SheetHeader>
 
-          <form onSubmit={handleSave} className="mt-6 space-y-5">
-            {errorMsg ? (
-              <div className="rounded-[10px] border border-danger/30 bg-danger-soft p-3 text-sm text-danger">
-                {errorMsg}
-              </div>
-            ) : null}
-
-            <div>
-              <label htmlFor="projectName" className="block text-xs font-semibold text-ink-800">
-                Project Name *
-              </label>
-              <input
-                id="projectName"
-                type="text"
-                required
-                value={projectName}
-                onChange={(e) => setProjectName(e.target.value)}
-                placeholder="e.g. Frontend Engineering, Product Growth"
-                className="apple-spring mt-1.5 min-h-11 w-full rounded-[10px] border border-ink-200 bg-white px-3.5 text-[14px] text-ink-900 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
-              />
-            </div>
-
-            {/* Skills selection with 2,482 shared vocabulary */}
-            <div>
-              <label htmlFor="projectSkills" className="block text-xs font-semibold text-ink-800">
-                Required Skills * ({skills.length}/{MAX_SKILLS})
-              </label>
-              <p className="mt-0.5 text-xs text-text-subtle">
-                Search the 2,482 shared skills vocabulary. Press Enter to add.
-              </p>
-
-              <div className="relative mt-2">
-                <div className="flex gap-2">
-                  <input
-                    id="projectSkills"
-                    type="text"
-                    value={skillDraft}
-                    onChange={(e) => setSkillDraft(e.target.value)}
-                    onFocus={() => setSkillFocused(true)}
-                    onBlur={() => window.setTimeout(() => setSkillFocused(false), 150)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        addSkill(skillDraft);
-                      }
-                    }}
-                    placeholder="e.g. React, TypeScript, Python"
-                    disabled={skills.length >= MAX_SKILLS}
-                    className="apple-spring min-h-11 flex-1 rounded-[10px] border border-ink-200 bg-white px-3.5 text-[14px] text-ink-900 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 disabled:bg-ink-50"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => addSkill(skillDraft)}
-                    disabled={skills.length >= MAX_SKILLS || !skillDraft.trim()}
-                    className="apple-spring apple-pressable min-h-11 rounded-[10px] border border-ink-200 bg-white px-3 text-xs font-semibold text-ink-800 hover:bg-ink-50 disabled:opacity-50"
-                  >
-                    Add
-                  </button>
-                </div>
-
-                {skillSuggestions.length > 0 ? (
-                  <ul className="absolute left-0 right-0 z-30 mt-1 max-h-44 overflow-y-auto rounded-[10px] border border-ink-200 bg-white shadow-md">
-                    {skillSuggestions.map((s) => (
-                      <li key={s}>
-                        <button
-                          type="button"
-                          onMouseDown={(e) => {
-                            e.preventDefault();
-                            addSkill(s);
-                          }}
-                          className="apple-spring flex min-h-11 w-full items-center px-3.5 py-2 text-left text-xs text-ink-800 hover:bg-ink-50"
-                        >
-                          {s}
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                ) : null}
-              </div>
-
-              {skills.length > 0 ? (
-                <div className="mt-2.5 flex flex-wrap gap-1.5">
-                  {skills.map((s) => (
-                    <span
-                      key={s}
-                      className="inline-flex items-center gap-1 rounded-[10px] bg-brand-50 border border-brand-200 px-2.5 py-1 text-xs font-medium text-brand-700"
-                    >
-                      <span>{s}</span>
-                      <button
-                        type="button"
-                        onClick={() => removeSkill(s)}
-                        className="text-brand-500 hover:text-brand-800"
-                      >
-                        <X className="size-3" />
-                      </button>
-                    </span>
-                  ))}
-                </div>
-              ) : null}
-            </div>
-
-            {/* Scope & Location mode */}
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="scope" className="block text-xs font-semibold text-ink-800">
-                  Scope of Work
-                </label>
-                <select
-                  id="scope"
-                  value={scopeOfWork}
-                  onChange={(e) => setScopeOfWork(e.target.value)}
-                  className="apple-spring mt-1.5 min-h-11 w-full rounded-[10px] border border-ink-200 bg-white px-3 text-[14px] text-ink-900 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
-                >
-                  {scopeOfWorkOptions.map((o) => (
-                    <option key={o.value} value={o.value}>
-                      {o.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label htmlFor="locType" className="block text-xs font-semibold text-ink-800">
-                  Location Type
-                </label>
-                <select
-                  id="locType"
-                  value={locationType}
-                  onChange={(e) => setLocationType(e.target.value)}
-                  className="apple-spring mt-1.5 min-h-11 w-full rounded-[10px] border border-ink-200 bg-white px-3 text-[14px] text-ink-900 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
-                >
-                  <option value="remote">Remote</option>
-                  <option value="hybrid">Hybrid</option>
-                  <option value="onsite">On-site</option>
-                </select>
-              </div>
-            </div>
-
-            {/* City & State (if not remote) */}
-            {locationType !== "remote" ? (
-              <div className="grid grid-cols-2 gap-4">
-                <StateField compact id="state" label="State" india={india} value={state} onChange={setState} />
-                <CityField
-                  compact
-                  id="city"
-                  label="City"
-                  india={india}
-                  state={state}
-                  onStateChange={setState}
-                  value={city}
-                  onChange={setCity}
-                  placeholder="e.g. Bengaluru, Gurugram"
-                />
-              </div>
-            ) : null}
-
-            {/* Timezone & Full-time offer */}
-            <div className="space-y-4 pt-2">
-              <div>
-                <label htmlFor="tz" className="block text-xs font-semibold text-ink-800">
-                  Timezone
-                </label>
-                <div className="mt-1.5">
-                  <TimezoneSelect id="tz" value={timezone} onChange={setTimezone} />
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between rounded-[10px] border border-ink-200/80 bg-ink-50/50 p-3.5">
-                <div>
-                  <p className="text-xs font-semibold text-ink-900">
-                    Full-time conversion opportunity?
-                  </p>
-                  <p className="text-xs text-text-subtle">
-                    Attract high-performing candidates looking for post-internship roles.
-                  </p>
-                </div>
-                <input
-                  type="checkbox"
-                  checked={fullTimeOffer}
-                  onChange={(e) => setFullTimeOffer(e.target.checked)}
-                  className="size-4.5 rounded border-ink-300 text-brand-700 focus:border-brand-500 focus:ring-brand-500/20"
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center justify-end gap-3 pt-6 border-t border-ink-100">
+          <form onSubmit={handleSave} noValidate className="px-6 pb-6 pt-5">
+            {saveError ? <FormNotice tone="error" className="mb-5">{saveError}</FormNotice> : null}
+            <ProjectFields values={form} set={setField} errors={errors} companyPlace={companyPlace} idPrefix="sheet" />
+            {/* Left-aligned, primary first: the "Ask me" launcher floats
+                over the bottom-right corner of every screen. */}
+            <div className="sticky bottom-0 -mx-6 mt-8 flex items-center gap-2 border-t border-ink-100 bg-white py-4 pl-6 pr-36">
+              <button type="submit" disabled={saving} className={buttonClass({ variant: "primary", size: "md" })}>
+                {saving ? "Saving…" : editing ? "Save changes" : "Create project"}
+              </button>
+              {/* On a phone the drawer's own close button does this. */}
               <button
                 type="button"
                 onClick={() => setSheetOpen(false)}
-                className="apple-spring apple-pressable min-h-11 rounded-[10px] border border-ink-200 bg-white px-4 text-xs font-semibold text-ink-700 hover:bg-ink-50"
+                className={buttonClass({ variant: "light", size: "md", className: "hidden sm:inline-flex" })}
               >
                 Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={saving}
-                className="apple-spring apple-pressable inline-flex min-h-11 items-center justify-center gap-2 rounded-[10px] bg-brand-700 px-5 text-xs font-semibold text-white shadow-xs hover:bg-brand-600 disabled:opacity-50"
-              >
-                {saving ? (
-                  <span>Saving...</span>
-                ) : (
-                  <span>{editingProject ? "Update Project" : "Create Project"}</span>
-                )}
               </button>
             </div>
           </form>

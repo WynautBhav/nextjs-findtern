@@ -213,7 +213,7 @@ export function EmployerSignupForm({
       {error ? (
         <div
           role="alert"
-          className="flex items-start gap-2.5 rounded-[10px] border border-danger/25 bg-danger-soft px-3.5 py-3 text-sm text-danger"
+          className="flex items-start gap-2.5 rounded-apple-sm border border-danger/25 bg-danger-soft px-3.5 py-3 text-sm text-danger"
         >
           <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden />
           <span>{error}</span>
@@ -222,7 +222,7 @@ export function EmployerSignupForm({
 
       {stage === "otp" ? (
         <div className="space-y-5">
-          <p className="flex items-start gap-2.5 rounded-[10px] border border-brand-200 bg-brand-50 px-3.5 py-3 text-sm text-ink-700">
+          <p className="flex items-start gap-2.5 rounded-apple-sm border border-brand-200 bg-brand-50 px-3.5 py-3 text-sm text-ink-700">
             <MailCheck className="mt-0.5 size-4 shrink-0 text-brand-700" aria-hidden />
             {verified ? (
               <span>
@@ -249,14 +249,14 @@ export function EmployerSignupForm({
               onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
               autoComplete="one-time-code"
               placeholder="000000"
-              className="apple-spring mt-2 min-h-12 w-full rounded-[10px] border border-ink-200 bg-white px-3.5 text-center font-mono text-lg tracking-[0.5em] text-ink-900 outline-none placeholder:text-ink-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+              className="apple-spring mt-2 min-h-12 w-full rounded-apple-sm border border-ink-200 bg-white px-3.5 text-center font-mono text-lg tracking-[0.5em] text-ink-900 outline-none placeholder:text-ink-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
             />
           </div>
           )}
           <button
             type="submit"
             disabled={(!verified && otp.length !== 6) || loading}
-            className="apple-spring apple-pressable flex min-h-11 w-full items-center justify-center gap-2 rounded-[10px] bg-brand-700 px-4 text-sm font-semibold text-white hover:bg-brand-600 disabled:pointer-events-none disabled:opacity-60"
+            className="apple-spring apple-pressable flex min-h-11 w-full items-center justify-center gap-2 rounded-apple-sm bg-brand-700 px-4 text-sm font-semibold text-white hover:bg-brand-600 disabled:pointer-events-none disabled:opacity-60"
           >
             {loading ? (
               <>
@@ -337,7 +337,7 @@ export function EmployerSignupForm({
           placeholder="hiring@acme.com"
           aria-invalid={personal ? true : undefined}
           aria-describedby="companyEmail-note"
-          className={`apple-spring mt-2 min-h-11 w-full rounded-[10px] border px-3.5 text-[14px] text-ink-900 outline-none placeholder:text-ink-400 focus:ring-2 ${
+          className={`apple-spring mt-2 min-h-11 w-full rounded-apple-sm border px-3.5 text-[0.9375rem] text-ink-900 outline-none placeholder:text-ink-400 focus:ring-2 ${
             google ? "bg-ink-50 text-ink-700" : "bg-white"
           } ${
             personal
@@ -347,7 +347,7 @@ export function EmployerSignupForm({
         />
         <p
           id="companyEmail-note"
-          className={`mt-1.5 text-xs ${personal ? "text-danger" : "text-text-subtle"}`}
+          className={`mt-1.5 text-xs ${personal ? "text-danger" : "text-ink-500"}`}
         >
           {google
             ? "Verified by Google."
@@ -366,7 +366,7 @@ export function EmployerSignupForm({
             value={countryCode}
             onChange={(e) => setCountryCode(e.target.value)}
             aria-label="Country code"
-            className="apple-spring min-h-11 shrink-0 rounded-[10px] border border-ink-200 bg-white px-2.5 text-[14px] tabular-nums text-ink-800 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+            className="apple-spring min-h-11 shrink-0 rounded-apple-sm border border-ink-200 bg-white px-2.5 text-[0.9375rem] tabular-nums text-ink-800 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
           >
             {COUNTRY_CODE_OPTIONS.map((option) => (
               <option key={option.code} value={option.code}>
@@ -384,7 +384,7 @@ export function EmployerSignupForm({
             onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, ""))}
             autoComplete="tel-national"
             placeholder={countryCode === "+91" ? "9876543210" : "2015550123"}
-            className="apple-spring min-h-11 w-full rounded-[10px] border border-ink-200 bg-white px-3.5 text-[14px] tabular-nums text-ink-900 outline-none placeholder:text-ink-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+            className="apple-spring min-h-11 w-full rounded-apple-sm border border-ink-200 bg-white px-3.5 text-[0.9375rem] tabular-nums text-ink-900 outline-none placeholder:text-ink-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
           />
         </div>
         {phoneTaken ? (
@@ -393,7 +393,7 @@ export function EmployerSignupForm({
             can&apos;t be used for both. Use another, or sign in instead.
           </p>
         ) : (
-          <p className="mt-1.5 text-xs text-text-subtle">
+          <p className="mt-1.5 text-xs text-ink-500">
             {phoneNumber && !isValidPhone(countryCode, phoneNumber)
               ? phoneError(countryCode, phoneNumber)
               : phoneHint(countryCode)}
@@ -414,7 +414,7 @@ export function EmployerSignupForm({
           autoComplete="new-password"
           placeholder="••••••••"
           aria-describedby="password-rules"
-          className="apple-spring mt-2 min-h-11 w-full rounded-[10px] border border-ink-200 bg-white px-3.5 text-[14px] text-ink-900 outline-none placeholder:text-ink-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+          className="apple-spring mt-2 min-h-11 w-full rounded-apple-sm border border-ink-200 bg-white px-3.5 text-[0.9375rem] text-ink-900 outline-none placeholder:text-ink-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
         />
         <ul id="password-rules" className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
           {PASSWORD_RULES.map((rule) => {
@@ -454,7 +454,7 @@ export function EmployerSignupForm({
       <button
         type="submit"
         disabled={!detailsOk || loading}
-        className="apple-spring apple-pressable group flex min-h-11 w-full items-center justify-center gap-2 rounded-[10px] bg-brand-700 px-4 text-sm font-semibold text-white hover:bg-brand-600 disabled:pointer-events-none disabled:opacity-60"
+        className="apple-spring apple-pressable group flex min-h-11 w-full items-center justify-center gap-2 rounded-apple-sm bg-brand-700 px-4 text-sm font-semibold text-white hover:bg-brand-600 disabled:pointer-events-none disabled:opacity-60"
       >
         {loading ? (
           <>
@@ -472,7 +472,7 @@ export function EmployerSignupForm({
         )}
       </button>
 
-      <p className="text-xs leading-relaxed text-text-subtle">
+      <p className="text-xs leading-relaxed text-ink-500">
         Creating the account does not start hiring. You will be taken to the two-stage company
         setup, and nothing is charged until a candidate accepts.
       </p>
@@ -510,7 +510,7 @@ function TextInput({
         placeholder={placeholder}
         autoComplete={autoComplete}
         onChange={(e) => onChange(e.target.value)}
-        className="apple-spring mt-2 min-h-11 w-full rounded-[10px] border border-ink-200 bg-white px-3.5 text-[14px] text-ink-900 outline-none placeholder:text-ink-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+        className="apple-spring mt-2 min-h-11 w-full rounded-apple-sm border border-ink-200 bg-white px-3.5 text-[0.9375rem] text-ink-900 outline-none placeholder:text-ink-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
       />
     </div>
   );

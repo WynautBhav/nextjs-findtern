@@ -1,41 +1,50 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { eq } from "drizzle-orm";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, KeyRound } from "lucide-react";
 
 import { getDb, schema } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
+import { DetailRow, EmptyScene, SectionHead, Surface } from "@/components/app/primitives";
 import { PageHeader } from "@/components/layout/page-header";
 import { CompanyProfileForm, type CompanyProfile } from "@/components/employer/company-profile-form";
 import { ChangePasswordForm } from "@/components/auth/change-password-form";
+import { missingCompanyFields } from "@/lib/employer-onboarding";
+import { formatDate } from "@/lib/format";
+import { timezoneForLocation } from "@/lib/timezones";
 
 export const metadata: Metadata = {
-  title: "Account",
+  title: "Company profile",
   robots: { index: false, follow: false },
 };
 
 /**
- * Employer account.
+ * Company profile and security.
  *
- * The previous version of this page was a single sentence saying profile
- * editing, password change and deactivation would be "wired in the next pass".
- * All three had working endpoints the whole time (`PATCH /api/employer/:id`,
- * `POST /api/employer/:id/change-password`, `POST /api/users/:id/deactivate`)
- * - nobody had written the forms. They are here now.
- *
- * Deactivation is deliberately a confirmation step rather than a button: it
- * ends the account, and the row behind it is the one employers are billed
- * against.
+ * The profile form on the left, the account's facts and the password on the
+ * right. The sidebar's "Change password" lands on `#security`.
  */
 export default async function EmployerAccount() {
   const session = await requireRole("employer");
   const uid = session.uid;
 
-  const [employer] = await getDb()
-    .select()
-    .from(schema.employers)
-    .where(eq(schema.employers.id, uid))
-    .limit(1);
+  let employer: typeof schema.employers.$inferSelect | undefined;
+  try {
+    [employer] = await getDb().select().from(schema.employers).where(eq(schema.employers.id, uid)).limit(1);
+  } catch (err) {
+    console.error("Failed to load employer account:", err);
+    return (
+      <div>
+        <PageHeader title="Company profile" />
+        <EmptyScene
+          art
+          title="Couldn't load your company profile"
+          body="Something went wrong on our side. Nothing has changed - reload the page in a moment."
+          who="Us - a connection issue"
+        />
+      </div>
+    );
+  }
 
   const profile: CompanyProfile = {
     companyName: employer?.companyName ?? "",
@@ -57,38 +66,59 @@ export default async function EmployerAccount() {
     gstNumber: employer?.gstNumber ?? null,
     billingPincode: employer?.billingPincode ?? null,
   };
+  const missing = employer ? missingCompanyFields(employer) : [];
 
   return (
     <div>
-      <PageHeader title="Account" subtitle="Company profile and security." />
+      <PageHeader
+        title="Company profile"
+        subtitle="Your company's details, who we contact, and how you sign in. Candidates never see your contacts."
+      />
 
       <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_22rem]">
-        <section className="min-w-0">
-          <h2 className="text-sm font-semibold tracking-[-0.01em] text-ink-900">Company details</h2>
-          <p className="mt-1 max-w-prose text-sm leading-relaxed text-ink-600">
-            What candidates and employers see when they look at your company.
-          </p>
-          <div className="mt-5 rounded-[20px] border border-ink-200/70 bg-white p-6 shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)]">
-            <CompanyProfileForm employerId={uid} profile={profile} hasLogo={Boolean(employer?.logoUrl)} />
-          </div>
-        </section>
+        <Surface as="section" className="p-5 sm:p-8" aria-label="Company details">
+          <CompanyProfileForm employerId={uid} profile={profile} hasLogo={Boolean(employer?.logoUrl)} />
+        </Surface>
 
         <aside className="min-w-0 space-y-4">
-          <section className="rounded-[20px] border border-ink-200/70 bg-white p-5 shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)]">
-            <h2 className="text-sm font-semibold text-ink-900">Password</h2>
-            <div className="mt-4">
-              <ChangePasswordForm endpoint={`/api/employer/${encodeURIComponent(uid)}/change-password`} />
-            </div>
-          </section>
+          <Surface className="p-5">
+            <SectionHead title="Account" />
+            <dl className="divide-y divide-ink-100">
+              <DetailRow label="Timezone" value={timezoneForLocation(profile)} />
+              <DetailRow label="Member since" value={employer?.createdAt ? formatDate(employer.createdAt) : "-"} mono />
+              <DetailRow
+                label="Profile"
+                value={
+                  missing.length === 0 ? (
+                    <span className="text-success">Complete</span>
+                  ) : (
+                    <span className="text-accent-700">{missing.length} to fill in</span>
+                  )
+                }
+              />
+            </dl>
+          </Surface>
 
-          <section className="rounded-[20px] border border-ink-200/70 bg-white p-5 shadow-[0_1px_2px_rgb(7_47_36/0.04),0_8px_24px_rgb(7_47_36/0.06)]">
-            <h2 className="text-sm font-semibold text-ink-900">Elsewhere</h2>
-            <ul className="mt-3 space-y-2.5">
-              <Jump href="/employer/orders" label="Orders and payments" />
+          <Surface as="section" id="security" className="scroll-mt-24 p-5" aria-labelledby="security-title">
+            <div className="mb-4 flex items-center gap-2.5">
+              <span className="grid size-9 place-items-center rounded-apple-sm bg-brand-50 text-brand-700">
+                <KeyRound className="size-4" aria-hidden />
+              </span>
+              <h2 id="security-title" className="text-base font-semibold tracking-[-0.01em] text-ink-900">
+                Password
+              </h2>
+            </div>
+            <ChangePasswordForm endpoint={`/api/employer/${encodeURIComponent(uid)}/change-password`} />
+          </Surface>
+
+          <Surface className="p-5">
+            <SectionHead title="Elsewhere" />
+            <ul className="-mx-2">
               <Jump href="/employer/projects" label="Projects" />
-              <Jump href="/employer/candidates" label="Candidates" />
+              <Jump href="/employer/orders" label="Orders and invoices" />
+              <Jump href="/employer/alerts" label="Alerts" />
             </ul>
-          </section>
+          </Surface>
         </aside>
       </div>
     </div>
@@ -100,10 +130,10 @@ function Jump({ href, label }: { href: string; label: string }) {
     <li>
       <Link
         href={href}
-        className="apple-spring apple-pressable inline-flex min-h-11 items-center gap-1 text-sm font-medium text-primary underline-offset-4 hover:underline"
+        className="apple-spring group flex min-h-11 items-center justify-between rounded-apple-sm px-2 text-sm font-medium text-ink-800 hover:bg-ink-50 hover:text-brand-700"
       >
         {label}
-        <ArrowRight className="size-3.5" aria-hidden />
+        <ArrowRight className="size-4 text-ink-400 group-hover:text-brand-700" aria-hidden />
       </Link>
     </li>
   );
