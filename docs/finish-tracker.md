@@ -82,3 +82,8 @@ branch, not to be touched: `feat/college-partners` (worktree
       fix, `dbTimestamp` helper, Playwright critical-path e2e
 - [ ] Confirm `/interns` full-page capture "blank boxes" is only the
       scroll-reveal in screenshots, not real (check with reduced motion)
+- 27 Oct: merged employer (5 commits), admin (7 commits) and peer/fixes
+  A+B (open-redirect fix, dbTimestamp). HEAD c450990: tests 361/361,
+  security 79/79, build green. Waiting on the intern worker and the peer's
+  e2e suite (C). The admin worker's out-of-scope list is in
+  docs/handoff/HANDOFF-nextjs-findtern-9a.md §3.
