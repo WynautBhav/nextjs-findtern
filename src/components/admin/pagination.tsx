@@ -70,20 +70,20 @@ export function Pagination({
     `${basePath}${toQueryString({ ...params, [pageParam]: String(target) })}`;
 
   const linkBase =
-    "apple-spring apple-pressable inline-flex h-8 min-w-8 items-center justify-center rounded-[10px] px-2.5 text-sm font-medium max-lg:min-h-11 max-lg:min-w-11";
+    "apple-spring apple-pressable inline-flex h-8 min-w-8 items-center justify-center rounded-apple-sm px-2.5 text-sm font-medium nums max-lg:min-h-11 max-lg:min-w-11";
 
   return (
     <nav
       aria-label="Pagination"
       className="flex flex-wrap items-center justify-between gap-3 border-t border-ink-100 px-5 py-3"
     >
-      <p className="text-xs text-text-subtle">
+      <p className="text-sm text-ink-600">
         Showing{" "}
-        <span className="font-medium text-ink-700 tabular-nums">
-          {from.toLocaleString("en-IN")} to {to.toLocaleString("en-IN")}
+        <span className="nums font-medium text-ink-800">
+          {from.toLocaleString("en-IN")}–{to.toLocaleString("en-IN")}
         </span>{" "}
         of{" "}
-        <span className="font-medium text-ink-700 tabular-nums">
+        <span className="nums font-medium text-ink-800">
           {total.toLocaleString("en-IN")}
         </span>{" "}
         {noun}
@@ -120,7 +120,7 @@ export function Pagination({
               className={cn(
                 linkBase,
                 entry === page
-                  ? "bg-brand-700 text-white"
+                  ? "bg-primary text-white"
                   : "border border-ink-200 text-ink-700 hover:bg-ink-50 hover:border-ink-300",
               )}
             >

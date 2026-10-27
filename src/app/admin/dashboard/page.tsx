@@ -2,32 +2,36 @@ import { and, count, desc, eq, gte, sql } from "drizzle-orm";
 import Link from "next/link";
 import {
   ArrowRight,
-  ArrowUpRight,
-  CalendarClock,
+  Banknote,
   ClipboardCheck,
   CreditCard,
+  Gauge,
+  Link2Off,
   MessageSquare,
-  UserRoundX,
 } from "lucide-react";
 
 import { getDb, schema } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { formatMoney } from "@/lib/format";
-import { AdminEmpty, AdminPageHeader, Panel } from "@/components/admin/panel";
+import { AdminEmpty, AdminLoadError, AttentionBanner, Panel, PanelHeader } from "@/components/admin/panel";
 import { StatCard, StatGrid } from "@/components/admin/stat-card";
-import { TrendChart, type TrendPoint } from "@/components/admin/trend-chart";
-import { cn } from "@/lib/utils";
-import { inrMinorSql, meaningfulProfile, realEmployerId, realEmployers } from "@/lib/admin/scope";
+import { HeroBand, SectionHead } from "@/components/app/primitives";
+import { ButtonLink } from "@/components/ui/button";
+import { inrMinorSql, meaningfulProfile, realEmployerId, realEmployers, TEST_EMPLOYER_ID, AI_INTERVIEW_EMAIL } from "@/lib/admin/scope";
+import { attentionTotal, funnelSteps, type FunnelStage } from "@/lib/admin/dashboard";
 
 /**
- * Admin home: what needs a person today, four numbers that move, the pipeline
- * and what just happened. Full lists (candidates, projects, placements) live
- * on their own pages; repeating them here only made this page five screens
- * long.
+ * Admin home (DESIGN.md §6): one hero number that answers "what needs me
+ * today", the queue of things a person owes someone directly under it, then
+ * the hiring funnel and the supporting figures. Full lists live on their own
+ * pages.
  */
 
 type Task = {
+  key: string;
   count: number;
+  /** Added in the last 7 days, when the queue can tell. */
+  fresh?: number;
   label: string;
   detail: string;
   href: string;
@@ -37,7 +41,8 @@ type Task = {
 
 type Event = { label: string; detail: string; href: string; date: Date | null };
 
-const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
+const WEEK_MS = 7 * DAY_MS;
 
 function greeting(now: Date): string {
   // Admins work in IST; the server may not.
@@ -45,13 +50,18 @@ function greeting(now: Date): string {
   return hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
 }
 
-export default async function AdminDashboard() {
-  const session = await getSession();
+/** The selected slot of an interview, in SQL. */
+const SELECTED_SLOT = sql`(CASE ${schema.interviews.selectedSlot} WHEN 1 THEN ${schema.interviews.slot1} WHEN 2 THEN ${schema.interviews.slot2} WHEN 3 THEN ${schema.interviews.slot3} END)`;
+
+/** An AI-interview row (the internal "admin" employer or the AI employer). */
+const AI_INTERVIEW = sql`(i.employer_id = ${TEST_EMPLOYER_ID} OR i.employer_id IN (SELECT id FROM ${schema.employers} WHERE lower(company_email) = ${AI_INTERVIEW_EMAIL}))`;
+
+async function loadDashboard(uid: string | null) {
   const db = getDb();
   const now = new Date();
   const weekAgo = new Date(now.getTime() - WEEK_MS);
-  // Six calendar months including this one (legacy dashboard chart).
-  const trendStart = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+  const yearAgo = new Date(now.getTime() - 365 * DAY_MS);
+  const soon = new Date(now.getTime() + 3 * DAY_MS).toISOString().slice(0, 10);
 
   const [
     [admin],
@@ -66,16 +76,21 @@ export default async function AdminDashboard() {
     [unreadMessages],
     [sheetsWaiting],
     [interviewsUpcoming],
+    [interviewsNoLink],
+    [interviewsAll],
+    [payoutsDue],
+    [unscored],
+    [projectsTotal],
+    [hiringSpeed],
     proposalStatus,
-    monthlyProposals,
-    monthlyInterviews,
+    funnelRows,
     recentUsers,
     recentProjects,
     recentAccepted,
     recentPayments,
   ] = await Promise.all([
-    session
-      ? db.select({ name: schema.admins.name }).from(schema.admins).where(eq(schema.admins.id, session.uid)).limit(1)
+    uid
+      ? db.select({ name: schema.admins.name }).from(schema.admins).where(eq(schema.admins.id, uid)).limit(1)
       : Promise.resolve([undefined]),
     // Legacy "total interns": active interns with a real profile, not every signup.
     db
@@ -115,36 +130,120 @@ export default async function AdminDashboard() {
       .from(schema.users)
       .leftJoin(schema.internOnboarding, eq(schema.internOnboarding.userId, schema.users.id))
       .where(sql`${schema.users.role} = 'intern' and not ${meaningfulProfile()}`),
-    db.select({ value: count() }).from(schema.contactMessages).where(eq(schema.contactMessages.isRead, false)),
-    db.select({ value: count() }).from(schema.timesheets).where(eq(schema.timesheets.status, "submitted")),
+    db
+      .select({
+        value: count(),
+        fresh: sql<number>`count(*) filter (where ${schema.contactMessages.createdAt} >= ${weekAgo})`,
+      })
+      .from(schema.contactMessages)
+      .where(eq(schema.contactMessages.isRead, false)),
+    db
+      .select({
+        value: count(),
+        fresh: sql<number>`count(*) filter (where ${schema.timesheets.updatedAt} >= ${weekAgo})`,
+      })
+      .from(schema.timesheets)
+      .where(eq(schema.timesheets.status, "submitted")),
     // Upcoming only: a picked slot still in the future, employer interviews
     // only (AI interviews are not on anyone's calendar). Legacy rule.
     db
       .select({ value: count() })
       .from(schema.interviews)
+      .where(and(eq(schema.interviews.status, "scheduled"), realEmployerId(schema.interviews.employerId), sql`${SELECTED_SLOT} > now()`)),
+    // Upcoming employer interviews nobody has sent a meeting link for.
+    db
+      .select({
+        value: count(),
+        fresh: sql<number>`count(*) filter (where ${schema.interviews.createdAt} >= ${weekAgo})`,
+      })
+      .from(schema.interviews)
       .where(
         and(
           eq(schema.interviews.status, "scheduled"),
           realEmployerId(schema.interviews.employerId),
-          sql`(CASE ${schema.interviews.selectedSlot} WHEN 1 THEN ${schema.interviews.slot1} WHEN 2 THEN ${schema.interviews.slot2} WHEN 3 THEN ${schema.interviews.slot3} END) > now()`,
+          sql`${SELECTED_SLOT} > now()`,
+          sql`coalesce(trim(${schema.interviews.meetingLink}), '') = ''`,
         ),
       ),
+    // Legacy "All interviews": every employer interview on record.
+    db
+      .select({
+        value: count(),
+        completed: sql<number>`count(*) filter (where lower(${schema.interviews.status}) = 'completed')`,
+      })
+      .from(schema.interviews)
+      .where(realEmployerId(schema.interviews.employerId)),
+    // Stipend payouts that are due (or due within 3 days) and still have no
+    // bank reference, i.e. nobody has paid them yet.
+    db
+      .select({
+        value: count(),
+        fresh: sql<number>`count(*) filter (where ${schema.internPayouts.createdAt} >= ${weekAgo})`,
+      })
+      .from(schema.internPayouts)
+      .where(
+        and(
+          eq(schema.internPayouts.status, "pending"),
+          sql`coalesce(nullif(${schema.internPayouts.raw}->>'scheduledFor', ''), '0000-01-01') <= ${soon}`,
+        ),
+      ),
+    // Interns whose latest AI interview is completed but who have no score.
+    db.execute<{ value: number; fresh: number }>(sql`
+      SELECT count(*)::int AS value,
+             count(*) FILTER (WHERE latest.created_at >= ${weekAgo})::int AS fresh
+        FROM ${schema.users} u
+        LEFT JOIN ${schema.internOnboarding} o ON o.user_id = u.id
+        JOIN LATERAL (
+          SELECT lower(i.status) AS status, i.created_at FROM ${schema.interviews} i
+           WHERE i.intern_id = u.id AND ${AI_INTERVIEW}
+           ORDER BY i.created_at DESC NULLS LAST LIMIT 1
+        ) latest ON true
+       WHERE u.role = 'intern' AND latest.status = 'completed'
+         AND coalesce(jsonb_typeof(o.extra_data->'findternScore'), '') <> 'number'`).then((r) => r.rows),
+    db
+      .select({
+        value: count(),
+        fullTime: sql<number>`count(*) filter (where ${schema.projects.fullTimeOffer})`,
+      })
+      .from(schema.projects)
+      .where(realEmployerId(schema.projects.employerId)),
+    // Legacy "Avg hiring speed": proposal sent to accepted/hired, in days.
+    db
+      .select({
+        days: sql<number | null>`round((avg(extract(epoch from (coalesce(${schema.proposals.hiredAt}, ${schema.proposals.updatedAt}) - ${schema.proposals.createdAt}))) / 86400)::numeric, 1)::float8`,
+        n: count(),
+      })
+      .from(schema.proposals)
+      .where(and(sql`${schema.proposals.status} in ('accepted', 'hired')`, realEmployerId(schema.proposals.employerId))),
     db
       .select({ status: schema.proposals.status, value: count() })
       .from(schema.proposals)
       .where(realEmployerId(schema.proposals.employerId))
       .groupBy(schema.proposals.status),
-    db
-      .select({ month: sql<string>`to_char(${schema.proposals.createdAt}, 'YYYY-MM')`, c: count() })
-      .from(schema.proposals)
-      .where(and(gte(schema.proposals.createdAt, trendStart), realEmployerId(schema.proposals.employerId)))
-      .groupBy(sql`1`),
-    db
-      .select({ month: sql<string>`to_char(${schema.interviews.createdAt}, 'YYYY-MM')`, c: count() })
-      .from(schema.interviews)
-      // AI interviews are an intern step, not hiring activity.
-      .where(and(gte(schema.interviews.createdAt, trendStart), realEmployerId(schema.interviews.employerId)))
-      .groupBy(sql`1`),
+    // Hiring funnel, last 12 months: each candidate counted once, at the
+    // furthest stage they reached.
+    db.execute<{ stage: number; value: number }>(sql`
+      WITH ev AS (
+        SELECT intern_id, 1 AS s FROM ${schema.profileViews}
+         WHERE created_at >= ${yearAgo} AND ${realEmployerId(sql`employer_id`)}
+        UNION ALL
+        SELECT intern_id, 2 FROM ${schema.employerCartItems}
+         WHERE created_at >= ${yearAgo} AND ${realEmployerId(sql`employer_id`)}
+        UNION ALL
+        SELECT intern_id, 3 FROM ${schema.interviews}
+         WHERE created_at >= ${yearAgo} AND ${realEmployerId(sql`employer_id`)}
+           AND lower(status) NOT IN ('cancelled', 'pending')
+        UNION ALL
+        SELECT intern_id, 4 FROM ${schema.proposals}
+         WHERE created_at >= ${yearAgo} AND ${realEmployerId(sql`employer_id`)}
+        UNION ALL
+        SELECT intern_id, 5 FROM ${schema.proposals}
+         WHERE lower(status) = 'hired' AND coalesce(hired_at, updated_at) >= ${yearAgo}
+           AND ${realEmployerId(sql`employer_id`)}
+      )
+      SELECT s AS stage, count(*)::int AS value
+        FROM (SELECT intern_id, max(s) AS s FROM ev GROUP BY intern_id) t
+       GROUP BY s`).then((r) => r.rows),
     db
       .select({
         id: schema.users.id,
@@ -195,114 +294,153 @@ export default async function AdminDashboard() {
       .limit(5),
   ]);
 
+  return {
+    now,
+    admin,
+    candidates,
+    signups,
+    candidatesNew,
+    companies,
+    companiesNew,
+    revenue,
+    revenueWeek,
+    incompleteProfiles,
+    unreadMessages,
+    sheetsWaiting,
+    interviewsUpcoming,
+    interviewsNoLink,
+    interviewsAll,
+    payoutsDue,
+    unscored,
+    projectsTotal,
+    hiringSpeed,
+    proposalStatus,
+    funnelRows,
+    recentUsers,
+    recentProjects,
+    recentAccepted,
+    recentPayments,
+  };
+}
+
+const plural = (n: number, one: string, many: string) => (n === 1 ? one : many);
+
+export default async function AdminDashboard() {
+  const session = await getSession();
+  let d: Awaited<ReturnType<typeof loadDashboard>>;
+  try {
+    d = await loadDashboard(session?.uid ?? null);
+  } catch (error) {
+    console.error("[admin/dashboard] load failed", error);
+    return (
+      <Panel>
+        <AdminLoadError what="the dashboard" retryHref="/admin/dashboard" />
+      </Panel>
+    );
+  }
+
   const n = (row: { value: number | string } | undefined) => Number(row?.value ?? 0);
-  const byStatus = new Map(proposalStatus.map((r) => [r.status, Number(r.value)]));
-  const sent = proposalStatus.reduce((sum, r) => sum + Number(r.value), 0);
+  const f = (row: { fresh?: number | string } | undefined) => Number(row?.fresh ?? 0);
+  const byStatus = new Map(d.proposalStatus.map((r) => [r.status, Number(r.value)]));
   const accepted = byStatus.get("accepted") ?? 0;
   const hired = byStatus.get("hired") ?? 0;
-  const declined = (byStatus.get("rejected") ?? 0) + (byStatus.get("withdrawn") ?? 0) + (byStatus.get("expired") ?? 0);
-  const open = sent - accepted - hired - declined;
 
-  const tasks: Task[] = [
-    {
-      count: n(unreadMessages),
-      label: "unread contact messages",
-      detail: "From the website contact form.",
-      href: "/admin/messages",
-      cta: "Open inbox",
-      Icon: MessageSquare,
-    },
-    {
-      count: accepted,
-      label: accepted === 1 ? "accepted offer waiting on employer payment" : "accepted offers waiting on employer payment",
-      detail: "The hire only completes once the employer pays. A nudge usually moves these.",
-      href: "/admin/proposal-tracker?tab=proposals",
-      cta: "See offers",
-      Icon: CreditCard,
-    },
-    {
-      count: n(sheetsWaiting),
-      label: n(sheetsWaiting) === 1 ? "timesheet waiting on employer approval" : "timesheets waiting on employer approval",
-      detail: "Interns are not paid until these are approved.",
-      href: "/admin/payouts",
-      cta: "Review",
-      Icon: ClipboardCheck,
-    },
-    {
-      count: n(interviewsUpcoming),
-      label: n(interviewsUpcoming) === 1 ? "interview scheduled" : "interviews scheduled",
-      detail: "Make sure both sides have the meeting link.",
-      href: "/admin/proposal-tracker?tab=interviews",
-      cta: "See schedule",
-      Icon: CalendarClock,
-    },
-    {
-      count: n(incompleteProfiles),
-      label: n(incompleteProfiles) === 1 ? "candidate signed up but never started a profile" : "candidates signed up but never started a profile",
-      detail: "They are invisible to employers until they do.",
-      href: "/admin/interns?profile=incomplete",
-      cta: "See list",
-      Icon: UserRoundX,
-    },
-  ].filter((t) => t.count > 0);
+  // Ordered by what a person owes someone: money first, then a meeting that
+  // can't happen, then a candidate waiting on a score, then the rest.
+  const tasks: Task[] = (
+    [
+      {
+        key: "payouts",
+        count: n(d.payoutsDue),
+        fresh: f(d.payoutsDue),
+        label: plural(n(d.payoutsDue), "stipend payout due with no bank reference", "stipend payouts due with no bank reference"),
+        detail: "Due now or within 3 days. Pay them, then record the bank reference.",
+        href: "/admin/payouts?status=pending",
+        cta: "Open payouts",
+        Icon: Banknote,
+      },
+      {
+        key: "nolink",
+        count: n(d.interviewsNoLink),
+        fresh: f(d.interviewsNoLink),
+        label: plural(n(d.interviewsNoLink), "upcoming interview has no meeting link", "upcoming interviews have no meeting link"),
+        detail: "Neither side can join until a link is saved.",
+        href: "/admin/proposal-tracker?tab=interviews",
+        cta: "Add links",
+        Icon: Link2Off,
+      },
+      {
+        key: "unscored",
+        count: n(d.unscored),
+        fresh: f(d.unscored),
+        label: plural(n(d.unscored), "candidate finished the AI interview but has no score", "candidates finished the AI interview but have no score"),
+        detail: "Employers can't find them until the Findtern Score is set.",
+        href: "/admin/interns?ai=completed&score=none",
+        cta: "Score them",
+        Icon: Gauge,
+      },
+      {
+        key: "messages",
+        count: n(d.unreadMessages),
+        fresh: f(d.unreadMessages),
+        label: plural(n(d.unreadMessages), "unread message", "unread messages"),
+        detail: "Contact form, in-app feedback and problem reports.",
+        href: "/admin/messages",
+        cta: "Open inbox",
+        Icon: MessageSquare,
+      },
+      {
+        key: "accepted",
+        count: accepted,
+        label: plural(accepted, "accepted offer waiting on employer payment", "accepted offers waiting on employer payment"),
+        detail: "The hire only completes once the employer pays. A nudge usually moves these.",
+        href: "/admin/proposal-tracker?tab=proposals",
+        cta: "See offers",
+        Icon: CreditCard,
+      },
+      {
+        key: "sheets",
+        count: n(d.sheetsWaiting),
+        fresh: f(d.sheetsWaiting),
+        label: plural(n(d.sheetsWaiting), "timesheet waiting on employer approval", "timesheets waiting on employer approval"),
+        detail: "Interns are not paid until these are approved.",
+        href: "/admin/payouts",
+        cta: "Review",
+        Icon: ClipboardCheck,
+      },
+    ] satisfies Task[]
+  ).filter((t) => t.count > 0);
 
-  const kpis = [
-    {
-      label: "Total interns",
-      value: n(candidates).toLocaleString("en-IN"),
-      note: `with a profile · ${n(signups).toLocaleString("en-IN")} signups${n(candidatesNew) ? `, ${n(candidatesNew)} this week` : ""}`,
-      href: "/admin/interns",
-    },
-    { label: "Hiring companies", value: n(companies).toLocaleString("en-IN"), delta: n(companiesNew), href: "/admin/companies" },
-    {
-      label: "Placements",
-      value: String(accepted + hired),
-      note: `${hired} paid · ${accepted} awaiting payment`,
-      href: "/admin/proposal-tracker",
-    },
-    {
-      label: "Revenue",
-      value: formatMoney(n(revenue), "INR", { zeroLabel: "₹0" }),
-      note: n(revenueWeek) ? `${formatMoney(n(revenueWeek), "INR")} this week` : "nothing this week",
-      href: "/admin/transactions",
-    },
-  ];
+  const owed = attentionTotal(tasks);
 
-  // Six monthly buckets, zero-filled (legacy showed months, not weeks).
-  const pMap = new Map(monthlyProposals.map((r) => [r.month, Number(r.c)]));
-  const iMap = new Map(monthlyInterviews.map((r) => [r.month, Number(r.c)]));
-  const trend: TrendPoint[] = [];
-  for (let i = 5; i >= 0; i--) {
-    const m = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const key = `${m.getFullYear()}-${String(m.getMonth() + 1).padStart(2, "0")}`;
-    trend.push({
-      label: m.toLocaleDateString("en-IN", { month: "short" }),
-      proposals: pMap.get(key) ?? 0,
-      interviews: iMap.get(key) ?? 0,
-    });
-  }
-  const trendTotal = trend.reduce((s, p) => s + p.proposals + p.interviews, 0);
+  const stages: FunnelStage[] = funnelSteps(
+    ["Viewed by an employer", "Shortlisted", "Interviewed", "Sent an offer", "Hired"],
+    d.funnelRows.map((r) => ({ stage: Number(r.stage), value: Number(r.value) })),
+  );
+  const funnelTop = stages[0]?.reached ?? 0;
+
+  const speed = d.hiringSpeed?.days;
 
   const events: Event[] = [
-    ...recentPayments.map((p) => ({
-      label: `Payment received · ${formatMoney(p.amountMinor, p.currency === "USD" ? "USD" : "INR")}`,
+    ...d.recentPayments.map((p) => ({
+      label: `Payment received · ${formatMoney(p.amountMinor, p.currency === "USD" ? "USD" : "INR", { zeroLabel: "₹0" })}`,
       detail: p.company ?? "Employer",
       href: "/admin/orders",
       date: p.date,
     })),
-    ...recentAccepted.map((p) => ({
+    ...d.recentAccepted.map((p) => ({
       label: "Offer accepted",
       detail: `${`${p.first ?? ""} ${p.last ?? ""}`.trim() || "Candidate"} · ${p.company ?? "Employer"}`,
       href: `/admin/interns/${p.internId}`,
       date: p.date,
     })),
-    ...recentProjects.map((p) => ({
+    ...d.recentProjects.map((p) => ({
       label: "Project posted",
       detail: `${p.name}${p.company ? ` · ${p.company}` : ""}`,
       href: `/admin/companies/${p.employerId}`,
       date: p.date,
     })),
-    ...recentUsers.map((u) => ({
+    ...d.recentUsers.map((u) => ({
       label: "Candidate signed up",
       detail: u.name.trim() || "New candidate",
       href: `/admin/interns/${u.id}`,
@@ -312,130 +450,198 @@ export default async function AdminDashboard() {
     .sort((a, b) => (b.date?.getTime() ?? 0) - (a.date?.getTime() ?? 0))
     .slice(0, 8);
 
-  const firstName = admin?.name?.trim().split(/\s+/)[0];
+  const firstName = d.admin?.name?.trim().split(/\s+/)[0];
+  const today = d.now.toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long", timeZone: "Asia/Kolkata" });
 
   return (
-    <div className="mx-auto w-full max-w-[84rem] space-y-10">
-      <AdminPageHeader
-        title={`${greeting(now)}${firstName ? `, ${firstName}` : ""}`}
-        subtitle={now.toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long", timeZone: "Asia/Kolkata" })}
-        action={
-          <Link
-            href="/admin/reports"
-            className="apple-spring apple-pressable inline-flex min-h-11 items-center gap-1.5 rounded-[10px] border border-ink-200 bg-white px-3.5 text-[14px] font-medium text-ink-700 hover:border-ink-300 hover:bg-ink-50"
-          >
-            Reports <ArrowUpRight className="size-4" aria-hidden />
-          </Link>
+    <div className="space-y-10">
+      <HeroBand
+        eyebrow={today}
+        title={`${greeting(d.now)}${firstName ? `, ${firstName}` : ""}`}
+        lede={
+          owed.total > 0
+            ? "These are the things someone is waiting on the team for, most urgent first."
+            : "Nothing is waiting on the team right now."
         }
-      />
+        actions={
+          <>
+            <ButtonLink href="/admin/proposal-tracker" variant={owed.total > 0 ? "outlineLight" : "accent"}>
+              Proposal pipeline
+              <ArrowRight className="size-4" aria-hidden />
+            </ButtonLink>
+            <ButtonLink href="/admin/reports" variant="outlineLight">
+              Reports
+            </ButtonLink>
+          </>
+        }
+      >
+        <div className="flex flex-wrap items-end gap-x-6 gap-y-2">
+          <p className="nums text-5xl font-semibold leading-none tracking-[-0.03em] text-white">
+            {owed.total > 0 ? owed.total.toLocaleString("en-IN") : "All clear"}
+          </p>
+          <div className="pb-1 text-sm text-on-dark-subtle">
+            <p className="font-medium text-white/90">
+              {owed.total > 0 ? plural(owed.total, "item needs a person today", "items need a person today") : "No open items"}
+            </p>
+            <p className="nums">
+              {owed.fresh > 0 ? `+${owed.fresh.toLocaleString("en-IN")} came in during the last 7 days` : "Nothing new in the last 7 days"}
+            </p>
+          </div>
+        </div>
+      </HeroBand>
 
-      {/* Needs a person */}
-      <section>
-        <h2 className="mb-3 text-[15px] font-semibold text-ink-950">Needs attention</h2>
+      {/* Needs a person: the band comes first, before any figure. */}
+      <section aria-labelledby="attention-head">
+        <h2 id="attention-head" className="sr-only">
+          Needs attention
+        </h2>
         {tasks.length ? (
           <Panel as="ul" className="divide-y divide-ink-100">
-            {tasks.map((t) => (
-              <li key={t.href} className="flex flex-col gap-3 px-5 py-3.5 sm:flex-row sm:items-center sm:gap-4">
-                <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-accent-100 text-accent-700">
+            {tasks.map((t, i) => (
+              <li key={t.key} className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:gap-4">
+                <span
+                  className={
+                    i === 0
+                      ? "grid size-9 shrink-0 place-items-center rounded-full bg-accent-100 text-accent-700"
+                      : "grid size-9 shrink-0 place-items-center rounded-full bg-ink-100 text-ink-600"
+                  }
+                >
                   <t.Icon className="size-4" aria-hidden />
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="text-[14px] font-medium text-ink-900">
-                    <span className="tabular-nums">{t.count}</span> {t.label}
+                  <p className="text-[0.9375rem] font-medium text-ink-900">
+                    <span className="nums font-semibold">{t.count.toLocaleString("en-IN")}</span> {t.label}
                   </p>
-                  <p className="text-[13px] text-text-subtle">{t.detail}</p>
+                  <p className="mt-0.5 text-sm text-ink-600">
+                    {t.detail}
+                    {t.fresh ? <span className="nums"> {t.fresh} new this week.</span> : null}
+                  </p>
                 </div>
-                <Link
-                  href={t.href}
-                  className="apple-spring apple-pressable inline-flex min-h-9 shrink-0 items-center gap-1.5 self-start whitespace-nowrap rounded-[10px] border border-ink-200 px-3 text-[13px] font-medium text-ink-800 hover:border-ink-300 hover:bg-ink-50 max-lg:min-h-11 sm:self-auto"
-                >
-                  {t.cta} <ArrowRight className="size-3.5" aria-hidden />
-                </Link>
+                <ButtonLink href={t.href} variant={i === 0 ? "primary" : "outline"} size="sm" className="self-start sm:self-auto">
+                  {t.cta}
+                  <ArrowRight className="size-4" aria-hidden />
+                </ButtonLink>
               </li>
             ))}
           </Panel>
         ) : (
           <Panel>
-            <p className="px-5 py-4 text-sm text-text-subtle">Nothing is waiting on the team.</p>
+            <AdminEmpty
+              title="Nothing is waiting on the team"
+              body="Due payouts, interviews without a link, unscored candidates and unread messages show up here the moment they appear."
+            />
           </Panel>
         )}
+        <div className="mt-3">
+          <AttentionBanner
+            count={n(d.incompleteProfiles)}
+            total={n(d.signups)}
+            noun="signups"
+            href="/admin/interns?profile=incomplete"
+          />
+        </div>
       </section>
 
-      {/* Four numbers */}
-      <StatGrid cols={4}>
-        {kpis.map((k) => {
-          const hasDelta = "delta" in k && typeof k.delta === "number";
-          return (
-            <StatCard
-              key={k.label}
-              label={k.label}
-              value={k.value}
-              href={k.href}
-              tone="neutral"
-              delta={hasDelta && k.delta > 0 ? `+${k.delta}` : undefined}
-              hint={hasDelta ? (k.delta > 0 ? "new this week" : "none new this week") : k.note}
-            />
-          );
-        })}
-      </StatGrid>
-
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
-        {/* Monthly activity */}
-        <Panel className="min-w-0 overflow-visible p-5 sm:p-6">
-          <div className="flex items-baseline justify-between gap-4">
-            <h2 className="text-[15px] font-semibold text-ink-950">Proposals and interviews, monthly</h2>
-            <span className="text-xs text-text-subtle">last 6 months</span>
-          </div>
-          {trendTotal === 0 ? (
-            <p className="mt-10 mb-10 text-center text-sm text-text-subtle">No proposals or interviews in the last 6 months.</p>
-          ) : (
-            <div className="mt-4">
-              <TrendChart data={trend} height={200} />
-            </div>
-          )}
-        </Panel>
-
-        {/* Pipeline */}
-        <Panel className="min-w-0 p-5 sm:p-6">
-          <div className="flex items-baseline justify-between gap-4">
-            <h2 className="text-[15px] font-semibold text-ink-950">Proposal pipeline</h2>
-            <Link href="/admin/proposal-tracker" className="text-xs font-medium text-brand-700 hover:underline">
-              Tracker
+      {/* The hiring funnel */}
+      <Panel>
+        <PanelHeader
+          title="Hiring funnel, last 12 months"
+          description="Each candidate is counted once, at the furthest step they reached. The percentage is how many of the step above made it to this one; the bar is the share of everyone an employer viewed."
+          action={
+            <Link href="/admin/reports" className="text-sm font-medium text-brand-700 hover:underline">
+              Full reports
             </Link>
-          </div>
-          <p className="mt-1 text-xs text-text-subtle">{sent} proposals, all time</p>
-          <dl className="mt-5 space-y-3.5">
-            {[
-              { label: "Open", value: open, tone: "bg-ink-300" },
-              { label: "Accepted, awaiting payment", value: accepted, tone: "bg-accent-500" },
-              { label: "Hired (paid)", value: hired, tone: "bg-brand-700" },
-              { label: "Declined or expired", value: declined, tone: "bg-ink-200" },
-            ].map((row) => (
-              <div key={row.label}>
-                <div className="flex items-baseline justify-between gap-3 text-[13px]">
-                  <dt className="text-ink-700">{row.label}</dt>
-                  <dd className="tabular-nums">
-                    <span className="font-semibold text-ink-950">{row.value}</span>
-                    <span className="ml-1.5 text-text-subtle">
-                      {sent ? `${Math.round((row.value / sent) * 100)}%` : "-"}
-                    </span>
-                  </dd>
-                </div>
-                <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-ink-100" aria-hidden>
-                  <div
-                    className={cn("h-full rounded-full", row.tone)}
-                    style={{ width: `${sent ? Math.max((row.value / sent) * 100, row.value ? 2 : 0) : 0}%` }}
-                  />
-                </div>
-              </div>
-            ))}
-          </dl>
-        </Panel>
-      </div>
+          }
+        />
+        {funnelTop === 0 ? (
+          <AdminEmpty
+            title="No hiring activity in the last 12 months"
+            body="The funnel fills in as employers view, shortlist, interview and hire candidates."
+          />
+        ) : (
+          <ol className="space-y-4 px-5 py-5">
+            {stages.map((s, i) => {
+              const width = funnelTop ? Math.max((s.reached / funnelTop) * 100, s.reached ? 1.5 : 0) : 0;
+              return (
+                <li key={s.label} className="grid gap-1.5 sm:grid-cols-[12rem_minmax(0,1fr)_7.5rem] sm:items-center sm:gap-4">
+                  <span className="text-sm font-medium text-ink-800">{s.label}</span>
+                  <span
+                    className="h-3 overflow-hidden rounded-full bg-ink-100"
+                    title={`${s.label}: ${s.reached} candidates${i > 0 && s.rate !== null ? `, ${s.rate}% of the step above` : ""}`}
+                    aria-hidden
+                  >
+                    <span className="block h-full rounded-full bg-brand-600" style={{ width: `${width}%` }} />
+                  </span>
+                  <span className="nums flex items-baseline gap-2 text-sm sm:justify-end">
+                    <span className="font-semibold text-ink-900">{s.reached.toLocaleString("en-IN")}</span>
+                    <span className="text-ink-600">{i === 0 ? "candidates" : s.rate === null ? "-" : `${s.rate}%`}</span>
+                  </span>
+                </li>
+              );
+            })}
+          </ol>
+        )}
+      </Panel>
+
+      {/* Supporting figures */}
+      <section>
+        <SectionHead title="Supporting figures" hint="All time unless the tile says otherwise." />
+        <StatGrid cols={4}>
+          <StatCard
+            label="Interns with a profile"
+            value={n(d.candidates).toLocaleString("en-IN")}
+            delta={n(d.candidatesNew) ? `+${n(d.candidatesNew)} this week` : undefined}
+            hint={`${n(d.signups).toLocaleString("en-IN")} signups in total`}
+            href="/admin/interns"
+          />
+          <StatCard
+            label="Hiring companies"
+            value={n(d.companies).toLocaleString("en-IN")}
+            delta={n(d.companiesNew) ? `+${n(d.companiesNew)} this week` : undefined}
+            hint="Active, onboarding finished"
+            href="/admin/companies"
+          />
+          <StatCard
+            label="Placements"
+            value={(accepted + hired).toLocaleString("en-IN")}
+            hint={`${hired} paid · ${accepted} awaiting payment`}
+            href="/admin/proposal-tracker?tab=proposals"
+          />
+          <StatCard
+            label="Revenue"
+            value={formatMoney(n(d.revenue), "INR", { zeroLabel: "₹0" })}
+            hint={n(d.revenueWeek) ? `${formatMoney(n(d.revenueWeek), "INR")} in the last 7 days` : "Nothing in the last 7 days"}
+            href="/admin/transactions"
+          />
+          <StatCard
+            label="Scheduled interviews"
+            value={n(d.interviewsUpcoming).toLocaleString("en-IN")}
+            hint="Employer interviews still to happen"
+            href="/admin/proposal-tracker?tab=interviews"
+          />
+          <StatCard
+            label="All interviews"
+            value={n(d.interviewsAll).toLocaleString("en-IN")}
+            hint={`${Number(d.interviewsAll?.completed ?? 0).toLocaleString("en-IN")} completed`}
+            href="/admin/proposal-tracker?tab=interviews"
+          />
+          <StatCard
+            label="Full-time potential"
+            value={Number(d.projectsTotal?.fullTime ?? 0).toLocaleString("en-IN")}
+            hint={`of ${n(d.projectsTotal).toLocaleString("en-IN")} projects offer a full-time role`}
+            href="/admin/projects"
+          />
+          <StatCard
+            label="Avg hiring speed"
+            value={speed == null ? "-" : `${speed} ${speed === 1 ? "day" : "days"}`}
+            hint={speed == null ? "No accepted offers yet" : "Offer sent to accepted"}
+          />
+        </StatGrid>
+      </section>
 
       {/* What just happened */}
       <section>
-        <h2 className="mb-3 text-[15px] font-semibold text-ink-950">Recent activity</h2>
+        <SectionHead title="Recent activity" />
         {events.length ? (
           <Panel as="ul" className="divide-y divide-ink-100">
             {events.map((e, i) => (
@@ -444,16 +650,12 @@ export default async function AdminDashboard() {
                   href={e.href}
                   className="grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-4 px-5 py-3 transition-colors hover:bg-ink-50/70"
                 >
-                  {/* Label stays on one line; the detail truncates as a real
-                      flex child instead of an inline span that wrapped under it. */}
-                  <span className="flex min-w-0 items-baseline gap-2">
-                    <span className="shrink-0 whitespace-nowrap text-[14px] font-medium text-ink-900">{e.label}</span>
-                    <span className="min-w-0 truncate text-[13px] text-text-subtle">{e.detail}</span>
+                  <span className="flex min-w-0 flex-col gap-0.5 sm:flex-row sm:items-baseline sm:gap-2">
+                    <span className="shrink-0 whitespace-nowrap text-sm font-medium text-ink-900">{e.label}</span>
+                    <span className="min-w-0 truncate text-sm text-ink-600">{e.detail}</span>
                   </span>
-                  <span className="whitespace-nowrap text-xs tabular-nums text-text-subtle">
-                    {e.date
-                      ? e.date.toLocaleDateString("en-IN", { day: "numeric", month: "short", timeZone: "Asia/Kolkata" })
-                      : "-"}
+                  <span className="nums whitespace-nowrap text-xs text-ink-600">
+                    {e.date ? e.date.toLocaleDateString("en-IN", { day: "numeric", month: "short", timeZone: "Asia/Kolkata" }) : "-"}
                   </span>
                 </Link>
               </li>

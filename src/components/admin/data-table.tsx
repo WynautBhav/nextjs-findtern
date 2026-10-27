@@ -1,3 +1,6 @@
+import Link from "next/link";
+import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
+
 import {
   Table,
   TableBody,
@@ -10,6 +13,7 @@ import { AdminEmpty } from "./panel.tsx";
 import { PageSizeSelect } from "./page-size-select.tsx";
 import { Pagination } from "./pagination.tsx";
 import { TableToolbar, type ToolbarFilter } from "./table-toolbar.tsx";
+import { toQueryString } from "@/lib/admin/params";
 import { cn } from "@/lib/utils";
 
 /**
@@ -39,7 +43,23 @@ export type Column<T> = {
   headerClassName?: string;
   /** Column header class for right-aligned numeric columns. */
   align?: "left" | "right";
+  /**
+   * Makes the header a sort link: `?sort=<key>&dir=asc|desc`. The page reads
+   * the same two params (see `parseSort`) and orders its query by them.
+   */
+  sort?: string;
 };
+
+/** Reads `sort` / `dir` from the URL, keeping only keys the page allows. */
+export function parseSort<K extends string>(
+  params: Record<string, string>,
+  allowed: readonly K[],
+  fallback: { key: K; dir: "asc" | "desc" },
+): { key: K; dir: "asc" | "desc" } {
+  const key = allowed.find((k) => k === params.sort);
+  if (!key) return fallback;
+  return { key, dir: params.dir === "asc" ? "asc" : "desc" };
+}
 
 export function DataTable<T>({
   basePath,
@@ -129,26 +149,56 @@ export function DataTable<T>({
             `sticky` on the header never had anything to pin to. `min-w-[40rem]`
             keeps the columns readable below the sidebar breakpoint instead of
             squeezing every cell into a word-per-line stack. */}
-        <p className="border-b border-ink-100 px-5 py-1.5 text-2xs text-text-subtle lg:hidden" aria-hidden>
+        <p className="border-b border-ink-100 px-5 py-1.5 text-xs text-text-subtle lg:hidden" aria-hidden>
           Scroll sideways to see every column →
         </p>
+        {/* The header is sticky inside this scroller, so long tables keep
+            their column names in view without the page losing its own scroll. */}
+        <div className="max-h-[min(72vh,56rem)] overflow-auto [&>[data-slot=table-container]]:overflow-visible">
         <Table className="min-w-[40rem]">
           {caption ? <caption className="sr-only">{caption}</caption> : null}
-          <TableHeader className="apple-material-bar">
+          <TableHeader>
             <TableRow className="hover:bg-transparent">
-              {columns.map((column, index) => (
-                <TableHead
-                  key={index}
-                  scope="col"
-                  className={cn(
-                    "px-3 py-3 text-[12px] font-semibold tracking-[0.02em] text-ink-600 capitalize",
-                    column.align === "right" && "text-right",
-                    column.headerClassName,
-                  )}
-                >
-                  {column.header}
-                </TableHead>
-              ))}
+              {columns.map((column, index) => {
+                const active = column.sort && params.sort === column.sort;
+                const dir = active ? (params.dir === "asc" ? "asc" : "desc") : null;
+                const nextDir = dir === "desc" ? "asc" : "desc";
+                return (
+                  <TableHead
+                    key={index}
+                    scope="col"
+                    aria-sort={dir === "asc" ? "ascending" : dir === "desc" ? "descending" : undefined}
+                    className={cn(
+                      "sticky top-0 z-10 bg-ink-50 px-3 py-2.5 text-xs font-semibold tracking-[0.01em] text-ink-600",
+                      column.align === "right" && "text-right",
+                      column.headerClassName,
+                    )}
+                  >
+                    {column.sort ? (
+                      <Link
+                        href={`${basePath}${toQueryString({ ...params, sort: column.sort, dir: nextDir, [pageKey ?? "page"]: "" })}`}
+                        scroll={false}
+                        className={cn(
+                          "inline-flex items-center gap-1 rounded-apple-sm hover:text-ink-900 focus-visible:outline-2 focus-visible:outline-brand-600",
+                          column.align === "right" && "flex-row-reverse",
+                          active && "text-ink-900",
+                        )}
+                      >
+                        {column.header}
+                        {dir === "asc" ? (
+                          <ArrowUp className="size-3" aria-hidden />
+                        ) : dir === "desc" ? (
+                          <ArrowDown className="size-3" aria-hidden />
+                        ) : (
+                          <ArrowUpDown className="size-3 opacity-40" aria-hidden />
+                        )}
+                      </Link>
+                    ) : (
+                      column.header
+                    )}
+                  </TableHead>
+                );
+              })}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -156,14 +206,14 @@ export function DataTable<T>({
               const tr = renderRow ? (
                 renderRow(row, index)
               ) : (
-                <TableRow key={index} className="apple-spring hover:bg-ink-50/70">
+                <TableRow key={index} className="border-ink-100 hover:bg-ink-50/60">
                   {columns.map((column, cellIndex) => (
                     <TableCell
                       key={cellIndex}
                       className={cn(
                         cellPad,
-                        "text-[14px] tracking-[-0.01em] text-ink-700",
-                        column.align === "right" && "text-right tabular-nums",
+                        "text-sm text-ink-700",
+                        column.align === "right" && "nums text-right",
                         column.className,
                       )}
                     >
@@ -176,6 +226,7 @@ export function DataTable<T>({
             })}
           </TableBody>
         </Table>
+        </div>
         </>
       )}
 
