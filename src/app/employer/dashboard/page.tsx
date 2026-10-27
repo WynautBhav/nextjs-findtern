@@ -1,28 +1,31 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { and, desc, eq } from "drizzle-orm";
-import { ArrowRight, CalendarClock, ClipboardCheck, CreditCard, FolderPlus, Send, ShoppingBag } from "lucide-react";
+import { and, desc, eq, inArray } from "drizzle-orm";
+import { ArrowRight, CalendarClock, ClipboardCheck, CreditCard, FolderPlus, ShoppingBag, Video } from "lucide-react";
 
 import { getDb, schema } from "@/lib/db";
 import { ButtonLink } from "@/components/ui/button";
-import { EmptyScene, SectionHead, Surface } from "@/components/app/primitives";
-import { PageHeader } from "@/components/layout/page-header";
+import { EmptyScene, HeroBand, Pill, SectionHead, StatTile, Surface } from "@/components/app/primitives";
 import { requireRole } from "@/lib/auth";
-import { displayNameOf, toCandidateProfile, type CandidateProfile } from "@/lib/employer-candidates";
-import { hiredInternIds } from "@/lib/employer-visibility";
-import { attachPhotos, candidatePoolClauses, scoreExpr } from "@/lib/employer-pool";
+import { toCandidateProfile, type CandidateProfile } from "@/lib/employer-candidates";
+import { candidatePoolClauses, scoreExpr } from "@/lib/employer-pool";
 import { requireEmployerSetup } from "@/lib/employer-setup";
-import { CandidateAvatar } from "@/components/employer/candidate-avatar";
+import { meetingEndsAt } from "@/lib/employer-interview-rules";
+import { payableCheckout } from "@/lib/employer-payable";
+import { isProjectOpen } from "@/lib/project-locations";
 import { proposalOutcome } from "@/lib/proposals";
+import { scopeLabel } from "@/lib/db/schema";
 import { PLAN_NAME, bandFor } from "@/lib/score";
-import { cn } from "@/lib/utils";
+import { timezoneForLocation } from "@/lib/timezones";
+import { formatSlotTime } from "@/lib/format";
 
 export const metadata: Metadata = {
-  title: "Employer Dashboard · Findtern",
+  title: "Dashboard",
   robots: { index: false, follow: false },
 };
 
 type ProjectRow = typeof schema.projects.$inferSelect;
+type InterviewRow = typeof schema.interviews.$inferSelect;
 
 type Task = {
   count: number;
@@ -30,18 +33,31 @@ type Task = {
   detail: string;
   href: string;
   cta: string;
-  Icon: typeof Send;
+  Icon: typeof CreditCard;
+};
+
+type Loaded = {
+  companyName: string;
+  timezone: string;
+  projects: ProjectRow[];
+  proposals: { status: string; projectId: string; internId: string }[];
+  submittedSheets: number;
+  pendingInterviews: number;
+  nextInterview: InterviewRow | null;
+  shortlisted: number;
+  toPay: number;
+  candidates: CandidateProfile[];
 };
 
 /**
  * Employer home.
  *
- * Built around one question: what is waiting on me? The top of the page is a
- * short list of real pending actions (pay for accepted offers, approve hours,
- * confirm interviews, send proposals to the shortlist), each with its own
- * button. Below it, the pipeline as four numbers that add up, then projects
- * and candidates who match those projects. One primary action in the header;
- * nothing else repeats it.
+ * Built around one question: what is waiting on me? The hero says it in a
+ * sentence and carries the pipeline as four figures that add up; below it,
+ * the real pending actions (pay for accepted offers, approve hours, confirm
+ * interviews, send proposals to the shortlist), each with its own button.
+ * Then the open projects and the candidates who match them, initials only
+ * (bug sheet 7 NC r41), best score first.
  */
 export default async function EmployerDashboard() {
   const session = await requireRole("employer");
@@ -49,374 +65,351 @@ export default async function EmployerDashboard() {
   // No company profile or no project yet: finish onboarding first.
   await requireEmployerSetup(employerId);
 
-  let companyName = "";
-  let projects: ProjectRow[] = [];
-  let proposals: { status: string; projectId: string }[] = [];
-  let submittedSheets = 0;
-  let pendingInterviews = 0;
-  let upcomingInterviews = 0;
-  let shortlisted = 0;
-  let candidates: CandidateProfile[] = [];
-  let nameUnlocked = new Set<string>();
-  let loadFailed = false;
-
-  try {
-    const db = getDb();
-    nameUnlocked = await hiredInternIds(db, employerId).catch(() => new Set<string>());
-
-    const [employerRow, projectRows, proposalRows, sheetRows, interviewRows, cartRows] = await Promise.all([
-      db
-        .select({ companyName: schema.employers.companyName })
-        .from(schema.employers)
-        .where(eq(schema.employers.id, employerId))
-        .limit(1),
-      db
-        .select()
-        .from(schema.projects)
-        .where(eq(schema.projects.employerId, employerId))
-        .orderBy(desc(schema.projects.createdAt)),
-      db
-        .select({
-          status: schema.proposals.status,
-          projectId: schema.proposals.projectId,
-          internId: schema.proposals.internId,
-        })
-        .from(schema.proposals)
-        .where(eq(schema.proposals.employerId, employerId)),
-      db
-        .select({ id: schema.timesheets.id })
-        .from(schema.timesheets)
-        .where(and(eq(schema.timesheets.employerId, employerId), eq(schema.timesheets.status, "submitted"))),
-      db
-        .select({ status: schema.interviews.status, selectedSlot: schema.interviews.selectedSlot })
-        .from(schema.interviews)
-        .where(eq(schema.interviews.employerId, employerId)),
-      db
-        .select({ internId: schema.employerCartItems.internId })
-        .from(schema.employerCartItems)
-        .where(eq(schema.employerCartItems.employerId, employerId)),
-    ]);
-
-    companyName = employerRow[0]?.companyName ?? "";
-    projects = projectRows;
-    proposals = proposalRows;
-    submittedSheets = sheetRows.length;
-    pendingInterviews = interviewRows.filter((i) => i.status === "pending" || i.status === "proposed").length;
-    upcomingInterviews = interviewRows.filter((i) => i.status === "scheduled").length;
-    // "No proposal yet" means exactly that: anyone already proposed to is out.
-    const proposedTo = new Set(proposalRows.map((p) => p.internId));
-    shortlisted = new Set(cartRows.map((c) => c.internId).filter((id) => !proposedTo.has(id))).size;
-
-    // Candidates who match the skills this employer is hiring for, best score
-    // first. Falls back to the top of the pool when no project lists skills.
-    // Same pool rule as the candidate browser: no un-interviewed, hidden or
-    // unlisted interns.
-    const wanted = Array.from(
-      new Set(projectRows.filter((p) => p.status === "active").flatMap((p) => (p.skills as string[]) ?? [])),
-    ).map((s) => s.toLowerCase());
-    const pool = await db
-      .select({ user: schema.users, onboarding: schema.internOnboarding })
-      .from(schema.users)
-      .innerJoin(schema.internOnboarding, eq(schema.users.id, schema.internOnboarding.userId))
-      .where(and(...candidatePoolClauses()))
-      .orderBy(desc(scoreExpr()), desc(schema.internOnboarding.updatedAt))
-      .limit(40);
-    // `intern_onboarding.user_id` is not unique; one card per intern.
-    const seen = new Set<string>();
-    const profiles = pool
-      .filter((r) => !seen.has(r.user.id) && Boolean(seen.add(r.user.id)))
-      .map((r) => toCandidateProfile(r.user, r.onboarding));
-    const matching = wanted.length
-      ? profiles.filter((c) => c.skills.some((s) => wanted.includes(s.toLowerCase())))
-      : profiles;
-    candidates = (matching.length ? matching : profiles).slice(0, 5);
-    await attachPhotos(db, candidates, nameUnlocked).catch(() => undefined);
-  } catch (err) {
+  const data = await load(employerId).catch((err) => {
     console.error("Failed to load employer dashboard:", err);
-    loadFailed = true;
-  }
+    return null;
+  });
 
-  if (loadFailed) {
+  if (!data) {
     return (
       <EmptyScene
         art
         title="Couldn't load your dashboard"
-        body="We couldn't load your dashboard right now. Nothing is wrong with your account - try again in a moment."
+        body="We couldn't load your dashboard right now. Nothing is wrong with your account; try again in a moment."
         who="Us - connection issue"
+        next={{ label: "Try again", href: "/employer/dashboard" }}
       />
     );
   }
 
+  const { proposals, projects } = data;
   const awaiting = proposals.filter((p) => p.status === "sent" || p.status === "interview_scheduled").length;
-  const accepted = proposals.filter((p) => p.status === "accepted").length;
+  const accepted = proposals.filter((p) => p.status === "accepted" || p.status === "processing").length;
   const hired = proposals.filter((p) => p.status === "hired").length;
   const declined = proposals.filter((p) => proposalOutcome(p.status) === "lost").length;
 
-  const tasks: Task[] = [
-    {
-      count: accepted,
-      label: accepted === 1 ? "offer accepted, payment due" : "offers accepted, payment due",
-      detail: "The hire completes once you pay. Names unlock after payment.",
-      href: "/employer/checkout",
-      cta: "Go to checkout",
-      Icon: CreditCard,
-    },
-    {
-      count: submittedSheets,
-      label: submittedSheets === 1 ? "timesheet to approve" : "timesheets to approve",
-      detail: "Interns are paid on approved hours only.",
-      href: "/employer/timesheets",
-      cta: "Review hours",
-      Icon: ClipboardCheck,
-    },
-    {
-      count: pendingInterviews,
-      label: pendingInterviews === 1 ? "interview waiting on a slot" : "interviews waiting on a slot",
-      detail: "Pick or confirm a time so the candidate can prepare.",
-      href: "/employer/schedule",
-      cta: "Open schedule",
-      Icon: CalendarClock,
-    },
-    {
-      count: upcomingInterviews,
-      label: upcomingInterviews === 1 ? "interview coming up" : "interviews coming up",
-      detail: "The meeting link is on each slot in your schedule.",
-      href: "/employer/schedule#upcoming",
-      cta: "See times",
-      Icon: CalendarClock,
-    },
-    {
-      count: shortlisted,
-      label: shortlisted === 1 ? "shortlisted candidate, no proposal yet" : "shortlisted candidates, no proposal yet",
-      detail: "They are in your cart. Send a proposal before someone else does.",
-      href: "/employer/cart",
-      cta: "Open cart",
-      Icon: ShoppingBag,
-    },
-  ].filter((t) => t.count > 0);
+  const tasks: Task[] = (
+    [
+      {
+        count: data.toPay,
+        label: data.toPay === 1 ? "payment due" : "payments due",
+        detail: "An accepted offer becomes a hire once it's paid; a running monthly placement pays month by month.",
+        href: "/employer/checkout",
+        cta: "Go to checkout",
+        Icon: CreditCard,
+      },
+      {
+        count: data.submittedSheets,
+        label: data.submittedSheets === 1 ? "timesheet to review" : "timesheets to review",
+        detail: "Interns are paid on approved hours only.",
+        href: "/employer/timesheets",
+        cta: "Review hours",
+        Icon: ClipboardCheck,
+      },
+      {
+        count: data.pendingInterviews,
+        label: data.pendingInterviews === 1 ? "meeting waiting on the candidate" : "meetings waiting on candidates",
+        detail: "They pick one of the three times you offered. Send a reminder from your schedule if it's been a while.",
+        href: "/employer/schedule",
+        cta: "Open schedule",
+        Icon: CalendarClock,
+      },
+      {
+        count: data.shortlisted,
+        label: data.shortlisted === 1 ? "shortlisted candidate, no proposal yet" : "shortlisted candidates, no proposal yet",
+        detail: "Book a meeting or send a proposal before someone else does.",
+        href: "/employer/cart",
+        cta: "Open shortlist",
+        Icon: ShoppingBag,
+      },
+    ] satisfies Task[]
+  ).filter((t) => t.count > 0);
 
-  const proposalsByProject = new Map<string, { total: number; won: number }>();
+  const waiting = tasks.reduce((n, t) => n + t.count, 0);
+  const openProjects = projects.filter((p) => isProjectOpen(p.status));
+  const shownProjects = [...openProjects, ...projects.filter((p) => !isProjectOpen(p.status))].slice(0, 5);
+  const byProject = new Map<string, { total: number; won: number }>();
   for (const p of proposals) {
-    const row = proposalsByProject.get(p.projectId) ?? { total: 0, won: 0 };
+    const row = byProject.get(p.projectId) ?? { total: 0, won: 0 };
     row.total += 1;
     if (proposalOutcome(p.status) === "won") row.won += 1;
-    proposalsByProject.set(p.projectId, row);
+    byProject.set(p.projectId, row);
   }
-  const activeProjects = projects.filter((p) => p.status === "active");
-  const shownProjects = [...activeProjects, ...projects.filter((p) => p.status !== "active")].slice(0, 5);
+  const top = tasks[0];
+
+  const next = data.nextInterview;
+  const nextAt = next ? slotDate(next) : null;
 
   return (
-    <div className="space-y-10">
-      <div>
-        <p className="mb-1 text-sm text-ink-600">{companyName || "Your company"}</p>
-        <PageHeader
-          title={
-            tasks.length
-              ? `${tasks.reduce((n, t) => n + t.count, 0)} things need you`
-              : proposals.length
-                ? "You're all caught up"
-                : "Let's make your first hire"
-          }
-          action={
-            <div className="flex flex-wrap gap-2">
-              <ButtonLink href="/employer/projects" variant="outline" size="sm" className="min-h-11">
-                <FolderPlus className="size-4" aria-hidden />
-                New project
+    <div>
+      <HeroBand
+        eyebrow={data.companyName || "Your company"}
+        title={waiting ? `${waiting} ${waiting === 1 ? "thing needs" : "things need"} you` : proposals.length ? "You're all caught up" : "Let's make your first hire"}
+        lede={
+          waiting
+            ? "Start with the first one; each takes a minute."
+            : proposals.length
+              ? "Nothing is waiting on you. Your candidates and offers are below."
+              : "Shortlist candidates ranked by their Findtern Score, meet them, and send a proposal."
+        }
+        actions={
+          <>
+            {top ? (
+              <ButtonLink href={top.href} variant="accent">
+                {top.cta}
+                <ArrowRight className="size-4" aria-hidden />
               </ButtonLink>
-              <ButtonLink href="/employer/candidates" variant="primary" size="sm" className="min-h-11">
+            ) : (
+              <ButtonLink href="/employer/candidates" variant="accent">
                 Find candidates
                 <ArrowRight className="size-4" aria-hidden />
               </ButtonLink>
-            </div>
-          }
-        />
-      </div>
+            )}
+            <ButtonLink href="/employer/projects?new=1" variant="outlineLight">
+              <FolderPlus className="size-4" aria-hidden />
+              New project
+            </ButtonLink>
+          </>
+        }
+      >
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <StatTile tone="onDark" label="Awaiting a reply" value={awaiting || null} empty="None out" href="/employer/proposals" />
+          <StatTile tone="onDark" label="Accepted, to pay" value={accepted || null} empty="None waiting" href="/employer/checkout" />
+          <StatTile tone="onDark" label="Hired" value={hired || null} empty="No hires yet" href="/employer/orders" />
+          <StatTile tone="onDark" label="Declined or expired" value={declined || null} empty="None" href="/employer/proposals" />
+        </div>
+      </HeroBand>
 
-      {/* What is waiting on you */}
-      {tasks.length ? (
-        <Surface as="ul" className="divide-y divide-ink-100 overflow-hidden">
-          {tasks.map((t) => (
-            <li key={t.href} className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:gap-5">
-              <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-accent-100 text-accent-700">
-                <t.Icon className="size-4" aria-hidden />
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="text-[15px] font-medium text-ink-900">
-                  <span className="tabular-nums">{t.count}</span> {t.label}
-                </p>
-                <p className="mt-0.5 text-sm text-ink-600">{t.detail}</p>
-              </div>
-              <Link
-                href={t.href}
-                className="inline-flex min-h-11 shrink-0 items-center gap-1.5 self-start rounded-[10px] border border-ink-200 bg-white px-3.5 text-sm font-medium text-ink-800 transition-colors hover:border-ink-300 hover:bg-ink-50 sm:self-auto"
-              >
-                {t.cta}
-                <ArrowRight className="size-3.5" aria-hidden />
-              </Link>
-            </li>
-          ))}
-        </Surface>
-      ) : null}
-
-      {/* Pipeline: four numbers that add up */}
-      <section>
-        <SectionHead
-          title="Proposal pipeline"
-          action={
-            <Link href="/employer/proposals" className="text-sm font-medium text-brand-700 hover:underline">
-              All proposals
-            </Link>
-          }
-        />
-        <Surface className="grid grid-cols-2 overflow-hidden sm:grid-cols-4">
-          {[
-            { label: "Awaiting reply", value: awaiting, note: "sent, no answer yet" },
-            { label: "Accepted", value: accepted, note: "payment due", warn: accepted > 0 },
-            { label: "Hired", value: hired, note: "paid and placed" },
-            { label: "Declined or expired", value: declined, note: "closed" },
-          ].map((s, i) => (
-            <div
-              key={s.label}
-              className={cn(
-                "px-5 py-4",
-                i % 2 === 1 && "border-l border-ink-100",
-                i >= 2 && "border-t border-ink-100 sm:border-t-0",
-                i === 2 && "sm:border-l",
-              )}
-            >
-              <p className="text-[13px] text-ink-600">{s.label}</p>
-              <p
-                className={cn(
-                  "mt-1 text-2xl font-semibold tabular-nums tracking-tight",
-                  s.warn ? "text-accent-700" : "text-ink-900",
-                )}
-              >
-                {s.value}
+      <div className="grid gap-x-10 gap-y-10 xl:grid-cols-[minmax(0,1fr)_22rem]">
+        <div className="min-w-0 space-y-10">
+          <section>
+            <SectionHead title="Waiting on you" hint={waiting ? undefined : "Nothing right now."} />
+            {tasks.length ? (
+              <Surface as="ul" className="divide-y divide-ink-100 overflow-hidden">
+                {tasks.map((t) => (
+                  <li key={t.href} className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:gap-5">
+                    <span aria-hidden className="grid size-10 shrink-0 place-items-center rounded-full bg-accent-100 text-accent-700">
+                      <t.Icon className="size-5" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[0.9375rem] font-medium text-ink-900">
+                        <span className="nums font-semibold">{t.count}</span> {t.label}
+                      </p>
+                      <p className="mt-0.5 text-sm text-ink-600">{t.detail}</p>
+                    </div>
+                    <ButtonLink href={t.href} variant="outline" size="sm" className="min-h-11 self-start sm:self-auto">
+                      {t.cta}
+                      <ArrowRight className="size-4" aria-hidden />
+                    </ButtonLink>
+                  </li>
+                ))}
+              </Surface>
+            ) : (
+              <p className="rounded-apple-xl border border-dashed border-ink-200 px-5 py-4 text-sm text-ink-600">
+                No payments, timesheets or meetings need you. New ones show up here first.
               </p>
-              <p className="mt-0.5 text-xs text-ink-600">{s.note}</p>
-            </div>
-          ))}
-        </Surface>
-      </section>
+            )}
+          </section>
 
-      <div className="grid min-w-0 gap-10 xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
-        {/* Projects */}
-        <section className="min-w-0">
-          <SectionHead
-            title="Projects"
-            hint={`${activeProjects.length} open of ${projects.length}`}
-            action={
-              projects.length ? (
+          <section>
+            <SectionHead
+              title="Projects"
+              hint={`${openProjects.length} open of ${projects.length}`}
+              action={
                 <Link href="/employer/projects" className="text-sm font-medium text-brand-700 hover:underline">
                   Manage
                 </Link>
-              ) : null
-            }
-          />
-          {projects.length === 0 ? (
-            <EmptyScene
-              title="No projects yet"
-              body="A project tells us the skills you need, so candidates are matched to it. It takes about five minutes."
-              next={{ label: "Create a project", href: "/employer/projects" }}
-              who="You - about five minutes"
+              }
             />
-          ) : (
-            <Surface as="ul" className="divide-y divide-ink-100 overflow-hidden">
-              {shownProjects.map((p) => {
-                const stats = proposalsByProject.get(p.id) ?? { total: 0, won: 0 };
-                const skills = ((p.skills as string[]) ?? []).slice(0, 3);
-                const open = p.status === "active";
-                return (
-                  <li key={p.id}>
-                    <Link
-                      href={
-                        skills.length
-                          ? `/employer/candidates?skills=${encodeURIComponent(((p.skills as string[]) ?? []).join(","))}`
-                          : "/employer/candidates"
-                      }
-                      className="group grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4 px-5 py-3.5 transition-colors hover:bg-ink-50/70"
-                    >
-                      <div className="min-w-0">
-                        <p className="flex items-center gap-2">
-                          <span
-                            aria-hidden
-                            className={cn("size-1.5 shrink-0 rounded-full", open ? "bg-success" : "bg-ink-300")}
-                          />
-                          <span className="truncate text-sm font-medium text-ink-900 group-hover:text-brand-700">
-                            {p.projectName}
-                          </span>
-                          <span className="sr-only">{open ? "(open)" : "(closed)"}</span>
+            {projects.length === 0 ? (
+              <EmptyScene
+                title="No projects yet"
+                body="A project tells us the skills you need, so candidates are matched to it. It takes about five minutes."
+                next={{ label: "Create a project", href: "/employer/projects?new=1" }}
+                who="You - about five minutes"
+              />
+            ) : (
+              <Surface as="ul" className="divide-y divide-ink-100 overflow-hidden">
+                {shownProjects.map((p) => {
+                  const stats = byProject.get(p.id) ?? { total: 0, won: 0 };
+                  const skills = ((p.skills as string[]) ?? []).slice(0, 4);
+                  const open = isProjectOpen(p.status);
+                  return (
+                    <li key={p.id}>
+                      <Link
+                        href={`/employer/candidates?project=${encodeURIComponent(p.id)}`}
+                        className="group grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4 px-5 py-4 transition-colors hover:bg-ink-50/70 focus-visible:bg-ink-50 focus-visible:outline-none"
+                      >
+                        <div className="min-w-0">
+                          <p className="flex flex-wrap items-center gap-2">
+                            <span className="truncate text-[0.9375rem] font-medium text-ink-900 group-hover:text-brand-700">{p.projectName}</span>
+                            {open ? null : <Pill tone="closed">Closed</Pill>}
+                          </p>
+                          <p className="mt-0.5 truncate text-sm text-ink-600">
+                            {scopeLabel(p.scopeOfWork)}
+                            {skills.length ? ` · ${skills.join(", ")}` : ""}
+                          </p>
+                        </div>
+                        <p className="nums text-right text-sm text-ink-600">
+                          <span className="font-semibold text-ink-900">{stats.total}</span> sent
+                          {stats.won ? (
+                            <span className="block text-success">
+                              <span className="font-semibold">{stats.won}</span> accepted
+                            </span>
+                          ) : null}
                         </p>
-                        <p className="mt-0.5 truncate pl-3.5 text-[13px] text-ink-600">
-                          {skills.join(" · ") || "No skills listed"}
-                        </p>
-                      </div>
-                      <p className="text-right text-[13px] tabular-nums text-ink-600">
-                        <span className="font-medium text-ink-800">{stats.total}</span> sent
-                        {stats.won ? (
-                          <>
-                            {" "}· <span className="font-medium text-success">{stats.won}</span> accepted
-                          </>
-                        ) : null}
-                      </p>
-                    </Link>
-                  </li>
-                );
-              })}
-            </Surface>
-          )}
-        </section>
+                      </Link>
+                    </li>
+                  );
+                })}
+              </Surface>
+            )}
+          </section>
+        </div>
 
-        {/* Candidates matching the open projects */}
-        <section className="min-w-0">
-          <SectionHead
-            title="Matches for your projects"
-            action={
-              <Link href="/employer/candidates" className="text-sm font-medium text-brand-700 hover:underline">
-                Browse all
-              </Link>
-            }
-          />
-          {candidates.length === 0 ? (
-            <p className="text-sm text-ink-600">No scored candidates yet.</p>
-          ) : (
-            <Surface as="ul" className="divide-y divide-ink-100 overflow-hidden">
-              {candidates.map((c) => {
-                const band = bandFor(c.score);
-                return (
-                  <li key={c.id}>
-                    <Link
-                      href={`/employer/intern/${encodeURIComponent(c.id)}`}
-                      className="group grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 px-4 py-3 transition-colors hover:bg-ink-50/70"
-                    >
-                      <CandidateAvatar
-                        photoUrl={c.photoUrl}
-                        initials={c.initials}
-                        className="size-9 rounded-full text-xs font-semibold"
-                      />
-                      <span className="min-w-0">
-                        <span className="block truncate text-sm font-medium text-ink-900 group-hover:text-brand-700">
-                          {displayNameOf(c, nameUnlocked.has(c.id))}
-                        </span>
-                        <span className="block truncate text-[13px] text-ink-600">
-                          {c.skills.slice(0, 3).join(" · ") || c.location || "Profile in progress"}
-                        </span>
-                      </span>
-                      <span className="text-right">
-                        <span className="block text-sm font-semibold tabular-nums text-ink-900">
-                          {c.score.toFixed(1)}
-                        </span>
-                        <span className="block text-[11px] text-ink-600">{PLAN_NAME[band.id]}</span>
-                      </span>
-                    </Link>
-                  </li>
-                );
-              })}
+        <aside className="min-w-0 space-y-8">
+          {next && nextAt ? (
+            <Surface className="p-5">
+              <p className="text-sm font-medium text-ink-600">Next meeting</p>
+              <p className="mt-1 text-base font-semibold text-ink-900">{formatSlotTime(nextAt, data.timezone)}</p>
+              <p className="mt-0.5 text-sm text-ink-600">Your timezone ({data.timezone.replace(/_/g, " ")})</p>
+              {next.meetingLink ? (
+                <ButtonLink href="/employer/schedule" size="sm" block className="mt-4 min-h-11">
+                  <Video className="size-4" aria-hidden />
+                  Open in schedule
+                </ButtonLink>
+              ) : (
+                <ButtonLink href="/employer/schedule" variant="outline" size="sm" block className="mt-4 min-h-11">
+                  Open schedule
+                </ButtonLink>
+              )}
             </Surface>
-          )}
-        </section>
+          ) : null}
+
+          <section>
+            <SectionHead
+              title="Matches for your projects"
+              action={
+                <Link href="/employer/candidates" className="text-sm font-medium text-brand-700 hover:underline">
+                  Browse all
+                </Link>
+              }
+            />
+            {data.candidates.length === 0 ? (
+              <p className="text-sm text-ink-600">No scored candidates match yet. New ones appear as they finish their AI interview.</p>
+            ) : (
+              <Surface as="ul" className="divide-y divide-ink-100 overflow-hidden">
+                {data.candidates.map((c) => {
+                  const band = bandFor(c.score);
+                  return (
+                    <li key={c.id}>
+                      <Link
+                        href={`/employer/intern/${encodeURIComponent(c.id)}`}
+                        className="group grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 px-4 py-3.5 transition-colors hover:bg-ink-50/70 focus-visible:bg-ink-50 focus-visible:outline-none"
+                      >
+                        <span aria-hidden className="grid size-10 place-items-center rounded-full bg-brand-50 text-sm font-semibold text-brand-800">
+                          {c.initials}
+                        </span>
+                        <span className="min-w-0">
+                          <span className="block truncate text-sm font-semibold text-ink-900 group-hover:text-brand-700">{c.initials}</span>
+                          <span className="block truncate text-sm text-ink-600">{c.skills.slice(0, 3).join(", ") || c.location || "Profile in progress"}</span>
+                        </span>
+                        <span className="text-right">
+                          <span className="nums block text-lg font-semibold leading-tight text-brand-700">{c.score.toFixed(1)}</span>
+                          <span className="block text-xs text-ink-500">{PLAN_NAME[band.id]}</span>
+                        </span>
+                      </Link>
+                    </li>
+                  );
+                })}
+              </Surface>
+            )}
+          </section>
+        </aside>
       </div>
-
     </div>
   );
+}
+
+/** The booked slot of an interview, if one was picked. */
+function slotDate(iv: InterviewRow): Date | null {
+  const pick = iv.selectedSlot === 1 ? iv.slot1 : iv.selectedSlot === 2 ? iv.slot2 : iv.selectedSlot === 3 ? iv.slot3 : null;
+  if (!pick) return null;
+  const d = new Date(pick);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+async function load(employerId: string): Promise<Loaded> {
+  const db = getDb();
+  const [employerRow, projectRows, proposalRows, sheetRows, interviewRows, cartRows, payable] = await Promise.all([
+    db
+      .select({ companyName: schema.employers.companyName, country: schema.employers.country, state: schema.employers.state, city: schema.employers.city })
+      .from(schema.employers)
+      .where(eq(schema.employers.id, employerId))
+      .limit(1),
+    db.select().from(schema.projects).where(eq(schema.projects.employerId, employerId)).orderBy(desc(schema.projects.createdAt)),
+    db
+      .select({ status: schema.proposals.status, projectId: schema.proposals.projectId, internId: schema.proposals.internId })
+      .from(schema.proposals)
+      .where(eq(schema.proposals.employerId, employerId)),
+    db
+      .select({ id: schema.timesheets.id })
+      .from(schema.timesheets)
+      .where(and(eq(schema.timesheets.employerId, employerId), eq(schema.timesheets.status, "submitted"))),
+    db
+      .select()
+      .from(schema.interviews)
+      .where(and(eq(schema.interviews.employerId, employerId), inArray(schema.interviews.status, ["pending", "proposed", "scheduled"]))),
+    db
+      .select({ internId: schema.employerCartItems.internId })
+      .from(schema.employerCartItems)
+      .where(and(eq(schema.employerCartItems.employerId, employerId), inArray(schema.employerCartItems.listType, ["cart", "checkout"]))),
+    payableCheckout(employerId),
+  ]);
+
+  const employer = employerRow[0];
+  // "No proposal yet" means exactly that: anyone already proposed to is out.
+  const proposedTo = new Set(proposalRows.map((p) => p.internId));
+  const shortlisted = new Set(cartRows.map((c) => c.internId).filter((id) => !proposedTo.has(id))).size;
+
+  const now = Date.now();
+  const upcoming = interviewRows
+    .filter((iv) => iv.status === "scheduled")
+    .map((iv) => ({ iv, at: slotDate(iv), end: meetingEndsAt(iv) }))
+    .filter((x) => x.at && (x.end ?? x.at.getTime()) > now)
+    .sort((a, b) => a.at!.getTime() - b.at!.getTime());
+
+  // Candidates who match the skills this employer is hiring for, best score
+  // first; the top of the pool when no open project lists skills. Same pool
+  // rule as the candidate browser.
+  const wanted = Array.from(
+    new Set(projectRows.filter((p) => isProjectOpen(p.status)).flatMap((p) => (p.skills as string[]) ?? [])),
+  ).map((s) => s.toLowerCase());
+  const pool = await db
+    .select({ user: schema.users, onboarding: schema.internOnboarding })
+    .from(schema.users)
+    .innerJoin(schema.internOnboarding, eq(schema.users.id, schema.internOnboarding.userId))
+    .where(and(...candidatePoolClauses()))
+    .orderBy(desc(scoreExpr()), desc(schema.internOnboarding.updatedAt))
+    .limit(60);
+  // `intern_onboarding.user_id` is not unique; one row per intern.
+  const seen = new Set<string>();
+  const profiles = pool
+    .filter((r) => !seen.has(r.user.id) && Boolean(seen.add(r.user.id)))
+    .filter((r) => !proposedTo.has(r.user.id))
+    .map((r) => toCandidateProfile(r.user, r.onboarding));
+  const matching = wanted.length ? profiles.filter((c) => c.skills.some((s) => wanted.includes(s.toLowerCase()))) : profiles;
+
+  return {
+    companyName: employer?.companyName ?? "",
+    timezone: timezoneForLocation(employer ?? {}),
+    projects: projectRows,
+    proposals: proposalRows,
+    submittedSheets: sheetRows.length,
+    pendingInterviews: interviewRows.filter((i) => i.status === "pending" || i.status === "proposed").length,
+    nextInterview: upcoming[0]?.iv ?? null,
+    shortlisted,
+    toPay: payable.lines.length,
+    candidates: (matching.length ? matching : profiles).slice(0, 5),
+  };
 }

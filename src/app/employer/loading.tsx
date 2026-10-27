@@ -1,86 +1,39 @@
 import { Skeleton } from "@/components/ui/skeleton";
 
+/**
+ * Shown while any employer screen loads. Shaped like the common page: a
+ * title and lede, a row of figures, then a list, so the frame doesn't jump
+ * when the real page arrives. The shell (sidebar, top bar) stays put.
+ */
 export default function EmployerLoading() {
   return (
-    <div className="space-y-8" aria-busy="true" aria-label="Loading employer dashboard">
-      {/* Hero command card */}
-      <div className="rounded-[20px] border border-ink-200/70 bg-white p-5 sm:p-7">
-        <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
-          <div className="max-w-xl space-y-2">
-            <Skeleton className="h-8 w-64 rounded-lg" />
-            <Skeleton className="h-4 w-full max-w-md rounded-md" />
-          </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <Skeleton className="h-11 w-40 rounded-[10px]" />
-            <Skeleton className="h-11 w-36 rounded-[10px]" />
-          </div>
-        </div>
+    <div aria-busy="true" aria-live="polite">
+      <span className="sr-only">Loading</span>
+      <div className="mb-8 space-y-3">
+        <Skeleton className="h-9 w-64 max-w-full rounded-apple-sm" />
+        <Skeleton className="h-5 w-[28rem] max-w-full rounded-apple-sm" />
       </div>
 
-      {/* 3 quiet stats */}
-      <div className="grid grid-cols-3 gap-px overflow-hidden rounded-[20px] border border-ink-200/70 bg-ink-100">
-        {Array.from({ length: 3 }).map((_, i) => (
-          <div
-            key={i}
-            className="bg-white p-3 sm:p-5 space-y-2 sm:space-y-3"
-          >
-            <Skeleton className="h-3.5 w-24 rounded-md" />
-            <Skeleton className="h-7 w-16 rounded-md" />
-            <Skeleton className="h-3.5 w-28 rounded-md" />
+      <div className="mb-8 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="space-y-3 rounded-apple-lg border border-ink-200/80 bg-white p-5">
+            <Skeleton className="h-4 w-24 rounded-apple-sm" />
+            <Skeleton className="h-8 w-16 rounded-apple-sm" />
           </div>
         ))}
       </div>
 
-      {/* Main grid: projects + candidates rail */}
-      <div className="grid min-w-0 grid-cols-1 gap-8 lg:grid-cols-3">
-        <div className="min-w-0 space-y-3 lg:col-span-2">
-          <div className="flex items-center justify-between">
-            <div className="space-y-1.5">
-              <Skeleton className="h-5 w-44 rounded-md" />
-              <Skeleton className="h-3.5 w-64 rounded-md" />
+      <div className="divide-y divide-ink-100 overflow-hidden rounded-apple-xl border border-ink-200/80 bg-white">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <div key={i} className="flex items-center gap-4 px-5 py-4">
+            <Skeleton className="size-10 shrink-0 rounded-full" />
+            <div className="min-w-0 flex-1 space-y-2">
+              <Skeleton className="h-4 w-48 max-w-full rounded-apple-sm" />
+              <Skeleton className="h-3.5 w-72 max-w-full rounded-apple-sm" />
             </div>
-            <Skeleton className="h-8 w-24 rounded-md" />
+            <Skeleton className="hidden h-9 w-28 rounded-apple-sm sm:block" />
           </div>
-          {Array.from({ length: 3 }).map((_, i) => (
-            <div
-              key={i}
-              className="rounded-[20px] border border-ink-200/70 bg-white p-5 space-y-3"
-            >
-              <div className="flex items-center justify-between gap-3">
-                <Skeleton className="h-5 w-48 rounded-md" />
-                <Skeleton className="h-6 w-16 rounded-full" />
-              </div>
-              <Skeleton className="h-3.5 w-72 max-w-full rounded-md" />
-              <div className="flex gap-1.5">
-                <Skeleton className="h-6 w-16 rounded-md" />
-                <Skeleton className="h-6 w-20 rounded-md" />
-                <Skeleton className="h-6 w-14 rounded-md" />
-              </div>
-            </div>
-          ))}
-        </div>
-
-        <div className="min-w-0 space-y-3">
-          <div className="space-y-1.5">
-            <Skeleton className="h-5 w-40 rounded-md" />
-            <Skeleton className="h-3.5 w-56 rounded-md" />
-          </div>
-          {Array.from({ length: 3 }).map((_, i) => (
-            <div
-              key={i}
-              className="rounded-[20px] border border-ink-200/70 bg-white p-4 space-y-3"
-            >
-              <div className="flex items-center gap-3">
-                <Skeleton className="size-10 rounded-[10px]" />
-                <div className="flex-1 space-y-1.5">
-                  <Skeleton className="h-4 w-28 rounded-md" />
-                  <Skeleton className="h-3 w-24 rounded-md" />
-                </div>
-                <Skeleton className="h-6 w-14 rounded-full" />
-              </div>
-            </div>
-          ))}
-        </div>
+        ))}
       </div>
     </div>
   );
