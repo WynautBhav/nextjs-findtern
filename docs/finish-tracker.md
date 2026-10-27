@@ -145,3 +145,10 @@ branch, not to be touched: `feat/college-partners` (worktree
   Meet link can be made; the admin dashboard's attention band shows
   "Google calendar not connected". On Vercel staging (no Google config, prod
   mode) that warning is permanent and expected.
+- 28 Oct: WP3 harness merged (`e1cf091`); QA-001 closed by the tester;
+  QA-002 (CountUp hydration mismatch under reduced motion, also hit
+  /intern/record) fixed in `db3cafe`, awaiting retest. GitHub refused the
+  branch push: the gh token lacks the `workflow` scope needed for
+  .github/workflows/ci.yml; owner runs `gh auth refresh -s workflow`.
+  Environment-only (not bugs): uploads 404 on local copies; admin login
+  rate-limits after ~3 rapid logins per IP.
