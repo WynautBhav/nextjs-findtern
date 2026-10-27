@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Clock, Loader2, Plus } from "lucide-react";
+import { AlertCircle, CalendarPlus, Loader2 } from "lucide-react";
 
 import { csrfFetch } from "@/lib/client-fetch";
+import { buttonClass } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -14,17 +15,26 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
-export interface AcceptedProposalOption {
-  id: string;
-  companyName: string;
-  roleTitle?: string;
-}
-
+/**
+ * Starts the next timesheet of one hired internship.
+ *
+ * The server picks the period (the earliest one of the engagement that has
+ * started and is not on a sheet yet); the page works the same rule out in
+ * advance and passes it in as `period`, so the dialog says exactly what
+ * will open. On success the new sheet opens for editing, as legacy did.
+ */
 export function CreateTimesheetModal({
-  proposals,
+  proposalId,
+  roleTitle,
+  company,
+  period,
   className,
 }: {
-  proposals: AcceptedProposalOption[];
+  proposalId: string;
+  roleTitle: string;
+  company: string;
+  /** "18 Oct – 17 Nov 2026", the period that will open. */
+  period: string;
   className?: string;
 }) {
   const router = useRouter();
@@ -32,47 +42,30 @@ export function CreateTimesheetModal({
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
-  const [selectedProposalId, setSelectedProposalId] = useState(proposals[0]?.id || "");
-
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
-    if (!selectedProposalId) {
-      setErrorMsg("Please select an engagement/company.");
-      return;
-    }
-
     setLoading(true);
     setErrorMsg("");
-
     try {
       const res = await csrfFetch("/api/intern/timesheets", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        // No month: the server opens the earliest engagement period that
-        // has started and has no timesheet yet.
-        body: JSON.stringify({ proposalId: selectedProposalId }),
+        body: JSON.stringify({ proposalId }),
       });
-
-      const data = await res.json().catch(() => ({}));
-
+      const data = (await res.json().catch(() => ({}))) as { error?: string; timesheet?: { id?: string }; timesheetId?: string };
       if (!res.ok) {
-        setErrorMsg(
-          data.error || (res.status === 409 ? "A timesheet for this period already exists." : "Failed to create timesheet."),
-        );
+        setErrorMsg(data.error || "Could not start the timesheet. Try again.");
         return;
       }
-
       setOpen(false);
+      const id = data.timesheet?.id;
+      router.push(id ? `/intern/timesheets?sheet=${encodeURIComponent(id)}` : `/intern/timesheets?proposalId=${encodeURIComponent(proposalId)}`);
       router.refresh();
-    } catch (err: unknown) {
-      setErrorMsg(err instanceof Error ? err.message : "Something went wrong.");
+    } catch {
+      setErrorMsg("Could not reach Findtern. Check your connection and try again.");
     } finally {
       setLoading(false);
     }
-  }
-
-  if (proposals.length === 0) {
-    return null;
   }
 
   return (
@@ -83,77 +76,51 @@ export function CreateTimesheetModal({
           setErrorMsg("");
           setOpen(true);
         }}
-        className={
-          className ||
-          "apple-spring apple-pressable inline-flex min-h-11 items-center gap-1.5 rounded-[10px] bg-brand-700 px-3.5 text-xs font-semibold text-white shadow-sm hover:bg-brand-800"
-        }
+        className={className ?? buttonClass({ variant: "primary", size: "md" })}
       >
-        <Plus className="size-3.5" />
-        New Monthly Timesheet
+        <CalendarPlus className="size-4" aria-hidden />
+        New timesheet
       </button>
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Clock className="size-5 text-brand-600" />
-              Start New Timesheet
-            </DialogTitle>
+            <DialogTitle>Start a timesheet</DialogTitle>
             <DialogDescription>
-              Opens the next month of your internship, counted from your joining date (for example
-              18 Sep to 17 Oct). Mark each day as it happens and send it once the period ends.
+              Periods follow your internship month by month from your joining date. Mark each day,
+              then send it to your manager once every day has a status.
             </DialogDescription>
           </DialogHeader>
 
-          <form onSubmit={handleCreate} className="space-y-4 pt-2">
-            {errorMsg && (
-              <div className="rounded-[10px] border border-rose-200 bg-rose-50 p-3 text-xs font-medium text-rose-700">
-                {errorMsg}
+          <form onSubmit={handleCreate} className="space-y-5 pt-1">
+            <dl className="divide-y divide-ink-100 rounded-apple-lg border border-ink-200/80 bg-ink-50/60 px-4">
+              <div className="flex items-baseline justify-between gap-4 py-3">
+                <dt className="text-sm text-ink-600">Internship</dt>
+                <dd className="min-w-0 text-right text-sm font-medium text-ink-900">
+                  {roleTitle}
+                  <span className="block text-xs font-normal text-ink-600">{company}</span>
+                </dd>
               </div>
-            )}
+              <div className="flex items-baseline justify-between gap-4 py-3">
+                <dt className="text-sm text-ink-600">Period</dt>
+                <dd className="nums text-right text-sm font-semibold text-ink-900">{period}</dd>
+              </div>
+            </dl>
 
-            {/* Engagement / Proposal selection */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-ink-800">
-                Active Engagement <span className="text-rose-500">*</span>
-              </label>
-              {proposals.length === 1 ? (
-                <div className="rounded-[10px] border border-ink-200 bg-ink-50/70 p-3 text-xs">
-                  <p className="font-semibold text-ink-900">{proposals[0].companyName}</p>
-                  {proposals[0].roleTitle && (
-                    <p className="text-text-subtle">{proposals[0].roleTitle}</p>
-                  )}
-                </div>
-              ) : (
-                <select
-                  value={selectedProposalId}
-                  onChange={(e) => setSelectedProposalId(e.target.value)}
-                  className="apple-spring w-full rounded-[10px] border border-ink-200 bg-white px-3 py-2 text-[14px] text-ink-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
-                >
-                  {proposals.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.companyName} {p.roleTitle ? `(${p.roleTitle})` : ""}
-                    </option>
-                  ))}
-                </select>
-              )}
-            </div>
+            {errorMsg ? (
+              <p role="alert" className="flex items-start gap-2 rounded-apple-md bg-danger-soft px-4 py-3 text-sm text-danger">
+                <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden />
+                {errorMsg}
+              </p>
+            ) : null}
 
-            <DialogFooter className="pt-2">
-              <button
-                type="button"
-                onClick={() => setOpen(false)}
-                className="apple-spring apple-pressable inline-flex min-h-11 items-center rounded-[10px] border border-ink-200 px-3.5 py-1.5 text-xs font-medium text-ink-700 hover:bg-ink-50"
-              >
+            <DialogFooter className="gap-2 sm:gap-2">
+              <button type="button" onClick={() => setOpen(false)} className={buttonClass({ variant: "light", size: "md" })}>
                 Cancel
               </button>
-              <button
-                type="submit"
-                disabled={loading}
-                className="apple-spring apple-pressable inline-flex min-h-11 items-center gap-1.5 rounded-[10px] bg-brand-700 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-brand-800 disabled:opacity-50"
-              >
-                {loading && <Loader2 className="size-3.5 animate-spin" />}
-                Initialize Period
+              <button type="submit" disabled={loading} className={buttonClass({ variant: "primary", size: "md" })}>
+                {loading ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
+                Start timesheet
               </button>
             </DialogFooter>
           </form>
