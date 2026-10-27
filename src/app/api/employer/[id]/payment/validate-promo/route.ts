@@ -23,10 +23,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   // Priced exactly as the order route prices it: one hire, in the chosen mode.
   const { lines } = await payableCheckout(id, { proposalIds: parsed.data.proposalIds, mode: parsed.data.mode });
-  const orderMinor = lines.filter((l) => l.currency === parsed.data.currency).reduce((s, l) => s + l.charge.totalMinor, 0);
+  const paying = lines.filter((l) => l.currency === parsed.data.currency);
+  const orderMinor = paying.reduce((s, l) => s + l.charge.totalMinor, 0);
+  const feeMinor = paying.reduce((s, l) => s + l.charge.perHireMinor, 0);
   if (orderMinor <= 0) return NextResponse.json({ error: "Nothing payable in this currency" }, { status: 400 });
 
-  const quote = await quotePromo({ code: parsed.data.code, subjectId: id, orderMinor, currency: parsed.data.currency, audience: "employer" });
+  const quote = await quotePromo({ code: parsed.data.code, subjectId: id, orderMinor, currency: parsed.data.currency, audience: "employer", undiscountableMinor: feeMinor });
   if (!quote.ok) return NextResponse.json({ error: quote.error }, { status: quote.status });
   return NextResponse.json({ code: quote.promo.code, discountMinor: quote.discountMinor, payableMinor: quote.payableMinor });
 }

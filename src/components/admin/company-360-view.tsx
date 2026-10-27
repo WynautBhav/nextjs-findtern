@@ -30,7 +30,7 @@ import { parseOffer } from "@/lib/offer";
 import { toInrMinor } from "@/lib/admin/money";
 
 export type Company360Props = {
-  company: Employer;
+  company: Omit<Employer, "password">;
   projects: Project[];
   proposals: (Proposal & { internName?: string; internEmail?: string })[];
   interviews: (Interview & { internName?: string; internEmail?: string })[];

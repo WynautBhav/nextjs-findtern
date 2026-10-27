@@ -13,7 +13,8 @@ import { requireRole } from "@/lib/auth";
 import { getDb, schema } from "@/lib/db";
 import { eq } from "drizzle-orm";
 import { loadInternData, openProjects } from "@/lib/intern-data";
-import { isPast, nextAction, slotOf } from "@/lib/journey";
+import { isMeetingLinkLive } from "@/lib/employer-interview-rules";
+import { nextAction, slotOf } from "@/lib/journey";
 import { formatMoney, formatSlotTime } from "@/lib/format";
 import { isInternPaid } from "@/lib/payments";
 import { paymentsAreFree } from "@/lib/razorpay";
@@ -109,7 +110,8 @@ export default async function InternHome() {
   const upcomingInterviewItem = scheduledInterviews
     .map((i) => ({ interview: i, when: slotOf(i) ?? (i.createdAt || new Date()) }))
     .filter((x): x is { interview: (typeof scheduledInterviews)[0]; when: Date } =>
-      Boolean(x.when && (!slotOf(x.interview) || !isPast(x.when))),
+      // A booked meeting keeps its Join link until slot + 60 min (legacy).
+      Boolean(x.when && (!slotOf(x.interview) || isMeetingLinkLive(x.interview))),
     )
     .sort((a, b) => a.when.getTime() - b.when.getTime())[0] ?? null;
 

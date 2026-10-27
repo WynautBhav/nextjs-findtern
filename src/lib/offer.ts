@@ -87,6 +87,20 @@ export function monthsOf(duration: unknown): number {
   return m ? Math.max(1, Number(m[1])) : 1;
 }
 
+/**
+ * The hiring fee carried by the offer. The legacy edit page saves totalPrice
+ * with the fee already inside and drops `perHireCharge`; without this, the fee
+ * would be added on top again at checkout (DB-02). Inferred only when both
+ * amounts are stored and the total is above the engagement; otherwise null,
+ * and checkout adds the standard fee.
+ */
+function perHireOf(o: Record<string, unknown>, months: number): number | null {
+  if (o.perHireCharge != null) return num(o.perHireCharge) === 0 ? 0 : toMinor(o.perHireCharge);
+  const total = num(o.totalPrice);
+  const monthly = num(o.monthlyAmount ?? o.monthly_amount);
+  return total != null && monthly != null ? toMinor(total - monthly * months) : null;
+}
+
 export function parseOffer(raw: unknown, rowCurrency?: string | null): Offer {
   const o = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
   const currency: OfferCurrency =
@@ -113,7 +127,7 @@ export function parseOffer(raw: unknown, rowCurrency?: string | null): Offer {
     monthlyMinor: toMinor(o.monthlyAmount ?? o.monthly_amount),
     totalMinor: toMinor(o.totalPrice),
     hourlyRateMinor: toMinor(o.hourlyRate),
-    perHireMinor: num(o.perHireCharge) === 0 ? 0 : toMinor(o.perHireCharge),
+    perHireMinor: perHireOf(o, monthsOf(duration)),
     fullTime: ft
       ? {
           annualCtcMinor: num(ft.annualCtcMinor) ?? toMinor(ft.annualCtc),

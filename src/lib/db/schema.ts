@@ -844,7 +844,7 @@ export const promoCodes = pgTable("promo_codes", {
   validUntil: timestamp("valid_until"),
   isActive: boolean("is_active").notNull().default(true),
   /** Where the code can be redeemed: "intern" | "employer" | "both". */
-  appliesTo: text("applies_to").notNull().default("both"),
+  appliesTo: text("applies_to").notNull().default("intern"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

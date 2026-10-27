@@ -92,6 +92,18 @@ test("checkout: a fee already inside the stored total is not charged twice", () 
   assert.equal(c.perHireMinor, 500_000);
 });
 
+test("checkout: a legacy-edited offer (fee inside the total, no perHireCharge) is not charged twice", () => {
+  // Live shape: score below 6, no stipend, the ₹5,000 fee is the whole total.
+  const feeOnly = lineCharge(parseOffer({ monthlyAmount: 0, duration: "2m", totalPrice: 5000 }, "INR"), 4);
+  assert.equal(feeOnly.totalMinor, 500_000);
+  assert.equal(feeOnly.perHireMinor, 500_000);
+  const withStipend = lineCharge(parseOffer({ monthlyAmount: 10000, duration: "2m", totalPrice: 25000 }, "INR"), 8);
+  assert.equal(withStipend.totalMinor, 2_500_000);
+  // A total equal to the engagement carried no fee: the standard one is added.
+  const noFee = lineCharge(parseOffer({ monthlyAmount: 32000, duration: "1m", totalPrice: 32000 }, "INR"), 8);
+  assert.equal(noFee.totalMinor, 3_200_000 + 500_000);
+});
+
 test("checkout: full-time offer is 8.33% of CTC", () => {
   const c = lineCharge(parseOffer({ fullTimeOffer: { annualCtc: 600000 } }, "INR"), 8);
   assert.equal(c.totalMinor, Math.round(60_000_000 * 0.0833));

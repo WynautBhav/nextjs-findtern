@@ -1,13 +1,13 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { desc, eq, inArray } from "drizzle-orm";
+import { desc, eq, getTableColumns, inArray } from "drizzle-orm";
 
 import { ContactEditor } from "@/components/admin/contact-editor";
 import { ViewAsButton } from "@/components/admin/view-as-button";
 import { getSession } from "@/lib/auth";
 import { canViewAs } from "@/lib/admin/impersonation";
 import { ApprovalSelect } from "@/components/admin/approval-select";
-import { getDb, schema } from "@/lib/db";
+import { getDb, schema, withoutPassword } from "@/lib/db";
 import { Intern360View } from "@/components/admin/intern-360-view";
 
 export async function generateMetadata({
@@ -34,7 +34,7 @@ export default async function AdminInternDetail({ params }: { params: Promise<{ 
   const viewAs = await canViewAs(session?.uid, session?.permissions);
 
   const db = getDb();
-  const [user] = await db.select().from(schema.users).where(eq(schema.users.id, id)).limit(1);
+  const [user] = await db.select(withoutPassword(getTableColumns(schema.users))).from(schema.users).where(eq(schema.users.id, id)).limit(1);
   if (!user) notFound();
 
   const [onboarding] = await db

@@ -323,8 +323,10 @@ export async function POST(req: Request) {
     city: parsed.data.city ?? existing?.city ?? null,
     state: parsed.data.state ?? existing?.state ?? null,
     pinCode: parsed.data.pinCode ?? existing?.pinCode ?? null,
-    aadhaarNumber: parsed.data.aadhaarNumber ?? existing?.aadhaarNumber ?? null,
-    panNumber: parsed.data.panNumber ?? existing?.panNumber ?? null,
+    // Blank means "not given yet": stored as NULL, never "". Both columns are
+    // UNIQUE, so a second "" would fail every later intern's save (INT-32).
+    aadhaarNumber: parsed.data.aadhaarNumber || existing?.aadhaarNumber || null,
+    panNumber: parsed.data.panNumber || existing?.panNumber || null,
     experienceJson: stored.experienceJson ?? existing?.experienceJson ?? [],
     previewSummary: parsed.data.previewSummary ?? existing?.previewSummary ?? null,
     skills: stored.skills ?? existing?.skills ?? [],
@@ -335,10 +337,18 @@ export async function POST(req: Request) {
     updatedAt: new Date(),
   };
 
-  if (existing) {
-    await db.update(schema.internOnboarding).set(values).where(eq(schema.internOnboarding.id, existing.id));
-  } else {
-    await db.insert(schema.internOnboarding).values(values);
+  try {
+    if (existing) {
+      await db.update(schema.internOnboarding).set(values).where(eq(schema.internOnboarding.id, existing.id));
+    } else {
+      await db.insert(schema.internOnboarding).values(values);
+    }
+  } catch (err) {
+    // Two accounts saving the same Aadhaar/PAN at once get past the check above.
+    if ((err as { code?: string; cause?: { code?: string } }).code === "23505" || (err as { cause?: { code?: string } }).cause?.code === "23505") {
+      return NextResponse.json({ error: "This Aadhaar or PAN number is already linked to another account." }, { status: 409 });
+    }
+    throw err;
   }
   return NextResponse.json({ ok: true });
 }

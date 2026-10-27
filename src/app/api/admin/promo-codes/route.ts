@@ -17,7 +17,7 @@ const bodySchema = z.object({
   validFrom: z.string().datetime().nullish(),
   validUntil: z.string().datetime().nullish(),
   isActive: z.boolean().default(true),
-  appliesTo: z.enum(PROMO_APPLIES_TO).default("both"),
+  appliesTo: z.enum(PROMO_APPLIES_TO).default("intern"),
 })
   .refine((b) => b.discountType !== "percentage" || b.discountValue === undefined || b.discountValue <= 100, {
     message: "A percentage discount can't be more than 100",

@@ -42,12 +42,15 @@ export default async function InternInterviews() {
   const isAi = (i: (typeof data.interviews)[number]) => data.aiEmployerIds.has(i.employerId);
   const aiInterview = data.interviews.find(isAi);
 
-  // An open invite whose slots have all passed is expired, not upcoming.
+  // An open invite whose slots have all passed is expired, not upcoming. A
+  // booked meeting stays upcoming, with its Join link, until the link window
+  // closes (legacy: slot + 60 min), not the moment it starts.
+  const joinable = (i: (typeof data.interviews)[number]) => Boolean(i.selectedSlot) && isMeetingLinkLive(i);
   const upcomingEmployerInterviews = data.interviews.filter(
-    (i) => !isAi(i) && (i.status === "scheduled" || i.status === "pending") && !isStaleInterview(i),
+    (i) => !isAi(i) && (i.status === "scheduled" || i.status === "pending") && (!isStaleInterview(i) || joinable(i)),
   );
   const past = data.interviews.filter(
-    (i) => !isAi(i) && (i.status === "completed" || i.status === "missed" || isStaleInterview(i)),
+    (i) => !isAi(i) && (i.status === "completed" || i.status === "missed" || (isStaleInterview(i) && !joinable(i))),
   );
 
   const extra = (data.onboarding?.extraData ?? {}) as Record<string, unknown>;
@@ -218,13 +221,13 @@ export default async function InternInterviews() {
                             <p className="mt-3 text-pretty text-xs leading-relaxed text-ink-600">
                               This round was marked as missed. Message the company directly if you want to reschedule.
                             </p>
-                          ) : interview.notes?.trim() ? (
+                          ) : feedbackText(interview.notes) ? (
                             <div className="mt-3 rounded-xl border border-brand-200 bg-brand-50/50 p-4">
                               <p className="text-xs font-semibold text-brand-800">
                                 Feedback from the company
                               </p>
                               <p className="mt-1 text-xs leading-relaxed text-ink-800">
-                                {interview.notes}
+                                {feedbackText(interview.notes)}
                               </p>
                             </div>
                           ) : (
@@ -261,4 +264,14 @@ export default async function InternInterviews() {
       </Surface>
     </div>
   );
+}
+
+/**
+ * The company's feedback only: the `feedback_text:` line of the notes (legacy
+ * parseNoteText). The rest of the field holds staff notes and the feedback /
+ * recording links, which are not for the candidate.
+ */
+function feedbackText(notes: string | null): string {
+  const line = (notes ?? "").split("\n").map((l) => l.trim()).find((l) => l.toLowerCase().startsWith("feedback_text:"));
+  return line ? line.slice("feedback_text:".length).trim() : "";
 }

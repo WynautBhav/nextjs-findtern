@@ -1,13 +1,13 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { desc, eq, inArray } from "drizzle-orm";
+import { desc, eq, getTableColumns, inArray } from "drizzle-orm";
 
 import { ContactEditor } from "@/components/admin/contact-editor";
 import { ViewAsButton } from "@/components/admin/view-as-button";
 import { getSession } from "@/lib/auth";
 import { canViewAs } from "@/lib/admin/impersonation";
 import { CompanyControls } from "@/components/admin/company-controls";
-import { getDb, schema } from "@/lib/db";
+import { getDb, schema, withoutPassword } from "@/lib/db";
 import { Company360View } from "@/components/admin/company-360-view";
 import { monthlyDues } from "@/lib/dues";
 import { parseOffer } from "@/lib/offer";
@@ -41,7 +41,7 @@ export default async function AdminCompanyDetailPage({
   const viewAs = await canViewAs(session?.uid, session?.permissions);
 
   const [company] = await db
-    .select()
+    .select(withoutPassword(getTableColumns(schema.employers)))
     .from(schema.employers)
     .where(eq(schema.employers.id, id))
     .limit(1);

@@ -65,11 +65,11 @@ export function StaffRolesManager({
   initialStaff,
   initialRoles,
 }: {
-  initialStaff: Admin[];
+  initialStaff: Omit<Admin, "password">[];
   initialRoles: RoleDef[];
 }) {
   const router = useRouter();
-  const [staffList, setStaffList] = useState<Admin[]>(initialStaff);
+  const [staffList, setStaffList] = useState<Omit<Admin, "password">[]>(initialStaff);
   const [rolesList, setRolesList] = useState<RoleDef[]>(initialRoles);
 
   const [staffModalOpen, setStaffModalOpen] = useState(false);

@@ -30,6 +30,13 @@ export function orderProposalIds(raw: Raw): string[] {
   return Array.isArray(ids) ? ids.map((v) => String(v ?? "").trim()).filter(Boolean) : [];
 }
 
+/** Of those, the monthly instalments of placements that are already hired. */
+export function orderDueIds(raw: Raw): string[] {
+  const r = (raw ?? {}) as Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
+  const due = (r.notes ?? r.order?.notes ?? {}).dueProposalIds;
+  return Array.isArray(due) ? due.map((v) => String(v ?? "").trim()).filter(Boolean) : [];
+}
+
 /**
  * Is a payment for this proposal open right now? The checkout keeps an
  * unpaid order for 30 minutes; changing the offer under it would bill (or
@@ -89,28 +96,32 @@ export async function settleEmployerOrder(input: {
     await recordPromoUse({ code: promo.code, subjectId: order.employerId, orderId: input.orderId, discountMinor: promo.discountMinor });
   }
 
-  // Only the proposals this order paid for become hires.
+  // Only the proposals this order paid for become hires. A month's instalment
+  // for a running placement (dueProposalIds) is already hired: it is paid,
+  // not hired again, and must not count as a missing hire.
   const ids = orderProposalIds(order.raw);
   if (ids.length === 0) return { ok: true, hired: 0 };
-  const hired = await db
+  const dueIds = new Set(orderDueIds(order.raw));
+  const hireIds = ids.filter((pid) => !dueIds.has(pid));
+  const hired = hireIds.length === 0 ? [] : await db
     .update(schema.proposals)
     .set({ status: "hired", hiredAt: new Date(), updatedAt: new Date() })
     .where(
       and(
         eq(schema.proposals.employerId, order.employerId),
-        inArray(schema.proposals.id, ids),
+        inArray(schema.proposals.id, hireIds),
         inArray(schema.proposals.status, ["accepted", "processing"]),
       ),
     )
     .returning({ id: schema.proposals.id, internId: schema.proposals.internId });
-  if (hired.length < ids.length) {
+  if (hired.length < hireIds.length) {
     // Paid for proposals that were withdrawn or already paid in between:
     // flag the order so accounts can refund the difference.
     await db
       .update(schema.employerPayments)
-      .set({ raw: { ...((order.raw ?? {}) as Record<string, unknown>), needsReview: { reason: "not_all_hired", expected: ids.length, hired: hired.length } } })
+      .set({ raw: { ...((order.raw ?? {}) as Record<string, unknown>), needsReview: { reason: "not_all_hired", expected: hireIds.length, hired: hired.length } } })
       .where(eq(schema.employerPayments.id, order.id));
-    console.error(`[payments] order ${input.orderId}: paid for ${ids.length}, hired ${hired.length} - needs review`);
+    console.error(`[payments] order ${input.orderId}: paid for ${hireIds.length} hires, hired ${hired.length} - needs review`);
   }
   // Legacy routes.ts:15658: a hired intern's onboarding status moves to
   // "Onboarding" until they are set up with the company.
@@ -141,14 +152,19 @@ export async function settleEmployerOrder(input: {
     type: "payment_completed",
     title: "Payment received",
     message:
-      hired.length === ids.length
-        ? `Payment received. ${hired.length} hire${hired.length === 1 ? "" : "s"} confirmed.`
-        : `Payment received. ${hired.length} of ${ids.length} hires confirmed; our team will contact you about the rest.`,
+      hireIds.length === 0
+        ? "Monthly payment received."
+        : hired.length === hireIds.length
+          ? `Payment received. ${hired.length} hire${hired.length === 1 ? "" : "s"} confirmed.`
+          : `Payment received. ${hired.length} of ${hireIds.length} hires confirmed; our team will contact you about the rest.`,
     data: { orderId: input.orderId },
     dedupeKey: `payment_completed_${input.orderId}`,
     email: emails.employerPaymentReceived({
       employerName: contact,
-      role: hired.length === 1 ? roleOf(hired[0].id) : `${hired.length} hires`,
+      role:
+        hireIds.length === 0
+          ? ids.length === 1 ? `this month of ${roleOf(ids[0])}` : `this month of ${ids.length} placements`
+          : hired.length === 1 ? roleOf(hired[0].id) : `${hired.length} hires`,
       amount: formatMoney(order.amountMinor, order.currency, { zeroLabel: false }),
     }),
   });

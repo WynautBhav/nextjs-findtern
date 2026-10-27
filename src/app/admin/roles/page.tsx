@@ -1,7 +1,7 @@
-import { count, desc } from "drizzle-orm";
+import { count, desc, getTableColumns } from "drizzle-orm";
 import { Shield, Users, KeyRound } from "lucide-react";
 
-import { getDb, schema } from "@/lib/db";
+import { getDb, schema, withoutPassword } from "@/lib/db";
 import { AdminPageHeader } from "@/components/admin/panel";
 import { StatCard, StatGrid } from "@/components/admin/stat-card";
 import { StaffRolesManager } from "@/components/admin/staff-roles-manager";
@@ -16,7 +16,7 @@ export default async function AdminRolesPage() {
   const [[staffCountRow], [rolesCountRow], staffUsers, dbRoles] = await Promise.all([
     db.select({ c: count() }).from(schema.admins),
     db.select({ c: count() }).from(schema.adminRoles),
-    db.select().from(schema.admins).orderBy(desc(schema.admins.createdAt)),
+    db.select(withoutPassword(getTableColumns(schema.admins))).from(schema.admins).orderBy(desc(schema.admins.createdAt)),
     db.select().from(schema.adminRoles),
   ]);
 

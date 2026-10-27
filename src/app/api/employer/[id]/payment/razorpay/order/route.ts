@@ -64,7 +64,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   let amountMinor = computedMinor;
   let promo: { promoCode: string; discountMinor: number } | null = null;
   if (parsed.data.promoCode) {
-    const quote = await quotePromo({ code: parsed.data.promoCode, subjectId: id, orderMinor: amountMinor, currency, audience: "employer" });
+    // The one-time hiring fee is never discounted (bug sheet 23 Oct).
+    const feeMinor = paying.reduce((s, l) => s + l.charge.perHireMinor, 0);
+    const quote = await quotePromo({ code: parsed.data.promoCode, subjectId: id, orderMinor: amountMinor, currency, audience: "employer", undiscountableMinor: feeMinor });
     if (!quote.ok) return NextResponse.json({ error: quote.error }, { status: quote.status });
     if (quote.payableMinor <= 0) {
       return NextResponse.json({ error: "This code covers the whole order - contact us to complete it" }, { status: 400 });
@@ -79,7 +81,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     employerId: id,
     purpose: "employer_checkout",
     proposalIds: paying.map((l) => l.id),
-    paymentMode: mode,
+    // Legacy's word for paid in full is "total"; it reads anything else as
+    // still owing and would offer to charge the months again (EMH-25).
+    paymentMode: mode === "monthly" ? "monthly" : "total",
     dueProposalIds: paying.filter((l) => l.due).map((l) => l.id),
     computedAmountMinor: computedMinor,
     discountAmountMinor: discountMinor,

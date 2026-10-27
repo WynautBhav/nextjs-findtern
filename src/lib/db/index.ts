@@ -60,3 +60,14 @@ export function hasDb(): boolean {
 }
 
 export { schema };
+
+/**
+ * Every column of a table except `password`, for rows that are handed to a
+ * browser component. Legacy accounts still hold plain-text passwords, so a
+ * full row in a client prop puts them in the page source.
+ */
+export function withoutPassword<T extends { password: unknown }>(columns: T): Omit<T, "password"> {
+  const { password, ...rest } = columns;
+  void password;
+  return rest;
+}

@@ -9,3 +9,8 @@ WHERE o.user_id = u.id AND o.created_at IS NOT NULL AND o.created_at < u.created
 
 -- Payouts: "paid" is the only settled status both apps count.
 UPDATE intern_payouts SET status = 'paid' WHERE status = 'completed';
+
+-- Onboarding: a blank Aadhaar/PAN is NULL. Early builds stored "", which the
+-- UNIQUE indexes then refused for every later intern (INT-32).
+UPDATE intern_onboarding SET aadhaar_number = NULL WHERE aadhaar_number = '';
+UPDATE intern_onboarding SET pan_number = NULL WHERE pan_number = '';

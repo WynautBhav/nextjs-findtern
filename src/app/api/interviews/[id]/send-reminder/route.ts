@@ -1,7 +1,8 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
 import { getDb, schema } from "@/lib/db";
+import { hiredProposalSql } from "@/lib/employer-visibility";
 import { formatSlotTime } from "@/lib/format";
 import { requireMutation } from "@/lib/guards-mutation";
 import { employerNames, internFirstName, notify } from "@/lib/notify";
@@ -25,7 +26,20 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   const start = interview.selectedSlot ? [interview.slot1, interview.slot2, interview.slot3][interview.selectedSlot - 1] : null;
   const when = start ? formatSlotTime(start, interview.timezone) : null;
-  const { company } = await employerNames(interview.employerId);
+  // The intern sees the company's name only once it has hired them (same
+  // rule as booking, select-slot/route.ts).
+  const [hire] = await db
+    .select({ id: schema.proposals.id })
+    .from(schema.proposals)
+    .where(
+      and(
+        eq(schema.proposals.employerId, interview.employerId),
+        eq(schema.proposals.internId, interview.internId),
+        hiredProposalSql(),
+      ),
+    )
+    .limit(1);
+  const company = hire ? (await employerNames(interview.employerId)).company : "a company on Findtern";
   const text = interview.status === "pending"
     ? `${company} is waiting for you to pick an interview slot.`
     : `Your interview with ${company} is on ${when}.`;

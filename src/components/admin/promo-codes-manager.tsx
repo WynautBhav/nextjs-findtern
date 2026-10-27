@@ -68,7 +68,7 @@ export function PromoCodesManager({
   const [validFrom, setValidFrom] = useState("");
   const [validUntil, setValidUntil] = useState("");
   const [isActive, setIsActive] = useState(true);
-  const [appliesTo, setAppliesTo] = useState<"intern" | "employer" | "both">("both");
+  const [appliesTo, setAppliesTo] = useState<"intern" | "employer" | "both">("intern");
 
   // Delete Dialog state
   const [deleteTarget, setDeleteTarget] = useState<PromoCode | null>(null);
@@ -88,7 +88,7 @@ export function PromoCodesManager({
     setValidFrom("");
     setValidUntil("");
     setIsActive(true);
-    setAppliesTo("both");
+    setAppliesTo("intern");
     setErrorMsg("");
     setModalOpen(true);
   }

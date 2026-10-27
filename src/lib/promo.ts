@@ -24,6 +24,8 @@ export async function quotePromo(input: {
   currency: "INR" | "USD";
   /** Who is redeeming; inferred from `subjectId` when not given. */
   audience?: PromoAudience;
+  /** Part of the order no code may discount: the one-time hiring fee. */
+  undiscountableMinor?: number;
 }): Promise<PromoQuote> {
   const db = getDb();
   const [row] = await db
@@ -37,7 +39,10 @@ export async function quotePromo(input: {
   const scopeProblem = promoAudienceProblem(row.appliesTo, audience);
   if (scopeProblem) return { ok: false, error: scopeProblem, status: 400 };
 
-  const problem = promoProblem(row, input.orderMinor, input.currency);
+  const discountableMinor = input.orderMinor - (input.undiscountableMinor ?? 0);
+  if (discountableMinor <= 0) return { ok: false, error: "Promo codes don't apply to the hiring fee", status: 400 };
+
+  const problem = promoProblem(row, discountableMinor, input.currency);
   if (problem) return { ok: false, error: problem, status: 400 };
 
   const [priorUse] = await db
@@ -47,7 +52,7 @@ export async function quotePromo(input: {
     .limit(1);
   if (priorUse) return { ok: false, error: "You have already used this code", status: 400 };
 
-  const discountMinor = promoDiscount(row, input.orderMinor, input.currency);
+  const discountMinor = promoDiscount(row, discountableMinor, input.currency);
   return { ok: true, promo: row, discountMinor, payableMinor: input.orderMinor - discountMinor };
 }
 

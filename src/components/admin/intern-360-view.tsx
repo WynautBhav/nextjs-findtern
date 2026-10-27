@@ -47,7 +47,7 @@ import {
 import { draftFromRecord } from "@/lib/onboarding";
 
 export type Intern360Props = {
-  user: UserType;
+  user: Omit<UserType, "password">;
   onboarding: InternOnboarding | null;
   documents: InternDocuments | null;
   interviews: Interview[];
