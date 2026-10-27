@@ -16,6 +16,7 @@
  * Re-running replaces the situation accounts, never touches anything else.
  * Refuses unless DATABASE_URL is on loopback.
  */
+import { spawnSync } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -24,7 +25,7 @@ import { hash } from "@node-rs/argon2";
 import { PERSONAS } from "./lib/personas.mjs";
 import { pngBase64 } from "./lib/browser.mjs";
 import { closeDb, db, one, rows } from "./lib/db.mjs";
-import { ARTIFACTS } from "./lib/env.mjs";
+import { ARTIFACTS, ROOT } from "./lib/env.mjs";
 
 const ARGON = { memoryCost: 19456, timeCost: 2, parallelism: 1 };
 const log = (...a) => console.log("[seed]", ...a);
@@ -43,7 +44,7 @@ async function scrub() {
     `WITH n AS (SELECT id, row_number() OVER (ORDER BY created_at, id) AS n FROM users)
      UPDATE users u SET first_name = 'Intern', last_name = 'No' || n.n,
        email = 'intern' || n.n || '@qa.invalid', phone_number = lpad((9000000000 + n.n)::text, 10, '0'),
-       password = '!scrubbed' FROM n WHERE n.id = u.id AND u.email NOT LIKE '%@qa.invalid' AND u.email NOT LIKE '%@qa.test' AND u.email <> 'ritika.launchtest@gmail.com'`,
+       password = '!scrubbed' FROM n WHERE n.id = u.id AND u.email NOT LIKE '%@qa.invalid' AND u.email NOT LIKE '%@qa.test' AND u.email NOT LIKE '%@jklu.edu.in' AND u.email <> 'ritika.launchtest@gmail.com'`,
     `UPDATE intern_onboarding SET linkedin_url = NULL, aadhaar_number = NULL, pan_number = NULL,
        bio = CASE WHEN bio IS NULL OR bio = '' THEN bio ELSE 'Curious learner who likes building small projects and shipping them.' END,
        experience_json = CASE WHEN jsonb_array_length(COALESCE(experience_json, '[]'::jsonb)) = 0 THEN '[]'::jsonb
@@ -360,6 +361,53 @@ async function seedPersonas() {
 
 const SITUATION_PW = "Qa#Situations2026";
 
+/**
+ * College Partners: scripts/seed-colleges.ts (synthetic JKLU roster, officer, a live
+ * drive; its link is written to e2e/.artifacts/qa-college.json), then my personas are
+ * put into that drive so /employer/drives, /intern/college and the call states have data.
+ */
+async function seedCollege(ids) {
+  mkdirSync(ARTIFACTS, { recursive: true });
+  const r = spawnSync(process.execPath, ["--experimental-strip-types", "--no-warnings", "scripts/seed-colleges.ts"], {
+    cwd: ROOT,
+    stdio: ["ignore", "pipe", "inherit"],
+    env: { ...process.env, PUBLIC_ORIGIN: process.env.PUBLIC_ORIGIN ?? "http://localhost:3500", COLLEGE_DEV_FILE: join(ARTIFACTS, "qa-college.json"), NODE_ENV: "development" },
+  });
+  if (r.status !== 0) throw new Error("scripts/seed-colleges.ts failed");
+  const drive = await one(`SELECT id, college_id FROM college_drives ORDER BY created_at DESC LIMIT 1`);
+  if (!drive) return;
+  for (const eid of [ids.employerMain, ids.employerHeavy]) {
+    await db().query(`INSERT INTO college_drive_employers (drive_id, employer_id) VALUES ($1,$2) ON CONFLICT DO NOTHING`, [drive.id, eid]);
+  }
+  // The hired intern is a verified JKLU student, with consent.
+  const consent = await one(`SELECT notice_version, notice_hash, purposes FROM college_consents LIMIT 1`);
+  await db().query(`DELETE FROM college_memberships WHERE user_id = $1`, [ids.internHired]);
+  const c = await one(
+    `INSERT INTO college_consents (user_id, college_id, notice_version, notice_hash, purposes, declared_adult) VALUES ($1,$2,$3,$4,$5,true) RETURNING id`,
+    [ids.internHired, drive.college_id, consent.notice_version, consent.notice_hash, JSON.stringify(consent.purposes)],
+  );
+  await db().query(
+    `INSERT INTO college_memberships (user_id, college_id, status, verified_by, year, branch, consent_id) VALUES ($1,$2,'verified','roster',3,'CSE',$3)`,
+    [ids.internHired, drive.college_id, c.id],
+  );
+  await db().query(`INSERT INTO college_roster (college_id, email, name, roll_no, year, branch) VALUES ($1,'ritika.launchtest@gmail.com','Ritika Verma','22JK901',3,'CSE') ON CONFLICT DO NOTHING`, [drive.college_id]);
+  // Accepted calls: one with a join link, one without (the QA-001 state), one still requested.
+  await db().query(`DELETE FROM college_drive_meetings WHERE employer_id = $1`, [ids.employerMain]);
+  const member = await rows(`SELECT user_id FROM college_memberships WHERE college_id = $1 AND user_id <> $2 LIMIT 2`, [drive.college_id, ids.internHired]);
+  const calls = [
+    [ids.internHired, "accepted", "https://meet.example.com/qa-drive-call"],
+    [member[0]?.user_id, "accepted", null],
+    [member[1]?.user_id, "requested", null],
+  ].filter((x) => x[0]);
+  for (const [uid, status, link] of calls) {
+    await db().query(
+      `INSERT INTO college_drive_meetings (drive_id, employer_id, user_id, starts_at, status, meeting_link) VALUES ($1,$2,$3,$4,$5,$6)`,
+      [drive.id, ids.employerMain, uid, iso(0.01), status, link],
+    );
+  }
+  log("college: drive, roster and calls seeded");
+}
+
 /** One neutral avatar for every seeded profile photo; the QA server's UPLOAD_ROOT (lib/qa-server.mjs). */
 function writePlaceholderPhoto() {
   const dir = join(ARTIFACTS, "qa-uploads");
@@ -373,6 +421,7 @@ async function main() {
   log(`database ${meta.db} (${meta.users} users)`);
   if (!process.argv.includes("--no-scrub")) await scrub();
   const ids = await seedPersonas();
+  await seedCollege(ids);
   const counts = await one(
     `SELECT (SELECT count(*) FROM users)::int users, (SELECT count(*) FROM employers)::int employers, (SELECT count(*) FROM proposals)::int proposals,
             (SELECT count(*) FROM interviews)::int interviews, (SELECT count(*) FROM timesheets)::int timesheets`);

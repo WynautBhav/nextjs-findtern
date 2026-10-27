@@ -85,7 +85,7 @@ export async function startServer(log = console.log) {
   mkdirSync(join(ARTIFACTS, "qa-uploads"), { recursive: true });
   mkdirSync(join(ARTIFACTS, "qa-legacy-uploads"), { recursive: true });
   if (!(await portFree(QA_PORT))) throw new Error(`port ${QA_PORT} is in use; set QA_PORT or stop that server`);
-  const logPath = join(ARTIFACTS, "qa-server.log");
+  const logPath = join(ARTIFACTS, QA_PORT === 3500 ? "qa-server.log" : `qa-server-${QA_PORT}.log`);
   const serverLog = createWriteStream(logPath);
   const server = spawn(join(ROOT, "node_modules", ".bin", "next"), ["start", "-p", String(QA_PORT)], {
     cwd: ROOT,

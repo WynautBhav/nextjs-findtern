@@ -41,3 +41,6 @@ export const DASHBOARDS = [
   { key: "employer-main", path: "/employer/dashboard" },
   { key: "admin", path: "/admin/dashboard" },
 ];
+
+/** The college console's landing page, for runs that cover the fourth role. */
+export const COLLEGE_HOME = { key: "college", path: "/college" };

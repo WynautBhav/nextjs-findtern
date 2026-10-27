@@ -2,10 +2,10 @@
  * The route list, derived from src/app/**\/page.tsx so it cannot drift, and
  * the real ids for dynamic segments, read from the QA database.
  */
-import { readdirSync, statSync } from "node:fs";
+import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 
-import { ROOT } from "./env.mjs";
+import { ARTIFACTS, ROOT } from "./env.mjs";
 import { one, rows } from "./db.mjs";
 
 const APP = join(ROOT, "src", "app");
@@ -36,6 +36,7 @@ const PUBLIC_AUTH = new Set([
   "/employer/forgot-password",
   "/employer/reset-password",
   "/employer/verify-email",
+  "/college/login",
 ]);
 
 /** intern | employer | admin | public (marketing + auth pages, no session needed) */
@@ -43,6 +44,7 @@ export function roleOf(route) {
   if (PUBLIC_AUTH.has(route)) return "public";
   if (route.startsWith("/admin")) return "admin";
   if (route.startsWith("/employer")) return "employer";
+  if (route === "/college" || route.startsWith("/college/")) return "college";
   if (route.startsWith("/intern/") && !["/intern-nda", "/intern-terms-and-conditions"].includes(route)) return "intern";
   return "public";
 }
@@ -77,6 +79,21 @@ export async function dynamicValues(route, persona, ids) {
     case "/intern/opportunities/[id]":
     case "/opportunities/[id]":
       return col(`SELECT id AS v FROM projects WHERE status = 'active' ORDER BY created_at DESC LIMIT 2`);
+    case "/college/drives/[id]":
+      return col(`SELECT id AS v FROM college_drives ORDER BY created_at DESC LIMIT 2`);
+    case "/college/students/[id]":
+      return col(`SELECT user_id AS v FROM college_memberships WHERE status = 'verified' ORDER BY joined_at LIMIT 2`);
+    case "/employer/drives/[id]":
+      return employerId ? col(`SELECT drive_id AS v FROM college_drive_employers WHERE employer_id = $1 LIMIT 2`, [employerId]) : [];
+    case "/drive/[token]": {
+      // The drive token is shown once at creation; seed-colleges writes it to a dev file.
+      try {
+        const t = JSON.parse(readFileSync(join(ARTIFACTS, "qa-college.json"), "utf8")).token;
+        return t ? [t] : [];
+      } catch {
+        return [];
+      }
+    }
     case "/blog/[slug]":
       return col(`SELECT slug AS v FROM website_blog_posts ORDER BY created_at DESC LIMIT 2`);
     default:

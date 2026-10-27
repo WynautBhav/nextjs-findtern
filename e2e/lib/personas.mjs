@@ -13,6 +13,8 @@ export const PERSONAS = [
   { key: "intern-hired", role: "intern", situation: "hired", email: "ritika.launchtest@gmail.com", password: "Launch#2026pw" },
   { key: "employer-main", role: "employer", situation: "main", email: "neha@acmerobotics-launchtest.in", password: "Launch#2026pw" },
   { key: "admin", role: "admin", situation: "super", email: "e2e-admin@findtern.test", password: "E2e#Admin2026" },
+  // College placement officer: the seed-colleges demo account (synthetic data, scripts/seed-colleges.ts).
+  { key: "college", role: "college", situation: "main", email: "tpo@jklu.edu.in", password: "Findtern@2026" },
 
   { key: "intern-empty", role: "intern", situation: "empty", email: "qa.intern.empty@qa.test", password: SITUATION_PASSWORD },
   { key: "intern-one", role: "intern", situation: "one", email: "qa.intern.one@qa.test", password: SITUATION_PASSWORD },
@@ -29,11 +31,12 @@ export const PERSONAS = [
 ];
 
 /** The role-level "main" accounts: the full-width matrix runs these. */
-export const MAIN_KEYS = ["intern-hired", "employer-main", "admin"];
+export const MAIN_KEYS = ["intern-hired", "employer-main", "admin", "college"];
 
 /** Where each role signs in. */
 export const LOGIN = {
   intern: { page: "/login", api: "/api/auth/login", body: (p) => ({ email: p.email, password: p.password }) },
   employer: { page: "/employer/login", api: "/api/auth/employer/login", body: (p) => ({ email: p.email, password: p.password }) },
+  college: { page: "/college/login", api: "/api/auth/college/login", body: (p) => ({ email: p.email, password: p.password }) },
   admin: { page: "/admin/login", api: "/api/auth/admin/login", body: (p) => ({ email: p.email, password: p.password }) },
 };
