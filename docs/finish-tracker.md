@@ -66,3 +66,19 @@ branch, not to be touched: `feat/college-partners` (worktree
   rules. Four workers then started in parallel worktrees: intern, employer,
   admin, public+auth+system. Each does its area's screens, parity items and
   bug-sheet rows. I merge, review and verify.
+- 27 Oct: public/auth/system merged (`39f7511`; 50b0bbf, 189c438, 93df790,
+  migration 0007_system_users_created_at). All checks + build green; 0007
+  rehearsed on the live copy.
+
+## Integration to-do (after the area branches merge)
+- [ ] INT-05: intern onboarding emergency / second-contact checks →
+      `phoneInUseAnywhere(cc, phone, { userId })` (src/lib/phone-owner.ts)
+- [ ] DB-16: `api/intern/[id]/ai-interview/apply` notification insert →
+      `onConflictDoNothing`
+- [ ] EMH-32: employer escalation phone save → `phoneInUseAnywhere(..., { employerId })`
+- [ ] Employer signup form carries `?next=` after signup
+- [ ] DB-28 (cosmetic, `api/admin/google`): Google token scope literal
+- [ ] Merge `peer/fixes` (College Partners session): safeNext open-redirect
+      fix, `dbTimestamp` helper, Playwright critical-path e2e
+- [ ] Confirm `/interns` full-page capture "blank boxes" is only the
+      scroll-reveal in screenshots, not real (check with reduced motion)
