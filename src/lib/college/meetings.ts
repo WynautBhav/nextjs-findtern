@@ -92,6 +92,8 @@ export async function requestMeeting(input: {
 
   const startsAt = new Date(Date.now() + input.inMinutes * 60_000);
   const { link, eventId } = await meetLink(startsAt);
+  // Never hand the student a call they can accept but can't join (QA-001).
+  if (!link) return { ok: false, error: "Calendar not connected; ask Findtern to connect it." };
   const [row] = await db
     .insert(schema.collegeDriveMeetings)
     .values({

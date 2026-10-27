@@ -3,6 +3,7 @@ import Link from "next/link";
 import {
   ArrowRight,
   Banknote,
+  CalendarX,
   ClipboardCheck,
   CreditCard,
   Gauge,
@@ -12,6 +13,7 @@ import {
 
 import { getDb, schema } from "@/lib/db";
 import { getSession } from "@/lib/auth";
+import { calendarMissing } from "@/lib/calendar-status";
 import { formatMoney } from "@/lib/format";
 import { AdminEmpty, AdminLoadError, AttentionBanner, Panel, PanelHeader } from "@/components/admin/panel";
 import { StatCard, StatGrid } from "@/components/admin/stat-card";
@@ -37,6 +39,8 @@ type Task = {
   href: string;
   cta: string;
   Icon: typeof MessageSquare;
+  /** A state rather than a queue: the label reads on its own, without the figure. */
+  flag?: boolean;
 };
 
 type Event = { label: string; detail: string; href: string; date: Date | null };
@@ -339,16 +343,28 @@ export default async function AdminDashboard() {
     );
   }
 
+  const noCalendar = await calendarMissing();
   const n = (row: { value: number | string } | undefined) => Number(row?.value ?? 0);
   const f = (row: { fresh?: number | string } | undefined) => Number(row?.fresh ?? 0);
   const byStatus = new Map(d.proposalStatus.map((r) => [r.status, Number(r.value)]));
   const accepted = byStatus.get("accepted") ?? 0;
   const hired = byStatus.get("hired") ?? 0;
 
-  // Ordered by what a person owes someone: money first, then a meeting that
+  // A disconnected calendar comes first: it breaks every meeting at once.
+  // Then by what a person owes someone: money first, then a meeting that
   // can't happen, then a candidate waiting on a score, then the rest.
   const tasks: Task[] = (
     [
+      {
+        key: "calendar",
+        count: noCalendar ? 1 : 0,
+        flag: true,
+        label: "Google calendar not connected",
+        detail: "Interviews and campus-drive calls get no meeting link until it is, so drive calls are refused.",
+        href: "/admin/settings",
+        cta: "Connect",
+        Icon: CalendarX,
+      },
       {
         key: "payouts",
         count: n(d.payoutsDue),
@@ -510,7 +526,8 @@ export default async function AdminDashboard() {
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="text-[0.9375rem] font-medium text-ink-900">
-                    <span className="nums font-semibold">{t.count.toLocaleString("en-IN")}</span> {t.label}
+                    {t.flag ? null : <span className="nums font-semibold">{t.count.toLocaleString("en-IN")} </span>}
+                    {t.label}
                   </p>
                   <p className="mt-0.5 text-sm text-ink-600">
                     {t.detail}
