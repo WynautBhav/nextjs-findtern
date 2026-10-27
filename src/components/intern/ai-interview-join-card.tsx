@@ -1,190 +1,286 @@
 "use client";
 
-import { useState } from "react";
-import {
-  AlertCircle,
-  CheckCircle2,
-  Clock,
-  ExternalLink,
-  ShieldAlert,
-  Sparkles,
-  Video,
-} from "lucide-react";
+/**
+ * The AI interview, everywhere a candidate meets it.
+ *
+ * One state machine (src/lib/ai-interview.ts) behind two surfaces:
+ *  - `AiInterviewAction`: the inline step on Home (apply, wait, join, done);
+ *  - `AiInterviewJoinCard`: the card at the top of the interviews page.
+ *
+ * Joining always goes through the legacy terms gate: the instructions, a
+ * tick, and a 10 second countdown before "Proceed" unlocks (INW-19, legacy
+ * CandidateHeader.tsx:955-1060). While the candidate waits for a link, the
+ * state is re-read every 15 s, as legacy did, so the Join button appears
+ * without a reload (INT-31).
+ */
 
-import { Surface, Pill } from "@/components/app/primitives";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog";
+import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { ArrowRight, CalendarCheck, CheckCircle2, Clock, Loader2, Sparkles, Video } from "lucide-react";
+
+import { Pill, Surface } from "@/components/app/primitives";
+import { CountdownAgreement, type AgreementSection } from "@/components/app/countdown-agreement";
+import { buttonClass } from "@/components/ui/button";
+import { csrfFetch } from "@/lib/client-fetch";
+import { aiInterviewPhase, joinableLink, type AiInterviewPhase } from "@/lib/ai-interview";
+import { cn } from "@/lib/utils";
+
+/** Legacy "AI Interview: Terms & Instructions", in substance. */
+const AI_TERMS: AgreementSection[] = [
+  {
+    title: "Before you start",
+    lines: ["The interview runs in a new tab. Give it your full attention until it ends."],
+    bullets: [
+      "Use a stable internet connection and a quiet room.",
+      "Allow microphone and camera access when the browser asks.",
+      "Do not refresh or close the interview window once it has started.",
+      "Your performance is evaluated and becomes part of your profile as your Findtern Score.",
+    ],
+  },
+];
+
+const POLL_MS = 15_000;
+
+type State = { phase: AiInterviewPhase; link: string | null };
+
+/** Re-reads the phase while it can still change on its own (an admin sets the link). */
+function useAiState(internId: string | null, initial: State) {
+  const router = useRouter();
+  const [state, setState] = useState<State>(initial);
+
+  const refresh = useCallback(async () => {
+    if (!internId) return;
+    try {
+      const res = await csrfFetch(`/api/intern/${encodeURIComponent(internId)}/ai-interview/apply`, { method: "GET" });
+      if (!res.ok) return;
+      const body = (await res.json().catch(() => ({}))) as { phase?: AiInterviewPhase; meetingLink?: string | null };
+      if (!body.phase) return;
+      setState((prev) => {
+        if (prev.phase !== body.phase) router.refresh();
+        return { phase: body.phase as AiInterviewPhase, link: joinableLink(body.meetingLink) };
+      });
+    } catch {
+      // A failed poll keeps the last known state; the next tick tries again.
+    }
+  }, [internId, router]);
+
+  useEffect(() => {
+    if (!internId || state.phase !== "waiting") return;
+    const t = window.setInterval(() => {
+      if (document.visibilityState === "visible") void refresh();
+    }, POLL_MS);
+    return () => window.clearInterval(t);
+  }, [internId, state.phase, refresh]);
+
+  return [state, setState, refresh] as const;
+}
+
+function JoinGate({ link, block, label = "Join AI interview" }: { link: string; block?: boolean; label?: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button type="button" onClick={() => setOpen(true)} className={buttonClass({ variant: "primary", block })}>
+        <Video className="size-4" aria-hidden />
+        {label}
+      </button>
+      <CountdownAgreement
+        open={open}
+        onOpenChange={setOpen}
+        title="AI interview: terms and instructions"
+        description="Please read and agree before starting. Proceed unlocks after 10 seconds."
+        sections={AI_TERMS}
+        agreeLabel="I have read the instructions and I agree to proceed."
+        confirmLabel="Proceed to interview"
+        seconds={10}
+        onConfirm={() => {
+          window.open(link, "_blank", "noopener,noreferrer");
+          setOpen(false);
+        }}
+      />
+    </>
+  );
+}
+
+/**
+ * The step on Home. The server passes the phase it already derived; this
+ * owns the apply POST, the poll while waiting, and the gated join.
+ */
+export function AiInterviewAction({
+  internId,
+  initialPhase,
+  initialLink,
+  sync = false,
+}: {
+  internId: string;
+  initialPhase: AiInterviewPhase;
+  initialLink: string | null;
+  /** Re-read the phase on mount, for callers that don't know it. */
+  sync?: boolean;
+}) {
+  const router = useRouter();
+  const [state, setState, refresh] = useAiState(internId, { phase: initialPhase, link: joinableLink(initialLink) });
+  useEffect(() => {
+    if (sync) void refresh();
+  }, [sync, refresh]);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function apply() {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await csrfFetch(`/api/intern/${encodeURIComponent(internId)}/ai-interview/apply`, { method: "POST" });
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      if (res.status === 409) {
+        setState({ phase: "waiting", link: null });
+        router.refresh();
+        return;
+      }
+      if (!res.ok) throw new Error(body.error ?? "Could not register your application.");
+      setState({ phase: "waiting", link: null });
+      router.refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not register your application.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (state.phase === "apply") {
+    return (
+      <div>
+        <p className="text-sm leading-relaxed text-ink-600">
+          Request the interview and the link reaches you here and by email, usually within 24 to 48 hours.
+        </p>
+        <button type="button" onClick={apply} disabled={busy} className={buttonClass({ className: "mt-4" })}>
+          {busy ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <CalendarCheck className="size-4" aria-hidden />}
+          Apply for the AI interview
+        </button>
+        {error ? (
+          <p role="alert" className="mt-2 text-sm text-danger">
+            {error}
+          </p>
+        ) : null}
+      </div>
+    );
+  }
+
+  if (state.phase === "waiting") {
+    return (
+      <p className="flex items-start gap-2.5 rounded-apple-md bg-accent-100/60 px-4 py-3 text-sm leading-relaxed text-ink-800">
+        <Clock className="mt-0.5 size-4 shrink-0 text-accent-700" aria-hidden />
+        <span>
+          <span className="font-semibold">You have applied.</span> Your interview link goes live within 24 to 48
+          hours and appears right here, with a notification.
+        </span>
+      </p>
+    );
+  }
+
+  if (state.phase === "ready" && state.link) {
+    return (
+      <div>
+        <p className="text-sm leading-relaxed text-ink-600">
+          Your AI interview is unlocked. Start when you are somewhere quiet with a steady connection.
+        </p>
+        <div className="mt-4">
+          <JoinGate link={state.link} />
+        </div>
+      </div>
+    );
+  }
+
+  if (state.phase === "completed") {
+    return (
+      <p className="text-sm leading-relaxed text-ink-600">
+        Interview done. Your Findtern Score is being prepared and appears here once it is published.
+      </p>
+    );
+  }
+
+  return (
+    <p className="text-sm leading-relaxed text-ink-600">
+      Done. Your Findtern Score is on{" "}
+      <Link href="/intern/record" className="font-medium text-primary underline-offset-4 hover:underline">
+        your record
+      </Link>
+      .
+    </p>
+  );
+}
 
 interface AiInterviewJoinCardProps {
   interviewId: string;
   status: string | null;
   meetingLink: string | null;
   updatedAt?: string | null;
+  /** When given, the card keeps itself current while waiting for the link. */
+  internId?: string | null;
+  /** Score published: the card says so instead of offering a join. */
+  scored?: boolean;
 }
 
-export function AiInterviewJoinCard({
-  status,
-  meetingLink,
-}: AiInterviewJoinCardProps) {
-  const [modalOpen, setModalOpen] = useState(false);
-  const [agreed, setAgreed] = useState(false);
+const PHASE_PILL: Record<AiInterviewPhase, { tone: "live" | "waiting" | "closed" | "paid"; label: string } | null> = {
+  apply: null,
+  waiting: { tone: "waiting", label: "Link on its way" },
+  ready: { tone: "live", label: "Ready to start" },
+  completed: { tone: "closed", label: "Completed" },
+  scored: { tone: "paid", label: "Score published" },
+};
 
-  const isWaiting = status === "waiting" || (!meetingLink && status !== "completed");
-  const isScheduled = status === "scheduled" && Boolean(meetingLink);
-  const isCompleted = status === "completed";
-
-  const handleProceed = () => {
-    if (!meetingLink || !agreed) return;
-    window.open(meetingLink, "_blank", "noopener,noreferrer");
-    setModalOpen(false);
-  };
+/** The AI interview card on the interviews page. */
+export function AiInterviewJoinCard({ interviewId, status, meetingLink, internId = null, scored = false }: AiInterviewJoinCardProps) {
+  const initial = aiInterviewPhase(
+    { id: interviewId, employerId: "admin", status, meetingLink, createdAt: null },
+    scored,
+  );
+  const [state] = useAiState(internId, { phase: initial, link: joinableLink(meetingLink) });
+  const pill = PHASE_PILL[state.phase];
 
   return (
-    <>
-      <Surface className="overflow-hidden border-brand-200/80 bg-gradient-to-br from-white via-brand-50/20 to-brand-50/40 p-6 shadow-xs">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div className="flex items-start gap-3.5">
-            <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-brand-600 text-white shadow-xs">
-              <Sparkles className="size-5" />
-            </span>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-base font-bold tracking-tight text-ink-900">
-                  AI Interview
-                </h3>
-              </div>
-              <p className="mt-1 text-xs text-ink-600 leading-relaxed max-w-xl">
-                Multi-modal technical assessment, behavioral screening, and proctored coding benchmark.
-                Your performance determines your Findtern Score across communication, coding, aptitude, and interview axes.
-              </p>
-            </div>
-          </div>
-
-          <div className="shrink-0">
-            {isWaiting && <Pill tone="waiting">Queue · Unlocking in 24–48h</Pill>}
-            {isScheduled && <Pill tone="live">Ready to Start</Pill>}
-            {isCompleted && <Pill tone="live">Completed</Pill>}
+    <Surface as="section" aria-labelledby={`ai-${interviewId}`} className="p-5 sm:p-6">
+      <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
+        <div className="flex min-w-0 items-start gap-3.5">
+          <span className="grid size-11 shrink-0 place-items-center rounded-apple-md bg-brand-50 text-brand-700" aria-hidden>
+            <Sparkles className="size-5" />
+          </span>
+          <div className="min-w-0">
+            <h2 id={`ai-${interviewId}`} className="text-base font-semibold tracking-[-0.01em] text-ink-900">
+              AI Interview
+            </h2>
+            <p className="mt-1 max-w-xl text-pretty text-sm leading-relaxed text-ink-600">
+              {state.phase === "scored"
+                ? "Your Findtern Score is published. Employers shortlist on it."
+                : state.phase === "completed"
+                  ? "Done. Your score is being prepared and appears on your record once published."
+                  : state.phase === "ready"
+                    ? "Your link is ready. Start when you are somewhere quiet with a steady connection."
+                    : "We are setting up your link. It goes live within 24 to 48 hours and appears here."}
+            </p>
           </div>
         </div>
+        {pill ? <Pill tone={pill.tone}>{pill.label}</Pill> : null}
+      </div>
 
-        {/* State-specific UI */}
-        {isWaiting && (
-          <div className="mt-4 flex items-start gap-3 rounded-xl border border-amber-200/80 bg-amber-50/70 p-3.5 text-xs text-amber-900">
-            <Clock className="mt-0.5 size-4 shrink-0 text-amber-700" />
-            <div>
-              <p className="font-semibold text-amber-950">Application registered in scheduling queue</p>
-              <p className="mt-0.5 text-amber-800 leading-normal">
-                We are setting up your AI interview link. You will receive an instant notification
-                here the moment your interview link is unlocked.
-              </p>
-            </div>
-          </div>
-        )}
+      {state.phase === "ready" && state.link ? (
+        <div className={cn("mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-ink-100 pt-4")}>
+          <p className="flex items-center gap-2 text-sm font-medium text-brand-800">
+            <CheckCircle2 className="size-4" aria-hidden />
+            Read the instructions, then join.
+          </p>
+          <JoinGate link={state.link} />
+        </div>
+      ) : null}
 
-        {isScheduled && (
-          <div className="mt-5 pt-4 border-t border-brand-200/60 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-2 text-xs font-medium text-brand-900">
-              <CheckCircle2 className="size-4 text-brand-700" />
-              <span>Your AI interview link is ready.</span>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => {
-                setAgreed(false);
-                setModalOpen(true);
-              }}
-              className="apple-spring apple-pressable inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-brand-700 px-5 text-xs font-semibold text-white shadow-xs hover:bg-brand-600"
-            >
-              <Video className="size-4" />
-              <span>Join AI Interview</span>
-            </button>
-          </div>
-        )}
-
-      </Surface>
-
-      {/* Instructions & Agreement Modal */}
-      <Dialog open={modalOpen} onOpenChange={setModalOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-base font-bold text-ink-900">
-              <ShieldAlert className="size-5 text-brand-700" />
-              <span>AI Interview: Instructions & Terms</span>
-            </DialogTitle>
-            <DialogDescription className="text-xs text-text-subtle">
-              Please review these requirements before you start the AI interview.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4 py-3 text-xs">
-            <div className="rounded-xl border border-brand-200 bg-brand-50/60 p-4 space-y-2 text-brand-950">
-              <p className="font-bold text-xs uppercase tracking-wider text-brand-900">
-                Mandatory Test Guidelines:
-              </p>
-              <ol className="list-decimal pl-4 space-y-1.5 text-xs leading-relaxed text-brand-900">
-                <li>
-                  <strong>Quiet Environment & Stable Internet:</strong> Use a quiet room with good lighting and minimum 5 Mbps stable connection.
-                </li>
-                <li>
-                  <strong>Microphone & Camera Enabled:</strong> Grant browser permissions for webcam and microphone when prompted.
-                </li>
-                <li>
-                  <strong>No Tab Switching or Reloading:</strong> Proctored tracking detects window blur, page refreshes, and secondary screens.
-                </li>
-                <li>
-                  <strong>Autonomous Evaluation:</strong> Your responses, code submissions, and communication will be scored automatically and published to your Findtern talent dossier.
-                </li>
-              </ol>
-            </div>
-
-            <div className="flex items-start gap-2.5 rounded-xl border border-ink-100 bg-ink-50/50 p-3">
-              <input
-                type="checkbox"
-                id="ai-terms-agreed"
-                checked={agreed}
-                onChange={(e) => setAgreed(e.target.checked)}
-                className="mt-0.5 size-4 rounded border-ink-300 text-brand-600 focus:ring-brand-500"
-              />
-              <label htmlFor="ai-terms-agreed" className="text-xs font-medium text-ink-800 cursor-pointer">
-                I have read the instructions and agree to proceed with the AI interview.
-              </label>
-            </div>
-
-            {!agreed && (
-              <p className="flex items-center gap-1.5 text-2xs text-text-subtle">
-                <AlertCircle className="size-3 text-amber-600" />
-                <span>You must accept the guidelines before proceeding.</span>
-              </p>
-            )}
-          </div>
-
-          <DialogFooter className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => setModalOpen(false)}
-              className="rounded-xl border border-ink-200 px-4 py-2 text-xs font-semibold text-ink-700 hover:bg-ink-50"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              disabled={!agreed || !meetingLink}
-              onClick={handleProceed}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-brand-700 px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-brand-600 disabled:opacity-50"
-            >
-              <ExternalLink className="size-3.5" />
-              <span>Proceed to Interview</span>
-            </button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </>
+      {state.phase === "scored" ? (
+        <div className="mt-5 border-t border-ink-100 pt-4">
+          <Link href="/intern/record" className={buttonClass({ variant: "outline", size: "sm" })}>
+            See your score
+            <ArrowRight className="size-4" aria-hidden />
+          </Link>
+        </div>
+      ) : null}
+    </Surface>
   );
 }

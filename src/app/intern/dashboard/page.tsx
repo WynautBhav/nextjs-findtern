@@ -1,15 +1,16 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, Video } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 
-import { EmptyScene, HeroBand, SectionHead, StatTile, Surface } from "@/components/app/primitives";
+import { EmptyScene, HeroBand, Pill, SectionHead, StatTile, Surface } from "@/components/app/primitives";
 import { buttonClass } from "@/components/ui/button";
-import { ReadinessStrip } from "@/components/app/readiness";
 import { StatusStrip, Thread } from "@/components/app/thread";
 import { ActivationCard } from "@/components/intern/activation-card";
 import { GettingStarted } from "@/components/intern/getting-started";
+import { MeetingJoinButton } from "@/components/intern/meeting-join";
 import { CompanyInitials } from "@/components/marketing/role-card";
 import { OpenToWorkToggle } from "@/components/intern/open-to-work-toggle";
+import { aiInterviewPhase, isAiInterview, isScored, joinableLink, latestAiInterview } from "@/lib/ai-interview";
 import { requireRole } from "@/lib/auth";
 import { getDb, schema } from "@/lib/db";
 import { eq } from "drizzle-orm";
@@ -48,27 +49,28 @@ function scoreOf(onboarding: { extraData?: Record<string, unknown> | null } | nu
   return typeof raw === "number" && Number.isFinite(raw) ? raw : null;
 }
 
-/** Per-axis scores backing the dashboard breakdown. Null when never assessed. */
-function ratingsOf(
-  onboarding: { extraData?: Record<string, unknown> | null } | null,
-): { communication: number; coding: number; aptitude: number; interview: number } | null {
+/** Legacy rating order and labels (dashboard.tsx ratingItems); "academic" was shown too. */
+const RATING_LABELS: [key: string, label: string][] = [
+  ["coding", "Coding"],
+  ["aptitude", "Aptitude"],
+  ["interview", "AI interview"],
+  ["communication", "Communication"],
+  ["academic", "Academics"],
+];
+
+/** Per-axis scores backing the breakdown. Null when never assessed. */
+function ratingsOf(onboarding: { extraData?: Record<string, unknown> | null } | null): [string, number][] | null {
   const raw = extraBag(onboarding).ratings;
   if (!raw || typeof raw !== "object") return null;
   const record = raw as Record<string, unknown>;
-  const num = (key: string) => {
-    const value = Number(record[key]);
-    return Number.isFinite(value) ? value : 0;
-  };
-  const ratings = {
-    communication: num("communication"),
-    coding: num("coding"),
-    aptitude: num("aptitude"),
-    interview: num("interview"),
-  };
-  return ratings.communication + ratings.coding + ratings.aptitude + ratings.interview > 0
-    ? ratings
-    : null;
+  const rows = RATING_LABELS.flatMap(([key, label]) => {
+    const value = record[key];
+    return typeof value === "number" && Number.isFinite(value) ? [[label, Math.max(0, Math.min(10, value))] as [string, number]] : [];
+  });
+  return rows.length > 0 ? rows : null;
 }
+
+const IST = "Asia/Kolkata";
 
 export default async function InternHome() {
   const session = await requireRole("intern");
@@ -76,7 +78,7 @@ export default async function InternHome() {
   const data = await loadInternData(session.uid);
   const action = nextAction(data.thread);
   const working = data.stage === "working";
-  const open = working ? [] : await openProjects(6);
+  const open = working ? [] : await openProjects(6, { strict: true });
 
   const [user] = await getDb()
     .select({
@@ -104,17 +106,26 @@ export default async function InternHome() {
     ? null
     : visibleAgainAt((extra as Record<string, unknown> | null)?.hiddenAt)?.toISOString() ?? null;
 
-  // Scheduled company or AI assessment interview
-  const scheduledInterviews = data.interviews.filter(
-    (i) => String(i.status ?? "").toLowerCase() === "scheduled" && (i.selectedSlot || i.meetingLink),
-  );
-  const upcomingInterviewItem = scheduledInterviews
-    .map((i) => ({ interview: i, when: slotOf(i) ?? (i.createdAt || new Date()) }))
-    .filter((x): x is { interview: (typeof scheduledInterviews)[0]; when: Date } =>
-      // A booked meeting keeps its Join link until slot + 60 min (legacy).
-      Boolean(x.when && (!slotOf(x.interview) || isMeetingLinkLive(x.interview))),
-    )
-    .sort((a, b) => a.when.getTime() - b.when.getTime())[0] ?? null;
+  // Next interview: company meetings with a booked slot only. AI interview
+  // rows have no slot and ~210 live ones sit in "scheduled" forever, so they
+  // stay out of this rail (INT-33); the AI interview has its own step.
+  const upcomingInterviewItem =
+    data.interviews
+      .filter(
+        (i) =>
+          !isAiInterview(i, data.aiEmployerIds) &&
+          String(i.status ?? "").toLowerCase() === "scheduled" &&
+          Boolean(i.selectedSlot),
+      )
+      .map((i) => ({ interview: i, when: slotOf(i) }))
+      .filter((x): x is { interview: (typeof data.interviews)[number]; when: Date } =>
+        // A booked meeting keeps its Join link until slot + 60 min (legacy).
+        Boolean(x.when && isMeetingLinkLive(x.interview)),
+      )
+      .sort((a, b) => a.when.getTime() - b.when.getTime())[0] ?? null;
+
+  const aiRow = latestAiInterview(data.interviews, data.aiEmployerIds);
+  const aiPhase = aiInterviewPhase(aiRow, isScored(data.onboarding?.extraData));
 
   const fullName = `${user?.first ?? ""} ${user?.last ?? ""}`.trim() || "Candidate";
   const score = scoreOf(data.onboarding);
@@ -125,7 +136,13 @@ export default async function InternHome() {
     hasAadhaarImage: Boolean(data.document?.aadhaarImageName),
     hasPhoto: Boolean(data.document?.profilePhotoName),
   });
-  const gettingStarted = !working && (!completion.complete || !activated || score === null);
+  const gettingStarted = !working && (!completion.complete || !activated || aiPhase !== "scored");
+  // Legacy badge (dashboard.tsx:1031): live only when paid and scored.
+  const profileStatus = !openToWork
+    ? { tone: "closed" as const, label: "Profile hidden" }
+    : activated && aiPhase === "scored"
+      ? { tone: "live" as const, label: "Profile live" }
+      : { tone: "waiting" as const, label: "Profile pending" };
 
   // The pending action is shown once, in the strip; the thread skips it.
   const history = action ? data.thread.filter((n) => n !== action) : data.thread;
@@ -144,7 +161,7 @@ export default async function InternHome() {
   return (
     <div>
       <HeroBand
-        eyebrow={working ? "Your internship" : gettingStarted ? "Getting started" : "Your profile is live"}
+        eyebrow={working ? "Your internship" : gettingStarted ? "Getting started" : openToWork ? "Your profile is live" : "Your profile is hidden"}
         title={`Hello, ${user?.first ?? "there"}`}
         lede={lede}
         actions={
@@ -166,7 +183,7 @@ export default async function InternHome() {
           ) : null
         }
       >
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           <StatTile
             tone="onDark"
             label="Findtern Score"
@@ -198,10 +215,11 @@ export default async function InternHome() {
           <StatTile
             tone="onDark"
             label="Next interview"
+            className="col-span-2 sm:col-span-1"
             value={null}
             empty={
               upcomingInterviewItem
-                ? formatSlotTime(upcomingInterviewItem.when, upcomingInterviewItem.interview.timezone || "Asia/Kolkata")
+                ? formatSlotTime(upcomingInterviewItem.when, IST)
                 : "None booked"
             }
             href="/intern/interviews"
@@ -216,11 +234,12 @@ export default async function InternHome() {
             <GettingStarted
               completion={completion}
               activated={activated}
-              scored={score !== null}
               feeMinor={activationFeeMinor}
-              action={
+              internId={session.uid}
+              aiPhase={aiPhase}
+              aiLink={aiPhase === "ready" ? joinableLink(aiRow?.meetingLink) : null}
+              payment={
                 <ActivationCard
-                  embedded
                   alreadyPaid={activated}
                   testMode={paymentsAreFree()}
                   feeMinor={activationFeeMinor}
@@ -309,23 +328,19 @@ export default async function InternHome() {
             <Surface className="p-5">
               <p className="text-sm font-medium text-ink-600">Next interview</p>
               <p className="mt-1 text-base font-semibold text-ink-900">
-                {data.names[upcomingInterviewItem.interview.employerId] ?? "Employer interview"}
+                {data.names[upcomingInterviewItem.interview.employerId] ?? "Company interview"}
               </p>
               <p className="mt-0.5 text-sm text-ink-600">
-                {/* In the meeting's zone, labelled: the server runs in UTC. */}
-                {formatSlotTime(upcomingInterviewItem.when, upcomingInterviewItem.interview.timezone || "Asia/Kolkata")}
+                {/* Interns always see India time, labelled (bug sheet 7, S2 r7). */}
+                {formatSlotTime(upcomingInterviewItem.when, IST)}
               </p>
               {upcomingInterviewItem.interview.meetingLink ? (
-                <a
-                  href={upcomingInterviewItem.interview.meetingLink}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={buttonClass({ size: "md", block: true, className: "mt-4" })}
-                >
-                  <Video className="size-4" aria-hidden />
-                  Join meeting
-                </a>
-              ) : null}
+                <div className="mt-4">
+                  <MeetingJoinButton link={upcomingInterviewItem.interview.meetingLink} block />
+                </div>
+              ) : (
+                <p className="mt-3 text-sm text-ink-600">The meeting link arrives before the start time.</p>
+              )}
             </Surface>
           ) : null}
 
@@ -338,40 +353,33 @@ export default async function InternHome() {
                 </Link>
               </div>
               <dl className="mt-4 space-y-3">
-                {(
-                  [
-                    ["Coding", ratings.coding],
-                    ["Aptitude", ratings.aptitude],
-                    ["AI interview", ratings.interview],
-                    ["Communication", ratings.communication],
-                  ] as const
-                )
-                  .filter(([, v]) => v > 0)
-                  .map(([label, v]) => (
-                    <div key={label}>
-                      <div className="flex justify-between gap-2 text-sm">
-                        <dt className="text-ink-600">{label}</dt>
-                        <dd className="nums font-semibold text-ink-900">{v.toFixed(1)}</dd>
-                      </div>
-                      <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-ink-100" aria-hidden>
-                        <div className="h-full rounded-full bg-brand-600" style={{ width: `${Math.min(100, v * 10)}%` }} />
-                      </div>
+                {ratings.map(([label, v]) => (
+                  <div key={label}>
+                    <div className="flex justify-between gap-2 text-sm">
+                      <dt className="text-ink-600">{label}</dt>
+                      <dd className="nums font-semibold text-ink-900">{v.toFixed(1)}</dd>
                     </div>
-                  ))}
+                    <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-ink-100" aria-hidden>
+                      <div className="h-full rounded-full bg-brand-600" style={{ width: `${Math.min(100, v * 10)}%` }} />
+                    </div>
+                  </div>
+                ))}
               </dl>
             </Surface>
           ) : null}
 
-          <ReadinessStrip readiness={data.readiness} />
-
           <Surface className="p-5">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <p className="text-sm font-medium text-ink-600">Profile status</p>
+              <Pill tone={profileStatus.tone}>{profileStatus.label}</Pill>
+            </div>
             <OpenToWorkToggle initial={openToWork} visibleAgainAt={visibleAgain} />
           </Surface>
 
           {!working && data.money.paidMinor > 0 ? (
             <Surface className="p-5">
               <p className="text-sm font-medium text-ink-600">Paid to you</p>
-              <p className="mt-1 text-2xl font-semibold tabular-nums tracking-tight text-ink-900">
+              <p className="nums mt-1 text-2xl font-semibold tracking-tight text-ink-900">
                 {formatMoney(data.money.paidMinor, "INR")}
               </p>
               {data.money.incomingMinor > 0 ? (
@@ -390,7 +398,7 @@ export default async function InternHome() {
 
           <Link
             href="/intern/profile"
-            className="apple-spring flex items-center justify-between rounded-apple-xl border border-dashed border-ink-200 px-5 py-4 text-sm font-medium text-ink-700 hover:border-brand-300 hover:bg-white"
+            className="apple-spring flex min-h-14 items-center justify-between rounded-apple-xl border border-dashed border-ink-200 px-5 py-4 text-sm font-medium text-ink-700 hover:border-brand-300 hover:bg-white"
           >
             See your profile as employers do
             <ArrowRight className="size-4 text-ink-400" aria-hidden />

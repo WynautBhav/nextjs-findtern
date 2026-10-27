@@ -55,8 +55,8 @@ export function OpenToWorkToggle({
   return (
     <div className="flex items-start justify-between gap-3">
       <div className="min-w-0">
-        <p className="text-sm font-semibold text-ink-900">Open to work</p>
-        <p className="mt-0.5 text-xs leading-relaxed text-text-subtle">
+        <p className="text-[0.9375rem] font-semibold text-ink-900">Open to work</p>
+        <p className="mt-1 text-sm leading-relaxed text-ink-600">
           {on
             ? "Employers can find you in the candidate pool. You can hide for up to 30 days at a time."
             : visibleAgainAt
@@ -64,7 +64,7 @@ export function OpenToWorkToggle({
               : "Hidden from the pool for up to 30 days. Your applications keep going."}
         </p>
         {error ? (
-          <p role="alert" className="mt-1 text-xs font-medium text-red-700">
+          <p role="alert" className="mt-1 text-sm font-medium text-danger">
             {error}
           </p>
         ) : null}
