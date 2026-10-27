@@ -206,7 +206,8 @@ export function formatJoiningDate(value: Date | string | null, now: Date = new D
   if (!value) return "To be agreed";
   const date = typeof value === "string" ? new Date(value) : value;
   if (Number.isNaN(date.getTime())) return "To be agreed";
-  const absolute = date.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Kolkata" });
+  // DD/MM/YYYY (bug sheet 7, NC r24); en-IN's "Sept" read oddly.
+  const absolute = date.toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "Asia/Kolkata" });
   const ahead = calendarDaysBetween(now, date);
   if (ahead === 0) return `${absolute} · today`;
   if (ahead === 1) return `${absolute} · tomorrow`;

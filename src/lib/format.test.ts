@@ -24,9 +24,9 @@ test("future dates are labelled ahead, not as Today", () => {
 test("joining dates are absolute, with a hint when close", async () => {
   const { formatJoiningDate } = await import("./format.ts");
   const now = new Date("2026-10-19T06:00:00Z");
-  assert.equal(formatJoiningDate("2026-10-24", now), "24 Oct 2026 · in 5 days");
-  assert.equal(formatJoiningDate("2026-10-20", now), "20 Oct 2026 · tomorrow");
-  assert.equal(formatJoiningDate("2026-12-01", now), "1 Dec 2026");
+  assert.equal(formatJoiningDate("2026-10-24", now), "24/10/2026 · in 5 days");
+  assert.equal(formatJoiningDate("2026-10-20", now), "20/10/2026 · tomorrow");
+  assert.equal(formatJoiningDate("2026-12-01", now), "01/12/2026");
   assert.equal(formatJoiningDate(null, now), "To be agreed");
 });
 

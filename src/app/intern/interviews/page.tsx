@@ -6,6 +6,7 @@ import { EmptyScene, PageHead, Pill, SectionHead, Surface, type Tone } from "@/c
 import { SlotPicker } from "@/components/app/slot-picker";
 import { AiFeedbackReport } from "@/components/employer/ai-feedback-report";
 import { AiInterviewJoinCard } from "@/components/intern/ai-interview-join-card";
+import { isScored } from "@/lib/ai-interview";
 import { AiInterviewButton } from "@/components/intern/activation-card";
 import { ButtonLink } from "@/components/ui/button";
 import { aiInterviewLinks } from "@/lib/ai-interview-links";
@@ -114,6 +115,8 @@ export default async function InternInterviews() {
             interviewId={aiInterview.id}
             status={aiInterview.status}
             meetingLink={aiInterview.meetingLink}
+            internId={session.uid}
+            scored={isScored(extra)}
             updatedAt={toIso((aiInterview as InterviewRow & { updatedAt?: Date | null }).updatedAt)}
           />
         ) : null}
