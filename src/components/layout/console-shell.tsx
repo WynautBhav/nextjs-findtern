@@ -84,7 +84,8 @@ export function ConsoleShell({
   tabs?: ConsoleNavItem[];
   account: { name: string; email: string; subtitle?: string; photoUrl?: string | null };
   menu?: ConsoleMenuLink[];
-  alerts: { href: string; count: number; label?: string };
+  /** The bell. Consoles with no inbox (college) leave it out. */
+  alerts?: { href: string; count: number; label?: string };
   /** Extra controls in the top bar (cart, command palette). */
   topActions?: React.ReactNode;
   /** FAQ / contact / email links under the nav. Staff consoles leave it out. */
@@ -273,18 +274,20 @@ export function ConsoleShell({
 
             <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-2">
               {topActions}
-              <Link
-                href={alerts.href}
-                aria-label={alerts.count > 0 ? `${alerts.label ?? "Notifications"}, ${alerts.count} unread` : alerts.label ?? "Notifications"}
-                className="apple-spring relative grid size-11 place-items-center rounded-apple-sm text-ink-600 hover:bg-ink-100 hover:text-ink-900"
-              >
-                <Bell className="size-5" aria-hidden />
-                {alerts.count > 0 ? (
-                  <span className="nums absolute right-1.5 top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-accent-500 px-1 text-[0.625rem] font-bold text-brand-950 ring-2 ring-surface">
-                    {alerts.count > 99 ? "99+" : alerts.count}
-                  </span>
-                ) : null}
-              </Link>
+              {alerts ? (
+                <Link
+                  href={alerts.href}
+                  aria-label={alerts.count > 0 ? `${alerts.label ?? "Notifications"}, ${alerts.count} unread` : alerts.label ?? "Notifications"}
+                  className="apple-spring relative grid size-11 place-items-center rounded-apple-sm text-ink-600 hover:bg-ink-100 hover:text-ink-900"
+                >
+                  <Bell className="size-5" aria-hidden />
+                  {alerts.count > 0 ? (
+                    <span className="nums absolute right-1.5 top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-accent-500 px-1 text-[0.625rem] font-bold text-brand-950 ring-2 ring-surface">
+                      {alerts.count > 99 ? "99+" : alerts.count}
+                    </span>
+                  ) : null}
+                </Link>
+              ) : null}
               <AccountMenu account={account} menu={menu} onSignOut={signOut} />
             </div>
           </div>

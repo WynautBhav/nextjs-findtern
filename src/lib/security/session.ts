@@ -28,7 +28,8 @@ import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
  * already written.
  */
 
-export type Role = "intern" | "employer" | "admin";
+/** `college` is a placement officer (src/lib/college). Never an admin. */
+export type Role = "intern" | "employer" | "admin" | "college";
 
 export type SessionData = {
   /** Subject id - the user row's id, never a client-supplied string. */
@@ -192,7 +193,9 @@ export function readSession(
 
   if (typeof data.exp !== "number" || data.exp <= now) return null;
   if (typeof data.uid !== "string" || !data.uid) return null;
-  if (!["intern", "employer", "admin"].includes(data.role)) return null;
+  if (!["intern", "employer", "admin", "college"].includes(data.role)) return null;
+  // Placement officers hold no admin permissions and are never "viewed as".
+  if (data.role === "college" && (data.permissions !== undefined || data.impersonator !== undefined)) return null;
 
   // Validate the shape when present. A tampered payload cannot get here
   // because the HMAC above covers the whole body, but a session minted by an

@@ -10,7 +10,8 @@ import {
   PRICING_PLANS_USD,
 } from "./home";
 import { BLOG_POSTS } from "./blog";
-import type { CmsBlogPost, CmsHome, CmsLegalDoc, CmsPlan } from "./types";
+import { COLLEGE_PITCH } from "./colleges";
+import type { CmsBlogPost, CmsCollegePartner, CmsCollegePitch, CmsHome, CmsLegalDoc, CmsPlan } from "./types";
 import { EMPLOYER_TERMS, PLATFORM_TERMS } from "./legal";
 import { INTERN_NDA, INTERN_TERMS } from "./legal-intern";
 import { getDb, schema, hasDb } from "@/lib/db";
@@ -68,6 +69,19 @@ export async function getPartners() {
     if (!rows.length) return PARTNERS;
     return rows.map((r) => ({ ...r, logoUrl: cmsImageSrc(r.logoUrl, `/api/cms-image/partner/${r.id}`) ?? "" })) as unknown as typeof PARTNERS;
   }, PARTNERS);
+}
+
+/** Partner colleges Findtern staff chose to show, plus the pitch copy. */
+export async function getCollegePartners(): Promise<{ pitch: CmsCollegePitch; partners: CmsCollegePartner[] }> {
+  const partners = await tryDb(async () => {
+    const c = schema.colleges;
+    return getDb()
+      .select({ id: c.id, name: c.name, city: c.city, logoUrl: c.logoUrl })
+      .from(c)
+      .where(sql`${c.isActive} AND ${c.isPartner} AND ${c.showOnWebsite}`)
+      .orderBy(asc(c.sortOrder), asc(c.name));
+  }, [] as CmsCollegePartner[]);
+  return { pitch: COLLEGE_PITCH, partners };
 }
 
 export async function getFeaturedSkills() {

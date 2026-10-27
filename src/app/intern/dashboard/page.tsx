@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, GraduationCap } from "lucide-react";
 
 import { EmptyScene, HeroBand, Pill, SectionHead, StatTile, Surface } from "@/components/app/primitives";
 import { buttonClass } from "@/components/ui/button";
@@ -24,6 +24,7 @@ import { paymentsAreFree } from "@/lib/razorpay";
 import { getInternActivationFeeMinor } from "@/lib/platform-settings";
 import { visibleAgainAt } from "@/lib/profile-hide";
 import { profileCompletion } from "@/lib/onboarding";
+import { membershipOf } from "@/lib/college/membership";
 
 export const metadata: Metadata = {
   title: "Home",
@@ -129,6 +130,7 @@ export default async function InternHome() {
   const aiPhase = aiInterviewPhase(aiRow, isScored(data.onboarding?.extraData));
 
   const fullName = `${user?.first ?? ""} ${user?.last ?? ""}`.trim() || "Candidate";
+  const college = await membershipOf(session.uid).catch(() => null);
   const score = scoreOf(data.onboarding);
   const ratings = ratingsOf(data.onboarding);
   // Profile → activation → AI interview, in that order, until all three are done.
@@ -387,6 +389,34 @@ export default async function InternHome() {
             </div>
             <OpenToWorkToggle initial={openToWork} visibleAgainAt={visibleAgain} />
           </Surface>
+
+          {college ? (
+            <Link
+              href="/intern/college"
+              className="apple-spring flex min-h-14 items-center gap-3 rounded-apple-xl border border-ink-200/80 bg-white px-5 py-4 text-sm text-ink-700 shadow-xs hover:border-ink-300"
+            >
+              <GraduationCap className="size-4 shrink-0 text-brand-700" aria-hidden />
+              <span className="min-w-0 flex-1 truncate">
+                <span className="font-medium text-ink-900">{college.name}</span>
+                {college.status === "verified" ? " · verified" : " · not verified yet"}
+              </span>
+              <ArrowRight className="size-4 shrink-0 text-ink-400" aria-hidden />
+            </Link>
+          ) : (
+            <Surface className="p-5">
+              <h2 className="text-base font-semibold text-ink-900">Is your college on Findtern?</h2>
+              <p className="mt-1 text-sm leading-relaxed text-ink-600">
+                Join it to be seen in your college&apos;s placement drives, where employers call students the same day.
+              </p>
+              <Link
+                href="/intern/college"
+                className="mt-3 inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-primary hover:underline"
+              >
+                Find your college
+                <ArrowRight className="size-4" aria-hidden />
+              </Link>
+            </Surface>
+          )}
 
           {!working && data.money.paidMinor > 0 ? (
             <Surface className="p-5">

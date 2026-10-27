@@ -20,7 +20,7 @@ export default async function EmployerLoginPage({
   const params = await searchParams;
   const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) ?? "";
   const oauthError = oauthErrorMessage(one(params.oauthError));
-  // Where sign in returns to (EMH-37): the page that sent them here.
+  // Where sign in returns to (EMH-37): the page that sent them here, e.g. a campus drive link.
   const next = safeNext(one(params.next), "");
   const googleHref = `/api/auth/google/start?role=employer${next ? `&next=${encodeURIComponent(next)}` : ""}`;
 
