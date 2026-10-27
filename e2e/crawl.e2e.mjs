@@ -70,8 +70,9 @@ async function login(browserType, persona) {
     headers: { "x-forwarded-for": nextIp(), "content-type": "application/json" },
   });
   if (!res.ok()) {
+    const detail = `login ${persona.key} → HTTP ${res.status()} ${(await res.text()).slice(0, 200)}`;
     await ctx.close();
-    throw new Error(`login ${persona.key} → HTTP ${res.status()} ${(await res.text()).slice(0, 200)}`);
+    throw new Error(detail);
   }
   const state = await ctx.storageState();
   await ctx.close();
