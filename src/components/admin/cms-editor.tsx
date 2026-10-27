@@ -1,231 +1,341 @@
 "use client";
 
-import { useState } from "react";
-import Link from "next/link";
+import { createContext, useContext, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { ExternalLink, Loader2, Pencil, Plus, Trash2, X } from "lucide-react";
 
-import { AdminEmpty, Panel, PanelHeader } from "@/components/admin/panel";
+import { RichTextField } from "@/components/admin/rich-text-field";
+import { sendInline } from "@/components/admin/inline-control";
 import { FileUpload } from "@/components/app/file-upload";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { CMS_COLLECTIONS, type CmsField, type CmsType } from "@/lib/admin/cms-collections";
-import { csrfFetch } from "@/lib/client-fetch";
+import { buttonClass } from "@/components/ui/button";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import {
+  CMS_COLLECTIONS,
+  buildCmsCreate,
+  buildCmsPatch,
+  cmsFields,
+  cmsImageSrc,
+  draftFromItem,
+  imageError,
+  inlineTokenKb,
+  isInlineToken,
+  slugError,
+  type CmsDraft,
+  type CmsField,
+  type CmsType,
+} from "@/lib/admin/cms-collections";
 import { cn } from "@/lib/utils";
 
-type Item = Record<string, unknown> & { id: string };
+export type CmsItem = Record<string, unknown> & { id: string };
 
-const input =
-  "mt-1.5 w-full rounded-[10px] border border-ink-200 bg-white px-3 text-sm text-ink-900 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20";
+const fieldClass =
+  "mt-1.5 w-full rounded-apple-sm border border-ink-200 bg-white px-3 text-sm text-ink-900 outline-none placeholder:text-ink-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20";
 
-/** One editor for every website collection: list, add, edit, hide, delete. */
-export function CmsEditor({ active, items }: { active: CmsType; items: Record<CmsType, Item[]> }) {
+type Ctx = { open: (item: CmsItem | "new") => void; remove: (item: CmsItem) => Promise<void>; busyId: string | null };
+const EditorContext = createContext<Ctx | null>(null);
+
+function useEditor(): Ctx {
+  const ctx = useContext(EditorContext);
+  if (!ctx) throw new Error("CMS controls must sit inside <CmsEditorProvider>");
+  return ctx;
+}
+
+/**
+ * Owns the edit sheet for one collection. The list itself is a server-rendered
+ * DataTable passed in as children; its row buttons reach the sheet through
+ * context. Edits send only the fields that changed (legacy inline images are
+ * never re-posted) and an emptied optional field as null, so it clears.
+ */
+export function CmsEditorProvider({
+  type,
+  items,
+  children,
+}: {
+  type: CmsType;
+  items: CmsItem[];
+  children: React.ReactNode;
+}) {
   const router = useRouter();
-  const def = CMS_COLLECTIONS[active];
-  const [editing, setEditing] = useState<Item | "new" | null>(null);
-  const [values, setValues] = useState<Record<string, string>>({});
+  const def = CMS_COLLECTIONS[type];
+  const [editing, setEditing] = useState<CmsItem | "new" | null>(null);
+  const [original, setOriginal] = useState<CmsDraft>({});
+  const [draft, setDraft] = useState<CmsDraft>({});
   const [busy, setBusy] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [listError, setListError] = useState<string | null>(null);
 
-  function open(item: Item | "new") {
+  function open(item: CmsItem | "new") {
+    const base = draftFromItem(type, item === "new" ? null : (items.find((i) => i.id === item.id) ?? item));
     setEditing(item);
+    setOriginal(base);
+    setDraft(base);
     setError(null);
-    setValues(
-      Object.fromEntries(
-        (def.fields as readonly CmsField[]).map((f) => [
-          f.name,
-          item === "new" ? (f.kind === "select" ? (f.options?.[0] ?? "") : "") : String(item[f.name] ?? ""),
-        ]),
-      ),
-    );
   }
 
-  async function send(method: "POST" | "PATCH" | "DELETE", payload: Record<string, unknown>) {
-    setBusy(true);
-    setError(null);
-    try {
-      const res = await csrfFetch("/api/admin/cms", {
-        method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type: active, ...payload }),
-      });
-      const data = (await res.json().catch(() => ({}))) as { error?: string };
-      if (!res.ok) {
-        setError(data.error ?? (method === "DELETE" ? "Couldn't delete." : "Couldn't save."));
-        return false;
-      }
-      router.refresh();
-      return true;
-    } catch {
-      setError("Couldn't reach the server. Check your connection and try again.");
-      return false;
-    } finally {
-      setBusy(false);
+  async function remove(item: CmsItem) {
+    const name = String(item[def.title] ?? "this item");
+    if (!window.confirm(`Delete "${name}"? It disappears from the website at once and can't be restored.`)) return;
+    setBusyId(item.id);
+    setListError(null);
+    const result = await sendInline({ url: "/api/admin/cms", method: "DELETE", body: { type, id: item.id } });
+    setBusyId(null);
+    if (!result.ok) {
+      setListError(result.error);
+      return;
     }
+    router.refresh();
+  }
+
+  function clientError(): string | null {
+    for (const f of cmsFields(type)) {
+      const v = draft[f.name] ?? "";
+      if (f.required && !v.trim()) return `${f.label} is required`;
+      if (f.kind === "image" && !isInlineToken(v)) {
+        const err = imageError(v, f.label);
+        if (err) return err;
+      }
+    }
+    if (type === "blog") return slugError(draft.slug, editing === "new" ? null : original.slug);
+    return null;
   }
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
-    const payload = Object.fromEntries(Object.entries(values).filter(([, v]) => v !== ""));
-    const ok = editing === "new" ? await send("POST", payload) : await send("PATCH", { id: (editing as Item).id, ...payload });
-    if (ok) setEditing(null);
+    const invalid = clientError();
+    if (invalid) {
+      setError(invalid);
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    const result =
+      editing === "new"
+        ? await sendInline({ url: "/api/admin/cms", method: "POST", body: { type, ...buildCmsCreate(type, draft) } })
+        : await sendInline({
+            url: "/api/admin/cms",
+            method: "PATCH",
+            body: { type, id: (editing as CmsItem).id, ...buildCmsPatch(type, original, draft) },
+          });
+    setBusy(false);
+    if (!result.ok) {
+      setError(result.error);
+      return;
+    }
+    setEditing(null);
+    router.refresh();
   }
 
-  const list = items[active];
+  const id = editing && editing !== "new" ? editing.id : null;
+  const wide = type === "blog";
+
   return (
-    <div className="space-y-4">
-      {/* Same ink-100 segmented control as payouts / messages; scrolls
-          sideways on phones rather than wrapping into a pile of pills. */}
-      <nav
-        className="flex max-w-full gap-0.5 overflow-x-auto rounded-[10px] bg-ink-100 p-1"
-        aria-label="Content types"
-      >
-        {(Object.keys(CMS_COLLECTIONS) as CmsType[]).map((t) => (
-          <Link
-            key={t}
-            href={`/admin/cms?tab=${t}`}
-            aria-current={t === active ? "page" : undefined}
-            className={cn(
-              "apple-spring apple-pressable inline-flex min-h-11 shrink-0 items-center gap-2 whitespace-nowrap rounded-[8px] px-4 text-[14px] font-medium tracking-[-0.01em]",
-              t === active ? "bg-white text-ink-900 shadow-xs" : "text-ink-600 hover:text-ink-800",
-            )}
-          >
-            {CMS_COLLECTIONS[t].label}
-            <span className="tabular-nums text-ink-600">{items[t].length}</span>
-          </Link>
-        ))}
-      </nav>
+    <EditorContext.Provider value={{ open, remove, busyId }}>
+      {listError ? (
+        <p role="alert" className="mb-4 flex items-start justify-between gap-3 rounded-apple-md bg-danger-soft px-4 py-3 text-sm text-danger">
+          {listError}
+          <button type="button" aria-label="Dismiss" onClick={() => setListError(null)} className="shrink-0">
+            <X className="size-4" aria-hidden />
+          </button>
+        </p>
+      ) : null}
+      {children}
 
-      <Panel>
-        <PanelHeader
-          title={def.label}
-          action={
-            <button
-              type="button"
-              onClick={() => open("new")}
-              className="apple-spring apple-pressable inline-flex min-h-11 items-center gap-1.5 rounded-[10px] bg-brand-700 px-3.5 text-[14px] font-medium text-white hover:bg-brand-600"
-            >
-              <Plus className="size-4" aria-hidden /> Add
-            </button>
-          }
-        />
-        {error && editing === null ? (
-          <p role="alert" className="border-b border-ink-100 bg-danger-soft px-5 py-3 text-sm text-danger">
-            {error}
-          </p>
-        ) : null}
-        {list.length === 0 ? (
-          <AdminEmpty
-            title={`No ${def.label.toLowerCase()} yet`}
-            body="Use Add to publish the first entry. It shows on the public site as soon as it is saved."
-          />
-        ) : (
-          <ul className="divide-y divide-ink-100">
-            {list.map((item) => {
-              const hidden = def.toggle && item.isActive === false;
-              return (
-                <li key={item.id} className="flex items-center gap-3 px-5 py-3">
-                  <span className={cn("min-w-0 flex-1", hidden && "opacity-50")}>
-                    <span className="block truncate text-sm font-medium text-ink-900">{String(item[def.title] ?? "Untitled")}</span>
-                    <span className="block truncate text-xs text-text-subtle">{String(item[def.subtitle] ?? "")}</span>
-                  </span>
-                  {def.toggle ? (
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={() => void send("PATCH", { id: item.id, isActive: hidden })}
-                      className="min-h-9 rounded-lg px-2.5 text-xs font-medium text-ink-700 hover:bg-ink-100 max-lg:min-h-11"
-                    >
-                      {hidden ? "Show" : "Hide"}
-                    </button>
-                  ) : null}
-                  <button type="button" onClick={() => open(item)} aria-label="Edit" className="grid size-9 place-items-center rounded-lg text-ink-500 hover:bg-ink-100 max-lg:size-11">
-                    <Pencil className="size-3.5" aria-hidden />
-                  </button>
-                  <button
-                    type="button"
-                    aria-label="Delete"
-                    disabled={busy}
-                    onClick={() => {
-                      if (window.confirm("Delete this item?")) void send("DELETE", { id: item.id });
-                    }}
-                    className="grid size-9 place-items-center rounded-lg text-ink-400 hover:bg-danger-soft hover:text-danger max-lg:size-11"
-                  >
-                    <Trash2 className="size-3.5" aria-hidden />
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </Panel>
-
-      <Sheet open={editing !== null} onOpenChange={(o) => !o && setEditing(null)}>
-        <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-lg">
-          <SheetHeader>
-            <SheetTitle>{editing === "new" ? `Add to ${def.label.toLowerCase()}` : "Edit"}</SheetTitle>
+      <Sheet open={editing !== null} onOpenChange={(o) => !o && !busy && setEditing(null)}>
+        <SheetContent side="right" className={cn("w-full overflow-y-auto", wide ? "sm:max-w-3xl" : "sm:max-w-lg")}>
+          <SheetHeader className="border-b border-ink-100 px-6 py-5">
+            <SheetTitle className="text-lg tracking-[-0.01em] text-ink-900">
+              {editing === "new" ? `New ${def.noun}` : `Edit ${def.noun}`}
+            </SheetTitle>
+            <SheetDescription className="text-sm text-ink-600">
+              {def.toggle
+                ? "Saved changes show on the public site on its next load. Hide an entry instead of deleting it to keep it for later."
+                : "Drafts stay private. Published posts show on the blog on its next load."}
+            </SheetDescription>
           </SheetHeader>
-          <form onSubmit={save} className="space-y-4 px-4 pb-6">
-            {(def.fields as readonly CmsField[]).map((f) => (
-              <div key={f.name}>
-                <label htmlFor={`cms-${f.name}`} className="block text-sm font-medium text-ink-800">
-                  {f.label}
-                  {f.required ? " *" : ""}
-                </label>
-                {f.kind === "textarea" ? (
-                  <textarea
-                    id={`cms-${f.name}`}
-                    rows={f.name === "body" ? 14 : 4}
-                    required={f.required}
-                    value={values[f.name] ?? ""}
-                    onChange={(e) => setValues((v) => ({ ...v, [f.name]: e.target.value }))}
-                    className={`${input} py-2`}
-                  />
-                ) : f.kind === "select" ? (
-                  <select
-                    id={`cms-${f.name}`}
-                    value={values[f.name] ?? ""}
-                    onChange={(e) => setValues((v) => ({ ...v, [f.name]: e.target.value }))}
-                    className={`${input} h-10`}
-                  >
-                    {f.options?.map((o) => (
-                      <option key={o}>{o}</option>
-                    ))}
-                  </select>
-                ) : (
-                  <input
-                    id={`cms-${f.name}`}
-                    type={f.kind === "number" ? "number" : "text"}
-                    required={f.required}
-                    value={values[f.name] ?? ""}
-                    placeholder={f.kind === "image" ? "Paste a URL or upload below" : undefined}
-                    onChange={(e) => setValues((v) => ({ ...v, [f.name]: e.target.value }))}
-                    className={`${input} h-10`}
-                  />
-                )}
-                {f.kind === "image" ? (
-                  <FileUpload
-                    className="mt-2"
-                    kind="cms_image"
-                    accept="image/jpeg,image/png,image/webp"
-                    label={f.label}
-                    onUploaded={(r) => setValues((v) => ({ ...v, [f.name]: r.url }))}
-                  />
-                ) : f.hint ? (
-                  <p className="mt-1 text-xs text-text-subtle">{f.hint}</p>
-                ) : null}
-              </div>
+          <form onSubmit={save} className="space-y-5 px-6 py-6" noValidate>
+            {cmsFields(type).map((f) => (
+              <FieldInput
+                key={f.name}
+                type={type}
+                itemId={id}
+                field={f}
+                value={draft[f.name] ?? ""}
+                onChange={(v) => setDraft((d) => ({ ...d, [f.name]: v }))}
+              />
             ))}
-            {error ? <p role="alert" className="text-sm text-danger">{error}</p> : null}
-            <button
-              type="submit"
-              disabled={busy}
-              className="inline-flex min-h-11 w-full items-center justify-center rounded-[10px] bg-brand-700 text-sm font-semibold text-white hover:bg-brand-600 disabled:opacity-50"
-            >
-              {busy ? "Saving…" : "Save"}
-            </button>
+            {error ? (
+              <p role="alert" className="rounded-apple-md bg-danger-soft px-4 py-3 text-sm text-danger">
+                {error}
+              </p>
+            ) : null}
+            <div className="sticky bottom-0 -mx-6 flex flex-wrap items-center gap-2 border-t border-ink-100 bg-white px-6 py-4">
+              <button type="submit" disabled={busy} className={buttonClass({ variant: "primary", size: "sm" })}>
+                {busy ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
+                {busy ? "Saving…" : editing === "new" ? `Add ${def.noun}` : "Save changes"}
+              </button>
+              <button type="button" disabled={busy} onClick={() => setEditing(null)} className={buttonClass({ variant: "ghost", size: "sm" })}>
+                Cancel
+              </button>
+            </div>
           </form>
         </SheetContent>
       </Sheet>
+    </EditorContext.Provider>
+  );
+}
+
+function FieldInput({
+  type,
+  itemId,
+  field: f,
+  value,
+  onChange,
+}: {
+  type: CmsType;
+  itemId: string | null;
+  field: CmsField;
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  const inputId = `cms-${f.name}`;
+  if (f.kind === "richtext") {
+    return <RichTextField label={f.label} value={value} onChange={onChange} imageUpload />;
+  }
+  const label = (
+    <label htmlFor={inputId} className="block text-sm font-medium text-ink-800">
+      {f.label}
+      {f.required ? <span className="text-danger"> *</span> : <span className="font-normal text-ink-500"> (optional)</span>}
+    </label>
+  );
+  if (f.kind === "image") {
+    return <ImageInput type={type} itemId={itemId} field={f} value={value} onChange={onChange} label={label} />;
+  }
+  return (
+    <div>
+      {label}
+      {f.kind === "textarea" ? (
+        <textarea id={inputId} rows={5} value={value} onChange={(e) => onChange(e.target.value)} className={cn(fieldClass, "py-2.5 leading-relaxed")} />
+      ) : f.kind === "select" ? (
+        <select id={inputId} value={value} onChange={(e) => onChange(e.target.value)} className={cn(fieldClass, "h-11")}>
+          {!(f.options ?? []).includes(value) && value ? <option value={value}>{value} (legacy value)</option> : null}
+          {f.options?.map((o) => (
+            <option key={o} value={o}>
+              {o === "draft" ? "Draft" : o === "published" ? "Published" : o}
+            </option>
+          ))}
+        </select>
+      ) : (
+        <input
+          id={inputId}
+          type={f.kind === "number" ? "number" : "text"}
+          inputMode={f.kind === "number" ? "numeric" : undefined}
+          min={f.kind === "number" ? 0 : undefined}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className={cn(fieldClass, "h-11", f.name === "slug" && "font-mono")}
+        />
+      )}
+      {f.hint ? <p className="mt-1.5 text-xs text-ink-600">{f.hint}</p> : null}
     </div>
   );
 }
+
+function ImageInput({
+  type,
+  itemId,
+  field: f,
+  value,
+  onChange,
+  label,
+}: {
+  type: CmsType;
+  itemId: string | null;
+  field: CmsField;
+  value: string;
+  onChange: (v: string) => void;
+  label: React.ReactNode;
+}) {
+  const inline = isInlineToken(value);
+  const src = itemId ? cmsImageSrc(type, itemId, f.name, value) : value.trim() || null;
+  return (
+    <div>
+      {label}
+      <div className="mt-1.5 flex items-start gap-3">
+        <span className="grid size-16 shrink-0 place-items-center overflow-hidden rounded-apple-md border border-ink-200 bg-ink-50">
+          {src ? (
+            // eslint-disable-next-line @next/next/no-img-element -- admin preview of arbitrary stored images
+            <img src={src} alt="" className="size-full object-contain" />
+          ) : (
+            <span className="text-xs text-ink-500">None</span>
+          )}
+        </span>
+        <div className="min-w-0 flex-1 space-y-2">
+          <input
+            id={`cms-${f.name}`}
+            type="text"
+            value={inline ? "" : value}
+            placeholder={inline ? `Embedded image (${inlineTokenKb(value)} KB, from the legacy site)` : "https://… or upload below"}
+            onChange={(e) => onChange(e.target.value)}
+            className={cn(fieldClass, "mt-0 h-10")}
+          />
+          <div className="flex flex-wrap items-center gap-2">
+            <FileUpload
+              kind="cms_image"
+              accept="image/jpeg,image/png,image/webp"
+              label={f.label}
+              noun="a new file"
+              onUploaded={(r) => onChange(r.url)}
+            />
+            {value ? (
+              <button type="button" onClick={() => onChange("")} className={buttonClass({ variant: "ghost", size: "sm" })}>
+                <X className="size-3.5" aria-hidden />
+                Remove
+              </button>
+            ) : null}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Row and toolbar controls (rendered inside the server DataTable) ── */
+
+export function CmsAddButton({ noun }: { noun: string }) {
+  const { open } = useEditor();
+  return (
+    <button type="button" onClick={() => open("new")} className={buttonClass({ variant: "primary", size: "sm" })}>
+      <Plus className="size-4" aria-hidden />
+      Add {noun}
+    </button>
+  );
+}
+
+export function CmsRowActions({ item, viewHref }: { item: CmsItem; viewHref?: string | null }) {
+  const { open, remove, busyId } = useEditor();
+  const busy = busyId === item.id;
+  return (
+    <span className="flex items-center justify-end gap-1">
+      {viewHref ? (
+        <a href={viewHref} target="_blank" rel="noreferrer" aria-label="View on the website" className={buttonClass({ variant: "ghost", size: "iconSm" })}>
+          <ExternalLink className="size-4" aria-hidden />
+        </a>
+      ) : null}
+      <button type="button" onClick={() => open(item)} className={buttonClass({ variant: "ghost", size: "sm" })}>
+        <Pencil className="size-3.5" aria-hidden />
+        Edit
+      </button>
+      <button
+        type="button"
+        aria-label="Delete"
+        disabled={busy}
+        onClick={() => void remove(item)}
+        className={cn(buttonClass({ variant: "ghost", size: "iconSm" }), "text-ink-500 hover:bg-danger-soft hover:text-danger")}
+      >
+        {busy ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <Trash2 className="size-4" aria-hidden />}
+      </button>
+    </span>
+  );
+}
+

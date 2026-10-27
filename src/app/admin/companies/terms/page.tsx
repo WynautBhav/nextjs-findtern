@@ -13,7 +13,7 @@ export default function AdminCompanyTermsPage() {
   return (
     <div className="space-y-6">
       <AdminPageHeader
-        title="Company Terms"
+        title="Company terms"
         subtitle="Edit the Company/Employer Terms & Conditions page content."
       />
 
@@ -23,6 +23,7 @@ export default function AdminCompanyTermsPage() {
         documentKey="company_terms"
         initialContent={EMPLOYER_TERMS.html}
         apiEndpoint="/api/admin/company/terms"
+        publicHref="/employer-terms-and-conditions"
       />
     </div>
   );

@@ -13,16 +13,17 @@ export default function AdminInternNonDisclosurePage() {
   return (
     <div className="space-y-6">
       <AdminPageHeader
-        title="Non-Disclosure Clauses"
-        subtitle="Manage the Non-Disclosure of Contact Information clauses shown for interns."
+        title="Intern NDA"
+        subtitle="The non-disclosure and non-bypass agreement interns accept with an offer. The first active clause is the live text, as on the legacy site."
       />
 
       <LegalDocEditor
         title="Findtern Internship Acceptance, Compliance & Non-Bypass Agreement"
-        description="This content is shown on the intern Non-Disclosure link."
+        description="Shown at /intern-nda and linked from every offer."
         documentKey="intern_nda"
         initialContent={INTERN_NDA.html}
         apiEndpoint="/api/admin/ndc-clauses"
+        publicHref="/intern-nda"
       />
     </div>
   );

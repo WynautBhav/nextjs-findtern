@@ -2,10 +2,12 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { CheckCircle2, IndianRupee, Loader2, Plus, Save, Star, Trash2 } from "lucide-react";
+import { AlertTriangle, CheckCircle2, IndianRupee, Loader2, Plus, Save, Star, Trash2 } from "lucide-react";
 
 import { Panel, PanelHeader } from "@/components/admin/panel";
+import { buttonClass } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
+import { describeLegacyBand, isLegacyTier, legacyBandChange } from "@/lib/admin/plan-band";
 import { csrfFetch } from "@/lib/client-fetch";
 import { inrMinorToUsdMinor, savingsPercent } from "@/lib/currency";
 import { formatMoney } from "@/lib/format";
@@ -33,7 +35,7 @@ export type EditablePlan = {
 };
 
 const inputClass =
-  "apple-spring mt-1.5 min-h-10 w-full rounded-[10px] border border-ink-200 bg-white px-3 text-[14px] text-ink-900 outline-none placeholder:text-ink-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20";
+  "mt-1.5 h-11 w-full rounded-apple-sm border border-ink-200 bg-white px-3 text-sm text-ink-900 outline-none placeholder:text-ink-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20";
 
 const toRupees = (minor: number | null) => (minor == null ? "" : String(minor / 100));
 const toMinor = (rupees: string) => Math.round(Number(rupees || 0) * 100);
@@ -78,12 +80,12 @@ export function AdminPricingEditor({
               type="button"
               onClick={seed}
               disabled={seeding}
-              className="inline-flex min-h-10 items-center gap-2 rounded-[10px] bg-brand-700 px-4 text-sm font-semibold text-white hover:bg-brand-600 disabled:opacity-60"
+              className={buttonClass({ variant: "primary", size: "sm" })}
             >
               {seeding ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
               Create plans from the built-in rate card
             </button>
-            {seedError ? <p className="mt-2 text-xs text-danger">{seedError}</p> : null}
+            {seedError ? <p role="alert" className="mt-2 text-sm text-danger">{seedError}</p> : null}
           </div>
         </Panel>
       ) : (
@@ -130,7 +132,7 @@ function ActivationFeePanel({ initialMinor }: { initialMinor: number }) {
         icon={IndianRupee}
       />
       <div className="flex flex-wrap items-end gap-3 px-5 py-4">
-        <label className="block w-48 text-xs font-medium text-ink-700">
+        <label className="block w-48 text-sm font-medium text-ink-800">
           Fee (₹)
           <input
             inputMode="decimal"
@@ -140,7 +142,7 @@ function ActivationFeePanel({ initialMinor }: { initialMinor: number }) {
           />
         </label>
         <SaveButton state={state} onClick={save} />
-        {error ? <p className="w-full text-xs text-danger">{error}</p> : null}
+        {error ? <p role="alert" className="w-full text-sm text-danger">{error}</p> : null}
       </div>
     </Panel>
   );
@@ -201,14 +203,20 @@ function PlanEditor({ plan }: { plan: EditablePlan }) {
         title={plan.displayName}
         description={`slug: ${plan.slug}`}
         action={
-          <label className="flex items-center gap-2 text-xs font-medium text-ink-600">
+          <label className="flex items-center gap-2 text-sm font-medium text-ink-700">
             Active
             <Switch checked={active} onCheckedChange={setActive} aria-label="Plan is active" />
           </label>
         }
       />
       <div className="space-y-4 px-5 py-4">
-        <label className="block text-xs font-medium text-ink-700">
+        {plan.isActive && !active && isLegacyTier(plan.features[1]) ? (
+          <Warning>
+            Switching this plan off also removes the {describeLegacyBand(plan.features[1])} price on the legacy site
+            (still the rollback target). Candidates in that band would be priced from another plan there.
+          </Warning>
+        ) : null}
+        <label className="block text-sm font-medium text-ink-800">
           Display name
           <input value={name} onChange={(e) => setName(e.target.value)} className={inputClass} />
         </label>
@@ -230,27 +238,29 @@ function PlanEditor({ plan }: { plan: EditablePlan }) {
           save={perHireSave}
         />
 
-        <label className="block text-xs font-medium text-ink-700">
+        <label className="block text-sm font-medium text-ink-800">
           Internship duration
           <input value={duration} onChange={(e) => setDuration(e.target.value)} className={inputClass} />
         </label>
 
         <fieldset className="space-y-2">
-          <legend className="text-xs font-medium text-ink-700">Comparison table rows</legend>
+          <legend className="text-sm font-medium text-ink-800">Comparison table rows</legend>
           {["Who is it for", "Findtern Score", "What you get"].map((label, i) => (
-            <input
-              key={label}
-              aria-label={label}
-              placeholder={label}
-              value={features[i]}
-              onChange={(e) => setFeatures((prev) => prev.map((v, j) => (j === i ? e.target.value : v)))}
-              className={inputClass}
-            />
+            <label key={label} className="block text-xs font-medium text-ink-600">
+              {label}
+              <input
+                value={features[i]}
+                aria-describedby={i === 1 ? `band-${plan.id}` : undefined}
+                onChange={(e) => setFeatures((prev) => prev.map((v, j) => (j === i ? e.target.value : v)))}
+                className={cn(inputClass, "mt-1")}
+              />
+            </label>
           ))}
+          <LegacyBandNote id={`band-${plan.id}`} previous={plan.features[1]} next={features[1]} />
         </fieldset>
 
         <fieldset>
-          <legend className="text-xs font-medium text-ink-700">Card checklist (✓ included / ✗ not included)</legend>
+          <legend className="text-sm font-medium text-ink-800">Card checklist (✓ included / ✗ not included)</legend>
           <ul className="mt-1.5 space-y-2">
             {featureList.map((f, i) => (
               <li key={i} className="flex items-center gap-2">
@@ -271,7 +281,7 @@ function PlanEditor({ plan }: { plan: EditablePlan }) {
                 <button
                   type="button"
                   onClick={() => setFeatureList((prev) => prev.filter((_, j) => j !== i))}
-                  className="grid size-9 shrink-0 place-items-center rounded-lg text-ink-400 hover:bg-danger-soft hover:text-danger"
+                  className={cn(buttonClass({ variant: "ghost", size: "iconSm" }), "text-ink-500 hover:bg-danger-soft hover:text-danger")}
                   aria-label="Remove row"
                 >
                   <Trash2 className="size-4" />
@@ -282,7 +292,7 @@ function PlanEditor({ plan }: { plan: EditablePlan }) {
           <button
             type="button"
             onClick={() => setFeatureList((prev) => [...prev, { label: "", included: true }])}
-            className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-brand-700 hover:underline"
+            className={cn(buttonClass({ variant: "ghost", size: "sm" }), "mt-2")}
           >
             <Plus className="size-3.5" /> Add row
           </button>
@@ -300,13 +310,13 @@ function PlanEditor({ plan }: { plan: EditablePlan }) {
         </label>
 
         <div className="flex items-center justify-between gap-3 border-t border-ink-100 pt-4">
-          <p className="text-xs text-text-subtle">
+          <p className="nums text-xs text-ink-600">
             USD: {formatMoney(inrMinorToUsdMinor(toMinor(hourly)), "USD")}/hr ·{" "}
             {formatMoney(inrMinorToUsdMinor(toMinor(perHire)), "USD")} per hire
           </p>
           <SaveButton state={state} onClick={save} />
         </div>
-        {error ? <p className="text-xs text-danger">{error}</p> : null}
+        {error ? <p role="alert" className="text-sm text-danger">{error}</p> : null}
       </div>
     </Panel>
   );
@@ -330,11 +340,11 @@ function PriceRow({
   const clean = (v: string) => v.replace(/[^\d.]/g, "");
   return (
     <div className="grid grid-cols-2 gap-3">
-      <label className="block text-xs font-medium text-ink-700">
+      <label className="block text-sm font-medium text-ink-800">
         {label}
         <input inputMode="decimal" value={now} onChange={(e) => onNow(clean(e.target.value))} className={inputClass} />
       </label>
-      <label className="block text-xs font-medium text-ink-700">
+      <label className="block text-sm font-medium text-ink-800">
         Struck-through &ldquo;was&rdquo;
         <input
           inputMode="decimal"
@@ -343,7 +353,7 @@ function PriceRow({
           onChange={(e) => onWas(clean(e.target.value))}
           className={inputClass}
         />
-        <span className="mt-1 block text-2xs font-normal text-text-subtle">
+        <span className="mt-1 block text-xs font-normal text-ink-600">
           {save != null ? `Shows "Save ${save}%"` : was ? "Must be above the price to show" : "Leave blank to hide"}
         </span>
       </label>
@@ -357,7 +367,7 @@ function SaveButton({ state, onClick }: { state: "idle" | "saving" | "saved"; on
       type="button"
       onClick={onClick}
       disabled={state === "saving"}
-      className="inline-flex min-h-10 items-center gap-1.5 rounded-[10px] bg-brand-700 px-4 text-xs font-semibold text-white hover:bg-brand-600 disabled:opacity-60"
+      className={buttonClass({ variant: "primary", size: "sm" })}
     >
       {state === "saving" ? (
         <Loader2 className="size-3.5 animate-spin" />
@@ -368,5 +378,42 @@ function SaveButton({ state, onClick }: { state: "idle" | "saving" | "saved"; on
       )}
       {state === "saved" ? "Saved" : "Save"}
     </button>
+  );
+}
+
+function Warning({ children, id, danger }: { children: React.ReactNode; id?: string; danger?: boolean }) {
+  return (
+    <p
+      id={id}
+      role={danger ? "alert" : undefined}
+      className={cn(
+        "flex items-start gap-2 rounded-apple-sm px-3 py-2.5 text-sm leading-relaxed",
+        danger ? "bg-danger-soft text-danger" : "bg-accent-100 text-accent-700",
+      )}
+    >
+      <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />
+      <span>{children}</span>
+    </p>
+  );
+}
+
+/** DB-26: what the legacy site will make of the "Findtern Score" row. */
+function LegacyBandNote({ id, previous, next }: { id: string; previous?: string; next: string }) {
+  const change = legacyBandChange(previous, next);
+  if (change) {
+    return (
+      <Warning id={id} danger={change.block}>
+        {change.message}
+        {change.block ? " Saving is refused until it can." : ""}
+      </Warning>
+    );
+  }
+  const band = describeLegacyBand(next);
+  return (
+    <p id={id} className="text-xs text-ink-600">
+      {band
+        ? `The legacy site reads this row to price candidates (${band}). Keep the numbers in the same form.`
+        : "The legacy site doesn't read this row as a score band (the lowest plan usually isn't)."}
+    </p>
   );
 }

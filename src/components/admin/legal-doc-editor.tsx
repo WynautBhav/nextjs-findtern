@@ -1,280 +1,190 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Check, Code, Eye, Loader2, Save } from "lucide-react";
+import { Check, ExternalLink, Loader2, Save } from "lucide-react";
 
+import { Panel, PanelHeader } from "@/components/admin/panel";
+import { RichTextField } from "@/components/admin/rich-text-field";
+import { buttonClass } from "@/components/ui/button";
+import { pickNdaClause, type NdaClause as Clause } from "@/lib/admin/legal-docs";
 import { csrfFetch } from "@/lib/client-fetch";
+import { cn } from "@/lib/utils";
 
+/**
+ * Editor for one legal document (platform / intern / company terms, the
+ * intern NDA). Loads the stored copy from `apiEndpoint`; until that load
+ * succeeds Save stays off, so the built-in fallback text can never overwrite
+ * what is live.
+ */
 export function LegalDocEditor({
   title: initialTitle,
   initialContent,
-  documentKey,
   description,
   apiEndpoint,
-  clauseId,
+  publicHref,
 }: {
   title: string;
   initialContent: string;
-  documentKey: string;
+  /** Kept for callers; the old browser-only draft store is gone. */
+  documentKey?: string;
   description: string;
-  apiEndpoint?: string;
-  clauseId?: string;
+  apiEndpoint: string;
+  /** Public page that shows this document. */
+  publicHref?: string;
 }) {
-  const [title, setTitle] = useState(() => {
-    if (typeof window !== "undefined" && !apiEndpoint) {
-      const stored = localStorage.getItem(`findtern_legal_${documentKey}`);
-      if (stored) {
-        try {
-          const parsed = JSON.parse(stored);
-          if (parsed.title) return parsed.title;
-        } catch {}
-      }
-    }
-    return initialTitle;
-  });
-  const [content, setContent] = useState(() => {
-    if (typeof window !== "undefined" && !apiEndpoint) {
-      const stored = localStorage.getItem(`findtern_legal_${documentKey}`);
-      if (stored) {
-        try {
-          const parsed = JSON.parse(stored);
-          if (parsed.content) return parsed.content;
-        } catch {}
-      }
-    }
-    return initialContent;
-  });
-  const [mode, setMode] = useState<"visual" | "html">("visual");
+  const [title, setTitle] = useState(initialTitle);
+  const [content, setContent] = useState(initialContent);
   const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const [activeClauseId, setActiveClauseId] = useState<string | undefined>(clauseId);
-
+  const [savedAt, setSavedAt] = useState<Date | null>(null);
+  const [clauseId, setClauseId] = useState<string | undefined>();
+  const [clauseInactive, setClauseInactive] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // Until the server copy has loaded, saving would overwrite it with the fallback text.
-  const [loaded, setLoaded] = useState(!apiEndpoint);
+  const [loaded, setLoaded] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+  const isNda = apiEndpoint.includes("/ndc-clauses");
 
   useEffect(() => {
-    if (!apiEndpoint) return;
-
     let cancelled = false;
-    async function load() {
+    (async () => {
       try {
-        const res = await fetch(apiEndpoint!);
+        const res = await fetch(apiEndpoint, { cache: "no-store" });
         if (!res.ok) throw new Error(String(res.status));
-        const data = await res.json();
+        const data = (await res.json()) as { terms?: Clause | null; clauses?: Clause[] };
         if (cancelled) return;
-        if (data.terms) {
-          if (data.terms.title) setTitle(data.terms.title);
-          if (data.terms.bodyHtml) setContent(data.terms.bodyHtml);
-        } else if (data.clauses && data.clauses.length > 0) {
-          const first = data.clauses[0];
-          setActiveClauseId(first.id);
-          if (first.title) setTitle(first.title);
-          if (first.bodyHtml) setContent(first.bodyHtml);
+        const doc = isNda ? pickNdaClause(data.clauses ?? []) : (data.terms ?? null);
+        if (doc) {
+          if (doc.title) setTitle(doc.title);
+          if (doc.bodyHtml) setContent(doc.bodyHtml);
+          if (isNda) {
+            setClauseId(doc.id);
+            setClauseInactive(doc.isActive === false);
+          }
         }
+        setLoadFailed(false);
         setLoaded(true);
       } catch {
-        if (!cancelled) setError("Couldn't load the current version. Reload the page before saving.");
+        if (!cancelled) setLoadFailed(true);
       }
-    }
-    load();
+    })();
     return () => {
       cancelled = true;
     };
-  }, [apiEndpoint, documentKey]);
+  }, [apiEndpoint, isNda, attempt]);
 
-  const handleSave = async () => {
-    if (!loaded) {
-      setError("Couldn't load the current version. Reload the page before saving.");
-      return;
-    }
+  async function save() {
+    if (!loaded) return;
     setSaving(true);
     setError(null);
     try {
-      if (apiEndpoint) {
-        let res: Response;
-        if (apiEndpoint.includes("/ndc-clauses")) {
-          if (activeClauseId) {
-            res = await csrfFetch(`${apiEndpoint}/${activeClauseId}`, {
-              method: "PUT",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ title, bodyHtml: content }),
-            });
-          } else {
-            res = await csrfFetch(apiEndpoint, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ title, bodyHtml: content, sortOrder: 0, isActive: true }),
-            });
-            if (res.ok) {
-              const body = await res.json();
-              if (body.clause?.id) setActiveClauseId(body.clause.id);
-            }
-          }
-        } else {
-          res = await csrfFetch(apiEndpoint, {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ title, bodyHtml: content }),
-          });
-        }
-        if (!res.ok) throw new Error(String(res.status));
+      let res: Response;
+      if (isNda && clauseId) {
+        res = await csrfFetch(`${apiEndpoint}/${clauseId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title, bodyHtml: content }),
+        });
+      } else if (isNda) {
+        res = await csrfFetch(apiEndpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title, bodyHtml: content, sortOrder: 0, isActive: true }),
+        });
+      } else {
+        res = await csrfFetch(apiEndpoint, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title, bodyHtml: content }),
+        });
       }
-      if (typeof window !== "undefined") {
-        localStorage.setItem(`findtern_legal_${documentKey}`, JSON.stringify({ title, content }));
+      const data = (await res.json().catch(() => null)) as { error?: string; clause?: { id?: string } } | null;
+      if (!res.ok) {
+        setError(data?.error ?? `Couldn't save (HTTP ${res.status}). Nothing was changed.`);
+        return;
       }
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2500);
+      if (data?.clause?.id) setClauseId(data.clause.id);
+      setSavedAt(new Date());
     } catch {
-      setError("Couldn't save your changes. Try again.");
+      setError("Couldn't save: the network request failed. Nothing was changed.");
     } finally {
       setSaving(false);
     }
-  };
-
-  const exec = (cmd: string, arg?: string) => {
-    if (typeof document === "undefined") return;
-    document.execCommand(cmd, false, arg);
-  };
+  }
 
   return (
-    <div className="space-y-6">
-      <div className="rounded-2xl border border-ink-100 bg-white p-6 shadow-2xs">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-ink-100 pb-5">
-          <div>
-            <h3 className="font-bold text-base text-ink-900">{title}</h3>
-            <p className="text-xs text-text-subtle mt-0.5">{description}</p>
+    <Panel>
+      <PanelHeader
+        title={title || "Untitled document"}
+        description={description}
+        action={
+          <>
+            {publicHref ? (
+              <a href={publicHref} target="_blank" rel="noreferrer" className={buttonClass({ variant: "ghost", size: "sm" })}>
+                View live <ExternalLink className="size-3.5" aria-hidden />
+              </a>
+            ) : null}
+            <button
+              type="button"
+              onClick={save}
+              disabled={saving || !loaded}
+              className={buttonClass({ variant: "primary", size: "sm" })}
+            >
+              {saving ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <Save className="size-4" aria-hidden />}
+              {saving ? "Saving…" : "Save changes"}
+            </button>
+          </>
+        }
+      />
+
+      <div className="space-y-5 px-5 py-5">
+        {loadFailed ? (
+          <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-apple-md bg-danger-soft px-4 py-3 text-sm text-danger">
+            <span>Couldn&apos;t load the live version, so saving is off to protect it. Nothing was changed.</span>
+            <button type="button" onClick={() => setAttempt((n) => n + 1)} className={buttonClass({ variant: "outline", size: "sm" })}>
+              Try again
+            </button>
           </div>
-
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={saving}
-            className="apple-spring apple-pressable inline-flex min-h-10 items-center justify-center gap-1.5 rounded-[10px] bg-brand-700 px-4 text-xs font-semibold text-white shadow-2xs hover:bg-brand-600 disabled:opacity-50"
-          >
-            {saving ? (
-              <Loader2 className="size-3.5 animate-spin" />
-            ) : saved ? (
-              <Check className="size-3.5" />
-            ) : (
-              <Save className="size-3.5" />
-            )}
-            <span>{saving ? "Saving..." : saved ? "Saved" : "Save Changes"}</span>
-          </button>
-        </div>
-
+        ) : !loaded ? (
+          <p className="flex items-center gap-2 text-sm text-ink-600">
+            <Loader2 className="size-4 animate-spin" aria-hidden /> Loading the live version…
+          </p>
+        ) : null}
         {error ? (
-          <p role="alert" className="mt-4 rounded-xl bg-danger-soft px-4 py-2.5 text-xs font-medium text-danger">
+          <p role="alert" className="rounded-apple-md bg-danger-soft px-4 py-3 text-sm text-danger">
             {error}
           </p>
         ) : null}
+        {savedAt && !error ? (
+          <p role="status" className="flex items-center gap-2 text-sm font-medium text-success">
+            <Check className="size-4" aria-hidden />
+            Saved at {savedAt.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}. The public page updates on its next load.
+          </p>
+        ) : null}
+        {clauseInactive ? (
+          <p className="rounded-apple-md bg-accent-100 px-4 py-3 text-sm text-accent-700">
+            No clause is switched on, so the public page shows the built-in text. Saving edits this inactive clause.
+          </p>
+        ) : null}
 
-        <div className="mt-5 space-y-4">
-          <div>
-            <label className="block text-2xs font-semibold uppercase tracking-wider text-text-subtle mb-1.5">
-              Document Title
-            </label>
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              className="w-full rounded-xl border border-ink-200 bg-white px-4 py-2.5 text-xs font-medium text-ink-900 focus:border-brand-500 focus:outline-hidden focus:ring-2 focus:ring-brand-500/20"
-            />
-          </div>
-
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <label className="text-2xs font-semibold uppercase tracking-wider text-text-subtle">
-                Document Content
-              </label>
-              <div className="flex items-center gap-1 rounded-lg border border-ink-200 p-0.5 bg-ink-50">
-                <button
-                  type="button"
-                  onClick={() => setMode("visual")}
-                  className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-2xs font-semibold ${
-                    mode === "visual"
-                      ? "bg-white text-ink-900 shadow-2xs"
-                      : "text-text-subtle hover:text-ink-800"
-                  }`}
-                >
-                  <Eye className="size-3" />
-                  <span>Visual</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setMode("html")}
-                  className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-2xs font-semibold ${
-                    mode === "html"
-                      ? "bg-white text-ink-900 shadow-2xs"
-                      : "text-text-subtle hover:text-ink-800"
-                  }`}
-                >
-                  <Code className="size-3" />
-                  <span>HTML</span>
-                </button>
-              </div>
-            </div>
-
-            {mode === "visual" ? (
-              <div className="space-y-2">
-                {/* Toolbar */}
-                <div className="flex flex-wrap items-center gap-1 rounded-t-xl border border-ink-200 bg-ink-50/70 p-2 border-b-0">
-                  <button
-                    type="button"
-                    onClick={() => exec("bold")}
-                    className="rounded px-2.5 py-1 text-xs font-bold text-ink-700 hover:bg-ink-200/60"
-                  >
-                    B
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => exec("italic")}
-                    className="rounded px-2.5 py-1 text-xs italic text-ink-700 hover:bg-ink-200/60"
-                  >
-                    I
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => exec("underline")}
-                    className="rounded px-2.5 py-1 text-xs underline text-ink-700 hover:bg-ink-200/60"
-                  >
-                    U
-                  </button>
-                  <span className="mx-1 h-4 w-px bg-ink-300" />
-                  <button
-                    type="button"
-                    onClick={() => exec("insertUnorderedList")}
-                    className="rounded px-2.5 py-1 text-xs text-ink-700 hover:bg-ink-200/60"
-                  >
-                    • List
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => exec("insertOrderedList")}
-                    className="rounded px-2.5 py-1 text-xs text-ink-700 hover:bg-ink-200/60"
-                  >
-                    1. List
-                  </button>
-                </div>
-                <div
-                  contentEditable
-                  suppressContentEditableWarning
-                  onBlur={(e) => setContent(e.currentTarget.innerHTML)}
-                  dangerouslySetInnerHTML={{ __html: content }}
-                  className="min-h-[380px] max-h-[550px] overflow-y-auto rounded-b-xl border border-ink-200 bg-white p-5 text-xs text-ink-900 leading-relaxed focus:outline-hidden prose prose-sm max-w-none"
-                />
-              </div>
-            ) : (
-              <textarea
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-                rows={18}
-                className="w-full rounded-xl border border-ink-200 bg-ink-950 p-4 font-mono text-2xs text-emerald-400 focus:border-brand-500 focus:outline-hidden focus:ring-2 focus:ring-brand-500/20"
-              />
+        <div>
+          <label htmlFor="legal-title" className="mb-1.5 block text-sm font-medium text-ink-800">
+            Document title
+          </label>
+          <input
+            id="legal-title"
+            type="text"
+            value={title}
+            disabled={!loaded}
+            onChange={(e) => setTitle(e.target.value)}
+            className={cn(
+              "h-11 w-full rounded-apple-sm border border-ink-200 bg-white px-3.5 text-[0.9375rem] font-medium text-ink-900 outline-none",
+              "focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 disabled:opacity-60",
             )}
-          </div>
+          />
         </div>
+
+        <RichTextField label="Document text" value={content} onChange={setContent} disabled={!loaded} />
       </div>
-    </div>
+    </Panel>
   );
 }
