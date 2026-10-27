@@ -1,0 +1,104 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: ["release/**"]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: findtern
+          POSTGRES_PASSWORD: findtern_dev
+          POSTGRES_DB: findtern
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U findtern"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      # Throwaway service container on the runner; nothing here is a real credential.
+      DATABASE_URL: postgresql://findtern:findtern_dev@localhost:5432/findtern
+      SESSION_SECRET: ci-session-secret-0123456789-abcdefghijklmnop
+      SIGNING_SECRET: ci-signing-secret-0123456789-abcdefghijklmnop
+      NEXT_TELEMETRY_DISABLED: "1"
+      MAIL_MODE: log
+      PAYMENTS_MODE: free
+      SCHEDULERS: "off"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Security tests
+        run: npm run test:security
+
+      - name: Migrate the CI database from drizzle/
+        run: npm run db:migrate
+
+      - name: Seed
+        run: node --experimental-strip-types scripts/seed.ts
+
+      - name: Verify seed logins
+        run: npm run db:verify
+
+      - name: Build
+        run: npm run build
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Create the e2e database
+        run: |
+          PGPASSWORD=findtern_dev psql -h localhost -U findtern -d postgres -c "CREATE DATABASE findtern_e2e"
+          DATABASE_URL=postgresql://findtern:findtern_dev@localhost:5432/findtern_e2e npm run db:migrate
+
+      - name: End-to-end (critical hiring path)
+        # Rebuilds with the server's own env so the tested build matches the run.
+        run: npm run e2e
+        env:
+          DATABASE_URL: postgresql://findtern:findtern_dev@localhost:5432/findtern_e2e
+          E2E_REBUILD: "1"
+
+      - name: Upload e2e artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-artifacts
+          path: |
+            e2e/.artifacts/*.png
+            e2e/.artifacts/server.log
+            logs/mail/
+          if-no-files-found: ignore
+          retention-days: 7
