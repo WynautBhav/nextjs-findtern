@@ -19,10 +19,11 @@ import { ProposalOfferSummary } from "@/components/admin/proposal-offer-summary"
 import { draftFromRecord } from "@/lib/onboarding";
 import type { RevealField } from "@/lib/admin/identity-mask";
 import type { User as UserType, InternOnboarding, Interview, Proposal, Timesheet, InternPayout } from "@/lib/db/schema";
-import { DetailRow, EmptyScene, PageHead, Pill, pillTabClass, SectionHead, StatTile, Surface } from "@/components/app/primitives";
+import { DetailRow, EmptyScene, PageHead, Pill, pillTabClass, SectionHead, Surface } from "@/components/app/primitives";
 import { buttonClass } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import { StatCard, StatGrid } from "@/components/admin/stat-card";
 
 /**
  * Candidate 360: everything staff need about one candidate on one page.
@@ -201,26 +202,26 @@ export function Intern360View({
         </div>
       </Surface>
 
-      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-        <StatTile
+      {/* The admin summary strip, as on Company detail and the lists. */}
+      <StatGrid cols={4}>
+        <StatCard
           label="Findtern Score"
-          value={score === null ? null : <>{score.toFixed(1)}<span className="ml-0.5 text-base font-normal text-text-subtle">/10</span></>}
-          empty="Not scored yet"
+          value={score === null ? "-" : `${score.toFixed(1)}/10`}
           hint={
             score === null
-              ? undefined
+              ? "Not scored yet"
               : `Comm ${ratings.communication ?? "-"} · Coding ${ratings.coding ?? "-"} · Apt ${ratings.aptitude ?? "-"} · AI ${ratings.interview ?? "-"}`
           }
         />
-        <StatTile label="Proposals" value={proposals.length || null} empty="None yet" hint={hiredCount ? `${hiredCount} hired` : undefined} />
-        <StatTile label="Interviews" value={interviews.length || null} empty="None yet" hint={scheduledCount ? `${scheduledCount} scheduled` : undefined} />
-        <StatTile
+        <StatCard label="Proposals" value={proposals.length} hint={hiredCount ? `${hiredCount} hired` : proposals.length ? "None hired" : "None yet"} />
+        <StatCard label="Interviews" value={interviews.length} hint={scheduledCount ? `${scheduledCount} scheduled` : interviews.length ? "None scheduled" : "None yet"} />
+        <StatCard
           label="Paid to candidate"
-          value={paidMinor > 0 ? formatMoney(paidMinor, "INR") : null}
-          empty="Nothing paid yet"
-          hint={owedTotalMinor > 0 ? `${formatMoney(owedTotalMinor, "INR")} still owed` : undefined}
+          value={formatMoney(paidMinor, "INR", { zeroLabel: "₹0" })}
+          hint={owedTotalMinor > 0 ? `${formatMoney(owedTotalMinor, "INR")} still owed` : paidMinor > 0 ? "Nothing owed" : "Nothing paid yet"}
+          tone={owedTotalMinor > 0 ? "warning" : "neutral"}
         />
-      </div>
+      </StatGrid>
 
       <div role="tablist" aria-label="Candidate record" className="-mx-1 flex max-w-full gap-1 overflow-x-auto px-1 pb-1 [scrollbar-width:none]">
         {tabs.map((t) => (
