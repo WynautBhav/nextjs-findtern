@@ -12,11 +12,13 @@ import {
   toArray,
   type InterviewRow,
   type PayoutRow,
+  type ProofSource,
   type ProposalRow,
   type TimesheetRow,
 } from "@/lib/journey";
 import { parseOffer } from "@/lib/offer";
 import { isHiredProposal } from "@/lib/hire-status";
+import { rawScore } from "@/lib/employer-candidates";
 
 /**
  * One read for every intern screen.
@@ -91,7 +93,7 @@ export async function loadInternData(uid: string) {
     names.admin = AI_INTERVIEW_NAME;
   }
 
-  const source = { proposals: p, interviews: i, timesheets: t, payouts: r, names, aiEmployerIds };
+  const source = { proposals: p, interviews: i, timesheets: t, payouts: r, names, aiEmployerIds, score: currentScore(onboarding[0]?.extraData) };
 
   return {
     proposals: p,
@@ -222,3 +224,16 @@ export async function notificationsFor(uid: string, limit = 60) {
 }
 
 export { toArray };
+
+/** The current Findtern Score from extra_data, as Home and Profile read it (QA-004). */
+function currentScore(extraData: unknown): ProofSource["score"] {
+  const extra = (extraData && typeof extraData === "object" ? extraData : {}) as Record<string, unknown>;
+  const overall = rawScore(extra);
+  if (overall === null) return null;
+  const raw = (extra.ratings && typeof extra.ratings === "object" ? extra.ratings : {}) as Record<string, unknown>;
+  const ratings = Object.fromEntries(
+    Object.entries(raw).filter((e): e is [string, number] => typeof e[1] === "number" && Number.isFinite(e[1])),
+  );
+  const at = typeof extra.approvedAt === "string" && !Number.isNaN(Date.parse(extra.approvedAt)) ? new Date(extra.approvedAt) : null;
+  return { overall, ratings, at };
+}

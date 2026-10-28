@@ -119,6 +119,12 @@ export type ProofSource = {
   names: CompanyNames;
   /** Employer ids that own AI interview rows (intern-data); their rows read as the AI interview. */
   aiEmployerIds?: Set<string>;
+  /**
+   * The current Findtern Score (intern_onboarding.extra_data), the one Home,
+   * Profile and Interviews show. Record used each proposal's frozen
+   * ai_ratings snapshot instead, one card per proposal (QA-004).
+   */
+  score?: { overall: number; ratings: Record<string, number>; at: Date | null } | null;
 };
 
 /* ── Stage ───────────────────────────────────────────────────────────────
@@ -458,22 +464,22 @@ export function deriveProofs(src: ProofSource): Proof[] {
   const out: Proof[] = [];
   const name = (id: string) => src.names[id] ?? "the company";
 
+  // One score card, the current score, dated by its approval (QA-004). The
+  // per-proposal snapshots stay on the offers that froze them.
+  if (src.score) {
+    const bands = Object.entries(src.score.ratings).map(([k, v]) => ({ label: prettyRating(k), value: `${v}/10` }));
+    const firstOffer = src.proposals.reduce<Date | null>((a, p) => (a && a < p.createdAt ? a : p.createdAt), null);
+    out.push({
+      id: "pf-score",
+      kind: "assessment",
+      title: "Findtern Score published",
+      line: "One assessment. The score is public and the rate that follows from it is public too.",
+      facts: [{ label: "Overall", value: `${src.score.overall}/10` }, ...bands],
+      at: src.score.at ?? firstOffer ?? new Date(0),
+    });
+  }
+
   for (const p of src.proposals) {
-    const ratings = p.aiRatings ?? null;
-    const overall = num(ratings?.overall);
-    if (overall != null) {
-      const bands = Object.entries(ratings ?? {})
-        .filter(([k, v]) => k !== "overall" && typeof v === "number")
-        .map(([k, v]) => ({ label: prettyRating(k), value: `${v}/10` }));
-      out.push({
-        id: `pf-score-${p.id}`,
-        kind: "assessment",
-        title: "Findtern Score published",
-        line: "One assessment. The score is public and the rate that follows from it is public too.",
-        facts: [{ label: "Overall", value: `${overall}/10` }, ...bands],
-        at: p.createdAt,
-      });
-    }
     if (p.hiredAt || isAcceptedStatus(p.status)) {
       const offer = p.offerDetails ?? {};
       out.push({
@@ -869,10 +875,6 @@ export function readScheduledForDate(r: PayoutRow): Date | null {
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
-
-function num(v: unknown): number | null {
-  return typeof v === "number" && Number.isFinite(v) ? v : null;
-}
 
 export function toArray<T = unknown>(v: unknown): T[] {
   return Array.isArray(v) ? (v as T[]) : [];
