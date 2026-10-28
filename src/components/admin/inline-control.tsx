@@ -187,14 +187,21 @@ export function InlineToggle({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [seen, setSeen] = useState(on);
+  // The in-page confirm for the destructive direction (it was window.confirm,
+  // which a browser driver auto-dismisses and which looks like a dead button; QA-145).
+  const [asking, setAsking] = useState(false);
   if (seen !== on) {
     setSeen(on);
     setState(on);
   }
 
-  async function flip() {
+  async function flip(confirmed = false) {
     const next = !state;
-    if (!next && confirmOff && !window.confirm(confirmOff)) return;
+    if (!next && confirmOff && !confirmed) {
+      setAsking(true);
+      return;
+    }
+    setAsking(false);
     const spec = next ? onRequest : offRequest;
     if (!spec && !request) {
       setError("No request configured for this control.");
@@ -220,9 +227,24 @@ export function InlineToggle({
           <span aria-hidden className={cn("size-1.5 rounded-full", state ? "bg-brand-600" : "bg-ink-300")} />
           {state ? onLabel : offLabel}
         </span>
+        {asking ? (
+          <span role="group" aria-label={confirmOff} className="inline-flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => void flip(true)}
+              autoFocus
+              className={cn(buttonClass({ variant: "ghost", size: "sm" }), "h-8 px-2 text-danger hover:bg-danger-soft max-lg:h-11")}
+            >
+              Yes, {turnOffLabel.toLowerCase()}
+            </button>
+            <button type="button" onClick={() => setAsking(false)} className={cn(buttonClass({ variant: "ghost", size: "sm" }), "h-8 px-2 max-lg:h-11")}>
+              Cancel
+            </button>
+          </span>
+        ) : (
         <button
           type="button"
-          onClick={flip}
+          onClick={() => void flip()}
           disabled={saving}
           aria-describedby={error ? errorId : undefined}
           // Turning off (Deactivate, Hide) is the risky direction: quiet,
@@ -236,7 +258,9 @@ export function InlineToggle({
           {saving ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : null}
           {state ? turnOffLabel : turnOnLabel}
         </button>
+        )}
       </span>
+      {asking && confirmOff ? <span className="max-w-64 whitespace-normal text-xs text-ink-600">{confirmOff}</span> : null}
       <ErrorText id={errorId} message={error} />
     </span>
   );
