@@ -38,12 +38,13 @@ export function Panel({
 export function PanelHeader({
   title,
   description,
-  icon: Icon,
   action,
   className,
 }: {
   title: React.ReactNode;
   description?: React.ReactNode;
+  /** Accepted for old callers, not drawn: an icon before every panel
+   * heading is a §0 template tell. */
   icon?: LucideIcon;
   action?: React.ReactNode;
   className?: string;
@@ -56,7 +57,6 @@ export function PanelHeader({
       )}
     >
       <div className="flex min-w-0 items-start gap-3">
-        {Icon ? <Icon className="mt-0.5 size-4 shrink-0 text-brand-700" aria-hidden /> : null}
         <div className="min-w-0">
           <h2 className="text-base font-semibold tracking-[-0.01em] text-ink-900">{title}</h2>
           {description ? (
