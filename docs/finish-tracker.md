@@ -198,3 +198,15 @@ branch, not to be touched: `feat/college-partners` (worktree
   CI on 6c4b000 failed only on the e2e Approve step: QA-132 added an inline
   confirm; suite updated in b8240a8. Ledger: 6 P1 closed, 7 P1 open (3 fixed
   awaiting retest + QA-139 + 3 older), ~22 P2 open after the retest wave.
+- 28 Oct (midday, new orchestrator session wynautbhav-f3): Tester B's
+  retests merged (`25aa398`: QA-139 and QA-112 closed, QA-003/009/016
+  re-verified; bug sheet 7 now 153 pass, 2 fail, 11 unclear, 16 n/a).
+  The orchestrator fixed the two unassigned employer-side P1s itself:
+  QA-005 (approval refused with 409 while any day has no status; Approve
+  disabled with the reason) and QA-006 (drive signup carries `next` and
+  returns to the drive), and the QA-133 seed vocabulary; merged as
+  `dc941df`, chain green (tsc, lint 0 errors, test 433, security 101,
+  db:verify, build), pushed. QA-004 handed to Opus inside the intern
+  group. Open P1 now: QA-004 (Opus), QA-005/006 (awaiting retest),
+  QA-111 (needs a real Safari), QA-137 and QA-138 (both wait on owner
+  answers 9 and 10 in docs/qa/owner-questions.md).
