@@ -130,7 +130,7 @@ export function TableToolbar({
     const value = searchParams.get(filter.key) ?? "";
     const id = `filter-${filter.key}`;
     return (
-      <div key={filter.key} className="flex items-center gap-1.5">
+      <div key={filter.key} className="flex min-w-0 items-center gap-1.5 max-sm:w-full">
         <label
           htmlFor={id}
           className="sr-only"
@@ -142,7 +142,7 @@ export function TableToolbar({
           value={value}
           onChange={(e) => setParam(filter.key, e.target.value || null)}
           className={cn(
-            "apple-spring h-9 max-w-56 cursor-pointer truncate rounded-apple-sm border bg-white px-2.5 pr-7 text-sm focus:ring-2 focus:ring-brand-500/20 focus:outline-none max-lg:min-h-11 max-sm:max-w-full",
+            "apple-spring h-9 max-w-56 cursor-pointer truncate rounded-apple-sm border bg-white px-2.5 pr-7 text-sm focus:ring-2 focus:ring-brand-500/20 focus:outline-none max-lg:min-h-11 max-sm:w-full max-sm:max-w-full",
             value
               ? "border-brand-300 font-medium text-brand-800"
               : "border-ink-200 text-ink-700",
