@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
-import { ArrowRight, LifeBuoy } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 
 import { DetailRow, PageHead, SectionHead, Surface } from "@/components/app/primitives";
 import { ChangePasswordForm } from "@/components/auth/change-password-form";
@@ -120,8 +120,7 @@ export default async function InternSettings({ searchParams }: { searchParams: P
           </Surface>
 
           <Surface as="section" aria-labelledby="help-head" className="p-5">
-            <h2 id="help-head" className="flex items-center gap-2 text-base font-semibold tracking-[-0.01em] text-ink-900">
-              <LifeBuoy className="size-4 text-brand-700" aria-hidden />
+            <h2 id="help-head" className="text-base font-semibold tracking-[-0.01em] text-ink-900">
               Need help?
             </h2>
             <p className="mt-2 text-pretty text-sm leading-relaxed text-ink-600">
