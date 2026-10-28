@@ -1315,9 +1315,12 @@ body:has([data-slot="dialog-content"][data-state="open"], [data-slot="sheet-cont
   /* Links in a stacked row are tap targets on a phone: names and counts
      were 20-24px high (QA-146). */
   [data-stack] td a {
+    /* A column, so a link that stacks a name over a contact keeps them on
+       two lines (inline-flex in a row ran them together, QA-156). */
     display: inline-flex;
+    flex-direction: column;
+    justify-content: center;
     min-height: 2.75rem;
-    align-items: center;
   }
 }
 

@@ -780,12 +780,15 @@ logins; `SEED=1` selects the seed accounts and server). Screenshots are in
 
 ### QA-154
 - Evidence: `int-sweep.mjs` small-target lines for hired and fresh intern at 375 (`/tmp` output not kept; rerun `PERSONA=hired node docs/qa/b/repro/int-sweep.mjs chromium 375`). Severity **P2**.
+- Status (builder, 29 Oct): fixed, awaiting retest (wp/opus, fix(QA-154)). A `touch` variant (coarse pointer or width < 40rem) grows the standalone links ("Call alerts", "Details", "Full record", Profile "Open") to 44px and sizes the Switch (48x28, 44px hit area). Left as is: links inside a sentence (onboarding "Settings", exempt under WCAG 2.5.8) and row titles whose stretched link makes the whole row the target.
 
 ### QA-155
 - Evidence: `int-empty-chromium-375-opportunities.png`, sweep line "banned copy: unlock"; `/intern/settings` "icon-in-heading: Need help?". Severity **P2**.
+- Status (builder, 29 Oct): fixed, awaiting retest (wp/opus, fix(QA-155)). "Two steps before you see open roles"; no icon before "Need help?".
 
 ### QA-156
 - Steps: Super Admin, `/admin/companies` at 375: the link text is "Globex IncDana US" (two `span`s with no gap). Evidence: `docs/qa/b/screens/adm2-chromium-375-companies.png`. Severity **P2**.
+- Status (builder, 29 Oct): fixed, awaiting retest (wp/opus, fix(QA-156)). Cause: the stacked-table link rule (QA-146) made links inline-flex in a row, so name and contact ran together; it is a column now (still 44px). Names wrap instead of truncating; an sr-only ", " keeps the link's accessible name "Northwind Labs, Arjun Mehta".
 
 ### Tester B, 28 Oct (fifth pass): the redesigned /college screens, public drive page and employer drive pages, QA-157 to QA-160
 - Build: production build of wp/qa-b on master b28270d (built 14:37), live-copy DB, placement officer `tpo@jklu.edu.in`; Chromium 375 and 1440, WebKit 375 (`docs/qa/b/repro/col-sweep.mjs`, `col-student.mjs`, `col-flow.mjs`, `col-close.mjs`, `col-emp.mjs`, `adm-deletes.mjs`; shots `docs/qa/b/screens/col-*.png`).
