@@ -17,6 +17,7 @@ import { isProjectOpen } from "@/lib/project-locations";
 import { SendProposalForm } from "@/components/employer/send-proposal-form";
 import { timezoneForLocation } from "@/lib/timezones";
 import { workPreferenceOf, type WorkPreference } from "@/lib/work-preference";
+import { isBlockingInterview } from "@/lib/employer-interview-rules";
 import { ButtonLink, buttonClass } from "@/components/ui/button";
 
 export const metadata: Metadata = {
@@ -68,6 +69,11 @@ export default async function SendProposal({
   // An offer already live with this candidate (any project): said up front,
   // not after the form is filled (legacy; EMH-16). A hire blocks too (EMB-26).
   let existing: { id: string; label: string; hired: boolean; fullTime: boolean } | null = null;
+  // Meetings with this candidate that haven't happened yet hold the offer
+  // (the API answers 409). A meeting with no project holds every project
+  // (QA-113): say so here, not in a toast after the policy dialog.
+  const heldProjectIds: string[] = [];
+  let heldEverywhere = false;
   let loadFailed = false;
 
   try {
@@ -152,6 +158,14 @@ export default async function SendProposal({
               inArray(schema.proposals.status, ["draft", "sent", "interview_scheduled", "accepted", "processing", "hired"]),
             ),
           );
+        const meetings = await db
+          .select()
+          .from(schema.interviews)
+          .where(and(eq(schema.interviews.employerId, uid), eq(schema.interviews.internId, user.id)));
+        for (const iv of meetings.filter((m) => isBlockingInterview(m))) {
+          if (iv.projectId) heldProjectIds.push(iv.projectId);
+          else heldEverywhere = true;
+        }
         for (const row of mine) {
           const offer = parseOffer(row.offerDetails, row.currency);
           const st = offerState(row, offer);
@@ -274,6 +288,30 @@ export default async function SendProposal({
     );
   }
 
+  if (heldEverywhere || (projects.length > 0 && projects.every((p) => heldProjectIds.includes(p.id)))) {
+    return (
+      <div>
+        {back}
+        <PageHead title="Send a proposal" />
+        <Surface className="max-w-2xl p-6 sm:p-7">
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="text-lg font-semibold text-ink-900">Meeting first</h2>
+            <Pill tone="waiting">Meeting booked</Pill>
+          </div>
+          <p className="mt-2 text-[0.9375rem] leading-relaxed text-ink-700">
+            You have a meeting with {candidate.name} that hasn&apos;t happened yet. The offer opens once it has.
+          </p>
+          <div className="mt-5 flex flex-wrap gap-2">
+            <Link href="/employer/schedule" className={buttonClass({ size: "sm" })}>
+              Open the schedule
+              <ArrowRight className="size-4" aria-hidden />
+            </Link>
+          </div>
+        </Surface>
+      </div>
+    );
+  }
+
   return (
     <div>
       {back}
@@ -294,6 +332,7 @@ export default async function SendProposal({
         preference={preference}
         companyTimezone={companyTimezone}
         candidateHasLaptop={hasLaptop}
+        heldProjectIds={heldProjectIds}
       />
     </div>
   );
