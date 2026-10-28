@@ -202,6 +202,10 @@ export function ChatWidget() {
   // private window, in which case it simply shows again next load.
   useEffect(() => {
     if (pathname?.startsWith("/admin")) return;
+    // Not inside the signed-in consoles: the nudge is for visitors, and in a
+    // console it landed over confirmations such as "Meeting request sent"
+    // (QA-128). Ask me is in the console's top bar or corner all the same.
+    if (/^\/(intern|employer|college)(\/|$)/.test(pathname ?? "")) return;
     try {
       if (window.sessionStorage.getItem(TEASER_KEY)) return;
     } catch {

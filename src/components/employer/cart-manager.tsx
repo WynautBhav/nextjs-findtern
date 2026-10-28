@@ -253,7 +253,7 @@ export function CartManager({
             <div role="status" className="rounded-apple-md border border-brand-200 bg-brand-50 p-6 text-center">
               <CheckCircle2 className="mx-auto size-8 text-brand-700" aria-hidden />
               <p className="mt-2 text-base font-semibold text-ink-900">Meeting request sent</p>
-              <p className="mt-1 text-sm text-ink-600">The candidate picks one of your times. It shows on your Schedule once they do.</p>
+              <p className="mt-1 text-sm text-ink-600">It is on your Schedule as &ldquo;Waiting on candidate&rdquo; until they pick one of your times.</p>
               <button type="button" onClick={() => setMeetingCandidate(null)} className={buttonClass({ variant: "outline", size: "sm", className: "mt-4 min-h-11" })}>
                 Done
               </button>
