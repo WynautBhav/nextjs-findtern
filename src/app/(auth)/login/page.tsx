@@ -8,7 +8,7 @@ import { LoginForm } from "@/components/auth/login-form";
 import { oauthErrorMessage, safeNext } from "@/lib/google";
 
 export const metadata: Metadata = {
-  title: "Sign in | Findtern",
+  title: "Sign in",
   robots: { index: false, follow: false },
 };
 

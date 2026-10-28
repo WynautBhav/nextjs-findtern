@@ -9,7 +9,7 @@ import { EmployerSignupForm } from "@/components/employer/employer-signup-form";
 import { oauthErrorMessage, safeNext } from "@/lib/google";
 
 export const metadata: Metadata = {
-  title: "Employer sign up | Findtern",
+  title: "Employer sign up",
   robots: { index: false, follow: false },
 };
 

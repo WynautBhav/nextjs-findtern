@@ -29,7 +29,7 @@ import { DriveEnterButton } from "@/components/employer/drive-enter-button";
  * not to send it onward in a Referer and search engines not to index it.
  */
 export const metadata: Metadata = {
-  title: "Campus drive | Findtern",
+  title: "Campus drive",
   robots: { index: false, follow: false, nocache: true },
   referrer: "no-referrer",
 };
