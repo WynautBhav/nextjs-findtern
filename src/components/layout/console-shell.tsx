@@ -388,10 +388,15 @@ function AccountMenu({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button type="button" aria-label={`${account.name}, account menu`} className="apple-spring flex min-h-11 items-center gap-2 rounded-apple-sm pl-1 pr-1 text-sm font-medium text-ink-800 hover:bg-ink-100 sm:pr-2">
-          <Avatar name={account.name} photoUrl={account.photoUrl} />
-          <span className="hidden max-w-[11rem] truncate md:block">{account.name}</span>
-          <ChevronDown className="hidden size-4 text-ink-500 md:block" aria-hidden />
+        {/* Named by its text, not an aria-label: the label never matched the
+            initials a phone shows (axe label-content-name-mismatch). */}
+        <button type="button" className="apple-spring flex min-h-11 items-center gap-2 rounded-apple-sm pl-1 pr-1 text-sm font-medium text-ink-800 hover:bg-ink-100 sm:pr-2">
+          <span aria-hidden>
+            <Avatar name={account.name} photoUrl={account.photoUrl} />
+          </span>
+          <span className="sr-only md:not-sr-only md:block md:max-w-[11rem] md:truncate">{account.name}</span>
+          <span className="sr-only">, account menu</span>
+          <ChevronDown className="hidden size-4 text-text-subtle md:block" aria-hidden />
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-64 p-1.5">

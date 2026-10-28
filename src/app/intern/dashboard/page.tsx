@@ -368,14 +368,13 @@ export default async function InternHome() {
               </div>
               <dl className="mt-4 space-y-3">
                 {ratings.map(([label, v]) => (
-                  <div key={label}>
-                    <div className="flex justify-between gap-2 text-sm">
-                      <dt className="text-ink-600">{label}</dt>
-                      <dd className="nums font-semibold text-ink-900">{v.toFixed(1)}</dd>
-                    </div>
-                    <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-ink-100" aria-hidden>
+                  <div key={label} className="grid grid-cols-[1fr_auto] gap-x-2 text-sm">
+                    {/* dt and dd straight under the div (axe definition-list); the bar is a hidden second dd. */}
+                    <dt className="text-ink-600">{label}</dt>
+                    <dd className="nums font-semibold text-ink-900">{v.toFixed(1)}</dd>
+                    <dd className="col-span-2 mt-1.5 h-1.5 overflow-hidden rounded-full bg-ink-100" aria-hidden>
                       <div className="h-full rounded-full bg-brand-600" style={{ width: `${Math.min(100, v * 10)}%` }} />
-                    </div>
+                    </dd>
                   </div>
                 ))}
               </dl>
