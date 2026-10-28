@@ -304,7 +304,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
         to: { type: "intern", id: proposal.internId },
         type: "full_time_hired",
         title: "Full-time hired",
-        message: `Congratulations! You're officially hired as a full-time employee for "${company}".`,
+        message: `You are hired full-time at ${company}.`,
         data: { proposalId: id, employerId: proposal.employerId, employerName: company },
         dedupeKey: `full_time_hired:${id}:${proposal.internId}`,
       });

@@ -47,12 +47,12 @@ function workModeLine(modes: string[]): string | null {
 }
 
 function Section({
-  icon: Icon,
   title,
   children,
   className,
 }: {
-  icon: React.ComponentType<{ className?: string }>;
+  /** Accepted, not drawn: an icon before every heading is a §0 tell. */
+  icon?: React.ComponentType<{ className?: string }>;
   title: string;
   children: React.ReactNode;
   className?: string;
@@ -60,7 +60,6 @@ function Section({
   return (
     <Surface as="section" className={cn("p-5 sm:p-6", className)}>
       <h2 className="flex items-center gap-2 text-base font-semibold tracking-[-0.01em] text-ink-900">
-        <Icon className="size-4 text-brand-700" aria-hidden />
         {title}
       </h2>
       <div className="mt-4">{children}</div>
@@ -120,7 +119,7 @@ export function ProfileView({
               <Pill tone={status.tone}>{status.label}</Pill>
             </div>
             <p className="mt-1.5 flex items-center gap-1.5 text-sm text-ink-600">
-              <MapPin className="size-4 shrink-0 text-ink-400" aria-hidden />
+              <MapPin className="size-4 shrink-0 text-text-subtle" aria-hidden />
               {place || "City not added yet"}
             </p>
             <p className="mt-3 max-w-prose text-pretty text-sm leading-relaxed text-ink-600">{status.detail}</p>
@@ -176,14 +175,13 @@ export function ProfileView({
           {ratings.length > 0 ? (
             <dl className="grid gap-x-8 gap-y-3 sm:grid-cols-2">
               {ratings.map(([label, v]) => (
-                <div key={label}>
-                  <div className="flex justify-between gap-2 text-sm">
-                    <dt className="text-ink-600">{label}</dt>
-                    <dd className="nums font-semibold text-ink-900">{v.toFixed(1)}</dd>
-                  </div>
-                  <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-ink-100" aria-hidden>
+                <div key={label} className="grid grid-cols-[1fr_auto] gap-x-2 text-sm">
+                  {/* dt and dd straight under the div (axe definition-list); the bar is a hidden second dd. */}
+                  <dt className="text-ink-600">{label}</dt>
+                  <dd className="nums font-semibold text-ink-900">{v.toFixed(1)}</dd>
+                  <dd className="col-span-2 mt-1.5 h-1.5 overflow-hidden rounded-full bg-ink-100" aria-hidden>
                     <div className="h-full rounded-full bg-brand-600" style={{ width: `${Math.min(100, v * 10)}%` }} />
-                  </div>
+                  </dd>
                 </div>
               ))}
             </dl>

@@ -1007,7 +1007,7 @@ function TimesheetsTab({
                         return (
                           <tr key={d.date}>
                             <td className="nums whitespace-nowrap py-2 pr-4 text-ink-800">
-                              {new Date(`${d.date}T00:00:00Z`).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" })}
+                              {new Date(`${d.date}T00:00:00Z`).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" }).replace(/\bSept\b/, "Sep")}
                             </td>
                             <td className="py-2 pr-4">{d.status ? <span className="text-ink-800">{d.status}</span> : <span className="text-text-subtle">Not filled</span>}</td>
                             <td className="nums py-2 pr-4 text-right text-ink-700">{x?.hours ?? "-"}</td>

@@ -40,12 +40,17 @@ export function RatingsImport() {
         {busy ? "Importing…" : "Import ratings"}
         <input ref={input} type="file" accept=".xlsx,.csv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" className="sr-only" disabled={busy} onChange={(e) => e.target.files?.[0] && upload(e.target.files[0])} />
       </label>
-      <a href="/api/admin/interns/ratings-import" className="text-sm font-medium text-brand-700 underline-offset-4 hover:underline">
-        Excel template
-      </a>
-      <a href="/api/admin/interns/ratings-import?format=csv" className="text-sm font-medium text-brand-700 underline-offset-4 hover:underline">
-        CSV
-      </a>
+      {/* One template link with its two formats, each a real target (QA-146). */}
+      <span className="inline-flex items-center gap-1 text-sm text-ink-600">
+        Template:
+        <a href="/api/admin/interns/ratings-import" className="inline-flex min-h-11 items-center px-1 font-medium text-brand-700 underline-offset-4 hover:underline">
+          Excel
+        </a>
+        ·
+        <a href="/api/admin/interns/ratings-import?format=csv" className="inline-flex min-h-11 items-center px-1 font-medium text-brand-700 underline-offset-4 hover:underline">
+          CSV
+        </a>
+      </span>
       {result ? <span role="status" className="w-full text-sm text-ink-600 sm:w-auto">{result}</span> : null}
     </div>
   );

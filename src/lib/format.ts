@@ -82,6 +82,11 @@ export function formatPerHire(
 
 export const formatCurrency = formatMoney;
 
+/**
+ * Three-letter months everywhere ("Sep", not en-IN's "Sept"; decided 28 Oct).
+ * en-IN date output has every other part we want, so short-month calls across
+ * the app take a `.replace(/\bSept\b/, "Sep")` on the result.
+ */
 export function formatDate(iso: string | Date | null | undefined): string {
   if (!iso) return "-";
   const date = typeof iso === "string" ? new Date(iso) : iso;
@@ -90,7 +95,7 @@ export function formatDate(iso: string | Date | null | undefined): string {
     day: "numeric",
     month: "short",
     year: "numeric",
-  });
+  }).replace(/\bSept\b/, "Sep");
 }
 
 /** Reading time at 200 wpm, rounded up, floored at 1. */
@@ -155,7 +160,9 @@ export function formatSlotTime(value: Date | string | null, tz?: string | null):
     minute: "2-digit",
     hour12: true,
     timeZone: tz || undefined,
-  }).format(date);
+  })
+    .format(date)
+    .replace(/\bSept\b/, "Sep");
   const abbrev = zoneAbbrev(tz, date);
   return abbrev ? `${core} ${abbrev}` : core;
 }
@@ -170,7 +177,9 @@ export function formatSlotDay(value: Date | string | null, tz?: string | null): 
     day: "numeric",
     month: "short",
     timeZone: tz || undefined,
-  }).format(date);
+  })
+    .format(date)
+    .replace(/\bSept\b/, "Sep");
 }
 
 /**
@@ -190,12 +199,12 @@ export function formatDayLabel(value: Date | string | null, now: Date = new Date
   const ahead = calendarDaysBetween(now, date);
   if (ahead === 1) return "Tomorrow";
   if (ahead > 1 && ahead < 7) return `In ${ahead} days`;
-  if (ahead >= 7) return date.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+  if (ahead >= 7) return date.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }).replace(/\bSept\b/, "Sep");
   const days = Math.floor((now.getTime() - date.getTime()) / 86_400_000);
   if (days <= 0) return "Today";
   if (days === 1) return "Yesterday";
   if (days < 7) return `${days} days ago`;
-  return date.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+  return date.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }).replace(/\bSept\b/, "Sep");
 }
 
 /**
@@ -234,13 +243,13 @@ export function formatMonth(value: Date | string | null): string {
 export function formatRange(start: Date | string | null, end: Date | string | null): string {
   if (!start) return "Dates to be confirmed";
   const a = typeof start === "string" ? new Date(start) : start;
-  if (!end) return a.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+  if (!end) return a.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }).replace(/\bSept\b/, "Sep");
   const b = typeof end === "string" ? new Date(end) : end;
   const sameMonth = a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth();
-  const left = a.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+  const left = a.toLocaleDateString("en-IN", { day: "numeric", month: "short" }).replace(/\bSept\b/, "Sep");
   const right = sameMonth
     ? b.toLocaleDateString("en-IN", { day: "numeric", year: "numeric" })
-    : b.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+    : b.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }).replace(/\bSept\b/, "Sep");
   return `${left} to ${right}`;
 }
 

@@ -29,7 +29,7 @@ import { loadRazorpay, RAZORPAY_THEME_COLOR } from "@/components/payments/razorp
 type Promo = { code: string; discountMinor: number };
 
 const fieldClass =
-  "h-11 min-w-0 flex-1 rounded-apple-sm border border-ink-200 bg-white px-3.5 text-[0.9375rem] text-ink-900 placeholder:text-ink-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20";
+  "h-11 min-w-0 flex-1 rounded-apple-sm border border-ink-200 bg-white px-3.5 text-[0.9375rem] text-ink-900 placeholder:text-text-subtle focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20";
 
 export function ActivationCard({
   internId,

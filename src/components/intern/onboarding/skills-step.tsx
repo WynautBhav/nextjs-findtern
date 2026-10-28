@@ -29,7 +29,7 @@ export function SkillsStep({ values, update, errors, skillsLocked }: StepProps) 
     return (
       <div className="space-y-5">
         <div className="flex gap-3 rounded-apple-lg border border-ink-200/80 bg-ink-50 p-4">
-          <Lock className="mt-0.5 size-4 shrink-0 text-ink-500" aria-hidden />
+          <Lock className="mt-0.5 size-4 shrink-0 text-text-subtle" aria-hidden />
           <p className="text-sm leading-relaxed text-ink-700">
             Your skills are locked because your AI interview is based on them. If one is wrong, write to{" "}
             <a href="mailto:communicate@findtern.in" className="font-medium text-brand-700 underline-offset-4 hover:underline">
@@ -105,7 +105,7 @@ export function SkillsStep({ values, update, errors, skillsLocked }: StepProps) 
           <Label htmlFor="skills">Your key skills</Label>
           <p className="nums text-sm text-ink-600" aria-live="polite">
             <span className="font-semibold text-ink-900">{skills.length}</span> of {MAX_SKILLS}
-            {skills.length < MIN_SKILLS ? <span className="text-ink-500"> · at least {MIN_SKILLS}</span> : null}
+            {skills.length < MIN_SKILLS ? <span className="text-text-subtle"> · at least {MIN_SKILLS}</span> : null}
           </p>
         </div>
         <div className="mt-2 flex gap-2.5">
@@ -193,7 +193,7 @@ export function SkillsStep({ values, update, errors, skillsLocked }: StepProps) 
                   type="button"
                   onClick={() => remove(skill)}
                   aria-label={`Remove ${skill}`}
-                  className="apple-spring order-2 grid size-11 shrink-0 place-items-center rounded-apple-sm text-ink-500 hover:bg-danger-soft hover:text-danger sm:order-3"
+                  className="apple-spring order-2 grid size-11 shrink-0 place-items-center rounded-apple-sm text-text-subtle hover:bg-danger-soft hover:text-danger sm:order-3"
                 >
                   <X className="size-4" aria-hidden />
                 </button>
@@ -206,7 +206,7 @@ export function SkillsStep({ values, update, errors, skillsLocked }: StepProps) 
       {!full ? (
         <div>
           <p className="text-sm font-medium text-ink-800">Popular picks</p>
-          <p className="mt-1 text-xs text-ink-500">Technical and non-technical. Tap to add.</p>
+          <p className="mt-1 text-xs text-text-subtle">Technical and non-technical. Tap to add.</p>
           <ul className="mt-3 flex flex-wrap gap-2">
             {shownPicks.map((s) => (
               <li key={s}>
@@ -239,7 +239,7 @@ function SkillChip({ onClick, children }: { onClick: () => void; children: React
       onClick={onClick}
       className="apple-spring apple-pressable inline-flex min-h-11 items-center gap-1.5 rounded-full border border-ink-200 bg-white px-3.5 text-sm text-ink-700 hover:border-brand-300 hover:bg-brand-50 hover:text-brand-800 sm:min-h-9"
     >
-      <Plus className="size-3.5 text-ink-400" aria-hidden />
+      <Plus className="size-3.5 text-text-subtle" aria-hidden />
       {children}
     </button>
   );

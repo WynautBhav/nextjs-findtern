@@ -138,7 +138,7 @@ export async function PUT(
           recipientId: existing.internId,
           type: "ai_interview_unlocked",
           title: "AI interview unlocked",
-          message: "🎤 Lights, camera, action! Your AI interview is unlocked.",
+          message: "Your AI interview is open. The link is on your Interviews page.",
           data: { interviewId: id, meetingLink: meetingLink.trim() },
           dedupeKey: `ai_interview_unlocked:${id}`,
         })

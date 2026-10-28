@@ -84,7 +84,8 @@ export function AdminPricingEditor({
               type="button"
               onClick={seed}
               disabled={seeding}
-              className={buttonClass({ variant: "primary", size: "sm" })}
+              // Wraps on a phone; the label ran 24px past its box (QA-143).
+              className={buttonClass({ variant: "primary", size: "sm", className: "h-auto min-h-9 whitespace-normal py-2 text-left" })}
             >
               {seeding ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
               Create plans from the built-in rate card

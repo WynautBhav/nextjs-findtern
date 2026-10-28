@@ -108,7 +108,7 @@ test("without a month, the earliest unlogged started period opens", async () => 
 
 test("period ends stored at T23:59:59.999Z print as the same calendar day (DB-36)", async () => {
   const { formatPeriod } = await import("./employer-timesheets.ts");
-  assert.equal(formatPeriod(new Date("2026-09-01T00:00:00Z"), new Date("2026-09-30T23:59:59.999Z")), "1 Sept – 30 Sept 2026");
+  assert.equal(formatPeriod(new Date("2026-09-01T00:00:00Z"), new Date("2026-09-30T23:59:59.999Z")), "1 Sep – 30 Sep 2026");
 });
 
 test("review grid: hours default to 8 for a present day, weeks run Monday to Sunday", async () => {

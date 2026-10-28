@@ -44,7 +44,6 @@ export default async function InternEarnings() {
   const waitingOnPayment = data.proposals.filter(
     (p) => isAcceptedStatus(p.status) && !isHiredProposal(p) && !parseOffer(p.offerDetails, p.currency).fullTime,
   );
-  const monthlyTotal = cards.reduce((sum, c) => sum + (c.eligible ? c.monthlyMinor ?? 0 : 0), 0);
   const cur = money.currency;
 
   if (earningsView(data.payouts.length, cards.length > 0) === "empty") {
@@ -76,9 +75,8 @@ export default async function InternEarnings() {
   return (
     <div>
       <HeroBand
-        eyebrow="Money"
         title="Your stipend"
-        lede="Paid by Findtern to your bank account. Paid and scheduled are kept apart, so you plan with money that has landed."
+        lede="Findtern pays it to your bank account once each month's timesheet is approved."
         actions={
           <Link href={BANK_HREF} className={buttonClass({ variant: "outlineLight" })}>
             <Landmark className="size-4" aria-hidden />
@@ -86,7 +84,8 @@ export default async function InternEarnings() {
           </Link>
         }
       >
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+        {/* Paid and pending; the monthly figure is on the engagement card below. */}
+        <div className="grid grid-cols-2 gap-3">
           <StatTile
             tone="onDark"
             label="Paid to you"
@@ -100,14 +99,6 @@ export default async function InternEarnings() {
             value={money.incomingMinor > 0 ? formatMoney(money.incomingMinor, cur, { zeroLabel: false }) : null}
             empty="Nothing scheduled"
             hint={money.nextExpectedAt ? `Next ${onDate(money.nextExpectedAt)}` : undefined}
-          />
-          <StatTile
-            tone="onDark"
-            label="Monthly stipend"
-            value={monthlyTotal > 0 ? formatMoney(monthlyTotal, "INR") : null}
-            empty={cards.length > 0 && cards.every((c) => !c.eligible) ? "Not eligible" : "Not set in your offer"}
-            hint={cards.length > 1 ? `Across ${cards.length} internships` : undefined}
-            className="col-span-2 lg:col-span-1"
           />
         </div>
       </HeroBand>
@@ -212,6 +203,8 @@ export default async function InternEarnings() {
         </div>
 
         <aside className="space-y-4">
+          {/* The explainer is for before the first payment. */}
+          {money.paidMinor === 0 && money.incomingMinor === 0 ? (
           <Surface className="p-5">
             <SectionHead title="How payment works" />
             <ol className="space-y-3">
@@ -230,6 +223,7 @@ export default async function InternEarnings() {
               ))}
             </ol>
           </Surface>
+          ) : null}
         </aside>
       </div>
     </div>

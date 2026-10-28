@@ -119,7 +119,7 @@ export default async function InternDocuments() {
                       <track kind="captions" />
                     </video>
                   ) : (
-                    <div className="grid aspect-[16/10] place-items-center bg-ink-50 text-ink-400" aria-hidden>
+                    <div className="grid aspect-[16/10] place-items-center bg-ink-50 text-text-subtle" aria-hidden>
                       <FileText className="size-10" />
                     </div>
                   )}

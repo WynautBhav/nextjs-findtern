@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { activeEngagement, buildThread, deriveMoney, deriveStage, isAcceptedStatus, payoutState } from "./journey.ts";
+import { activeEngagement, buildThread, deriveMoney, deriveProofs, deriveStage, isAcceptedStatus, payoutState } from "./journey.ts";
 
 const payout = (id: string, status: string, amountMinor: number, scheduledFor?: string) => ({
   id,
@@ -71,4 +71,26 @@ test("an offer in legacy 'processing' counts as accepted for the journey (INW-21
   assert.equal(thread[0].title, "You accepted: Designer");
   assert.equal(thread[0].tone, "waiting");
   assert.equal(deriveStage([proposal("p1", "sent")]), "seeking");
+});
+
+test("QA-004: Record has one score card, the current score, not a snapshot per proposal", () => {
+  const stale = { ...proposal("p1", "hired", new Date("2026-09-01")), aiRatings: { overall: 8.2, coding: 8.5 } };
+  const older = { ...proposal("p2", "rejected"), aiRatings: { overall: 7.9 } };
+  const proofs = deriveProofs({
+    proposals: [stale, older],
+    interviews: [],
+    timesheets: [],
+    payouts: [],
+    names: {},
+    score: { overall: 8.8, ratings: { coding: 9.3 }, at: new Date("2026-08-20") },
+  });
+  const scores = proofs.filter((p) => p.title === "Findtern Score published");
+  assert.equal(scores.length, 1);
+  assert.deepEqual(scores[0].facts.slice(0, 2), [
+    { label: "Overall", value: "8.8/10" },
+    { label: "Coding", value: "9.3/10" },
+  ]);
+  assert.equal(scores[0].at.toISOString(), "2026-08-20T00:00:00.000Z");
+  // No current score: no score card (the snapshots are not a fallback).
+  assert.equal(deriveProofs({ proposals: [stale], interviews: [], timesheets: [], payouts: [], names: {} }).filter((p) => p.kind === "assessment").length, 0);
 });

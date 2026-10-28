@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { BadgeCheck, Building2, CircleHelp, Search, X } from "lucide-react";
+import { BadgeCheck, Building2, Check, CircleHelp, Minus, Search, X } from "lucide-react";
 
 import { Pill, SectionHead, Surface } from "@/components/app/primitives";
 import { buttonVariants } from "@/components/ui/button";
@@ -34,7 +34,7 @@ const YEARS = [
 ];
 
 const FIELD =
-  "min-h-11 w-full rounded-apple-sm border border-ink-200 bg-white px-3.5 text-[0.9375rem] text-ink-900 placeholder:text-ink-400 focus-visible:border-brand-600 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand-600/30";
+  "min-h-11 w-full rounded-apple-sm border border-ink-200 bg-white px-3.5 text-[0.9375rem] text-ink-900 placeholder:text-text-subtle focus-visible:border-brand-600 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand-600/30";
 
 export function CollegeForm({
   initial,
@@ -151,10 +151,10 @@ function Membership({
                     aria-hidden
                     className={cn(
                       "mt-0.5 grid size-5 shrink-0 place-items-center rounded-full text-xs font-bold",
-                      on ? "bg-brand-700 text-white" : "bg-ink-100 text-ink-500",
+                      on ? "bg-brand-700 text-white" : "bg-ink-100 text-text-subtle",
                     )}
                   >
-                    {on ? "✓" : "–"}
+                    {on ? <Check className="size-3" strokeWidth={3} /> : <Minus className="size-3" />}
                   </span>
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-ink-900">
@@ -335,7 +335,7 @@ function JoinForm({
         </div>
         <div>
           <label htmlFor={`${ids}-branch`} className="mb-1.5 block text-sm font-medium text-ink-800">
-            Branch <span className="font-normal text-ink-500">(optional)</span>
+            Branch <span className="font-normal text-text-subtle">(optional)</span>
           </label>
           <input
             id={`${ids}-branch`}
@@ -491,7 +491,7 @@ function CollegeSearch({ initialQuery, onPick }: { initialQuery: string; onPick:
         Search for your college
       </label>
       <div className="relative">
-        <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-ink-400" aria-hidden />
+        <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-text-subtle" aria-hidden />
         <input
           id={`${ids}-q`}
           role="combobox"
@@ -515,7 +515,7 @@ function CollegeSearch({ initialQuery, onPick }: { initialQuery: string; onPick:
             type="button"
             aria-label="Clear search"
             onClick={() => setQuery("")}
-            className="absolute right-1 top-1/2 grid size-10 -translate-y-1/2 place-items-center rounded-apple-sm text-ink-400 hover:text-ink-700 focus-visible:outline-2 focus-visible:outline-brand-700"
+            className="absolute right-1 top-1/2 grid size-10 -translate-y-1/2 place-items-center rounded-apple-sm text-text-subtle hover:text-ink-700 focus-visible:outline-2 focus-visible:outline-brand-700"
           >
             <X className="size-4" />
           </button>

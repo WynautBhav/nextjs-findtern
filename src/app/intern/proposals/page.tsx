@@ -173,7 +173,7 @@ function OfferCard({
       </h3>
       <p className="mt-1 text-sm text-ink-600">
         {facts.company ?? "Company shared after hire"}
-        {project ? <span className="text-ink-500"> · {project}</span> : null}
+        {project ? <span className="text-text-subtle"> · {project}</span> : null}
       </p>
 
       <dl className="mt-5 grid grid-cols-2 gap-x-4 gap-y-4 border-t border-ink-200/80 pt-4">

@@ -17,7 +17,7 @@ import { cn } from "@/lib/utils";
 
 /** One control size: 44px tall everywhere (touch-first), radius token, 16px text so iOS never zooms. */
 export const CONTROL =
-  "apple-spring block h-11 w-full min-w-0 rounded-apple-sm border bg-white px-3.5 text-base text-ink-900 shadow-xs outline-none placeholder:text-ink-400 focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:bg-ink-50 disabled:text-ink-600 sm:text-[0.9375rem]";
+  "apple-spring block h-11 w-full min-w-0 rounded-apple-sm border bg-white px-3.5 text-base text-ink-900 shadow-xs outline-none placeholder:text-text-subtle focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:bg-ink-50 disabled:text-ink-600 sm:text-[0.9375rem]";
 export const CONTROL_OK = "border-ink-200 hover:border-ink-300 focus-visible:border-brand-600 focus-visible:ring-brand-600/15";
 export const CONTROL_BAD = "border-danger focus-visible:border-danger focus-visible:ring-danger/15";
 export const controlClass = (error?: string, extra?: string) => cn(CONTROL, error ? CONTROL_BAD : CONTROL_OK, extra);
@@ -29,7 +29,7 @@ export function Label({ htmlFor, children, optional }: { htmlFor?: string; child
   return (
     <Tag htmlFor={htmlFor} className={LABEL}>
       {children}
-      {optional ? <span className="ml-1.5 font-normal text-ink-500">(optional)</span> : null}
+      {optional ? <span className="ml-1.5 font-normal text-text-subtle">(optional)</span> : null}
     </Tag>
   );
 }
@@ -46,7 +46,7 @@ export function FieldNote({ id, error, hint }: { id: string; error?: React.React
     );
   }
   return hint ? (
-    <p id={`${id}-hint`} className="mt-1.5 text-xs text-ink-500">
+    <p id={`${id}-hint`} className="mt-1.5 text-xs text-text-subtle">
       {hint}
     </p>
   ) : null;
@@ -244,7 +244,7 @@ export function Select({
         onChange={(e) => onChange(e.target.value)}
         aria-invalid={error ? true : undefined}
         aria-describedby={describedBy(id, error, hint)}
-        className={controlClass(error, cn("appearance-none pr-10", !value && "text-ink-400"))}
+        className={controlClass(error, cn("appearance-none pr-10", !value && "text-text-subtle"))}
       >
         {placeholder !== undefined ? (
           <option value="" disabled={Boolean(value)}>
@@ -260,7 +260,7 @@ export function Select({
       <svg
         aria-hidden
         viewBox="0 0 20 20"
-        className="pointer-events-none absolute right-3.5 top-1/2 size-4 -translate-y-1/2 text-ink-500"
+        className="pointer-events-none absolute right-3.5 top-1/2 size-4 -translate-y-1/2 text-text-subtle"
         fill="none"
         stroke="currentColor"
         strokeWidth="1.75"
@@ -339,7 +339,7 @@ export function Choice<T extends string>({
                 {active ? <span className="size-1.5 rounded-full bg-white" /> : null}
               </span>
               <span>{o.label}</span>
-              {o.detail ? <span className="text-xs font-normal text-ink-500">{o.detail}</span> : null}
+              {o.detail ? <span className="text-xs font-normal text-text-subtle">{o.detail}</span> : null}
             </button>
           );
         })}
@@ -416,7 +416,7 @@ export function RemoveButton({ label, onClick }: { label: string; onClick: () =>
       onClick={onClick}
       aria-label={label}
       title={label}
-      className="apple-spring -mr-2 grid size-11 shrink-0 place-items-center rounded-apple-sm text-ink-500 hover:bg-danger-soft hover:text-danger"
+      className="apple-spring -mr-2 grid size-11 shrink-0 place-items-center rounded-apple-sm text-text-subtle hover:bg-danger-soft hover:text-danger"
     >
       <Trash2 className="size-4" aria-hidden />
     </button>

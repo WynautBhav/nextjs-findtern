@@ -129,7 +129,7 @@ export function Thread({
                 <h3 className={cn("text-[0.9375rem] font-semibold tracking-[-0.01em]", mark.text)}>
                   {node.title}
                 </h3>
-                <span className="nums text-xs text-ink-600">{node.at.toLocaleDateString("en-IN", { day: "numeric", month: "short", timeZone: "Asia/Kolkata" })}</span>
+                <span className="nums text-xs text-ink-600">{node.at.toLocaleDateString("en-IN", { day: "numeric", month: "short", timeZone: "Asia/Kolkata" }).replace(/\bSept\b/, "Sep")}</span>
               </div>
 
               <p className="mt-1 text-pretty text-sm leading-relaxed text-ink-600">{node.detail}</p>

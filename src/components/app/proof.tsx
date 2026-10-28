@@ -306,5 +306,5 @@ export function RecordCount({ proofs }: { proofs: Proof[] }) {
 }
 
 function formatDate(d: Date): string {
-  return d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+  return d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }).replace(/\bSept\b/, "Sep");
 }

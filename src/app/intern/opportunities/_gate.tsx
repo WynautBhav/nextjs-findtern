@@ -56,7 +56,7 @@ export function LockedRoles({ complete, activated, done, total }: { complete: bo
           <li key={s.label} className="flex items-start gap-3">
             <span
               className={`nums mt-0.5 grid size-7 shrink-0 place-items-center rounded-full text-sm font-semibold ${
-                s.done ? "bg-brand-600 text-white" : s === next ? "bg-accent-400 text-brand-950" : "border border-ink-200 text-ink-500"
+                s.done ? "bg-brand-600 text-white" : s === next ? "bg-accent-400 text-brand-950" : "border border-ink-200 text-text-subtle"
               }`}
             >
               {s.done ? <Check className="size-4" strokeWidth={3} aria-label="Done" /> : i + 1}

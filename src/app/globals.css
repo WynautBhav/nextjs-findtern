@@ -1290,6 +1290,13 @@ body:has([data-slot="dialog-content"][data-state="open"], [data-slot="sheet-cont
     padding-bottom: 0.5rem;
     font-size: 0.9375rem;
   }
+  /* Links in a stacked row are tap targets on a phone: names and counts
+     were 20-24px high (QA-146). */
+  [data-stack] td a {
+    display: inline-flex;
+    min-height: 2.75rem;
+    align-items: center;
+  }
 }
 
 /* Native checkboxes and radios are 13-16px; on touch they get the 24px

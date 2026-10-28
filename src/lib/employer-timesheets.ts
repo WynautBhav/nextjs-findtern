@@ -76,7 +76,7 @@ export function formatPeriodDay(value: Date | null, withYear = true): string {
     month: "short",
     ...(withYear ? { year: "numeric" } : {}),
     timeZone: "UTC",
-  });
+  }).replace(/\bSept\b/, "Sep");
 }
 
 export function formatPeriod(start: Date | null, end: Date | null): string {
@@ -92,7 +92,7 @@ export function formatDay(value: Date | null): string {
     month: "short",
     year: "numeric",
     timeZone: "Asia/Kolkata",
-  });
+  }).replace(/\bSept\b/, "Sep");
 }
 
 /** One-letter codes for the review grid. */

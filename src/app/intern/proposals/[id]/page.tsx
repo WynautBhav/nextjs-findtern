@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { eq } from "drizzle-orm";
-import { AlertCircle, ArrowLeft, Building2, Download, Phone, Sparkles, User } from "lucide-react";
+import { AlertCircle, ArrowLeft, Building2, Download, Phone, User } from "lucide-react";
 
 import { DetailRow, PageHead, Pill, SectionHead, Surface } from "@/components/app/primitives";
 import { OfferDecision } from "@/components/app/offer-decision";
@@ -151,13 +151,13 @@ export default async function ProposalDetail({ params }: { params: Promise<{ id:
         lede={
           <>
             {facts.company ?? "Company shared after hire"}
-            {project.row?.projectName ? <span className="text-ink-500"> · {project.row.projectName}</span> : null}
+            {project.row?.projectName ? <span className="text-text-subtle"> · {project.row.projectName}</span> : null}
           </>
         }
         action={
           <div className="flex flex-wrap gap-2">
             <Pill tone={status.tone}>{status.label}</Pill>
-            {fullTime ? <Pill tone="live">Full Time Job Role</Pill> : null}
+            {fullTime ? <Pill tone="neutral">Full-time role</Pill> : null}
             {facts.edited ? <Pill tone="new">Updated</Pill> : null}
           </div>
         }
@@ -248,17 +248,15 @@ export default async function ProposalDetail({ params }: { params: Promise<{ id:
               <dl className="divide-y divide-ink-200/80">
                 <DetailRow label="Joining date" value={joining} />
                 <DetailRow label="Duration" value={facts.duration} />
-                <DetailRow
-                  label="Weekly schedule"
-                  value={rawSchedule ? WEEKLY_SCHEDULES[offer.weeklySchedule].label : "Not specified"}
-                />
-                <DetailRow label="Shift timings (IST)" value={shift ?? "Not specified"} />
+                {/* Rows the company left empty are left out, not "Not specified". */}
+                {rawSchedule ? <DetailRow label="Weekly schedule" value={WEEKLY_SCHEDULES[offer.weeklySchedule].label} /> : null}
+                {shift ? <DetailRow label="Shift timings (IST)" value={shift} /> : null}
                 <DetailRow
                   label="Monthly hours"
                   value={offer.monthlyHours > 0 ? `${offer.monthlyHours} hrs / month` : "About 160 hrs / month"}
                   mono
                 />
-                <DetailRow label="Leave per month" value={`${offer.paidLeavesPerMonth} / month`} mono />
+                <DetailRow label="Paid leave" value={offer.paidLeavesPerMonth > 0 ? `${offer.paidLeavesPerMonth} ${offer.paidLeavesPerMonth === 1 ? "day" : "days"} a month` : "None"} mono />
                 <DetailRow label="Work mode" value={modeLabel(facts.mode)} />
                 {split ? (
                   <DetailRow label="Hybrid schedule" value={`WFO ${split.office} days · WFH ${split.home} days a week`} />
@@ -325,7 +323,8 @@ export default async function ProposalDetail({ params }: { params: Promise<{ id:
             <>
               <div className="grid gap-6 md:grid-cols-2">
                 <Surface className="p-6">
-                  <SectionHead title="AI interview ratings" action={<Sparkles className="size-4 text-accent-500" aria-hidden />} />
+                  {/* The snapshot this offer was made on (QA-004 keeps it here). */}
+                  <SectionHead title="Ratings when the offer was made" />
                   <ul className="space-y-3">
                     {ratingRows.map(([label, value]) => (
                       <li key={label}>
@@ -344,8 +343,8 @@ export default async function ProposalDetail({ params }: { params: Promise<{ id:
                   {skills.length > 0 ? (
                     <ul className="flex flex-wrap gap-1.5">
                       {skills.map((skill) => (
-                        <li key={skill}>
-                          <Pill tone="live">{skill}</Pill>
+                        <li key={skill} className="rounded-full bg-ink-100 px-2.5 py-1 text-xs font-medium text-ink-700">
+                          {skill}
                         </li>
                       ))}
                     </ul>
@@ -357,7 +356,18 @@ export default async function ProposalDetail({ params }: { params: Promise<{ id:
                 </Surface>
               </div>
 
-              <ImportantInstructions />
+              {/* In full while the offer waits on an answer; afterwards folded,
+                  not a 1,000px wall above a running internship. */}
+              {open ? (
+                <ImportantInstructions />
+              ) : (
+                <details className="rounded-apple-lg border border-ink-200/80 bg-white px-5 py-4">
+                  <summary className="cursor-pointer text-sm font-medium text-ink-800">The rules you agreed to</summary>
+                  <div className="mt-4">
+                    <ImportantInstructions />
+                  </div>
+                </details>
+              )}
             </>
           ) : null}
         </div>
@@ -369,7 +379,7 @@ export default async function ProposalDetail({ params }: { params: Promise<{ id:
 function Locked({ icon }: { icon: "user" | "phone" }) {
   const Icon = icon === "user" ? User : Phone;
   return (
-    <span className="inline-flex items-center gap-1.5 text-ink-500">
+    <span className="inline-flex items-center gap-1.5 text-text-subtle">
       <Icon className="size-3.5" aria-hidden />
       Shared after hire
     </span>

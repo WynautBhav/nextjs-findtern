@@ -13,6 +13,7 @@ import { MONEY_STATUSES, moneyRowFilter, narrowReceivables, type MoneyRow, type 
 import { loadReceivables, moneyFilter } from "@/lib/admin/receivables-load";
 import { formatDate, formatMoney } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { AutoSubmitForm } from "@/components/app/auto-submit-form";
 
 export const metadata: Metadata = { title: "Money in and out" };
 
@@ -96,8 +97,9 @@ export default async function AdminMoneyReportPage({ searchParams }: { searchPar
       />
       <ReportRange basePath={BASE} params={params} defaultLabel="Last 18 months" hidden={keep} />
 
-      {/* Candidate / company / status (ADM-15): one GET form, applies to both tables. */}
-      <form method="get" className="flex flex-wrap items-end gap-2 rounded-apple-lg border border-ink-200/80 bg-white px-4 py-3">
+      {/* Candidate / company / status (ADM-15): one GET form, applies to both
+          tables as you change it (no Filter button, QA-149). */}
+      <AutoSubmitForm className="flex flex-wrap items-end gap-2 rounded-apple-lg border border-ink-200/80 bg-white px-4 py-3">
         {Object.entries(params)
           .filter(([k, v]) => v && !["company", "candidate", "status", "page"].includes(k))
           .map(([k, v]) => (
@@ -122,15 +124,15 @@ export default async function AdminMoneyReportPage({ searchParams }: { searchPar
             ))}
           </select>
         </label>
-        <button type="submit" className={cn(buttonClass({ variant: "outline", size: "sm" }), "max-lg:h-11")}>
-          Filter
+        <button type="submit" className="sr-only">
+          Apply filters
         </button>
         {filtered ? (
           <Link href={link({ company: "", candidate: "", status: "" })} className={cn(buttonClass({ variant: "ghost", size: "sm" }), "max-lg:h-11")}>
             Clear
           </Link>
         ) : null}
-      </form>
+      </AutoSubmitForm>
 
       {data ? (
         <>

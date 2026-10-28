@@ -247,7 +247,7 @@ function PhonePrefixed({
         aria-hidden
         className="nums pointer-events-none absolute inset-y-0 left-0 flex items-center gap-1.5 border-r border-ink-200 pl-3.5 pr-3 text-[0.9375rem] font-medium text-ink-600"
       >
-        {disabled ? <Lock className="size-3.5 text-ink-400" /> : null}
+        {disabled ? <Lock className="size-3.5 text-text-subtle" /> : null}
         {code}
       </span>
       <input

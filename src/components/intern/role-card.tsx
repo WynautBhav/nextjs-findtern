@@ -44,7 +44,7 @@ export function InternRoleCard({ role, considered = false }: { role: InternRole;
           <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink-600">
             {mode || place ? (
               <span className="inline-flex items-center gap-1.5">
-                <MapPin className="size-4 shrink-0 text-ink-400" aria-hidden />
+                <MapPin className="size-4 shrink-0 text-text-subtle" aria-hidden />
                 {[mode, mode === "Remote" ? null : place].filter(Boolean).join(" · ")}
               </span>
             ) : null}
@@ -52,7 +52,7 @@ export function InternRoleCard({ role, considered = false }: { role: InternRole;
           </p>
         </div>
         {role.fullTimeOffer ? (
-          <Pill tone="waiting" className="hidden shrink-0 sm:inline-flex">
+          <Pill tone="neutral" className="hidden shrink-0 sm:inline-flex">
             Can lead to full time
           </Pill>
         ) : null}
@@ -81,7 +81,7 @@ export function InternRoleCard({ role, considered = false }: { role: InternRole;
         {considered ? (
           <Pill tone="live">Offer received</Pill>
         ) : role.fullTimeOffer ? (
-          <Pill tone="waiting" className="sm:hidden">
+          <Pill tone="neutral" className="sm:hidden">
             Can lead to full time
           </Pill>
         ) : (

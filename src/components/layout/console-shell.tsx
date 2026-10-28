@@ -150,7 +150,9 @@ export function ConsoleShell({
 
   const rail = (compact: boolean, onNavigate?: () => void) => (
     <>
-      <nav aria-label="Main" className="mt-6 min-h-0 flex-1 space-y-5 overflow-y-auto overflow-x-hidden overscroll-contain [scrollbar-color:transparent_transparent] [scrollbar-width:thin] hover:[scrollbar-color:var(--color-brand-700)_transparent]">
+      {/* The bottom fades when there is more below, so a long nav (admin has
+          20 items) reads as a scroller; short screens tighten it (QA-144). */}
+      <nav aria-label="Main" className="mt-6 min-h-0 flex-1 space-y-5 overflow-y-auto overflow-x-hidden overscroll-contain pb-6 [mask-image:linear-gradient(to_bottom,black_calc(100%-2.5rem),transparent)] [scrollbar-color:transparent_transparent] [scrollbar-width:thin] hover:[scrollbar-color:var(--color-brand-700)_transparent] [@media(max-height:60rem)]:mt-4 [@media(max-height:60rem)]:space-y-3">
         {groups.map((group, i) => (
           <div key={group.title ?? i}>
             {group.title ? (
@@ -344,7 +346,7 @@ function RailLink({ item, active, compact, onNavigate }: { item: ConsoleNavItem;
   const className = cn(
     // 44px on touch; 40px with a mouse, so a 900px-tall window shows the
     // whole employer nav without scrolling the rail.
-    "apple-spring apple-pressable group relative flex min-h-11 items-center gap-3 rounded-apple-sm px-3 text-[0.9375rem] tracking-[-0.01em] [@media(pointer:fine)]:min-h-10",
+    "apple-spring apple-pressable group relative flex min-h-11 items-center gap-3 rounded-apple-sm px-3 text-[0.9375rem] tracking-[-0.01em] [@media(pointer:fine)]:min-h-10 [@media(pointer:fine)_and_(max-height:60rem)]:min-h-8",
     active ? "bg-white/[0.09] font-semibold text-white" : "text-on-dark-subtle hover:bg-white/[0.06] hover:text-white",
     compact && "justify-center px-0",
   );
@@ -388,10 +390,15 @@ function AccountMenu({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button type="button" aria-label={`${account.name}, account menu`} className="apple-spring flex min-h-11 items-center gap-2 rounded-apple-sm pl-1 pr-1 text-sm font-medium text-ink-800 hover:bg-ink-100 sm:pr-2">
-          <Avatar name={account.name} photoUrl={account.photoUrl} />
-          <span className="hidden max-w-[11rem] truncate md:block">{account.name}</span>
-          <ChevronDown className="hidden size-4 text-ink-500 md:block" aria-hidden />
+        {/* Named by its text, not an aria-label: the label never matched the
+            initials a phone shows (axe label-content-name-mismatch). */}
+        <button type="button" className="apple-spring flex min-h-11 items-center gap-2 rounded-apple-sm pl-1 pr-1 text-sm font-medium text-ink-800 hover:bg-ink-100 sm:pr-2">
+          <span aria-hidden>
+            <Avatar name={account.name} photoUrl={account.photoUrl} />
+          </span>
+          <span className="sr-only md:not-sr-only md:block md:max-w-[11rem] md:truncate">{account.name}</span>
+          <span className="sr-only">, account menu</span>
+          <ChevronDown className="hidden size-4 text-text-subtle md:block" aria-hidden />
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-64 p-1.5">

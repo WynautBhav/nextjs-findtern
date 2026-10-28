@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useId, useRef, useState } from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { Phone, PhoneOff, Radio, Video, X } from "lucide-react";
 
 import { csrfFetch } from "@/lib/client-fetch";
@@ -91,31 +93,41 @@ export function CollegeLive({ collegeName, vapidKey }: { collegeName: string; va
     return () => clearInterval(t);
   }, [meetings.length]);
 
+  const pathname = usePathname();
+  const full = /^\/intern\/(dashboard|college)(\/|$)/.test(pathname ?? "");
   const visible = meetings.filter((m) => !dismissed.has(m.id));
   const current = visible[0] ?? null;
 
   return (
     <>
       {drive ? (
-        <div
-          role="status"
-          className="mb-6 flex flex-col gap-3 rounded-apple-lg border border-brand-200 bg-brand-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
-        >
-          <div className="flex min-w-0 items-start gap-2.5">
-            <span className="relative mt-1.5 flex size-2.5 shrink-0" aria-hidden>
-              <span className="absolute inline-flex h-full w-full rounded-full bg-brand-500 opacity-60 motion-safe:animate-ping" />
-              <span className="relative inline-flex size-2.5 rounded-full bg-brand-600" />
-            </span>
-            <p className="min-w-0 text-sm leading-relaxed text-brand-950">
-              <strong className="font-semibold">
-                {collegeName}: {drive.title} is live.
-              </strong>{" "}
-              Employers in the drive can ask you for a call: keep Findtern open, or turn on call alerts. Open until{" "}
-              {new Date(drive.endsAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}.
-            </p>
+        // Not role="status": it was re-announced (about 50 words) on every
+        // navigation. No looping ping. Full size on Home and College; one line
+        // with a link everywhere else, so it doesn't take the first screen.
+        full ? (
+          <div className="mb-6 flex flex-col gap-3 rounded-apple-lg border border-brand-200 bg-brand-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex min-w-0 items-start gap-2.5">
+              <span aria-hidden className="mt-1.5 size-2.5 shrink-0 rounded-full bg-brand-600" />
+              <p className="min-w-0 text-sm leading-relaxed text-brand-950">
+                <strong className="font-semibold">
+                  {collegeName}: {drive.title} is live.
+                </strong>{" "}
+                Employers in the drive can ask you for a call: keep Findtern open, or turn on call alerts. Open until{" "}
+                {new Date(drive.endsAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" }).replace(/\bSept\b/, "Sep")}.
+              </p>
+            </div>
+            <PushToggle vapidKey={vapidKey} className="shrink-0" />
           </div>
-          <PushToggle vapidKey={vapidKey} className="shrink-0" />
-        </div>
+        ) : (
+          <p className="mb-6 flex min-h-11 flex-wrap items-center gap-x-2 gap-y-1 rounded-apple-lg border border-brand-200 bg-brand-50 px-4 py-2 text-sm text-brand-950">
+            <span aria-hidden className="size-2 shrink-0 rounded-full bg-brand-600" />
+            <span className="font-semibold">{drive.title} is live</span>
+            <span className="text-brand-900">until {new Date(drive.endsAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" }).replace(/\bSept\b/, "Sep")}</span>
+            <Link href="/intern/college" className="ml-auto font-medium text-brand-700 underline-offset-4 hover:underline">
+              Call alerts
+            </Link>
+          </p>
+        )
       ) : null}
 
       {current ? (
@@ -229,7 +241,7 @@ function CallCard({
             type="button"
             onClick={() => onDismiss(meeting.id)}
             aria-label="Close"
-            className="-mr-1 -mt-1 grid size-11 shrink-0 place-items-center rounded-apple-sm text-ink-400 hover:bg-ink-100 hover:text-ink-700"
+            className="-mr-1 -mt-1 grid size-11 shrink-0 place-items-center rounded-apple-sm text-text-subtle hover:bg-ink-100 hover:text-ink-700"
           >
             <X className="size-4" />
           </button>

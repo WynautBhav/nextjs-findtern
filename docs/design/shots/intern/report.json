@@ -1,0 +1,338 @@
+[
+  {
+    "role": "intern",
+    "width": 390,
+    "route": "/intern/dashboard",
+    "finalUrl": "/intern/dashboard",
+    "problems": []
+  },
+  {
+    "role": "intern",
+    "width": 390,
+    "route": "/intern/timesheets",
+    "finalUrl": "/intern/timesheets",
+    "problems": []
+  },
+  {
+    "role": "intern",
+    "width": 390,
+    "route": "/intern/timesheets?sheet=920dfa13-bd15-448f-8e3e-08b251ae725b",
+    "finalUrl": "/intern/timesheets?sheet=920dfa13-bd15-448f-8e3e-08b251ae725b",
+    "problems": []
+  },
+  {
+    "role": "intern",
+    "width": 390,
+    "route": "/intern/earnings",
+    "finalUrl": "/intern/earnings",
+    "problems": []
+  },
+  {
+    "role": "intern",
+    "width": 390,
+    "route": "/intern/interviews",
+    "finalUrl": "/intern/interviews",
+    "problems": []
+  },
+  {
+    "role": "intern",
+    "width": 390,
+    "route": "/intern/record",
+    "finalUrl": "/intern/record",
+    "problems": []
+  },
+  {
+    "role": "intern",
+    "width": 390,
+    "route": "/intern/opportunities",
+    "finalUrl": "/intern/opportunities",
+    "problems": []
+  },
+  {
+    "role": "intern",
+    "width": 390,
+    "route": "/intern/opportunities/7d3ca169-468c-4291-835d-fb0c4c597745",
+    "finalUrl": "/intern/opportunities/7d3ca169-468c-4291-835d-fb0c4c597745",
+    "problems": []
+  },
+  {
+    "role": "intern",
+    "width": 390,
+    "route": "/intern/proposals",
+    "finalUrl": "/intern/proposals",
+    "problems": []
+  },
+  {
+    "role": "intern",
+    "width": 390,
+    "route": "/intern/proposals/2ccca2cc-ea21-4611-b160-eae0414a53cd",
+    "finalUrl": "/intern/proposals/2ccca2cc-ea21-4611-b160-eae0414a53cd",
+    "problems": []
+  },
+  {
+    "role": "intern",
+    "width": 390,
+    "route": "/intern/documents",
+    "finalUrl": "/intern/documents",
+    "problems": []
+  },
+  {
+    "role": "intern",
+    "width": 390,
+    "route": "/intern/profile",
+    "finalUrl": "/intern/profile",
+    "problems": []
+  },
+  {
+    "role": "intern",
+    "width": 390,
+    "route": "/intern/college",
+    "finalUrl": "/intern/college",
+    "problems": []
+  },
+  {
+    "role": "intern",
+    "width": 390,
+    "route": "/intern/notifications",
+    "finalUrl": "/intern/notifications",
+    "problems": []
+  },
+  {
+    "role": "intern",
+    "width": 390,
+    "route": "/intern/settings",
+    "finalUrl": "/intern/settings",
+    "problems": []
+  },
+  {
+    "role": "intern",
+    "width": 390,
+    "route": "/intern/onboarding",
+    "finalUrl": "/intern/onboarding",
+    "problems": []
+  },
+  {
+    "role": "intern",
+    "width": 768,
+    "route": "/intern/dashboard",
+    "finalUrl": "/intern/dashboard",
+    "problems": []
+  },
+  {
+    "role": "intern",
+    "width": 768,
+    "route": "/intern/timesheets",
+    "finalUrl": "/intern/timesheets",
+    "problems": []
+  },
+  {
+    "role": "intern",
+    "width": 768,
+    "route": "/intern/timesheets?sheet=920dfa13-bd15-448f-8e3e-08b251ae725b",
+    "finalUrl": "/intern/timesheets?sheet=920dfa13-bd15-448f-8e3e-08b251ae725b",
+    "problems": []
+  },
+  {
+    "role": "intern",
+    "width": 768,
+    "route": "/intern/earnings",
+    "finalUrl": "/intern/earnings",
+    "problems": []
+  },
+  {
+    "role": "intern",
+    "width": 768,
+    "route": "/intern/interviews",
+    "finalUrl": "/intern/interviews",
+    "problems": []
+  },
+  {
+    "role": "intern",
+    "width": 768,
+    "route": "/intern/record",
+    "finalUrl": "/intern/record",
+    "problems": []
+  },
+  {
+    "role": "intern",
+    "width": 768,
+    "route": "/intern/opportunities",
+    "finalUrl": "/intern/opportunities",
+    "problems": []
+  },
+  {
+    "role": "intern",
+    "width": 768,
+    "route": "/intern/opportunities/7d3ca169-468c-4291-835d-fb0c4c597745",
+    "finalUrl": "/intern/opportunities/7d3ca169-468c-4291-835d-fb0c4c597745",
+    "problems": []
+  },
+  {
+    "role": "intern",
+    "width": 768,
+    "route": "/intern/proposals",
+    "finalUrl": "/intern/proposals",
+    "problems": []
+  },
+  {
+    "role": "intern",
+    "width": 768,
+    "route": "/intern/proposals/2ccca2cc-ea21-4611-b160-eae0414a53cd",
+    "finalUrl": "/intern/proposals/2ccca2cc-ea21-4611-b160-eae0414a53cd",
+    "problems": []
+  },
+  {
+    "role": "intern",
+    "width": 768,
+    "route": "/intern/documents",
+    "finalUrl": "/intern/documents",
+    "problems": []
+  },
+  {
+    "role": "intern",
+    "width": 768,
+    "route": "/intern/profile",
+    "finalUrl": "/intern/profile",
+    "problems": []
+  },
+  {
+    "role": "intern",
+    "width": 768,
+    "route": "/intern/college",
+    "finalUrl": "/intern/college",
+    "problems": []
+  },
+  {
+    "role": "intern",
+    "width": 768,
+    "route": "/intern/notifications",
+    "finalUrl": "/intern/notifications",
+    "problems": []
+  },
+  {
+    "role": "intern",
+    "width": 768,
+    "route": "/intern/settings",
+    "finalUrl": "/intern/settings",
+    "problems": []
+  },
+  {
+    "role": "intern",
+    "width": 768,
+    "route": "/intern/onboarding",
+    "finalUrl": "/intern/onboarding",
+    "problems": []
+  },
+  {
+    "role": "intern",
+    "width": 1440,
+    "route": "/intern/dashboard",
+    "finalUrl": "/intern/dashboard",
+    "problems": []
+  },
+  {
+    "role": "intern",
+    "width": 1440,
+    "route": "/intern/timesheets",
+    "finalUrl": "/intern/timesheets",
+    "problems": []
+  },
+  {
+    "role": "intern",
+    "width": 1440,
+    "route": "/intern/timesheets?sheet=920dfa13-bd15-448f-8e3e-08b251ae725b",
+    "finalUrl": "/intern/timesheets?sheet=920dfa13-bd15-448f-8e3e-08b251ae725b",
+    "problems": []
+  },
+  {
+    "role": "intern",
+    "width": 1440,
+    "route": "/intern/earnings",
+    "finalUrl": "/intern/earnings",
+    "problems": []
+  },
+  {
+    "role": "intern",
+    "width": 1440,
+    "route": "/intern/interviews",
+    "finalUrl": "/intern/interviews",
+    "problems": []
+  },
+  {
+    "role": "intern",
+    "width": 1440,
+    "route": "/intern/record",
+    "finalUrl": "/intern/record",
+    "problems": []
+  },
+  {
+    "role": "intern",
+    "width": 1440,
+    "route": "/intern/opportunities",
+    "finalUrl": "/intern/opportunities",
+    "problems": []
+  },
+  {
+    "role": "intern",
+    "width": 1440,
+    "route": "/intern/opportunities/7d3ca169-468c-4291-835d-fb0c4c597745",
+    "finalUrl": "/intern/opportunities/7d3ca169-468c-4291-835d-fb0c4c597745",
+    "problems": []
+  },
+  {
+    "role": "intern",
+    "width": 1440,
+    "route": "/intern/proposals",
+    "finalUrl": "/intern/proposals",
+    "problems": []
+  },
+  {
+    "role": "intern",
+    "width": 1440,
+    "route": "/intern/proposals/2ccca2cc-ea21-4611-b160-eae0414a53cd",
+    "finalUrl": "/intern/proposals/2ccca2cc-ea21-4611-b160-eae0414a53cd",
+    "problems": []
+  },
+  {
+    "role": "intern",
+    "width": 1440,
+    "route": "/intern/documents",
+    "finalUrl": "/intern/documents",
+    "problems": []
+  },
+  {
+    "role": "intern",
+    "width": 1440,
+    "route": "/intern/profile",
+    "finalUrl": "/intern/profile",
+    "problems": []
+  },
+  {
+    "role": "intern",
+    "width": 1440,
+    "route": "/intern/college",
+    "finalUrl": "/intern/college",
+    "problems": []
+  },
+  {
+    "role": "intern",
+    "width": 1440,
+    "route": "/intern/notifications",
+    "finalUrl": "/intern/notifications",
+    "problems": []
+  },
+  {
+    "role": "intern",
+    "width": 1440,
+    "route": "/intern/settings",
+    "finalUrl": "/intern/settings",
+    "problems": []
+  },
+  {
+    "role": "intern",
+    "width": 1440,
+    "route": "/intern/onboarding",
+    "finalUrl": "/intern/onboarding",
+    "problems": []
+  }
+]

@@ -236,6 +236,7 @@ logins; `SEED=1` selects the seed accounts and server). Screenshots are in
   `approvedAt`; keep snapshots only where the *offer* is shown (employer and intern proposal pages).
 - Evidence: `docs/qa/b/screens/qa-004-record-*.png`, `qa-004-dashboard-*.png`; trace `qa-004-*-trace.zip`.
 - Severity: **P1 confirmed** (Record is the exported artefact: `recordAsText` writes the stale figure).
+- Status (builder, 28 Oct): fixed, awaiting retest (wp/opus, fix(QA-004)). Record's "Findtern Score published" came from each proposal's frozen ai_ratings snapshot (one card per proposal, 8.2); it is now one card from the current score in intern_onboarding.extra_data (findternScore + ratings), dated by approvedAt, as Home, Profile and Interviews read it; recordAsText follows. Snapshots stay on the offers that froze them. Seed: Record and Home both 8.8. Unit test in journey.test.ts.
 
 ### QA-005
 - Reproduced: **yes**, SEED only (`node docs/qa/b/repro/qa005.mjs`, employer owning a submitted sheet).
@@ -346,6 +347,7 @@ logins; `SEED=1` selects the seed accounts and server). Screenshots are in
   Cause: `src/app/intern/opportunities/[id]/page.tsx:75-83` special-cases only `hired` and `sent`.
 - Severity: **P2 confirmed**, wording should be per status ("You accepted this offer", "You declined it", ...).
 - Evidence: `docs/qa/b/screens/qa-010-opportunity-accepted-3503.png`, `...-hired-3502.png`.
+- Status (builder, 28 Oct): fixed, awaiting retest (wp/opus, fix(QA-010)). The page checked status === "hired" only; it uses isHiredProposal (status or hiredAt). With an offer the generic four-step explainer is gone (it showed steps 3-4 undone for a hire), the section is "Your offer" / "Your placement" with its one action, and a hired intern sees the company name.
 
 ### QA-011
 - Reproduced: **no.** On the LIVE-COPY the hired intern with saved bank details sees the bank form
