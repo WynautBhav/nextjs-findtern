@@ -56,7 +56,9 @@ export default async function EmployerDrivesPage() {
           who="The college's placement office sends the link"
         />
       ) : (
-        <ul className="grid gap-3">
+        // minmax(0,1fr): a grid track's minimum is its content, and the one-line
+        // title counted at full length, so the column grew to 668px on a phone (QA-118).
+        <ul className="grid grid-cols-[minmax(0,1fr)] gap-3">
           {rows.map(({ drive, college }) => {
             const state = driveWindow(drive);
             const left = state === "live" ? timeLeft(drive.endsAt) : null;
@@ -70,13 +72,13 @@ export default async function EmployerDrivesPage() {
                     <span className="text-xs font-medium text-text-subtle">{KIND_LABEL[drive.kind] ?? "Campus drive"}</span>
                   </div>
                   <p className="mt-1.5 truncate text-base font-semibold text-ink-900">{drive.title}</p>
-                  <p className="mt-0.5 truncate text-sm text-ink-600">
+                  <p className="mt-0.5 text-sm text-ink-600">
                     {college.name}
                     {college.city ? `, ${college.city}` : ""} · {state === "upcoming" ? `opens ${driveTime(drive.startsAt)}` : `closes ${driveTime(drive.endsAt)}`}
                     {left ? ` · ${left}` : ""}
                   </p>
                 </div>
-                {open ? <ArrowUpRight className="size-5 shrink-0 text-ink-400" aria-hidden /> : null}
+                {open ? <ArrowUpRight className="size-5 shrink-0 text-text-subtle" aria-hidden /> : null}
               </div>
             );
             return (
