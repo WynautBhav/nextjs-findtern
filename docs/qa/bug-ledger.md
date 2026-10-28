@@ -21,7 +21,7 @@ lines only.
 | QA-010 | P2 | intern | /intern/opportunities/[id] | any | closed | Role detail tells a hired intern "You have an offer for this role"; should reflect the hire. |
 | QA-011 | P2 | intern | /intern/settings | any | open | A paid intern with saved bank details sees an empty bank form and no read-only saved state. |
 | QA-012 | P2 | employer | /employer/account | any | open | "Profile complete" shown while required escalation-contact fields are empty. |
-| QA-013 | P2 | college | /college/drives | any | open | A closed drive is sorted above the live one. |
+| QA-013 | P2 | college | /college/drives | any | fixed, awaiting retest (385de4c) | A closed drive is sorted above the live one. |
 | QA-014 | P2 | employer | /employer/intern/[id] | any | open | Preferred cities not deduplicated ("Bengaluru, Bengaluru, Remote"). Builder fixes within the employer redesign. |
 | QA-015 | P2 | intern | /intern/record | any | closed | A raw ISO date ("2026-10-30") is shown instead of the DD/MM/YYYY format. Builder fixes within the intern redesign. |
 | QA-016 | P2 | admin | /admin/account | any | closed | Two different password rules stated on the same page. Builder fixes within the admin redesign. |
