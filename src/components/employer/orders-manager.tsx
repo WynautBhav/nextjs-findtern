@@ -2,11 +2,12 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Download, FileText, RotateCcw, Search } from "lucide-react";
+import { ArrowRight, BriefcaseBusiness, CalendarCheck, CreditCard, Download, FileText, RotateCcw, Search } from "lucide-react";
 
 import { EmptyScene, PageHead, Pill, Surface, type Tone } from "@/components/app/primitives";
 import { ButtonLink, buttonClass } from "@/components/ui/button";
 import { FullTimeOfferButton } from "@/components/employer/full-time-offer-button";
+import { RowMenu } from "@/components/app/row-menu";
 import { fieldClass, labelClass, tabClass, tdClass, thClass } from "@/components/employer/ui-tokens";
 import { downloadCsv } from "@/lib/admin/csv";
 import type { PlacementLedger } from "@/lib/dues";
@@ -204,6 +205,8 @@ function HiresPanel({
   fteStatus: string;
   timezone: string;
 }) {
+  // The full-time offer dialog, opened from a row's menu.
+  const [ftFor, setFtFor] = useState<string | null>(null);
   if (hires.length === 0) {
     return (
       <EmptyScene
@@ -248,6 +251,9 @@ function HiresPanel({
       </div>
       <Surface as="ul" className="divide-y divide-ink-100 overflow-hidden">
         {hires.map((h) => {
+          const due = h.ledger.dueMinor > 0;
+          const timesheets = `/employer/timesheets?intern=${encodeURIComponent(h.internId)}`;
+          const contract = `/employer/proposal/${encodeURIComponent(h.proposalId)}`;
           const plan = PLAN[h.ledger.plan];
           return (
             <li key={h.proposalId} className="grid gap-4 px-5 py-5 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_auto] lg:items-center">
@@ -289,24 +295,37 @@ function HiresPanel({
                 <dd className="nums text-right font-medium text-ink-900 lg:text-left">
                   {h.fullTime
                     ? formatMoney(h.ledger.totalMinor, h.currency, { zeroLabel: false })
-                    : `${h.months} month${h.months === 1 ? "" : "s"}${h.ledger.plan === "monthly" ? ` · ${h.ledger.monthsPaid} paid` : ""}`}
+                    : <span className="whitespace-nowrap">{`${h.months} month${h.months === 1 ? "" : "s"}${h.ledger.plan === "monthly" ? ` · ${h.ledger.monthsPaid} paid` : ""}`}</span>}
                 </dd>
               </dl>
 
-              <div className="flex flex-wrap items-center gap-2 lg:justify-end">
-                {!h.fullTime ? (
-                  <ButtonLink
-                    href={`/employer/timesheets?intern=${encodeURIComponent(h.internId)}`}
-                    variant="ghost"
-                    size="sm"
-                  >
+              {/* One visible action by state: Pay while money is due (it was
+                  only reachable from the page header), else Timesheets, else
+                  the contract; the rest are in the menu (QA-122). */}
+              <div className="flex items-center gap-1 lg:justify-end">
+                {due ? (
+                  <ButtonLink href={`/employer/checkout?proposal=${encodeURIComponent(h.proposalId)}`} variant="accent" size="sm">
+                    <CreditCard className="size-4" aria-hidden />
+                    Pay {formatMoney(h.ledger.dueMinor, h.currency)}
+                  </ButtonLink>
+                ) : !h.fullTime ? (
+                  <ButtonLink href={timesheets} variant="outline" size="sm">
                     Timesheets
                   </ButtonLink>
-                ) : null}
-                <ButtonLink href={`/employer/proposal/${encodeURIComponent(h.proposalId)}`} variant="outline" size="sm">
-                  <FileText className="size-4" aria-hidden />
-                  Contract
-                </ButtonLink>
+                ) : (
+                  <ButtonLink href={contract} variant="outline" size="sm">
+                    <FileText className="size-4" aria-hidden />
+                    Contract
+                  </ButtonLink>
+                )}
+                <RowMenu
+                  label={`More actions for ${h.candidateName}`}
+                  items={[
+                    ...(due && !h.fullTime ? [{ label: "Timesheets", href: timesheets, icon: <CalendarCheck /> }] : []),
+                    ...(due || !h.fullTime ? [{ label: "Contract", href: contract, icon: <FileText /> }] : []),
+                    ...(h.canOfferFullTime ? [{ label: "Full-time offer", onSelect: () => setFtFor(h.proposalId), icon: <BriefcaseBusiness /> }] : []),
+                  ]}
+                />
                 {h.canOfferFullTime ? (
                   <FullTimeOfferButton
                     employerId={employerId}
@@ -314,6 +333,8 @@ function HiresPanel({
                     candidate={h.candidateName}
                     fteStatus={fteStatus}
                     timezone={timezone}
+                    open={ftFor === h.proposalId}
+                    onOpenChange={(o) => setFtFor(o ? h.proposalId : null)}
                   />
                 ) : null}
               </div>
