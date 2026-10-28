@@ -502,8 +502,8 @@ await check("Student cannot open the officer's recording endpoint", async () => 
 // ── 12. Officer closes the link ──────────────────────────────────────────
 await check("Officer closes the link; employer is locked out, old link refused", async () => {
   await tpo.goto(`${B}/college/drives/${driveId}`);
-  tpo.once("dialog", (d) => d.accept());
   await tpo.getByRole("button", { name: "Close link now" }).click();
+  await tpo.getByRole("button", { name: "Yes, close the link" }).click();
   await tpo.getByText("Closed. No employer can get in.").waitFor();
   await emp.reload();
   assert(!/Showing \d+ of/.test(await emp.locator("main").innerText()), "employer still sees students");

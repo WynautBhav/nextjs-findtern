@@ -41,7 +41,8 @@ const SITUATION_WIDTHS = arg("widths")?.split(",").map(Number) ?? (QUICK ? [375,
 const EXTRA_ID_WIDTHS = [375, 1440];
 const BROWSERS = (arg("browsers") ?? "chromium,webkit,firefox").split(",");
 // Browser coverage from the brief: Chromium everywhere, WebKit at 375 + 1440, Firefox at 1440.
-const BROWSER_WIDTHS = { chromium: null, webkit: [375, 1440], firefox: [1440] };
+// QA_ALL_WIDTHS=1 (release gate): WebKit and Firefox run the same widths as Chromium.
+const BROWSER_WIDTHS = process.env.QA_ALL_WIDTHS === "1" ? {} : { chromium: null, webkit: [375, 1440], firefox: [1440] };
 const AXE = !flag("no-axe");
 const TRACE = process.env.QA_TRACE !== "0";
 const CONCURRENCY = Number(process.env.QA_CONCURRENCY || 4);
