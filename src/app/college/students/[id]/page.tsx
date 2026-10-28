@@ -1,7 +1,6 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { and, desc, eq, inArray } from "drizzle-orm";
-import { ArrowLeft, FileText, PlayCircle, ShieldCheck } from "lucide-react";
+import { FileText, PlayCircle, ShieldCheck } from "lucide-react";
 
 import { Panel, PanelBody, PanelHeader } from "@/components/admin/panel";
 import { NudgeButton } from "@/components/college/nudge-button";
@@ -69,9 +68,7 @@ export default async function CollegeStudentPage({ params }: { params: Promise<{
 
   return (
     <div className="space-y-6">
-      <Link href="/college" className="inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-ink-600 hover:text-brand-700">
-        <ArrowLeft className="size-4" aria-hidden /> All students
-      </Link>
+      {/* The breadcrumb leads back to Students (crumbParents). */}
 
       <PageHead
         title={name || student.email}

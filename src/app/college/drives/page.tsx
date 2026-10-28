@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { Megaphone, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 
-import { AdminEmpty, AdminPageHeader, Panel } from "@/components/admin/panel";
+import { Panel } from "@/components/admin/panel";
 import { driveWindow } from "@/lib/college/access";
 import { drivesOverview } from "@/lib/college/drives";
 import { DRIVE_KIND_LABEL, WINDOW_LABEL } from "@/lib/college/labels";
@@ -9,6 +9,7 @@ import { requireCollegeContext } from "@/lib/college/scope";
 import { Pill } from "@/components/app/primitives";
 import { ButtonLink } from "@/components/ui/button";
 import { shortDateTime } from "@/lib/format";
+import { EmptyScene, PageHead } from "@/components/app/primitives";
 
 export const dynamic = "force-dynamic";
 
@@ -20,9 +21,8 @@ export default async function DrivesPage() {
 
   return (
     <div className="space-y-6">
-      <AdminPageHeader
+      <PageHead
         title="Drives"
-        subtitle="A drive is a dated link you send to employers. They sign in and see only your eligible students."
         action={
           <ButtonLink href="/college/drives/new">
             <Plus className="size-4" aria-hidden /> New drive
@@ -31,11 +31,11 @@ export default async function DrivesPage() {
       />
       <Panel as="div">
         {drives.length === 0 ? (
-          <AdminEmpty
-            icon={Megaphone}
+          <EmptyScene
             title="No drives yet"
-            body="Set the dates and who's eligible, then share the link with the companies you invite."
-            action={{ href: "/college/drives/new", label: "Set up your first drive" }}
+            body="A drive is a dated link you send to the companies you invite. They sign in and see only your eligible students, while it is open."
+            next={{ href: "/college/drives/new", label: "Set up your first drive" }}
+            who="You - set the dates and who is eligible"
           />
         ) : (
           <ul className="divide-y divide-ink-100">
