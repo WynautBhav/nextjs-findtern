@@ -57,8 +57,8 @@ test("promo applied / per-code filters count legacy discounts (ADM-02, ADM-12)",
   assert.deepEqual(promoCodeOptions([...rows, row({ promoCode: "campus99" })]), ["CAMPUS99"]);
 });
 
-test("status 'paid' includes captured; dates are inclusive in India time", () => {
-  const rows = [row({ id: "p", status: "captured" }), row({ id: "c", status: "created" })];
+test("status 'paid' is paid only; dates are inclusive in India time", () => {
+  const rows = [row({ id: "p", status: "paid" }), row({ id: "x", status: "captured" }), row({ id: "c", status: "created" })];
   assert.deepEqual(filterInvoiceRows(rows, invoiceFilters({ status: "paid" }), "X").map((r) => r.id), ["p"]);
   // 20:00 UTC on 31 Jul is 1 Aug in India.
   assert.equal(inDateRange("2026-07-31T20:00:00.000Z", "2026-08-01", "2026-08-01"), true);

@@ -18,6 +18,8 @@ import pg from "pg";
 import * as schema from "../src/lib/db/schema.ts";
 import { hashPassword } from "../src/lib/security/password.ts";
 import { PRICING_PLANS } from "../src/lib/content/home.ts";
+import { lineCharge } from "../src/lib/checkout.ts";
+import { parseOffer } from "../src/lib/offer.ts";
 
 const PASSWORD = "Findtern@2026";
 
@@ -385,10 +387,10 @@ async function main() {
   const insertedProjects = await db.insert(schema.projects).values(projectRecords).returning();
 
   // ── 40 Proposals Covering Every Status ────────────────────────────────
-  // Statuses: draft, sent, accepted, rejected, interview_scheduled, withdrawn
+  // Statuses: draft, sent, accepted, hired, rejected, interview_scheduled, withdrawn
   console.log("Seeding 40 proposals across all status types…");
   const PROPOSAL_STATUSES = [
-    "accepted", "accepted", "accepted", "accepted", "accepted", // 5 hired/accepted
+    "accepted", "accepted", "accepted", "accepted", "accepted", // 5 hired
     "sent", "sent", "sent", "sent", "sent", "sent", "sent", "sent", // 8 sent
     "interview_scheduled", "interview_scheduled", "interview_scheduled", "interview_scheduled", // 4 interview scheduled
     "rejected", "rejected", "rejected", // 3 rejected
@@ -401,10 +403,13 @@ async function main() {
   for (let i = 0; i < 40; i++) {
     const project = insertedProjects[i % insertedProjects.length];
     const intern = insertedUsers[i % 55]; // pick from assessed interns
-    const status = PROPOSAL_STATUSES[i] || (i % 2 === 0 ? "sent" : "accepted");
+    // The first five, and every other leftover "accepted", are paid placements:
+    // settlement moves a paid offer to "hired", so "accepted" means not paid yet.
+    const picked = PROPOSAL_STATUSES[i] || (i % 2 === 0 ? "sent" : "accepted");
+    const status = picked === "accepted" && (i < 5 || i % 4 === 1) ? "hired" : picked;
 
     const stipend = 25000 + (i % 6) * 5000;
-    const isHired = status === "accepted";
+    const isHired = status === "hired";
 
     proposalRecords.push({
       employerId: project.employerId,
@@ -519,7 +524,7 @@ async function main() {
 
   // ── Timesheets (draft, submitted, approved, rejected) ────────────────
   console.log("Seeding timesheets in draft, submitted, approved, rejected…");
-  const acceptedProposals = insertedProposals.filter((p) => p.status === "accepted");
+  const hiredProposals = insertedProposals.filter((p) => p.status === "hired");
   const timesheetStatuses = ["approved", "approved", "submitted", "submitted", "draft", "rejected"];
   const timesheetRecords = [];
 
@@ -527,8 +532,8 @@ async function main() {
   const lastMonthStart = new Date(nowDate.getFullYear(), nowDate.getMonth() - 1, 1);
   const lastMonthEnd = new Date(nowDate.getFullYear(), nowDate.getMonth(), 0);
 
-  for (let i = 0; i < Math.min(12, acceptedProposals.length); i++) {
-    const prop = acceptedProposals[i];
+  for (let i = 0; i < Math.min(12, hiredProposals.length); i++) {
+    const prop = hiredProposals[i];
     const status = timesheetStatuses[i % timesheetStatuses.length];
 
     timesheetRecords.push({
@@ -556,19 +561,23 @@ async function main() {
 
   // ── Employer Payments & Intern Payouts ───────────────────────────────
   console.log("Seeding payments and payouts (pending & paid)…");
-  const employerPaymentRecords = [];
-  for (let i = 0; i < 8; i++) {
-    const emp = insertedEmployers[i % insertedEmployers.length];
-    employerPaymentRecords.push({
-      employerId: emp.id,
-      orderId: `order_ftn_${1000 + i}`,
+  // One paid order per hired placement, in the shape settlement writes:
+  // status "paid", the upfront charge checkout asks for, and the proposal ID
+  // in the order notes (so Orders, Transactions and Companies agree).
+  const employerPaymentRecords = hiredProposals.map((p, i) => {
+    const amountMinor = lineCharge(parseOffer(p.offerDetails, "INR"), 10, "upfront").totalMinor;
+    const orderId = `order_ftn_${1000 + i}`;
+    return {
+      employerId: p.employerId,
+      orderId,
       paymentId: `pay_rzp_${2000 + i}`,
-      amountMinor: 3500000,
+      amountMinor,
       currency: "INR",
-      status: "captured",
+      status: "paid",
+      raw: { id: orderId, amount: amountMinor, currency: "INR", notes: { proposalIds: [p.id], paymentMode: "upfront" } },
       paidAt: new Date(nowDate.getTime() - (i * 4 + 2) * 86_400_000),
-    });
-  }
+    };
+  });
   await db.insert(schema.employerPayments).values(employerPaymentRecords);
 
   const internPayoutRecords = [];
