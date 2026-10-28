@@ -167,3 +167,16 @@ branch, not to be touched: `feat/college-partners` (worktree
   build green. Tester A session 5a exited; 5b took over its worktree. The
   orchestrator's own QA Postgres on :5436 was removed (tmp filesystem full).
   Ledger: 34 entries, 2 closed, 7 P1 open.
+- 28 Oct (morning): master is the integration line and is pushed to GitHub
+  after every verified merge (owner decision; `release/master-merge` kept
+  equal to it as the rebase target). The push had been blocked by a broken
+  gh keyring (four entries incl. a nameless one; git's helper pointed at a
+  removed gh 2.100.0). Fixed by logging out all accounts, clearing the
+  keyring, one fresh `gh auth login -s workflow`; GitHub confirms
+  WynautBhav with `workflow`. First pushes: 0cb5433, c6cff74 (CI now also
+  runs on master), 2a90cef. Vercel staging rebuilt from master.
+  Merged today: QA-007 (3 causes), QA-100/101/102, QA-003 (masked identity,
+  audited reveal), QA-009, QA-016; Tester B closed six of them, reopened
+  QA-016 (hint vs validator), logged QA-118 (P1, drives overflow at 375) and
+  QA-119..136 from the employer redesign pass. Ledger: 6 P1 closed, 4 P1
+  open, 38 P2 open. Opus on the admin group; Tester A (5b) stuck on a prompt.
