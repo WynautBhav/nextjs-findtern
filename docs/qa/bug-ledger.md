@@ -372,6 +372,7 @@ logins; `SEED=1` selects the seed accounts and server). Screenshots are in
   Cause: `drivesOverview` in `src/lib/college/drives.ts` is `ORDER BY starts_at DESC`, regardless of state.
   Severity **P2 confirmed**. Fix: order by state (live, upcoming, ended, closed) then start.
 - Evidence: `docs/qa/b/screens/qa-013-college-drives-3503.png`; script `qa013.mjs`.
+- Status (builder, 28 Oct): fixed, awaiting retest (wp/opus, fix(QA-013)). Drives were ordered by start date only; compareDrives (lib/college/access, unit-tested) orders live first (ending soonest), then upcoming (starting soonest), then ended or revoked (most recent first), on /college/drives and /employer/drives.
 
 ### QA-014
 - Reproduced: **yes**, SEED intern (`preferred_locations = ["Bengaluru","Bengaluru","Remote"]`):
