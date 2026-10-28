@@ -29,7 +29,7 @@ export type DriveDraft = {
 };
 
 const field =
-  "h-11 w-full rounded-apple-sm border border-ink-200 bg-white px-3 text-sm text-ink-900 placeholder:text-ink-500 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20";
+  "h-11 w-full rounded-apple-sm border border-ink-200 bg-white px-3 text-sm text-ink-900 placeholder:text-text-subtle focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20";
 
 export function DriveBuilder({
   initial,
@@ -283,7 +283,7 @@ export function DriveBuilder({
             </div>
             <label className="relative w-full sm:w-64">
               <span className="sr-only">Search students</span>
-              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-400" aria-hidden />
+              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-text-subtle" aria-hidden />
               <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search" className={cn(field, "pl-9")} />
             </label>
           </div>

@@ -243,7 +243,7 @@ export function DriveWorkspace({
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.6fr)_repeat(3,minmax(0,1fr))]">
             <label className="relative block">
               <span className="sr-only">Search skills or branch</span>
-              <Search aria-hidden className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-400" />
+              <Search aria-hidden className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-text-subtle" />
               <input
                 type="search"
                 value={q}
@@ -385,7 +385,7 @@ function Select({
       >
         {children}
       </select>
-      <ChevronDown aria-hidden className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-ink-400" />
+      <ChevronDown aria-hidden className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-text-subtle" />
     </label>
   );
 }

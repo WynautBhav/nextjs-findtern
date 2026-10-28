@@ -65,7 +65,7 @@ export default async function DriveLandingPage({ params }: { params: Promise<{ t
             <CollegeMark name={college.name} logoUrl={college.logoUrl} className="size-9 rounded-lg text-xs" />
             <span className="truncate text-sm font-semibold text-ink-900">{college.name}</span>
           </div>
-          <div className="flex shrink-0 items-center gap-2 text-xs text-ink-500">
+          <div className="flex shrink-0 items-center gap-2 text-xs text-text-subtle">
             <span className="hidden sm:inline">Placement drive on</span>
             <Logo className="h-5" alt="Findtern" priority />
           </div>
@@ -131,7 +131,7 @@ function Fact({ icon, label, value }: { icon: React.ReactNode; label: string; va
         {icon}
       </span>
       <div className="min-w-0">
-        <dt className="text-xs font-medium text-ink-500">{label}</dt>
+        <dt className="text-xs font-medium text-text-subtle">{label}</dt>
         <dd className="nums mt-0.5 text-sm font-semibold text-ink-900">{value}</dd>
       </div>
     </div>
