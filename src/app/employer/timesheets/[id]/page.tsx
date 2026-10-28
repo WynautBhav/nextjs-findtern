@@ -151,7 +151,7 @@ export default async function EmployerTimesheetDetail({ params }: { params: Prom
             <h2 className="text-base font-semibold text-ink-900">Decision</h2>
             <div className="mt-3">
               {status === "submitted" ? (
-                <TimesheetDecision timesheetId={timesheet.id} />
+                <TimesheetDecision timesheetId={timesheet.id} unfilled={unfilled} />
               ) : decided ? (
                 <p className="text-sm leading-relaxed text-ink-700">
                   {status === "approved"

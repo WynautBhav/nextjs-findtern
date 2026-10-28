@@ -34,8 +34,11 @@ import { PASSWORD_RULES } from "@/lib/password-policy";
 
 export function EmployerSignupForm({
   google = null,
+  next,
 }: {
   google?: { email: string; name: string } | null;
+  /** Where to go once the account exists (from ?next=, e.g. a college drive link), else onboarding. */
+  next?: string;
 } = {}) {
   const router = useRouter();
   const [name, setName] = useState(google?.name ?? "");
@@ -143,7 +146,7 @@ export function EmployerSignupForm({
         setLoading(false);
         return;
       }
-      router.push("/employer/onboarding");
+      router.push(next || "/employer/onboarding");
       router.refresh();
     } catch {
       setError("Network error. Nothing was created.");

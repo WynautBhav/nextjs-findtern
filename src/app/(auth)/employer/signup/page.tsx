@@ -81,7 +81,7 @@ export default async function EmployerSignupPage({
       )}
 
       <div className={google ? "mt-8" : "mt-5"}>
-        <EmployerSignupForm google={google} />
+        <EmployerSignupForm google={google} next={next || undefined} />
       </div>
     </AuthShell>
   );

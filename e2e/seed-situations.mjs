@@ -241,7 +241,11 @@ async function mkTimesheet({ proposalId, employerId, internId, status, startOffs
   const entries = Array.from({ length: days }, (_, d) => {
     const date = dateOnly(startOffset + d);
     const dow = new Date(date + "T00:00:00Z").getUTCDay();
-    return { date, status: dow === 0 || dow === 6 ? "off" : status === "draft" ? "" : "present" };
+    // The app's own words (QA-133): "Present" / "Fixed off", with the hours a
+    // real sheet carries, so the review screen tallies them like a submission.
+    const weekend = dow === 0 || dow === 6;
+    const dayStatus = weekend ? "Fixed off" : status === "draft" ? "" : "Present";
+    return { date, hours: dayStatus === "Present" ? 8 : 0, note: "", status: dayStatus };
   });
   await db().query(
     `INSERT INTO timesheets (proposal_id, employer_id, intern_id, period_start, period_end, status, entries, submitted_at, approved_at)

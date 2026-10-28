@@ -196,7 +196,7 @@ function EntryPanel({
           Sign in to enter
         </ButtonLink>
         <Link
-          href={`/employer/signup`}
+          href={`/employer/signup?next=${next}`}
           className="inline-flex min-h-11 items-center justify-center rounded-lg text-sm font-medium text-brand-700 underline-offset-4 hover:underline"
         >
           Create an employer account
