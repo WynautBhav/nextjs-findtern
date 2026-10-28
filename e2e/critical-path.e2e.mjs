@@ -677,9 +677,11 @@ step("employer: approves the timesheet on /employer/timesheets/[id] [UI]", ["tim
     '"Approve"',
     async () => {
       await visit(page, `/employer/timesheets/${state.timesheetId}`);
-      // The decision is a radiogroup that defaults to Approve; the PATCH fires
-      // from the confirm button, not the radio.
-      const res = await clickFor(page, page.getByRole("button", { name: "Approve timesheet" }), { path, method: "PATCH" });
+      // The decision is a radiogroup that defaults to Approve. "Approve
+      // timesheet" opens an inline confirm (QA-132: approval locks the days
+      // for billing); the PATCH fires from "Yes, approve and lock".
+      await page.getByRole("button", { name: "Approve timesheet" }).click();
+      const res = await clickFor(page, page.getByRole("button", { name: "Yes, approve and lock" }), { path, method: "PATCH" });
       expectOk(`PATCH ${path}`, res);
     },
     async () => expectOk(`PATCH ${path}`, await api(page, "PATCH", path, { decision: "approved" })),
