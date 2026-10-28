@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { eq } from "drizzle-orm";
-import { CalendarDays, ShieldCheck, Users } from "lucide-react";
 
 import { getSession } from "@/lib/auth";
 import { driveWindow } from "@/lib/college/access";
@@ -10,7 +9,7 @@ import { eligibleStudents } from "@/lib/college/scope";
 import { hashDriveToken } from "@/lib/college/tokens";
 import { getDb, schema } from "@/lib/db";
 import { ButtonLink } from "@/components/ui/button";
-import { Surface } from "@/components/app/primitives";
+import { Surface, DetailRow } from "@/components/app/primitives";
 import { Logo } from "@/components/brand/logo";
 import {
   CollegeMark,
@@ -40,12 +39,25 @@ export default async function DriveLandingPage({ params }: { params: Promise<{ t
   const { token } = await params;
   if (!token || token.length < 20 || token.length > 100) notFound();
 
-  const [row] = await getDb()
-    .select({ drive: schema.collegeDrives, college: schema.colleges })
-    .from(schema.collegeDrives)
-    .innerJoin(schema.colleges, eq(schema.colleges.id, schema.collegeDrives.collegeId))
-    .where(eq(schema.collegeDrives.tokenHash, hashDriveToken(token)))
-    .limit(1);
+  // A database hiccup says so instead of a 500 page (the link is shared
+  // with outside companies, often opened once).
+  let row: { drive: typeof schema.collegeDrives.$inferSelect; college: typeof schema.colleges.$inferSelect } | undefined;
+  try {
+    [row] = await getDb()
+      .select({ drive: schema.collegeDrives, college: schema.colleges })
+      .from(schema.collegeDrives)
+      .innerJoin(schema.colleges, eq(schema.colleges.id, schema.collegeDrives.collegeId))
+      .where(eq(schema.collegeDrives.tokenHash, hashDriveToken(token)))
+      .limit(1);
+  } catch (err) {
+    console.error("[drive landing]", err);
+    return (
+      <main id="main" className="mx-auto max-w-xl px-4 py-24 text-center">
+        <h1 className="text-2xl font-semibold tracking-[-0.02em] text-ink-900">We couldn&apos;t open this drive just now</h1>
+        <p className="mt-3 text-[0.9375rem] leading-relaxed text-ink-600">Nothing is wrong with your link. Try again in a moment.</p>
+      </main>
+    );
+  }
   if (!row || !row.college.isActive) notFound();
   const { drive, college } = row;
 
@@ -91,28 +103,19 @@ export default async function DriveLandingPage({ params }: { params: Promise<{ t
               {drive.description ? ` ${drive.description}` : ""}
             </p>
 
-            <dl className="mt-8 grid gap-3 sm:grid-cols-2">
-              <Fact icon={<CalendarDays className="size-4" />} label="Opens" value={driveTime(drive.startsAt)} />
-              <Fact
-                icon={<CalendarDays className="size-4" />}
-                label="Closes"
-                value={`${driveTime(drive.endsAt)}${left ? ` · ${left}` : ""}`}
-              />
-              {studentCount !== null ? (
-                <Fact
-                  icon={<Users className="size-4" />}
-                  label="Students in this drive"
-                  value={`${studentCount.toLocaleString("en-IN")} eligible`}
-                />
-              ) : null}
-              {studentCount ? (
-                <Fact
-                  icon={<ShieldCheck className="size-4" />}
-                  label="AI-interviewed"
-                  value={`${scoredCount.toLocaleString("en-IN")} with a Findtern Score`}
-                />
-              ) : null}
-            </dl>
+            {/* One quiet list, not four equal cards with an icon each (a §0 tell). */}
+            <Surface className="mt-8 px-5">
+              <dl className="divide-y divide-ink-100">
+                <DetailRow label="Opens" value={driveTime(drive.startsAt)} mono />
+                <DetailRow label="Closes" value={`${driveTime(drive.endsAt)}${left ? ` · ${left}` : ""}`} mono />
+                {studentCount !== null ? (
+                  <DetailRow label="Students in this drive" value={`${studentCount.toLocaleString("en-IN")} eligible`} mono />
+                ) : null}
+                {studentCount ? (
+                  <DetailRow label="AI-interviewed" value={`${scoredCount.toLocaleString("en-IN")} with a Findtern Score`} mono />
+                ) : null}
+              </dl>
+            </Surface>
           </section>
 
           <Surface className="p-6">
@@ -124,19 +127,6 @@ export default async function DriveLandingPage({ params }: { params: Promise<{ t
   );
 }
 
-function Fact({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
-  return (
-    <div className="flex items-start gap-3 rounded-xl border border-ink-200/80 bg-white px-4 py-3">
-      <span aria-hidden className="mt-0.5 text-brand-700">
-        {icon}
-      </span>
-      <div className="min-w-0">
-        <dt className="text-xs font-medium text-text-subtle">{label}</dt>
-        <dd className="nums mt-0.5 text-sm font-semibold text-ink-900">{value}</dd>
-      </div>
-    </div>
-  );
-}
 
 function EntryPanel({
   state,
