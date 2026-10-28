@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { rawScore } from "./employer-candidates.ts";
+import { preferredCities, rawScore } from "./employer-candidates.ts";
 
 // EMB-02: legacy stored findternScore as a number or a numeric string and
 // read it with Number(); the new pool must agree on who is scored.
@@ -18,4 +18,10 @@ test("rawScore treats anything else as not scored", () => {
   assert.equal(rawScore({ findternScore: "n/a" }), null);
   assert.equal(rawScore({ findternScore: null }), null);
   assert.equal(rawScore({ findternScore: Number.NaN }), null);
+});
+
+test("preferred cities: the city part, each city once, first spelling and order kept (QA-014)", () => {
+  assert.deepEqual(preferredCities(["Bengaluru", "Bengaluru", "Remote"]), ["Bengaluru", "Remote"]);
+  assert.deepEqual(preferredCities(["Mumbai, Maharashtra", "mumbai, Gujarat", "Pune, Maharashtra"]), ["Mumbai", "Pune"]);
+  assert.deepEqual(preferredCities([" , x", ""]), []);
 });

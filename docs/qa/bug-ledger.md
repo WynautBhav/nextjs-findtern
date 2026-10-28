@@ -394,6 +394,7 @@ logins; `SEED=1` selects the seed accounts and server). Screenshots are in
   data for two entries in one city and different states ("Mumbai, Maharashtra" + "Mumbai, Gujarat").
   The LIVE-COPY has no such row. Severity **P2 confirmed**.
 - Evidence: `docs/qa/b/screens/qa-014-intern-detail-3503.png`.
+- Status (builder, 28 Oct): fixed, awaiting retest (wp/opus, fix(QA-014)). preferredCities() in lib/employer-candidates takes the city part of each entry and keeps each city once (case-insensitive; first spelling and order kept), so "Bengaluru, Bengaluru, Remote" reads "Bengaluru, Remote" and "Mumbai, Maharashtra" + "Mumbai, Gujarat" read "Mumbai". It is used on /employer/intern/[id] ("Prefers") and on Compare, the two places that listed them. A unit test pins it (employer-candidates.test.ts).
 
 ### QA-015
 - Reproduced: **yes**, both DBs. `/intern/record` shows "Start 2026-09-17" (LIVE-COPY) and "Start 2026-10-30"

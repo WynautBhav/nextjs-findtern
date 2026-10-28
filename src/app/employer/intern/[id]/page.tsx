@@ -10,7 +10,7 @@ import { candidateRelations, isAdminViewing, type CandidateRelation } from "@/li
 import { ShortlistToggle } from "@/components/employer/shortlist-toggle";
 import { bandFor } from "@/lib/score";
 import { formatDate, formatMoney, formatRate } from "@/lib/format";
-import { displayNameOf, toCandidateProfile, type CandidateProfile } from "@/lib/employer-candidates";
+import { displayNameOf, preferredCities, toCandidateProfile, type CandidateProfile } from "@/lib/employer-candidates";
 import { employerRegion, resolvePricing } from "@/lib/employer-pricing";
 import { AiFeedbackReport } from "@/components/employer/ai-feedback-report";
 import { CandidateAvatar } from "@/components/employer/candidate-avatar";
@@ -553,7 +553,7 @@ export default async function EmployerInternDetail({
               <DetailRow
                 label="Prefers"
                 value={
-                  profile.preferredLocations.map((l) => l.split(",")[0].trim()).join(", ") ||
+                  preferredCities(profile.preferredLocations).join(", ") ||
                   (profile.workModes.length === 1 && profile.workModes[0] === "Remote" ? "Remote only" : "Not stated")
                 }
               />

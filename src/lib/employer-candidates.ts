@@ -126,6 +126,24 @@ export function initialsOf(first: string, last: string): string {
 }
 
 /**
+ * Preferred cities as employers see them: the city part of each entry, each
+ * city once ("Mumbai, Maharashtra" and "Mumbai, Gujarat" are one Mumbai;
+ * QA-014). First spelling wins, order kept.
+ */
+export function preferredCities(locations: string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const l of locations) {
+    const city = l.split(",")[0].trim();
+    const key = city.toLowerCase();
+    if (!city || seen.has(key)) continue;
+    seen.add(key);
+    out.push(city);
+  }
+  return out;
+}
+
+/**
  * What one employer is allowed to call a candidate.
  *
  * Initials everywhere, full name only after that employer hired them
