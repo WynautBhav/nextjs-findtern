@@ -440,6 +440,8 @@ async function main() {
         overall: 8.2,
       },
       skills: (project.skills as string[]).slice(0, 3),
+      // A hire comes after its offer: sent 3-9 days before it was accepted.
+      createdAt: isHired ? new Date(Date.now() - (30 - i + 3 + (i % 7)) * 86_400_000) : undefined,
       hiredAt: isHired ? new Date(Date.now() - (30 - i) * 86_400_000) : null,
     });
   }

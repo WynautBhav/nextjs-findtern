@@ -238,7 +238,7 @@ function CompaniesTab({
         { header: "Accepted or hired", align: "right", cell: (r) => r.won },
         { header: "Hired", sort: "hired", align: "right", cell: (r) => r.hired },
         { header: "Declined", align: "right", cell: (r) => r.lost },
-        { header: "Acceptance", sort: "rate", align: "right", cell: (r) => (r.rate === null ? <span className="text-ink-400">-</span> : `${r.rate}%`) },
+        { header: "Acceptance", sort: "rate", align: "right", cell: (r) => (r.rate === null ? <span className="text-text-subtle">-</span> : `${r.rate}%`) },
         { header: "Account", cell: (r) => <StatusBadge value={r.isActive ? "active" : "inactive"} /> },
       ]}
     />
@@ -545,7 +545,7 @@ function InterviewsTab({ params, page, perPage, search, pickers, rows }: TabProp
                 <p className="text-xs text-ink-600">{tz} · not picked yet</p>
               </div>
             ) : (
-              <span className="text-ink-500">No slot offered</span>
+              <span className="text-text-subtle">No slot offered</span>
             );
           },
         },

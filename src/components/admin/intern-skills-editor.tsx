@@ -144,7 +144,7 @@ export function InternSkillsEditor({
             }
           }}
           placeholder="Add a skill"
-          className="h-11 min-w-0 flex-1 rounded-apple-sm border border-ink-200 bg-white px-3 text-sm text-ink-900 outline-none placeholder:text-ink-400 focus-visible:border-brand-600 focus-visible:ring-2 focus-visible:ring-brand-600/20"
+          className="h-11 min-w-0 flex-1 rounded-apple-sm border border-ink-200 bg-white px-3 text-sm text-ink-900 outline-none placeholder:text-text-subtle focus-visible:border-brand-600 focus-visible:ring-2 focus-visible:ring-brand-600/20"
         />
         <button
           type="button"

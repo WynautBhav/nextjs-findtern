@@ -274,7 +274,7 @@ export default async function AdminInterns({
     {
       header: "Review",
       cell: (row) =>
-        row.hasOnboarding ? <InternApprovalCell internId={row.id} value={row.approval ?? "Pending"} /> : <span className="text-ink-500">-</span>,
+        row.hasOnboarding ? <InternApprovalCell internId={row.id} value={row.approval ?? "Pending"} /> : <span className="text-text-subtle">-</span>,
     },
     {
       header: "Offer",
@@ -290,7 +290,7 @@ export default async function AdminInterns({
             ) : null}
           </div>
         ) : (
-          <span className="text-ink-500">No offers</span>
+          <span className="text-text-subtle">No offers</span>
         ),
     },
     {
@@ -305,7 +305,7 @@ export default async function AdminInterns({
             ) : null}
           </div>
         ) : (
-          <span className="text-ink-500">-</span>
+          <span className="text-text-subtle">-</span>
         ),
     },
     {
@@ -321,7 +321,7 @@ export default async function AdminInterns({
             ) : null}
           </div>
         ) : (
-          <span className="text-ink-500">-</span>
+          <span className="text-text-subtle">-</span>
         ),
     },
     {

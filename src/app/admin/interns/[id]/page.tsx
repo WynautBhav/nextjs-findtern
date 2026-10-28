@@ -6,6 +6,7 @@ import { ContactEditor } from "@/components/admin/contact-editor";
 import { ViewAsButton } from "@/components/admin/view-as-button";
 import { AccountActiveCell, InternApprovalCell, InternVisibilityCell } from "@/components/admin/intern-row-controls";
 import { Intern360View } from "@/components/admin/intern-360-view";
+import { redactIdentity } from "@/lib/admin/identity-mask";
 import { AdminLoadError, AdminPageHeader } from "@/components/admin/panel";
 import { getSession } from "@/lib/auth";
 import { canViewAs } from "@/lib/admin/impersonation";
@@ -62,7 +63,8 @@ export default async function AdminInternDetail({
   return (
     <Intern360View
       user={user}
-      onboarding={onboarding}
+      // Aadhaar, PAN and the bank account leave the server as their last four (QA-003).
+      onboarding={onboarding ? redactIdentity(onboarding) : null}
       documents={listCandidateDocuments(documents, extra)}
       hasPhoto={Boolean(documents?.profilePhotoName)}
       initialTab={typeof tab === "string" ? tab : undefined}

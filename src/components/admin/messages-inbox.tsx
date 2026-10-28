@@ -188,7 +188,7 @@ export function MessagesInbox({ messages, filtering }: { messages: InboxMessage[
               <Trash2 className="size-4" aria-hidden />
               Delete
             </button>
-            {busy ? <Loader2 className="size-4 animate-spin text-ink-500" aria-label="Saving" /> : null}
+            {busy ? <Loader2 className="size-4 animate-spin text-text-subtle" aria-label="Saving" /> : null}
           </div>
         ) : null}
       </div>

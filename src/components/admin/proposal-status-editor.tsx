@@ -36,7 +36,7 @@ export function ProposalStatusEditor({
 
   const options = OPEN.includes(status) ? OPEN_OPTIONS : status === "accepted" ? ACCEPTED_OPTIONS : [];
   if (options.length === 0) {
-    return <span className="text-sm text-ink-400">-</span>;
+    return <span className="text-sm text-text-subtle">-</span>;
   }
 
   async function save() {

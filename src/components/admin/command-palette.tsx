@@ -101,14 +101,14 @@ export function CommandPalette() {
             aria-label="Command Menu"
           >
             <div className="flex items-center border-b border-ink-100 px-3.5 py-2.5">
-              <Search className="size-4 text-ink-400 mr-2.5 shrink-0" />
+              <Search className="size-4 text-text-subtle mr-2.5 shrink-0" />
               <input
                 type="text"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Jump to any section or command..."
                 autoFocus
-                className="w-full bg-transparent text-sm text-ink-900 placeholder:text-ink-400 focus:outline-hidden"
+                className="w-full bg-transparent text-sm text-ink-900 placeholder:text-text-subtle focus:outline-hidden"
               />
               <button
                 type="button"

@@ -137,7 +137,7 @@ export function InlineSelect({
             </option>
           ))}
         </select>
-        {saving ? <Loader2 className="pointer-events-none absolute right-7 size-3.5 animate-spin text-ink-500" aria-hidden /> : null}
+        {saving ? <Loader2 className="pointer-events-none absolute right-7 size-3.5 animate-spin text-text-subtle" aria-hidden /> : null}
       </span>
       <ErrorText id={errorId} message={error} />
     </span>
@@ -387,7 +387,7 @@ export function InlineEditor({
           className="group inline-flex min-h-9 items-center gap-2 rounded-apple-sm px-1.5 text-left text-sm text-ink-800 hover:bg-ink-50 focus-visible:outline-2 focus-visible:outline-brand-600 max-lg:min-h-11"
         >
           <span className="min-w-0">{display}</span>
-          <Pencil className="size-3.5 shrink-0 text-ink-400 group-hover:text-brand-700" aria-hidden />
+          <Pencil className="size-3.5 shrink-0 text-text-subtle group-hover:text-brand-700" aria-hidden />
         </button>
       ) : null}
       <AnimatePresence initial={false}>

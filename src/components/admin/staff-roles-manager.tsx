@@ -12,6 +12,7 @@ import { Pill } from "@/components/app/primitives";
 import { buttonClass } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
+import { PASSWORD_HINT } from "@/lib/password-policy";
 
 const AREA_LABEL: Record<string, string> = {
   dashboard: "Dashboard",
@@ -47,7 +48,7 @@ export interface RoleDef {
 type Staff = Omit<Admin, "password">;
 
 const field =
-  "mt-1.5 min-h-11 w-full rounded-apple-sm border border-ink-200 bg-white px-3.5 text-sm text-ink-900 outline-none placeholder:text-ink-400 focus-visible:border-brand-600 focus-visible:ring-2 focus-visible:ring-brand-500/20";
+  "mt-1.5 min-h-11 w-full rounded-apple-sm border border-ink-200 bg-white px-3.5 text-sm text-ink-900 outline-none placeholder:text-text-subtle focus-visible:border-brand-600 focus-visible:ring-2 focus-visible:ring-brand-500/20";
 
 const permsOf = (r: RoleDef): string[] => (Array.isArray(r.permissions) ? (r.permissions as string[]) : []);
 
@@ -489,7 +490,7 @@ function AddStaffSheet({
               Temporary password
             </label>
             <input id="staff-password" type="password" required minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} className={field} />
-            <p className="mt-1 text-xs text-ink-600">8 or more characters, with upper and lower case letters and a number.</p>
+            <p className="mt-1 text-xs text-ink-600">{PASSWORD_HINT}</p>
           </div>
           <div>
             <label htmlFor="staff-role" className="block text-sm font-medium text-ink-800">

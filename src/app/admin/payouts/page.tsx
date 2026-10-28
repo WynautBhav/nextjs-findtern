@@ -124,7 +124,7 @@ async function PayoutsView({ params }: { params: Record<string, string> }) {
             {r.projectName ? <span className="block max-w-56 truncate text-xs text-ink-600">{r.projectName}</span> : null}
           </span>
         ) : (
-          <span className="text-ink-500">Not linked</span>
+          <span className="text-text-subtle">Not linked</span>
         ),
     },
     { header: "Scheduled", sort: "scheduled", className: "nums whitespace-nowrap", cell: (r) => (r.scheduledFor ? formatDate(r.scheduledFor) : "-") },
@@ -164,7 +164,7 @@ async function PayoutsView({ params }: { params: Record<string, string> }) {
             {r.referenceId}
           </span>
         ) : (
-          <span className="text-ink-500">-</span>
+          <span className="text-text-subtle">-</span>
         ),
     },
     { header: "Paid on", sort: "paid", className: "nums whitespace-nowrap", cell: (r) => (r.paidAt ? formatDate(r.paidAt) : "-") },
@@ -332,7 +332,7 @@ async function DuesView({ params }: { params: Record<string, string> }) {
       header: "Monthly stipend",
       align: "right",
       className: "whitespace-nowrap",
-      cell: (d) => (d.monthlyShareMinor > 0 ? inr(d.monthlyShareMinor) : <span className="text-ink-500">None (score below 6)</span>),
+      cell: (d) => (d.monthlyShareMinor > 0 ? inr(d.monthlyShareMinor) : <span className="text-text-subtle">None (score below 6)</span>),
     },
     { header: "Total", align: "right", className: "whitespace-nowrap", cell: (d) => inr(d.totalShareMinor) },
     { header: "Paid", align: "right", className: "whitespace-nowrap", cell: (d) => inr(d.paidMinor) },
@@ -340,7 +340,7 @@ async function DuesView({ params }: { params: Record<string, string> }) {
       header: "Due",
       align: "right",
       className: "whitespace-nowrap font-semibold text-ink-900",
-      cell: (d) => (d.remainingMinor > 0 ? inr(d.remainingMinor) : <span className="font-normal text-ink-500">-</span>),
+      cell: (d) => (d.remainingMinor > 0 ? inr(d.remainingMinor) : <span className="font-normal text-text-subtle">-</span>),
     },
     {
       header: "Next payment",

@@ -100,7 +100,7 @@ export function InterviewNotesButton({ title, notes }: { title: string; notes: s
  */
 export function MeetingLinkCell({ interviewId, link, locked }: { interviewId: string; link: string | null; locked: boolean }) {
   if (locked) {
-    return link ? <LinkOut href={link} /> : <span className="text-sm text-ink-500">No link</span>;
+    return link ? <LinkOut href={link} /> : <span className="text-sm text-text-subtle">No link</span>;
   }
   return (
     <InlineEditor
@@ -113,7 +113,7 @@ export function MeetingLinkCell({ interviewId, link, locked }: { interviewId: st
             Link set
           </span>
         ) : (
-          <span className="text-ink-500">Add link</span>
+          <span className="text-text-subtle">Add link</span>
         )
       }
       fields={[

@@ -29,7 +29,7 @@ import { cn } from "@/lib/utils";
 export type CmsItem = Record<string, unknown> & { id: string };
 
 const fieldClass =
-  "mt-1.5 w-full rounded-apple-sm border border-ink-200 bg-white px-3 text-sm text-ink-900 outline-none placeholder:text-ink-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20";
+  "mt-1.5 w-full rounded-apple-sm border border-ink-200 bg-white px-3 text-sm text-ink-900 outline-none placeholder:text-text-subtle focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20";
 
 type Ctx = { open: (item: CmsItem | "new") => void; remove: (item: CmsItem) => Promise<void>; busyId: string | null };
 const EditorContext = createContext<Ctx | null>(null);
@@ -205,7 +205,7 @@ function FieldInput({
   const label = (
     <label htmlFor={inputId} className="block text-sm font-medium text-ink-800">
       {f.label}
-      {f.required ? <span className="text-danger"> *</span> : <span className="font-normal text-ink-500"> (optional)</span>}
+      {f.required ? <span className="text-danger"> *</span> : <span className="font-normal text-text-subtle"> (optional)</span>}
     </label>
   );
   if (f.kind === "image") {
@@ -267,7 +267,7 @@ function ImageInput({
             // eslint-disable-next-line @next/next/no-img-element -- admin preview of arbitrary stored images
             <img src={src} alt="" className="size-full object-contain" />
           ) : (
-            <span className="text-xs text-ink-500">None</span>
+            <span className="text-xs text-text-subtle">None</span>
           )}
         </span>
         <div className="min-w-0 flex-1 space-y-2">
@@ -331,7 +331,7 @@ export function CmsRowActions({ item, viewHref }: { item: CmsItem; viewHref?: st
         aria-label="Delete"
         disabled={busy}
         onClick={() => void remove(item)}
-        className={cn(buttonClass({ variant: "ghost", size: "iconSm" }), "text-ink-500 hover:bg-danger-soft hover:text-danger")}
+        className={cn(buttonClass({ variant: "ghost", size: "iconSm" }), "text-text-subtle hover:bg-danger-soft hover:text-danger")}
       >
         {busy ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <Trash2 className="size-4" aria-hidden />}
       </button>

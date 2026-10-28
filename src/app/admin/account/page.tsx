@@ -45,7 +45,7 @@ export default async function AdminAccountPage() {
           )}
         </Panel>
         <Panel>
-          <PanelHeader title="Password" description="8 or more characters, with upper and lower case letters and a number." />
+          <PanelHeader title="Password" description="Change the password you sign in with." />
           <PanelBody>
             <ChangePasswordForm endpoint="/api/admin/account/password" />
           </PanelBody>

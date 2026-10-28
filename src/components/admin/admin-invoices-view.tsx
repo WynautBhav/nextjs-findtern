@@ -74,7 +74,7 @@ export function AdminInvoicesView({
       header: "Invoice no.",
       cell: (r) => {
         const n = displayInvoiceNumber(r, k.invoicePrefix);
-        return n ? <span className="font-mono text-xs text-ink-800">{n}</span> : <span className="text-ink-500">-</span>;
+        return n ? <span className="font-mono text-xs text-ink-800">{n}</span> : <span className="text-text-subtle">-</span>;
       },
     },
     {
@@ -101,13 +101,13 @@ export function AdminInvoicesView({
                   {r.interns.split("; ").join(", ")}
                 </span>
               ) : (
-                <span className="text-ink-500">-</span>
+                <span className="text-text-subtle">-</span>
               ),
           },
         ]
       : []),
     { header: "Amount", align: "right", sort: "amount", cell: (r) => <span className="font-semibold text-ink-900">{money(r.amountMinor, r.currency)}</span> },
-    { header: "GST", align: "right", cell: (r) => (r.amountMinor > 0 ? money(gstOf(r), r.currency) : <span className="text-ink-500">-</span>) },
+    { header: "GST", align: "right", cell: (r) => (r.amountMinor > 0 ? money(gstOf(r), r.currency) : <span className="text-text-subtle">-</span>) },
     {
       header: "Discount",
       align: "right",
@@ -117,12 +117,12 @@ export function AdminInvoicesView({
         ) : r.promoCode ? (
           <span className="text-ink-600">Not recorded</span>
         ) : (
-          <span className="text-ink-500">-</span>
+          <span className="text-text-subtle">-</span>
         ),
     },
     {
       header: "Promo code",
-      cell: (r) => (r.promoCode ? <span className="font-mono text-xs font-semibold text-ink-800">{r.promoCode}</span> : <span className="text-ink-500">-</span>),
+      cell: (r) => (r.promoCode ? <span className="font-mono text-xs font-semibold text-ink-800">{r.promoCode}</span> : <span className="text-text-subtle">-</span>),
     },
     {
       header: "Status",
@@ -135,7 +135,7 @@ export function AdminInvoicesView({
       ),
     },
     ...(kind === "employer" ? [{ header: "Gateway", cell: (r: AdminInvoiceRow) => gatewayLabel(r.gateway) }] : []),
-    { header: "Paid on", sort: "date", align: "right", cell: (r) => (r.paidAt ? formatDate(r.paidAt) : <span className="text-ink-500">-</span>) },
+    { header: "Paid on", sort: "date", align: "right", cell: (r) => (r.paidAt ? formatDate(r.paidAt) : <span className="text-text-subtle">-</span>) },
     { header: "Created", align: "right", cell: (r) => <span className="text-ink-600">{formatDate(r.createdAt)}</span> },
     {
       header: <span className="sr-only">Actions</span>,

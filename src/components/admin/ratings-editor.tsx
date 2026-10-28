@@ -119,7 +119,7 @@ export function RatingsEditor({
               }}
               inputMode="decimal"
               placeholder="0–10"
-              className="nums mt-1 h-11 w-full rounded-apple-sm border border-ink-200 bg-white px-3 text-sm text-ink-900 outline-none placeholder:text-ink-400 focus-visible:border-brand-600 focus-visible:ring-2 focus-visible:ring-brand-600/20"
+              className="nums mt-1 h-11 w-full rounded-apple-sm border border-ink-200 bg-white px-3 text-sm text-ink-900 outline-none placeholder:text-text-subtle focus-visible:border-brand-600 focus-visible:ring-2 focus-visible:ring-brand-600/20"
             />
           </div>
         ))}
@@ -139,7 +139,7 @@ export function RatingsEditor({
               setSaved(null);
             }}
             placeholder="https://incruiter.com/reports/... or PDF URL"
-            className="mt-1 h-11 w-full rounded-apple-sm border border-ink-200 bg-white px-3 text-sm text-ink-900 outline-none placeholder:text-ink-400 focus-visible:border-brand-600 focus-visible:ring-2 focus-visible:ring-brand-600/20"
+            className="mt-1 h-11 w-full rounded-apple-sm border border-ink-200 bg-white px-3 text-sm text-ink-900 outline-none placeholder:text-text-subtle focus-visible:border-brand-600 focus-visible:ring-2 focus-visible:ring-brand-600/20"
           />
         </div>
         <div>
@@ -155,7 +155,7 @@ export function RatingsEditor({
               setSaved(null);
             }}
             placeholder="https://incruiter.com/recording/..."
-            className="mt-1 h-11 w-full rounded-apple-sm border border-ink-200 bg-white px-3 text-sm text-ink-900 outline-none placeholder:text-ink-400 focus-visible:border-brand-600 focus-visible:ring-2 focus-visible:ring-brand-600/20"
+            className="mt-1 h-11 w-full rounded-apple-sm border border-ink-200 bg-white px-3 text-sm text-ink-900 outline-none placeholder:text-text-subtle focus-visible:border-brand-600 focus-visible:ring-2 focus-visible:ring-brand-600/20"
           />
         </div>
       </div>

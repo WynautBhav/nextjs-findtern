@@ -35,7 +35,7 @@ export type EditablePlan = {
 };
 
 const inputClass =
-  "mt-1.5 h-11 w-full rounded-apple-sm border border-ink-200 bg-white px-3 text-sm text-ink-900 outline-none placeholder:text-ink-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20";
+  "mt-1.5 h-11 w-full rounded-apple-sm border border-ink-200 bg-white px-3 text-sm text-ink-900 outline-none placeholder:text-text-subtle focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20";
 
 const toRupees = (minor: number | null) => (minor == null ? "" : String(minor / 100));
 const toMinor = (rupees: string) => Math.round(Number(rupees || 0) * 100);
@@ -281,7 +281,7 @@ function PlanEditor({ plan }: { plan: EditablePlan }) {
                 <button
                   type="button"
                   onClick={() => setFeatureList((prev) => prev.filter((_, j) => j !== i))}
-                  className={cn(buttonClass({ variant: "ghost", size: "iconSm" }), "text-ink-500 hover:bg-danger-soft hover:text-danger")}
+                  className={cn(buttonClass({ variant: "ghost", size: "iconSm" }), "text-text-subtle hover:bg-danger-soft hover:text-danger")}
                   aria-label="Remove row"
                 >
                   <Trash2 className="size-4" />

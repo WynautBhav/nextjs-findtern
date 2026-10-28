@@ -18,7 +18,7 @@ import { isValidPhone, phoneError, phoneHint } from "@/lib/phone";
 import { DIAL_CODE_VALUES } from "@/lib/data/dial-codes";
 
 const inputClass =
-  "mt-1.5 h-11 w-full rounded-apple-sm border border-ink-200 bg-white px-3 text-sm text-ink-900 outline-none placeholder:text-ink-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20";
+  "mt-1.5 h-11 w-full rounded-apple-sm border border-ink-200 bg-white px-3 text-sm text-ink-900 outline-none placeholder:text-text-subtle focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20";
 
 const CODES = DIAL_CODE_VALUES;
 

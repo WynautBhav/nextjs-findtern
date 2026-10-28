@@ -474,7 +474,7 @@ async function PayoutsTable({ params }: { params: Record<string, string> }) {
         { header: "Date", align: "right", sort: "date", cell: (row) => (row.paidAt ? `Paid ${formatDate(row.paidAt.toISOString())}` : formatDate(row.createdAt?.toISOString() ?? null)) },
         {
           header: "Update",
-          cell: (row) => (row.status === "pending" ? <PayoutEditor payoutId={row.id} initialReference={row.referenceId} status={row.status} /> : <span className="text-ink-500">-</span>),
+          cell: (row) => (row.status === "pending" ? <PayoutEditor payoutId={row.id} initialReference={row.referenceId} status={row.status} /> : <span className="text-text-subtle">-</span>),
         },
       ]}
     />
