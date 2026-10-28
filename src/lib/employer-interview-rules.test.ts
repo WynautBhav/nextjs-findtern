@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  canMarkCompleted,
   canMarkMissed,
   displayInterviewStatus,
   hasDuplicateSlots,
@@ -116,4 +117,14 @@ test("interview stage drives the schedule's actions", async () => {
   assert.equal(normalizeMeetingLink("meet.google.com/abc"), "https://meet.google.com/abc");
   assert.equal(normalizeMeetingLink("http://x.test"), "http://x.test");
   assert.equal(normalizeMeetingLink("  "), null);
+});
+
+test("mark completed: a booked meeting from its start time on, never before (bug sheet 8)", () => {
+  const booked = (at: Date) => ({ status: "scheduled", slot1: at, slot2: null, slot3: null, selectedSlot: 1 });
+  assert.equal(canMarkCompleted(booked(h(1)), NOW), false);
+  assert.equal(canMarkCompleted(booked(h(0)), NOW), true);
+  assert.equal(canMarkCompleted({ status: "pending", slot1: h(-1), slot2: null, slot3: null }, NOW), false);
+  const done = { ...booked(h(-0.1)), status: "completed" };
+  assert.equal(isBlockingInterview(done, NOW), false, "a completed meeting frees the candidate");
+  assert.equal(isMeetingOver(done, NOW), true);
 });

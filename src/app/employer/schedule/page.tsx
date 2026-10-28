@@ -8,6 +8,7 @@ import { requireRole } from "@/lib/auth";
 import { requireEmployerSetup } from "@/lib/employer-setup";
 import {
   canLeaveFeedback,
+  canMarkCompleted,
   canMarkMissed,
   interviewStage,
   isMeetingLinkLive,
@@ -362,6 +363,7 @@ export default async function EmployerSchedule({ searchParams }: { searchParams:
                       timezone={r.tz}
                       meetingLink={link}
                       canMarkMissed={iv.status === "scheduled" && Boolean(iv.selectedSlot) && canMarkMissed(iv)}
+                      canMarkCompleted={canMarkCompleted(iv)}
                       canFeedback={!r.feedback && canLeaveFeedback(iv)}
                       internHref={`/employer/intern/${encodeURIComponent(iv.internId)}`}
                     />

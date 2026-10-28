@@ -9,7 +9,7 @@ import { redactForEmployer, toCandidateProfile } from "@/lib/employer-candidates
 import { hiredInternIds, isAdminViewing } from "@/lib/employer-visibility";
 import { employerRegion, resolvePricing, type Currency } from "@/lib/employer-pricing";
 import { visibleInternIds } from "@/lib/employer-pool";
-import { isBlockingInterview, meetingEndsAt } from "@/lib/employer-interview-rules";
+import { isBlockingInterview, isMeetingLinkLive, meetingEndsAt } from "@/lib/employer-interview-rules";
 import { hireFlowCounts } from "@/lib/employer-flow";
 import { payableCheckout } from "@/lib/employer-payable";
 import { timezoneForLocation } from "@/lib/timezones";
@@ -179,7 +179,10 @@ async function loadCart(uid: string, unlockAll: boolean): Promise<CartData> {
           )
       : [];
     const meetingUntil = new Map<string, string>();
+    // A booked meeting's link, while it is live, so the cart can join it (bug sheet 8).
+    const meetingLinks = new Map<string, string>();
     for (const iv of meetingRows) {
+      if (iv.status === "scheduled" && iv.selectedSlot && iv.meetingLink && isMeetingLinkLive(iv)) meetingLinks.set(iv.internId, iv.meetingLink);
       const end = meetingEndsAt(iv);
       if (!isBlockingInterview(iv) || end === null) continue;
       const prev = meetingUntil.get(iv.internId);
@@ -224,6 +227,7 @@ async function loadCart(uid: string, unlockAll: boolean): Promise<CartData> {
         openProposalId: openFor.get(item.internId) ?? null,
         acceptedProposalId: acceptedFor.get(item.internId) ?? null,
         meetingUntil: meetingUntil.get(item.internId) ?? null,
+        meetingLink: meetingLinks.get(item.internId) ?? null,
       });
     }
   }

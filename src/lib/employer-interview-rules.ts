@@ -105,6 +105,13 @@ export function canMarkMissed(iv: SlotLike, now: number = Date.now()): boolean {
   return t !== null && now >= t + MISSED_GRACE_MINUTES * 60_000;
 }
 
+/** "Mark completed" ends a booked meeting early, once its start time has come (bug sheet 8). */
+export function canMarkCompleted(iv: SlotLike, now: number = Date.now()): boolean {
+  if ((iv.status ?? "").toLowerCase() !== "scheduled" || !iv.selectedSlot) return false;
+  const t = meetingTime(iv);
+  return t !== null && now >= t;
+}
+
 /** Three proposed slots must be distinct instants. */
 export function hasDuplicateSlots(slots: (Date | string)[]): boolean {
   const times = slots.map((s) => new Date(s).getTime());

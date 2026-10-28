@@ -10,7 +10,7 @@
  *   awaiting_pick → Send reminder · Offer new times
  *   expired       → Offer new times
  *   upcoming      → Join meeting · Send reminder · Reschedule
- *   live          → Join meeting · Mark missed (after the grace period)
+ *   live          → Join meeting · Mark completed · Mark missed (after the grace period)
  *   over          → Leave feedback · Mark missed
  *   missed        → Leave feedback
  *
@@ -23,7 +23,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Bell, CalendarClock, Check, Loader2, MessageSquare, UserRound, X } from "lucide-react";
+import { Bell, CalendarCheck, CalendarClock, Check, Loader2, MessageSquare, UserRound, X } from "lucide-react";
 
 import { buttonClass } from "@/components/ui/button";
 import { csrfFetch } from "@/lib/client-fetch";
@@ -40,6 +40,7 @@ export function InterviewActions({
   timezone = "Asia/Kolkata",
   meetingLink = null,
   canMarkMissed = false,
+  canMarkCompleted = false,
   canFeedback = false,
   internHref,
 }: {
@@ -51,6 +52,8 @@ export function InterviewActions({
   meetingLink?: string | null;
   /** Scheduled, and the start plus 15 minutes has passed. */
   canMarkMissed?: boolean;
+  /** Scheduled, and the start time has come: the call can be closed early. */
+  canMarkCompleted?: boolean;
   /** Over or missed, and no feedback yet (it is shared once). */
   canFeedback?: boolean;
   internHref: string;
@@ -95,6 +98,13 @@ export function InterviewActions({
     if (await post("mark-missed", {}, "mark it missed")) {
       setPanel("none");
       setNotice("Marked as missed.");
+      router.refresh();
+    }
+  }
+
+  async function markCompleted() {
+    if (await post("mark-completed", {}, "mark it completed")) {
+      setNotice("Marked as completed. You can send a proposal now.");
       router.refresh();
     }
   }
@@ -149,6 +159,12 @@ export function InterviewActions({
           buttons a card). Panels still open inline under the card. */}
       <div className="flex flex-wrap items-center gap-2">
         {primary === "join" ? <JoinMeetingButton link={meetingLink!} /> : null}
+        {canMarkCompleted && stage === "live" ? (
+          <button type="button" onClick={markCompleted} disabled={busy !== null} className={buttonClass({ variant: "outline", size: "sm" })}>
+            {busy === "mark it completed" ? <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden /> : <CalendarCheck className="size-4" aria-hidden />}
+            Mark completed
+          </button>
+        ) : null}
         {primary === "feedback" ? (
           <button
             type="button"

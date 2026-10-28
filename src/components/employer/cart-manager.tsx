@@ -12,6 +12,7 @@ import { formatRate, shortDateTime } from "@/lib/format";
 import { displayNameOf, type CandidateProfile } from "@/lib/employer-candidates";
 import { isQuarterHourWall, meetingEndsAt, suggestedSlots } from "@/lib/employer-interview-rules";
 import { MeetingSlots, TimezoneSelect, type Slots } from "@/components/employer/meeting-slots";
+import { JoinMeetingButton } from "@/components/employer/meeting-join";
 import { fieldClass, labelClass } from "@/components/employer/ui-tokens";
 import type { Currency } from "@/lib/employer-pricing";
 import { PLAN_NAME, bandFor } from "@/lib/score";
@@ -42,6 +43,8 @@ export type CartLineItem = {
   acceptedProposalId?: string | null;
   /** An open meeting holds the candidate until this time (ISO); no new booking or proposal before. */
   meetingUntil?: string | null;
+  /** The booked meeting's link while it is live, for "Join meeting". */
+  meetingLink?: string | null;
 };
 
 export function CartManager({
@@ -453,6 +456,15 @@ function CartLine({
           </ButtonLink>
         )}
 
+        {/* Its own button, not in the menu (bug sheet 8). */}
+        {!line.acceptedProposalId && !closed && !locked ? (
+          <button type="button" onClick={onMeeting} className={buttonClass({ variant: "outline", size: "sm", className: "min-h-11" })}>
+            <Video className="size-4" aria-hidden />
+            Book meeting
+          </button>
+        ) : null}
+        {line.meetingLink ? <JoinMeetingButton link={line.meetingLink} variant="outline" /> : null}
+
         {!line.acceptedProposalId && !closed && locked ? (
           <span className="inline-flex min-h-11 items-center gap-1.5 px-2 text-sm text-ink-600" title="You can book another meeting once this one's time is over.">
             <CalendarCheck className="size-4 text-brand-700" aria-hidden />
@@ -460,13 +472,12 @@ function CartLine({
           </span>
         ) : null}
 
-        {/* One visible action; the rest in a menu (QA-124: four controls a card). */}
+        {/* Profile and remove stay in the menu (QA-124). */}
         {busy ? <Loader2 className="ml-auto size-4 animate-spin text-text-subtle" aria-label="Removing" /> : null}
         <RowMenu
           label={`More actions for ${name}`}
           className={busy ? undefined : "ml-auto"}
           items={[
-            ...(!line.acceptedProposalId && !closed && !locked ? [{ label: "Book a meeting", onSelect: onMeeting, icon: <Video /> }] : []),
             { label: "Open profile", href: profileHref, icon: <UserRound /> },
             { label: "Remove from shortlist", onSelect: onRemove, icon: <Trash2 />, destructive: true, disabled: busy },
           ]}

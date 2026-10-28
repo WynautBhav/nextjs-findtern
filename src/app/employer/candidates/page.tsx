@@ -786,13 +786,13 @@ export default async function CandidatesPage({
                           "No skills listed"
                         ) : (
                           <>
-                            {skills.slice(0, 3).map((k, i) => (
+                            {/* Every skill (at most seven), never "+N" (bug sheet 8). */}
+                            {skills.map((k, i) => (
                               <span key={k}>
                                 {i > 0 ? " · " : ""}
                                 <span className={wanted.has(k.toLowerCase()) ? "font-semibold text-ink-900" : undefined}>{k}</span>
                               </span>
                             ))}
-                            {skills.length > 3 ? <span className="text-text-subtle"> +{skills.length - 3}</span> : null}
                           </>
                         );
                       return (
@@ -813,12 +813,12 @@ export default async function CandidatesPage({
                                 {status ? <Pill tone={status.tone} className="shrink-0 whitespace-nowrap">{status.label}</Pill> : null}
                               </div>
                               <p className="text-sm text-ink-600">{meta || "Location not stated"}</p>
-                              <p className="mt-0.5 hidden truncate text-sm text-ink-600 lg:block" title={c.skills.join(", ")}>
+                              <p className="mt-0.5 hidden text-pretty text-sm text-ink-600 lg:block">
                                 {skillLine}
                               </p>
                             </div>
                           </div>
-                          <p className="min-w-0 truncate text-sm text-ink-600 max-lg:col-span-2 max-lg:pl-[3.25rem] lg:hidden" title={c.skills.join(", ")}>
+                          <p className="min-w-0 text-pretty text-sm text-ink-600 max-lg:col-span-2 max-lg:pl-[3.25rem] lg:hidden">
                             {skillLine}
                           </p>
                           <div className="text-right max-lg:col-start-2 max-lg:row-start-1">
