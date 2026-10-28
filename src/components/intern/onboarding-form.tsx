@@ -391,7 +391,7 @@ export function OnboardingForm({
               )}
             </footer>
           </section>
-          <p className="mt-4 text-center text-xs text-ink-500 lg:text-left">Signed in as {email}. Your progress on this device is kept as you type.</p>
+          <p className="mt-4 text-center text-xs text-text-subtle lg:text-left">Signed in as {email}. Your progress on this device is kept as you type.</p>
         </div>
       </div>
     </div>
@@ -437,7 +437,7 @@ function StepRail({ step, passes, reachable, onSelect }: RailProps) {
                 title={open ? undefined : i === LAST ? "Finish every step to review" : "Finish the steps before this one first"}
                 className={cn(
                   "apple-spring flex min-h-11 w-full items-center gap-3 rounded-apple-sm px-3 text-left text-sm",
-                  current ? "bg-brand-50 font-semibold text-brand-900" : open ? "text-ink-700 hover:bg-ink-50" : "cursor-not-allowed text-ink-400",
+                  current ? "bg-brand-50 font-semibold text-brand-900" : open ? "text-ink-700 hover:bg-ink-50" : "cursor-not-allowed text-text-subtle",
                 )}
               >
                 <StepDot index={i} current={current} done={done} open={open} />
@@ -457,7 +457,7 @@ function StepDot({ index, current, done, open }: { index: number; current: boole
       aria-hidden
       className={cn(
         "nums grid size-6 shrink-0 place-items-center rounded-full text-xs font-semibold",
-        current ? "bg-brand-700 text-white" : done ? "bg-brand-100 text-brand-700" : open ? "bg-ink-100 text-ink-600" : "bg-ink-50 text-ink-400",
+        current ? "bg-brand-700 text-white" : done ? "bg-brand-100 text-brand-700" : open ? "bg-ink-100 text-ink-600" : "bg-ink-50 text-text-subtle",
       )}
     >
       {done && !current ? <Check className="size-3.5" /> : !open ? <Lock className="size-3" /> : index + 1}
@@ -504,7 +504,7 @@ function MobileSteps({ step, passes, reachable, onSelect }: RailProps) {
                   }}
                   className={cn(
                     "apple-spring flex min-h-11 w-full items-center gap-3 rounded-apple-sm px-3 text-left text-sm",
-                    current ? "bg-brand-50 font-semibold text-brand-900" : can ? "text-ink-700 hover:bg-ink-50" : "text-ink-400",
+                    current ? "bg-brand-50 font-semibold text-brand-900" : can ? "text-ink-700 hover:bg-ink-50" : "text-text-subtle",
                   )}
                 >
                   <StepDot index={i} current={current} done={passes[i] && i !== LAST} open={can} />

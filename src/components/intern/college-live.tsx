@@ -229,7 +229,7 @@ function CallCard({
             type="button"
             onClick={() => onDismiss(meeting.id)}
             aria-label="Close"
-            className="-mr-1 -mt-1 grid size-11 shrink-0 place-items-center rounded-apple-sm text-ink-400 hover:bg-ink-100 hover:text-ink-700"
+            className="-mr-1 -mt-1 grid size-11 shrink-0 place-items-center rounded-apple-sm text-text-subtle hover:bg-ink-100 hover:text-ink-700"
           >
             <X className="size-4" />
           </button>

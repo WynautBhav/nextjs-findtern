@@ -155,7 +155,7 @@ function CityPicker({ cities, error, onChange }: { cities: string[]; error?: str
   return (
     <div>
       <Label htmlFor="preferredLocations">
-        Add a city <span className="nums font-normal text-ink-500">({cities.length} of {MAX_CITIES})</span>
+        Add a city <span className="nums font-normal text-text-subtle">({cities.length} of {MAX_CITIES})</span>
       </Label>
       <input
         id="preferredLocations"
@@ -191,7 +191,7 @@ function CityPicker({ cities, error, onChange }: { cities: string[]; error?: str
                 onClick={() => add(c)}
                 className="apple-spring apple-pressable inline-flex min-h-11 items-center gap-1.5 rounded-full border border-ink-200 bg-white px-3.5 text-sm text-ink-700 hover:border-brand-300 hover:bg-brand-50 hover:text-brand-800 sm:min-h-9"
               >
-                <Plus className="size-3.5 text-ink-400" aria-hidden />
+                <Plus className="size-3.5 text-text-subtle" aria-hidden />
                 {c === custom ? `Add "${c}"` : c}
               </button>
             </li>

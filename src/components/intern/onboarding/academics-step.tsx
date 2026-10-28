@@ -250,13 +250,13 @@ function FileList({
     <div className="space-y-3">
       {files.length > 0 ? (
         <div>
-          <p className="text-xs font-medium text-ink-500">Uploaded</p>
+          <p className="text-xs font-medium text-text-subtle">Uploaded</p>
           <ul className="mt-2 divide-y divide-ink-200/70 rounded-apple-md border border-ink-200/80 bg-white">
             {files.map((u, i) => (
               <li key={u.name} className="flex min-h-12 items-center gap-3 pl-3.5 pr-2">
                 <FileText className="size-4 shrink-0 text-brand-600" aria-hidden />
                 <span className="min-w-0 flex-1 truncate text-sm text-ink-800">{u.originalName || `${capitalise(noun)} ${i + 1}`}</span>
-                {u.size ? <span className="nums hidden shrink-0 text-xs text-ink-500 sm:inline">{Math.max(1, Math.round(u.size / 1024))} KB</span> : null}
+                {u.size ? <span className="nums hidden shrink-0 text-xs text-text-subtle sm:inline">{Math.max(1, Math.round(u.size / 1024))} KB</span> : null}
                 <RemoveButton label={`Remove ${u.originalName || `${noun} ${i + 1}`}`} onClick={() => onChange(files.filter((x) => x.name !== u.name))} />
               </li>
             ))}
@@ -276,7 +276,7 @@ function FileList({
           onUploaded={(r) => onChange([...files, { name: r.key, originalName: r.name, type: r.contentType, size: r.bytes }])}
         />
       ) : (
-        <p className="text-xs text-ink-500">That is the most you can add. Remove one to add another.</p>
+        <p className="text-xs text-text-subtle">That is the most you can add. Remove one to add another.</p>
       )}
     </div>
   );

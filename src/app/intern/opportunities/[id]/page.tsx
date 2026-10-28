@@ -193,7 +193,7 @@ export default async function RoleDetail({ params }: { params: Promise<{ id: str
                 value={
                   role.locationType ? (
                     <span className="inline-flex items-center gap-1.5">
-                      <MapPin className="size-3.5 shrink-0 text-ink-400" aria-hidden />
+                      <MapPin className="size-3.5 shrink-0 text-text-subtle" aria-hidden />
                       {({ onsite: "On-site", hybrid: "Hybrid", remote: "Remote" } as Record<string, string>)[role.locationType.toLowerCase()] ?? role.locationType}
                     </span>
                   ) : (

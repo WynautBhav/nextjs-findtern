@@ -70,7 +70,7 @@ export function OpenToWorkToggle({
         ) : null}
       </div>
       <div className="flex shrink-0 items-center gap-2 pt-0.5">
-        {saving ? <Loader2 className="size-4 animate-spin text-ink-400" aria-hidden /> : null}
+        {saving ? <Loader2 className="size-4 animate-spin text-text-subtle" aria-hidden /> : null}
         <Switch checked={on} onCheckedChange={flip} disabled={saving} aria-label="Open to work" />
       </div>
     </div>

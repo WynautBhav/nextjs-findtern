@@ -400,7 +400,7 @@ export default async function InternHome() {
                 <span className="font-medium text-ink-900">{college.name}</span>
                 {college.status === "verified" ? " · verified" : " · not verified yet"}
               </span>
-              <ArrowRight className="size-4 shrink-0 text-ink-400" aria-hidden />
+              <ArrowRight className="size-4 shrink-0 text-text-subtle" aria-hidden />
             </Link>
           ) : (
             <Surface className="p-5">
@@ -443,7 +443,7 @@ export default async function InternHome() {
             className="apple-spring flex min-h-14 items-center justify-between rounded-apple-xl border border-dashed border-ink-200 px-5 py-4 text-sm font-medium text-ink-700 hover:border-brand-300 hover:bg-white"
           >
             See your profile as employers do
-            <ArrowRight className="size-4 text-ink-400" aria-hidden />
+            <ArrowRight className="size-4 text-text-subtle" aria-hidden />
           </Link>
         </aside>
       </div>

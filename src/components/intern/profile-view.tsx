@@ -120,7 +120,7 @@ export function ProfileView({
               <Pill tone={status.tone}>{status.label}</Pill>
             </div>
             <p className="mt-1.5 flex items-center gap-1.5 text-sm text-ink-600">
-              <MapPin className="size-4 shrink-0 text-ink-400" aria-hidden />
+              <MapPin className="size-4 shrink-0 text-text-subtle" aria-hidden />
               {place || "City not added yet"}
             </p>
             <p className="mt-3 max-w-prose text-pretty text-sm leading-relaxed text-ink-600">{status.detail}</p>

@@ -206,7 +206,7 @@ export default async function InternInterviews() {
                         <Pill tone={outcome.tone}>{outcome.label}</Pill>
                       </div>
                       <p className="nums mt-3 flex items-center gap-1.5 text-sm text-ink-700">
-                        <CalendarClock className="size-4 text-ink-500" aria-hidden />
+                        <CalendarClock className="size-4 text-text-subtle" aria-hidden />
                         {i.selectedSlot || outcome.label !== "Expired" ? formatIst(slotOf(i) ?? i.createdAt, { year: true }) : "No time was picked"}
                       </p>
                       {outcome.label === "Interview done" && feedback ? (

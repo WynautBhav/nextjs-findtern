@@ -153,7 +153,7 @@ function Step({
           "nums mt-0.5 grid size-7 shrink-0 place-items-center rounded-full text-sm font-semibold",
           state === "done" && "bg-brand-600 text-white",
           state === "current" && "bg-accent-400 text-brand-950",
-          state === "todo" && "border border-ink-200 bg-white text-ink-500",
+          state === "todo" && "border border-ink-200 bg-white text-text-subtle",
         )}
       >
         {state === "done" ? <Check className="size-4" strokeWidth={3} /> : n}

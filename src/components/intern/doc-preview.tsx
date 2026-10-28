@@ -8,7 +8,7 @@ export function DocImagePreview({ href, label }: { href: string; label: string }
   const [failed, setFailed] = useState(false);
   if (failed) {
     return (
-      <div className="grid aspect-[16/10] place-items-center bg-ink-50 text-ink-400">
+      <div className="grid aspect-[16/10] place-items-center bg-ink-50 text-text-subtle">
         <span className="flex flex-col items-center gap-2 text-sm">
           <FileImage className="size-10" aria-hidden />
           Preview not available

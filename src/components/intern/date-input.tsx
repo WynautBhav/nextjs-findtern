@@ -113,7 +113,7 @@ export function DateInput({
         disabled={disabled}
         aria-label="Open calendar"
         tabIndex={-1}
-        className="apple-spring absolute right-0.5 top-0.5 grid size-10 place-items-center rounded-apple-sm text-ink-500 hover:bg-ink-100 hover:text-brand-700 disabled:pointer-events-none"
+        className="apple-spring absolute right-0.5 top-0.5 grid size-10 place-items-center rounded-apple-sm text-text-subtle hover:bg-ink-100 hover:text-brand-700 disabled:pointer-events-none"
       >
         <CalendarDays className="size-[1.125rem]" aria-hidden />
       </button>

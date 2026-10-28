@@ -71,8 +71,8 @@ export function PreviewStep({ values, update, errors, onJumpStep }: StepProps) {
                   <li key={q.id}>
                     <span className="font-medium text-ink-900">{q.name}</span>
                     {q.level ? ` ${q.level}` : ""}
-                    {q.issuer ? <span className="text-ink-500"> · {q.issuer}</span> : null}
-                    {q.completionDate ? <span className="nums text-ink-500"> · {dateLabel(q.completionDate)}</span> : q.status === "Pursuing" ? <span className="text-ink-500"> · pursuing</span> : null}
+                    {q.issuer ? <span className="text-text-subtle"> · {q.issuer}</span> : null}
+                    {q.completionDate ? <span className="nums text-text-subtle"> · {dateLabel(q.completionDate)}</span> : q.status === "Pursuing" ? <span className="text-text-subtle"> · pursuing</span> : null}
                   </li>
                 ))}
               </ul>
@@ -92,7 +92,7 @@ export function PreviewStep({ values, update, errors, onJumpStep }: StepProps) {
                 ))}
               </ul>
             ) : (
-              <p className="text-sm text-ink-500">No skills yet.</p>
+              <p className="text-sm text-text-subtle">No skills yet.</p>
             )}
           </Block>
 
@@ -105,11 +105,11 @@ export function PreviewStep({ values, update, errors, onJumpStep }: StepProps) {
                       <p className="text-[0.9375rem] font-medium text-ink-900">
                         {e.role || "Role"} <span className="font-normal text-ink-600">at {e.company || "-"}</span>
                       </p>
-                      <p className="nums text-xs text-ink-500">
+                      <p className="nums text-xs text-text-subtle">
                         {dateLabel(e.from)} – {e.current ? "Present" : dateLabel(e.to)}
                       </p>
                     </div>
-                    {e.type ? <p className="text-xs text-ink-500">{e.type}</p> : null}
+                    {e.type ? <p className="text-xs text-text-subtle">{e.type}</p> : null}
                     {e.description ? <p className="mt-1 line-clamp-3 text-sm leading-relaxed text-ink-700">{e.description}</p> : null}
                   </li>
                 ))}
@@ -123,7 +123,7 @@ export function PreviewStep({ values, update, errors, onJumpStep }: StepProps) {
                 {languages.map((l) => (
                   <li key={l.id}>
                     <span className="font-medium">{l.language}</span>
-                    <span className="text-ink-500"> · {l.level || "-"}</span>
+                    <span className="text-text-subtle"> · {l.level || "-"}</span>
                   </li>
                 ))}
               </ul>
@@ -143,7 +143,7 @@ export function PreviewStep({ values, update, errors, onJumpStep }: StepProps) {
                 {activities.map((x) => (
                   <li key={x.id}>
                     <span className="font-medium">{x.activity}</span>
-                    {x.level ? <span className="text-ink-500"> · {x.level}</span> : null}
+                    {x.level ? <span className="text-text-subtle"> · {x.level}</span> : null}
                   </li>
                 ))}
               </ul>
@@ -179,7 +179,7 @@ function Block({ title, onEdit, children, className }: { title: string; onEdit: 
   return (
     <section className={cn("px-5 py-5 sm:px-6", className)}>
       <div className="mb-3 flex items-center justify-between gap-3">
-        <h4 className="text-2xs font-semibold uppercase tracking-[0.14em] text-ink-500">{title}</h4>
+        <h4 className="text-2xs font-semibold uppercase tracking-[0.14em] text-text-subtle">{title}</h4>
         <button
           type="button"
           onClick={onEdit}

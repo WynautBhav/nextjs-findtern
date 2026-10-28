@@ -151,7 +151,7 @@ export default async function ProposalDetail({ params }: { params: Promise<{ id:
         lede={
           <>
             {facts.company ?? "Company shared after hire"}
-            {project.row?.projectName ? <span className="text-ink-500"> · {project.row.projectName}</span> : null}
+            {project.row?.projectName ? <span className="text-text-subtle"> · {project.row.projectName}</span> : null}
           </>
         }
         action={
@@ -369,7 +369,7 @@ export default async function ProposalDetail({ params }: { params: Promise<{ id:
 function Locked({ icon }: { icon: "user" | "phone" }) {
   const Icon = icon === "user" ? User : Phone;
   return (
-    <span className="inline-flex items-center gap-1.5 text-ink-500">
+    <span className="inline-flex items-center gap-1.5 text-text-subtle">
       <Icon className="size-3.5" aria-hidden />
       Shared after hire
     </span>
