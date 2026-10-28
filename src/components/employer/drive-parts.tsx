@@ -18,17 +18,18 @@ const STATE: Record<DriveWindow, { tone: Tone; label: string }> = {
   revoked: { tone: "closed", label: "Closed by the college" },
 };
 
-export function DriveStatePill({ state }: { state: DriveWindow }) {
+/**
+ * The one drive-state pill for both sides (college and employer used
+ * different words and tones). `audience="college"` words a revoked drive
+ * from the side that closed it. Static dot: the ping looped for the whole
+ * drive.
+ */
+export function DriveStatePill({ state, audience = "employer" }: { state: DriveWindow; audience?: "employer" | "college" }) {
   const s = STATE[state];
   return (
     <Pill tone={s.tone}>
-      {state === "live" ? (
-        <span aria-hidden className="relative flex size-1.5">
-          <span className="absolute inline-flex size-full rounded-full bg-brand-500 opacity-60 motion-safe:animate-ping" />
-          <span className="relative inline-flex size-1.5 rounded-full bg-brand-600" />
-        </span>
-      ) : null}
-      {s.label}
+      {state === "live" ? <span aria-hidden className="size-1.5 rounded-full bg-brand-600" /> : null}
+      {audience === "college" && state === "revoked" ? "Link closed" : s.label}
     </Pill>
   );
 }

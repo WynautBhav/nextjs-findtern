@@ -1,5 +1,6 @@
 import { parseOffer } from "../offer.ts";
 import { toInrMinor } from "./money.ts";
+import { shortDateTime } from "../format.ts";
 
 /**
  * Hiring analytics (legacy `GET /api/admin/reports/analytics`,
@@ -167,7 +168,7 @@ export function computeAnalytics(input: AnalyticsInput) {
     const intv = new Set(input.interviews.filter((i) => within(i.createdAt)).map((i) => i.internId));
     const hires = input.proposals.filter((p) => p.status === "hired" && within(p.hiredAt)).length;
     trend.push({
-      month: m.toLocaleString("en-IN", { month: "short", year: "2-digit", timeZone: "UTC" }),
+      month: shortDateTime(m, { month: "short", year: "2-digit", timeZone: "UTC" }),
       proposals: props.length,
       hires,
       successRate: pct(hires, props.length),

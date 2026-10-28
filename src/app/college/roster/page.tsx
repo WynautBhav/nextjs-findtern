@@ -1,4 +1,5 @@
-import { AdminPageHeader, Panel, PanelBody, PanelHeader } from "@/components/admin/panel";
+import { Panel, PanelBody, PanelHeader } from "@/components/admin/panel";
+import { PageHead } from "@/components/app/primitives";
 import { RosterImport } from "@/components/college/roster-import";
 import { CopyText } from "@/components/college/copy-text";
 import { yearLabel } from "@/lib/college/labels";
@@ -24,9 +25,9 @@ export default async function RosterPage() {
 
   return (
     <div className="space-y-6">
-      <AdminPageHeader
+      <PageHead
         title="Roster"
-        subtitle={
+        lede={
           coverage.rosterSize
             ? `${coverage.joined} of ${coverage.rosterSize} students on your roster have joined Findtern.`
             : "Upload your student list to see who hasn't joined yet."

@@ -6,6 +6,7 @@ import { Upload } from "lucide-react";
 
 import { csrfFetch } from "@/lib/client-fetch";
 import { cn } from "@/lib/utils";
+import { buttonClass } from "@/components/ui/button";
 
 /** Upload or paste the college's student list. Upserts by email; never deletes. */
 export function RosterImport() {
@@ -81,7 +82,7 @@ export function RosterImport() {
           type="button"
           disabled={busy || !csv.trim()}
           onClick={() => submit(csv)}
-          className="apple-spring apple-pressable mt-2 inline-flex min-h-11 items-center rounded-apple-sm border border-ink-200 bg-white px-4 text-sm font-medium text-ink-800 shadow-2xs hover:bg-ink-50 disabled:opacity-60"
+          className={buttonClass({ variant: "outline", size: "sm", className: "mt-2" })}
         >
           Import pasted rows
         </button>

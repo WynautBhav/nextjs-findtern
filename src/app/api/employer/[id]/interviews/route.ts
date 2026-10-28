@@ -10,6 +10,7 @@ import { timezoneForLocation, wallTimeToUtc } from "@/lib/timezones";
 import { canEmployerSeeIntern } from "@/lib/employer-pool";
 import { hiredProposalSql } from "@/lib/employer-visibility";
 import { hasDuplicateSlots, isBlockingInterview, isQuarterHourWall } from "@/lib/employer-interview-rules";
+import { shortDateTime } from "@/lib/format";
 
 const wall = z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/);
 const bodySchema = z.object({
@@ -127,7 +128,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 /** "Tue 3 Nov 2026, 3:30 pm" for a wall-clock "2026-11-03T15:30". */
 function wallLabel(wall: string): string {
   const d = new Date(`${wall.slice(0, 16)}:00Z`);
-  return d.toLocaleString("en-IN", {
+  return shortDateTime(d, {
     weekday: "short",
     day: "numeric",
     month: "short",

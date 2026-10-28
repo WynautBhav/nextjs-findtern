@@ -6,7 +6,7 @@ import { ArrowLeft, CheckCircle2, Download, Eye, EyeOff, FileText, Link2, Loader
 
 import { csrfFetch } from "@/lib/client-fetch";
 import { toInrMinor } from "@/lib/admin/money";
-import { formatDate, formatMoney, formatSlotTime } from "@/lib/format";
+import { formatDate, formatMoney, formatSlotTime, shortDate } from "@/lib/format";
 import { StatusBadge, humanizeStatus } from "@/components/admin/status-badge";
 import { InternPayoutTools } from "@/components/admin/intern-payout-tools";
 import { owedMinor, stipendDues } from "@/lib/admin/stipend-dues";
@@ -1007,7 +1007,7 @@ function TimesheetsTab({
                         return (
                           <tr key={d.date}>
                             <td className="nums whitespace-nowrap py-2 pr-4 text-ink-800">
-                              {new Date(`${d.date}T00:00:00Z`).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" }).replace(/\bSept\b/, "Sep")}
+                              {shortDate(new Date(`${d.date}T00:00:00Z`), { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" })}
                             </td>
                             <td className="py-2 pr-4">{d.status ? <span className="text-ink-800">{d.status}</span> : <span className="text-text-subtle">Not filled</span>}</td>
                             <td className="nums py-2 pr-4 text-right text-ink-700">{x?.hours ?? "-"}</td>

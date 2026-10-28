@@ -8,7 +8,7 @@ import { AlertCircle, CalendarCheck, CheckCircle2, CreditCard, Laptop, Loader2, 
 import { EmptyScene, Pill, Surface } from "@/components/app/primitives";
 import { ButtonLink, buttonClass } from "@/components/ui/button";
 import { csrfFetch } from "@/lib/client-fetch";
-import { formatRate } from "@/lib/format";
+import { formatRate, shortDateTime } from "@/lib/format";
 import { displayNameOf, type CandidateProfile } from "@/lib/employer-candidates";
 import { isQuarterHourWall, meetingEndsAt, suggestedSlots } from "@/lib/employer-interview-rules";
 import { MeetingSlots, TimezoneSelect, type Slots } from "@/components/employer/meeting-slots";
@@ -491,5 +491,5 @@ function meetingLocked(line: CartLineItem): boolean {
 
 /** "3 Nov, 4:30 pm" in the company's timezone. */
 function untilLabel(iso: string, timeZone: string): string {
-  return new Date(iso).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit", timeZone });
+  return shortDateTime(new Date(iso), { day: "numeric", month: "short", hour: "numeric", minute: "2-digit", timeZone });
 }

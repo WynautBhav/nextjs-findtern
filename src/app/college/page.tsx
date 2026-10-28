@@ -1,9 +1,7 @@
 import Link from "next/link";
 import { and, eq, gt, isNull, lte, sql } from "drizzle-orm";
-import { ClipboardCheck, MailWarning, Sparkles, UserPlus } from "lucide-react";
 
-import { AdminPageHeader } from "@/components/admin/panel";
-import { StatCard } from "@/components/admin/stat-card";
+import { StatCard, StatGrid } from "@/components/admin/stat-card";
 import { PresenceLive } from "@/components/college/presence-live";
 import { StudentTable } from "@/components/college/student-table";
 import { aiStatusLabel } from "@/lib/college/labels";
@@ -16,6 +14,7 @@ import {
 } from "@/lib/college/scope";
 import { toStudentRow } from "@/lib/college/serialize";
 import { getDb, schema } from "@/lib/db";
+import { PageHead, Pill } from "@/components/app/primitives";
 
 export const dynamic = "force-dynamic";
 
@@ -65,9 +64,11 @@ export default async function CollegeDashboard() {
 
   return (
     <div className="space-y-6">
-      <AdminPageHeader
+      <PageHead
         title={ctx.college.name}
-        subtitle={`Placement console${ctx.college.city ? ` · ${ctx.college.city}` : ""}. Live from Findtern; nothing here can be edited by your team.`}
+        lede={`Placement console${ctx.college.city ? ` · ${ctx.college.city}` : ""}. Live from Findtern.`}
+        // Said once, here (it was in the lede and again under the table).
+        action={<Pill tone="neutral">Read-only</Pill>}
       />
 
       {liveDrive && presence ? (
@@ -79,7 +80,7 @@ export default async function CollegeDashboard() {
         />
       ) : null}
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <StatGrid cols={4}>
         <StatCard
           label="Joined Findtern"
           value={coverage.rosterSize ? `${coverage.joined}/${coverage.rosterSize}` : students.length}
@@ -88,31 +89,27 @@ export default async function CollegeDashboard() {
               ? `${joinedPct}% of your roster${coverage.notJoined.length ? `; ${coverage.notJoined.length} still to join` : ""}`
               : "Upload your roster to track who's missing"
           }
-          icon={UserPlus}
           href="/college/roster"
         />
         <StatCard
           label="AI interview done"
           value={`${interviewed.length}/${students.length}`}
           hint={students.length ? `${students.length - interviewed.length} still to take it` : "No students yet"}
-          icon={ClipboardCheck}
           tone="neutral"
         />
         <StatCard
           label="Median Findtern score"
           value={med === null ? "—" : med.toFixed(1)}
           hint={scores.length ? `out of 10, across ${scores.length} interviewed` : "Appears after the first interview"}
-          icon={Sparkles}
           tone="neutral"
         />
         <StatCard
           label="Offers waiting on reply"
           value={waiting.reduce((n, s) => n + s.offersPending, 0)}
           hint={waiting.length ? `${waiting.length} student${waiting.length === 1 ? "" : "s"} to chase` : "Nobody is sitting on an offer"}
-          icon={MailWarning}
           tone={waiting.length ? "warning" : "neutral"}
         />
-      </div>
+      </StatGrid>
 
       {!liveDrive ? (
         <p className="text-sm text-text-subtle">

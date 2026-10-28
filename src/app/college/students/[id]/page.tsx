@@ -1,7 +1,6 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { and, desc, eq, inArray } from "drizzle-orm";
-import { ArrowLeft, FileText, PlayCircle, ShieldCheck } from "lucide-react";
+import { FileText, PlayCircle, ShieldCheck } from "lucide-react";
 
 import { Panel, PanelBody, PanelHeader } from "@/components/admin/panel";
 import { NudgeButton } from "@/components/college/nudge-button";
@@ -13,6 +12,8 @@ import { requireCollegeContext, studentForCollegeAdmin } from "@/lib/college/sco
 import { getDb, schema } from "@/lib/db";
 import { parseOffer } from "@/lib/offer";
 import { realEmployerId } from "@/lib/admin/scope";
+import { shortDateTime } from "@/lib/format";
+import { buttonClass } from "@/components/ui/button";
 
 export const dynamic = "force-dynamic";
 
@@ -68,9 +69,7 @@ export default async function CollegeStudentPage({ params }: { params: Promise<{
 
   return (
     <div className="space-y-6">
-      <Link href="/college" className="inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-ink-600 hover:text-brand-700">
-        <ArrowLeft className="size-4" aria-hidden /> All students
-      </Link>
+      {/* The breadcrumb leads back to Students (crumbParents). */}
 
       <PageHead
         title={name || student.email}
@@ -135,7 +134,7 @@ export default async function CollegeStudentPage({ params }: { params: Promise<{
                   href={`/api/college/students/${id}/report`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="apple-spring apple-pressable inline-flex min-h-11 items-center gap-2 rounded-apple-sm border border-ink-200 bg-white px-4 text-sm font-medium text-ink-800 shadow-2xs hover:bg-ink-50"
+                  className={buttonClass({ variant: "outline", size: "sm" })}
                 >
                   <FileText className="size-4 text-brand-700" aria-hidden /> Open report
                 </a>
@@ -145,7 +144,7 @@ export default async function CollegeStudentPage({ params }: { params: Promise<{
                   href={`/api/college/students/${id}/recording`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="apple-spring apple-pressable inline-flex min-h-11 items-center gap-2 rounded-apple-sm border border-ink-200 bg-white px-4 text-sm font-medium text-ink-800 shadow-2xs hover:bg-ink-50"
+                  className={buttonClass({ variant: "outline", size: "sm" })}
                 >
                   <PlayCircle className="size-4 text-brand-700" aria-hidden /> Watch recording
                 </a>
@@ -226,7 +225,7 @@ export default async function CollegeStudentPage({ params }: { params: Promise<{
                 <div>
                   <p className="font-medium text-ink-900">{company ?? "Employer"} · drive call</p>
                   <p className="text-sm text-text-subtle">
-                    {drive} · {m.startsAt.toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}
+                    {drive} · {shortDateTime(m.startsAt, { timeZone: "Asia/Kolkata", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}
                   </p>
                 </div>
                 <span className="rounded-full bg-ink-100 px-2.5 py-1 text-xs font-medium text-ink-700">{humanizeStatus(m.status)}</span>

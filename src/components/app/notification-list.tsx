@@ -17,6 +17,7 @@ import { AlertCircle, Check, CheckCheck } from "lucide-react";
 import { buttonClass } from "@/components/ui/button";
 import { csrfFetch } from "@/lib/client-fetch";
 import { cn } from "@/lib/utils";
+import { shortDateTime } from "@/lib/format";
 
 export type NotificationRow = {
   id: string;
@@ -29,14 +30,14 @@ export type NotificationRow = {
   href?: string | null;
 };
 
-const when = new Intl.DateTimeFormat("en-IN", {
+const WHEN: Intl.DateTimeFormatOptions = {
   day: "numeric",
   month: "short",
   hour: "numeric",
   minute: "2-digit",
   hour12: true,
   timeZone: "Asia/Kolkata",
-});
+};
 
 export function NotificationList({
   rows,
@@ -132,7 +133,7 @@ export function NotificationList({
                   </span>
                   {n.createdAt ? (
                     <time dateTime={new Date(n.createdAt).toISOString()} className="nums shrink-0 text-xs text-text-subtle">
-                      {when.format(new Date(n.createdAt)).replace(/\bSept\b/, "Sep")} IST
+                      {shortDateTime(new Date(n.createdAt), WHEN)} IST
                     </time>
                   ) : null}
                 </span>

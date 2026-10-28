@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { csrfFetch } from "@/lib/client-fetch";
+import { buttonClass } from "@/components/ui/button";
 import { ShareLink } from "./share-link";
 
 /** Issue a fresh link (old one dies) or close the drive to every employer at once. */
@@ -20,10 +21,12 @@ export function LinkActions(props: {
   const [url, setUrl] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Asked in the page, not window.confirm (as admin since QA-145): the
+  // consequence is spelled out next to the yes/cancel pair.
+  const [asking, setAsking] = useState<"POST" | "DELETE" | null>(null);
 
   async function call(method: "POST" | "DELETE") {
-    if (method === "DELETE" && !window.confirm("Close this drive's link? Every employer, including those already inside, loses access immediately.")) return;
-    if (method === "POST" && !props.revoked && !window.confirm("Issue a new link? Companies already inside keep access, but anyone you sent the current link to who hasn't opened it yet will need the new one.")) return;
+    setAsking(null);
     setBusy(true);
     setError(null);
     const res = await csrfFetch(`/api/college/drives/${props.driveId}/link`, { method }).catch(() => null);
@@ -34,32 +37,64 @@ export function LinkActions(props: {
     router.refresh();
   }
 
+  const consequence =
+    asking === "DELETE"
+      ? "Every employer, including those already inside, loses access immediately."
+      : "Companies already inside keep access. Anyone you sent the current link to who hasn't opened it yet will need the new one.";
+
   return (
     <div className="space-y-4">
-      {url ? <ShareLink url={url} {...props} /> : null}
-      <div className="flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => call("POST")}
-          className="apple-spring apple-pressable inline-flex min-h-11 items-center rounded-apple-sm border border-ink-200 bg-white px-4 text-sm font-medium text-ink-800 shadow-2xs hover:bg-ink-50"
-        >
-          {props.revoked ? "Reopen with a new link" : "Issue a new link"}
-        </button>
-        {!props.revoked ? (
+      {url ? (
+        <ShareLink url={url} {...props} />
+      ) : !props.revoked ? (
+        // Only a fingerprint of the link is stored, so it can't be shown again.
+        <p className="text-sm text-ink-600">
+          The link was shown once, when it was made, and can&apos;t be shown again. If you&apos;ve lost it, issue a new one.
+        </p>
+      ) : null}
+      {asking ? (
+        <div role="group" aria-label="Confirm" className="rounded-apple-md border border-ink-200 bg-ink-50 p-4">
+          <p className="text-sm text-ink-800">{consequence}</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button
+              type="button"
+              autoFocus
+              disabled={busy}
+              onClick={() => void call(asking)}
+              className={buttonClass({ variant: asking === "DELETE" ? "dark" : "primary", size: "sm" })}
+            >
+              {asking === "DELETE" ? "Yes, close the link" : "Yes, issue a new link"}
+            </button>
+            <button type="button" onClick={() => setAsking(null)} className={buttonClass({ variant: "outline", size: "sm" })}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
             disabled={busy}
-            onClick={() => call("DELETE")}
-            className="apple-spring apple-pressable inline-flex min-h-11 items-center rounded-apple-sm px-4 text-sm font-medium text-danger hover:bg-danger-soft"
+            onClick={() => (props.revoked ? void call("POST") : setAsking("POST"))}
+            className={buttonClass({ variant: "outline", size: "sm" })}
           >
-            Close link now
+            {props.revoked ? "Reopen with a new link" : "Issue a new link"}
           </button>
-        ) : null}
-        <span role="status" aria-live="polite" className="text-sm text-danger">
-          {error}
-        </span>
-      </div>
+          {!props.revoked ? (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => setAsking("DELETE")}
+              className={buttonClass({ variant: "ghost", size: "sm", className: "text-danger hover:bg-danger-soft" })}
+            >
+              Close link now
+            </button>
+          ) : null}
+        </div>
+      )}
+      <span role="status" aria-live="polite" className="text-sm text-danger">
+        {error}
+      </span>
     </div>
   );
 }

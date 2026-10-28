@@ -17,7 +17,7 @@ import { eq } from "drizzle-orm";
 import { loadInternData, openProjects } from "@/lib/intern-data";
 import { isMeetingLinkLive } from "@/lib/employer-interview-rules";
 import { nextAction, slotOf } from "@/lib/journey";
-import { formatMoney, formatSlotTime } from "@/lib/format";
+import { formatMoney, formatSlotTime, shortDate } from "@/lib/format";
 import { isInternPaid } from "@/lib/payments";
 import { isHiredProposal } from "@/lib/hire-status";
 import { paymentsAreFree } from "@/lib/razorpay";
@@ -430,7 +430,7 @@ export default async function InternHome() {
                 <p className="mt-1 text-sm text-ink-600">
                   {formatMoney(data.money.incomingMinor, data.money.currency, { zeroLabel: false })} on its way
                   {data.money.nextExpectedAt
-                    ? `, due ${data.money.nextExpectedAt.toLocaleDateString("en-IN", { day: "numeric", month: "short" }).replace(/\bSept\b/, "Sep")}`
+                    ? `, due ${shortDate(data.money.nextExpectedAt, { day: "numeric", month: "short" })}`
                     : ""}
                 </p>
               ) : null}

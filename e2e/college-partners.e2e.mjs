@@ -41,9 +41,17 @@ let driveLink;
 let drivePath;
 let employerDriveId;
 
-/** IST wall-clock for a datetime-local input, `offsetMin` from now. */
+/** IST wall-clock `offsetMin` from now, as the drive form's DD/MM/YYYY date and HH:mm time fields. */
 function istInput(offsetMin) {
-  return new Date(Date.now() + offsetMin * 60_000 + 330 * 60_000).toISOString().slice(0, 16);
+  const iso = new Date(Date.now() + offsetMin * 60_000 + 330 * 60_000).toISOString();
+  return { date: `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}`, time: iso.slice(11, 16) };
+}
+
+/** Fill one of the drive form's IST date + time pairs. */
+async function fillIst(page, label, offsetMin) {
+  const v = istInput(offsetMin);
+  await page.getByLabel(`${label}, date`).fill(v.date);
+  await page.getByLabel(`${label}, time`).fill(v.time);
 }
 
 before(async () => {
@@ -73,15 +81,15 @@ test("officer: signs in and sees the console", async () => {
   assert.match(main, /Joined Findtern/);
   assert.match(main, /61\/73/, "61 of 73 roster students joined in the seed");
   // Cohort tabs filter the table.
-  await tpo.getByRole("tab", { name: /4th year/ }).click();
+  await tpo.getByRole("button", { name: /4th year/ }).click();
   assert.match(await tpo.locator("main").innerText(), /Showing \d+ of 61/);
 });
 
 test("officer: builds a live drive that shows only Sana", async () => {
   await tpo.goto(`${BASE}/college/drives/new`);
   await tpo.getByLabel("Name").fill("E2E campus drive");
-  await tpo.getByLabel("Opens (IST)").fill(istInput(-5));
-  await tpo.getByLabel("Closes (IST)").fill(istInput(120));
+  await fillIst(tpo, "Opens (IST)", -5);
+  await fillIst(tpo, "Closes (IST)", 120);
   await tpo.getByLabel("Minimum Findtern score").fill("10"); // nobody scores a perfect 10, so nobody qualifies by rule…
   await tpo.getByRole("tab", { name: /^Left out/ }).click();
   await tpo.getByPlaceholder("Search").fill("Sana");
@@ -171,8 +179,9 @@ test("officer: sees Sana online and the employer inside; closes the link", async
   await main.getByText("Northwind Labs").waitFor();
   assert.match(await main.innerText(), calendar ? /1 shortlisted · 1 call\b/ : /1 shortlisted · 0 calls/);
   await main.getByText(/^1\s*\/1$/).waitFor(); // presence: 1 of 1 eligible online
-  tpo.once("dialog", (d) => d.accept());
+  // Confirmed in the page now, not a browser dialog.
   await tpo.getByRole("button", { name: "Close link now" }).click();
+  await tpo.getByRole("button", { name: "Yes, close the link" }).click();
   await main.getByText("Closed. No employer can get in.").waitFor();
 });
 

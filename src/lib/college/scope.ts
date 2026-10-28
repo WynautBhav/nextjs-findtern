@@ -274,7 +274,7 @@ export async function eligibleStudents(drive: Drive): Promise<CollegeStudent[]> 
 export async function driveForEmployer(
   driveId: string,
   session: SessionData | null,
-): Promise<{ drive: Drive; college: typeof schema.colleges.$inferSelect; access: AccessResult } | null> {
+): Promise<{ drive: Drive; college: typeof schema.colleges.$inferSelect; joined: boolean; access: AccessResult } | null> {
   const db = getDb();
   const [row] = await db
     .select({ drive: schema.collegeDrives, college: schema.colleges })
@@ -292,7 +292,7 @@ export async function driveForEmployer(
       .limit(1);
     joined = Boolean(j);
   }
-  return { ...row, access: checkDriveAccess({ drive: row.drive, session, joined }) };
+  return { ...row, joined, access: checkDriveAccess({ drive: row.drive, session, joined }) };
 }
 
 /** The drive's own college, for a placement officer's write. Null when not theirs. */

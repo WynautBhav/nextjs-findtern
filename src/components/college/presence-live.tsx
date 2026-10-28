@@ -6,6 +6,7 @@ import { Radio } from "lucide-react";
 
 import { Pill } from "@/components/app/primitives";
 import { NudgeButton } from "./nudge-button";
+import { shortDateTime } from "@/lib/format";
 
 type Snapshot = {
   total: number;
@@ -24,11 +25,14 @@ const SHOW_OFFLINE = 12;
 export function PresenceLive({
   driveId,
   driveTitle,
+  showTitle = true,
   endsAt,
   initial,
 }: {
   driveId: string;
   driveTitle: string;
+  /** Off on the drive's own page, whose heading already names it. */
+  showTitle?: boolean;
   endsAt: string;
   initial: Snapshot;
 }) {
@@ -68,13 +72,17 @@ export function PresenceLive({
             </span>
             Drive live
           </p>
-          <h2 id="live-drive" className="mt-1 text-lg font-semibold tracking-[-0.02em] text-ink-900">
-            <Link href={`/college/drives/${driveId}`} className="hover:text-brand-700">
-              {driveTitle}
-            </Link>
-          </h2>
+          {showTitle ? (
+            <h2 id="live-drive" className="mt-1 text-lg font-semibold tracking-[-0.02em] text-ink-900">
+              <Link href={`/college/drives/${driveId}`} className="hover:text-brand-700">
+                {driveTitle}
+              </Link>
+            </h2>
+          ) : (
+            <h2 id="live-drive" className="sr-only">{driveTitle}, live</h2>
+          )}
           <p className="mt-0.5 text-sm text-text-subtle">
-            Open until {ends.toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}
+            Open until {shortDateTime(ends, { timeZone: "Asia/Kolkata", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}
           </p>
         </div>
         <Pill tone={conn === "live" ? "live" : "waiting"}>
@@ -104,8 +112,12 @@ export function PresenceLive({
           </div>
           {snap.offline.length > 0 ? (
             <p className="mt-3 text-sm text-ink-700">
-              <span className="nums font-semibold">{snap.alertable}</span> more can get a phone alert;{" "}
-              <span className="nums font-semibold">{snap.offline.length - snap.alertable}</span> only see a nudge when they next open Findtern.
+              {/* Said plainly; it read "0 more can get a phone alert; 35 only see…". */}
+              {snap.alertable === 0
+                ? "None of them has call alerts on, so a nudge reaches them when they next open Findtern."
+                : snap.alertable === snap.offline.length
+                  ? "All of them have call alerts on: a nudge reaches their phone now."
+                  : `${snap.alertable} of them get a nudge on their phone now; the rest when they next open Findtern.`}
             </p>
           ) : null}
         </div>
@@ -120,6 +132,7 @@ export function PresenceLive({
                 kind="online"
                 userIds={snap.offline.map((o) => o.userId)}
                 label={snap.offline.length === 1 ? "Nudge" : `Nudge all ${snap.offline.length}`}
+                emphasis
               />
             ) : null}
           </div>

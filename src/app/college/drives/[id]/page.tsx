@@ -1,8 +1,7 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
 
-import { AdminPageHeader, Panel, PanelBody, PanelHeader } from "@/components/admin/panel";
+import { Panel, PanelBody, PanelHeader } from "@/components/admin/panel";
+import { PageHead } from "@/components/app/primitives";
 import { DriveBuilder } from "@/components/college/drive-builder";
 import { toLocalInput } from "@/lib/college/ist";
 import { LinkActions } from "@/components/college/link-actions";
@@ -40,16 +39,13 @@ export default async function DrivePage({ params }: { params: Promise<{ id: stri
 
   return (
     <div className="space-y-6">
-      <Link href="/college/drives" className="inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-ink-600 hover:text-brand-700">
-        <ArrowLeft className="size-4" aria-hidden /> All drives
-      </Link>
-      <AdminPageHeader
+      <PageHead
         title={drive.title}
-        subtitle={`${DRIVE_KIND_LABEL[drive.kind] ?? drive.kind} · ${WINDOW_LABEL[w]} · ${eligible.length} ${eligible.length === 1 ? "student" : "students"} visible to employers`}
+        lede={`${DRIVE_KIND_LABEL[drive.kind] ?? drive.kind} · ${WINDOW_LABEL[w]} · ${eligible.length} ${eligible.length === 1 ? "student" : "students"} visible to employers`}
       />
 
       {presence ? (
-        <PresenceLive driveId={drive.id} driveTitle={drive.title} endsAt={drive.endsAt.toISOString()} initial={presence} />
+        <PresenceLive driveId={drive.id} driveTitle={drive.title} showTitle={false} endsAt={drive.endsAt.toISOString()} initial={presence} />
       ) : null}
 
       <div className="grid gap-6 lg:grid-cols-2">
@@ -95,6 +91,16 @@ export default async function DrivePage({ params }: { params: Promise<{ id: stri
         </Panel>
       </div>
 
+      {/* Folded: the page is about the drive running, and editing is the
+          rare case (it was 2,500px open under everything). Gone once the
+          drive is over or its link is closed. */}
+      {w === "ended" || w === "revoked" ? null : (
+      <details className="group rounded-apple-xl border border-ink-200/80 bg-white shadow-xs">
+        <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between px-5 text-sm font-semibold text-ink-900 hover:bg-ink-50">
+          Edit dates and eligibility
+          <span aria-hidden className="font-medium text-brand-700 group-open:hidden">Open</span>
+        </summary>
+        <div className="border-t border-ink-100 p-5">
       <DriveBuilder
         collegeId={ctx.college.id}
         collegeName={ctx.college.name}
@@ -116,6 +122,9 @@ export default async function DrivePage({ params }: { params: Promise<{ id: stri
           excludeUserIds: drive.excludeUserIds,
         }}
       />
+        </div>
+      </details>
+      )}
     </div>
   );
 }

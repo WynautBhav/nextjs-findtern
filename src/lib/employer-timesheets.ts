@@ -1,3 +1,5 @@
+import { shortDate } from "./format.ts";
+
 /**
  * Timesheet entry normalisation.
  *
@@ -71,12 +73,12 @@ export type DayEntry = { date: string; status: string };
  */
 export function formatPeriodDay(value: Date | null, withYear = true): string {
   if (!value) return "-";
-  return new Date(value).toLocaleDateString("en-IN", {
+  return shortDate(new Date(value), {
     day: "numeric",
     month: "short",
     ...(withYear ? { year: "numeric" } : {}),
     timeZone: "UTC",
-  }).replace(/\bSept\b/, "Sep");
+  });
 }
 
 export function formatPeriod(start: Date | null, end: Date | null): string {
@@ -87,12 +89,12 @@ export function formatPeriod(start: Date | null, end: Date | null): string {
 /** A real instant (submitted, approved), in India time. */
 export function formatDay(value: Date | null): string {
   if (!value) return "-";
-  return new Date(value).toLocaleDateString("en-IN", {
+  return shortDate(new Date(value), {
     day: "numeric",
     month: "short",
     year: "numeric",
     timeZone: "Asia/Kolkata",
-  }).replace(/\bSept\b/, "Sep");
+  });
 }
 
 /** One-letter codes for the review grid. */

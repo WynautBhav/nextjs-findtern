@@ -7,7 +7,7 @@ import { Search } from "lucide-react";
 import { ONLINE_WINDOW_MS } from "@/lib/college/constants";
 import { COHORTS, aiStatusLabel, ago, yearLabel } from "@/lib/college/labels";
 import { cn } from "@/lib/utils";
-import { Pill } from "@/components/app/primitives";
+import { Pill, pillTabClass } from "@/components/app/primitives";
 import { NudgeButton } from "./nudge-button";
 import type { StudentRow } from "./types";
 
@@ -23,7 +23,7 @@ const FILTERS: { id: Filter; label: string }[] = [
 
 const WEEK = 7 * 86400_000;
 /** Rows rendered before "Show all": a 500-student college was a 1 MB page. */
-const PAGE = 60;
+const PAGE = 50;
 
 export function StudentTable({ students, now }: { students: StudentRow[]; now: number }) {
   const [cohort, setCohort] = useState<number | "all">("all");
@@ -80,26 +80,24 @@ export function StudentTable({ students, now }: { students: StudentRow[]; now: n
           </label>
         </div>
 
-        <div role="tablist" aria-label="Cohort" className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-0.5">
+        {/* The console's one pill-tab look, one line each (the cohort goal
+            under every tab made it two lines tall). They filter one list,
+            so they're pressed buttons, not tabs. */}
+        <div role="group" aria-label="Cohort" className="flex flex-wrap gap-1">
           {[{ year: "all" as const, label: "All years", goal: "" }, ...COHORTS].map((c) => {
             const active = cohort === c.year;
             const n = counts[String(c.year)] ?? 0;
             return (
               <button
                 key={String(c.year)}
-                role="tab"
-                aria-selected={active}
+                aria-pressed={active}
                 type="button"
+                title={c.goal || undefined}
                 onClick={() => setCohort(c.year)}
-                className={cn(
-                  "apple-spring flex min-h-11 shrink-0 flex-col items-start justify-center rounded-apple-sm px-3 py-1.5 text-left",
-                  active ? "bg-brand-950 text-white" : "text-ink-700 hover:bg-ink-100",
-                )}
+                className={pillTabClass(active)}
               >
-                <span className="text-sm font-semibold">
-                  {c.label} <span className={cn("nums font-medium", active ? "text-white/80" : "text-ink-600")}>{n}</span>
-                </span>
-                {c.goal ? <span className={cn("text-xs", active ? "text-white/70" : "text-text-subtle")}>{c.goal}</span> : null}
+                {c.label}
+                <span className={cn("nums text-xs", active ? "text-white/75" : "text-text-subtle")}>{n}</span>
               </button>
             );
           })}
@@ -112,12 +110,7 @@ export function StudentTable({ students, now }: { students: StudentRow[]; now: n
               type="button"
               aria-pressed={filter === f.id}
               onClick={() => setFilter(f.id)}
-              className={cn(
-                "min-h-11 rounded-full border px-3 text-sm font-medium",
-                filter === f.id
-                  ? "border-brand-700 bg-brand-50 text-brand-800"
-                  : "border-ink-200 text-ink-700 hover:border-ink-300 hover:bg-ink-50",
-              )}
+              className={pillTabClass(filter === f.id)}
             >
               {f.label}
             </button>
@@ -186,8 +179,7 @@ export function StudentTable({ students, now }: { students: StudentRow[]; now: n
         </div>
       ) : null}
       <p className="border-t border-ink-100 px-5 py-3 text-xs text-text-subtle">
-        Showing <span className="nums">{shown.length}</span> of <span className="nums">{students.length}</span>. Read-only: you
-        can chase students, but their profiles, scores and offers are theirs to change.
+        Showing <span className="nums">{shown.length}</span> of <span className="nums">{students.length}</span>.
       </p>
     </section>
   );
@@ -218,9 +210,13 @@ function Ai({ s }: { s: StudentRow }) {
 
 function Row({ s, now }: { s: StudentRow; now: number }) {
   return (
-    <tr className="hover:bg-ink-50/60">
+    // The row opens the student: the name's link is stretched over it.
+    <tr className="relative hover:bg-ink-50/60">
       <td className="px-5 py-3">
-        <Link href={`/college/students/${s.userId}`} className="font-medium text-ink-900 hover:text-brand-700">
+        <Link
+          href={`/college/students/${s.userId}`}
+          className="font-medium text-ink-900 outline-none after:absolute after:inset-0 after:content-[''] hover:text-brand-700 focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-brand-500"
+        >
           {s.name || s.email}
         </Link>
         <p className="mt-0.5 text-xs text-text-subtle">
@@ -237,7 +233,7 @@ function Row({ s, now }: { s: StudentRow; now: number }) {
       </td>
       <td className="px-3 py-3">
         {s.offersPending > 0 ? (
-          <span className="inline-flex flex-wrap items-center gap-2">
+          <span className="relative z-10 inline-flex flex-wrap items-center gap-2">
             <Pill tone="waiting" className="nums">
               {s.offersPending} waiting
             </Pill>
@@ -256,9 +252,12 @@ function Row({ s, now }: { s: StudentRow; now: number }) {
 
 function MobileRow({ s, now }: { s: StudentRow; now: number }) {
   return (
-    <div className="flex items-start justify-between gap-3">
+    <div className="relative flex items-start justify-between gap-3">
       <div className="min-w-0">
-        <Link href={`/college/students/${s.userId}`} className="font-medium text-ink-900">
+        <Link
+          href={`/college/students/${s.userId}`}
+          className="font-medium text-ink-900 outline-none after:absolute after:inset-0 after:content-[''] focus-visible:after:ring-2 focus-visible:after:ring-brand-500"
+        >
           {s.name || s.email}
         </Link>
         <p className="mt-0.5 truncate text-xs text-text-subtle">
@@ -268,7 +267,7 @@ function MobileRow({ s, now }: { s: StudentRow; now: number }) {
           <Online at={s.lastSeenAt ?? s.lastActivityAt} now={now} />
         </p>
         {s.offersPending > 0 ? (
-          <div className="mt-2 flex items-center gap-2">
+          <div className="relative z-10 mt-2 flex items-center gap-2">
             <Pill tone="waiting" className="nums">
               {s.offersPending} offer waiting
             </Pill>

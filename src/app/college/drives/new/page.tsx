@@ -1,4 +1,4 @@
-import { AdminPageHeader } from "@/components/admin/panel";
+import { PageHead } from "@/components/app/primitives";
 import { DriveBuilder } from "@/components/college/drive-builder";
 import { toLocalInput } from "@/lib/college/ist";
 import { requireCollegeContext, studentsForCollegeAdmin } from "@/lib/college/scope";
@@ -17,7 +17,7 @@ export default async function NewDrivePage() {
 
   return (
     <div className="space-y-6">
-      <AdminPageHeader title="New drive" subtitle="Takes two minutes. You can change dates and eligibility later without a new link." />
+      <PageHead title="New drive" lede="Takes two minutes. You can change dates and eligibility later without a new link." />
       <DriveBuilder
         collegeId={ctx.college.id}
         collegeName={ctx.college.name}

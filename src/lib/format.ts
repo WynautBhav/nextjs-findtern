@@ -84,9 +84,18 @@ export const formatCurrency = formatMoney;
 
 /**
  * Three-letter months everywhere ("Sep", not en-IN's "Sept"; decided 28 Oct).
- * en-IN date output has every other part we want, so short-month calls across
- * the app take a `.replace(/\bSept\b/, "Sep")` on the result.
+ * en-IN output has every other part we want; these two are the only places
+ * that rule lives, so call sites use them rather than toLocale*String.
  */
+export function shortDate(date: Date, options: Intl.DateTimeFormatOptions): string {
+  return date.toLocaleDateString("en-IN", options).replace(/\bSept\b/g, "Sep");
+}
+
+/** As shortDate, for date and time together (toLocaleString). */
+export function shortDateTime(date: Date, options: Intl.DateTimeFormatOptions): string {
+  return date.toLocaleString("en-IN", options).replace(/\bSept\b/g, "Sep");
+}
+
 export function formatDate(iso: string | Date | null | undefined): string {
   if (!iso) return "-";
   const date = typeof iso === "string" ? new Date(iso) : iso;

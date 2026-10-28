@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 import { ShareLink } from "./share-link";
 import type { StudentRow } from "./types";
 import { buttonClass } from "@/components/ui/button";
+import { DmyDateInput } from "@/components/app/dmy-date-input";
 
 export type DriveDraft = {
   id?: string;
@@ -167,15 +168,8 @@ export function DriveBuilder({
             </div>
           </fieldset>
 
-          <label className="block">
-            <span className="text-sm font-medium text-ink-800">Opens (IST)</span>
-            <input type="datetime-local" className={cn(field, "mt-1.5")} value={d.startsAt} onChange={(e) => set("startsAt", e.target.value)} required />
-          </label>
-          <label className="block">
-            <span className="text-sm font-medium text-ink-800">Closes (IST)</span>
-            <input type="datetime-local" className={cn(field, "mt-1.5")} value={d.endsAt} onChange={(e) => set("endsAt", e.target.value)} required />
-            <span className="mt-1 block text-xs text-text-subtle">The link stops working at this time.</span>
-          </label>
+          <IstDateTime label="Opens (IST)" value={d.startsAt} onChange={(v) => set("startsAt", v)} field={field} />
+          <IstDateTime label="Closes (IST)" value={d.endsAt} onChange={(v) => set("endsAt", v)} field={field} hint="The link stops working at this time." />
 
           <label className="block md:col-span-2">
             <span className="text-sm font-medium text-ink-800">Note for employers <span className="font-normal text-text-subtle">(optional)</span></span>
@@ -339,5 +333,51 @@ export function DriveBuilder({
         </p>
       </div>
     </form>
+  );
+}
+
+/**
+ * A date (DD/MM/YYYY, the product format) and a time, in IST. The browser's
+ * datetime-local showed "10/28/2026, 09:54 AM" in an en-US browser (critique
+ * P1). Reads and writes the same "YYYY-MM-DDTHH:mm" IST value as before.
+ */
+function IstDateTime({
+  label,
+  value,
+  onChange,
+  field,
+  hint,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  field: string;
+  hint?: string;
+}) {
+  const date = value.slice(0, 10);
+  const time = value.slice(11, 16) || "09:00";
+  return (
+    <fieldset className="min-w-0">
+      <legend className="text-sm font-medium text-ink-800">{label}</legend>
+      <div className="mt-1.5 grid grid-cols-[minmax(0,1fr)_7.5rem] gap-2">
+        <DmyDateInput
+          aria-label={`${label}, date`}
+          className={field}
+          value={date}
+          onChange={(iso) => onChange(iso ? `${iso}T${time}` : "")}
+          required
+        />
+        <input
+          type="time"
+          aria-label={`${label}, time`}
+          className={field}
+          value={time}
+          step={900}
+          onChange={(e) => onChange(date ? `${date}T${e.target.value || "09:00"}` : "")}
+          required
+        />
+      </div>
+      {hint ? <span className="mt-1 block text-xs text-text-subtle">{hint}</span> : null}
+    </fieldset>
   );
 }

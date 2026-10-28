@@ -17,12 +17,15 @@ export function NudgeButton({
   kind,
   label = "Nudge",
   size = "sm",
+  emphasis = false,
   className,
 }: {
   userIds: string[];
   kind: Kind;
   label?: string;
   size?: "sm" | "xs";
+  /** The one thing to do on the screen (Nudge all during a live drive): amber. */
+  emphasis?: boolean;
   className?: string;
 }) {
   const [state, setState] = useState<"idle" | "sending" | "done" | "error">("idle");
@@ -74,7 +77,9 @@ export function NudgeButton({
           size === "sm" ? "min-h-11 px-3 text-sm" : "min-h-11 px-2.5 text-xs",
           done
             ? "border-brand-200 bg-brand-50 text-brand-800"
-            : "border-ink-200 bg-white text-ink-800 shadow-2xs hover:border-ink-300 hover:bg-ink-50",
+            : emphasis
+              ? "border-transparent bg-accent text-brand-950 shadow-sm hover:bg-accent-600 hover:text-white [&_svg]:text-current"
+              : "border-ink-200 bg-white text-ink-800 shadow-2xs hover:border-ink-300 hover:bg-ink-50",
           className,
         )}
       >
