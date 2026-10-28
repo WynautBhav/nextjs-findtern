@@ -156,3 +156,14 @@ branch, not to be touched: `feat/college-partners` (worktree
   closed; its QA-002 retest check merged as `cc0b76b`). A new Sonnet session
   (nextjs-findtern-48) took over as tester with a private QA Postgres on
   :5436 (findtern_qa, migrated 27 Oct copy) prepared by the orchestrator.
+- 28 Oct (after an ~8 h orchestrator gap): merged Tester A (QA-002 closed
+  on retest), Tester B (QA-003..016 reproduced with steps/traces; QA-007 is
+  three causes, one a real SQL defect in admin/companies; bug sheet 7 walked:
+  147 pass, 1 fail, 18 unclear, 16 n/a; QA-100..117 from the 375 px pass,
+  three P1: header overflow, employer-signup phone field, Ask-me covering
+  inputs), and the builder's WP2 employer group (FilterTabs, RowMenu,
+  aligned rows, Ask me in the top bar; slop scan 0 hits; approved with two
+  density notes). HEAD f58fb33: tsc, lint 0 errors, test 426, security 100,
+  build green. Tester A session 5a exited; 5b took over its worktree. The
+  orchestrator's own QA Postgres on :5436 was removed (tmp filesystem full).
+  Ledger: 34 entries, 2 closed, 7 P1 open.
