@@ -221,11 +221,14 @@ export default async function InternTimesheets({
               }
             />
           ) : (
-            <ul className="space-y-3">
-              {sheets.map((sheet) => (
-                <SheetRow key={sheet.id} sheet={sheet} />
-              ))}
-            </ul>
+            // One list of aligned rows, not a 150px card per month (critique).
+            <Surface className="overflow-hidden">
+              <ul className="divide-y divide-ink-100">
+                {sheets.map((sheet) => (
+                  <SheetRow key={sheet.id} sheet={sheet} />
+                ))}
+              </ul>
+            </Surface>
           )}
         </section>
 
@@ -234,7 +237,7 @@ export default async function InternTimesheets({
             <SectionHead title="Next timesheet" />
             {"error" in next ? (
               <p className="text-pretty text-sm leading-relaxed text-ink-600">
-                {upcoming ? `Opens on ${formatPeriodStart(upcoming.start)} (${formatPeriodDays(upcoming.start, upcoming.end)}).` : next.error}
+                {upcoming ? `Covers ${formatPeriodDays(upcoming.start, upcoming.end)}; opens on its first day.` : next.error}
               </p>
             ) : (
               <>
@@ -243,6 +246,8 @@ export default async function InternTimesheets({
               </>
             )}
           </Surface>
+          {/* The tutorial is for before the first sheet, not a permanent rail. */}
+          {sheets.length === 0 ? (
           <Surface className="p-5">
             <SectionHead title="How it works" />
             <ol className="space-y-3">
@@ -261,6 +266,7 @@ export default async function InternTimesheets({
               ))}
             </ol>
           </Surface>
+          ) : null}
         </aside>
       </div>
     </div>
@@ -284,35 +290,38 @@ function SheetRow({ sheet }: { sheet: TimesheetRow }) {
   const href = `/intern/timesheets?sheet=${encodeURIComponent(sheet.id)}`;
 
   return (
-    <li>
-      <Surface className="p-4 sm:p-5">
-        <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
-          <div className="min-w-0">
-            <p className="nums text-[0.9375rem] font-semibold text-ink-900">
-              {formatPeriodDays(sheet.periodStart, sheet.periodEnd) || "A period"}
-            </p>
-            <p className="mt-0.5 text-sm text-ink-600">{meta}</p>
-          </div>
-          <Pill tone={sheetTone(sheet.status)}>{sheetLabel(sheet.status)}</Pill>
-        </div>
-
-        {editable && sheet.managerNote ? (
-          <div className="mt-3 rounded-apple-md border-l-2 border-accent-400 bg-accent-100/40 py-2.5 pl-4 pr-3">
-            <p className="text-xs font-semibold text-accent-700">From your manager</p>
-            <p className="mt-1 text-pretty text-sm leading-relaxed text-ink-800">{sheet.managerNote}</p>
-          </div>
-        ) : null}
-
-        <div className="mt-4 flex flex-wrap items-center gap-2">
-          <Link href={href} className={buttonClass({ variant: editable ? "primary" : "outline", size: "sm", className: "h-11 px-4" })}>
-            {editable ? "Edit" : "View"}
-            <ArrowRight className="size-4" aria-hidden />
+    <li className="relative px-5 py-4 transition-colors hover:bg-ink-50/70">
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+        <div className="min-w-0">
+          {/* The row opens the sheet: the period's link is stretched over it. */}
+          <Link
+            href={href}
+            className="nums text-[0.9375rem] font-semibold text-ink-900 outline-none after:absolute after:inset-0 after:content-[''] focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-brand-500"
+          >
+            {formatPeriodDays(sheet.periodStart, sheet.periodEnd) || "A period"}
           </Link>
+          <p className="mt-0.5 text-sm text-ink-600">{meta}</p>
+        </div>
+        <div className="relative z-10 flex items-center gap-2">
+          <Pill tone={sheetTone(sheet.status)}>{sheetLabel(sheet.status)}</Pill>
+          {editable ? (
+            <Link href={href} className={buttonClass({ variant: "primary", size: "sm" })}>
+              Edit
+              <ArrowRight className="size-4" aria-hidden />
+            </Link>
+          ) : null}
           {status === "draft" || status === "submitted" ? (
             <DeleteSheetButton timesheetId={sheet.id} withdraw={status === "submitted"} />
           ) : null}
         </div>
-      </Surface>
+      </div>
+
+      {editable && sheet.managerNote ? (
+        <div className="relative z-10 mt-3 rounded-apple-md bg-accent-50 px-4 py-2.5">
+          <p className="text-xs font-semibold text-accent-700">From your manager</p>
+          <p className="mt-1 text-pretty text-sm leading-relaxed text-ink-800">{sheet.managerNote}</p>
+        </div>
+      ) : null}
     </li>
   );
 }
