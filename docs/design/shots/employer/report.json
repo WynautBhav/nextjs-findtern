@@ -1,0 +1,212 @@
+[
+  {
+    "role": "employer",
+    "width": 390,
+    "route": "/employer/account",
+    "finalUrl": "/employer/account",
+    "problems": [
+      "console: Failed to load resource: net::ERR_CONNECTION_RESET",
+      "console: Failed to load resource: net::ERR_CONNECTION_RESET"
+    ]
+  },
+  {
+    "role": "employer",
+    "width": 768,
+    "route": "/employer/account",
+    "finalUrl": "/employer/account",
+    "problems": [
+      "console: Failed to load resource: net::ERR_CONNECTION_RESET",
+      "console: Failed to load resource: net::ERR_CONNECTION_RESET"
+    ]
+  },
+  {
+    "role": "employer",
+    "width": 1440,
+    "route": "/employer/account",
+    "finalUrl": "/employer/account",
+    "problems": [
+      "console: Failed to load resource: net::ERR_CONNECTION_RESET",
+      "console: Failed to load resource: net::ERR_CONNECTION_RESET"
+    ]
+  },
+  {
+    "role": "employer",
+    "width": 390,
+    "route": "/employer/alerts",
+    "finalUrl": "/employer/alerts",
+    "problems": [
+      "console: Failed to load resource: net::ERR_CONNECTION_RESET",
+      "console: Failed to load resource: net::ERR_CONNECTION_RESET"
+    ]
+  },
+  {
+    "role": "employer",
+    "width": 768,
+    "route": "/employer/alerts",
+    "finalUrl": "/employer/alerts",
+    "problems": [
+      "console: Failed to load resource: net::ERR_CONNECTION_RESET",
+      "console: Failed to load resource: net::ERR_CONNECTION_RESET"
+    ]
+  },
+  {
+    "role": "employer",
+    "width": 1440,
+    "route": "/employer/alerts",
+    "finalUrl": "/employer/alerts",
+    "problems": [
+      "console: Failed to load resource: net::ERR_CONNECTION_RESET",
+      "console: Failed to load resource: net::ERR_CONNECTION_RESET"
+    ]
+  },
+  {
+    "role": "employer",
+    "width": 390,
+    "route": "/employer/candidates",
+    "finalUrl": "/employer/candidates",
+    "problems": [
+      "console: Failed to load resource: net::ERR_CONNECTION_RESET",
+      "console: Failed to load resource: net::ERR_CONNECTION_RESET"
+    ]
+  },
+  {
+    "role": "employer",
+    "width": 768,
+    "route": "/employer/candidates",
+    "finalUrl": "/employer/candidates",
+    "problems": [
+      "console: Failed to load resource: net::ERR_CONNECTION_RESET",
+      "console: Failed to load resource: net::ERR_CONNECTION_RESET"
+    ]
+  },
+  {
+    "role": "employer",
+    "width": 1440,
+    "route": "/employer/candidates",
+    "finalUrl": "/employer/candidates",
+    "problems": [
+      "console: Failed to load resource: net::ERR_CONNECTION_RESET",
+      "console: Failed to load resource: net::ERR_CONNECTION_RESET"
+    ]
+  },
+  {
+    "role": "employer",
+    "width": 390,
+    "route": "/employer/cart",
+    "finalUrl": "/employer/cart",
+    "problems": [
+      "console: Failed to load resource: net::ERR_CONNECTION_RESET",
+      "console: Failed to load resource: net::ERR_CONNECTION_RESET"
+    ]
+  },
+  {
+    "role": "employer",
+    "width": 768,
+    "route": "/employer/cart",
+    "finalUrl": "/employer/cart",
+    "problems": [
+      "console: Failed to load resource: net::ERR_CONNECTION_RESET",
+      "console: Failed to load resource: net::ERR_CONNECTION_RESET"
+    ]
+  },
+  {
+    "role": "employer",
+    "width": 1440,
+    "route": "/employer/cart",
+    "finalUrl": "/employer/cart",
+    "problems": [
+      "console: Failed to load resource: net::ERR_CONNECTION_RESET",
+      "console: Failed to load resource: net::ERR_CONNECTION_RESET"
+    ]
+  },
+  {
+    "role": "employer",
+    "width": 390,
+    "route": "/employer/dashboard",
+    "finalUrl": "/employer/dashboard",
+    "problems": [
+      "console: Failed to load resource: net::ERR_CONNECTION_RESET",
+      "console: Failed to load resource: net::ERR_CONNECTION_RESET"
+    ]
+  },
+  {
+    "role": "employer",
+    "width": 768,
+    "route": "/employer/dashboard",
+    "finalUrl": "/employer/dashboard",
+    "problems": [
+      "console: Failed to load resource: net::ERR_CONNECTION_RESET",
+      "console: Failed to load resource: net::ERR_CONNECTION_RESET"
+    ]
+  },
+  {
+    "role": "employer",
+    "width": 1440,
+    "route": "/employer/dashboard",
+    "finalUrl": "/employer/dashboard",
+    "problems": [
+      "console: Failed to load resource: net::ERR_CONNECTION_RESET",
+      "console: Failed to load resource: net::ERR_CONNECTION_RESET"
+    ]
+  },
+  {
+    "role": "employer",
+    "width": 390,
+    "route": "/employer/orders",
+    "finalUrl": "/employer/orders",
+    "problems": [
+      "console: Failed to load resource: net::ERR_CONNECTION_RESET",
+      "console: Failed to load resource: net::ERR_CONNECTION_RESET"
+    ]
+  },
+  {
+    "role": "employer",
+    "width": 768,
+    "route": "/employer/orders",
+    "finalUrl": "/employer/orders",
+    "problems": [
+      "console: Failed to load resource: net::ERR_CONNECTION_RESET",
+      "console: Failed to load resource: net::ERR_CONNECTION_RESET"
+    ]
+  },
+  {
+    "role": "employer",
+    "width": 1440,
+    "route": "/employer/orders",
+    "finalUrl": "/employer/orders",
+    "problems": [
+      "console: Failed to load resource: net::ERR_CONNECTION_RESET",
+      "console: Failed to load resource: net::ERR_CONNECTION_RESET"
+    ]
+  },
+  {
+    "role": "employer",
+    "width": 390,
+    "route": "/employer/schedule",
+    "finalUrl": "/employer/schedule",
+    "problems": [
+      "console: Failed to load resource: net::ERR_CONNECTION_RESET",
+      "console: Failed to load resource: net::ERR_CONNECTION_RESET"
+    ]
+  },
+  {
+    "role": "employer",
+    "width": 768,
+    "route": "/employer/schedule",
+    "finalUrl": "/employer/schedule",
+    "problems": [
+      "console: Failed to load resource: net::ERR_CONNECTION_RESET",
+      "console: Failed to load resource: net::ERR_CONNECTION_RESET"
+    ]
+  },
+  {
+    "role": "employer",
+    "width": 1440,
+    "route": "/employer/schedule",
+    "finalUrl": "/employer/schedule",
+    "problems": [
+      "console: Failed to load resource: net::ERR_CONNECTION_RESET",
+      "console: Failed to load resource: net::ERR_CONNECTION_RESET"
+    ]
+  }
+]
