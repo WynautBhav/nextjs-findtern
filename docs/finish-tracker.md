@@ -210,3 +210,11 @@ branch, not to be touched: `feat/college-partners` (worktree
   group. Open P1 now: QA-004 (Opus), QA-005/006 (awaiting retest),
   QA-111 (needs a real Safari), QA-137 and QA-138 (both wait on owner
   answers 9 and 10 in docs/qa/owner-questions.md).
+- 28 Oct (late morning): QA-005, QA-006 and QA-133 closed by Tester B on
+  dc941df. QA-150 (soft 404 on unknown drive tokens, also blog slugs) took
+  two attempts: a metadata-time lookup could not set the status (metadata
+  streams), so the root `loading.tsx` is gone and only the four consoles
+  keep a loading boundary; verified 404 locally on a production build.
+  The local e2e Postgres on :5433 was migrated to 0007 (it lacked the
+  college tables). Master pushed; Tester B retests QA-150 then waits for
+  the intern merge.
