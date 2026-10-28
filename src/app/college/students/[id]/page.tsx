@@ -13,6 +13,7 @@ import { getDb, schema } from "@/lib/db";
 import { parseOffer } from "@/lib/offer";
 import { realEmployerId } from "@/lib/admin/scope";
 import { shortDateTime } from "@/lib/format";
+import { buttonClass } from "@/components/ui/button";
 
 export const dynamic = "force-dynamic";
 
@@ -133,7 +134,7 @@ export default async function CollegeStudentPage({ params }: { params: Promise<{
                   href={`/api/college/students/${id}/report`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="apple-spring apple-pressable inline-flex min-h-11 items-center gap-2 rounded-apple-sm border border-ink-200 bg-white px-4 text-sm font-medium text-ink-800 shadow-2xs hover:bg-ink-50"
+                  className={buttonClass({ variant: "outline", size: "sm" })}
                 >
                   <FileText className="size-4 text-brand-700" aria-hidden /> Open report
                 </a>
@@ -143,7 +144,7 @@ export default async function CollegeStudentPage({ params }: { params: Promise<{
                   href={`/api/college/students/${id}/recording`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="apple-spring apple-pressable inline-flex min-h-11 items-center gap-2 rounded-apple-sm border border-ink-200 bg-white px-4 text-sm font-medium text-ink-800 shadow-2xs hover:bg-ink-50"
+                  className={buttonClass({ variant: "outline", size: "sm" })}
                 >
                   <PlayCircle className="size-4 text-brand-700" aria-hidden /> Watch recording
                 </a>

@@ -1,32 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import { Check, Copy } from "lucide-react";
+import { shortDateTime } from "@/lib/format";
+import { CopyText } from "./copy-text";
 
-import { cn } from "@/lib/utils";
-
-function CopyButton({ text, label }: { text: string; label: string }) {
-  const [done, setDone] = useState(false);
-  return (
-    <button
-      type="button"
-      onClick={async () => {
-        try {
-          await navigator.clipboard.writeText(text);
-          setDone(true);
-          setTimeout(() => setDone(false), 2000);
-        } catch {}
-      }}
-      className={cn(
-        "apple-spring apple-pressable inline-flex min-h-11 items-center gap-1.5 rounded-apple-sm px-3.5 text-sm font-medium",
-        done ? "bg-brand-50 text-brand-800" : "bg-brand-700 text-white hover:bg-brand-600",
-      )}
-    >
-      {done ? <Check className="size-4" aria-hidden /> : <Copy className="size-4" aria-hidden />}
-      <span aria-live="polite">{done ? "Copied" : label}</span>
-    </button>
-  );
-}
 
 /**
  * The drive link, shown once. Only its hash is stored, so if the officer
@@ -47,7 +23,8 @@ export function ShareLink({
   endsAt: string;
   kind: string;
 }) {
-  const fmt = (iso: string) => new Date(iso).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "numeric", month: "long", hour: "numeric", minute: "2-digit" });
+  // Three-letter month with the year, like every other date (it was "4 November").
+  const fmt = (iso: string) => `${shortDateTime(new Date(iso), { timeZone: "Asia/Kolkata", day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" })} IST`;
   const message = [
     `Dear hiring team,`,
     ``,
@@ -77,7 +54,7 @@ export function ShareLink({
           onFocus={(e) => e.currentTarget.select()}
           className="h-11 min-w-0 flex-1 rounded-apple-sm border border-ink-200 bg-white px-3 font-mono text-sm text-ink-800"
         />
-        <CopyButton text={url} label="Copy link" />
+        <CopyText primary text={url} label="Copy link" />
       </div>
       <details className="group">
         <summary className="cursor-pointer text-sm font-medium text-brand-800">Invitation message for employers</summary>
@@ -85,7 +62,7 @@ export function ShareLink({
           {message}
         </pre>
         <div className="mt-2">
-          <CopyButton text={message} label="Copy message" />
+          <CopyText primary text={message} label="Copy message" />
         </div>
       </details>
     </div>

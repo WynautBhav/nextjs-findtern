@@ -3,22 +3,31 @@
 import { useState } from "react";
 import { Check, Copy } from "lucide-react";
 
-export function CopyText({ text, label }: { text: string; label: string }) {
-  const [done, setDone] = useState(false);
+import { buttonClass } from "@/components/ui/button";
+
+/**
+ * One copy button for the college screens (there were two). A copy that
+ * fails (no clipboard permission, an http page) says so instead of doing
+ * nothing; the text is on screen to select by hand.
+ */
+export function CopyText({ text, label, primary = false }: { text: string; label: string; primary?: boolean }) {
+  const [state, setState] = useState<"idle" | "done" | "failed">("idle");
   return (
     <button
       type="button"
       onClick={async () => {
         try {
           await navigator.clipboard.writeText(text);
-          setDone(true);
-          setTimeout(() => setDone(false), 2000);
-        } catch {}
+          setState("done");
+        } catch {
+          setState("failed");
+        }
+        setTimeout(() => setState("idle"), 2500);
       }}
-      className="apple-spring apple-pressable inline-flex min-h-11 items-center gap-1.5 rounded-apple-sm border border-ink-200 bg-white px-3.5 text-sm font-medium text-ink-800 shadow-2xs hover:bg-ink-50"
+      className={buttonClass({ variant: primary && state === "idle" ? "primary" : "outline", size: "sm" })}
     >
-      {done ? <Check className="size-4 text-brand-700" aria-hidden /> : <Copy className="size-4 text-brand-700" aria-hidden />}
-      <span aria-live="polite">{done ? "Copied" : label}</span>
+      {state === "done" ? <Check className="size-4 text-brand-700" aria-hidden /> : <Copy className="size-4" aria-hidden />}
+      <span aria-live="polite">{state === "done" ? "Copied" : state === "failed" ? "Couldn't copy: select it instead" : label}</span>
     </button>
   );
 }
