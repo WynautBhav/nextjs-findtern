@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { activeEngagement, buildThread, deriveMoney, deriveProofs, deriveStage, isAcceptedStatus, payoutState } from "./journey.ts";
+import { HIDDEN_COMPANY, activeEngagement, buildThread, deriveMoney, deriveProofs, deriveStage, isAcceptedStatus, payoutState } from "./journey.ts";
 
 const payout = (id: string, status: string, amountMinor: number, scheduledFor?: string) => ({
   id,
@@ -93,4 +93,13 @@ test("QA-004: Record has one score card, the current score, not a snapshot per p
   assert.equal(scores[0].at.toISOString(), "2026-08-20T00:00:00.000Z");
   // No current score: no score card (the snapshots are not a fallback).
   assert.equal(deriveProofs({ proposals: [stale], interviews: [], timesheets: [], payouts: [], names: {} }).filter((p) => p.kind === "assessment").length, 0);
+});
+
+test("QA-108: a hidden company reads as \"the company\" in the thread, never \"Hidden company\"", () => {
+  const thread = buildThread({ proposals: [proposal("p1", "accepted")], interviews: [], timesheets: [], payouts: [], names: { e1: HIDDEN_COMPANY } });
+  assert.equal(thread[0].detail, "Waiting for the company to complete the payment. Logging hours opens once they do.");
+  const sent = buildThread({ proposals: [proposal("p1", "sent")], interviews: [], timesheets: [], payouts: [], names: { e1: HIDDEN_COMPANY } });
+  assert.match(sent[0].detail ?? "", /^The company sent you an offer/);
+  const named = buildThread({ proposals: [proposal("p1", "accepted")], interviews: [], timesheets: [], payouts: [], names: { e1: "Northwind Labs" } });
+  assert.match(named[0].detail ?? "", /^Waiting for Northwind Labs to complete/);
 });

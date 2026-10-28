@@ -492,6 +492,7 @@ logins; `SEED=1` selects the seed accounts and server). Screenshots are in
 ### QA-108
 - Evidence: accept dialog "This tells The company yes for a start on 6 Nov 2026." (`docs/qa/b/screens/intern-accept-dialog-375-webkit.png`);
   dashboard activity "Waiting for Hidden company to complete the payment." Severity **P2** (copy).
+- Status (builder, 28 Oct): fixed, awaiting retest (wp/opus, fix(QA-108)). Accept dialog: an unrevealed company reads "This tells the company yes for a start on …" (lower case mid-sentence). Activity thread: journey.companyIn() turns the "Hidden company" placeholder into "the company" ("Waiting for the company to complete the payment"), and sentences that open with the company are capitalised ("The company sent you an offer"). HIDDEN_COMPANY now lives in lib/journey and intern-data re-exports it. Pinned by a journey test (hidden and named).
 
 ### QA-109
 - Steps: sign up two interns, give the second the first one's emergency number at step 1.

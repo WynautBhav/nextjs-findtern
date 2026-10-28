@@ -193,6 +193,21 @@ export type ThreadNode = {
   action?: string;
 };
 
+/** What an intern sees in place of a company name before the hire. */
+export const HIDDEN_COMPANY = "Hidden company";
+
+/**
+ * A company as it reads inside a sentence: its name once revealed, else
+ * "the company". "Waiting for Hidden company to complete the payment" read
+ * like a company called Hidden (QA-108).
+ */
+export function companyIn(name: string | null | undefined): string {
+  return name && name !== HIDDEN_COMPANY ? name : "the company";
+}
+
+/** The same, opening a sentence ("The company sent you an offer"). */
+const sentence = (who: string) => who.charAt(0).toUpperCase() + who.slice(1);
+
 const roleOf = (offer: Record<string, unknown> | null): string => {
   const v = offer?.roleTitle ?? offer?.role;
   return typeof v === "string" && v.trim() ? v.trim() : "this internship";
@@ -208,7 +223,7 @@ const roleOf = (offer: Record<string, unknown> | null): string => {
  */
 export function buildThread(src: ProofSource, now: Date = new Date()): ThreadNode[] {
   const nodes: ThreadNode[] = [];
-  const name = (id: string) => src.names[id] ?? "the company";
+  const name = (id: string) => companyIn(src.names[id]);
 
   for (const p of src.proposals) {
     const role = roleOf(p.offerDetails);
@@ -220,7 +235,7 @@ export function buildThread(src: ProofSource, now: Date = new Date()): ThreadNod
         tone: "action",
         at: p.createdAt,
         title: `Offer waiting on you: ${role}`,
-        detail: `${withName} sent you an offer. If you do nothing, it is marked as rejected once the joining date passes.`,
+        detail: `${sentence(withName)} sent you an offer. If you do nothing, it is marked as rejected once the joining date passes.`,
         with: withName,
         href: `/intern/proposals/${p.id}`,
         action: "Read the offer",
@@ -232,7 +247,7 @@ export function buildThread(src: ProofSource, now: Date = new Date()): ThreadNod
         tone: "done",
         at: p.hiredAt ?? p.createdAt,
         title: `You started: ${role}`,
-        detail: `${withName} completed the payment. Log your hours on Timesheets.`,
+        detail: `${sentence(withName)} completed the payment. Log your hours on Timesheets.`,
         with: withName,
         href: `/intern/proposals/${p.id}`,
       });
@@ -310,7 +325,7 @@ export function buildThread(src: ProofSource, now: Date = new Date()): ThreadNod
         at: slotOf(i) ?? i.createdAt,
         title: needsChoice ? "Choose your interview time" : "Interview confirmed",
         detail: needsChoice
-          ? `${withName} offered you three times. Pick the one that suits you and they will be told.`
+          ? `${sentence(withName)} offered you three times. Pick the one that suits you and they will be told.`
           : `Confirmed for ${withName}. The join link is on the interview page.`,
         with: withName,
         href: "/intern/interviews",
@@ -323,7 +338,7 @@ export function buildThread(src: ProofSource, now: Date = new Date()): ThreadNod
         tone: "waiting",
         at: i.createdAt,
         title: "Interview request pending",
-        detail: `${withName} will send times shortly. There is nothing to do yet.`,
+        detail: `${sentence(withName)} will send times shortly. There is nothing to do yet.`,
         with: withName,
         href: "/intern/interviews",
       });
@@ -362,7 +377,7 @@ export function buildThread(src: ProofSource, now: Date = new Date()): ThreadNod
         tone: "done",
         at: t.rejectedAt ?? t.createdAt,
         title: `Hours for ${period} need another look`,
-        detail: t.managerNote?.trim() ?? `${withName} asked for a change to this period.`,
+        detail: t.managerNote?.trim() ?? `${sentence(withName)} asked for a change to this period.`,
         href: "/intern/timesheets",
         action: "Open and fix",
       });
@@ -462,7 +477,7 @@ export const PROOF_META: Record<ProofKind, { label: string; blurb: string }> = {
 
 export function deriveProofs(src: ProofSource): Proof[] {
   const out: Proof[] = [];
-  const name = (id: string) => src.names[id] ?? "the company";
+  const name = (id: string) => companyIn(src.names[id]);
 
   // One score card, the current score, dated by its approval (QA-004). The
   // per-proposal snapshots stay on the offers that froze them.
