@@ -22,7 +22,9 @@ export const SHORT_LABEL: Record<keyof Ratings, string> = {
   communication: "Comms",
   coding: "Coding",
   aptitude: "Aptitude",
-  interview: "AI interview",
+  // "AI interview" was cut to "AI intervie…" in a four-column meter at 375
+  // (QA-117); every axis here is from the AI interview.
+  interview: "Interview",
 };
 
 /** What a hired candidate's card needs to offer a full-time role (EMH-42). */
@@ -59,8 +61,10 @@ export function RatingMeter({ ratings, className }: { ratings: Ratings; classNam
       {RATING_META.map((meta) => {
         const value = ratings[meta.key];
         return (
-          <div key={meta.key} className="min-w-0">
-            <dt className="truncate text-xs text-ink-600" title={meta.label}>
+          // Labels wrap rather than cut; the figure sits at the bottom so the
+          // four stay level if one label takes two lines.
+          <div key={meta.key} className="flex min-w-0 flex-col justify-between">
+            <dt className="break-words text-xs leading-snug text-ink-600" title={meta.label}>
               {SHORT_LABEL[meta.key]}
             </dt>
             <dd className="mt-0.5">
