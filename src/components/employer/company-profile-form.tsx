@@ -20,7 +20,7 @@ import { PhoneField } from "@/components/employer/phone-field";
 import { csrfFetch } from "@/lib/client-fetch";
 import { escalationEmailDomainError, websiteDomainError } from "@/lib/company-domain";
 import { isIndiaCountry } from "@/lib/data/countries";
-import { COMPANY_SIZE_OPTIONS, REQUIRED_COMPANY_FIELDS, isPersonalEmail, needsBillingPincode } from "@/lib/employer-onboarding";
+import { COMPANY_SIZE_OPTIONS, ESCALATION_FIELDS, REQUIRED_COMPANY_FIELDS, isPersonalEmail, needsBillingPincode } from "@/lib/employer-onboarding";
 import { phoneChangeError } from "@/lib/phone";
 import { timezoneForLocation } from "@/lib/timezones";
 
@@ -57,13 +57,6 @@ function companyDomainOf(email: string): string {
   if (!e.includes("@") || isPersonalEmail(e)) return "";
   return e.split("@").pop()!.toLowerCase();
 }
-
-const ESCALATION_FIELDS = [
-  ["escalationContactName", "Escalation contact name"],
-  ["escalationContactRole", "Escalation contact role"],
-  ["escalationContactEmail", "Escalation contact email"],
-  ["escalationContactPhone", "Escalation contact phone"],
-] as const;
 
 /**
  * Everything is mandatory except the logo and the GST number. The escalation

@@ -134,6 +134,30 @@ export function needsBillingPincode(country: string | null | undefined): boolean
   return !c || /^(india|in)$/i.test(c);
 }
 
+/**
+ * The escalation contact, mandatory on save (bug sheet 7 S1 r92) but not part
+ * of the setup gate: every company onboarded before the field existed has it
+ * empty, and the gate would lock them all out of the console.
+ */
+export const ESCALATION_FIELDS = [
+  ["escalationContactName", "Escalation contact name"],
+  ["escalationContactRole", "Escalation contact role"],
+  ["escalationContactEmail", "Escalation contact email"],
+  ["escalationContactPhone", "Escalation contact phone"],
+] as const;
+
+/**
+ * What the company profile still lacks: the setup fields plus the escalation
+ * contact. "Complete" on the profile page follows this, so it never says
+ * complete over a form that won't save as it is (QA-012).
+ */
+export function missingProfileFields(
+  row: Partial<Record<RequiredCompanyField | (typeof ESCALATION_FIELDS)[number][0], string | null | undefined>>,
+): string[] {
+  const escalation = ESCALATION_FIELDS.filter(([key]) => !(row[key] ?? "").trim()).map(([, label]) => label);
+  return [...missingCompanyFields(row), ...escalation];
+}
+
 /** Labels of the required company fields that are blank on this record. */
 export function missingCompanyFields(
   row: Partial<Record<RequiredCompanyField, string | null | undefined>>,

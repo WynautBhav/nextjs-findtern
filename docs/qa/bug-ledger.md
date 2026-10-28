@@ -375,6 +375,7 @@ logins; `SEED=1` selects the seed accounts and server). Screenshots are in
   `onboardingCompleted` only. Severity **P2 confirmed**; also decide whether saving the form then blocks on the
   now-required fields.
 - Evidence: `docs/qa/b/screens/qa-012-account-*.png`; script `qa012.mjs`.
+- Status (builder, 28 Oct): fixed, awaiting retest (wp/opus, fix(QA-012)). The Profile row on /employer/account now counts the escalation contact (missingProfileFields = the setup fields plus the four escalation fields, the same list the form and the API already require on save). With the contact empty it reads "Escalation contact to add"; with other gaps, "N to fill in"; "Complete" only when the form would save as it is. The setup gate (requireEmployerSetup) is unchanged on purpose: adding the contact to it would lock every company onboarded before the field existed out of the console. Whether to require it at the gate is an owner call. Checked on the seed DB (Swiggy, no escalation contact): "Escalation contact to add".
 
 ### QA-013
 - Reproduced: **yes**, SEED with a second drive added (a revoked drive that starts later than the live one,
