@@ -17,6 +17,7 @@ import { normaliseEntries, countStatuses } from "@/lib/employer-timesheets";
 import { offerScore, parseOffer } from "@/lib/offer";
 import { ProposalOfferSummary } from "@/components/admin/proposal-offer-summary";
 import { draftFromRecord } from "@/lib/onboarding";
+import type { RevealField } from "@/lib/admin/identity-mask";
 import type { User as UserType, InternOnboarding, Interview, Proposal, Timesheet, InternPayout } from "@/lib/db/schema";
 import { DetailRow, EmptyScene, PageHead, Pill, SectionHead, StatTile, Surface } from "@/components/app/primitives";
 import { buttonClass } from "@/components/ui/button";
@@ -80,7 +81,6 @@ export function Intern360View({
 }: Intern360Props) {
   const [tab, setTab] = useState<TabKey>(() => TAB_KEYS.find((k) => k === initialTab) ?? "profile");
   const [photoFailed, setPhotoFailed] = useState(false);
-  const [unmaskBank, setUnmaskBank] = useState(false);
   const [selectedProposal, setSelectedProposal] = useState<Proposal | null>(null);
   const [selectedInterview, setSelectedInterview] = useState<Interview | null>(null);
   const [interviewFilter, setInterviewFilter] = useState("all");
@@ -190,7 +190,7 @@ export function Intern360View({
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <StatTile
           label="Findtern Score"
-          value={score === null ? null : <>{score.toFixed(1)}<span className="ml-0.5 text-base font-normal text-ink-500">/10</span></>}
+          value={score === null ? null : <>{score.toFixed(1)}<span className="ml-0.5 text-base font-normal text-text-subtle">/10</span></>}
           empty="Not scored yet"
           hint={
             score === null
@@ -370,15 +370,7 @@ export function Intern360View({
           <Surface className="p-5 sm:p-6">
             <SectionHead
               title="Bank account for stipends"
-              hint="Shown masked by default. Unmask only when you are making a payment."
-              action={
-                draft?.bank && (draft.bank.accountNumber || draft.bank.upiId) ? (
-                  <button type="button" onClick={() => setUnmaskBank(!unmaskBank)} className={buttonClass({ variant: "outline", size: "sm" })}>
-                    {unmaskBank ? <EyeOff className="size-4" aria-hidden /> : <Eye className="size-4" aria-hidden />}
-                    {unmaskBank ? "Mask" : "Unmask"}
-                  </button>
-                ) : null
-              }
+              hint="The account number shows its last four. Reveal it only when you are making a payment; each reveal is logged."
             />
             {draft?.bank && (draft.bank.accountNumber || draft.bank.upiId) ? (
               <dl className="divide-y divide-ink-100">
@@ -387,7 +379,7 @@ export function Intern360View({
                 <DetailRow label="IFSC" value={draft.bank.ifscCode || "-"} mono />
                 <DetailRow
                   label="Account number"
-                  value={unmaskBank ? draft.bank.accountNumber || "-" : maskAccount(draft.bank.accountNumber)}
+                  value={<RevealValue internId={user.id} field="bank" masked={draft.bank.accountNumber} label="account number" />}
                   mono
                 />
                 <DetailRow label="UPI ID" value={draft.bank.upiId || "-"} mono />
@@ -480,8 +472,8 @@ function ProfileTab({
             <DetailRow label="Work modes" value={draft.locationTypes?.length ? draft.locationTypes.map((m) => MODE[m] ?? m).join(", ") : "-"} />
             <DetailRow label="Preferred cities" value={draft.preferredLocations?.length ? draft.preferredLocations.join(", ") : "-"} />
             <DetailRow label="Has a laptop" value={yesNo(draft.hasLaptop)} />
-            <DetailRow label="Aadhaar number" value={draft.aadhaarNumber || "-"} mono />
-            <DetailRow label="PAN" value={draft.panNumber || "-"} mono />
+            <DetailRow label="Aadhaar number" value={<RevealValue internId={internId} field="aadhaar" masked={draft.aadhaarNumber} label="Aadhaar number" />} mono />
+            <DetailRow label="PAN" value={<RevealValue internId={internId} field="pan" masked={draft.panNumber} label="PAN" />} mono />
             <DetailRow
               label="Emergency contact"
               value={[draft.emergencyName, draft.emergencyRelation, phone(draft.emergencyCountryCode, draft.emergencyPhone)].filter(Boolean).join(" · ") || "-"}
@@ -521,7 +513,7 @@ function ProfileTab({
                 <li key={`${q.kind}-${q.id}`} className="py-3 text-sm">
                   <p className="font-medium text-ink-900">
                     {q.name || q.kind}
-                    <span className="ml-2 text-xs font-normal text-ink-500">{q.kind}</span>
+                    <span className="ml-2 text-xs font-normal text-text-subtle">{q.kind}</span>
                   </p>
                   <p className="text-ink-600">
                     {[q.issuer, q.completionDate ? formatDate(q.completionDate) : ""].filter(Boolean).join(" · ") || "-"}
@@ -663,7 +655,7 @@ function DocumentsTab({ internId, documents }: { internId: string; documents: Ca
             <tr key={slot}>
               <td className="px-4 py-3 text-ink-700">{slot}</td>
               <td className="px-4 py-3 text-ink-600">{slot === "Aadhaar card" || slot === "PAN card" ? "Identity" : "Media"}</td>
-              <td className="px-4 py-3 text-right text-ink-500">-</td>
+              <td className="px-4 py-3 text-right text-text-subtle">-</td>
               <td className="px-4 py-3 text-right">
                 <Pill tone="closed">Not uploaded</Pill>
               </td>
@@ -711,7 +703,7 @@ function InterviewCard({
           s ? (
             <li key={idx} className={cn("flex flex-wrap items-baseline gap-x-2", i.selectedSlot === idx + 1 ? "text-ink-900" : "text-ink-600")}>
               <span className="nums font-medium">{formatSlotTime(s, IST)}</span>
-              {zone ? <span className="nums text-xs text-ink-500">({formatSlotTime(s, zone)})</span> : null}
+              {zone ? <span className="nums text-xs text-text-subtle">({formatSlotTime(s, zone)})</span> : null}
               {i.selectedSlot === idx + 1 ? <Pill tone="live">Booked</Pill> : null}
             </li>
           ) : null,
@@ -795,7 +787,7 @@ function InterviewDialog({
     }
   }
 
-  const field = "h-11 w-full rounded-apple-sm border border-ink-200 bg-white px-3 text-sm text-ink-900 placeholder:text-ink-400 focus-visible:border-brand-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600/20";
+  const field = "h-11 w-full rounded-apple-sm border border-ink-200 bg-white px-3 text-sm text-ink-900 placeholder:text-text-subtle focus-visible:border-brand-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600/20";
 
   return (
     <Dialog open={interview !== null} onOpenChange={(open) => !open && onClose()}>
@@ -813,7 +805,7 @@ function InterviewDialog({
                 Meeting link
               </label>
               <input id="iv-meeting" type="url" value={meeting} onChange={(e) => setMeeting(e.target.value)} placeholder="https://meet.google.com/… or Incruiter link" className={cn(field, "mt-1")} />
-              <p className="mt-1 text-xs text-ink-500">
+              <p className="mt-1 text-xs text-text-subtle">
                 For an AI interview, saving a link unlocks it for the candidate. For a company interview, both sides are notified.
               </p>
             </div>
@@ -1004,7 +996,7 @@ function TimesheetsTab({
                             <td className="nums whitespace-nowrap py-2 pr-4 text-ink-800">
                               {new Date(`${d.date}T00:00:00Z`).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" })}
                             </td>
-                            <td className="py-2 pr-4">{d.status ? <span className="text-ink-800">{d.status}</span> : <span className="text-ink-500">Not filled</span>}</td>
+                            <td className="py-2 pr-4">{d.status ? <span className="text-ink-800">{d.status}</span> : <span className="text-text-subtle">Not filled</span>}</td>
                             <td className="nums py-2 pr-4 text-right text-ink-700">{x?.hours ?? "-"}</td>
                             <td className="py-2 text-ink-700">{x?.note || ""}</td>
                           </tr>
@@ -1013,7 +1005,7 @@ function TimesheetsTab({
                     </tbody>
                   </table>
                 </div>
-                <p className="nums mt-3 text-xs text-ink-500">
+                <p className="nums mt-3 text-xs text-text-subtle">
                   {t.submittedAt ? `Submitted ${formatDate(t.submittedAt)}` : "Not submitted"}
                   {t.approvedAt ? ` · approved ${formatDate(t.approvedAt)}` : ""}
                   {t.rejectedAt ? ` · sent back ${formatDate(t.rejectedAt)}` : ""}
@@ -1075,8 +1067,49 @@ function fileSize(bytes: number): string {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
-function maskAccount(value: string | undefined): string {
-  if (!value) return "-";
-  if (value.length <= 4) return "••••";
-  return `•••• ${value.slice(-4)}`;
+/**
+ * An identity number as it arrives (last four only), with a Reveal that asks
+ * the audit-logged route for the full value (QA-003). Hide forgets it again.
+ */
+function RevealValue({ internId, field, masked, label }: { internId: string; field: RevealField; masked: string | undefined; label: string }) {
+  const [full, setFull] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  if (!masked) return <>-</>;
+
+  async function reveal() {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await csrfFetch(`/api/admin/interns/${encodeURIComponent(internId)}/reveal`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ field }),
+      });
+      const json = (await res.json().catch(() => null)) as { value?: string; error?: string } | null;
+      if (!res.ok || !json?.value) throw new Error(json?.error ?? "Couldn't reveal it");
+      setFull(json.value);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn't reveal it");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <span className="inline-flex flex-wrap items-center justify-end gap-x-3 gap-y-1">
+      <span>{full ?? masked}</span>
+      <button
+        type="button"
+        onClick={() => (full ? setFull(null) : void reveal())}
+        disabled={busy}
+        aria-label={full ? `Hide ${label}` : `Reveal full ${label}`}
+        className={buttonClass({ variant: "ghost", size: "sm", className: "text-brand-700" })}
+      >
+        {busy ? <Loader2 className="size-4 animate-spin" aria-hidden /> : full ? <EyeOff className="size-4" aria-hidden /> : <Eye className="size-4" aria-hidden />}
+        {full ? "Hide" : "Reveal"}
+      </button>
+      {error ? <span role="alert" className="basis-full text-xs text-danger">{error}</span> : null}
+    </span>
+  );
 }
