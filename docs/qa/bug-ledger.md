@@ -500,6 +500,7 @@ logins; `SEED=1` selects the seed accounts and server). Screenshots are in
   `secure: process.env.NODE_ENV === "production"`, where `src/lib/auth.ts` uses `isHttps()` (honours `x-forwarded-proto`).
   The same applies to the employer signup. My WebKit runs worked around it by creating the account in Chromium.
 - Severity **P2** (only non-TLS deployments); fix: use `isHttps()` for the proof cookie.
+- Status (builder, 28 Oct): fixed, awaiting retest (wp/opus, fix(QA-110)). attachOtpProof is async and sets Secure from isHttps() (x-forwarded-proto first, NODE_ENV only as the fallback), as the session cookie does. All three callers await it: signup verify-otp, and the Google callback for intern and employer. Checked in WebKit against a production build over http on the seed DB: send-otp 200, verify-otp 200, the ft_otp cookie is stored, POST /api/auth/signup 200 with the account created.
 
 ### QA-111
 - Steps: `node docs/qa/b/repro/webkit-home.mjs 375` (and 1440), then `webkit-home-bisect.mjs`, `webkit-home-novideotag.mjs`.

@@ -1,6 +1,7 @@
 import { and, desc, eq, gt, isNotNull } from "drizzle-orm";
 import type { NextResponse } from "next/server";
 
+import { isHttps } from "@/lib/auth";
 import { getDb, schema } from "@/lib/db";
 import { isPersonalEmail } from "@/lib/employer-onboarding";
 import { readCookie } from "@/lib/security/session";
@@ -38,13 +39,18 @@ export const VERIFIED_WINDOW_MS = 15 * 60_000;
 const PROOF_COOKIE = "ft_otp";
 const PROOF_KIND = "signup-otp";
 
-/** Attach the proof that this browser entered the code for `email`. */
-export function attachOtpProof(res: NextResponse, subject: SignupOtpSubject, email: string): void {
+/**
+ * Attach the proof that this browser entered the code for `email`. Secure
+ * follows the request, as the session cookie does (`isHttps`): set from
+ * NODE_ENV, a production build served over plain http marked it Secure, so
+ * WebKit dropped it and signup failed right after a verified code (QA-110).
+ */
+export async function attachOtpProof(res: NextResponse, subject: SignupOtpSubject, email: string): Promise<void> {
   const ttl = VERIFIED_WINDOW_MS / 1000;
   res.cookies.set(PROOF_COOKIE, sign({ k: email, s: subject, d: PROOF_KIND }, ttl), {
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    secure: await isHttps(),
     path: "/",
     maxAge: ttl,
   });

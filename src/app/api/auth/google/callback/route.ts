@@ -84,7 +84,7 @@ export async function GET(req: Request) {
       if (name) to.searchParams.set("name", name);
       const res = NextResponse.redirect(to);
       res.cookies.delete({ name: NONCE_COOKIE, path: "/" });
-      attachOtpProof(res, "employer", email);
+      await attachOtpProof(res, "employer", email);
       return res;
     }
     if (!employer.isActive) return fail(req, "/employer/login", "inactive");
@@ -123,7 +123,7 @@ export async function GET(req: Request) {
     if (familyName) to.searchParams.set("lastName", familyName);
     const res = NextResponse.redirect(to);
     res.cookies.delete({ name: NONCE_COOKIE, path: "/" });
-    attachOtpProof(res, "intern", email);
+    await attachOtpProof(res, "intern", email);
     return res;
   }
   if (!user.isActive) return fail(req, "/login", "inactive");
