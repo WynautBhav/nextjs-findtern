@@ -7,6 +7,7 @@ import { AlertCircle, ArrowLeft, ArrowRight, Loader2, MailCheck } from "lucide-r
 
 import { COUNTRY_CODE_OPTIONS, isPersonalEmail } from "@/lib/employer-onboarding";
 import { isValidPhone, phoneError, phoneHint } from "@/lib/phone";
+import { PASSWORD_RULES } from "@/lib/password-policy";
 
 /**
  * Employer registration.
@@ -30,13 +31,6 @@ import { isValidPhone, phoneError, phoneHint } from "@/lib/phone";
  * passes on the proof cookie the OAuth callback set.
  */
 
-const PASSWORD_RULES = [
-  { test: (v: string) => v.length >= 8, label: "At least 8 characters" },
-  { test: (v: string) => /[a-z]/.test(v), label: "One lowercase letter" },
-  { test: (v: string) => /[A-Z]/.test(v), label: "One uppercase letter" },
-  { test: (v: string) => /\d/.test(v), label: "One number" },
-  { test: (v: string) => /[^A-Za-z0-9]/.test(v), label: "One special character" },
-];
 
 export function EmployerSignupForm({
   google = null,
@@ -422,8 +416,8 @@ export function EmployerSignupForm({
           {PASSWORD_RULES.map((rule) => {
             const met = rule.test(password);
             return (
-              <li key={rule.label} className={met ? "text-xs text-success" : "text-xs text-ink-600"}>
-                {rule.label}
+              <li key={rule.item} className={met ? "text-xs text-success" : "text-xs text-ink-600"}>
+                {rule.item}
               </li>
             );
           })}

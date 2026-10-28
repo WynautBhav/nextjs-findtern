@@ -5,7 +5,7 @@ import { z } from "zod";
 import { getDb, schema } from "@/lib/db";
 import { canGrant } from "@/lib/admin/permissions";
 import { requireMutation } from "@/lib/guards-mutation";
-import { hashPassword, isStrongPassword } from "@/lib/security/password";
+import { hashPassword, isStrongPassword, WEAK_PASSWORD_MESSAGE } from "@/lib/security/password";
 
 const createStaffSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
@@ -29,7 +29,7 @@ export async function POST(req: Request) {
 
   const { name, email, password, role } = parsed.data;
   const db = getDb();
-  if (!isStrongPassword(password)) return NextResponse.json({ error: WEAK_PASSWORD }, { status: 400 });
+  if (!isStrongPassword(password)) return NextResponse.json({ error: WEAK_PASSWORD_MESSAGE }, { status: 400 });
   if (!(await roleExists(role))) return NextResponse.json({ error: "Invalid role" }, { status: 400 });
   if (!(await mayAssign(guard.session.permissions, role))) {
     return NextResponse.json({ error: "You can only assign roles within your own permissions." }, { status: 403 });
@@ -99,7 +99,7 @@ export async function PATCH(req: Request) {
   if (role && id === guard.session.uid) {
     return NextResponse.json({ error: "You can't change your own role" }, { status: 400 });
   }
-  if (password && !isStrongPassword(password)) return NextResponse.json({ error: WEAK_PASSWORD }, { status: 400 });
+  if (password && !isStrongPassword(password)) return NextResponse.json({ error: WEAK_PASSWORD_MESSAGE }, { status: 400 });
   const db = getDb();
   // Who they are now matters as much as what they become: without this, anyone
   // with roles:write could reset a super admin's password and sign in as them.
@@ -122,7 +122,6 @@ export async function PATCH(req: Request) {
   return NextResponse.json({ ok: true });
 }
 
-const WEAK_PASSWORD = "Password is too weak. Use at least 8 characters mixing upper and lower case letters, numbers and symbols.";
 
 async function roleExists(roleKey: string): Promise<boolean> {
   if (roleKey.toLowerCase() === "super_admin") return true;

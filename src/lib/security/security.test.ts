@@ -185,3 +185,17 @@ describe("signed tokens", () => {
     assert.equal(guard.check("abc", now + 6 * 60_000), true, "entry aged out");
   });
 });
+
+test("QA-016: the stated rule and the validator agree at the boundary", async () => {
+  const { isStrongPassword, PASSWORD_HINT, WEAK_PASSWORD_MESSAGE, PASSWORD_RULES } = await import("../password-policy.ts");
+  // The tester's case: meets a rule that forgets the special character.
+  assert.equal(isStrongPassword("Abcdefg1"), false);
+  assert.equal(isStrongPassword("Abcdef1!"), true, "8 characters with every kind passes");
+  assert.equal(isStrongPassword("Abcde1!"), false, "7 characters fails");
+  // Every rule the validator checks is named in both the hint and the message.
+  for (const r of PASSWORD_RULES.slice(1)) {
+    assert.ok(PASSWORD_HINT.includes(r.label), `hint names ${r.label}`);
+    assert.ok(WEAK_PASSWORD_MESSAGE.includes(r.label), `message names ${r.label}`);
+  }
+  assert.match(PASSWORD_HINT, /^At least 8 characters/);
+});
