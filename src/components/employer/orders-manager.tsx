@@ -251,13 +251,13 @@ function HiresPanel({
                   <p className="flex flex-wrap items-center gap-2">
                     <Link
                       href={`/employer/intern/${encodeURIComponent(h.internId)}`}
-                      className="truncate text-[0.9375rem] font-semibold text-ink-900 underline-offset-4 hover:text-brand-700 hover:underline"
+                      className="break-words text-[0.9375rem] font-semibold text-ink-900 underline-offset-4 hover:text-brand-700 hover:underline"
                     >
                       {h.candidateName}
                     </Link>
                     <Pill tone={plan.tone}>{plan.label}</Pill>
                   </p>
-                  <p className="mt-0.5 truncate text-sm text-ink-600">
+                  <p className="mt-0.5 text-sm text-ink-600">
                     {h.roleTitle === h.projectName ? h.roleTitle : `${h.roleTitle} · ${h.projectName}`}
                   </p>
                   <p className="nums mt-1 text-sm text-ink-600">

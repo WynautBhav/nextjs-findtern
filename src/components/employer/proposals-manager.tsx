@@ -226,11 +226,11 @@ export function ProposalsManager({ initialProposals }: { initialProposals: Propo
                         stretched over it, and keeps its own focus ring. */}
                     <Link
                       href={href}
-                      className="block truncate text-[0.9375rem] font-semibold text-ink-900 outline-none after:absolute after:inset-0 after:content-[''] focus-visible:after:rounded-apple-sm focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-brand-500"
+                      className="block break-words text-[0.9375rem] font-semibold text-ink-900 outline-none after:absolute after:inset-0 after:content-[''] focus-visible:after:rounded-apple-sm focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-brand-500"
                     >
                       {title}
                     </Link>
-                    <p className="truncate text-sm text-ink-600">
+                    <p className="text-sm text-ink-600">
                       {nameOf(item)}
                       {item.project ? ` · ${item.project.projectName}` : ""}
                       {ft ? " · Full-time" : ""}
