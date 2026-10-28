@@ -338,6 +338,8 @@ function ProposalsTab({ params, page, perPage, search, pickers, rows }: TabProps
             return (
               <div className="whitespace-nowrap">
                 <p className="nums">{formatDate(o.startDate)}</p>
+                {/* Sent rides here (its own column pushed the table past 1440). */}
+                <p className="nums text-xs text-ink-600">sent {formatDate(p.createdAt)}</p>
                 {tz ? <p className="text-xs text-ink-600">{tz}</p> : null}
               </div>
             );
@@ -352,7 +354,6 @@ function ProposalsTab({ params, page, perPage, search, pickers, rows }: TabProps
             </div>
           ),
         },
-        { header: "Sent", sort: "sent", cell: (p) => <span className="nums whitespace-nowrap">{formatDate(p.createdAt)}</span> },
         {
           header: "",
           cell: (p) => (
@@ -531,12 +532,21 @@ function InterviewsTab({ params, page, perPage, search, pickers, rows }: TabProp
             );
           },
         },
-        { header: "Status", cell: (i) => <StatusBadge value={i.status} /> },
+        {
+          // Created rides under the status (its own column pushed the table past 1440).
+          header: "Status",
+          sort: "created",
+          cell: (i) => (
+            <div className="flex flex-col items-start gap-1">
+              <StatusBadge value={i.status} />
+              <span className="nums whitespace-nowrap text-xs text-ink-600">requested {formatDate(i.createdAt)}</span>
+            </div>
+          ),
+        },
         {
           header: "Meeting link",
           cell: (i) => <MeetingLinkCell interviewId={i.id} link={i.meetingLink} locked={FINISHED_INTERVIEW.includes(i.status.toLowerCase())} />,
         },
-        { header: "Created", sort: "created", cell: (i) => <span className="nums whitespace-nowrap">{formatDate(i.createdAt)}</span> },
         {
           header: "",
           cell: (i) => (i.notes?.trim() ? <InterviewNotesButton title={`${nameOf(i)} · ${i.companyName ?? "Company"}`} notes={i.notes} /> : null),
