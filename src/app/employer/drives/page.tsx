@@ -6,8 +6,8 @@ import { ArrowUpRight } from "lucide-react";
 import { requireRole } from "@/lib/auth";
 import { driveWindow } from "@/lib/college/access";
 import { getDb, schema } from "@/lib/db";
-import { PageHeader, EmptyState } from "@/components/layout/page-header";
-import { Surface } from "@/components/app/primitives";
+
+import { Surface, EmptyScene, PageHead } from "@/components/app/primitives";
 import { CollegeMark, DriveStatePill, KIND_LABEL, driveTime, timeLeft } from "@/components/employer/drive-parts";
 import { compareDrives } from "@/lib/college/access";
 
@@ -44,16 +44,13 @@ export default async function EmployerDrivesPage() {
 
   return (
     <div>
-      <PageHeader
-        title="Campus drives"
-        subtitle="Placement drives you've entered from a college's link. Each one shows only that college's eligible students, while the drive is open."
-      />
+      <PageHead title="Campus drives" />
       {failed ? (
         <Surface className="p-6 text-sm text-danger" role="alert">
           We couldn&apos;t load your drives just now. Refresh the page to try again.
         </Surface>
       ) : rows.length === 0 ? (
-        <EmptyState
+        <EmptyScene
           title="No drives yet"
           body="Colleges on Findtern share a drive link with the companies they invite. Open that link while signed in and the drive appears here."
           who="The college's placement office sends the link"
@@ -94,7 +91,9 @@ export default async function EmployerDrivesPage() {
                     <Surface className="transition-shadow hover:shadow-md">{body}</Surface>
                   </Link>
                 ) : (
-                  <Surface className="opacity-80">{body}</Surface>
+                  // Not dimmed with opacity: that pushed already-quiet text
+                  // under AA (3.81:1); the state pill says it is closed.
+                  <Surface>{body}</Surface>
                 )}
               </li>
             );

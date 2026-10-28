@@ -9,7 +9,7 @@ import { ONLINE_WINDOW_MS, driveForEmployer, eligibleStudents } from "@/lib/coll
 import { getDb, schema } from "@/lib/db";
 import { displayNameOf, initialsOf, readSkills } from "@/lib/employer-candidates";
 import { hiredInternIds } from "@/lib/employer-visibility";
-import { EmptyState } from "@/components/layout/page-header";
+import { EmptyScene } from "@/components/app/primitives";
 import { CoBrand, CollegeMark, DriveStatePill, KIND_LABEL, driveTime, timeLeft } from "@/components/employer/drive-parts";
 import { DriveWorkspace, type DriveCandidate } from "@/components/employer/drive-workspace";
 
@@ -74,7 +74,7 @@ export default async function EmployerDrivePage({ params }: { params: Promise<{ 
         {/* An employer who never joined learns nothing about the drive (title,
             college, dates), whatever its window: only how to get in. */}
         {joined ? header : null}
-        <EmptyState title={copy.title} body={copy.body} action={{ label: "All campus drives", href: "/employer/drives" }} />
+        <EmptyScene title={copy.title} body={copy.body} next={{ label: "All campus drives", href: "/employer/drives" }} />
       </div>
     );
   }
