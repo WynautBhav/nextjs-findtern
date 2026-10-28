@@ -2,6 +2,7 @@ import { and, desc, eq, gte, inArray, sql, type SQL } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
 import { getDb, schema } from "@/lib/db";
+import { q } from "@/lib/college/sql";
 import { INTERN_SORTS, loadInterns } from "@/lib/admin/intern-query";
 import { csvFilename, csvResponse, toCsv, type CsvColumn } from "@/lib/admin/csv";
 import { flattenParams, parsePageRequest, periodStart, searchAny } from "@/lib/admin/params";
@@ -386,7 +387,7 @@ async function exportPayouts(search: string, params: Record<string, string>) {
   const db = getDb();
   const since = periodStart(params.period);
   // Company name too, as the payouts list searches it (ADP-27).
-  const company = sql`coalesce((select e.company_name from ${schema.employers} e where e.id::text = ${schema.internPayouts.raw}->>'employerId'), '')`;
+  const company = sql`coalesce((select e.company_name from ${schema.employers} e where e.id::text = ${q(schema.internPayouts, schema.internPayouts.raw)}->>'employerId'), '')`;
   const parts = [
     searchAny([sql`${schema.users.firstName}`, sql`${schema.users.lastName}`, sql`${schema.users.email}`, sql`coalesce(${schema.internPayouts.referenceId}, '')`, company], search),
     params.status ? eq(schema.internPayouts.status, params.status) : undefined,

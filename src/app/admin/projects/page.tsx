@@ -3,6 +3,7 @@ import { and, asc, count, desc, eq, not, sql, type SQL } from "drizzle-orm";
 import { Download } from "lucide-react";
 
 import { getDb, schema } from "@/lib/db";
+import { q } from "@/lib/college/sql";
 import { formatDate, formatNumber } from "@/lib/format";
 import { flattenParams, parsePageRequest, searchAny, toPage } from "@/lib/admin/params";
 import { activeProject, realEmployerId } from "@/lib/admin/scope";
@@ -20,7 +21,7 @@ import { ButtonAnchor } from "@/components/ui/button";
 
 const SORTS = ["name", "company", "proposals", "posted"] as const;
 
-const proposalCount = sql<number>`(select count(*)::int from ${schema.proposals} p where p.project_id = ${schema.projects.id})`;
+const proposalCount = sql<number>`(select count(*)::int from ${schema.proposals} p where p.project_id = ${q(schema.projects, schema.projects.id)})`;
 
 export default async function AdminProjectsPage({
   searchParams,

@@ -257,6 +257,7 @@ logins; `SEED=1` selects the seed accounts and server). Screenshots are in
   item 3 **P2** (the pages are each correct for what they define, the labels contradict).
 - Evidence: `docs/qa/b/screens/qa-007-*-3503.png` (SEED) and `-3502.png` (LIVE-COPY);
   scripts `qa007.mjs`, `qa007-companies.mjs`, `qa007-projects.mjs`; traces `qa-007-*-trace.zip`.
+- Status (builder, 28 Oct): fixed, awaiting retest (wp/opus: 5af9f5a companies q(); ddac6ea seed writes paid/hired + one isPaidRow; 8cbad37 Orders lede names accepted offers). Fresh seed: companies, transactions, reports and Orders agree (9 hires, ₹10,20,000 received).
 
 ### QA-008
 - Reproduced: **yes**, SEED (`docs/qa/b/screens/qa-008-employer-dashboard-3503.png`). Employer dashboard
@@ -343,11 +344,13 @@ logins; `SEED=1` selects the seed accounts and server). Screenshots are in
   context the same pages report 375/375, so confirm on a real phone.
 - Evidence: `docs/qa/b/bs7-marketing-results.md` (X1), trace `e2e/.artifacts/qa-b/verify-x1-chromium-trace.zip`.
 - Severity: **P1** (every marketing page scrolls sideways on a phone; the done-definition bans sideways scroll).
+- Status (builder, 28 Oct): fixed, awaiting retest (wp/opus 9b81744). Cause was not the logo: GetStartedMenu concatenated its className, so `hidden` lost to `inline-flex` and the button showed below sm. 375/375 on /, /faq, /pricing.
 
 ### QA-101
 - Steps: 375 px, signed out, open `/employer/signup` (`node docs/qa/b/repro/inspect.mjs anon /employer/signup 375`).
 - Actual: country-code select 269 x 44, phone input 50 x 44 (placeholder cut to "98'"). Same row on `/signup` is 144 + 175.
 - Evidence: `docs/qa/b/screens/inspect-anon--employer-signup-375.png`. Severity **P1** (a required field is unreadable while typing).
+- Status (builder, 28 Oct): fixed, awaiting retest (wp/opus 4dd433e). Select 112 px, number 207 px at 375.
 
 ### QA-102
 - Steps: 375 px; wait 3 s for the bubble; scroll to the bottom of `/signup`, `/employer/signup`, `/faq`, `/about`.
@@ -357,6 +360,7 @@ logins; `SEED=1` selects the seed accounts and server). Screenshots are in
 - Expected: bottom padding equal to the launcher height, or the launcher hides on forms.
 - Evidence: `docs/qa/b/screens/inspect-anon--employer-signup-375.png`, `flow-intern-signup-filled-375-chromium.png`;
   marketing sub-run X2 in `docs/qa/b/bs7-marketing-results.md`. Severity **P1** (covers an input and a link).
+- Status (builder, 28 Oct): fixed, awaiting retest (wp/opus e9b743f). Launcher hidden below lg on auth/onboarding, no bubble on forms, bubble auto-dismisses after 12 s, footer bottom padding clears the launcher.
 
 ### QA-103
 - Steps: admin, 375 px, `/admin/payouts?status=pending`, tap "Mark paid or failed" on a row (`node docs/qa/b/repro/admin-payout.mjs`).

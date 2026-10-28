@@ -37,7 +37,8 @@ export type AdminInvoiceRow = {
   flagOnly?: boolean;
 };
 
-export const isPaidRow = (r: Pick<AdminInvoiceRow, "status">) => r.status === "paid" || r.status === "captured";
+/** Money received. Settlement writes "paid" and nothing else (no legacy row says "captured"). */
+export const isPaidRow = (r: Pick<AdminInvoiceRow, "status">) => r.status === "paid";
 
 /**
  * A tax invoice exists only for money actually received. Unpaid, failed and

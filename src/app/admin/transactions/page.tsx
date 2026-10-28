@@ -3,6 +3,7 @@ import { ArrowDownLeft, ArrowUpRight, CheckCircle2, Clock } from "lucide-react";
 import Link from "next/link";
 
 import { getDb, schema } from "@/lib/db";
+import { q } from "@/lib/college/sql";
 import { formatDate, formatMoney, formatNumber } from "@/lib/format";
 import { flattenParams, parsePageRequest, PERIOD_OPTIONS, periodStart, searchAny, toPage, type RawSearchParams } from "@/lib/admin/params";
 import { AdminLoadError, AdminPageHeader, Panel, PanelBody, PanelHeader } from "@/components/admin/panel";
@@ -390,7 +391,7 @@ async function InternFeesTable({ params }: { params: Record<string, string> }) {
 async function PayoutsTable({ params }: { params: Record<string, string> }) {
   const db = getDb();
   const req = parsePageRequest(params);
-  const company = sql`coalesce((select e.company_name from ${schema.employers} e where e.id::text = ${schema.internPayouts.raw}->>'employerId'), '')`;
+  const company = sql`coalesce((select e.company_name from ${schema.employers} e where e.id::text = ${q(schema.internPayouts, schema.internPayouts.raw)}->>'employerId'), '')`;
   const conditions = [
     searchAny([sql`${schema.users.firstName}`, sql`${schema.users.lastName}`, sql`${schema.users.email}`, sql`coalesce(${schema.internPayouts.referenceId}, '')`, company], req.search),
     params.status ? eq(schema.internPayouts.status, params.status) : undefined,
