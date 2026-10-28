@@ -180,3 +180,11 @@ branch, not to be touched: `feat/college-partners` (worktree
   QA-016 (hint vs validator), logged QA-118 (P1, drives overflow at 375) and
   QA-119..136 from the employer redesign pass. Ledger: 6 P1 closed, 4 P1
   open, 38 P2 open. Opus on the admin group; Tester A (5b) stuck on a prompt.
+- 28 Oct: **staging /admin/colleges errored**: Neon was at migration 0005
+  while the code expected 0007 (the college tables didn't exist). Ran
+  db:migrate against Neon (dry run in a rollback first; 0006, both 0007s and
+  the backfill applied; 9 rows in _ft_migrations). `vercel.json` now runs
+  `scripts/migrate.ts` before `next build` (`afe01c7`), so a deploy can never
+  run ahead of its schema again. CI: first master run failed only because
+  `test:security` passed a directory to `node --test` (Node 24 on the
+  runner); fixed with a glob in `750824f`.
