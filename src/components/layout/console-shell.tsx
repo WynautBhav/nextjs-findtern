@@ -21,7 +21,7 @@ import Link from "next/link";
 
 import { RAIL_COOKIE } from "@/lib/rail";
 import { usePathname, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion } from "motion/react";
 import { Bell, ChevronDown, ChevronsLeft, ChevronsRight, CircleQuestionMark, LogOut, Mail, Menu, MessageCircle, MessageSquareText, X } from "lucide-react";
 
@@ -150,9 +150,7 @@ export function ConsoleShell({
 
   const rail = (compact: boolean, onNavigate?: () => void) => (
     <>
-      {/* The bottom fades when there is more below, so a long nav (admin has
-          20 items) reads as a scroller; short screens tighten it (QA-144). */}
-      <nav aria-label="Main" className="mt-6 min-h-0 flex-1 space-y-5 overflow-y-auto overflow-x-hidden overscroll-contain pb-6 [mask-image:linear-gradient(to_bottom,black_calc(100%-2.5rem),transparent)] [scrollbar-color:transparent_transparent] [scrollbar-width:thin] hover:[scrollbar-color:var(--color-brand-700)_transparent] [@media(max-height:60rem)]:mt-4 [@media(max-height:60rem)]:space-y-3">
+      <RailScroller>
         {groups.map((group, i) => (
           <div key={group.title ?? i}>
             {group.title ? (
@@ -185,7 +183,7 @@ export function ConsoleShell({
             ))}
           </ul>
         </div> : null}
-      </nav>
+      </RailScroller>
 
       <div className="mt-4 shrink-0 space-y-1 border-t border-white/10 pt-3">
         <FeedbackFab variant="link" deepLink={!onNavigate} className={cn("w-full", compact && "justify-center px-0 [&>span]:sr-only")} />
@@ -341,12 +339,56 @@ export function ConsoleShell({
   );
 }
 
+/**
+ * The rail's scroller (admin has 20 links; a laptop shows about 16). The
+ * links keep their size and the list scrolls (QA-144): a thin scrollbar is
+ * always visible, the bottom fades only while there is more below, and the
+ * current page is scrolled into view, so it is never hidden under the fold.
+ */
+function RailScroller({ children }: { children: React.ReactNode }) {
+  const ref = useRef<HTMLElement>(null);
+  const [more, setMore] = useState(false);
+
+  useEffect(() => {
+    const nav = ref.current;
+    if (!nav) return;
+    const update = () => setMore(nav.scrollTop + nav.clientHeight < nav.scrollHeight - 1);
+    // Centre the current page when it would sit under the fold or the fade.
+    const current = nav.querySelector('[aria-current="page"]')?.getBoundingClientRect();
+    const box = nav.getBoundingClientRect();
+    if (current && current.bottom > box.bottom - 48) {
+      nav.scrollTop += current.top - box.top - (box.height - current.height) / 2;
+    }
+    update();
+    nav.addEventListener("scroll", update, { passive: true });
+    const resize = new ResizeObserver(update);
+    resize.observe(nav);
+    return () => {
+      nav.removeEventListener("scroll", update);
+      resize.disconnect();
+    };
+  }, []);
+
+  return (
+    <nav
+      ref={ref}
+      aria-label="Main"
+      className={cn(
+        "mt-6 min-h-0 flex-1 space-y-5 overflow-y-auto overflow-x-hidden overscroll-contain pb-6 [scrollbar-color:rgb(255_255_255/0.2)_transparent] [scrollbar-width:thin]",
+        more && "[mask-image:linear-gradient(to_bottom,black_calc(100%-2.5rem),transparent)]",
+      )}
+    >
+      {children}
+    </nav>
+  );
+}
+
 function RailLink({ item, active, compact, onNavigate }: { item: ConsoleNavItem; active: boolean; compact: boolean; onNavigate?: () => void }) {
   const external = item.href.startsWith("mailto:");
   const className = cn(
-    // 44px on touch; 40px with a mouse, so a 900px-tall window shows the
-    // whole employer nav without scrolling the rail.
-    "apple-spring apple-pressable group relative flex min-h-11 items-center gap-3 rounded-apple-sm px-3 text-[0.9375rem] tracking-[-0.01em] [@media(pointer:fine)]:min-h-10 [@media(pointer:fine)_and_(max-height:60rem)]:min-h-8",
+    // 44px on touch; 40px with a mouse. A short window scrolls the rail
+    // rather than squeezing the links (QA-144).
+    "apple-spring apple-pressable group relative flex min-h-11 items-center gap-3 rounded-apple-sm px-3 text-[0.9375rem] tracking-[-0.01em] [@media(pointer:fine)]:min-h-10",
     active ? "bg-white/[0.09] font-semibold text-white" : "text-on-dark-subtle hover:bg-white/[0.06] hover:text-white",
     compact && "justify-center px-0",
   );
