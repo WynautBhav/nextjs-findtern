@@ -100,6 +100,14 @@ export function FilterForm({
         id="candidate-filters"
         method="get"
         onChange={schedule}
+        onBlur={(e) => {
+          // Text applies on leaving the field too, not only on Enter (QA-125).
+          const t = e.target;
+          if (t instanceof HTMLInputElement && (t.type === "text" || t.type === "search") && t.value !== t.defaultValue) {
+            window.clearTimeout(timer.current);
+            apply();
+          }
+        }}
         onSubmit={(e) => {
           e.preventDefault();
           window.clearTimeout(timer.current);

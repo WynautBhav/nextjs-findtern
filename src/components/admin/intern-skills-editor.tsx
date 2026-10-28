@@ -92,7 +92,9 @@ export function InternSkillsEditor({
           {list.map((skill) => (
             <li
               key={skill.name}
-              className="inline-flex items-center gap-1.5 rounded-full bg-ink-100 py-1 pl-3 pr-2 text-sm font-medium text-ink-800"
+              // On touch each skill is its own row, so the level and remove
+              // controls can be 44px without turning the pills into slabs (QA-104).
+              className="inline-flex items-center gap-1.5 rounded-full bg-ink-100 py-1 pl-3 pr-2 text-sm font-medium text-ink-800 pointer-coarse:flex pointer-coarse:w-full pointer-coarse:rounded-apple-md pointer-coarse:py-1.5"
             >
               {skill.name}
               <select
@@ -102,7 +104,7 @@ export function InternSkillsEditor({
                   setSaved(false);
                 }}
                 aria-label={`Level for ${skill.name}`}
-                className="rounded-apple-sm border border-ink-200 bg-white px-1.5 py-0.5 text-xs text-ink-700"
+                className="rounded-apple-sm border border-ink-200 bg-white px-1.5 py-0.5 text-xs text-ink-700 pointer-coarse:ml-auto pointer-coarse:min-h-11 pointer-coarse:px-2.5 pointer-coarse:text-sm"
               >
                 {LEVELS.map((l) => (
                   <option key={l} value={l}>
@@ -117,9 +119,9 @@ export function InternSkillsEditor({
                   setSaved(false);
                 }}
                 aria-label={`Remove ${skill.name}`}
-                className="text-ink-600 transition-colors hover:text-danger"
+                className="grid size-6 place-items-center rounded-full text-ink-600 transition-colors hover:bg-danger-soft hover:text-danger pointer-coarse:size-11"
               >
-                <X className="size-3" aria-hidden />
+                <X className="size-3.5" aria-hidden />
               </button>
             </li>
           ))}

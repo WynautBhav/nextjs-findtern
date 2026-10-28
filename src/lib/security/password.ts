@@ -191,22 +191,6 @@ function safeEqual(a: Buffer, b: Buffer): boolean {
   return timingSafeEqual(a, b);
 }
 
-/** One wording for every "weak password" refusal, so users learn the rule. */
-export const WEAK_PASSWORD_MESSAGE =
-  "Use at least 8 characters with an uppercase letter, a lowercase letter, a number and a special character (like ! or @).";
-
-/**
- * Password strength policy, ported from the legacy `isStrongPassword`
- * (routes.ts:27) so the rules do not change under users mid-migration.
- */
-export function isStrongPassword(pw: string): boolean {
-  if (typeof pw !== "string") return false;
-  return (
-    pw.length >= 8 &&
-    pw.length <= 200 &&
-    /[a-z]/.test(pw) &&
-    /[A-Z]/.test(pw) &&
-    /\d/.test(pw) &&
-    /[^A-Za-z0-9]/.test(pw)
-  );
-}
+// The rule lives in lib/password-policy (client-safe, one source for the
+// validator, the hint and the message; QA-016).
+export { isStrongPassword, WEAK_PASSWORD_MESSAGE } from "../password-policy.ts";

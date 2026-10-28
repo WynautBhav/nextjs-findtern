@@ -19,6 +19,7 @@ import {
 } from "@/lib/offer";
 import { shiftInIst, TIMEZONES } from "@/lib/timezones";
 import { offerableModes, type WorkPreference } from "@/lib/work-preference";
+import { DmyDateInput } from "@/components/app/dmy-date-input";
 
 export type EditableOffer = {
   roleTitle?: string;
@@ -204,7 +205,7 @@ export function ProposalOfferForm({
         </label>
         <label className="block">
           <span className={LABEL}>Start date</span>
-          <input type="date" min={tomorrowIst()} value={startDate} onChange={(e) => setStartDate(e.target.value)} className={INPUT} />
+          <DmyDateInput min={tomorrowIst()} value={startDate} onChange={setStartDate} className={INPUT} />
         </label>
         <label className="col-span-2 block">
           <span className={LABEL}>Working week</span>

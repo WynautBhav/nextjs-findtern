@@ -192,6 +192,9 @@ export function ChatWidget() {
   const listRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const [teaser, setTeaser] = useState(false);
+  // A field outside the chat has focus (the phone keyboard is up): the
+  // launcher steps aside so it never covers what is being typed (QA-136).
+  const [typing, setTyping] = useState(false);
   const reduceMotion = useReducedMotion();
 
   // A one-time "Questions? Ask me" nudge a few seconds after load. Dismissed
@@ -199,6 +202,10 @@ export function ChatWidget() {
   // private window, in which case it simply shows again next load.
   useEffect(() => {
     if (pathname?.startsWith("/admin")) return;
+    // Not inside the signed-in consoles: the nudge is for visitors, and in a
+    // console it landed over confirmations such as "Meeting request sent"
+    // (QA-128). Ask me is in the console's top bar or corner all the same.
+    if (/^\/(intern|employer|college)(\/|$)/.test(pathname ?? "")) return;
     try {
       if (window.sessionStorage.getItem(TEASER_KEY)) return;
     } catch {
@@ -224,6 +231,21 @@ export function ChatWidget() {
     const t = window.setTimeout(dismissTeaser, TEASER_MS);
     return () => window.clearTimeout(t);
   }, [teaser]);
+
+  useEffect(() => {
+    const isField = (t: EventTarget | null) =>
+      t instanceof HTMLElement &&
+      t.matches("input:not([type=checkbox]):not([type=radio]):not([type=button]):not([type=submit]), textarea, select, [contenteditable=true]") &&
+      !t.closest("[data-chat-root]");
+    const onIn = (e: FocusEvent) => setTyping(isField(e.target));
+    const onOut = () => setTyping(false);
+    document.addEventListener("focusin", onIn);
+    document.addEventListener("focusout", onOut);
+    return () => {
+      document.removeEventListener("focusin", onIn);
+      document.removeEventListener("focusout", onOut);
+    };
+  }, []);
 
   // The signed-in consoles open the chat from their top bar on desktop.
   useEffect(() => {
@@ -307,6 +329,7 @@ export function ChatWidget() {
       className={cn(
         "pointer-events-none fixed z-[80] flex flex-col items-end gap-3",
         isForm && "max-lg:hidden",
+        typing && !open && "max-lg:hidden",
         hasBottomNav ? "bottom-20 right-4" : "bottom-5 right-4",
         inApp ? "lg:bottom-auto lg:right-6 lg:top-[4.5rem]" : "lg:bottom-6 lg:right-6",
       )}

@@ -36,6 +36,8 @@ export function FullTimeOfferButton({
   fteStatus: initialFte,
   timezone = "Asia/Kolkata",
   className,
+  open: openProp,
+  onOpenChange,
 }: {
   employerId: string;
   proposalId: string;
@@ -44,9 +46,15 @@ export function FullTimeOfferButton({
   /** The company's timezone, from its location. */
   timezone?: string;
   className?: string;
+  /** Controlled from outside (a row menu item opens it); no trigger button is drawn. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }) {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
+  const [openState, setOpenState] = useState(false);
+  const controlled = openProp !== undefined;
+  const open = controlled ? openProp : openState;
+  const setOpen = (o: boolean) => (controlled ? onOpenChange?.(o) : setOpenState(o));
   const [notice, setNotice] = useState(false);
   const [noticeBusy, setNoticeBusy] = useState(false);
   const [fte, setFte] = useState(initialFte);
@@ -110,10 +118,12 @@ export function FullTimeOfferButton({
 
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)} className={buttonClass({ variant: "outline", size: "sm", className: cn("min-h-11", className) })}>
-        <BriefcaseBusiness className="size-4" aria-hidden />
-        Full-time offer
-      </button>
+      {controlled ? null : (
+        <button type="button" onClick={() => setOpen(true)} className={buttonClass({ variant: "outline", size: "sm", className: cn("min-h-11", className) })}>
+          <BriefcaseBusiness className="size-4" aria-hidden />
+          Full-time offer
+        </button>
+      )}
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-h-[90dvh] max-w-lg overflow-y-auto">
           <DialogHeader>

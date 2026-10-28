@@ -8,7 +8,7 @@ import { requireCollegeContext } from "@/lib/college/scope";
 import { SITE } from "@/lib/content/site";
 
 export const metadata: Metadata = {
-  title: "Placement console | Findtern",
+  title: "Placement console",
   robots: { index: false, follow: false },
 };
 

@@ -15,6 +15,7 @@ import { buttonClass } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { offerableModes, type WorkPreference } from "@/lib/work-preference";
 import { CountdownAgreement, EMPLOYER_HIRING_POLICY } from "@/components/app/countdown-agreement";
+import { DmyDateInput } from "@/components/app/dmy-date-input";
 
 /**
  * Proposal composer.
@@ -732,19 +733,33 @@ function Field({
         {label}
       </label>
       {hint ? <p className="mt-0.5 text-xs text-text-subtle">{hint}</p> : null}
-      <input
-        id={id}
-        name={id}
-        type={type}
-        value={value}
-        placeholder={placeholder}
-        inputMode={inputMode}
-        min={min}
-        onChange={(e) => onChange(e.target.value)}
-        aria-invalid={error ? true : undefined}
-        aria-describedby={error ? `${id}-error` : undefined}
-        className={`${FIELD_BASE} ${error ? FIELD_BAD : FIELD_OK}`}
-      />
+      {type === "date" ? (
+        // DD/MM/YYYY, not the browser's native date control (QA-126).
+        <DmyDateInput
+          id={id}
+          name={id}
+          value={value}
+          min={min}
+          onChange={onChange}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error ? `${id}-error` : undefined}
+          className={`${FIELD_BASE} ${error ? FIELD_BAD : FIELD_OK}`}
+        />
+      ) : (
+        <input
+          id={id}
+          name={id}
+          type={type}
+          value={value}
+          placeholder={placeholder}
+          inputMode={inputMode}
+          min={min}
+          onChange={(e) => onChange(e.target.value)}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error ? `${id}-error` : undefined}
+          className={`${FIELD_BASE} ${error ? FIELD_BAD : FIELD_OK}`}
+        />
+      )}
       {error ? (
         <p id={`${id}-error`} className="mt-1.5 text-xs text-danger">
           {error}

@@ -376,6 +376,14 @@ export function DetailRow({
 
 export type FilterTab = { key: string; label: string; count?: number };
 
+/** The one tab look (filters, view switches, record tabs): a filled pill when on. */
+export function pillTabClass(on: boolean): string {
+  return cn(
+    "apple-spring inline-flex min-h-10 shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-3.5 text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 max-lg:min-h-11",
+    on ? "bg-brand-700 text-white" : "text-ink-600 hover:bg-ink-100 hover:text-ink-900",
+  );
+}
+
 export function FilterTabs({
   label,
   tabs,
@@ -399,16 +407,15 @@ export function FilterTabs({
       role="group"
       aria-label={label}
       className={cn(
-        "-mx-1 flex max-w-full gap-1 overflow-x-auto px-1 pb-1 [scrollbar-width:none]",
+        // Wraps rather than scrolling sideways: a hidden scroller cut the last
+        // tab mid-word ("Paymer") with nothing to say there was more (QA-131).
+        "flex max-w-full flex-wrap gap-1",
         className,
       )}
     >
       {tabs.map((t) => {
         const on = t.key === value;
-        const cls = cn(
-          "apple-spring inline-flex min-h-10 shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-3.5 text-sm font-medium",
-          on ? "bg-brand-700 text-white" : "text-ink-600 hover:bg-ink-100 hover:text-ink-900",
-        );
+        const cls = pillTabClass(on);
         const inner = (
           <>
             {t.label}

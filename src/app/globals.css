@@ -1241,3 +1241,64 @@ body:has([data-slot="dialog-content"][data-state="open"], [data-slot="sheet-cont
     }
   }
 }
+
+/* ── Stacked tables (admin DataTable) ─────────────────────────────────────
+   Below lg a data table becomes one block per row: the title cell on its own
+   line, then each column as "label … value", actions last. Same DOM as the
+   desktop table (row checkboxes and inline editors keep their state), so
+   it is CSS only. Labels come from each cell's data-label; a cell without
+   one (checkbox, actions) has no label. It replaced a sideways scroller that
+   showed only the name column on a phone. */
+@media (width < 64rem) {
+  [data-stack] table,
+  [data-stack] tbody,
+  [data-stack] tr {
+    display: block;
+    width: 100%;
+    min-width: 0;
+  }
+  [data-stack] thead {
+    display: none;
+  }
+  [data-stack] tr {
+    padding: 0.875rem 1.25rem;
+  }
+  [data-stack] td {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.25rem 0;
+    white-space: normal;
+    text-align: right;
+  }
+  [data-stack] td:empty {
+    display: none;
+  }
+  [data-stack] td[data-label]::before {
+    content: attr(data-label);
+    flex-shrink: 0;
+    color: var(--color-text-subtle);
+    text-align: left;
+  }
+  [data-stack] td[data-title],
+  [data-stack] td:not([data-label]) {
+    justify-content: flex-start;
+    text-align: left;
+  }
+  [data-stack] td[data-title] {
+    padding-bottom: 0.5rem;
+    font-size: 0.9375rem;
+  }
+}
+
+/* Native checkboxes and radios are 13-16px; on touch they get the 24px
+   WCAG 2.5.8 minimum (admin row selection, permission grids; QA-104).
+   Most also sit inside a larger <label>, which stays the real target. */
+@media (pointer: coarse) {
+  input[type="checkbox"],
+  input[type="radio"] {
+    min-width: 1.5rem;
+    min-height: 1.5rem;
+  }
+}

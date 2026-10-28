@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { CircleDollarSign, Hourglass, Receipt } from "lucide-react";
 
 import { DataTable, parseSort, type Column } from "@/components/admin/data-table";
 import { InvoiceCsvButton, InvoiceRowActions } from "@/components/admin/invoice-actions";
@@ -151,21 +150,18 @@ export function AdminInvoicesView({
           label="Collected"
           value={formatMoney(paidMinor, "INR", { zeroLabel: "₹0" })}
           hint={`${paid.length.toLocaleString("en-IN")} paid ${k.noun} · USD at ₹100/$`}
-          icon={CircleDollarSign}
           tone="neutral"
         />
         <StatCard
           label="Discounts given"
           value={formatMoney(discountMinor, "INR", { zeroLabel: "₹0" })}
           hint="Promo codes and legacy discounts on paid rows"
-          icon={Receipt}
           tone="neutral"
         />
         <StatCard
           label="Not collected"
           value={formatMoney(pendingMinor, "INR", { zeroLabel: "₹0" })}
           hint={`${(filtered.length - paid.length).toLocaleString("en-IN")} unpaid, failed or abandoned`}
-          icon={Hourglass}
           tone="neutral"
         />
       </StatGrid>

@@ -187,11 +187,11 @@ function SheetRow({ row, review = false }: { row: Row; review?: boolean }) {
           {/* The row opens the sheet; the link is stretched over it. */}
           <Link
             href={href}
-            className="block truncate text-[0.9375rem] font-semibold text-ink-900 outline-none after:absolute after:inset-0 after:content-[''] focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-brand-500"
+            className="block break-words text-[0.9375rem] font-semibold text-ink-900 outline-none after:absolute after:inset-0 after:content-[''] focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-brand-500"
           >
             {row.name}
           </Link>
-          <p className="nums truncate text-sm text-ink-600">
+          <p className="nums text-sm text-ink-600">
             {row.period}
             {row.project ? ` · ${row.project}` : ""}
             {review && row.submittedAt ? ` · sent ${formatDay(row.submittedAt)}` : ""}

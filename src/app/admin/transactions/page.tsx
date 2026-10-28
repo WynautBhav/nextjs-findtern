@@ -1,5 +1,5 @@
 import { and, asc, count, desc, eq, gte, sql, type AnyColumn, type SQL, type SQLWrapper } from "drizzle-orm";
-import { ArrowDownLeft, ArrowUpRight, CheckCircle2, Clock } from "lucide-react";
+
 import Link from "next/link";
 
 import { getDb, schema } from "@/lib/db";
@@ -146,26 +146,22 @@ export default async function AdminTransactionsPage({ searchParams }: { searchPa
             label="Received"
             value={formatMoney(metrics.inflowMinor, "INR", { compact: true, zeroLabel: "₹0" })}
             hint={`${formatNumber(metrics.inflowCount)} paid receipts · USD at ₹100/$`}
-            icon={ArrowDownLeft}
           />
           <StatCard
             label="Paid out to interns"
             value={formatMoney(metrics.outflowMinor, "INR", { compact: true, zeroLabel: "₹0" })}
             hint={`${formatNumber(metrics.outflowPaid)} of ${formatNumber(metrics.outflowTotal)} payouts settled`}
-            icon={ArrowUpRight}
           />
           <StatCard
             label="Payouts pending"
             value={formatNumber(metrics.pendingPayouts)}
             hint="Waiting for a bank reference"
-            icon={Clock}
             href="/admin/transactions?view=payouts&status=pending"
           />
           <StatCard
             label="Settlement rate"
             value={metrics.outflowTotal ? `${Math.round((metrics.outflowPaid / metrics.outflowTotal) * 100)}%` : "-"}
             hint={metrics.outflowTotal ? "Payouts settled of all recorded" : "No payouts recorded yet"}
-            icon={CheckCircle2}
           />
         </StatGrid>
       ) : (

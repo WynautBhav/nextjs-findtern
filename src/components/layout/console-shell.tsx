@@ -50,6 +50,8 @@ export type ConsoleNavItem = {
   badge?: number | string;
   /** A quiet dot: this needs the user, without turning it into a score. */
   attention?: boolean;
+  /** Other paths this item stands for (one "Legal texts" item for four pages). */
+  also?: string[];
 };
 
 export type ConsoleNavGroup = { title?: string; items: ConsoleNavItem[] };
@@ -113,9 +115,9 @@ export function ConsoleShell({
   // The longest matching href wins, so /admin/interns/terms doesn't also
   // light up /admin/interns.
   const activeHref = allItems
-    .map((i) => i.href.split("#")[0])
-    .filter((h) => pathname === h || pathname.startsWith(`${h}/`))
-    .sort((a, b) => b.length - a.length)[0];
+    .flatMap((i) => [i.href, ...(i.also ?? [])].map((p) => ({ path: p.split("#")[0], href: i.href.split("#")[0] })))
+    .filter(({ path }) => pathname === path || pathname.startsWith(`${path}/`))
+    .sort((a, b) => b.path.length - a.path.length)[0]?.href;
   // The root crumb already names the home page; don't repeat it.
   const crumbs = breadcrumbsFor(
     pathname,
@@ -322,7 +324,9 @@ export function ConsoleShell({
           className={cn(
             "mx-auto w-full min-w-0 flex-1 px-[clamp(1rem,4vw,2.5rem)] pt-6 outline-none lg:pt-9",
             width === "reading" ? "max-w-[75rem]" : "max-w-[90rem]",
-            tabs ? "pb-28 lg:pb-24" : "pb-24",
+            // Clears the floating "Ask me" on phones: it sits above the tab
+            // bar (top edge 136px up) or in the corner (76px) (QA-136).
+            tabs ? "pb-40 lg:pb-24" : "pb-24",
           )}
         >
           {children}
@@ -384,7 +388,7 @@ function AccountMenu({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button type="button" aria-label="Account menu" className="apple-spring flex min-h-11 items-center gap-2 rounded-apple-sm pl-1 pr-1 text-sm font-medium text-ink-800 hover:bg-ink-100 sm:pr-2">
+        <button type="button" aria-label={`${account.name}, account menu`} className="apple-spring flex min-h-11 items-center gap-2 rounded-apple-sm pl-1 pr-1 text-sm font-medium text-ink-800 hover:bg-ink-100 sm:pr-2">
           <Avatar name={account.name} photoUrl={account.photoUrl} />
           <span className="hidden max-w-[11rem] truncate md:block">{account.name}</span>
           <ChevronDown className="hidden size-4 text-ink-500 md:block" aria-hidden />
@@ -394,7 +398,7 @@ function AccountMenu({
         <DropdownMenuLabel className="px-2 py-2 font-normal">
           <p className="truncate text-sm font-semibold text-ink-900">{account.name}</p>
           {account.subtitle ? <p className="truncate text-xs text-ink-600">{account.subtitle}</p> : null}
-          <p className="truncate text-xs text-ink-500">{account.email}</p>
+          <p className="truncate text-xs text-text-subtle">{account.email}</p>
         </DropdownMenuLabel>
         {menu.length ? <DropdownMenuSeparator /> : null}
         {menu.map((m) => (

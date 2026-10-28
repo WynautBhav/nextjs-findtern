@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { CreditCard, Eye, Loader2, Pencil, Search, X } from "lucide-react";
+import { CreditCard, Loader2, Pencil, Search, X } from "lucide-react";
 
 import { csrfFetch } from "@/lib/client-fetch";
 import { formatMoney } from "@/lib/format";
@@ -35,7 +35,7 @@ function nameOf(item: ProposalItem): string {
 /** Status filter buckets (the raw enums never reach the select). */
 const FILTERS: { value: string; label: string; match: (status: string, lapsed: boolean) => boolean }[] = [
   { value: "open", label: "Waiting on candidate", match: (s, l) => !l && (s === "sent" || s === "interview_scheduled" || s === "draft") },
-  { value: "accepted", label: "Payment due", match: (s) => s === "accepted" || s === "processing" },
+  { value: "accepted", label: "Accepted, to pay", match: (s) => s === "accepted" || s === "processing" },
   { value: "hired", label: "Hired", match: (s) => s === "hired" },
   { value: "closed", label: "Closed", match: (s, l) => l || ["rejected", "withdrawn", "expired"].includes(s) },
 ];
@@ -144,7 +144,9 @@ export function ProposalsManager({ initialProposals }: { initialProposals: Propo
           tabs={[
             { key: "all", label: "All", count: rows.length },
             { key: "open", label: "Waiting on candidate", count: counts.open },
-            { key: "accepted", label: "Payment due", count: counts.accepted },
+            // Accepted offers only; running placements' monthly dues are on Orders,
+            // so this is not called "payment due" beside the dashboard's count (QA-123).
+            { key: "accepted", label: "Accepted, to pay", count: counts.accepted },
             { key: "hired", label: "Hired", count: counts.hired },
             { key: "closed", label: "Closed", count: counts.closed },
           ]}
@@ -226,11 +228,11 @@ export function ProposalsManager({ initialProposals }: { initialProposals: Propo
                         stretched over it, and keeps its own focus ring. */}
                     <Link
                       href={href}
-                      className="block truncate text-[0.9375rem] font-semibold text-ink-900 outline-none after:absolute after:inset-0 after:content-[''] focus-visible:after:rounded-apple-sm focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-brand-500"
+                      className="block break-words text-[0.9375rem] font-semibold text-ink-900 outline-none after:absolute after:inset-0 after:content-[''] focus-visible:after:rounded-apple-sm focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-brand-500"
                     >
                       {title}
                     </Link>
-                    <p className="truncate text-sm text-ink-600">
+                    <p className="text-sm text-ink-600">
                       {nameOf(item)}
                       {item.project ? ` · ${item.project.projectName}` : ""}
                       {ft ? " · Full-time" : ""}
@@ -257,20 +259,35 @@ export function ProposalsManager({ initialProposals }: { initialProposals: Propo
                 </div>
                 {/* Above the stretched link, so these stay clickable. */}
                 <div className="relative z-10 flex items-center justify-end gap-1 max-lg:col-start-2 max-lg:row-start-1">
+                  {/* One visible action, chosen by the state; the row itself
+                      opens the offer, and the menu holds only the rest (QA-120). */}
                   {state.canPay ? (
                     <Link href="/employer/checkout" className={buttonClass({ variant: "accent", size: "sm" })}>
                       <CreditCard className="size-4" aria-hidden />
                       Pay to hire
                     </Link>
+                  ) : state.canEdit ? (
+                    <Link href={`${href}?edit=1`} className={buttonClass({ variant: "outline", size: "sm" })}>
+                      <Pencil className="size-4" aria-hidden />
+                      Edit offer
+                    </Link>
+                  ) : item.proposal.status === "hired" ? (
+                    <Link href="/employer/timesheets" className={buttonClass({ variant: "outline", size: "sm" })}>
+                      Timesheets
+                    </Link>
                   ) : null}
-                  <RowMenu
-                    label={`More actions for ${title}`}
-                    items={[
-                      { label: "Open offer", href, icon: <Eye /> },
-                      ...(state.canEdit ? [{ label: "Edit offer", href: `${href}?edit=1`, icon: <Pencil /> }] : []),
-                      ...(state.canWithdraw ? [{ label: "Withdraw offer", onSelect: () => setWithdrawTarget(item), icon: <X />, destructive: true }] : []),
-                    ]}
-                  />
+                  {state.canWithdraw || (state.canEdit && state.canPay) ? (
+                    <RowMenu
+                      label={`More actions for ${title}, ${nameOf(item)}`}
+                      items={[
+                        ...(state.canEdit && state.canPay ? [{ label: "Edit offer", href: `${href}?edit=1`, icon: <Pencil /> }] : []),
+                        ...(state.canWithdraw ? [{ label: "Withdraw offer", onSelect: () => setWithdrawTarget(item), icon: <X />, destructive: true }] : []),
+                      ]}
+                    />
+                  ) : (
+                    // Keeps the visible actions in one column when a row has no menu.
+                    <span aria-hidden className="size-10 shrink-0" />
+                  )}
                 </div>
               </li>
             );

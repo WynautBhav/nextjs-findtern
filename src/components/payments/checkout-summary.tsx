@@ -136,7 +136,7 @@ export function CheckoutSummary({
         </ul>
         <p className="mt-4 flex items-start gap-2 text-sm leading-relaxed text-ink-600">
           <ShieldCheck className="mt-0.5 size-4 shrink-0 text-brand-700" aria-hidden />
-          Amounts are the terms each candidate accepted, recalculated on our side before you pay. Names unlock once the hire is paid.
+          Amounts are the terms each candidate accepted, recalculated on our side before you pay. You see each candidate&apos;s name once the hire is paid.
         </p>
       </fieldset>
 

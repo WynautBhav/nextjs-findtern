@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowDownLeft, ArrowLeft, ArrowUpRight, Download, Hourglass, Wallet } from "lucide-react";
+import { ArrowLeft, Download } from "lucide-react";
 
 import { AdminLoadError, AdminPageHeader, Panel, PanelHeader } from "@/components/admin/panel";
 import { ChipLinks, ReportRange } from "@/components/admin/report-range";
@@ -135,15 +135,14 @@ export default async function AdminMoneyReportPage({ searchParams }: { searchPar
       {data ? (
         <>
           <StatGrid cols={4}>
-            <StatCard label="Received" value={inr(data.totals.receivedMinor)} hint="Paid orders and activation fees" icon={ArrowDownLeft} />
+            <StatCard label="Received" value={inr(data.totals.receivedMinor)} hint="Paid orders and activation fees" />
             <StatCard
               label="Still to collect"
               value={inr(data.totals.dueMinor)}
               hint={`Accepted offers and monthly instalments · ${inr(data.totals.prospectMinor)} in unpaid fees`}
-              icon={Hourglass}
             />
-            <StatCard label="Paid to interns" value={inr(data.totals.paidOutMinor)} hint="Stipend payouts marked paid" icon={ArrowUpRight} />
-            <StatCard label="Owed to interns" value={inr(data.totals.owedMinor)} hint="Pending payouts and stipend months ahead" icon={Wallet} />
+            <StatCard label="Paid to interns" value={inr(data.totals.paidOutMinor)} hint="Stipend payouts marked paid" />
+            <StatCard label="Owed to interns" value={inr(data.totals.owedMinor)} hint="Pending payouts and stipend months ahead" />
           </StatGrid>
 
           <MoneyTable title="Receivables" description="Money coming in, newest first." rows={data.receivables} filter={sourceLinks("receivables", receivablesFilter)} filtered={filtered} />
@@ -181,7 +180,8 @@ function MoneyTable({
           {filtered ? "Nothing matches these filters in this range." : "Nothing in this range."}
         </p>
       ) : (
-        <div className="max-h-[min(72vh,48rem)] overflow-auto">
+        // Focusable, so the inner scroll can be reached from the keyboard (axe scrollable-region-focusable).
+        <div tabIndex={0} role="region" aria-label={title} className="max-h-[min(72vh,48rem)] overflow-auto focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand-600">
           <table className="w-full min-w-[48rem] text-left text-sm">
             <thead>
               <tr className="border-b border-ink-100">

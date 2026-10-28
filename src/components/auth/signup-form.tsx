@@ -8,6 +8,7 @@ import { AlertCircle, ArrowLeft, ArrowRight, Loader2, MailCheck } from "lucide-r
 import { isValidPhone, phoneError, phoneHint } from "@/lib/phone";
 import { DIAL_CODES } from "@/lib/data/dial-codes";
 import { isPersonalEmail } from "@/lib/employer-onboarding";
+import { PASSWORD_RULES } from "@/lib/password-policy";
 
 /**
  * Intern signup: three real API calls, in order.
@@ -27,13 +28,6 @@ import { isPersonalEmail } from "@/lib/employer-onboarding";
 
 type Stage = "details" | "otp" | "creating";
 
-const PASSWORD_RULES = [
-  { test: (v: string) => v.length >= 8, label: "At least 8 characters" },
-  { test: (v: string) => /[a-z]/.test(v), label: "One lowercase letter" },
-  { test: (v: string) => /[A-Z]/.test(v), label: "One uppercase letter" },
-  { test: (v: string) => /\d/.test(v), label: "One number" },
-  { test: (v: string) => /[^A-Za-z0-9]/.test(v), label: "One special character" },
-];
 
 /** Resend is allowed once a minute (the API refuses sooner). */
 const RESEND_SECONDS = 60;
@@ -356,10 +350,10 @@ export function SignupForm({
                 const met = rule.test(password);
                 return (
                   <li
-                    key={rule.label}
+                    key={rule.item}
                     className={met ? "text-xs text-success" : "text-xs text-ink-600"}
                   >
-                    {rule.label}
+                    {rule.item}
                   </li>
                 );
               })}

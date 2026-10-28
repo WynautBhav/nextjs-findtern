@@ -318,6 +318,7 @@ export function InlineEditor({
   note,
   columns = 1,
   refresh = true,
+  check,
 }: {
   label: string;
   value: InlineValue;
@@ -328,6 +329,8 @@ export function InlineEditor({
   note?: string;
   columns?: 1 | 2;
   refresh?: boolean;
+  /** A rule checked before sending; a message stops the save and is shown. */
+  check?: (values: Record<string, unknown>) => string | null;
 }) {
   const router = useRouter();
   const reduce = useReducedMotion();
@@ -356,6 +359,11 @@ export function InlineEditor({
     const typed = typedDraft(fields, draft, initial);
     if (!typed.ok) {
       setError(typed.error);
+      return;
+    }
+    const refused = check?.(typed.values);
+    if (refused) {
+      setError(refused);
       return;
     }
     setSaving(true);

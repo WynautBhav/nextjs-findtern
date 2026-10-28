@@ -1,6 +1,7 @@
 import { Metadata } from "next";
 
 import { AdminPageHeader } from "@/components/admin/panel";
+import { LegalTabs } from "@/components/admin/legal-tabs";
 import { LegalDocEditor } from "@/components/admin/legal-doc-editor";
 import { EMPLOYER_TERMS } from "@/lib/content/legal";
 
@@ -16,6 +17,7 @@ export default function AdminCompanyTermsPage() {
         title="Company terms"
         subtitle="Edit the Company/Employer Terms & Conditions page content."
       />
+      <LegalTabs current="/admin/companies/terms" />
 
       <LegalDocEditor
         title="Company Terms and Conditions"

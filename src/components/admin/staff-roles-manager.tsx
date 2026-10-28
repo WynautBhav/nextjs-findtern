@@ -257,7 +257,7 @@ export function StaffRolesManager({
                       type="button"
                       disabled={busyId === s.id}
                       onClick={() => {
-                        const pw = window.prompt(`New password for ${s.email} (8+ characters, upper and lower case and a number)`);
+                        const pw = window.prompt(`New password for ${s.email}. ${PASSWORD_HINT}`);
                         if (pw) void updateStaff(s.id, { password: pw });
                       }}
                       className={buttonClass({ variant: "ghost", size: "sm" })}

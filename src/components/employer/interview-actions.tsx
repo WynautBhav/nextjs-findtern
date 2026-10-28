@@ -16,10 +16,12 @@
  *
  * Reschedule and feedback open an inline panel; reminder and mark-missed are
  * one click (mark-missed asks once). The server's refusal is shown verbatim.
+ *
+ * The first of those (Join when there is a link) is the card's one visible
+ * button; the others, the profile and Mark missed sit in its ⋯ menu.
  */
 
 import { useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Bell, CalendarClock, Check, Loader2, MessageSquare, UserRound, X } from "lucide-react";
 
@@ -28,6 +30,7 @@ import { csrfFetch } from "@/lib/client-fetch";
 import { isQuarterHourWall, suggestedSlots, type InterviewStage } from "@/lib/employer-interview-rules";
 import { MeetingSlots, type Slots } from "@/components/employer/meeting-slots";
 import { JoinMeetingButton } from "@/components/employer/meeting-join";
+import { RowMenu } from "@/components/app/row-menu";
 
 type Panel = "none" | "reschedule" | "feedback" | "missed";
 
@@ -128,12 +131,25 @@ export function InterviewActions({
   const canReschedule = stage === "awaiting_pick" || stage === "expired" || stage === "upcoming";
   const missedShown = canMarkMissed && (stage === "live" || stage === "over");
   const linkShown = Boolean(meetingLink) && (stage === "upcoming" || stage === "live");
+  const primary: "join" | "feedback" | "remind" | "reschedule" | null = linkShown
+    ? "join"
+    : canFeedback
+      ? "feedback"
+      : stage === "expired"
+        ? "reschedule"
+        : canRemind
+          ? "remind"
+          : canReschedule
+            ? "reschedule"
+            : null;
 
   return (
     <div className="mt-5 border-t border-ink-100 pt-4">
+      {/* One visible action by stage; the rest in a menu (QA-121: two to four
+          buttons a card). Panels still open inline under the card. */}
       <div className="flex flex-wrap items-center gap-2">
-        {linkShown ? <JoinMeetingButton link={meetingLink!} /> : null}
-        {canFeedback ? (
+        {primary === "join" ? <JoinMeetingButton link={meetingLink!} /> : null}
+        {primary === "feedback" ? (
           <button
             type="button"
             onClick={() => toggle("feedback")}
@@ -144,13 +160,13 @@ export function InterviewActions({
             Leave feedback
           </button>
         ) : null}
-        {canRemind ? (
+        {primary === "remind" ? (
           <button type="button" onClick={remind} disabled={busy !== null} className={buttonClass({ variant: "outline", size: "sm" })}>
             {busy === "send a reminder" ? <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden /> : <Bell className="size-4" aria-hidden />}
             Send reminder
           </button>
         ) : null}
-        {canReschedule ? (
+        {primary === "reschedule" ? (
           <button
             type="button"
             onClick={() => toggle("reschedule")}
@@ -162,22 +178,19 @@ export function InterviewActions({
             {stage === "upcoming" ? "Reschedule" : "Offer new times"}
           </button>
         ) : null}
-        {missedShown ? (
-          <button
-            type="button"
-            onClick={() => toggle("missed")}
-            aria-expanded={panel === "missed"}
-            disabled={busy !== null}
-            className={buttonClass({ variant: "ghost", size: "sm" })}
-          >
-            <X className="size-4" aria-hidden />
-            Mark missed
-          </button>
-        ) : null}
-        <Link href={internHref} className={buttonClass({ variant: "ghost", size: "sm", className: "ml-auto" })}>
-          <UserRound className="size-4" aria-hidden />
-          Profile
-        </Link>
+        <RowMenu
+          label="More actions for this interview"
+          className="ml-auto"
+          items={[
+            ...(canRemind && primary !== "remind" ? [{ label: "Send reminder", onSelect: () => void remind(), icon: <Bell />, disabled: busy !== null }] : []),
+            ...(canReschedule && primary !== "reschedule"
+              ? [{ label: stage === "upcoming" ? "Reschedule" : "Offer new times", onSelect: () => toggle("reschedule"), icon: <CalendarClock />, disabled: busy !== null }]
+              : []),
+            ...(canFeedback && primary !== "feedback" ? [{ label: "Leave feedback", onSelect: () => toggle("feedback"), icon: <MessageSquare /> }] : []),
+            { label: "Open profile", href: internHref, icon: <UserRound /> },
+            ...(missedShown ? [{ label: "Mark missed", onSelect: () => toggle("missed"), icon: <X />, destructive: true, disabled: busy !== null }] : []),
+          ]}
+        />
       </div>
 
       {panel === "reschedule" ? (

@@ -19,7 +19,7 @@ import { ProposalOfferSummary } from "@/components/admin/proposal-offer-summary"
 import { draftFromRecord } from "@/lib/onboarding";
 import type { RevealField } from "@/lib/admin/identity-mask";
 import type { User as UserType, InternOnboarding, Interview, Proposal, Timesheet, InternPayout } from "@/lib/db/schema";
-import { DetailRow, EmptyScene, PageHead, Pill, SectionHead, StatTile, Surface } from "@/components/app/primitives";
+import { DetailRow, EmptyScene, PageHead, Pill, pillTabClass, SectionHead, StatTile, Surface } from "@/components/app/primitives";
 import { buttonClass } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
@@ -208,7 +208,7 @@ export function Intern360View({
         />
       </div>
 
-      <div role="tablist" aria-label="Candidate record" className="flex max-w-full gap-1 overflow-x-auto rounded-apple-md bg-ink-100 p-1">
+      <div role="tablist" aria-label="Candidate record" className="-mx-1 flex max-w-full gap-1 overflow-x-auto px-1 pb-1 [scrollbar-width:none]">
         {tabs.map((t) => (
           <button
             key={t.key}
@@ -218,14 +218,11 @@ export function Intern360View({
             aria-selected={tab === t.key}
             aria-controls={`panel-${t.key}`}
             onClick={() => setTab(t.key)}
-            className={cn(
-              "inline-flex min-h-11 shrink-0 items-center gap-2 whitespace-nowrap rounded-apple-sm px-4 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-brand-600",
-              tab === t.key ? "bg-white text-ink-900 shadow-xs" : "text-ink-600 hover:text-ink-900",
-            )}
+            className={pillTabClass(tab === t.key)}
           >
             {t.label}
             {t.count !== undefined ? (
-              <span className={cn("nums rounded-full px-2 py-0.5 text-xs", tab === t.key ? "bg-brand-50 text-brand-800" : "bg-ink-200/70 text-ink-600")}>
+              <span className={cn("nums text-xs", tab === t.key ? "text-white/75" : "text-text-subtle")}>
                 {t.count}
               </span>
             ) : null}
@@ -509,8 +506,9 @@ function ProfileTab({
           )}
           {[...(a?.professional ?? []).map((q) => ({ ...q, kind: "Professional course" })), ...(a?.certifications ?? []).map((q) => ({ ...q, kind: "Certification" }))].length ? (
             <ul className="mt-4 divide-y divide-ink-100 border-t border-ink-100">
-              {[...(a?.professional ?? []).map((q) => ({ ...q, kind: "Professional course" })), ...(a?.certifications ?? []).map((q) => ({ ...q, kind: "Certification" }))].map((q) => (
-                <li key={`${q.kind}-${q.id}`} className="py-3 text-sm">
+              {[...(a?.professional ?? []).map((q) => ({ ...q, kind: "Professional course" })), ...(a?.certifications ?? []).map((q) => ({ ...q, kind: "Certification" }))].map((q, i) => (
+                // Legacy rows often have no id, so the index keeps keys unique.
+                <li key={`${q.kind}-${q.id ?? ""}-${i}`} className="py-3 text-sm">
                   <p className="font-medium text-ink-900">
                     {q.name || q.kind}
                     <span className="ml-2 text-xs font-normal text-text-subtle">{q.kind}</span>

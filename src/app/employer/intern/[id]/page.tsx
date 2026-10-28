@@ -347,8 +347,10 @@ export default async function EmployerInternDetail({
             </div>
           </div>
 
-          <div className="flex shrink-0 gap-8">
-            <div>
+          {/* Not shrink-0 on phones: the price line set the block's width and
+              ran to x=460 on a 375 screen (QA-119). It wraps instead. */}
+          <div className="flex min-w-0 gap-8 sm:shrink-0">
+            <div className="shrink-0">
               <p className="text-sm font-medium text-ink-600">Findtern Score</p>
               <p className="nums mt-1 text-4xl font-semibold leading-none tracking-[-0.03em] text-brand-700">
                 {profile.scored ? profile.score.toFixed(1) : "-"}
@@ -356,7 +358,7 @@ export default async function EmployerInternDetail({
               </p>
               <p className="mt-1.5 text-sm text-ink-600">{band.name}</p>
             </div>
-            <div>
+            <div className="min-w-0">
               <p className="text-sm font-medium text-ink-600">Price</p>
               <p className="nums mt-2.5 text-2xl font-semibold leading-none tracking-[-0.02em] text-ink-900">
                 {formatRate(pricing.hourlyRateMinor, currency)}
@@ -364,7 +366,6 @@ export default async function EmployerInternDetail({
               <p className="mt-2.5 text-sm text-ink-600">
                 {/* The price is said once, here: no separate "what hiring costs" card. */}
                 {pricing.perHireMinor > 0 ? `+ ${formatMoney(pricing.perHireMinor, currency)} per hire · ` : ""}set by the score band
-
               </p>
             </div>
           </div>

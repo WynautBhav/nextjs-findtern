@@ -261,44 +261,30 @@ export default async function AdminCompaniesPage({
         ]}
         columns={[
           {
+            // Location, phone and joined date ride under the name; the table
+            // had 13 columns and ran 640px past a 1440 screen (critique).
             header: "Company",
             sort: "name",
             cell: (row) => (
-              <Link href={`/admin/companies/${row.id}`} className="group block min-w-0 max-w-64">
-                <p className="truncate font-medium text-ink-900 group-hover:text-brand-700 group-hover:underline">{row.companyName}</p>
-                <p className="truncate text-xs text-ink-600">{row.primaryContactName || row.name || row.companyEmail}</p>
-              </Link>
-            ),
-          },
-          {
-            header: "Location",
-            sort: "country",
-            cell: (row) => (
-              <div className="min-w-0 max-w-44">
-                <p className="truncate">{row.country || "-"}</p>
-                {row.city ? <p className="truncate text-xs text-ink-600">{[row.city, row.state].filter(Boolean).join(", ")}</p> : null}
+              <div className="min-w-0 max-w-72">
+                <Link href={`/admin/companies/${row.id}`} className="group block">
+                  <span className="flex items-center gap-2">
+                    <span className="truncate font-medium text-ink-900 group-hover:text-brand-700 group-hover:underline">{row.companyName}</span>
+                    {row.onboardingCompleted ? null : <StatusBadge tone="warning" label="Onboarding" />}
+                  </span>
+                  <span className="block truncate text-xs text-ink-600">{row.primaryContactName || row.name || row.companyEmail}</span>
+                </Link>
+                <p className="nums whitespace-normal text-xs text-ink-600">
+                  {[[row.city, row.country].filter(Boolean).join(", "), `${row.countryCode ?? ""} ${row.phoneNumber ?? ""}`.trim(), `joined ${formatDate(row.createdAt)}`]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </p>
               </div>
-            ),
-          },
-          {
-            header: "Phone",
-            cell: (row) => (
-              <span className="nums whitespace-nowrap">
-                {row.countryCode} {row.phoneNumber}
-              </span>
             ),
           },
           { header: "Projects", sort: "projects", align: "right", cell: (row) => row.projectCount },
           { header: "Proposals", sort: "proposals", align: "right", cell: (row) => row.proposalCount },
           { header: "Hires", sort: "hires", align: "right", cell: (row) => row.hireCount },
-          {
-            header: "Billed",
-            align: "right",
-            cell: (row) => {
-              const billed = Number(row.paidTotal) + (money.get(row.id)?.amountLeftInrMinor ?? 0);
-              return billed > 0 ? formatMoney(billed, "INR") : <span className="text-text-subtle">-</span>;
-            },
-          },
           {
             header: "Paid",
             sort: "paid",
@@ -326,23 +312,22 @@ export default async function AdminCompaniesPage({
                   {m.nextDueDate ? <p className="text-xs text-ink-600">next {formatDate(m.nextDueDate)}</p> : null}
                 </div>
               ) : (
-                <span className="text-text-subtle">Nothing</span>
+                <span className="text-text-subtle">–</span>
               );
             },
           },
           {
-            header: "Onboarding",
-            cell: (row) => <StatusBadge tone={row.onboardingCompleted ? "success" : "warning"} label={row.onboardingCompleted ? "Complete" : "Pending"} />,
+            header: "Access",
+            cell: (row) => (
+              <div className="flex flex-col items-start gap-1.5">
+                <CompanyActiveToggle id={row.id} isActive={row.isActive} />
+                <span className="flex items-center gap-2 text-xs text-ink-600">
+                  International FTE
+                  <CompanyFteSelect id={row.id} value={row.internationalFteStatus} />
+                </span>
+              </div>
+            ),
           },
-          {
-            header: "International FTE",
-            cell: (row) => <CompanyFteSelect id={row.id} value={row.internationalFteStatus} />,
-          },
-          {
-            header: "Account",
-            cell: (row) => <CompanyActiveToggle id={row.id} isActive={row.isActive} />,
-          },
-          { header: "Joined", sort: "joined", cell: (row) => <span className="nums whitespace-nowrap">{formatDate(row.createdAt)}</span> },
         ]}
       />
     </div>

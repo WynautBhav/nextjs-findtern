@@ -2,17 +2,20 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Download, FileText, RotateCcw, Search } from "lucide-react";
+import { ArrowRight, BriefcaseBusiness, CalendarCheck, CreditCard, Download, FileText, RotateCcw, Search } from "lucide-react";
 
 import { EmptyScene, PageHead, Pill, Surface, type Tone } from "@/components/app/primitives";
 import { ButtonLink, buttonClass } from "@/components/ui/button";
 import { FullTimeOfferButton } from "@/components/employer/full-time-offer-button";
+import { RowMenu } from "@/components/app/row-menu";
 import { fieldClass, labelClass, tabClass, tdClass, thClass } from "@/components/employer/ui-tokens";
 import { downloadCsv } from "@/lib/admin/csv";
 import type { PlacementLedger } from "@/lib/dues";
 import { formatDate, formatMoney } from "@/lib/format";
 import { downloadInvoice } from "@/lib/invoice";
 import { cn } from "@/lib/utils";
+import { DmyDateInput } from "@/components/app/dmy-date-input";
+import { todayIst } from "@/lib/offer";
 
 export type HireRow = {
   proposalId: string;
@@ -101,6 +104,7 @@ export function OrdersManager({
 
   const paid = sumLabel(hires.map((h) => ({ currency: h.currency, minor: h.ledger.paidMinor })));
   const left = sumLabel(hires.map((h) => ({ currency: h.currency, minor: h.ledger.dueMinor })));
+  const today = todayIst();
   const nextDue = hires
     .map((h) => h.ledger.nextDue)
     .filter((d): d is string => Boolean(d))
@@ -126,7 +130,12 @@ export function OrdersManager({
             ? [
                 `${hires.length} hire${hires.length === 1 ? "" : "s"}`,
                 paid ? `${paid} paid` : "nothing paid yet",
-                left ? `${left} still to pay on hires${nextDue ? `, next instalment ${formatDate(nextDue)}` : ""}` : "",
+                // A past date is overdue, never "next" (QA-123).
+                left
+                  ? `${left} still to pay on hires${
+                      nextDue ? (nextDue < today ? `, overdue since ${formatDate(nextDue)}` : `, next instalment ${formatDate(nextDue)}`) : ""
+                    }`
+                  : "",
                 offers,
               ]
                 .filter(Boolean)
@@ -196,6 +205,8 @@ function HiresPanel({
   fteStatus: string;
   timezone: string;
 }) {
+  // The full-time offer dialog, opened from a row's menu.
+  const [ftFor, setFtFor] = useState<string | null>(null);
   if (hires.length === 0) {
     return (
       <EmptyScene
@@ -240,6 +251,9 @@ function HiresPanel({
       </div>
       <Surface as="ul" className="divide-y divide-ink-100 overflow-hidden">
         {hires.map((h) => {
+          const due = h.ledger.dueMinor > 0;
+          const timesheets = `/employer/timesheets?intern=${encodeURIComponent(h.internId)}`;
+          const contract = `/employer/proposal/${encodeURIComponent(h.proposalId)}`;
           const plan = PLAN[h.ledger.plan];
           return (
             <li key={h.proposalId} className="grid gap-4 px-5 py-5 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_auto] lg:items-center">
@@ -251,13 +265,13 @@ function HiresPanel({
                   <p className="flex flex-wrap items-center gap-2">
                     <Link
                       href={`/employer/intern/${encodeURIComponent(h.internId)}`}
-                      className="truncate text-[0.9375rem] font-semibold text-ink-900 underline-offset-4 hover:text-brand-700 hover:underline"
+                      className="break-words text-[0.9375rem] font-semibold text-ink-900 underline-offset-4 hover:text-brand-700 hover:underline"
                     >
                       {h.candidateName}
                     </Link>
                     <Pill tone={plan.tone}>{plan.label}</Pill>
                   </p>
-                  <p className="mt-0.5 truncate text-sm text-ink-600">
+                  <p className="mt-0.5 text-sm text-ink-600">
                     {h.roleTitle === h.projectName ? h.roleTitle : `${h.roleTitle} · ${h.projectName}`}
                   </p>
                   <p className="nums mt-1 text-sm text-ink-600">
@@ -281,24 +295,37 @@ function HiresPanel({
                 <dd className="nums text-right font-medium text-ink-900 lg:text-left">
                   {h.fullTime
                     ? formatMoney(h.ledger.totalMinor, h.currency, { zeroLabel: false })
-                    : `${h.months} month${h.months === 1 ? "" : "s"}${h.ledger.plan === "monthly" ? ` · ${h.ledger.monthsPaid} paid` : ""}`}
+                    : <span className="whitespace-nowrap">{`${h.months} month${h.months === 1 ? "" : "s"}${h.ledger.plan === "monthly" ? ` · ${h.ledger.monthsPaid} paid` : ""}`}</span>}
                 </dd>
               </dl>
 
-              <div className="flex flex-wrap items-center gap-2 lg:justify-end">
-                {!h.fullTime ? (
-                  <ButtonLink
-                    href={`/employer/timesheets?intern=${encodeURIComponent(h.internId)}`}
-                    variant="ghost"
-                    size="sm"
-                  >
+              {/* One visible action by state: Pay while money is due (it was
+                  only reachable from the page header), else Timesheets, else
+                  the contract; the rest are in the menu (QA-122). */}
+              <div className="flex items-center gap-1 lg:justify-end">
+                {due ? (
+                  <ButtonLink href={`/employer/checkout?proposal=${encodeURIComponent(h.proposalId)}`} variant="accent" size="sm">
+                    <CreditCard className="size-4" aria-hidden />
+                    Pay {formatMoney(h.ledger.dueMinor, h.currency)}
+                  </ButtonLink>
+                ) : !h.fullTime ? (
+                  <ButtonLink href={timesheets} variant="outline" size="sm">
                     Timesheets
                   </ButtonLink>
-                ) : null}
-                <ButtonLink href={`/employer/proposal/${encodeURIComponent(h.proposalId)}`} variant="outline" size="sm">
-                  <FileText className="size-4" aria-hidden />
-                  Contract
-                </ButtonLink>
+                ) : (
+                  <ButtonLink href={contract} variant="outline" size="sm">
+                    <FileText className="size-4" aria-hidden />
+                    Contract
+                  </ButtonLink>
+                )}
+                <RowMenu
+                  label={`More actions for ${h.candidateName}`}
+                  items={[
+                    ...(due && !h.fullTime ? [{ label: "Timesheets", href: timesheets, icon: <CalendarCheck /> }] : []),
+                    ...(due || !h.fullTime ? [{ label: "Contract", href: contract, icon: <FileText /> }] : []),
+                    ...(h.canOfferFullTime ? [{ label: "Full-time offer", onSelect: () => setFtFor(h.proposalId), icon: <BriefcaseBusiness /> }] : []),
+                  ]}
+                />
                 {h.canOfferFullTime ? (
                   <FullTimeOfferButton
                     employerId={employerId}
@@ -306,6 +333,8 @@ function HiresPanel({
                     candidate={h.candidateName}
                     fteStatus={fteStatus}
                     timezone={timezone}
+                    open={ftFor === h.proposalId}
+                    onOpenChange={(o) => setFtFor(o ? h.proposalId : null)}
                   />
                 ) : null}
               </div>
@@ -327,6 +356,7 @@ function initials(name: string): string {
 type ScheduleFilter = "all" | "partially_paid" | "fully_paid";
 
 function SchedulePanel({ hires }: { hires: HireRow[] }) {
+  const today = todayIst();
   const [filter, setFilter] = useState<ScheduleFilter>("all");
   const rows = hires.filter((h) => filter === "all" || h.ledger.status === filter);
 
@@ -415,7 +445,11 @@ function SchedulePanel({ hires }: { hires: HireRow[] }) {
                     <td className={cn(tdClass, "nums")}>
                       {h.ledger.nextDue ? (
                         <>
-                          {formatDate(h.ledger.nextDue)}
+                          {h.ledger.nextDue < today ? (
+                            <span className="font-medium text-danger">Overdue since {formatDate(h.ledger.nextDue)}</span>
+                          ) : (
+                            formatDate(h.ledger.nextDue)
+                          )}
                           <span className="block text-xs text-text-subtle">
                             Month {h.ledger.monthsPaid + 1} of {h.ledger.months}
                           </span>
@@ -503,11 +537,11 @@ function InvoicesPanel({ invoices }: { invoices: InvoiceRow[] }) {
         </label>
         <label className={labelClass}>
           Paid from
-          <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className={cn(fieldClass, "mt-1.5")} />
+          <DmyDateInput value={from} onChange={setFrom} className={cn(fieldClass, "mt-1.5")} />
         </label>
         <label className={labelClass}>
           Paid to
-          <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className={cn(fieldClass, "mt-1.5")} />
+          <DmyDateInput value={to} onChange={setTo} className={cn(fieldClass, "mt-1.5")} />
         </label>
         <button
           type="button"

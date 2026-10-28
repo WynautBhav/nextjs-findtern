@@ -70,8 +70,8 @@ export default async function EmployerSchedule({ searchParams }: { searchParams:
   const q = (sp.q ?? "").trim().toLowerCase();
   // Typed as DD/MM/YYYY (bug sheet 7); older links carried YYYY-MM-DD.
   const dateTyped = (sp.date ?? "").trim();
-  const dmy = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(dateTyped);
-  const dateFilter = dmy ? `${dmy[3]}-${dmy[2]}-${dmy[1]}` : /^\d{4}-\d{2}-\d{2}$/.test(dateTyped) ? dateTyped : "";
+  const dmy = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(dateTyped);
+  const dateFilter = dmy ? `${dmy[3]}-${dmy[2].padStart(2, "0")}-${dmy[1].padStart(2, "0")}` : /^\d{4}-\d{2}-\d{2}$/.test(dateTyped) ? dateTyped : "";
   const statusFilter = STATUS_FILTERS.find((s) => s.value === sp.status) ?? null;
   const projectFilter = (sp.project ?? "").trim();
   const tzFilter = (sp.tz ?? "").trim();
@@ -242,8 +242,9 @@ export default async function EmployerSchedule({ searchParams }: { searchParams:
                   defaultValue={dateFilter ? dateFilter.split("-").reverse().join("/") : ""}
                   placeholder="DD/MM/YYYY"
                   inputMode="numeric"
-                  pattern="\d{2}/\d{2}/\d{4}"
-                  data-complete="^\d{2}/\d{2}/\d{4}$"
+                  pattern="\d{1,2}/\d{1,2}/\d{4}"
+                  data-complete="^\d{1,2}/\d{1,2}/\d{4}$"
+                  data-date="dmy"
                   className={cn(field, "nums")}
                 />
               </label>

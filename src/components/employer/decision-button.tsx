@@ -20,6 +20,8 @@ export function TimesheetDecision({ timesheetId }: { timesheetId: string }) {
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  // Approving can't be undone, so it takes a second, deliberate tap (QA-132).
+  const [confirming, setConfirming] = useState(false);
 
   async function decide() {
     if (mode === "reject" && !note.trim()) {
@@ -64,9 +66,10 @@ export function TimesheetDecision({ timesheetId }: { timesheetId: string }) {
             onClick={() => {
               setMode(value);
               setError("");
+              setConfirming(false);
             }}
             className={cn(
-              "apple-spring inline-flex min-h-10 items-center justify-center gap-1.5 rounded-apple-sm text-sm font-medium",
+              "apple-spring inline-flex min-h-11 items-center justify-center gap-1.5 rounded-apple-sm text-sm font-medium",
               mode === value ? "bg-white text-ink-900 shadow-xs" : "text-ink-600 hover:text-ink-900",
             )}
           >
@@ -93,10 +96,27 @@ export function TimesheetDecision({ timesheetId }: { timesheetId: string }) {
           {error}
         </p>
       ) : null}
-      <button type="button" onClick={decide} disabled={busy} className={buttonClass({ variant: mode === "approve" ? "primary" : "dark", block: true })}>
-        {busy ? <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden /> : null}
-        {mode === "approve" ? "Approve timesheet" : "Send back to the intern"}
-      </button>
+      {mode === "approve" && confirming ? (
+        <div className="grid grid-cols-[1fr_auto] gap-2" role="group" aria-label="Confirm approval">
+          <button type="button" onClick={decide} disabled={busy} className={buttonClass({ variant: "primary", block: true })}>
+            {busy ? <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden /> : null}
+            Yes, approve and lock
+          </button>
+          <button type="button" onClick={() => setConfirming(false)} disabled={busy} className={buttonClass({ variant: "outline" })}>
+            Cancel
+          </button>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => (mode === "approve" ? setConfirming(true) : void decide())}
+          disabled={busy}
+          className={buttonClass({ variant: mode === "approve" ? "primary" : "dark", block: true })}
+        >
+          {busy ? <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden /> : null}
+          {mode === "approve" ? "Approve timesheet" : "Send back to the intern"}
+        </button>
+      )}
       <p className="text-sm leading-relaxed text-ink-600">
         {mode === "approve"
           ? "Approving locks these days for billing and the stipend. It can't be undone."

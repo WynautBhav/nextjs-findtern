@@ -4,7 +4,7 @@ import { z } from "zod";
 
 import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
-import { hashPassword, isStrongPassword, verifyPassword } from "@/lib/security/password";
+import { hashPassword, isStrongPassword, verifyPassword, WEAK_PASSWORD_MESSAGE } from "@/lib/security/password";
 
 const bodySchema = z.object({ currentPassword: z.string().min(1), newPassword: z.string() });
 
@@ -15,7 +15,7 @@ export async function POST(req: Request) {
   const parsed = bodySchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Invalid input" }, { status: 400 });
   if (!isStrongPassword(parsed.data.newPassword)) {
-    return NextResponse.json({ error: "Use 8+ characters with upper and lower case letters and a number." }, { status: 400 });
+    return NextResponse.json({ error: WEAK_PASSWORD_MESSAGE }, { status: 400 });
   }
   const db = getDb();
   const [admin] = await db.select().from(schema.admins).where(eq(schema.admins.id, guard.session.uid)).limit(1);

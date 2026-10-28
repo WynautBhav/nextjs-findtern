@@ -15,12 +15,12 @@ import { getDb, schema } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { calendarMissing } from "@/lib/calendar-status";
 import { formatMoney } from "@/lib/format";
-import { AdminEmpty, AdminLoadError, AttentionBanner, Panel, PanelHeader } from "@/components/admin/panel";
+import { AdminEmpty, AdminLoadError, AttentionBanner, Panel } from "@/components/admin/panel";
 import { StatCard, StatGrid } from "@/components/admin/stat-card";
 import { HeroBand, SectionHead } from "@/components/app/primitives";
 import { ButtonLink } from "@/components/ui/button";
 import { inrMinorSql, meaningfulProfile, realEmployerId, realEmployers, TEST_EMPLOYER_ID, AI_INTERVIEW_EMAIL } from "@/lib/admin/scope";
-import { attentionTotal, funnelSteps, type FunnelStage } from "@/lib/admin/dashboard";
+import { attentionTotal } from "@/lib/admin/dashboard";
 
 /**
  * Admin home (DESIGN.md §6): one hero number that answers "what needs me
@@ -64,7 +64,6 @@ async function loadDashboard(uid: string | null) {
   const db = getDb();
   const now = new Date();
   const weekAgo = new Date(now.getTime() - WEEK_MS);
-  const yearAgo = new Date(now.getTime() - 365 * DAY_MS);
   const soon = new Date(now.getTime() + 3 * DAY_MS).toISOString().slice(0, 10);
 
   const [
@@ -87,7 +86,6 @@ async function loadDashboard(uid: string | null) {
     [projectsTotal],
     [hiringSpeed],
     proposalStatus,
-    funnelRows,
     recentUsers,
     recentProjects,
     recentAccepted,
@@ -103,13 +101,22 @@ async function loadDashboard(uid: string | null) {
       .leftJoin(schema.internOnboarding, eq(schema.internOnboarding.userId, schema.users.id))
       .where(and(eq(schema.users.role, "intern"), eq(schema.users.isActive, true), meaningfulProfile())),
     db.select({ value: count() }).from(schema.users).where(eq(schema.users.role, "intern")),
-    db.select({ value: count() }).from(schema.users).where(and(eq(schema.users.role, "intern"), gte(schema.users.createdAt, weekAgo))),
+    // New this week, counted by the same rule as the total beside it (it
+    // counted every signup, so the tile read "117, +120 this week").
+    db
+      .select({ value: count() })
+      .from(schema.users)
+      .leftJoin(schema.internOnboarding, eq(schema.internOnboarding.userId, schema.users.id))
+      .where(and(eq(schema.users.role, "intern"), eq(schema.users.isActive, true), meaningfulProfile(), gte(schema.users.createdAt, weekAgo))),
     // Legacy rule: active, onboarded, real companies (not the test employers).
     db
       .select({ value: count() })
       .from(schema.employers)
       .where(and(realEmployers(), eq(schema.employers.isActive, true), eq(schema.employers.onboardingCompleted, true))),
-    db.select({ value: count() }).from(schema.employers).where(and(realEmployers(), gte(schema.employers.createdAt, weekAgo))),
+    db
+      .select({ value: count() })
+      .from(schema.employers)
+      .where(and(realEmployers(), eq(schema.employers.isActive, true), eq(schema.employers.onboardingCompleted, true), gte(schema.employers.createdAt, weekAgo))),
     // Paid employer orders plus intern fees, USD converted (same as Reports).
     db.execute<{ value: number }>(sql`
       SELECT coalesce(sum(v), 0)::bigint AS value FROM (
@@ -217,46 +224,19 @@ async function loadDashboard(uid: string | null) {
     // which moves on any edit and averaged to a negative figure (QA-009).
     db
       .select({
-        days: sql<number | null>`round((avg(extract(epoch from (${schema.proposals.hiredAt} - ${schema.proposals.createdAt}))) / 86400)::numeric, 1)::float8`,
-        n: count(),
+        // Rows with a hire date before the offer (bad legacy data) are left
+        // out of the average and counted, so the tile can say so (QA-134).
+        days: sql<number | null>`round((avg(extract(epoch from (${schema.proposals.hiredAt} - ${schema.proposals.createdAt}))) filter (where ${schema.proposals.hiredAt} >= ${schema.proposals.createdAt}) / 86400)::numeric, 1)::float8`,
+        n: sql<number>`(count(*) filter (where ${schema.proposals.hiredAt} >= ${schema.proposals.createdAt}))::int`,
+        total: count(),
       })
       .from(schema.proposals)
-      .where(
-        and(
-          eq(schema.proposals.status, "hired"),
-          sql`${schema.proposals.hiredAt} >= ${schema.proposals.createdAt}`,
-          realEmployerId(schema.proposals.employerId),
-        ),
-      ),
+      .where(and(eq(schema.proposals.status, "hired"), realEmployerId(schema.proposals.employerId))),
     db
       .select({ status: schema.proposals.status, value: count() })
       .from(schema.proposals)
       .where(realEmployerId(schema.proposals.employerId))
       .groupBy(schema.proposals.status),
-    // Hiring funnel, last 12 months: each candidate counted once, at the
-    // furthest stage they reached.
-    db.execute<{ stage: number; value: number }>(sql`
-      WITH ev AS (
-        SELECT intern_id, 1 AS s FROM ${schema.profileViews}
-         WHERE created_at >= ${yearAgo} AND ${realEmployerId(sql`employer_id`)}
-        UNION ALL
-        SELECT intern_id, 2 FROM ${schema.employerCartItems}
-         WHERE created_at >= ${yearAgo} AND ${realEmployerId(sql`employer_id`)}
-        UNION ALL
-        SELECT intern_id, 3 FROM ${schema.interviews}
-         WHERE created_at >= ${yearAgo} AND ${realEmployerId(sql`employer_id`)}
-           AND lower(status) NOT IN ('cancelled', 'pending')
-        UNION ALL
-        SELECT intern_id, 4 FROM ${schema.proposals}
-         WHERE created_at >= ${yearAgo} AND ${realEmployerId(sql`employer_id`)}
-        UNION ALL
-        SELECT intern_id, 5 FROM ${schema.proposals}
-         WHERE lower(status) = 'hired' AND coalesce(hired_at, updated_at) >= ${yearAgo}
-           AND ${realEmployerId(sql`employer_id`)}
-      )
-      SELECT s AS stage, count(*)::int AS value
-        FROM (SELECT intern_id, max(s) AS s FROM ev GROUP BY intern_id) t
-       GROUP BY s`).then((r) => r.rows),
     db
       .select({
         id: schema.users.id,
@@ -328,7 +308,6 @@ async function loadDashboard(uid: string | null) {
     projectsTotal,
     hiringSpeed,
     proposalStatus,
-    funnelRows,
     recentUsers,
     recentProjects,
     recentAccepted,
@@ -438,13 +417,10 @@ export default async function AdminDashboard() {
 
   const owed = attentionTotal(tasks);
 
-  const stages: FunnelStage[] = funnelSteps(
-    ["Viewed by an employer", "Shortlisted", "Interviewed", "Sent an offer", "Hired"],
-    d.funnelRows.map((r) => ({ stage: Number(r.stage), value: Number(r.value) })),
-  );
-  const funnelTop = stages[0]?.reached ?? 0;
 
   const speed = d.hiringSpeed?.days;
+  const speedN = Number(d.hiringSpeed?.n ?? 0);
+  const speedTotal = Number(d.hiringSpeed?.total ?? 0);
 
   const events: Event[] = [
     ...d.recentPayments.map((p) => ({
@@ -568,47 +544,6 @@ export default async function AdminDashboard() {
         </div>
       </section>
 
-      {/* The hiring funnel */}
-      <Panel>
-        <PanelHeader
-          title="Hiring funnel, last 12 months"
-          description="Each candidate is counted once, at the furthest step they reached. The percentage is how many of the step above made it to this one; the bar is the share of everyone an employer viewed."
-          action={
-            <Link href="/admin/reports" className="text-sm font-medium text-brand-700 hover:underline">
-              Full reports
-            </Link>
-          }
-        />
-        {funnelTop === 0 ? (
-          <AdminEmpty
-            title="No hiring activity in the last 12 months"
-            body="The funnel fills in as employers view, shortlist, interview and hire candidates."
-          />
-        ) : (
-          <ol className="space-y-4 px-5 py-5">
-            {stages.map((s, i) => {
-              const width = funnelTop ? Math.max((s.reached / funnelTop) * 100, s.reached ? 1.5 : 0) : 0;
-              return (
-                <li key={s.label} className="grid gap-1.5 sm:grid-cols-[12rem_minmax(0,1fr)_7.5rem] sm:items-center sm:gap-4">
-                  <span className="text-sm font-medium text-ink-800">{s.label}</span>
-                  <span
-                    className="h-3 overflow-hidden rounded-full bg-ink-100"
-                    title={`${s.label}: ${s.reached} candidates${i > 0 && s.rate !== null ? `, ${s.rate}% of the step above` : ""}`}
-                    aria-hidden
-                  >
-                    <span className="block h-full rounded-full bg-brand-600" style={{ width: `${width}%` }} />
-                  </span>
-                  <span className="nums flex items-baseline gap-2 text-sm sm:justify-end">
-                    <span className="font-semibold text-ink-900">{s.reached.toLocaleString("en-IN")}</span>
-                    <span className="text-ink-600">{i === 0 ? "candidates" : s.rate === null ? "-" : `${s.rate}%`}</span>
-                  </span>
-                </li>
-              );
-            })}
-          </ol>
-        )}
-      </Panel>
-
       {/* Supporting figures */}
       <section>
         <SectionHead title="Supporting figures" hint="All time unless the tile says otherwise." />
@@ -660,7 +595,13 @@ export default async function AdminDashboard() {
           <StatCard
             label="Avg hiring speed"
             value={speed == null ? "-" : `${speed} ${speed === 1 ? "day" : "days"}`}
-            hint={speed == null ? "No accepted offers yet" : "Offer sent to accepted"}
+            hint={
+              speed == null
+                ? "No hires with usable dates yet"
+                : `Offer sent to hire, over ${speedN} of ${speedTotal} hires${
+                    speedTotal > speedN ? " (the rest have a hire date before the offer)" : ""
+                  }`
+            }
           />
         </StatGrid>
       </section>

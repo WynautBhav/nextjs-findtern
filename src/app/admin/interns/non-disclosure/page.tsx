@@ -1,6 +1,7 @@
 import { Metadata } from "next";
 
 import { AdminPageHeader } from "@/components/admin/panel";
+import { LegalTabs } from "@/components/admin/legal-tabs";
 import { LegalDocEditor } from "@/components/admin/legal-doc-editor";
 import { INTERN_NDA } from "@/lib/content/legal-intern";
 
@@ -16,6 +17,7 @@ export default function AdminInternNonDisclosurePage() {
         title="Intern NDA"
         subtitle="The non-disclosure and non-bypass agreement interns accept with an offer. The first active clause is the live text, as on the legacy site."
       />
+      <LegalTabs current="/admin/interns/non-disclosure" />
 
       <LegalDocEditor
         title="Findtern Internship Acceptance, Compliance & Non-Bypass Agreement"

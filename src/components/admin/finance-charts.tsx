@@ -141,7 +141,7 @@ export function VolumeBars({ data }: { data: VolumePoint[] }) {
             onMouseLeave={() => setActive(null)}
             onFocus={() => setActive(index)}
             onBlur={() => setActive(null)}
-            aria-label={`${point.label}: ${point.count} transactions, ${formatMoney(point.totalMinor, "INR", { short: true, zeroLabel: false })}`}
+            aria-label={`${point.count} ${point.count === 1 ? "transaction" : "transactions"} ${point.label}, ${formatMoney(point.totalMinor, "INR", { short: true, zeroLabel: false })}`}
             className="group flex h-full flex-1 flex-col items-center justify-end gap-1.5 rounded focus-visible:outline-2"
           >
             <span className={cn("text-xs font-bold tabular-nums", active === index ? "text-ink-900" : "text-ink-600")}>

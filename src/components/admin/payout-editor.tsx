@@ -1,3 +1,5 @@
+"use client";
+
 import { InlineEditor } from "@/components/admin/inline-control";
 
 /**
@@ -45,6 +47,9 @@ export function PayoutEditor({
         { key: "opsNote", label: "Note for the team (optional)", type: "text", maxLength: 500, onlyIfChanged: true },
       ]}
       request={{ url: `/api/admin/payouts/${encodeURIComponent(payoutId)}`, method: "PATCH" }}
+      // Checked here too, so a missing reference is said before a request
+      // goes out rather than as a 400 from the API (QA-103).
+      check={(v) => (v.status === "paid" && !(typeof v.referenceId === "string" && v.referenceId.trim()) ? "Add the bank reference to mark it paid." : null)}
     />
   );
 }

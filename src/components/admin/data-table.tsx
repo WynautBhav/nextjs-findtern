@@ -36,6 +36,11 @@ import { cn } from "@/lib/utils";
 export type Column<T> = {
   /** Visible header text. Keep it short - the header row is nowrap. */
   header: React.ReactNode;
+  /**
+   * The cell's label in the stacked phone layout, when `header` is not plain
+   * text. Leave both unset (checkbox, actions) for a cell with no label.
+   */
+  label?: string;
   /** Renders the cell. */
   cell: (row: T, index: number) => React.ReactNode;
   /** Extra classes on every cell in this column. */
@@ -71,6 +76,7 @@ export function DataTable<T>({
   columns,
   rows,
   renderRow,
+  rowClassName,
   noun = "records",
   searchPlaceholder,
   filters,
@@ -93,6 +99,8 @@ export function DataTable<T>({
   rows: T[];
   /** Row renderer, so callers can add hover/selection behaviour. */
   renderRow?: (row: T, index: number) => React.ReactElement<typeof TableRow>;
+  /** Extra classes on every row (default rows only). */
+  rowClassName?: string;
   noun?: string;
   searchPlaceholder?: string;
   filters?: ToolbarFilter[];
@@ -112,6 +120,12 @@ export function DataTable<T>({
 }) {
   const hasToolbar = Boolean(searchPlaceholder || filters?.length || exportHref || extraControls);
   const cellPad = dense ? "px-3 py-2.5" : "px-3 py-3";
+  // Stacked phone layout: the first plain-text column is the row's title,
+  // the others carry their header as a label.
+  const labelOf = (c: Column<T>) => (typeof c.header === "string" ? c.header : c.label);
+  const titleIndex = columns.findIndex((c) => typeof c.header === "string");
+  const stackAttrs = (i: number) =>
+    i === titleIndex ? { "data-title": "" } : labelOf(columns[i]) ? { "data-label": labelOf(columns[i]) } : {};
 
   return (
     <div
@@ -149,13 +163,12 @@ export function DataTable<T>({
             `sticky` on the header never had anything to pin to. `min-w-[40rem]`
             keeps the columns readable below the sidebar breakpoint instead of
             squeezing every cell into a word-per-line stack. */}
-        <p className="border-b border-ink-100 px-5 py-1.5 text-xs text-text-subtle lg:hidden" aria-hidden>
-          Scroll sideways to see every column →
-        </p>
-        {/* The header is sticky inside this scroller, so long tables keep
-            their column names in view without the page losing its own scroll. */}
-        <div className="max-h-[min(72vh,56rem)] overflow-auto [&>[data-slot=table-container]]:overflow-visible">
-        <Table className="min-w-[40rem]">
+        {/* No inner height cap: the list is paged, and a second scrollbar
+            stopped every list around row 8. Below lg the table stacks into
+            one block per row (data-stack, globals.css) instead of scrolling
+            sideways with only the name column in view. */}
+        <div data-stack>
+        <Table className="lg:min-w-[40rem]">
           {caption ? <caption className="sr-only">{caption}</caption> : null}
           <TableHeader>
             <TableRow className="hover:bg-transparent">
@@ -169,7 +182,7 @@ export function DataTable<T>({
                     scope="col"
                     aria-sort={dir === "asc" ? "ascending" : dir === "desc" ? "descending" : undefined}
                     className={cn(
-                      "sticky top-0 z-10 bg-ink-50 px-3 py-2.5 text-xs font-semibold tracking-[0.01em] text-ink-600",
+                      "bg-ink-50 px-3 py-2.5 text-xs font-semibold tracking-[0.01em] text-ink-600",
                       column.align === "right" && "text-right",
                       column.headerClassName,
                     )}
@@ -206,10 +219,11 @@ export function DataTable<T>({
               const tr = renderRow ? (
                 renderRow(row, index)
               ) : (
-                <TableRow key={index} className="border-ink-100 hover:bg-ink-50/60">
+                <TableRow key={index} className={cn("border-ink-100 hover:bg-ink-50/60", rowClassName)}>
                   {columns.map((column, cellIndex) => (
                     <TableCell
                       key={cellIndex}
+                      {...stackAttrs(cellIndex)}
                       className={cn(
                         cellPad,
                         "text-sm text-ink-700",

@@ -325,8 +325,8 @@ export function ProjectsManager({
                       className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-6 gap-y-2 px-5 py-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_5.5rem_12rem]"
                     >
                       <div className="min-w-0">
-                        <h2 className={cn("truncate text-[0.9375rem] font-semibold", open ? "text-ink-900" : "text-ink-600")}>{p.projectName}</h2>
-                        <p className="truncate text-sm text-ink-600">{meta.join(" · ")}</p>
+                        <h2 className={cn("break-words text-[0.9375rem] font-semibold", open ? "text-ink-900" : "text-ink-600")}>{p.projectName}</h2>
+                        <p className="text-sm text-ink-600">{meta.join(" · ")}</p>
                       </div>
                       <p className="min-w-0 truncate text-sm text-ink-600 max-lg:col-span-2" title={skills.join(", ")}>
                         {skills.length ? (
