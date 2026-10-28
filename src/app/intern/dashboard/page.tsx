@@ -278,7 +278,7 @@ export default async function InternHome() {
               title="Activity"
               action={
                 history.length > 4 ? (
-                  <Link href="/intern/record" className="text-sm font-medium text-primary hover:underline">
+                  <Link href="/intern/record" className="text-sm font-medium text-primary hover:underline touch:inline-flex touch:min-h-11 touch:items-center">
                     Full record
                   </Link>
                 ) : null
@@ -365,7 +365,7 @@ export default async function InternHome() {
             <Surface className="p-5">
               <div className="flex items-baseline justify-between">
                 <h2 className="text-base font-semibold text-ink-900">How your score is made</h2>
-                <Link href="/intern/record" className="text-sm font-medium text-primary hover:underline">
+                <Link href="/intern/record" className="text-sm font-medium text-primary hover:underline touch:inline-flex touch:min-h-11 touch:items-center">
                   Details
                 </Link>
               </div>

@@ -127,7 +127,7 @@ export function CollegeLive({ collegeName, vapidKey }: { collegeName: string; va
             <span aria-hidden className="size-2 shrink-0 rounded-full bg-brand-600" />
             <span className="font-semibold">{drive.title} is live</span>
             <span className="text-brand-900">until {shortDate(new Date(drive.endsAt), { day: "numeric", month: "short" })}</span>
-            <Link href="/intern/college" className="ml-auto font-medium text-brand-700 underline-offset-4 hover:underline">
+            <Link href="/intern/college" className="ml-auto font-medium text-brand-700 underline-offset-4 hover:underline touch:inline-flex touch:min-h-11 touch:items-center">
               Call alerts
             </Link>
           </p>
