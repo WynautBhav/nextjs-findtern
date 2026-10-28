@@ -95,7 +95,10 @@ export function CollegeLive({ collegeName, vapidKey }: { collegeName: string; va
   }, [meetings.length]);
 
   const pathname = usePathname();
-  const full = /^\/intern\/(dashboard|college)(\/|$)/.test(pathname ?? "");
+  // Full size on College only (call alerts live there); one line everywhere
+  // else, Home included: on a phone the Home card pushed the intern's own
+  // offer below the fold (QA-153).
+  const full = /^\/intern\/college(\/|$)/.test(pathname ?? "");
   const visible = meetings.filter((m) => !dismissed.has(m.id));
   const current = visible[0] ?? null;
 
@@ -103,8 +106,8 @@ export function CollegeLive({ collegeName, vapidKey }: { collegeName: string; va
     <>
       {drive ? (
         // Not role="status": it was re-announced (about 50 words) on every
-        // navigation. No looping ping. Full size on Home and College; one line
-        // with a link everywhere else, so it doesn't take the first screen.
+        // navigation. No looping ping. Full size on College; one line with a
+        // link everywhere else, so it doesn't take the first screen.
         full ? (
           <div className="mb-6 flex flex-col gap-3 rounded-apple-lg border border-brand-200 bg-brand-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex min-w-0 items-start gap-2.5">

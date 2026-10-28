@@ -776,6 +776,7 @@ logins; `SEED=1` selects the seed accounts and server). Screenshots are in
 
 ### QA-153
 - Evidence: `int-hired-chromium-375-dashboard.png`, `int-hired-chromium-375-college.png`. Severity **P2**.
+- Status (builder, 29 Oct): fixed, awaiting retest (wp/opus, fix(QA-153)). The drive is announced in one place: the banner. Full size (explanation and call alerts) on /intern/college only; one line ("<drive> is live until … · Call alerts") on every other page, Home included, so the intern's own offer stays on the first screen.
 
 ### QA-154
 - Evidence: `int-sweep.mjs` small-target lines for hired and fresh intern at 375 (`/tmp` output not kept; rerun `PERSONA=hired node docs/qa/b/repro/int-sweep.mjs chromium 375`). Severity **P2**.
