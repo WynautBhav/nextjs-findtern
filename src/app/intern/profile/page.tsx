@@ -153,7 +153,7 @@ export default async function InternProfile() {
                 label="LinkedIn"
                 value={
                   draft?.linkedinUrl ? (
-                    <a href={draft.linkedinUrl} target="_blank" rel="noopener noreferrer" className="font-medium text-primary underline-offset-4 hover:underline">
+                    <a href={draft.linkedinUrl} target="_blank" rel="noopener noreferrer" className="font-medium text-primary underline-offset-4 hover:underline touch:inline-flex touch:min-h-11 touch:items-center">
                       Open
                     </a>
                   ) : (

@@ -27,7 +27,8 @@ const STATE: Record<DriveWindow, { tone: Tone; label: string }> = {
 export function DriveStatePill({ state, audience = "employer" }: { state: DriveWindow; audience?: "employer" | "college" }) {
   const s = STATE[state];
   return (
-    <Pill tone={s.tone}>
+    // Never wraps: "Live now" broke over two lines beside a long title.
+    <Pill tone={s.tone} className="shrink-0 whitespace-nowrap">
       {state === "live" ? <span aria-hidden className="size-1.5 rounded-full bg-brand-600" /> : null}
       {audience === "college" && state === "revoked" ? "Link closed" : s.label}
     </Pill>

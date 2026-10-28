@@ -8,7 +8,7 @@ import { InlineSelect, InlineToggle, sendInline } from "@/components/admin/inlin
 import { buttonClass } from "@/components/ui/button";
 import { fteOf } from "@/lib/admin/fte";
 import { cn } from "@/lib/utils";
-import { useConfirm } from "@/components/admin/use-confirm";
+import { useConfirm } from "@/components/app/use-confirm";
 
 /**
  * Company controls, all on PATCH/DELETE /api/admin/companies/[id].

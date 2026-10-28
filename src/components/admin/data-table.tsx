@@ -136,7 +136,9 @@ export function DataTable<T>({
     >
       {hasToolbar ? (
         <div className="flex flex-wrap items-end justify-between gap-3 border-b border-ink-100 px-5 py-3.5">
-          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2.5">
+          {/* On a phone the filters take the full row and Rows drops below
+              them, so a long select never runs into the label (QA-141). */}
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2.5 max-sm:basis-full">
             <TableToolbar
               searchPlaceholder={searchPlaceholder}
               filters={filters}

@@ -13,7 +13,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import type { ContactFile, ContactMeta } from "@/lib/admin/contact-meta";
 import { csrfFetch } from "@/lib/client-fetch";
 import { cn } from "@/lib/utils";
-import { useConfirm } from "@/components/admin/use-confirm";
+import { useConfirm } from "@/components/app/use-confirm";
 
 export type InboxMessage = {
   id: string;
@@ -211,13 +211,17 @@ export function MessagesInbox({ messages, filtering }: { messages: InboxMessage[
           const role = roleLabel(m);
           return (
             <li key={m.id} className={cn("flex items-start gap-3 px-5 py-3.5 hover:bg-ink-50/60", selected.has(m.id) && "bg-brand-50/50")}>
-              <input
-                type="checkbox"
-                aria-label={`Select message from ${m.name}`}
-                checked={selected.has(m.id)}
-                onChange={() => toggle(m.id)}
-                className="mt-1 size-4 shrink-0 rounded-sm accent-brand-700 max-lg:mt-0 max-lg:size-5"
-              />
+              {/* The label is the 44px target; negative margins keep the box
+                  where it was (QA-146). */}
+              <label className="-m-3 flex size-11 shrink-0 cursor-pointer items-start justify-center pt-3 max-lg:-m-2.5 max-lg:items-center max-lg:pt-0">
+                <input
+                  type="checkbox"
+                  aria-label={`Select message from ${m.name}`}
+                  checked={selected.has(m.id)}
+                  onChange={() => toggle(m.id)}
+                  className="mt-1 size-4 shrink-0 rounded-sm accent-brand-700 max-lg:mt-0 max-lg:size-5"
+                />
+              </label>
               <button
                 type="button"
                 onClick={() => openMessage(m)}

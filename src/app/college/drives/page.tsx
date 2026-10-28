@@ -54,8 +54,9 @@ export default async function DrivesPage() {
                       </p>
                     </div>
                     {/* Fixed, right-aligned columns so each figure lines up down the
-                        list (they were a loose flex row, left-aligned). */}
-                    <dl className="nums grid shrink-0 grid-cols-[5.5rem_5.5rem_7rem] gap-x-4 text-right text-sm max-sm:grid-cols-3 max-sm:text-left">
+                        list (they were a loose flex row, left-aligned). On a phone
+                        the row takes the card width and labels wrap (QA-157). */}
+                    <dl className="nums grid shrink-0 grid-cols-[5.5rem_5.5rem_7rem] gap-x-4 text-right text-sm max-sm:w-full max-sm:grid-cols-3 max-sm:text-left">
                       <div><dt className="text-text-subtle">Employers</dt><dd className="font-semibold text-ink-900">{employers}</dd></div>
                       <div><dt className="text-text-subtle">Shortlisted</dt><dd className="font-semibold text-ink-900">{shortlisted}</dd></div>
                       <div><dt className="text-text-subtle">Calls answered</dt><dd className="font-semibold text-ink-900">{calls ? `${accepted} of ${calls}` : "—"}</dd></div>

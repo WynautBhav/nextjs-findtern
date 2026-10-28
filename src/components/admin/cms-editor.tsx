@@ -25,7 +25,7 @@ import {
   type CmsType,
 } from "@/lib/admin/cms-collections";
 import { cn } from "@/lib/utils";
-import { useConfirm } from "@/components/admin/use-confirm";
+import { useConfirm } from "@/components/app/use-confirm";
 
 export type CmsItem = Record<string, unknown> & { id: string };
 

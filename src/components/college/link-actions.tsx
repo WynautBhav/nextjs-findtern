@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { csrfFetch } from "@/lib/client-fetch";
@@ -25,6 +25,19 @@ export function LinkActions(props: {
   // consequence is spelled out next to the yes/cancel pair.
   const [asking, setAsking] = useState<"POST" | "DELETE" | null>(null);
 
+  // Cancel or Esc puts focus back on the button that asked (QA-159).
+  const box = useRef<HTMLDivElement>(null);
+  const returnTo = useRef<"POST" | "DELETE" | null>(null);
+  function cancel() {
+    returnTo.current = asking;
+    setAsking(null);
+  }
+  useEffect(() => {
+    if (asking || !returnTo.current) return;
+    box.current?.querySelector<HTMLButtonElement>(`[data-ask="${returnTo.current}"]`)?.focus();
+    returnTo.current = null;
+  }, [asking]);
+
   async function call(method: "POST" | "DELETE") {
     setAsking(null);
     setBusy(true);
@@ -43,7 +56,7 @@ export function LinkActions(props: {
       : "Companies already inside keep access. Anyone you sent the current link to who hasn't opened it yet will need the new one.";
 
   return (
-    <div className="space-y-4">
+    <div ref={box} className="space-y-4">
       {url ? (
         <ShareLink url={url} {...props} />
       ) : !props.revoked ? (
@@ -53,19 +66,29 @@ export function LinkActions(props: {
         </p>
       ) : null}
       {asking ? (
-        <div role="group" aria-label="Confirm" className="rounded-apple-md border border-ink-200 bg-ink-50 p-4">
+        <div
+          role="group"
+          aria-label="Confirm"
+          onKeyDown={(e) => {
+            if (e.key === "Escape") {
+              e.stopPropagation();
+              cancel();
+            }
+          }}
+          className="rounded-apple-md border border-ink-200 bg-ink-50 p-4"
+        >
           <p className="text-sm text-ink-800">{consequence}</p>
           <div className="mt-3 flex flex-wrap gap-2">
             <button
               type="button"
-              autoFocus
               disabled={busy}
               onClick={() => void call(asking)}
               className={buttonClass({ variant: asking === "DELETE" ? "dark" : "primary", size: "sm" })}
             >
               {asking === "DELETE" ? "Yes, close the link" : "Yes, issue a new link"}
             </button>
-            <button type="button" onClick={() => setAsking(null)} className={buttonClass({ variant: "outline", size: "sm" })}>
+            {/* Cancel takes the focus: Enter on a focused "close" can't be undone. */}
+            <button type="button" autoFocus onClick={cancel} className={buttonClass({ variant: "outline", size: "sm" })}>
               Cancel
             </button>
           </div>
@@ -74,6 +97,7 @@ export function LinkActions(props: {
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
+            data-ask="POST"
             disabled={busy}
             onClick={() => (props.revoked ? void call("POST") : setAsking("POST"))}
             className={buttonClass({ variant: "outline", size: "sm" })}
@@ -83,6 +107,7 @@ export function LinkActions(props: {
           {!props.revoked ? (
             <button
               type="button"
+              data-ask="DELETE"
               disabled={busy}
               onClick={() => setAsking("DELETE")}
               className={buttonClass({ variant: "ghost", size: "sm", className: "text-danger hover:bg-danger-soft" })}

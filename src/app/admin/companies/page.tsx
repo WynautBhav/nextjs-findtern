@@ -268,10 +268,12 @@ export default async function AdminCompaniesPage({
               <div className="min-w-0 max-w-72">
                 <Link href={`/admin/companies/${row.id}`} className="group block">
                   <span className="flex items-center gap-2">
-                    <span className="truncate font-medium text-ink-900 group-hover:text-brand-700 group-hover:underline">{row.companyName}</span>
+                    <span className="break-words font-medium text-ink-900 group-hover:text-brand-700 group-hover:underline">{row.companyName}</span>
                     {row.onboardingCompleted ? null : <StatusBadge tone="warning" label="Onboarding" />}
                   </span>
-                  <span className="block truncate text-xs text-ink-600">{row.primaryContactName || row.name || row.companyEmail}</span>
+                  {/* The separator keeps the link's name "Globex Inc, Dana" for screen readers too. */}
+                  <span className="sr-only">, </span>
+                  <span className="block break-words text-xs text-ink-600">{row.primaryContactName || row.name || row.companyEmail}</span>
                 </Link>
                 <p className="nums whitespace-normal text-xs text-ink-600">
                   {[[row.city, row.country].filter(Boolean).join(", "), `${row.countryCode ?? ""} ${row.phoneNumber ?? ""}`.trim(), `joined ${formatDate(row.createdAt)}`]
