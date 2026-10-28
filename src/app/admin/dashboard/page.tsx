@@ -211,14 +211,23 @@ async function loadDashboard(uid: string | null) {
       })
       .from(schema.projects)
       .where(realEmployerId(schema.projects.employerId)),
-    // Legacy "Avg hiring speed": proposal sent to accepted/hired, in days.
+    // "Avg hiring speed": offer sent to hire, in days. The same definition as
+    // Reports' "Avg time to hire" (lib/admin/analytics.ts): hired rows with a
+    // real hired_at at or after the offer. It used to fall back to updated_at,
+    // which moves on any edit and averaged to a negative figure (QA-009).
     db
       .select({
-        days: sql<number | null>`round((avg(extract(epoch from (coalesce(${schema.proposals.hiredAt}, ${schema.proposals.updatedAt}) - ${schema.proposals.createdAt}))) / 86400)::numeric, 1)::float8`,
+        days: sql<number | null>`round((avg(extract(epoch from (${schema.proposals.hiredAt} - ${schema.proposals.createdAt}))) / 86400)::numeric, 1)::float8`,
         n: count(),
       })
       .from(schema.proposals)
-      .where(and(sql`${schema.proposals.status} in ('accepted', 'hired')`, realEmployerId(schema.proposals.employerId))),
+      .where(
+        and(
+          eq(schema.proposals.status, "hired"),
+          sql`${schema.proposals.hiredAt} >= ${schema.proposals.createdAt}`,
+          realEmployerId(schema.proposals.employerId),
+        ),
+      ),
     db
       .select({ status: schema.proposals.status, value: count() })
       .from(schema.proposals)
