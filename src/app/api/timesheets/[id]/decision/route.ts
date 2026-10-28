@@ -3,8 +3,10 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { getDb, schema } from "@/lib/db";
+import { unfilledDays } from "@/lib/employer-timesheets";
 import { requireMutation } from "@/lib/guards-mutation";
 import { notify } from "@/lib/notify";
+import { periodDays } from "@/lib/timesheet-days";
 
 const bodySchema = z.object({
   decision: z.enum(["approved", "rejected"]),
@@ -18,6 +20,11 @@ const bodySchema = z.object({
  * Only the employer on the proposal may do this - not the intern who wrote it,
  * and not the other party on an unrelated proposal. A rejection requires a
  * reason, because a bare "rejected" gives the intern nothing to act on.
+ *
+ * Approval needs every day of the period to carry a status (QA-005): the
+ * intern's submit route enforces the same rule, but a legacy row or a
+ * hand-made request can still arrive with empty days, and an approved sheet
+ * is locked for billing and the stipend. Sending it back is always allowed.
  */
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const guard = await requireMutation({ req, roles: ["employer", "admin"] });
@@ -57,6 +64,19 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
       { error: `Timesheet is already ${sheet.status}` },
       { status: 409 },
     );
+  }
+
+  if (decision === "approved" && sheet.periodStart && sheet.periodEnd) {
+    const missing = unfilledDays(periodDays(sheet.periodStart, sheet.periodEnd), sheet.entries);
+    if (missing.length > 0) {
+      return NextResponse.json(
+        {
+          error: `${missing.length} day${missing.length === 1 ? " has" : "s have"} no status yet. Set each day, or send the sheet back for the intern to fill in, before approving.`,
+          missingDates: missing.slice(0, 62),
+        },
+        { status: 409 },
+      );
+    }
   }
 
   const now = new Date();

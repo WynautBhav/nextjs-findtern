@@ -13,8 +13,8 @@ lines only.
 
 | QA-003 | P1 | admin | /admin/interns/[id] | any | closed | Candidate detail shows the full Aadhaar and PAN numbers. Expected: masked to the last 4, with an explicit reveal that is audit-logged. Sensitive-data exposure even though admin-only. |
 | QA-004 | P1 | intern | /intern/record vs /intern/dashboard, /interviews, /profile, /proposals/[id] | any | open | Two different Findtern scores for the same intern: 8.8 (Coding 9.3) on Home/Interviews/Profile/Offer, 8.2 (Coding 8.5) on Record. One page computes from the wrong source. Find which is stored and fix the other. |
-| QA-005 | P1 | employer | /employer/timesheets/[id] | any | open | A timesheet with 0 days filled could be approved. Expected: approve is refused (or disabled) until every day has a status, as the intern-side submit rule requires. |
-| QA-006 | P1 | employer (signup via college drive) | /drive/[token] → employer signup | any | open | Signing up from a drive link loses the drive (`next` not carried), and the route has no error handling on its query. Source reading by the builder; verify in the browser. |
+| QA-005 | P1 | employer | /employer/timesheets/[id] | any | fixed (awaiting retest) | A timesheet with 0 days filled could be approved. Expected: approve is refused (or disabled) until every day has a status, as the intern-side submit rule requires. |
+| QA-006 | P1 | employer (signup via college drive) | /drive/[token] → employer signup | any | fixed (awaiting retest) | Signing up from a drive link loses the drive (`next` not carried), and the route has no error handling on its query. Source reading by the builder; verify in the browser. |
 | QA-007 | P1 | employer, admin | /employer/orders; /admin/dashboard, /admin/proposal-tracker, /admin/reports, /admin/transactions, /admin/companies | any | closed | Money/hire counts disagree across pages: orders "3 payments due" vs "Nothing outstanding"; admin hires 0 vs 13; transactions "Received ₹0" vs orders ₹2,80,000; companies list 0 projects/proposals vs detail 3/9. Likely one root cause (₹0 free-mode test orders, or a status filter, counted differently per page). Verify and fix at the source, then each symptom. |
 | QA-008 | P2 | employer | /employer/dashboard | any | open | Hero says "4 things need you" above a 2-item "Waiting on you" list; the two counts come from different rules. |
 | QA-009 | P2 | admin | /admin/reports | any | closed | "Avg hiring speed −9.8 days": a negative duration; the date pair is reversed or includes unhired rows. |
@@ -58,7 +58,7 @@ lines only.
 | QA-130 | P2 | employer | timesheets list, projects, proposals, orders | 375 | closed | Meta lines cut with an ellipsis where they could wrap: "17 Sept – 16 Oct 20…", "Remote · Up to 60 days · Full-ti…", "Ritika Verma · Data Analy…". |
 | QA-131 | P2 | employer | proposals and schedule filter tabs; every dialog | 375 | closed | The tab strips scroll sideways with the last tab cut mid-word ("Paymer") and no hint; every dialog's close "×" is 16 x 16 px; the Approve / Send back choice is 40 px high. Extends QA-116. |
 | QA-132 | P2 | employer | /employer/timesheets/[id] | any | closed | "Approve timesheet" commits on one tap with Approve pre-selected and no confirm; the page itself says it "can't be undone". |
-| QA-133 | P2 (harness) | tester, employer | /employer/timesheets, /employer/timesheets/[id] | any | open | `e2e/seed-situations.mjs:244` writes day statuses "present" / "off"; the app uses Present / Absent / Fixed off / Holiday. On every seeded sheet the review shows Present 0, Hours 0 and "Not filled 7" per week while the grid says "P present" and the list says "0 / 30 days present". Real submissions are fine. The review screen cannot be tested on the personas until this is fixed. |
+| QA-133 | P2 (harness) | tester, employer | /employer/timesheets, /employer/timesheets/[id] | any | fixed (awaiting retest) | `e2e/seed-situations.mjs:244` writes day statuses "present" / "off"; the app uses Present / Absent / Fixed off / Holiday. On every seeded sheet the review shows Present 0, Hours 0 and "Not filled 7" per week while the grid says "P present" and the list says "0 / 30 days present". Real submissions are fine. The review screen cannot be tested on the personas until this is fixed. |
 | QA-134 | P2 | admin (and seed) | /admin/dashboard | any | closed | After the QA-009 fix "Avg hiring speed" skips rows whose `hired_at` is before `created_at` without saying so: 2 of 9 hired rows on a fresh seed (7 are reversed), 13 of 18 on the live copy. The tile shows no n. The seed writes the reversed dates. |
 | QA-135 | P2 | everyone | /login, /employer/login (and likely the other sign-in pages) | any | closed | The tab title is "Sign in \| Findtern \| Findtern": the brand twice. |
 | QA-136 | P2 | employer | /employer/candidates, every console page | 375 | closed | The floating "Ask me" button (kept on phones by design) still sits over the right half of the "Skill, city or keyword" search box at scroll 0. QA-102's fix covers marketing, auth and onboarding only. |
@@ -249,6 +249,7 @@ logins; `SEED=1` selects the seed accounts and server). Screenshots are in
   rule is missing, so a legacy row or a hand-made request can still approve. Fix at the decision route
   (409 with the count of unfilled days), keep the UI warning, disable Approve until filled.
 - Evidence: `docs/qa/b/screens/qa-005-timesheet-zero-days.png`, `qa-005-after-approve.png`; trace `qa-005-trace.zip`.
+- Status (builder, 28 Oct): fixed, awaiting retest (master, fix(QA-005)). `PATCH /api/timesheets/[id]/decision` now refuses `approved` with 409 and the count (plus `missingDates`) while any day of the period has no status, using the same `unfilledDays` rule as the intern's submit; sending back is unchanged. On the review page the Approve button is disabled with the reason ("N days have no status. Set each day in the grid, or send the sheet back…") until the days are filled.
 
 ### QA-006
 - Reproduced: **yes** (link target; 375 px, signed out; `node docs/qa/b/repro/qa006.mjs <token>`).
@@ -264,6 +265,7 @@ logins; `SEED=1` selects the seed accounts and server). Screenshots are in
 - Severity: **P1 kept** by the ledger's definition (a new employer from a drive loses the drive at
   signup; it is recoverable by reopening the link). The soft 404 and the title are P2.
 - Evidence: `docs/qa/b/screens/qa-006-drive-signedout-375.png`; trace `qa-006-trace.zip`.
+- Status (builder, 28 Oct): fixed, awaiting retest (master, fix(QA-006)). The drive page's "Create an employer account" now carries `?next=/drive/<token>`; the employer signup page passes `next` to the form, which goes there after the account is created (else onboarding, as before), the same as the intern signup. Google path unchanged. The soft 404 and the doubled title are not in this fix.
 
 ### QA-007 (root cause: three causes, not one)
 - Reproduced: **yes**, on SEED. On the LIVE-COPY only the companies list reproduces.
@@ -629,6 +631,7 @@ logins; `SEED=1` selects the seed accounts and server). Screenshots are in
 - Proof that the app is fine: after `UPDATE timesheets SET entries = …` with Present / Fixed off, the same sheet reads Present 21, Hours 168, Off 9 and the list "21 / 30 days present · 168 h" (the intern UI, `submit/route.ts`, uses those words).
 - Fix in the harness (normalise to the app's words). Not a product bug, but until fixed the review screen shows nonsense on every persona, which would also hide a QA-005 regression. Tell Tester A.
 - Retest (tester B, 28 Oct, production build of wp/qa-b on master 6c4b000): **still open**: `e2e/seed-situations.mjs:244` still writes "present" / "off".
+- Status (builder, 28 Oct): fixed, awaiting retest (master, with fix(QA-005)). `e2e/seed-situations.mjs` writes `Present` / `Fixed off` with hours 8 / 0 and a note, the shape a real submission has.
 
 ### QA-134
 - Steps: `/admin/dashboard` on a fresh seed: "Avg hiring speed 4.8 days"; in SQL 7 of 9 hired rows have `hired_at < created_at`, so the tile averages 2. Live copy: 13 of 18 used, 1.9 days.

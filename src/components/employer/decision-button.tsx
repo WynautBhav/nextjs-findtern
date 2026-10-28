@@ -13,8 +13,12 @@ import { cn } from "@/lib/utils";
  * optional note (legacy managerNote, EMH-24); sending back needs a reason
  * the intern can act on. One textarea, two outcomes, no modal: this is the
  * screen employers use most, and a dialog per click slowed it down.
+ *
+ * Approve stays off while any day has no status (QA-005): the server refuses
+ * it anyway, and the employer can fill the days in the grid or send the
+ * sheet back instead.
  */
-export function TimesheetDecision({ timesheetId }: { timesheetId: string }) {
+export function TimesheetDecision({ timesheetId, unfilled = 0 }: { timesheetId: string; unfilled?: number }) {
   const router = useRouter();
   const [mode, setMode] = useState<"approve" | "reject">("approve");
   const [note, setNote] = useState("");
@@ -22,6 +26,7 @@ export function TimesheetDecision({ timesheetId }: { timesheetId: string }) {
   const [error, setError] = useState("");
   // Approving can't be undone, so it takes a second, deliberate tap (QA-132).
   const [confirming, setConfirming] = useState(false);
+  const approveBlocked = mode === "approve" && unfilled > 0;
 
   async function decide() {
     if (mode === "reject" && !note.trim()) {
@@ -110,17 +115,20 @@ export function TimesheetDecision({ timesheetId }: { timesheetId: string }) {
         <button
           type="button"
           onClick={() => (mode === "approve" ? setConfirming(true) : void decide())}
-          disabled={busy}
+          disabled={busy || approveBlocked}
+          aria-describedby={approveBlocked ? "decision-help" : undefined}
           className={buttonClass({ variant: mode === "approve" ? "primary" : "dark", block: true })}
         >
           {busy ? <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden /> : null}
           {mode === "approve" ? "Approve timesheet" : "Send back to the intern"}
         </button>
       )}
-      <p className="text-sm leading-relaxed text-ink-600">
-        {mode === "approve"
-          ? "Approving locks these days for billing and the stipend. It can't be undone."
-          : "The intern sees your reason, corrects the days and sends it again."}
+      <p id="decision-help" className="text-sm leading-relaxed text-ink-600">
+        {approveBlocked
+          ? `${unfilled} day${unfilled === 1 ? " has" : "s have"} no status. Set each day in the grid, or send the sheet back for the intern to fill in.`
+          : mode === "approve"
+            ? "Approving locks these days for billing and the stipend. It can't be undone."
+            : "The intern sees your reason, corrects the days and sends it again."}
       </p>
     </div>
   );
