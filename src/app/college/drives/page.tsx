@@ -8,10 +8,11 @@ import { DRIVE_KIND_LABEL, WINDOW_LABEL } from "@/lib/college/labels";
 import { requireCollegeContext } from "@/lib/college/scope";
 import { Pill } from "@/components/app/primitives";
 import { ButtonLink } from "@/components/ui/button";
+import { shortDateTime } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
-const fmt = (d: Date) => d.toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
+const fmt = (d: Date) => shortDateTime(d, { timeZone: "Asia/Kolkata", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
 
 export default async function DrivesPage() {
   const ctx = await requireCollegeContext();

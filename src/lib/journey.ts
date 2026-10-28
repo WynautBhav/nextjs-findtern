@@ -1,4 +1,4 @@
-import { formatDate, formatMoney } from "./format.ts";
+import { formatDate, formatMoney, shortDate } from "./format.ts";
 import { draftFromRecord, MIN_SKILLS } from "./onboarding.ts";
 /**
  * The journey derivation.
@@ -516,7 +516,7 @@ export function deriveProofs(src: ProofSource): Proof[] {
       line: i.notes?.trim() ?? "You met the team and completed the conversation.",
       facts: [
         { label: "Company", value: name(i.employerId) },
-        { label: "When", value: at.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }).replace(/\bSept\b/, "Sep") },
+        { label: "When", value: shortDate(at, { day: "numeric", month: "short", year: "numeric" }) },
       ],
       at,
       issuedBy: name(i.employerId),
@@ -802,8 +802,8 @@ export function periodLabel(t: TimesheetRow): string {
     end &&
     start.getFullYear() === end.getFullYear() &&
     start.getMonth() === end.getMonth();
-  const a = start.toLocaleDateString("en-IN", { day: "numeric", month: "short" }).replace(/\bSept\b/, "Sep");
-  const b = end!.toLocaleDateString("en-IN", { day: "numeric", month: "short" }).replace(/\bSept\b/, "Sep");
+  const a = shortDate(start, { day: "numeric", month: "short" });
+  const b = shortDate(end!, { day: "numeric", month: "short" });
   if (sameMonth) return `${a} to ${b}`;
   return `${a} to ${b} ${end!.getFullYear()}`;
 }

@@ -9,7 +9,7 @@ import { buttonClass } from "@/components/ui/button";
 import { CreateTimesheetModal } from "@/components/intern/create-timesheet-modal";
 import { requireRole } from "@/lib/auth";
 import { engagementPeriods, timesheetPeriod, uncoveredParts, unfilledDays, type Period } from "@/lib/employer-timesheets";
-import { formatDayLabel, formatJoiningDate } from "@/lib/format";
+import { formatDayLabel, formatJoiningDate, shortDate } from "@/lib/format";
 import { isHiredProposal } from "@/lib/hire-status";
 import { loadInternData } from "@/lib/intern-data";
 import { isAcceptedStatus, toArray, type ProposalRow, type TimesheetRow } from "@/lib/journey";
@@ -343,7 +343,7 @@ function first(v: string | string[] | undefined): string {
 }
 
 function formatPeriodStart(iso: string): string {
-  return new Date(`${iso}T12:00:00Z`).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }).replace(/\bSept\b/, "Sep");
+  return shortDate(new Date(`${iso}T12:00:00Z`), { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
 }
 
 /** "today" / "3 days ago" mid-sentence; an absolute date keeps its capital. */

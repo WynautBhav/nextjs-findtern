@@ -4,7 +4,7 @@ import Link from "next/link";
 
 import { getDb, schema } from "@/lib/db";
 import { q } from "@/lib/college/sql";
-import { formatDate, formatMoney, formatNumber } from "@/lib/format";
+import { formatDate, formatMoney, formatNumber, shortDateTime } from "@/lib/format";
 import { flattenParams, parsePageRequest, PERIOD_OPTIONS, periodStart, searchAny, toPage, type RawSearchParams } from "@/lib/admin/params";
 import { AdminLoadError, AdminPageHeader, Panel, PanelBody, PanelHeader } from "@/components/admin/panel";
 import { StatCard, StatGrid } from "@/components/admin/stat-card";
@@ -98,7 +98,7 @@ async function loadCharts(): Promise<{ revenue: RevenuePoint[]; volume: VolumePo
   return {
     revenue: Array.from({ length: 6 }, (_, i) => {
       const d = new Date(now.getFullYear(), now.getMonth() - 5 + i, 1);
-      return { label: d.toLocaleString("en-IN", { month: "short" }), totalMinor: monthly.get(`${d.getFullYear()}-${pad(d.getMonth() + 1)}`)?.total ?? 0 };
+      return { label: shortDateTime(d, { month: "short" }), totalMinor: monthly.get(`${d.getFullYear()}-${pad(d.getMonth() + 1)}`)?.total ?? 0 };
     }),
     volume: Array.from({ length: 7 }, (_, i) => {
       const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6 + i);

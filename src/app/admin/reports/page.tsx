@@ -8,7 +8,7 @@ import { hiringFunnel } from "@/lib/admin/funnel";
 import { AdminPageHeader, Panel, PanelHeader, PanelBody } from "@/components/admin/panel";
 import { StatCard, StatGrid } from "@/components/admin/stat-card";
 import { TrendChart, PipelineBars, type TrendPoint } from "@/components/admin/trend-chart";
-import { formatMoney, formatNumber } from "@/lib/format";
+import { formatMoney, formatNumber, shortDateTime } from "@/lib/format";
 import { flattenParams, PERIOD_OPTIONS, periodStart } from "@/lib/admin/params";
 import { inrMinorSql, meaningfulProfile, realEmployerId, realEmployers } from "@/lib/admin/scope";
 import { RevenueChart, type RevenuePoint } from "@/components/admin/finance-charts";
@@ -134,7 +134,7 @@ export default async function AdminReportsPage({
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
     buckets.push({
       key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`,
-      label: d.toLocaleString("en-IN", { month: "short" }),
+      label: shortDateTime(d, { month: "short" }),
     });
   }
   const proposalsByMonth = new Map(proposalsMonthly.map((r) => [r.month, Number(r.c)]));

@@ -6,6 +6,7 @@ import { Radio } from "lucide-react";
 
 import { Pill } from "@/components/app/primitives";
 import { NudgeButton } from "./nudge-button";
+import { shortDateTime } from "@/lib/format";
 
 type Snapshot = {
   total: number;
@@ -74,7 +75,7 @@ export function PresenceLive({
             </Link>
           </h2>
           <p className="mt-0.5 text-sm text-text-subtle">
-            Open until {ends.toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}
+            Open until {shortDateTime(ends, { timeZone: "Asia/Kolkata", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}
           </p>
         </div>
         <Pill tone={conn === "live" ? "live" : "waiting"}>

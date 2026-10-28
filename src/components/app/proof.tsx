@@ -38,6 +38,7 @@ import { PROOF_META, proofAsText, type Proof } from "@/lib/journey";
 import { useSeenIds } from "@/components/app/thread";
 import { buttonClass } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { shortDate } from "@/lib/format";
 
 const KIND_TONE: Record<Proof["kind"], "live" | "paid" | "new" | "neutral" | "closed" | "waiting"> = {
   assessment: "new",
@@ -306,5 +307,5 @@ export function RecordCount({ proofs }: { proofs: Proof[] }) {
 }
 
 function formatDate(d: Date): string {
-  return d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }).replace(/\bSept\b/, "Sep");
+  return shortDate(d, { day: "numeric", month: "short", year: "numeric" });
 }

@@ -9,6 +9,7 @@ import { csrfFetch } from "@/lib/client-fetch";
 import { HEARTBEAT_MS } from "@/lib/college/constants";
 import { cn } from "@/lib/utils";
 import { PushToggle } from "./college-push";
+import { shortDate } from "@/lib/format";
 
 /**
  * A college member's live link to their placement drive.
@@ -113,7 +114,7 @@ export function CollegeLive({ collegeName, vapidKey }: { collegeName: string; va
                   {collegeName}: {drive.title} is live.
                 </strong>{" "}
                 Employers in the drive can ask you for a call: keep Findtern open, or turn on call alerts. Open until{" "}
-                {new Date(drive.endsAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" }).replace(/\bSept\b/, "Sep")}.
+                {shortDate(new Date(drive.endsAt), { day: "numeric", month: "short" })}.
               </p>
             </div>
             <PushToggle vapidKey={vapidKey} className="shrink-0" />
@@ -122,7 +123,7 @@ export function CollegeLive({ collegeName, vapidKey }: { collegeName: string; va
           <p className="mb-6 flex min-h-11 flex-wrap items-center gap-x-2 gap-y-1 rounded-apple-lg border border-brand-200 bg-brand-50 px-4 py-2 text-sm text-brand-950">
             <span aria-hidden className="size-2 shrink-0 rounded-full bg-brand-600" />
             <span className="font-semibold">{drive.title} is live</span>
-            <span className="text-brand-900">until {new Date(drive.endsAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" }).replace(/\bSept\b/, "Sep")}</span>
+            <span className="text-brand-900">until {shortDate(new Date(drive.endsAt), { day: "numeric", month: "short" })}</span>
             <Link href="/intern/college" className="ml-auto font-medium text-brand-700 underline-offset-4 hover:underline">
               Call alerts
             </Link>

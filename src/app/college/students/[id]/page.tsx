@@ -13,6 +13,7 @@ import { requireCollegeContext, studentForCollegeAdmin } from "@/lib/college/sco
 import { getDb, schema } from "@/lib/db";
 import { parseOffer } from "@/lib/offer";
 import { realEmployerId } from "@/lib/admin/scope";
+import { shortDateTime } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
@@ -226,7 +227,7 @@ export default async function CollegeStudentPage({ params }: { params: Promise<{
                 <div>
                   <p className="font-medium text-ink-900">{company ?? "Employer"} · drive call</p>
                   <p className="text-sm text-text-subtle">
-                    {drive} · {m.startsAt.toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}
+                    {drive} · {shortDateTime(m.startsAt, { timeZone: "Asia/Kolkata", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}
                   </p>
                 </div>
                 <span className="rounded-full bg-ink-100 px-2.5 py-1 text-xs font-medium text-ink-700">{humanizeStatus(m.status)}</span>

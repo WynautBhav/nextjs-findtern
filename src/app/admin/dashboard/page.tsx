@@ -14,7 +14,7 @@ import {
 import { getDb, schema } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { calendarMissing } from "@/lib/calendar-status";
-import { formatMoney } from "@/lib/format";
+import { formatMoney, shortDate } from "@/lib/format";
 import { AdminEmpty, AdminLoadError, AttentionBanner, Panel } from "@/components/admin/panel";
 import { StatCard, StatGrid } from "@/components/admin/stat-card";
 import { HeroBand, SectionHead } from "@/components/app/primitives";
@@ -622,7 +622,7 @@ export default async function AdminDashboard() {
                     <span className="min-w-0 truncate text-sm text-ink-600">{e.detail}</span>
                   </span>
                   <span className="nums whitespace-nowrap text-xs text-ink-600">
-                    {e.date ? e.date.toLocaleDateString("en-IN", { day: "numeric", month: "short", timeZone: "Asia/Kolkata" }).replace(/\bSept\b/, "Sep") : "-"}
+                    {e.date ? shortDate(e.date, { day: "numeric", month: "short", timeZone: "Asia/Kolkata" }) : "-"}
                   </span>
                 </Link>
               </li>
