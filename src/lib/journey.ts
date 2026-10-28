@@ -690,11 +690,11 @@ export function deriveReadiness(
       href: "/intern/onboarding",
     },
     {
-      // Both card images are required, as in the payment gate (bug sheet 7, NC r18).
+      // The PAN image is required, as in the payment gate; the Aadhaar image is optional (bug sheet 8).
       id: "pan",
-      label: "PAN and Aadhaar card images",
+      label: "PAN card image",
       unlocks: "Needed before the first stipend is released.",
-      done: Boolean(doc?.panImageName && doc?.aadhaarImageName),
+      done: Boolean(doc?.panImageName),
       href: "/intern/onboarding",
       blocking: live,
     },
