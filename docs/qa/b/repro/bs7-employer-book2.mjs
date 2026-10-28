@@ -1,0 +1,15 @@
+import { open, shot } from "./lib.mjs";
+import { NEHA, body, errsOf } from "./bs7-employer-lib.mjs";
+import { dump } from "./dump.mjs";
+const s = await open({ port: 3502, ...NEHA, width: 1440, height: 900, name: "bs7-emp-book2" });
+const p = s.page;
+console.log("now (host):", new Date().toString());
+await p.goto(s.url("/employer/cart"), { waitUntil: "networkidle" });
+await p.getByRole("button", { name: "Book meeting" }).first().click();
+await p.waitForTimeout(1500);
+const dlg = p.locator("[data-slot=dialog-content]");
+console.log("dialog:", (await dlg.innerText()).replace(/\s+/g, " ").slice(0, 1500));
+console.log(JSON.stringify(await p.$$eval("[data-slot=dialog-content] input, [data-slot=dialog-content] select, [data-slot=dialog-content] button, [data-slot=dialog-content] textarea", (e) => e.map((x) => `${x.tagName}:${x.type||""}:${x.name||x.id||""}:${(x.getAttribute("aria-label")||x.innerText||"").slice(0,30)}:val=${x.value||""}:step=${x.step||""}`))));
+console.log(JSON.stringify(await p.$$eval("[data-slot=dialog-content] select", (e) => e.map((x) => [x.name||x.id, [...x.options].map(o=>o.text).slice(0,12)]))));
+await shot(s, "bs7-emp-book-dialog-1440", { fullPage: false });
+await s.close();

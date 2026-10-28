@@ -1,0 +1,11 @@
+import { open, shot } from "./lib.mjs";
+import { NEHA, body, small, hscroll } from "./bs7-employer-lib.mjs";
+const s = await open({ port: 3502, ...NEHA, width: 1440, height: 900, name: "bs7-emp-cand" });
+const p = s.page;
+await p.goto(s.url("/employer/candidates"), { waitUntil: "networkidle" });
+console.log(new URL(p.url()).pathname + new URL(p.url()).search);
+console.log((await body(p)).slice(0, 3500));
+console.log(JSON.stringify(await p.evaluate(() => [...document.querySelectorAll("main input,main select,main button,main [role=combobox],main a")].filter(e=>e.getBoundingClientRect().width>0).slice(0,70).map(e=>`${e.tagName}:${e.type||""}:${e.name||e.id||""}:${(e.getAttribute("aria-label")||e.innerText||e.placeholder||"").replace(/\s+/g," ").slice(0,40)}`))));
+await shot(s, "bs7-emp-cand-1440", { fullPage: true });
+console.log(s.errors);
+await s.close();

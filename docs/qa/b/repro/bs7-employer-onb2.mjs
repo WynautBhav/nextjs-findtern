@@ -1,0 +1,54 @@
+import { open, shot } from "./lib.mjs";
+import { loadState, body, small, hscroll, errsOf } from "./bs7-employer-lib.mjs";
+const ENGINE = process.argv[2] ?? "chromium";
+const st = loadState();
+const s = await open({ port: 3502, role: "employer", email: st.email, password: "Qa#Tester2026", width: 375, height: 812, engine: ENGINE, name: "bs7-emp-onb2" });
+const p = s.page;
+await p.goto(s.url("/employer/onboarding"), { waitUntil: "networkidle" });
+const city = p.locator("input[name=city]");
+console.log("city attrs", await city.evaluate((e) => ({ role: e.getAttribute("role"), list: e.getAttribute("list"), ac: e.autocomplete, dis: e.disabled, ph: e.placeholder, cb: e.getAttribute("aria-autocomplete") })));
+await p.locator("select[name=state]").selectOption({ label: "Rajasthan" });
+await city.click(); await city.pressSequentially("Jai", { delay: 60 }); await p.waitForTimeout(800);
+console.log("city suggestions:", await p.$$eval("[role=listbox] [role=option], datalist option", (o) => o.map((x) => x.textContent).slice(0, 8)));
+await shot(s, "bs7-emp-onb-city-375", { fullPage: false });
+await p.keyboard.press("ArrowDown"); await p.keyboard.press("Enter");
+console.log("city value:", await city.inputValue());
+// website mismatch
+await p.locator("input[name=companyName]").fill("Acme QA Test");
+await p.locator("select[name=companySize]").selectOption({ index: 2 });
+await p.locator("input[name=websiteUrl]").fill("https://www.example.org");
+await p.locator("input[name=billingPincode]").fill("302017");
+await p.locator("input[name=primaryContactRole]").fill("Talent lead");
+await p.locator("input[name=escalationContactName]").fill("Esc Manager");
+await p.locator("input[name=escalationContactRole]").fill("Ops head");
+await p.locator("input[name=escalationContactEmail]").fill(st.email);
+await p.locator("input[name=escalationContactPhone]").fill("9934716258");
+await p.getByRole("button", { name: /save and continue/i }).click();
+await p.waitForTimeout(1500);
+console.log("mismatch site + same esc email ->", JSON.stringify(await errsOf(p)), new URL(p.url()).pathname);
+await shot(s, "bs7-emp-onb-errors-375", { fullPage: true });
+// other domain esc email
+await p.locator("input[name=websiteUrl]").fill("https://www.acme-qa-test.in");
+await p.locator("input[name=escalationContactEmail]").fill("boss@other-domain.com");
+await p.getByRole("button", { name: /save and continue/i }).click();
+await p.waitForTimeout(1500);
+console.log("other-domain esc email ->", JSON.stringify(await errsOf(p)), new URL(p.url()).pathname);
+// empty escalation
+await p.locator("input[name=escalationContactName]").fill("");
+await p.locator("input[name=escalationContactEmail]").fill("");
+await p.locator("input[name=escalationContactPhone]").fill("");
+await p.getByRole("button", { name: /save and continue/i }).click();
+await p.waitForTimeout(1500);
+console.log("empty escalation ->", JSON.stringify(await errsOf(p)), new URL(p.url()).pathname);
+// valid
+await p.locator("input[name=escalationContactName]").fill("Esc Manager");
+await p.locator("input[name=escalationContactEmail]").fill("esc.manager@acme-qa-test.in");
+await p.locator("input[name=escalationContactPhone]").fill("9934716258");
+await p.getByRole("button", { name: /save and continue/i }).click();
+await p.waitForTimeout(3000);
+console.log("valid ->", JSON.stringify(await errsOf(p)), new URL(p.url()).pathname);
+console.log((await body(p)).slice(0, 700));
+await shot(s, "bs7-emp-onb-step2-375", { fullPage: true });
+console.log("small", await small(p), await hscroll(p));
+console.log(s.errors);
+await s.close();

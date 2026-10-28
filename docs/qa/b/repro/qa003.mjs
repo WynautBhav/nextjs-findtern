@@ -1,0 +1,13 @@
+import { open, shot, text, pick } from "./lib.mjs";
+const PORT = process.env.PORT ?? (process.env.SEED ? 3503 : 3502);
+const id = process.argv[2];
+const s = await open({ port: PORT, ...pick("admin"), name: `qa-003-${PORT}` });
+await s.page.goto(s.url(`/admin/interns/${id}`), { waitUntil: "networkidle" });
+const t = await text(s);
+console.log("12-digit runs:", t.match(/\b\d{4}\s?\d{4}\s?\d{4}\b/g));
+console.log("PAN-like:", t.match(/\b[A-Z]{5}\d{4}[A-Z]\b/g));
+console.log("masked-ish:", t.match(/[Xx*•]{4,}\s?\d{4}/g));
+console.log((t.match(/(Aadhaar|PAN)[^.]{0,120}/gi) ?? []).slice(0, 6));
+console.log("buttons containing reveal/show:", await s.page.$$eval("button,a", (b) => b.map((x) => x.innerText.trim()).filter((x) => /reveal|show|unmask|view/i.test(x))));
+console.log(await shot(s, `qa-003-admin-intern-${PORT}`, { fullPage: true }));
+await s.close();

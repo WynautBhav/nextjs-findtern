@@ -1,0 +1,18 @@
+import { open, shot } from "./lib.mjs";
+import { loadState, saveState, body, small, hscroll, errsOf } from "./bs7-employer-lib.mjs";
+const st = loadState();
+const QT = "d3cfce82-7f94-494d-9416-8c3ab740f78b";
+const s = await open({ port: 3502, role: "employer", email: st.emailW, password: "Qa#Tester2026", width: 375, height: 812, engine: "webkit", name: "bs7-emp-wk-offer" });
+const p = s.page;
+await p.goto(s.url("/employer/cart"), { waitUntil: "domcontentloaded" }); await p.waitForTimeout(3500);
+console.log("cart:", (await body(p)).match(/shortlisted.{0,300}/)?.[0]);
+const link = await p.locator("main a:has-text('Send proposal')").first().getAttribute("href").catch(() => null);
+console.log("send link:", link);
+const url = link ?? `/employer/send-proposal?intern=${QT}`;
+await p.goto(s.url(url), { waitUntil: "domcontentloaded" }); await p.waitForTimeout(3500);
+console.log("send page:", new URL(p.url()).pathname, (await body(p)).slice(0, 500));
+await shot(s, "bs7-emp-wk-sendprop", { fullPage: false });
+console.log("labels:", await p.$$eval("main label", (l) => l.map((x) => x.innerText.replace(/\s+/g, " ").trim()).filter((t) => /amount|hour|fee/i.test(t))));
+console.log("monthly:", await p.locator("input[name=monthlyAmount]").inputValue().catch(() => "n/a"));
+console.log("pay band text:", (await body(p)).match(/(BAND|Billed in)[^.]{0,120}/g));
+await s.close();

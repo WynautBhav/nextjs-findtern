@@ -1,0 +1,12 @@
+import { open, shot } from "./lib.mjs";
+import { NEHA, body, errsOf } from "./bs7-employer-lib.mjs";
+const s = await open({ port: 3502, ...NEHA, width: 1440, height: 900, name: "bs7-emp-prop4" });
+const p = s.page;
+await p.goto(s.url("/employer/proposals"), { waitUntil: "networkidle" });
+console.log(await p.$$eval("main a", (a) => a.filter(x=>/^(View|Edit|Proceed)/.test(x.innerText.trim())).map((x) => x.innerText.trim() + "→" + x.getAttribute("href"))));
+await p.goto(s.url("/employer/proposal/d4742141-2e38-4e87-9f16-2bbf1b7d4ff4"), { waitUntil: "networkidle" });
+console.log(p.url().replace(s.origin, ""));
+console.log((await body(p)).slice(250, 3500));
+await shot(s, "bs7-emp-proposal-view-1440", { fullPage: true });
+console.log(JSON.stringify(await p.$$eval("main a, main button", (e) => e.filter(x=>x.getBoundingClientRect().width>0).map((x) => (x.innerText||"").trim().slice(0, 30)+"→"+(x.getAttribute("href")||"")))));
+await s.close();

@@ -1,0 +1,13 @@
+import { open, shot } from "./lib.mjs";
+import { NEHA, body } from "./bs7-employer-lib.mjs";
+const s = await open({ port: 3502, ...NEHA, width: 1440, height: 900, name: "bs7-emp-profile2" });
+const p = s.page;
+await p.goto(s.url("/employer/candidates"), { waitUntil: "networkidle" });
+const hrefs = await p.$$eval("main a", (a) => a.filter((x) => /^Profile/.test(x.innerText.trim())).map((x) => x.getAttribute("href")));
+console.log(hrefs.slice(0, 3));
+await p.goto(s.url(hrefs[0]), { waitUntil: "networkidle" });
+console.log(p.url());
+console.log((await body(p)).slice(250, 1200));
+console.log(JSON.stringify(await p.$$eval("main a, main button", (e) => e.map((x) => (x.getAttribute("aria-label") || x.innerText || "").replace(/\s+/g, " ").trim().slice(0, 30) + "→" + (x.getAttribute("href") || "")))));
+await shot(s, "bs7-emp-profile-fresh-1440", { fullPage: false });
+await s.close();

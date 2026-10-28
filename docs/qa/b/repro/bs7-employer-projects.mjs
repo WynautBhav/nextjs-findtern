@@ -1,0 +1,34 @@
+import { open, shot } from "./lib.mjs";
+import { NEHA, body, errsOf } from "./bs7-employer-lib.mjs";
+const s = await open({ port: 3502, ...NEHA, width: 1440, height: 900, name: "bs7-emp-projects" });
+const p = s.page;
+await p.goto(s.url("/employer/projects"), { waitUntil: "domcontentloaded" }); await p.waitForTimeout(3000);
+await p.getByRole("button", { name: "New project" }).first().click(); await p.waitForTimeout(1200);
+const dlg = p.locator("[data-slot=dialog-content], [role=dialog]:not([aria-label='Chat with Findtern'])").first();
+console.log("new project form:", (await dlg.innerText()).replace(/\s+/g, " ").slice(0, 1200));
+console.log(JSON.stringify(await dlg.locator("input,select,textarea,button").evaluateAll((e) => e.filter(x=>x.getBoundingClientRect().width>0).map((x) => `${x.tagName[0]}:${x.type||""}:${x.name||x.id||""}:${(x.getAttribute("aria-label")||x.innerText||x.placeholder||"").replace(/\s+/g," ").trim().slice(0,30)}`))));
+console.log("tz default:", await dlg.locator("select#sheet-tz").inputValue());
+await dlg.locator("#sheet-name").fill("QA Temp Delete Me");
+const sk = dlg.locator("#sheet-skills");
+for (const k of ["React", "Python", "SQL", "Figma"]) { await sk.fill(k); await p.waitForTimeout(500); await p.keyboard.press("ArrowDown"); await p.keyboard.press("Enter"); await p.waitForTimeout(300); }
+await dlg.locator("button:text-is(\"Up to 60 days\")").click();
+await dlg.locator("button:text-is(\"On-site\")").click(); await p.waitForTimeout(600);
+console.log("after On-site:", JSON.stringify(await dlg.locator("input,select").evaluateAll((e) => e.filter(x=>x.getBoundingClientRect().width>0).map((x) => `${x.type}:${x.name||x.id}:${x.placeholder||""}`))));
+console.log("loc text:", (await dlg.innerText()).replace(/\s+/g, " ").match(/(Preferred|Location|cit(y|ies))[^.]{0,140}\./i)?.[0]);
+await shot(s, "bs7-emp-newproject-onsite-1440", { fullPage: false });
+const loc = dlg.locator("input[role=combobox]").last();
+const cities = ["Pune", "Mumbai", "Delhi", "Jaipur"];
+for (const c of cities) { if (await loc.isDisabled().catch(()=>true)) { console.log("location input disabled before", c); break; } await loc.fill(c); await p.waitForTimeout(600); await p.keyboard.press("ArrowDown"); await p.keyboard.press("Enter"); await p.waitForTimeout(300); }
+console.log("loc after 4 tries:", (await dlg.innerText()).replace(/\s+/g, " ").match(/\d+ (of|added)[^.]{0,80}/g), await loc.getAttribute("placeholder"), "disabled:", await loc.isDisabled());
+await dlg.locator("button:text-is(\"Create project\")").click(); await p.waitForTimeout(3000);
+console.log("created:", (await body(p)).match(/QA Temp Delete Me.{0,200}/)?.[0]);
+const card = p.locator("main li, main article").filter({ hasText: "QA Temp Delete Me" }).first();
+await card.getByRole("button", { name: "Delete" }).click(); await p.waitForTimeout(1200);
+console.log("delete confirm:", (await p.locator("[role=alertdialog], [data-slot=dialog-content]").first().innerText().catch(() => "no confirm")).replace(/\s+/g, " ").slice(0, 300));
+await shot(s, "bs7-emp-delete-confirm-1440", { fullPage: false });
+const conf = p.locator("[role=alertdialog] button, [data-slot=dialog-content] button").filter({ hasText: /^Delete/ }).last();
+await conf.click().catch((e) => console.log("confirm click:", e.message.slice(0, 80))); await p.waitForTimeout(2500);
+console.log("after delete, still listed:", /QA Temp Delete Me/.test(await body(p)));
+await p.reload({ waitUntil: "domcontentloaded" }); await p.waitForTimeout(2500);
+console.log("after reload, still listed:", /QA Temp Delete Me/.test(await body(p)));
+await s.close();

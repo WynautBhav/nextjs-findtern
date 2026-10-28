@@ -1,0 +1,12 @@
+import { open, shot } from "./lib.mjs";
+import { body } from "./bs7-employer-lib.mjs";
+const s = await open({ port: 3502, role: "intern", email: "qa.b.intern.941877@gmail.com", password: "Qa#Tester2026", width: 1280, height: 900, name: "bs7-emp-intern-iv" });
+const p = s.page;
+await p.goto(s.url("/intern/interviews"), { waitUntil: "domcontentloaded" }); await p.waitForTimeout(3500);
+console.log("INTERN INTERVIEWS:", (await body(p)).slice(0, 2500));
+console.log(JSON.stringify(await p.$$eval("main button, main a", (e) => e.filter(x=>x.getBoundingClientRect().width>0).map((x) => (x.innerText||"").trim().slice(0, 40)))));
+await shot(s, "bs7-intern-interviews-1280", { fullPage: true });
+await p.goto(s.url("/intern/opportunities"), { waitUntil: "domcontentloaded" }); await p.waitForTimeout(3000);
+console.log("OPEN ROLES:", (await body(p)).slice(0, 900));
+await shot(s, "bs7-intern-openroles-1280", { fullPage: false });
+await s.close();

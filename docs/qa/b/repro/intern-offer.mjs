@@ -1,0 +1,14 @@
+import { open, shot, pickOr as pick } from "./lib.mjs";
+import { dump } from "./dump.mjs";
+const W = Number(process.argv[2] ?? 375), ENGINE = process.argv[3] ?? "chromium", ID = process.argv[4];
+const s = await open({ port: 3502, ...pick("intern"), width: W, engine: ENGINE, name: `intern-offer-${W}-${ENGINE}` });
+const p = s.page;
+const body = () => p.evaluate(() => document.querySelector("main")?.innerText.replace(/\s+/g, " ") ?? "");
+await p.goto(s.url("/intern/proposals"), { waitUntil: "networkidle" });
+console.log("LIST:", (await body()).slice(0, 400));
+await p.goto(s.url(`/intern/proposals/${ID}`), { waitUntil: "networkidle" });
+console.log("DETAIL:", (await body()).slice(0, 1800));
+await shot(s, `intern-offer-detail-${W}-${ENGINE}`, { fullPage: true });
+console.log("CONTROLS:", JSON.stringify((await dump(p)).filter((c) => c.t.startsWith("button") || c.t === "input:checkbox").map((c) => `${c.l.replace(/\n/g, " ")}:${c.w}x${c.h}`)));
+console.log(s.errors);
+await s.close();

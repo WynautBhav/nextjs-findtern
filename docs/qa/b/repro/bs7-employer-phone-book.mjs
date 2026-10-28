@@ -1,0 +1,35 @@
+import { open, shot } from "./lib.mjs";
+import { loadState, saveState, body, small, hscroll } from "./bs7-employer-lib.mjs";
+const ENGINE = process.argv[2] ?? "chromium";
+const st = loadState();
+const s = await open({ port: 3502, role: "employer", email: st.email, password: "Qa#Tester2026", width: 375, height: 812, engine: ENGINE, name: "bs7-emp-phone-book-" + ENGINE });
+const p = s.page;
+await p.goto(s.url("/employer/candidates"), { waitUntil: "networkidle" });
+const cards = p.locator("main ul > li:has(button:text-is(\"Shortlist\"))");
+const find = async (ini) => { const n = await cards.count(); for (let i = 0; i < n; i++) { const t = await cards.nth(i).innerText(); if (new RegExp("^" + ini + "\\b|\\n" + ini + "\\n").test(t)) return cards.nth(i); } return null; };
+const ph = cards.first();
+await ph.getByRole("button", { name: /^Shortlist$/ }).click(); await p.waitForTimeout(1500);
+console.log("PH shortlist ->", (await ph.innerText()).replace(/\s+/g, " ").slice(-120));
+const qt = await find("QT");
+console.log("QT card found:", !!qt);
+if (qt) { await qt.scrollIntoViewIfNeeded(); await qt.getByRole("button", { name: /^Shortlist$/ }).click(); await p.waitForTimeout(1500); const href = await qt.locator("a:has-text('Send proposal')").getAttribute("href"); console.log("QT send href", href); saveState({ qtHref: href }); }
+// quick view
+await ph.getByRole("button", { name: /Quick view/ }).click(); await p.waitForTimeout(1200);
+console.log("quick view:", (await p.locator("[data-slot=dialog-content], [role=dialog]:not([aria-hidden=true])").first().innerText().catch(() => "none")).replace(/\s+/g, " ").slice(0, 600));
+await shot(s, `bs7-emp-phone-quickview-${ENGINE}`, { fullPage: false });
+console.log("quickview overflow:", JSON.stringify(await p.evaluate(() => { const d = document.querySelector("[data-slot=dialog-content]"); if (!d) return null; const r = d.getBoundingClientRect(); return { w: Math.round(r.width), h: Math.round(r.height), top: Math.round(r.top), sh: d.scrollHeight, ch: d.clientHeight }; })));
+await p.keyboard.press("Escape");
+await p.goto(s.url("/employer/cart"), { waitUntil: "networkidle" });
+console.log("cart:", (await body(p)).slice(0, 900));
+console.log("small:", JSON.stringify(await small(p)));
+await shot(s, `bs7-emp-phone-cart-${ENGINE}`, { fullPage: false });
+await p.getByRole("button", { name: "Book meeting" }).first().click(); await p.waitForTimeout(1200);
+const dlg = p.locator("[data-slot=dialog-content]");
+await shot(s, `bs7-emp-phone-book-dialog-${ENGINE}`, { fullPage: false });
+console.log("dialog metrics:", JSON.stringify(await p.evaluate(() => { const d = document.querySelector("[data-slot=dialog-content]"); const r = d.getBoundingClientRect(); const btn = [...d.querySelectorAll("button")].find(b=>/Send meeting request/.test(b.innerText)); const br = btn.getBoundingClientRect(); return { w: Math.round(r.width), h: Math.round(r.height), top: Math.round(r.top), bottom: Math.round(r.bottom), vh: innerHeight, sh: d.scrollHeight, ch: d.clientHeight, btnTop: Math.round(br.top), btnBottom: Math.round(br.bottom), ctrls: [...d.querySelectorAll("input,select,button")].map(x=>`${x.name||x.type}:${Math.round(x.getBoundingClientRect().width)}x${Math.round(x.getBoundingClientRect().height)}`) }; })));
+await dlg.getByRole("button", { name: "Send meeting request" }).scrollIntoViewIfNeeded();
+await dlg.getByRole("button", { name: "Send meeting request" }).click(); await p.waitForTimeout(2500);
+console.log("booked:", (await dlg.innerText().catch(() => "closed")).replace(/\s+/g, " ").slice(-160));
+await shot(s, `bs7-emp-phone-booked-${ENGINE}`, { fullPage: false });
+console.log(s.errors, await hscroll(p));
+await s.close();

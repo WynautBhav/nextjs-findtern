@@ -1,0 +1,12 @@
+import { open, shot, text, pickOr as pick } from "./lib.mjs";
+const s = await open({ port: 3502, ...pick("intern"), width: 375, name: "onb-step1" });
+const p = s.page;
+await p.goto(s.url("/intern/onboarding"), { waitUntil: "networkidle" });
+await p.getByRole("button", { name: /^continue/i }).click();
+await p.waitForTimeout(800);
+const errs = await p.$$eval("[role=alert], .text-danger, [id$=-error], p.text-red-600", (e) => e.map((x) => (x.textContent || "").trim()).filter(Boolean));
+console.log("errors on empty Continue:", errs);
+console.log("labels with (optional):", await p.$$eval("label", (l) => l.map((x) => x.innerText.replace(/\s+/g, " ").trim()).filter((t) => /optional/i.test(t))));
+console.log("state options:", await p.$eval("select[name=state]", (e) => e.options.length));
+await shot(s, "onb-step1-errors-375", { fullPage: false });
+await s.close();

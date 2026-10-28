@@ -1,0 +1,10 @@
+import { open, shot } from "./lib.mjs";
+import { NEHA, body } from "./bs7-employer-lib.mjs";
+const s = await open({ port: 3502, ...NEHA, width: 1440, height: 900, name: "bs7-emp-checkout2" });
+const p = s.page;
+await p.goto(s.url("/employer/checkout"), { waitUntil: "networkidle" });
+await p.locator("input[name=checkout-mode]").nth(1).check({ force: true }); await p.waitForTimeout(800);
+const t = await body(p);
+console.log(t.slice(t.indexOf("Order summary"), t.indexOf("Order summary") + 700));
+await shot(s, "bs7-emp-checkout-whole-1440", { fullPage: false });
+await s.close();

@@ -1,0 +1,12 @@
+import { open, shot } from "./lib.mjs";
+import { loadState, body, small, hscroll } from "./bs7-employer-lib.mjs";
+const ENGINE = process.argv[2] ?? "chromium";
+const st = loadState();
+const s = await open({ port: 3502, role: "employer", email: st.email, password: "Qa#Tester2026", width: 375, height: 812, engine: ENGINE, name: "bs7-emp-onb" });
+const p = s.page;
+await p.goto(s.url("/employer/onboarding"), { waitUntil: "networkidle" });
+const rows = await p.evaluate(() => [...document.querySelectorAll("main input,main select,main textarea,main button")].filter(e=>e.getBoundingClientRect().width>0).map(e => { const r=e.getBoundingClientRect(); const lab=(e.labels?.[0]?.innerText||e.getAttribute("aria-label")||e.placeholder||"").replace(/\s+/g," ").slice(0,40); return `${e.tagName}:${e.type||""}:${e.name||e.id}:[${lab}]:im=${e.inputMode}:ro=${e.readOnly||e.disabled}:${Math.round(r.width)}x${Math.round(r.height)}${e.tagName==="SELECT"?" opts="+[...e.options].length+" first="+[...e.options].slice(0,4).map(o=>o.text).join("|"):""}${e.value&&e.tagName==="INPUT"?" val="+e.value:""}`; }));
+console.log(rows.join("\n"));
+console.log(await body(p));
+await shot(s, "bs7-emp-onb1-375", { fullPage: true });
+await s.close();

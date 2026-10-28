@@ -1,0 +1,12 @@
+import { chromium } from "playwright";
+import { join } from "node:path"; import { SHOTS } from "./lib.mjs";
+const b = await chromium.launch();
+const ctx = await b.newContext({ viewport: { width: 1440, height: 900 }, locale: "en-US", timezoneId: "America/New_York" });
+await ctx.addInitScript(() => { try { localStorage.setItem("ft-currency", "USD"); } catch {} });
+const p = await ctx.newPage();
+await p.goto("http://localhost:3502/", { waitUntil: "networkidle" }); await p.waitForTimeout(1000);
+const loc = p.getByText("Fixed per-hire fee").first();
+await loc.scrollIntoViewIfNeeded(); await p.evaluate(() => scrollBy(0, -250)); await p.waitForTimeout(600);
+await p.screenshot({ path: join(SHOTS, "bs7mk-home-usd-stats-1440.png") });
+console.log(await p.evaluate(() => [...document.querySelectorAll("*")].filter((e) => e.children.length === 0 && /5,000/.test(e.textContent)).map((e) => e.parentElement.innerText.replace(/\s+/g, " ").slice(0, 60))));
+await b.close();
