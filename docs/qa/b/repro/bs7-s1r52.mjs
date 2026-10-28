@@ -1,0 +1,20 @@
+// Tester B, 28 Oct: S1 r52 "where does this query show to us": send a report as the intern, look for it in the admin inbox.
+import { open, shot, pick } from "./lib.mjs";
+const MARK = `QA-B probe ${Date.now() % 100000}`;
+const i = await open({ port: 3502, ...pick("intern"), width: 1440, name: "s1r52-intern" });
+await i.page.goto(i.url("/intern/dashboard"), { waitUntil: "networkidle" });
+await i.page.getByRole("button", { name: /Report a problem/i }).first().click().catch(async () => i.page.getByText("Report a problem").first().click());
+await i.page.waitForTimeout(600);
+const dlg = i.page.getByRole("dialog");
+console.log("dialog fields:", await dlg.locator("input, textarea, select").evaluateAll((es) => es.map((e) => `${e.tagName.toLowerCase()}:${e.name || e.placeholder || e.getAttribute("aria-label")}`)));
+await dlg.locator("textarea").fill(MARK);
+await shot(i, "bs7-s1r52-intern-report", { fullPage: false });
+await dlg.getByRole("button", { name: /send|submit/i }).click(); await i.page.waitForTimeout(1500);
+console.log("after send:", (await i.page.locator("body").innerText()).replace(/\s+/g, " ").match(/(thank|sent|received|we'll)[^.]{0,80}/i)?.[0]);
+await i.close();
+const a = await open({ port: 3502, ...pick("admin"), width: 1440, name: "s1r52-admin" });
+await a.page.goto(a.url("/admin/messages"), { waitUntil: "networkidle" });
+const t = (await a.page.locator("main").innerText()).replace(/\s+/g, " ");
+console.log("admin inbox shows probe:", t.includes(MARK), "| tabs:", t.match(/(Problem reports?|Messages|Contact|Feedback)[^A-Z]{0,20}/g)?.slice(0, 5));
+await shot(a, "bs7-s1r52-admin-inbox", { fullPage: false });
+await a.close();
