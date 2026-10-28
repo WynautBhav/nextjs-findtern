@@ -85,6 +85,7 @@ export function OrdersManager({
   hires,
   invoices,
   payableCount,
+  offersToPay,
 }: {
   employerId: string;
   fteStatus: string;
@@ -93,6 +94,8 @@ export function OrdersManager({
   invoices: InvoiceRow[];
   /** Accepted offers and due months waiting at checkout. */
   payableCount: number;
+  /** Of those, accepted offers not yet paid for (not hires, so not in the hire figures). */
+  offersToPay: number;
 }) {
   const [tab, setTab] = useState<Tab>("hires");
 
@@ -109,6 +112,10 @@ export function OrdersManager({
     { id: "invoices", label: "Invoices", count: invoices.length },
   ];
 
+  // Accepted offers are not hires yet, so the hire figures leave them out;
+  // name them here so "N payments due" never sits beside a clean slate (QA-007).
+  const offers = offersToPay > 0 ? `${offersToPay} accepted offer${offersToPay === 1 ? "" : "s"} to pay for` : "";
+
   return (
     <div>
       <PageHead
@@ -119,11 +126,14 @@ export function OrdersManager({
             ? [
                 `${hires.length} hire${hires.length === 1 ? "" : "s"}`,
                 paid ? `${paid} paid` : "nothing paid yet",
-                left ? `${left} still to pay${nextDue ? `, next instalment ${formatDate(nextDue)}` : ""}` : "",
+                left ? `${left} still to pay on hires${nextDue ? `, next instalment ${formatDate(nextDue)}` : ""}` : "",
+                offers,
               ]
                 .filter(Boolean)
                 .join(" · ")
-            : "No hires yet. A hire, its payments and its invoices land here once you pay for an accepted offer."
+            : offers
+              ? `No hires yet: ${offers}. The hire starts once you pay.`
+              : "No hires yet. A hire, its payments and its invoices land here once you pay for an accepted offer."
         }
         action={
           payableCount > 0 ? (

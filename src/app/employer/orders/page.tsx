@@ -18,6 +18,7 @@ import { parseOffer } from "@/lib/offer";
 import { payableCheckout } from "@/lib/employer-payable";
 import { expireStaleEmployerOrders, orderProposalIds } from "@/lib/payments";
 import { formatMoney } from "@/lib/format";
+import { isPaidRow } from "@/lib/admin/invoice-rows";
 
 export const metadata: Metadata = {
   title: "Orders & payments",
@@ -143,7 +144,7 @@ async function loadOrders(employerId: string) {
   // Money received only: a cancelled, failed or abandoned checkout is not an
   // invoice (bug sheet 7 S1 r135), and a ₹0 test order has nothing to bill.
   const invoices: InvoiceRow[] = paymentRows
-    .filter((p) => (p.status === "paid" || p.status === "captured") && p.amountMinor > 0)
+    .filter((p) => isPaidRow(p) && p.amountMinor > 0)
     .map((p) => {
       const ids = orderProposalIds(p.raw);
       const rows = ids.map((id) => byId.get(id)).filter((r): r is NonNullable<typeof r> => Boolean(r));
@@ -194,5 +195,5 @@ async function loadOrders(employerId: string) {
       };
     });
 
-  return { fteStatus, timezone, hires, invoices, payableCount: payable?.lines.length ?? 0 };
+  return { fteStatus, timezone, hires, invoices, payableCount: payable?.lines.length ?? 0, offersToPay: payable?.lines.filter((l) => !l.due).length ?? 0 };
 }
