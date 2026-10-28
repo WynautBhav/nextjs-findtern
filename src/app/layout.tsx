@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { Poppins } from "next/font/google";
 import { SmoothScroll } from "@/components/motion/smooth-scroll";
+import { NavigationProgress } from "@/components/layout/navigation-progress";
+import { Suspense } from "react";
 import { AnalyticsGate } from "@/components/marketing/analytics-gate";
 import { ChatWidget } from "@/components/chat/chat-widget";
 import { JsonLd } from "@/components/seo/json-ld";
@@ -94,6 +96,9 @@ export default function RootLayout({
           */}
           <style>{`.reveal-pending > * { opacity: 1 !important; transform: none !important; }`}</style>
         </noscript>
+        <Suspense fallback={null}>
+          <NavigationProgress />
+        </Suspense>
         <SmoothScroll>{children}</SmoothScroll>
         {/* Organization + WebSite once, site-wide. Pages add their own graphs. */}
         <JsonLd data={siteGraph()} />
