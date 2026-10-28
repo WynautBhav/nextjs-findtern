@@ -218,3 +218,14 @@ branch, not to be touched: `feat/college-partners` (worktree
   The local e2e Postgres on :5433 was migrated to 0007 (it lacked the
   college tables). Master pushed; Tester B retests QA-150 then waits for
   the intern merge.
+- 28 Oct (afternoon): the earlier orchestrator session (nextjs-findtern-9a,
+  Desktop) woke while wynautbhav-f3 was paused on a usage limit and, in the
+  main checkout, committed the uncommitted QA-151 progress bar (`3429293`),
+  merged Opus's QA-013 and college contrast commits (`b722ac6`), and
+  pushed master to `2a8540e`; CI green on each. Owner decision: one
+  orchestrator only, wynautbhav-f3 (Fable); Opus (6a) and Sonnet (cb)
+  are its workers and ignore 9a. Both confirmed nothing unmerged or
+  unreported. Opus: college group in critique. Tester B: /intern sweep
+  run at 375 and 1440 (Chromium and WebKit), no page-level clip or
+  overflow, findings not yet read; retests of QA-004/010/015, admin
+  QA-140 to 149 and QA-151 follow on 2a8540e.
