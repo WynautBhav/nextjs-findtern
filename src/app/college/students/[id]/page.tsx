@@ -95,7 +95,6 @@ export default async function CollegeStudentPage({ params }: { params: Promise<{
         action={!ai.done ? <NudgeButton kind="interview" userIds={[id]} label="Nudge to take the interview" /> : null}
       />
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">
         <Panel>
           <PanelHeader
             title="AI interview"
@@ -155,39 +154,39 @@ export default async function CollegeStudentPage({ params }: { params: Promise<{
                 Each time someone opens the report or recording, Findtern records who and when. The student can&apos;t view the recording themselves.
               </p>
             ) : null}
+            {/* Folded here, and only when there is something to list: a full
+                side card said "Nobody has opened them yet" most of the time. */}
+            {views.length > 0 ? (
+              <details className="border-t border-ink-100 pt-4">
+                <summary className="cursor-pointer text-sm font-medium text-ink-800">
+                  Opened by your team <span className="nums text-text-subtle">({views.length})</span>
+                </summary>
+                <ul className="mt-3 space-y-2 text-sm">
+                  {views.map((v, i) => (
+                    <li key={i} className="flex justify-between gap-3">
+                      <span className="text-ink-800">
+                        {v.who ?? "Findtern staff"} · {v.action === "view_recording" ? "recording" : "report"}
+                      </span>
+                      <span className="shrink-0 text-text-subtle">{ago(v.at.toISOString())}</span>
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            ) : null}
           </PanelBody>
         </Panel>
 
-        <Panel>
-          <PanelHeader title="Recently opened by" description="Your team's views of this student's report and recording." />
-          <PanelBody>
-            {views.length === 0 ? (
-              <p className="text-sm text-text-subtle">Nobody has opened them yet.</p>
-            ) : (
-              <ul className="space-y-2 text-sm">
-                {views.map((v, i) => (
-                  <li key={i} className="flex justify-between gap-3">
-                    <span className="text-ink-800">
-                      {v.who ?? "Findtern staff"} · {v.action === "view_recording" ? "recording" : "report"}
-                    </span>
-                    <span className="shrink-0 text-text-subtle">{ago(v.at.toISOString())}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </PanelBody>
-        </Panel>
-      </div>
-
+      {/* One card for what employers have done with this student (two cards
+          each said "No … yet"); a Pill per row for the state. */}
       <Panel>
         <PanelHeader
-          title="Offers and proposals"
+          title="Offers and meetings"
           description="From employers on Findtern and in your drives."
           action={student.offersPending > 0 ? <NudgeButton kind="offer" userIds={[id]} label="Nudge to reply" /> : undefined}
         />
-        {proposals.length === 0 ? (
+        {proposals.length + interviews.length + calls.length === 0 ? (
           <PanelBody>
-            <p className="text-sm text-text-subtle">No proposals yet.</p>
+            <p className="text-sm text-text-subtle">No offers or meetings yet.</p>
           </PanelBody>
         ) : (
           <ul className="divide-y divide-ink-100">
@@ -197,47 +196,33 @@ export default async function CollegeStudentPage({ params }: { params: Promise<{
               return (
                 <li key={p.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5">
                   <div className="min-w-0">
-                    <p className="font-medium text-ink-900">{offer.roleTitle || "Internship"}</p>
+                    <p className="font-medium text-ink-900">{offer.roleTitle || "Internship"} · offer</p>
                     <p className="text-sm text-text-subtle">
                       {company ?? "Employer"} · sent {ago(p.createdAt?.toISOString() ?? null)}
                     </p>
                   </div>
-                  <Pill tone={waiting ? "waiting" : "neutral"}>
-                    {waiting ? "Waiting for the student's reply" : humanizeStatus(p.status)}
-                  </Pill>
+                  <Pill tone={waiting ? "waiting" : "neutral"}>{waiting ? "Waiting for the student's reply" : humanizeStatus(p.status)}</Pill>
                 </li>
               );
             })}
-          </ul>
-        )}
-      </Panel>
-
-      <Panel>
-        <PanelHeader title="Meetings" description="Scheduled interviews and calls from your drives." />
-        {interviews.length + calls.length === 0 ? (
-          <PanelBody>
-            <p className="text-sm text-text-subtle">No meetings yet.</p>
-          </PanelBody>
-        ) : (
-          <ul className="divide-y divide-ink-100">
             {calls.map(({ m, company, drive }) => (
               <li key={m.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5">
-                <div>
+                <div className="min-w-0">
                   <p className="font-medium text-ink-900">{company ?? "Employer"} · drive call</p>
                   <p className="text-sm text-text-subtle">
-                    {drive} · {shortDateTime(m.startsAt, { timeZone: "Asia/Kolkata", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}
+                    {drive} · {shortDateTime(m.startsAt, { timeZone: "Asia/Kolkata", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })} IST
                   </p>
                 </div>
-                <span className="rounded-full bg-ink-100 px-2.5 py-1 text-xs font-medium text-ink-700">{humanizeStatus(m.status)}</span>
+                <Pill tone="neutral">{humanizeStatus(m.status)}</Pill>
               </li>
             ))}
             {interviews.map(({ i, company }) => (
               <li key={i.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5">
-                <div>
+                <div className="min-w-0">
                   <p className="font-medium text-ink-900">{company ?? "Employer"} · interview</p>
                   <p className="text-sm text-text-subtle">Requested {ago(i.createdAt?.toISOString() ?? null)}</p>
                 </div>
-                <span className="rounded-full bg-ink-100 px-2.5 py-1 text-xs font-medium text-ink-700">{humanizeStatus(i.status)}</span>
+                <Pill tone="neutral">{humanizeStatus(i.status)}</Pill>
               </li>
             ))}
           </ul>
