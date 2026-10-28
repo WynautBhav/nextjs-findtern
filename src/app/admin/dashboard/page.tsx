@@ -224,17 +224,14 @@ async function loadDashboard(uid: string | null) {
     // which moves on any edit and averaged to a negative figure (QA-009).
     db
       .select({
-        days: sql<number | null>`round((avg(extract(epoch from (${schema.proposals.hiredAt} - ${schema.proposals.createdAt}))) / 86400)::numeric, 1)::float8`,
-        n: count(),
+        // Rows with a hire date before the offer (bad legacy data) are left
+        // out of the average and counted, so the tile can say so (QA-134).
+        days: sql<number | null>`round((avg(extract(epoch from (${schema.proposals.hiredAt} - ${schema.proposals.createdAt}))) filter (where ${schema.proposals.hiredAt} >= ${schema.proposals.createdAt}) / 86400)::numeric, 1)::float8`,
+        n: sql<number>`(count(*) filter (where ${schema.proposals.hiredAt} >= ${schema.proposals.createdAt}))::int`,
+        total: count(),
       })
       .from(schema.proposals)
-      .where(
-        and(
-          eq(schema.proposals.status, "hired"),
-          sql`${schema.proposals.hiredAt} >= ${schema.proposals.createdAt}`,
-          realEmployerId(schema.proposals.employerId),
-        ),
-      ),
+      .where(and(eq(schema.proposals.status, "hired"), realEmployerId(schema.proposals.employerId))),
     db
       .select({ status: schema.proposals.status, value: count() })
       .from(schema.proposals)
@@ -422,6 +419,8 @@ export default async function AdminDashboard() {
 
 
   const speed = d.hiringSpeed?.days;
+  const speedN = Number(d.hiringSpeed?.n ?? 0);
+  const speedTotal = Number(d.hiringSpeed?.total ?? 0);
 
   const events: Event[] = [
     ...d.recentPayments.map((p) => ({
@@ -596,7 +595,13 @@ export default async function AdminDashboard() {
           <StatCard
             label="Avg hiring speed"
             value={speed == null ? "-" : `${speed} ${speed === 1 ? "day" : "days"}`}
-            hint={speed == null ? "No hires yet" : "Offer sent to hire"}
+            hint={
+              speed == null
+                ? "No hires with usable dates yet"
+                : `Offer sent to hire, over ${speedN} of ${speedTotal} hires${
+                    speedTotal > speedN ? " (the rest have a hire date before the offer)" : ""
+                  }`
+            }
           />
         </StatGrid>
       </section>
