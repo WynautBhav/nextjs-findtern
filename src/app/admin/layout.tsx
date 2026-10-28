@@ -149,6 +149,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       initialCollapsed={(await cookies()).get(RAIL_COOKIE)?.value === "1"}
       crumbLabels={NAV_LABELS}
       rootCrumb={{ label: "Workspace", href: "/admin/dashboard" }}
+      // Detail pages read "Offers", not "Offers / Details": the title names the record.
+      crumbParents={{}}
     >
       {children}
     </ConsoleShell>

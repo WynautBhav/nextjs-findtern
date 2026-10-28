@@ -138,6 +138,8 @@ export default async function InternLayout({ children }: { children: React.React
       signOutTo="/login"
       initialCollapsed={(await cookies()).get(RAIL_COOKIE)?.value === "1"}
       rootCrumb={{ label: "Home", href: "/intern/dashboard" }}
+      // Detail pages read "Offers", not "Offers / Details": the title names the record.
+      crumbParents={{}}
       width="reading"
       banner={session.impersonator ? <ViewAsBanner viewing={name} admin={session.impersonator.email} /> : null}
     >
