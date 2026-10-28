@@ -92,8 +92,9 @@ don't re-implement them:
 person taps on a phone is a target at least 44px tall (WCAG 2.5.8 asks for
 24; we hold 44). Use the `touch:` variant (declared in `globals.css`: a
 coarse pointer **or** a screen under 40rem, because phone emulation does
-not always report a coarse pointer). `pointer-coarse:` remains only in the
-`ui/button` sizes. The patterns, in order of preference:
+not always report a coarse pointer). Nothing uses `pointer-coarse:` any
+more; `ui/button`, `ui/dialog` and `ui/sheet` grow on `touch:` too (QA-104).
+The patterns, in order of preference:
 - a standalone link: `touch:inline-flex touch:min-h-11 touch:items-center`;
 - a small control keeps its look and gains an absolutely positioned 44px
   `::before` (`ui/switch`, `ui/checkbox`);

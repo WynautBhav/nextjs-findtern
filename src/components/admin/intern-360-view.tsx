@@ -176,7 +176,7 @@ export function Intern360View({
         }
         lede={
           <span className="flex flex-wrap gap-x-3 gap-y-1 text-[0.9375rem]">
-            <a href={`mailto:${user.email}`} className="break-all underline-offset-4 hover:underline">
+            <a href={`mailto:${user.email}`} className="break-all underline-offset-4 hover:underline touch:inline-flex touch:min-h-11 touch:items-center">
               {user.email}
             </a>
             {user.phoneNumber ? (
@@ -472,7 +472,7 @@ function ProfileTab({
               label="LinkedIn"
               value={
                 draft.linkedinUrl ? (
-                  <a href={draft.linkedinUrl} target="_blank" rel="noopener noreferrer" className="break-all text-brand-700 underline-offset-4 hover:underline">
+                  <a href={draft.linkedinUrl} target="_blank" rel="noopener noreferrer" className="break-all text-brand-700 underline-offset-4 hover:underline touch:inline-flex touch:min-h-11 touch:items-center">
                     {draft.linkedinUrl.replace(/^https?:\/\/(www\.)?/, "")}
                   </a>
                 ) : (

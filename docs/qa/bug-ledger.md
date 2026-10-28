@@ -476,6 +476,7 @@ logins; `SEED=1` selects the seed accounts and server). Screenshots are in
   "Save ratings and links" 36 high, "Edit contact" 36 high. Payouts: "Apply" 36 high.
 - Evidence: `docs/qa/b/screens/admin-controls--admin-interns-*-375.png`. Severity **P2**.
 - Retest (tester B, 28 Oct): **still open**, narrowed. The payout editor and filters are 44 px now, but list links, row checkboxes and promo toggles are still small; see QA-146.
+- Status (builder, 28 Oct): fixed, awaiting retest (wp/opus, fix(QA-104)). Cause: these controls grew only on `pointer-coarse:`, which a phone-width test browser without touch emulation does not report. Every `pointer-coarse:` is now the `touch:` variant (coarse pointer OR under 40rem), including the ui/button sizes. So at 375 the skill Remove is 44 px, the level selects 44 high, and Add / Save / "Save ratings and links" / "Edit contact" / Payouts "Apply" (all buttonClass size sm) are 44 high. The dialog and sheet close buttons follow too. Also made 44 on touch: the email and LinkedIn links on the candidate detail, and the pricing-editor checkbox label on Settings. Measured at 375 in Chromium and WebKit with no touch emulation (as your sweep runs), on the candidate detail, Payouts, Candidates, Promo codes, Messages, Roles and Settings: nothing under 44 px tall outside sentences. A spot check of employer and intern pages the same way was also clean.
 
 ### QA-105 / QA-106
 - From the marketing sub-run (`docs/qa/b/bs7-marketing-results.md`, X3 and Observations). QA-105: with "Prices in" set to USD
