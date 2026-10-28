@@ -75,7 +75,7 @@ lines only.
 | QA-147 | P2 | admin (and probably the intern side) | /admin/interns/non-disclosure | any | open | The page requests `/cdn/assets/sprites-core-jxe2m7va.svg` and gets a 404: pasted legacy HTML references an icon sprite that does not exist here (`<use href>`), so its icons are blank. |
 | QA-148 | P2 | intern, admin | notification text (candidate bell, Admin > Notification history) | any | open | Notification templates use emoji and exclamation marks, which DESIGN §0 lists as copy tells: "🚀 Spotlight's on you, Qab - 1 profile view and counting!" (`src/app/employer/intern/[id]/page.tsx:155`) and "🎉 Hurray {name}! Your AI interview is complete…" (`src/lib/admin/score-live.ts:55`). Both are ported legacy wording, so it is a decision as much as a defect. |
 | QA-149 | P2 | admin | /admin/reports/money | 375 + 1440 | open | The only admin page that still has a "Filter" button (Company, Candidate, Status), against "filters apply on change". |
-| QA-150 | P2 | everyone | /drive/<unknown token> | any | open | An unknown or malformed drive token answers HTTP 200 with the "not found" page instead of 404 (a soft 404: crawlers and monitors see a healthy page). Left over from QA-006. |
+| QA-150 | P2 | everyone | /drive/<unknown token> | any | fixed (awaiting retest) | An unknown or malformed drive token answers HTTP 200 with the "not found" page instead of 404 (a soft 404: crawlers and monitors see a healthy page). Left over from QA-006. |
 
 ## Details
 
@@ -722,3 +722,5 @@ logins; `SEED=1` selects the seed accounts and server). Screenshots are in
 ### QA-150
 - Steps: `curl -s -o /dev/null -w '%{http_code}' localhost:<port>/drive/nonexistenttoken1234567890abcdef` (also 30 x "x" and a 101-character token): 200, title "Campus drive | Findtern" (Chromium and curl).
 - Expected: 404 (`notFound()`), with the same page. Severity **P2**. Note for the orchestrator: the intern pass IDs start at QA-151, not QA-150.
+- Status (builder, 28 Oct): fixed, awaiting retest (master, fix(QA-150)). The drive lookup moved into a React-cached loader shared by `generateMetadata` and the page; an unknown, short or inactive token throws `notFound()` from the metadata, which resolves before the root `loading.tsx` streams the 200 shell, so the response is a real 404. One query per request as before.
+
