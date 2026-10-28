@@ -114,74 +114,78 @@ export async function settleEmployerOrder(input: {
     .limit(1);
   if (!order) return { ok: false, status: 404, error: "Unknown order" };
   // Verify and the webhook can arrive together: only the one that flips the
-  // row to paid goes on to hire and notify.
-  const claimed = await db
-    .update(schema.employerPayments)
-    .set({ paymentId: input.paymentId, signature: input.signature ?? order.signature, status: "paid", paidAt: new Date() })
-    .where(and(eq(schema.employerPayments.id, order.id), ne(schema.employerPayments.status, "paid")))
-    .returning({ id: schema.employerPayments.id });
-  if (claimed.length === 0) return { ok: true, hired: 0 };
-  // A free (test-mode) order is not a sale, so it takes no invoice number.
-  if (order.amountMinor > 0) await assignInvoiceNumber("employer", order.id);
-
-  const promo = promoOf(order.raw);
-  if (promo) {
-    await recordPromoUse({ code: promo.code, subjectId: order.employerId, orderId: input.orderId, discountMinor: promo.discountMinor });
-  }
-
-  // Only the proposals this order paid for become hires. A month's instalment
-  // for a running placement (dueProposalIds) is already hired: it is paid,
-  // not hired again, and must not count as a missing hire.
+  // row to paid goes on to hire and notify. Every write commits with the
+  // claim or not at all, so a failure leaves the order open for the retry.
   const ids = orderProposalIds(order.raw);
-  if (ids.length === 0) return { ok: true, hired: 0 };
   const dueIds = new Set(orderDueIds(order.raw));
   const hireIds = ids.filter((pid) => !dueIds.has(pid));
-  const hired = hireIds.length === 0 ? [] : await db
-    .update(schema.proposals)
-    .set({ status: "hired", hiredAt: new Date(), updatedAt: new Date() })
-    .where(
-      and(
-        eq(schema.proposals.employerId, order.employerId),
-        inArray(schema.proposals.id, hireIds),
-        inArray(schema.proposals.status, ["accepted", "processing"]),
-      ),
-    )
-    .returning({ id: schema.proposals.id, internId: schema.proposals.internId });
-  if (hired.length < hireIds.length) {
-    // Paid for proposals that were withdrawn or already paid in between:
-    // flag the order so accounts can refund the difference.
-    await db
+  const hired = await db.transaction(async (tx) => {
+    const claimed = await tx
       .update(schema.employerPayments)
-      .set({ raw: { ...((order.raw ?? {}) as Record<string, unknown>), needsReview: { reason: "not_all_hired", expected: hireIds.length, hired: hired.length } } })
-      .where(eq(schema.employerPayments.id, order.id));
-    console.error(`[payments] order ${input.orderId}: paid for ${hireIds.length} hires, hired ${hired.length} - needs review`);
-  }
-  // EMB-26: once hired, the candidate leaves every shortlist of this company
-  // (legacy removed them from all its carts), so the cart count stays true.
-  if (hired.length > 0) {
-    await db
-      .delete(schema.employerCartItems)
+      .set({ paymentId: input.paymentId, signature: input.signature ?? order.signature, status: "paid", paidAt: new Date() })
+      .where(and(eq(schema.employerPayments.id, order.id), ne(schema.employerPayments.status, "paid")))
+      .returning({ id: schema.employerPayments.id });
+    if (claimed.length === 0) return null;
+    // A free (test-mode) order is not a sale, so it takes no invoice number.
+    if (order.amountMinor > 0) await assignInvoiceNumber("employer", order.id, new Date(), tx);
+
+    const promo = promoOf(order.raw);
+    if (promo) {
+      await recordPromoUse({ code: promo.code, subjectId: order.employerId, orderId: input.orderId, discountMinor: promo.discountMinor }, tx);
+    }
+
+    // Only the proposals this order paid for become hires. A month's instalment
+    // for a running placement (dueProposalIds) is already hired: it is paid,
+    // not hired again, and must not count as a missing hire.
+    const hired = hireIds.length === 0 ? [] : await tx
+      .update(schema.proposals)
+      .set({ status: "hired", hiredAt: new Date(), updatedAt: new Date() })
       .where(
         and(
-          eq(schema.employerCartItems.employerId, order.employerId),
-          inArray(schema.employerCartItems.internId, hired.map((p) => p.internId)),
+          eq(schema.proposals.employerId, order.employerId),
+          inArray(schema.proposals.id, hireIds),
+          inArray(schema.proposals.status, ["accepted", "processing"]),
         ),
-      );
-  }
-  // Legacy routes.ts:15658: a hired intern's onboarding status moves to
-  // "Onboarding" until they are set up with the company.
-  for (const p of hired) {
-    const [ob] = await db
-      .select({ id: schema.internOnboarding.id, extraData: schema.internOnboarding.extraData })
-      .from(schema.internOnboarding)
-      .where(eq(schema.internOnboarding.userId, p.internId))
-      .limit(1);
-    if (!ob) continue;
-    await db
-      .update(schema.internOnboarding)
-      .set({ extraData: { ...((ob.extraData ?? {}) as Record<string, unknown>), onboardingStatus: "Onboarding", isOnboarded: false } })
-      .where(eq(schema.internOnboarding.id, ob.id));
-  }
+      )
+      .returning({ id: schema.proposals.id, internId: schema.proposals.internId });
+    if (hired.length < hireIds.length) {
+      // Paid for proposals that were withdrawn or already paid in between:
+      // flag the order so accounts can refund the difference.
+      await tx
+        .update(schema.employerPayments)
+        .set({ raw: { ...((order.raw ?? {}) as Record<string, unknown>), needsReview: { reason: "not_all_hired", expected: hireIds.length, hired: hired.length } } })
+        .where(eq(schema.employerPayments.id, order.id));
+      console.error(`[payments] order ${input.orderId}: paid for ${hireIds.length} hires, hired ${hired.length} - needs review`);
+    }
+    // EMB-26: once hired, the candidate leaves every shortlist of this company
+    // (legacy removed them from all its carts), so the cart count stays true.
+    if (hired.length > 0) {
+      await tx
+        .delete(schema.employerCartItems)
+        .where(
+          and(
+            eq(schema.employerCartItems.employerId, order.employerId),
+            inArray(schema.employerCartItems.internId, hired.map((p) => p.internId)),
+          ),
+        );
+    }
+    // Legacy routes.ts:15658: a hired intern's onboarding status moves to
+    // "Onboarding" until they are set up with the company.
+    for (const p of hired) {
+      const [ob] = await tx
+        .select({ id: schema.internOnboarding.id, extraData: schema.internOnboarding.extraData })
+        .from(schema.internOnboarding)
+        .where(eq(schema.internOnboarding.userId, p.internId))
+        .limit(1);
+      if (!ob) continue;
+      await tx
+        .update(schema.internOnboarding)
+        .set({ extraData: { ...((ob.extraData ?? {}) as Record<string, unknown>), onboardingStatus: "Onboarding", isOnboarded: false } })
+        .where(eq(schema.internOnboarding.id, ob.id));
+    }
+    return hired;
+  });
+  if (!hired || ids.length === 0) return { ok: true, hired: 0 };
 
   const { contact, company } = await employerNames(order.employerId);
   const roles = await db
@@ -278,17 +282,23 @@ export async function settleInternOrder(input: {
     )
     .limit(1);
   if (!payment) return { ok: false, status: 404, error: "Unknown order" };
-  const claimed = await db
-    .update(schema.internPayments)
-    .set({ paymentId: input.paymentId, signature: input.signature ?? payment.signature, status: "paid", paidAt: new Date(), updatedAt: new Date() })
-    .where(and(eq(schema.internPayments.id, payment.id), ne(schema.internPayments.status, "paid")))
-    .returning({ id: schema.internPayments.id });
-  if (claimed.length > 0) {
-    if (payment.amountMinor > 0) await assignInvoiceNumber("intern", payment.id);
+  // The claim, its invoice number and the promo use commit together, so a
+  // failure leaves the order open for the retry; notify only after commit.
+  const claimed = await db.transaction(async (tx) => {
+    const rows = await tx
+      .update(schema.internPayments)
+      .set({ paymentId: input.paymentId, signature: input.signature ?? payment.signature, status: "paid", paidAt: new Date(), updatedAt: new Date() })
+      .where(and(eq(schema.internPayments.id, payment.id), ne(schema.internPayments.status, "paid")))
+      .returning({ id: schema.internPayments.id });
+    if (rows.length === 0) return false;
+    if (payment.amountMinor > 0) await assignInvoiceNumber("intern", payment.id, new Date(), tx);
     const promo = promoOf(payment.raw);
     if (promo) {
-      await recordPromoUse({ code: promo.code, subjectId: payment.internId, orderId: input.orderId, discountMinor: promo.discountMinor });
+      await recordPromoUse({ code: promo.code, subjectId: payment.internId, orderId: input.orderId, discountMinor: promo.discountMinor }, tx);
     }
+    return true;
+  });
+  if (claimed) {
     await notify({
       to: { type: "intern", id: payment.internId },
       type: "payment_completed",

@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq, ne } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -47,14 +47,18 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const entries = [...byDate.values()].sort((a, b) => String(a.date).localeCompare(String(b.date)));
   const note = parsed.data.managerNote;
 
-  await db
+  const updated = await db
     .update(schema.timesheets)
     .set({
       ...(parsed.data.entries?.length ? { entries } : {}),
       ...(note !== undefined ? { managerNote: note || null } : {}),
       updatedAt: new Date(),
     })
-    .where(eq(schema.timesheets.id, id));
+    .where(and(eq(schema.timesheets.id, id), ne(schema.timesheets.status, "approved")))
+    .returning({ id: schema.timesheets.id });
+  if (updated.length === 0) {
+    return NextResponse.json({ error: "Approved timesheets can't be edited." }, { status: 409 });
+  }
   await notify({
     to: { type: "intern", id: sheet.internId },
     type: "timesheet_updated_by_employer",

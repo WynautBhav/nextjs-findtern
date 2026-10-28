@@ -6,7 +6,7 @@ import { getDb, schema } from "@/lib/db";
 import { emails, icsInvite } from "@/lib/emails";
 import { initialsOf } from "@/lib/employer-candidates";
 import { formatIst, formatSlotTime } from "@/lib/format";
-import { CALENDAR_TOKEN_OWNER, createMeetEvent } from "@/lib/google";
+import { CALENDAR_TOKEN_OWNER, createMeetEvent, deleteMeetEvent } from "@/lib/google";
 import { requireMutation } from "@/lib/guards-mutation";
 import { employerNames, notify } from "@/lib/notify";
 import { hiredProposalSql } from "@/lib/employer-visibility";
@@ -45,6 +45,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   // admin adds one by hand (api/admin/interviews/[id]/meeting-link).
   let meetingLink = interview.meetingLink;
   let calendarEventId = interview.calendarEventId;
+  let refreshToken: string | null = null;
   if (!meetingLink) {
     const [token] = await db
       .select({ refreshToken: schema.employerGoogleTokens.refreshToken })
@@ -52,6 +53,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       .where(eq(schema.employerGoogleTokens.employerId, CALENDAR_TOKEN_OWNER))
       .limit(1);
     if (token?.refreshToken) {
+      refreshToken = token.refreshToken;
       try {
         const ev = await createMeetEvent(token.refreshToken, {
           summary: "Findtern Interview",
@@ -72,10 +74,20 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     }
   }
 
-  await db
+  const claimed = await db
     .update(schema.interviews)
     .set({ selectedSlot: parsed.data.slot, status: "scheduled", meetingLink, calendarEventId, updatedAt: new Date() })
-    .where(eq(schema.interviews.id, id));
+    .where(and(eq(schema.interviews.id, id), eq(schema.interviews.status, "pending")))
+    .returning({ id: schema.interviews.id });
+  if (claimed.length === 0) {
+    // A concurrent click already booked it: drop the Meet event this one made.
+    if (refreshToken && calendarEventId && calendarEventId !== interview.calendarEventId) {
+      await deleteMeetEvent(refreshToken, calendarEventId).catch((err) =>
+        console.error("[select-slot] lost race; orphaned Meet event needs manual deletion", { interviewId: id, calendarEventId }, err),
+      );
+    }
+    return NextResponse.json({ error: "This interview is already scheduled" }, { status: 409 });
+  }
 
   // Each side reads the time in its own zone: the company in the zone it
   // booked in, the intern always in India time, labelled IST (INW-09).

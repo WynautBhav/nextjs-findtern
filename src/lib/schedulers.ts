@@ -252,6 +252,10 @@ function isoWeekNumber(d: Date): number {
 
 async function profileHideLimit(now: Date) {
   const db = getDb();
+  // Merge only the keys this job sets, in SQL, so a concurrent edit to other
+  // extra_data keys between our read and write is not reverted.
+  const mergeExtra = (patch: Record<string, unknown>) =>
+    sql`coalesce(${schema.internOnboarding.extraData}, '{}'::jsonb) || ${JSON.stringify(patch)}::jsonb`;
   const rows = await db
     .select({ id: schema.internOnboarding.id, userId: schema.internOnboarding.userId, extra: schema.internOnboarding.extraData })
     .from(schema.internOnboarding)
@@ -267,7 +271,7 @@ async function profileHideLimit(now: Date) {
       hiddenAt = now.toISOString();
       await db
         .update(schema.internOnboarding)
-        .set({ extraData: { ...extra, hiddenAt } })
+        .set({ extraData: mergeExtra({ hiddenAt }) })
         .where(eq(schema.internOnboarding.id, r.id));
       continue;
     }
@@ -277,7 +281,7 @@ async function profileHideLimit(now: Date) {
     if (msLeft <= 0) {
       await db
         .update(schema.internOnboarding)
-        .set({ extraData: { ...extra, openToWork: true, hiddenAt: null, hideReminderSentAt: null }, updatedAt: now })
+        .set({ extraData: mergeExtra({ openToWork: true, hiddenAt: null, hideReminderSentAt: null }), updatedAt: now })
         .where(eq(schema.internOnboarding.id, r.id));
       await notify({
         to: { type: "intern", id: r.userId },
@@ -296,18 +300,22 @@ async function profileHideLimit(now: Date) {
       });
       await db
         .update(schema.internOnboarding)
-        .set({ extraData: { ...extra, hideReminderSentAt: now.toISOString() } })
+        .set({ extraData: mergeExtra({ hideReminderSentAt: now.toISOString() }) })
         .where(eq(schema.internOnboarding.id, r.id));
     }
   }
 }
+
+/** SQL: no notification with this dedupe key exists yet for the recipient, so the 6-hourly jobs skip rows already nudged. */
+const notNotifiedYet = (recipientType: string, recipientId: unknown, keyPrefix: string, suffix: string) =>
+  sql`not exists (select 1 from ${schema.notifications} n where n.recipient_type = ${recipientType} and n.recipient_id = ${recipientId} and n.dedupe_key = concat(${keyPrefix}::text, ${recipientId}, ${suffix}::text))`;
 
 async function internProfileNudges(now: Date) {
   const rows = await getDb()
     .select({ id: schema.users.id, first: schema.users.firstName, o: schema.internOnboarding })
     .from(schema.users)
     .leftJoin(schema.internOnboarding, eq(schema.internOnboarding.userId, schema.users.id))
-    .where(eq(schema.users.isActive, true));
+    .where(and(eq(schema.users.isActive, true), notNotifiedYet("intern", schema.users.id, "profile_completion_nudge:", `:${dayKey(now)}`)));
   for (const r of rows) {
     const o = r.o;
     if (o && readSkills(o.skills).length > 0 && o.bio?.trim() && o.city?.trim()) continue;
@@ -322,7 +330,9 @@ async function internProfileNudges(now: Date) {
 }
 
 async function employerProfileNudges(now: Date) {
-  const rows = await getDb().select().from(schema.employers).where(eq(schema.employers.isActive, true));
+  const rows = await getDb().select().from(schema.employers).where(
+    and(eq(schema.employers.isActive, true), notNotifiedYet("employer", schema.employers.id, "employer_profile_completion_nudge:", `:${dayKey(now)}`)),
+  );
   for (const e of rows) {
     if (e.setupCompleted && e.onboardingCompleted && e.logoUrl && e.websiteUrl && e.companySize && e.city) continue;
     await notify({
@@ -401,7 +411,13 @@ async function feedbackRequests(now: Date) {
     .select({ id: schema.interviews.id, employerId: schema.interviews.employerId, at: schema.interviews.updatedAt, created: schema.interviews.createdAt, notes: schema.interviews.notes, email: schema.employers.companyEmail })
     .from(schema.interviews)
     .innerJoin(schema.employers, eq(schema.employers.id, schema.interviews.employerId))
-    .where(eq(schema.interviews.status, "completed"));
+    .where(
+      and(
+        eq(schema.interviews.status, "completed"),
+        // The key's trailing day part is derived from updated_at, so match on the prefix.
+        sql`not exists (select 1 from ${schema.notifications} n where n.recipient_type = 'employer' and n.recipient_id = ${schema.interviews.employerId} and n.dedupe_key like concat('interview_feedback_request:', ${schema.interviews.id}::text, ':', ${schema.interviews.employerId}::text, ':%'))`,
+      ),
+    );
   for (const i of rows) {
     if (i.employerId === "admin" || i.email === "ai-interview@findtern.ai") continue;
     if (i.notes?.includes("feedback_text:")) continue; // already given

@@ -139,6 +139,19 @@ export async function createMeetEvent(
   return { meetUrl, eventId: body.id };
 }
 
+/** Deletes an event made by createMeetEvent. 410 means it is already gone. */
+export async function deleteMeetEvent(refreshToken: string, eventId: string): Promise<void> {
+  const cfg = calendarConfig();
+  if (!cfg) throw new Error("Google is not configured");
+  const token = await refreshAccessToken(cfg, refreshToken);
+  const calendarId = encodeURIComponent(process.env.MEET_CALENDAR_ID || "primary");
+  const res = await fetch(
+    `https://www.googleapis.com/calendar/v3/calendars/${calendarId}/events/${encodeURIComponent(eventId)}?sendUpdates=none`,
+    { method: "DELETE", headers: { Authorization: `Bearer ${token}` } },
+  );
+  if (!res.ok && res.status !== 410) throw new Error(`Google Calendar delete failed (${res.status})`);
+}
+
 export type GoogleTokens = { access_token: string; refresh_token?: string; expires_in: number; id_token?: string };
 
 export async function exchangeCode(cfg: GoogleConfig, code: string): Promise<GoogleTokens> {

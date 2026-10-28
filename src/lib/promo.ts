@@ -12,6 +12,8 @@ import { promoAudienceProblem, promoDiscount, promoProblem, type PromoAudience }
  */
 
 type Promo = typeof schema.promoCodes.$inferSelect;
+type Db = ReturnType<typeof getDb>;
+type Tx = Parameters<Parameters<Db["transaction"]>[0]>[0];
 
 export type PromoQuote =
   | { ok: true; promo: Promo; discountMinor: number; payableMinor: number }
@@ -73,8 +75,7 @@ export async function recordPromoUse(input: {
   subjectId: string;
   orderId: string;
   discountMinor: number;
-}): Promise<void> {
-  const db = getDb();
+}, db: Db | Tx = getDb()): Promise<void> {
   const [promo] = await db
     .select({ id: schema.promoCodes.id })
     .from(schema.promoCodes)

@@ -25,6 +25,11 @@ export async function register() {
         "[startup] WARNING: SCHEDULERS is not \"on\": interview reminders and notification jobs will NOT run. Set SCHEDULERS=on on the live server.",
       );
     }
+    // Without it every caller shares one rate-limit bucket (clientIp), so one
+    // person's failed logins lock everyone out.
+    if (process.env.VERCEL !== "1" && !/^(1|true|yes)$/i.test(process.env.TRUST_PROXY ?? "")) {
+      console.warn("[startup] WARNING: TRUST_PROXY is not set: all visitors share one rate limit. Set TRUST_PROXY=1 behind nginx.");
+    }
     const mailMode = (process.env.MAIL_MODE ?? "").trim().toLowerCase();
     if (mailMode === "log") {
       console.warn(

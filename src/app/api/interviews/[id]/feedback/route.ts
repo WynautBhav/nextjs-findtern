@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -36,7 +36,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({ error: "You can add feedback once the interview is completed." }, { status: 409 });
   }
   const notes = interview.notes ? `${interview.notes}\nfeedback_text: ${parsed.data.feedback}` : `feedback_text: ${parsed.data.feedback}`;
-  await db.update(schema.interviews).set({ notes, status: interview.status === "missed" ? "missed" : "completed", updatedAt: new Date() }).where(eq(schema.interviews.id, id));
+  const updated = await db
+    .update(schema.interviews)
+    .set({ notes, status: interview.status === "missed" ? "missed" : "completed", updatedAt: new Date() })
+    .where(and(eq(schema.interviews.id, id), eq(schema.interviews.status, interview.status), sql`coalesce(${schema.interviews.notes}, '') not like '%feedback_text:%'`))
+    .returning({ id: schema.interviews.id });
+  if (updated.length === 0) return NextResponse.json({ error: "Feedback has already been shared for this interview." }, { status: 409 });
   await notify({
     to: { type: "intern", id: interview.internId },
     type: "interview_feedback",

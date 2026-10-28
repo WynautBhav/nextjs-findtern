@@ -104,6 +104,20 @@ test("checkout: a legacy-edited offer (fee inside the total, no perHireCharge) i
   assert.equal(noFee.totalMinor, 3_200_000 + 500_000);
 });
 
+test("offer edit: a legacy fee (no perHireCharge) survives a change of months", () => {
+  // ₹10,000 a month for 2 months, ₹22,000 total: the fee is ₹2,000.
+  const stored = { monthlyAmount: 10000, duration: "2m", totalPrice: 22000 };
+  const before = parseOffer(stored, "INR");
+  assert.equal(before.perHireMinor, 200_000);
+  // Re-inferred from the new months and the old total, the fee moves.
+  assert.equal(parseOffer({ ...stored, duration: "1m" }, "INR").perHireMinor, 1_200_000);
+  assert.equal(parseOffer({ ...stored, duration: "3m" }, "INR").perHireMinor, null);
+  // The edit route writes the fee from before the edit, so it holds.
+  for (const duration of ["1m", "3m"]) {
+    assert.equal(parseOffer({ ...stored, duration, perHireCharge: before.perHireMinor! / 100 }, "INR").perHireMinor, 200_000);
+  }
+});
+
 test("checkout: full-time offer is 8.33% of CTC", () => {
   const c = lineCharge(parseOffer({ fullTimeOffer: { annualCtc: 600000 } }, "INR"), 8);
   assert.equal(c.totalMinor, Math.round(60_000_000 * 0.0833));

@@ -11,6 +11,9 @@ import { getDb, schema } from "@/lib/db";
 
 export const INVOICE_PREFIX = "FT";
 
+type Db = ReturnType<typeof getDb>;
+type Tx = Parameters<Parameters<Db["transaction"]>[0]>[0];
+
 /** "2026-27" for any instant in that Indian financial year. */
 export function financialYear(at: Date = new Date()): string {
   const ist = new Date(at.getTime() + 330 * 60_000);
@@ -31,8 +34,9 @@ export async function assignInvoiceNumber(
   kind: "employer" | "intern",
   paymentId: string,
   paidAt: Date = new Date(),
+  // Pass the settling transaction, so a rollback also takes the serial back.
+  db: Db | Tx = getDb(),
 ): Promise<string | null> {
-  const db = getDb();
   const table = kind === "employer" ? schema.employerPayments : schema.internPayments;
   const [row] = await db
     .select({ invoiceNumber: table.invoiceNumber })

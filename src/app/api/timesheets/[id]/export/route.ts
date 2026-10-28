@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
 import { getSession } from "@/lib/auth";
+import { hasAnyPermission } from "@/lib/security/guards";
 import { getDb, schema } from "@/lib/db";
 import { displayNameOf, toCandidateProfile } from "@/lib/employer-candidates";
 import { hiredInternIds } from "@/lib/employer-visibility";
@@ -24,7 +25,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const db = getDb();
   const [sheet] = await db.select().from(schema.timesheets).where(eq(schema.timesheets.id, id)).limit(1);
   if (!sheet) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  const owns = session.role === "admin" || (session.role === "employer" && sheet.employerId === session.uid);
+  const staff = hasAnyPermission(session, ["interns:read", "companies:read", "reports:read"]);
+  const owns = staff || (session.role === "employer" && sheet.employerId === session.uid);
   if (!owns) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const [[user], [onboarding], [project]] = await Promise.all([
@@ -40,7 +42,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       : Promise.resolve([] as { name: string | null }[]),
   ]);
   // Names follow the same unmasking rule as every employer screen.
-  const unlocked = session.role === "admin" || (await hiredInternIds(db, sheet.employerId)).has(sheet.internId);
+  const unlocked = staff || (await hiredInternIds(db, sheet.employerId)).has(sheet.internId);
   const name = user ? displayNameOf(toCandidateProfile(user, onboarding), unlocked) : "Candidate";
 
   const notes = new Map<string, string>();

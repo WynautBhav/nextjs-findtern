@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
 import { getSession } from "@/lib/auth";
+import { hasAnyPermission } from "@/lib/security/guards";
 import { getDb, schema } from "@/lib/db";
 import { parseOffer } from "@/lib/offer";
 import { readAny } from "@/lib/security/store";
@@ -16,7 +17,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
   const [p] = await getDb().select().from(schema.proposals).where(eq(schema.proposals.id, id)).limit(1);
   if (!p) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  const party = session.role === "admin" || session.uid === p.internId || session.uid === p.employerId;
+  const party = hasAnyPermission(session, ["interns:read", "companies:read"]) || session.uid === p.internId || session.uid === p.employerId;
   if (!party) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const ft = parseOffer(p.offerDetails, p.currency).fullTime;

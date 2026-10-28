@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
 import { getSession } from "@/lib/auth";
+import { hasAnyPermission } from "@/lib/security/guards";
 import { getDb } from "@/lib/db";
 import { legacyContentType, legacyPath, readLegacy } from "@/lib/security/store";
 
@@ -54,7 +55,7 @@ async function canRead(path: string, folder: string | null): Promise<true | stri
 
   const session = await getSession();
   if (!session) return "Sign in";
-  if (session.role === "admin") return true;
+  if (hasAnyPermission(session, ["interns:read", "companies:read", "contact:intern:read", "contact:employer:read"])) return true;
   if (folder === "support") return "Forbidden";
   // Placement officers read student data through src/lib/college only.
   if (session.role === "college") return "Forbidden";

@@ -204,12 +204,15 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   // leave, times the band rate the offer was priced on. An edit that touches
   // neither keeps the stored hours (legacy rows may predate the schedule).
   const touchesHours = edits.weeklySchedule !== undefined || edits.paidLeavesPerMonth !== undefined;
+  // The fee as it stood before the edit: a legacy row has no perHireCharge,
+  // and inferring it from the new months and the old total would move it.
+  if (before.perHireMinor != null) next.perHireCharge = before.perHireMinor / 100;
   const o = parseOffer(next, proposal.currency);
   if (touchesHours) next.monthlyHours = scheduledMonthlyHours(o.weeklySchedule, o.paidLeavesPerMonth);
   const hours = touchesHours ? Number(next.monthlyHours) : o.monthlyHours;
   const monthlyMinor = o.hourlyRateMinor ? Math.round(hours * o.hourlyRateMinor) : (o.monthlyMinor ?? 0);
   next.monthlyAmount = monthlyMinor / 100;
-  next.totalPrice = (monthlyMinor * o.months + (o.perHireMinor ?? 0)) / 100;
+  next.totalPrice = (monthlyMinor * o.months + (before.perHireMinor ?? 0)) / 100;
   const [updated] = await db
     .update(schema.proposals)
     .set({ offerDetails: next, updatedAt: new Date(), ...(reopen ? { status: "sent" } : {}) })

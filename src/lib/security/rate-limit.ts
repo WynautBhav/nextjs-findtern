@@ -90,6 +90,9 @@ export const limiters = {
   login: new RateLimiter(8, 15 * 60_000),
   otp: new RateLimiter(5, 15 * 60_000),
   otpVerify: new RateLimiter(10, 15 * 60_000),
+  // Wrong guesses per issued code, keyed on the code row: the per-IP limit
+  // alone let a pool of IPs walk all 10^6 codes. The 5th miss burns the code.
+  otpGuess: new RateLimiter(4, 15 * 60_000),
   forgotPassword: new RateLimiter(3, 60 * 60_000),
   signup: new RateLimiter(5, 60 * 60_000),
   upload: new RateLimiter(20, 60 * 60_000),

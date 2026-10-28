@@ -1,4 +1,4 @@
-import { and, eq, gte, lte } from "drizzle-orm";
+import { and, eq, gte, lte, sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
 import { isHiredProposal } from "@/lib/hire-status";
@@ -84,45 +84,51 @@ export async function POST(req: Request) {
   const start = new Date(`${period.start}T00:00:00.000Z`);
   const end = new Date(`${period.end}T23:59:59.999Z`);
 
-  // Check if a timesheet already exists for this proposal and overlapping date
-  const [existing] = await db
-    .select()
-    .from(schema.timesheets)
-    .where(
-      and(
-        eq(schema.timesheets.proposalId, proposal.id),
-        gte(schema.timesheets.periodEnd, start),
-        lte(schema.timesheets.periodStart, end)
-      )
-    )
-    .limit(1);
+  const initialEntries = generateMonthEntries(period.start, period.end);
 
-  if (existing) {
+  // Serialised per placement, so two concurrent POSTs cannot both pass the
+  // overlap check (no unique index: the legacy app shares this table).
+  const result = await db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${proposal.id}))`);
+    const [existing] = await tx
+      .select()
+      .from(schema.timesheets)
+      .where(
+        and(
+          eq(schema.timesheets.proposalId, proposal.id),
+          gte(schema.timesheets.periodEnd, start),
+          lte(schema.timesheets.periodStart, end)
+        )
+      )
+      .limit(1);
+    if (existing) return { existing, sheet: null };
+
+    const [sheet] = await tx
+      .insert(schema.timesheets)
+      .values({
+        proposalId: proposal.id,
+        employerId: proposal.employerId,
+        internId: proposal.internId,
+        periodStart: start,
+        periodEnd: end,
+        status: "draft",
+        entries: initialEntries,
+        internNote: parsed.data.internNote || null,
+        submittedAt: null,
+      })
+      .returning();
+    return { existing: null, sheet };
+  });
+
+  if (result.existing) {
     return NextResponse.json(
       {
         error: "A timesheet for this period already exists",
-        timesheetId: existing.id,
+        timesheetId: result.existing.id,
       },
       { status: 409 }
     );
   }
 
-  const initialEntries = generateMonthEntries(period.start, period.end);
-
-  const [sheet] = await db
-    .insert(schema.timesheets)
-    .values({
-      proposalId: proposal.id,
-      employerId: proposal.employerId,
-      internId: proposal.internId,
-      periodStart: start,
-      periodEnd: end,
-      status: "draft",
-      entries: initialEntries,
-      internNote: parsed.data.internNote || null,
-      submittedAt: null,
-    })
-    .returning();
-
-  return NextResponse.json({ timesheet: sheet }, { status: 201 });
+  return NextResponse.json({ timesheet: result.sheet }, { status: 201 });
 }

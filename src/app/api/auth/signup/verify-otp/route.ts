@@ -38,7 +38,14 @@ export async function POST(req: Request) {
     .orderBy(desc(schema.emailOtps.createdAt))
     .limit(1);
 
-  if (!row || row.expiresAt < new Date() || !verifyOtp(otp, email, row.otpHash)) {
+  if (!row || row.expiresAt < new Date()) {
+    return NextResponse.json({ error: "Invalid or expired code" }, { status: 400 });
+  }
+  if (!verifyOtp(otp, email, row.otpHash)) {
+    if (!limiters.otpGuess.take(row.id)) {
+      await db.update(schema.emailOtps).set({ usedAt: new Date() }).where(eq(schema.emailOtps.id, row.id));
+      return NextResponse.json({ error: "Too many wrong codes. Request a new one." }, { status: 429 });
+    }
     return NextResponse.json({ error: "Invalid or expired code" }, { status: 400 });
   }
 

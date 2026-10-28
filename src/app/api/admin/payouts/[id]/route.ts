@@ -6,7 +6,7 @@ import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
 import { notifyStipendPaid } from "@/lib/payments";
 import { proposalOf } from "@/lib/admin/stipend-dues";
-import { queueNextMonth } from "@/lib/admin/stipend-queue";
+import { lockPlacement, queueNextMonth } from "@/lib/admin/stipend-queue";
 
 const patchSchema = z
   .object({
@@ -72,25 +72,6 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (to === "paid" && existing.status !== "pending") {
     return NextResponse.json({ error: "Only a pending payout can be marked paid" }, { status: 409 });
   }
-  if (to === "pending" && existing.status !== "pending") {
-    const proposalId = proposalOf(existing.raw);
-    if (proposalId) {
-      const [other] = await db
-        .select({ id: schema.internPayouts.id })
-        .from(schema.internPayouts)
-        .where(
-          and(
-            eq(schema.internPayouts.internId, existing.internId),
-            eq(schema.internPayouts.status, "pending"),
-            ne(schema.internPayouts.id, id),
-            sql`coalesce(${schema.internPayouts.raw}->>'proposalId', ${schema.internPayouts.raw}->>'proposal_id') = ${proposalId}`,
-          ),
-        )
-        .limit(1);
-      if (other) return NextResponse.json({ error: "Another payout is already pending for this placement" }, { status: 409 });
-    }
-  }
-
   const set: Partial<typeof schema.internPayouts.$inferInsert> = { updatedAt: new Date() };
   if (to !== undefined) {
     set.status = to;
@@ -106,20 +87,49 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     set.raw = raw;
   }
 
-  // Conditional on the status read above, so two admins cannot both mark it.
-  const updated = await db
-    .update(schema.internPayouts)
-    .set(set)
-    .where(and(eq(schema.internPayouts.id, id), eq(schema.internPayouts.status, existing.status)))
-    .returning({ id: schema.internPayouts.id });
+  // Reopening takes the placement lock and re-checks for another pending
+  // payout inside it, like the create path, so two reopens cannot both win.
+  const reopenProposal = to === "pending" && existing.status !== "pending" ? proposalOf(existing.raw) : null;
+  const updated = await db.transaction(async (tx) => {
+    if (reopenProposal) {
+      await lockPlacement(tx, reopenProposal);
+      const [other] = await tx
+        .select({ id: schema.internPayouts.id })
+        .from(schema.internPayouts)
+        .where(
+          and(
+            eq(schema.internPayouts.internId, existing.internId),
+            eq(schema.internPayouts.status, "pending"),
+            ne(schema.internPayouts.id, id),
+            sql`coalesce(${schema.internPayouts.raw}->>'proposalId', ${schema.internPayouts.raw}->>'proposal_id') = ${reopenProposal}`,
+          ),
+        )
+        .limit(1);
+      if (other) return "other-pending" as const;
+    }
+    // Conditional on the status read above, so two admins cannot both mark it.
+    return tx
+      .update(schema.internPayouts)
+      .set(set)
+      .where(and(eq(schema.internPayouts.id, id), eq(schema.internPayouts.status, existing.status)))
+      .returning({ id: schema.internPayouts.id });
+  });
+  if (updated === "other-pending") {
+    return NextResponse.json({ error: "Another payout is already pending for this placement" }, { status: 409 });
+  }
   if (updated.length === 0) {
     return NextResponse.json({ error: "This payout changed meanwhile. Reload and try again." }, { status: 409 });
   }
 
   let next = null;
   if (to === "paid") {
-    await notifyStipendPaid(id);
+    // Queue first: the row is already "paid", so a retry would 409 and never queue.
     next = await queueNextMonth(db, existing.internId, existing);
+    try {
+      await notifyStipendPaid(id);
+    } catch (err) {
+      console.error("[payouts] notifyStipendPaid failed", id, err);
+    }
   }
   return NextResponse.json({ ok: true, next });
 }

@@ -54,7 +54,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({ error: "Only a pending payout can be marked paid" }, { status: 409 });
   }
 
-  await notifyStipendPaid(payoutId);
+  // Queue first: the row is already "paid", so a retry would 409 and never queue.
   const next = await queueNextMonth(db, id, updated[0]);
+  try {
+    await notifyStipendPaid(payoutId);
+  } catch (err) {
+    console.error("[mark-paid] notifyStipendPaid failed", payoutId, err);
+  }
   return NextResponse.json({ ok: true, next });
 }

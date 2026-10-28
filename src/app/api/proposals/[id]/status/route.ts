@@ -194,22 +194,98 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   const details = stampedDetails();
 
 
-  const [updated] = await db
-    .update(schema.proposals)
-    .set({
-      status,
-      updatedAt: new Date(),
-      ...(details ? { offerDetails: details } : {}),
-    })
-    // Only if nobody changed it since we read it (accept vs withdraw race).
-    .where(and(eq(schema.proposals.id, id), eq(schema.proposals.status, proposal.status)))
-    .returning();
+  // One transaction: status flip, expiring the intern's other offers and the
+  // cart cleanup land together. Locking the intern's proposal rows first makes
+  // two simultaneous acceptances queue instead of both winning.
+  let expired: { id: string; employerId: string }[] = [];
+  const updated = await db.transaction(async (tx) => {
+    await tx.select({ id: schema.proposals.id }).from(schema.proposals).where(eq(schema.proposals.internId, proposal.internId)).for("update");
+    // One internship at a time: an offer accepted elsewhere and not yet
+    // closed (awaiting payment) blocks a second acceptance.
+    if (status === "accepted") {
+      const [other] = await tx
+        .select({ id: schema.proposals.id })
+        .from(schema.proposals)
+        .where(
+          and(
+            eq(schema.proposals.internId, proposal.internId),
+            ne(schema.proposals.id, id),
+            inArray(schema.proposals.status, ["accepted", "processing"]),
+          ),
+        )
+        .limit(1);
+      if (other) return "busy" as const;
+    }
+    const [row] = await tx
+      .update(schema.proposals)
+      .set({
+        status,
+        updatedAt: new Date(),
+        ...(details ? { offerDetails: details } : {}),
+      })
+      // Only if nobody changed it since we read it (accept vs withdraw race).
+      .where(and(eq(schema.proposals.id, id), eq(schema.proposals.status, proposal.status)))
+      .returning();
+    if (!row) return null;
+
+    // Accepting closes the intern's other open offers from every company (one
+    // internship at a time) and takes them off this employer's shortlist.
+    if (status === "rejected" || status === "expired") {
+      // A declined or expired candidate leaves the employer's shortlist
+      // (legacy routes.ts:14481).
+      await tx
+        .delete(schema.employerCartItems)
+        .where(
+          and(
+            eq(schema.employerCartItems.employerId, proposal.employerId),
+            eq(schema.employerCartItems.internId, proposal.internId),
+            eq(schema.employerCartItems.projectId, proposal.projectId),
+          ),
+        );
+    }
+    if (status === "accepted") {
+      expired = await tx
+          .update(schema.proposals)
+          .set({ status: "expired", updatedAt: new Date() })
+          .where(
+            and(
+              eq(schema.proposals.internId, proposal.internId),
+              ne(schema.proposals.id, id),
+              inArray(schema.proposals.status, ["draft", "sent", "interview_scheduled"]),
+            ),
+          )
+          .returning({ id: schema.proposals.id, employerId: schema.proposals.employerId });
+      await tx
+        .delete(schema.employerCartItems)
+        .where(
+          and(
+            eq(schema.employerCartItems.employerId, proposal.employerId),
+            eq(schema.employerCartItems.internId, proposal.internId),
+          ),
+        );
+    }
+    return row;
+  });
+  if (updated === "busy") {
+    return NextResponse.json({ error: "You have already accepted another offer. Only one internship at a time." }, { status: 409 });
+  }
   if (!updated) {
     return NextResponse.json({ error: "This offer changed a moment ago. Refresh and try again." }, { status: 409 });
   }
 
   // Any status change here closes the offer as something to act on.
-  await resolveOfferNotifications(proposal.internId, [id]).catch(() => {});
+  await resolveOfferNotifications(proposal.internId, [id, ...expired.map((e) => e.id)]).catch(() => {});
+  // Other companies learn their offer closed because the candidate took another.
+  for (const e of expired.filter((e) => e.employerId !== proposal.employerId)) {
+    await notify({
+      to: { type: "employer", id: e.employerId },
+      type: "proposal_expired",
+      title: "Offer closed",
+      message: "The candidate accepted another internship, so your offer has closed.",
+      data: { proposalId: e.id },
+      dedupeKey: `proposal_expired_${e.id}`,
+    }).catch((err) => console.error("[proposal status] expiry notice failed", err));
+  }
 
   if (endsGuarantee) {
     const [onboarding] = await db
@@ -231,45 +307,6 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
         })
         .where(eq(schema.internOnboarding.id, onboarding.id));
     }
-  }
-
-  // Accepting closes the intern's other open offers from this employer and
-  // takes them off that employer's shortlist (legacy behaviour).
-  if (status === "rejected" || status === "expired") {
-    // A declined or expired candidate leaves the employer's shortlist
-    // (legacy routes.ts:14481).
-    await db
-      .delete(schema.employerCartItems)
-      .where(
-        and(
-          eq(schema.employerCartItems.employerId, proposal.employerId),
-          eq(schema.employerCartItems.internId, proposal.internId),
-          eq(schema.employerCartItems.projectId, proposal.projectId),
-        ),
-      );
-  }
-  if (status === "accepted") {
-    await db
-      .update(schema.proposals)
-      .set({ status: "expired", updatedAt: new Date() })
-      .where(
-        and(
-          eq(schema.proposals.employerId, proposal.employerId),
-          eq(schema.proposals.internId, proposal.internId),
-          ne(schema.proposals.id, id),
-          inArray(schema.proposals.status, ["draft", "sent", "interview_scheduled"]),
-        ),
-      )
-      .returning({ id: schema.proposals.id })
-      .then((rows) => resolveOfferNotifications(proposal.internId, rows.map((r) => r.id)).catch(() => {}));
-    await db
-      .delete(schema.employerCartItems)
-      .where(
-        and(
-          eq(schema.employerCartItems.employerId, proposal.employerId),
-          eq(schema.employerCartItems.internId, proposal.internId),
-        ),
-      );
   }
 
   // Tell the other party. Names stay initials until a hire (legacy rule).

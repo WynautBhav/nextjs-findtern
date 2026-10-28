@@ -29,7 +29,7 @@ const payoutEmployer = alias(schema.employers, "payout_employer");
 const payoutProject = alias(schema.projects, "payout_project");
 
 function dayParam(v: string | undefined): Date | null {
-  return v && /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(v)) ? new Date(`${v}T00:00:00Z`) : null;
+  return v && /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(v)) ? new Date(`${v}T00:00:00+05:30`) : null; // IST midnight; India has no DST, so +1 day below is exact
 }
 
 function payoutWhere(params: Record<string, string>): SQL | undefined {

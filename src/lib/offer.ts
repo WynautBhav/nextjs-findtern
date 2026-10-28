@@ -117,7 +117,7 @@ function perHireOf(o: Record<string, unknown>, months: number): number | null {
   if (o.perHireCharge != null) return num(o.perHireCharge) === 0 ? 0 : toMinor(o.perHireCharge);
   const total = num(o.totalPrice);
   const monthly = num(o.monthlyAmount ?? o.monthly_amount);
-  return total != null && monthly != null ? toMinor(total - monthly * months) : null;
+  return total != null && monthly != null && total > monthly * months ? toMinor(total - monthly * months) : null;
 }
 
 /**

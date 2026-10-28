@@ -12,7 +12,8 @@ export const dynamic = "force-dynamic";
 
 function authorised(req: Request): boolean {
   const secret = process.env.INCRUITER_WEBHOOK_SECRET;
-  const given = req.headers.get("x-webhook-secret") ?? new URL(req.url).searchParams.get("secret") ?? "";
+  // Header only: a ?secret= query lands in nginx access logs.
+  const given = req.headers.get("x-webhook-secret") ?? "";
   if (!secret) return false;
   const a = Buffer.from(secret);
   const b = Buffer.from(given);
@@ -21,7 +22,7 @@ function authorised(req: Request): boolean {
 
 /**
  * Incruiter AI-interview results. Disabled unless INCRUITER_WEBHOOK_SECRET is
- * set and sent back as `x-webhook-secret` (or `?secret=`): scores here change
+ * set and sent back as `x-webhook-secret`: scores here change
  * what employers pay, so an unauthenticated caller must never reach them.
  * Only scores Incruiter actually sends are written; nothing is defaulted.
  */

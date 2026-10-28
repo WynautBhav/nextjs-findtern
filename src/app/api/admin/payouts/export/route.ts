@@ -15,6 +15,7 @@ import {
   type PlacementDueRow,
   type PayoutRow,
 } from "@/lib/admin/payout-list";
+import { todayIst } from "@/lib/timesheet-days";
 import { requireRole } from "@/lib/security/guards";
 
 /**
@@ -33,7 +34,7 @@ const money = (minor: number) => (minor / 100).toFixed(2);
 const day = (d: Date | string | null | undefined) => {
   if (!d) return "";
   const t = new Date(d);
-  return Number.isNaN(t.getTime()) ? "" : t.toISOString().slice(0, 10);
+  return Number.isNaN(t.getTime()) ? "" : todayIst(t); // the IST calendar day
 };
 
 export async function GET(req: Request) {
@@ -69,7 +70,13 @@ export async function GET(req: Request) {
   }
 
   const sort = (PAYOUT_SORTS as readonly string[]).includes(params.sort ?? "") ? (params.sort as PayoutSort) : "scheduled";
-  const { rows } = await loadPayouts(params, { offset: 0, limit: MAX_ROWS, sort, dir: params.dir === "asc" ? "asc" : "desc" });
+  const { rows } = await loadPayouts(params, { offset: 0, limit: MAX_ROWS + 1, sort, dir: params.dir === "asc" ? "asc" : "desc" });
+  if (rows.length > MAX_ROWS) {
+    return NextResponse.json(
+      { error: `More than ${MAX_ROWS} payouts match. Narrow the filters (dates, status) and export again.` },
+      { status: 413 },
+    );
+  }
   const columns: CsvColumn<PayoutRow>[] = [
     { header: "Intern", value: (r) => r.internName },
     { header: "Email", value: (r) => r.internEmail ?? "" },
