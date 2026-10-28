@@ -152,7 +152,7 @@ export default async function EmployerInternDetail({
             to: { type: "intern", id },
             type: "profile_view",
             title: "Profile viewed",
-            message: `🚀 Spotlight's on you${name ? `, ${name}` : ""} - ${views} profile view${views === 1 ? "" : "s"} and counting!`,
+            message: `An employer viewed your profile${name ? `, ${name}` : ""}: ${views} view${views === 1 ? "" : "s"} so far.`,
             data: { employerId, monthViews: views },
             dedupeKey: `profile_view:${id}:${employerId}:${now.toISOString().slice(0, 10)}`,
           }).catch((e) => console.error("[employer/intern] view notice", e));

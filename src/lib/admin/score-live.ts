@@ -52,7 +52,7 @@ export async function afterRatingsSaved(
         to: { type: "intern", id: internId },
         type: "ai_interview_scores_live",
         title: "AI interview scores are live",
-        message: `🎉 Hurray ${name}! Your AI interview is complete. Scores will be live soon.`,
+        message: `Your AI interview is scored${name ? `, ${name}` : ""}: your Findtern Score is on your dashboard.`,
         data: { findternScore: score },
         dedupeKey: `ai_interview_scores_live:${internId}`,
       });
