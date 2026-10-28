@@ -534,6 +534,31 @@ async function main() {
   const lastMonthStart = new Date(nowDate.getFullYear(), nowDate.getMonth() - 1, 1);
   const lastMonthEnd = new Date(nowDate.getFullYear(), nowDate.getMonth(), 0);
 
+  // One entry per day of the period, in the shape a real submission has
+  // (every real row carries a status): weekdays Present with hours and a
+  // note, weekends Fixed off. The seed used to write four hand-picked days
+  // with no status, so an approved sheet read "0 days present".
+  const NOTES = [
+    "Sprint setup and API contract definition",
+    "Component styling and state integration",
+    "Unit testing and PR revision",
+    "Staging deployment smoke testing",
+    "Code review and bug fixes",
+  ];
+  const periodEntries = (start: Date, end: Date) => {
+    const out: { date: string; status: string; hours: number; note: string }[] = [];
+    for (let d = new Date(Date.UTC(start.getFullYear(), start.getMonth(), start.getDate())); d.getTime() <= Date.UTC(end.getFullYear(), end.getMonth(), end.getDate()); d.setUTCDate(d.getUTCDate() + 1)) {
+      const weekend = d.getUTCDay() === 0 || d.getUTCDay() === 6;
+      out.push({
+        date: d.toISOString().slice(0, 10),
+        status: weekend ? "Fixed off" : "Present",
+        hours: weekend ? 0 : 6 + (d.getUTCDate() % 3),
+        note: weekend ? "" : NOTES[d.getUTCDate() % NOTES.length],
+      });
+    }
+    return out;
+  };
+
   for (let i = 0; i < Math.min(12, hiredProposals.length); i++) {
     const prop = hiredProposals[i];
     const status = timesheetStatuses[i % timesheetStatuses.length];
@@ -545,12 +570,7 @@ async function main() {
       periodStart: lastMonthStart,
       periodEnd: lastMonthEnd,
       status,
-      entries: [
-        { date: "2026-09-02", hours: 6, note: "Sprint setup and API contract definition" },
-        { date: "2026-09-04", hours: 7, note: "Component styling and state integration" },
-        { date: "2026-09-08", hours: 5, note: "Unit testing and PR revision" },
-        { date: "2026-09-12", hours: 6, note: "Staging deployment smoke testing" },
-      ],
+      entries: periodEntries(lastMonthStart, lastMonthEnd),
       submittedAt: status !== "draft" ? new Date(nowDate.getFullYear(), nowDate.getMonth(), 1) : null,
       approvedAt: status === "approved" ? new Date(nowDate.getFullYear(), nowDate.getMonth(), 3) : null,
       rejectedAt: status === "rejected" ? new Date(nowDate.getFullYear(), nowDate.getMonth(), 4) : null,
