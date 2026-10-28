@@ -9,6 +9,7 @@ import { getDb, schema } from "@/lib/db";
 import { PageHeader, EmptyState } from "@/components/layout/page-header";
 import { Surface } from "@/components/app/primitives";
 import { CollegeMark, DriveStatePill, KIND_LABEL, driveTime, timeLeft } from "@/components/employer/drive-parts";
+import { compareDrives } from "@/lib/college/access";
 
 export const metadata: Metadata = {
   title: "Campus drives",
@@ -34,6 +35,8 @@ export default async function EmployerDrivesPage() {
       .innerJoin(schema.colleges, eq(schema.colleges.id, schema.collegeDrives.collegeId))
       .where(eq(schema.collegeDriveEmployers.employerId, session.uid))
       .orderBy(desc(schema.collegeDrives.endsAt));
+    // Live first, then upcoming, then past (QA-013's order, shared).
+    rows.sort((a, b) => compareDrives(a.drive, b.drive));
   } catch (err) {
     console.error("[employer/drives]", err);
     failed = true;

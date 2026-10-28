@@ -46,6 +46,21 @@ export function driveWindow(drive: Pick<DriveLike, "startsAt" | "endsAt" | "revo
   return "live";
 }
 
+/**
+ * List order for drives (QA-013: a closed drive sat above the live one):
+ * live first, ending soonest; then upcoming, starting soonest; then ended or
+ * revoked, most recent first.
+ */
+export function compareDrives(a: Pick<DriveLike, "startsAt" | "endsAt" | "revokedAt">, b: Pick<DriveLike, "startsAt" | "endsAt" | "revokedAt">, now = Date.now()): number {
+  const rank = { live: 0, upcoming: 1, ended: 2, revoked: 2 } as const;
+  const wa = driveWindow(a, now);
+  const wb = driveWindow(b, now);
+  if (rank[wa] !== rank[wb]) return rank[wa] - rank[wb];
+  if (wa === "live") return a.endsAt.getTime() - b.endsAt.getTime();
+  if (wa === "upcoming") return a.startsAt.getTime() - b.startsAt.getTime();
+  return b.endsAt.getTime() - a.endsAt.getTime();
+}
+
 function windowDenial(drive: DriveLike, now: number): AccessResult | null {
   const w = driveWindow(drive, now);
   if (w === "revoked") return { ok: false, reason: "revoked" };
