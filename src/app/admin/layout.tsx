@@ -9,7 +9,6 @@ import {
   Building2,
   CircleUserRound,
   CreditCard,
-  FileText,
   Globe,
   GraduationCap,
   History,
@@ -20,7 +19,6 @@ import {
   Send,
   Settings,
   Shield,
-  ShieldCheck,
   ShoppingBag,
   Tag,
   UserCheck,
@@ -28,6 +26,7 @@ import {
 } from "lucide-react";
 
 import { CommandPalette } from "@/components/admin/command-palette";
+import { LEGAL_PAGES } from "@/components/admin/legal-tabs";
 import { ConsoleShell, type ConsoleNavGroup } from "@/components/layout/console-shell";
 import { RAIL_COOKIE } from "@/lib/rail";
 import { allows, requiredPermissions } from "@/lib/admin/permissions";
@@ -55,7 +54,9 @@ const NAV: ConsoleNavGroup[] = [
       { href: "/admin/dashboard", label: "Dashboard", icon: <LayoutDashboard /> },
       { href: "/admin/proposal-tracker", label: "Proposal pipeline", icon: <Send /> },
       { href: "/admin/messages", label: "Messages", icon: <MessageSquare /> },
-      { href: "/admin/notification-history", label: "Notification history", icon: <History /> },
+      // A daily queue (stipends due), so it sits with the daily work rather
+      // than below the fold under Finance.
+      { href: "/admin/payouts", label: "Payouts", icon: <CreditCard /> },
     ],
   },
   {
@@ -74,7 +75,6 @@ const NAV: ConsoleNavGroup[] = [
       { href: "/admin/orders", label: "Orders", icon: <ShoppingBag /> },
       { href: "/admin/intern-invoices", label: "Intern invoices", icon: <Receipt /> },
       { href: "/admin/transactions", label: "Transactions", icon: <ArrowLeftRight /> },
-      { href: "/admin/payouts", label: "Payouts", icon: <CreditCard /> },
       { href: "/admin/promo-codes", label: "Promo codes", icon: <Tag /> },
       { href: "/admin/reports", label: "Reports", icon: <BarChart3 /> },
     ],
@@ -84,26 +84,32 @@ const NAV: ConsoleNavGroup[] = [
     items: [
       { href: "/admin/cms", label: "Website content", icon: <Globe /> },
       { href: "/admin/notifications", label: "Send notification", icon: <Bell /> },
+      { href: "/admin/notification-history", label: "Notification history", icon: <History /> },
     ],
   },
   {
     title: "Settings",
     items: [
       { href: "/admin/settings", label: "Pricing and fees", icon: <Settings /> },
-      { href: "/admin/cms/terms", label: "Website terms", icon: <ScrollText /> },
-      { href: "/admin/interns/terms", label: "Intern terms", icon: <FileText /> },
-      { href: "/admin/interns/non-disclosure", label: "Intern NDA", icon: <ShieldCheck /> },
-      { href: "/admin/companies/terms", label: "Company terms", icon: <ScrollText /> },
+      // The four legal texts were four sidebar items; one item, with tabs
+      // between them on the pages (LegalTabs).
+      {
+        href: "/admin/cms/terms",
+        label: "Legal texts",
+        icon: <ScrollText />,
+        also: ["/admin/interns/terms", "/admin/interns/non-disclosure", "/admin/companies/terms"],
+      },
       { href: "/admin/roles", label: "Roles and access", icon: <Shield /> },
-      { href: "/admin/account", label: "Your account", icon: <CircleUserRound /> },
     ],
   },
 ];
 
 /** href → sidebar label, for breadcrumbs. */
-const NAV_LABELS: Record<string, string> = Object.fromEntries(
-  NAV.flatMap((g) => g.items.map((i) => [i.href, i.label])),
-);
+const NAV_LABELS: Record<string, string> = {
+  ...Object.fromEntries(NAV.flatMap((g) => g.items.map((i) => [i.href, i.label]))),
+  // Breadcrumbs name each legal text, not the one sidebar item.
+  ...Object.fromEntries(LEGAL_PAGES.map((l) => [l.key, l.label])),
+};
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const session = await getSession();

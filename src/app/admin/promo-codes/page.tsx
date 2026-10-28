@@ -1,5 +1,4 @@
 import { desc } from "drizzle-orm";
-import { CheckCircle2, Percent, Sparkles, Tag } from "lucide-react";
 
 import { getDb, schema } from "@/lib/db";
 import type { PromoCode } from "@/lib/db/schema";
@@ -48,15 +47,14 @@ export default async function AdminPromoCodesPage() {
       {header}
 
       <StatGrid cols={4}>
-        <StatCard label="Active codes" value={formatNumber(activeCount)} hint={`${formatNumber(totalCodes)} codes in all`} icon={Tag} />
-        <StatCard label="Total redemptions" value={formatNumber(totalRedemptions)} hint="Paid orders and fees that used a code" icon={Sparkles} />
+        <StatCard label="Active codes" value={formatNumber(activeCount)} hint={`${formatNumber(totalCodes)} codes in all`} />
+        <StatCard label="Total redemptions" value={formatNumber(totalRedemptions)} hint="Paid orders and fees that used a code" />
         <StatCard
           label="Uses per code"
           value={totalCodes ? (totalRedemptions / totalCodes).toFixed(1) : "-"}
           hint="Average across every code"
-          icon={Percent}
         />
-        <StatCard label="Used up" value={formatNumber(exhausted)} hint="Codes at their usage limit" icon={CheckCircle2} />
+        <StatCard label="Used up" value={formatNumber(exhausted)} hint="Codes at their usage limit" />
       </StatGrid>
 
       <PromoCodesManager initialPromoCodes={rows} />

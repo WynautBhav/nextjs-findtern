@@ -18,8 +18,6 @@ import {
   InternVisibilityCell,
 } from "@/components/admin/intern-row-controls";
 import { buttonClass } from "@/components/ui/button";
-import { TableCell, TableRow } from "@/components/ui/table";
-import { cn } from "@/lib/utils";
 
 /**
  * Candidate directory - the screen an admin actually lives in.
@@ -227,7 +225,7 @@ export default async function AdminInterns({
       header: "Candidate",
       sort: "name",
       cell: (row) => (
-        <div className="flex min-w-56 items-center gap-3">
+        <div className="flex items-center gap-3">
           <span aria-hidden className="grid size-9 shrink-0 place-items-center rounded-full bg-brand-100 text-xs font-semibold text-brand-800">
             {row.firstName.charAt(0)}
             {row.lastName.charAt(0)}
@@ -235,28 +233,31 @@ export default async function AdminInterns({
           <div className="min-w-0">
             <Link
               href={`/admin/interns/${row.id}`}
-              className="block max-w-64 truncate font-semibold text-ink-900 underline-offset-4 hover:underline"
+              className="block max-w-52 truncate font-semibold text-ink-900 underline-offset-4 hover:underline"
               title={`${row.firstName} ${row.lastName}`}
             >
               {row.firstName} {row.lastName}
             </Link>
-            <p className="max-w-64 truncate text-sm text-ink-600" title={row.email}>
+            <p className="max-w-52 truncate text-sm text-ink-600" title={row.email}>
               {row.email}
+            </p>
+            {/* Joined rides here, not in its own column ("Newest first" still sorts by it). */}
+            <p className="nums max-w-52 whitespace-normal text-xs text-ink-600">
+              {row.createdAt ? `Joined ${formatDate(row.createdAt)}` : ""}
+              {/* Only the exceptions: a complete, paid profile is the norm. */}
+              {!row.hasProfile ? <span className="text-accent-700"> · profile incomplete</span> : null}
+              {row.hasProfile && !row.feePaid ? " · fee unpaid" : null}
+              {!row.openToWork && row.visibility !== "hidden" ? " · hidden by candidate" : null}
             </p>
           </div>
         </div>
       ),
     },
     {
-      header: "Joined",
-      sort: "created",
-      cell: (row) => <span className="nums whitespace-nowrap text-ink-600">{row.createdAt ? formatDate(row.createdAt) : "-"}</span>,
-    },
-    {
       header: "Score",
       sort: "score",
       cell: (row) => (
-        <div className="flex min-w-32 flex-col items-start gap-1">
+        <div className="flex flex-col items-start gap-1">
           {row.hasOnboarding ? (
             <InternRatingsCell
               internId={row.id}
@@ -267,7 +268,10 @@ export default async function AdminInterns({
           ) : (
             <span className="text-ink-600">No profile</span>
           )}
-          <span className="text-xs text-ink-600">AI interview: {AI_STATUS_LABEL[row.aiStatus] ?? humanizeStatus(row.aiStatus)}</span>
+          {/* Only when it is not done: "Completed" under every score was noise. */}
+          {row.aiStatus !== "completed" ? (
+            <span className="max-w-28 whitespace-normal text-xs text-ink-600">AI interview: {AI_STATUS_LABEL[row.aiStatus] ?? humanizeStatus(row.aiStatus)}</span>
+          ) : null}
         </div>
       ),
     },
@@ -294,54 +298,34 @@ export default async function AdminInterns({
         ),
     },
     {
-      header: "Next payout",
-      sort: "next",
-      cell: (row) =>
-        row.money?.nextDate ? (
-          <div className="flex flex-col items-start gap-1 whitespace-nowrap">
-            <span className="nums text-ink-800">{formatDate(row.money.nextDate)}</span>
-            {matchesDue(row.money.nextDate, "overdue", today) ? (
-              <StatusBadge tone="danger" label="Overdue" />
-            ) : null}
-          </div>
-        ) : (
-          <span className="text-text-subtle">-</span>
-        ),
-    },
-    {
-      header: "Left to pay",
+      // Owed and when, in one column (they were two, and the table ran past 1440).
+      header: "Stipend",
       sort: "owed",
       align: "right",
       cell: (row) =>
-        row.money && (row.money.owedMinor > 0 || row.money.pendingPayoutMinor > 0) ? (
-          <div className="whitespace-nowrap">
-            <span className="font-semibold text-ink-900">{formatMoney(row.money.owedMinor, "INR", { zeroLabel: "₹0" })}</span>
+        row.money && (row.money.owedMinor > 0 || row.money.pendingPayoutMinor > 0 || row.money.nextDate) ? (
+          <div className="flex flex-col items-end gap-1 whitespace-nowrap">
+            <span className="font-semibold text-ink-900">{formatMoney(row.money.owedMinor, "INR", { zeroLabel: "₹0" })} due</span>
             {row.money.pendingPayoutMinor > 0 ? (
-              <span className="block text-xs text-ink-600">{formatMoney(row.money.pendingPayoutMinor, "INR")} pending</span>
+              <span className="text-xs text-ink-600">{formatMoney(row.money.pendingPayoutMinor, "INR")} pending</span>
+            ) : null}
+            {row.money.nextDate ? (
+              <span className="nums flex items-center gap-1.5 text-xs text-ink-600">
+                {matchesDue(row.money.nextDate, "overdue", today) ? <StatusBadge tone="danger" label="Overdue" /> : null}
+                next {formatDate(row.money.nextDate)}
+              </span>
             ) : null}
           </div>
         ) : (
-          <span className="text-text-subtle">-</span>
+          <span className="text-text-subtle">–</span>
         ),
     },
     {
-      header: "Visibility",
+      header: "Access",
       cell: (row) => (
-        <div className="flex flex-col items-start gap-1">
+        <div className="flex flex-col items-start gap-1 whitespace-nowrap">
           <InternVisibilityCell internId={row.id} live={row.visibility !== "hidden"} />
-          {!row.openToWork && row.visibility !== "hidden" ? <span className="text-xs text-ink-600">Hidden by candidate</span> : null}
-        </div>
-      ),
-    },
-    {
-      header: "Account",
-      cell: (row) => (
-        <div className="flex flex-col items-start gap-1">
           <AccountActiveCell id={row.id} kind="intern" active={row.isActive} />
-          <span className="whitespace-nowrap text-xs text-ink-600">
-            {row.hasProfile ? "Profile complete" : <span className="text-accent-700">Profile incomplete</span>} ·{" "}
-            {row.feePaid ? "fee paid" : "fee unpaid"}
-          </span>
         </div>
       ),
     },
@@ -366,18 +350,7 @@ export default async function AdminInterns({
             caption="Candidates"
             searchPlaceholder="Search name, email or phone…"
             filters={FILTERS}
-            renderRow={(row) => (
-              <TableRow key={row.id} className="group/row border-ink-100 align-top hover:bg-ink-50/60">
-                {columns.map((column, i) => (
-                  <TableCell
-                    key={i}
-                    className={cn("px-3 py-3 text-sm text-ink-700", column.align === "right" && "nums text-right", column.className)}
-                  >
-                    {column.cell(row, i)}
-                  </TableCell>
-                ))}
-              </TableRow>
-            )}
+            rowClassName="group/row align-top"
             empty={{
               title: "No candidates match",
               body: "Try a different search, or clear the filters to see everyone.",

@@ -6,7 +6,7 @@ import { fteOf } from "@/lib/admin/fte";
 import { DataTable } from "@/components/admin/data-table";
 import { ProposalStatusEditor } from "@/components/admin/proposal-status-editor";
 import { StatusBadge } from "@/components/admin/status-badge";
-import { DetailRow, PageHead, Pill, SectionHead, StatTile, Surface } from "@/components/app/primitives";
+import { DetailRow, PageHead, Pill, SectionHead, StatTile, Surface, pillTabClass } from "@/components/app/primitives";
 import { toQueryString } from "@/lib/admin/params";
 import type { CompanyLedger, HireLedger } from "@/lib/admin/company-ledger";
 import type { Employer, EmployerPayment, Interview, Project, Proposal } from "@/lib/db/schema";
@@ -149,7 +149,7 @@ export function Company360View({
       </div>
 
       <nav aria-label="Company records" className="-mx-1 overflow-x-auto px-1">
-        <ul className="flex min-w-max gap-1 border-b border-ink-200/80">
+        <ul className="flex min-w-max gap-1 pb-1">
           {tabs.map((t) => {
             const active = t.key === tab;
             return (
@@ -158,14 +158,11 @@ export function Company360View({
                   href={`${base}${toQueryString({ tab: t.key === "profile" ? "" : t.key })}`}
                   scroll={false}
                   aria-current={active ? "page" : undefined}
-                  className={cn(
-                    "-mb-px inline-flex min-h-11 items-center gap-2 border-b-2 px-3 text-sm font-medium focus-visible:outline-2 focus-visible:outline-brand-600",
-                    active ? "border-brand-700 text-ink-900" : "border-transparent text-ink-600 hover:text-ink-900",
-                  )}
+                  className={pillTabClass(active)}
                 >
                   {t.label}
                   {t.count !== undefined ? (
-                    <span className={cn("nums rounded-full px-2 py-0.5 text-xs", active ? "bg-brand-50 text-brand-800" : "bg-ink-100 text-ink-600")}>
+                    <span className={cn("nums text-xs", active ? "text-white/75" : "text-text-subtle")}>
                       {t.count}
                     </span>
                   ) : null}

@@ -1,55 +1,12 @@
 import Link from "next/link";
 
-import { buttonClass } from "@/components/ui/button";
+import { DateRangeForm } from "@/components/admin/date-range-form";
 import { PERIOD_OPTIONS } from "@/lib/admin/params";
-import { cn } from "@/lib/utils";
+import { pillTabClass } from "@/components/app/primitives";
 
-const dateInput =
-  "h-9 rounded-apple-sm border border-ink-200 bg-white px-2.5 text-sm text-ink-800 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand-600 max-lg:h-11";
-
-/**
- * A plain GET form for a custom from-to range. Every other query value is
- * carried as a hidden field, so applying dates keeps the search and filters
- * (and drops the page number, which would point past the narrowed list).
- */
-export function DateRangeForm({
-  params,
-  fromKey = "from",
-  toKey = "to",
-  drop = [],
-  label = "Apply dates",
-  className,
-}: {
-  params: Record<string, string>;
-  fromKey?: string;
-  toKey?: string;
-  /** Extra keys to drop when the range changes (e.g. a preset period). */
-  drop?: string[];
-  label?: string;
-  className?: string;
-}) {
-  const skip = new Set([fromKey, toKey, "page", ...drop]);
-  return (
-    <form method="get" className={cn("flex flex-wrap items-end gap-2", className)}>
-      {Object.entries(params)
-        .filter(([k, v]) => !skip.has(k) && v)
-        .map(([k, v]) => (
-          <input key={k} type="hidden" name={k} value={v} />
-        ))}
-      <label className="flex flex-col gap-1 text-xs font-medium text-ink-600">
-        From
-        <input type="date" name={fromKey} defaultValue={params[fromKey] ?? ""} className={dateInput} />
-      </label>
-      <label className="flex flex-col gap-1 text-xs font-medium text-ink-600">
-        To
-        <input type="date" name={toKey} defaultValue={params[toKey] ?? ""} className={dateInput} />
-      </label>
-      <button type="submit" className={cn(buttonClass({ variant: "outline", size: "sm" }), "max-lg:h-11")}>
-        {label}
-      </button>
-    </form>
-  );
-}
+// The date filter is a client component (DD/MM/YYYY, applies itself);
+// re-exported so the report pages keep importing it from here.
+export { DateRangeForm } from "@/components/admin/date-range-form";
 
 /** Segmented links (period presets, source switches) in one style. */
 export function ChipLinks({
@@ -67,10 +24,7 @@ export function ChipLinks({
           href={o.href}
           scroll={false}
           aria-current={o.current ? "page" : undefined}
-          className={cn(
-            "inline-flex min-h-9 items-center rounded-full px-3.5 text-sm font-medium max-lg:min-h-11",
-            o.current ? "bg-brand-800 text-white" : "bg-white text-ink-700 ring-1 ring-inset ring-ink-200 hover:bg-ink-50",
-          )}
+          className={pillTabClass(o.current)}
         >
           {o.label}
         </Link>
@@ -109,7 +63,7 @@ export function ReportRange({
           current: current === o.value,
         }))}
       />
-      <DateRangeForm params={{ ...keep, from: params.from ?? "", to: params.to ?? "" }} label="Apply range" />
+      <DateRangeForm params={{ ...keep, from: params.from ?? "", to: params.to ?? "" }} drop={["period"]} />
     </div>
   );
 }

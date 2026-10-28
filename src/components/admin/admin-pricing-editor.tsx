@@ -260,7 +260,7 @@ function PlanEditor({ plan }: { plan: EditablePlan }) {
         </fieldset>
 
         <fieldset>
-          <legend className="text-sm font-medium text-ink-800">Card checklist (✓ included / ✗ not included)</legend>
+          <legend className="text-sm font-medium text-ink-800">Card checklist <span className="font-normal text-ink-600">(switch on: the plan includes it)</span></legend>
           <ul className="mt-1.5 space-y-2">
             {featureList.map((f, i) => (
               <li key={i} className="flex items-center gap-2">
@@ -273,16 +273,17 @@ function PlanEditor({ plan }: { plan: EditablePlan }) {
                 />
                 <input
                   value={f.label}
+                  aria-label={`Checklist row ${i + 1}`}
                   onChange={(e) =>
                     setFeatureList((prev) => prev.map((row, j) => (j === i ? { ...row, label: e.target.value } : row)))
                   }
-                  className={cn(inputClass, "mt-0")}
+                  className={cn(inputClass, "mt-0 min-w-0 flex-1")}
                 />
                 <button
                   type="button"
                   onClick={() => setFeatureList((prev) => prev.filter((_, j) => j !== i))}
                   className={cn(buttonClass({ variant: "ghost", size: "iconSm" }), "text-text-subtle hover:bg-danger-soft hover:text-danger")}
-                  aria-label="Remove row"
+                  aria-label={`Remove checklist row ${i + 1}`}
                 >
                   <Trash2 className="size-4" />
                 </button>

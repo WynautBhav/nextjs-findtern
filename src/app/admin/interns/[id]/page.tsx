@@ -89,18 +89,18 @@ export default async function AdminInternDetail({
       }
       controls={
         canWrite ? (
-          <div className="flex flex-wrap items-start gap-x-8 gap-y-4">
+          <div key="controls" className="flex flex-wrap items-start gap-x-8 gap-y-4">
             {onboarding ? (
-              <div>
+              <div key="review">
                 <p className="mb-1.5 text-xs font-medium text-ink-600">Review</p>
                 <InternApprovalCell internId={user.id} value={String(extra.approvalStatus ?? "Pending")} />
               </div>
             ) : null}
-            <div>
+            <div key="visibility">
               <p className="mb-1.5 text-xs font-medium text-ink-600">Employer visibility</p>
               <InternVisibilityCell internId={user.id} live={user.profileVisibility !== "hidden"} />
             </div>
-            <div>
+            <div key="account">
               <p className="mb-1.5 text-xs font-medium text-ink-600">Account</p>
               <AccountActiveCell id={user.id} kind="intern" active={user.isActive} />
             </div>

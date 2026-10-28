@@ -1,18 +1,10 @@
 import { and, count, eq, gte, lt, sql } from "drizzle-orm";
 import type { AnyPgColumn } from "drizzle-orm/pg-core";
 import Link from "next/link";
-import {
-  BarChart3,
-  Download,
-  Users,
-  CalendarCheck,
-  CheckCircle2,
-  FileSpreadsheet,
-  TrendingUp,
-  IndianRupee,
-} from "lucide-react";
+import { BarChart3, Download, FileSpreadsheet, TrendingUp, IndianRupee } from "lucide-react";
 
 import { getDb, schema } from "@/lib/db";
+import { hiringFunnel } from "@/lib/admin/funnel";
 import { AdminPageHeader, Panel, PanelHeader, PanelBody } from "@/components/admin/panel";
 import { StatCard, StatGrid } from "@/components/admin/stat-card";
 import { TrendChart, PipelineBars, type TrendPoint } from "@/components/admin/trend-chart";
@@ -46,7 +38,6 @@ export default async function AdminReportsPage({
   const [
     [signupsTotal],
     [profilesCompleted],
-    [proposalsTotal],
     [interviewsTotal],
     [hiresTotal],
     [companiesTotal],
@@ -64,7 +55,6 @@ export default async function AdminReportsPage({
       .from(schema.internOnboarding)
       .innerJoin(schema.users, eq(schema.users.id, schema.internOnboarding.userId))
       .where(and(eq(schema.users.role, "intern"), meaningfulProfile(), from(schema.internOnboarding.createdAt))),
-    db.select({ c: count() }).from(schema.proposals).where(and(realProposal, from(schema.proposals.createdAt))),
     db.select({ c: count() }).from(schema.interviews).where(and(realInterview, from(schema.interviews.createdAt))),
     db.select({ c: count() }).from(schema.proposals).where(and(realProposal, sql`${schema.proposals.hiredAt} is not null`, from(schema.proposals.hiredAt))),
     db.select({ c: count() }).from(schema.employers).where(and(realEmployers(), from(schema.employers.createdAt))),
@@ -127,7 +117,6 @@ export default async function AdminReportsPage({
 
   const totalSignups = Number(signupsTotal?.c ?? 0);
   const totalProfiles = Number(profilesCompleted?.c ?? 0);
-  const totalProposals = Number(proposalsTotal?.c ?? 0);
   const totalInterviews = Number(interviewsTotal?.c ?? 0);
   const totalHires = Number(hiresTotal?.c ?? 0);
   const totalCompanies = Number(companiesTotal?.c ?? 0);
@@ -160,13 +149,9 @@ export default async function AdminReportsPage({
     interviews: interviewsByMonth.get(b.key) ?? 0,
   }));
 
-  const funnelSteps = [
-    { status: "registered", label: "Signed up", count: totalSignups },
-    { status: "profiled", label: "Profile completed", count: totalProfiles },
-    { status: "interviewed", label: "Employer interview booked", count: totalInterviews },
-    { status: "proposed", label: "Offer sent", count: totalProposals },
-    { status: "hired", label: "Hired (employer paid)", count: totalHires },
-  ];
+  // People at the furthest step they reached in the period (lib/admin/funnel):
+  // the one funnel definition, so no step is wider than the one above it.
+  const funnel = (await hiringFunnel(since ?? null, until)).map((st, i) => ({ status: `s${i}`, label: st.label, count: st.reached }));
 
   const states = topStatesRaw.map((r) => ({ label: r.state, count: Number(r.c) }));
   const formats = projectTypesRaw.map((r) => ({ label: r.locationType, count: Number(r.c) }));
@@ -235,7 +220,7 @@ export default async function AdminReportsPage({
             current: currentPeriod === o.value,
           }))}
         />
-        <DateRangeForm params={{ from: params.from ?? "", to: params.to ?? "" }} label="Apply range" />
+        <DateRangeForm params={{ from: params.from ?? "", to: params.to ?? "" }} drop={["period"]} />
       </div>
 
       <StatGrid cols={4}>
@@ -243,35 +228,31 @@ export default async function AdminReportsPage({
           label="Revenue collected"
           value={formatMoney(totalRevenue, "INR", { zeroLabel: "₹0" })}
           hint="Paid orders and intern fees · USD at ₹100/$"
-          icon={IndianRupee}
         />
         <StatCard
           label="Profile completion"
           value={totalSignups ? `${profileRate}%` : "-"}
           hint={`${formatNumber(totalProfiles)} of ${formatNumber(totalSignups)} signups`}
-          icon={Users}
         />
         <StatCard
           label="Interview conversion"
           value={totalSignups ? `${interviewRate}%` : "-"}
           hint={`${formatNumber(totalInterviews)} interviews for ${formatNumber(totalSignups)} signups`}
-          icon={CalendarCheck}
         />
         <StatCard
           label="Hires per interview"
           value={totalInterviews ? `${hireRate}%` : "-"}
           hint={`${formatNumber(totalHires)} hires · ${formatNumber(totalCompanies)} new companies, ${formatNumber(totalProjects)} projects`}
-          icon={CheckCircle2}
         />
       </StatGrid>
 
       <Panel>
         <PanelHeader
-          title="Conversion funnel"
-          description="Each bar is how many people reached that step in the period; the percentage is against signups. The biggest drop between two bars is where to look first."
+          title="Hiring funnel"
+          description="Each candidate is counted once, at the furthest step they reached in the period; the percentage is of everyone an employer viewed. The biggest drop between two bars is where to look first."
         />
         <PanelBody>
-          <PipelineBars items={funnelSteps} percentOf="first" />
+          <PipelineBars items={funnel} percentOf="first" />
         </PanelBody>
       </Panel>
 

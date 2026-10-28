@@ -48,10 +48,13 @@ export function TableToolbar({
   const [, startTransition] = useTransition();
 
   const [term, setTerm] = useState(searchParams.get(searchKey) ?? "");
-  const [filtersOpen, setFiltersOpen] = useState(false);
   const filtersId = useId();
   const foldable = filters.length > 3;
-  const activeFilterCount = filters.filter((f) => searchParams.get(f.key)).length;
+  const shown = foldable ? filters.slice(0, 3) : filters;
+  const folded = foldable ? filters.slice(3) : [];
+  const foldedActive = folded.filter((f) => searchParams.get(f.key)).length;
+  // Open from the start when a folded filter is already applied.
+  const [filtersOpen, setFiltersOpen] = useState(foldedActive > 0);
   const inputRef = useRef<HTMLInputElement>(null);
   const firstRender = useRef(true);
 
@@ -123,6 +126,39 @@ export function TableToolbar({
     });
   }
 
+  const renderFilter = (filter: ToolbarFilter) => {
+    const value = searchParams.get(filter.key) ?? "";
+    const id = `filter-${filter.key}`;
+    return (
+      <div key={filter.key} className="flex items-center gap-1.5">
+        <label
+          htmlFor={id}
+          className="sr-only"
+        >
+          {filter.label}
+        </label>
+        <select
+          id={id}
+          value={value}
+          onChange={(e) => setParam(filter.key, e.target.value || null)}
+          className={cn(
+            "apple-spring h-9 cursor-pointer rounded-apple-sm border bg-white px-2.5 pr-7 text-sm focus:ring-2 focus:ring-brand-500/20 focus:outline-none max-lg:min-h-11",
+            value
+              ? "border-brand-300 font-medium text-brand-800"
+              : "border-ink-200 text-ink-700",
+          )}
+        >
+          <option value="">{filter.allLabel ?? `All ${lowerFirst(filter.label)}`}</option>
+          {filter.options.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </div>
+    );
+  };
+
   return (
     <>
       <div className="flex flex-wrap items-center gap-2.5">
@@ -165,58 +201,27 @@ export function TableToolbar({
         </div>
 
         {/* Facet filters ------------------------------------------------ */}
-        {/* Below lg, more than three filters fold behind one toggle so the
-            table is not pushed a screen down by a column of selects. */}
+        {/* Three filters show; the rest fold behind "More filters" at every
+            width (eleven selects in three rows pushed the list a screen down). */}
+        {shown.map(renderFilter)}
         {foldable ? (
           <button
             type="button"
             onClick={() => setFiltersOpen((o) => !o)}
             aria-expanded={filtersOpen}
             aria-controls={filtersId}
-            className="apple-spring inline-flex min-h-11 items-center gap-1.5 rounded-apple-sm border border-ink-200 bg-white px-3 text-sm font-medium text-ink-700 hover:bg-ink-50 lg:hidden"
+            className="apple-spring inline-flex h-9 items-center gap-1.5 rounded-apple-sm border border-ink-200 bg-white px-3 text-sm font-medium text-ink-700 hover:bg-ink-50 max-lg:min-h-11"
           >
             <SlidersHorizontal className="size-4" aria-hidden />
-            Filters
-            {activeFilterCount ? <span className="nums rounded-full bg-brand-50 px-1.5 text-xs text-brand-800">{activeFilterCount}</span> : null}
+            {filtersOpen ? "Fewer filters" : "More filters"}
+            {foldedActive ? <span className="nums rounded-full bg-brand-50 px-1.5 text-xs text-brand-800">{foldedActive}</span> : null}
           </button>
         ) : null}
-        <div
-          id={filtersId}
-          className={cn("contents", foldable && !filtersOpen && "max-lg:hidden", foldable && filtersOpen && "max-lg:flex max-lg:w-full max-lg:flex-wrap max-lg:gap-2.5")}
-        >
-        {filters.map((filter) => {
-          const value = searchParams.get(filter.key) ?? "";
-          const id = `filter-${filter.key}`;
-          return (
-            <div key={filter.key} className="flex items-center gap-1.5">
-              <label
-                htmlFor={id}
-                className="sr-only"
-              >
-                {filter.label}
-              </label>
-              <select
-                id={id}
-                value={value}
-                onChange={(e) => setParam(filter.key, e.target.value || null)}
-                className={cn(
-                  "apple-spring h-9 cursor-pointer rounded-apple-sm border bg-white px-2.5 pr-7 text-sm focus:ring-2 focus:ring-brand-500/20 focus:outline-none max-lg:min-h-11",
-                  value
-                    ? "border-brand-300 font-medium text-brand-800"
-                    : "border-ink-200 text-ink-700",
-                )}
-              >
-                <option value="">{filter.allLabel ?? `All ${lowerFirst(filter.label)}`}</option>
-                {filter.options.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-          );
-        })}
-        </div>
+        {foldable && filtersOpen ? (
+          <div id={filtersId} className="flex w-full flex-wrap items-center gap-2.5">
+            {folded.map(renderFilter)}
+          </div>
+        ) : null}
 
         {extra}
 

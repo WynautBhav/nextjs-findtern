@@ -8,9 +8,9 @@ import { filterInterviews, filterProposals, parseIstDay, proposalTimezone, type 
 import { acceptanceRate, proposalOutcome } from "@/lib/proposals";
 import { formatNumber } from "@/lib/format";
 import { AdminLoadError, AdminPageHeader, Panel } from "@/components/admin/panel";
-import { StatCard, StatGrid } from "@/components/admin/stat-card";
+import { DateRangeForm } from "@/components/admin/date-range-form";
 import { ProposalTrackerView, TRACKER_TABS, type TrackerTab } from "@/components/admin/proposal-tracker-view";
-import { ButtonAnchor, buttonClass } from "@/components/ui/button";
+import { ButtonAnchor } from "@/components/ui/button";
 
 /**
  * Proposal pipeline (legacy admin-proposal-tracker.tsx): companies,
@@ -96,7 +96,7 @@ export default async function AdminProposalTrackerPage({
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const params = flattenParams(await searchParams);
-  const tab: TrackerTab = (TRACKER_TABS as readonly string[]).includes(params.tab ?? "") ? (params.tab as TrackerTab) : "companies";
+  const tab: TrackerTab = (TRACKER_TABS as readonly string[]).includes(params.tab ?? "") ? (params.tab as TrackerTab) : "proposals";
   const filters: TrackerFilters = {
     from: parseIstDay(params.from),
     to: parseIstDay(params.to, true),
@@ -169,7 +169,6 @@ export default async function AdminProposalTrackerPage({
 
   const won = proposals.filter((p) => proposalOutcome(p.status) === "won").length;
   const lost = proposals.filter((p) => proposalOutcome(p.status) === "lost").length;
-  const hired = proposals.filter((p) => p.status === "hired").length;
   const rate = acceptanceRate(won, lost);
   const now = new Date().getTime();
   const upcoming = interviews.filter((i) => {
@@ -183,54 +182,19 @@ export default async function AdminProposalTrackerPage({
     <div className="space-y-6">
       {header}
 
-      {/* Date range: its own row, because beside the title it overflowed a phone. */}
-      <form method="get" aria-label="Date range" className="flex flex-wrap items-end gap-3">
-        {Object.entries(params)
-          .filter(([k]) => !["from", "to", "page"].includes(k))
-          .map(([k, v]) => (
-            <input key={k} type="hidden" name={k} value={v} />
-          ))}
-        <label className="text-sm font-medium text-ink-700">
-          From
-          <input
-            type="date"
-            name="from"
-            defaultValue={params.from ?? ""}
-            className="mt-1 block h-11 rounded-apple-sm border border-ink-200 bg-white px-3 text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-brand-600"
-          />
-        </label>
-        <label className="text-sm font-medium text-ink-700">
-          To
-          <input
-            type="date"
-            name="to"
-            defaultValue={params.to ?? ""}
-            className="mt-1 block h-11 rounded-apple-sm border border-ink-200 bg-white px-3 text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-brand-600"
-          />
-        </label>
-        <button type="submit" className={buttonClass({ variant: "primary", size: "md" })}>
-          Apply
-        </button>
-        <span className="pb-3 text-sm text-ink-600">{rangeLabel}</span>
-      </form>
-
-      <StatGrid cols={4}>
-        <StatCard label="Proposals" value={formatNumber(proposals.length)} hint={rangeLabel} tone="neutral" href="/admin/proposal-tracker?tab=proposals" />
-        <StatCard
-          label="Accepted or hired"
-          value={formatNumber(won)}
-          hint={rate === null ? "Nothing decided yet" : `${rate}% of decided offers (${formatNumber(lost)} declined)`}
-          tone="neutral"
-        />
-        <StatCard label="Hired" value={formatNumber(hired)} hint="Paid for by the company" tone="neutral" href="/admin/proposal-tracker?tab=hired" />
-        <StatCard
-          label="Interviews"
-          value={formatNumber(interviews.length)}
-          hint={upcoming ? `${formatNumber(upcoming)} upcoming` : "None upcoming"}
-          tone="neutral"
-          href="/admin/proposal-tracker?tab=interviews"
-        />
-      </StatGrid>
+      {/* Date range and the period's figures in one row; the four tiles
+          repeated the tab counts below (critique). */}
+      <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
+        <DateRangeForm params={params} />
+        <p className="nums pb-2 text-sm text-ink-600">
+          <span className="font-medium text-ink-900">{rangeLabel}</span>
+          {" · "}
+          {formatNumber(won)} accepted or hired
+          {rate === null ? "" : ` (${rate}% of decided offers, ${formatNumber(lost)} declined)`}
+          {" · "}
+          {upcoming ? `${formatNumber(upcoming)} interviews upcoming` : "no interviews upcoming"}
+        </p>
+      </div>
 
       <ProposalTrackerView
         tab={tab}

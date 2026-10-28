@@ -213,9 +213,11 @@ export function MessagesInbox({ messages, filtering }: { messages: InboxMessage[
               <button
                 type="button"
                 onClick={() => openMessage(m)}
-                aria-label={`${m.isRead ? "" : "Unread: "}${m.subject || "No subject"} from ${m.name}`}
                 className="flex min-w-0 flex-1 items-start gap-3 text-left focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-600"
               >
+                {/* The row's visible text is its name (sender, date, subject),
+                    so voice control can say what it sees; only "unread" is added. */}
+                {m.isRead ? null : <span className="sr-only">Unread. </span>}
                 <span
                   aria-hidden
                   className={cn(

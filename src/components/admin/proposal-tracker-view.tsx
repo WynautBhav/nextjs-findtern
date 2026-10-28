@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { FilterTabs } from "@/components/app/primitives";
 
 import { DataTable, parseSort } from "@/components/admin/data-table";
 import { InterviewNotesButton, MeetingLinkCell, ProposalDetailsButton } from "@/components/admin/proposal-tracker-dialogs";
@@ -9,7 +10,6 @@ import { matchesSearch, paginate, proposalTimezone, sortBy } from "@/lib/admin/t
 import { formatDate, formatMoney, formatSlotTime } from "@/lib/format";
 import { parseOffer } from "@/lib/offer";
 import { acceptanceRate, proposalOutcome } from "@/lib/proposals";
-import { cn } from "@/lib/utils";
 
 /**
  * The proposal pipeline's five lists. Server-rendered from rows the page has
@@ -17,7 +17,8 @@ import { cn } from "@/lib/utils";
  * the per-tab search, status filters, sort and page, all from the URL.
  */
 
-export const TRACKER_TABS = ["companies", "proposals", "candidates", "interviews", "hired"] as const;
+// Proposals first: the work itself; Companies is a rollup of it.
+export const TRACKER_TABS = ["proposals", "candidates", "interviews", "hired", "companies"] as const;
 export type TrackerTab = (typeof TRACKER_TABS)[number];
 
 type ProposalItem = {
@@ -98,11 +99,11 @@ export function ProposalTrackerView({
   const activeCompanies = employers.filter((e) => proposals.some((p) => p.employerId === e.id) || interviews.some((i) => i.employerId === e.id));
 
   const tabs: { key: TrackerTab; label: string; count: number }[] = [
-    { key: "companies", label: "Companies", count: activeCompanies.length },
     { key: "proposals", label: "Proposals", count: proposals.length },
     { key: "candidates", label: "Candidates", count: candidateIds.size },
     { key: "interviews", label: "Interviews", count: interviews.length },
     { key: "hired", label: "Hired", count: hired.length },
+    { key: "companies", label: "Companies", count: activeCompanies.length },
   ];
 
   // Shared pickers (ADP-12): exact company, exact candidate, timezone.
@@ -116,31 +117,12 @@ export function ProposalTrackerView({
 
   return (
     <div className="space-y-4">
-      <nav aria-label="Pipeline view" className="-mx-1 overflow-x-auto px-1">
-        <ul className="flex min-w-max gap-1 border-b border-ink-200/80">
-          {tabs.map((t) => {
-            const active = t.key === tab;
-            return (
-              <li key={t.key}>
-                <Link
-                  href={`${BASE}${toQueryString({ ...keep, tab: t.key })}`}
-                  scroll={false}
-                  aria-current={active ? "page" : undefined}
-                  className={cn(
-                    "-mb-px inline-flex min-h-11 items-center gap-2 border-b-2 px-3 text-sm font-medium focus-visible:outline-2 focus-visible:outline-brand-600",
-                    active ? "border-brand-700 text-ink-900" : "border-transparent text-ink-600 hover:text-ink-900",
-                  )}
-                >
-                  {t.label}
-                  <span className={cn("nums rounded-full px-2 py-0.5 text-xs", active ? "bg-brand-50 text-brand-800" : "bg-ink-100 text-ink-600")}>
-                    {t.count}
-                  </span>
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
-      </nav>
+      <FilterTabs
+        label="Pipeline view"
+        tabs={tabs}
+        value={tab}
+        hrefFor={(key) => `${BASE}${toQueryString({ ...keep, tab: key })}`}
+      />
 
       {tab === "companies" ? <CompaniesTab {...{ params, page, perPage, search, pickers, proposals, interviews }} employers={activeCompanies} /> : null}
       {tab === "proposals" ? <ProposalsTab {...{ params, page, perPage, search, pickers }} rows={proposals} /> : null}

@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowLeft, Download, IndianRupee, Timer, TrendingUp, Users } from "lucide-react";
+import { ArrowLeft, Download } from "lucide-react";
 
 import { AdminLoadError, AdminPageHeader, Panel, PanelBody, PanelHeader } from "@/components/admin/panel";
-import { ChipLinks, ReportRange } from "@/components/admin/report-range";
+import { ChipLinks, DateRangeForm, ReportRange } from "@/components/admin/report-range";
 import { StatCard, StatGrid } from "@/components/admin/stat-card";
 import { StatusBadge } from "@/components/admin/status-badge";
 import { PipelineBars } from "@/components/admin/trend-chart";
@@ -89,17 +89,15 @@ export default async function AdminAnalyticsPage({ searchParams }: { searchParam
           label="Signups"
           value={formatNumber(a.totals.signups)}
           hint={`${a.totals.activeUsers} with a real profile`}
-          icon={Users}
           delta={a.rates.monthlyGrowth == null ? undefined : `${a.rates.monthlyGrowth > 0 ? "+" : ""}${a.rates.monthlyGrowth}% vs previous period`}
         />
-        <StatCard label="Hires" value={formatNumber(a.totals.hires)} hint={`${a.totals.fullTimeHires} full-time · ${a.totals.proposals} offers sent`} icon={TrendingUp} />
+        <StatCard label="Hires" value={formatNumber(a.totals.hires)} hint={`${a.totals.fullTimeHires} full-time · ${a.totals.proposals} offers sent`} />
         <StatCard
           label="Revenue"
           value={formatMoney(a.totals.revenueMinor, "INR", { zeroLabel: "₹0" })}
           hint={`Companies ${formatMoney(a.totals.revenueEmployersMinor, "INR", { zeroLabel: "₹0" })} · Fees ${formatMoney(a.totals.revenueInternsMinor, "INR", { zeroLabel: "₹0" })}`}
-          icon={IndianRupee}
         />
-        <StatCard label="Avg time to hire" value={a.rates.avgHireTimeDays == null ? "-" : `${a.rates.avgHireTimeDays} days`} hint="Offer sent to employer paid" icon={Timer} />
+        <StatCard label="Avg time to hire" value={a.rates.avgHireTimeDays == null ? "-" : `${a.rates.avgHireTimeDays} days`} hint="Offer sent to employer paid" />
       </StatGrid>
 
       <div className="grid gap-4 lg:grid-cols-2">
@@ -248,18 +246,12 @@ export default async function AdminAnalyticsPage({ searchParams }: { searchParam
               .map(([k, v]) => (
                 <input key={k} type="hidden" name={k} value={v} />
               ))}
-            <label className="flex flex-col gap-1 text-xs font-medium text-ink-600">
-              Hired from
-              <input type="date" name="hiredFrom" defaultValue={hireFilter.from} className="h-9 rounded-apple-sm border border-ink-200 bg-white px-2.5 text-sm text-ink-800 max-lg:h-11" />
-            </label>
-            <label className="flex flex-col gap-1 text-xs font-medium text-ink-600">
-              To
-              <input type="date" name="hiredTo" defaultValue={hireFilter.to} className="h-9 rounded-apple-sm border border-ink-200 bg-white px-2.5 text-sm text-ink-800 max-lg:h-11" />
-            </label>
-            <button type="submit" className={cn(buttonClass({ variant: "outline", size: "sm" }), "max-lg:h-11")}>
-              Filter
-            </button>
+            <input type="hidden" name="hiredFrom" value={hireFilter.from} />
+            <input type="hidden" name="hiredTo" value={hireFilter.to} />
+            {/* Enter searches; the dates below apply themselves. */}
+            <button type="submit" className="sr-only">Search hires</button>
           </form>
+          <DateRangeForm params={params} fromKey="hiredFrom" toKey="hiredTo" fromLabel="Hired from" />
         </div>
         <SimpleTable
           minWidth="min-w-[30rem]"
@@ -306,7 +298,8 @@ function SimpleTable({
 }) {
   if (rows.length === 0) return <p className="px-5 py-8 text-center text-sm text-ink-600">{empty}</p>;
   return (
-    <div className="max-h-[32rem] overflow-auto">
+    // Focusable, so the inner scroll can be reached from the keyboard (axe scrollable-region-focusable).
+    <div tabIndex={0} role="region" aria-label={`${head[0]} table`} className="max-h-[32rem] overflow-auto focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand-600">
       <table className={cn("w-full text-left text-sm", minWidth)}>
         <thead>
           <tr className="border-b border-ink-100">

@@ -5,10 +5,11 @@ import { AlertTriangle } from "lucide-react";
 import { DataTable, parseSort, type Column } from "@/components/admin/data-table";
 import { AdminLoadError, AdminPageHeader, Panel } from "@/components/admin/panel";
 import { PayoutEditor } from "@/components/admin/payout-editor";
+import { pillTabClass } from "@/components/app/primitives";
+import { DateRangeForm } from "@/components/admin/date-range-form";
 import { StatCard, StatGrid } from "@/components/admin/stat-card";
 import { StatusBadge } from "@/components/admin/status-badge";
 import { Pill } from "@/components/app/primitives";
-import { buttonClass } from "@/components/ui/button";
 import { flattenParams, parsePageRequest, toQueryString, type RawSearchParams } from "@/lib/admin/params";
 import {
   DUE_FILTERS,
@@ -23,7 +24,6 @@ import {
   type PlacementDueRow,
 } from "@/lib/admin/payout-list";
 import { formatDate, formatMoney } from "@/lib/format";
-import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Intern payouts" };
 
@@ -49,7 +49,7 @@ export default async function AdminPayouts({ searchParams }: { searchParams?: Pr
         subtitle="Stipends owed and paid to interns, and what employers have paid for each placement."
       />
 
-      <nav aria-label="Payout views" className="inline-grid grid-cols-2 gap-1 rounded-apple-md bg-ink-100 p-1">
+      <nav aria-label="Payout views" className="flex gap-1">
         {(
           [
             { key: "payouts", label: "Payouts" },
@@ -60,10 +60,7 @@ export default async function AdminPayouts({ searchParams }: { searchParams?: Pr
             key={t.key}
             href={`${BASE}?tab=${t.key}`}
             aria-current={tab === t.key ? "page" : undefined}
-            className={cn(
-              "inline-flex min-h-10 items-center justify-center rounded-apple-sm px-4 text-sm font-medium max-lg:min-h-11",
-              tab === t.key ? "bg-white text-ink-900 shadow-xs" : "text-ink-600 hover:text-ink-900",
-            )}
+            className={pillTabClass(tab === t.key)}
           >
             {t.label}
           </Link>
@@ -97,78 +94,79 @@ async function PayoutsView({ params }: { params: Record<string, string> }) {
   const exportParams = Object.fromEntries(Object.entries(params).filter(([k]) => !["tab", "page", "per"].includes(k)));
   const filtered = Boolean(params.q || params.status || params.currency || params.from || params.to);
 
+  // Six columns, so the action (record the bank reference: the screen's job)
+  // is always on screen at 1440. Company and project, the INR value of a USD
+  // payout and the source ride as second lines instead of their own columns,
+  // and "Not linked" is simply absent (critique P0, QA-103).
   const columns: Column<PayoutRow>[] = [
     {
       header: "Intern",
       cell: (r) => (
-        <span className="block min-w-40">
+        <span className="block min-w-0">
           <Link href={`/admin/interns/${r.internId}`} className="font-medium text-ink-900 underline-offset-4 hover:underline">
             {r.internName || "Candidate"}
           </Link>
-          {r.internEmail ? <span className="block max-w-56 truncate text-xs text-ink-600">{r.internEmail}</span> : null}
+          <span className="block text-xs text-ink-600">
+            {r.companyName ? (
+              <>
+                {r.employerId ? (
+                  <Link href={`/admin/companies/${r.employerId}`} className="underline-offset-4 hover:underline">
+                    {r.companyName}
+                  </Link>
+                ) : (
+                  r.companyName
+                )}
+                {r.projectName ? ` · ${r.projectName}` : ""}
+              </>
+            ) : (
+              r.internEmail
+            )}
+          </span>
         </span>
       ),
     },
     {
-      header: "Company and project",
-      cell: (r) =>
-        r.companyName ? (
-          <span className="block min-w-40">
-            {r.employerId ? (
-              <Link href={`/admin/companies/${r.employerId}`} className="text-ink-800 underline-offset-4 hover:underline">
-                {r.companyName}
-              </Link>
-            ) : (
-              r.companyName
-            )}
-            {r.projectName ? <span className="block max-w-56 truncate text-xs text-ink-600">{r.projectName}</span> : null}
-          </span>
-        ) : (
-          <span className="text-text-subtle">Not linked</span>
-        ),
-    },
-    { header: "Scheduled", sort: "scheduled", className: "nums whitespace-nowrap", cell: (r) => (r.scheduledFor ? formatDate(r.scheduledFor) : "-") },
-    {
       header: "Amount",
       sort: "amount",
       align: "right",
-      className: "whitespace-nowrap font-semibold text-ink-900",
-      cell: (r) => formatMoney(r.amountMinor, r.currency === "USD" ? "USD" : "INR", { zeroLabel: "₹0" }),
-    },
-    {
-      header: "INR value",
-      align: "right",
       className: "whitespace-nowrap",
-      cell: (r) => inr(r.inrMinor),
-    },
-    { header: "Status", cell: (r) => <StatusBadge status={r.status} /> },
-    {
-      header: "Source",
       cell: (r) => (
-        <span className="block min-w-32">
-          {payoutSourceLabel(r.source)}
-          {r.opsNote ? (
-            <span className="block max-w-56 truncate text-xs text-ink-600" title={r.opsNote}>
-              {r.opsNote}
-            </span>
-          ) : null}
+        <>
+          <span className="font-semibold text-ink-900">{formatMoney(r.amountMinor, r.currency === "USD" ? "USD" : "INR", { zeroLabel: "₹0" })}</span>
+          {r.currency === "USD" ? <span className="block text-xs font-normal text-ink-600">{inr(r.inrMinor)}</span> : null}
+        </>
+      ),
+    },
+    {
+      header: "Status",
+      cell: (r) => (
+        <span className="flex flex-col items-start gap-1 max-lg:items-end">
+          <StatusBadge status={r.status} />
+          <span className="text-xs text-ink-600" title={r.opsNote ?? undefined}>
+            {payoutSourceLabel(r.source)}
+            {r.opsNote ? ` · ${r.opsNote}` : ""}
+          </span>
         </span>
       ),
     },
     {
       header: "Reference",
       className: "nums",
+      cell: (r) => (r.referenceId ? <span className="break-all">{r.referenceId}</span> : <span className="text-text-subtle">–</span>),
+    },
+    {
+      header: "Date",
+      sort: "paid",
+      className: "nums whitespace-nowrap",
       cell: (r) =>
-        r.referenceId ? (
-          <span className="block max-w-40 truncate" title={r.referenceId}>
-            {r.referenceId}
-          </span>
+        r.paidAt ? (
+          <>Paid {formatDate(r.paidAt)}</>
+        ) : r.scheduledFor ? (
+          <>Due {formatDate(r.scheduledFor)}</>
         ) : (
-          <span className="text-text-subtle">-</span>
+          <span className="text-ink-600">Added {r.createdAt ? formatDate(r.createdAt) : "–"}</span>
         ),
     },
-    { header: "Paid on", sort: "paid", className: "nums whitespace-nowrap", cell: (r) => (r.paidAt ? formatDate(r.paidAt) : "-") },
-    { header: "Created", sort: "created", className: "nums whitespace-nowrap text-ink-600", cell: (r) => (r.createdAt ? formatDate(r.createdAt) : "-") },
     {
       header: <span className="sr-only">Action</span>,
       cell: (r) => <PayoutEditor payoutId={r.id} status={r.status} initialReference={r.referenceId} initialNote={r.opsNote} />,
@@ -244,29 +242,9 @@ async function PayoutsView({ params }: { params: Record<string, string> }) {
   );
 }
 
-/** Created-date range. A plain GET form, so it works before hydration. */
+/** Created-date range (DD/MM/YYYY, applies itself). */
 function DateRange({ params }: { params: Record<string, string> }) {
-  const keep = Object.entries(params).filter(([k]) => !["from", "to", "page"].includes(k));
-  const field =
-    "h-9 rounded-apple-sm border border-ink-200 bg-white px-2.5 text-sm text-ink-800 focus-visible:outline-2 focus-visible:outline-brand-600 max-lg:h-11";
-  return (
-    <form method="get" action={BASE} className="flex flex-wrap items-end gap-2">
-      {keep.map(([k, v]) => (
-        <input key={k} type="hidden" name={k} value={v} />
-      ))}
-      <label className="flex flex-col text-xs font-medium text-ink-600">
-        Created from
-        <input type="date" name="from" defaultValue={params.from ?? ""} className={cn(field, "mt-1")} />
-      </label>
-      <label className="flex flex-col text-xs font-medium text-ink-600">
-        to
-        <input type="date" name="to" defaultValue={params.to ?? ""} className={cn(field, "mt-1")} />
-      </label>
-      <button type="submit" className={buttonClass({ variant: "outline", size: "sm" })}>
-        Apply
-      </button>
-    </form>
-  );
+  return <DateRangeForm params={params} fromLabel="Created from" />;
 }
 
 /* ── Dues by placement ──────────────────────────────────────────────── */

@@ -1,6 +1,7 @@
 import { Metadata } from "next";
 
 import { AdminPageHeader } from "@/components/admin/panel";
+import { LegalTabs } from "@/components/admin/legal-tabs";
 import { LegalDocEditor } from "@/components/admin/legal-doc-editor";
 import { INTERN_TERMS } from "@/lib/content/legal-intern";
 
@@ -16,6 +17,7 @@ export default function AdminInternTermsPage() {
         title="Intern terms"
         subtitle="Edit the Intern Terms & Conditions page content."
       />
+      <LegalTabs current="/admin/interns/terms" />
 
       <LegalDocEditor
         title="Intern Terms and Conditions"
