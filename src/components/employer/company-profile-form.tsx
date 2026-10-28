@@ -20,6 +20,7 @@ import { PhoneField } from "@/components/employer/phone-field";
 import { csrfFetch } from "@/lib/client-fetch";
 import { escalationEmailDomainError, websiteDomainError } from "@/lib/company-domain";
 import { isIndiaCountry } from "@/lib/data/countries";
+import { dialCodeFor } from "@/lib/data/dial-codes";
 import { COMPANY_SIZE_OPTIONS, ESCALATION_FIELDS, REQUIRED_COMPANY_FIELDS, isPersonalEmail, needsBillingPincode } from "@/lib/employer-onboarding";
 import { phoneChangeError } from "@/lib/phone";
 import { timezoneForLocation } from "@/lib/timezones";
@@ -245,7 +246,21 @@ export function CompanyProfileForm({
             label="Country"
             required
             value={values.country}
-            onChange={(v) => set({ country: v, state: "", city: "" })}
+            onChange={(v) => {
+              // As in onboarding (QA-114): phone codes on the old country's
+              // follow the new one, and a PIN only applies in India.
+              const before = dialCodeFor(values.country) ?? "+91";
+              const next = dialCodeFor(v);
+              const follow = (code: string | null) => (next && (!code || code === before) ? next : code ?? "");
+              set({
+                country: v,
+                state: "",
+                city: "",
+                countryCode: follow(values.countryCode),
+                escalationContactCountryCode: follow(values.escalationContactCountryCode),
+                ...(isIndiaCountry(v) ? {} : { billingPincode: "" }),
+              });
+            }}
             error={errors.country}
           />
           <StateField
@@ -279,17 +294,19 @@ export function CompanyProfileForm({
           </p>
         ) : null}
         <div className="grid gap-5 sm:grid-cols-2">
-          <TextField
-            id="billingPincode"
-            label="Billing PIN code"
-            required={needsBillingPincode(values.country)}
-            inputMode="numeric"
-            maxLength={6}
-            value={values.billingPincode}
-            onChange={(v) => set({ billingPincode: v.replace(/\D/g, "").slice(0, 6) })}
-            error={errors.billingPincode}
-            hint={india ? "Sets CGST + SGST or IGST on your invoice." : "Only needed for an Indian billing address."}
-          />
+          {needsBillingPincode(values.country) ? (
+            <TextField
+              id="billingPincode"
+              label="Billing PIN code"
+              required
+              inputMode="numeric"
+              maxLength={6}
+              value={values.billingPincode}
+              onChange={(v) => set({ billingPincode: v.replace(/\D/g, "").slice(0, 6) })}
+              error={errors.billingPincode}
+              hint="Sets CGST + SGST or IGST on your invoice."
+            />
+          ) : null}
           <TextField
             id="gstNumber"
             label="GST number"
