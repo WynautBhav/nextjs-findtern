@@ -240,7 +240,8 @@ export function RowCheckbox({ id }: { id: string }) {
       aria-label="Select row"
       className={cn(
         "transition-opacity",
-        checked ? "opacity-100" : "opacity-0 group-hover/row:opacity-100 focus-within:opacity-100",
+        // Shown on hover with a mouse; always on touch, which has no hover (QA-146).
+        checked ? "opacity-100" : "opacity-0 group-hover/row:opacity-100 focus-within:opacity-100 touch:opacity-100",
       )}
     />
   );

@@ -140,7 +140,7 @@ async function render(query: string, header: React.ReactNode) {
         <PanelHeader
           title="Recently sent"
           description="The 15 newest notifications people sent (automatic reminders are left out)."
-          action={<Link href="/admin/notification-history" className="text-sm font-medium text-brand-700 underline-offset-4 hover:underline">Full history</Link>}
+          action={<Link href="/admin/notification-history" className="text-sm font-medium text-brand-700 underline-offset-4 hover:underline touch:inline-flex touch:min-h-11 touch:items-center">Full history</Link>}
         />
         <PanelBody className="p-0">
           {history.length === 0 ? (
