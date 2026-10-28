@@ -482,6 +482,7 @@ logins; `SEED=1` selects the seed accounts and server). Screenshots are in
 - Steps: intern 375 px, fill steps 1 to 3, reload `/intern/onboarding` (`node docs/qa/b/repro/onb-resume.mjs`).
 - Actual: "Step 1 of 8 · About you"; fields and uploads are kept ("Replace Aadhaar card"), steps 2 to 8 stay unlocked.
 - Expected: reopen on the first unfinished step. Severity **P2**.
+- Status (builder, 28 Oct): fixed, awaiting retest (wp/opus, fix(QA-107)). The step shown was min(remembered step, first failing step), and the remembered step defaults to 1 when this browser has none. It now opens on the first step that does not pass, and only a complete profile reopens on the remembered step. Checked at 375 on the seed DB with a new intern: fill step 1, Continue (step 2); with the remembered step removed or set back to 1, a reload opens "Step 2 of 8 · Academics" (it was step 1). Limit, by design and unchanged: until the final submit, the typed fields live in this browser's draft (INT-30) and only uploads reach the server, so a different browser starts on step 1 because step 1 really is incomplete there.
 
 ### QA-108
 - Evidence: accept dialog "This tells The company yes for a start on 6 Nov 2026." (`docs/qa/b/screens/intern-accept-dialog-375-webkit.png`);
