@@ -1,4 +1,4 @@
-import { formatMoney } from "./format.ts";
+import { formatDate, formatMoney } from "./format.ts";
 import { draftFromRecord, MIN_SKILLS } from "./onboarding.ts";
 /**
  * The journey derivation.
@@ -484,7 +484,7 @@ export function deriveProofs(src: ProofSource): Proof[] {
         facts: [
           { label: "Company", value: name(p.employerId) },
           ...(typeof offer.startDate === "string"
-            ? [{ label: "Start", value: offer.startDate }]
+            ? [{ label: "Start", value: formatDate(offer.startDate) }] // was the raw ISO day (QA-015)
             : []),
           ...(typeof offer.durationWeeks === "number"
             ? [{ label: "Length", value: `${offer.durationWeeks} weeks` }]
