@@ -5,7 +5,7 @@ import { ArrowRight, CalendarClock, ClipboardCheck, CreditCard, FolderPlus, Shop
 
 import { getDb, schema } from "@/lib/db";
 import { ButtonLink } from "@/components/ui/button";
-import { EmptyScene, HeroBand, Pill, SectionHead, StatTile, Surface } from "@/components/app/primitives";
+import { EmptyScene, HeroBand, Pill, SectionHead, Surface } from "@/components/app/primitives";
 import { requireRole } from "@/lib/auth";
 import { toCandidateProfile, type CandidateProfile } from "@/lib/employer-candidates";
 import { candidatePoolClauses, scoreExpr } from "@/lib/employer-pool";
@@ -34,6 +34,8 @@ type Task = {
   href: string;
   cta: string;
   Icon: typeof CreditCard;
+  /** False when the next move is someone else's (the candidate picking a time). */
+  yours?: boolean;
 };
 
 type Loaded = {
@@ -113,6 +115,7 @@ export default async function EmployerDashboard() {
         href: "/employer/schedule",
         cta: "Open schedule",
         Icon: CalendarClock,
+        yours: false,
       },
       {
         count: data.shortlisted,
@@ -125,7 +128,6 @@ export default async function EmployerDashboard() {
     ] satisfies Task[]
   ).filter((t) => t.count > 0);
 
-  const waiting = tasks.reduce((n, t) => n + t.count, 0);
   const openProjects = projects.filter((p) => isProjectOpen(p.status));
   const shownProjects = [...openProjects, ...projects.filter((p) => !isProjectOpen(p.status))].slice(0, 5);
   const byProject = new Map<string, { total: number; won: number }>();
@@ -135,7 +137,9 @@ export default async function EmployerDashboard() {
     if (proposalOutcome(p.status) === "won") row.won += 1;
     byProject.set(p.projectId, row);
   }
-  const top = tasks[0];
+  // The hero's amber action is only ever something the employer can do now.
+  const top = tasks.find((t) => t.yours !== false);
+  const rest = tasks.filter((t) => t !== top);
 
   const next = data.nextInterview;
   const nextAt = next ? slotDate(next) : null;
@@ -143,11 +147,12 @@ export default async function EmployerDashboard() {
   return (
     <div>
       <HeroBand
-        eyebrow={data.companyName || "Your company"}
-        title={waiting ? `${waiting} ${waiting === 1 ? "thing needs" : "things need"} you` : proposals.length ? "You're all caught up" : "Let's make your first hire"}
+        // Name the first thing waiting rather than a total of different kinds
+        // of things, so the headline matches the list below it.
+        title={top ? `${top.count} ${top.label}` : proposals.length ? "You're all caught up" : "Let's make your first hire"}
         lede={
-          waiting
-            ? "Start with the first one; each takes a minute."
+          top
+            ? top.detail
             : proposals.length
               ? "Nothing is waiting on you. Your candidates and offers are below."
               : "Shortlist candidates ranked by their Findtern Score, meet them, and send a proposal."
@@ -172,51 +177,64 @@ export default async function EmployerDashboard() {
           </>
         }
       >
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <StatTile tone="onDark" label="Awaiting a reply" value={awaiting || null} empty="None out" href="/employer/proposals" />
-          <StatTile tone="onDark" label="Accepted, to pay" value={accepted || null} empty="None waiting" href="/employer/checkout" />
-          <StatTile tone="onDark" label="Hired" value={hired || null} empty="No hires yet" href="/employer/orders" />
-          <StatTile tone="onDark" label="Declined or expired" value={declined || null} empty="None" href="/employer/proposals" />
-        </div>
+        {proposals.length ? (
+          // The pipeline as one line, not four tiles: Proposals is where it's worked.
+          <Link
+            href="/employer/proposals"
+            className="group nums inline-flex flex-wrap items-baseline gap-x-5 gap-y-1 rounded-apple-sm text-sm text-on-dark-subtle hover:text-white"
+          >
+            {(
+              [
+                [awaiting, "awaiting a reply"],
+                [accepted, "accepted, to pay"],
+                [hired, "hired"],
+                [declined, "declined or expired"],
+              ] as const
+            ).map(([n, label]) => (
+              <span key={label}>
+                <span className="text-lg font-semibold text-white">{n}</span> {label}
+              </span>
+            ))}
+            <span className="inline-flex items-center gap-1 font-medium text-white underline-offset-4 group-hover:underline">
+              Proposals
+              <ArrowRight className="size-3.5" aria-hidden />
+            </span>
+          </Link>
+        ) : null}
       </HeroBand>
 
       <div className="grid gap-x-10 gap-y-10 xl:grid-cols-[minmax(0,1fr)_22rem]">
         <div className="min-w-0 space-y-10">
-          <section>
-            <SectionHead title="Waiting on you" hint={waiting ? undefined : "Nothing right now."} />
-            {tasks.length ? (
+          {/* The hero carries the first thing waiting; this list carries the rest,
+              so nothing is said twice. Nothing waiting: the hero says so. */}
+          {rest.length ? (
+            <section>
+              <SectionHead title={top ? "Also waiting" : "Waiting"} />
               <Surface as="ul" className="divide-y divide-ink-100 overflow-hidden">
-                {tasks.map((t) => (
-                  <li key={t.href} className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:gap-5">
-                    <span aria-hidden className="grid size-10 shrink-0 place-items-center rounded-full bg-accent-100 text-accent-700">
-                      <t.Icon className="size-5" />
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[0.9375rem] font-medium text-ink-900">
-                        <span className="nums font-semibold">{t.count}</span> {t.label}
-                      </p>
+                {rest.map((t) => (
+                  <li key={t.href} className="grid grid-cols-[3rem_minmax(0,1fr)] items-center gap-x-4 gap-y-3 px-5 py-4 sm:grid-cols-[3rem_minmax(0,1fr)_auto]">
+                    {/* The count leads the row: type, not an icon, carries it. */}
+                    <span className="nums text-right text-2xl font-semibold tracking-[-0.02em] text-ink-900">{t.count}</span>
+                    <div className="min-w-0">
+                      <p className="text-[0.9375rem] font-medium text-ink-900">{t.label.charAt(0).toUpperCase() + t.label.slice(1)}</p>
                       <p className="mt-0.5 text-sm text-ink-600">{t.detail}</p>
                     </div>
-                    <ButtonLink href={t.href} variant="outline" size="sm" className="min-h-11 self-start sm:self-auto">
+                    <ButtonLink href={t.href} variant="outline" size="sm" className="col-start-2 min-h-11 justify-self-start sm:col-start-auto sm:justify-self-end">
                       {t.cta}
                       <ArrowRight className="size-4" aria-hidden />
                     </ButtonLink>
                   </li>
                 ))}
               </Surface>
-            ) : (
-              <p className="rounded-apple-xl border border-dashed border-ink-200 px-5 py-4 text-sm text-ink-600">
-                No payments, timesheets or meetings need you. New ones show up here first.
-              </p>
-            )}
-          </section>
+            </section>
+          ) : null}
 
           <section>
             <SectionHead
               title="Projects"
               hint={`${openProjects.length} open of ${projects.length}`}
               action={
-                <Link href="/employer/projects" className="text-sm font-medium text-brand-700 hover:underline">
+                <Link href="/employer/projects" className="inline-flex min-h-11 items-center text-sm font-medium text-brand-700 hover:underline">
                   Manage
                 </Link>
               }
@@ -290,7 +308,7 @@ export default async function EmployerDashboard() {
             <SectionHead
               title="Matches for your projects"
               action={
-                <Link href="/employer/candidates" className="text-sm font-medium text-brand-700 hover:underline">
+                <Link href="/employer/candidates" className="inline-flex min-h-11 items-center text-sm font-medium text-brand-700 hover:underline">
                   Browse all
                 </Link>
               }
@@ -316,7 +334,7 @@ export default async function EmployerDashboard() {
                         </span>
                         <span className="text-right">
                           <span className="nums block text-lg font-semibold leading-tight text-brand-700">{c.score.toFixed(1)}</span>
-                          <span className="block text-xs text-ink-500">{PLAN_NAME[band.id]}</span>
+                          <span className="block text-xs text-text-subtle">{PLAN_NAME[band.id]} plan</span>
                         </span>
                       </Link>
                     </li>

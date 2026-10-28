@@ -105,11 +105,12 @@ export default async function EmployerTimesheetDetail({ params }: { params: Prom
               {initials}
             </span>
             <div className="min-w-0">
-              <p className="nums text-xs font-semibold uppercase tracking-[0.14em] text-ink-500">
-                Timesheet · {formatPeriod(timesheet.periodStart, timesheet.periodEnd)}
+              <h1 className="text-balance text-2xl font-semibold tracking-[-0.02em] text-ink-900 sm:text-3xl">{name}</h1>
+              {/* The period and project as the meta line, not a kicker above the name. */}
+              <p className="nums mt-1 text-sm text-ink-600">
+                Timesheet for {formatPeriod(timesheet.periodStart, timesheet.periodEnd)}
+                {projectName ? ` · ${projectName}` : ""}
               </p>
-              <h1 className="mt-1.5 text-balance text-2xl font-semibold tracking-[-0.02em] text-ink-900 sm:text-3xl">{name}</h1>
-              {projectName ? <p className="mt-1 text-sm text-ink-600">{projectName}</p> : null}
             </div>
           </div>
           <StatusPill status={status} />
@@ -165,7 +166,7 @@ export default async function EmployerTimesheetDetail({ params }: { params: Prom
             </div>
             {timesheet.managerNote ? (
               <div className="mt-4 rounded-apple-md bg-ink-50 px-4 py-3">
-                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-ink-500">Your note</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-subtle">Your note</p>
                 <p className="mt-1 whitespace-pre-line text-sm leading-relaxed text-ink-800">{timesheet.managerNote}</p>
               </div>
             ) : null}

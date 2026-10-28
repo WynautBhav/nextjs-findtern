@@ -161,15 +161,12 @@ export default async function EmployerProposalDetail({
               {initials}
             </span>
             <div className="min-w-0">
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-ink-500">
-                {ft ? "Full-time offer" : "Internship offer"}
-                {projectName ? ` · ${projectName}` : ""}
-              </p>
-              <h1 className="mt-1.5 text-balance text-2xl font-semibold tracking-[-0.02em] text-ink-900 sm:text-3xl">
+              <h1 className="text-balance text-2xl font-semibold tracking-[-0.02em] text-ink-900 sm:text-3xl">
                 {offer.roleTitle || projectName || "Proposal"}
               </h1>
               <p className="mt-1.5 text-sm text-ink-600">
-                To{" "}
+                {ft ? "Full-time offer" : "Internship offer"}
+                {projectName ? ` for ${projectName}` : ""} to{" "}
                 <Link href={`/employer/intern/${encodeURIComponent(proposal.internId)}`} className="font-medium text-ink-900 underline-offset-4 hover:underline">
                   {internName}
                 </Link>
@@ -210,7 +207,7 @@ export default async function EmployerProposalDetail({
                     offer.monthlyMinor != null ? (
                       <>
                         {formatMoney(offer.monthlyMinor, currency)}
-                        {currency === "INR" ? <span className="ml-1 text-xs font-normal text-ink-500">(includes GST)</span> : null}
+                        {currency === "INR" ? <span className="ml-1 text-xs font-normal text-text-subtle">(includes GST)</span> : null}
                       </>
                     ) : (
                       "-"
@@ -220,7 +217,7 @@ export default async function EmployerProposalDetail({
                 />
                 {offer.perHireMinor ? <DetailRow label="One-time hiring fee" value={formatMoney(offer.perHireMinor, currency)} mono /> : null}
                 <DetailRow label="Working week" value={WEEKLY_SCHEDULES[offer.weeklySchedule].label} />
-                <DetailRow label="Paid leave" value={offer.paidLeavesPerMonth ? `${offer.paidLeavesPerMonth} days a month` : "None"} />
+                <DetailRow label="Paid leave" value={offer.paidLeavesPerMonth ? `${offer.paidLeavesPerMonth} day${offer.paidLeavesPerMonth === 1 ? "" : "s"} a month` : "None"} />
                 <DetailRow
                   label="Working hours"
                   value={
@@ -229,13 +226,22 @@ export default async function EmployerProposalDetail({
                     ) : (
                       <>
                         {offer.shiftFrom}–{offer.shiftTo}
-                        {ist ? <span className="block text-xs font-normal text-ink-500">{ist} for the intern</span> : null}
+                        {ist ? <span className="block text-xs font-normal text-text-subtle">{ist} for the intern</span> : null}
                       </>
                     )
                   }
                   mono
                 />
                 <DetailRow label="Timezone" value={offer.timezone || "Asia/Kolkata"} />
+                {/* Work setup sits in the same table: one card for one set of terms. */}
+                <DetailRow label="Mode" value={MODE[offer.mode] ?? "-"} />
+                {offer.mode !== "remote" ? (
+                  <DetailRow label="Location" value={[offer.city, offer.state].filter(Boolean).join(", ") || offer.location || "-"} />
+                ) : null}
+                {offer.mode === "hybrid" ? (
+                  <DetailRow label="Hybrid split" value={`${offer.officeDays ?? 0} office · ${offer.homeDays ?? 0} home days a week`} />
+                ) : null}
+                <DetailRow label="Laptop" value={laptopLabel(offer.laptop)} />
               </dl>
             </Surface>
           ) : (
@@ -272,21 +278,6 @@ export default async function EmployerProposalDetail({
             </Surface>
           )}
 
-          {!ft ? (
-            <Surface as="section" className="px-6 pb-2 pt-5">
-              <SectionHead title="Work setup" />
-              <dl className="divide-y divide-ink-100">
-                <DetailRow label="Mode" value={MODE[offer.mode] ?? "-"} />
-                {offer.mode !== "remote" ? (
-                  <DetailRow label="Location" value={[offer.city, offer.state].filter(Boolean).join(", ") || offer.location || "-"} />
-                ) : null}
-                {offer.mode === "hybrid" ? (
-                  <DetailRow label="Hybrid split" value={`${offer.officeDays ?? 0} office · ${offer.homeDays ?? 0} home days a week`} />
-                ) : null}
-                <DetailRow label="Laptop" value={laptopLabel(offer.laptop)} />
-              </dl>
-            </Surface>
-          ) : null}
 
           {offer.jd ? (
             <Surface as="section" className="p-6">
@@ -301,7 +292,7 @@ export default async function EmployerProposalDetail({
               <SectionHead title="Skills" />
               <ul className="flex flex-wrap gap-1.5">
                 {skills.map((skill) => (
-                  <li key={skill} className="rounded-full bg-brand-50 px-3 py-1 text-sm font-medium text-brand-800">
+                  <li key={skill} className="rounded-apple-sm bg-ink-100 px-2.5 py-1 text-sm text-ink-700">
                     {skill}
                   </li>
                 ))}
@@ -327,9 +318,9 @@ export default async function EmployerProposalDetail({
             {state.canPay || state.canWithdraw || state.canEdit || proposal.status === "hired" ? (
               <div className="mt-4 grid gap-2">
                 {state.canPay ? (
-                  <Link href="/employer/checkout" className={buttonClass({ block: true })}>
+                  <Link href="/employer/checkout" className={buttonClass({ variant: "accent", block: true })}>
                     <CreditCard className="size-4" aria-hidden />
-                    Proceed to checkout
+                    Pay to confirm the hire
                   </Link>
                 ) : null}
                 {state.canEdit ? (
@@ -373,7 +364,7 @@ export default async function EmployerProposalDetail({
                 {ratings.map(([key, value]) => (
                   <DetailRow
                     key={key}
-                    label={key === "overall" ? "Findtern Score" : key.charAt(0).toUpperCase() + key.slice(1)}
+                    label={key === "overall" ? "Findtern Score" : humanizeKey(key)}
                     value={`${value}/10`}
                     mono
                   />
@@ -401,4 +392,10 @@ function formatDate(value: Date | string | null): string {
   const d = typeof value === "string" ? new Date(`${value.slice(0, 10)}T00:00:00+05:30`) : new Date(value);
   if (Number.isNaN(d.getTime())) return String(value);
   return d.toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "Asia/Kolkata" });
+}
+
+/** "problemSolving" / "problem_solving" → "Problem solving". */
+function humanizeKey(key: string): string {
+  const words = key.replace(/_/g, " ").replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase().trim();
+  return words.charAt(0).toUpperCase() + words.slice(1);
 }

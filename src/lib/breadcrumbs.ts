@@ -14,6 +14,11 @@ export function breadcrumbsFor(
   pathname: string,
   labels: Record<string, string>,
   idLabel = "Details",
+  /**
+   * URL segments that aren't pages but belong to one: "/employer/proposal"
+   * (the detail's parent segment) reads "Proposals" and links to the list.
+   */
+  parents: Record<string, { label: string; href: string }> = {},
 ): Crumb[] {
   const parts = pathname.split("/").filter(Boolean);
   const out: Crumb[] = [];
@@ -21,6 +26,13 @@ export function breadcrumbsFor(
   for (let i = 1; i < parts.length; i += 1) {
     const href = `/${parts.slice(0, i + 1).join("/")}`;
     const part = parts[i];
+    const parent = parents[href];
+    if (parent) {
+      out.push({ href: parent.href, label: parent.label, link: true });
+      continue;
+    }
+    // An empty idLabel drops record ids: the page title already names it.
+    if (ID_LIKE.test(part) && idLabel === "") continue;
     const label = ID_LIKE.test(part)
       ? idLabel
       : (labels[href] ?? part.replace(/[-_]/g, " ").replace(/^\w/, (c) => c.toUpperCase()));

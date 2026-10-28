@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
-import { ArrowLeft, Laptop, Link2, MapPin, Send, Sparkles } from "lucide-react";
+import { ArrowLeft, Laptop, Link2, MapPin, Send } from "lucide-react";
 
 import { getDb, schema } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
@@ -352,7 +352,7 @@ export default async function EmployerInternDetail({
               <p className="text-sm font-medium text-ink-600">Findtern Score</p>
               <p className="nums mt-1 text-4xl font-semibold leading-none tracking-[-0.03em] text-brand-700">
                 {profile.scored ? profile.score.toFixed(1) : "-"}
-                <span className="ml-0.5 text-base font-medium text-ink-500">/10</span>
+                <span className="ml-0.5 text-base font-medium text-text-subtle">/10</span>
               </p>
               <p className="mt-1.5 text-sm text-ink-600">{band.name}</p>
             </div>
@@ -362,7 +362,9 @@ export default async function EmployerInternDetail({
                 {formatRate(pricing.hourlyRateMinor, currency)}
               </p>
               <p className="mt-2.5 text-sm text-ink-600">
-                {pricing.perHireMinor > 0 ? `+ ${formatMoney(pricing.perHireMinor, currency)} per hire` : "Set by the score band"}
+                {/* The price is said once, here: no separate "what hiring costs" card. */}
+                {pricing.perHireMinor > 0 ? `+ ${formatMoney(pricing.perHireMinor, currency)} per hire · ` : ""}set by the score band
+
               </p>
             </div>
           </div>
@@ -404,7 +406,6 @@ export default async function EmployerInternDetail({
           {/* EMB-12: hires and full-time offers are not compared (legacy). */}
           {compareBlocked ? null : <CompareToggle employerId={employerId} internId={profile.id} picked={comparePicks} />}
           <a href="#ai-report" className="inline-flex min-h-11 items-center gap-1.5 px-2 text-sm font-medium text-brand-700 underline-offset-4 hover:underline">
-            <Sparkles className="size-4" aria-hidden />
             AI interview report
           </a>
         </div>
@@ -573,15 +574,6 @@ export default async function EmployerInternDetail({
                 LinkedIn profile
               </a>
             ) : null}
-          </Surface>
-
-          <Surface className="p-5">
-            <h2 className="text-base font-semibold text-ink-900">What hiring costs</h2>
-            <p className="nums mt-3 text-2xl font-semibold tracking-[-0.02em] text-ink-900">{formatRate(pricing.hourlyRateMinor, currency)}</p>
-            <p className="mt-1 text-sm text-ink-600">
-              {pricing.perHireMinor > 0 ? `plus ${formatMoney(pricing.perHireMinor, currency)} per hire. ` : ""}
-              Fixed by the score band. You choose the hours and can pay above the band.
-            </p>
           </Surface>
 
           {appliedProjects.length > 0 ? (

@@ -1,0 +1,338 @@
+[
+  {
+    "role": "employer",
+    "width": 390,
+    "route": "/employer/dashboard",
+    "finalUrl": "/employer/dashboard",
+    "problems": []
+  },
+  {
+    "role": "employer",
+    "width": 390,
+    "route": "/employer/candidates",
+    "finalUrl": "/employer/candidates",
+    "problems": []
+  },
+  {
+    "role": "employer",
+    "width": 390,
+    "route": "/employer/intern/8c88eabd-fabb-4098-abdc-caa8dca7cc59",
+    "finalUrl": "/employer/intern/8c88eabd-fabb-4098-abdc-caa8dca7cc59",
+    "problems": []
+  },
+  {
+    "role": "employer",
+    "width": 390,
+    "route": "/employer/compare",
+    "finalUrl": "/employer/compare",
+    "problems": []
+  },
+  {
+    "role": "employer",
+    "width": 390,
+    "route": "/employer/drives",
+    "finalUrl": "/employer/drives",
+    "problems": []
+  },
+  {
+    "role": "employer",
+    "width": 390,
+    "route": "/employer/projects",
+    "finalUrl": "/employer/projects",
+    "problems": []
+  },
+  {
+    "role": "employer",
+    "width": 390,
+    "route": "/employer/proposals",
+    "finalUrl": "/employer/proposals",
+    "problems": []
+  },
+  {
+    "role": "employer",
+    "width": 390,
+    "route": "/employer/proposal/d061a8dc-c2e4-481f-85ce-bfe236e632b5",
+    "finalUrl": "/employer/proposal/d061a8dc-c2e4-481f-85ce-bfe236e632b5",
+    "problems": []
+  },
+  {
+    "role": "employer",
+    "width": 390,
+    "route": "/employer/send-proposal",
+    "finalUrl": "/employer/send-proposal",
+    "problems": []
+  },
+  {
+    "role": "employer",
+    "width": 390,
+    "route": "/employer/schedule",
+    "finalUrl": "/employer/schedule",
+    "problems": []
+  },
+  {
+    "role": "employer",
+    "width": 390,
+    "route": "/employer/timesheets",
+    "finalUrl": "/employer/timesheets",
+    "problems": []
+  },
+  {
+    "role": "employer",
+    "width": 390,
+    "route": "/employer/timesheets/c2a01aa8-cb5f-477f-8861-447829655d2d",
+    "finalUrl": "/employer/timesheets/c2a01aa8-cb5f-477f-8861-447829655d2d",
+    "problems": []
+  },
+  {
+    "role": "employer",
+    "width": 390,
+    "route": "/employer/cart",
+    "finalUrl": "/employer/cart",
+    "problems": []
+  },
+  {
+    "role": "employer",
+    "width": 390,
+    "route": "/employer/orders",
+    "finalUrl": "/employer/orders",
+    "problems": []
+  },
+  {
+    "role": "employer",
+    "width": 390,
+    "route": "/employer/alerts",
+    "finalUrl": "/employer/alerts",
+    "problems": []
+  },
+  {
+    "role": "employer",
+    "width": 390,
+    "route": "/employer/account",
+    "finalUrl": "/employer/account",
+    "problems": []
+  },
+  {
+    "role": "employer",
+    "width": 768,
+    "route": "/employer/dashboard",
+    "finalUrl": "/employer/dashboard",
+    "problems": []
+  },
+  {
+    "role": "employer",
+    "width": 768,
+    "route": "/employer/candidates",
+    "finalUrl": "/employer/candidates",
+    "problems": []
+  },
+  {
+    "role": "employer",
+    "width": 768,
+    "route": "/employer/intern/8c88eabd-fabb-4098-abdc-caa8dca7cc59",
+    "finalUrl": "/employer/intern/8c88eabd-fabb-4098-abdc-caa8dca7cc59",
+    "problems": []
+  },
+  {
+    "role": "employer",
+    "width": 768,
+    "route": "/employer/compare",
+    "finalUrl": "/employer/compare",
+    "problems": []
+  },
+  {
+    "role": "employer",
+    "width": 768,
+    "route": "/employer/drives",
+    "finalUrl": "/employer/drives",
+    "problems": []
+  },
+  {
+    "role": "employer",
+    "width": 768,
+    "route": "/employer/projects",
+    "finalUrl": "/employer/projects",
+    "problems": []
+  },
+  {
+    "role": "employer",
+    "width": 768,
+    "route": "/employer/proposals",
+    "finalUrl": "/employer/proposals",
+    "problems": []
+  },
+  {
+    "role": "employer",
+    "width": 768,
+    "route": "/employer/proposal/d061a8dc-c2e4-481f-85ce-bfe236e632b5",
+    "finalUrl": "/employer/proposal/d061a8dc-c2e4-481f-85ce-bfe236e632b5",
+    "problems": []
+  },
+  {
+    "role": "employer",
+    "width": 768,
+    "route": "/employer/send-proposal",
+    "finalUrl": "/employer/send-proposal",
+    "problems": []
+  },
+  {
+    "role": "employer",
+    "width": 768,
+    "route": "/employer/schedule",
+    "finalUrl": "/employer/schedule",
+    "problems": []
+  },
+  {
+    "role": "employer",
+    "width": 768,
+    "route": "/employer/timesheets",
+    "finalUrl": "/employer/timesheets",
+    "problems": []
+  },
+  {
+    "role": "employer",
+    "width": 768,
+    "route": "/employer/timesheets/c2a01aa8-cb5f-477f-8861-447829655d2d",
+    "finalUrl": "/employer/timesheets/c2a01aa8-cb5f-477f-8861-447829655d2d",
+    "problems": []
+  },
+  {
+    "role": "employer",
+    "width": 768,
+    "route": "/employer/cart",
+    "finalUrl": "/employer/cart",
+    "problems": []
+  },
+  {
+    "role": "employer",
+    "width": 768,
+    "route": "/employer/orders",
+    "finalUrl": "/employer/orders",
+    "problems": []
+  },
+  {
+    "role": "employer",
+    "width": 768,
+    "route": "/employer/alerts",
+    "finalUrl": "/employer/alerts",
+    "problems": []
+  },
+  {
+    "role": "employer",
+    "width": 768,
+    "route": "/employer/account",
+    "finalUrl": "/employer/account",
+    "problems": []
+  },
+  {
+    "role": "employer",
+    "width": 1440,
+    "route": "/employer/dashboard",
+    "finalUrl": "/employer/dashboard",
+    "problems": []
+  },
+  {
+    "role": "employer",
+    "width": 1440,
+    "route": "/employer/candidates",
+    "finalUrl": "/employer/candidates",
+    "problems": []
+  },
+  {
+    "role": "employer",
+    "width": 1440,
+    "route": "/employer/intern/8c88eabd-fabb-4098-abdc-caa8dca7cc59",
+    "finalUrl": "/employer/intern/8c88eabd-fabb-4098-abdc-caa8dca7cc59",
+    "problems": []
+  },
+  {
+    "role": "employer",
+    "width": 1440,
+    "route": "/employer/compare",
+    "finalUrl": "/employer/compare",
+    "problems": []
+  },
+  {
+    "role": "employer",
+    "width": 1440,
+    "route": "/employer/drives",
+    "finalUrl": "/employer/drives",
+    "problems": []
+  },
+  {
+    "role": "employer",
+    "width": 1440,
+    "route": "/employer/projects",
+    "finalUrl": "/employer/projects",
+    "problems": []
+  },
+  {
+    "role": "employer",
+    "width": 1440,
+    "route": "/employer/proposals",
+    "finalUrl": "/employer/proposals",
+    "problems": []
+  },
+  {
+    "role": "employer",
+    "width": 1440,
+    "route": "/employer/proposal/d061a8dc-c2e4-481f-85ce-bfe236e632b5",
+    "finalUrl": "/employer/proposal/d061a8dc-c2e4-481f-85ce-bfe236e632b5",
+    "problems": []
+  },
+  {
+    "role": "employer",
+    "width": 1440,
+    "route": "/employer/send-proposal",
+    "finalUrl": "/employer/send-proposal",
+    "problems": []
+  },
+  {
+    "role": "employer",
+    "width": 1440,
+    "route": "/employer/schedule",
+    "finalUrl": "/employer/schedule",
+    "problems": []
+  },
+  {
+    "role": "employer",
+    "width": 1440,
+    "route": "/employer/timesheets",
+    "finalUrl": "/employer/timesheets",
+    "problems": []
+  },
+  {
+    "role": "employer",
+    "width": 1440,
+    "route": "/employer/timesheets/c2a01aa8-cb5f-477f-8861-447829655d2d",
+    "finalUrl": "/employer/timesheets/c2a01aa8-cb5f-477f-8861-447829655d2d",
+    "problems": []
+  },
+  {
+    "role": "employer",
+    "width": 1440,
+    "route": "/employer/cart",
+    "finalUrl": "/employer/cart",
+    "problems": []
+  },
+  {
+    "role": "employer",
+    "width": 1440,
+    "route": "/employer/orders",
+    "finalUrl": "/employer/orders",
+    "problems": []
+  },
+  {
+    "role": "employer",
+    "width": 1440,
+    "route": "/employer/alerts",
+    "finalUrl": "/employer/alerts",
+    "problems": []
+  },
+  {
+    "role": "employer",
+    "width": 1440,
+    "route": "/employer/account",
+    "finalUrl": "/employer/account",
+    "problems": []
+  }
+]

@@ -63,7 +63,6 @@ export default async function EmployerProposalsPage() {
     <div>
       <PageHead
         title="Proposals"
-        lede="Every offer you've sent, where it stands, and what you can still do about it."
         action={
           <ButtonLink href="/employer/candidates" size="sm">
             <Send className="size-4" aria-hidden />

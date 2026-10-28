@@ -90,7 +90,7 @@ export function TimesheetReview({
           {(usedCodes.length ? usedCodes : ["Present"]).map((s) => (
             <li key={s} className="inline-flex items-center gap-1.5">
               <span className={cn("grid size-5 place-items-center rounded-apple-sm border text-2xs font-bold", CELL[s] ?? "border-ink-200 bg-white text-ink-700")} aria-hidden>
-                {DAY_CODE[s] ?? "?"}
+                {DAY_CODE[s] ?? s.charAt(0).toUpperCase()}
               </span>
               {s}
             </li>
@@ -123,7 +123,7 @@ export function TimesheetReview({
                 {cells.map((d, i) =>
                   d ? (
                     <li key={d.date} className="min-w-0">
-                      <span className="block truncate text-center text-2xs font-medium uppercase tracking-wide text-ink-500">
+                      <span className="block truncate text-center text-2xs font-medium uppercase tracking-wide text-text-subtle">
                         <span className="sm:hidden">{WEEKDAYS[i][0]}</span>
                         <span className="hidden sm:inline">{WEEKDAYS[i]}</span> <span className="nums">{dayLabel(d.date, { day: "numeric" })}</span>
                       </span>
@@ -134,7 +134,7 @@ export function TimesheetReview({
                           onChange={(e) => setValues((v) => ({ ...v, [d.date]: e.target.value }))}
                           className={cn(
                             "mt-1 h-11 w-full appearance-none rounded-apple-sm border text-center text-sm font-bold outline-none focus-visible:ring-2 focus-visible:ring-brand-500/30",
-                            CELL[values[d.date] ?? ""] ?? "border-dashed border-ink-300 bg-white text-ink-500",
+                            CELL[values[d.date] ?? ""] ?? "border-dashed border-ink-300 bg-white text-text-subtle",
                             values[d.date] !== d.status && "ring-2 ring-accent-400",
                           )}
                         >
@@ -156,7 +156,7 @@ export function TimesheetReview({
                             CELL[d.status] ?? "border-dashed border-ink-300 bg-white text-ink-400",
                           )}
                         >
-                          {d.status ? (DAY_CODE[d.status] ?? "?") : "–"}
+                          {d.status ? (DAY_CODE[d.status] ?? d.status.charAt(0).toUpperCase()) : "–"}
                           {d.status === "Present" && d.hours !== 8 ? <span className="nums mt-0.5 text-2xs font-medium">{d.hours}h</span> : null}
                           <span className="sr-only">{d.status || "Not filled"}</span>
                         </span>
@@ -164,7 +164,7 @@ export function TimesheetReview({
                     </li>
                   ) : (
                     <li key={i} aria-hidden className="min-w-0">
-                      <span className="block text-center text-2xs font-medium uppercase tracking-wide text-ink-300">
+                      <span className="block text-center text-2xs font-medium uppercase tracking-wide text-text-subtle">
                         <span className="sm:hidden">{WEEKDAYS[i][0]}</span>
                         <span className="hidden sm:inline">{WEEKDAYS[i]}</span>
                       </span>
@@ -223,7 +223,7 @@ export function TimesheetReview({
       {notes.length > 0 ? (
         <details className="group mt-6" open={notes.length <= 5}>
           <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 text-sm font-semibold text-ink-900 [&::-webkit-details-marker]:hidden">
-            Day notes from the intern <span className="nums font-normal text-ink-500">({notes.length})</span>
+            Day notes from the intern <span className="nums font-normal text-text-subtle">({notes.length})</span>
             <span aria-hidden className="text-ink-400 transition-transform group-open:rotate-90 motion-reduce:transition-none">›</span>
           </summary>
           <ul className="mt-1 divide-y divide-ink-100 rounded-apple-lg border border-ink-200/80">

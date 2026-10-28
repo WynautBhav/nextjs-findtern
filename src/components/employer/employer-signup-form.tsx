@@ -337,7 +337,7 @@ export function EmployerSignupForm({
           placeholder="hiring@acme.com"
           aria-invalid={personal ? true : undefined}
           aria-describedby="companyEmail-note"
-          className={`apple-spring mt-2 min-h-11 w-full rounded-apple-sm border px-3.5 text-[0.9375rem] text-ink-900 outline-none placeholder:text-ink-400 focus:ring-2 ${
+          className={`apple-spring mt-2 min-h-11 w-full rounded-apple-sm border px-3.5 text-[0.9375rem] text-ink-900 outline-none placeholder:text-text-subtle focus:ring-2 ${
             google ? "bg-ink-50 text-ink-700" : "bg-white"
           } ${
             personal
@@ -347,7 +347,7 @@ export function EmployerSignupForm({
         />
         <p
           id="companyEmail-note"
-          className={`mt-1.5 text-xs ${personal ? "text-danger" : "text-ink-500"}`}
+          className={`mt-1.5 text-xs ${personal ? "text-danger" : "text-text-subtle"}`}
         >
           {google
             ? "Verified by Google."
@@ -384,7 +384,7 @@ export function EmployerSignupForm({
             onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, ""))}
             autoComplete="tel-national"
             placeholder={countryCode === "+91" ? "9876543210" : "2015550123"}
-            className="apple-spring min-h-11 w-full rounded-apple-sm border border-ink-200 bg-white px-3.5 text-[0.9375rem] tabular-nums text-ink-900 outline-none placeholder:text-ink-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+            className="apple-spring min-h-11 w-full rounded-apple-sm border border-ink-200 bg-white px-3.5 text-[0.9375rem] tabular-nums text-ink-900 outline-none placeholder:text-text-subtle focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
           />
         </div>
         {phoneTaken ? (
@@ -393,7 +393,7 @@ export function EmployerSignupForm({
             can&apos;t be used for both. Use another, or sign in instead.
           </p>
         ) : (
-          <p className="mt-1.5 text-xs text-ink-500">
+          <p className="mt-1.5 text-xs text-text-subtle">
             {phoneNumber && !isValidPhone(countryCode, phoneNumber)
               ? phoneError(countryCode, phoneNumber)
               : phoneHint(countryCode)}
@@ -414,7 +414,7 @@ export function EmployerSignupForm({
           autoComplete="new-password"
           placeholder="••••••••"
           aria-describedby="password-rules"
-          className="apple-spring mt-2 min-h-11 w-full rounded-apple-sm border border-ink-200 bg-white px-3.5 text-[0.9375rem] text-ink-900 outline-none placeholder:text-ink-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+          className="apple-spring mt-2 min-h-11 w-full rounded-apple-sm border border-ink-200 bg-white px-3.5 text-[0.9375rem] text-ink-900 outline-none placeholder:text-text-subtle focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
         />
         <ul id="password-rules" className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
           {PASSWORD_RULES.map((rule) => {
@@ -472,7 +472,7 @@ export function EmployerSignupForm({
         )}
       </button>
 
-      <p className="text-xs leading-relaxed text-ink-500">
+      <p className="text-xs leading-relaxed text-text-subtle">
         Creating the account does not start hiring. You will be taken to the two-stage company
         setup, and nothing is charged until a candidate accepts.
       </p>
@@ -510,7 +510,7 @@ function TextInput({
         placeholder={placeholder}
         autoComplete={autoComplete}
         onChange={(e) => onChange(e.target.value)}
-        className="apple-spring mt-2 min-h-11 w-full rounded-apple-sm border border-ink-200 bg-white px-3.5 text-[0.9375rem] text-ink-900 outline-none placeholder:text-ink-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+        className="apple-spring mt-2 min-h-11 w-full rounded-apple-sm border border-ink-200 bg-white px-3.5 text-[0.9375rem] text-ink-900 outline-none placeholder:text-text-subtle focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
       />
     </div>
   );

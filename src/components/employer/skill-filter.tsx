@@ -94,7 +94,7 @@ export function SkillFilter({
             </li>
           ))}
           {active.length === 0 ? (
-            <li className="flex min-h-9 items-center gap-3 text-sm text-ink-500">
+            <li className="flex min-h-9 items-center gap-3 text-sm text-text-subtle">
               No skills selected.
               {projectSkills.length > 0 ? (
                 <Link
@@ -130,7 +130,7 @@ export function SkillFilter({
             }}
             placeholder={full ? `${MAX_SKILLS} skills max` : "Search & add skills…"}
             aria-label="Search skills to filter by"
-            className="apple-spring min-h-11 w-full rounded-apple-sm border border-ink-200 bg-ink-50 pl-9 pr-3.5 text-sm text-ink-900 outline-none placeholder:text-ink-400 focus:border-brand-500 focus:bg-white focus:ring-2 focus:ring-brand-500/20 disabled:opacity-60"
+            className="apple-spring min-h-11 w-full rounded-apple-sm border border-ink-200 bg-ink-50 pl-9 pr-3.5 text-sm text-ink-900 outline-none placeholder:text-text-subtle focus:border-brand-500 focus:bg-white focus:ring-2 focus:ring-brand-500/20 disabled:opacity-60"
           />
           {open && (options.length > 0 || custom) ? (
             <ul className="absolute left-0 right-0 z-20 mt-1 max-h-64 overflow-y-auto rounded-apple-sm border border-ink-200 bg-white shadow-sm">
@@ -167,7 +167,7 @@ export function SkillFilter({
           ) : null}
         </div>
       </div>
-      <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-500">
+      <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-text-subtle">
         <span>
           {fromProject ? "Skills from the selected project. " : ""}
           {note ?? `Up to ${MAX_SKILLS}. Candidates with any of them are shown; more matches rank higher.`}

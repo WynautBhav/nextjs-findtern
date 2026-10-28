@@ -1,7 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { eq } from "drizzle-orm";
-import { ArrowRight, KeyRound } from "lucide-react";
 
 import { getDb, schema } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
@@ -72,7 +70,7 @@ export default async function EmployerAccount() {
     <div>
       <PageHeader
         title="Company profile"
-        subtitle="Your company's details, who we contact, and how you sign in. Candidates never see your contacts."
+        subtitle="Candidates never see your contacts."
       />
 
       <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_22rem]">
@@ -100,41 +98,14 @@ export default async function EmployerAccount() {
           </Surface>
 
           <Surface as="section" id="security" className="scroll-mt-24 p-5" aria-labelledby="security-title">
-            <div className="mb-4 flex items-center gap-2.5">
-              <span className="grid size-9 place-items-center rounded-apple-sm bg-brand-50 text-brand-700">
-                <KeyRound className="size-4" aria-hidden />
-              </span>
-              <h2 id="security-title" className="text-base font-semibold tracking-[-0.01em] text-ink-900">
-                Password
-              </h2>
-            </div>
+            <h2 id="security-title" className="mb-4 text-base font-semibold tracking-[-0.01em] text-ink-900">
+              Password
+            </h2>
             <ChangePasswordForm endpoint={`/api/employer/${encodeURIComponent(uid)}/change-password`} />
           </Surface>
 
-          <Surface className="p-5">
-            <SectionHead title="Elsewhere" />
-            <ul className="-mx-2">
-              <Jump href="/employer/projects" label="Projects" />
-              <Jump href="/employer/orders" label="Orders and invoices" />
-              <Jump href="/employer/alerts" label="Alerts" />
-            </ul>
-          </Surface>
         </aside>
       </div>
     </div>
-  );
-}
-
-function Jump({ href, label }: { href: string; label: string }) {
-  return (
-    <li>
-      <Link
-        href={href}
-        className="apple-spring group flex min-h-11 items-center justify-between rounded-apple-sm px-2 text-sm font-medium text-ink-800 hover:bg-ink-50 hover:text-brand-700"
-      >
-        {label}
-        <ArrowRight className="size-4 text-ink-400 group-hover:text-brand-700" aria-hidden />
-      </Link>
-    </li>
   );
 }

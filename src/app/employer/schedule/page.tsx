@@ -16,7 +16,8 @@ import {
   stageRank,
   type InterviewStage,
 } from "@/lib/employer-interview-rules";
-import { EmptyScene, PageHead, Pill, Surface, type Tone } from "@/components/app/primitives";
+import { EmptyScene, FilterTabs, PageHead, Pill, Surface, type Tone } from "@/components/app/primitives";
+import { AutoSubmitForm } from "@/components/app/auto-submit-form";
 import { buttonClass } from "@/components/ui/button";
 import { displayNameOf, initialsOf } from "@/lib/employer-candidates";
 import { hiredInternIds } from "@/lib/employer-visibility";
@@ -67,7 +68,10 @@ export default async function EmployerSchedule({ searchParams }: { searchParams:
   const uid = session.uid;
   const sp = await searchParams;
   const q = (sp.q ?? "").trim().toLowerCase();
-  const dateFilter = /^\d{4}-\d{2}-\d{2}$/.test(sp.date ?? "") ? sp.date! : "";
+  // Typed as DD/MM/YYYY (bug sheet 7); older links carried YYYY-MM-DD.
+  const dateTyped = (sp.date ?? "").trim();
+  const dmy = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(dateTyped);
+  const dateFilter = dmy ? `${dmy[3]}-${dmy[2]}-${dmy[1]}` : /^\d{4}-\d{2}-\d{2}$/.test(dateTyped) ? dateTyped : "";
   const statusFilter = STATUS_FILTERS.find((s) => s.value === sp.status) ?? null;
   const projectFilter = (sp.project ?? "").trim();
   const tzFilter = (sp.tz ?? "").trim();
@@ -174,7 +178,7 @@ export default async function EmployerSchedule({ searchParams }: { searchParams:
   const booked = all.filter((r) => r.stage === "upcoming" || r.stage === "live").length;
   const waiting = all.filter((r) => r.stage === "awaiting_pick").length;
   const field =
-    "apple-spring min-h-11 w-full rounded-apple-sm border border-ink-200 bg-white px-3 text-sm text-ink-900 outline-none focus-visible:border-brand-500 focus-visible:ring-2 focus-visible:ring-brand-500/20";
+    "apple-spring min-h-11 w-full rounded-apple-sm border border-ink-200 bg-white px-3 text-sm text-ink-900 outline-none placeholder:text-text-subtle focus-visible:border-brand-500 focus-visible:ring-2 focus-visible:ring-brand-500/20";
 
   return (
     <div>
@@ -188,7 +192,7 @@ export default async function EmployerSchedule({ searchParams }: { searchParams:
         action={
           <Link href="/employer/cart" className={buttonClass({ variant: "outline", size: "sm" })}>
             <CalendarDays className="size-4" aria-hidden />
-            Book from your cart
+            Book from your shortlist
           </Link>
         }
       />
@@ -197,71 +201,88 @@ export default async function EmployerSchedule({ searchParams }: { searchParams:
         <EmptyScene
           art
           title="No interviews yet"
-          body="Shortlist a candidate, then book a meeting from your cart: you offer three times and they pick one."
+          body="Shortlist a candidate, then book a meeting from your shortlist: you offer three times and they pick one."
           next={{ label: "Browse candidates", href: "/employer/candidates" }}
           who="You - shortlist someone first"
         />
       ) : (
         <>
-          <form method="get" className="mb-6 grid grid-cols-2 gap-3 rounded-apple-xl border border-ink-200/80 bg-white p-4 shadow-xs lg:grid-cols-[minmax(0,1.4fr)_repeat(4,minmax(0,1fr))_auto]">
-            <label className="relative col-span-2 block lg:col-span-1">
-              <span className="sr-only">Search by initials or project</span>
-              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-400" aria-hidden />
-              <input name="q" defaultValue={sp.q ?? ""} placeholder="Initials or project" className={cn(field, "pl-9")} />
-            </label>
-            <label className="block">
-              <span className="sr-only">Date</span>
-              <input type="date" name="date" defaultValue={dateFilter} className={field} aria-label="Date" />
-            </label>
-            <label className="block">
-              <span className="sr-only">Status</span>
-              <select name="status" defaultValue={statusFilter?.value ?? ""} className={field} aria-label="Status">
-                <option value="">All statuses</option>
-                {STATUS_FILTERS.map((s) => (
-                  <option key={s.value} value={s.value}>
-                    {s.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="block">
-              <span className="sr-only">Project</span>
-              <select name="project" defaultValue={projectFilter} className={field} aria-label="Project">
-                <option value="">All projects</option>
-                {projectOptions.map((p) => (
-                  <option key={p} value={p}>
-                    {p}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="block">
-              <span className="sr-only">Timezone</span>
-              <select name="tz" defaultValue={tzFilter} className={field} aria-label="Timezone">
-                <option value="">All timezones</option>
-                {timezones.map((tz) => (
-                  <option key={tz} value={tz}>
-                    {tz}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <div className="col-span-2 flex gap-2 lg:col-span-1">
-              <button type="submit" className={buttonClass({ size: "sm", className: "min-h-11 flex-1" })}>
-                Filter
-              </button>
+          {/* Status as tabs with counts; the rest of the filters apply as
+              they change, so there is no Filter button. */}
+          <div className="mb-5 flex flex-col gap-3">
+            <FilterTabs
+              label="Show interviews"
+              value={statusFilter?.value ?? ""}
+              hrefFor={(key) => {
+                const next = new URLSearchParams(
+                  Object.entries(sp).filter((e): e is [string, string] => typeof e[1] === "string" && e[1] !== "" && e[0] !== "status"),
+                );
+                if (key) next.set("status", key);
+                const qs = next.toString();
+                return qs ? `/employer/schedule?${qs}` : "/employer/schedule";
+              }}
+              tabs={[
+                { key: "", label: "All", count: all.length },
+                ...STATUS_FILTERS.map((f) => ({ key: f.value, label: f.label, count: all.filter((r) => f.stages.includes(r.stage)).length })).filter(
+                  (t) => t.count > 0 || t.key === statusFilter?.value,
+                ),
+              ]}
+            />
+            <AutoSubmitForm className="grid grid-cols-2 gap-2 lg:grid-cols-[minmax(0,1.4fr)_10rem_minmax(0,1fr)_minmax(0,1fr)_auto]">
+              {statusFilter ? <input type="hidden" name="status" value={statusFilter.value} /> : null}
+              <label className="relative col-span-2 block lg:col-span-1">
+                <span className="sr-only">Search by initials or project</span>
+                <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-400" aria-hidden />
+                <input name="q" defaultValue={sp.q ?? ""} placeholder="Initials or project" className={cn(field, "pl-9")} />
+              </label>
+              <label className="block">
+                <span className="sr-only">Date, DD/MM/YYYY</span>
+                <input
+                  name="date"
+                  defaultValue={dateFilter ? dateFilter.split("-").reverse().join("/") : ""}
+                  placeholder="DD/MM/YYYY"
+                  inputMode="numeric"
+                  pattern="\d{2}/\d{2}/\d{4}"
+                  data-complete="^\d{2}/\d{2}/\d{4}$"
+                  className={cn(field, "nums")}
+                />
+              </label>
+              <label className="block">
+                <span className="sr-only">Project</span>
+                <select name="project" defaultValue={projectFilter} className={field}>
+                  <option value="">All projects</option>
+                  {projectOptions.map((p) => (
+                    <option key={p} value={p}>
+                      {p}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="block">
+                <span className="sr-only">Timezone</span>
+                <select name="tz" defaultValue={tzFilter} className={field}>
+                  <option value="">All timezones</option>
+                  {timezones.map((tz) => (
+                    <option key={tz} value={tz}>
+                      {tz}
+                    </option>
+                  ))}
+                </select>
+              </label>
               {filtering ? (
                 <Link href="/employer/schedule" className={buttonClass({ variant: "ghost", size: "sm", className: "min-h-11" })}>
                   Clear
                 </Link>
               ) : null}
-            </div>
-          </form>
+            </AutoSubmitForm>
+          </div>
 
-          <p className="mb-3 text-sm text-ink-600" aria-live="polite">
-            Showing <span className="nums font-semibold text-ink-900">{shown.length}</span> of{" "}
-            <span className="nums">{all.length}</span> interview{all.length === 1 ? "" : "s"}
-          </p>
+          {filtering ? (
+            <p className="mb-3 text-sm text-ink-600" aria-live="polite">
+              Showing <span className="nums font-semibold text-ink-900">{shown.length}</span> of{" "}
+              <span className="nums">{all.length}</span> interview{all.length === 1 ? "" : "s"}
+            </p>
+          ) : null}
 
           {shown.length === 0 ? (
             <EmptyScene
@@ -276,9 +297,10 @@ export default async function EmployerSchedule({ searchParams }: { searchParams:
                 const { iv, stage } = r;
                 const stageInfo = STAGE[stage];
                 const slots = [iv.slot1, iv.slot2, iv.slot3];
+                const offered = slots.filter((x): x is NonNullable<typeof x> => Boolean(x));
                 const link = iv.meetingLink && isMeetingLinkLive(iv) ? iv.meetingLink : null;
                 return (
-                  <Surface as="li" key={iv.id} className="p-5 sm:p-6">
+                  <Surface as="li" key={iv.id} className="p-5">
                     <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
                       <div className="flex min-w-0 items-start gap-3.5">
                         <span aria-hidden className="grid size-11 shrink-0 place-items-center rounded-full bg-brand-50 text-sm font-bold text-brand-800">
@@ -298,37 +320,37 @@ export default async function EmployerSchedule({ searchParams }: { searchParams:
                       <Pill tone={stageInfo.tone}>{stageInfo.label}</Pill>
                     </div>
 
-                    <ol className="mt-4 grid gap-2 sm:grid-cols-3" aria-label="Offered times">
-                      {slots.map((slot, idx) => {
-                        const picked = iv.selectedSlot === idx + 1;
-                        return (
-                          <li
-                            key={idx}
-                            className={cn(
-                              "rounded-apple-md border px-3 py-2.5 text-sm",
-                              picked ? "border-brand-300 bg-brand-50 text-brand-900" : "border-ink-200/80 bg-ink-50/60 text-ink-700",
-                              !slot && "text-ink-400",
-                            )}
-                          >
-                            <span className="block text-xs font-medium text-ink-500">
-                              Slot {idx + 1}
-                              {picked ? " · picked" : ""}
-                            </span>
-                            <span className={cn("nums mt-0.5 block", picked && "font-semibold")}>
-                              {slot ? formatSlotTime(slot, r.tz) : "Not offered"}
-                            </span>
-                          </li>
-                        );
-                      })}
-                    </ol>
+                    {/* All three offered times, always, with the picked one marked
+                        (PRODUCT.md: which slot was chosen is the most common
+                        candidate complaint). The picked time leads, larger. */}
+                    {offered.length ? (
+                      <ol className="nums mt-3 flex flex-wrap items-baseline gap-x-4 gap-y-1 pl-[3.625rem] text-sm text-ink-600" aria-label="Offered times">
+                        {slots.map((slot, idx) =>
+                          slot ? (
+                            <li
+                              key={idx}
+                              className={cn(
+                                iv.selectedSlot === idx + 1 && "order-first basis-full font-semibold text-ink-900",
+                                iv.selectedSlot === idx + 1 && (stage === "upcoming" || stage === "live") && "text-base",
+                              )}
+                            >
+                              {iv.selectedSlot === idx + 1 ? (
+                                <span className="mr-1.5 text-xs font-medium text-text-subtle">Picked</span>
+                              ) : null}
+                              {formatSlotTime(slot, r.tz)}
+                            </li>
+                          ) : null,
+                        )}
+                      </ol>
+                    ) : null}
 
-                    <p className="mt-3 text-sm leading-relaxed text-ink-600">
+                    <p className="mt-2 pl-[3.625rem] text-sm leading-relaxed text-ink-600">
                       {r.feedback && (stage === "over" || stage === "missed") ? "Feedback shared with the candidate. Nothing more to do." : stageInfo.next}
                     </p>
 
                     {r.feedback ? (
                       <div className="mt-4 rounded-apple-md border border-ink-200/80 bg-ink-50/60 px-4 py-3">
-                        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-ink-500">Your feedback</p>
+                        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-subtle">Your feedback</p>
                         <p className="mt-1.5 whitespace-pre-line text-sm leading-relaxed text-ink-800">{r.feedback}</p>
                       </div>
                     ) : null}

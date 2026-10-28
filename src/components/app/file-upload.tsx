@@ -177,7 +177,7 @@ export function FileUpload({
           {error}
         </p>
       ) : hint ? (
-        <p className="mt-1.5 text-xs text-ink-500">{hint}</p>
+        <p className="mt-1.5 text-xs text-text-subtle">{hint}</p>
       ) : null}
     </div>
   );

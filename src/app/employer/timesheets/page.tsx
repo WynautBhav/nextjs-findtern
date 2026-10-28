@@ -10,7 +10,7 @@ import { displayNameOf, initialsOf } from "@/lib/employer-candidates";
 import { hiredInternIds } from "@/lib/employer-visibility";
 import { dayDetails, formatDay, formatPeriod } from "@/lib/employer-timesheets";
 import { StatusPill } from "@/components/employer/timesheet-parts";
-import { EmptyScene, PageHead, SectionHead, StatTile, Surface } from "@/components/app/primitives";
+import { EmptyScene, PageHead, SectionHead, Surface } from "@/components/app/primitives";
 import { buttonClass } from "@/components/ui/button";
 
 export const metadata: Metadata = {
@@ -105,8 +105,6 @@ export default async function EmployerTimesheets() {
     .filter((r) => r.status === "submitted")
     .sort((a, b) => (a.submittedAt?.getTime() ?? 0) - (b.submittedAt?.getTime() ?? 0));
   const rest = rows.filter((r) => r.status !== "submitted");
-  const approved = rows.filter((r) => r.status === "approved");
-  const approvedHours = approved.reduce((n, r) => n + r.hours, 0);
 
   return (
     <div>
@@ -129,30 +127,16 @@ export default async function EmployerTimesheets() {
         />
       ) : (
         <div className="space-y-8">
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
-            <StatTile label="Waiting for review" value={queue.length > 0 ? queue.length : null} empty="Nothing waiting" />
-            <StatTile label="Approved" value={approved.length} />
-            <StatTile
-              label="Approved hours"
-              value={approvedHours > 0 ? approvedHours.toLocaleString("en-IN") : null}
-              empty="None yet"
-              className="col-span-2 lg:col-span-1"
-            />
-          </div>
-
           {queue.length > 0 ? (
             <section>
               <SectionHead title="Waiting for your review" hint="Oldest first." />
-              <Surface as="ul" className="divide-y divide-ink-100 overflow-hidden">
-                {queue.map((r) => (
-                  <li key={r.id} className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:gap-5">
-                    <SheetSummary row={r} />
-                    <Link href={`/employer/timesheets/${encodeURIComponent(r.id)}`} className={buttonClass({ size: "sm", className: "self-start sm:self-auto" })}>
-                      Review
-                      <ArrowRight className="size-4" aria-hidden />
-                    </Link>
-                  </li>
-                ))}
+              <Surface className="overflow-hidden">
+                <SheetHead />
+                <ul className="divide-y divide-ink-100">
+                  {queue.map((r) => (
+                    <SheetRow key={r.id} row={r} review />
+                  ))}
+                </ul>
               </Surface>
             </section>
           ) : null}
@@ -160,18 +144,13 @@ export default async function EmployerTimesheets() {
           {rest.length > 0 ? (
             <section>
               <SectionHead title={queue.length ? "Everything else" : "All timesheets"} />
-              <Surface as="ul" className="divide-y divide-ink-100 overflow-hidden">
-                {rest.map((r) => (
-                  <li key={r.id}>
-                    <Link
-                      href={`/employer/timesheets/${encodeURIComponent(r.id)}`}
-                      className="group flex flex-col gap-3 p-5 transition-colors hover:bg-ink-50/70 sm:flex-row sm:items-center sm:gap-5"
-                    >
-                      <SheetSummary row={r} />
-                      <ArrowRight className="hidden size-4 shrink-0 text-ink-300 group-hover:text-brand-700 sm:block" aria-hidden />
-                    </Link>
-                  </li>
-                ))}
+              <Surface className="overflow-hidden">
+                <SheetHead />
+                <ul className="divide-y divide-ink-100">
+                  {rest.map((r) => (
+                    <SheetRow key={r.id} row={r} />
+                  ))}
+                </ul>
               </Surface>
             </section>
           ) : null}
@@ -181,28 +160,65 @@ export default async function EmployerTimesheets() {
   );
 }
 
-function SheetSummary({ row }: { row: Row }) {
+/** Intern · period · days · hours · status · action, aligned down the list. */
+const SHEET_GRID = "grid-cols-[minmax(0,1fr)_auto] lg:grid-cols-[minmax(0,1fr)_7rem_5rem_8rem_7rem]";
+
+function SheetHead() {
   return (
-    <div className="flex min-w-0 flex-1 items-start gap-3.5">
-      <span aria-hidden className="grid size-10 shrink-0 place-items-center rounded-full bg-brand-50 text-sm font-bold text-brand-800">
-        {row.initials}
-      </span>
-      <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-2">
-          <p className="text-[0.9375rem] font-semibold text-ink-900">{row.name}</p>
-          <StatusPill status={row.status} />
-        </div>
-        <p className="nums mt-0.5 text-sm text-ink-600">
-          {row.period}
-          {row.project ? ` · ${row.project}` : ""}
-        </p>
-        <p className="nums mt-1 text-sm text-ink-700">
-          <span className="font-semibold text-ink-900">{row.present}</span> of {row.days} days present ·{" "}
-          <span className="font-semibold text-ink-900">{row.hours}</span> h
-          {row.status === "submitted" && row.submittedAt ? <span className="text-ink-500"> · sent {formatDay(row.submittedAt)}</span> : null}
-        </p>
-        {row.internNote ? <p className="mt-1.5 line-clamp-1 text-sm text-ink-600">&ldquo;{row.internNote}&rdquo;</p> : null}
-      </div>
+    <div aria-hidden className={`${SHEET_GRID} hidden gap-x-6 border-b border-ink-100 px-5 py-2.5 text-xs font-medium text-text-subtle lg:grid`}>
+      <span>Intern and period</span>
+      <span className="text-right">Days present</span>
+      <span className="text-right">Hours</span>
+      <span>Status</span>
+      <span />
     </div>
+  );
+}
+
+function SheetRow({ row, review = false }: { row: Row; review?: boolean }) {
+  const href = `/employer/timesheets/${encodeURIComponent(row.id)}`;
+  return (
+    <li className={`${SHEET_GRID} relative grid items-center gap-x-6 gap-y-1.5 px-5 py-3.5 transition-colors hover:bg-ink-50/70`}>
+      <div className="flex min-w-0 items-center gap-3">
+        <span aria-hidden className="grid size-9 shrink-0 place-items-center rounded-full bg-brand-50 text-xs font-bold text-brand-800">
+          {row.initials}
+        </span>
+        <div className="min-w-0">
+          {/* The row opens the sheet; the link is stretched over it. */}
+          <Link
+            href={href}
+            className="block truncate text-[0.9375rem] font-semibold text-ink-900 outline-none after:absolute after:inset-0 after:content-[''] focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-brand-500"
+          >
+            {row.name}
+          </Link>
+          <p className="nums truncate text-sm text-ink-600">
+            {row.period}
+            {row.project ? ` · ${row.project}` : ""}
+            {review && row.submittedAt ? ` · sent ${formatDay(row.submittedAt)}` : ""}
+          </p>
+        </div>
+      </div>
+      <p className="nums text-sm text-ink-700 max-lg:col-span-2 max-lg:pl-12 lg:text-right">
+        <span className="font-semibold text-ink-900">{row.present}</span>
+        <span className="text-text-subtle"> / {row.days}</span>
+        <span className="lg:sr-only"> days present</span>
+        <span className="lg:hidden"> · {row.hours} h</span>
+      </p>
+      <p className="nums text-sm font-semibold text-ink-900 max-lg:hidden lg:text-right">
+        {row.hours}
+        <span className="sr-only"> hours</span>
+      </p>
+      <div className="max-lg:col-start-2 max-lg:row-start-1 max-lg:justify-self-end lg:col-auto">
+        <StatusPill status={row.status} />
+      </div>
+      <div className="relative z-10 flex justify-end max-lg:col-span-2 max-lg:justify-start max-lg:pl-12">
+        {review ? (
+          <Link href={href} className={buttonClass({ size: "sm" })}>
+            Review
+            <ArrowRight className="size-4" aria-hidden />
+          </Link>
+        ) : null}
+      </div>
+    </li>
   );
 }

@@ -85,7 +85,7 @@ export function TimesheetDecision({ timesheetId }: { timesheetId: string }) {
           rows={3}
           maxLength={1000}
           placeholder={mode === "approve" ? "Thanks - great month." : "Wednesday 12th should be a fixed off, not present."}
-          className="apple-spring w-full rounded-apple-sm border border-ink-200 bg-white px-3 py-2.5 text-sm leading-relaxed text-ink-900 outline-none placeholder:text-ink-400 focus-visible:border-brand-500 focus-visible:ring-2 focus-visible:ring-brand-500/20"
+          className="apple-spring w-full rounded-apple-sm border border-ink-200 bg-white px-3 py-2.5 text-sm leading-relaxed text-ink-900 outline-none placeholder:text-text-subtle focus-visible:border-brand-500 focus-visible:ring-2 focus-visible:ring-brand-500/20"
         />
       </label>
       {error ? (

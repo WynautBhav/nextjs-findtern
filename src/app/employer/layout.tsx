@@ -50,10 +50,10 @@ const NAV_GROUPS: ConsoleNavGroup[] = [
   {
     title: "Billing & Account",
     items: [
-      { href: "/employer/cart", label: "Cart", icon: <ShoppingBag /> },
+      { href: "/employer/cart", label: "Shortlist", icon: <ShoppingBag /> },
       { href: "/employer/orders", label: "Orders", icon: <ShoppingCart /> },
       { href: "/employer/alerts", label: "Alerts", icon: <Bell /> },
-      { href: "/employer/account", label: "Company Profile", icon: <Building2 /> },
+      { href: "/employer/account", label: "Company profile", icon: <Building2 /> },
     ],
   },
 ];
@@ -120,12 +120,12 @@ export default async function EmployerLayout({ children }: { children: React.Rea
       topActions={
         <Link
           href="/employer/cart"
-          aria-label={cartCount > 0 ? `Cart, ${cartCount} candidates` : "Cart"}
+          aria-label={cartCount > 0 ? `Shortlist, ${cartCount} candidates` : "Shortlist"}
           className="apple-spring relative grid size-11 place-items-center rounded-apple-sm text-ink-600 hover:bg-ink-100 hover:text-ink-900"
         >
           <ShoppingBag className="size-5" aria-hidden />
           {cartCount > 0 ? (
-            <span className="nums absolute right-1.5 top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand-700 px-1 text-[0.625rem] font-bold text-white ring-2 ring-surface">
+            <span className="nums absolute right-1.5 top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand-700 px-1 text-2xs font-bold text-white ring-2 ring-surface">
               {cartCount > 99 ? "99+" : cartCount}
             </span>
           ) : null}
@@ -136,6 +136,10 @@ export default async function EmployerLayout({ children }: { children: React.Rea
       signOutTo="/employer/login"
       initialCollapsed={(await cookies()).get(RAIL_COOKIE)?.value === "1"}
       rootCrumb={{ label: "Home", href: "/employer/dashboard" }}
+      crumbParents={{
+        "/employer/proposal": { label: "Proposals", href: "/employer/proposals" },
+        "/employer/intern": { label: "Candidates", href: "/employer/candidates" },
+      }}
       banner={session.impersonator ? <ViewAsBanner viewing={companyName} admin={session.impersonator.email} /> : null}
     >
       {children}

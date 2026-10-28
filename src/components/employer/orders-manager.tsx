@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, Download, FileText, RotateCcw, Search } from "lucide-react";
 
-import { EmptyScene, PageHead, Pill, StatTile, Surface, type Tone } from "@/components/app/primitives";
+import { EmptyScene, PageHead, Pill, Surface, type Tone } from "@/components/app/primitives";
 import { ButtonLink, buttonClass } from "@/components/ui/button";
 import { FullTimeOfferButton } from "@/components/employer/full-time-offer-button";
 import { fieldClass, labelClass, tabClass, tdClass, thClass } from "@/components/employer/ui-tokens";
@@ -113,10 +113,21 @@ export function OrdersManager({
     <div>
       <PageHead
         title="Orders & payments"
-        lede="Everyone you've hired, what each placement has cost so far, what is still to pay, and your tax invoices."
+        // The figures as one line, not three tiles of words ("Nothing paid yet").
+        lede={
+          hires.length > 0
+            ? [
+                `${hires.length} hire${hires.length === 1 ? "" : "s"}`,
+                paid ? `${paid} paid` : "nothing paid yet",
+                left ? `${left} still to pay${nextDue ? `, next instalment ${formatDate(nextDue)}` : ""}` : "",
+              ]
+                .filter(Boolean)
+                .join(" · ")
+            : "No hires yet. A hire, its payments and its invoices land here once you pay for an accepted offer."
+        }
         action={
           payableCount > 0 ? (
-            <ButtonLink href="/employer/checkout" variant="primary">
+            <ButtonLink href="/employer/checkout" variant="accent">
               {payableCount === 1 ? "1 payment due" : `${payableCount} payments due`}
               <ArrowRight className="size-4" aria-hidden />
             </ButtonLink>
@@ -124,19 +135,7 @@ export function OrdersManager({
         }
       />
 
-      <div className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-3">
-        <StatTile label="Hires" value={hires.length > 0 ? hires.length : null} empty="No hires yet" />
-        <StatTile label="Paid so far" value={paid} empty="Nothing paid yet" />
-        <StatTile
-          className="col-span-2 sm:col-span-1"
-          label="Still to pay"
-          value={left}
-          empty="Nothing outstanding"
-          hint={left && nextDue ? `Next instalment ${formatDate(nextDue)}` : undefined}
-        />
-      </div>
-
-      <div role="tablist" aria-label="Orders" className="mb-6 flex max-w-full gap-1 overflow-x-auto rounded-apple-md border border-ink-200/80 bg-white p-1 shadow-xs sm:inline-flex">
+      <div role="tablist" aria-label="Orders" className="-mx-1 mb-6 flex max-w-full gap-1 overflow-x-auto px-1 pb-1 [scrollbar-width:none]">
         {tabs.map((t) => (
           <button
             key={t.id}
@@ -156,7 +155,7 @@ export function OrdersManager({
             ) : (
               t.label
             )}
-            <span className={cn("nums text-xs", tab === t.id ? "text-white/75" : "text-ink-500")}>{t.count}</span>
+            <span className={cn("nums text-xs", tab === t.id ? "text-white/75" : "text-text-subtle")}>{t.count}</span>
           </button>
         ))}
       </div>
@@ -389,7 +388,7 @@ function SchedulePanel({ hires }: { hires: HireRow[] }) {
                     </td>
                     <td className={cn(tdClass, "nums text-right font-medium text-ink-900")}>{m(h.ledger.totalMinor)}</td>
                     <td className={cn(tdClass, "nums text-right")}>{h.ledger.paidMinor > 0 ? m(h.ledger.paidMinor) : "-"}</td>
-                    <td className={cn(tdClass, "nums text-right font-semibold", h.ledger.dueMinor > 0 ? "text-ink-900" : "text-ink-500")}>
+                    <td className={cn(tdClass, "nums text-right font-semibold", h.ledger.dueMinor > 0 ? "text-ink-900" : "text-text-subtle")}>
                       {h.ledger.dueMinor > 0 ? m(h.ledger.dueMinor) : "-"}
                     </td>
                     <td className={cn(tdClass, "nums")}>
@@ -407,7 +406,7 @@ function SchedulePanel({ hires }: { hires: HireRow[] }) {
                       {h.ledger.nextDue ? (
                         <>
                           {formatDate(h.ledger.nextDue)}
-                          <span className="block text-xs text-ink-500">
+                          <span className="block text-xs text-text-subtle">
                             Month {h.ledger.monthsPaid + 1} of {h.ledger.months}
                           </span>
                         </>
@@ -538,7 +537,7 @@ function InvoicesPanel({ invoices }: { invoices: InvoiceRow[] }) {
                 <tr key={i.id}>
                   <td className={tdClass}>
                     <p className="nums font-medium text-ink-900">{i.number}</p>
-                    <p className="max-w-[14rem] truncate font-mono text-xs text-ink-500" title={i.orderId}>
+                    <p className="max-w-[14rem] truncate font-mono text-xs text-text-subtle" title={i.orderId}>
                       {i.orderId}
                     </p>
                   </td>

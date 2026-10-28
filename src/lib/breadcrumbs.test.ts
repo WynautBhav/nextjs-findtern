@@ -26,4 +26,11 @@ describe("breadcrumbsFor", () => {
   it("is empty on the role root", () => {
     assert.deepEqual(breadcrumbsFor("/employer", {}), []);
   });
+
+  it("maps a detail page's parent segment to its list and drops the id", () => {
+    const parents = { "/employer/proposal": { label: "Proposals", href: "/employer/proposals" } };
+    assert.deepEqual(breadcrumbsFor("/employer/proposal/763872fb-0512-49e9-99b9-d4c61b8f4719", {}, "", parents), [
+      { href: "/employer/proposals", label: "Proposals", link: true },
+    ]);
+  });
 });

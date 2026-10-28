@@ -3,12 +3,13 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRight, CreditCard, Loader2, Pencil, Search, X } from "lucide-react";
+import { CreditCard, Eye, Loader2, Pencil, Search, X } from "lucide-react";
 
 import { csrfFetch } from "@/lib/client-fetch";
 import { formatMoney } from "@/lib/format";
 import { displayNameOf, initialsOf } from "@/lib/employer-candidates";
-import { EmptyScene, Pill, StatTile, Surface } from "@/components/app/primitives";
+import { EmptyScene, FilterTabs, Pill, Surface } from "@/components/app/primitives";
+import { RowMenu } from "@/components/app/row-menu";
 import { buttonClass } from "@/components/ui/button";
 import type { Proposal } from "@/lib/db/schema";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -34,10 +35,13 @@ function nameOf(item: ProposalItem): string {
 /** Status filter buckets (the raw enums never reach the select). */
 const FILTERS: { value: string; label: string; match: (status: string, lapsed: boolean) => boolean }[] = [
   { value: "open", label: "Waiting on candidate", match: (s, l) => !l && (s === "sent" || s === "interview_scheduled" || s === "draft") },
-  { value: "accepted", label: "Accepted · payment due", match: (s) => s === "accepted" || s === "processing" },
+  { value: "accepted", label: "Payment due", match: (s) => s === "accepted" || s === "processing" },
   { value: "hired", label: "Hired", match: (s) => s === "hired" },
-  { value: "closed", label: "Declined, withdrawn or expired", match: (s, l) => l || ["rejected", "withdrawn", "expired"].includes(s) },
+  { value: "closed", label: "Closed", match: (s, l) => l || ["rejected", "withdrawn", "expired"].includes(s) },
 ];
+
+/** Offer · pay · starts · status · actions; one row per offer at desktop. */
+const ROW_GRID = "grid-cols-[minmax(0,1fr)_auto] lg:grid-cols-[minmax(0,1fr)_11rem_6.5rem_12.5rem_9.5rem]";
 
 function formatStart(iso: string | null): string | null {
   if (!iso || !/^\d{4}-\d{2}-\d{2}/.test(iso)) return null;
@@ -126,30 +130,37 @@ export function ProposalsManager({ initialProposals }: { initialProposals: Propo
   }
 
   const field =
-    "apple-spring min-h-11 rounded-apple-sm border border-ink-200 bg-white px-3 text-sm text-ink-900 outline-none focus-visible:border-brand-500 focus-visible:ring-2 focus-visible:ring-brand-500/20";
+    "apple-spring min-h-11 rounded-apple-sm border border-ink-200 bg-white px-3 text-sm text-ink-900 outline-none placeholder:text-text-subtle focus-visible:border-brand-500 focus-visible:ring-2 focus-visible:ring-brand-500/20";
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatTile label="Waiting on candidate" value={counts.open} />
-        <StatTile label="Accepted · payment due" value={counts.accepted} hint={counts.accepted ? "Pay to confirm the hire" : undefined} href={counts.accepted ? "/employer/checkout" : undefined} />
-        <StatTile label="Hired" value={counts.hired} />
-        <StatTile label="Closed" value={counts.closed} />
-      </div>
-
-      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
-        <label className="relative min-w-0 flex-1 sm:max-w-md">
-          <span className="sr-only">Search proposals</span>
-          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-400" aria-hidden />
-          <input
-            type="search"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Role, project or initials"
-            className={cn(field, "w-full pl-9")}
-          />
-        </label>
-        <div className="grid grid-cols-2 gap-2 sm:flex">
+      {/* One toolbar row: status (with counts, in place of four tiles that
+          repeated them), then search and project. */}
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <FilterTabs
+          label="Show proposals"
+          value={statusFilter}
+          onChange={setStatusFilter}
+          tabs={[
+            { key: "all", label: "All", count: rows.length },
+            { key: "open", label: "Waiting on candidate", count: counts.open },
+            { key: "accepted", label: "Payment due", count: counts.accepted },
+            { key: "hired", label: "Hired", count: counts.hired },
+            { key: "closed", label: "Closed", count: counts.closed },
+          ]}
+        />
+        <div className="flex flex-col gap-2 sm:flex-row lg:shrink-0">
+          <label className="relative min-w-0 sm:w-64">
+            <span className="sr-only">Search proposals</span>
+            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-400" aria-hidden />
+            <input
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Role, project or initials"
+              className={cn(field, "w-full pl-9")}
+            />
+          </label>
           {projectOptions.length > 1 ? (
             <select value={projectFilter} onChange={(e) => setProjectFilter(e.target.value)} className={field} aria-label="Project">
               <option value="all">All projects</option>
@@ -160,14 +171,6 @@ export function ProposalsManager({ initialProposals }: { initialProposals: Propo
               ))}
             </select>
           ) : null}
-          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className={field} aria-label="Status">
-            <option value="all">All statuses</option>
-            {FILTERS.map((f) => (
-              <option key={f.value} value={f.value}>
-                {f.label}
-              </option>
-            ))}
-          </select>
         </div>
       </div>
 
@@ -184,7 +187,17 @@ export function ProposalsManager({ initialProposals }: { initialProposals: Propo
           who="You - loosen the filters"
         />
       ) : (
-        <Surface as="ul" className="divide-y divide-ink-100 overflow-hidden">
+        <Surface className="overflow-hidden">
+          {/* Column labels for sighted scanning; every row also says what each
+              figure is, so the list reads on its own to a screen reader. */}
+          <div aria-hidden className={cn(ROW_GRID, "hidden gap-x-6 border-b border-ink-100 px-5 py-2.5 text-xs font-medium text-text-subtle lg:grid")}>
+            <span>Offer</span>
+            <span className="text-right">Pay</span>
+            <span>Starts</span>
+            <span>Status</span>
+            <span />
+          </div>
+          <ul className="divide-y divide-ink-100">
           {filtered.map(({ item, offer, state }) => {
             const ini = initialsOf(item.user?.firstName?.trim() || "", item.user?.lastName?.trim() || "");
             const ft = offer.fullTime;
@@ -192,67 +205,77 @@ export function ProposalsManager({ initialProposals }: { initialProposals: Propo
             const money = ft
               ? ft.annualCtcMinor
                 ? `${formatMoney(ft.annualCtcMinor, offer.currency)} a year`
-                : "Annual CTC not set"
+                : "CTC not set"
               : offer.monthlyMinor != null
                 ? `${formatMoney(offer.monthlyMinor, offer.currency)} a month`
                 : null;
             const start = formatStart(offer.startDate);
+            const href = `/employer/proposal/${item.proposal.id}`;
+            const title = offer.roleTitle || item.project?.projectName || "Internship";
             return (
-              <li key={item.proposal.id} className="flex flex-col gap-4 p-5 lg:flex-row lg:items-center lg:gap-6">
-                <div className="flex min-w-0 flex-1 items-start gap-3.5">
-                  <span aria-hidden className="grid size-11 shrink-0 place-items-center rounded-full bg-brand-50 text-sm font-bold text-brand-800">
+              <li
+                key={item.proposal.id}
+                className={cn(ROW_GRID, "relative grid items-center gap-x-6 gap-y-2 px-5 py-4 transition-colors hover:bg-ink-50/70")}
+              >
+                <div className="flex min-w-0 items-center gap-3">
+                  <span aria-hidden className="grid size-9 shrink-0 place-items-center rounded-full bg-brand-50 text-xs font-bold text-brand-800">
                     {ini === "?" ? "C" : ini}
                   </span>
                   <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Link
-                        href={`/employer/proposal/${item.proposal.id}`}
-                        className="text-[0.9375rem] font-semibold text-ink-900 hover:text-brand-700 hover:underline"
-                      >
-                        {offer.roleTitle || item.project?.projectName || "Internship"}
-                      </Link>
-                      <Pill tone={state.tone}>{state.label}</Pill>
-                    </div>
-                    <p className="mt-0.5 text-sm text-ink-600">
+                    {/* The whole row opens the offer: the title's link is
+                        stretched over it, and keeps its own focus ring. */}
+                    <Link
+                      href={href}
+                      className="block truncate text-[0.9375rem] font-semibold text-ink-900 outline-none after:absolute after:inset-0 after:content-[''] focus-visible:after:rounded-apple-sm focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-brand-500"
+                    >
+                      {title}
+                    </Link>
+                    <p className="truncate text-sm text-ink-600">
                       {nameOf(item)}
                       {item.project ? ` · ${item.project.projectName}` : ""}
                       {ft ? " · Full-time" : ""}
                     </p>
-                    <p className="nums mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-sm text-ink-700">
-                      {money ? <span className="font-semibold text-ink-900">{money}</span> : null}
-                      {!ft ? <span>{offer.months} month{offer.months === 1 ? "" : "s"}</span> : null}
-                      {start ? <span>{ft ? "Joins" : "Starts"} {start}</span> : null}
-                    </p>
                   </div>
                 </div>
-
-                <div className="flex flex-wrap items-center gap-2 lg:shrink-0 lg:justify-end">
+                <p className="nums text-sm font-semibold text-ink-900 max-lg:col-span-2 max-lg:row-start-2 max-lg:pl-12 lg:text-right">
+                  {money ?? <span className="font-normal text-text-subtle">Not set</span>}
+                  {!ft ? <span className="font-normal text-ink-600"> · {offer.months} mo</span> : null}
+                  {start ? <span className="font-normal text-ink-600 lg:hidden"> · {ft ? "joins" : "starts"} {start}</span> : null}
+                </p>
+                <p className="nums text-sm text-ink-700 max-lg:hidden">
+                  {start ? (
+                    <>
+                      <span className="lg:sr-only">{ft ? "Joins " : "Starts "}</span>
+                      {start}
+                    </>
+                  ) : (
+                    <span className="text-text-subtle">Not set</span>
+                  )}
+                </p>
+                <div className="max-lg:col-span-2 max-lg:row-start-3 max-lg:pl-12">
+                  <Pill tone={state.tone} className="whitespace-nowrap">{state.label}</Pill>
+                </div>
+                {/* Above the stretched link, so these stay clickable. */}
+                <div className="relative z-10 flex items-center justify-end gap-1 max-lg:col-start-2 max-lg:row-start-1">
                   {state.canPay ? (
-                    <Link href="/employer/checkout" className={buttonClass({ size: "sm" })}>
+                    <Link href="/employer/checkout" className={buttonClass({ variant: "accent", size: "sm" })}>
                       <CreditCard className="size-4" aria-hidden />
-                      Proceed to hire
+                      Pay to hire
                     </Link>
                   ) : null}
-                  {state.canEdit ? (
-                    <Link href={`/employer/proposal/${item.proposal.id}?edit=1`} className={buttonClass({ variant: "outline", size: "sm" })}>
-                      <Pencil className="size-4" aria-hidden />
-                      Edit
-                    </Link>
-                  ) : null}
-                  {state.canWithdraw ? (
-                    <button type="button" onClick={() => setWithdrawTarget(item)} className={buttonClass({ variant: "ghost", size: "sm" })}>
-                      <X className="size-4" aria-hidden />
-                      Withdraw
-                    </button>
-                  ) : null}
-                  <Link href={`/employer/proposal/${item.proposal.id}`} className={buttonClass({ variant: "ghost", size: "sm" })}>
-                    View
-                    <ArrowRight className="size-4" aria-hidden />
-                  </Link>
+                  <RowMenu
+                    label={`More actions for ${title}`}
+                    items={[
+                      { label: "Open offer", href, icon: <Eye /> },
+                      ...(state.canEdit ? [{ label: "Edit offer", href: `${href}?edit=1`, icon: <Pencil /> }] : []),
+                      ...(state.canWithdraw ? [{ label: "Withdraw offer", onSelect: () => setWithdrawTarget(item), icon: <X />, destructive: true }] : []),
+                    ]}
+                  />
                 </div>
               </li>
             );
           })}
+          </ul>
         </Surface>
       )}
       {filtering && filtered.length > 0 ? (

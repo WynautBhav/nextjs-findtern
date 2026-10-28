@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef } from "react";
-import { Download, ExternalLink, FileText, Sparkles, Video } from "lucide-react";
+import { Download, ExternalLink, FileText, Video } from "lucide-react";
 
 import { buttonClass } from "@/components/ui/button";
 
@@ -82,9 +82,6 @@ export function AiFeedbackReport({
     return (
       <section className="min-w-0 rounded-apple-xl border border-ink-200/80 bg-white p-6 shadow-xs">
         <div className="flex items-start gap-3">
-          <span className="grid size-10 shrink-0 place-items-center rounded-apple-md bg-ink-100 text-ink-600">
-            <Sparkles className="size-5" aria-hidden />
-          </span>
           <div className="min-w-0">
             <h3 className="text-base font-semibold text-ink-900">AI interview results pending</h3>
             <p className="mt-0.5 text-sm text-ink-600">
@@ -103,8 +100,7 @@ export function AiFeedbackReport({
     >
       <div className="flex flex-wrap items-start justify-between gap-4 border-b border-ink-100 p-5 sm:p-6">
         <div className="min-w-0">
-          <p className="inline-flex items-center gap-1.5 text-2xs font-semibold uppercase tracking-[0.14em] text-brand-700">
-            <Sparkles className="size-3.5" aria-hidden />
+          <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-brand-700">
             AI interview results
           </p>
           <h3 className="mt-1 truncate text-lg font-semibold tracking-[-0.01em] text-ink-900">{candidateName}</h3>
@@ -150,7 +146,7 @@ export function AiFeedbackReport({
           <dt className="text-sm font-medium text-brand-800">Findtern Score</dt>
           <dd className="mt-1 flex items-baseline gap-1">
             <span className="nums text-3xl font-semibold tracking-[-0.02em] text-brand-700">{score !== null ? score.toFixed(1) : "–"}</span>
-            <span className="nums text-sm text-ink-500">/10</span>
+            <span className="nums text-sm text-text-subtle">/10</span>
           </dd>
         </div>
         {AXES.map((axis) => {
@@ -163,14 +159,14 @@ export function AiFeedbackReport({
                   <>
                     <span className="flex items-baseline gap-1">
                       <span className="nums text-xl font-semibold text-ink-900">{value.toFixed(1)}</span>
-                      <span className="nums text-sm text-ink-500">/10</span>
+                      <span className="nums text-sm text-text-subtle">/10</span>
                     </span>
                     <span className="mt-2 block h-1.5 overflow-hidden rounded-full bg-ink-100" aria-hidden>
                       <span className="block h-full rounded-full bg-brand-600" style={{ width: `${value * 10}%` }} />
                     </span>
                   </>
                 ) : (
-                  <span className="text-sm text-ink-500">Not rated</span>
+                  <span className="text-sm text-text-subtle">Not rated</span>
                 )}
               </dd>
             </div>

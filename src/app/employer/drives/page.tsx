@@ -67,7 +67,7 @@ export default async function EmployerDrivesPage() {
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <DriveStatePill state={state} />
-                    <span className="text-xs font-medium text-ink-500">{KIND_LABEL[drive.kind] ?? "Campus drive"}</span>
+                    <span className="text-xs font-medium text-text-subtle">{KIND_LABEL[drive.kind] ?? "Campus drive"}</span>
                   </div>
                   <p className="mt-1.5 truncate text-base font-semibold text-ink-900">{drive.title}</p>
                   <p className="mt-0.5 truncate text-sm text-ink-600">

@@ -12,7 +12,7 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AlertCircle, Check, CheckCheck, ChevronRight } from "lucide-react";
+import { AlertCircle, Check, CheckCheck } from "lucide-react";
 
 import { buttonClass } from "@/components/ui/button";
 import { csrfFetch } from "@/lib/client-fetch";
@@ -124,41 +124,45 @@ export function NotificationList({
                 className={cn("mt-2 size-2 shrink-0 rounded-full", isRead ? "bg-transparent" : "bg-accent-500")}
               />
               <span className="min-w-0 flex-1">
-                <span className={cn("block text-pretty text-[0.9375rem]", isRead ? "font-medium text-ink-700" : "font-semibold text-ink-900")}>
-                  {n.title}
-                  {!isRead ? <span className="sr-only"> (unread)</span> : null}
+                {/* Title with the time on the right; one quiet line of detail. */}
+                <span className="flex items-baseline justify-between gap-4">
+                  <span className={cn("min-w-0 text-pretty text-[0.9375rem]", isRead ? "font-medium text-ink-700" : "font-semibold text-ink-900")}>
+                    {n.title}
+                    {!isRead ? <span className="sr-only"> (unread)</span> : null}
+                  </span>
+                  {n.createdAt ? (
+                    <time dateTime={new Date(n.createdAt).toISOString()} className="nums shrink-0 text-xs text-text-subtle">
+                      {when.format(new Date(n.createdAt))} IST
+                    </time>
+                  ) : null}
                 </span>
-                <span className="mt-1 block text-pretty text-sm leading-relaxed text-ink-600">{n.message}</span>
-                {n.createdAt ? (
-                  <time dateTime={new Date(n.createdAt).toISOString()} className="nums mt-1.5 block text-xs text-ink-500">
-                    {when.format(new Date(n.createdAt))} IST
-                  </time>
-                ) : null}
+                <span className="mt-0.5 line-clamp-2 block text-pretty text-sm leading-relaxed text-ink-600">{n.message}</span>
               </span>
             </>
           );
           return (
-            <li key={n.id} className={cn("flex items-stretch", isRead && "bg-ink-50/40")}>
+            <li key={n.id} className="group/row relative flex items-center">
               {n.href ? (
                 <Link
                   href={n.href}
                   onClick={() => {
                     if (!isRead) void markOne(n.id, true);
                   }}
-                  className="group flex min-w-0 flex-1 items-start gap-4 px-5 py-4 transition-colors hover:bg-ink-50/80 focus-visible:bg-ink-50/80"
+                  className="flex min-w-0 flex-1 items-start gap-4 py-3.5 pl-5 pr-14 transition-colors hover:bg-ink-50/80 focus-visible:bg-ink-50/80"
                 >
                   {body}
-                  <ChevronRight className="mt-1 size-4 shrink-0 text-ink-300 group-hover:text-brand-700" aria-hidden />
                 </Link>
               ) : (
-                <div className="flex min-w-0 flex-1 items-start gap-4 px-5 py-4">{body}</div>
+                <div className="flex min-w-0 flex-1 items-start gap-4 py-3.5 pl-5 pr-14">{body}</div>
               )}
               {!isRead ? (
+                // Always there on touch; on a pointer it shows on hover or focus.
                 <button
                   type="button"
                   onClick={() => markOne(n.id)}
                   aria-label={`Mark "${n.title}" as read`}
-                  className="flex min-w-14 shrink-0 items-center justify-center border-l border-ink-100 px-3 text-ink-500 transition-colors hover:bg-ink-100 hover:text-ink-900"
+                  title="Mark as read"
+                  className="absolute right-2 top-1/2 grid size-10 -translate-y-1/2 place-items-center rounded-apple-sm text-text-subtle transition-opacity hover:bg-ink-100 hover:text-ink-900 focus-visible:opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/row:opacity-100"
                 >
                   <Check className="size-4" aria-hidden />
                 </button>

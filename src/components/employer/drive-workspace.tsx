@@ -249,7 +249,7 @@ export function DriveWorkspace({
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
                 placeholder="Skill or branch, e.g. React"
-                className="h-11 w-full rounded-lg border border-ink-200 bg-white pl-9 pr-3 text-sm text-ink-900 placeholder:text-ink-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                className="h-11 w-full rounded-lg border border-ink-200 bg-white pl-9 pr-3 text-sm text-ink-900 placeholder:text-text-subtle focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
               />
             </label>
             <Select label="Minimum score" value={String(minScore)} onChange={(v) => setMinScore(Number(v))}>
@@ -449,15 +449,15 @@ function CandidateRow({
 
       <div className={cn("mt-4 grid gap-4", fullTime ? "grid-cols-2" : "grid-cols-1")}>
         <div>
-          <div className="flex items-baseline justify-between text-xs font-medium text-ink-500">
+          <div className="flex items-baseline justify-between text-xs font-medium text-text-subtle">
             <span>Findtern Score</span>
             {c.score !== null ? <span className="nums text-sm font-semibold text-ink-900">{c.score.toFixed(1)}</span> : null}
           </div>
-          {c.score !== null ? <ScoreBar value={c.score} /> : <p className="mt-1 text-sm text-ink-500">AI interview not taken yet</p>}
+          {c.score !== null ? <ScoreBar value={c.score} /> : <p className="mt-1 text-sm text-text-subtle">AI interview not taken yet</p>}
         </div>
         {fullTime ? (
           <div>
-            <p className="text-xs font-medium text-ink-500">CGPA</p>
+            <p className="text-xs font-medium text-text-subtle">CGPA</p>
             <p className="nums mt-0.5 text-sm font-semibold text-ink-900">{c.cgpa !== null ? c.cgpa.toFixed(1) : "Not given"}</p>
           </div>
         ) : null}

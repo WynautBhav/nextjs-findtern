@@ -23,7 +23,7 @@ import { RAIL_COOKIE } from "@/lib/rail";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { motion } from "motion/react";
-import { Bell, ChevronDown, ChevronsLeft, ChevronsRight, CircleQuestionMark, LogOut, Mail, Menu, MessageSquareText, X } from "lucide-react";
+import { Bell, ChevronDown, ChevronsLeft, ChevronsRight, CircleQuestionMark, LogOut, Mail, Menu, MessageCircle, MessageSquareText, X } from "lucide-react";
 
 import { Logo, LogoMark } from "@/components/brand/logo";
 import { FeedbackFab } from "@/components/app/feedback-fab";
@@ -36,7 +36,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { buttonClass } from "@/components/ui/button";
 import { breadcrumbsFor } from "@/lib/breadcrumbs";
+import { OPEN_CHAT_EVENT } from "@/lib/chat-events";
 import { csrfFetch } from "@/lib/client-fetch";
 import { cn } from "@/lib/utils";
 
@@ -71,6 +73,7 @@ export function ConsoleShell({
   signOutTo,
   initialCollapsed = false,
   crumbLabels = {},
+  crumbParents,
   rootCrumb,
   width = "wide",
   banner,
@@ -93,6 +96,8 @@ export function ConsoleShell({
   signOutTo: string;
   initialCollapsed?: boolean;
   crumbLabels?: Record<string, string>;
+  /** Detail-page parent segments → the list they belong to; ids are then dropped. */
+  crumbParents?: Record<string, { label: string; href: string }>;
   rootCrumb: { label: string; href: string };
   /** `reading` keeps prose screens to a comfortable measure; `wide` is for tables. */
   width?: "reading" | "wide";
@@ -112,7 +117,12 @@ export function ConsoleShell({
     .filter((h) => pathname === h || pathname.startsWith(`${h}/`))
     .sort((a, b) => b.length - a.length)[0];
   // The root crumb already names the home page; don't repeat it.
-  const crumbs = breadcrumbsFor(pathname, { ...Object.fromEntries(allItems.map((i) => [i.href, i.label])), ...crumbLabels }).filter(
+  const crumbs = breadcrumbsFor(
+    pathname,
+    { ...Object.fromEntries(allItems.map((i) => [i.href, i.label])), ...crumbLabels },
+    crumbParents ? "" : "Details",
+    crumbParents,
+  ).filter(
     (c) => c.href !== rootCrumb.href,
   );
 
@@ -138,7 +148,7 @@ export function ConsoleShell({
 
   const rail = (compact: boolean, onNavigate?: () => void) => (
     <>
-      <nav aria-label="Main" className="mt-8 min-h-0 flex-1 space-y-7 overflow-y-auto overflow-x-hidden overscroll-contain [scrollbar-color:transparent_transparent] [scrollbar-width:thin] hover:[scrollbar-color:var(--color-brand-700)_transparent]">
+      <nav aria-label="Main" className="mt-6 min-h-0 flex-1 space-y-5 overflow-y-auto overflow-x-hidden overscroll-contain [scrollbar-color:transparent_transparent] [scrollbar-width:thin] hover:[scrollbar-color:var(--color-brand-700)_transparent]">
         {groups.map((group, i) => (
           <div key={group.title ?? i}>
             {group.title ? (
@@ -148,7 +158,7 @@ export function ConsoleShell({
                 <p className="mb-2 px-3 text-2xs font-semibold uppercase tracking-[0.14em] text-on-dark-subtle">{group.title}</p>
               )
             ) : null}
-            <ul className="flex flex-col gap-1">
+            <ul className="flex flex-col gap-0.5">
               {group.items.map((item) => (
                 <li key={item.href}>
                   <RailLink item={item} active={activeHref === item.href.split("#")[0]} compact={compact} onNavigate={onNavigate} />
@@ -163,7 +173,7 @@ export function ConsoleShell({
           ) : (
             <p className="mb-2 px-3 text-2xs font-semibold uppercase tracking-[0.14em] text-on-dark-subtle">Help</p>
           )}
-          <ul className="flex flex-col gap-1">
+          <ul className="flex flex-col gap-0.5">
             {helpLinks.map((item) => (
               <li key={item.href}>
                 <RailLink item={item} active={false} compact={compact} onNavigate={onNavigate} />
@@ -249,7 +259,7 @@ export function ConsoleShell({
                 {rail(false, () => setDrawer(false))}
               </SheetContent>
             </Sheet>
-            <Link href={homeHref} aria-label="Findtern home" className="flex min-w-0 items-center lg:hidden">
+            <Link href={homeHref} aria-label="Findtern home" className="flex min-h-11 min-w-0 items-center lg:hidden">
               <Logo variant="green" priority className="h-8" />
             </Link>
 
@@ -273,6 +283,19 @@ export function ConsoleShell({
             </nav>
 
             <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-2">
+              {/* Customer consoles (the ones with `help`) open the chat from
+                  here on desktop rather than from a floating button that
+                  covers tables and rails; phones keep the floating one. */}
+              {help ? (
+                <button
+                  type="button"
+                  onClick={() => window.dispatchEvent(new Event(OPEN_CHAT_EVENT))}
+                  className={buttonClass({ variant: "outline", size: "sm", className: "mr-1 hidden lg:inline-flex" })}
+                >
+                  <MessageCircle className="size-4" aria-hidden />
+                  Ask me
+                </button>
+              ) : null}
               {topActions}
               {alerts ? (
                 <Link
@@ -282,7 +305,7 @@ export function ConsoleShell({
                 >
                   <Bell className="size-5" aria-hidden />
                   {alerts.count > 0 ? (
-                    <span className="nums absolute right-1.5 top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-accent-500 px-1 text-[0.625rem] font-bold text-brand-950 ring-2 ring-surface">
+                    <span className="nums absolute right-1.5 top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-accent-500 px-1 text-2xs font-bold text-brand-950 ring-2 ring-surface">
                       {alerts.count > 99 ? "99+" : alerts.count}
                     </span>
                   ) : null}
@@ -315,7 +338,9 @@ export function ConsoleShell({
 function RailLink({ item, active, compact, onNavigate }: { item: ConsoleNavItem; active: boolean; compact: boolean; onNavigate?: () => void }) {
   const external = item.href.startsWith("mailto:");
   const className = cn(
-    "apple-spring apple-pressable group relative flex min-h-11 items-center gap-3 rounded-apple-sm px-3 text-[0.9375rem] tracking-[-0.01em]",
+    // 44px on touch; 40px with a mouse, so a 900px-tall window shows the
+    // whole employer nav without scrolling the rail.
+    "apple-spring apple-pressable group relative flex min-h-11 items-center gap-3 rounded-apple-sm px-3 text-[0.9375rem] tracking-[-0.01em] [@media(pointer:fine)]:min-h-10",
     active ? "bg-white/[0.09] font-semibold text-white" : "text-on-dark-subtle hover:bg-white/[0.06] hover:text-white",
     compact && "justify-center px-0",
   );
