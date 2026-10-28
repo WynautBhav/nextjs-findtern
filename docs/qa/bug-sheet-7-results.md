@@ -5,10 +5,10 @@ Build under test: production build of `release/master-merge` @ 733c683 against a
 
 Verdicts: **PASS** the complaint no longer applies or the requested change is present; **FAIL** it still applies; **UNCLEAR** no testable criterion (a question, no target wording, an environment limit such as Google OAuth, or rows that contradict each other; the later row wins and the finding says what the build does); **N/A** date-serial header, section header or empty row.
 
-Totals over all 182 rows (Sheet1 has 136 data rows, rows 2 to 137): PASS 147, FAIL 1, UNCLEAR 18, N/A 16.
-Per sheet: S1 (Sheet1): PASS 107, FAIL 1, UNCLEAR 14, N/A 14; S2 (Sheet2): PASS 6; NC (NEW CHANGES): PASS 34, UNCLEAR 4, N/A 2.
+Totals over all 182 rows (Sheet1 has 136 data rows, rows 2 to 137): PASS 152, FAIL 3, UNCLEAR 11, N/A 16 (after the 28 Oct pass over the 18 unclear rows: 5 became PASS, 2 became FAIL, see the last section).
+Per sheet: S1 (Sheet1): PASS 112, FAIL 3, UNCLEAR 7, N/A 14; S2 (Sheet2): PASS 6; NC (NEW CHANGES): PASS 34, UNCLEAR 4, N/A 2.
 
-Every FAIL is in `docs/qa/bug-ledger.md`. Defects found while walking the rows that no row describes are QA-100 to QA-117 there (phone layout, tap targets, the floating "Ask me" button, cookies, checkout arithmetic).
+Every FAIL is in `docs/qa/bug-ledger.md` (S1 r121 is QA-112; S1 r41 and r45 are QA-137). Defects found while walking the rows that no row describes are QA-100 to QA-117 there (phone layout, tap targets, the floating "Ask me" button, cookies, checkout arithmetic).
 
 Detail by area, with the extra findings and the per-area scripts: `docs/qa/b/bs7-marketing-results.md`, `docs/qa/b/bs7-employer-results.md`, `docs/qa/b/bs7-intern-results.md`.
 
@@ -37,7 +37,7 @@ Detail by area, with the extra findings and the per-area scripts: `docs/qa/b/bs7
 | S1 | 22 | PASS | Onboarding step 1: empty Continue says "Aadhaar number is required.", "PAN is required for stipend payouts.", "Upload a photo or scan of your Aadhaar card.", "Upload a photo or scan of your PAN card." | docs/qa/b/screens/onb-step1-errors-375.png |
 | S1 | 23 | PASS | "Your mobile number" and "Emergency contact number" are two separate fields. | docs/qa/b/screens/inspect-intern--intern-onboarding-375.png |
 | S1 | 24 | PASS | Mobile number is pre-filled (+91 and the signup number) and read-only with "To change it, go to Settings". | docs/qa/b/screens/inspect-intern--intern-onboarding-375.png |
-| S1 | 25 | UNCLEAR | Query row. Intro video exists as "Intro video (optional)", 30 to 60 s, MP4/WebM/MOV up to 50 MB. | docs/qa/b/screens/inspect-intern--intern-onboarding-375.png |
+| S1 | 25 | PASS | Resolved 28 Oct by reading the legacy: the intro video is optional there too (photo required, video optional, `onboarding.tsx:794`). Was: Query row. Intro video exists as "Intro video (optional)", 30 to 60 s, MP4/WebM/MOV up to 50 MB. | docs/qa/b/screens/inspect-intern--intern-onboarding-375.png |
 | S1 | 26 | PASS | Academics level list: Diploma, Bachelor's, Master's, Ph.D. No "High school". | docs/qa/b/screens/onb-step2-filled-1440-chromium.png |
 | S1 | 27 | PASS | Open roles list and detail show no company name ("Company shared after hire"). | docs/qa/b/screens/bs7-intern-opportunities-1440.png |
 | S1 | 28 | PASS | After submitting the profile the dashboard shows "1 of 3 done": profile, then the one-time activation, then the AI interview. | docs/qa/b/screens/intern-activated-dashboard-375.png |
@@ -53,18 +53,18 @@ Detail by area, with the extra findings and the per-area scripts: `docs/qa/b/bs7
 | S1 | 38 | PASS | Single pick among Remote / Hybrid / Onsite ("Pick the most on-site option you can do"); the intern profile of the hired persona reads "Hybrid, and open to remote". | docs/qa/b/screens/onb-step7-Onsite-375-chromium.png |
 | S1 | 39 | PASS | Onsite or Hybrid without a city: "Add at least one city you can work from (up to 5) for onsite or hybrid work." Field "Add a city (0 of 5)". | docs/qa/b/screens/onb-step7-Onsite-375-chromium.png |
 | S1 | 40 | PASS | Review > Submit profile (double-clicked) lands on /intern/dashboard in Chromium and WebKit; the button is gone, no double submit. A failed submit (409 on a duplicate Aadhaar or emergency number) returns to step 1 with the message. | docs/qa/b/screens/onb-step8-375-chromium.png |
-| S1 | 41 | UNCLEAR | No percentage "profile completion bar" on the dashboard any more; a "(done)" checklist is on /intern/profile. The row asks for a PAN document in that bar and the checklist text does not name it. | docs/qa/b/screens/bs7-intern-profile-1440.png |
+| S1 | 41 | FAIL | QA-137. The checklist item reads "Aadhaar and PAN, with card images"; the sheet wants the PAN document only. Was: No percentage "profile completion bar" on the dashboard any more; a "(done)" checklist is on /intern/profile. The row asks for a PAN document in that bar and the checklist text does not name it. | docs/qa/b/screens/bs7-intern-profile-1440.png |
 | S1 | 42 | PASS | An offer for a monthly amount of 26,400 shows the intern "Stipend ₹13,200 / month" (half). | docs/qa/b/screens/intern-offer-detail-375-chromium.png |
 | S1 | 43 | PASS | Joining date "06/11/2026" is on the offer card, list and details. | docs/qa/b/screens/intern-offer-detail-375-chromium.png |
 | S1 | 44 | N/A | Date serial header row (46316). |  |
-| S1 | 45 | UNCLEAR | Says the Aadhaar image is NOT mandatory; contradicts r22 and NC-r18 (mandatory). Current build: mandatory (later rows win). | docs/qa/b/screens/onb-step1-errors-375.png |
+| S1 | 45 | FAIL | QA-137. The build blocks onboarding without the Aadhaar image; legacy `onboarding.tsx:797` requires only the PAN image, and r22 asks for the Aadhaar number and the PAN image (not an Aadhaar image), so r45 and r22 agree. (My first reading took r22 to say the image is mandatory; it says the number.) | docs/qa/b/screens/onb-step1-errors-375.png |
 | S1 | 46 | UNCLEAR | "Bank account should not be there" conflicts with NC-r25 and NC-r27 (bank asked on the About page, with a bank-name dropdown). Current build: a bank block on step 1, labelled "Optional now - but once you start, fill in every field". | docs/qa/b/screens/inspect-intern--intern-onboarding-375.png |
 | S1 | 47 | PASS | Reads as "only the emergency number is required": one emergency number field, required. | docs/qa/b/screens/onb-step1-errors-375.png |
 | S1 | 48 | PASS | LinkedIn profile is marked optional. | docs/qa/b/screens/inspect-intern--intern-onboarding-375.png |
 | S1 | 49 | PASS | Certification dates are DD/MM/YYYY with a calendar (no "year" question). | docs/qa/b/screens/onb-step2-filled-1440-chromium.png |
 | S1 | 50 | PASS | Skills step has an "Important note" explaining the self-rating sets the AI interview difficulty. | docs/qa/b/screens/onb-step4-375-chromium.png |
 | S1 | 51 | PASS | Conflicts with NC-r20 (only the picked chip looks selected); the owner decision is single pick with the implied set stored. Only one chip is selected at a time and the profile shows "Hybrid, and open to remote". | docs/qa/b/screens/onb-step7-Hybrid-375-chromium.png |
-| S1 | 52 | UNCLEAR | A question ("where does this query show"). Admin has a Messages inbox (nav item, 64 entries on the LIVE-COPY); the intern-side submission was not exercised. |  |
+| S1 | 52 | PASS | Exercised 28 Oct: an intern's "Report a problem" lands in Admin > Messages as a "Problem report" (found by its text; `bs7-s1r52.mjs`). Was: A question ("where does this query show"). Admin has a Messages inbox (nav item, 64 entries on the LIVE-COPY); the intern-side submission was not exercised. |  |
 | S1 | 53 | PASS | "If you do nothing, the offer stays open until the day before the joining date (6 Nov 2026). On the joining date it closes and is marked as rejected." | docs/qa/b/screens/intern-offer-detail-375-chromium.png |
 | S1 | 54 | N/A | Date serial header row (46317). |  |
 | S1 | 55 | PASS | After accepting, /intern/timesheets says "Timesheets open once the company pays ... logging hours opens as soon as the company completes the payment". The hired persona has timesheets. | docs/qa/b/screens/intern-accepted-375-chromium.png |
@@ -75,7 +75,7 @@ Detail by area, with the extra findings and the per-area scripts: `docs/qa/b/bs7
 | S1 | 60 | UNCLEAR | Editing preferred location after onboarding was not exercised (no edit path found from the profile page in this pass). |  |
 | S1 | 61 | PASS | After "Activate free (test mode)" the dashboard shows "Pay the one-time activation, ₹2,499 (done)" and moves on to the AI interview. | docs/qa/b/screens/intern-activated-dashboard-375.png |
 | S1 | 62 | PASS | No "Incruiter" text on interviews, dashboard, profile, documents, settings or opportunities. | docs/qa/b/screens/bs7-intern-interviews-1440.png |
-| S1 | 63 | UNCLEAR | Needs a generated AI-interview link; the interview provider is disabled in this environment. No "Hidden company" text appears on the interviews page. |  |
+| S1 | 63 | PASS | Resolved by reading 28 Oct: `src/app/intern/interviews/page.tsx` puts the AI interview in its own section labelled "AI Interview" and maps the hidden-company marker to "Company shared after hire"; legacy has no such text. Re-check with a live provider link. Was: Needs a generated AI-interview link; the interview provider is disabled in this environment. No "Hidden company" text appears on the interviews page. |  |
 | S1 | 64 | PASS | Interviews page shows the intern's name with Findtern Score, Communication, Coding, Aptitude, AI Interview (all /10). | docs/qa/b/screens/bs7-intern-interviews-1440.png |
 | S1 | 65 | PASS | Dashboard and timesheets say logging hours opens once the company completes payment (see r55). | docs/qa/b/screens/intern-accepted-375-chromium.png |
 | S1 | 66 | N/A | Date serial header row (46321). |  |
@@ -105,14 +105,14 @@ Detail by area, with the extra findings and the per-area scripts: `docs/qa/b/bs7
 | S1 | 90 | N/A | Date serial header rows (46316, 46317, 46318, 46321). |  |
 | S1 | 91 | PASS | Company email is read-only ("Your sign-in email. It can't be changed here."); website `https://www.example.org` -> "The website must be on your company email's domain (acme-qa-test.in) ..."; subdomain/own domain accepted. | docs/qa/b/screens/bs7-emp-onb-errors-375.png |
 | S1 | 92 | PASS | Empty escalation name/email/phone -> "An escalation contact name is required." / "...email is required." / "...phone is required."; form does not advance. | docs/qa/b/screens/bs7-emp-onb-errors-375.png |
-| S1 | 93 | UNCLEAR | A question ("why up to 5 locations"). Observed: project locations now stop at "3 of 3 added" (matches the 3-location decision). | docs/qa/b/screens/bs7-emp-newproject-onsite-1440.png |
+| S1 | 93 | PASS | Answered by the recorded owner decision (21 to 26 Oct): projects take up to 3 locations, the build stops at "3 of 3 added". Was: A question ("why up to 5 locations"). Observed: project locations now stop at "3 of 3 added" (matches the 3-location decision). | docs/qa/b/screens/bs7-emp-newproject-onsite-1440.png |
 | S1 | 94 | PASS | Same filter set as row 76 (legacy list read from the old employer dashboard: skills, city, include remote, laptop, price, five min-ratings); each tested filter narrows correctly. | docs/qa/b/screens/bs7-emp-cand-top-1440.png |
 | S1 | 95 | PASS | "Include remote candidates - Also show interns who only work remotely" checkbox in the Location filter (default on for remote projects). Caveat: no remote-only candidate in this data, so toggling gave 34 -> 34. | docs/qa/b/screens/bs7-emp-cand-top-1440.png |
 | S1 | 96 | PASS | Compare page has no "zero placement surcharge" line (searched "surcharge"/"placement"); only "Per-hire charge ₹5,000". | docs/qa/b/screens/bs7-emp-compare-skills-1440.png |
 | S1 | 97 | UNCLEAR | A question. Compare lists every skill the candidate has, no cap (a synthetic candidate with 68 skills shows all 68, matches first). | docs/qa/b/screens/bs7-emp-compare-skills-1440.png |
 | S1 | 98 | PASS | No "+N more" anywhere in about 290 cards; cards show all skills (a 68-skill candidate shows all chips). | docs/qa/b/screens/bs7-emp-cand-top-1440.png |
 | S1 | 99 | PASS | Form, review and offer page show one "Monthly amount" ₹32,000 (does not change with 1/2/3/6 months); "Length 3 months" is separate. | docs/qa/b/screens/bs7-emp-proposal-view-1440.png |
-| S1 | 100 | UNCLEAR | No criterion beyond layout; intern's offer page renders sanely (stipend, joining date, schedule, company, responsibilities, instructions). | docs/qa/b/screens/bs7-intern-offer-1280.png |
+| S1 | 100 | PASS | Compared 28 Oct with legacy `proposal-detail.tsx`: the intern offer page has the same sections (Internship details, Roles and responsibilities, AI interview ratings, Required key skills, Important Instructions) plus Company details; the legacy "Compensation" block is inside Internship details. Pixel parity is not judged. Was: No criterion beyond layout; intern's offer page renders sanely (stipend, joining date, schedule, company, responsibilities, instructions). | docs/qa/b/screens/bs7-intern-offer-1280.png |
 | S1 | 101 | PASS | After sending, `/employer/proposals` lists the offer ("Waiting on candidate", ₹32,000 a month, 3 months, Starts 02/11/2026) with Edit/Withdraw/View. | docs/qa/b/screens/bs7-emp-proposal-view-1440.png |
 | S1 | 102 | N/A | Date serial header row (46317), not a bug. |  |
 | S1 | 103 | PASS | Escalation email equal to sign-in email -> "Use a different email from your sign-in email."; also on `/employer/account`: "Use a different email from the company sign-in email." | docs/qa/b/screens/bs7-emp-onb-errors-375.png |
@@ -196,3 +196,28 @@ Detail by area, with the extra findings and the per-area scripts: `docs/qa/b/bs7
 | NC | 39 | PASS | Same evidence as NC-r29. | docs/qa/b/screens/bs7mk-mobile-menu-375.png |
 | NC | 40 | PASS | Chat icon is 28 px (`size-7`, was 24 px) inside a 64 px high button with a 12 px notification dot. | docs/qa/b/screens/bs7mk-askme-open-1440.png |
 | NC | 41 | PASS | No photo `<img>` on candidates, compare or cart; avatar endpoint 403 for non-hired interns, 200 only after hire. | docs/qa/b/screens/bs7-emp-cand-top-1440.png |
+
+## The 18 unclear rows: what would make each one clear (28 Oct)
+
+Owner questions are one line each in `docs/qa/owner-questions.md` (Q numbers below). "Legacy" means `/home/wynautbhav/FindTern`, read only.
+
+| sheet | row | status now | what would make it clear |
+|---|---|---|---|
+| S1 | 4 | UNCLEAR | A product decision: the sheet says steps 3 and 6 "need to be changed" with no new text; the legacy has no such section, so there is nothing to compare. Q1. |
+| S1 | 25 | PASS | Resolved: legacy also has the intro video as optional (photo required). |
+| S1 | 41 | FAIL | Resolved by reading: see QA-137. |
+| S1 | 45 | FAIL | Resolved by reading: see QA-137; Q10 asks the owner to confirm the reading. |
+| S1 | 46 | UNCLEAR | A product decision: legacy strips the bank fields from the onboarding draft (`onboarding.tsx:277`), which is what r46 asks; NC r25 and r27 (later) ask for bank on the About page with a bank-name dropdown, which is what the build does. Q2. |
+| S1 | 52 | PASS | Exercised: see the finding. |
+| S1 | 60 | UNCLEAR | A repro I could not set up: "Edit profile" opens the wizard at step 1 and the persona has no Aadhaar image on file, so it never reaches the location step (QA-137). Needs an account with all documents uploaded (uploads 404 locally), then: Edit profile, step 4 work preferences, change the cities, save, read /intern/profile. |
+| S1 | 63 | PASS | Resolved by reading; confirm once with a live AI-interview provider link. |
+| S1 | 86 | UNCLEAR | A product decision: "proposal need to be change" names no screen and no change. Q3. |
+| S1 | 93 | PASS | Answered by the 3-location decision. |
+| S1 | 97 | UNCLEAR | A product decision: the build lists every skill (a synthetic 68-skill candidate shows all 68). Q4. |
+| S1 | 100 | PASS | Resolved by structure (see the row); Q7 asks whether pixel parity is wanted. |
+| S1 | 110 | UNCLEAR | A product decision and a reference: the filter set matches legacy, the design cannot be compared without a reference image (the old screenshots are stale by the owner's note). Q5. |
+| S1 | 111 | UNCLEAR | A product decision: which part of the quick view should change. Q6. |
+| NC | 16 | UNCLEAR | Configuration, not code: the Google authorised redirect URI for the staging and production hosts. Needs a Google client id to test. Q8. |
+| NC | 25 | UNCLEAR | Same as S1 r46. Q2. |
+| NC | 35 | UNCLEAR | A repro I could not set up: not reproducible with four new accounts one at a time. Likely cause found, QA-138 (a shared address trips the per-address limits). Needs the message the owner saw and the network. Q9. |
+| NC | 36 | UNCLEAR | Same as NC r35: several emails signing in together from one place is exactly what QA-138 blocks; I could not reproduce it from separate browser contexts because each carried its own address. Q9. |

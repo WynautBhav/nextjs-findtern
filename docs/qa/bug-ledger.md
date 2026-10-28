@@ -62,6 +62,8 @@ lines only.
 | QA-134 | P2 | admin (and seed) | /admin/dashboard | any | open | After the QA-009 fix "Avg hiring speed" skips rows whose `hired_at` is before `created_at` without saying so: 2 of 9 hired rows on a fresh seed (7 are reversed), 13 of 18 on the live copy. The tile shows no n. The seed writes the reversed dates. |
 | QA-135 | P2 | everyone | /login, /employer/login (and likely the other sign-in pages) | any | open | The tab title is "Sign in \| Findtern \| Findtern": the brand twice. |
 | QA-136 | P2 | employer | /employer/candidates, every console page | 375 | open | The floating "Ask me" button (kept on phones by design) still sits over the right half of the "Skill, city or keyword" search box at scroll 0. QA-102's fix covers marketing, auth and onboarding only. |
+| QA-137 | P1 | intern | /intern/onboarding step 1, /intern/profile checklist (bug sheet 7 S1 r22, r41, r45) | any | open | Onboarding refuses to continue without an Aadhaar card image ("Upload a photo or scan of your Aadhaar card.") and the profile checklist item is "Aadhaar and PAN, with card images". The sheet says the Aadhaar number and the PAN image are mandatory and the Aadhaar image is not; the legacy app required only the PAN image. |
+| QA-138 | P1 | everyone behind one shared address (colleges, offices) | sign-up code, sign-up, intern/employer login | any | open | The limiter keys on the client address alone: the 6th sign-up code request from one address in 15 minutes gets 429, the 6th sign-up in an hour and the 9th login in 15 minutes too. A campus lab or an office is one address, so a drive of 30 students cannot sign up, and it is the likeliest cause of bug sheet 7 NC r35 / r36 ("new account cannot log in", "several emails at once"). |
 
 ## Details
 
@@ -606,3 +608,19 @@ logins; `SEED=1` selects the seed accounts and server). Screenshots are in
 - Actual: the "Ask me" button (141 x 56) sits over x=232 to 359 of the "Skill, city or keyword" box, which is its tap area; same on other console screens wherever content reaches the bottom-right corner.
   DESIGN §0 says phones keep the labelled button on purpose (bug sheet 7), so this is a placement issue, not a removal request: raise it above the tab/field row or let the page's last row clear it.
 - Evidence: `emp2v-candidates-375-top.png`. Severity **P2** (QA-102's fix did not cover the console).
+
+### QA-137
+- Steps: a new intern (or the persona with no uploaded Aadhaar image), `/intern/onboarding` step 1 "About you": fill everything, add the PAN image, leave the Aadhaar image empty, Continue.
+- Actual: "Upload a photo or scan of your Aadhaar card." blocks the step (`src/lib/onboarding.ts:1038`, `hasAadhaarImage`). `/intern/profile` shows the checklist item "Aadhaar and PAN, with card images", counted in "Profile completeness".
+- Expected: Aadhaar number mandatory and PAN image mandatory (S1 r22), Aadhaar image not mandatory (S1 r45), the completeness list naming the PAN document (S1 r41). Legacy: `/home/wynautbhav/FindTern/client/src/pages/onboarding.tsx:797`
+  validates only `panImage` ("Upload your PAN image"), the photo (`profileMedia`) and the two numbers; its completeness list does count both images, so r41 is the sheet's change.
+- Also: reopening the wizard from "Edit profile" starts at step 1, so an intern with no Aadhaar image on file cannot reach a later step (S1 r60) until they upload one.
+- Evidence: `docs/qa/b/screens/onb-step1-errors-375.png`, `docs/qa/b/screens/bs7-s1r60-wizard-location-step.png`; `bs7-unclear-peek.mjs`, `bs7-s1r60.mjs`. Severity **P1**: every new intern meets it, and it contradicts two rows of the owner's sheet.
+
+### QA-138
+- Steps (local server, one forwarded address): `node docs/qa/b/repro/nc35-shared-ip.mjs` asks for a sign-up code for seven different students from one address.
+- Actual: students 1 to 5 get 200; students 6 and 7 get 429 "Too many requests". Limits in `src/lib/security/rate-limit.ts` (`otp` 5 per 15 min, `signup` 5 per hour, `login` 8 per 15 min), keyed by `bucketKey(ip)` in the intern and employer login, sign-up, `send-otp` and
+  `verify-otp` routes; only the college login adds the email to the key. The counters are in memory, so on serverless each instance also counts on its own.
+- Why it matters: the college-partner drive sends a whole class to sign up from one campus network; an office testing the staging site does the same (NC r35 and r36 in the owner's words: a new account that will not log in, several emails logging in at once).
+  I could not reach staging, so the link to NC r35 / r36 is a hypothesis: ask what the screen said (429 "Too many requests" would confirm it).
+- Fix options (builder's call): key sign-up codes by email plus address with a higher per-address ceiling; count only failed logins per address; a shared store. Severity **P1** for the drive launch.
