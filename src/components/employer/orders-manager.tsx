@@ -13,6 +13,7 @@ import type { PlacementLedger } from "@/lib/dues";
 import { formatDate, formatMoney } from "@/lib/format";
 import { downloadInvoice } from "@/lib/invoice";
 import { cn } from "@/lib/utils";
+import { DmyDateInput } from "@/components/app/dmy-date-input";
 
 export type HireRow = {
   proposalId: string;
@@ -503,11 +504,11 @@ function InvoicesPanel({ invoices }: { invoices: InvoiceRow[] }) {
         </label>
         <label className={labelClass}>
           Paid from
-          <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className={cn(fieldClass, "mt-1.5")} />
+          <DmyDateInput value={from} onChange={setFrom} className={cn(fieldClass, "mt-1.5")} />
         </label>
         <label className={labelClass}>
           Paid to
-          <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className={cn(fieldClass, "mt-1.5")} />
+          <DmyDateInput value={to} onChange={setTo} className={cn(fieldClass, "mt-1.5")} />
         </label>
         <button
           type="button"

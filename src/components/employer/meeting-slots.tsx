@@ -12,6 +12,7 @@
 
 import { TIMEZONES } from "@/lib/timezones";
 import { SLOT_MINUTES, wallNow } from "@/lib/employer-interview-rules";
+import { DmyDateInput } from "@/components/app/dmy-date-input";
 
 export type Slots = [string, string, string];
 
@@ -64,13 +65,12 @@ export function MeetingSlots({
           <fieldset key={idx} disabled={disabled} className="min-w-0">
             <legend className="mb-1.5 text-sm font-medium text-ink-800">Slot {idx + 1} *</legend>
             <div className="grid grid-cols-2 gap-2">
-              <input
-                type="date"
+              <DmyDateInput
                 required
                 value={date}
                 min={today}
                 max={maxDate}
-                onChange={(e) => set(idx, e.target.value ? `${e.target.value}T${time || "09:00"}` : "")}
+                onChange={(iso) => set(idx, iso ? `${iso}T${time || "09:00"}` : "")}
                 aria-label={`Slot ${idx + 1} date`}
                 className={FIELD}
               />
