@@ -28,7 +28,7 @@ lines only.
 | QA-100 | P1 | all (marketing) | every marketing page, e.g. `/`, `/faq`, `/pricing` | 375, Chromium | closed | Header is wider than the phone: the menu button spans x=344 to 384, so `scrollWidth` is 384/385 and the page scrolls sideways (the larger logo from NC-r2 is the likely cause). Found by the marketing sub-run, verified by Tester B. |
 | QA-101 | P1 | employer (signup) | /employer/signup | 375 | closed | Phone number input is 50 px wide beside a 269 px country-code select; the number shows as "98'" and cannot be read or checked while typing. The intern signup form is fine (175 px). |
 | QA-102 | P1 | everyone | marketing footer, auth pages, onboarding | 375 | closed | The floating "Ask me" button (141 x 64) and its prompt bubble cover real content: the right end of the Password field on employer signup, the "Employer sign in" link at the end of the intern signup, the footer copyright line and the "Copy email" icon on /faq and /about. The page has no bottom padding to scroll them clear. |
-| QA-103 | P2 | admin | /admin/payouts ("Mark paid or failed") | 375 | open | The payout editor opens inside the horizontally scrolling table: "Failed", the reference label and "Cancel" are cut off; the admin has to scroll sideways to reach them. Also fires a 400 to the API when "Done" is pressed with no reference (the message is correct, but the check is server-side only). |
+| QA-103 | P2 | admin | /admin/payouts ("Mark paid or failed") | 375 | closed | The payout editor opens inside the horizontally scrolling table: "Failed", the reference label and "Cancel" are cut off; the admin has to scroll sideways to reach them. Also fires a 400 to the API when "Done" is pressed with no reference (the message is correct, but the check is server-side only). |
 | QA-104 | P2 | admin | /admin/interns/[id], payouts, candidate lists | 375 | open | Tap targets far under 44 px: skill "Remove" buttons 12 x 12, skill level selects 25 px high, Save / Add / Apply 36 px, "Edit contact" 36 px. |
 | QA-105 | P2 | employer (USD), signed out | `/`, `/about` | any | open | With USD selected the stats strip still says "₹5,000 Fixed per-hire fee" while /pricing says "$50". Found by the marketing sub-run. |
 | QA-106 | P2 | everyone | `/pricing` calculator | any | open | Hours are 5 days x 4 weeks = 160 h and 6 x 4 = 192 h; the owner decision (and plan) is a flat 22 or 26 days a month, i.e. 176 h and 208 h at 8 h a day. Needs the owner's confirmation which number the marketing page should show. |
@@ -65,6 +65,16 @@ lines only.
 | QA-137 | P1 | intern | /intern/onboarding step 1, /intern/profile checklist (bug sheet 7 S1 r22, r41, r45) | any | open | Onboarding refuses to continue without an Aadhaar card image ("Upload a photo or scan of your Aadhaar card.") and the profile checklist item is "Aadhaar and PAN, with card images". The sheet says the Aadhaar number and the PAN image are mandatory and the Aadhaar image is not; the legacy app required only the PAN image. |
 | QA-138 | P1 | everyone behind one shared address (colleges, offices) | sign-up code, sign-up, intern/employer login | any | open | The limiter keys on the client address alone: the 6th sign-up code request from one address in 15 minutes gets 429, the 6th sign-up in an hour and the 9th login in 15 minutes too. A campus lab or an office is one address, so a drive of 30 students cannot sign up, and it is the likeliest cause of bug sheet 7 NC r35 / r36 ("new account cannot log in", "several emails at once"). |
 | QA-139 | P2 | employer | /employer/orders → /employer/checkout?proposal=… | any | open | "Pay ₹29,000" on the unpaid hire (Ritika Verma) opens a Checkout that lists a different hire (Qab Tester, Month 2 of 2) at ₹26,400, and ₹29,000 cannot be derived from the offer (₹26,400 a month, total 24,000 on the row). Probably the QA seed's row, but the link's `?proposal=` should select that hire or say why it cannot be paid. |
+| QA-140 | P2 | admin | /admin/orders, /admin/projects, /admin/notification-history, /admin/intern-invoices | 1440 | open | The tables do not fit: Orders is 1473 px wide in a 1102 px card, so the "Paid at" column and what follows are cut and need a sideways scroll; Projects 1185, Notification history 1197, Intern invoices 1110. At 375 the Analytics, Money, Roles and Notification-history tables also still scroll sideways. |
+| QA-141 | P2 | admin | /admin/proposal-tracker, /admin/companies, /admin/projects, /admin/payouts, /admin/notification-history | 375 + 1440, both engines | open | Filter bars collide or overflow. Proposal pipeline: the Company and Candidate selects run past the card's right edge (423 to 510 px at 1440, 85 to 105 at 375), the search placeholder is cut, "More filters" sits under the "Rows" control. Companies, Projects, Notification history: the "Rows" label overlaps the select before it. Payouts: the "CSV" button touches "Rows". |
+| QA-142 | P2 | admin | /admin/roles | 375 | open | Each staff row's role select is 62 px wide and shows "Adı", "Exe", "Exe", "Exe": the three Executive roles cannot be told apart on a phone (301 px only for the signed-in user's row). |
+| QA-143 | P2 | admin | /admin/notification-history, /admin/settings | 375 | open | Text runs off the card instead of wrapping: the notification text ("A company invited you to an int…") in every history row, and the button label "Create plans from the built-in rate car…" (24 px past its box). |
+| QA-144 | P2 | admin | every admin page (sidebar) | 1440 x 900 and shorter | open | The 20-item sidebar does not fit: at 900 px high Send notification, Notification history, Pricing and fees, Legal texts and Roles and access are below the fold, at 768 px Reports and Website content too. The nav scrolls but nothing says so beyond one clipped item. |
+| QA-145 | P2 | admin | /admin/interns, /admin/companies (row "Deactivate", "Hide") | 1440 + 375 | open | Each row carries four inline controls ("Live Hide", "Active Deactivate") with the destructive one always in view, and the confirmation is the browser's own `window.confirm`, not an in-page dialog. An automated click on "Deactivate" looks like a dead button (no request, no dialog). |
+| QA-146 | P2 | admin | candidates, users, projects, proposal pipeline, orders, payouts, promo codes, roles | 375 | open | Tap targets far under 44 px: name links 20 to 24 px high, "Select row" 16 x 16, role-matrix checkboxes 24 px (90 of them), promo-code toggles 37 x 21, "Excel template" and "CSV" links 24 px. QA-104 still stands; the payout editor itself is fine now (QA-103). |
+| QA-147 | P2 | admin (and probably the intern side) | /admin/interns/non-disclosure | any | open | The page requests `/cdn/assets/sprites-core-jxe2m7va.svg` and gets a 404: pasted legacy HTML references an icon sprite that does not exist here (`<use href>`), so its icons are blank. |
+| QA-148 | P2 | intern, admin | notification text (candidate bell, Admin > Notification history) | any | open | Notification templates use emoji and exclamation marks, which DESIGN §0 lists as copy tells: "🚀 Spotlight's on you, Qab - 1 profile view and counting!" (`src/app/employer/intern/[id]/page.tsx:155`) and "🎉 Hurray {name}! Your AI interview is complete…" (`src/lib/admin/score-live.ts:55`). Both are ported legacy wording, so it is a decision as much as a defect. |
+| QA-149 | P2 | admin | /admin/reports/money | 375 + 1440 | open | The only admin page that still has a "Filter" button (Company, Candidate, Status), against "filters apply on change". |
 
 ## Details
 
@@ -430,12 +440,14 @@ logins; `SEED=1` selects the seed accounts and server). Screenshots are in
   at the right edge, "Bank reference (required wh..." and "Cancel" are partly out of view. Pressing "Done" with no
   reference shows the right message but only after a 400 from the API. With a reference the payout is marked paid (14 pending to 13).
 - Evidence: `docs/qa/b/screens/admin-payout-dialog-375.png`; trace `admin-payout-trace.zip`. Severity **P2** (works after scrolling).
+- Retest (tester B, 28 Oct, master 6c4b000): **closed**. At 375 the payout rows stack and "Edit payout status" opens an inline card inside the row (Paid / Failed, bank reference, note, Done / Cancel, all 44 px); "Done" without a reference says "Add the bank reference to mark it paid."; with one, pending 13 becomes 12 (`adm-payout.mjs`, `docs/qa/b/screens/adm-payout-dialog-375.png`).
 
 ### QA-104
 - Steps: admin, 375 px, `/admin/interns/[id]` (`node docs/qa/b/repro/admin-controls.mjs /admin/interns/<id> 375`).
 - Actual (px): "Remove React" 12 x 12, "Level for React" select 25 high, "Add" 60 x 36, "Save" 63 x 36,
   "Save ratings and links" 36 high, "Edit contact" 36 high. Payouts: "Apply" 36 high.
 - Evidence: `docs/qa/b/screens/admin-controls--admin-interns-*-375.png`. Severity **P2**.
+- Retest (tester B, 28 Oct): **still open**, narrowed. The payout editor and filters are 44 px now, but list links, row checkboxes and promo toggles are still small; see QA-146.
 
 ### QA-105 / QA-106
 - From the marketing sub-run (`docs/qa/b/bs7-marketing-results.md`, X3 and Observations). QA-105: with "Prices in" set to USD
@@ -650,3 +662,46 @@ logins; `SEED=1` selects the seed accounts and server). Screenshots are in
 - Steps: employer (live copy), `/employer/orders`, press "Pay ₹29,000" on the "Not paid" row (`/employer/checkout?proposal=7883…`).
 - Actual: Checkout shows "Ready to pay: Qab Tester, Month 2 of 2, Due 6 Dec 2026, ₹26,400" and "Due now ₹26,400"; the hire the user clicked is not on the page. The proposal row: `status hired`, `monthlyAmount 26400`, `duration 3m`, `totalPrice 24000`, start 17 Sept 2026; Orders totals read "₹29,000 paid · ₹29,000 still to pay".
 - Expected: the clicked hire, with an amount that adds up; or an honest "nothing to pay for this hire" and no Pay button. Likely a seed-row inconsistency like QA-112; retest with a freshly sent and accepted offer. Evidence: `docs/qa/b/screens/emp3v2-chromium-375-pay-target.png`, `emp3-chromium-1440-orders.png`. Severity **P2**.
+
+### Tester B, 28 Oct (third pass): the redesigned /admin screens, QA-140 to QA-149
+- Build: production build of wp/qa-b on master 6c4b000, live-copy DB, Super Admin; Chromium and WebKit at 375, Chromium at 1440, all 27 admin pages plus a candidate and a company page (`docs/qa/b/repro/adm-*.mjs`; screenshots `docs/qa/b/screens/adm-*.png`). Judged the same way as the employer pass: against DESIGN.md §0, by doing the jobs: filter the candidate list, deactivate an account, mark a payout paid, change a password, open the roles list.
+- **What worked:** nothing wider than the shell on any page at 375 or 1440, no console error beyond QA-147, no overlapping filter bars except those listed; rows stack below lg with a label in front of each figure; the DD/MM/YYYY fields are text fields on Orders, Proposal pipeline and Reports ("31/10/2026" applies, an ISO date is ignored); selects and search apply on change (candidates: "Pending" gives 300 of 524 at once; typing "Qab" applies without Enter); the dashboard is one focal point (99 items) over a list with one action each; the payout flow works end to end at 375 (reference enforced, 13 to 12 pending); QA-016's rule reads once on `/admin/account`.
+- **Not judged:** the CSV and Excel exports, bulk actions, CMS editors (add / edit forms), notification sending (no mail goes out here).
+
+### QA-140
+- Steps: Super Admin, 1440 x 900, `/admin/orders` (also Projects, Notification history, Intern invoices); read `scrollWidth` against `clientWidth` of the card's scroller (`adm-sweep.mjs`).
+- Actual: Orders 1473 > 1102: the "Paid at" header shows as "Pa", dates are cut ("28 Oct"), the columns after it need a sideways scroll. Projects 1185 > 1102, Notification history 1197 > 1102, Intern invoices 1110 > 1102. At 375: Analytics (three tables 480 to 552 > 341), Money (803, 768 > 341), Roles matrix (844), Notification history (565).
+- Expected: "tables fit at 1440" (the builder's note); at 375 rows stack. Evidence: `adm-chromium-1440-orders.png`. Severity **P2**.
+
+### QA-141
+- Steps: `/admin/proposal-tracker` at 1440 and 375; `/admin/companies`, `/admin/projects`, `/admin/notification-history`, `/admin/payouts` at 375 (`adm-overlap.mjs chromium|webkit 375|1440`).
+- Actual: Proposal pipeline: the "All companies" and "All candidates" selects end beyond the white card (clipped at its right edge), the search placeholder is cut ("Search candidate, company, projec"), at 375 "More filters" overlaps "Rows" by 33 x 18 px and the row-count control by 75 x 44. "Rows" overlaps the previous select by 10 to 26 px on Companies and Projects (both engines), 14 px on Notification history (WebKit). Payouts: "CSV" and "Rows" touch.
+- Evidence: `adm-chromium-1440-proposal-tracker.png`, `adm-chromium-375-proposal-tracker.png`, `adm-chromium-375-projects.png`, `adm-chromium-375-payouts.png`. Severity **P2** (the busiest admin page; every control still works).
+
+### QA-142
+- Steps: `/admin/roles` at 375 (`adm-roles.mjs`): selected text of each staff select.
+- Actual: Admin, Executive - Sales, Executive - Operations and Executive - Accounts are 62 px wide ("Adı", "Exe", "Exe", "Exe"); only the signed-in user's row is 301 px. At 1440 all are 192 px and read in full. Evidence: `adm-chromium-375-roles.png`. Severity **P2** (permissions screen; the wrong Executive role cannot be seen).
+
+### QA-143
+- Actual (375): `/admin/notification-history` rows show "Notification  A company invited you to an int" and "Your timesheet was rejected: Ple" running off the card, no wrap, no ellipsis; `/admin/settings` "Create plans from the built-in rate car…" ends 24 px past its button (`adm-overlap.mjs`). Evidence: `adm-chromium-375-notification-history.png`, `adm-chromium-375-settings.png`. Severity **P2**.
+
+### QA-144
+- Steps: 1440 wide at 900, 768 and 700 px high (`adm-nav.mjs`): count sidebar links inside the viewport.
+- Actual: 20 links, 15 visible at 900, 13 at 768 (Reports and Website content hidden), 11 at 700; the nav is the scroller (`overflow-y: auto`, 1030 px of content); the only cue is a clipped item at the bottom. Evidence: `adm-nav-768.png`. Severity **P2**.
+
+### QA-145
+- Steps: `/admin/interns?q=Qab` at 1440, press "Deactivate" on a row (`adm-deactivate.mjs`).
+- Actual: nothing visible happens in a browser driver, because the confirmation is `window.confirm` ("Deactivate this account? They will not be able to sign in until it is activated again."), auto-dismissed; accepting it sends `POST /api/users/<id>/deactivate` and the row flips to "Inactive / Activate" (I restored it). Each row shows "Live Hide" and "Active Deactivate" at once (four inline controls), no "⋯" menu anywhere in /admin.
+- Expected: the in-page confirm used on the employer side ("Yes, approve and lock / Cancel"); destructive actions in a menu. Evidence: `admi-chromium-1440-deactivate.png`, `adm-chromium-1440-interns.png`. Severity **P2**.
+
+### QA-146
+- Actual (375, `adm-sweep.mjs`): `a` name links 20 to 24 px high on Candidates, Users, Projects, Proposal pipeline, Orders, Payouts, Notification history, Analytics; "Select row" 16 x 16 (Candidates); 24 x 24 checkboxes on Colleges, Messages, Notifications and 90 in the role matrix; promo-code toggles 37 x 21; "Excel template" and "CSV" 24 px. Severity **P2**.
+
+### QA-147
+- Steps: `/admin/interns/non-disclosure`: `404 /cdn/assets/sprites-core-jxe2m7va.svg` (Chromium and WebKit). Severity **P2**; check the intern-facing NDA page for the same blank icons.
+
+### QA-148
+- Steps: read the candidate's notification list in Admin > Notification history: "🚀 Spotlight's on you, Qab - 1 profile view and counting!". Sources above. Owner decision: keep legacy wording or write plain text. Evidence: `adm-chromium-1440-notifications.png`.
+
+### QA-149
+- Steps: `adm-applybtn.mjs` at 1440 over 17 admin lists and reports: only `/admin/reports/money` shows a "Filter" button next to Company, Candidate and Status. Severity **P2**.
