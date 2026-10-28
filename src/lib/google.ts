@@ -87,6 +87,12 @@ export function googleAuthUrl(cfg: GoogleConfig, state: string, scopes = ["openi
   return url.toString();
 }
 
+/** "Sign in with Google" is offered only with GOOGLE_LOGIN=on, so it stays
+ *  off until tested on staging; the Meet calendar uses the same keys regardless. */
+export function googleLoginEnabled(): boolean {
+  return /^(1|true|on|yes)$/i.test(process.env.GOOGLE_LOGIN ?? "") && googleConfig() !== null;
+}
+
 /** Findtern's own calendar (Meet links): legacy redirect URI and token owner. */
 export function calendarConfig(): GoogleConfig | null {
   const base = googleConfig();

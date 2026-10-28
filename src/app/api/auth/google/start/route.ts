@@ -1,14 +1,14 @@
 import { NextResponse } from "next/server";
 
 import { isHttps } from "@/lib/auth";
-import { googleAuthUrl, googleConfig, NONCE_COOKIE, safeNext } from "@/lib/google";
+import { googleAuthUrl, googleConfig, googleLoginEnabled, NONCE_COOKIE, safeNext } from "@/lib/google";
 
 export async function GET(req: Request) {
   const url = new URL(req.url);
   const role = url.searchParams.get("role") === "employer" ? "employer" : "intern";
   const next = safeNext(url.searchParams.get("next"), "");
 
-  const cfg = googleConfig(req);
+  const cfg = googleLoginEnabled() ? googleConfig(req) : null;
   if (!cfg) {
     // Back to the page the button was on, with a readable message, instead
     // of a bare JSON error.

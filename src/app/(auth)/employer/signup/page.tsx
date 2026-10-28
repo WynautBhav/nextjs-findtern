@@ -6,7 +6,7 @@ import { AlertCircle } from "lucide-react";
 import { AuthShell } from "@/components/auth/auth-shell";
 import { GoogleButton } from "@/components/auth/login-form";
 import { EmployerSignupForm } from "@/components/employer/employer-signup-form";
-import { oauthErrorMessage, safeNext } from "@/lib/google";
+import { googleLoginEnabled, oauthErrorMessage, safeNext } from "@/lib/google";
 
 export const metadata: Metadata = {
   title: "Employer sign up",
@@ -63,7 +63,7 @@ export default async function EmployerSignupPage({
         </div>
       ) : null}
 
-      {google ? null : (
+      {google || !googleLoginEnabled() ? null : (
         <div className="mt-8 space-y-5">
           <GoogleButton
             href={`/api/auth/google/start?role=employer${next ? `&next=${encodeURIComponent(next)}` : ""}`}
@@ -80,7 +80,7 @@ export default async function EmployerSignupPage({
         </div>
       )}
 
-      <div className={google ? "mt-8" : "mt-5"}>
+      <div className={google || !googleLoginEnabled() ? "mt-8" : "mt-5"}>
         <EmployerSignupForm google={google} next={next || undefined} />
       </div>
     </AuthShell>

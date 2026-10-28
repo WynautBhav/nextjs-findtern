@@ -13,3 +13,17 @@ test("safeNext refuses anything that can leave the site", () => {
     assert.equal(safeNext(bad, "/fallback"), "/fallback", JSON.stringify(bad));
   }
 });
+
+test("Google sign-in is off unless GOOGLE_LOGIN=on and keys are set", async () => {
+  const { googleLoginEnabled } = await import("../google.ts");
+  const saved = { ...process.env };
+  process.env.GOOGLE_CLIENT_ID = "id";
+  process.env.GOOGLE_CLIENT_SECRET = "secret";
+  delete process.env.GOOGLE_LOGIN;
+  assert.equal(googleLoginEnabled(), false);
+  process.env.GOOGLE_LOGIN = "on";
+  assert.equal(googleLoginEnabled(), true);
+  delete process.env.GOOGLE_CLIENT_SECRET;
+  assert.equal(googleLoginEnabled(), false);
+  process.env = saved;
+});

@@ -5,7 +5,7 @@ import { NextResponse } from "next/server";
 
 import { getDb, schema } from "@/lib/db";
 import { withSession, issueCsrfCookie } from "@/lib/auth";
-import { exchangeCode, fetchProfile, googleConfig, NONCE_COOKIE, safeNext } from "@/lib/google";
+import { exchangeCode, fetchProfile, googleConfig, googleLoginEnabled, NONCE_COOKIE, safeNext } from "@/lib/google";
 import { isPersonalEmail } from "@/lib/employer-onboarding";
 import { attachOtpProof, type SignupOtpSubject } from "@/lib/signup-otp";
 
@@ -46,7 +46,7 @@ export async function GET(req: Request) {
   const nonce = (await cookies()).get(NONCE_COOKIE)?.value;
   if (!nonce || nonce !== state.nonce) return fail(req, loginPath, "bad_state");
 
-  const cfg = googleConfig(req);
+  const cfg = googleLoginEnabled() ? googleConfig(req) : null;
   if (!cfg) return fail(req, loginPath, "not_configured");
 
   let email: string | undefined;

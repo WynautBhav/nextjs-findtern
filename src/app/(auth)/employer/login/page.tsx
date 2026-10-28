@@ -5,7 +5,7 @@ import { AlertCircle } from "lucide-react";
 
 import { AuthShell } from "@/components/auth/auth-shell";
 import { LoginForm } from "@/components/auth/login-form";
-import { oauthErrorMessage, safeNext } from "@/lib/google";
+import { googleLoginEnabled, oauthErrorMessage, safeNext } from "@/lib/google";
 
 export const metadata: Metadata = {
   title: "Employer sign in",
@@ -62,7 +62,7 @@ export default async function EmployerLoginPage({
           endpoint="/api/auth/employer/login"
           redirectTo={next || "/employer/dashboard"}
           forgotHref="/employer/forgot-password"
-          googleHref={googleHref}
+          googleHref={googleLoginEnabled() ? googleHref : undefined}
           googleLabel="Sign in or sign up with Google"
           verifyHref="/employer/verify-email"
         />
