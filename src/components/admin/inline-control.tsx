@@ -190,6 +190,18 @@ export function InlineToggle({
   // The in-page confirm for the destructive direction (it was window.confirm,
   // which a browser driver auto-dismisses and which looks like a dead button; QA-145).
   const [asking, setAsking] = useState(false);
+  // Cancel and Esc hand focus back to the toggle that asked.
+  const toggleRef = useRef<HTMLButtonElement>(null);
+  const restore = useRef(false);
+  useEffect(() => {
+    if (asking || !restore.current) return;
+    toggleRef.current?.focus();
+    restore.current = false;
+  }, [asking]);
+  function cancel() {
+    restore.current = true;
+    setAsking(false);
+  }
   if (seen !== on) {
     setSeen(on);
     setState(on);
@@ -228,21 +240,32 @@ export function InlineToggle({
           {state ? onLabel : offLabel}
         </span>
         {asking ? (
-          <span role="group" aria-label={confirmOff} className="inline-flex items-center gap-1">
+          <span
+            role="group"
+            aria-label={confirmOff}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") {
+                e.stopPropagation();
+                cancel();
+              }
+            }}
+            className="inline-flex items-center gap-1"
+          >
             <button
               type="button"
               onClick={() => void flip(true)}
-              autoFocus
               className={cn(buttonClass({ variant: "ghost", size: "sm" }), "h-8 px-2 text-danger hover:bg-danger-soft max-lg:h-11")}
             >
               Yes, {turnOffLabel.toLowerCase()}
             </button>
-            <button type="button" onClick={() => setAsking(false)} className={cn(buttonClass({ variant: "ghost", size: "sm" }), "h-8 px-2 max-lg:h-11")}>
+            {/* Cancel takes the focus: Enter on a focused "Yes, deactivate" can't be undone. */}
+            <button type="button" autoFocus onClick={cancel} className={cn(buttonClass({ variant: "ghost", size: "sm" }), "h-8 px-2 max-lg:h-11")}>
               Cancel
             </button>
           </span>
         ) : (
         <button
+          ref={toggleRef}
           type="button"
           onClick={() => void flip()}
           disabled={saving}
