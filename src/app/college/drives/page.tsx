@@ -4,12 +4,12 @@ import { Plus } from "lucide-react";
 import { Panel } from "@/components/admin/panel";
 import { driveWindow } from "@/lib/college/access";
 import { drivesOverview } from "@/lib/college/drives";
-import { DRIVE_KIND_LABEL, WINDOW_LABEL } from "@/lib/college/labels";
+import { DRIVE_KIND_LABEL } from "@/lib/college/labels";
 import { requireCollegeContext } from "@/lib/college/scope";
-import { Pill } from "@/components/app/primitives";
 import { ButtonLink } from "@/components/ui/button";
 import { shortDateTime } from "@/lib/format";
 import { EmptyScene, PageHead } from "@/components/app/primitives";
+import { DriveStatePill } from "@/components/employer/drive-parts";
 
 export const dynamic = "force-dynamic";
 
@@ -47,7 +47,7 @@ export default async function DrivesPage() {
                     <div className="min-w-0">
                       <p className="flex items-center gap-2">
                         <span className="font-semibold text-ink-900">{drive.title}</span>
-                        <Pill tone={w === "live" ? "live" : w === "upcoming" ? "new" : "closed"}>{WINDOW_LABEL[w]}</Pill>
+                        <DriveStatePill state={w} audience="college" />
                       </p>
                       <p className="mt-0.5 text-sm text-text-subtle">
                         {DRIVE_KIND_LABEL[drive.kind] ?? drive.kind} · {fmt(drive.startsAt)} to {fmt(drive.endsAt)}
