@@ -142,7 +142,7 @@ export function TableToolbar({
           value={value}
           onChange={(e) => setParam(filter.key, e.target.value || null)}
           className={cn(
-            "apple-spring h-9 cursor-pointer rounded-apple-sm border bg-white px-2.5 pr-7 text-sm focus:ring-2 focus:ring-brand-500/20 focus:outline-none max-lg:min-h-11",
+            "apple-spring h-9 max-w-56 cursor-pointer truncate rounded-apple-sm border bg-white px-2.5 pr-7 text-sm focus:ring-2 focus:ring-brand-500/20 focus:outline-none max-lg:min-h-11 max-sm:max-w-full",
             value
               ? "border-brand-300 font-medium text-brand-800"
               : "border-ink-200 text-ink-700",
