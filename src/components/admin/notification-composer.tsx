@@ -287,15 +287,21 @@ export function NotificationComposer({
             <label htmlFor="notif-type" className="block text-sm font-medium text-ink-800">
               Type
             </label>
-            <input id="notif-type" list="notif-types" value={type} maxLength={40} onChange={(e) => setType(e.target.value)} className={field} />
-            <datalist id="notif-types">
-              <option value="custom" />
-              <option value="announcement" />
-              <option value="update" />
-              <option value="promo" />
-              <option value="alert" />
-              <option value="maintenance" />
-            </datalist>
+            {/* A choice, not free text: the stored values are the legacy ones. */}
+            <select id="notif-type" value={type} onChange={(e) => setType(e.target.value)} className={field}>
+              {[
+                ["announcement", "Announcement"],
+                ["update", "Product update"],
+                ["promo", "Offer or promotion"],
+                ["alert", "Alert"],
+                ["maintenance", "Maintenance"],
+                ["custom", "Other"],
+              ].map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
 
@@ -316,10 +322,10 @@ export function NotificationComposer({
           Link <span className="font-normal text-ink-600">(optional)</span>
         </label>
         <input id="notif-link" value={link} onChange={(e) => setLink(e.target.value)} placeholder="/intern/proposals" className={field} />
-        <p className="mt-1 text-xs text-ink-600">A page on this site, saved as the notification&apos;s link (data.link).</p>
+        <p className="mt-1 text-xs text-ink-600">Where tapping the notification takes them: a page on this site.</p>
 
         <details className="mt-4 rounded-apple-sm border border-ink-200/80 px-3.5 py-2.5">
-          <summary className="cursor-pointer text-sm font-medium text-ink-800">Extra data (JSON, advanced)</summary>
+          <summary className="cursor-pointer text-sm font-medium text-ink-800">Advanced: data for developers</summary>
           <textarea
             aria-label="Extra data as JSON"
             value={dataJson}

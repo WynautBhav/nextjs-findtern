@@ -29,7 +29,7 @@ export default async function AdminAccountPage() {
 
   return (
     <div className="space-y-6">
-      <AdminPageHeader title="Your account" subtitle="Your name, the email you sign in with, and your password." />
+      <AdminPageHeader title="Your account" />
       <div className="grid max-w-4xl gap-6 lg:grid-cols-2">
         <Panel>
           <PanelHeader

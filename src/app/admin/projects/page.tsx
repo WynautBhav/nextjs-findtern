@@ -101,7 +101,6 @@ export default async function AdminProjectsPage({
   const header = (
     <AdminPageHeader
       title="Projects"
-      subtitle="Every project companies have posted, how many offers each has drawn, and whether it is still open."
       action={
         <ButtonAnchor href={exportHref} variant="outline" size="sm">
           <Download className="size-4" aria-hidden />

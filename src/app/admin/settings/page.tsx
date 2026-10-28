@@ -51,20 +51,7 @@ async function loadPricing(): Promise<{ plans: EditablePlan[]; activationFeeMino
 export default async function AdminSettingsPage() {
   const [pricing, calendarConnected] = await Promise.all([loadPricing(), checkCalendar()]);
 
-  return (
-    <div className="space-y-8">
-      <AdminPageHeader
-        title="Pricing and fees"
-        subtitle="The employer rate card and the intern activation fee. Prices are in rupees; USD is derived at ₹100 = $1. Changes go live on the next page load."
-      />
-      {pricing ? (
-        <AdminPricingEditor plans={pricing.plans} activationFeeMinor={pricing.activationFeeMinor} />
-      ) : (
-        <Panel>
-          <AdminLoadError what="the rate card" retryHref="/admin/settings" />
-        </Panel>
-      )}
-
+  const calendar = (
       <Panel className="max-w-3xl">
         <PanelHeader
           title="Google Calendar (Meet links)"
@@ -91,6 +78,26 @@ export default async function AdminSettingsPage() {
           }
         />
       </Panel>
+  );
+
+  return (
+    <div className="space-y-8">
+      <AdminPageHeader
+        title="Pricing and fees"
+        subtitle="Prices are in rupees; USD is derived at ₹100 = $1. Changes go live on the next page load."
+      />
+      {/* While disconnected it is the dashboard's top attention item, so it
+          leads here too; once connected it sits at the end. */}
+      {calendarConnected === false ? calendar : null}
+      {pricing ? (
+        <AdminPricingEditor plans={pricing.plans} activationFeeMinor={pricing.activationFeeMinor} />
+      ) : (
+        <Panel>
+          <AdminLoadError what="the rate card" retryHref="/admin/settings" />
+        </Panel>
+      )}
+
+      {calendarConnected === false ? null : calendar}
     </div>
   );
 }

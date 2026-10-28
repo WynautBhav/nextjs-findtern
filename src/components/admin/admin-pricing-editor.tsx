@@ -13,6 +13,7 @@ import { inrMinorToUsdMinor, savingsPercent } from "@/lib/currency";
 import { formatMoney } from "@/lib/format";
 import type { CmsPlanFeature } from "@/lib/content/types";
 import { cn } from "@/lib/utils";
+import { FilterTabs } from "@/components/app/primitives";
 
 /**
  * Rate card editor. Admins type rupees; the API stores paise. USD is never
@@ -51,6 +52,7 @@ export function AdminPricingEditor({
   const router = useRouter();
   const [seeding, setSeeding] = useState(false);
   const [seedError, setSeedError] = useState<string | null>(null);
+  const [activePlan, setActivePlan] = useState(plans[0]?.id ?? "");
 
   async function seed() {
     setSeeding(true);
@@ -66,7 +68,9 @@ export function AdminPricingEditor({
 
   return (
     <div className="space-y-6">
-      <ActivationFeePanel initialMinor={activationFeeMinor} />
+      <div className="max-w-3xl">
+        <ActivationFeePanel initialMinor={activationFeeMinor} />
+      </div>
 
       {plans.length === 0 ? (
         <Panel>
@@ -89,9 +93,15 @@ export function AdminPricingEditor({
           </div>
         </Panel>
       ) : (
-        <div className="grid gap-6 xl:grid-cols-3">
+        // One plan at a time (three ~1300px forms side by side, each with
+        // its own Save, before). All stay mounted, so switching tabs keeps
+        // unsaved edits.
+        <div className="space-y-4">
+          <FilterTabs label="Plan" tabs={plans.map((p) => ({ key: p.id, label: p.displayName }))} value={activePlan} onChange={setActivePlan} />
           {plans.map((plan) => (
-            <PlanEditor key={plan.id} plan={plan} />
+            <div key={plan.id} hidden={plan.id !== activePlan} className="max-w-3xl">
+              <PlanEditor plan={plan} />
+            </div>
           ))}
         </div>
       )}

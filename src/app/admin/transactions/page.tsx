@@ -138,7 +138,7 @@ export default async function AdminTransactionsPage({ searchParams }: { searchPa
 
   return (
     <div className="space-y-8">
-      <AdminPageHeader title="Transactions" subtitle="Money received from employers and interns, and stipends paid out to interns." />
+      <AdminPageHeader title="Transactions" />
 
       {metrics ? (
         <StatGrid cols={4}>

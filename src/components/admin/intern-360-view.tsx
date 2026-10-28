@@ -19,10 +19,11 @@ import { ProposalOfferSummary } from "@/components/admin/proposal-offer-summary"
 import { draftFromRecord } from "@/lib/onboarding";
 import type { RevealField } from "@/lib/admin/identity-mask";
 import type { User as UserType, InternOnboarding, Interview, Proposal, Timesheet, InternPayout } from "@/lib/db/schema";
-import { DetailRow, EmptyScene, PageHead, Pill, pillTabClass, SectionHead, StatTile, Surface } from "@/components/app/primitives";
+import { DetailRow, EmptyScene, PageHead, Pill, pillTabClass, SectionHead, Surface } from "@/components/app/primitives";
 import { buttonClass } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import { StatCard, StatGrid } from "@/components/admin/stat-card";
 
 /**
  * Candidate 360: everything staff need about one candidate on one page.
@@ -92,6 +93,18 @@ export function Intern360View({
   const draft = onboarding ? draftFromRecord(onboarding) : null;
   const skills = draft?.skills ?? [];
   const openToWork = extra.openToWork !== false;
+  // What decides whether employers can see this candidate, first reason wins.
+  const hiddenWhy =
+    user.profileVisibility === "hidden"
+      ? "Hidden by Findtern (the visibility switch)."
+      : !openToWork
+        ? extra.hiddenByAdmin === true
+          ? "Hidden by an admin."
+          : "The candidate turned off Open to work."
+        : !profileComplete
+          ? "The profile is incomplete."
+          : "";
+  const visibleToEmployers = !hiddenWhy;
 
   const paidMinor = payouts.filter((p) => p.status === "paid").reduce((sum, p) => sum + toInrMinor(p.amountMinor, p.currency), 0);
   const dues = stipendDues(proposals, payouts, score);
@@ -180,33 +193,35 @@ export function Intern360View({
 
       <Surface className="flex flex-wrap items-start gap-x-8 gap-y-4 p-5">
         {controls}
-        <div className="flex flex-wrap items-center gap-1.5 self-center">
-          <Pill tone={profileComplete ? "live" : "waiting"}>{profileComplete ? "Profile complete" : "Profile incomplete"}</Pill>
+        {/* One derived answer to "can employers see them?": the switch said
+            Live beside a "Hidden by candidate" pill (critique A). */}
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 self-center text-sm text-ink-600">
+          <Pill tone={visibleToEmployers ? "live" : "waiting"}>{visibleToEmployers ? "Employers can see them" : "Employers can't see them"}</Pill>
+          {hiddenWhy ? <span>{hiddenWhy}</span> : null}
           <Pill tone={feePaid ? "paid" : "closed"}>{feePaid ? "Activation fee paid" : "Activation fee unpaid"}</Pill>
-          {!openToWork ? <Pill tone="waiting">{extra.hiddenByAdmin === true ? "Hidden by admin" : "Hidden by candidate"}</Pill> : null}
         </div>
       </Surface>
 
-      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-        <StatTile
+      {/* The admin summary strip, as on Company detail and the lists. */}
+      <StatGrid cols={4}>
+        <StatCard
           label="Findtern Score"
-          value={score === null ? null : <>{score.toFixed(1)}<span className="ml-0.5 text-base font-normal text-text-subtle">/10</span></>}
-          empty="Not scored yet"
+          value={score === null ? "-" : `${score.toFixed(1)}/10`}
           hint={
             score === null
-              ? undefined
+              ? "Not scored yet"
               : `Comm ${ratings.communication ?? "-"} · Coding ${ratings.coding ?? "-"} · Apt ${ratings.aptitude ?? "-"} · AI ${ratings.interview ?? "-"}`
           }
         />
-        <StatTile label="Proposals" value={proposals.length || null} empty="None yet" hint={hiredCount ? `${hiredCount} hired` : undefined} />
-        <StatTile label="Interviews" value={interviews.length || null} empty="None yet" hint={scheduledCount ? `${scheduledCount} scheduled` : undefined} />
-        <StatTile
+        <StatCard label="Proposals" value={proposals.length} hint={hiredCount ? `${hiredCount} hired` : proposals.length ? "None hired" : "None yet"} />
+        <StatCard label="Interviews" value={interviews.length} hint={scheduledCount ? `${scheduledCount} scheduled` : interviews.length ? "None scheduled" : "None yet"} />
+        <StatCard
           label="Paid to candidate"
-          value={paidMinor > 0 ? formatMoney(paidMinor, "INR") : null}
-          empty="Nothing paid yet"
-          hint={owedTotalMinor > 0 ? `${formatMoney(owedTotalMinor, "INR")} still owed` : undefined}
+          value={formatMoney(paidMinor, "INR", { zeroLabel: "₹0" })}
+          hint={owedTotalMinor > 0 ? `${formatMoney(owedTotalMinor, "INR")} still owed` : paidMinor > 0 ? "Nothing owed" : "Nothing paid yet"}
+          tone={owedTotalMinor > 0 ? "warning" : "neutral"}
         />
-      </div>
+      </StatGrid>
 
       <div role="tablist" aria-label="Candidate record" className="-mx-1 flex max-w-full gap-1 overflow-x-auto px-1 pb-1 [scrollbar-width:none]">
         {tabs.map((t) => (
@@ -804,7 +819,7 @@ function InterviewDialog({
               </label>
               <input id="iv-meeting" type="url" value={meeting} onChange={(e) => setMeeting(e.target.value)} placeholder="https://meet.google.com/… or Incruiter link" className={cn(field, "mt-1")} />
               <p className="mt-1 text-xs text-text-subtle">
-                For an AI interview, saving a link unlocks it for the candidate. For a company interview, both sides are notified.
+                For an AI interview, saving a link opens it to the candidate. For a company interview, both sides are notified.
               </p>
             </div>
             <div className="grid gap-3 sm:grid-cols-2">

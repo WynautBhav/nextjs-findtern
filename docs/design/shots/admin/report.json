@@ -1,0 +1,548 @@
+[
+  {
+    "role": "admin",
+    "width": 390,
+    "route": "/admin/dashboard",
+    "finalUrl": "/admin/dashboard",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 390,
+    "route": "/admin/proposal-tracker",
+    "finalUrl": "/admin/proposal-tracker",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 390,
+    "route": "/admin/messages",
+    "finalUrl": "/admin/messages",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 390,
+    "route": "/admin/notification-history",
+    "finalUrl": "/admin/notification-history",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 390,
+    "route": "/admin/interns",
+    "finalUrl": "/admin/interns",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 390,
+    "route": "/admin/interns/3fdff44d-df70-4075-815b-5b50c9441ff3",
+    "finalUrl": "/admin/interns/3fdff44d-df70-4075-815b-5b50c9441ff3",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 390,
+    "route": "/admin/users",
+    "finalUrl": "/admin/users",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 390,
+    "route": "/admin/companies",
+    "finalUrl": "/admin/companies",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 390,
+    "route": "/admin/companies/7bca5987-bc89-4e96-b11e-1613bb0cb633",
+    "finalUrl": "/admin/companies/7bca5987-bc89-4e96-b11e-1613bb0cb633",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 390,
+    "route": "/admin/colleges",
+    "finalUrl": "/admin/colleges",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 390,
+    "route": "/admin/projects",
+    "finalUrl": "/admin/projects",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 390,
+    "route": "/admin/orders",
+    "finalUrl": "/admin/orders",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 390,
+    "route": "/admin/intern-invoices",
+    "finalUrl": "/admin/intern-invoices",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 390,
+    "route": "/admin/transactions",
+    "finalUrl": "/admin/transactions",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 390,
+    "route": "/admin/payouts",
+    "finalUrl": "/admin/payouts",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 390,
+    "route": "/admin/payouts?tab=dues",
+    "finalUrl": "/admin/payouts?tab=dues",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 390,
+    "route": "/admin/promo-codes",
+    "finalUrl": "/admin/promo-codes",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 390,
+    "route": "/admin/reports",
+    "finalUrl": "/admin/reports",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 390,
+    "route": "/admin/reports/money",
+    "finalUrl": "/admin/reports/money",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 390,
+    "route": "/admin/reports/analytics",
+    "finalUrl": "/admin/reports/analytics",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 390,
+    "route": "/admin/cms",
+    "finalUrl": "/admin/cms",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 390,
+    "route": "/admin/cms/terms",
+    "finalUrl": "/admin/cms/terms",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 390,
+    "route": "/admin/notifications",
+    "finalUrl": "/admin/notifications",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 390,
+    "route": "/admin/settings",
+    "finalUrl": "/admin/settings",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 390,
+    "route": "/admin/roles",
+    "finalUrl": "/admin/roles",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 390,
+    "route": "/admin/account",
+    "finalUrl": "/admin/account",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 768,
+    "route": "/admin/dashboard",
+    "finalUrl": "/admin/dashboard",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 768,
+    "route": "/admin/proposal-tracker",
+    "finalUrl": "/admin/proposal-tracker",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 768,
+    "route": "/admin/messages",
+    "finalUrl": "/admin/messages",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 768,
+    "route": "/admin/notification-history",
+    "finalUrl": "/admin/notification-history",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 768,
+    "route": "/admin/interns",
+    "finalUrl": "/admin/interns",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 768,
+    "route": "/admin/interns/3fdff44d-df70-4075-815b-5b50c9441ff3",
+    "finalUrl": "/admin/interns/3fdff44d-df70-4075-815b-5b50c9441ff3",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 768,
+    "route": "/admin/users",
+    "finalUrl": "/admin/users",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 768,
+    "route": "/admin/companies",
+    "finalUrl": "/admin/companies",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 768,
+    "route": "/admin/companies/7bca5987-bc89-4e96-b11e-1613bb0cb633",
+    "finalUrl": "/admin/companies/7bca5987-bc89-4e96-b11e-1613bb0cb633",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 768,
+    "route": "/admin/colleges",
+    "finalUrl": "/admin/colleges",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 768,
+    "route": "/admin/projects",
+    "finalUrl": "/admin/projects",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 768,
+    "route": "/admin/orders",
+    "finalUrl": "/admin/orders",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 768,
+    "route": "/admin/intern-invoices",
+    "finalUrl": "/admin/intern-invoices",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 768,
+    "route": "/admin/transactions",
+    "finalUrl": "/admin/transactions",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 768,
+    "route": "/admin/payouts",
+    "finalUrl": "/admin/payouts",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 768,
+    "route": "/admin/payouts?tab=dues",
+    "finalUrl": "/admin/payouts?tab=dues",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 768,
+    "route": "/admin/promo-codes",
+    "finalUrl": "/admin/promo-codes",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 768,
+    "route": "/admin/reports",
+    "finalUrl": "/admin/reports",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 768,
+    "route": "/admin/reports/money",
+    "finalUrl": "/admin/reports/money",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 768,
+    "route": "/admin/reports/analytics",
+    "finalUrl": "/admin/reports/analytics",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 768,
+    "route": "/admin/cms",
+    "finalUrl": "/admin/cms",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 768,
+    "route": "/admin/cms/terms",
+    "finalUrl": "/admin/cms/terms",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 768,
+    "route": "/admin/notifications",
+    "finalUrl": "/admin/notifications",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 768,
+    "route": "/admin/settings",
+    "finalUrl": "/admin/settings",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 768,
+    "route": "/admin/roles",
+    "finalUrl": "/admin/roles",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 768,
+    "route": "/admin/account",
+    "finalUrl": "/admin/account",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 1440,
+    "route": "/admin/dashboard",
+    "finalUrl": "/admin/dashboard",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 1440,
+    "route": "/admin/proposal-tracker",
+    "finalUrl": "/admin/proposal-tracker",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 1440,
+    "route": "/admin/messages",
+    "finalUrl": "/admin/messages",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 1440,
+    "route": "/admin/notification-history",
+    "finalUrl": "/admin/notification-history",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 1440,
+    "route": "/admin/interns",
+    "finalUrl": "/admin/interns",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 1440,
+    "route": "/admin/interns/3fdff44d-df70-4075-815b-5b50c9441ff3",
+    "finalUrl": "/admin/interns/3fdff44d-df70-4075-815b-5b50c9441ff3",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 1440,
+    "route": "/admin/users",
+    "finalUrl": "/admin/users",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 1440,
+    "route": "/admin/companies",
+    "finalUrl": "/admin/companies",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 1440,
+    "route": "/admin/companies/7bca5987-bc89-4e96-b11e-1613bb0cb633",
+    "finalUrl": "/admin/companies/7bca5987-bc89-4e96-b11e-1613bb0cb633",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 1440,
+    "route": "/admin/colleges",
+    "finalUrl": "/admin/colleges",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 1440,
+    "route": "/admin/projects",
+    "finalUrl": "/admin/projects",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 1440,
+    "route": "/admin/orders",
+    "finalUrl": "/admin/orders",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 1440,
+    "route": "/admin/intern-invoices",
+    "finalUrl": "/admin/intern-invoices",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 1440,
+    "route": "/admin/transactions",
+    "finalUrl": "/admin/transactions",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 1440,
+    "route": "/admin/payouts",
+    "finalUrl": "/admin/payouts",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 1440,
+    "route": "/admin/payouts?tab=dues",
+    "finalUrl": "/admin/payouts?tab=dues",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 1440,
+    "route": "/admin/promo-codes",
+    "finalUrl": "/admin/promo-codes",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 1440,
+    "route": "/admin/reports",
+    "finalUrl": "/admin/reports",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 1440,
+    "route": "/admin/reports/money",
+    "finalUrl": "/admin/reports/money",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 1440,
+    "route": "/admin/reports/analytics",
+    "finalUrl": "/admin/reports/analytics",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 1440,
+    "route": "/admin/cms",
+    "finalUrl": "/admin/cms",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 1440,
+    "route": "/admin/cms/terms",
+    "finalUrl": "/admin/cms/terms",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 1440,
+    "route": "/admin/notifications",
+    "finalUrl": "/admin/notifications",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 1440,
+    "route": "/admin/settings",
+    "finalUrl": "/admin/settings",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 1440,
+    "route": "/admin/roles",
+    "finalUrl": "/admin/roles",
+    "problems": []
+  },
+  {
+    "role": "admin",
+    "width": 1440,
+    "route": "/admin/account",
+    "finalUrl": "/admin/account",
+    "problems": []
+  }
+]

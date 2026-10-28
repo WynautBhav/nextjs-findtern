@@ -38,7 +38,7 @@ export default async function AdminNotifications({
   const header = (
     <AdminPageHeader
       title="Send notification"
-      subtitle="One message to candidates, companies, or both. It shows in their bell; nothing is emailed."
+      subtitle="It shows in their bell; nothing is emailed."
     />
   );
 

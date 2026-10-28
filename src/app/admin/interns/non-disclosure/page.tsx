@@ -15,7 +15,7 @@ export default function AdminInternNonDisclosurePage() {
     <div className="space-y-6">
       <AdminPageHeader
         title="Intern NDA"
-        subtitle="The non-disclosure and non-bypass agreement interns accept with an offer. The first active clause is the live text, as on the legacy site."
+        subtitle="The first active clause is the live text, as on the legacy site."
       />
       <LegalTabs current="/admin/interns/non-disclosure" />
 

@@ -15,7 +15,6 @@ export default function AdminCompanyTermsPage() {
     <div className="space-y-6">
       <AdminPageHeader
         title="Company terms"
-        subtitle="Edit the Company/Employer Terms & Conditions page content."
       />
       <LegalTabs current="/admin/companies/terms" />
 

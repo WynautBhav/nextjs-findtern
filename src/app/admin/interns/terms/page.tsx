@@ -15,7 +15,6 @@ export default function AdminInternTermsPage() {
     <div className="space-y-6">
       <AdminPageHeader
         title="Intern terms"
-        subtitle="Edit the Intern Terms & Conditions page content."
       />
       <LegalTabs current="/admin/interns/terms" />
 

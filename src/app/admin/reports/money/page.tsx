@@ -80,7 +80,7 @@ export default async function AdminMoneyReportPage({ searchParams }: { searchPar
     <div className="space-y-8">
       <AdminPageHeader
         title="Money in and out"
-        subtitle="What companies and candidates owe Findtern, and what Findtern owes interns. Amounts keep their currency; totals are in INR (USD at ₹100/$)."
+        subtitle="Amounts keep their currency; totals are in INR (USD at ₹100/$)."
         action={
           <>
             <Link href="/admin/reports" className={buttonClass({ variant: "outline", size: "sm" })}>

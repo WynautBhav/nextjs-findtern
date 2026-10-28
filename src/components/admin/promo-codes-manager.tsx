@@ -18,7 +18,6 @@ import { csrfFetch } from "@/lib/client-fetch";
 import { formatDate } from "@/lib/format";
 import type { PromoCode } from "@/lib/db/schema";
 import { AdminEmpty } from "@/components/admin/panel";
-import { StatusBadge } from "@/components/admin/status-badge";
 import { buttonClass } from "@/components/ui/button";
 import {
   Dialog,
@@ -30,11 +29,16 @@ import {
 } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
+import { RowMenu } from "@/components/app/row-menu";
+import { Surface } from "@/components/app/primitives";
 
 const inputClass =
   "mt-1.5 min-h-11 w-full rounded-apple-sm border border-ink-200 bg-white px-3 text-sm text-ink-900 outline-none placeholder:text-text-subtle focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20";
 
 /** Fixed amounts are stored as major rupees (the form takes "₹"), not minor units. */
+/** Code · discount · used · active · menu. */
+const PROMO_GRID = "grid-cols-[minmax(0,1fr)_auto] lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1fr)_4.5rem_2.5rem]";
+
 function benefitLabel(promo: PromoCode): string {
   return promo.discountType === "percentage"
     ? `${promo.discountValue}% off`
@@ -317,7 +321,7 @@ export function PromoCodesManager({
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search codes…"
             aria-label="Search promo codes"
-            className="min-h-11 w-full rounded-apple-sm border border-ink-200 bg-ink-50 pr-10 pl-9 text-[0.9375rem] text-ink-900 placeholder:text-text-subtle focus:border-brand-500 focus:bg-white focus:ring-2 focus:ring-brand-500/20 focus:outline-none [&::-webkit-search-cancel-button]:hidden"
+            className="min-h-11 w-full rounded-apple-sm border border-ink-200 bg-white pr-10 pl-9 text-[0.9375rem] text-ink-900 placeholder:text-text-subtle focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 focus:outline-none [&::-webkit-search-cancel-button]:hidden"
           />
           {search ? (
             <button
@@ -379,108 +383,103 @@ export function PromoCodesManager({
           />
         </div>
       ) : (
-        <ul className="grid gap-4 md:grid-cols-2">
+        // Rows, not one card per code (critique A, §0 density): the state is
+        // the switch alone (it was a switch and a pill), Edit and Delete are
+        // in the row's menu.
+        <Surface className="overflow-hidden">
+          <div aria-hidden className={cn(PROMO_GRID, "hidden gap-x-6 border-b border-ink-100 px-5 py-2.5 text-xs font-medium text-text-subtle lg:grid")}>
+            <span>Code</span>
+            <span>Discount</span>
+            <span>Used</span>
+            <span>Active</span>
+            <span />
+          </div>
+          <ul className="divide-y divide-ink-100">
           {filteredPromos.map((promo) => {
             const max = promo.maxUsages;
             const used = promo.usedCount;
             const pct = max ? Math.min(100, Math.round((used / max) * 100)) : 0;
             const isCopied = copiedCode === promo.code;
             return (
-              <li
-                key={promo.id}
-                className={cn(
-                  "apple-panel apple-spring bg-white p-5",
-                  !promo.isActive && "opacity-70",
-                )}
-              >
-                <div className="flex items-center gap-2">
-                  <span className="min-w-0 flex-1 truncate font-mono text-lg font-bold tracking-[0.04em] text-ink-900">
-                    {promo.code}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => copyToClipboard(promo.code)}
-                    title="Copy code"
-                    aria-label={`Copy code ${promo.code}`}
-                    className={buttonClass({ variant: "ghost", size: "icon", className: "text-ink-600" })}
-                  >
-                    {isCopied ? (
-                      <Check className="size-4 text-success" />
-                    ) : (
-                      <Copy className="size-4" />
-                    )}
-                  </button>
+              <li key={promo.id} className={cn(PROMO_GRID, "grid items-center gap-x-6 gap-y-2 px-5 py-4")}>
+                <div className="min-w-0">
+                  <p className="flex items-center gap-1">
+                    <span className={cn("truncate font-mono text-[0.9375rem] font-semibold tracking-[0.04em]", promo.isActive ? "text-ink-900" : "text-ink-600")}>
+                      {promo.code}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => copyToClipboard(promo.code)}
+                      title="Copy code"
+                      aria-label={`Copy code ${promo.code}`}
+                      className={buttonClass({ variant: "ghost", size: "iconSm", className: "text-text-subtle" })}
+                    >
+                      {isCopied ? <Check className="size-4 text-success" /> : <Copy className="size-4" />}
+                    </button>
+                  </p>
+                  {promo.description ? <p className="text-sm text-ink-600">{promo.description}</p> : null}
+                </div>
+                <div className="max-lg:col-span-2">
+                  <p className="nums font-semibold text-ink-900">{benefitLabel(promo)}</p>
+                  <p className="text-xs text-ink-600">
+                    {promo.appliesTo === "intern" ? "Interns only" : promo.appliesTo === "employer" ? "Companies only" : "Interns and companies"}
+                    {promo.minOrderAmountMinor ? ` · min ₹${Math.round(promo.minOrderAmountMinor / 100).toLocaleString("en-IN")}` : ""}
+                  </p>
+                </div>
+                <div className="max-lg:col-span-2">
+                  <p className="nums text-sm text-ink-800">
+                    {used.toLocaleString("en-IN")}
+                    {max ? ` of ${max.toLocaleString("en-IN")}` : " · no limit"}
+                  </p>
+                  {max ? (
+                    <div aria-hidden className="mt-1.5 h-1 max-w-40 overflow-hidden rounded-full bg-ink-100">
+                      <div className="h-full rounded-full bg-brand-600" style={{ width: `${pct}%` }} />
+                    </div>
+                  ) : null}
+                  <p className="mt-1 text-xs text-ink-600">
+                    {promo.validUntil ? `Until ${formatDate(new Date(promo.validUntil).toISOString())}` : "No expiry"}
+                  </p>
+                </div>
+                <div className="max-lg:col-start-2 max-lg:row-start-1 max-lg:justify-self-end">
                   <Switch
                     checked={promo.isActive}
                     onCheckedChange={() => handleToggleActive(promo)}
-                    aria-label={`Toggle ${promo.code} active status`}
+                    aria-label={`${promo.code} active`}
                   />
                 </div>
-
-                <div className="mt-2 flex flex-wrap items-baseline justify-between gap-2">
-                  <p className="nums text-3xl font-semibold tracking-[-0.02em] text-brand-800">{benefitLabel(promo)}</p>
-                  <StatusBadge value={promo.isActive ? "active" : "inactive"} />
+                <div className="max-lg:hidden">
+                  <RowMenu
+                    label={`More actions for ${promo.code}`}
+                    items={[
+                      { label: "Edit code", onSelect: () => openEditModal(promo), icon: <Edit2 /> },
+                      { label: "Delete code", onSelect: () => setDeleteTarget(promo), icon: <Trash2 />, destructive: true },
+                    ]}
+                  />
                 </div>
-                <p className="mt-1 text-sm font-medium text-ink-700">
-                  {promo.appliesTo === "intern" ? "Interns only" : promo.appliesTo === "employer" ? "Companies only" : "Interns and companies"}
-                </p>
-                {promo.description ? (
-                  <p className="mt-1 truncate text-sm text-ink-600">
-                    {promo.description}
+                <div className="flex gap-2 lg:hidden max-lg:col-span-2">
+                  <button type="button" onClick={() => openEditModal(promo)} className={buttonClass({ variant: "outline", size: "sm" })}>
+                    <Edit2 className="size-4" />
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDeleteTarget(promo)}
+                    aria-label={`Delete ${promo.code}`}
+                    className={buttonClass({ variant: "ghost", size: "iconSm", className: "text-ink-600 hover:bg-danger-soft hover:text-danger" })}
+                  >
+                    <Trash2 className="size-4" />
+                  </button>
+                </div>
+                {rowError?.id === promo.id ? (
+                  <p role="alert" className="text-sm font-medium text-danger lg:col-span-5 max-lg:col-span-2">
+                    {rowError.message}
                   </p>
                 ) : null}
-
-                <div className="mt-4 border-t border-dashed border-ink-200 pt-4">
-                  <div className="flex items-baseline justify-between gap-3">
-                    <span className="nums text-sm text-ink-600">
-                      {used.toLocaleString("en-IN")}
-                      {max ? ` of ${max.toLocaleString("en-IN")} used` : " used · unlimited"}
-                    </span>
-                    <span className="shrink-0 text-xs text-ink-600">
-                      {promo.validUntil
-                        ? `Until ${formatDate(new Date(promo.validUntil).toISOString())}`
-                        : "No expiry"}
-                      {promo.minOrderAmountMinor
-                        ? ` · min ₹${Math.round(promo.minOrderAmountMinor / 100).toLocaleString("en-IN")}`
-                        : ""}
-                    </span>
-                  </div>
-                  {max ? (
-                    <div aria-hidden className="mt-2 h-1.5 overflow-hidden rounded-full bg-ink-100">
-                      <div
-                        className="h-full rounded-full bg-brand-600"
-                        style={{ width: `${pct}%` }}
-                      />
-                    </div>
-                  ) : null}
-                  <div className="mt-3 flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => openEditModal(promo)}
-                      className={buttonClass({ variant: "outline", size: "sm", className: "flex-1 max-lg:h-11" })}
-                    >
-                      <Edit2 className="size-4" />
-                      Edit
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setDeleteTarget(promo)}
-                      aria-label={`Delete ${promo.code}`}
-                      className={buttonClass({ variant: "ghost", size: "iconSm", className: "text-ink-600 hover:bg-danger-soft hover:text-danger max-lg:size-11" })}
-                    >
-                      <Trash2 className="size-4" />
-                    </button>
-                  </div>
-                  {rowError?.id === promo.id ? (
-                    <p role="alert" className="mt-2 text-sm font-medium text-danger">
-                      {rowError.message}
-                    </p>
-                  ) : null}
-                </div>
               </li>
             );
           })}
-        </ul>
+          </ul>
+        </Surface>
       )}
 
       {/* Add / Edit Dialog */}

@@ -183,7 +183,7 @@ export default async function AdminCmsPage({
     <div>
       <AdminPageHeader
         title="Website content"
-        subtitle="Testimonials, partners, FAQs, blog posts and featured skills on the public site. Prices live under Pricing and fees; legal texts under Settings."
+        subtitle="Prices live under Pricing and fees; legal texts under Settings."
       />
 
       <nav aria-label="Content types" className="mb-6 flex max-w-full gap-1 overflow-x-auto rounded-apple-md bg-ink-100 p-1">

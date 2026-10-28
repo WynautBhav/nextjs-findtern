@@ -120,6 +120,12 @@ export function CollegeRowControls({ row }: { row: CollegeAdminRow }) {
           </label>
         ))}
       </div>
+      {/* Folded away once the college has an officer (an empty form sat
+          under the existing one); open from the start when it has none. */}
+      <details open={row.officers.length === 0} className="group">
+        <summary className="inline-flex min-h-11 cursor-pointer list-none items-center text-sm font-medium text-brand-700 hover:underline group-open:sr-only">
+          Issue another officer login
+        </summary>
       <form
         className="flex flex-wrap items-end gap-2"
         onSubmit={async (e) => {
@@ -145,6 +151,7 @@ export function CollegeRowControls({ row }: { row: CollegeAdminRow }) {
           Issue login
         </button>
       </form>
+      </details>
       <div role="status" aria-live="polite">
         {issued ? (
           <p className="rounded-apple-sm border border-brand-200 bg-brand-50 px-3 py-2 text-sm text-brand-900">

@@ -225,7 +225,13 @@ export function InlineToggle({
           onClick={flip}
           disabled={saving}
           aria-describedby={error ? errorId : undefined}
-          className={cn(buttonClass({ variant: "ghost", size: "sm" }), "h-8 px-2 max-lg:h-11")}
+          // Turning off (Deactivate, Hide) is the risky direction: quiet,
+          // with a danger hover, never the brand-green of a safe action.
+          className={cn(
+            buttonClass({ variant: "ghost", size: "sm" }),
+            "h-8 px-2 max-lg:h-11",
+            state && "text-ink-600 hover:bg-danger-soft hover:text-danger",
+          )}
         >
           {saving ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : null}
           {state ? turnOffLabel : turnOnLabel}

@@ -128,7 +128,6 @@ export default async function AdminInternInvoicesPage({ searchParams }: { search
     <div>
       <AdminPageHeader
         title="Intern invoices"
-        subtitle="Activation fees: who paid, with which promo code, the discount and the tax invoice."
       />
       {rows ? (
         <AdminInvoicesView kind="intern" rows={rows} seller={getInvoiceSeller()} params={params} basePath="/admin/intern-invoices" />

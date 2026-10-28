@@ -13,6 +13,7 @@ import type { Employer, EmployerPayment, Interview, Project, Proposal } from "@/
 import { formatDate, formatMoney, formatSlotTime } from "@/lib/format";
 import { parseOffer } from "@/lib/offer";
 import { cn } from "@/lib/utils";
+import { StatCard, StatGrid } from "@/components/admin/stat-card";
 
 /**
  * Company 360 (legacy admin-company-detail.tsx): a profile first (ADP-04),
@@ -94,7 +95,6 @@ export function Company360View({
         </Link>
         <PageHead
           className="mb-0"
-          eyebrow="Company 360"
           title={company.companyName}
           lede={
             <span className="flex flex-col gap-3">
@@ -127,16 +127,12 @@ export function Company360View({
         />
       </div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <StatTile label="Projects" value={projects.length} hint={`${activeProjects} active`} href={`${base}?tab=projects`} />
-        <StatTile label="Proposals sent" value={proposals.length} hint={`${hired.length} hired`} href={`${base}?tab=proposals`} />
-        <StatTile
-          label="Interviews"
-          value={interviews.length}
-          hint={upcoming ? `${upcoming} upcoming` : "None upcoming"}
-          href={`${base}?tab=interviews`}
-        />
-        <StatTile
+      {/* The admin summary strip, as on the list pages (four separate tiles before). */}
+      <StatGrid cols={4}>
+        <StatCard label="Projects" value={projects.length} hint={`${activeProjects} active`} href={`${base}?tab=projects`} />
+        <StatCard label="Proposals sent" value={proposals.length} hint={`${hired.length} hired`} href={`${base}?tab=proposals`} />
+        <StatCard label="Interviews" value={interviews.length} hint={upcoming ? `${upcoming} upcoming` : "None upcoming"} href={`${base}?tab=interviews`} />
+        <StatCard
           label="Paid to date"
           value={formatMoney(ledger.totals.paidInrMinor, "INR", { zeroLabel: "₹0" })}
           hint={
@@ -144,9 +140,10 @@ export function Company360View({
               ? `${formatMoney(ledger.totals.remainingInrMinor, "INR")} still due of ${formatMoney(ledger.totals.billedInrMinor, "INR")}`
               : "Nothing due"
           }
+          tone={ledger.totals.remainingInrMinor > 0 ? "warning" : "neutral"}
           href={`${base}?tab=dues`}
         />
-      </div>
+      </StatGrid>
 
       <nav aria-label="Company records" className="-mx-1 overflow-x-auto px-1">
         <ul className="flex min-w-max gap-1 pb-1">
@@ -470,6 +467,10 @@ function ProfileTab({ company, fte }: { company: Omit<Employer, "password">; fte
         </dl>
         <div className="mt-6">
           <SectionHead title="Escalation contact" hint="Second point of contact" />
+          {/* Four dashes said "not given" four times; say it once. */}
+          {!company.escalationContactName && !company.escalationContactPhone && !company.escalationContactEmail ? (
+            <p className="text-sm text-ink-600">Not given yet.</p>
+          ) : (
           <dl className="divide-y divide-ink-100">
             <DetailRow label="Name" value={company.escalationContactName || "-"} />
             <DetailRow label="Role" value={company.escalationContactRole || "-"} />
@@ -480,6 +481,7 @@ function ProfileTab({ company, fte }: { company: Omit<Employer, "password">; fte
             />
             <DetailRow label="Email" value={company.escalationContactEmail ? <span className="break-all">{company.escalationContactEmail}</span> : "-"} />
           </dl>
+          )}
         </div>
       </Surface>
 
@@ -503,16 +505,17 @@ function ProfileTab({ company, fte }: { company: Omit<Employer, "password">; fte
               <CompanyFteSelect id={company.id} value={company.internationalFteStatus} refresh />
             </dd>
           </div>
-          <div className="flex flex-wrap items-center justify-between gap-3 py-3">
-            <dt className="text-sm text-ink-600">
-              Delete company
-              <span className="block text-xs text-text-subtle">Only possible before any proposal, interview or payment.</span>
-            </dt>
-            <dd>
-              <CompanyDeleteButton id={company.id} />
-            </dd>
-          </div>
         </dl>
+      </Surface>
+
+      {/* Apart from the routine switches above (critique A: Delete sat
+          among them in the Account card). */}
+      <Surface className="flex flex-wrap items-center justify-between gap-3 border-danger/20 p-6">
+        <div>
+          <p className="text-sm font-semibold text-ink-900">Delete company</p>
+          <p className="text-sm text-ink-600">Only possible before any proposal, interview or payment.</p>
+        </div>
+        <CompanyDeleteButton id={company.id} />
       </Surface>
     </div>
   );
