@@ -101,7 +101,7 @@ export function InternRatingsCell({
         ) : (
           <span className="nums font-semibold text-ink-900">
             {score.toFixed(1)}
-            <span className="ml-0.5 text-xs font-normal text-ink-500">/10</span>
+            <span className="ml-0.5 text-xs font-normal text-text-subtle">/10</span>
           </span>
         )
       }

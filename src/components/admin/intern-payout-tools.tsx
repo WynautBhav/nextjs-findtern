@@ -260,7 +260,7 @@ export function InternPayoutTools({
                             ) : null}
                           </>
                         ) : (
-                          <span className="text-ink-500">-</span>
+                          <span className="text-text-subtle">-</span>
                         )}
                       </td>
                       <td className={cn(td, "whitespace-nowrap text-right")}>
@@ -405,7 +405,7 @@ export function InternPayoutTools({
                     <tr key={p.id}>
                       <td className={cn(td, "nums whitespace-nowrap")}>{scheduled ? formatDate(scheduled) : "-"}</td>
                       <td className={td}>
-                        {proposalId ? placementLabel.get(proposalId) ?? "Placement" : <span className="text-ink-500">Not linked</span>}
+                        {proposalId ? placementLabel.get(proposalId) ?? "Placement" : <span className="text-text-subtle">Not linked</span>}
                         {opsNote ? (
                           <span className="block max-w-64 truncate text-xs text-ink-600" title={opsNote}>
                             {opsNote}
@@ -418,7 +418,7 @@ export function InternPayoutTools({
                       <td className={td}>
                         <StatusBadge status={p.status} />
                       </td>
-                      <td className={cn(td, "nums")}>{p.referenceId ?? <span className="text-ink-500">-</span>}</td>
+                      <td className={cn(td, "nums")}>{p.referenceId ?? <span className="text-text-subtle">-</span>}</td>
                       <td className={cn(td, "nums whitespace-nowrap")}>{p.paidAt ? formatDate(p.paidAt) : "-"}</td>
                       <td className={cn(td, "text-right")}>
                         {p.status === "pending" ? (

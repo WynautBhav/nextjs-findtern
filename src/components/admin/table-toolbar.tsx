@@ -132,7 +132,7 @@ export function TableToolbar({
         <div className="relative w-full min-w-[12rem] flex-1 sm:w-auto sm:max-w-xs">
           <Search
             aria-hidden
-            className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-ink-400"
+            className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-text-subtle"
           />
           <input
             ref={inputRef}
@@ -147,7 +147,7 @@ export function TableToolbar({
             }}
             placeholder={searchPlaceholder}
             aria-label={searchPlaceholder}
-            className="h-9 w-full rounded-apple-sm border border-ink-200 bg-white pr-8 pl-9 text-sm text-ink-900 placeholder:text-ink-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 focus:outline-none max-lg:min-h-11 [&::-webkit-search-cancel-button]:hidden"
+            className="h-9 w-full rounded-apple-sm border border-ink-200 bg-white pr-8 pl-9 text-sm text-ink-900 placeholder:text-text-subtle focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 focus:outline-none max-lg:min-h-11 [&::-webkit-search-cancel-button]:hidden"
           />
           {term ? (
             <button

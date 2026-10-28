@@ -32,7 +32,7 @@ import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 
 const inputClass =
-  "mt-1.5 min-h-11 w-full rounded-apple-sm border border-ink-200 bg-white px-3 text-sm text-ink-900 outline-none placeholder:text-ink-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20";
+  "mt-1.5 min-h-11 w-full rounded-apple-sm border border-ink-200 bg-white px-3 text-sm text-ink-900 outline-none placeholder:text-text-subtle focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20";
 
 /** Fixed amounts are stored as major rupees (the form takes "₹"), not minor units. */
 function benefitLabel(promo: PromoCode): string {
@@ -309,7 +309,7 @@ export function PromoCodesManager({
         <div className="relative min-w-0 flex-1 lg:max-w-sm">
           <Search
             aria-hidden
-            className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-ink-400"
+            className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-text-subtle"
           />
           <input
             type="search"
@@ -317,7 +317,7 @@ export function PromoCodesManager({
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search codes…"
             aria-label="Search promo codes"
-            className="min-h-11 w-full rounded-apple-sm border border-ink-200 bg-ink-50 pr-10 pl-9 text-[0.9375rem] text-ink-900 placeholder:text-ink-400 focus:border-brand-500 focus:bg-white focus:ring-2 focus:ring-brand-500/20 focus:outline-none [&::-webkit-search-cancel-button]:hidden"
+            className="min-h-11 w-full rounded-apple-sm border border-ink-200 bg-ink-50 pr-10 pl-9 text-[0.9375rem] text-ink-900 placeholder:text-text-subtle focus:border-brand-500 focus:bg-white focus:ring-2 focus:ring-brand-500/20 focus:outline-none [&::-webkit-search-cancel-button]:hidden"
           />
           {search ? (
             <button

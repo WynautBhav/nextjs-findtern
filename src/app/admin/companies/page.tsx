@@ -296,7 +296,7 @@ export default async function AdminCompaniesPage({
             align: "right",
             cell: (row) => {
               const billed = Number(row.paidTotal) + (money.get(row.id)?.amountLeftInrMinor ?? 0);
-              return billed > 0 ? formatMoney(billed, "INR") : <span className="text-ink-400">-</span>;
+              return billed > 0 ? formatMoney(billed, "INR") : <span className="text-text-subtle">-</span>;
             },
           },
           {
@@ -311,7 +311,7 @@ export default async function AdminCompaniesPage({
                   {m?.lastPaymentAt ? <p className="text-xs text-ink-600">last {formatDate(m.lastPaymentAt)}</p> : null}
                 </div>
               ) : (
-                <span className="text-ink-400">-</span>
+                <span className="text-text-subtle">-</span>
               );
             },
           },
@@ -326,7 +326,7 @@ export default async function AdminCompaniesPage({
                   {m.nextDueDate ? <p className="text-xs text-ink-600">next {formatDate(m.nextDueDate)}</p> : null}
                 </div>
               ) : (
-                <span className="text-ink-400">Nothing</span>
+                <span className="text-text-subtle">Nothing</span>
               );
             },
           },

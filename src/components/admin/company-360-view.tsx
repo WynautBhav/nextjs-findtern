@@ -107,16 +107,16 @@ export function Company360View({
               </span>
               <span className="flex flex-wrap gap-x-5 gap-y-1.5 text-sm text-ink-600">
                 <span className="inline-flex min-w-0 items-center gap-1.5">
-                  <Mail className="size-4 shrink-0 text-ink-400" aria-hidden />
+                  <Mail className="size-4 shrink-0 text-text-subtle" aria-hidden />
                   <span className="truncate">{company.companyEmail}</span>
                 </span>
                 <span className="nums inline-flex items-center gap-1.5">
-                  <Phone className="size-4 shrink-0 text-ink-400" aria-hidden />
+                  <Phone className="size-4 shrink-0 text-text-subtle" aria-hidden />
                   {company.countryCode} {company.phoneNumber}
                 </span>
                 {location || company.country ? (
                   <span className="inline-flex items-center gap-1.5">
-                    <MapPin className="size-4 shrink-0 text-ink-400" aria-hidden />
+                    <MapPin className="size-4 shrink-0 text-text-subtle" aria-hidden />
                     {[location, company.country].filter(Boolean).join(" · ")}
                   </span>
                 ) : null}
@@ -342,7 +342,7 @@ export function Company360View({
                     Open link <ExternalLink className="size-3.5" aria-hidden />
                   </a>
                 ) : (
-                  <span className="text-ink-500">No link</span>
+                  <span className="text-text-subtle">No link</span>
                 ),
             },
             { header: "Status", cell: (i) => <StatusBadge value={i.status} /> },
@@ -498,7 +498,7 @@ function ProfileTab({ company, fte }: { company: Omit<Employer, "password">; fte
           <div className="flex flex-wrap items-center justify-between gap-3 py-3">
             <dt className="text-sm text-ink-600">
               International FTE
-              <span className="block text-xs text-ink-500">
+              <span className="block text-xs text-text-subtle">
                 {fte === "applied" ? "Requested; approve, or set back to Not approved to decline." : "Lets the company send full-time offers in USD."}
               </span>
             </dt>
@@ -509,7 +509,7 @@ function ProfileTab({ company, fte }: { company: Omit<Employer, "password">; fte
           <div className="flex flex-wrap items-center justify-between gap-3 py-3">
             <dt className="text-sm text-ink-600">
               Delete company
-              <span className="block text-xs text-ink-500">Only possible before any proposal, interview or payment.</span>
+              <span className="block text-xs text-text-subtle">Only possible before any proposal, interview or payment.</span>
             </dt>
             <dd>
               <CompanyDeleteButton id={company.id} />
@@ -585,7 +585,7 @@ function DuesTab({
           {
             header: "Due",
             align: "right",
-            cell: (h) => (h.dueMinor > 0 ? <span className="font-semibold text-ink-900">{money(h.dueMinor, h.currency)}</span> : <span className="text-ink-500">Nothing</span>),
+            cell: (h) => (h.dueMinor > 0 ? <span className="font-semibold text-ink-900">{money(h.dueMinor, h.currency)}</span> : <span className="text-text-subtle">Nothing</span>),
           },
           {
             header: "Months",

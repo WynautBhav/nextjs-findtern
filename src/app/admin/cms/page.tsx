@@ -100,7 +100,7 @@ function columnsFor(type: CmsType): Column<CmsItem>[] {
     className: cn("max-w-[18rem]", cls),
     cell: (row) => (
       <span className="block truncate" title={String(row[key] ?? "")}>
-        {String(row[key] ?? "") || <span className="text-ink-400">-</span>}
+        {String(row[key] ?? "") || <span className="text-text-subtle">-</span>}
       </span>
     ),
   });
@@ -198,7 +198,7 @@ export default async function AdminCmsPage({
             )}
           >
             {CMS_COLLECTIONS[t].label}
-            {counts[t] !== undefined ? <span className="nums text-xs text-ink-500">{counts[t]}</span> : null}
+            {counts[t] !== undefined ? <span className="nums text-xs text-text-subtle">{counts[t]}</span> : null}
           </Link>
         ))}
       </nav>

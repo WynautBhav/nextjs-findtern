@@ -21,7 +21,7 @@ type Person = { id: string; label: string; email: string };
 type Side = "intern" | "employer";
 
 const field =
-  "mt-1.5 min-h-11 w-full rounded-apple-sm border border-ink-200 bg-white px-3.5 text-sm text-ink-900 outline-none placeholder:text-ink-400 focus-visible:border-brand-600 focus-visible:ring-2 focus-visible:ring-brand-500/20";
+  "mt-1.5 min-h-11 w-full rounded-apple-sm border border-ink-200 bg-white px-3.5 text-sm text-ink-900 outline-none placeholder:text-text-subtle focus-visible:border-brand-600 focus-visible:ring-2 focus-visible:ring-brand-500/20";
 
 export function NotificationComposer({
   interns,
@@ -223,7 +223,7 @@ export function NotificationComposer({
         <fieldset disabled={everyone[side]} className="mt-3 disabled:opacity-50">
           <legend className="sr-only">Pick {side === "intern" ? "candidates" : "companies"}</legend>
           <div className="relative">
-            <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-ink-400" aria-hidden />
+            <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-text-subtle" aria-hidden />
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
