@@ -384,12 +384,14 @@ export function SendProposalForm({
               id="monthlyHours"
               label="Hours per month"
               value={`${monthlyHours} h`}
+              inputMode="numeric"
               hint={`(${monthlyDays} working days − ${Number(paidLeaves) || 0} leave) × 8 h`}
             />
             <ReadOnlyField
               id="monthlyAmount"
               label={`Monthly amount (${currency})${currency === "INR" && totals.monthly > 0 ? " (includes GST)" : ""}`}
               value={formatMoney(Math.round(totals.monthly * 100), currency)}
+              inputMode="decimal"
               hint={`${formatRate(rate.hourlyRateMinor, currency)} × ${monthlyHours} h. Worked out for you.`}
             />
           </div>
@@ -466,7 +468,7 @@ export function SendProposalForm({
                 error={errors.officeDays}
                 onChange={setOfficeDays}
               />
-              <ReadOnlyField id="homeDays" label="Work-from-home days per week" value={`${homeDays} day${homeDays === "1" ? "" : "s"}`} hint="The rest of the working week." />
+              <ReadOnlyField id="homeDays" label="Work-from-home days per week" value={`${homeDays} day${homeDays === "1" ? "" : "s"}`} inputMode="numeric" hint="The rest of the working week." />
             </div>
           ) : null}
 
@@ -786,11 +788,14 @@ function ReadOnlyField({
   label,
   value,
   hint,
+  inputMode,
 }: {
   id: string;
   label: string;
   value: string;
   hint?: string;
+  /** A figure: if a phone ever opens a keyboard on it, the numeric one (QA-126). */
+  inputMode?: "numeric" | "decimal";
 }) {
   return (
     <div>
@@ -803,6 +808,7 @@ function ReadOnlyField({
         name={id}
         value={value}
         readOnly
+        inputMode={inputMode}
         className={`${FIELD_BASE} ${FIELD_OK} cursor-not-allowed bg-ink-50 text-ink-600`}
       />
     </div>

@@ -613,6 +613,7 @@ logins; `SEED=1` selects the seed accounts and server). Screenshots are in
   check a real phone); Schedule's date filter is a DD/MM/YYYY text field. "Hours per month" (value "160 h") and "Monthly amount" ("₹32,000") are `type=text` with no `inputmode`.
 - Expected: one date control, DD/MM/YYYY (bug sheet 7, DESIGN §0); numeric keyboard for numbers. Evidence: `emp2f1-chromium-375-proposal-form.png`, `emp2f3-chromium-375-book.png`. Severity **P2**.
 - Retest (tester B, 28 Oct, production build of wp/qa-b on master 6c4b000): **partly fixed, still open**: Start date and the three meeting-slot dates are now DD/MM/YYYY text fields (`inputmode=numeric`), same as Schedule's filter. "Hours per month" and "Monthly amount" are still `type=text` without `inputmode`, so a phone opens the letters keyboard (Chromium and WebKit).
+- Status (builder, 28 Oct): fixed, awaiting retest (wp/opus, fix(QA-126)). The remaining part: "Hours per month", "Work-from-home days per week" (inputmode=numeric) and "Monthly amount" (inputmode=decimal) now carry an inputmode. They are read-only figures the form works out, so normally no keyboard opens, but if a phone does open one it is numeric. They stay inputs with the same name attributes, so bs7-employer-prop2.mjs keeps reading input[name=monthlyAmount]. The dates were already DD/MM/YYYY text fields (as your retest found). No other type=number fields without inputmode in the employer area.
 
 ### QA-127
 - Steps: `/employer/schedule`, type each value in the DD/MM/YYYY field and tab out (`emp2-interact.mjs`).
