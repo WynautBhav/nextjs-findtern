@@ -82,6 +82,10 @@ lines only.
 | QA-154 | P2 | intern | dashboard, timesheets, proposals, settings, onboarding, college | 375 | open | Tap targets under 44 px: "Call alerts" 76 x 24 (on every page), "Details" 50 x 24, "Full record" 78 x 20, the "Open to work" switch 41 x 24, sheet and offer title links 21 to 24 px high, the support email link 20 px, onboarding's "Settings" link 17 px, the college consent toggles 20 to 24 px. |
 | QA-155 | P2 | intern | /intern/opportunities (new intern), /intern/settings | any | open | Copy and shape tells from DESIGN §0: "Open roles unlock after two steps"; an icon before the heading "Need help?" on Settings (the brief asked for it to go). |
 | QA-156 | P2 | admin | /admin/companies | 375 | open | In each company row the company name and the contact name run together with no space ("Globex IncDana US"), and long company names are cut at the card edge ("Bharatiya Anusandhan Evam Vikas Prati…"). |
+| QA-157 | P2 | college | /college/drives | 375, Chromium + WebKit | open | The figures row of a drive card (Employers / Shortlisted / Calls answered) runs past the card: "Calls answered 2 of 3" is 19 px (Chromium) or 27 px (WebKit) outside its box and cut. |
+| QA-158 | P2 | college | /college/drives/new, right after "Create drive" | 375 | open | After creating a drive the URL becomes the drive's page and the form turns into its edit form ("Save changes"), but the heading still says "New drive / Takes two minutes. You can change dates and eligibility later…", above "Your drive link". |
+| QA-159 | P2 | college | /college/drives/[id] "Close link now" | 375, both engines | open | The in-page confirm ("…close the link / Cancel") does not close on Esc; only Cancel does. (The five admin deletes do close on Esc.) |
+| QA-160 | P2 | college | /college (student list), /college/roster | 375 | open | Tap targets and density: each student's name link is 107 to 162 x 23 px (51 links), the New drive radios 24 px; the roster's "Not joined yet (12)" list puts name, roll number, year, branch and email on five separate lines per student, about 150 px each. |
 
 ## Details
 
@@ -726,6 +730,7 @@ logins; `SEED=1` selects the seed accounts and server). Screenshots are in
 - Expected: the in-page confirm used on the employer side ("Yes, approve and lock / Cancel"); destructive actions in a menu. Evidence: `admi-chromium-1440-deactivate.png`, `adm-chromium-1440-interns.png`. Severity **P2**.
 - Retest (tester B, 28 Oct, production build of wp/qa-b on master 2a8540e): **closed for the row toggles**: "Deactivate" on a candidate row now opens an in-page confirm in the row ("Deactivate this account? They will not be able to sign in until it is activated again." with "Yes, deactivate" and "Cancel"); no `window.confirm`, no request until confirmed (`adm-rowtoggle.mjs`, `adm-rowtoggle-1440-click.png`). The row still shows four inline controls ("Live Hide", "Active Deactivate"); the orchestrator says the five other deletes keep `window.confirm` by design for now.
 - Status (builder, 29 Oct): follow-up done (wp/opus). The five other admin window.confirm deletes (delete company, delete message(s), CMS delete, staff revoke, role delete) use useConfirm (components/admin/use-confirm): an in-page dialog with the consequence and "Yes, …" / Cancel. Checked on Messages: no native dialog, no DELETE on Cancel. Outside admin, still window.confirm: intern timesheet delete (delete-sheet-button, timesheet-grid) and employer project delete.
+- Retest 2 (tester B, 28 Oct, production build of wp/qa-b on master b28270d): **the five remaining deletes confirm in the page**, in Chromium 1440, Chromium 375 and WebKit 375 (`docs/qa/b/repro/adm-deletes.mjs`): delete company ("Delete this company? The employer account is deleted permanently. This can't be undone."), delete message(s) (select a message first; "Deleted messages are gone from the inbox for everyone"), delete a website item ("Delete \"Rishi Parashar\"? It disappears from the website at once"), revoke staff access ("They lose the admin console and are signed out at their next request"), delete a role ("Delete the role \"Admin\"? Its permissions go with it"). Each opens an in-page dialog, Cancel closes it, Esc closes it, no native `confirm()` is raised, and no mutating request is sent until "Yes" (I never confirmed). Shots `adm-del-*`.
 
 ### QA-146
 - Actual (375, `adm-sweep.mjs`): `a` name links 20 to 24 px high on Candidates, Users, Projects, Proposal pipeline, Orders, Payouts, Notification history, Analytics; "Select row" 16 x 16 (Candidates); 24 x 24 checkboxes on Colleges, Messages, Notifications and 90 in the role matrix; promo-code toggles 37 x 21; "Excel template" and "CSV" 24 px. Severity **P2**.
@@ -778,3 +783,20 @@ logins; `SEED=1` selects the seed accounts and server). Screenshots are in
 
 ### QA-156
 - Steps: Super Admin, `/admin/companies` at 375: the link text is "Globex IncDana US" (two `span`s with no gap). Evidence: `docs/qa/b/screens/adm2-chromium-375-companies.png`. Severity **P2**.
+
+### Tester B, 28 Oct (fifth pass): the redesigned /college screens, public drive page and employer drive pages, QA-157 to QA-160
+- Build: production build of wp/qa-b on master b28270d (built 14:37), live-copy DB, placement officer `tpo@jklu.edu.in`; Chromium 375 and 1440, WebKit 375 (`docs/qa/b/repro/col-sweep.mjs`, `col-student.mjs`, `col-flow.mjs`, `col-close.mjs`, `col-emp.mjs`, `adm-deletes.mjs`; shots `docs/qa/b/screens/col-*.png`).
+- **What worked:** nothing wider than the shell on any college page at 375 or 1440; Students (figures, year and status filters, search, table) and Roster (one "Keep the list current" row; the 12 not-joined students as an aligned table at 1440) read well; the offline chips stop at 6 plus "+29 more"; student detail has the AI interview, the report and recording controls with the "who opened it" note, and one "Offers and meetings" card; New drive takes DD/MM/YYYY text dates with a time field ("Use DD/MM/YYYY, for example 31/10/2026." for ISO or 99/99/2026), creates the drive and shows the link once; "Close link now" asks in the page, Cancel sends nothing, Confirm sends one `DELETE .../link` and the drive reads "Link closed. No employer can get in. Reopen with a new link". Public `/drive/<token>` signed out: a live drive shows title, dates and the student counts ("This drive hasn't opened yet" before it opens), a closed link says "Closed by the college… Ask the placement officer"; an employer who never joined the drive sees only "Open the college's link first… All campus drives" (no title, no dates; Chromium and WebKit, also for a drive whose link was closed); an employer who did join sees the filters and the students (QA-006 re-checked earlier). The five admin deletes (QA-145) confirm in the page.
+- **Not exercised:** the roster upload, "Nudge all 35" (it would notify test students), the e2e selectors file.
+
+### QA-157
+- Steps: `/college/drives` at 375 with a drive card; `col-sweep.mjs` reports `dl "Employers 2 Shortlisted 0 Ca…" 19px past` (WebKit 27 px). Evidence: `docs/qa/b/screens/col-chromium-375-drives.png`. Severity **P2**.
+
+### QA-158
+- Evidence: `docs/qa/b/screens/col-flow-chromium-375-created.png`. Severity **P2**.
+
+### QA-159
+- Steps: `DRIVE=<id> node docs/qa/b/repro/col-close.mjs chromium|webkit 375`: after "Close link now", Esc leaves the confirm open (Cancel still visible), no request is sent. Severity **P2**.
+
+### QA-160
+- Evidence: `col-chromium-375-home.png`, `col-chromium-375-roster.png`. Severity **P2**.
