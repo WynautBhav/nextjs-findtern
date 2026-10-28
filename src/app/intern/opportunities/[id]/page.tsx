@@ -12,6 +12,7 @@ import { formatDayLabel } from "@/lib/format";
 import { toArray } from "@/lib/journey";
 
 import { LockedRoles, rolesGate } from "../_gate";
+import { isHiredProposal } from "@/lib/hire-status";
 
 export const metadata: Metadata = {
   title: "Role",
@@ -42,6 +43,8 @@ export default async function RoleDetail({ params }: { params: Promise<{ id: str
 
   const data = await loadInternData(session.uid);
   const existing = data.proposals.find((p) => p.projectId === id) ?? null;
+  // A hire is a hire whether the status or only hiredAt says so (QA-010).
+  const hired = existing ? isHiredProposal(existing) : false;
   // A role they already have an offer on stays readable; anything else waits
   // for the same unlock as the list.
   if (!existing) {
@@ -72,15 +75,15 @@ export default async function RoleDetail({ params }: { params: Promise<{ id: str
         title={role.projectName}
         lede={
           existing
-            ? existing.status === "hired"
+            ? hired
               ? "You are doing this role now."
               : "You have an offer for this role."
             : "This company is hiring for this right now."
         }
         action={
           existing ? (
-            <Pill tone={existing.status === "sent" ? "waiting" : existing.status === "hired" ? "live" : "neutral"}>
-              {existing.status === "sent" ? "Offer waiting on you" : existing.status === "hired" ? "Hired" : "Offer received"}
+            <Pill tone={hired ? "live" : existing.status === "sent" ? "waiting" : "neutral"}>
+              {hired ? "Hired" : existing.status === "sent" ? "Offer waiting on you" : "Offer received"}
             </Pill>
           ) : role.fullTimeOffer ? (
             <Pill tone="waiting">Can lead to full time</Pill>
@@ -116,7 +119,10 @@ export default async function RoleDetail({ params }: { params: Promise<{ id: str
               No button that pretends. What actually happens is written
               out, which is the thing a candidate is actually missing. */}
           <Surface className="mt-4 p-5 sm:p-6">
-            <SectionHead title="What happens next" className="mb-0" />
+            <SectionHead title={existing ? (hired ? "Your placement" : "Your offer") : "What happens next"} className="mb-0" />
+            {/* The explainer is for someone without an offer; with one it only
+                contradicted where they are (steps 3-4 undone for a hire). */}
+            {existing ? null : (
             <ol className="mt-4 space-y-4">
               {[
                 {
@@ -151,11 +157,12 @@ export default async function RoleDetail({ params }: { params: Promise<{ id: str
                 </li>
               ))}
             </ol>
+            )}
 
-            <div className="mt-6 border-t border-ink-100 pt-5">
+            <div className={existing ? "mt-4" : "mt-6 border-t border-ink-100 pt-5"}>
               {existing ? (
                 <ButtonLink href={`/intern/proposals/${existing.id}`}>
-                  Open your offer
+                  {hired ? "Open your placement" : "Open your offer"}
                   <ArrowRight className="size-4" aria-hidden />
                 </ButtonLink>
               ) : (
@@ -184,7 +191,11 @@ export default async function RoleDetail({ params }: { params: Promise<{ id: str
                 value={
                   <span className="inline-flex items-center gap-2">
                     <CompanyInitials name={role.companyName} className="size-8 text-xs" />
-                    <span className="text-ink-600">Name shared once hired</span>
+                    {hired ? (
+                      <span className="text-ink-900">{data.names[existing!.employerId] ?? role.companyName}</span>
+                    ) : (
+                      <span className="text-ink-600">Name shared once hired</span>
+                    )}
                   </span>
                 }
               />

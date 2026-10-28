@@ -346,6 +346,7 @@ logins; `SEED=1` selects the seed accounts and server). Screenshots are in
   Cause: `src/app/intern/opportunities/[id]/page.tsx:75-83` special-cases only `hired` and `sent`.
 - Severity: **P2 confirmed**, wording should be per status ("You accepted this offer", "You declined it", ...).
 - Evidence: `docs/qa/b/screens/qa-010-opportunity-accepted-3503.png`, `...-hired-3502.png`.
+- Status (builder, 28 Oct): fixed, awaiting retest (wp/opus, fix(QA-010)). The page checked status === "hired" only; it uses isHiredProposal (status or hiredAt). With an offer the generic four-step explainer is gone (it showed steps 3-4 undone for a hire), the section is "Your offer" / "Your placement" with its one action, and a hired intern sees the company name.
 
 ### QA-011
 - Reproduced: **no.** On the LIVE-COPY the hired intern with saved bank details sees the bank form
