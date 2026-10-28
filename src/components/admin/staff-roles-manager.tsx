@@ -237,13 +237,15 @@ export function StaffRolesManager({
                 <label className="sr-only" htmlFor={`role-${s.id}`}>
                   Role for {s.email}
                 </label>
+                {/* Its own line on a phone: squeezed beside the buttons it was
+                    62px and read "Exe", "Exe", "Exe" (QA-142). */}
                 <select
                   id={`role-${s.id}`}
                   value={s.role ?? ""}
                   disabled={busyId === s.id || self}
                   title={self ? "You can't change your own role" : undefined}
                   onChange={(e) => updateStaff(s.id, { role: e.target.value })}
-                  className="h-9 min-w-0 flex-1 rounded-apple-sm border border-ink-200 bg-white px-2.5 text-sm text-ink-800 disabled:opacity-60 max-lg:h-11 sm:w-48 sm:flex-none"
+                  className="h-9 min-w-0 flex-1 rounded-apple-sm border border-ink-200 bg-white px-2.5 text-sm text-ink-800 disabled:opacity-60 max-lg:h-11 max-sm:basis-full sm:w-48 sm:flex-none"
                 >
                   {roles.map((r) => (
                     <option key={r.key} value={r.key}>
