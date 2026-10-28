@@ -81,6 +81,7 @@ export function DateRangeForm({
             placeholder="DD/MM/YYYY"
             defaultValue={toDmy(initial)}
             data-complete={DMY}
+            data-date="dmy"
             onChange={(e) => set(toIso(e.target.value))}
             className={field}
           />
