@@ -111,7 +111,7 @@ export function CollegeLive({ collegeName, vapidKey }: { collegeName: string; va
                 {collegeName}: {drive.title} is live.
               </strong>{" "}
               Employers in the drive can ask you for a call: keep Findtern open, or turn on call alerts. Open until{" "}
-              {new Date(drive.endsAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}.
+              {new Date(drive.endsAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" }).replace(/\bSept\b/, "Sep")}.
             </p>
           </div>
           <PushToggle vapidKey={vapidKey} className="shrink-0" />

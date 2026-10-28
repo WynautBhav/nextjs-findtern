@@ -622,7 +622,7 @@ export default async function AdminDashboard() {
                     <span className="min-w-0 truncate text-sm text-ink-600">{e.detail}</span>
                   </span>
                   <span className="nums whitespace-nowrap text-xs text-ink-600">
-                    {e.date ? e.date.toLocaleDateString("en-IN", { day: "numeric", month: "short", timeZone: "Asia/Kolkata" }) : "-"}
+                    {e.date ? e.date.toLocaleDateString("en-IN", { day: "numeric", month: "short", timeZone: "Asia/Kolkata" }).replace(/\bSept\b/, "Sep") : "-"}
                   </span>
                 </Link>
               </li>

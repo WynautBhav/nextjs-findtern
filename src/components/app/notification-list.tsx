@@ -132,7 +132,7 @@ export function NotificationList({
                   </span>
                   {n.createdAt ? (
                     <time dateTime={new Date(n.createdAt).toISOString()} className="nums shrink-0 text-xs text-text-subtle">
-                      {when.format(new Date(n.createdAt))} IST
+                      {when.format(new Date(n.createdAt)).replace(/\bSept\b/, "Sep")} IST
                     </time>
                   ) : null}
                 </span>

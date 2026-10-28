@@ -516,7 +516,7 @@ export function deriveProofs(src: ProofSource): Proof[] {
       line: i.notes?.trim() ?? "You met the team and completed the conversation.",
       facts: [
         { label: "Company", value: name(i.employerId) },
-        { label: "When", value: at.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) },
+        { label: "When", value: at.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }).replace(/\bSept\b/, "Sep") },
       ],
       at,
       issuedBy: name(i.employerId),
@@ -802,8 +802,8 @@ export function periodLabel(t: TimesheetRow): string {
     end &&
     start.getFullYear() === end.getFullYear() &&
     start.getMonth() === end.getMonth();
-  const a = start.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
-  const b = end!.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+  const a = start.toLocaleDateString("en-IN", { day: "numeric", month: "short" }).replace(/\bSept\b/, "Sep");
+  const b = end!.toLocaleDateString("en-IN", { day: "numeric", month: "short" }).replace(/\bSept\b/, "Sep");
   if (sameMonth) return `${a} to ${b}`;
   return `${a} to ${b} ${end!.getFullYear()}`;
 }

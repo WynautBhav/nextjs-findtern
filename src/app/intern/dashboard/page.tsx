@@ -427,7 +427,7 @@ export default async function InternHome() {
                 <p className="mt-1 text-sm text-ink-600">
                   {formatMoney(data.money.incomingMinor, data.money.currency, { zeroLabel: false })} on its way
                   {data.money.nextExpectedAt
-                    ? `, due ${data.money.nextExpectedAt.toLocaleDateString("en-IN", { day: "numeric", month: "short" })}`
+                    ? `, due ${data.money.nextExpectedAt.toLocaleDateString("en-IN", { day: "numeric", month: "short" }).replace(/\bSept\b/, "Sep")}`
                     : ""}
                 </p>
               ) : null}

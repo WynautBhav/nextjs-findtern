@@ -64,8 +64,8 @@ export function formatPeriodDays(start: Date | string | null, end: Date | string
   const sameMonth = sameYear && a.getUTCMonth() === b.getUTCMonth();
   const left = sameMonth
     ? String(a.getUTCDate())
-    : a.toLocaleDateString("en-IN", { day: "numeric", month: "short", ...(sameYear ? {} : { year: "numeric" }), timeZone: "UTC" });
-  const right = b.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+    : a.toLocaleDateString("en-IN", { day: "numeric", month: "short", ...(sameYear ? {} : { year: "numeric" }), timeZone: "UTC" }).replace(/\bSept\b/, "Sep");
+  const right = b.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }).replace(/\bSept\b/, "Sep");
   return `${left} – ${right}`;
 }
 
@@ -74,7 +74,7 @@ export function dayParts(iso: string): { weekday: string; date: string } {
   const d = new Date(`${iso}T12:00:00Z`);
   return {
     weekday: d.toLocaleDateString("en-IN", { weekday: "short", timeZone: "UTC" }),
-    date: d.toLocaleDateString("en-IN", { day: "numeric", month: "short", timeZone: "UTC" }),
+    date: d.toLocaleDateString("en-IN", { day: "numeric", month: "short", timeZone: "UTC" }).replace(/\bSept\b/, "Sep"),
   };
 }
 

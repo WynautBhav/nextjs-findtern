@@ -334,7 +334,7 @@ function first(v: string | string[] | undefined): string {
 }
 
 function formatPeriodStart(iso: string): string {
-  return new Date(`${iso}T12:00:00Z`).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+  return new Date(`${iso}T12:00:00Z`).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }).replace(/\bSept\b/, "Sep");
 }
 
 /** "today" / "3 days ago" mid-sentence; an absolute date keeps its capital. */
