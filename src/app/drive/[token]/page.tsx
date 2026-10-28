@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { cache } from "react";
 import { eq } from "drizzle-orm";
 import { CalendarDays, ShieldCheck, Users } from "lucide-react";
 
@@ -29,40 +28,25 @@ import { DriveEnterButton } from "@/components/employer/drive-enter-button";
  * every call after that). The token is a secret, so the page asks browsers
  * not to send it onward in a Referer and search engines not to index it.
  */
+export const metadata: Metadata = {
+  title: "Campus drive",
+  robots: { index: false, follow: false, nocache: true },
+  referrer: "no-referrer",
+};
+
 export const dynamic = "force-dynamic";
 
-/**
- * One lookup per request, shared by the metadata and the page. The root
- * `loading.tsx` streams the shell with a 200 before the page body runs, so a
- * `notFound()` thrown from the page lands in the stream as a 200 (QA-150).
- * Thrown from `generateMetadata`, which resolves before the first byte, it
- * is a real 404.
- */
-const loadDrive = cache(async (token: string) => {
-  if (!token || token.length < 20 || token.length > 100) return null;
+export default async function DriveLandingPage({ params }: { params: Promise<{ token: string }> }) {
+  const { token } = await params;
+  if (!token || token.length < 20 || token.length > 100) notFound();
+
   const [row] = await getDb()
     .select({ drive: schema.collegeDrives, college: schema.colleges })
     .from(schema.collegeDrives)
     .innerJoin(schema.colleges, eq(schema.colleges.id, schema.collegeDrives.collegeId))
     .where(eq(schema.collegeDrives.tokenHash, hashDriveToken(token)))
     .limit(1);
-  return row && row.college.isActive ? row : null;
-});
-
-export async function generateMetadata({ params }: { params: Promise<{ token: string }> }): Promise<Metadata> {
-  const { token } = await params;
-  if (!(await loadDrive(token))) notFound();
-  return {
-    title: "Campus drive",
-    robots: { index: false, follow: false, nocache: true },
-    referrer: "no-referrer",
-  };
-}
-
-export default async function DriveLandingPage({ params }: { params: Promise<{ token: string }> }) {
-  const { token } = await params;
-  const row = await loadDrive(token);
-  if (!row) notFound();
+  if (!row || !row.college.isActive) notFound();
   const { drive, college } = row;
 
   const state = driveWindow(drive);
