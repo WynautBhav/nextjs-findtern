@@ -1,4 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "regions": ["cle1"]
+  "regions": [
+    "cle1"
+  ],
+  "buildCommand": "node --experimental-strip-types scripts/migrate.ts && next build"
 }
