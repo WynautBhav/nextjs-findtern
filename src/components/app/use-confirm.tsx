@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 type Ask = { title: string; body: string; confirmLabel: string; destructive?: boolean };
 
 /**
- * An in-page confirm for destructive admin actions, in place of
+ * An in-page confirm for destructive actions (admin, intern, employer), in place of
  * window.confirm (QA-145 and its follow-up): a browser driver dismisses the
  * native dialog, it can't be styled or read with the rest of the page, and it
  * looked like a dead button. `await ask({...})` resolves true on "Yes",
@@ -40,12 +40,13 @@ export function useConfirm() {
           <DialogDescription>{current?.body}</DialogDescription>
         </DialogHeader>
         <DialogFooter>
-          <button type="button" onClick={() => settle(false)} className={buttonClass({ variant: "outline", size: "sm" })}>
+          {/* Cancel takes the focus: Enter on a focused delete is the one
+              keyboard slip that can't be undone. */}
+          <button type="button" autoFocus onClick={() => settle(false)} className={buttonClass({ variant: "outline", size: "sm" })}>
             Cancel
           </button>
           <button
             type="button"
-            autoFocus
             onClick={() => settle(true)}
             className={buttonClass({ variant: current?.destructive === false ? "primary" : "dark", size: "sm" })}
           >

@@ -33,6 +33,7 @@ import { dayTone } from "@/components/intern/day-status";
 import { buttonClass } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import { useConfirm } from "@/components/app/use-confirm";
 
 export type Entry = { date: string; hours: number; note: string; status: string };
 
@@ -71,6 +72,7 @@ export function TimesheetGrid({
   const [sendState, setSendState] = useState<"idle" | "sending" | "error">("idle");
   const [sendError, setSendError] = useState("");
   const [deleting, setDeleting] = useState(false);
+  const { ask: askConfirm, dialog } = useConfirm();
   const [deleteError, setDeleteError] = useState("");
   const timer = useRef<number | null>(null);
   const inFlight = useRef<Promise<boolean> | null>(null);
@@ -163,7 +165,8 @@ export function TimesheetGrid({
   }
 
   async function remove() {
-    if (!window.confirm("Delete this timesheet? This cannot be undone.")) return;
+    const ok = await askConfirm({ title: "Delete this timesheet?", body: "The sheet and its days are deleted. This can't be undone.", confirmLabel: "Yes, delete it" });
+    if (!ok) return;
     setDeleting(true);
     setDeleteError("");
     try {
@@ -187,6 +190,7 @@ export function TimesheetGrid({
 
   return (
     <div className="space-y-6">
+      {dialog}
       {managerNote ? (
         <Surface className="border-accent-300/70 bg-accent-100/40 p-5">
           <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-accent-700">

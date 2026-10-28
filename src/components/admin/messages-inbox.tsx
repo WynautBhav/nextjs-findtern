@@ -13,7 +13,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import type { ContactFile, ContactMeta } from "@/lib/admin/contact-meta";
 import { csrfFetch } from "@/lib/client-fetch";
 import { cn } from "@/lib/utils";
-import { useConfirm } from "@/components/admin/use-confirm";
+import { useConfirm } from "@/components/app/use-confirm";
 
 export type InboxMessage = {
   id: string;

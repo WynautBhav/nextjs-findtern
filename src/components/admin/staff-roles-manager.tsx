@@ -13,7 +13,7 @@ import { buttonClass } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import { PASSWORD_HINT } from "@/lib/password-policy";
-import { useConfirm } from "@/components/admin/use-confirm";
+import { useConfirm } from "@/components/app/use-confirm";
 
 const AREA_LABEL: Record<string, string> = {
   dashboard: "Dashboard",

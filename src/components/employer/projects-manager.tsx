@@ -16,6 +16,7 @@ import { emptyProject, projectFromRecord, type ProjectDraft } from "@/lib/employ
 import { CLOSED_PROJECT_STATUS, isProjectOpen } from "@/lib/project-locations";
 import { cn } from "@/lib/utils";
 import { RowMenu } from "@/components/app/row-menu";
+import { useConfirm } from "@/components/app/use-confirm";
 
 type Filter = "all" | "open" | "closed";
 
@@ -61,6 +62,7 @@ export function ProjectsManager({
   const [listError, setListError] = useState("");
   const [rowError, setRowError] = useState<{ id: string; message: string } | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const { ask: askConfirm, dialog } = useConfirm();
 
   // `?new=1` (the dashboard's "New project") opens the drawer straight away.
   useEffect(() => {
@@ -189,7 +191,8 @@ export function ProjectsManager({
   }
 
   async function deleteProject(project: Project) {
-    if (!window.confirm(`Delete "${project.projectName}"? This can't be undone.`)) return;
+    const ok = await askConfirm({ title: `Delete "${project.projectName}"?`, body: "The project and its listing are removed. This can't be undone.", confirmLabel: "Yes, delete it" });
+    if (!ok) return;
     setBusyId(project.id);
     setRowError(null);
     try {
@@ -224,6 +227,7 @@ export function ProjectsManager({
 
   return (
     <div>
+      {dialog}
       <PageHeader
         title="Projects"
         subtitle="What you're hiring for. Candidates are matched on each project's skills, work mode and place."

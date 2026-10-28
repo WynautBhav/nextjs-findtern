@@ -6,6 +6,7 @@ import { Loader2 } from "lucide-react";
 
 import { csrfFetch } from "@/lib/client-fetch";
 import { buttonClass } from "@/components/ui/button";
+import { useConfirm } from "@/components/app/use-confirm";
 
 /**
  * Delete a draft, or withdraw a sheet that is waiting for approval (legacy
@@ -27,12 +28,15 @@ export function DeleteSheetButton({
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const { ask: askConfirm, dialog } = useConfirm();
 
   async function run() {
-    const ask = withdraw
-      ? "Withdraw this timesheet? Your manager will no longer see it, and the sheet and its days are deleted. This cannot be undone."
-      : "Delete this timesheet? This cannot be undone.";
-    if (!window.confirm(ask)) return;
+    const ok = await askConfirm({
+      title: withdraw ? "Withdraw this timesheet?" : "Delete this timesheet?",
+      body: withdraw ? "Your manager no longer sees it, and the sheet and its days are deleted. This can't be undone." : "The sheet and its days are deleted. This can't be undone.",
+      confirmLabel: withdraw ? "Yes, withdraw it" : "Yes, delete it",
+    });
+    if (!ok) return;
     setBusy(true);
     setError("");
     try {
@@ -53,6 +57,7 @@ export function DeleteSheetButton({
 
   return (
     <span className="inline-flex flex-col items-start gap-1">
+      {dialog}
       <button
         type="button"
         onClick={run}
