@@ -188,3 +188,13 @@ branch, not to be touched: `feat/college-partners` (worktree
   run ahead of its schema again. CI: first master run failed only because
   `test:security` passed a directory to `node --test` (Node 24 on the
   runner); fixed with a glob in `750824f`.
+- 28 Oct (late morning): admin group complete (part 1 + part 2 + polish,
+  105 shots at 390/768/1440, slop scan 0; reviewed and approved: one focal
+  number + attention band first, tables fit 1440, inline row actions, real
+  pagination). Tester B closed 18 of 19 retests (QA-133 harness-side open,
+  QA-126 narrowed), resolved the 18 unclear bug-sheet rows, logged QA-137/
+  138/139 and 12 owner questions (docs/qa/owner-questions.md). QA-139
+  re-graded P1 by the orchestrator (Pay opens a different hire's checkout).
+  CI on 6c4b000 failed only on the e2e Approve step: QA-132 added an inline
+  confirm; suite updated in b8240a8. Ledger: 6 P1 closed, 7 P1 open (3 fixed
+  awaiting retest + QA-139 + 3 older), ~22 P2 open after the retest wave.
