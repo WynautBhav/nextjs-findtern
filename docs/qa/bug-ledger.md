@@ -336,6 +336,7 @@ logins; `SEED=1` selects the seed accounts and server). Screenshots are in
   `src/app/employer/dashboard/page.tsx:128`) while the list shows one row per task type. On the LIVE-COPY
   both say 1, so it only shows when a row has a count above 1. Severity **P2 confirmed**.
   Fix: say "3 payments and 1 meeting need you", or count rows in both places.
+- Status (builder, 28 Oct): fixed, awaiting retest (no code in this batch; fixed by the employer redesign, e5d6571). The rule is now one for both: the hero names the first thing waiting on you, with its own count ("1 payment due"), and the list below, titled "Also waiting", shows each of the other kinds with its own count. Nothing sums counts of different kinds any more (the `tasks.reduce` total is gone). Checked on the seed DB (Swiggy): hero "1 payment due", other kinds under "Also waiting".
 
 ### QA-009
 - Reproduced: **yes**, on both DBs, but on `/admin/dashboard` (the ledger says `/admin/reports`; the metric
