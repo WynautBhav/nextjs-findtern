@@ -1,0 +1,23 @@
+// Tester B, 28 Oct: send a submitted timesheet back (phone). Sheet must be `submitted`.
+import { open, shot, pick } from "./lib.mjs";
+const engine = process.argv[2] ?? "webkit";
+const s = await open({ port: 3502, ...pick("employer"), width: 375, height: 812, engine, name: `emp2f4b-${engine}` });
+const { page } = s;
+const log = (k, v) => console.log(`${k}: ${typeof v === "string" ? v : JSON.stringify(v)}`);
+await page.goto(s.url("/employer/timesheets/bc48e71f-9e64-4abf-aa31-c5ccde99d7b2"), { waitUntil: "networkidle" });
+const opt = page.getByText("Send back", { exact: true }).first();
+log("opt.role", await opt.evaluate((e) => `${e.tagName} ${e.getAttribute("role") ?? e.closest("[role]")?.getAttribute("role")}`));
+await opt.click(); await page.waitForTimeout(400);
+const main = (await page.locator("main").innerText()).replace(/\s+/g, " ");
+log("afterPick", main.slice(main.indexOf("Decision"), main.indexOf("Decision") + 400));
+await shot(s, `emp2f4b-${engine}-375-sendback`, { fullPage: false });
+const btn = page.getByRole("button", { name: /Send back (to|the)|Send timesheet back|Return/ }).first();
+log("sendBtn", { n: await btn.count(), text: await btn.innerText().catch(() => null) });
+await btn.click(); await page.waitForTimeout(1000);
+log("noNote", (await page.locator("main").innerText()).replace(/\s+/g, " ").match(/(note|reason)[^.]{0,80}/i)?.[0] ?? "(no message)");
+await page.locator("textarea").fill("Please fill 23 and 24 Oct as Present.");
+await btn.click(); await page.waitForTimeout(1500);
+const t = (await page.locator("main").innerText()).replace(/\s+/g, " ");
+log("after", t.slice(t.indexOf("Decision"), t.indexOf("Decision") + 300));
+log("errors", [...new Set(s.errors)]);
+await s.close();

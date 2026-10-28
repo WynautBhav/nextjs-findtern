@@ -1,0 +1,23 @@
+// Tester B, 28 Oct: retest of QA-007 after the builder's fix (d6dfd6b). SEED=1 -> fresh seed DB on :3503, else live copy on :3502.
+import { open, shot, pick } from "./lib.mjs";
+const PORT = process.env.SEED ? 3503 : 3502;
+const grab = async (s, path, res) => { await s.page.goto(s.url(path), { waitUntil: "networkidle" }); const t = (await s.page.locator("main").innerText()).replace(/\s+/g, " "); return res.map((r) => (t.match(r) ?? ["(no match)"])[0].slice(0, 120)); };
+const a = await open({ port: PORT, ...pick("admin"), name: `qa007r-admin-${PORT}` });
+const rows = async () => a.page.evaluate(() => [...document.querySelectorAll("main table tbody tr")].map((tr) => [...tr.querySelectorAll("td")].map((td) => td.innerText.replace(/\s+/g, " ").trim()).join(" | ")));
+await a.page.goto(a.url("/admin/companies"), { waitUntil: "networkidle" });
+const cr = await rows();
+console.log("companies rows:", cr.length); cr.slice(0, 6).forEach((r) => console.log("  ", r.slice(0, 160)));
+const heavy = cr.find((r) => /Heavy Data/.test(r)); if (heavy) console.log("HEAVY:", heavy);
+await shot(a, `qa007r-companies-${PORT}`, { fullPage: false });
+console.log("dashboard", await grab(a, "/admin/dashboard", [/Hires?[^.]{0,60}/, /Avg[^.]{0,80}/, /Hired[^.]{0,40}/]));
+console.log("proposal-tracker", await grab(a, "/admin/proposal-tracker", [/Hired \d+[^A-Z]{0,40}/, /Accepted or hired \d+/, /Paid[^A-Z]{0,40}/]));
+console.log("transactions", await grab(a, "/admin/transactions", [/Received ₹[\d,]+ \d+ paid receipts/, /Paid out to interns ₹[\d,]+/]));
+console.log("reports", await grab(a, "/admin/reports", [/Revenue collected ₹[\d,]+/, /Paid orders \d+/, /Hires? \d+/]));
+await a.close();
+const e = await open({ port: PORT, ...pick("employer"), name: `qa007r-employer-${PORT}` });
+console.log("orders", await grab(e, "/employer/orders", [/(\d+ hires?|placements?)[^A-Z]{0,90}/, /(Still to pay|still to pay)[^.]{0,60}/, /\d+ (accepted offers? to pay|payments? due)[^.]{0,60}/, /Nothing outstanding/]));
+console.log("dashboard", await grab(e, "/employer/dashboard", [/\d+ (payments? due|timesheets? to review|accepted, to pay)/, /\d+ accepted, to pay/, /\d+ hired/]));
+console.log("checkout", await grab(e, "/employer/checkout", [/Ready to pay[^.]{0,80}/, /Nothing to pay[^.]{0,60}/]));
+console.log("proposals tabs", await grab(e, "/employer/proposals", [/Payment due \d+/, /Hired \d+/, /All \d+/]));
+await shot(e, `qa007r-orders-${PORT}`, { fullPage: false });
+await e.close();
