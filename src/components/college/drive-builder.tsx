@@ -9,6 +9,8 @@ import { fromLocalInput } from "@/lib/college/ist";
 import { COHORTS, yearLabel } from "@/lib/college/labels";
 import { csrfFetch } from "@/lib/client-fetch";
 import { cn } from "@/lib/utils";
+import { PageHead } from "@/components/app/primitives";
+
 import { ShareLink } from "./share-link";
 import type { StudentRow } from "./types";
 import { buttonClass } from "@/components/ui/button";
@@ -39,6 +41,7 @@ export function DriveBuilder({
   collegeId,
   collegeName,
   live = false,
+  heading,
 }: {
   initial: DriveDraft;
   students: StudentRow[];
@@ -47,6 +50,9 @@ export function DriveBuilder({
   collegeName: string;
   /** The drive is open right now; edits reach employers immediately. */
   live?: boolean;
+  /** The new-drive heading. Once the drive is created it becomes the drive's
+      own, so "New drive" never sits over its edit form (QA-158). */
+  heading?: { title: string; lede: string };
 }) {
   const router = useRouter();
   const [d, setD] = useState<DriveDraft>(initial);
@@ -127,6 +133,14 @@ export function DriveBuilder({
   }
 
   return (
+    <>
+    {heading ? (
+      link ? (
+        <PageHead title={d.title || "Your drive"} lede="Drive created. Send employers the link; you can still change the details below." />
+      ) : (
+        <PageHead title={heading.title} lede={heading.lede} />
+      )
+    ) : null}
     <form onSubmit={save} className="space-y-6" noValidate>
       {link ? (
         <ShareLink url={link} collegeName={collegeName} driveTitle={d.title} startsAt={fromLocalInput(d.startsAt)} endsAt={fromLocalInput(d.endsAt)} kind={d.kind} />
@@ -333,6 +347,7 @@ export function DriveBuilder({
         </p>
       </div>
     </form>
+    </>
   );
 }
 

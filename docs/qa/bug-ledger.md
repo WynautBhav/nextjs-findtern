@@ -806,6 +806,7 @@ logins; `SEED=1` selects the seed accounts and server). Screenshots are in
 
 ### QA-158
 - Evidence: `docs/qa/b/screens/col-flow-chromium-375-created.png`. Severity **P2**.
+- Status (builder, 28 Oct): fixed, awaiting retest (wp/opus, fix(QA-158)). Switching the heading, not redirecting: a redirect would drop the one-time link off the screen. The new-drive heading now lives in the builder, and after "Create drive" it becomes the drive's name with "Drive created. Send employers the link; you can still change the details below." Checked at 375 on the seed DB: before, "New drive"; after, the drive title, with the URL on the drive and one h1.
 
 ### QA-159
 - Steps: `DRIVE=<id> node docs/qa/b/repro/col-close.mjs chromium|webkit 375`: after "Close link now", Esc leaves the confirm open (Cancel still visible), no request is sent. Severity **P2**.

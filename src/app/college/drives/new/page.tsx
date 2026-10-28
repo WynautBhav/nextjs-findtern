@@ -1,4 +1,3 @@
-import { PageHead } from "@/components/app/primitives";
 import { DriveBuilder } from "@/components/college/drive-builder";
 import { toLocalInput } from "@/lib/college/ist";
 import { requireCollegeContext, studentsForCollegeAdmin } from "@/lib/college/scope";
@@ -17,8 +16,8 @@ export default async function NewDrivePage() {
 
   return (
     <div className="space-y-6">
-      <PageHead title="New drive" lede="Takes two minutes. You can change dates and eligibility later without a new link." />
       <DriveBuilder
+        heading={{ title: "New drive", lede: "Takes two minutes. You can change dates and eligibility later without a new link." }}
         collegeId={ctx.college.id}
         collegeName={ctx.college.name}
         students={students}
