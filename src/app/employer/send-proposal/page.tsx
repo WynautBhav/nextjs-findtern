@@ -215,12 +215,12 @@ export default async function SendProposal({
   if (!internId || !candidate) {
     return (
       <div>
-        <PageHead title="Send a proposal" lede="Pick a candidate first. The offer is built around their Findtern Score." />
+        <PageHead title="Send a proposal" lede="An offer is built around one candidate's Findtern Score." />
         <EmptyScene
-          title="No candidate selected"
+          title="Choose a candidate"
           body="Open a candidate from the browser and use Send proposal on their card to start an offer."
           next={{ label: "Browse candidates", href: "/employer/candidates" }}
-          who="You - pick a candidate first"
+          who="You - from their profile or your shortlist"
         />
         <div className="mt-6 flex justify-center">
           <ButtonLink href="/employer/cart" variant="ghost" size="sm">
