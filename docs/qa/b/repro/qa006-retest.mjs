@@ -1,0 +1,40 @@
+// Tester B, 28 Oct: retest of QA-006 (employer signup from a drive link keeps the drive).
+// Usage: TOKEN=<drive token> node qa006-retest.mjs [chromium|webkit]   (fresh seed on :3503; WebKit stops after the link check, QA-110)
+import { open, shot } from "./lib.mjs";
+import { lastOtp, body } from "./bs7-employer-lib.mjs";
+const engine = process.argv[2] ?? "chromium", token = process.env.TOKEN, PORT = 3503;
+const log = (k, v) => console.log(`${k}: ${typeof v === "string" ? v : JSON.stringify(v)}`);
+const s = await open({ port: PORT, width: 375, height: 812, engine, name: `qa006r-${engine}` });
+const p = s.page;
+await p.goto(s.url(`/drive/${token}`), { waitUntil: "networkidle" });
+log("drive page (signed out)", (await body(p)).slice(0, 260));
+const link = p.getByRole("link", { name: /create an employer account/i });
+log("signup link href", await link.getAttribute("href"));
+await shot(s, `qa006r-${engine}-drive-signedout`, { fullPage: false });
+await link.click(); await p.waitForURL(/employer\/signup/, { timeout: 15000 }).catch(() => {}); await p.waitForLoadState("networkidle");
+log("after click", new URL(p.url()).pathname + new URL(p.url()).search);
+if (engine === "webkit") { log("note", "full signup not run in WebKit over http (QA-110)"); await s.close(); process.exit(0); }
+const rnd = Math.floor(100000 + Math.random() * 899999);
+const email = `qa.b.drive.${rnd}@acme-qa-test.in`;
+const phone = `96${String(Math.floor(10000000 + Math.random() * 89999999))}`.replace(/(\d)\1{3,}/g, "$1$12");
+await p.locator("input[name=name]").fill("Drive Tester");
+await p.locator("input[name=companyName]").fill("Drive Retest Co");
+await p.locator("input[name=companyEmail]").fill(email);
+await p.locator("input[name=phoneNumber]").fill(phone);
+await p.locator("input[name=password]").fill("Qa#Tester2026");
+await p.locator("input[type=checkbox]").first().check();
+await p.waitForTimeout(1200);
+await p.getByRole("button", { name: /send verification code/i }).click(); await p.waitForTimeout(2500);
+const otp = lastOtp(email); log("otp found", !!otp);
+await p.locator("input[inputmode=numeric], input[autocomplete=one-time-code]").first().fill(otp);
+await p.getByRole("button", { name: /verify|create|continue/i }).first().click();
+await p.waitForTimeout(5000);
+log("landed", new URL(p.url()).pathname + new URL(p.url()).search);
+log("page text", (await body(p)).slice(0, 320));
+log("enter drive control", await p.getByRole("button", { name: /enter drive/i }).or(p.getByRole("link", { name: /enter drive/i })).allInnerTexts());
+log("cookies", (await s.ctx.cookies()).map((c) => c.name));
+log("signed-out controls still shown", await p.getByRole("link", { name: /create an employer account|sign in/i }).allInnerTexts());
+await p.goto(s.url("/employer/dashboard"), { waitUntil: "networkidle" }); log("dashboard reachable (signed in)", new URL(p.url()).pathname);
+await shot(s, `qa006r-${engine}-landed`, { fullPage: false });
+log("errors", [...new Set(s.errors)].slice(0, 3));
+await s.close();
