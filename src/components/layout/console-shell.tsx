@@ -324,7 +324,9 @@ export function ConsoleShell({
           className={cn(
             "mx-auto w-full min-w-0 flex-1 px-[clamp(1rem,4vw,2.5rem)] pt-6 outline-none lg:pt-9",
             width === "reading" ? "max-w-[75rem]" : "max-w-[90rem]",
-            tabs ? "pb-28 lg:pb-24" : "pb-24",
+            // Clears the floating "Ask me" on phones: it sits above the tab
+            // bar (top edge 136px up) or in the corner (76px) (QA-136).
+            tabs ? "pb-40 lg:pb-24" : "pb-24",
           )}
         >
           {children}
