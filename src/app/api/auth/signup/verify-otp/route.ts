@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { getDb, schema } from "@/lib/db";
-import { verifyOtp, limiters, bucketKey, clientIp } from "@/lib/security/rate-limit";
+import { verifyOtp, limiters, clientIp, takeAuth } from "@/lib/security/rate-limit";
 import { SIGNUP_OTP_SUBJECTS, attachOtpProof } from "@/lib/signup-otp";
 
 const bodySchema = z.object({
@@ -14,13 +14,12 @@ const bodySchema = z.object({
 
 export async function POST(req: Request) {
   const ip = clientIp(req.headers);
-  if (!limiters.otpVerify.take(bucketKey(ip))) {
-    return NextResponse.json({ error: "Too many attempts" }, { status: 429 });
-  }
-
   const parsed = bodySchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+  }
+  if (!takeAuth(limiters.otpVerify, "signup/verify-otp", ip, parsed.data.email)) {
+    return NextResponse.json({ error: "Too many attempts" }, { status: 429 });
   }
 
   const { email, otp, subjectType } = parsed.data;

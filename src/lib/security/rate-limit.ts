@@ -120,6 +120,20 @@ export function bucketKey(ip: string, identifier?: string): string {
   return `${ip}:${id}`;
 }
 
+/** Wide per-address ceiling behind `takeAuth`, one bucket per route. */
+const authCeiling = new RateLimiter(150, 15 * 60_000);
+
+/**
+ * An auth limit keyed on address + account, under a wide per-address ceiling
+ * (QA-138). A campus lab or an office is one address, so a strict budget per
+ * address alone locked everyone there out together; per account it still
+ * stops guessing one person's password, and the ceiling stops one address
+ * spraying many accounts.
+ */
+export function takeAuth(limiter: RateLimiter, route: string, ip: string, identifier: string): boolean {
+  return authCeiling.take(bucketKey(ip, `ceiling:${route}`)) && limiter.take(bucketKey(ip, identifier));
+}
+
 /** Client IP from proxy headers, first entry. */
 export function clientIp(headers: {
   get(name: string): string | null;

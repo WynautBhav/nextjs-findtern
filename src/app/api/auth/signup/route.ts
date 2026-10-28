@@ -5,7 +5,7 @@ import { z } from "zod";
 import { getDb, schema } from "@/lib/db";
 import { hashPassword, isStrongPassword, WEAK_PASSWORD_MESSAGE } from "@/lib/security/password";
 import { withSession, issueCsrfCookie } from "@/lib/auth";
-import { limiters, bucketKey, clientIp } from "@/lib/security/rate-limit";
+import { limiters, clientIp, takeAuth } from "@/lib/security/rate-limit";
 import { normalizePhone, phoneError } from "@/lib/phone";
 import { hasVerifiedSignupOtp, INTERN_EMAIL_MESSAGE, isInternEmail } from "@/lib/signup-otp";
 import { phoneInUseAnywhere } from "@/lib/phone-owner";
@@ -22,13 +22,12 @@ const bodySchema = z.object({
 
 export async function POST(req: Request) {
   const ip = clientIp(req.headers);
-  if (!limiters.signup.take(bucketKey(ip))) {
-    return NextResponse.json({ error: "Too many attempts" }, { status: 429 });
-  }
-
   const parsed = bodySchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+  }
+  if (!takeAuth(limiters.signup, "signup", ip, parsed.data.email)) {
+    return NextResponse.json({ error: "Too many attempts" }, { status: 429 });
   }
   if (!isStrongPassword(parsed.data.password)) {
     return NextResponse.json({ error: WEAK_PASSWORD_MESSAGE }, { status: 400 });

@@ -5,7 +5,7 @@ import { z } from "zod";
 import { getDb, schema } from "@/lib/db";
 import { withSession, issueCsrfCookie } from "@/lib/auth";
 import { verifyPassword, needsRehash, hashPassword } from "@/lib/security/password";
-import { limiters, bucketKey, clientIp } from "@/lib/security/rate-limit";
+import { limiters, clientIp, takeAuth } from "@/lib/security/rate-limit";
 
 const bodySchema = z.object({
   email: z.string().trim().toLowerCase().email(),
@@ -14,13 +14,12 @@ const bodySchema = z.object({
 
 export async function POST(req: Request) {
   const ip = clientIp(req.headers);
-  if (!limiters.login.take(bucketKey(ip))) {
-    return NextResponse.json({ error: "Too many attempts" }, { status: 429 });
-  }
-
   const parsed = bodySchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+  }
+  if (!takeAuth(limiters.login, "login", ip, parsed.data.email)) {
+    return NextResponse.json({ error: "Too many attempts" }, { status: 429 });
   }
 
   const db = getDb();

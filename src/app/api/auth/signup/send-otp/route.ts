@@ -5,7 +5,7 @@ import { z } from "zod";
 import { getDb, schema } from "@/lib/db";
 import { emails, renderEmail } from "@/lib/emails";
 import { sendSmtpMail } from "@/lib/mailer";
-import { generateOtp, hashOtp, limiters, bucketKey, clientIp } from "@/lib/security/rate-limit";
+import { generateOtp, hashOtp, limiters, clientIp, takeAuth } from "@/lib/security/rate-limit";
 import { INTERN_EMAIL_MESSAGE, isInternEmail, SIGNUP_OTP_SUBJECTS } from "@/lib/signup-otp";
 
 const bodySchema = z.object({
@@ -26,13 +26,12 @@ const RESEND_COOLDOWN_MS = 60_000;
 
 export async function POST(req: Request) {
   const ip = clientIp(req.headers);
-  if (!limiters.otp.take(bucketKey(ip))) {
-    return NextResponse.json({ error: "Too many requests" }, { status: 429 });
-  }
-
   const parsed = bodySchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid email" }, { status: 400 });
+  }
+  if (!takeAuth(limiters.otp, "signup/send-otp", ip, parsed.data.email)) {
+    return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }
 
   const { email, subjectType, purpose } = parsed.data;

@@ -6,7 +6,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { getDb, schema } from "@/lib/db";
 import { emails, renderEmail } from "@/lib/emails";
 import { sendSmtpMail } from "@/lib/mailer";
-import { limiters, bucketKey, clientIp } from "@/lib/security/rate-limit";
+import { limiters, clientIp, takeAuth } from "@/lib/security/rate-limit";
 import { publicOrigin } from "@/lib/google";
 
 const bodySchema = z.object({
@@ -19,12 +19,12 @@ const RESET_TTL_MINUTES = 30;
 
 export async function POST(req: Request) {
   const ip = clientIp(req.headers);
-  // Its own budget, so resets cannot starve logins or the other way round.
-  if (!limiters.forgotPassword.take(bucketKey(ip))) {
-    return NextResponse.json({ error: "Too many attempts" }, { status: 429 });
-  }
   const parsed = bodySchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+  // Its own budget, so resets cannot starve logins or the other way round.
+  if (!takeAuth(limiters.forgotPassword, "forgot-password", ip, parsed.data.email)) {
+    return NextResponse.json({ error: "Too many attempts" }, { status: 429 });
+  }
 
   const db = getDb();
   const isEmployer = parsed.data.role === "employer";

@@ -199,3 +199,25 @@ test("QA-016: the stated rule and the validator agree at the boundary", async ()
   }
   assert.match(PASSWORD_HINT, /^At least 8 characters/);
 });
+
+describe("auth limits per address + account (QA-138)", async () => {
+  const { RateLimiter, takeAuth } = await import("./rate-limit.ts");
+
+  test("30 students on one campus address each get their own budget", () => {
+    const login = new RateLimiter(8, 15 * 60_000);
+    for (let i = 0; i < 30; i++) assert.equal(takeAuth(login, "t-campus", "10.0.0.1", `s${i}@gmail.com`), true);
+  });
+
+  test("one account is still capped from one address", () => {
+    const login = new RateLimiter(8, 15 * 60_000);
+    for (let i = 0; i < 8; i++) assert.equal(takeAuth(login, "t-guess", "10.0.0.2", "a@gmail.com"), true);
+    assert.equal(takeAuth(login, "t-guess", "10.0.0.2", "a@gmail.com"), false);
+  });
+
+  test("one address spraying many accounts hits the ceiling", () => {
+    const login = new RateLimiter(8, 15 * 60_000);
+    let allowed = 0;
+    for (let i = 0; i < 400; i++) if (takeAuth(login, "t-spray", "10.0.0.3", `x${i}@gmail.com`)) allowed++;
+    assert.equal(allowed, 150);
+  });
+});
