@@ -10,6 +10,7 @@ import { CountUp } from "@/components/motion/count-up";
 import { TiltCard } from "@/components/motion/tilt-card";
 import { CirclePhoto } from "@/components/home/sections";
 import { ABOUT_COPY, PROOF_STATS } from "@/lib/content/site";
+import { PerHireFigure } from "@/components/marketing/region-rates";
 import { getHappyFaces, getPartners } from "@/lib/content";
 import { TestimonialCarousel } from "@/components/marketing/testimonial-carousel";
 import { VelocityMarquee } from "@/components/motion/velocity-marquee";
@@ -140,7 +141,7 @@ export default async function AboutPage() {
       <PageSection className="py-8 sm:py-14 md:py-20">
         <div className="grid grid-cols-3 divide-x divide-ink-200/80 rounded-2xl border border-ink-200/80 bg-white/70 py-5 shadow-xs backdrop-blur-xs sm:divide-x-0 sm:border-0 sm:bg-transparent sm:py-0 sm:shadow-none sm:gap-10">
           {PROOF_STATS.map((s) => (
-            <Figure key={s.label} value={s.value} prefix={s.prefix} suffix={s.suffix} label={s.label} />
+            <Figure key={s.label} value={s.value} prefix={s.prefix} suffix={s.suffix} label={s.label} perHire={"perHire" in s} />
           ))}
         </div>
         <p className="mt-6 text-center text-xs sm:mt-8 sm:text-sm text-ink-600">
@@ -220,16 +221,19 @@ function Figure({
   suffix = "",
   prefix = "",
   label,
+  perHire = false,
 }: {
   value: number;
   suffix?: string;
   prefix?: string;
   label: string;
+  /** The per-hire fee, shown in the visitor's currency (QA-105). */
+  perHire?: boolean;
 }) {
   return (
     <div className="px-1 text-center sm:px-0">
       <p className="text-2xl font-bold tracking-tight text-ink-900 sm:text-4xl md:text-5xl">
-        <CountUp value={value} prefix={prefix} />
+        {perHire ? <PerHireFigure /> : <CountUp value={value} prefix={prefix} />}
         {suffix ? <span className="text-xs font-semibold text-ink-600 sm:text-xl sm:font-medium">{suffix}</span> : null}
       </p>
       <p className="mt-1 text-[11px] leading-tight text-ink-600 sm:mt-2 sm:text-base">{label}</p>

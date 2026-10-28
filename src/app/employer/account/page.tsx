@@ -7,7 +7,7 @@ import { DetailRow, EmptyScene, SectionHead, Surface } from "@/components/app/pr
 import { PageHeader } from "@/components/layout/page-header";
 import { CompanyProfileForm, type CompanyProfile } from "@/components/employer/company-profile-form";
 import { ChangePasswordForm } from "@/components/auth/change-password-form";
-import { missingCompanyFields } from "@/lib/employer-onboarding";
+import { missingProfileFields } from "@/lib/employer-onboarding";
 import { formatDate } from "@/lib/format";
 import { timezoneForLocation } from "@/lib/timezones";
 
@@ -64,7 +64,7 @@ export default async function EmployerAccount() {
     gstNumber: employer?.gstNumber ?? null,
     billingPincode: employer?.billingPincode ?? null,
   };
-  const missing = employer ? missingCompanyFields(employer) : [];
+  const missing = employer ? missingProfileFields(employer) : [];
 
   return (
     <div>
@@ -90,7 +90,9 @@ export default async function EmployerAccount() {
                   missing.length === 0 ? (
                     <span className="text-success">Complete</span>
                   ) : (
-                    <span className="text-accent-700">{missing.length} to fill in</span>
+                    <span className="text-accent-700">
+                      {missing.every((m) => m.startsWith("Escalation")) ? "Escalation contact to add" : `${missing.length} to fill in`}
+                    </span>
                   )
                 }
               />

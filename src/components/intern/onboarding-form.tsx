@@ -159,15 +159,18 @@ export function OnboardingForm({
   // edited; it read "0 of 7 steps" with everything locked behind step 1.
   // Review stays gated until every step before it passes (INT-41).
   const reachable = (i: number) => i <= (firstOpen === -1 ? LAST : firstOpen) || (submittedBefore && i < LAST && passes[i]);
-  // The step to show: the one picked, else the remembered one (INT-30), never past the first open step.
-  const step = chosenStep ?? Math.min(clampStep(savedStep), firstOpen === -1 ? LAST : firstOpen);
+  // The step to show: the one picked; else, while the profile is incomplete,
+  // the first step that doesn't pass yet. The remembered step (INT-30) lives
+  // in this browser only, so a reload elsewhere, or a cleared browser, opened
+  // on step 1 over steps that were already filled (QA-107). A complete
+  // profile reopens where it was left.
+  const resumeAt = firstOpen === -1 ? clampStep(savedStep) : firstOpen;
+  const step = chosenStep ?? resumeAt;
 
   const live = stepErrors[step];
-  const errors = useMemo(() => {
-    const shown: Record<string, string> = {};
-    for (const [k, msg] of Object.entries(live)) if (attempted.has(step) || touched.has(k)) shown[k] = msg;
-    return { ...shown, ...serverErrors };
-  }, [live, attempted, step, touched, serverErrors]);
+  const shown: Record<string, string> = {};
+  for (const [k, msg] of Object.entries(live)) if (attempted.has(step) || touched.has(k)) shown[k] = msg;
+  const errors = { ...shown, ...serverErrors };
 
   const update: Update = (key, value) => {
     setEdits((prev) => ({ ...prev, [key]: value }));

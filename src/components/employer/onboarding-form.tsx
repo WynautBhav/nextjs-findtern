@@ -14,6 +14,7 @@ import { ProjectFields, projectFormErrors, type ProjectBaseline } from "@/compon
 import { csrfFetch } from "@/lib/client-fetch";
 import { escalationEmailDomainError, websiteDomainError } from "@/lib/company-domain";
 import { isIndiaCountry } from "@/lib/data/countries";
+import { dialCodeFor } from "@/lib/data/dial-codes";
 import { phoneChangeError } from "@/lib/phone";
 import { timezoneForLocation } from "@/lib/timezones";
 import { cn } from "@/lib/utils";
@@ -424,7 +425,21 @@ function CompanyStage({
             required
             value={values.country}
             error={errors.country}
-            onChange={(v) => setCompany({ country: v, state: "", city: "" })}
+            onChange={(v) => {
+              // Phone codes still on the old country's follow the new one, and
+              // a PIN only means something in India (QA-114).
+              const before = dialCodeFor(values.country) ?? "+91";
+              const next = dialCodeFor(v);
+              const follow = (code: string) => (next && (!code || code === before) ? next : code);
+              setCompany({
+                country: v,
+                state: "",
+                city: "",
+                primaryContactCountryCode: follow(values.primaryContactCountryCode),
+                escalationContactCountryCode: follow(values.escalationContactCountryCode),
+                ...(isIndiaCountry(v) ? {} : { billingPincode: "" }),
+              });
+            }}
           />
           <StateField
             id="state"
@@ -456,17 +471,19 @@ function CompanyStage({
           </p>
         ) : null}
         <div className="grid gap-5 sm:grid-cols-2">
-          <TextField
-            id="billingPincode"
-            label="Billing PIN code"
-            required={india}
-            inputMode="numeric"
-            maxLength={6}
-            hint={india ? "Sets the GST on your invoice: CGST + SGST within Rajasthan, IGST elsewhere." : "Only needed for an Indian billing address."}
-            value={values.billingPincode}
-            error={errors.billingPincode}
-            onChange={(v) => setCompany({ billingPincode: v.replace(/\D/g, "").slice(0, 6) })}
-          />
+          {india ? (
+            <TextField
+              id="billingPincode"
+              label="Billing PIN code"
+              required
+              inputMode="numeric"
+              maxLength={6}
+              hint="Sets the GST on your invoice: CGST + SGST within Rajasthan, IGST elsewhere."
+              value={values.billingPincode}
+              error={errors.billingPincode}
+              onChange={(v) => setCompany({ billingPincode: v.replace(/\D/g, "").slice(0, 6) })}
+            />
+          ) : null}
           <TextField
             id="gstNumber"
             label="GST number"

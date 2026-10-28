@@ -260,10 +260,11 @@ export default async function EmployerDashboard() {
                       >
                         <div className="min-w-0">
                           <p className="flex flex-wrap items-center gap-2">
-                            <span className="truncate text-[0.9375rem] font-medium text-ink-900 group-hover:text-brand-700">{p.projectName}</span>
+                            <span className="line-clamp-2 break-words text-[0.9375rem] font-medium text-ink-900 group-hover:text-brand-700">{p.projectName}</span>
                             {open ? null : <Pill tone="closed">Closed</Pill>}
                           </p>
-                          <p className="mt-0.5 truncate text-sm text-ink-600">
+                          {/* Two lines, then cut: a phone showed half a project name (QA-117). */}
+                          <p className="mt-0.5 line-clamp-2 text-sm text-ink-600">
                             {scopeLabel(p.scopeOfWork)}
                             {skills.length ? ` · ${skills.join(", ")}` : ""}
                           </p>
@@ -330,7 +331,7 @@ export default async function EmployerDashboard() {
                         </span>
                         <span className="min-w-0">
                           <span className="block truncate text-sm font-semibold text-ink-900 group-hover:text-brand-700">{c.initials}</span>
-                          <span className="block truncate text-sm text-ink-600">{c.skills.slice(0, 3).join(", ") || c.location || "Profile in progress"}</span>
+                          <span className="line-clamp-2 text-sm text-ink-600">{c.skills.slice(0, 3).join(", ") || c.location || "Profile in progress"}</span>
                         </span>
                         <span className="text-right">
                           <span className="nums block text-lg font-semibold leading-tight text-brand-700">{c.score.toFixed(1)}</span>

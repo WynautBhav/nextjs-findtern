@@ -19,7 +19,7 @@ export function tabClass(active: boolean): string {
   return [
     // The same look as FilterTabs (primitives.tsx); these switch panels, so
     // they keep real tab semantics where they're used.
-    "apple-spring inline-flex min-h-10 shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-3.5 text-sm font-medium",
+    "apple-spring inline-flex min-h-10 shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-3.5 text-sm font-medium touch:min-h-11",
     "focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-brand-600/30",
     active ? "bg-brand-700 text-white" : "text-ink-600 hover:bg-ink-100 hover:text-ink-900",
   ].join(" ");

@@ -42,7 +42,7 @@ export function HireFlow({ counts, current }: { counts: HireFlowCounts; current:
                 aria-current={active ? "step" : undefined}
                 title={s.hint}
                 className={cn(
-                  "apple-spring inline-flex min-h-10 items-center gap-1.5 rounded-full px-3",
+                  "apple-spring inline-flex min-h-10 items-center gap-1.5 rounded-full px-3 touch:min-h-11",
                   active ? "bg-brand-50 font-semibold text-brand-800" : "text-ink-600 hover:bg-ink-100 hover:text-ink-900",
                 )}
               >

@@ -371,7 +371,7 @@ function CartLine({
         </span>
         <div className="min-w-0">
           <p className="flex flex-wrap items-center gap-2">
-            <Link href={profileHref} className="inline-flex min-h-6 min-w-6 items-center text-[0.9375rem] font-semibold text-ink-900 underline-offset-4 hover:text-brand-700 hover:underline">
+            <Link href={profileHref} className="inline-flex min-h-6 min-w-6 items-center touch:min-h-11 touch:min-w-11 text-[0.9375rem] font-semibold text-ink-900 underline-offset-4 hover:text-brand-700 hover:underline">
               {name}
             </Link>
             {line.acceptedProposalId ? (

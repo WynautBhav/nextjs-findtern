@@ -309,7 +309,7 @@ export default async function EmployerSchedule({ searchParams }: { searchParams:
                         </span>
                         <div className="min-w-0">
                           <p className="text-base font-semibold text-ink-900">
-                            <Link href={`/employer/intern/${encodeURIComponent(iv.internId)}`} className="hover:text-brand-700 hover:underline">
+                            <Link href={`/employer/intern/${encodeURIComponent(iv.internId)}`} className="hover:text-brand-700 hover:underline touch:inline-flex touch:min-h-11 touch:min-w-11 touch:items-center">
                               {r.name}
                             </Link>
                           </p>

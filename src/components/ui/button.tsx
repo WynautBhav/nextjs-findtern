@@ -46,11 +46,11 @@ const buttonVariants = cva(
       },
       size: {
         // 36px with a mouse, 44px on touch screens (target size).
-        sm: "h-9 rounded-md px-3.5 text-sm pointer-coarse:h-11",
+        sm: "h-9 rounded-md px-3.5 text-sm touch:h-11",
         md: "h-11 rounded-lg px-5 text-base",
         lg: "h-13 rounded-xl px-7 text-base",
         icon: "size-10 rounded-lg",
-        iconSm: "size-9 rounded-md pointer-coarse:size-11",
+        iconSm: "size-9 rounded-md touch:size-11",
       },
       block: {
         true: "w-full",

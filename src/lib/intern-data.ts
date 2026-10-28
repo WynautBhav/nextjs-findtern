@@ -2,6 +2,7 @@ import { and, desc, eq, inArray } from "drizzle-orm";
 
 import { getDb, hasDb, schema } from "@/lib/db";
 import {
+  HIDDEN_COMPANY,
   activeEngagement,
   buildThread,
   deriveMoney,
@@ -34,8 +35,7 @@ import { rawScore } from "@/lib/employer-candidates";
  */
 export type InternData = ReturnType<typeof loadInternData>;
 
-/** What an intern sees in place of a company name before the hire. */
-export const HIDDEN_COMPANY = "Hidden company";
+export { HIDDEN_COMPANY };
 
 /** The synthetic employer that owns AI interview rows, and what it is called. */
 export const AI_INTERVIEW_EMAIL = "ai-interview@findtern.ai";

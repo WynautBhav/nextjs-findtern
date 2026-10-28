@@ -215,7 +215,7 @@ export function OfferDecision({
                 Accept {roleTitle}?
               </DialogTitle>
               <DialogDescription className="text-pretty text-sm leading-relaxed text-ink-700">
-                This tells {company} yes{joining ? ` for a start on ${joining}` : ""}. They complete the payment next.
+                This tells {company === "The company" ? "the company" : company} yes{joining ? ` for a start on ${joining}` : ""}. They complete the payment next.
                 You&apos;re hired, and logging hours opens, once they do. Your other open offers from this company close.
               </DialogDescription>
             </DialogHeader>

@@ -310,7 +310,7 @@ function PlanEditor({ plan }: { plan: EditablePlan }) {
           </button>
         </fieldset>
 
-        <label className="flex items-center gap-2 text-sm text-ink-700">
+        <label className="flex items-center gap-2 text-sm text-ink-700 touch:min-h-11">
           <input
             type="checkbox"
             checked={featured}

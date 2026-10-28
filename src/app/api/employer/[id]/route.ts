@@ -50,7 +50,6 @@ const bodySchema = z.object({
   billingPincode: z
     .string()
     .trim()
-    .regex(/^([1-9]\d{5})?$/, "PIN code must be 6 digits")
     .nullable()
     .optional(),
 });
@@ -68,8 +67,14 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   // companyEmail is the login identity; it is not editable here, because
   // changing it would skip the email verification signup requires.
   const d = parsed.data;
+  // A PIN only applies to an Indian billing address; elsewhere it is dropped
+  // rather than rejected for not having six digits (QA-114).
+  if (!needsBillingPincode(d.country)) d.billingPincode = null;
   if (needsBillingPincode(d.country) && !d.billingPincode) {
     return NextResponse.json({ error: "Billing PIN code is required for GST invoices in India" }, { status: 400 });
+  }
+  if (d.billingPincode && !/^[1-9]\d{5}$/.test(d.billingPincode)) {
+    return NextResponse.json({ error: "PIN code must be 6 digits" }, { status: 400 });
   }
   const db = getDb();
   // The website must sit on the login email's domain (owner@acme.com ->

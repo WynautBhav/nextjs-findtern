@@ -49,6 +49,6 @@ export async function POST(req: Request) {
 
   // Binds the verification to this browser: account creation checks it.
   const res = NextResponse.json({ ok: true });
-  attachOtpProof(res, subjectType, email);
+  await attachOtpProof(res, subjectType, email);
   return res;
 }

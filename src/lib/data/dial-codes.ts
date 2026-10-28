@@ -183,3 +183,9 @@ const REST: DialCode[] = [
 export const DIAL_CODES: DialCode[] = [{ code: "+91", country: "India" }, ...REST];
 
 export const DIAL_CODE_VALUES: string[] = DIAL_CODES.map((d) => d.code);
+
+/** The dial code for a country name as `COUNTRIES` spells it, or null when there's no single one. */
+export function dialCodeFor(country: string | null | undefined): string | null {
+  const c = (country ?? "").trim().toLowerCase();
+  return DIAL_CODES.find((d) => d.country.toLowerCase() === c)?.code ?? null;
+}

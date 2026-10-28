@@ -86,6 +86,7 @@ export function SendProposalForm({
   preference,
   companyTimezone = "Asia/Kolkata",
   candidateHasLaptop = null,
+  heldProjectIds = [],
 }: {
   candidate: CandidateSummary;
   /** Where the candidate said they can work; the offer's location follows it. */
@@ -103,6 +104,8 @@ export function SendProposalForm({
   companyTimezone?: string;
   /** False: the candidate has no laptop, so only "Company provides" is offered (EMH-18). */
   candidateHasLaptop?: boolean | null;
+  /** Projects with a meeting still to happen: no offer until it has (QA-113). */
+  heldProjectIds?: string[];
 }) {
   const router = useRouter();
   // The project the employer came from, not just the first one in the list:
@@ -115,6 +118,7 @@ export function SendProposalForm({
   const [projectId, setProjectId] = useState(firstProject?.id ?? "");
   // The selected project owns the timezone (legacy sent it); without one, the
   // company's own, from its location (bug sheet 26 Oct).
+  const held = heldProjectIds.includes(projectId);
   const projectTimezone = (id: string) => projects.find((p) => p.id === id)?.timezone || companyTimezone;
   const [timezone, setTimezone] = useState(projectTimezone(firstProject?.id ?? ""));
   const modes = MODES.filter((m) => offerableModes(preference).includes(m.value));
@@ -167,6 +171,10 @@ export function SendProposalForm({
 
   /** Validate first; the policy agreement only opens for a complete offer. */
   function review() {
+    if (held) {
+      document.getElementById("projectId")?.focus();
+      return;
+    }
     const problems = validate({ projectId, roleTitle, duration, startDate, minStart, mode, city, state, officeDays, homeDays, week, laptop, message, shiftFrom, shiftTo, flexibleHours, timezone });
     setErrors(problems);
     if (Object.keys(problems).length > 0) {
@@ -263,7 +271,10 @@ export function SendProposalForm({
               label="Project"
               value={projectId}
               options={projects.map((p) => ({ value: p.id, label: p.projectName }))}
-              error={errors.projectId}
+              error={
+                errors.projectId ??
+                (held ? "Your meeting with this candidate for this project hasn't happened yet. The offer opens once it has, or pick another project." : undefined)
+              }
               onChange={(v) => {
                 setProjectId(v);
                 const project = projects.find((p) => p.id === v);
@@ -373,12 +384,14 @@ export function SendProposalForm({
               id="monthlyHours"
               label="Hours per month"
               value={`${monthlyHours} h`}
+              inputMode="numeric"
               hint={`(${monthlyDays} working days − ${Number(paidLeaves) || 0} leave) × 8 h`}
             />
             <ReadOnlyField
               id="monthlyAmount"
               label={`Monthly amount (${currency})${currency === "INR" && totals.monthly > 0 ? " (includes GST)" : ""}`}
               value={formatMoney(Math.round(totals.monthly * 100), currency)}
+              inputMode="decimal"
               hint={`${formatRate(rate.hourlyRateMinor, currency)} × ${monthlyHours} h. Worked out for you.`}
             />
           </div>
@@ -455,7 +468,7 @@ export function SendProposalForm({
                 error={errors.officeDays}
                 onChange={setOfficeDays}
               />
-              <ReadOnlyField id="homeDays" label="Work-from-home days per week" value={`${homeDays} day${homeDays === "1" ? "" : "s"}`} hint="The rest of the working week." />
+              <ReadOnlyField id="homeDays" label="Work-from-home days per week" value={`${homeDays} day${homeDays === "1" ? "" : "s"}`} inputMode="numeric" hint="The rest of the working week." />
             </div>
           ) : null}
 
@@ -548,7 +561,7 @@ export function SendProposalForm({
         </Step>
 
         <div className="flex flex-wrap items-center gap-3 border-t border-ink-100 bg-ink-50/60 px-6 py-4 lg:hidden">
-          <button type="submit" disabled={sending || projects.length === 0} className={buttonClass({ block: true })}>
+          <button type="submit" disabled={sending || projects.length === 0 || held} className={buttonClass({ block: true })}>
             <Send className="size-4" aria-hidden />
             Review and send
           </button>
@@ -619,7 +632,7 @@ export function SendProposalForm({
             <button
               type="button"
               onClick={review}
-              disabled={sending || projects.length === 0}
+              disabled={sending || projects.length === 0 || held}
               className={buttonClass({ block: true, className: "mt-4 hidden lg:inline-flex" })}
             >
               <Send className="size-4" aria-hidden />
@@ -775,11 +788,14 @@ function ReadOnlyField({
   label,
   value,
   hint,
+  inputMode,
 }: {
   id: string;
   label: string;
   value: string;
   hint?: string;
+  /** A figure: if a phone ever opens a keyboard on it, the numeric one (QA-126). */
+  inputMode?: "numeric" | "decimal";
 }) {
   return (
     <div>
@@ -792,6 +808,7 @@ function ReadOnlyField({
         name={id}
         value={value}
         readOnly
+        inputMode={inputMode}
         className={`${FIELD_BASE} ${FIELD_OK} cursor-not-allowed bg-ink-50 text-ink-600`}
       />
     </div>

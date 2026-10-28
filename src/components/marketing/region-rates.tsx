@@ -18,6 +18,7 @@ import {
   type BandId,
 } from "@/lib/score";
 import { cn } from "@/lib/utils";
+import { CountUp } from "@/components/motion/count-up";
 
 /**
  * Region-aware rates for marketing surfaces.
@@ -111,6 +112,28 @@ export function BandPerHire({ bandId }: { bandId: BandId }) {
   const { bands, currency } = useRegionBands();
   const band = bandById(bands, bandId);
   return <>{formatMoney(band.perHireMinor, currency)}</>;
+}
+
+/**
+ * The per-hire fee as a counting figure, in the visitor's currency: the home
+ * and about stats said "₹5,000" with USD picked while /pricing said "$50"
+ * (QA-105). The symbol is split off so the bands can style it smaller.
+ */
+export function PerHireFigure({ prefixClassName }: { prefixClassName?: string }) {
+  const { bands, currency } = useRegionBands();
+  const text = formatMoney(bands[0]?.perHireMinor ?? 0, currency);
+  const m = /^([^\d]*)([\d,.]+)/.exec(text);
+  const prefix = m?.[1]?.trim() ?? "";
+  const value = Number((m?.[2] ?? "0").replace(/,/g, ""));
+  if (prefixClassName) {
+    return (
+      <>
+        {prefix ? <span className={prefixClassName}>{prefix}</span> : null}
+        <CountUp value={value} decimals={0} />
+      </>
+    );
+  }
+  return <CountUp value={value} prefix={prefix} />;
 }
 
 /** One line under a price block saying what the shown currency means. */

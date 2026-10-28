@@ -8,7 +8,7 @@ import { requireRole } from "@/lib/auth";
 import { requireEmployerSetup } from "@/lib/employer-setup";
 import { bandFor } from "@/lib/score";
 import { formatMoney, formatRate } from "@/lib/format";
-import { RATING_META, displayNameOf, toCandidateProfile, type CandidateProfile } from "@/lib/employer-candidates";
+import { RATING_META, displayNameOf, preferredCities, toCandidateProfile, type CandidateProfile } from "@/lib/employer-candidates";
 import { candidateRelations, hiredInternIds, type CandidateRelation } from "@/lib/employer-visibility";
 import { attachPhotos, visibleInternIds } from "@/lib/employer-pool";
 import { CandidateAvatar } from "@/components/employer/candidate-avatar";
@@ -448,7 +448,7 @@ export default async function CompareCandidates({ searchParams }: { searchParams
               {candidates.map((c) => (
                 <Cell key={c.id}>
                   {c.preferredLocations.length > 0 ? (
-                    c.preferredLocations.map((l) => l.split(",")[0].trim()).join(", ")
+                    preferredCities(c.preferredLocations).join(", ")
                   ) : (
                     <span className="text-text-subtle">{c.workModes.length === 1 && c.workModes[0] === "Remote" ? "Remote only" : "Not stated"}</span>
                   )}

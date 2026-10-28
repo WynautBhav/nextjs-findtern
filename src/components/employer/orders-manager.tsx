@@ -273,7 +273,7 @@ function HiresPanel({
                   <p className="flex flex-wrap items-center gap-2">
                     <Link
                       href={`/employer/intern/${encodeURIComponent(h.internId)}`}
-                      className="break-words text-[0.9375rem] font-semibold text-ink-900 underline-offset-4 hover:text-brand-700 hover:underline"
+                      className="break-words text-[0.9375rem] font-semibold text-ink-900 underline-offset-4 hover:text-brand-700 hover:underline touch:inline-flex touch:min-h-11 touch:items-center"
                     >
                       {h.candidateName}
                     </Link>

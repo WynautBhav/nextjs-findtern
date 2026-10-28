@@ -633,7 +633,7 @@ export default async function CandidatesPage({
                 Matched to <span className="font-semibold text-ink-900">{projectApplied.name}</span>
                 {projectApplied.city ? `, open to working in ${projectApplied.city}` : ""}. Best matches first.
               </span>
-              <Link href={withFilters(filters, { projectDefaults: false, page: "" })} className="font-medium text-brand-700 underline-offset-4 hover:underline">
+              <Link href={withFilters(filters, { projectDefaults: false, page: "" })} className="font-medium text-brand-700 underline-offset-4 hover:underline touch:inline-flex touch:min-h-11 touch:items-center">
                 Show everyone
               </Link>
             </p>
@@ -948,7 +948,7 @@ function SegmentLink({ href, active, label, children }: { href: string; active: 
       aria-current={active ? "true" : undefined}
       title={label}
       className={cn(
-        "apple-spring inline-flex min-h-9 min-w-9 items-center justify-center rounded-apple-sm px-2 text-sm font-medium",
+        "apple-spring inline-flex min-h-9 min-w-9 items-center justify-center rounded-apple-sm px-2 text-sm font-medium touch:min-h-11 touch:min-w-11",
         active ? "bg-brand-50 text-brand-800" : "text-ink-600 hover:bg-ink-100 hover:text-ink-900",
       )}
     >

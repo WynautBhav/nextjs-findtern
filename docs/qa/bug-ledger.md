@@ -21,7 +21,7 @@ lines only.
 | QA-010 | P2 | intern | /intern/opportunities/[id] | any | closed | Role detail tells a hired intern "You have an offer for this role"; should reflect the hire. |
 | QA-011 | P2 | intern | /intern/settings | any | open | A paid intern with saved bank details sees an empty bank form and no read-only saved state. |
 | QA-012 | P2 | employer | /employer/account | any | open | "Profile complete" shown while required escalation-contact fields are empty. |
-| QA-013 | P2 | college | /college/drives | any | open | A closed drive is sorted above the live one. |
+| QA-013 | P2 | college | /college/drives | any | fixed, awaiting retest (385de4c) | A closed drive is sorted above the live one. |
 | QA-014 | P2 | employer | /employer/intern/[id] | any | open | Preferred cities not deduplicated ("Bengaluru, Bengaluru, Remote"). Builder fixes within the employer redesign. |
 | QA-015 | P2 | intern | /intern/record | any | closed | A raw ISO date ("2026-10-30") is shown instead of the DD/MM/YYYY format. Builder fixes within the intern redesign. |
 | QA-016 | P2 | admin | /admin/account | any | closed | Two different password rules stated on the same page. Builder fixes within the admin redesign. |
@@ -336,6 +336,7 @@ logins; `SEED=1` selects the seed accounts and server). Screenshots are in
   `src/app/employer/dashboard/page.tsx:128`) while the list shows one row per task type. On the LIVE-COPY
   both say 1, so it only shows when a row has a count above 1. Severity **P2 confirmed**.
   Fix: say "3 payments and 1 meeting need you", or count rows in both places.
+- Status (builder, 28 Oct): fixed, awaiting retest (no code in this batch; fixed by the employer redesign, e5d6571). The rule is now one for both: the hero names the first thing waiting on you, with its own count ("1 payment due"), and the list below, titled "Also waiting", shows each of the other kinds with its own count. Nothing sums counts of different kinds any more (the `tasks.reduce` total is gone). Checked on the seed DB (Swiggy): hero "1 payment due", other kinds under "Also waiting".
 
 ### QA-009
 - Reproduced: **yes**, on both DBs, but on `/admin/dashboard` (the ledger says `/admin/reports`; the metric
@@ -367,6 +368,7 @@ logins; `SEED=1` selects the seed accounts and server). Screenshots are in
   flow does not allow. Recommendation: close as a seed-data artefact.
 - Residual, optional (P3): the saved full account number is shown unmasked in an editable input.
 - Evidence: `docs/qa/b/screens/qa-011-settings-*.png`; script `qa011.mjs`.
+- Status (builder, 28 Oct): fixed, awaiting retest (wp/opus, fix(QA-011)). As the tester found, the seed intern simply has nothing on file, so an empty form is right there. With details on file, Settings now shows a read-only summary: account holder, bank, account number masked to the last four ("•••• 9012"), IFSC and UPI. "Edit bank details" opens the form, prefilled and focused on the first field, and Cancel returns to the summary. After a save the summary shows the new details. This also covers the residual P3 (the full number in an editable field). The full number still reaches the page so the form can prefill; it is the intern's own data. Checked at 375 on the seed DB by saving test details (removed afterwards): summary after save and after a reload, Edit focus and prefill, Cancel.
 
 ### QA-012
 - Reproduced: **yes**, both DBs. `/employer/account` shows "Profile Complete" while all four escalation
@@ -375,6 +377,7 @@ logins; `SEED=1` selects the seed accounts and server). Screenshots are in
   `onboardingCompleted` only. Severity **P2 confirmed**; also decide whether saving the form then blocks on the
   now-required fields.
 - Evidence: `docs/qa/b/screens/qa-012-account-*.png`; script `qa012.mjs`.
+- Status (builder, 28 Oct): fixed, awaiting retest (wp/opus, fix(QA-012)). The Profile row on /employer/account now counts the escalation contact (missingProfileFields = the setup fields plus the four escalation fields, the same list the form and the API already require on save). With the contact empty it reads "Escalation contact to add"; with other gaps, "N to fill in"; "Complete" only when the form would save as it is. The setup gate (requireEmployerSetup) is unchanged on purpose: adding the contact to it would lock every company onboarded before the field existed out of the console. Whether to require it at the gate is an owner call. Checked on the seed DB (Swiggy, no escalation contact): "Escalation contact to add".
 
 ### QA-013
 - Reproduced: **yes**, SEED with a second drive added (a revoked drive that starts later than the live one,
@@ -392,6 +395,7 @@ logins; `SEED=1` selects the seed accounts and server). Screenshots are in
   data for two entries in one city and different states ("Mumbai, Maharashtra" + "Mumbai, Gujarat").
   The LIVE-COPY has no such row. Severity **P2 confirmed**.
 - Evidence: `docs/qa/b/screens/qa-014-intern-detail-3503.png`.
+- Status (builder, 28 Oct): fixed, awaiting retest (wp/opus, fix(QA-014)). preferredCities() in lib/employer-candidates takes the city part of each entry and keeps each city once (case-insensitive; first spelling and order kept), so "Bengaluru, Bengaluru, Remote" reads "Bengaluru, Remote" and "Mumbai, Maharashtra" + "Mumbai, Gujarat" read "Mumbai". It is used on /employer/intern/[id] ("Prefers") and on Compare, the two places that listed them. A unit test pins it (employer-candidates.test.ts).
 
 ### QA-015
 - Reproduced: **yes**, both DBs. `/intern/record` shows "Start 2026-09-17" (LIVE-COPY) and "Start 2026-10-30"
@@ -472,20 +476,24 @@ logins; `SEED=1` selects the seed accounts and server). Screenshots are in
   "Save ratings and links" 36 high, "Edit contact" 36 high. Payouts: "Apply" 36 high.
 - Evidence: `docs/qa/b/screens/admin-controls--admin-interns-*-375.png`. Severity **P2**.
 - Retest (tester B, 28 Oct): **still open**, narrowed. The payout editor and filters are 44 px now, but list links, row checkboxes and promo toggles are still small; see QA-146.
+- Status (builder, 28 Oct): fixed, awaiting retest (wp/opus, fix(QA-104)). Cause: these controls grew only on `pointer-coarse:`, which a phone-width test browser without touch emulation does not report. Every `pointer-coarse:` is now the `touch:` variant (coarse pointer OR under 40rem), including the ui/button sizes. So at 375 the skill Remove is 44 px, the level selects 44 high, and Add / Save / "Save ratings and links" / "Edit contact" / Payouts "Apply" (all buttonClass size sm) are 44 high. The dialog and sheet close buttons follow too. Also made 44 on touch: the email and LinkedIn links on the candidate detail, and the pricing-editor checkbox label on Settings. Measured at 375 in Chromium and WebKit with no touch emulation (as your sweep runs), on the candidate detail, Payouts, Candidates, Promo codes, Messages, Roles and Settings: nothing under 44 px tall outside sentences. A spot check of employer and intern pages the same way was also clean.
 
 ### QA-105 / QA-106
 - From the marketing sub-run (`docs/qa/b/bs7-marketing-results.md`, X3 and Observations). QA-105: with "Prices in" set to USD
   the home and About stats strip still reads "₹5,000". QA-106: calculator copy "8 h x 5 d x 4 weeks = 160 hours".
   Not re-measured by me beyond reading the page text; severity as logged.
+- Status QA-105 (builder, 28 Oct): fixed, awaiting retest (wp/opus, fix(QA-105)). The per-hire stat on / and /about is now PerHireFigure (components/marketing/region-rates), which formats the band's per-hire fee in the visitor's chosen currency, the same source /pricing uses. Checked at 1440 with reduced motion and ft-currency set: INR "₹5,000" on both pages, USD "$50" on both. QA-106 left alone (owner question).
 
 ### QA-107
 - Steps: intern 375 px, fill steps 1 to 3, reload `/intern/onboarding` (`node docs/qa/b/repro/onb-resume.mjs`).
 - Actual: "Step 1 of 8 · About you"; fields and uploads are kept ("Replace Aadhaar card"), steps 2 to 8 stay unlocked.
 - Expected: reopen on the first unfinished step. Severity **P2**.
+- Status (builder, 28 Oct): fixed, awaiting retest (wp/opus, fix(QA-107)). The step shown was min(remembered step, first failing step), and the remembered step defaults to 1 when this browser has none. It now opens on the first step that does not pass, and only a complete profile reopens on the remembered step. Checked at 375 on the seed DB with a new intern: fill step 1, Continue (step 2); with the remembered step removed or set back to 1, a reload opens "Step 2 of 8 · Academics" (it was step 1). Limit, by design and unchanged: until the final submit, the typed fields live in this browser's draft (INT-30) and only uploads reach the server, so a different browser starts on step 1 because step 1 really is incomplete there.
 
 ### QA-108
 - Evidence: accept dialog "This tells The company yes for a start on 6 Nov 2026." (`docs/qa/b/screens/intern-accept-dialog-375-webkit.png`);
   dashboard activity "Waiting for Hidden company to complete the payment." Severity **P2** (copy).
+- Status (builder, 28 Oct): fixed, awaiting retest (wp/opus, fix(QA-108)). Accept dialog: an unrevealed company reads "This tells the company yes for a start on …" (lower case mid-sentence). Activity thread: journey.companyIn() turns the "Hidden company" placeholder into "the company" ("Waiting for the company to complete the payment"), and sentences that open with the company are capitalised ("The company sent you an offer"). HIDDEN_COMPANY now lives in lib/journey and intern-data re-exports it. Pinned by a journey test (hidden and named).
 
 ### QA-109
 - Steps: sign up two interns, give the second the first one's emergency number at step 1.
@@ -500,6 +508,7 @@ logins; `SEED=1` selects the seed accounts and server). Screenshots are in
   `secure: process.env.NODE_ENV === "production"`, where `src/lib/auth.ts` uses `isHttps()` (honours `x-forwarded-proto`).
   The same applies to the employer signup. My WebKit runs worked around it by creating the account in Chromium.
 - Severity **P2** (only non-TLS deployments); fix: use `isHttps()` for the proof cookie.
+- Status (builder, 28 Oct): fixed, awaiting retest (wp/opus, fix(QA-110)). attachOtpProof is async and sets Secure from isHttps() (x-forwarded-proto first, NODE_ENV only as the fallback), as the session cookie does. All three callers await it: signup verify-otp, and the Google callback for intern and employer. Checked in WebKit against a production build over http on the seed DB: send-otp 200, verify-otp 200, the ft_otp cookie is stored, POST /api/auth/signup 200 with the account created.
 
 ### QA-111
 - Steps: `node docs/qa/b/repro/webkit-home.mjs 375` (and 1440), then `webkit-home-bisect.mjs`, `webkit-home-novideotag.mjs`.
@@ -605,6 +614,7 @@ logins; `SEED=1` selects the seed accounts and server). Screenshots are in
   check a real phone); Schedule's date filter is a DD/MM/YYYY text field. "Hours per month" (value "160 h") and "Monthly amount" ("₹32,000") are `type=text` with no `inputmode`.
 - Expected: one date control, DD/MM/YYYY (bug sheet 7, DESIGN §0); numeric keyboard for numbers. Evidence: `emp2f1-chromium-375-proposal-form.png`, `emp2f3-chromium-375-book.png`. Severity **P2**.
 - Retest (tester B, 28 Oct, production build of wp/qa-b on master 6c4b000): **partly fixed, still open**: Start date and the three meeting-slot dates are now DD/MM/YYYY text fields (`inputmode=numeric`), same as Schedule's filter. "Hours per month" and "Monthly amount" are still `type=text` without `inputmode`, so a phone opens the letters keyboard (Chromium and WebKit).
+- Status (builder, 28 Oct): fixed, awaiting retest (wp/opus, fix(QA-126)). The remaining part: "Hours per month", "Work-from-home days per week" (inputmode=numeric) and "Monthly amount" (inputmode=decimal) now carry an inputmode. They are read-only figures the form works out, so normally no keyboard opens, but if a phone does open one it is numeric. They stay inputs with the same name attributes, so bs7-employer-prop2.mjs keeps reading input[name=monthlyAmount]. The dates were already DD/MM/YYYY text fields (as your retest found). No other type=number fields without inputmode in the employer area.
 
 ### QA-127
 - Steps: `/employer/schedule`, type each value in the DD/MM/YYYY field and tab out (`emp2-interact.mjs`).
@@ -817,3 +827,23 @@ logins; `SEED=1` selects the seed accounts and server). Screenshots are in
 ### QA-160
 - Evidence: `col-chromium-375-home.png`, `col-chromium-375-roster.png`. Severity **P2**.
 - Status (builder, 28 Oct): fixed, awaiting retest (wp/opus, fix(QA-160)). Roster, Not joined yet, below 640px: two lines per student, name with roll number on the right, then "year · branch · email". Rows are 71 px (95 when the email wraps), not about 150. Student names on /college and the New drive radios were already full targets: each name link is a stretched link whose ::after covers the whole row (at least 44 px, all 56 at 375), and each radio sits in a 102 px label card. A bounding box of the <a> or the <input> doesn't show this. Checked in Chromium and WebKit at 375.
+
+### QA-115
+- Status (builder, 28 Oct): fixed, awaiting retest (wp/opus, fix(QA-115)). The proposal page already had an inline confirm, but its own "Withdraw offer" button appeared where the first one had been, so a double click (or a script clicking the label twice) withdrew the offer. Withdraw now goes through useConfirm: a dialog, "Yes, withdraw the offer" / Cancel, Cancel focused, Esc cancels. Checked on the seed DB in Chromium and WebKit on an accepted, unpaid offer at 1440: a double click opens the dialog and sends nothing; Esc closes it with no PATCH; a single click puts focus on Cancel. The list page's withdraw dialog was already a separate dialog with "Keep it" first.
+
+### QA-113
+- Status (builder, 28 Oct): fixed, awaiting retest (wp/opus, fix(QA-113)). The page now reads the meetings the API would block on (isBlockingInterview, same rule). If a meeting with no project is open, or every project has one, the page shows "Meeting first" with a link to the schedule instead of the form. If only the selected project is held, the Project field says why ("Your meeting with this candidate for this project hasn't happened yet. The offer opens once it has, or pick another project.") and both "Review and send" buttons are disabled until another project is picked. The API's 409 is unchanged. Checked at 375 on the seed DB with a temporary future meeting (removed afterwards): held project, message shown, send disabled; switching project re-enables it; a no-project meeting shows "Meeting first".
+
+### QA-114
+- Status (builder, 28 Oct): fixed in part, awaiting retest (wp/opus, fix(QA-114)). In onboarding and on /employer/account: the Billing PIN field shows only for India, and changing the country clears it; the API drops a PIN for a non-Indian address instead of rejecting it as "PIN code must be 6 digits", and still requires a valid 6-digit PIN in India. Phone codes that were still on the previous country's code (primary and escalation) follow the new country (UAE: +971); a code the employer picked by hand is left alone. Checked on the seed DB at 375 (Swiggy, not saved): India, then UAE: the PIN field is gone and both codes read +971. Not changed: State and City outside India stay free text. There is no world state/city dataset in the app, legacy used free text too, and adding one means a new dependency (an owner/orchestrator call).
+
+### QA-117
+- Status (builder, 28 Oct): fixed, awaiting retest (wp/opus, fix(QA-117)). Rating meter (candidate card and quick view): the interview axis is labelled "Interview" (every axis is from the AI interview; the full "AI interview" stays in the title), and the labels wrap instead of truncating, with the figure kept level at the bottom of each column. The project cards with Scope / Work mode / Timezone labels are gone since the redesign (projects are rows). On the dashboard at 375, project names and the scope / skills lines were cut mid-word ("High-Volume Delivery Routing O…"); they now wrap to two lines, as do the candidate skills lines. Measured at 375 in Chromium and WebKit on Candidates (with the quick view open), Projects and Dashboard: the only overflowing text is screen-reader-only, plus the one-line "Required skills" filter summary next to Edit, which is a summary on purpose.
+
+### QA-116
+- Status (builder, 28 Oct): fixed, awaiting retest (wp/opus, fix(QA-116)). On touch (the `touch:` variant) these controls are now 44 px:
+  - the row "⋯" menu (RowMenu, shared, so admin rows too);
+  - the Orders tabs (tabClass), the Shortlist hire-flow steps and the Alerts tabs;
+  - Candidates' 12 / 24 / 48 and Rows / Cards toggles, and "Show everyone";
+  - the candidate name links on Schedule (44 wide as well, since the pre-hire name is two initials), Orders and the Shortlist.
+  Shortlist, Send proposal, Quick view and Compare were already 44 on touch. Candidate row titles are stretched links (the whole row). "Candidate NP" on the proposal page sits inside a sentence and is exempt. Measured at 375 in Chromium and WebKit on Candidates, Dashboard, Projects, Proposals, Schedule, Orders, Timesheets, Shortlist, Alerts, Company profile, a candidate profile, a proposal and Campus drives, counting ::before/::after hit areas and enclosing labels: nothing under 44 px tall or 24 wide outside sentences.
