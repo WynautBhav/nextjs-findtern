@@ -11,8 +11,10 @@ export { isStudentEligible, readEligibility, normBranch, type DriveEligibility, 
  *
  * The rules, in one place:
  *  - A drive link admits a signed-in employer, inside the drive's window,
- *    while the drive is not revoked. The token is checked against the stored
- *    hash; afterwards the employer's "joined" row is their pass.
+ *    while the drive is not revoked and its college is active (a switched-off
+ *    college shuts its drives, QA-201). The token is checked against the
+ *    stored hash; afterwards the employer's "joined" row is their pass, and
+ *    issuing a new link clears those rows (QA-200).
  *  - An employer sees a student only if the student is a verified (or
  *    hand-included) member of the drive's college, consented to drive
  *    visibility, has not left, and meets the cutoffs. Exclude beats include;
@@ -74,11 +76,14 @@ export function checkDriveLink(input: {
   drive: DriveLike;
   token: string | null | undefined;
   session: SessionLike;
+  /** The drive's college is switched on. Required, so no caller can skip it. */
+  collegeActive: boolean;
   now?: number;
 }): AccessResult {
   const now = input.now ?? Date.now();
   // Token first: a wrong token must not learn anything about the drive.
   if (!tokenMatches(input.token, input.drive.tokenHash)) return { ok: false, reason: "bad_token" };
+  if (!input.collegeActive) return { ok: false, reason: "revoked" };
   const w = windowDenial(input.drive, now);
   if (w) return w;
   if (!input.session) return { ok: false, reason: "sign_in" };
@@ -91,11 +96,14 @@ export function checkDriveAccess(input: {
   drive: DriveLike;
   session: SessionLike;
   joined: boolean;
+  /** The drive's college is switched on (QA-201). */
+  collegeActive: boolean;
   now?: number;
 }): AccessResult {
   const now = input.now ?? Date.now();
   if (!input.session) return { ok: false, reason: "sign_in" };
   if (input.session.role !== "employer") return { ok: false, reason: "not_employer" };
+  if (!input.collegeActive) return { ok: false, reason: "revoked" };
   const w = windowDenial(input.drive, now);
   if (w) return w;
   if (!input.joined) return { ok: false, reason: "not_joined" };

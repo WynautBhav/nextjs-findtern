@@ -60,7 +60,8 @@ export default async function EmployerDrivesPage() {
         // title counted at full length, so the column grew to 668px on a phone (QA-118).
         <ul className="grid grid-cols-[minmax(0,1fr)] gap-3">
           {rows.map(({ drive, college }) => {
-            const state = driveWindow(drive);
+            // A switched-off college's drives read as closed, as the drive itself refuses (QA-201).
+            const state = college.isActive ? driveWindow(drive) : "revoked";
             const left = state === "live" ? timeLeft(drive.endsAt) : null;
             const open = state === "live";
             const body = (

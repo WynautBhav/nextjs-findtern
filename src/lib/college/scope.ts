@@ -292,7 +292,7 @@ export async function driveForEmployer(
       .limit(1);
     joined = Boolean(j);
   }
-  return { ...row, joined, access: checkDriveAccess({ drive: row.drive, session, joined }) };
+  return { ...row, joined, access: checkDriveAccess({ drive: row.drive, session, joined, collegeActive: row.college.isActive }) };
 }
 
 /** The drive's own college, for a placement officer's write. Null when not theirs. */

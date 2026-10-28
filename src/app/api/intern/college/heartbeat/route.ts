@@ -33,6 +33,8 @@ export async function POST(req: Request) {
   const [drive] = await db
     .select({ id: schema.collegeDrives.id, title: schema.collegeDrives.title, endsAt: schema.collegeDrives.endsAt })
     .from(schema.collegeDrives)
+    // A switched-off college announces no drive (QA-201).
+    .innerJoin(schema.colleges, and(eq(schema.colleges.id, schema.collegeDrives.collegeId), eq(schema.colleges.isActive, true)))
     .where(
       and(
         eq(schema.collegeDrives.collegeId, m.collegeId),

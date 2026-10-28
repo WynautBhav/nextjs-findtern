@@ -25,14 +25,16 @@ export async function POST(req: Request) {
   if (!parsed.success) return NextResponse.json({ error: "This link isn't valid" }, { status: 404 });
 
   const db = getDb();
-  const [drive] = await db
-    .select()
+  const [row] = await db
+    .select({ drive: schema.collegeDrives, collegeActive: schema.colleges.isActive })
     .from(schema.collegeDrives)
+    .innerJoin(schema.colleges, eq(schema.colleges.id, schema.collegeDrives.collegeId))
     .where(eq(schema.collegeDrives.tokenHash, hashDriveToken(parsed.data.token)))
     .limit(1);
-  if (!drive) return NextResponse.json({ error: "This link isn't valid" }, { status: 404 });
+  if (!row) return NextResponse.json({ error: "This link isn't valid" }, { status: 404 });
+  const { drive } = row;
 
-  const access = checkDriveLink({ drive, token: parsed.data.token, session: guard.session });
+  const access = checkDriveLink({ drive, token: parsed.data.token, session: guard.session, collegeActive: row.collegeActive });
   if (!access.ok) {
     const msg: Record<string, string> = {
       revoked: "The college has closed this link.",
