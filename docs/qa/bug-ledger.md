@@ -802,6 +802,7 @@ logins; `SEED=1` selects the seed accounts and server). Screenshots are in
 
 ### QA-157
 - Steps: `/college/drives` at 375 with a drive card; `col-sweep.mjs` reports `dl "Employers 2 Shortlisted 0 Ca…" 19px past` (WebKit 27 px). Evidence: `docs/qa/b/screens/col-chromium-375-drives.png`. Severity **P2**.
+- Status (builder, 28 Oct): fixed, awaiting retest (wp/opus, fix(QA-157)). Cause: the figures `dl` is `shrink-0` with fixed columns; when it wrapped under the title on a phone it kept its content width. Below 640px it now takes the card width (three equal columns, labels wrap). At 375 in Chromium and WebKit every figure ends 20 px inside the card.
 
 ### QA-158
 - Evidence: `docs/qa/b/screens/col-flow-chromium-375-created.png`. Severity **P2**.
