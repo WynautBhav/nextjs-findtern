@@ -101,6 +101,7 @@ export default async function InternSettings({ searchParams }: { searchParams: P
               <div className="py-3">
                 <dt className="text-sm text-ink-600">Findtern ID</dt>
                 <dd className="mt-0.5 break-all font-mono text-xs font-medium text-ink-900">{uid}</dd>
+                <dd className="mt-1 text-xs text-ink-600">Your account&apos;s reference number. Quote it when you write to support so we can find you.</dd>
               </div>
               {user?.createdAt ? (
                 <DetailRow

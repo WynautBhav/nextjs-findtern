@@ -5,7 +5,7 @@ import { phoneError } from "./phone.ts";
  * Intern onboarding shape across the 8-step wizard.
  *
  * Steps:
- * 1. About Me (photo, bio, identity documents, address, phone, emergency contact, bank)
+ * 1. About Me (photo, bio, identity documents, address, phone, emergency contact)
  * 2. Academics (level, degree, status, institution, years, score, marksheets, courses)
  * 3. Experience (Internship, Job, Project, Freelancing)
  * 4. Skills (4 to 7, each rated Beginner / Intermediate / Advanced)
@@ -1034,8 +1034,7 @@ export function validateStep(values: OnboardingDraft, step: number, ctx: Validat
     else if (!AADHAAR.test(aadhaar) && aadhaar !== (ctx.storedAadhaar ?? "").replace(/\s/g, "")) {
       errors.aadhaarNumber = "Aadhaar numbers never start with 0 or 1. Check the number.";
     }
-    // Mandatory again (bug sheet 7, NC r18).
-    if (!ctx.hasAadhaarImage) errors.aadhaarImage = "Upload a photo or scan of your Aadhaar card.";
+    // The Aadhaar image is optional (bug sheet 8); the number is still required.
 
     const pan = (values.panNumber ?? "").trim();
     if (!pan) errors.panNumber = "PAN is required for stipend payouts.";
@@ -1068,9 +1067,7 @@ export function validateStep(values: OnboardingDraft, step: number, ctx: Validat
       }
     }
 
-    // Bank details: optional here (they can wait for Settings), but once any
-    // field is filled in, all of it has to be right (NC r25).
-    if (bankStarted(values.bank)) Object.assign(errors, bankErrors(values.bank));
+    // Bank details are not part of onboarding (bug sheet 8); Settings checks them.
   }
 
   if (step === 1) {
@@ -1264,7 +1261,7 @@ export type CompletionItem = { id: string; label: string; done: boolean; href: s
  */
 export type CompletionDocs = {
   hasPanImage: boolean;
-  /** An Aadhaar card image is on file (mandatory again, NC r18). */
+  /** An Aadhaar card image is on file (optional since bug sheet 8). */
   hasAadhaarImage?: boolean;
   /** A profile photo is on file. */
   hasPhoto?: boolean;
@@ -1287,7 +1284,7 @@ function academicsFilled(a: OnboardingDraft["academics"] | undefined): boolean {
 }
 
 export function profileCompletion(row: OnboardingLike | null, docs: boolean | CompletionDocs): { items: CompletionItem[]; done: number; total: number; complete: boolean } {
-  const { hasPanImage, hasAadhaarImage = false, hasPhoto = false } = typeof docs === "boolean" ? { hasPanImage: docs } : docs;
+  const { hasPanImage, hasPhoto = false } = typeof docs === "boolean" ? { hasPanImage: docs } : docs;
   const d = row ? draftFromRecord(row) : null;
   const extra = obj(row?.extraData);
   const modes = d?.locationTypes ?? [];
@@ -1297,11 +1294,11 @@ export function profileCompletion(row: OnboardingLike | null, docs: boolean | Co
     { id: "photo", label: "Profile photo", done: hasPhoto, href: form },
     // Bio is optional (INT-20): legacy had none, and the dashboard meter says so.
     { id: "about", label: "Your address", done: Boolean(d && d.city && d.state && d.pinCode), href: form },
-    // Both numbers and both card images (bug sheet 7, NC r18). A marksheet is optional.
+    // Both numbers and the PAN card image; the Aadhaar image is optional (bug sheet 8).
     {
       id: "identity",
-      label: "Aadhaar and PAN, with card images",
-      done: Boolean(d?.aadhaarNumber && d?.panNumber && hasPanImage && hasAadhaarImage),
+      label: "Aadhaar and PAN, with PAN card image",
+      done: Boolean(d?.aadhaarNumber && d?.panNumber && hasPanImage),
       href: form,
     },
     { id: "emergency", label: "Emergency contact", done: Boolean(d?.emergencyPhone), href: form },

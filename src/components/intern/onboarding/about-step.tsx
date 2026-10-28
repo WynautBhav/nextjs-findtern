@@ -6,7 +6,6 @@ import { Lock } from "lucide-react";
 import { FileUpload } from "@/components/app/file-upload";
 import { cn } from "@/lib/utils";
 
-import { BankFields } from "../bank-fields";
 import { CityStatePicker } from "../city-state-picker";
 import { Field, FieldNote, Grid, Label, Section, TextArea, controlClass, describedBy } from "./fields";
 import { PhotoUpload } from "./photo-upload";
@@ -100,7 +99,7 @@ export function AboutStep({ values, update, errors, documents, account, onUpload
             error={errors.panNumber}
             onChange={(v) => update("panNumber", v.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 10))}
           />
-          <DocSlot id="aadhaarImage" label="Aadhaar card image" error={errors.aadhaarImage}>
+          <DocSlot id="aadhaarImage" label="Aadhaar card image" optional error={errors.aadhaarImage}>
             <FileUpload
               kind="aadhaar"
               accept={CARD_TYPES}
@@ -205,13 +204,6 @@ export function AboutStep({ values, update, errors, documents, account, onUpload
           </div>
         </Grid>
       </Section>
-
-      <Section
-        title="Bank account"
-        hint="Where your stipend is paid. Optional now - you can add it later from Settings - but once you start, fill in every field."
-      >
-        <BankFields value={values.bank} onChange={(patch) => update("bank", { ...values.bank, ...patch })} errors={errors} />
-      </Section>
     </div>
   );
 }
@@ -271,10 +263,10 @@ function PhonePrefixed({
 }
 
 /** An upload with its label and error, laid out like a field. */
-function DocSlot({ id, label, error, children }: { id: string; label: string; error?: string; children: React.ReactNode }) {
+function DocSlot({ id, label, optional, error, children }: { id: string; label: string; optional?: boolean; error?: string; children: React.ReactNode }) {
   return (
     <div id={id} tabIndex={-1} className="min-w-0 outline-none">
-      <Label>{label}</Label>
+      <Label optional={optional}>{label}</Label>
       <div
         className={cn(
           "mt-2 rounded-apple-md border border-dashed p-3",

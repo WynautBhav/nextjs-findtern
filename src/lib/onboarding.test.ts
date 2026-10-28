@@ -278,11 +278,11 @@ test("a complete profile passes every step; bio is optional (INT-20)", () => {
   assert.equal(firstOpenStep(complete(), ctx, 8), 8);
 });
 
-test("Aadhaar number, Aadhaar image (NC r18) and PAN image are required", () => {
+test("Aadhaar number and PAN image are required; the Aadhaar image is optional (bug sheet 8)", () => {
   const e = validateStep({ ...complete(), aadhaarNumber: "" }, 0, { ...ctx, hasPanImage: false, hasAadhaarImage: false });
   assert.ok(e.aadhaarNumber);
   assert.ok(e.panImage);
-  assert.ok(e.aadhaarImage);
+  assert.equal(e.aadhaarImage, undefined);
   assert.match(validateStep({ ...complete(), aadhaarNumber: "12345" }, 0, ctx).aadhaarNumber, /12 digits/);
   assert.ok(validateStep({ ...complete(), aadhaarNumber: "123456789012" }, 0, ctx).aadhaarNumber, "cannot start with 1");
   assert.equal(
@@ -307,14 +307,9 @@ test("INT-39: the account's own number must be valid to submit", () => {
   assert.equal(validateStep(complete(), 0, { ...ctx, ownPhone: { countryCode: "+91", phoneNumber: "9876501234" } }).ownPhone, undefined);
 });
 
-test("bank details on the About step: optional, but all or nothing (NC r25)", () => {
+test("bank details are not part of onboarding (bug sheet 8)", () => {
   const empty = { accountHolderName: "", bankName: "", accountNumber: "", ifscCode: "", upiId: "" };
-  assert.deepEqual(validateStep({ ...complete(), bank: empty }, 0, ctx), {});
-  const half = validateStep({ ...complete(), bank: { ...empty, bankName: "State Bank of India" } }, 0, ctx);
-  assert.ok(half.bankAccountNumber);
-  assert.ok(half.bankIfscCode);
-  const full = { accountHolderName: "Asha Rao", bankName: "State Bank of India", accountNumber: "123456789012", ifscCode: "SBIN0001234", upiId: "" };
-  assert.deepEqual(validateStep({ ...complete(), bank: full }, 0, ctx), {});
+  assert.deepEqual(validateStep({ ...complete(), bank: { ...empty, bankName: "State Bank of India" } }, 0, ctx), {});
 });
 
 test("LinkedIn is optional; a given link must be a LinkedIn profile (legacy pattern)", () => {
@@ -476,10 +471,11 @@ const storedComplete = {
 };
 const allDocs = { hasPanImage: true, hasAadhaarImage: true, hasPhoto: true };
 
-test("profile completion: bio optional, both card images required, 4 skills", () => {
+test("profile completion: bio optional, PAN image required, Aadhaar image optional, 4 skills", () => {
   assert.equal(profileCompletion(storedComplete, allDocs).complete, true);
-  const identity = (aadhaar: boolean) => profileCompletion(storedComplete, { ...allDocs, hasAadhaarImage: aadhaar }).items.find((i) => i.id === "identity")?.done;
-  assert.equal(identity(false), false);
+  const identity = (docs: Partial<typeof allDocs>) => profileCompletion(storedComplete, { ...allDocs, ...docs }).items.find((i) => i.id === "identity")?.done;
+  assert.equal(identity({ hasAadhaarImage: false }), true);
+  assert.equal(identity({ hasPanImage: false }), false);
   assert.equal(profileCompletion({ ...storedComplete, skills: ["A", "B", "C"] }, allDocs).complete, false);
 });
 

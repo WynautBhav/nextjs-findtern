@@ -7,8 +7,6 @@ import { ArrowLeft, ArrowRight, Check, CheckCircle2, Loader2, Lock, TriangleAler
 import { buttonClass } from "@/components/ui/button";
 import { csrfFetch } from "@/lib/client-fetch";
 import {
-  bankErrors,
-  bankStarted,
   experienceType,
   toDay,
   validateProfile,
@@ -235,14 +233,12 @@ export function OnboardingForm({
     if (final && !checkAll()) return;
     setSaving(true);
     setNotice(null);
-    // Bank details go with the save only once they are complete and right;
-    // a half-filled form is kept on screen, not sent.
-    const bankReady = bankStarted(values.bank) && Object.keys(bankErrors(values.bank)).length === 0;
     try {
       const res = await csrfFetch("/api/intern/onboarding", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...values, bank: bankReady ? values.bank : undefined, final }),
+        // Bank details are not asked for here (bug sheet 8); Settings saves them.
+        body: JSON.stringify({ ...values, bank: undefined, final }),
       });
       const data = (await res.json().catch(() => ({}))) as { error?: string; step?: number; fields?: Record<string, string> };
       if (!res.ok) {
@@ -270,7 +266,7 @@ export function OnboardingForm({
         return;
       }
       setNotice({
-        text: final ? "Changes saved." : bankStarted(values.bank) && !bankReady ? "Draft saved. Your bank details were not saved yet - finish them first." : "Draft saved.",
+        text: final ? "Changes saved." : "Draft saved.",
         ok: true,
       });
       router.refresh();

@@ -194,20 +194,20 @@ step("intern: signs up through the form, code read from the mail log [UI]", [], 
   state.internId = user.id;
 });
 
-step("intern: completes onboarding (photo + Aadhaar + PAN uploads, final submit) [API]", ["internId"], async () => {
+step("intern: completes onboarding (photo + PAN uploads, no Aadhaar image, final submit) [API]", ["internId"], async () => {
   const page = pages.intern;
   await visit(page, "/intern/onboarding");
   // The page renders the stepper twice (desktop header, lg:hidden phones);
   // .first() picks the hidden one.
   await page.getByText(/step 1 of/i).filter({ visible: true }).first().waitFor();
 
-  // Aadhaar image is mandatory (bug sheet 7, NEW CHANGES r18).
-  for (const kind of ["profile_photo", "aadhaar", "pan"]) {
+  // The Aadhaar image is optional (bug sheet 8): the submit must pass without it.
+  for (const kind of ["profile_photo", "pan"]) {
     const res = await upload(page, { kind, base64: pngBase64(), type: "image/png", name: `${kind}.png` });
     expectOk(`POST /api/uploads (${kind})`, res, [201]);
   }
   const docs = await one(`SELECT profile_photo_name, aadhaar_image_name, pan_image_name, pan_image_type FROM intern_document WHERE user_id = $1`, [state.internId]);
-  assert.ok(docs?.profile_photo_name && docs.aadhaar_image_name && docs.pan_image_name, "photo, Aadhaar and PAN stored on intern_document");
+  assert.ok(docs?.profile_photo_name && docs.pan_image_name && !docs.aadhaar_image_name, "photo and PAN stored, no Aadhaar image");
   assert.equal(docs.pan_image_type, "image/webp", "uploaded images are re-encoded to WebP");
 
   const skills = ["Python", "SQL", "React", "Data Analysis"];

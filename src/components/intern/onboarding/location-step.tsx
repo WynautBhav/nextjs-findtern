@@ -20,8 +20,9 @@ const MAX_CITIES = 5;
 
 export function LocationStep({ values, update, errors }: StepProps) {
   // One pick; the stored set is that mode plus every less on-site one
-  // (onsite ⇒ hybrid + remote). Only the pick looks selected (NC r20).
+  // (onsite ⇒ hybrid + remote), and all of them show selected (bug sheet 8).
   const picked = widestWorkMode(values.locationTypes ?? []);
+  const included = cascadeWorkModes([], picked ?? "");
   const needsCities = picked === "onsite" || picked === "hybrid";
   const cities = Array.from(new Set(values.preferredLocations ?? []));
 
@@ -44,13 +45,13 @@ export function LocationStep({ values, update, errors }: StepProps) {
           className="grid gap-3 outline-none sm:grid-cols-3"
         >
           {MODES.map(({ value, label, detail, icon: Icon }) => {
-            const on = picked === value;
+            const on = included.includes(value);
             return (
               <button
                 key={value}
                 type="button"
                 role="radio"
-                aria-checked={on}
+                aria-checked={picked === value}
                 data-field="locationTypes"
                 onClick={() => pick(value)}
                 className={cn(
