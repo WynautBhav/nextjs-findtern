@@ -48,9 +48,14 @@ import { compareBySortFields, parseSortFields } from "@/lib/candidate-sort";
 import { MAX_COMPARE, isOpenProject, parseIds, rememberedFilters, rememberedSelection } from "@/lib/employer-selection";
 import { RememberSelection } from "@/components/employer/remember-selection";
 
-/** Candidate · skills · score · AI interview · actions. */
+/**
+ * Candidate · score · (AI interview at 2xl) · actions. The skills sit under
+ * the identity line rather than in a column: the console content is capped,
+ * so a skills column only squeezed the city, work modes and laptop (what an
+ * employer scans for) into an ellipsis.
+ */
 const CANDIDATE_GRID =
-  "grid-cols-[minmax(0,1fr)_auto] lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_6.5rem_10rem] 2xl:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_6.5rem_5.5rem_10rem]";
+  "grid-cols-[minmax(0,1fr)_auto] lg:grid-cols-[minmax(0,1fr)_6.5rem_10rem] 2xl:grid-cols-[minmax(0,1fr)_6.5rem_5.5rem_10rem]";
 
 export const metadata: Metadata = {
   title: "Candidates",
@@ -759,7 +764,6 @@ export default async function CandidatesPage({
                   {/* Column labels for scanning; each row also names its figures. */}
                   <div aria-hidden className={cn(CANDIDATE_GRID, "hidden gap-x-6 border-b border-ink-100 px-5 py-2.5 text-xs font-medium text-text-subtle lg:grid")}>
                     <span>Candidate</span>
-                    <span>Skills</span>
                     <span className="text-right">Findtern Score</span>
                     <span className="hidden text-right 2xl:block">AI interview</span>
                     <span />
@@ -775,39 +779,46 @@ export default async function CandidatesPage({
                       const wanted = new Set(effectiveSkills.map((k) => k.toLowerCase()));
                       // The project's skills first, so the match is what you read.
                       const skills = [...c.skills].sort((a, b) => Number(wanted.has(b.toLowerCase())) - Number(wanted.has(a.toLowerCase())));
-                      const meta = [c.city, c.workModes.join(", "), c.hasLaptop === false ? "Needs a laptop" : c.hasLaptop ? "Own laptop" : ""].filter(Boolean).join(" · ");
+                      const meta = [c.city, c.workModes.join(" / "), c.hasLaptop === false ? "Needs a laptop" : c.hasLaptop ? "Own laptop" : ""].filter(Boolean).join(" · ");
+                      const skillLine =
+                        skills.length === 0 ? (
+                          "No skills listed"
+                        ) : (
+                          <>
+                            {skills.slice(0, 3).map((k, i) => (
+                              <span key={k}>
+                                {i > 0 ? " · " : ""}
+                                <span className={wanted.has(k.toLowerCase()) ? "font-semibold text-ink-900" : undefined}>{k}</span>
+                              </span>
+                            ))}
+                            {skills.length > 3 ? <span className="text-text-subtle"> +{skills.length - 3}</span> : null}
+                          </>
+                        );
                       return (
                         <li key={c.id} className={cn(CANDIDATE_GRID, "relative grid items-center gap-x-6 gap-y-2 px-5 py-3.5 transition-colors hover:bg-ink-50/70")}>
                           <div className="flex min-w-0 items-center gap-3">
                             <CandidateAvatar photoUrl={c.photoUrl} initials={c.initials} className="size-10 shrink-0 rounded-full text-xs" />
                             <div className="min-w-0">
-                              <div className="flex min-w-0 items-center gap-2">
+                              {/* Wraps rather than truncates: a revealed name, and the city,
+                                  work modes and laptop an employer scans for, are never cut off. */}
+                              <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
                                 {/* The row opens the profile; the link is stretched over it. */}
                                 <Link
                                   href={`/employer/intern/${c.id}${activeProjectId ? `?project=${encodeURIComponent(activeProjectId)}` : ""}`}
-                                  className="truncate text-[0.9375rem] font-semibold text-ink-900 outline-none after:absolute after:inset-0 after:content-[''] focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-brand-500"
+                                  className="break-words text-[0.9375rem] font-semibold text-ink-900 outline-none after:absolute after:inset-0 after:content-[''] focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-brand-500"
                                 >
                                   {name}
                                 </Link>
                                 {status ? <Pill tone={status.tone} className="shrink-0 whitespace-nowrap">{status.label}</Pill> : null}
                               </div>
-                              <p className="truncate text-sm text-ink-600">{meta || "Location not stated"}</p>
+                              <p className="text-sm text-ink-600">{meta || "Location not stated"}</p>
+                              <p className="mt-0.5 hidden truncate text-sm text-ink-600 lg:block" title={c.skills.join(", ")}>
+                                {skillLine}
+                              </p>
                             </div>
                           </div>
-                          <p className="min-w-0 truncate text-sm text-ink-600 max-lg:col-span-2 max-lg:pl-[3.25rem]" title={c.skills.join(", ")}>
-                            {skills.length === 0 ? (
-                              "No skills listed"
-                            ) : (
-                              <>
-                                {skills.slice(0, 3).map((k, i) => (
-                                  <span key={k}>
-                                    {i > 0 ? " · " : ""}
-                                    <span className={wanted.has(k.toLowerCase()) ? "font-semibold text-ink-900" : undefined}>{k}</span>
-                                  </span>
-                                ))}
-                                {skills.length > 3 ? <span className="text-text-subtle"> +{skills.length - 3}</span> : null}
-                              </>
-                            )}
+                          <p className="min-w-0 truncate text-sm text-ink-600 max-lg:col-span-2 max-lg:pl-[3.25rem] lg:hidden" title={c.skills.join(", ")}>
+                            {skillLine}
                           </p>
                           <div className="text-right max-lg:col-start-2 max-lg:row-start-1">
                             <p className="nums text-xl font-semibold tracking-[-0.01em] text-ink-900">
