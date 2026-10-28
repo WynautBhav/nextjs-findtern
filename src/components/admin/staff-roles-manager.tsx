@@ -13,6 +13,7 @@ import { buttonClass } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import { PASSWORD_HINT } from "@/lib/password-policy";
+import { useConfirm } from "@/components/admin/use-confirm";
 
 const AREA_LABEL: Record<string, string> = {
   dashboard: "Dashboard",
@@ -81,6 +82,7 @@ export function StaffRolesManager({
   initialRoles: RoleDef[];
   currentAdminId: string | null;
 }) {
+  const { ask, dialog } = useConfirm();
   const router = useRouter();
   const [staff, setStaff] = useState<Staff[]>(initialStaff);
   const [roles, setRoles] = useState<RoleDef[]>(initialRoles);
@@ -170,7 +172,8 @@ export function StaffRolesManager({
   }
 
   async function removeStaff(s: Staff) {
-    if (!window.confirm(`Revoke console access for ${s.email}? They are signed out at their next request.`)) return;
+    const ok = await ask({ title: `Revoke access for ${s.email}?`, body: "They lose the admin console and are signed out at their next request.", confirmLabel: "Yes, revoke access" });
+    if (!ok) return;
     setBusyId(s.id);
     setStaffError(null);
     const result = await call("/api/admin/staff", "DELETE", { id: s.id });
@@ -184,7 +187,8 @@ export function StaffRolesManager({
   }
 
   async function deleteRole(role: RoleDef) {
-    if (!window.confirm(`Delete the role "${role.name}"?`)) return;
+    const ok = await ask({ title: `Delete the role "${role.name}"?`, body: "Its permissions go with it. Staff on this role need another one.", confirmLabel: "Yes, delete the role" });
+    if (!ok) return;
     setMatrixError(null);
     const result = await call(`/api/admin/roles/${encodeURIComponent(role.key)}`, "DELETE");
     if (!result.ok) {
@@ -197,6 +201,7 @@ export function StaffRolesManager({
 
   return (
     <div className="space-y-6">
+      {dialog}
       {/* Staff */}
       <Panel>
         <PanelHeader

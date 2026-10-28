@@ -13,6 +13,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import type { ContactFile, ContactMeta } from "@/lib/admin/contact-meta";
 import { csrfFetch } from "@/lib/client-fetch";
 import { cn } from "@/lib/utils";
+import { useConfirm } from "@/components/admin/use-confirm";
 
 export type InboxMessage = {
   id: string;
@@ -64,6 +65,7 @@ function initials(name: string): string {
 }
 
 export function MessagesInbox({ messages, filtering }: { messages: InboxMessage[]; filtering: boolean }) {
+  const { ask, dialog } = useConfirm();
   const router = useRouter();
   const [rows, setRows] = useState(messages);
   const [seen, setSeen] = useState(messages);
@@ -110,7 +112,12 @@ export function MessagesInbox({ messages, filtering }: { messages: InboxMessage[
   }
 
   async function remove(ids: string[]) {
-    if (!window.confirm(ids.length === 1 ? "Delete this message? This can't be undone." : `Delete ${ids.length} messages? This can't be undone.`)) return;
+    const ok = await ask({
+      title: ids.length === 1 ? "Delete this message?" : `Delete ${ids.length} messages?`,
+      body: "Deleted messages are gone from the inbox for everyone. This can't be undone.",
+      confirmLabel: ids.length === 1 ? "Yes, delete it" : `Yes, delete ${ids.length}`,
+    });
+    if (!ok) return;
     if (!(await send("DELETE", ids))) return;
     setRows((prev) => prev.filter((m) => !ids.includes(m.id)));
     setSelected(new Set());
@@ -158,6 +165,7 @@ export function MessagesInbox({ messages, filtering }: { messages: InboxMessage[
 
   return (
     <div>
+      {dialog}
       {/* Bulk bar replaces the select-all row while a selection exists. */}
       <div className="flex min-h-12 flex-wrap items-center gap-2 border-b border-ink-100 bg-ink-50/60 px-5 py-2">
         <label className="inline-flex min-h-9 items-center gap-2.5 text-sm font-medium text-ink-700 max-lg:min-h-11">

@@ -8,6 +8,7 @@ import { InlineSelect, InlineToggle, sendInline } from "@/components/admin/inlin
 import { buttonClass } from "@/components/ui/button";
 import { fteOf } from "@/lib/admin/fte";
 import { cn } from "@/lib/utils";
+import { useConfirm } from "@/components/admin/use-confirm";
 
 /**
  * Company controls, all on PATCH/DELETE /api/admin/companies/[id].
@@ -58,8 +59,11 @@ export function CompanyDeleteButton({ id }: { id: string }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const { ask, dialog } = useConfirm();
+
   async function remove() {
-    if (!window.confirm("Delete this employer permanently? This can't be undone.")) return;
+    const ok = await ask({ title: "Delete this company?", body: "The employer account is deleted permanently. This can't be undone.", confirmLabel: "Yes, delete it" });
+    if (!ok) return;
     setBusy(true);
     setError(null);
     const result = await sendInline({ url: `/api/admin/companies/${id}`, method: "DELETE" });
@@ -70,6 +74,7 @@ export function CompanyDeleteButton({ id }: { id: string }) {
 
   return (
     <span className="inline-flex flex-col gap-1">
+      {dialog}
       <button
         type="button"
         disabled={busy}

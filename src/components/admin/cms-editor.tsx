@@ -25,6 +25,7 @@ import {
   type CmsType,
 } from "@/lib/admin/cms-collections";
 import { cn } from "@/lib/utils";
+import { useConfirm } from "@/components/admin/use-confirm";
 
 export type CmsItem = Record<string, unknown> & { id: string };
 
@@ -56,6 +57,7 @@ export function CmsEditorProvider({
   children: React.ReactNode;
 }) {
   const router = useRouter();
+  const { ask, dialog } = useConfirm();
   const def = CMS_COLLECTIONS[type];
   const [editing, setEditing] = useState<CmsItem | "new" | null>(null);
   const [original, setOriginal] = useState<CmsDraft>({});
@@ -75,7 +77,8 @@ export function CmsEditorProvider({
 
   async function remove(item: CmsItem) {
     const name = String(item[def.title] ?? "this item");
-    if (!window.confirm(`Delete "${name}"? It disappears from the website at once and can't be restored.`)) return;
+    const ok = await ask({ title: `Delete "${name}"?`, body: "It disappears from the website at once and can't be restored.", confirmLabel: "Yes, delete it" });
+    if (!ok) return;
     setBusyId(item.id);
     setListError(null);
     const result = await sendInline({ url: "/api/admin/cms", method: "DELETE", body: { type, id: item.id } });
@@ -131,6 +134,7 @@ export function CmsEditorProvider({
 
   return (
     <EditorContext.Provider value={{ open, remove, busyId }}>
+      {dialog}
       {listError ? (
         <p role="alert" className="mb-4 flex items-start justify-between gap-3 rounded-apple-md bg-danger-soft px-4 py-3 text-sm text-danger">
           {listError}
