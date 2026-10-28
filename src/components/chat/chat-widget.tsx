@@ -19,6 +19,11 @@ const QUICK_PROMPTS = [
 ];
 
 const TEASER_KEY = "findtern:chat-teaser-seen";
+/** Auth and onboarding forms (see the placement note in ChatWidget). */
+const FORM_ROUTE =
+  /^\/(?:(?:employer\/)?(?:login|signup|forgot-password|reset-password|verify-email)|college\/login|(?:intern|employer)\/onboarding)(?:\/|$)/;
+/** The nudge goes away by itself; it used to sit over the page until dismissed (QA-102). */
+const TEASER_MS = 12_000;
 
 const GREETING: Msg = {
   role: "assistant",
@@ -214,6 +219,12 @@ export function ChatWidget() {
     }
   }
 
+  useEffect(() => {
+    if (!teaser) return;
+    const t = window.setTimeout(dismissTeaser, TEASER_MS);
+    return () => window.clearTimeout(t);
+  }, [teaser]);
+
   // The signed-in consoles open the chat from their top bar on desktop.
   useEffect(() => {
     const openChat = () => {
@@ -281,14 +292,21 @@ export function ChatWidget() {
   // the panel drop from there. "/intern-nda" and
   // "/intern-terms-and-conditions" are public pages, so match the app
   // segments exactly rather than by prefix.
-  const inApp = /^\/(intern|employer|college)(\/|$)/.test(pathname ?? "");
-  const hasBottomNav = /^\/(intern|college)(\/|$)/.test(pathname ?? "");
+  //
+  // Sign-in, sign-up and onboarding are forms on a phone: a floating button
+  // there sat over the password field and the "sign in" link (QA-102), and
+  // they carry their own help links, so below lg it stays out of the way.
+  // They are not console pages either, so the top-bar placement never applies.
+  const isForm = FORM_ROUTE.test(pathname ?? "");
+  const inApp = !isForm && /^\/(intern|employer|college)(\/|$)/.test(pathname ?? "");
+  const hasBottomNav = !isForm && /^\/(intern|college)(\/|$)/.test(pathname ?? "");
 
   return (
     <div
       data-chat-root
       className={cn(
         "pointer-events-none fixed z-[80] flex flex-col items-end gap-3",
+        isForm && "max-lg:hidden",
         hasBottomNav ? "bottom-20 right-4" : "bottom-5 right-4",
         inApp ? "lg:bottom-auto lg:right-6 lg:top-[4.5rem]" : "lg:bottom-6 lg:right-6",
       )}
@@ -421,7 +439,8 @@ export function ChatWidget() {
       </div>
 
       {/* ── Teaser (once per session) ─────────────────────── */}
-      {teaser && !open ? (
+      {/* Never on a form: at lg the bubble sat over the signup's helper text. */}
+      {teaser && !open && !isForm ? (
         <motion.div
           role="status"
           initial={reduceMotion ? false : { opacity: 0, y: 8 }}

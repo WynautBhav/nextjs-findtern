@@ -32,7 +32,9 @@ export function SiteFooter() {
         className="pointer-events-none absolute inset-x-0 -top-px h-px bg-gradient-to-r from-transparent via-on-dark-accent/40 to-transparent"
       />
 
-      <div className="container-page py-16 lg:py-20">
+      {/* The bottom padding clears the floating "Ask me" launcher, which sat
+          over the copyright line and the copy-email button (QA-102). */}
+      <div className="container-page pt-16 pb-28 lg:pt-20">
         <div className="grid gap-12 lg:grid-cols-[1.5fr_repeat(3,1fr)] lg:gap-10">
           {/* Brand */}
           <div className="max-w-sm">
@@ -94,7 +96,7 @@ export function SiteFooter() {
         </div>
 
         <div className="mt-14 flex flex-col gap-4 border-t border-white/10 pt-8 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-sm text-text-subtle">
+          <p className="text-sm text-on-dark-subtle">
             {year} © Findtern. All rights reserved.
           </p>
           <p className="text-sm">
