@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { CreditCard, Eye, Loader2, Pencil, Search, X } from "lucide-react";
+import { CreditCard, Loader2, Pencil, Search, X } from "lucide-react";
 
 import { csrfFetch } from "@/lib/client-fetch";
 import { formatMoney } from "@/lib/format";
@@ -259,20 +259,35 @@ export function ProposalsManager({ initialProposals }: { initialProposals: Propo
                 </div>
                 {/* Above the stretched link, so these stay clickable. */}
                 <div className="relative z-10 flex items-center justify-end gap-1 max-lg:col-start-2 max-lg:row-start-1">
+                  {/* One visible action, chosen by the state; the row itself
+                      opens the offer, and the menu holds only the rest (QA-120). */}
                   {state.canPay ? (
                     <Link href="/employer/checkout" className={buttonClass({ variant: "accent", size: "sm" })}>
                       <CreditCard className="size-4" aria-hidden />
                       Pay to hire
                     </Link>
+                  ) : state.canEdit ? (
+                    <Link href={`${href}?edit=1`} className={buttonClass({ variant: "outline", size: "sm" })}>
+                      <Pencil className="size-4" aria-hidden />
+                      Edit offer
+                    </Link>
+                  ) : item.proposal.status === "hired" ? (
+                    <Link href="/employer/timesheets" className={buttonClass({ variant: "outline", size: "sm" })}>
+                      Timesheets
+                    </Link>
                   ) : null}
-                  <RowMenu
-                    label={`More actions for ${title}`}
-                    items={[
-                      { label: "Open offer", href, icon: <Eye /> },
-                      ...(state.canEdit ? [{ label: "Edit offer", href: `${href}?edit=1`, icon: <Pencil /> }] : []),
-                      ...(state.canWithdraw ? [{ label: "Withdraw offer", onSelect: () => setWithdrawTarget(item), icon: <X />, destructive: true }] : []),
-                    ]}
-                  />
+                  {state.canWithdraw || (state.canEdit && state.canPay) ? (
+                    <RowMenu
+                      label={`More actions for ${title}, ${nameOf(item)}`}
+                      items={[
+                        ...(state.canEdit && state.canPay ? [{ label: "Edit offer", href: `${href}?edit=1`, icon: <Pencil /> }] : []),
+                        ...(state.canWithdraw ? [{ label: "Withdraw offer", onSelect: () => setWithdrawTarget(item), icon: <X />, destructive: true }] : []),
+                      ]}
+                    />
+                  ) : (
+                    // Keeps the visible actions in one column when a row has no menu.
+                    <span aria-hidden className="size-10 shrink-0" />
+                  )}
                 </div>
               </li>
             );
