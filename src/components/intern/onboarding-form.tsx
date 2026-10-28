@@ -71,6 +71,7 @@ export function OnboardingForm({
   hasPhoto: photoOnFile = false,
   skillsLocked = false,
   onboarded = false,
+  submittedBefore = false,
 }: {
   initial: OnboardingDraft;
   documents: StoredDocument[];
@@ -88,6 +89,8 @@ export function OnboardingForm({
   skillsLocked?: boolean;
   /** The stored profile is submitted: every save runs the full rules. */
   onboarded?: boolean;
+  /** Submitted once before (or past the AI interview): steps that pass stay open. */
+  submittedBefore?: boolean;
 }) {
   const router = useRouter();
   const [chosenStep, setChosenStep] = useState<number | null>(null);
@@ -151,7 +154,11 @@ export function OnboardingForm({
   const stepErrors = useMemo(() => STEPS.map((_, i) => validateStep(values, i, ctx)), [values, ctx]);
   const passes = stepErrors.map((e) => Object.keys(e).length === 0);
   const firstOpen = passes.findIndex((ok) => !ok);
-  const reachable = (i: number) => i <= (firstOpen === -1 ? LAST : firstOpen);
+  // A step that already passes is always reachable, so a live profile that
+  // lacks one item (often a card image legacy never asked for) can still be
+  // edited; it read "0 of 7 steps" with everything locked behind step 1.
+  // Review stays gated until every step before it passes (INT-41).
+  const reachable = (i: number) => i <= (firstOpen === -1 ? LAST : firstOpen) || (submittedBefore && i < LAST && passes[i]);
   // The step to show: the one picked, else the remembered one (INT-30), never past the first open step.
   const step = chosenStep ?? Math.min(clampStep(savedStep), firstOpen === -1 ? LAST : firstOpen);
 
@@ -275,8 +282,15 @@ export function OnboardingForm({
   // A step counts as done only once every step before it is done too, so an
   // optional step that passes empty does not show a tick ahead of the gate.
   const openAt = firstOpen === -1 ? LAST : firstOpen;
-  const done = passes.map((ok, i) => ok && i < openAt);
+  // First time through, a step counts only once every step before it does
+  // (an optional step passes empty); a profile submitted before counts what
+  // passes.
+  const done = passes.map((ok, i) => ok && (i < openAt || (submittedBefore && i < LAST)));
   const doneCount = done.slice(0, LAST).filter(Boolean).length;
+  // Steps short of something, named once above the form.
+  const needs = STEPS.slice(0, LAST)
+    .map((s, i) => (passes[i] ? null : s.title))
+    .filter((t): t is NonNullable<typeof t> => Boolean(t));
 
   return (
     // Bottom room on phones so the chat launcher (fixed above the tab bar)
@@ -294,6 +308,16 @@ export function OnboardingForm({
         <div className="min-w-0">
           {/* ── Progress (phones and tablets) ─────────────────────────── */}
           <MobileSteps step={step} passes={done} reachable={reachable} onSelect={goTo} />
+
+          {submittedBefore && needs.length > 0 ? (
+            <p className="mb-4 flex items-start gap-2 rounded-apple-md border border-accent-200 bg-accent-50 px-4 py-3 text-sm text-ink-800">
+              <span aria-hidden className="mt-1.5 size-1.5 shrink-0 rounded-full bg-accent-500" />
+              <span>
+                {needs.length === 1 ? "One step still needs something: " : `${needs.length} steps still need something: `}
+                <span className="font-medium">{needs.join(", ")}</span>.
+              </span>
+            </p>
+          ) : null}
 
           <section aria-labelledby="step-title" className="rounded-apple-xl border border-ink-200/80 bg-white shadow-xs">
             <header className="border-b border-ink-200/70 px-5 py-5 sm:px-8 sm:py-6">

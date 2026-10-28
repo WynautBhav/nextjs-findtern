@@ -26,6 +26,8 @@ export default async function InternOnboarding() {
   let account: { countryCode: string; phoneNumber: string } | null = null;
   let locked = false;
   let onboarded = false;
+  // Submitted once, or far enough along that skills are locked (AI interview).
+  let submittedBefore = false;
   let hasPanImage = false;
   let hasAadhaarImage = false;
   let hasPhoto = false;
@@ -71,6 +73,7 @@ export default async function InternOnboarding() {
       locked = await skillsLocked(db, session.uid, row.extraData);
       serverUpdatedAt = (row.updatedAt ?? row.createdAt)?.toISOString() ?? null;
       onboarded = isOnboarded(row, { hasPanImage, hasAadhaarImage, hasPhoto });
+      submittedBefore = onboarded || locked || Boolean((row.extraData as Record<string, unknown> | null)?.profileSubmittedAt);
     }
 
     // The upload writes intern_documents, not extra.photoUrl, so the form's
@@ -114,6 +117,7 @@ export default async function InternOnboarding() {
         account={account}
         skillsLocked={locked}
         onboarded={onboarded}
+        submittedBefore={submittedBefore}
         hasPanImage={hasPanImage}
         hasAadhaarImage={hasAadhaarImage}
         hasPhoto={hasPhoto}
