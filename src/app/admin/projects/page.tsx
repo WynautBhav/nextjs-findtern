@@ -185,8 +185,10 @@ export default async function AdminProjectsPage({
             header: "Project",
             sort: "name",
             cell: (row) => (
-              <div className="min-w-0 max-w-sm">
-                <p className="truncate font-medium text-ink-900" title={row.projectName}>
+              // Long names wrap to two lines rather than widen the table past
+              // its card at 1440 (QA-140).
+              <div className="min-w-0 max-w-xs whitespace-normal">
+                <p className="line-clamp-2 break-words font-medium text-ink-900" title={row.projectName}>
                   {row.projectName}
                 </p>
                 <p className="truncate text-xs text-ink-600" title={(row.skills ?? []).join(", ")}>
@@ -199,7 +201,7 @@ export default async function AdminProjectsPage({
             header: "Company",
             sort: "company",
             cell: (row) => (
-              <Link href={`/admin/companies/${row.employerId}?tab=projects`} className="block max-w-52 truncate font-medium text-brand-700 hover:underline">
+              <Link href={`/admin/companies/${row.employerId}?tab=projects`} className="block max-w-44 whitespace-normal break-words font-medium text-brand-700 hover:underline">
                 {row.employerName}
               </Link>
             ),
@@ -207,13 +209,13 @@ export default async function AdminProjectsPage({
           {
             header: "Where",
             cell: (row) => (
-              <div className="min-w-0 max-w-44">
+              <div className="min-w-0 max-w-36">
                 <p className="truncate capitalize">{row.locationType || "Remote"}</p>
                 {row.city || row.timezone ? <p className="truncate text-xs text-ink-600">{row.city || row.timezone}</p> : null}
               </div>
             ),
           },
-          { header: "Type", cell: (row) => (row.fullTimeOffer ? "Full-time potential" : "Internship") },
+          { header: "Type", cell: (row) => <span className="whitespace-normal">{row.fullTimeOffer ? "Full-time potential" : "Internship"}</span> },
           {
             header: "Proposals",
             sort: "proposals",
