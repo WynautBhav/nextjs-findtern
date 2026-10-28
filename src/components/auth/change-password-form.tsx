@@ -16,6 +16,7 @@ import { useRouter } from "next/navigation";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 
 import { csrfFetch } from "@/lib/client-fetch";
+import { PASSWORD_HINT } from "@/lib/password-policy";
 
 /** Where to sign in again if this browser could not keep its session. */
 function loginPathFor(endpoint: string): string {
@@ -114,7 +115,7 @@ export function ChangePasswordForm({
         onChange={setNext}
         type={show ? "text" : "password"}
         autoComplete="new-password"
-        hint="At least 8 characters, with a lowercase letter, an uppercase letter, a number and a special character."
+        hint={PASSWORD_HINT}
       />
       <Field
         id="confirm-password"

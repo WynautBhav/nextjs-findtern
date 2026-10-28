@@ -12,6 +12,7 @@ import { Pill } from "@/components/app/primitives";
 import { buttonClass } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
+import { PASSWORD_HINT } from "@/lib/password-policy";
 
 const AREA_LABEL: Record<string, string> = {
   dashboard: "Dashboard",
@@ -489,7 +490,7 @@ function AddStaffSheet({
               Temporary password
             </label>
             <input id="staff-password" type="password" required minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} className={field} />
-            <p className="mt-1 text-xs text-ink-600">8 or more characters, with upper and lower case letters and a number.</p>
+            <p className="mt-1 text-xs text-ink-600">{PASSWORD_HINT}</p>
           </div>
           <div>
             <label htmlFor="staff-role" className="block text-sm font-medium text-ink-800">
