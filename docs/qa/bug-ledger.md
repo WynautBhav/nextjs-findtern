@@ -9,7 +9,7 @@ lines only.
 | ID | Sev | Role | Route | Width / browser | Status | Summary |
 |---|---|---|---|---|---|---|
 | QA-001 | P1 | employer, intern | /employer/drives/[id] (accept a drive call) | any | closed | Production build without the Google calendar token: `src/lib/college/meetings.ts` returns `link: null` (the Jitsi stand-in is dev-only), yet `requestMeeting` still accepts the call, so the student gets an accepted call with no join link. Expected: refuse with "Calendar not connected; ask Findtern to connect it" (and the admin sees it in attention), never a silent null. Found by the Opus session during WP1 (e2e 7/9 under `next start`). |
-| QA-002 | P2 | intern | /intern/dashboard, /intern/record (any page with a Thread "action" node) | any width, Chromium; only with `prefers-reduced-motion: reduce` | open (reopened 28 Oct: db3cafe fixed CountUp only; real cause is `Thread`'s NodeMark, below) | React error #418 (hydration mismatch) in the console on every load. `src/components/app/count-up.tsx`: the server renders `display` (state starts at 0), but under reduced motion the client's first render already returns the formatted final `value`, so the server HTML and the first client render differ. React recovers by client-rendering the subtree, so the user sees no wrong number, but it is a console error, a wasted re-render, and a flash of 0 on slower devices for exactly the users who asked for less motion. |
+| QA-002 | P2 | intern | /intern/dashboard, /intern/record (any page with a Thread "action" node) | any width, Chromium; only with `prefers-reduced-motion: reduce` | closed (28 Oct, tester A: fix(QA-002b) verified) | React error #418 (hydration mismatch) in the console on every load. `src/components/app/count-up.tsx`: the server renders `display` (state starts at 0), but under reduced motion the client's first render already returns the formatted final `value`, so the server HTML and the first client render differ. React recovers by client-rendering the subtree, so the user sees no wrong number, but it is a console error, a wasted re-render, and a flash of 0 on slower devices for exactly the users who asked for less motion. |
 
 | QA-003 | P1 | admin | /admin/interns/[id] | any | open | Candidate detail shows the full Aadhaar and PAN numbers. Expected: masked to the last 4, with an explicit reveal that is audit-logged. Sensitive-data exposure even though admin-only. |
 | QA-004 | P1 | intern | /intern/record vs /intern/dashboard, /interviews, /profile, /proposals/[id] | any | open | Two different Findtern scores for the same intern: 8.8 (Coding 9.3) on Home/Interviews/Profile/Offer, 8.2 (Coding 8.5) on Record. One page computes from the wrong source. Find which is stored and fix the other. |
@@ -113,6 +113,14 @@ lines only.
   readers before hydration. ScoreBar grows by scaleX from a fixed width.
   `npm run qa -- motion` on my build: 0 findings (was 6:
   animation-not-reduced on the pulse after the first pass).
+- Retest (tester A, 28 Oct): **closed**. Production build of wp/qa-a on 733c683 (includes
+  fix(QA-002b)), own database clone, Chromium. `QA_REBUILD=1 npm run qa -- motion`: 0
+  findings; text length identical with and without reduced motion on all ten page×width
+  combinations. Repeat run `E2E_PORT=3501 node e2e/retest-qa002.mjs` (6 loads per page ×
+  {390, 1440}, `reducedMotion: "reduce"`): `/intern/dashboard`, `/intern/record`,
+  `/intern/earnings`, `/employer/dashboard`, `/admin/dashboard` all 0/6 loads with a console
+  or page error (was 6/6 on dashboard and record). The server HTML (fetched without JS)
+  carries the real figures on every page (e.g. earnings ₹15,010 / ₹13,200), not a 0.
 
 ### QA-003 to QA-016
 - Source: the builder's design briefs (docs/design/briefs.md, "Found while
