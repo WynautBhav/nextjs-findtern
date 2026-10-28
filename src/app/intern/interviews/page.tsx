@@ -142,13 +142,17 @@ export default async function InternInterviews() {
         <SectionHead title="Company interviews" hint="Pick a time when a company invites you. Join from here when it is time." />
 
         {upcoming.length === 0 ? (
-          <EmptyScene
-            art
-            title="No company interviews right now"
-            body="When a company wants to talk before sending an offer, it sends up to three times here. You pick one, in India time, and join from this page."
-            who="Companies invite you"
-            next={{ label: "Look at open roles", href: "/intern/opportunities" }}
-          />
+          // Someone already working needs one line, not a scene pointing at open roles.
+          data.stage === "working" ? (
+            <p className="text-sm text-ink-600">No company interviews. You are working on a placement.</p>
+          ) : (
+            <EmptyScene
+              title="No company interviews right now"
+              body="When a company wants to talk before sending an offer, it sends up to three times here. You pick one, in India time, and join from this page."
+              who="Companies invite you"
+              next={{ label: "Look at open roles", href: "/intern/opportunities" }}
+            />
+          )
         ) : (
           <ul className="space-y-4">
             {upcoming.map((i) => {

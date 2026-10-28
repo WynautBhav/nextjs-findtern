@@ -47,12 +47,12 @@ function workModeLine(modes: string[]): string | null {
 }
 
 function Section({
-  icon: Icon,
   title,
   children,
   className,
 }: {
-  icon: React.ComponentType<{ className?: string }>;
+  /** Accepted, not drawn: an icon before every heading is a §0 tell. */
+  icon?: React.ComponentType<{ className?: string }>;
   title: string;
   children: React.ReactNode;
   className?: string;
@@ -60,7 +60,6 @@ function Section({
   return (
     <Surface as="section" className={cn("p-5 sm:p-6", className)}>
       <h2 className="flex items-center gap-2 text-base font-semibold tracking-[-0.01em] text-ink-900">
-        <Icon className="size-4 text-brand-700" aria-hidden />
         {title}
       </h2>
       <div className="mt-4">{children}</div>

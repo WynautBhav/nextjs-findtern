@@ -1,12 +1,10 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 
-import { EmptyScene, PageHead, SectionHead } from "@/components/app/primitives";
+import { EmptyScene, FilterTabs, PageHead, SectionHead } from "@/components/app/primitives";
 import { NotificationList, type NotificationRow } from "@/components/app/notification-list";
 import { requireRole } from "@/lib/auth";
 import { notificationsFor } from "@/lib/intern-data";
 import { internNotificationHref } from "@/lib/notification-href";
-import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = {
   title: "Notifications",
@@ -57,29 +55,19 @@ export default async function InternNotifications({
         action={<NotificationList mode="mark-all" disabled={unreadCount === 0} />}
       />
 
-      <nav aria-label="Filter notifications" className="mb-6 inline-flex rounded-apple-md bg-ink-100 p-1">
-        {(
-          [
-            ["All", "/intern/notifications", !unreadOnly, all.length],
-            ["Unread", "/intern/notifications?show=unread", unreadOnly, unreadCount],
-          ] as const
-        ).map(([label, href, active, n]) => (
-          <Link
-            key={label}
-            href={href}
-            aria-current={active ? "page" : undefined}
-            className={cn(
-              "inline-flex min-h-10 items-center gap-2 rounded-apple-sm px-4 text-sm font-medium transition-colors",
-              active ? "bg-white text-ink-900 shadow-xs" : "text-ink-600 hover:text-ink-900",
-            )}
-          >
-            {label}
-            <span className={cn("nums rounded-full px-1.5 text-xs", active ? "bg-brand-50 text-brand-800" : "bg-white/70 text-ink-600")}>
-              {n}
-            </span>
-          </Link>
-        ))}
-      </nav>
+      {/* The shared tab look; hidden when All and Unread are the same list. */}
+      {unreadOnly || (unreadCount > 0 && unreadCount < all.length) ? (
+        <FilterTabs
+          label="Filter notifications"
+          className="mb-6"
+          value={unreadOnly ? "unread" : "all"}
+          tabs={[
+            { key: "all", label: "All", count: all.length },
+            { key: "unread", label: "Unread", count: unreadCount },
+          ]}
+          hrefFor={(k) => (k === "unread" ? "/intern/notifications?show=unread" : "/intern/notifications")}
+        />
+      ) : null}
 
       {rows.length === 0 ? (
         unreadOnly ? (
@@ -112,9 +100,6 @@ export default async function InternNotifications({
             </section>
           ) : null}
 
-          <p className="text-sm text-ink-600">
-            Findtern only writes here when something real happens: no streak reminders and no nudges to open the app.
-          </p>
         </div>
       )}
     </div>
