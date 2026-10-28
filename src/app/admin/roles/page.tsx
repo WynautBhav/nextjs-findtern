@@ -35,7 +35,6 @@ export default async function AdminRolesPage() {
     <div className="space-y-6">
       <AdminPageHeader
         title="Roles and access"
-        subtitle="Who can sign in to the console, and what each role can see and change."
       />
       {data ? (
         <StaffRolesManager initialStaff={data.staff} initialRoles={data.roles} currentAdminId={session?.uid ?? null} />

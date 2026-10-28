@@ -22,7 +22,6 @@ export default async function AdminPromoCodesPage() {
   const header = (
     <AdminPageHeader
       title="Promo codes"
-      subtitle="Discount codes for the intern activation fee and employer checkout: value, who can use them, limits and dates."
     />
   );
 

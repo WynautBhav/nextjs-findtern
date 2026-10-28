@@ -196,7 +196,6 @@ export default async function AdminReportsPage({
     <div className="space-y-8">
       <AdminPageHeader
         title="Reports"
-        subtitle="Signups to hires, revenue, where candidates come from, and raw CSV exports."
         action={
           <>
             <Link href="/admin/reports/analytics" className={buttonClass({ variant: "outline", size: "sm" })}>

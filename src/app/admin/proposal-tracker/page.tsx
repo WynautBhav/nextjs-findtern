@@ -108,7 +108,6 @@ export default async function AdminProposalTrackerPage({
   const header = (
     <AdminPageHeader
       title="Proposal pipeline"
-      subtitle="Every offer and interview between companies and candidates, from first proposal to hire."
       action={
         <ButtonAnchor
           href={

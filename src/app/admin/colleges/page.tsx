@@ -4,6 +4,7 @@ import { AdminPageHeader, Panel, PanelBody, PanelHeader } from "@/components/adm
 import { AddCollegeForm, CollegeRowControls, type CollegeAdminRow } from "@/components/admin/college-partners-manager";
 import { getDb, schema } from "@/lib/db";
 import { q } from "@/lib/college/sql";
+import { formatDate } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
@@ -47,14 +48,8 @@ export default async function AdminCollegesPage() {
     <div className="space-y-6">
       <AdminPageHeader
         title="College partners"
-        subtitle="Colleges with a placement console, plus any college students have picked. Officers see only their own college's consenting students."
+        subtitle="Officers see only their own college's consenting students."
       />
-      <Panel>
-        <PanelHeader title="Add a partner college" />
-        <PanelBody>
-          <AddCollegeForm />
-        </PanelBody>
-      </Panel>
       {list.map((r) => (
         <Panel key={r.id}>
           <PanelHeader
@@ -62,7 +57,7 @@ export default async function AdminCollegesPage() {
             description={[r.city, r.aisheCode ? `AISHE ${r.aisheCode}` : null, r.emailDomains.length ? `@${r.emailDomains.join(", @")}` : null].filter(Boolean).join(" · ")}
             action={
               <span className="nums text-sm text-text-subtle">
-                {r.members} students · {r.roster} on roster · {r.drives} drives
+                {r.members} {r.members === 1 ? "student" : "students"} · {r.roster} on roster · {r.drives} {r.drives === 1 ? "drive" : "drives"}
               </span>
             }
           />
@@ -72,7 +67,7 @@ export default async function AdminCollegesPage() {
                 {r.officers.map((o) => (
                   <li key={o.email}>
                     {o.name} · {o.email}
-                    <span className="text-text-subtle"> · {o.lastLoginAt ? `last signed in ${new Date(o.lastLoginAt).toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata" })}` : "never signed in"}</span>
+                    <span className="text-text-subtle"> · {o.lastLoginAt ? `last signed in ${formatDate(o.lastLoginAt)}` : "never signed in"}</span>
                   </li>
                 ))}
               </ul>
@@ -83,6 +78,19 @@ export default async function AdminCollegesPage() {
           </PanelBody>
         </Panel>
       ))}
+      {/* Last, and folded: adding a college is rare, and the open form put
+          ~450px above the colleges themselves (critique A). */}
+      <Panel>
+        <details open={list.length === 0} className="group">
+          <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between px-5 text-sm font-semibold text-ink-900 hover:bg-ink-50">
+            Add a partner college
+            <span aria-hidden className="text-brand-700 group-open:hidden">Open</span>
+          </summary>
+          <PanelBody>
+            <AddCollegeForm />
+          </PanelBody>
+        </details>
+      </Panel>
     </div>
   );
 }

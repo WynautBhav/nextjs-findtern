@@ -46,7 +46,6 @@ export default async function AdminPayouts({ searchParams }: { searchParams?: Pr
     <div className="space-y-6">
       <AdminPageHeader
         title="Payouts"
-        subtitle="Stipends owed and paid to interns, and what employers have paid for each placement."
       />
 
       <nav aria-label="Payout views" className="flex gap-1">
@@ -273,52 +272,54 @@ async function DuesView({ params }: { params: Record<string, string> }) {
   const filtered = Boolean(params.q || params.due);
   const exportParams = Object.fromEntries(Object.entries(params).filter(([k]) => ["q", "due"].includes(k)));
 
+  // Five columns (ten ran 220px past 1440): who and where, the stipend and
+  // months paid, what is still due against the total.
   const columns: Column<PlacementDueRow>[] = [
     {
-      header: "Intern",
+      header: "Placement",
       cell: (d) => (
-        <Link href={`/admin/interns/${d.internId}?tab=payments`} className="block min-w-36 font-medium text-ink-900 underline-offset-4 hover:underline">
-          {d.internName}
-        </Link>
-      ),
-    },
-    {
-      header: "Employer and project",
-      cell: (d) => (
-        <span className="block min-w-40">
-          <Link href={`/admin/companies/${d.employerId}`} className="text-ink-800 underline-offset-4 hover:underline">
-            {d.companyName}
+        <span className="block min-w-0 max-w-72">
+          <Link href={`/admin/interns/${d.internId}?tab=payments`} className="font-medium text-ink-900 underline-offset-4 hover:underline">
+            {d.internName}
           </Link>
-          <span className="block max-w-56 truncate text-xs text-ink-600">{d.projectName}</span>
-        </span>
-      ),
-    },
-    { header: "Start", className: "nums whitespace-nowrap", cell: (d) => (d.startDate ? formatDate(d.startDate) : "-") },
-    {
-      header: "Months paid",
-      className: "whitespace-nowrap",
-      cell: (d) => (
-        <span className="inline-flex items-center gap-2">
-          <span className="nums">
-            <span className="font-semibold text-ink-900">{d.paidMonths}</span> of {d.months}
+          <span className="block truncate text-xs text-ink-600">
+            <Link href={`/admin/companies/${d.employerId}`} className="underline-offset-4 hover:underline">
+              {d.companyName}
+            </Link>
+            {d.projectName ? ` · ${d.projectName}` : ""}
           </span>
-          {d.remainingMonths <= 0 ? <Pill tone="paid">Done</Pill> : null}
+          {d.startDate ? <span className="nums block text-xs text-ink-600">Started {formatDate(d.startDate)}</span> : null}
         </span>
       ),
     },
     {
-      header: "Monthly stipend",
+      header: "Stipend",
       align: "right",
-      className: "whitespace-nowrap",
-      cell: (d) => (d.monthlyShareMinor > 0 ? inr(d.monthlyShareMinor) : <span className="text-text-subtle">None (score below 6)</span>),
+      cell: (d) => (
+        <span className="block whitespace-nowrap">
+          {d.monthlyShareMinor > 0 ? (
+            <span className="nums">{inr(d.monthlyShareMinor)}/month</span>
+          ) : (
+            <span className="text-text-subtle">None (score below 6)</span>
+          )}
+          <span className="nums flex items-center justify-end gap-1.5 text-xs text-ink-600 max-lg:justify-start">
+            {d.paidMonths} of {d.months} paid
+            {d.remainingMonths <= 0 ? <Pill tone="paid">Done</Pill> : null}
+          </span>
+        </span>
+      ),
     },
-    { header: "Total", align: "right", className: "whitespace-nowrap", cell: (d) => inr(d.totalShareMinor) },
-    { header: "Paid", align: "right", className: "whitespace-nowrap", cell: (d) => inr(d.paidMinor) },
     {
       header: "Due",
       align: "right",
-      className: "whitespace-nowrap font-semibold text-ink-900",
-      cell: (d) => (d.remainingMinor > 0 ? inr(d.remainingMinor) : <span className="font-normal text-text-subtle">-</span>),
+      cell: (d) => (
+        <span className="block whitespace-nowrap">
+          {d.remainingMinor > 0 ? <span className="font-semibold text-ink-900">{inr(d.remainingMinor)}</span> : <span className="text-text-subtle">–</span>}
+          <span className="nums block text-xs text-ink-600">
+            {inr(d.paidMinor)} of {inr(d.totalShareMinor)} paid
+          </span>
+        </span>
+      ),
     },
     {
       header: "Next payment",

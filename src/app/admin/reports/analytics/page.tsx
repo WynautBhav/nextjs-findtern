@@ -40,7 +40,7 @@ export default async function AdminAnalyticsPage({ searchParams }: { searchParam
   const header = (
     <AdminPageHeader
       title="Hiring analytics"
-      subtitle="Conversion, hiring speed, demand and leaders. Money in INR (USD at ₹100/$); test employers excluded."
+      subtitle="Money in INR (USD at ₹100/$); test employers excluded."
       action={
         <>
           <Link href="/admin/reports" className={buttonClass({ variant: "outline", size: "sm" })}>
@@ -181,7 +181,7 @@ export default async function AdminAnalyticsPage({ searchParams }: { searchParam
             }
           />
           <SimpleTable
-            minWidth="min-w-[34rem]"
+            minWidth="min-w-[32rem]"
             head={["Company", "Status", "Projects", "Offers", "Internship / FT hires", "Conversion"]}
             right={[2, 3, 4, 5]}
             rows={companies.map((c) => [

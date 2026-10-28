@@ -100,7 +100,6 @@ export default async function AdminOrdersPage({ searchParams }: { searchParams?:
     <div>
       <AdminPageHeader
         title="Orders"
-        subtitle="Every employer checkout: who paid, for which interns, GST, discounts and the tax invoice."
       />
       {rows ? (
         <AdminInvoicesView kind="employer" rows={rows} seller={getInvoiceSeller()} params={params} basePath="/admin/orders" />

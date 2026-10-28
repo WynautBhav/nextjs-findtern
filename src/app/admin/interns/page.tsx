@@ -182,7 +182,6 @@ export default async function AdminInterns({
   const header = (
     <AdminPageHeader
       title="Candidates"
-      subtitle="Every registered candidate: review status, scores, offers, stipends and visibility, editable in the row."
       action={
         <div className="flex flex-wrap items-center gap-2">
           <RatingsImport />

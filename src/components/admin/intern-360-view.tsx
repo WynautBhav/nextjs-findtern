@@ -92,6 +92,18 @@ export function Intern360View({
   const draft = onboarding ? draftFromRecord(onboarding) : null;
   const skills = draft?.skills ?? [];
   const openToWork = extra.openToWork !== false;
+  // What decides whether employers can see this candidate, first reason wins.
+  const hiddenWhy =
+    user.profileVisibility === "hidden"
+      ? "Hidden by Findtern (the visibility switch)."
+      : !openToWork
+        ? extra.hiddenByAdmin === true
+          ? "Hidden by an admin."
+          : "The candidate turned off Open to work."
+        : !profileComplete
+          ? "The profile is incomplete."
+          : "";
+  const visibleToEmployers = !hiddenWhy;
 
   const paidMinor = payouts.filter((p) => p.status === "paid").reduce((sum, p) => sum + toInrMinor(p.amountMinor, p.currency), 0);
   const dues = stipendDues(proposals, payouts, score);
@@ -180,10 +192,12 @@ export function Intern360View({
 
       <Surface className="flex flex-wrap items-start gap-x-8 gap-y-4 p-5">
         {controls}
-        <div className="flex flex-wrap items-center gap-1.5 self-center">
-          <Pill tone={profileComplete ? "live" : "waiting"}>{profileComplete ? "Profile complete" : "Profile incomplete"}</Pill>
+        {/* One derived answer to "can employers see them?": the switch said
+            Live beside a "Hidden by candidate" pill (critique A). */}
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 self-center text-sm text-ink-600">
+          <Pill tone={visibleToEmployers ? "live" : "waiting"}>{visibleToEmployers ? "Employers can see them" : "Employers can't see them"}</Pill>
+          {hiddenWhy ? <span>{hiddenWhy}</span> : null}
           <Pill tone={feePaid ? "paid" : "closed"}>{feePaid ? "Activation fee paid" : "Activation fee unpaid"}</Pill>
-          {!openToWork ? <Pill tone="waiting">{extra.hiddenByAdmin === true ? "Hidden by admin" : "Hidden by candidate"}</Pill> : null}
         </div>
       </Surface>
 
@@ -804,7 +818,7 @@ function InterviewDialog({
               </label>
               <input id="iv-meeting" type="url" value={meeting} onChange={(e) => setMeeting(e.target.value)} placeholder="https://meet.google.com/… or Incruiter link" className={cn(field, "mt-1")} />
               <p className="mt-1 text-xs text-text-subtle">
-                For an AI interview, saving a link unlocks it for the candidate. For a company interview, both sides are notified.
+                For an AI interview, saving a link opens it to the candidate. For a company interview, both sides are notified.
               </p>
             </div>
             <div className="grid gap-3 sm:grid-cols-2">

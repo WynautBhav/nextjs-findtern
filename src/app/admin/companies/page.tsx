@@ -175,7 +175,6 @@ export default async function AdminCompaniesPage({
   const header = (
     <AdminPageHeader
       title="Companies"
-      subtitle="Every hiring company: who to contact, what they've posted, what they've paid and what they still owe."
       action={
         <ButtonAnchor href={exportHref} variant="outline" size="sm">
           <Download className="size-4" aria-hidden />

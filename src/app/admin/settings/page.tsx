@@ -55,7 +55,7 @@ export default async function AdminSettingsPage() {
     <div className="space-y-8">
       <AdminPageHeader
         title="Pricing and fees"
-        subtitle="The employer rate card and the intern activation fee. Prices are in rupees; USD is derived at ₹100 = $1. Changes go live on the next page load."
+        subtitle="Prices are in rupees; USD is derived at ₹100 = $1. Changes go live on the next page load."
       />
       {pricing ? (
         <AdminPricingEditor plans={pricing.plans} activationFeeMinor={pricing.activationFeeMinor} />

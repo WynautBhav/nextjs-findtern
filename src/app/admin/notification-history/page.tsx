@@ -58,7 +58,7 @@ export default async function AdminNotificationHistoryPage({
   const header = (
     <AdminPageHeader
       title="Notification history"
-      subtitle="Everything staff sent to candidates and companies, and whether they have read it. Automatic reminders are not listed."
+      subtitle="Automatic reminders are not listed."
       action={
         <ButtonLink href="/admin/notifications" variant="primary" size="sm">
           Send a notification
@@ -87,10 +87,6 @@ export default async function AdminNotificationHistoryPage({
 
   const columns: Column<Row>[] = [
     {
-      header: "Sent",
-      cell: (r) => <span className="nums whitespace-nowrap text-ink-600">{when(r.createdAt)}</span>,
-    },
-    {
       header: "Recipient",
       cell: (r) => (
         <div className="min-w-0 max-w-56">
@@ -113,7 +109,10 @@ export default async function AdminNotificationHistoryPage({
       cell: (r) => (
         <details className="group max-w-md">
           <summary className="cursor-pointer list-none">
-            <span className="block truncate font-medium text-ink-900">{r.title}</span>
+            <span className="flex min-w-0 items-center gap-2">
+              <span className="truncate font-medium text-ink-900">{r.title}</span>
+              <Pill tone="neutral" className="shrink-0">{humanizeStatus(r.type)}</Pill>
+            </span>
             <span className="block truncate text-ink-600 group-open:hidden">{r.message}</span>
           </summary>
           <p className="mt-1 whitespace-pre-wrap break-words text-ink-700">{r.message}</p>
@@ -121,10 +120,15 @@ export default async function AdminNotificationHistoryPage({
         </details>
       ),
     },
-    { header: "Type", cell: (r) => <Pill tone="neutral">{humanizeStatus(r.type)}</Pill> },
     {
+      // Sent time and read state together (the table ran past 1440).
       header: "Status",
-      cell: (r) => <StatusBadge tone={r.isRead ? "success" : "neutral"} label={r.isRead ? "Read" : "Not read yet"} />,
+      cell: (r) => (
+        <div className="flex flex-col items-start gap-1 max-lg:items-end">
+          <StatusBadge tone={r.isRead ? "success" : "neutral"} label={r.isRead ? "Read" : "Not read yet"} />
+          <span className="nums whitespace-nowrap text-xs text-ink-600">Sent {when(r.createdAt)}</span>
+        </div>
+      ),
     },
   ];
 

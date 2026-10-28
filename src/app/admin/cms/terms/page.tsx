@@ -15,7 +15,6 @@ export default function AdminPlatformTermsPage() {
     <div className="space-y-6">
       <AdminPageHeader
         title="Website terms"
-        subtitle="Edit the general Terms & Conditions that apply to everyone. Employer and intern specifics live in their own documents."
       />
       <LegalTabs current="/admin/cms/terms" />
 

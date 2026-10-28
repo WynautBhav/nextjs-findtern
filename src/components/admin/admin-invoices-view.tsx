@@ -68,74 +68,67 @@ export function AdminInvoicesView({
   const gstOf = (r: AdminInvoiceRow) => r.amountMinor - splitGst(r.amountMinor, placeOfSupply({ ...r.buyer, currency: r.currency })).baseMinor;
   const codes = promoCodeOptions(rows);
 
+  // Five columns (it was twelve and ran 360px past 1440): the invoice number,
+  // interns, GST, discount, promo and gateway ride as second lines.
   const columns: Column<AdminInvoiceRow>[] = [
-    {
-      header: "Invoice no.",
-      cell: (r) => {
-        const n = displayInvoiceNumber(r, k.invoicePrefix);
-        return n ? <span className="font-mono text-xs text-ink-800">{n}</span> : <span className="text-text-subtle">-</span>;
-      },
-    },
     {
       header: k.party,
       sort: "party",
+      cell: (r) => {
+        const n = displayInvoiceNumber(r, k.invoicePrefix);
+        return (
+          <div className="min-w-0 max-w-72">
+            <Link href={`${k.hrefBase}/${r.partyId}`} className="block truncate font-medium text-ink-900 hover:text-brand-700 hover:underline" title={r.partyName}>
+              {r.partyName}
+            </Link>
+            <p className="truncate text-xs text-ink-600" title={r.partyEmail}>
+              {kind === "employer" && r.interns ? r.interns.split("; ").join(", ") : r.partyEmail}
+            </p>
+            {n ? <p className="font-mono text-xs text-text-subtle">{n}</p> : null}
+          </div>
+        );
+      },
+    },
+    {
+      header: "Amount",
+      align: "right",
+      sort: "amount",
       cell: (r) => (
-        <div className="min-w-0 max-w-56">
-          <Link href={`${k.hrefBase}/${r.partyId}`} className="block truncate font-medium text-ink-900 hover:text-brand-700 hover:underline" title={r.partyName}>
-            {r.partyName}
-          </Link>
-          <p className="truncate text-xs text-ink-600" title={r.partyEmail}>
-            {r.partyEmail}
-          </p>
+        <div className="whitespace-nowrap">
+          <p className="font-semibold text-ink-900">{money(r.amountMinor, r.currency)}</p>
+          {r.amountMinor > 0 ? <p className="text-xs text-ink-600">incl. GST {money(gstOf(r), r.currency)}</p> : null}
+          {(r.discountMinor ?? 0) > 0 || r.promoCode ? (
+            <p className="text-xs text-ink-600">
+              {r.promoCode ? <span className="font-mono font-semibold text-ink-800">{r.promoCode}</span> : null}
+              {(r.discountMinor ?? 0) > 0 ? ` − ${money(r.discountMinor ?? 0, r.currency)}` : r.promoCode ? " · discount not recorded" : ""}
+            </p>
+          ) : null}
         </div>
       ),
-    },
-    ...(kind === "employer"
-      ? [
-          {
-            header: "Interns",
-            cell: (r: AdminInvoiceRow) =>
-              r.interns ? (
-                <span className="block max-w-48 truncate" title={r.interns.split("; ").join(", ")}>
-                  {r.interns.split("; ").join(", ")}
-                </span>
-              ) : (
-                <span className="text-text-subtle">-</span>
-              ),
-          },
-        ]
-      : []),
-    { header: "Amount", align: "right", sort: "amount", cell: (r) => <span className="font-semibold text-ink-900">{money(r.amountMinor, r.currency)}</span> },
-    { header: "GST", align: "right", cell: (r) => (r.amountMinor > 0 ? money(gstOf(r), r.currency) : <span className="text-text-subtle">-</span>) },
-    {
-      header: "Discount",
-      align: "right",
-      cell: (r) =>
-        (r.discountMinor ?? 0) > 0 ? (
-          <span className="text-ink-800">− {money(r.discountMinor ?? 0, r.currency)}</span>
-        ) : r.promoCode ? (
-          <span className="text-ink-600">Not recorded</span>
-        ) : (
-          <span className="text-text-subtle">-</span>
-        ),
-    },
-    {
-      header: "Promo code",
-      cell: (r) => (r.promoCode ? <span className="font-mono text-xs font-semibold text-ink-800">{r.promoCode}</span> : <span className="text-text-subtle">-</span>),
     },
     {
       header: "Status",
       cell: (r) => (
-        <span className="inline-flex flex-wrap items-center gap-1">
-          <StatusBadge value={isPaidRow(r) ? "paid" : r.status} />
-          {r.needsReview ? <StatusBadge tone="danger" label="Needs review" /> : null}
-          {r.flagOnly ? <StatusBadge tone="neutral" label="Marked paid" /> : null}
-        </span>
+        <div className="flex flex-col items-start gap-1">
+          <span className="inline-flex flex-wrap items-center gap-1">
+            <StatusBadge value={isPaidRow(r) ? "paid" : r.status} />
+            {r.needsReview ? <StatusBadge tone="danger" label="Needs review" /> : null}
+            {r.flagOnly ? <StatusBadge tone="neutral" label="Marked paid" /> : null}
+          </span>
+          {kind === "employer" ? <span className="text-xs text-ink-600">{gatewayLabel(r.gateway)}</span> : null}
+        </div>
       ),
     },
-    ...(kind === "employer" ? [{ header: "Gateway", cell: (r: AdminInvoiceRow) => gatewayLabel(r.gateway) }] : []),
-    { header: "Paid on", sort: "date", align: "right", cell: (r) => (r.paidAt ? formatDate(r.paidAt) : <span className="text-text-subtle">-</span>) },
-    { header: "Created", align: "right", cell: (r) => <span className="text-ink-600">{formatDate(r.createdAt)}</span> },
+    {
+      header: "Date",
+      sort: "date",
+      cell: (r) =>
+        r.paidAt ? (
+          <span className="nums whitespace-nowrap">Paid {formatDate(r.paidAt)}</span>
+        ) : (
+          <span className="nums whitespace-nowrap text-ink-600">Created {formatDate(r.createdAt)}</span>
+        ),
+    },
     {
       header: <span className="sr-only">Actions</span>,
       className: "text-right",
