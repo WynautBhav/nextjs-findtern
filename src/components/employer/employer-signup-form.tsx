@@ -361,12 +361,14 @@ export function EmployerSignupForm({
         <label htmlFor="phoneNumber" className="block text-sm font-medium text-ink-800">
           Phone number
         </label>
+        {/* The select is a fixed width: left to size itself it takes the longest
+            country name and squeezes the number to ~50 px on a phone (QA-101). */}
         <div className="mt-2 flex gap-2">
           <select
             value={countryCode}
             onChange={(e) => setCountryCode(e.target.value)}
             aria-label="Country code"
-            className="apple-spring min-h-11 shrink-0 rounded-apple-sm border border-ink-200 bg-white px-2.5 text-[0.9375rem] tabular-nums text-ink-800 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+            className="apple-spring min-h-11 w-28 shrink-0 rounded-apple-sm border border-ink-200 bg-white px-2.5 text-[0.9375rem] tabular-nums sm:w-36 text-ink-800 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
           >
             {COUNTRY_CODE_OPTIONS.map((option) => (
               <option key={option.code} value={option.code}>
@@ -384,7 +386,7 @@ export function EmployerSignupForm({
             onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, ""))}
             autoComplete="tel-national"
             placeholder={countryCode === "+91" ? "9876543210" : "2015550123"}
-            className="apple-spring min-h-11 w-full rounded-apple-sm border border-ink-200 bg-white px-3.5 text-[0.9375rem] tabular-nums text-ink-900 outline-none placeholder:text-text-subtle focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+            className="apple-spring min-h-11 w-full min-w-0 flex-1 rounded-apple-sm border border-ink-200 bg-white px-3.5 text-[0.9375rem] tabular-nums text-ink-900 outline-none placeholder:text-text-subtle focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
           />
         </div>
         {phoneTaken ? (
