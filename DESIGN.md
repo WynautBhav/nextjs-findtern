@@ -1,43 +1,84 @@
 # DESIGN.md — the logged-in surfaces, rebuilt as one system
 
-## 0. Rules in force (27 Oct 2026). Every signed-in screen follows these
+## 0. Rules in force (28 Oct 2026). Every signed-in screen follows these
 
 Owner's call, 27 Oct: the signed-in app **matches the marketing site**. One
 frame, one type scale, one set of primitives. Reference screen:
 `src/app/intern/dashboard/page.tsx`.
 
 **Frame.** `components/layout/console-shell.tsx` is the only shell (intern,
-employer and admin layouts). Pages never draw their own sidebar, top bar or
-outer padding.
+employer, admin and college layouts). Pages never draw their own sidebar,
+top bar or outer padding. The rail keeps its links at full size (40px with
+a mouse, 44 on touch) and scrolls when the window is short: a thin
+scrollbar is always visible, the bottom fades only while there is more
+below, and the current page is scrolled into view (QA-144).
 
 **Primitives** (`components/app/primitives.tsx` unless noted). Use these and
 don't re-implement them:
-- `PageHead`: the page title. `AdminPageHeader` and the employer
-  `PageHeader` wrap it.
+- `PageHead` (`title`, `lede`, `eyebrow`, `action`): the page title, one
+  `h1` per page. `AdminPageHeader` (`components/admin/panel.tsx`) and the
+  employer `PageHeader` (`components/layout/page-header.tsx`) wrap it. When
+  a page changes state in place, the heading follows (after "Create drive"
+  it is the drive's name, not "New drive"; QA-158).
 - `HeroBand`: dark green dashboard hero, at most one per screen.
-- `StatTile`: a figure set large, `tone="onDark"` inside `HeroBand`.
-- `Surface`: the card (`rounded-apple-xl`). Admin lists keep `Panel`
-  (`components/admin/panel.tsx`).
-- `SectionHead`, `Pill` (status), `EmptyScene` (every empty state, never
-  `EmptyState`), `DetailRow`.
+- `StatTile`: a figure set large, `tone="onDark"` inside `HeroBand`. Admin
+  uses one `StatGrid`/`StatCard` strip per page (`components/admin`).
+- `Surface`: the card (`rounded-apple-xl`). Admin lists keep `Panel` and
+  `PanelHeader` (`components/admin/panel.tsx`).
+- `SectionHead`, `Pill` (status), `DetailRow`.
+- `EmptyScene` (`title`, `body`, `next`, `who`, `art`): every empty state.
+  It says what resolves the state and who has to act. `EmptyState` in
+  `layout/page-header.tsx` is a leftover adapter with no callers; don't use
+  it.
 - Buttons and button-looking links: `buttonClass({ variant, size })`,
   `ButtonLink` or `ButtonAnchor` from `components/ui/button`, with variants
   `primary` / `accent` (amber, the hero CTA) / `outline` / `outlineLight`
-  (on dark) / `ghost` / `light`. No hand-written button class strings.
-  `size: "sm"` is 36px with a mouse and 44px on touch (`pointer-coarse`).
-- `FilterTabs`: status filters with counts, in place of a row of tiles that
-  repeat the numbers. Links for URL filters, toggle buttons for in-browser
-  ones; `role="group"`, not a tablist. Panels that genuinely switch (Orders)
-  keep real tabs, styled the same (`tabClass`).
+  (on dark) / `ghost` / `light` / `white` / `dark` (the "Yes" of a
+  destructive confirm) / `link`. No hand-written button class strings.
+  `size: "sm"` is 36px with a mouse and 44px on touch.
+- `FilterTabs` (`label`, `tabs` of `{ key, label, count }`, `value`, then
+  `hrefFor` for URL filters or `onChange` for in-browser ones): status
+  filters with counts, in place of a row of tiles that repeat the numbers.
+  `role="group"`, not a tablist. It wraps and never scrolls sideways (a
+  hidden scroller cut the last tab mid-word, QA-131). `pillTabClass(on)` is
+  the one tab look, also for view switches and record tabs. Orders, whose
+  panels genuinely switch, keeps real tabs (`tabClass` in
+  `components/employer/ui-tokens`).
 - Lists people work in are aligned rows, not cards: one grid per list
   (a header row of column labels at `lg`, `aria-hidden`; each row also
   names its figures), figures right-aligned with `nums`, status as `Pill`,
-  **one** visible action chosen by state, everything else in `RowMenu`
-  (`components/app/row-menu.tsx`, the Radix menu: arrow keys, Esc). The
-  row's title is a real `<a>` stretched over the row (`after:inset-0`) with
-  its own focus ring. On phones the same row stacks into 2–3 lines.
+  **one** visible action chosen by state, everything else in `RowMenu`.
+  The row's title is a real `<a>` stretched over the row (`after:inset-0`)
+  with its own focus ring. On phones the same row stacks into 2 or 3 lines.
+  Names and messages wrap rather than truncate where a cut would hide the
+  data (company and project names, notification text; QA-140, 143, 156).
+- `RowMenu` (`components/app/row-menu.tsx`): the "⋯" at the end of a row,
+  on the Radix dropdown (arrow keys, typeahead, Esc). Destructive items
+  come last, after a separator, in danger colour. The caller confirms.
+- `useConfirm` (`components/app/use-confirm.tsx`): every destructive action
+  confirms in the page, never with `window.confirm` (there is none left in
+  `src`). `const { ask, dialog } = useConfirm()`, then
+  `if (await ask({ title, body, confirmLabel })) ...`, and render `{dialog}`
+  once. The body states the consequence; the buttons are "Yes, …" and
+  Cancel. **Cancel takes the initial focus**: Enter on a focused delete is
+  the one keyboard slip that can't be undone. Esc and an outside click
+  cancel. A confirm shown inline in a row or panel (the admin row toggles,
+  the college "Close link now") follows the same rules and returns focus to
+  the button that asked (QA-159).
+- `DriveStatePill` (`components/employer/drive-parts.tsx`): a campus
+  drive's state for employers and colleges: "Live now" (with a dot),
+  "Opens soon", "Ended", "Closed by the college" ("Link closed" on the
+  college side). It never wraps.
+- Admin tables: `DataTable` (`components/admin/data-table.tsx`) with
+  `TableToolbar`, `Pagination` ("Showing 1–25 of …") and `PageSizeSelect`.
+  Below `lg` each row stacks (`[data-stack]` in `globals.css`); on a phone
+  the filter selects take the full row and "Rows" drops below them
+  (QA-141). Row selection is `bulk-select.tsx`; its checkboxes show on
+  hover with a mouse and always on touch.
 - Filter rows apply on change (`components/app/auto-submit-form.tsx`): no
-  Filter / Apply button. Typed dates are a DD/MM/YYYY text field.
+  Filter / Apply button. Typed dates are a DD/MM/YYYY text field
+  (`DmyDateInput`, admin `DateRangeForm`, or `data-date="dmy"` in an
+  `AutoSubmitForm`), never the native date input.
 - Detail pages pass `crumbParents` to the shell, so a crumb reads
   "Proposals", never "Proposal / Details".
 - Help: on desktop the customer consoles open chat from the top bar's
@@ -46,6 +87,22 @@ don't re-implement them:
   while a dialog or sheet is open.
 - Secondary text and placeholders use `text-text-subtle` (5.2:1), not
   `ink-500`/`ink-400`, which fail AA on white.
+
+**Touch targets: 44px.** Every link, button, checkbox, radio and switch a
+person taps on a phone is a target at least 44px tall (WCAG 2.5.8 asks for
+24; we hold 44). Use the `touch:` variant (declared in `globals.css`: a
+coarse pointer **or** a screen under 40rem, because phone emulation does
+not always report a coarse pointer). `pointer-coarse:` remains only in the
+`ui/button` sizes. The patterns, in order of preference:
+- a standalone link: `touch:inline-flex touch:min-h-11 touch:items-center`;
+- a small control keeps its look and gains an absolutely positioned 44px
+  `::before` (`ui/switch`, `ui/checkbox`);
+- a native checkbox or radio sits inside a label that is the 44px target;
+- a list row: the stretched title link makes the whole row the target;
+- links in a stacked table row get `min-height: 2.75rem` from the
+  `[data-stack]` rules.
+Links inside a sentence are exempt. Measure with the `::before` and the
+enclosing label counted; a bare bounding box under-reports.
 
 **Type floor** (this is what made the app look barebones):
 - Body copy, table cells, form labels, list rows: `text-sm` (14px) minimum;
@@ -69,21 +126,33 @@ always through `Pill` tones, never ad-hoc colour classes.
 failed query shows an error state, never "no data" (`catch {}` returning an
 empty list is banned).
 
-**Dates and times:** DD/MM/YYYY for typed dates (bug sheet 7). Interns see
-times in IST (labelled); employers see their own zone.
+**Loading.** Each console segment (`intern`, `employer`, `admin`,
+`college`) has its own `loading.tsx`, a skeleton shaped like its pages.
+**No loading boundary outside the consoles**: a root `loading.tsx` turned
+every not-found page into a 200 (QA-150), so it is gone. Everywhere else
+the `NavigationProgress` bar (`components/layout/navigation-progress.tsx`,
+in the root layout) runs a thin bar along the top while a client
+navigation is in flight; with reduced motion it is a still bar (QA-151).
+
+**Dates and times:** DD/MM/YYYY for typed dates (bug sheet 7). Displayed
+dates use `shortDate` / `shortDateTime` from `lib/format.ts`: three-letter
+months ("Sep", never en-IN's "Sept"), and no `toLocale*String` at call
+sites. A one-day period reads as one date, not "18 – 18 Oct" (QA-152).
+Interns see times in IST (labelled); employers see their own zone.
 
 **Privacy rules that look like design:** employers see candidate initials,
 never photos or names before hire (bug sheet 7, NC r41).
 
-Plan for the design pass across `/intern`, `/employer` and `/admin`.
-Product truth: `PRODUCT.md`. Existing tokens and component contracts:
-`docs/design_system.md`, `docs/component_inventory.md`. Evidence:
-`PARITY_AUDIT.md` §10, and the live-site screens in `~/Desktop/ftss`.
+Plan for the design pass across `/intern`, `/employer` and `/admin` (the
+`/college` console joined on 27 Oct and follows the same rules). Product
+truth: `PRODUCT.md`. Existing tokens and component contracts:
+`docs/design_system.md`, `docs/component_inventory.md`. Before and after
+screens: `docs/design/shots/<role>/` (390 / 768 / 1440).
 
 Decisions taken with the user, 2026-10-08: employer keeps the **sidebar**;
 admin stat tiles go **monochrome with one accent**; retention ships as
-**readiness + milestones + a forgiving weekly streak**; **dark mode ships in
-this pass**.
+**readiness + milestones + a forgiving weekly streak**; dark mode was to
+ship in this pass, but it has not (see §9).
 
 ---
 
@@ -125,6 +194,8 @@ orchestrator or a fresh agent) checks the shots against this list. A fail
 goes back; it is never merged with a "polish later".
 
 ## 1. The diagnosis, honestly
+
+As measured on 8 Oct, before the rebuild; §0 is what holds now.
 
 45 login-required pages. They do not look like one product.
 
@@ -251,6 +322,11 @@ Cheap, and it is the difference between "a prototype" and "a product".
    is sample data: a new candidate sees what a finished profile looks like, a new
    employer sees what a populated pipeline looks like.
 
+**Where this stands (28 Oct).** Done: a skeleton `loading.tsx` per console
+segment, the root spinner deleted, and nothing outside the consoles (the
+navigation bar covers it; see §0 Loading). `Suspense` is used on one page.
+Empty states are `EmptyScene` everywhere.
+
 ---
 
 ## 5. Phase 3 — Tables, where the data actually lives
@@ -277,6 +353,13 @@ Migrate the 5 implementations onto `DataTable`, then raise its bar:
 - **Pagination**: explicit counts — "Showing 1–50 of 12,480".
   `admin/payouts` hard-caps at 200 rows with no pager; `admin/roles` and
   `admin/cms` have no pagination at all.
+
+**Where this stands (28 Oct).** Built: `DataTable` with the stacked phone
+layout, toolbar, explicit pagination and page size; selection with a bulk
+bar. Changed from the plan: cells that hold names or messages wrap (two
+lines) instead of truncating, because the cut hid the data (QA-140, 143,
+156), and selection checkboxes are always visible on touch, which has no
+hover. Not built: density modes, Shift-range selection.
 
 ---
 
@@ -416,7 +499,9 @@ hard cap. At most two simultaneous animations, stagger ≤6 items × 30ms,
 The three shells currently disagree — intern uses `--dur-*` tokens, admin and
 employer use bare `transition-colors`. One token set.
 
-**Dark mode**, shipped in this pass because you asked for it:
+**Dark mode: not shipped.** The `dark` variant and its token values are
+declared in `globals.css`, but nothing sets the `.dark` class, so every
+console renders light. The plan below stands for when it is picked up:
 
 - Strategy (C) — dark marketing, light product. Both consoles stay light by
   default; dark is a genuine preference, not the default reading surface.
