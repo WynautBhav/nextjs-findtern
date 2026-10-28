@@ -85,7 +85,11 @@ export function RichTextField({
   useEffect(() => {
     if (mode !== "visual" || !surface.current) return;
     if (value === lastEmitted.current && surface.current.innerHTML !== "") return;
-    surface.current.innerHTML = value;
+    // Pasted legacy HTML carries <svg><use href="/cdn/assets/sprites-…">
+    // icons from another site: injected as is, the browser fetched a sprite
+    // that 404s here (QA-147). The public page drops svg (sanitizeRichText),
+    // so the editor does too.
+    surface.current.innerHTML = value.replace(/<svg\b[\s\S]*?<\/svg\s*>/gi, "");
     lastEmitted.current = value;
   }, [value, mode]);
 
