@@ -1,4 +1,5 @@
 import { CountUp } from "@/components/motion/count-up";
+import { PerHireFigure } from "@/components/marketing/region-rates";
 import { PROOF_STATS as STATS } from "@/lib/content/site";
 
 /**
@@ -33,10 +34,16 @@ export function StatsBand() {
           {STATS.map((s) => (
             <div key={s.label} className="px-2 text-center sm:border-l sm:border-white/10 sm:px-0 sm:pl-5 sm:text-left">
               <dd className="flex items-baseline justify-center sm:justify-start gap-0.5 text-2xl font-semibold tracking-tight text-white sm:text-4xl lg:text-5xl">
-                {s.prefix ? (
-                  <span className="text-xs font-medium text-accent-400 sm:text-2xl">{s.prefix}</span>
-                ) : null}
-                <CountUp value={s.value} decimals={0} />
+                {"perHire" in s ? (
+                  <PerHireFigure prefixClassName="text-xs font-medium text-accent-400 sm:text-2xl" />
+                ) : (
+                  <>
+                    {String(s.prefix) ? (
+                      <span className="text-xs font-medium text-accent-400 sm:text-2xl">{s.prefix}</span>
+                    ) : null}
+                    <CountUp value={s.value} decimals={0} />
+                  </>
+                )}
                 {s.suffix ? (
                   <span className="text-xs font-medium text-accent-400 sm:text-2xl">{s.suffix}</span>
                 ) : null}

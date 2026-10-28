@@ -481,6 +481,7 @@ logins; `SEED=1` selects the seed accounts and server). Screenshots are in
 - From the marketing sub-run (`docs/qa/b/bs7-marketing-results.md`, X3 and Observations). QA-105: with "Prices in" set to USD
   the home and About stats strip still reads "₹5,000". QA-106: calculator copy "8 h x 5 d x 4 weeks = 160 hours".
   Not re-measured by me beyond reading the page text; severity as logged.
+- Status QA-105 (builder, 28 Oct): fixed, awaiting retest (wp/opus, fix(QA-105)). The per-hire stat on / and /about is now PerHireFigure (components/marketing/region-rates), which formats the band's per-hire fee in the visitor's chosen currency, the same source /pricing uses. Checked at 1440 with reduced motion and ft-currency set: INR "₹5,000" on both pages, USD "$50" on both. QA-106 left alone (owner question).
 
 ### QA-107
 - Steps: intern 375 px, fill steps 1 to 3, reload `/intern/onboarding` (`node docs/qa/b/repro/onb-resume.mjs`).
