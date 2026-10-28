@@ -25,6 +25,7 @@ import { getInternActivationFeeMinor } from "@/lib/platform-settings";
 import { visibleAgainAt } from "@/lib/profile-hide";
 import { profileCompletion } from "@/lib/onboarding";
 import { membershipOf } from "@/lib/college/membership";
+import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = {
   title: "Home",
@@ -151,6 +152,7 @@ export default async function InternHome() {
   const history = action ? data.thread.filter((n) => n !== action) : data.thread;
 
   const offersWaiting = data.proposals.filter((p) => p.status === "sent").length;
+  const showInterviewTile = !working || Boolean(upcomingInterviewItem);
   // Hours open only once the company has paid (bug sheet 7, S1 r65); an
   // accepted, unpaid offer is "working" but has nothing to log yet.
   const hired = data.proposals.some((p) => isHiredProposal(p));
@@ -184,8 +186,10 @@ export default async function InternHome() {
               <ArrowRight className="size-4" aria-hidden />
             </Link>
           ) : working ? (
-            <Link href="/intern/timesheets" className={buttonClass({ variant: "accent" })}>
-              Log your hours
+            // Amber means "do this now"; a sheet that is due arrives as the
+            // action above. With nothing waiting it was false urgency.
+            <Link href="/intern/timesheets" className={buttonClass({ variant: "outlineLight" })}>
+              Timesheets
               <ArrowRight className="size-4" aria-hidden />
             </Link>
           ) : !gettingStarted ? (
@@ -196,7 +200,7 @@ export default async function InternHome() {
           ) : null
         }
       >
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <div className={cn("grid grid-cols-2 gap-3", showInterviewTile && "sm:grid-cols-3")}>
           <StatTile
             tone="onDark"
             label="Findtern Score"
@@ -226,18 +230,17 @@ export default async function InternHome() {
               href="/intern/proposals"
             />
           )}
-          <StatTile
-            tone="onDark"
-            label="Next interview"
-            className="col-span-2 sm:col-span-1"
-            value={null}
-            empty={
-              upcomingInterviewItem
-                ? formatSlotTime(upcomingInterviewItem.when, IST)
-                : "None booked"
-            }
-            href="/intern/interviews"
-          />
+          {/* Not for someone already working with nothing booked: "None booked" was noise. */}
+          {showInterviewTile ? (
+            <StatTile
+              tone="onDark"
+              label="Next interview"
+              className="col-span-2 sm:col-span-1"
+              value={null}
+              empty={upcomingInterviewItem ? formatSlotTime(upcomingInterviewItem.when, IST) : "None booked"}
+              href="/intern/interviews"
+            />
+          ) : null}
         </div>
       </HeroBand>
 
@@ -395,7 +398,7 @@ export default async function InternHome() {
               className="apple-spring flex min-h-14 items-center gap-3 rounded-apple-xl border border-ink-200/80 bg-white px-5 py-4 text-sm text-ink-700 shadow-xs hover:border-ink-300"
             >
               <GraduationCap className="size-4 shrink-0 text-brand-700" aria-hidden />
-              <span className="min-w-0 flex-1 truncate">
+              <span className="min-w-0 flex-1">
                 <span className="font-medium text-ink-900">{college.name}</span>
                 {college.status === "verified" ? " · verified" : " · not verified yet"}
               </span>
