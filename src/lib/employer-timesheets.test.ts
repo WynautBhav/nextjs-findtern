@@ -215,3 +215,16 @@ test("a legacy calendar-month sheet never strands days of new-app periods (INW-2
   });
   assert.ok("error" in timesheetPeriod("2026-10", null, 1, "2026-11-20", legacyOct));
 });
+
+test("QA-152: a day between two sheets is offered as itself, and only that day", async () => {
+  const { timesheetPeriod } = await import("./employer-timesheets.ts");
+  // Sheets 18 Sep – 17 Oct and 19 Oct – 17 Nov leave 18 Oct on no sheet.
+  const taken = [
+    { start: "2026-09-18", end: "2026-10-17" },
+    { start: "2026-10-19", end: "2026-11-17" },
+  ];
+  assert.deepEqual(timesheetPeriod(null, "2026-09-18", 3, "2026-10-28", taken), { start: "2026-10-18", end: "2026-10-18" });
+  // With the boundary right (second sheet from 18 Oct), nothing is open until 18 Nov.
+  const aligned = [taken[0], { start: "2026-10-18", end: "2026-11-17" }];
+  assert.deepEqual(timesheetPeriod(null, "2026-09-18", 3, "2026-10-28", aligned), { error: "The next period hasn't started yet." });
+});

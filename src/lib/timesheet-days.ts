@@ -68,6 +68,8 @@ export function formatPeriodDays(start: Date | string | null, end: Date | string
     ? String(a.getUTCDate())
     : shortDate(a, { day: "numeric", month: "short", ...(sameYear ? {} : { year: "numeric" }), timeZone: "UTC" });
   const right = shortDate(b, { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+  // A one-day period is one date, not "18 – 18 Oct 2026" (QA-152).
+  if (toDay(start) === toDay(end)) return right;
   return `${left} – ${right}`;
 }
 

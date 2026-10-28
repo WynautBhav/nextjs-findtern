@@ -771,6 +771,7 @@ logins; `SEED=1` selects the seed accounts and server). Screenshots are in
 ### QA-152
 - Steps: hired intern, `/intern/timesheets` at 375 or 1440: "Next timesheet 18 – 18 Oct 2026, Ready to start now"; press "New timesheet": "Start a timesheet … Period 18 – 18 Oct 2026". Sheets on file: 18 Sep – 17 Oct 2026 and 19 Oct – 17 Nov 2026 (both approved).
 - Expected: the next period after the last sheet (18 Nov 2026) or nothing yet. Evidence: `int-ts-chromium-375-new.png`, `int-ts.mjs`. Severity **P2**; confirm with consistent data (the QA seed's boundary may be one day off).
+- Status (builder, 29 Oct): fixed (display) + data cause found (wp/opus, fix(QA-152)). The app's periods are anchored to the joining date (18 Sep–17 Oct, 18 Oct–17 Nov); the QA seed (e2e/seed-situations.mjs mkTimesheet) writes fixed 30-day sheets, so its second sheet starts 19 Oct and 18 Oct really is on no sheet. timesheetPeriod offering that one day is correct (it can be worked and billed); the app itself can't produce the gap. Fixed: a one-day period reads "18 Oct 2026", not "18 – 18 Oct 2026". Unit tests pin both: the gap day is offered alone; aligned sheets open nothing until 18 Nov. For the tester: mkTimesheet could step by engagement month instead of 30 days.
 
 ### QA-153
 - Evidence: `int-hired-chromium-375-dashboard.png`, `int-hired-chromium-375-college.png`. Severity **P2**.
