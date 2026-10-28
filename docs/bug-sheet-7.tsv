@@ -1,0 +1,186 @@
+##### SHEET Sheet1
+1	1:location	2:Bugs /Updates	3:Status
+2	1:Home page	2:Logo quality need to be improved	3:Pending
+3	1:Home page	2:Video is overlaying	3:Pending
+4	1:From blank profile to signed offer(Home Page)	2:Step 3 and 6 Text need to be changed	3:Pending
+5	1:Intern non bypass agreement ( Legal)	2:UI need to be adjusted	3:Pending
+6	1:Home page	2:Talk to us button in comapre attribute need to lead us on contact us page instead of employer page	3:Pending
+7	1:About us	2:the sliding comapnies should not show working with 9 companies instead like - leading comapnies etx.	3:Pending
+8	1:Pricing	2:What an intern costs a month in this we are not providing 4 hours and 6 hours for internship	3:Pending
+9	1:Pricing	2:For US client it must be showing in USD?	3:Pending	4:Query
+10	1:Home page	2:mail id's not clickable	3:Pending
+11	1:Contact us	2:contact no. digits should be fixed	3:Pending
+12	1:FAQ	2:there should be 2 button one for intern and second for employer FAQ instead of scrolling on single page	3:Pending
+13	1:Guranteed Internship Program	2:add that they can't hide their profile not more than 30 days and what is 160+ hours contracted engagement	3:Pending
+14	1:for interns	2:change admin mail id with communicate@findtern.in in every place where where intern query mail needed	3:Pending
+15	1:for interns	2:remove pricing card from for interns	3:Pending
+16	1:for interns	2:change the times of five stagesd and color of Findtern in FIndtern Guarantee	3:Pending
+17	1:46316.0
+18	1:home page	2:video has pause and play button which should not be there
+20	1:Intern Page
+21	1:Login page	2:add an option for sign up from google
+22	1:about me	2:aadhar card no. is mandatory and pan card image is mandatory
+23	1:about me	2:divide contact no. and emergency contact no. in 2 parts
+24	1:about me	2:contact no. should be pre-fetched from the signup page 
+25	1:about me	2:intro video 	3:QUERY
+26	1:academics 	2:add phd option instead of high school
+27	1:open roles	2:remove it or keep comapny intials
+28	1:home 	2:first you need to complete the profile and do the payment things
+29	1:academics 	2:add degree drop down
+30	1:academics 	2:add starting and ending year of degree and iin graduated it should not more than the current year
+31	1:academics 	2:in CGPA it should be 10 maximum and in percentage it should be 100
+32	1:academics 	2:add professional and certificate columns
+33	1:experience	2:I currently work here / ongoing UI need to be adjusted
+34	1:experience	2:add calendar
+35	1:experience	2:if anyone select any type of experience he/she need to fill every details
+36	1:skills	2:add non-tech skills
+37	1:lanugages	2:add read option
+38	1:location	2:if a candidate select onsite he is avaliable for hybrid or remote and if hybrid he is also available for remote
+39	1:location	2:if he select onsite or hybrid then he need to must add max 5 city for work prefrence
+40	1:profile preview	2:after submitting the profile it doesn't take me to the instead and keep the submit button there for multiple times
+41	1:dashboard	2:in profile completion bar , document of PAN should be there only
+42	1:offer 	2:intern should see the half amount of the employer amount of proposal
+43	1:offer 	2:no joining date shown in proposal it should be there
+44	1:46316.0
+45	1:profile creation	2:adhar card image is not mandatory
+46	1:profile creation	2:bank account should not be there
+47	1:profile creation	2:only EPC no. is required
+48	1:profile creation	2:linkedin is not mandatory
+49	1:academics	2:instead of asking asking year in professional and certificate add calendar and ask completion date
+50	1:skills	2:add important notice in skills tab from previous skills tab
+51	1:location	2:if candidate select hybrid remote will also highlight with it and with onsite other two also be highlighted
+52	1:report a problem	2:where does this query shown to us
+53	1:offer	2:change the text of if you do nothing - add this thing also ( it will marked as rejected after the joining date pass)
+54	1:46317.0
+55	1:offer	2:after accepting it enable the button of log hours
+56	1:46318.0
+57	1:Profile creaation	2:in profile creation on ask phone no. Emergency contact not other things and remove second contact
+58	1:academics	2:specialization is not mandatory
+59	1:academics	2:add an option to upload professional course and certificate
+60	1:location	2:i can update my preferred location in remote work which not be done
+61	1:dashboard	2:after making it still asking to make payment >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+62	1:AI interview	2:remove incruiter AI interview link
+63	1:AI interview	2:after AI interview link generated it says hidden company but in AI interview it should say AI INterview
+64	1:interview	2:After AI interview in interview section the score and their names are noy shown  correctly
+65	1:proposal	2:Your timesheet and stipend are running. need to change and log hours will be enable after employer make payment
+66	1:46321.0
+67	1:open roles	2:only initials should be shown of name
+68	1:46322.0
+69	1:Interview	2:non of these work ask for a new one get remove
+71	1:Company
+72	1:Signup	2:add google signup
+73	1:Dashboard	2:without creating a project it takes me directly to the dashboard
+74	1:compare	2:compare button is not working
+75	1:After signup	2:It should ask to create employer profile
+76	1:filter	2:add filter like previous one
+77	1:candidate dashboard	2:showing candiate those who doesn't given AI interview
+78	1:candidate dashboard	2:not showing profile picture
+79	1:candidate dashboard	2:there is not option to view profile
+80	1:Projects	2:max 7 skills while creating project
+81	1:Projects	2:in scope of work make these three option upto 60 - upto 90 or 180 days
+82	1:candidate dashboard	2:while selecting project it didn't sort candidate according to the filter
+83	1:cart	2:we can't hire intern directly , first we need to send proposal for approval
+84	1:proposal	2:taking previous dates while sending proposal
+85	1:porposal	2:US client only sees USD and indian client INR . don't show type of payments 
+86	1:proposal	2:need to be change
+87	1:book meeting	2:there should timing of  00 , 15 ,30 ,45 format and the other 2 slots and the timing will be nearest to this format and the other will be its next 2 hours but it can be changable
+88	1:proposal	2:add option to edit it
+89	1:proposal	2:view option should show the whole proposal
+90	1:46316.0
+91	1:profile creation	2:mail id can't be editable  and the website should match the name
+92	1:profile creation	2:escalation details are mandatory
+93	1:project	2:why we are asking upto 5 location 
+94	1:filters	2:add filters like previous one
+95	1:candidates	2:how can i see remote candidate
+96	1:compare	2:remove zero placemet surcharge in 1 and 2 $
+97	1:compare	2:why is it showing 16 skills in compare
+98	1:candidates	2:instead of +1 more it should show every skill
+99	1:proposal	2:it should show only 1 month amount instead of showing every month amount
+100	1:offer letter	2:keep it same from previous website
+101	1:proposal	2:sent proposal are not visible
+102	1:46317.0
+103	1:Company profile	2:escalation manager and company account mail should be different
+104	1:Company profile	2:add country code
+105	1:proposal	2:pricing calculation was not done automatically correct while sending proposal
+106	1:proposal	2:after sending it still kept me on send proposal page
+107	1:checkout	2:instead of monthly payment it ask me to do whole payment at one time
+108	1:proposal	2:there is no option to withdraw proposal and edit proposal
+109	1:46318.0
+110	1:Filters	2:all filters should same as previous one , also their design
+111	1:quick view	2:design need to be changed
+112	1:view profile	2:Ai interview score and their name are not shown  properly
+113	1:price	2:instead of 0$ it should show free
+114	1:proposal	2:work location will be based on candidate preference
+115	1:proposal	2:made wroking hours editable
+116	1:proposal	2:timezone is not changing
+117	1:proposal	2:there is no option to withdraw proposal and edit proposal after accepting
+118	1:checkout	2:add one time hiring fee
+119	1:checkout	2:for test mode you need to change payment method to free
+120	1:46321.0
+121	1:Checkout	2:remove upfront discount
+122	1:interview	2:leave feedback enbale only in completed interview
+123	1:candidates	2:it is not showing the correct candidate list of the skills which i have filled in select required skills
+124	1:candidates	2:when i change the project skills are not changing
+125	1:cart	2:shortlisted candidate should show on top
+126	1:cart	2:add option to view profile from cart
+127	1:candidates	2:selected project got removed when we go on another page
+128	1:candidates	2:compare button is not working
+129	1:view profile	2:where i can see candidate AI interview report
+130	1:book meeting	2:there should timing of  00 , 15 ,30 ,45 format and the other 2 slots and the timing will be nearest to this format and the other will be its next 2 hours but it can be changable	3:Note done
+131	1:book meeting	2:timezone is not working
+132	1:book meeting	2:after booking a meeting the meeting button get disable until the time was not completed for previous one
+133	1:timezone	2:it will be automatically set by the employer loaction	3:Note done
+134	1:open to work	2:if candidate open to work is disable i am still able to see candidate profile
+135	1:projects	2:delete button is not working
+136	1:orders	2:i am geeting canceled payment invoice
+137	1:company profile	2:secondary mail should also match company domain
+##### SHEET Sheet2
+1	1:Location	2:Description	3:TYPE	4:Vaibhav Status
+2	1:book meeting	2:in booking it should take current time like it was 12:34 soit should take 12:45 for the interview the next two timing will be 1:45 and 2:45	3:BUG
+3	1:timezone	2:it should take the employer timezone automatically like - if a employer is from US, new york it will automatically fetch newyork timezone at creating profile , scheduling interview and sending proposal	3:BUG
+4	1:dashboard	2:make the sidebar of list go inside with the help of a arrow	3:CHANGES
+5	1:open roles(INTERN)	2:only initials should be shown of name	3:CHANGES
+6	1:Interview(INTERN)	2:(non of these work ask for a new one) this button should get removed	3:BUG
+7	1:interview time	2:if a employer send the meeting timing in their timezone it should get converted in IST in candidate interview . Like if a send a interview slot in UAE timing then iin candidate profile it should get converted to IST timezone . Also add Day Time Saver (DTS) thing in timezone 
+##### SHEET NEW CHANGES
+1	1:LOCATION	2:BUG/UPDATES	3:STATUS
+2	1:HOME PAGE	2:LOGO SIZE TO BE INCREASED
+3	1:HOME PAGE	2:WHY IT'S STARTING FROM HIRING PRESPECTIVE
+4	1:FROM BLANK PROFILE TO SIGNED OFFER	2:STEP 3 TO LAST FONT SIZE CHECK
+5	2:SKILL - BASED IS LOOKING WEIRD, - CAN BE REMOVED
+6	1:Findtern Internship Acceptance, Compliance & Non-Bypass Agreement	2:LOOKING WEIRD NEEDS TO BE FIXED
+7	2:OFFER REJECTED MORE THAN 3 TIME WILL NOT BE CONSIDERED FOR REFUND
+8	1:HIRE AN INTERN FOR THE PRICE OF A COFFEE	2:ISME EMAIL COMMUNICATE KHULRA H BUT IT SHOULD GO TO ADMIN WALA
+9	2:YAHA SIRF ITNE KAM COUNTRY CODE KYU H 
+10	1:FOR INTERNS	2:GIVE MAIL ID AS COMMUNICATE WALA HAR JAGAH
+11	1:FOR EMPLOYERS	2:GIVE MAIL AS ADMIN WALA
+12	1:https://nextjs-findtern.vercel.app/terms-and-conditions#s-for-interns-5	2:PAGE TO BE FIXED AS LOOKING WEIRD
+13	1:https://nextjs-findtern.vercel.app/intern-terms-and-conditions	2:POINTS TO BE WRITE CORRECTLY LIKE 2 KE BAAD 2.1 A LITTLE ASIDE
+14	2:LINE SPACING SHOULD BE INCREASED IN NICHE WALA FEATURES
+15	1:INTERNS ACCOUNT
+16	2:GMAIL LOGIN PE YEAH ARA H
+17	2:account creation nhi hora
+18	2:isko mandat karna h
+19	2:ADD MIX OF TECH AND NON TECH, NOT ONLY NON-TECH
+20	2:MORE THAN ONE IS GETTING SELECTED
+21	1:bio me or sab jagah	2:if u have completed the target the red mark should disappear
+22	2:add drop down for all
+23	2:symmetry issue
+24	2:FORMAT LIKHO DD/MM/YYYY
+25	1:BANK ACCOUNT DETAILS 	2:ABOUT PAGE ME HI MANG LETE H
+26	1:MARKSHEET UPLOAD	2:IS NOT MANDATORY IN OTHER WEBSITES
+27	1:BANK ACCOUNT DETAILS 	2:BANK NAME DROPDOWN SHOULD BE THERE
+28	1:JOINING DATE	2:SHOULD BE SHOWN IN OFFER
+29	1:FAQ	2:THERE IS NO FAQ, CONTACT PAGE
+30	1:ASK ME	2:SIZE SHOULD BE INCREASED, POP UP ANA CHAHIYE KI ASK ME OR SOMETHING
+31	2:LOGO FIX KARO
+32	2:LOGO SIZE TO BE INCREASED
+33	1:COMPANY
+34	1:SIGNUP PAGE	2:ADD GOOGLE SIGNUP
+35	1:LOGIN NHI HORA NEW ACCOUNT SE MEANS SIGNUP NHI KAAM KARA THA
+36	1:KAL EK EMAIL SE JADA LOGIN HO PARA THA SO WOH CHECK KARNA
+37	1:PLACES ME	2:DROPDOWN DALNA H FOR CITY STATE COUNTRY
+38	1:https://nextjs-findtern.vercel.app/employer/onboarding	2:YAHA SABME DROPDOWN DALNA H LOCATION ME
+39	1:FAQ CONTACT ME KA OPTION	2:DALNA H
+40	1:ASK ME KA ICON BADA KARNA H 
+41	1:I THINK CANDIDATE PHOTOS SHOULD BE HIDE TOO 	2:AS ANYONE CAN SCAN AND FIND THEM IN GOOGLE

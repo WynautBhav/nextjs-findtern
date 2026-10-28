@@ -1,0 +1,16 @@
+Bug sheet 7 embedded screenshots (extracted to /tmp/claude-1000/-home-wynautbhav-Desktop-nextjs-findtern/d4eb5712-273f-44cd-8de3-e0ae802c6c3f/scratchpad/bugs7/x/xl/media/)
+Sheet "NEW CHANGES" (NC) row -> image, with what it shows:
+ r7  image3.png  Guaranteed Internship "What the guarantee does not cover" block -> add "3+ declined offers: not eligible for refund"
+ r9  image6.png  a Phone country-code <select> with only 7 codes (+91,+1,+44,+61,+65,+971,+27) -> use the full list
+ r14 image14.png footer LEGAL column: uneven line spacing ("Intern Non-Bypass Agreement" wraps)
+ r16 image8.png  Google sign-in "Error 400: redirect_uri_mismatch" on the Vercel staging (config)
+ r17 image12.png intern signup form, "account creation nhi hora" (on staging)
+ r18 image4.png  onboarding "Aadhaar card image (optional)" -> make it mandatory
+ r19 image7.png  onboarding skills step suggests only non-technical skills -> mix tech + non-tech
+ r20 image10.png work modes: picking Onsite shows all three chips selected -> only the picked one looks selected
+ r22 image11.png "Where you live": city/state free text, red errors stay although filled -> dropdowns, errors clear when valid
+ r23 image5.png  Start Year / Expected End Year fields misaligned (helper text under one label only)
+ r24 image13.png Start month / End month native inputs show "---------, ----" -> DD/MM/YYYY picker
+ r31 image9.png  a header showing a cap icon + "Findtern" text instead of the real logo
+ r32 image1.png  intern sidebar logo too small
+Sheet1 r56 image2.png activation card: "Your profile is already activated" error after applying 100OFF on an activated profile
