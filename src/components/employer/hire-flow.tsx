@@ -37,7 +37,6 @@ export function HireFlow({ counts, current }: { counts: HireFlowCounts; current:
           const n = counts[s.key];
           return (
             <li key={s.key} className="flex items-center gap-1">
-              {i > 0 ? <ChevronRight className="size-4 shrink-0 text-ink-300" aria-hidden /> : null}
               <Link
                 href={s.href}
                 aria-current={active ? "step" : undefined}
@@ -51,6 +50,8 @@ export function HireFlow({ counts, current }: { counts: HireFlowCounts; current:
                 {s.label}
                 <span className={cn("nums", active ? "text-brand-700" : "text-text-subtle")}>{n}</span>
               </Link>
+              {/* After the step, so a wrap never starts a line with a chevron (QA-124). */}
+              {i < STEPS.length - 1 ? <ChevronRight className="size-4 shrink-0 text-ink-300" aria-hidden /> : null}
             </li>
           );
         })}

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { and, count, eq } from "drizzle-orm";
+import { and, count, eq, inArray, sql } from "drizzle-orm";
 import {
   LayoutDashboard,
   FolderKanban,
@@ -26,6 +26,7 @@ import { ViewAsBanner } from "@/components/admin/view-as-banner";
 import { getSession } from "@/lib/auth";
 import { getDb, schema } from "@/lib/db";
 import { SITE } from "@/lib/content/site";
+import { q } from "@/lib/college/sql";
 
 const NAV_GROUPS: ConsoleNavGroup[] = [
   {
@@ -89,7 +90,15 @@ export default async function EmployerLayout({ children }: { children: React.Rea
     const [cart] = await db
       .select({ value: count() })
       .from(schema.employerCartItems)
-      .where(and(eq(schema.employerCartItems.employerId, session.uid), eq(schema.employerCartItems.listType, "cart")));
+      // Same set as the Shortlist page and its steps strip: saved, legacy
+      // "checkout" rows included, and no live proposal yet (QA-124).
+      .where(
+        and(
+          eq(schema.employerCartItems.employerId, session.uid),
+          inArray(schema.employerCartItems.listType, ["cart", "checkout"]),
+          sql`NOT EXISTS (SELECT 1 FROM ${schema.proposals} p WHERE p.employer_id = ${q(schema.employerCartItems, schema.employerCartItems.employerId)} AND p.intern_id = ${q(schema.employerCartItems, schema.employerCartItems.internId)} AND p.status NOT IN ('rejected', 'withdrawn', 'expired'))`,
+        ),
+      );
     cartCount = Number(cart?.value ?? 0);
   } catch {
     // Keep fallback

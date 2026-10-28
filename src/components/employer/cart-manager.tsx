@@ -8,7 +8,7 @@ import { AlertCircle, CalendarCheck, CheckCircle2, CreditCard, Laptop, Loader2, 
 import { EmptyScene, Pill, Surface } from "@/components/app/primitives";
 import { ButtonLink, buttonClass } from "@/components/ui/button";
 import { csrfFetch } from "@/lib/client-fetch";
-import { formatPerHire, formatRate } from "@/lib/format";
+import { formatRate } from "@/lib/format";
 import { displayNameOf, type CandidateProfile } from "@/lib/employer-candidates";
 import { isQuarterHourWall, meetingEndsAt, suggestedSlots } from "@/lib/employer-interview-rules";
 import { MeetingSlots, TimezoneSelect, type Slots } from "@/components/employer/meeting-slots";
@@ -24,6 +24,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { RowMenu } from "@/components/app/row-menu";
 
 export type CartLineItem = {
   id: string;
@@ -75,7 +76,12 @@ export function CartManager({
   const [errorMsg, setErrorMsg] = useState("");
 
   const projectOptions = Array.from(new Map(cartLines.map((l) => [l.projectId, l.projectName])).entries());
-  const shown = selectedProject === "all" ? cartLines : cartLines.filter((l) => l.projectId === selectedProject);
+  const inProject = selectedProject === "all" ? cartLines : cartLines.filter((l) => l.projectId === selectedProject);
+  // One meaning of "shortlisted": saved, no live proposal yet. The header
+  // badge, the hiring-steps strip and this heading all count that; anyone
+  // already proposed to is listed apart, below (QA-124).
+  const shown = inProject.filter((l) => !l.openProposalId && !l.acceptedProposalId);
+  const proposed = inProject.filter((l) => l.openProposalId || l.acceptedProposalId);
 
   async function confirmRemove() {
     const item = removing;
@@ -210,6 +216,29 @@ export function CartManager({
           />
         ))}
       </ul>
+      {shown.length === 0 ? <p className="text-sm text-ink-600">Everyone saved here already has a proposal.</p> : null}
+
+      {proposed.length > 0 ? (
+        <section aria-labelledby="proposed-heading" className="mt-8">
+          <h2 id="proposed-heading" className="mb-3 text-sm font-semibold text-ink-900">
+            Already proposed <span className="nums font-normal text-text-subtle">{proposed.length}</span>
+          </h2>
+          <ul className="space-y-3">
+            {proposed.map((line) => (
+              <CartLine
+                key={line.id}
+                line={line}
+                name={nameOf(line)}
+                currency={currency}
+                timezone={companyTimezone}
+                busy={busyId === line.id}
+                onMeeting={() => openMeeting(line)}
+                onRemove={() => setRemoving(line)}
+              />
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       {/* Remove: confirmed, as legacy did (EMB-16). */}
       <Dialog open={Boolean(removing)} onOpenChange={(open) => !open && setRemoving(null)}>
@@ -386,7 +415,6 @@ function CartLine({
           </p>
           <p className="mt-1 text-xs font-medium text-ink-600">{PLAN_NAME[band.id]}</p>
           <p className="nums mt-2 text-sm font-semibold text-ink-900">{formatRate(line.hourlyRateMinor, currency)}</p>
-          {line.perHireMinor > 0 ? <p className="nums text-xs text-text-subtle">{formatPerHire(line.perHireMinor, currency)}</p> : null}
         </div>
       </div>
 
@@ -425,34 +453,24 @@ function CartLine({
           </ButtonLink>
         )}
 
-        {!line.acceptedProposalId && !closed ? (
-          locked ? (
-            <span className="inline-flex min-h-11 items-center gap-1.5 px-2 text-sm text-ink-600" title="You can book another meeting once this one's time is over.">
-              <CalendarCheck className="size-4 text-brand-700" aria-hidden />
-              Meeting until {untilLabel(line.meetingUntil!, timezone)}
-            </span>
-          ) : (
-            <button type="button" onClick={onMeeting} className={buttonClass({ variant: "outline", size: "sm", className: "min-h-11" })}>
-              <Video className="size-4" aria-hidden />
-              Book meeting
-            </button>
-          )
+        {!line.acceptedProposalId && !closed && locked ? (
+          <span className="inline-flex min-h-11 items-center gap-1.5 px-2 text-sm text-ink-600" title="You can book another meeting once this one's time is over.">
+            <CalendarCheck className="size-4 text-brand-700" aria-hidden />
+            Meeting until {untilLabel(line.meetingUntil!, timezone)}
+          </span>
         ) : null}
 
-        <ButtonLink href={profileHref} variant="ghost" size="sm" className="min-h-11">
-          <UserRound className="size-4" aria-hidden />
-          Profile
-        </ButtonLink>
-
-        <button
-          type="button"
-          onClick={onRemove}
-          disabled={busy}
-          className={buttonClass({ variant: "ghost", size: "sm", className: "ml-auto min-h-11 text-ink-600 hover:bg-danger-soft hover:text-danger" })}
-        >
-          {busy ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <Trash2 className="size-4" aria-hidden />}
-          Remove
-        </button>
+        {/* One visible action; the rest in a menu (QA-124: four controls a card). */}
+        {busy ? <Loader2 className="ml-auto size-4 animate-spin text-text-subtle" aria-label="Removing" /> : null}
+        <RowMenu
+          label={`More actions for ${name}`}
+          className={busy ? undefined : "ml-auto"}
+          items={[
+            ...(!line.acceptedProposalId && !closed && !locked ? [{ label: "Book a meeting", onSelect: onMeeting, icon: <Video /> }] : []),
+            { label: "Open profile", href: profileHref, icon: <UserRound /> },
+            { label: "Remove from shortlist", onSelect: onRemove, icon: <Trash2 />, destructive: true, disabled: busy },
+          ]}
+        />
       </div>
       {locked && !line.openProposalId && !line.acceptedProposalId ? (
         <p className="mt-2 text-xs text-text-subtle">Send a proposal once the meeting is completed.</p>
