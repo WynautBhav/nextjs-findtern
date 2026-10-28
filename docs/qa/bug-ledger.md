@@ -368,6 +368,7 @@ logins; `SEED=1` selects the seed accounts and server). Screenshots are in
   flow does not allow. Recommendation: close as a seed-data artefact.
 - Residual, optional (P3): the saved full account number is shown unmasked in an editable input.
 - Evidence: `docs/qa/b/screens/qa-011-settings-*.png`; script `qa011.mjs`.
+- Status (builder, 28 Oct): fixed, awaiting retest (wp/opus, fix(QA-011)). As the tester found, the seed intern simply has nothing on file, so an empty form is right there. With details on file, Settings now shows a read-only summary: account holder, bank, account number masked to the last four ("•••• 9012"), IFSC and UPI. "Edit bank details" opens the form, prefilled and focused on the first field, and Cancel returns to the summary. After a save the summary shows the new details. This also covers the residual P3 (the full number in an editable field). The full number still reaches the page so the form can prefill; it is the intern's own data. Checked at 375 on the seed DB by saving test details (removed afterwards): summary after save and after a reload, Edit focus and prefill, Cancel.
 
 ### QA-012
 - Reproduced: **yes**, both DBs. `/employer/account` shows "Profile Complete" while all four escalation
