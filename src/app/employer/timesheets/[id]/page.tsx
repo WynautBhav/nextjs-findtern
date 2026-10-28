@@ -11,7 +11,8 @@ import { TimesheetReview } from "@/components/employer/timesheet-review";
 import { canAccess } from "@/lib/security/guards";
 import { displayNameOf, initialsOf } from "@/lib/employer-candidates";
 import { hiredInternIds } from "@/lib/employer-visibility";
-import { dayDetails, formatDay, formatPeriod } from "@/lib/employer-timesheets";
+import { dayDetails, formatDay, formatPeriod, unfilledDays } from "@/lib/employer-timesheets";
+import { periodDays } from "@/lib/timesheet-days";
 import { StatusPill } from "@/components/employer/timesheet-parts";
 import { DetailRow, SectionHead, Surface } from "@/components/app/primitives";
 import { buttonClass } from "@/components/ui/button";
@@ -76,7 +77,8 @@ export default async function EmployerTimesheetDetail({ params }: { params: Prom
   const present = count("Present");
   const absent = count("Absent");
   const off = count("Fixed off") + count("Holiday") + count("Leave");
-  const unfilled = days.filter((d) => !d.status).length;
+  // The decision route's own rule, so Approve is never enabled for a sheet it would refuse.
+  const unfilled = unfilledDays(periodDays(timesheet.periodStart, timesheet.periodEnd), timesheet.entries).length;
   const hours = days.reduce((n, d) => n + d.hours, 0);
   const status = timesheet.status;
   const decided = status === "approved" || status === "rejected";

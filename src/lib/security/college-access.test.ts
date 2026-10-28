@@ -62,18 +62,18 @@ test("tokens: 256-bit, only the hash is stored, hash is stable", () => {
 });
 
 test("valid link + signed-in employer inside the window is allowed", () => {
-  assert.deepEqual(checkDriveLink({ drive: driveX, token, session: employer, now: NOW }), { ok: true });
+  assert.deepEqual(checkDriveLink({ drive: driveX, token, session: employer, collegeActive: true, now: NOW }), { ok: true });
 });
 
 test("signed-out visitor is sent to sign in, never shown students", () => {
-  const r = checkDriveLink({ drive: driveX, token, session: null, now: NOW });
+  const r = checkDriveLink({ drive: driveX, token, session: null, collegeActive: true, now: NOW });
   assert.equal(r.ok, false);
   assert.equal(r.ok === false && r.reason, "sign_in");
 });
 
 test("only employers may enter a drive (intern, college admin, admin are refused)", () => {
   for (const role of ["intern", "college", "admin"] as const) {
-    const r = checkDriveLink({ drive: driveX, token, session: { uid: "u", role }, now: NOW });
+    const r = checkDriveLink({ drive: driveX, token, session: { uid: "u", role }, collegeActive: true, now: NOW });
     assert.equal(r.ok, false, role);
     assert.equal(r.ok === false && r.reason, "not_employer");
   }
@@ -81,16 +81,16 @@ test("only employers may enter a drive (intern, college admin, admin are refused
 
 test("wrong token for this drive is refused (cross-college link)", () => {
   const other = generateDriveToken();
-  const r = checkDriveLink({ drive: driveX, token: other.token, session: employer, now: NOW });
+  const r = checkDriveLink({ drive: driveX, token: other.token, session: employer, collegeActive: true, now: NOW });
   assert.equal(r.ok === false && r.reason, "bad_token");
-  assert.equal(checkDriveLink({ drive: driveX, token: "", session: employer, now: NOW }).ok, false);
+  assert.equal(checkDriveLink({ drive: driveX, token: "", session: employer, collegeActive: true, now: NOW }).ok, false);
 });
 
 test("expired, not-yet-open and revoked links are refused", () => {
-  assert.equal(checkDriveLink({ drive: driveX, token, session: employer, now: NOW + 25 * HOUR }).ok, false);
-  assert.equal(checkDriveLink({ drive: driveX, token, session: employer, now: NOW - 2 * HOUR }).ok, false);
+  assert.equal(checkDriveLink({ drive: driveX, token, session: employer, collegeActive: true, now: NOW + 25 * HOUR }).ok, false);
+  assert.equal(checkDriveLink({ drive: driveX, token, session: employer, collegeActive: true, now: NOW - 2 * HOUR }).ok, false);
   const revoked = { ...driveX, revokedAt: new Date(NOW - 1000) };
-  const r = checkDriveLink({ drive: revoked, token, session: employer, now: NOW });
+  const r = checkDriveLink({ drive: revoked, token, session: employer, collegeActive: true, now: NOW });
   assert.equal(r.ok === false && r.reason, "revoked");
 });
 
@@ -104,14 +104,14 @@ test("driveWindow reports the state the landing page shows", () => {
 // ── After the link: every drive API call ───────────────────────────────
 
 test("drive API needs a joined employer, a live window and no revocation", () => {
-  assert.deepEqual(checkDriveAccess({ drive: driveX, session: employer, joined: true, now: NOW }), { ok: true });
-  assert.equal(checkDriveAccess({ drive: driveX, session: employer, joined: false, now: NOW }).ok, false);
-  assert.equal(checkDriveAccess({ drive: driveX, session: employer, joined: true, now: NOW + 25 * HOUR }).ok, false);
+  assert.deepEqual(checkDriveAccess({ drive: driveX, session: employer, joined: true, collegeActive: true, now: NOW }), { ok: true });
+  assert.equal(checkDriveAccess({ drive: driveX, session: employer, joined: false, collegeActive: true, now: NOW }).ok, false);
+  assert.equal(checkDriveAccess({ drive: driveX, session: employer, joined: true, collegeActive: true, now: NOW + 25 * HOUR }).ok, false);
   assert.equal(
-    checkDriveAccess({ drive: { ...driveX, revokedAt: new Date(NOW) }, session: employer, joined: true, now: NOW }).ok,
+    checkDriveAccess({ drive: { ...driveX, revokedAt: new Date(NOW) }, session: employer, joined: true, collegeActive: true, now: NOW }).ok,
     false,
   );
-  assert.equal(checkDriveAccess({ drive: driveX, session: null, joined: true, now: NOW }).ok, false);
+  assert.equal(checkDriveAccess({ drive: driveX, session: null, joined: true, collegeActive: true, now: NOW }).ok, false);
 });
 
 // ── Which students an employer sees ────────────────────────────────────
@@ -242,4 +242,59 @@ test("a college session cannot carry an impersonator or permissions", () => {
     secure: false,
   });
   assert.equal(readSession(cookie.split(";")[0].slice("ft_sid=".length)), null);
+});
+
+// ── QA-201: a switched-off college shuts its drives ─────────────────────
+
+test("QA-201: a drive of an inactive college refuses the link and every API call as revoked", () => {
+  const link = checkDriveLink({ drive: driveX, token, session: employer, collegeActive: false, now: NOW });
+  assert.equal(link.ok === false && link.reason, "revoked");
+  const api = checkDriveAccess({ drive: driveX, session: employer, joined: true, collegeActive: false, now: NOW });
+  assert.equal(api.ok === false && api.reason, "revoked");
+  // A wrong token still learns nothing, not even that the college is off.
+  const other = generateDriveToken();
+  const wrong = checkDriveLink({ drive: driveX, token: other.token, session: employer, collegeActive: false, now: NOW });
+  assert.equal(wrong.ok === false && wrong.reason, "bad_token");
+});
+
+// ── QA-200: a new link lets out everyone who joined through the old one ─
+
+test("QA-200: reissuing a link swaps the token, reopens the drive and deletes the joined rows, in one transaction", async () => {
+  const { reissueDriveLink } = await import("../college/link.ts");
+  const { getTableName } = await import("drizzle-orm");
+  const ops: string[] = [];
+  let inTx = false;
+  const tx = {
+    update: (table: never) => ({
+      set: (values: Record<string, unknown>) => ({
+        where: async () => {
+          ops.push(`${inTx ? "tx" : "NO-TX"} update ${getTableName(table)} ${JSON.stringify({ tokenHash: values.tokenHash, revokedAt: values.revokedAt })}`);
+        },
+      }),
+    }),
+    delete: (table: never) => ({
+      where: async () => {
+        ops.push(`${inTx ? "tx" : "NO-TX"} delete ${getTableName(table)}`);
+      },
+    }),
+  };
+  const db = {
+    transaction: async (fn: (t: typeof tx) => Promise<unknown>) => {
+      inTx = true;
+      try {
+        return await fn(tx);
+      } finally {
+        inTx = false;
+      }
+    },
+  };
+  await reissueDriveLink(db as never, "drive-x", "new-hash");
+  assert.deepEqual(ops, [
+    'tx update college_drives {"tokenHash":"new-hash","revokedAt":null}',
+    "tx delete college_drive_employers",
+  ]);
+  // And with its row gone, the employer who joined through the old link is
+  // out even though the drive is live with a valid link again.
+  const after = checkDriveAccess({ drive: driveX, session: employer, joined: false, collegeActive: true, now: NOW });
+  assert.equal(after.ok === false && after.reason, "not_joined");
 });

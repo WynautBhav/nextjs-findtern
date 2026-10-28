@@ -53,7 +53,7 @@ export function LinkActions(props: {
   const consequence =
     asking === "DELETE"
       ? "Every employer, including those already inside, loses access immediately."
-      : "Companies already inside keep access. Anyone you sent the current link to who hasn't opened it yet will need the new one.";
+      : "The current link stops working, and companies already inside are let out too. Send the new link to the companies you still want; their shortlists are kept.";
 
   return (
     <div ref={box} className="space-y-4">

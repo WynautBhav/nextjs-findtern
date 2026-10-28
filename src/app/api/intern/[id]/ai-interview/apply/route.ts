@@ -136,7 +136,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const [interview] = await db
     .insert(schema.interviews)
     .values({
-      employerId: AI_EMPLOYER_ID,
+      employerId: known?.id ?? AI_EMPLOYER_ID, // the row that exists: a fresh DB may hold the AI employer under another id
       internId: id,
       projectId: null,
       status: "waiting",
