@@ -12,6 +12,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { cn } from "@/lib/utils";
 
 /**
  * Single entry point for both unauthenticated audiences.
@@ -36,7 +37,13 @@ export function GetStartedMenu({ className = "" }: { className?: string }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
-        className={`inline-flex h-9 items-center gap-1.5 rounded-lg bg-brand-700 px-4 text-sm font-semibold text-white shadow-sm transition-[background-color,box-shadow,transform] duration-200 hover:bg-brand-600 hover:shadow-md active:scale-[0.97] data-[state=open]:bg-brand-600 ${className}`}
+        // cn, not string concatenation: "inline-flex … hidden" kept both classes
+        // and inline-flex won, so the header's "hidden sm:inline-flex" showed
+        // the button on phones and pushed the menu toggle off-screen (QA-100).
+        className={cn(
+          "inline-flex h-9 items-center gap-1.5 rounded-lg bg-brand-700 px-4 text-sm font-semibold text-white shadow-sm transition-[background-color,box-shadow,transform] duration-200 hover:bg-brand-600 hover:shadow-md active:scale-[0.97] data-[state=open]:bg-brand-600",
+          className,
+        )}
       >
         Get started
         <ChevronDown
