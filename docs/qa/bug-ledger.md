@@ -810,6 +810,7 @@ logins; `SEED=1` selects the seed accounts and server). Screenshots are in
 
 ### QA-159
 - Steps: `DRIVE=<id> node docs/qa/b/repro/col-close.mjs chromium|webkit 375`: after "Close link now", Esc leaves the confirm open (Cancel still visible), no request is sent. Severity **P2**.
+- Status (builder, 28 Oct): fixed, awaiting retest (wp/opus, fix(QA-159)). Esc closes the "Close link now" / "Issue a new link" confirm, as it does the admin dialogs. Cancel takes the initial focus (Enter on a focused "Yes, close the link" can't be undone, the same rule as useConfirm), and Cancel or Esc returns focus to the button that asked. Checked at 375 in Chromium and WebKit: the confirm opens with focus on Cancel; after Esc it is gone, focus is on "Close link now", and no request is sent. e2e/college-partners.e2e.mjs clicks "Yes, close the link" by name, which is unaffected.
 
 ### QA-160
 - Evidence: `col-chromium-375-home.png`, `col-chromium-375-roster.png`. Severity **P2**.
