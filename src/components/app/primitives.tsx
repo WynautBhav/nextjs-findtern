@@ -407,7 +407,9 @@ export function FilterTabs({
       role="group"
       aria-label={label}
       className={cn(
-        "-mx-1 flex max-w-full gap-1 overflow-x-auto px-1 pb-1 [scrollbar-width:none]",
+        // Wraps rather than scrolling sideways: a hidden scroller cut the last
+        // tab mid-word ("Paymer") with nothing to say there was more (QA-131).
+        "flex max-w-full flex-wrap gap-1",
         className,
       )}
     >
