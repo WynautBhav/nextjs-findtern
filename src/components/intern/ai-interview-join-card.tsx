@@ -17,7 +17,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowRight, CalendarCheck, CheckCircle2, Clock, Loader2, Sparkles, Video } from "lucide-react";
+import { ArrowRight, CalendarCheck, CheckCircle2, Clock, Loader2, Video } from "lucide-react";
 
 import { Pill, Surface } from "@/components/app/primitives";
 import { CountdownAgreement, type AgreementSection } from "@/components/app/countdown-agreement";
@@ -243,7 +243,7 @@ export function AiInterviewJoinCard({ interviewId, status, meetingLink, internId
       <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
         <div className="flex min-w-0 items-start gap-3.5">
           <span className="grid size-11 shrink-0 place-items-center rounded-apple-md bg-brand-50 text-brand-700" aria-hidden>
-            <Sparkles className="size-5" />
+            <Video className="size-5" />
           </span>
           <div className="min-w-0">
             <h2 id={`ai-${interviewId}`} className="text-base font-semibold tracking-[-0.01em] text-ink-900">

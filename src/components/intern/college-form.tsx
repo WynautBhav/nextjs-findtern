@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { BadgeCheck, Building2, CircleHelp, Search, X } from "lucide-react";
+import { BadgeCheck, Building2, Check, CircleHelp, Minus, Search, X } from "lucide-react";
 
 import { Pill, SectionHead, Surface } from "@/components/app/primitives";
 import { buttonVariants } from "@/components/ui/button";
@@ -154,7 +154,7 @@ function Membership({
                       on ? "bg-brand-700 text-white" : "bg-ink-100 text-text-subtle",
                     )}
                   >
-                    {on ? "✓" : "–"}
+                    {on ? <Check className="size-3" strokeWidth={3} /> : <Minus className="size-3" />}
                   </span>
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-ink-900">

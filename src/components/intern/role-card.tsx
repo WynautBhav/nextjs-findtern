@@ -52,7 +52,7 @@ export function InternRoleCard({ role, considered = false }: { role: InternRole;
           </p>
         </div>
         {role.fullTimeOffer ? (
-          <Pill tone="waiting" className="hidden shrink-0 sm:inline-flex">
+          <Pill tone="neutral" className="hidden shrink-0 sm:inline-flex">
             Can lead to full time
           </Pill>
         ) : null}
@@ -81,7 +81,7 @@ export function InternRoleCard({ role, considered = false }: { role: InternRole;
         {considered ? (
           <Pill tone="live">Offer received</Pill>
         ) : role.fullTimeOffer ? (
-          <Pill tone="waiting" className="sm:hidden">
+          <Pill tone="neutral" className="sm:hidden">
             Can lead to full time
           </Pill>
         ) : (
