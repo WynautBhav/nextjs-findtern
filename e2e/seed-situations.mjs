@@ -237,21 +237,44 @@ async function mkNotes(recipientType, id, n, longText = false) {
   }
 }
 
-async function mkTimesheet({ proposalId, employerId, internId, status, startOffset, days = 30 }) {
-  const entries = Array.from({ length: days }, (_, d) => {
-    const date = dateOnly(startOffset + d);
+// Timesheet periods as the app anchors them (src/lib/employer-timesheets.ts
+// engagementPeriods): one per engagement month from the joining date
+// (18 Sep -> 17 Oct, 18 Oct -> 17 Nov), consecutive. Fixed 30-day sheets left
+// one-day gaps the app then offered as a period of its own (QA-152).
+function addDaysIso(isoDate, n) {
+  const d = new Date(isoDate + "T00:00:00Z");
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+function addMonthsIso(isoDate, n) {
+  const [y, m, d] = isoDate.split("-").map(Number);
+  const target = new Date(Date.UTC(y, m - 1 + n, 1));
+  const last = new Date(Date.UTC(target.getUTCFullYear(), target.getUTCMonth() + 1, 0)).getUTCDate();
+  target.setUTCDate(Math.min(d, last));
+  return target.toISOString().slice(0, 10);
+}
+const offsetOf = (isoDate) => Math.round((Date.parse(isoDate + "T00:00:00Z") - Date.parse(dateOnly(0) + "T00:00:00Z")) / DAY);
+
+/** Sheet `period` (0 = first month) of an engagement that joined `joiningOffset` days from today. */
+async function mkTimesheet({ proposalId, employerId, internId, status, joiningOffset, period = 0 }) {
+  const joining = dateOnly(joiningOffset);
+  const start = addMonthsIso(joining, period);
+  const end = addDaysIso(addMonthsIso(joining, period + 1), -1);
+  const entries = [];
+  for (let date = start; date <= end; date = addDaysIso(date, 1)) {
     const dow = new Date(date + "T00:00:00Z").getUTCDay();
     // The app's own words (QA-133): "Present" / "Fixed off", with the hours a
     // real sheet carries, so the review screen tallies them like a submission.
     const weekend = dow === 0 || dow === 6;
     const dayStatus = weekend ? "Fixed off" : status === "draft" ? "" : "Present";
-    return { date, hours: dayStatus === "Present" ? 8 : 0, note: "", status: dayStatus };
-  });
+    entries.push({ date, hours: dayStatus === "Present" ? 8 : 0, note: "", status: dayStatus });
+  }
+  const after = offsetOf(end) + 1;
   await db().query(
     `INSERT INTO timesheets (proposal_id, employer_id, intern_id, period_start, period_end, status, entries, submitted_at, approved_at)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
-    [proposalId, employerId, internId, dateOnly(startOffset), dateOnly(startOffset + days - 1), status, JSON.stringify(entries),
-     status === "draft" ? null : iso(startOffset + days), status === "approved" ? iso(startOffset + days + 1) : null],
+    [proposalId, employerId, internId, start, end, status, JSON.stringify(entries),
+     status === "draft" ? null : iso(after), status === "approved" ? iso(after + 1) : null],
   );
 }
 
@@ -280,8 +303,8 @@ async function seedPersonas() {
   const mainProj = await mkProject(out.employerMain, "Robotics Software Intern", 0);
   const mainProj2 = await mkProject(out.employerMain, "Data Analyst Intern", 1);
   const hiredProp = await mkProposal({ employerId: out.employerMain, internId: out.internHired, projectId: mainProj, status: "hired", i: 1, startOffset: -40 });
-  await mkTimesheet({ proposalId: hiredProp, employerId: out.employerMain, internId: out.internHired, status: "approved", startOffset: -40 });
-  await mkTimesheet({ proposalId: hiredProp, employerId: out.employerMain, internId: out.internHired, status: "draft", startOffset: -9 });
+  await mkTimesheet({ proposalId: hiredProp, employerId: out.employerMain, internId: out.internHired, status: "approved", joiningOffset: -40 });
+  await mkTimesheet({ proposalId: hiredProp, employerId: out.employerMain, internId: out.internHired, status: "draft", joiningOffset: -40, period: 1 });
   await mkPayout(out.internHired, 1);
   await db().query(
     `INSERT INTO employer_payments (employer_id, gateway, order_id, amount_minor, currency, status, paid_at, invoice_number)
@@ -323,7 +346,7 @@ async function seedPersonas() {
       const internId = i < 52 ? out.internHeavy : heavyInterns[i % heavyInterns.length];
       const pid = await mkProposal({ employerId: out.employerHeavy, internId, projectId: projs[i], status, i, ...(hired ? { startOffset: -40 - i } : {}) });
       await mkInterview({ employerId: out.employerHeavy, internId: out.internHeavy, projectId: projs[i], status: ["scheduled", "pending", "completed"][i % 3], i });
-      if (hired && internId === out.internHeavy) await mkTimesheet({ proposalId: pid, employerId: out.employerHeavy, internId, status: ["approved", "submitted", "draft"][(i / 11) % 3 | 0], startOffset: -40 - i });
+      if (hired && internId === out.internHeavy) await mkTimesheet({ proposalId: pid, employerId: out.employerHeavy, internId, status: ["approved", "submitted", "draft"][(i / 11) % 3 | 0], joiningOffset: -40 - i });
       await mkPayout(out.internHeavy, i, i % 4 === 0 ? "pending" : "paid");
       if (i < 50) await db().query(`INSERT INTO employer_cart_items (employer_id, project_id, intern_id, list_type) VALUES ($1,$2,$3,$4) ON CONFLICT DO NOTHING`, [out.employerHeavy, projs[i], heavyInterns[i % heavyInterns.length], i % 2 ? "cart" : "shortlist"]);
     }
