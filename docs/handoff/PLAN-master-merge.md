@@ -108,6 +108,13 @@ Suggested split (the orchestrator decides):
   WP5 fixes, WP6, WP8) → the cheaper model.
 - Keep builder and tester different sessions.
 
+## Coordination rules (updated 28 Oct: master is the line)
+- Owner decision, 28 Oct: **everything lands on `master`, nothing else is
+  pushed.** The orchestrator fast-forwards `master` after each verified
+  merge and pushes it; `release/master-merge` is kept equal to `master` as
+  the sessions' rebase target. Worker sessions never push any branch.
+  `master` on GitHub deploys to Vercel staging only, never to findtern.in.
+
 ## Coordination rules
 - One integration branch: `release/master-merge`. Each session works in its
   own git worktree, on its own branch cut from it, and hands merges to the
