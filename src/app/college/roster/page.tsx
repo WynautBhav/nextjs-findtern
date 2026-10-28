@@ -6,7 +6,7 @@ import { yearLabel } from "@/lib/college/labels";
 import { requireCollegeContext, rosterCoverage } from "@/lib/college/scope";
 
 /** Name · roll · year · branch · email (stacks on a phone). */
-const ROSTER_GRID = "sm:grid-cols-[minmax(0,1.3fr)_6rem_5.5rem_minmax(0,0.8fr)_minmax(0,1.5fr)]";
+const ROSTER_GRID = "grid-cols-[minmax(0,1fr)_auto] sm:grid-cols-[minmax(0,1.3fr)_6rem_5.5rem_minmax(0,0.8fr)_minmax(0,1.5fr)]";
 
 export const dynamic = "force-dynamic";
 
@@ -97,6 +97,8 @@ export default async function RosterPage() {
         ) : (
           // A table of who to chase: name, roll, year, branch, email in aligned
           // columns (rows were 72px with the email pushed to the far right).
+          // On a phone, two lines: name and roll, then year, branch and email
+          // (five stacked lines made each student 150px tall, QA-160).
           <div>
             <div aria-hidden className={`${ROSTER_GRID} hidden gap-x-4 border-b border-ink-100 px-5 py-2.5 text-xs font-medium text-text-subtle sm:grid`}>
               <span>Name</span>
@@ -110,9 +112,12 @@ export default async function RosterPage() {
                 <li key={s.email} className={`${ROSTER_GRID} grid items-baseline gap-x-4 gap-y-0.5 px-5 py-2.5 text-sm`}>
                   <span className="font-medium text-ink-900">{s.name || "—"}</span>
                   <span className="nums text-ink-700">{s.rollNo || "—"}</span>
-                  <span className="text-ink-700">{s.year ? yearLabel(s.year) : "—"}</span>
-                  <span className="text-ink-700">{s.branch || "—"}</span>
-                  <span className="break-all text-ink-600">{s.email}</span>
+                  <span className="text-ink-700 max-sm:hidden">{s.year ? yearLabel(s.year) : "—"}</span>
+                  <span className="text-ink-700 max-sm:hidden">{s.branch || "—"}</span>
+                  <span className="break-all text-ink-600 max-sm:col-span-2">
+                    <span className="sm:hidden">{[s.year ? yearLabel(s.year) : null, s.branch].filter(Boolean).map((t) => `${t} · `).join("")}</span>
+                    {s.email}
+                  </span>
                 </li>
               ))}
             </ul>

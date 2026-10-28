@@ -814,3 +814,4 @@ logins; `SEED=1` selects the seed accounts and server). Screenshots are in
 
 ### QA-160
 - Evidence: `col-chromium-375-home.png`, `col-chromium-375-roster.png`. Severity **P2**.
+- Status (builder, 28 Oct): fixed, awaiting retest (wp/opus, fix(QA-160)). Roster, Not joined yet, below 640px: two lines per student, name with roll number on the right, then "year · branch · email". Rows are 71 px (95 when the email wraps), not about 150. Student names on /college and the New drive radios were already full targets: each name link is a stretched link whose ::after covers the whole row (at least 44 px, all 56 at 375), and each radio sits in a 102 px label card. A bounding box of the <a> or the <input> doesn't show this. Checked in Chromium and WebKit at 375.
