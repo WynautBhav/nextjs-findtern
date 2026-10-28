@@ -89,6 +89,7 @@ export function OrdersManager({
   invoices,
   payableCount,
   offersToPay,
+  payableIds,
 }: {
   employerId: string;
   fteStatus: string;
@@ -99,6 +100,8 @@ export function OrdersManager({
   payableCount: number;
   /** Of those, accepted offers not yet paid for (not hires, so not in the hire figures). */
   offersToPay: number;
+  /** Proposals checkout can bill right now: a hire's Pay links only to these (QA-139). */
+  payableIds: string[];
 }) {
   const [tab, setTab] = useState<Tab>("hires");
 
@@ -181,7 +184,7 @@ export function OrdersManager({
 
       <div role="tabpanel" id={`orders-panel-${tab}`} aria-labelledby={`orders-tab-${tab}`}>
         {tab === "hires" ? (
-          <HiresPanel hires={hires} employerId={employerId} fteStatus={fteStatus} timezone={timezone} />
+          <HiresPanel hires={hires} employerId={employerId} fteStatus={fteStatus} timezone={timezone} payableIds={payableIds} />
         ) : tab === "schedule" ? (
           <SchedulePanel hires={hires} />
         ) : (
@@ -199,11 +202,13 @@ function HiresPanel({
   employerId,
   fteStatus,
   timezone,
+  payableIds,
 }: {
   hires: HireRow[];
   employerId: string;
   fteStatus: string;
   timezone: string;
+  payableIds: string[];
 }) {
   // The full-time offer dialog, opened from a row's menu.
   const [ftFor, setFtFor] = useState<string | null>(null);
@@ -251,7 +256,10 @@ function HiresPanel({
       </div>
       <Surface as="ul" className="divide-y divide-ink-100 overflow-hidden">
         {hires.map((h) => {
-          const due = h.ledger.dueMinor > 0;
+          // Pay only where checkout can bill this placement; otherwise the
+          // link opened a checkout for a different hire (QA-139).
+          const due = h.ledger.dueMinor > 0 && payableIds.includes(h.proposalId);
+          const owedOffline = h.ledger.dueMinor > 0 && !due;
           const timesheets = `/employer/timesheets?intern=${encodeURIComponent(h.internId)}`;
           const contract = `/employer/proposal/${encodeURIComponent(h.proposalId)}`;
           const plan = PLAN[h.ledger.plan];
@@ -274,6 +282,11 @@ function HiresPanel({
                   <p className="mt-0.5 text-sm text-ink-600">
                     {h.roleTitle === h.projectName ? h.roleTitle : `${h.roleTitle} · ${h.projectName}`}
                   </p>
+                  {owedOffline ? (
+                    <p className="mt-1 text-sm text-danger">
+                      {formatMoney(h.ledger.dueMinor, h.currency)} unpaid · can&apos;t be paid online; write to communicate@findtern.in
+                    </p>
+                  ) : null}
                   <p className="nums mt-1 text-sm text-ink-600">
                     {h.fullTime ? `Joining ${h.startDate ? formatDate(h.startDate) : "date to be agreed"}` : dateRange(h.startDate, h.ledger.endsOn)}
                   </p>

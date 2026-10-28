@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { Metadata } from "next";
 
 import { requireRole } from "@/lib/auth";
@@ -10,6 +11,7 @@ import { paymentsAreFree } from "@/lib/razorpay";
 import { EmptyScene, PageHead } from "@/components/app/primitives";
 import { HireFlow, type HireFlowCounts } from "@/components/employer/hire-flow";
 import { CheckoutSummary } from "@/components/payments/checkout-summary";
+import { selectCheckoutLines } from "@/lib/checkout-selection";
 
 export const metadata: Metadata = {
   title: "Checkout",
@@ -63,7 +65,10 @@ export default async function EmployerCheckout({
     );
   }
 
-  const { lines, prefill } = result;
+  const { prefill } = result;
+  const selection = selectCheckoutLines(result.lines, sp.proposal ?? sp.proposalId);
+  const lines = selection.lines;
+  const othersDue = result.lines.length - lines.length;
   return (
     <div>
       <PageHead
@@ -72,7 +77,20 @@ export default async function EmployerCheckout({
       />
       {counts ? <HireFlow counts={counts} current="checkout" /> : null}
 
-      {lines.length === 0 ? (
+      {selection.missing ? (
+        // A link named a placement this page can't bill: say so, never show
+        // a different hire in its place (QA-139).
+        <EmptyScene
+          title="This placement can't be paid here"
+          body="Checkout bills offers a candidate has accepted and the next month of a running monthly placement. The placement in your link is neither, so there is nothing to pay for it online. If you think you owe for it, write to us and we'll sort it out."
+          next={
+            result.lines.length > 0
+              ? { label: `See what is due (${result.lines.length})`, href: "/employer/checkout" }
+              : { label: "Back to orders", href: "/employer/orders" }
+          }
+          who="Findtern - write to communicate@findtern.in"
+        />
+      ) : lines.length === 0 ? (
         <EmptyScene
           art
           title="Nothing to pay yet"
@@ -85,6 +103,7 @@ export default async function EmployerCheckout({
           who={counts && counts.awaitingReply > 0 ? "Candidates - reply to your offers" : "You - send a proposal"}
         />
       ) : (
+        <>
         <CheckoutSummary
           employerId={uid}
           testMode={paymentsAreFree()}
@@ -110,6 +129,15 @@ export default async function EmployerCheckout({
             fullTimeCtcMinor: line.fullTime ? line.fullTimeCtcMinor ?? 0 : null,
           }))}
         />
+        {othersDue > 0 ? (
+          <p className="mt-4 text-sm text-ink-600">
+            This page shows the placement from your link.{" "}
+            <Link href="/employer/checkout" className="font-medium text-brand-700 underline-offset-4 hover:underline">
+              See everything due ({result.lines.length})
+            </Link>
+          </p>
+        ) : null}
+        </>
       )}
     </div>
   );

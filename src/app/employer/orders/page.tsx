@@ -195,5 +195,5 @@ async function loadOrders(employerId: string) {
       };
     });
 
-  return { fteStatus, timezone, hires, invoices, payableCount: payable?.lines.length ?? 0, offersToPay: payable?.lines.filter((l) => !l.due).length ?? 0 };
+  return { fteStatus, timezone, hires, invoices, payableCount: payable?.lines.length ?? 0, offersToPay: payable?.lines.filter((l) => !l.due).length ?? 0, payableIds: payable?.lines.map((l) => l.id) ?? [] };
 }
