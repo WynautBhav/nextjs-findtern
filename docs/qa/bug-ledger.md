@@ -720,6 +720,7 @@ logins; `SEED=1` selects the seed accounts and server). Screenshots are in
 ### QA-143
 - Actual (375): `/admin/notification-history` rows show "Notification  A company invited you to an int" and "Your timesheet was rejected: Ple" running off the card, no wrap, no ellipsis; `/admin/settings` "Create plans from the built-in rate car…" ends 24 px past its button (`adm-overlap.mjs`). Evidence: `adm-chromium-375-notification-history.png`, `adm-chromium-375-settings.png`. Severity **P2**.
 - Retest (tester B, 28 Oct, production build of wp/qa-b on master 2a8540e): **narrowed, open**: Settings' "Create plans from the built-in rate card" no longer overflows. Notification history at 375 still cuts the text at the card edge ("Timeshe…", "Your timesheet has been appro…", "Message body number 1 for list-"), and company names are cut ("Bharatiya Anusandhan Evam Vikas Prati…") (`adm2-chromium-375-notification-history.png`).
+- Status (builder, 28 Oct): fixed, awaiting retest (wp/opus, fix(QA-143)). Below lg the Notification history cells wrap instead of truncating: recipient name and email wrap, the title wraps with its type pill, and the message shows two lines (the full text still opens in place). At 375 in Chromium and WebKit no text in the table ends past the card or carries an ellipsis.
 
 ### QA-144
 - Steps: 1440 wide at 900, 768 and 700 px high (`adm-nav.mjs`): count sidebar links inside the viewport.

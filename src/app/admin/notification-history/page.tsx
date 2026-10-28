@@ -92,14 +92,14 @@ export default async function AdminNotificationHistoryPage({
         <div className="min-w-0 max-w-56">
           <Link
             href={r.recipientType === "employer" ? `/admin/companies/${r.recipientId}` : `/admin/interns/${r.recipientId}`}
-            className="block truncate font-medium text-ink-900 underline-offset-4 hover:text-brand-700 hover:underline"
+            className="block truncate font-medium text-ink-900 max-lg:whitespace-normal max-lg:break-words underline-offset-4 hover:text-brand-700 hover:underline"
             title={r.recipientName ?? undefined}
           >
             {r.recipientName || "Deleted account"}
           </Link>
-          <span className="flex items-center gap-1.5 text-xs text-ink-600">
+          <span className="flex items-center gap-1.5 text-xs text-ink-600 max-lg:flex-wrap">
             {r.recipientType === "employer" ? "Company" : "Candidate"}
-            {r.recipientEmail ? <span className="truncate">· {r.recipientEmail}</span> : null}
+            {r.recipientEmail ? <span className="truncate max-lg:whitespace-normal max-lg:break-all">· {r.recipientEmail}</span> : null}
           </span>
         </div>
       ),
@@ -107,13 +107,15 @@ export default async function AdminNotificationHistoryPage({
     {
       header: "Notification",
       cell: (r) => (
-        <details className="group max-w-md">
+        // On a phone the text wraps (two lines of the message) instead of
+        // running past the card in one cut line (QA-143).
+        <details className="group min-w-0 max-w-md max-lg:text-left">
           <summary className="cursor-pointer list-none">
-            <span className="flex min-w-0 items-center gap-2">
-              <span className="truncate font-medium text-ink-900">{r.title}</span>
+            <span className="flex min-w-0 items-center gap-2 max-lg:flex-wrap">
+              <span className="truncate font-medium text-ink-900 max-lg:whitespace-normal max-lg:break-words">{r.title}</span>
               <Pill tone="neutral" className="shrink-0">{humanizeStatus(r.type)}</Pill>
             </span>
-            <span className="block truncate text-ink-600 group-open:hidden">{r.message}</span>
+            <span className="block truncate text-ink-600 group-open:hidden max-lg:line-clamp-2 max-lg:whitespace-normal max-lg:break-words">{r.message}</span>
           </summary>
           <p className="mt-1 whitespace-pre-wrap break-words text-ink-700">{r.message}</p>
           {r.link ? <p className="mt-1 text-xs text-ink-600">Link: {r.link}</p> : null}
