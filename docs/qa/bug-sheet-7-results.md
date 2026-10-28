@@ -5,10 +5,10 @@ Build under test: production build of `release/master-merge` @ 733c683 against a
 
 Verdicts: **PASS** the complaint no longer applies or the requested change is present; **FAIL** it still applies; **UNCLEAR** no testable criterion (a question, no target wording, an environment limit such as Google OAuth, or rows that contradict each other; the later row wins and the finding says what the build does); **N/A** date-serial header, section header or empty row.
 
-Totals over all 182 rows (Sheet1 has 136 data rows, rows 2 to 137): PASS 152, FAIL 3, UNCLEAR 11, N/A 16 (after the 28 Oct pass over the 18 unclear rows: 5 became PASS, 2 became FAIL, see the last section).
-Per sheet: S1 (Sheet1): PASS 112, FAIL 3, UNCLEAR 7, N/A 14; S2 (Sheet2): PASS 6; NC (NEW CHANGES): PASS 34, UNCLEAR 4, N/A 2.
+Totals over all 182 rows (Sheet1 has 136 data rows, rows 2 to 137): PASS 153, FAIL 2, UNCLEAR 11, N/A 16 (after the 28 Oct pass over the 18 unclear rows: 5 became PASS, 2 became FAIL, see the last section).
+Per sheet: S1 (Sheet1): PASS 113, FAIL 2, UNCLEAR 7, N/A 14; S2 (Sheet2): PASS 6; NC (NEW CHANGES): PASS 34, UNCLEAR 4, N/A 2.
 
-Every FAIL is in `docs/qa/bug-ledger.md` (S1 r121 is QA-112; S1 r41 and r45 are QA-137). Defects found while walking the rows that no row describes are QA-100 to QA-117 there (phone layout, tap targets, the floating "Ask me" button, cookies, checkout arithmetic).
+Every FAIL is in `docs/qa/bug-ledger.md` (S1 r41 and r45 are QA-137; S1 r121 became a PASS on 28 Oct, QA-112 closed). Defects found while walking the rows that no row describes are QA-100 to QA-117 there (phone layout, tap targets, the floating "Ask me" button, cookies, checkout arithmetic).
 
 Detail by area, with the extra findings and the per-area scripts: `docs/qa/b/bs7-marketing-results.md`, `docs/qa/b/bs7-employer-results.md`, `docs/qa/b/bs7-intern-results.md`.
 
@@ -133,7 +133,7 @@ Detail by area, with the extra findings and the per-area scripts: `docs/qa/b/bs7
 | S1 | 118 | PASS | Checkout shows "Hiring fee (one-time) ₹5,000" with the first month (Due now ₹31,400 = ₹26,400 + ₹5,000); the month-2 summary has no fee ("Due now ₹26,400"). USD employer sees $50. | docs/qa/b/screens/bs7-emp-checkout-1440.png |
 | S1 | 119 | PASS | Button "Complete for free (test mode)" with "Test mode: no payment is taken"; clicking completed the hire (intern then sees "The company completed the payment. Log your hours"). | docs/qa/b/screens/bs7-emp-wk-after-pay.png |
 | S1 | 120 | N/A | Date serial header row (46321), not a bug. |  |
-| S1 | 121 | FAIL | (QA-112) "Whole engagement" is far below the monthly sum: 2 months at ₹26,400 shows "Engagement ₹24,000 + fee ₹5,000 = ₹29,000", less than the month-1 option (₹31,400), i.e. an effective upfront discount (see D2). | docs/qa/b/screens/bs7-emp-checkout-whole-1440.png |
+| S1 | 121 | PASS | (QA-112, retest 28 Oct) With consistent offers Checkout's "Whole engagement" equals the months plus the fee (₹40,000 x 3 + ₹5,000 = ₹1,25,000); the ₹24,000 came from a seed row. | docs/qa/b/screens/qa139r2-chromium-3503-0.png |
 | S1 | 122 | PASS | Schedule: "Leave feedback" appears only on the Completed card; Booked and Waiting cards show Join/Reminder/Reschedule/Offer new times only. | docs/qa/b/screens/bs7-emp-schedule-1440.png |
 | S1 | 123 | PASS | With React+SQL selected every listed card contains React or SQL (0 exceptions of 24); copy says "Candidates with any of them are shown; more matches rank higher". | docs/qa/b/screens/bs7-emp-cand-top-1440.png |
 | S1 | 124 | PASS | Changing project replaces the skills (Figma added manually, then switching to Robotics gave "React" only). | docs/qa/b/screens/bs7-emp-cand-projswitch-1440.png |
