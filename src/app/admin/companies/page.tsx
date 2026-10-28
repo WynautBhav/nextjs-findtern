@@ -3,6 +3,7 @@ import { and, asc, count, desc, eq, inArray, sql, type SQL } from "drizzle-orm";
 import { Download } from "lucide-react";
 
 import { getDb, schema } from "@/lib/db";
+import { q } from "@/lib/college/sql";
 import { formatDate, formatMoney, formatNumber } from "@/lib/format";
 import { companyMoney } from "@/lib/admin/company-money";
 import { flattenParams, parsePageRequest, searchAny, toPage } from "@/lib/admin/params";
@@ -22,10 +23,10 @@ import { ButtonAnchor } from "@/components/ui/button";
 
 const SORTS = ["name", "joined", "country", "projects", "proposals", "hires", "paid"] as const;
 
-const projectCount = sql<number>`(select count(*)::int from ${schema.projects} p where p.employer_id = ${schema.employers.id})`;
-const proposalCount = sql<number>`(select count(*)::int from ${schema.proposals} p where p.employer_id = ${schema.employers.id})`;
-const hireCount = sql<number>`(select count(*)::int from ${schema.proposals} p where p.employer_id = ${schema.employers.id} and p.status = 'hired')`;
-const paidTotal = sql<number>`(select coalesce(sum(${inrMinorSql(sql`ep.amount_minor`, sql`ep.currency`)}), 0)::bigint from ${schema.employerPayments} ep where ep.employer_id = ${schema.employers.id} and ep.status = 'paid')`;
+const projectCount = sql<number>`(select count(*)::int from ${schema.projects} p where p.employer_id = ${q(schema.employers, schema.employers.id)})`;
+const proposalCount = sql<number>`(select count(*)::int from ${schema.proposals} p where p.employer_id = ${q(schema.employers, schema.employers.id)})`;
+const hireCount = sql<number>`(select count(*)::int from ${schema.proposals} p where p.employer_id = ${q(schema.employers, schema.employers.id)} and p.status = 'hired')`;
+const paidTotal = sql<number>`(select coalesce(sum(${inrMinorSql(sql`ep.amount_minor`, sql`ep.currency`)}), 0)::bigint from ${schema.employerPayments} ep where ep.employer_id = ${q(schema.employers, schema.employers.id)} and ep.status = 'paid')`;
 
 export default async function AdminCompaniesPage({
   searchParams,
