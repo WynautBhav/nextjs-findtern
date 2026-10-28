@@ -179,8 +179,7 @@ export function StudentTable({ students, now }: { students: StudentRow[]; now: n
         </div>
       ) : null}
       <p className="border-t border-ink-100 px-5 py-3 text-xs text-text-subtle">
-        Showing <span className="nums">{shown.length}</span> of <span className="nums">{students.length}</span>. Read-only: you
-        can chase students, but their profiles, scores and offers are theirs to change.
+        Showing <span className="nums">{shown.length}</span> of <span className="nums">{students.length}</span>.
       </p>
     </section>
   );
