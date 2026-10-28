@@ -600,17 +600,18 @@ export default async function CandidatesPage({
                 </div>
               </FilterSection>
 
-              <div className="mt-4 flex gap-2 border-t border-ink-100 pt-4">
+              {/* Filters apply as they change (QA-125): no Apply. On a phone the
+                  panel folds out, so "Done" closes it; Reset is a quiet link. */}
+              <div className="mt-4 flex items-center gap-2 border-t border-ink-100 pt-4">
                 <Link
                   href={`/employer/candidates?fresh=1${activeProjectId ? `&project=${encodeURIComponent(activeProjectId)}` : ""}`}
-                  className={buttonClass({ variant: "outline", size: "sm", className: "min-h-11 flex-1" })}
+                  className={buttonClass({ variant: "ghost", size: "sm", className: "min-h-11" })}
                 >
                   <RotateCcw className="size-4" aria-hidden />
-                  Reset
+                  Reset filters
                 </Link>
-                <button type="submit" className={buttonClass({ variant: "primary", size: "sm", className: "min-h-11 flex-1" })}>
-                  Apply
-                  {activeFilterCount(filters) > 0 ? <span className="nums">({activeFilterCount(filters)})</span> : null}
+                <button type="submit" className={buttonClass({ variant: "primary", size: "sm", className: "ml-auto min-h-11 lg:hidden" })}>
+                  Done
                 </button>
               </div>
             </Surface>
@@ -628,8 +629,8 @@ export default async function CandidatesPage({
           {projectApplied ? (
             <p className="mb-5 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-apple-lg border border-brand-200/80 bg-brand-50/70 px-4 py-3 text-sm text-ink-700">
               <span>
+                {/* The skills are the chips just above; not listed again (QA-125). */}
                 Matched to <span className="font-semibold text-ink-900">{projectApplied.name}</span>
-                {projectApplied.skills.length > 0 ? `: any of ${projectApplied.skills.join(", ")}` : ""}
                 {projectApplied.city ? `, open to working in ${projectApplied.city}` : ""}. Best matches first.
               </span>
               <Link href={withFilters(filters, { projectDefaults: false, page: "" })} className="font-medium text-brand-700 underline-offset-4 hover:underline">
@@ -695,7 +696,7 @@ export default async function CandidatesPage({
                   name="q"
                   type="search"
                   defaultValue={filters.q}
-                  placeholder="Skill, city or keyword"
+                  placeholder="Keyword search"
                   className="apple-spring min-h-11 w-full rounded-apple-sm border border-ink-200 bg-white pl-9 pr-3 text-sm text-ink-900 outline-none placeholder:text-text-subtle focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
                 />
               </form>

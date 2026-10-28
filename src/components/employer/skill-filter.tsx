@@ -21,6 +21,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Check, Plus, Search, X } from "lucide-react";
 
 import { suggestSkills } from "@/lib/data/skills";
+import { cn } from "@/lib/utils";
 
 const MAX_SKILLS = 7;
 
@@ -46,6 +47,9 @@ export function SkillFilter({
   const params = useSearchParams();
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
+  // Phones: the panel folds to one summary line, so the people list starts
+  // on the first screen (QA-125). Always open at lg.
+  const [shown, setShown] = useState(false);
   const full = active.length >= MAX_SKILLS;
 
   const typed = query.trim();
@@ -75,10 +79,29 @@ export function SkillFilter({
 
   return (
     <section aria-labelledby="skills-heading" className="mb-5">
-      <h2 id="skills-heading" className="mb-3 text-base font-semibold tracking-[-0.01em] text-ink-900">
+      <h2 id="skills-heading" className="mb-3 text-base font-semibold tracking-[-0.01em] text-ink-900 max-lg:sr-only">
         {title}
       </h2>
-      <div className="flex flex-col gap-3 rounded-apple-lg border border-ink-200/80 bg-white p-3 sm:p-4 md:flex-row md:items-start">
+      <button
+        type="button"
+        onClick={() => setShown((v) => !v)}
+        aria-expanded={shown}
+        aria-controls="skills-panel"
+        className="apple-spring flex min-h-11 w-full items-center justify-between gap-3 rounded-apple-lg border border-ink-200/80 bg-white px-4 text-left text-sm lg:hidden"
+      >
+        <span className="min-w-0 truncate">
+          <span className="font-semibold text-ink-900">{title}</span>
+          <span className="text-ink-600"> · {active.length ? active.join(", ") : "none"}</span>
+        </span>
+        <span className="shrink-0 font-medium text-brand-700">{shown ? "Done" : "Edit"}</span>
+      </button>
+      <div
+        id="skills-panel"
+        className={cn(
+          "flex flex-col gap-3 rounded-apple-lg border border-ink-200/80 bg-white p-3 sm:p-4 md:flex-row md:items-start",
+          shown ? "max-lg:mt-2" : "max-lg:hidden",
+        )}
+      >
         <ul className="flex min-w-0 flex-1 flex-wrap gap-2" aria-label="Selected skills">
           {active.map((skill) => (
             <li key={skill}>
@@ -128,7 +151,7 @@ export function SkillFilter({
                 add(options[0] ?? typed);
               }
             }}
-            placeholder={full ? `${MAX_SKILLS} skills max` : "Search & add skills…"}
+            placeholder={full ? `${MAX_SKILLS} skills max` : "Add a required skill…"}
             aria-label="Search skills to filter by"
             className="apple-spring min-h-11 w-full rounded-apple-sm border border-ink-200 bg-ink-50 pl-9 pr-3.5 text-sm text-ink-900 outline-none placeholder:text-text-subtle focus:border-brand-500 focus:bg-white focus:ring-2 focus:ring-brand-500/20 disabled:opacity-60"
           />
@@ -167,7 +190,7 @@ export function SkillFilter({
           ) : null}
         </div>
       </div>
-      <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-text-subtle">
+      <p className={cn("mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-text-subtle", !shown && "max-lg:hidden")}>
         <span>
           {fromProject ? "Skills from the selected project. " : ""}
           {note ?? `Up to ${MAX_SKILLS}. Candidates with any of them are shown; more matches rank higher.`}
