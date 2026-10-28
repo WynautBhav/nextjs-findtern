@@ -4,8 +4,8 @@
 
 ### Pre-screened interns. Hired by the hour. Billed only for approved work.
 
-The platform behind **[findtern.in](https://findtern.in)**: the public site, the candidate app,<br/>
-the hiring app and the admin console, in one Next.js codebase.
+The platform behind **[findtern.in](https://findtern.in)**: the public site, candidate app,<br/>
+hiring app, placement-officer console and admin console, in one Next.js codebase.
 
 <br/>
 
@@ -18,7 +18,7 @@ the hiring app and the admin console, in one Next.js codebase.
 
 <br/>
 
-**86 screens** · **105 API routes** · **142 tests** · **0 type errors** · **one `npm run build`**
+**101 screens** · **137 API routes** · **67 unit-test files** · **strict TypeScript** · **one `npm run build`**
 
 <br/>
 
@@ -77,6 +77,13 @@ screened (coding, aptitude, communication and an AI interview) before an employe
 </tr>
 </table>
 
+### 🎓 Placement officers
+
+- Upload and track a college roster
+- Run dated campus drives and invite employers
+- Follow student interview and offer progress without editing student data
+- Monitor drive calls and participation from a dedicated console
+
 <details>
 <summary><b>The full journey, end to end</b></summary>
 
@@ -119,6 +126,7 @@ flowchart LR
         I[Candidate app]
         EM[Hiring app]
         A[Admin console]
+        C[College console]
     end
 
     subgraph Next["Next.js 16 · one Node process"]
@@ -131,7 +139,7 @@ flowchart LR
     DB[(Postgres<br/>shared with the legacy app<br/>during cutover)]
     FS[[Private file store<br/>signed, expiring links]]
 
-    M & I & EM & A --> P --> RSC & API
+    M & I & EM & A & C --> P --> RSC & API
     RSC & API & J --> DB
     API --> FS
     API <--> RZ[Razorpay]
@@ -153,12 +161,12 @@ flowchart LR
 
 ## 🚀 Run it locally
 
-> **Needs** Node 20+, a local Postgres, and a `findtern` role (`findtern_dev`).
+> **Needs** Node 20+, a local Postgres, and a local `findtern` role.
 
 ```bash
-git clone -b staging https://github.com/findterntech-byte/findtern-v1.git
-cd findtern-v1
-npm install
+git clone https://github.com/WynautBhav/nextjs-findtern.git
+cd nextjs-findtern
+npm ci
 cp .env.example .env.local      # fill in what you need; defaults are safe
 npm run db:seed                 # fresh local DB with demo data
 npm run dev                     # → http://localhost:3000
@@ -171,6 +179,9 @@ npm run dev                     # → http://localhost:3000
 | Candidate | `candidate@findtern.dev` | `/login` |
 | Employer | `hiring@northwind.dev` | `/employer/login` |
 | Admin | `admin@findtern.dev` | `/admin/login` |
+| Placement officer* | `tpo@jklu.edu.in` | `/college/login` |
+
+\* Run `npm run db:seed-colleges` after `npm run db:seed` to add the college demo data.
 
 > 💡 Locally, **emails are written to `logs/mail/`** instead of being sent, scheduled jobs stay off, and
 > Razorpay is off unless you add **test** keys. You can click anything without notifying a real person.
@@ -198,14 +209,14 @@ npm run db:make-admin you@findtern.in 'YourPassword1'
 |---|---|
 | `npm run dev` | Dev server with hot reload |
 | `npm run build` · `npm start` | Production build and server |
-| `npm test` | 142 unit tests: pricing, GST, offers, onboarding shapes, security |
+| `npm test` | Unit tests for pricing, GST, offers, onboarding, college drives and security |
 | `npm run lint` | ESLint |
 | `npm run db:seed` | Reset the **local** DB and load demo data (refuses anything but localhost) |
 | `npm run db:migrate` | Apply pending migrations; additive, recorded, safe to re-run |
 | `npm run db:verify` | Row counts plus real logins through the route handlers |
-| `npm run db:pull-live` | Copy the live DB and uploads to your machine (read-only on the server) |
+| `npm run db:pull-live` | Create a local testing copy of production data (never use it as an app database) |
 
-**Before every push:** `npx tsc --noEmit` → `npm run lint` → `npm test` → `npm run db:verify`
+**Before every push:** `npx tsc --noEmit` → `npm run lint` → `npm test` → `npm run test:security` → `npm run db:verify` → `npm run build`
 
 <br/>
 
@@ -323,7 +334,7 @@ deploy/                   Backup, release, PM2 and nginx
 
 ## 🤝 Working on it
 
-1. Branch from `staging`; keep pull requests small.
+1. Branch from `master`; keep pull requests small.
 2. New write endpoint? Start it with `requireMutation({ req, roles })`.
 3. Touching offers or profiles? Go through `lib/offer.ts` and `lib/onboarding.ts`; never read the JSON directly.
 4. Schema change? `npm run db:generate`, read the SQL, commit it.
