@@ -16,7 +16,7 @@ type Snapshot = {
   at: string;
 };
 
-const SHOW_OFFLINE = 12;
+const SHOW_OFFLINE = 6;
 
 /**
  * "490/500 online" for a live drive, pushed over Server-Sent Events. The

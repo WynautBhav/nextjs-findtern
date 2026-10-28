@@ -42,7 +42,9 @@ export default async function CollegeLayout({ children }: { children: React.Reac
       initialCollapsed={(await cookies()).get(RAIL_COOKIE)?.value === "1"}
       rootCrumb={{ label: "Students", href: "/college" }}
       // Record pages read "Drives", not "Drives / Details"; no back links needed.
-      crumbParents={{}}
+      // "/college/students" is the Students home itself; pointing it at the
+      // root lets the shell drop it ("Students / Students" before).
+      crumbParents={{ "/college/students": { label: "Students", href: "/college" } }}
     >
       {children}
     </ConsoleShell>
