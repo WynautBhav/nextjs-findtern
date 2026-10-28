@@ -35,7 +35,7 @@ function nameOf(item: ProposalItem): string {
 /** Status filter buckets (the raw enums never reach the select). */
 const FILTERS: { value: string; label: string; match: (status: string, lapsed: boolean) => boolean }[] = [
   { value: "open", label: "Waiting on candidate", match: (s, l) => !l && (s === "sent" || s === "interview_scheduled" || s === "draft") },
-  { value: "accepted", label: "Payment due", match: (s) => s === "accepted" || s === "processing" },
+  { value: "accepted", label: "Accepted, to pay", match: (s) => s === "accepted" || s === "processing" },
   { value: "hired", label: "Hired", match: (s) => s === "hired" },
   { value: "closed", label: "Closed", match: (s, l) => l || ["rejected", "withdrawn", "expired"].includes(s) },
 ];
@@ -144,7 +144,9 @@ export function ProposalsManager({ initialProposals }: { initialProposals: Propo
           tabs={[
             { key: "all", label: "All", count: rows.length },
             { key: "open", label: "Waiting on candidate", count: counts.open },
-            { key: "accepted", label: "Payment due", count: counts.accepted },
+            // Accepted offers only; running placements' monthly dues are on Orders,
+            // so this is not called "payment due" beside the dashboard's count (QA-123).
+            { key: "accepted", label: "Accepted, to pay", count: counts.accepted },
             { key: "hired", label: "Hired", count: counts.hired },
             { key: "closed", label: "Closed", count: counts.closed },
           ]}

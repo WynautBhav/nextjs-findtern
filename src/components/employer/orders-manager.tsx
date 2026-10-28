@@ -14,6 +14,7 @@ import { formatDate, formatMoney } from "@/lib/format";
 import { downloadInvoice } from "@/lib/invoice";
 import { cn } from "@/lib/utils";
 import { DmyDateInput } from "@/components/app/dmy-date-input";
+import { todayIst } from "@/lib/offer";
 
 export type HireRow = {
   proposalId: string;
@@ -102,6 +103,7 @@ export function OrdersManager({
 
   const paid = sumLabel(hires.map((h) => ({ currency: h.currency, minor: h.ledger.paidMinor })));
   const left = sumLabel(hires.map((h) => ({ currency: h.currency, minor: h.ledger.dueMinor })));
+  const today = todayIst();
   const nextDue = hires
     .map((h) => h.ledger.nextDue)
     .filter((d): d is string => Boolean(d))
@@ -127,7 +129,12 @@ export function OrdersManager({
             ? [
                 `${hires.length} hire${hires.length === 1 ? "" : "s"}`,
                 paid ? `${paid} paid` : "nothing paid yet",
-                left ? `${left} still to pay on hires${nextDue ? `, next instalment ${formatDate(nextDue)}` : ""}` : "",
+                // A past date is overdue, never "next" (QA-123).
+                left
+                  ? `${left} still to pay on hires${
+                      nextDue ? (nextDue < today ? `, overdue since ${formatDate(nextDue)}` : `, next instalment ${formatDate(nextDue)}`) : ""
+                    }`
+                  : "",
                 offers,
               ]
                 .filter(Boolean)
@@ -328,6 +335,7 @@ function initials(name: string): string {
 type ScheduleFilter = "all" | "partially_paid" | "fully_paid";
 
 function SchedulePanel({ hires }: { hires: HireRow[] }) {
+  const today = todayIst();
   const [filter, setFilter] = useState<ScheduleFilter>("all");
   const rows = hires.filter((h) => filter === "all" || h.ledger.status === filter);
 
@@ -416,7 +424,11 @@ function SchedulePanel({ hires }: { hires: HireRow[] }) {
                     <td className={cn(tdClass, "nums")}>
                       {h.ledger.nextDue ? (
                         <>
-                          {formatDate(h.ledger.nextDue)}
+                          {h.ledger.nextDue < today ? (
+                            <span className="font-medium text-danger">Overdue since {formatDate(h.ledger.nextDue)}</span>
+                          ) : (
+                            formatDate(h.ledger.nextDue)
+                          )}
                           <span className="block text-xs text-text-subtle">
                             Month {h.ledger.monthsPaid + 1} of {h.ledger.months}
                           </span>
