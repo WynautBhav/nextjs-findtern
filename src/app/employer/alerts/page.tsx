@@ -141,7 +141,7 @@ export default async function EmployerAlerts({
               href={href}
               aria-current={active ? "page" : undefined}
               className={cn(
-                "apple-spring inline-flex min-h-10 items-center gap-1.5 rounded-apple-sm px-3.5 text-sm font-medium",
+                "apple-spring inline-flex min-h-10 items-center gap-1.5 rounded-apple-sm px-3.5 text-sm font-medium touch:min-h-11",
                 active ? "bg-brand-700 text-white shadow-xs" : "text-ink-600 hover:bg-ink-50 hover:text-ink-900",
               )}
             >

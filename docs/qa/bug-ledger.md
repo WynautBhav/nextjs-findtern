@@ -838,3 +838,11 @@ logins; `SEED=1` selects the seed accounts and server). Screenshots are in
 
 ### QA-117
 - Status (builder, 28 Oct): fixed, awaiting retest (wp/opus, fix(QA-117)). Rating meter (candidate card and quick view): the interview axis is labelled "Interview" (every axis is from the AI interview; the full "AI interview" stays in the title), and the labels wrap instead of truncating, with the figure kept level at the bottom of each column. The project cards with Scope / Work mode / Timezone labels are gone since the redesign (projects are rows). On the dashboard at 375, project names and the scope / skills lines were cut mid-word ("High-Volume Delivery Routing O…"); they now wrap to two lines, as do the candidate skills lines. Measured at 375 in Chromium and WebKit on Candidates (with the quick view open), Projects and Dashboard: the only overflowing text is screen-reader-only, plus the one-line "Required skills" filter summary next to Edit, which is a summary on purpose.
+
+### QA-116
+- Status (builder, 28 Oct): fixed, awaiting retest (wp/opus, fix(QA-116)). On touch (the `touch:` variant) these controls are now 44 px:
+  - the row "⋯" menu (RowMenu, shared, so admin rows too);
+  - the Orders tabs (tabClass), the Shortlist hire-flow steps and the Alerts tabs;
+  - Candidates' 12 / 24 / 48 and Rows / Cards toggles, and "Show everyone";
+  - the candidate name links on Schedule (44 wide as well, since the pre-hire name is two initials), Orders and the Shortlist.
+  Shortlist, Send proposal, Quick view and Compare were already 44 on touch. Candidate row titles are stretched links (the whole row). "Candidate NP" on the proposal page sits inside a sentence and is exempt. Measured at 375 in Chromium and WebKit on Candidates, Dashboard, Projects, Proposals, Schedule, Orders, Timesheets, Shortlist, Alerts, Company profile, a candidate profile, a proposal and Campus drives, counting ::before/::after hit areas and enclosing labels: nothing under 44 px tall or 24 wide outside sentences.

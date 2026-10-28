@@ -75,7 +75,7 @@ export function RowMenu({
           type="button"
           aria-label={label}
           className={cn(
-            "apple-spring grid size-10 shrink-0 place-items-center rounded-apple-sm text-text-subtle hover:bg-ink-100 hover:text-ink-900 data-[state=open]:bg-ink-100 data-[state=open]:text-ink-900",
+            "apple-spring grid size-10 shrink-0 place-items-center rounded-apple-sm touch:size-11 text-text-subtle hover:bg-ink-100 hover:text-ink-900 data-[state=open]:bg-ink-100 data-[state=open]:text-ink-900",
             className,
           )}
         >
