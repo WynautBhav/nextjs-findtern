@@ -11,23 +11,23 @@ lines only.
 | QA-001 | P1 | employer, intern | /employer/drives/[id] (accept a drive call) | any | closed | Production build without the Google calendar token: `src/lib/college/meetings.ts` returns `link: null` (the Jitsi stand-in is dev-only), yet `requestMeeting` still accepts the call, so the student gets an accepted call with no join link. Expected: refuse with "Calendar not connected; ask Findtern to connect it" (and the admin sees it in attention), never a silent null. Found by the Opus session during WP1 (e2e 7/9 under `next start`). |
 | QA-002 | P2 | intern | /intern/dashboard, /intern/record (any page with a Thread "action" node) | any width, Chromium; only with `prefers-reduced-motion: reduce` | closed (28 Oct, tester A: fix(QA-002b) verified) | React error #418 (hydration mismatch) in the console on every load. `src/components/app/count-up.tsx`: the server renders `display` (state starts at 0), but under reduced motion the client's first render already returns the formatted final `value`, so the server HTML and the first client render differ. React recovers by client-rendering the subtree, so the user sees no wrong number, but it is a console error, a wasted re-render, and a flash of 0 on slower devices for exactly the users who asked for less motion. |
 
-| QA-003 | P1 | admin | /admin/interns/[id] | any | open | Candidate detail shows the full Aadhaar and PAN numbers. Expected: masked to the last 4, with an explicit reveal that is audit-logged. Sensitive-data exposure even though admin-only. |
+| QA-003 | P1 | admin | /admin/interns/[id] | any | closed | Candidate detail shows the full Aadhaar and PAN numbers. Expected: masked to the last 4, with an explicit reveal that is audit-logged. Sensitive-data exposure even though admin-only. |
 | QA-004 | P1 | intern | /intern/record vs /intern/dashboard, /interviews, /profile, /proposals/[id] | any | open | Two different Findtern scores for the same intern: 8.8 (Coding 9.3) on Home/Interviews/Profile/Offer, 8.2 (Coding 8.5) on Record. One page computes from the wrong source. Find which is stored and fix the other. |
 | QA-005 | P1 | employer | /employer/timesheets/[id] | any | open | A timesheet with 0 days filled could be approved. Expected: approve is refused (or disabled) until every day has a status, as the intern-side submit rule requires. |
 | QA-006 | P1 | employer (signup via college drive) | /drive/[token] → employer signup | any | open | Signing up from a drive link loses the drive (`next` not carried), and the route has no error handling on its query. Source reading by the builder; verify in the browser. |
-| QA-007 | P1 | employer, admin | /employer/orders; /admin/dashboard, /admin/proposal-tracker, /admin/reports, /admin/transactions, /admin/companies | any | open | Money/hire counts disagree across pages: orders "3 payments due" vs "Nothing outstanding"; admin hires 0 vs 13; transactions "Received ₹0" vs orders ₹2,80,000; companies list 0 projects/proposals vs detail 3/9. Likely one root cause (₹0 free-mode test orders, or a status filter, counted differently per page). Verify and fix at the source, then each symptom. |
+| QA-007 | P1 | employer, admin | /employer/orders; /admin/dashboard, /admin/proposal-tracker, /admin/reports, /admin/transactions, /admin/companies | any | closed | Money/hire counts disagree across pages: orders "3 payments due" vs "Nothing outstanding"; admin hires 0 vs 13; transactions "Received ₹0" vs orders ₹2,80,000; companies list 0 projects/proposals vs detail 3/9. Likely one root cause (₹0 free-mode test orders, or a status filter, counted differently per page). Verify and fix at the source, then each symptom. |
 | QA-008 | P2 | employer | /employer/dashboard | any | open | Hero says "4 things need you" above a 2-item "Waiting on you" list; the two counts come from different rules. |
-| QA-009 | P2 | admin | /admin/reports | any | open | "Avg hiring speed −9.8 days": a negative duration; the date pair is reversed or includes unhired rows. |
+| QA-009 | P2 | admin | /admin/reports | any | closed | "Avg hiring speed −9.8 days": a negative duration; the date pair is reversed or includes unhired rows. |
 | QA-010 | P2 | intern | /intern/opportunities/[id] | any | open | Role detail tells a hired intern "You have an offer for this role"; should reflect the hire. |
 | QA-011 | P2 | intern | /intern/settings | any | open | A paid intern with saved bank details sees an empty bank form and no read-only saved state. |
 | QA-012 | P2 | employer | /employer/account | any | open | "Profile complete" shown while required escalation-contact fields are empty. |
 | QA-013 | P2 | college | /college/drives | any | open | A closed drive is sorted above the live one. |
 | QA-014 | P2 | employer | /employer/intern/[id] | any | open | Preferred cities not deduplicated ("Bengaluru, Bengaluru, Remote"). Builder fixes within the employer redesign. |
 | QA-015 | P2 | intern | /intern/record | any | open | A raw ISO date ("2026-10-30") is shown instead of the DD/MM/YYYY format. Builder fixes within the intern redesign. |
-| QA-016 | P2 | admin | /admin/account | any | open | Two different password rules stated on the same page. Builder fixes within the admin redesign. |
-| QA-100 | P1 | all (marketing) | every marketing page, e.g. `/`, `/faq`, `/pricing` | 375, Chromium | open | Header is wider than the phone: the menu button spans x=344 to 384, so `scrollWidth` is 384/385 and the page scrolls sideways (the larger logo from NC-r2 is the likely cause). Found by the marketing sub-run, verified by Tester B. |
-| QA-101 | P1 | employer (signup) | /employer/signup | 375 | open | Phone number input is 50 px wide beside a 269 px country-code select; the number shows as "98'" and cannot be read or checked while typing. The intern signup form is fine (175 px). |
-| QA-102 | P1 | everyone | marketing footer, auth pages, onboarding | 375 | open | The floating "Ask me" button (141 x 64) and its prompt bubble cover real content: the right end of the Password field on employer signup, the "Employer sign in" link at the end of the intern signup, the footer copyright line and the "Copy email" icon on /faq and /about. The page has no bottom padding to scroll them clear. |
+| QA-016 | P2 | admin | /admin/account | any | open (reopened 28 Oct, tester B) | Two different password rules stated on the same page. Builder fixes within the admin redesign. |
+| QA-100 | P1 | all (marketing) | every marketing page, e.g. `/`, `/faq`, `/pricing` | 375, Chromium | closed | Header is wider than the phone: the menu button spans x=344 to 384, so `scrollWidth` is 384/385 and the page scrolls sideways (the larger logo from NC-r2 is the likely cause). Found by the marketing sub-run, verified by Tester B. |
+| QA-101 | P1 | employer (signup) | /employer/signup | 375 | closed | Phone number input is 50 px wide beside a 269 px country-code select; the number shows as "98'" and cannot be read or checked while typing. The intern signup form is fine (175 px). |
+| QA-102 | P1 | everyone | marketing footer, auth pages, onboarding | 375 | closed | The floating "Ask me" button (141 x 64) and its prompt bubble cover real content: the right end of the Password field on employer signup, the "Employer sign in" link at the end of the intern signup, the footer copyright line and the "Copy email" icon on /faq and /about. The page has no bottom padding to scroll them clear. |
 | QA-103 | P2 | admin | /admin/payouts ("Mark paid or failed") | 375 | open | The payout editor opens inside the horizontally scrolling table: "Failed", the reference label and "Cancel" are cut off; the admin has to scroll sideways to reach them. Also fires a 400 to the API when "Done" is pressed with no reference (the message is correct, but the check is server-side only). |
 | QA-104 | P2 | admin | /admin/interns/[id], payouts, candidate lists | 375 | open | Tap targets far under 44 px: skill "Remove" buttons 12 x 12, skill level selects 25 px high, Save / Add / Apply 36 px, "Edit contact" 36 px. |
 | QA-105 | P2 | employer (USD), signed out | `/`, `/about` | any | open | With USD selected the stats strip still says "₹5,000 Fixed per-hire fee" while /pricing says "$50". Found by the marketing sub-run. |
@@ -43,6 +43,25 @@ lines only.
 | QA-115 | P2 | employer | /employer/proposal/[id] | 1440 | open | "Withdraw offer" on an accepted-unpaid offer acts on one click with no confirmation. |
 | QA-116 | P2 | employer | candidates, dashboard, projects, proposals, schedule, orders | 375 | open | Tap targets under 44 px: Shortlist 112 x 40, Send proposal 162 x 40, Quick view 121 x 40, Compare 114 x 40, view toggles 36 x 36, skill chips 38 high, "Show everyone" 24 high, "Manage" 60 x 20, project filter tabs 40, Edit / Withdraw / View 36, Join meeting / Reschedule / Leave feedback 36, project-name links 23 high. Full list in `docs/qa/b/bs7-employer-results.md` (D7). |
 | QA-117 | P2 | employer | candidate cards, quick view, project cards | 375 | open | Text cut off: the rating label "AI interview" shows as "AI intervie..."; the Scope / Work mode / Timezone labels on project cards are clipped by their containers. |
+| QA-118 | P1 | employer | /employer/drives | 375, Chromium + WebKit | open | The page's content is 668 px wide inside a 375 px screen and the shell clips it: the drive card's right edge and its closing date ("closes Wed, 4 N…") are cut off, with no way to scroll to them. The crawler's `scrollWidth` check cannot see this (the shell uses `overflow: clip`). |
+| QA-119 | P2 | employer | /employer/intern/[id] | 375, both | open | The price line "+ ₹5,000 per hire · set by the score band" runs to x=460 on a 375 px screen and is cut off at the card edge (page content 460 px wide, clipped). Same family as QA-118. |
+| QA-120 | P2 | employer | /employer/proposals | 375 + 1440, both | open | No row shows a visible action, only "⋯". DESIGN §0 wants one visible action chosen by state. Hired and Withdrawn rows get a menu with a single item ("Open offer"), and five different rows share the menu name "More actions for Product Intern". Keyboard, Esc and focus return work. |
+| QA-121 | P2 | employer | /employer/schedule | 375 + 1440 | open | Interview rows are cards with 2 to 4 visible buttons (Booked: Join meeting, Send reminder, Reschedule, Profile), no "⋯" and no single main action, against the aligned-row rule in DESIGN §0. At 375 the buttons stack into four lines per card. |
+| QA-122 | P2 | employer | /employer/orders | 375 + 1440 | open | A "Not paid" hire shows the same Timesheets / Contract / Full-time offer as a paid one and no Pay action; paying is only reachable from the header's amber "1 payment due". The wrong action for the state. |
+| QA-123 | P2 | employer | /employer/orders, /employer/checkout, /employer/proposals | any | open | Orders says "next instalment 17 Sept 2026" (41 days in the past); Checkout says "Due 6 Dec 2026" for a different hire; Proposals' "Payment due 0" sits next to "1 payment due" on Dashboard and Orders. Probably one seed row (start 17 Sept, never paid) but a past date must not be called "next". QA-007's three causes themselves are closed. |
+| QA-124 | P2 | employer | /employer/cart (Shortlist), /employer/checkout | 375 | open | The shortlist count reads 4 (header), 2 (tab) and "4 shortlisted" (heading) at once; the active "Shortlist" tab still lists cards that already have a proposal. Each card carries four buttons and repeats "₹5,000 per hire". The step chevrons wrap with a stray chevron at the start of line two. |
+| QA-125 | P2 | employer | /employer/candidates | 375 + 1440 | open | Two search boxes stacked ("Search & add skills…" and "Skill, city or keyword"); at 375 the first candidate starts below the first screen; the filter panel still has Apply and Reset buttons (DESIGN §0: filters apply on change). |
+| QA-126 | P2 | employer | /employer/send-proposal, booking dialog on /employer/cart | any | open | Start date and the three meeting-slot dates are native `type=date` controls (mm/dd/yyyy in an en-US browser), while Schedule uses a DD/MM/YYYY text field. "Hours per month" and "Monthly amount" are plain text inputs with no `inputmode`, so phones open the letters keyboard. |
+| QA-127 | P2 | employer | /employer/schedule | any | open | The DD/MM/YYYY filter ignores "2026-10-31", "1/1/26" and "31/10" without any message, and applies "99/99/2026" as if it were a date ("No interviews match these filters"). |
+| QA-128 | P2 | employer | booking dialog on /employer/cart | 375 | open | After "Send meeting request" the confirmation says the meeting "shows on your Schedule once they do [pick]", but it is already on Schedule as "Waiting on candidate"; a second toast, "Stuck somewhere? Ask me", appears over the confirmation. |
+| QA-129 | P2 | employer | /employer/checkout, /employer/send-proposal | any | open | Copy tells from DESIGN §0: "Names unlock once the hire is paid."; the empty Send-a-proposal screen says the same thing three times ("Pick a candidate first." / "No candidate selected" / "You: pick a candidate first"). |
+| QA-130 | P2 | employer | timesheets list, projects, proposals, orders | 375 | open | Meta lines cut with an ellipsis where they could wrap: "17 Sept – 16 Oct 20…", "Remote · Up to 60 days · Full-ti…", "Ritika Verma · Data Analy…". |
+| QA-131 | P2 | employer | proposals and schedule filter tabs; every dialog | 375 | open | The tab strips scroll sideways with the last tab cut mid-word ("Paymer") and no hint; every dialog's close "×" is 16 x 16 px; the Approve / Send back choice is 40 px high. Extends QA-116. |
+| QA-132 | P2 | employer | /employer/timesheets/[id] | any | open | "Approve timesheet" commits on one tap with Approve pre-selected and no confirm; the page itself says it "can't be undone". |
+| QA-133 | P2 (harness) | tester, employer | /employer/timesheets, /employer/timesheets/[id] | any | open | `e2e/seed-situations.mjs:244` writes day statuses "present" / "off"; the app uses Present / Absent / Fixed off / Holiday. On every seeded sheet the review shows Present 0, Hours 0 and "Not filled 7" per week while the grid says "P present" and the list says "0 / 30 days present". Real submissions are fine. The review screen cannot be tested on the personas until this is fixed. |
+| QA-134 | P2 | admin (and seed) | /admin/dashboard | any | open | After the QA-009 fix "Avg hiring speed" skips rows whose `hired_at` is before `created_at` without saying so: 2 of 9 hired rows on a fresh seed (7 are reversed), 13 of 18 on the live copy. The tile shows no n. The seed writes the reversed dates. |
+| QA-135 | P2 | everyone | /login, /employer/login (and likely the other sign-in pages) | any | open | The tab title is "Sign in \| Findtern \| Findtern": the brand twice. |
+| QA-136 | P2 | employer | /employer/candidates, every console page | 375 | open | The floating "Ask me" button (kept on phones by design) still sits over the right half of the "Skill, city or keyword" search box at scroll 0. QA-102's fix covers marketing, auth and onboarding only. |
 
 ## Details
 
@@ -172,6 +191,16 @@ logins; `SEED=1` selects the seed accounts and server). Screenshots are in
 - Severity: **P1 confirmed** (sensitive identifiers rendered to every admin role that can
   open the candidate page, and sent in the HTML). Also worth checking in the fix: the
   CSV export and `/api/admin/interns/[id]` payloads.
+- Retest (tester B, 28 Oct): **closed**. Production build of wp/qa-b on 22054b0, live-copy DB, candidate with Aadhaar and PAN
+  (`docs/qa/b/repro/qa003-retest.mjs`, `qa003-leak.mjs`). (1) The page shows "Aadhaar number •••• 8183" and "PAN •••• 327F" with a
+  Reveal button each. (2) The full numbers are in neither the HTML (128 KB) nor the RSC payload (45 KB) of `/admin/interns/[id]`;
+  8 admin pages x HTML and RSC (candidates list, users, payouts, transactions, tracker, companies, reports) are clean too (16/16).
+  (3) Reveal as Super Admin shows the full value; one `identity.reveal` row per click ({"field": "aadhaar"} or "pan", with the admin id,
+  target intern); two clicks, two rows. (4) Roles: Executive - Sales and Executive - Accounts (no `interns:write`): no Reveal button on
+  the page, and the API answers 403 "Your role doesn't allow this" with 0 audit rows; Executive - Operations and the default **Admin**
+  role both have `interns:write` (the ADP-17 grant in `roles-grants.ts`) and can reveal, 1 audit row each. So the brief's "default admin
+  has no `interns:write`" is not so: the default Admin keeps it by design. (5) The route also needs the CSRF token (a bare POST gets 403).
+  Not covered: CSV exports. Evidence: `docs/qa/b/screens/qa003r-admin-masked.png`, `qa003r-admin-revealed.png`.
 
 ### QA-004
 - Reproduced: **yes**, on both DBs (so the seed is not needed for the two-score case).
@@ -258,6 +287,16 @@ logins; `SEED=1` selects the seed accounts and server). Screenshots are in
 - Evidence: `docs/qa/b/screens/qa-007-*-3503.png` (SEED) and `-3502.png` (LIVE-COPY);
   scripts `qa007.mjs`, `qa007-companies.mjs`, `qa007-projects.mjs`; traces `qa-007-*-trace.zip`.
 - Status (builder, 28 Oct): fixed, awaiting retest (wp/opus: 5af9f5a companies q(); ddac6ea seed writes paid/hired + one isPaidRow; 8cbad37 Orders lede names accepted offers). Fresh seed: companies, transactions, reports and Orders agree (9 hires, ₹10,20,000 received).
+- Retest (tester B, 28 Oct): **closed**, all three causes, production build on 22054b0.
+  Part 1 (live copy): `/admin/companies` shows Heavy Data Co with 55 projects, 55 proposals, 15 hires (was 0/0/0) and its money
+  (`docs/qa/b/repro/qa007-retest.mjs`, screenshot `qa007r-companies-3502.png`). Part 2 (fresh seed rebuilt from `scripts/seed.ts`): the
+  seed now writes `hired` (9) beside `accepted` (4); admin Hired 9 on dashboard and tracker, Transactions "Received ₹10,20,000 · 9 paid receipts" =
+  Reports "Revenue collected ₹10,20,000"; Northwind's company row ₹2,70,000 = its Orders page "3 hires · ₹2,70,000 paid". Part 3: an
+  employer with two accepted-unpaid offers (Swiggy Instamart Labs, seed) reads "2 accepted offers to pay for · 2 payments due" on Orders,
+  "2 payments due / 2 accepted, to pay" on the dashboard, "Payment due 2" on Proposals and "2 ready to pay" on Checkout: all agree
+  (`qa007-accepted.mjs`). Left over, not QA-007: the live copy shows dashboard funnel "Hired 5" beside tracker "Hired 18" because the funnel counts
+  distinct candidates (18 hired proposals, 5 candidates; checked in SQL), and Transactions says ₹7,624 where Reports says ₹7,623 (₹7,623.95 rounded
+  two ways). The employer-side residue is QA-123.
 
 ### QA-008
 - Reproduced: **yes**, SEED (`docs/qa/b/screens/qa-008-employer-dashboard-3503.png`). Employer dashboard
@@ -275,6 +314,9 @@ logins; `SEED=1` selects the seed accounts and server). Screenshots are in
   LIVE-COPY: 5 of 17 hired rows have `hired_at < created_at`. Fix: filter or clamp `>= created_at`
   (and prefer a real accepted-at timestamp, since `updated_at` moves on any edit).
 - Severity: **P2 confirmed**. Evidence: `docs/qa/b/screens/qa-009-dashboard-*.png`.
+- Retest (tester B, 28 Oct): **closed**. "Avg hiring speed" reads 1.9 days (live copy) and 4.8 days (fresh seed), labelled "Offer sent to accepted";
+  no negative figure on either (`qa009-016-retest.mjs`). The raw data still has `hired_at` before `created_at` (average -3.3 days live, -15.3 days seed),
+  which the fix now filters out; see QA-134 for the missing n.
 
 ### QA-010
 - Reproduced: **yes, with a correction.** A **hired** intern is told "You are doing this role now." (correct).
@@ -330,6 +372,13 @@ logins; `SEED=1` selects the seed accounts and server). Screenshots are in
   `src/app/admin/account/page.tsx:48` (and again in `staff-roles-manager.tsx:492`); the hint is the shared
   `change-password-form.tsx`. Severity **P2 confirmed**; the form hint is the one that matches the policy.
 - Evidence: `docs/qa/b/screens/qa-016-admin-account-*.png`.
+- Retest (tester B, 28 Oct): **reopened**. The page's hint is now the single shared one ("At least 8 characters, with a lowercase letter, an
+  uppercase letter, a number and a special character."), but a rejected change prints a different rule: `src/app/api/admin/account/password/route.ts:18`
+  returns "Use 8+ characters with upper and lower case letters and a number." (no special character). Steps: as an admin on `/admin/account`,
+  enter the right current password and "Abcdefg1" twice, press Change password. Actual: the server rejects it (the stored hash does not change)
+  and shows the second sentence, which "Abcdefg1" already satisfies. All six weak variants (lowercase only, 7 characters, no special, no upper, no lower,
+  no number) are rejected, so the rule is enforced; only the message is wrong. Fix: use `PASSWORD_HINT` in the route. Evidence:
+  `docs/qa/b/screens/qa016r-weak-password-error.png`, `docs/qa/b/repro/qa016-error-text.mjs`, `qa016-enforce.mjs`.
 
 ### QA-004 (addendum, Tester B)
 - Re-score proof: as admin I set all four ratings to 9 on an intern (`node docs/qa/b/repro/admin-score.mjs <id>`).
@@ -345,12 +394,16 @@ logins; `SEED=1` selects the seed accounts and server). Screenshots are in
 - Evidence: `docs/qa/b/bs7-marketing-results.md` (X1), trace `e2e/.artifacts/qa-b/verify-x1-chromium-trace.zip`.
 - Severity: **P1** (every marketing page scrolls sideways on a phone; the done-definition bans sideways scroll).
 - Status (builder, 28 Oct): fixed, awaiting retest (wp/opus 9b81744). Cause was not the logo: GetStartedMenu concatenated its className, so `hidden` lost to `inline-flex` and the button showed below sm. 375/375 on /, /faq, /pricing.
+- Retest (tester B, 28 Oct): **closed**. Production build on 22054b0, 375 px: `/`, `/faq`, `/pricing`, `/about` in Chromium and `/faq`, `/pricing`, `/about` in
+  WebKit all report `scrollWidth` 375 and the menu button's right edge at 355 (`docs/qa/b/repro/qa100-102-retest.mjs`). WebKit `/` still crashes (QA-111).
 
 ### QA-101
 - Steps: 375 px, signed out, open `/employer/signup` (`node docs/qa/b/repro/inspect.mjs anon /employer/signup 375`).
 - Actual: country-code select 269 x 44, phone input 50 x 44 (placeholder cut to "98'"). Same row on `/signup` is 144 + 175.
 - Evidence: `docs/qa/b/screens/inspect-anon--employer-signup-375.png`. Severity **P1** (a required field is unreadable while typing).
 - Status (builder, 28 Oct): fixed, awaiting retest (wp/opus 4dd433e). Select 112 px, number 207 px at 375.
+- Retest (tester B, 28 Oct): **closed**. `/employer/signup` at 375: country-code select 112 px, phone input 207 px, `inputmode=numeric`,
+  `autocomplete=tel-national`, in Chromium and WebKit. Screenshot `docs/qa/b/screens/qa101r-employer-signup-375-chromium.png`.
 
 ### QA-102
 - Steps: 375 px; wait 3 s for the bubble; scroll to the bottom of `/signup`, `/employer/signup`, `/faq`, `/about`.
@@ -361,6 +414,11 @@ logins; `SEED=1` selects the seed accounts and server). Screenshots are in
 - Evidence: `docs/qa/b/screens/inspect-anon--employer-signup-375.png`, `flow-intern-signup-filled-375-chromium.png`;
   marketing sub-run X2 in `docs/qa/b/bs7-marketing-results.md`. Severity **P1** (covers an input and a link).
 - Status (builder, 28 Oct): fixed, awaiting retest (wp/opus e9b743f). Launcher hidden below lg on auth/onboarding, no bubble on forms, bubble auto-dismisses after 12 s, footer bottom padding clears the launcher.
+- Retest (tester B, 28 Oct): **closed for the cases logged**. At 375 in Chromium and WebKit, scrolling `/signup`, `/employer/signup` and `/login` in 250 px steps:
+  the launcher never overlaps an input, link or button, and at the very bottom of `/signup`, `/employer/signup`, `/faq`, `/about` and `/login` nothing is under it.
+  The "Agree and send" dialog button is tappable (the launcher is hidden under the modal; the proposal went through in both engines). On `/faq` and `/about` it
+  passes over accordion rows and footer links while the page scrolls, which is what a floating button does; not counted. The same button still covers the right half of a search box
+  inside the app at scroll 0 (QA-136). Evidence: `qa102r-employer-signup-bottom-375-*.png`.
 
 ### QA-103
 - Steps: admin, 375 px, `/admin/payouts?status=pending`, tap "Mark paid or failed" on a row (`node docs/qa/b/repro/admin-payout.mjs`).
@@ -425,3 +483,126 @@ logins; `SEED=1` selects the seed accounts and server). Screenshots are in
   The employer sub-run also tried stripping `Secure` from the cookie and it still failed, so the cause above is likely but not proven; confirm on https or a real iPhone.
 - **Not logged (environment):** `/api/intern/avatar` 404s on candidates and compare (D9) and on every intern page: uploads are not served locally (known non-bug in the brief).
 - **Not tested by either of us:** Google sign-in and calendar (no keys), real payments, live email, the AI-interview provider.
+
+### Tester B, 28 Oct (second pass): the redesigned employer screens, QA-118 to QA-136
+- Build: production build of wp/qa-b on 22054b0 (the builder's employer redesign plus the QA-007/100/101/102/003/009/016 fixes), live-copy DB, employer
+  `neha@acmerobotics-launchtest.in`; Chromium and WebKit at 375, Chromium at 1440. Judged against DESIGN.md §0 (the "No AI slop" list and the type floor), by
+  doing the job: candidates, shortlist, send proposal, book a meeting, review a timesheet, orders. Scripts in `docs/qa/b/repro/emp2-*.mjs`; screenshots
+  `docs/qa/b/screens/emp2-*.png`; traces in `e2e/.artifacts/qa-b/` (git-ignored).
+- **What worked** (not logged): the whole path runs in both engines at 375: shortlist, Review and send, the policy dialog (tick, wait ten seconds, "Agree and send"),
+  the proposal lands in the list as "Waiting on candidate", a meeting request goes out, a submitted timesheet is approved or sent back with a note, Orders and
+  Checkout read correctly for an accepted-unpaid employer. Every "⋯" menu opens with Enter, moves with the arrow keys, closes on Esc and returns focus to its button
+  (8 rows, Chromium 1440 and WebKit 375); menu items are 44 px; outside click closes. Filters on Proposals apply on change (select, search, tabs); Schedule's timezone
+  select applies on change; Candidates' project select applies on change. No overflow, no 4xx/5xx, no console errors apart from the known avatar 404. The builder's
+  candidate-row rework removed the truncated locations and the rate/button collision I saw on the first build.
+- **Why my first automatic check missed QA-118/119**: the shell clips with `overflow: clip`, so `documentElement.scrollWidth` stays 375 even when `main` is 668 wide.
+  Compare `main.scrollWidth` with `main.clientWidth` instead (`emp2-clip.mjs` does; it finds exactly these two pages and nothing else at 375 in either engine).
+
+### QA-118
+- Steps: employer, 375 px (Chromium or WebKit), open `/employer/drives`.
+- Expected: the drive's name, college and closing date all readable, wrapping inside the card.
+- Actual: `main` scrollWidth 668 (WebKit 645) against 375; the card text ends at x=615; "JK Lakshmipat University, Jaipur · closes Wed, 4 N" is cut at the screen edge and the
+  card's right border is off-screen. Nothing scrolls.
+- Evidence: `docs/qa/b/screens/emp2-chromium-375-drives.png`; `node docs/qa/b/repro/emp2-clip.mjs chromium 375`.
+- Severity **P1**: the closing date is the one fact the employer needs from the row, and it is the only content on the page.
+
+### QA-119
+- Steps: employer, 375 px, open any candidate from `/employer/candidates` (`/employer/intern/[id]`).
+- Actual: under "Price ₹200/hr" the line "+ ₹5,000 per hire · set by the score band" spans x=178 to 460 (WebKit 174 to 454); the screen is 375, so "set by the score band" is cut off.
+- Expected: the line wraps inside the card. Evidence: `docs/qa/b/screens/emp2-chromium-375-detail-intern.png`. Severity **P2** (the fee is also shown on the form and in the cart; the cut line is the
+  decision screen's only disclosure of it).
+
+### QA-120
+- Steps: employer, `/employer/proposals` at 375 and at 1440; open each row's "⋯" with the keyboard.
+- Actual: no row has a visible action. "Waiting on candidate" rows: menu "Open offer / Edit offer / Withdraw offer". "Hired" and "Withdrawn" rows: a menu with the single item
+  "Open offer". Five rows are named "More actions for Product Intern" (the role, not the candidate), so a screen-reader user cannot tell them apart.
+- Expected (DESIGN §0): one visible action chosen by the row's state, the rest in the menu; a one-item menu is a visible link.
+- Evidence: `docs/qa/b/screens/emp2-chromium-1440-proposals.png`, `emp2-chromium-375-proposals.png`; `emp2-interact.mjs`. Severity **P2**.
+
+### QA-121
+- Steps: employer, `/employer/schedule` at 1440 and 375.
+- Actual: Booked: Join meeting + Send reminder + Reschedule + Profile; Waiting: Send reminder + Offer new times + Profile; Expired: Offer new times + Profile; Completed:
+  Leave feedback + Profile. They are separate cards, not an aligned list, with no "⋯". At 375 each card is about 400 px tall.
+- Expected: the Proposals pattern (rows, one action, a menu). Evidence: `emp2-chromium-1440-schedule.png`, `emp2-chromium-375-schedule.png`. Severity **P2**.
+
+### QA-122
+- Steps: employer with a hire that has no payment yet (live copy: Ritika Verma, "Not paid"), `/employer/orders`.
+- Actual: that row offers Timesheets, Contract and Full-time offer, exactly like the paid row; there is no Pay. The only way to pay is the amber "1 payment due" at the top, which opens Checkout
+  (and Checkout lists a different hire; see QA-123). "2 months · 1 paid" wraps to "1 / paid" at 1440.
+- Evidence: `emp2-chromium-1440-orders.png`, `emp2-chromium-375-orders.png`. Severity **P2**.
+
+### QA-123
+- Steps: employer (live copy), read the lede on `/employer/orders`, then `/employer/checkout`, then the tabs on `/employer/proposals`.
+- Actual: Orders "₹29,000 still to pay on hires, next instalment 17 Sept 2026"; today is 28 Oct. Checkout "Ready to pay: Qab Tester, Month 2 of 2, Due 6 Dec 2026". Proposals "Payment due 0",
+  Dashboard hero "1 payment due" beside "0 accepted, to pay". The hero's copy explains that accepted offers and running placements both count, but the Proposals tab counts only the first.
+- Likely cause: the QA seed's second hire (Ritika, 17 Sept start, three months, nothing paid), so confirm with a fresh offer. Whatever the data, a past date should read "overdue since 17 Sept".
+- Evidence: `qa007r-orders-3502.png`. Severity **P2**.
+
+### QA-124
+- Steps: employer, shortlist one more candidate from `/employer/candidates`, then open `/employer/cart` at 375.
+- Actual (first run): header badge 4, tab "Shortlist 2 | Proposed 3 | Accepted 1 | Hired 2", heading "4 shortlisted", and 4 cards of which 2 say "Proposal sent"; shortlisting one more made the badge 5 while the tab read 3. Each card repeats "₹5,000 per hire" and
+  has Send proposal, Book meeting, Profile and Remove (four controls, about 360 px per card). "Accepted 1 > Hired 2" wraps with a chevron at the start of line two (also on Checkout).
+- Expected: one count and one meaning; a row pattern like Proposals. Evidence: `emp2-chromium-375-cart.png`, `emp2f1-chromium-375-after-shortlist.png`. Severity **P2**.
+
+### QA-125
+- Steps: employer, `/employer/candidates` at 375 and 1440.
+- Actual: "Search & add skills…" (inside Required skills) and "Skill, city or keyword" (above the list) are two search boxes with different meanings and no label; at 375 the skills box,
+  the explanatory strip and the toolbar fill about 870 px, so the first candidate is below the first screen; the filter panel keeps "Apply" and "Reset" (sliders and text need them).
+- Expected (DESIGN §0): filters apply on change; the people list starts above the fold. Evidence: `emp2v-candidates-375-top.png`, `emp2-chromium-1440-candidates.png`. Severity **P2**.
+
+### QA-126
+- Steps: employer, `/employer/send-proposal?intern=…` at 375, and the booking dialog from the shortlist.
+- Actual: "Start date" and "Slot 1/2/3 date" are `<input type="date">` (mm/dd/yyyy in the test browser; the control follows the browser's language, so en-IN would differ and I could not
+  check a real phone); Schedule's date filter is a DD/MM/YYYY text field. "Hours per month" (value "160 h") and "Monthly amount" ("₹32,000") are `type=text` with no `inputmode`.
+- Expected: one date control, DD/MM/YYYY (bug sheet 7, DESIGN §0); numeric keyboard for numbers. Evidence: `emp2f1-chromium-375-proposal-form.png`, `emp2f3-chromium-375-book.png`. Severity **P2**.
+
+### QA-127
+- Steps: `/employer/schedule`, type each value in the DD/MM/YYYY field and tab out (`emp2-interact.mjs`).
+- Actual: "31/10/2026" filters. "2026-10-31", "1/1/26" and "31/10" do nothing and say nothing. "99/99/2026" passes the pattern and answers "No interviews match these filters" / "Showing 0 of 6".
+- Expected: a short "Use DD/MM/YYYY" message for text that is not a date. Severity **P2**.
+
+### QA-128
+- Steps: shortlist, "Book meeting", keep the three suggested times, "Send meeting request" (375, both engines).
+- Actual: the confirmation says "…It shows on your Schedule once they do."; `/employer/schedule` already lists it as "Waiting on candidate" (waiting count 1 to 2, all 4 to 5). A second toast,
+  "Stuck somewhere? Ask me", is on screen with it.
+- Severity **P2** (copy that is wrong, and a help nudge over a confirmation). Evidence: `emp2f3-chromium-375-booked.png`.
+
+### QA-129
+- Steps: `/employer/checkout`, and `/employer/send-proposal` with no candidate chosen, at 375.
+- Actual: "Amounts are the terms each candidate accepted… Names unlock once the hire is paid." ("Unlock" is on the §0 copy-tell list). The empty state reads "Pick a candidate first." (subtitle),
+  "No candidate selected" (title) and "You: pick a candidate first" (hint).
+- Evidence: `emp2-chromium-375-checkout.png`, `emp2-chromium-375-send-proposal.png`. Severity **P2**.
+
+### QA-130
+- Steps: 375 px: `/employer/timesheets`, `/employer/projects`, `/employer/proposals`, `/employer/orders`.
+- Actual (ellipsis found by script): "18 Oct – 16 Nov 2026 · Robotics Software Intern" and "17 Sept – 16 Oct 2026 · …" cut to "17 Sept – 16 Oct 20…"; "On-site · Bengaluru, Karnataka · Up to 90 days";
+  "Remote · Up to 60 days · Full-time path"; "Ritika Verma · Data Analyst Intern"; "Product Intern · Robotics Software Intern". There is room to wrap on every one.
+- Evidence: `emp2v-timesheets-375.png`, `emp2-chromium-375-projects.png`; `emp2-verify.mjs`. Severity **P2**.
+
+### QA-131
+- Actual (375): the Proposals and Schedule status tabs scroll sideways with the last label cut mid-word ("Paymer") and no fade; every dialog's "×" (policy, booking) is 16 x 16 px; the Approve / Send back
+  switch on a timesheet is 40 px high; list/card toggles and "12 / 24 / 48" are 36 px. Cut-down QA-116 list otherwise unchanged (the 36 px buttons now grow to 44 on touch).
+- Evidence: `emp2-chromium-375-proposals.png`, `emp2f2-chromium-375-policy-dialog.png`. Severity **P2**.
+
+### QA-132
+- Steps: a submitted sheet (`/employer/timesheets/[id]`), 375: "Approve timesheet" is the pre-selected, full-width button; one tap approves (Chromium); "Send back" with a note works (WebKit; I did not check the empty-note case).
+- Actual: no confirmation before an action the page calls "can't be undone". Evidence: `emp2f4-chromium-375-decision.png`. Severity **P2**.
+
+### QA-133 (harness)
+- Steps: `e2e/seed-situations.mjs:244` writes `status: "present"` / `"off"`. Open the employer's seeded submitted sheet: tiles read Present 0, Hours 0, Absent 0, Off 0; weeks read "Not filled 7";
+  the grid says "P present" and "30 days, every one filled". The list says "0 / 30 days present · 0 h" for an Approved sheet.
+- Proof that the app is fine: after `UPDATE timesheets SET entries = …` with Present / Fixed off, the same sheet reads Present 21, Hours 168, Off 9 and the list "21 / 30 days present · 168 h" (the intern UI, `submit/route.ts`, uses those words).
+- Fix in the harness (normalise to the app's words). Not a product bug, but until fixed the review screen shows nonsense on every persona, which would also hide a QA-005 regression. Tell Tester A.
+
+### QA-134
+- Steps: `/admin/dashboard` on a fresh seed: "Avg hiring speed 4.8 days"; in SQL 7 of 9 hired rows have `hired_at < created_at`, so the tile averages 2. Live copy: 13 of 18 used, 1.9 days.
+- Expected: the tile (or its tooltip) says "from n hires"; `scripts/seed.ts` writes `hired_at` after `created_at`. Severity **P2**.
+
+### QA-135
+- Steps: `curl localhost:<port>/login | grep '<title>'`: "Sign in | Findtern | Findtern", and "Employer sign in | Findtern | Findtern". `/signup`, `/faq`, `/pricing`, `/about`, `/forgot-password` are single. Severity **P2** (tab titles, shares).
+
+### QA-136
+- Steps: employer, `/employer/candidates` at 375 x 812, scroll 0.
+- Actual: the "Ask me" button (141 x 56) sits over x=232 to 359 of the "Skill, city or keyword" box, which is its tap area; same on other console screens wherever content reaches the bottom-right corner.
+  DESIGN §0 says phones keep the labelled button on purpose (bug sheet 7), so this is a placement issue, not a removal request: raise it above the tab/field row or let the page's last row clear it.
+- Evidence: `emp2v-candidates-375-top.png`. Severity **P2** (QA-102's fix did not cover the console).
