@@ -62,7 +62,7 @@ export function DeleteSheetButton({
         type="button"
         onClick={run}
         disabled={busy}
-        className={buttonClass({ variant: "ghost", size, className: "h-11 text-danger hover:bg-danger-soft" })}
+        className={buttonClass({ variant: "ghost", size, className: "text-danger hover:bg-danger-soft" })}
       >
         {busy ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
         {withdraw ? "Withdraw" : "Delete"}

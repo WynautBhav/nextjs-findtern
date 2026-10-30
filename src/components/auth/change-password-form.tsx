@@ -15,14 +15,17 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 
+import { Label, FieldNote, controlClass, describedBy } from "@/components/intern/onboarding/fields";
+import { buttonClass } from "@/components/ui/button";
 import { csrfFetch } from "@/lib/client-fetch";
+import { cn } from "@/lib/utils";
 import { PASSWORD_HINT } from "@/lib/password-policy";
 
 /** Where to sign in again if this browser could not keep its session. */
 function loginPathFor(endpoint: string): string {
   if (endpoint.startsWith("/api/admin")) return "/admin/login";
-  if (endpoint.startsWith("/api/employer")) return "/employer/login";
-  return "/login";
+  if (endpoint.startsWith("/api/employer")) return "/login?as=employer";
+  return "/login?as=intern";
 }
 
 export function ChangePasswordForm({
@@ -84,21 +87,24 @@ export function ChangePasswordForm({
     }
   }
 
-  if (state === "done") {
-    return (
-      <p className="rounded-lg border border-brand-200 bg-brand-50 px-3.5 py-3 text-sm leading-relaxed text-brand-800">
-        Password changed. Other sessions on this account were ended.
-      </p>
-    );
-  }
+  const done = state === "done";
 
   return (
+    <>
+      {/* Mounted from the start, so the success note is announced when it fills in. */}
+      <p
+        role="status"
+        className={cn(done && "rounded-apple-sm border border-brand-200 bg-brand-50 px-3.5 py-3 text-sm leading-relaxed text-brand-800")}
+      >
+        {done ? "Password changed. Other sessions on this account were ended." : null}
+      </p>
+      {done ? null : (
     <form className="space-y-4" noValidate onSubmit={submit}>
-      {error ? (
-        <p role="alert" className="rounded-lg border border-danger/25 bg-danger-soft px-3.5 py-3 text-sm text-danger">
-          {error}
-        </p>
-      ) : null}
+      <div role="alert">
+        {error ? (
+          <p className="rounded-apple-sm border border-danger/25 bg-danger-soft px-3.5 py-3 text-sm text-danger">{error}</p>
+        ) : null}
+      </div>
 
       <Field
         id="current-password"
@@ -124,14 +130,14 @@ export function ChangePasswordForm({
         onChange={setConfirm}
         type={show ? "text" : "password"}
         autoComplete="new-password"
-        invalid={mismatched}
+        error={mismatched ? "The two passwords differ." : undefined}
       />
 
       <div className="flex flex-wrap items-center gap-3">
         <button
           type="submit"
           disabled={busy || !current || !next || mismatched}
-          className="apple-spring apple-pressable inline-flex min-h-11 items-center justify-center gap-2 rounded-[10px] bg-brand-700 px-5 text-sm font-semibold text-white hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-60"
+          className={buttonClass({ variant: "primary", size: "md", className: "text-sm font-semibold" })}
         >
           {busy ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
           Change password
@@ -139,13 +145,16 @@ export function ChangePasswordForm({
         <button
           type="button"
           onClick={() => setShow((v) => !v)}
-          className="apple-spring inline-flex min-h-11 items-center gap-1.5 px-2 text-xs font-medium text-text-subtle underline-offset-4 hover:underline"
+          aria-pressed={show}
+          className={buttonClass({ variant: "ghost", size: "sm", className: "text-sm" })}
         >
-          {show ? <EyeOff className="size-3.5" aria-hidden /> : <Eye className="size-3.5" aria-hidden />}
-          {show ? "Hide" : "Show"} passwords
+          {show ? <EyeOff className="size-4" aria-hidden /> : <Eye className="size-4" aria-hidden />}
+          Show passwords
         </button>
       </div>
     </form>
+      )}
+    </>
   );
 }
 
@@ -157,7 +166,7 @@ function Field({
   type,
   autoComplete,
   hint,
-  invalid,
+  error,
 }: {
   id: string;
   label: string;
@@ -166,13 +175,11 @@ function Field({
   type: string;
   autoComplete: string;
   hint?: string;
-  invalid?: boolean;
+  error?: string;
 }) {
   return (
     <div>
-      <label htmlFor={id} className="block text-sm font-medium text-ink-800">
-        {label}
-      </label>
+      <Label htmlFor={id}>{label}</Label>
       <input
         id={id}
         name={id}
@@ -180,11 +187,11 @@ function Field({
         autoComplete={autoComplete}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        aria-invalid={invalid || undefined}
-        className="apple-spring mt-1.5 min-h-11 w-full rounded-[10px] border border-ink-200 bg-white px-3.5 text-[14px] text-ink-900 outline-none focus-visible:border-brand-600 focus-visible:ring-[3px] focus-visible:ring-brand-600/20 aria-invalid:border-danger"
+        aria-invalid={error ? true : undefined}
+        aria-describedby={describedBy(id, error, hint)}
+        className={controlClass(error, "mt-1.5 sm:text-base")}
       />
-      {hint ? <p className="mt-1.5 text-xs text-text-subtle">{hint}</p> : null}
-      {invalid ? <p className="mt-1.5 text-xs text-danger">The two passwords differ.</p> : null}
+      <FieldNote id={id} error={error} hint={hint} />
     </div>
   );
 }

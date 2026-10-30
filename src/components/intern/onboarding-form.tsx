@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, Check, CheckCircle2, Loader2, Lock, TriangleAlert } from "lucide-react";
 
@@ -17,13 +18,6 @@ import {
 } from "@/lib/onboarding";
 import { cn } from "@/lib/utils";
 
-import { AboutStep } from "./onboarding/about-step";
-import { AcademicsStep } from "./onboarding/academics-step";
-import { ExperienceStep } from "./onboarding/experience-step";
-import { ExtracurricularStep, LanguagesStep } from "./onboarding/languages-step";
-import { LocationStep } from "./onboarding/location-step";
-import { PreviewStep } from "./onboarding/preview-step";
-import { SkillsStep } from "./onboarding/skills-step";
 import { STEPS, type StepProps, type Update } from "./onboarding/types";
 
 export { STEPS } from "./onboarding/types";
@@ -33,15 +27,18 @@ const STEP_KEY = "findtern:intern-onboarding:step";
 const SAVED_AT = "__savedAt";
 const LAST = STEPS.length - 1;
 
+// Each step loads when it is first shown, not with the form. dynamic() needs
+// its options as a literal. The fallback holds the card open so the buttons below do not jump while a chunk arrives.
+const HoldOpen = () => <div className="min-h-64" aria-hidden />;
 const STEP_VIEWS: React.ComponentType<StepProps>[] = [
-  AboutStep,
-  AcademicsStep,
-  ExperienceStep,
-  SkillsStep,
-  LanguagesStep,
-  ExtracurricularStep,
-  LocationStep,
-  PreviewStep,
+  dynamic(() => import("./onboarding/about-step").then((m) => m.AboutStep), { loading: HoldOpen }),
+  dynamic(() => import("./onboarding/academics-step").then((m) => m.AcademicsStep), { loading: HoldOpen }),
+  dynamic(() => import("./onboarding/experience-step").then((m) => m.ExperienceStep), { loading: HoldOpen }),
+  dynamic(() => import("./onboarding/skills-step").then((m) => m.SkillsStep), { loading: HoldOpen }),
+  dynamic(() => import("./onboarding/languages-step").then((m) => m.LanguagesStep), { loading: HoldOpen }),
+  dynamic(() => import("./onboarding/languages-step").then((m) => m.ExtracurricularStep), { loading: HoldOpen }),
+  dynamic(() => import("./onboarding/location-step").then((m) => m.LocationStep), { loading: HoldOpen }),
+  dynamic(() => import("./onboarding/preview-step").then((m) => m.PreviewStep), { loading: HoldOpen }),
 ];
 
 /**
@@ -134,9 +131,12 @@ export function OnboardingForm({
   useEffect(() => {
     if (!dirty) return;
     try {
-      // Bank details never go into localStorage.
-      const { bank: _bank, ...rest } = values;
+      // Bank details and identity numbers never go into localStorage (a shared
+      // lab computer would keep them); unsaved ones are typed again.
+      const { bank: _bank, aadhaarNumber: _a, panNumber: _p, ...rest } = values;
       void _bank;
+      void _a;
+      void _p;
       window.localStorage.setItem(draftKey, JSON.stringify({ ...rest, [SAVED_AT]: Date.now() }));
     } catch {
       // Quota errors in private mode are non-fatal
@@ -188,8 +188,7 @@ export function OnboardingForm({
     }
     window.requestAnimationFrame(() => {
       headingRef.current?.focus({ preventScroll: true });
-      const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-      formTop.current?.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
+      formTop.current?.scrollIntoView({ behavior: scrollBehavior(), block: "start" });
     });
   }
 
@@ -200,7 +199,7 @@ export function OnboardingForm({
       const el = document.getElementById(first);
       if (!el) return;
       el.focus({ preventScroll: true });
-      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      el.scrollIntoView({ behavior: scrollBehavior(), block: "center" });
     });
   }
 
@@ -249,6 +248,8 @@ export function OnboardingForm({
         setNotice({ text: data.error ?? "Your profile could not be saved. Try again.", ok: false });
         return;
       }
+      // Saved on the server: stop mirroring, or the refresh below writes the draft back.
+      setDirty(false);
       try {
         window.localStorage.removeItem(draftKey);
       } catch {
@@ -299,7 +300,7 @@ export function OnboardingForm({
         {/* ── Step rail (desktop) ─────────────────────────────────────── */}
         <aside className="hidden lg:block">
           <div className="sticky top-24">
-            <Progress done={doneCount} total={LAST} />
+            <Progress step={step} done={doneCount} total={LAST} />
             <StepRail step={step} passes={done} reachable={reachable} onSelect={goTo} />
           </div>
         </aside>
@@ -320,12 +321,15 @@ export function OnboardingForm({
 
           <section aria-labelledby="step-title" className="rounded-apple-xl border border-ink-200/80 bg-white shadow-xs">
             <header className="border-b border-ink-200/70 px-5 py-5 sm:px-8 sm:py-6">
-              <p className="nums text-2xs font-semibold uppercase tracking-[0.16em] text-brand-700">
-                Step {step + 1} of {STEPS.length}
-              </p>
-              <h2 id="step-title" ref={headingRef} tabIndex={-1} className="mt-1.5 text-xl font-semibold tracking-[-0.015em] text-ink-900 outline-none">
-                {STEPS[step].title}
-              </h2>
+              {/* Count sits beside the title, not above it; phones and tablets get it from MobileSteps. */}
+              <div className="flex items-baseline justify-between gap-4">
+                <h2 id="step-title" ref={headingRef} tabIndex={-1} className="text-xl font-semibold tracking-[-0.015em] text-ink-900 outline-none">
+                  {STEPS[step].title}
+                </h2>
+                <p className="nums hidden shrink-0 text-sm text-text-subtle lg:block">
+                  Step {step + 1} of {STEPS.length}
+                </p>
+              </div>
               <p className="mt-1.5 max-w-2xl text-pretty text-sm leading-relaxed text-ink-600">{STEPS[step].blurb}</p>
             </header>
 
@@ -352,66 +356,72 @@ export function OnboardingForm({
               />
             </div>
 
-            {notice ? (
-              <div className="px-5 sm:px-8">
-                <p
-                  role="status"
-                  className={cn(
-                    "mb-5 flex items-start gap-2.5 rounded-apple-md border px-4 py-3 text-sm",
-                    notice.ok ? "border-brand-200 bg-brand-50 text-brand-900" : "border-danger/30 bg-danger-soft text-ink-900",
-                  )}
-                >
-                  {notice.ok ? (
-                    <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-brand-600" aria-hidden />
-                  ) : (
-                    <TriangleAlert className="mt-0.5 size-4 shrink-0 text-danger" aria-hidden />
-                  )}
-                  <span>{notice.text}</span>
-                </p>
-              </div>
-            ) : null}
-
             {/* ── Actions ─────────────────────────────────────────────── */}
-            <footer className="flex flex-col-reverse gap-3 rounded-b-apple-xl border-t border-ink-200/70 bg-ink-50/60 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-8">
-              <div className={cn("grid gap-3 sm:flex sm:items-center", onboarded && step === LAST ? "grid-cols-1" : "grid-cols-2")}>
-                <button
-                  type="button"
-                  onClick={() => goTo(step - 1)}
-                  disabled={step === 0}
-                  className={buttonClass({ variant: "light", size: "md", className: "w-full sm:w-auto" })}
-                >
-                  <ArrowLeft className="size-4" aria-hidden />
-                  Back
-                </button>
-                {/* On the review step of a live profile the main button already saves. */}
-                {onboarded && step === LAST ? null : (
+            {/* Phones: pinned just above the tab bar (4rem + its border) so Continue and the save status stay in reach. */}
+            <footer className="rounded-b-apple-xl border-t border-ink-200/70 bg-ink-50/60 px-5 py-4 max-sm:sticky max-sm:bottom-[calc(4.0625rem+env(safe-area-inset-bottom))] max-sm:z-30 max-sm:bg-ink-50 sm:px-8">
+              {/* Mounted empty, then filled, so the message is announced. */}
+              <div role="status" className={notice ? "mb-3" : undefined}>
+                {notice ? (
+                  <p
+                    className={cn(
+                      "flex items-start gap-2.5 rounded-apple-md border px-4 py-3 text-sm",
+                      notice.ok ? "border-brand-200 bg-brand-50 text-brand-900" : "border-danger/30 bg-danger-soft text-ink-900",
+                    )}
+                  >
+                    {notice.ok ? (
+                      <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-brand-600" aria-hidden />
+                    ) : (
+                      <TriangleAlert className="mt-0.5 size-4 shrink-0 text-danger" aria-hidden />
+                    )}
+                    <span>{notice.text}</span>
+                  </p>
+                ) : null}
+              </div>
+              <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className={cn("grid gap-3 sm:flex sm:items-center", onboarded && step === LAST ? "grid-cols-1" : "grid-cols-2")}>
                   <button
                     type="button"
-                    onClick={() => void save(onboarded)}
-                    disabled={saving || submitted}
-                    className={buttonClass({ variant: "ghost", size: "md", className: "w-full sm:w-auto" })}
+                    onClick={() => goTo(step - 1)}
+                    disabled={step === 0}
+                    className={buttonClass({ variant: "light", size: "md", className: "w-full sm:w-auto" })}
                   >
-                    {saving && step !== LAST ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
-                    {onboarded ? "Save changes" : "Save draft"}
+                    <ArrowLeft className="size-4" aria-hidden />
+                    Back
+                  </button>
+                  {/* On the review step of a live profile the main button already saves. */}
+                  {onboarded && step === LAST ? null : (
+                    <button
+                      type="button"
+                      onClick={() => void save(onboarded)}
+                      disabled={saving || submitted}
+                      className={buttonClass({ variant: "ghost", size: "md", className: "w-full sm:w-auto" })}
+                    >
+                      {saving && step !== LAST ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
+                      {onboarded ? "Save changes" : "Save draft"}
+                    </button>
+                  )}
+                </div>
+                {step < LAST ? (
+                  <button
+                    type="button"
+                    onClick={onContinue}
+                    className={buttonClass({ variant: "primary", size: "md", className: "w-full sm:w-auto" })}
+                  >
+                    Continue
+                    <ArrowRight className="size-4" aria-hidden />
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => void save(true)}
+                    disabled={saving || submitted}
+                    className={buttonClass({ variant: "primary", size: "md", className: "w-full sm:w-auto" })}
+                  >
+                    {saving || submitted ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <Check className="size-4" aria-hidden />}
+                    {submitted ? "Submitted" : onboarded ? "Save changes" : "Submit profile"}
                   </button>
                 )}
               </div>
-              {step < LAST ? (
-                <button type="button" onClick={onContinue} className={buttonClass({ variant: "primary", size: "md", className: "w-full sm:w-auto" })}>
-                  Continue
-                  <ArrowRight className="size-4" aria-hidden />
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => void save(true)}
-                  disabled={saving || submitted}
-                  className={buttonClass({ variant: "primary", size: "md", className: "w-full sm:w-auto" })}
-                >
-                  {saving || submitted ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <Check className="size-4" aria-hidden />}
-                  {submitted ? "Submitted" : onboarded ? "Save changes" : "Submit profile"}
-                </button>
-              )}
             </footer>
           </section>
           <p className="mt-4 text-center text-xs text-text-subtle lg:text-left">Signed in as {email}. Your progress on this device is kept as you type.</p>
@@ -423,17 +433,17 @@ export function OnboardingForm({
 
 /* ── Progress and step rail ─────────────────────────────────────────────── */
 
-function Progress({ done, total }: { done: number; total: number }) {
+function Progress({ step, done, total }: { step: number; done: number; total: number }) {
   const pct = Math.round((done / total) * 100);
   return (
     <div className="mb-4 rounded-apple-xl border border-ink-200/80 bg-white p-4 shadow-xs">
       <div className="flex items-baseline justify-between">
         <p className="text-sm font-medium text-ink-700">Profile</p>
         <p className="nums text-sm text-ink-600">
-          <span className="font-semibold text-ink-900">{done}</span> of {total} steps
+          Step <span className="font-semibold text-ink-900">{step + 1}</span> of {STEPS.length}
         </p>
       </div>
-      <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-ink-100" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label="Steps complete">
+      <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-ink-100" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-valuetext={`${done} of ${total} steps complete`} aria-label="Steps complete">
         <div className="h-full rounded-full bg-brand-600 transition-[width] duration-300 motion-reduce:transition-none" style={{ width: `${pct}%` }} />
       </div>
     </div>
@@ -442,7 +452,20 @@ function Progress({ done, total }: { done: number; total: number }) {
 
 type RailProps = { step: number; passes: boolean[]; reachable: (i: number) => boolean; onSelect: (i: number) => void };
 
+const LOCK_NOTE = "Steps with a lock open once the steps before them are finished. Review opens when every step is.";
+
+/** The lock reason, in text: a tooltip never reaches touch or screen-reader users. */
+function LockNote({ id, show }: { id: string; show: boolean }) {
+  return show ? (
+    <p id={id} className="flex items-start gap-2 px-3 pb-2 pt-3 text-xs leading-relaxed text-ink-600">
+      <Lock className="mt-0.5 size-3 shrink-0" aria-hidden />
+      {LOCK_NOTE}
+    </p>
+  ) : null;
+}
+
 function StepRail({ step, passes, reachable, onSelect }: RailProps) {
+  const anyLocked = STEPS.some((_, i) => !reachable(i));
   return (
     <nav aria-label="Profile steps" className="rounded-apple-xl border border-ink-200/80 bg-white p-2 shadow-xs">
       <ol className="space-y-0.5">
@@ -454,10 +477,10 @@ function StepRail({ step, passes, reachable, onSelect }: RailProps) {
             <li key={s.id}>
               <button
                 type="button"
-                onClick={() => onSelect(i)}
-                disabled={!open}
+                onClick={() => open && onSelect(i)}
+                aria-disabled={!open}
+                aria-describedby={open ? undefined : "rail-lock-note"}
                 aria-current={current ? "step" : undefined}
-                title={open ? undefined : i === LAST ? "Finish every step to review" : "Finish the steps before this one first"}
                 className={cn(
                   "apple-spring flex min-h-11 w-full items-center gap-3 rounded-apple-sm px-3 text-left text-sm",
                   current ? "bg-brand-50 font-semibold text-brand-900" : open ? "text-ink-700 hover:bg-ink-50" : "cursor-not-allowed text-text-subtle",
@@ -470,6 +493,7 @@ function StepRail({ step, passes, reachable, onSelect }: RailProps) {
           );
         })}
       </ol>
+      <LockNote id="rail-lock-note" show={anyLocked} />
     </nav>
   );
 }
@@ -511,38 +535,47 @@ function MobileSteps({ step, passes, reachable, onSelect }: RailProps) {
         <span className="font-medium text-brand-700">{open ? "Hide steps" : "All steps"}</span>
       </button>
       {open ? (
-        <ol id="mobile-steps" className="mt-1 space-y-0.5 rounded-apple-xl border border-ink-200/80 bg-white p-2 shadow-xs">
-          {STEPS.map((s, i) => {
-            const current = i === step;
-            const can = reachable(i);
-            return (
-              <li key={s.id}>
-                <button
-                  type="button"
-                  disabled={!can}
-                  aria-current={current ? "step" : undefined}
-                  onClick={() => {
-                    setOpen(false);
-                    onSelect(i);
-                  }}
-                  className={cn(
-                    "apple-spring flex min-h-11 w-full items-center gap-3 rounded-apple-sm px-3 text-left text-sm",
-                    current ? "bg-brand-50 font-semibold text-brand-900" : can ? "text-ink-700 hover:bg-ink-50" : "text-text-subtle",
-                  )}
-                >
-                  <StepDot index={i} current={current} done={passes[i] && i !== LAST} open={can} />
-                  {s.title}
-                </button>
-              </li>
-            );
-          })}
-        </ol>
+        <div id="mobile-steps" className="mt-1 rounded-apple-xl border border-ink-200/80 bg-white p-2 shadow-xs">
+          <ol className="space-y-0.5">
+            {STEPS.map((s, i) => {
+              const current = i === step;
+              const can = reachable(i);
+              return (
+                <li key={s.id}>
+                  <button
+                    type="button"
+                    aria-disabled={!can}
+                    aria-describedby={can ? undefined : "mobile-lock-note"}
+                    aria-current={current ? "step" : undefined}
+                    onClick={() => {
+                      if (!can) return;
+                      setOpen(false);
+                      onSelect(i);
+                    }}
+                    className={cn(
+                      "apple-spring flex min-h-11 w-full items-center gap-3 rounded-apple-sm px-3 text-left text-sm",
+                      current ? "bg-brand-50 font-semibold text-brand-900" : can ? "text-ink-700 hover:bg-ink-50" : "cursor-not-allowed text-text-subtle",
+                    )}
+                  >
+                    <StepDot index={i} current={current} done={passes[i] && i !== LAST} open={can} />
+                    {s.title}
+                  </button>
+                </li>
+              );
+            })}
+          </ol>
+          <LockNote id="mobile-lock-note" show={STEPS.some((_, i) => !reachable(i))} />
+        </div>
       ) : null}
     </div>
   );
 }
 
 /* ── Local draft ────────────────────────────────────────────────────────── */
+
+function scrollBehavior(): ScrollBehavior {
+  return window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
+}
 
 function subscribeToNothing() {
   return () => {};

@@ -2,20 +2,21 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { eq } from "drizzle-orm";
-import { AlertCircle, ArrowLeft, Building2, Download, Phone, User } from "lucide-react";
+import { AlertCircle, ArrowLeft, Download, Phone, User } from "lucide-react";
 
 import { DetailRow, PageHead, Pill, SectionHead, Surface } from "@/components/app/primitives";
+import { ScoreScale, STAT_ROW, StatTile } from "@/components/app/tiles";
 import { OfferDecision } from "@/components/app/offer-decision";
 import { proposalStatus } from "@/components/app/status";
-import { ScoreBar } from "@/components/app/score-bar";
 import { ImportantInstructions } from "@/components/intern/offer/important-instructions";
 import { declinesUsedBy, modeLabel, offerFacts } from "@/components/intern/offer/offer-facts";
 import { ButtonAnchor, ButtonLink, buttonClass } from "@/components/ui/button";
 import { requireRole } from "@/lib/auth";
+import { cn } from "@/lib/utils";
 import { canAccess } from "@/lib/security/guards";
 import { getDb, hasDb, schema } from "@/lib/db";
 import { loadInternData } from "@/lib/intern-data";
-import { formatJoiningDate } from "@/lib/format";
+import { formatJoiningDate, shortDate } from "@/lib/format";
 import { canDecide, hybridSplit, shiftInIst } from "@/lib/intern-offer-view";
 import { toArray } from "@/lib/journey";
 import { sanitizeRichText } from "@/lib/richtext";
@@ -115,15 +116,16 @@ export default async function ProposalDetail({ params }: { params: Promise<{ id:
   const projectSkills = toArray<string>(project.row?.skills).map((s) => String(s).trim()).filter(Boolean);
   const skills = projectSkills.length > 0 ? projectSkills : toArray<string>(proposal.skills).map((s) => String(s).trim()).filter(Boolean);
 
-  // The intern's current ratings, with the Findtern Score as "Overall" so it
-  // matches the stipend rule; the proposal's snapshot fills any gaps.
-  const current = (extra.ratings ?? {}) as Record<string, unknown>;
+  // The ratings the company saw: the snapshot stored on the proposal when it
+  // was sent. Older rows without one fall back to the current ratings (with
+  // the Findtern Score as "Overall"), and the heading then says so.
   const snapshot = (proposal.aiRatings ?? {}) as Record<string, unknown>;
-  const rating = (key: string) => {
-    const v = key === "overall" && score > 0 ? score : (current[key] ?? snapshot[key]);
-    return typeof v === "number" && Number.isFinite(v) ? v : 0;
-  };
-  const ratingRows: [string, number][] = [
+  const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : null);
+  const fromSnapshot = ["communication", "coding", "aptitude", "overall"].some((k) => num(snapshot[k]) !== null);
+  const current = (extra.ratings ?? {}) as Record<string, unknown>;
+  const rating = (key: string) =>
+    fromSnapshot ? num(snapshot[key]) : num(key === "overall" && score > 0 ? score : current[key]);
+  const ratingRows: [string, number | null][] = [
     ["Communication", rating("communication")],
     ["Coding", rating("coding")],
     ["Aptitude", rating("aptitude")],
@@ -134,6 +136,8 @@ export default async function ProposalDetail({ params }: { params: Promise<{ id:
   const jdHtml = jd && /<[^>]+>/.test(jd) ? sanitizeRichText(jd) : "";
   const scope = (project.row?.scopeOfWork ?? "").trim();
   const joining = formatJoiningDate(offer.startDate);
+  const startsOn = offer.startDate && !Number.isNaN(new Date(offer.startDate).getTime()) ? new Date(offer.startDate) : null;
+  const durationParts = /^(\d+)\s+(.+)$/.exec(String(facts.duration ?? ""));
 
   return (
     <div>
@@ -146,7 +150,6 @@ export default async function ProposalDetail({ params }: { params: Promise<{ id:
       </Link>
 
       <PageHead
-        eyebrow={fullTime ? "Full-time offer" : "Internship offer"}
         title={facts.role}
         lede={
           <>
@@ -157,40 +160,46 @@ export default async function ProposalDetail({ params }: { params: Promise<{ id:
         action={
           <div className="flex flex-wrap gap-2">
             <Pill tone={status.tone}>{status.label}</Pill>
-            {fullTime ? <Pill tone="neutral">Full-time role</Pill> : null}
+            <Pill tone="neutral">{fullTime ? "Full-time role" : "Internship"}</Pill>
             {facts.edited ? <Pill tone="new">Updated</Pill> : null}
           </div>
         }
       />
 
+      {/* The terms that decide an offer, as key numbers; the money is the brand tile. */}
+      <div className={cn(STAT_ROW, "mb-6 lg:mb-8")}>
+        {[
+          { label: fullTime ? "Annual CTC" : "Monthly stipend", value: facts.amount, unit: facts.per ? facts.per.replace(/^\/\s*/, "/") : undefined },
+          // A value and a smaller unit, so a 2-up tile on a phone never clips ("11 Oct" + "2026").
+          startsOn
+            ? { label: "Joining date", value: shortDate(startsOn, { day: "numeric", month: "short", timeZone: "Asia/Kolkata" }), unit: shortDate(startsOn, { year: "numeric", timeZone: "Asia/Kolkata" }) }
+            : { label: "Joining date", value: joining },
+          fullTime
+            ? { label: "Job mode", value: modeLabel(facts.mode) }
+            : durationParts
+              ? { label: "Duration", value: durationParts[1], unit: durationParts[2] }
+              : { label: "Duration", value: facts.duration },
+          { label: fullTime ? "Location" : "Work mode", value: fullTime ? facts.location : modeLabel(facts.mode) },
+        ].map((s, i) => (
+          <StatTile key={s.label} {...s} featured={i === 0} index={i} />
+        ))}
+      </div>
+
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
         {/* ── The decision (focal point; first on a phone) ─────────── */}
         <aside className="lg:sticky lg:top-24 lg:order-2">
-          <Surface className="p-6">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-700">
+          <Surface className="p-5 lg:p-6">
+            <h2 className="text-lg font-semibold tracking-[-0.01em] text-ink-900">
               {open ? "Your decision" : "Where this stands"}
-            </p>
-            <p className="mt-4 text-sm text-ink-600">{fullTime ? "Annual CTC" : "Your monthly stipend"}</p>
-            <p className="mt-1 flex flex-wrap items-baseline gap-x-1.5 text-ink-900">
-              <span className="nums text-3xl font-semibold leading-tight tracking-[-0.02em]">{facts.amount}</span>
-              {facts.per ? <span className="text-base font-medium text-ink-600">{facts.per}</span> : null}
-            </p>
-            <dl className="mt-4 divide-y divide-ink-200/80 border-y border-ink-200/80">
-              <DetailRow label="Joining date" value={joining} />
-              {fullTime ? (
-                <DetailRow label="Job mode" value={modeLabel(facts.mode)} />
-              ) : (
-                <DetailRow label="Duration" value={facts.duration} />
-              )}
-            </dl>
+            </h2>
 
             {facts.edited && open ? (
-              <p className="mt-4 rounded-apple-sm bg-info-soft px-3.5 py-3 text-sm leading-relaxed text-info">
+              <p className="mt-4 rounded-apple-sm bg-info-soft px-4 py-3 text-sm leading-relaxed text-info">
                 The company changed this offer after sending it. Read it again before you answer.
               </p>
             ) : null}
 
-            <div className="mt-5">
+            <div className="mt-4">
               {open ? (
                 <OfferDecision
                   proposalId={proposal.id}
@@ -219,7 +228,7 @@ export default async function ProposalDetail({ params }: { params: Promise<{ id:
         {/* ── The terms ────────────────────────────────────────────── */}
         <div className="min-w-0 space-y-6">
           {ft ? (
-            <Surface className="p-6">
+            <Surface className="p-5 lg:p-6">
               <SectionHead
                 title="Job details"
                 hint="Shared by the company as part of this full-time offer."
@@ -228,27 +237,23 @@ export default async function ProposalDetail({ params }: { params: Promise<{ id:
                     <ButtonAnchor href={`/api/proposals/${proposal.id}/offer-letter`} target="_blank" rel="noreferrer" variant="outline" size="sm" className="min-h-11">
                       <Download className="size-4" aria-hidden />
                       Offer letter
+                      <span className="sr-only"> (opens in a new tab)</span>
                     </ButtonAnchor>
                   ) : null
                 }
               />
               <dl className="divide-y divide-ink-200/80">
-                <DetailRow label="Job title" value={facts.role} />
-                <DetailRow label="Job mode" value={modeLabel(facts.mode)} />
-                <DetailRow label="Location" value={facts.location} />
-                <DetailRow label="Joining date" value={joining} />
+                {/* Title, mode, location, joining date and CTC are the heading and the tiles above. */}
                 <DetailRow label="Shift (IST)" value={shift ?? "Not specified"} />
                 <DetailRow label="Company timezone" value={timezone} />
-                <DetailRow label="Annual CTC" mono value={<span className="font-semibold">{facts.money}</span>} />
               </dl>
             </Surface>
           ) : (
-            <Surface className="p-6">
+            <Surface className="p-5 lg:p-6">
               <SectionHead title="Internship details" />
               <dl className="divide-y divide-ink-200/80">
-                <DetailRow label="Joining date" value={joining} />
-                <DetailRow label="Duration" value={facts.duration} />
-                {/* Rows the company left empty are left out, not "Not specified". */}
+                {/* Joining date, duration and work mode are the tiles above.
+                    Rows the company left empty are left out, not "Not specified". */}
                 {rawSchedule ? <DetailRow label="Weekly schedule" value={WEEKLY_SCHEDULES[offer.weeklySchedule].label} /> : null}
                 {shift ? <DetailRow label="Shift timings (IST)" value={shift} /> : null}
                 <DetailRow
@@ -257,39 +262,26 @@ export default async function ProposalDetail({ params }: { params: Promise<{ id:
                   mono
                 />
                 <DetailRow label="Paid leave" value={offer.paidLeavesPerMonth > 0 ? `${offer.paidLeavesPerMonth} ${offer.paidLeavesPerMonth === 1 ? "day" : "days"} a month` : "None"} mono />
-                <DetailRow label="Work mode" value={modeLabel(facts.mode)} />
                 {split ? (
                   <DetailRow label="Hybrid schedule" value={`WFO ${split.office} days · WFH ${split.home} days a week`} />
                 ) : null}
                 <DetailRow label="Location" value={facts.location} />
                 <DetailRow label="Laptop" value={laptopLabel(offer.laptop)} />
-                <DetailRow label="Monthly stipend" mono value={<span className="font-semibold">{facts.money}</span>} />
               </dl>
-              <p className="mt-3 text-pretty text-sm leading-relaxed text-ink-600">
-                Your stipend is paid through Findtern as per the agreed terms.
-              </p>
             </Surface>
           )}
 
           {/* ── Company ──────────────────────────────────────────── */}
-          <Surface className="p-6">
-            <div className="flex items-center gap-3">
-              <span className="grid size-10 shrink-0 place-items-center rounded-apple-sm bg-accent-100 text-accent-700" aria-hidden>
-                <Building2 className="size-5" />
-              </span>
-              <div className="min-w-0">
-                <h2 className="text-base font-semibold tracking-[-0.01em] text-ink-900">Company details</h2>
-                <p className="mt-0.5 text-sm text-ink-600">{facts.company ?? "Hidden until hire"}</p>
-              </div>
-            </div>
+          <Surface className="p-5 lg:p-6">
+            <SectionHead title="Company details" hint={facts.company ?? "Hidden until hire"} />
             {!employer.ok ? (
-              <p className="mt-4 flex items-start gap-2 text-sm text-danger">
+              <p className="flex items-start gap-2 text-sm text-danger">
                 <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden />
                 We couldn&apos;t load the company details. Refresh to try again.
               </p>
             ) : (
               <>
-                <dl className="mt-3 divide-y divide-ink-200/80">
+                <dl className="divide-y divide-ink-200/80">
                   <DetailRow
                     label="Reporting manager"
                     value={revealed && employer.row?.primaryContactName ? employer.row.primaryContactName : <Locked icon="user" />}
@@ -303,7 +295,7 @@ export default async function ProposalDetail({ params }: { params: Promise<{ id:
           </Surface>
 
           {/* ── Roles & responsibilities ─────────────────────────── */}
-          <Surface className="p-6">
+          <Surface className="p-5 lg:p-6">
             <SectionHead title="Roles and responsibilities" />
             {!project.ok && !jd ? (
               <p className="flex items-start gap-2 text-sm text-danger">
@@ -311,9 +303,9 @@ export default async function ProposalDetail({ params }: { params: Promise<{ id:
                 We couldn&apos;t load the role description. Refresh to try again.
               </p>
             ) : jdHtml ? (
-              <div className="prose-rt break-words text-[0.9375rem] leading-relaxed text-ink-700 [overflow-wrap:anywhere]" dangerouslySetInnerHTML={{ __html: jdHtml }} />
+              <div className="prose-rt break-words text-base leading-relaxed text-ink-700 [overflow-wrap:anywhere]" dangerouslySetInnerHTML={{ __html: jdHtml }} />
             ) : jd || scope ? (
-              <p className="whitespace-pre-line text-pretty text-[0.9375rem] leading-relaxed text-ink-700 [overflow-wrap:anywhere]">{jd || scope}</p>
+              <p className="whitespace-pre-line text-pretty text-base leading-relaxed text-ink-700 [overflow-wrap:anywhere]">{jd || scope}</p>
             ) : (
               <p className="text-sm leading-relaxed text-ink-600">The company did not add a description to this offer.</p>
             )}
@@ -321,53 +313,32 @@ export default async function ProposalDetail({ params }: { params: Promise<{ id:
 
           {!fullTime ? (
             <>
-              <div className="grid gap-6 md:grid-cols-2">
-                <Surface className="p-6">
-                  {/* The snapshot this offer was made on (QA-004 keeps it here). */}
-                  <SectionHead title="Ratings when the offer was made" />
-                  <ul className="space-y-3">
-                    {ratingRows.map(([label, value]) => (
-                      <li key={label}>
-                        <div className="flex items-baseline justify-between gap-3">
-                          <span className="text-sm text-ink-600">{label}</span>
-                          <span className="nums text-sm font-semibold text-brand-700">{value}/10</span>
-                        </div>
-                        <ScoreBar value={value} />
+              <Surface className="p-5 lg:p-6">
+                <SectionHead title="Required key skills" />
+                {skills.length > 0 ? (
+                  <ul className="flex flex-wrap gap-2">
+                    {skills.map((skill) => (
+                      <li key={skill}>
+                        <Pill tone="neutral">{skill}</Pill>
                       </li>
                     ))}
                   </ul>
-                </Surface>
+                ) : !project.ok ? (
+                  <p className="text-sm text-danger">We couldn&apos;t load the skills. Refresh to try again.</p>
+                ) : (
+                  <p className="text-sm text-ink-600">No skills highlighted in this offer.</p>
+                )}
+              </Surface>
 
-                <Surface className="p-6">
-                  <SectionHead title="Required key skills" />
-                  {skills.length > 0 ? (
-                    <ul className="flex flex-wrap gap-1.5">
-                      {skills.map((skill) => (
-                        <li key={skill} className="rounded-full bg-ink-100 px-2.5 py-1 text-xs font-medium text-ink-700">
-                          {skill}
-                        </li>
-                      ))}
-                    </ul>
-                  ) : !project.ok ? (
-                    <p className="text-sm text-danger">We couldn&apos;t load the skills. Refresh to try again.</p>
-                  ) : (
-                    <p className="text-sm text-ink-600">No skills highlighted in this offer.</p>
-                  )}
-                </Surface>
-              </div>
+              <Surface className="p-5 lg:p-6">
+                {/* The snapshot this offer was made on (QA-004 keeps it here). */}
+                <SectionHead title={fromSnapshot ? "Your ratings when this was sent" : "Your ratings now"} />
+                <ScoreScale rows={ratingRows.map(([label, value]) => ({ label, value }))} />
+              </Surface>
 
               {/* In full while the offer waits on an answer; afterwards folded,
                   not a 1,000px wall above a running internship. */}
-              {open ? (
-                <ImportantInstructions />
-              ) : (
-                <details className="rounded-apple-lg border border-ink-200/80 bg-white px-5 py-4">
-                  <summary className="cursor-pointer text-sm font-medium text-ink-800">The rules you agreed to</summary>
-                  <div className="mt-4">
-                    <ImportantInstructions />
-                  </div>
-                </details>
-              )}
+              <ImportantInstructions folded={!open} />
             </>
           ) : null}
         </div>

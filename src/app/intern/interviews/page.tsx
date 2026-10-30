@@ -1,22 +1,19 @@
 import type { Metadata } from "next";
-import { ArrowRight, CalendarClock } from "lucide-react";
-import { eq } from "drizzle-orm";
+import Link from "next/link";
 
 import { EmptyScene, PageHead, Pill, SectionHead, Surface, type Tone } from "@/components/app/primitives";
 import { SlotPicker } from "@/components/app/slot-picker";
-import { AiFeedbackReport } from "@/components/employer/ai-feedback-report";
 import { AiInterviewJoinCard } from "@/components/intern/ai-interview-join-card";
 import { isScored } from "@/lib/ai-interview";
 import { AiInterviewButton } from "@/components/intern/activation-card";
-import { ButtonLink } from "@/components/ui/button";
+import { AgendaRow } from "@/components/intern/interviews/agenda";
+import { ScoreReport } from "@/components/intern/interviews/score-report";
 import { aiInterviewLinks } from "@/lib/ai-interview-links";
 import { requireRole } from "@/lib/auth";
-import { getDb, schema } from "@/lib/db";
 import { isMeetingLinkLive, isStaleInterview } from "@/lib/employer-interview-rules";
 import { formatIst } from "@/lib/format";
 import { HIDDEN_COMPANY, loadInternData, projectNames } from "@/lib/intern-data";
 import { isPast, slotOf, type InterviewRow } from "@/lib/journey";
-import { readSkillRatings } from "@/lib/onboarding";
 import { isInternPaid } from "@/lib/payments";
 
 export const metadata: Metadata = {
@@ -25,26 +22,16 @@ export const metadata: Metadata = {
 };
 
 /**
- * The AI interview and its report first (it is Findtern's, and labelled
- * "AI Interview", never "Hidden company": bug sheet 7, S1 r63), then company
- * rounds: the ones to pick a time for or join, then past ones. Every time an
- * intern reads here is in India time, labelled IST (INW-09, S2 r7).
+ * Template: list, ordered by state. Whatever needs the intern comes first
+ * (the AI interview's own step, company rounds to pick a time for or join),
+ * then the Findtern Score (ring + radar), then past rounds. The AI interview
+ * is Findtern's, labelled "AI Interview", never "Hidden company" (bug sheet 7,
+ * S1 r63). Every time here is India time, labelled IST (INW-09, S2 r7).
  */
 export default async function InternInterviews() {
   const session = await requireRole("intern");
 
-  const db = getDb();
-  const [[user], data, paid] = await Promise.all([
-    db
-      .select({ firstName: schema.users.firstName, lastName: schema.users.lastName })
-      .from(schema.users)
-      .where(eq(schema.users.id, session.uid))
-      .limit(1),
-    loadInternData(session.uid),
-    isInternPaid(session.uid),
-  ]);
-
-  const candidateName = user ? `${user.firstName || ""} ${user.lastName || ""}`.trim() || "Candidate" : "Candidate";
+  const [data, paid] = await Promise.all([loadInternData(session.uid), isInternPaid(session.uid)]);
 
   // The AI interview is the row owned by Findtern's AI interviewer (newest
   // first); everything else is a company round.
@@ -65,7 +52,6 @@ export default async function InternInterviews() {
   const extra = (data.onboarding?.extraData ?? {}) as Record<string, unknown>;
   const findternScore = Number(extra.findternScore ?? 0);
   const ratings = (extra.ratings ?? {}) as { communication?: number; coding?: number; aptitude?: number; interview?: number };
-  const skills = readSkillRatings(data.onboarding?.skills, extra).map((s) => s.name);
   // Legacy admin kept these on the AI interview row's notes only.
   const { feedbackLink: aiFeedbackLink, recordingLink: aiRecordingLink } = await aiInterviewLinks(session.uid, extra);
 
@@ -75,173 +61,162 @@ export default async function InternInterviews() {
   };
   const titleOf = (i: InterviewRow) => (i.projectId && projects[i.projectId]) || "Company interview";
 
-  return (
-    <div className="space-y-10">
-      <PageHead
-        title="Interviews"
-        lede="Your AI interview and Findtern Score, and the interview rounds companies book with you. Times are in India time (IST)."
-      />
+  const scored = findternScore > 0 || Object.values(ratings).some((v) => Number(v) > 0);
+  // Once the score is on the page, the AI card would only repeat it.
+  const showAiCard = Boolean(aiInterview) && !(scored && isScored(extra));
+  const slotsOf = (i: InterviewRow) =>
+    [i.slot1, i.slot2, i.slot3].flatMap((d, n) =>
+      // Keep each slot's column number (1..3): select-slot reads by position,
+      // so an empty slot 1 must not renumber slot 2.
+      d instanceof Date ? [{ index: n + 1, iso: d.toISOString(), passed: isPast(d) }] : [],
+    );
 
-      {/* ── AI interview ───────────────────────────────────────────── */}
+  const agenda =
+    upcoming.length > 0 ? (
       <section className="space-y-4">
-        <SectionHead title="AI Interview" hint="Findtern's own interview. It produces the score companies see." />
-
-        {!aiInterview && !(findternScore > 0) ? (
-          <Surface className="p-6">
-            <h3 className="text-base font-semibold tracking-[-0.01em] text-ink-900">Your AI interview</h3>
-            {paid ? (
-              <>
-                <p className="mt-1 text-sm leading-relaxed text-ink-600">
-                  Request it here. The joining link arrives in your notifications, usually within two working days.
-                </p>
-                <AiInterviewButton internId={session.uid} />
-              </>
-            ) : (
-              <>
-                <p className="mt-1 text-sm leading-relaxed text-ink-600">
-                  The AI interview opens once the one-time activation is paid. It produces your Findtern Score.
-                </p>
-                <ButtonLink href="/intern/dashboard" variant="primary" className="mt-4 text-sm font-semibold">
-                  Go to activation
-                  <ArrowRight className="size-4" aria-hidden />
-                </ButtonLink>
-              </>
-            )}
-          </Surface>
-        ) : null}
-
-        {aiInterview ? (
-          <AiInterviewJoinCard
-            interviewId={aiInterview.id}
-            status={aiInterview.status}
-            meetingLink={aiInterview.meetingLink}
-            internId={session.uid}
-            scored={isScored(extra)}
-            updatedAt={toIso((aiInterview as InterviewRow & { updatedAt?: Date | null }).updatedAt)}
-          />
-        ) : null}
-
-        <AiFeedbackReport
-          candidateName={candidateName}
-          findternScore={findternScore}
-          ratings={{
-            communication: ratings.communication,
-            coding: ratings.coding,
-            aptitude: ratings.aptitude,
-            interview: ratings.interview,
-          }}
-          skills={skills}
-          bio={data.onboarding?.bio}
-          aiFeedbackLink={aiFeedbackLink}
-          aiRecordingLink={aiRecordingLink}
+        <SectionHead
+          title="Company interviews"
+          action={
+            <Link href="/intern/record" className="text-sm font-medium text-primary underline-offset-4 hover:underline touch:inline-flex touch:min-h-11 touch:items-center">
+              What companies see
+            </Link>
+          }
         />
+        <Surface as="ul" className="divide-y divide-ink-100">
+          {upcoming.map((i) => {
+            const slots = slotsOf(i);
+            const booked = Boolean(i.selectedSlot);
+            const when = booked ? slotOf(i) : null;
+            return (
+              <AgendaRow
+                key={i.id}
+                iso={when ? when.toISOString() : null}
+                title={titleOf(i)}
+                company={companyLine(i)}
+                status={booked ? <Pill tone="live">Booked</Pill> : slots.length > 0 ? <Pill tone="waiting">Pick a time</Pill> : <Pill tone="neutral">Times to follow</Pill>}
+              >
+                {slots.length > 0 ? (
+                  <SlotPicker
+                    interviewId={i.id}
+                    slots={slots}
+                    timezone={i.timezone}
+                    chosen={i.selectedSlot}
+                    meetUrl={isMeetingLinkLive(i) ? i.meetingLink : null}
+                  />
+                ) : (
+                  <p className="text-pretty text-sm text-text-subtle">
+                    The company has not sent its times yet. They appear here as soon as they are set.
+                  </p>
+                )}
+              </AgendaRow>
+            );
+          })}
+        </Surface>
       </section>
+    ) : null;
 
-      {/* ── Company rounds ─────────────────────────────────────────── */}
-      <section className="space-y-4">
-        <SectionHead title="Company interviews" hint="Pick a time when a company invites you. Join from here when it is time." />
+  return (
+    <div className="space-y-6 lg:space-y-8">
+      <PageHead title="Interviews" lede="Your Findtern Score and the rounds companies book with you. Every time here is India time (IST)." />
 
-        {upcoming.length === 0 ? (
-          // Someone already working needs one line, not a scene pointing at open roles.
-          data.stage === "working" ? (
-            <p className="text-sm text-ink-600">No company interviews. You are working on a placement.</p>
-          ) : (
-            <EmptyScene
-              title="No company interviews right now"
-              body="When a company wants to talk before sending an offer, it sends up to three times here. You pick one, in India time, and join from this page."
-              who="Companies invite you"
-              next={{ label: "Look at open roles", href: "/intern/opportunities" }}
-            />
-          )
+      {/* What needs you comes first: the AI interview's own step, then company rounds to pick or join. */}
+      {showAiCard && aiInterview ? (
+        <AiInterviewJoinCard
+          interviewId={aiInterview.id}
+          status={aiInterview.status}
+          meetingLink={aiInterview.meetingLink}
+          internId={session.uid}
+          scored={isScored(extra)}
+          updatedAt={toIso((aiInterview as InterviewRow & { updatedAt?: Date | null }).updatedAt)}
+        />
+      ) : null}
+
+      {!aiInterview && !scored ? (
+        paid ? (
+          <Surface as="section" aria-labelledby="ai-apply" className="p-5 lg:p-6">
+            <h2 id="ai-apply" className="text-lg font-semibold tracking-[-0.01em] text-ink-900">
+              Your AI interview
+            </h2>
+            <p className="mt-1 max-w-xl text-pretty text-sm text-text-subtle">
+              It produces your Findtern Score, the number companies shortlist on. Company interviews follow from there.
+            </p>
+            <div className="mt-4">
+              <AiInterviewButton internId={session.uid} />
+            </div>
+          </Surface>
+        ) : upcoming.length === 0 && past.length === 0 ? (
+          // One honest empty state for a new intern, not one per section.
+          <EmptyScene
+            as="h2"
+            title="Your interviews start with the AI interview"
+            body="It opens once the one-time activation is done and produces your Findtern Score. When a company wants to meet you after that, it sends three times here and you pick one."
+            next={{ label: "Go to activation", href: "/intern/dashboard" }}
+          />
         ) : (
-          <ul className="space-y-4">
-            {upcoming.map((i) => {
-              const slots = [i.slot1, i.slot2, i.slot3].flatMap((d, n) =>
-                // Keep each slot's column number (1..3): select-slot reads by
-                // position, so an empty slot 1 must not renumber slot 2.
-                d instanceof Date ? [{ index: n + 1, iso: d.toISOString(), passed: isPast(d) }] : [],
-              );
-              const booked = Boolean(i.selectedSlot);
+          <p className="text-pretty text-sm text-text-subtle">
+            Your AI interview opens once the one-time activation is done.{" "}
+            <Link href="/intern/dashboard" className="font-medium text-primary underline-offset-4 hover:underline">
+              Go to activation
+            </Link>
+          </p>
+        )
+      ) : null}
+
+      {agenda}
+
+      {scored ? (
+        <ScoreReport findternScore={findternScore} ratings={ratings} feedbackLink={aiFeedbackLink} recordingLink={aiRecordingLink} />
+      ) : null}
+
+      {scored && upcoming.length === 0 && past.length === 0 ? (
+        data.stage === "working" ? (
+          <p className="text-pretty text-sm text-text-subtle">
+            No company interviews. You are working on a placement, so companies are not booking rounds with you.
+          </p>
+        ) : (
+          <EmptyScene
+            as="h2"
+            title="No company interviews yet"
+            body="When a company wants to talk before sending an offer, it sends up to three times here. You pick one and join from this page."
+            who="Companies invite you"
+            next={{ label: "Look at open roles", href: "/intern/opportunities" }}
+          />
+        )
+      ) : null}
+
+      {past.length > 0 ? (
+        <section className="space-y-4">
+          <SectionHead title={`Past interviews · ${past.length}`} />
+          {/* A finished round is read, not acted on: muted date blocks, outcome, feedback. */}
+          <Surface as="ul" className="divide-y divide-ink-100">
+            {past.map((i) => {
+              const outcome = pastOutcome(i);
+              const feedback = feedbackText(i.notes);
+              const when = i.selectedSlot ? slotOf(i) : null;
               return (
-                <li key={i.id}>
-                  <Surface as="article" className="p-5 sm:p-6">
-                    <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <h3 className="text-pretty text-base font-semibold tracking-[-0.01em] text-ink-900">{titleOf(i)}</h3>
-                        <p className="mt-0.5 text-sm text-ink-600">{companyLine(i)}</p>
-                      </div>
-                      {booked ? <Pill tone="live">Booked</Pill> : slots.length > 0 ? <Pill tone="waiting">Pick a time</Pill> : <Pill tone="neutral">Times to follow</Pill>}
+                <AgendaRow
+                  key={i.id}
+                  past
+                  iso={when ? when.toISOString() : null}
+                  title={titleOf(i)}
+                  company={companyLine(i)}
+                  status={<Pill tone={outcome.tone}>{outcome.label}</Pill>}
+                >
+                  {when ? <p className="nums text-sm text-ink-700">{formatIst(when, { year: true })}</p> : null}
+                  {outcome.label === "Interview done" && feedback ? (
+                    <div className="mt-2 rounded-apple-md bg-brand-50/70 p-4">
+                      <p className="text-xs font-medium text-brand-800">Feedback from the company</p>
+                      <p className="mt-1 text-pretty text-sm text-ink-800">{feedback}</p>
                     </div>
-                    {slots.length > 0 ? (
-                      <SlotPicker
-                        interviewId={i.id}
-                        slots={slots}
-                        timezone={i.timezone}
-                        chosen={i.selectedSlot}
-                        meetUrl={isMeetingLinkLive(i) ? i.meetingLink : null}
-                      />
-                    ) : (
-                      <p className="text-pretty text-sm leading-relaxed text-ink-600">
-                        The company has not sent its times yet. Nothing to do now; they appear here as soon as they are set.
-                      </p>
-                    )}
-                  </Surface>
-                </li>
+                  ) : (
+                    <p className="mt-1 text-pretty text-sm text-text-subtle">{outcome.detail}</p>
+                  )}
+                </AgendaRow>
               );
             })}
-          </ul>
-        )}
-
-        {past.length > 0 ? (
-          <div className="pt-4">
-            <SectionHead title={`Past interviews · ${past.length}`} />
-            <ul className="space-y-3">
-              {past.map((i) => {
-                const outcome = pastOutcome(i);
-                const feedback = feedbackText(i.notes);
-                return (
-                  <li key={i.id}>
-                    <Surface as="article" className="p-5">
-                      <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <h3 className="text-pretty text-sm font-semibold text-ink-900">{titleOf(i)}</h3>
-                          <p className="mt-0.5 text-sm text-ink-600">{companyLine(i)}</p>
-                        </div>
-                        <Pill tone={outcome.tone}>{outcome.label}</Pill>
-                      </div>
-                      <p className="nums mt-3 flex items-center gap-1.5 text-sm text-ink-700">
-                        <CalendarClock className="size-4 text-text-subtle" aria-hidden />
-                        {i.selectedSlot || outcome.label !== "Expired" ? formatIst(slotOf(i) ?? i.createdAt, { year: true }) : "No time was picked"}
-                      </p>
-                      {outcome.label === "Interview done" && feedback ? (
-                        <div className="mt-3 rounded-apple-lg bg-brand-50/70 p-4 ring-1 ring-inset ring-brand-200/70">
-                          <p className="text-xs font-semibold text-brand-800">Feedback from the company</p>
-                          <p className="mt-1 text-pretty text-sm leading-relaxed text-ink-800">{feedback}</p>
-                        </div>
-                      ) : (
-                        <p className="mt-2 text-pretty text-sm leading-relaxed text-ink-600">{outcome.detail}</p>
-                      )}
-                    </Surface>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        ) : null}
-      </section>
-
-      <Surface className="flex flex-col items-start gap-4 p-6 sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-w-0">
-          <h2 className="text-base font-semibold tracking-[-0.01em] text-ink-900">Preparing for a company interview</h2>
-          <p className="mt-1 max-w-xl text-pretty text-sm leading-relaxed text-ink-600">
-            Companies see your AI interview scores before they meet you. Look over your record so you know what they have seen.
-          </p>
-        </div>
-        <ButtonLink href="/intern/record" variant="outline" className="text-sm">
-          Your verified record
-          <ArrowRight className="size-4" aria-hidden />
-        </ButtonLink>
-      </Surface>
+          </Surface>
+        </section>
+      ) : null}
     </div>
   );
 }

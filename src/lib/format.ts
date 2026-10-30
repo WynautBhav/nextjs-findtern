@@ -216,6 +216,11 @@ export function formatDayLabel(value: Date | string | null, now: Date = new Date
   return date.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }).replace(/\bSept\b/, "Sep");
 }
 
+/** DD/MM/YYYY in India time: the one numeric date format (bug sheet 7, NC r24; SPECS §5). */
+export function formatDmy(value: Date | string): string {
+  return new Date(value).toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "Asia/Kolkata" });
+}
+
 /**
  * A joining date, always absolute ("24 Oct 2026") so it can be planned around,
  * with the relative hint while it is close: "24 Oct 2026 · in 5 days".
@@ -224,8 +229,7 @@ export function formatJoiningDate(value: Date | string | null, now: Date = new D
   if (!value) return "To be agreed";
   const date = typeof value === "string" ? new Date(value) : value;
   if (Number.isNaN(date.getTime())) return "To be agreed";
-  // DD/MM/YYYY (bug sheet 7, NC r24); en-IN's "Sept" read oddly.
-  const absolute = date.toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "Asia/Kolkata" });
+  const absolute = formatDmy(date);
   const ahead = calendarDaysBetween(now, date);
   if (ahead === 0) return `${absolute} · today`;
   if (ahead === 1) return `${absolute} · tomorrow`;

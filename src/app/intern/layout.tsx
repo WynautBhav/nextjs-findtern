@@ -81,34 +81,30 @@ const MORE_NAV: ConsoleNavItem[] = [
  */
 export default async function InternLayout({ children }: { children: React.ReactNode }) {
   const session = await getSession();
-  if (!session || session.role !== "intern") redirect("/login");
+  if (!session || session.role !== "intern") redirect("/login?as=intern");
 
-  const data = await loadInternData(session.uid);
+  // Independent reads, in parallel. loadInternData is cache()d, so the page's own call reuses this one.
+  const [data, name, [unread], college] = await Promise.all([
+    loadInternData(session.uid),
+    fullName(session.uid),
+    getDb()
+      .select({ value: count() })
+      .from(schema.notifications)
+      .where(
+        and(
+          eq(schema.notifications.recipientType, "intern"),
+          eq(schema.notifications.recipientId, session.uid),
+          eq(schema.notifications.isRead, false),
+        ),
+      ),
+    // Only college members heartbeat; "View as" must not mark the student online.
+    session.impersonator ? null : membershipOf(session.uid).catch(() => null),
+  ]);
   const action = nextAction(data.thread);
   const attentionHrefs = action ? [action.href ?? "/intern/dashboard"] : [];
 
-  const name = await fullName(session.uid);
-
-  const db = getDb();
-  const [doc] = await db
-    .select({ profilePhotoName: schema.internDocuments.profilePhotoName })
-    .from(schema.internDocuments)
-    .where(eq(schema.internDocuments.userId, session.uid))
-    .limit(1);
-
   // Uploaded photos only; a saved outside URL is never rendered.
-  const photoUrl = doc?.profilePhotoName ? "/api/intern/avatar" : null;
-
-  const [unread] = await db
-    .select({ value: count() })
-    .from(schema.notifications)
-    .where(
-      and(
-        eq(schema.notifications.recipientType, "intern"),
-        eq(schema.notifications.recipientId, session.uid),
-        eq(schema.notifications.isRead, false),
-      ),
-    );
+  const photoUrl = data.document?.profilePhotoName ? "/api/intern/avatar" : null;
   const unreadAlerts = Number(unread?.value ?? 0);
 
   const main = STAGE_NAV[data.stage].map((item) => ({
@@ -118,9 +114,6 @@ export default async function InternLayout({ children }: { children: React.React
   const more = MORE_NAV.filter((i) => !main.some((m) => m.href === i.href)).map((i) =>
     i.href === "/intern/notifications" && unreadAlerts > 0 ? { ...i, badge: unreadAlerts > 99 ? "99+" : unreadAlerts } : i,
   );
-
-  // Only college members heartbeat; "View as" must not mark the student online.
-  const college = session.impersonator ? null : await membershipOf(session.uid).catch(() => null);
 
   return (
     <ConsoleShell
@@ -135,15 +128,17 @@ export default async function InternLayout({ children }: { children: React.React
       ]}
       alerts={{ href: "/intern/notifications", count: unreadAlerts }}
       help={{ faqHref: "/faq#interns", contactHref: "/contact", email: SITE.email }}
-      signOutTo="/login"
+      signOutTo="/login?as=intern"
       initialCollapsed={(await cookies()).get(RAIL_COOKIE)?.value === "1"}
       rootCrumb={{ label: "Home", href: "/intern/dashboard" }}
       // Detail pages read "Offers", not "Offers / Details": the title names the record.
       crumbParents={{}}
       width="reading"
+      tone="light"
       banner={session.impersonator ? <ViewAsBanner viewing={name} admin={session.impersonator.email} /> : null}
     >
-      {college ? (
+      {/* Presence, drive banner and call alerts only exist for partner colleges. */}
+      {college?.isPartner ? (
         <CollegeLive
           collegeName={college.name}
           vapidKey={process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? ""}

@@ -1,11 +1,15 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { eq, desc } from "drizzle-orm";
-import { FileImage, FileText, Info, Upload, Video } from "lucide-react";
+import { ExternalLink, FileImage, FileText, Upload, Video } from "lucide-react";
 
 import { getDb, schema } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
-import { EmptyScene, PageHead, Surface } from "@/components/app/primitives";
-import { ButtonLink, buttonClass } from "@/components/ui/button";
+import { EmptyScene, PageHead, Pill } from "@/components/app/primitives";
+import { Tile } from "@/components/app/tiles";
+import { cn } from "@/lib/utils";
+import { ButtonLink } from "@/components/ui/button";
+import { formatDmy } from "@/lib/format";
 import { DocImagePreview } from "@/components/intern/doc-preview";
 import { certificateFiles } from "@/lib/onboarding";
 
@@ -103,53 +107,88 @@ export default async function InternDocuments() {
           next={{ label: "Add them in your profile", href: "/intern/onboarding" }}
         />
       ) : (
-        <>
-          <ul className="grid gap-4 sm:grid-cols-2">
-            {rows.map((doc) => {
-              const type = (doc.contentType ?? "").toLowerCase();
-              const isImage = type.startsWith("image/");
-              const isVideo = type.startsWith("video/");
-              return (
-                <Surface as="li" key={doc.id} className="flex flex-col overflow-hidden">
-                  {/* Inline preview (INT-29): images as a thumbnail, the intro video as a player. */}
-                  {isImage ? (
-                    <DocImagePreview href={doc.href} label={doc.label} />
-                  ) : isVideo ? (
-                    <video controls preload="none" src={doc.href} className="aspect-video w-full bg-ink-900">
-                      <track kind="captions" />
-                    </video>
+        <div className="grid gap-4 lg:grid-cols-2">
+          {/* What the files are for, in the order they matter: being paid, then the profile, then education. */}
+          {GROUPS.map((g) => {
+            const docs = rows.filter((r) => g.has(r.label));
+            if (docs.length === 0 && g.title !== "For your stipend") return null;
+            const pan = rows.some((r) => r.label === "PAN");
+            return (
+              <Tile
+                key={g.title}
+                title={g.title}
+                className={g.wide ? "lg:col-span-2" : undefined}
+                aside={g.title === "For your stipend" ? <Pill tone={pan ? "paid" : "waiting"}>{pan ? "PAN on file" : "PAN missing"}</Pill> : null}
+                description={
+                  g.title !== "For your stipend" ? undefined : pan ? (
+                    "Your PAN image is what payouts need, so your stipend can go out. Employers never see these files."
                   ) : (
-                    <div className="grid aspect-[16/10] place-items-center bg-ink-50 text-text-subtle" aria-hidden>
-                      <FileText className="size-10" />
-                    </div>
-                  )}
-                  <div className="flex items-center gap-3 border-t border-ink-100 px-4 py-3.5">
-                    <span className="grid size-10 shrink-0 place-items-center rounded-apple-sm bg-brand-50 text-brand-700">
-                      <DocIcon contentType={doc.contentType} />
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[0.9375rem] font-medium text-ink-900">{doc.label}</p>
-                      <p className="truncate text-xs text-ink-600">
-                        {doc.fileName} · {formatBytes(doc.size)}
-                        {doc.stampedAt ? ` · ${formatDay(doc.stampedAt)}` : ""}
-                      </p>
-                    </div>
-                    <a href={doc.href} target="_blank" rel="noreferrer" className={buttonClass({ variant: "outline", size: "sm", className: "min-h-11 shrink-0" })}>
-                      Open
-                    </a>
-                  </div>
-                </Surface>
-              );
-            })}
-          </ul>
-
-          <p className="mt-5 flex items-start gap-2 text-sm text-ink-600">
-            <Info className="mt-0.5 size-4 shrink-0" aria-hidden />
-            Employers never see these files. They are used to verify you and to pay your stipend.
-          </p>
-        </>
+                    <>
+                      Payouts need your PAN image.{" "}
+                      <Link href="/intern/onboarding" className="font-medium text-brand-700 underline underline-offset-2 hover:text-brand-800">
+                        Add it in your profile
+                      </Link>{" "}
+                      so your stipend can go out.
+                    </>
+                  )
+                }
+              >
+                {docs.length > 0 ? (
+                  <ul className={cn("grid gap-4", g.wide ? "grid-cols-2 sm:grid-cols-3 xl:grid-cols-5" : "grid-cols-2")}>
+                    {docs.map((doc) => (
+                      <DocCard key={doc.id} doc={doc} />
+                    ))}
+                  </ul>
+                ) : null}
+              </Tile>
+            );
+          })}
+        </div>
       )}
     </div>
+  );
+}
+
+const GROUPS: { title: string; wide?: boolean; has: (label: string) => boolean }[] = [
+  { title: "For your stipend", has: (l) => l === "Aadhaar" || l === "PAN" },
+  { title: "Your profile", has: (l) => l === "Profile photo" || l === "Intro video" },
+  { title: "Education and certificates", wide: true, has: (l) => !["Aadhaar", "PAN", "Profile photo", "Intro video"].includes(l) },
+];
+
+/** One file as itself: the image or the video's first frame, large enough to recognise. */
+function DocCard({ doc }: { doc: DocumentRow }) {
+  const type = (doc.contentType ?? "").toLowerCase();
+  return (
+    <li className="group relative min-w-0">
+      <span className="grid aspect-[4/3] place-items-center overflow-hidden rounded-apple-md bg-ink-50 text-text-subtle ring-1 ring-inset ring-ink-200/70 apple-spring group-hover:ring-brand-400">
+        {type.startsWith("image/") ? (
+          <DocImagePreview href={doc.href} fit={doc.label === "Profile photo" ? "cover" : "contain"} />
+        ) : type.startsWith("video/") ? (
+          <video muted preload="metadata" src={doc.href} className="size-full object-cover" aria-hidden />
+        ) : (
+          <span className="flex flex-col items-center gap-2 text-xs">
+            <DocIcon contentType={doc.contentType} />
+            {kindLabel(doc.contentType)}
+          </span>
+        )}
+      </span>
+      <p className="mt-2.5 flex items-center gap-1.5 text-sm font-medium text-ink-900">
+        <a
+          href={doc.href}
+          target="_blank"
+          rel="noreferrer"
+          className="truncate rounded-apple-sm hover:text-brand-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 after:absolute after:inset-0"
+        >
+          {doc.label}
+          <span className="sr-only"> (opens in a new tab)</span>
+        </a>
+        <ExternalLink className="size-3.5 shrink-0 text-text-subtle" aria-hidden />
+      </p>
+      <p className="nums mt-0.5 text-xs text-text-subtle [overflow-wrap:anywhere]">
+        {doc.fileName} · {formatBytes(doc.size)}
+        {doc.stampedAt ? ` · ${formatDmy(doc.stampedAt)}` : ""}
+      </p>
+    </li>
   );
 }
 
@@ -189,9 +228,9 @@ function kindLabel(type: string | null): string {
 
 function DocIcon({ contentType }: { contentType: string | null }) {
   const type = (contentType ?? "").toLowerCase();
-  if (type.startsWith("video/")) return <Video className="size-4" aria-hidden />;
-  if (type.startsWith("image/")) return <FileImage className="size-4" aria-hidden />;
-  return <FileText className="size-4" aria-hidden />;
+  if (type.startsWith("video/")) return <Video className="size-5" aria-hidden />;
+  if (type.startsWith("image/")) return <FileImage className="size-5" aria-hidden />;
+  return <FileText className="size-5" aria-hidden />;
 }
 
 function formatBytes(bytes: number | null): string {
@@ -199,9 +238,4 @@ function formatBytes(bytes: number | null): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-function formatDay(value: Date): string {
-  // DD/MM/YYYY, India time (bug sheet 7, NC r24).
-  return new Date(value).toLocaleDateString("en-GB", { timeZone: "Asia/Kolkata" });
 }

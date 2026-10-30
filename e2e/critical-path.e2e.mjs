@@ -366,7 +366,7 @@ step("admin: scores the intern (ratings PUT) → auto-approved, AI interview clo
 step("employer: signs up through the form, company-email code from the mail log [UI]", [], async () => {
   const page = pages.employer;
   const started = Date.now();
-  await visit(page, "/employer/signup");
+  await visit(page, "/signup?as=employer");
   await page.getByLabel("Your name").fill(EMPLOYER.name);
   await page.getByLabel("Company name").fill(EMPLOYER.companyName);
   await page.locator("#companyEmail").fill(EMPLOYER.email);

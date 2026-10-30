@@ -5,11 +5,12 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Phone, PhoneOff, Radio, Video, X } from "lucide-react";
 
+import { buttonVariants } from "@/components/ui/button";
 import { csrfFetch } from "@/lib/client-fetch";
 import { HEARTBEAT_MS } from "@/lib/college/constants";
 import { cn } from "@/lib/utils";
 import { PushToggle } from "./college-push";
-import { shortDate } from "@/lib/format";
+import { formatIstClock, shortDate } from "@/lib/format";
 
 /**
  * A college member's live link to their placement drive.
@@ -36,10 +37,6 @@ function whenLabel(startsAt: string, now: number): string {
   const mins = Math.round((new Date(startsAt).getTime() - now) / 60_000);
   if (mins <= 0) return "now";
   return `in ${mins} min`;
-}
-
-function clock(iso: string): string {
-  return new Date(iso).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" });
 }
 
 export function CollegeLive({ collegeName, vapidKey }: { collegeName: string; vapidKey: string }) {
@@ -213,7 +210,7 @@ function CallCard({
       aria-describedby={`${ids}-desc`}
       className={cn(
         // Above the chat launcher (z-80): an incoming call outranks it.
-        "fixed inset-x-3 z-[90] rounded-apple-xl border bg-white p-4 shadow-[0_12px_40px_rgb(7_47_36/0.18)]",
+        "fixed inset-x-3 z-[90] rounded-apple-xl border bg-white p-4 shadow-xl",
         "bottom-[calc(5.25rem+env(safe-area-inset-bottom))] lg:bottom-6 lg:left-auto lg:right-6 lg:w-[24rem]",
         "motion-safe:animate-[ft-call-in_240ms_cubic-bezier(0.16,1,0.3,1)]",
         accepted ? "border-brand-300" : "border-accent-300",
@@ -225,7 +222,7 @@ function CallCard({
           aria-hidden
           className={cn(
             "grid size-11 shrink-0 place-items-center rounded-full",
-            accepted ? "bg-brand-50 text-brand-700" : "bg-accent-100 text-accent-800",
+            accepted ? "bg-brand-50 text-brand-700" : "bg-accent-100 text-accent-700",
           )}
         >
           {accepted ? <Video className="size-5" /> : <Radio className="size-5" />}
@@ -236,8 +233,8 @@ function CallCard({
           </p>
           <p id={`${ids}-desc`} className="mt-0.5 text-sm leading-relaxed text-ink-600">
             {accepted
-              ? `Starts ${whenLabel(meeting.startsAt, now) === "now" ? "now" : `at ${clock(meeting.startsAt)}`}. About 20 minutes on video.`
-              : `${meeting.driveTitle ?? "Campus drive"}. A short video call. Reply by ${clock(new Date(new Date(meeting.startsAt).getTime() + 10 * 60_000).toISOString())} or it lapses.`}
+              ? `Starts ${whenLabel(meeting.startsAt, now) === "now" ? "now" : `at ${formatIstClock(meeting.startsAt)}`}. About 20 minutes on video.`
+              : `${meeting.driveTitle ?? "Campus drive"}. A short video call. Reply by ${formatIstClock(new Date(new Date(meeting.startsAt).getTime() + 10 * 60_000))} or it lapses.`}
           </p>
         </div>
         {accepted ? (
@@ -265,7 +262,7 @@ function CallCard({
               href={meeting.meetingLink}
               target="_blank"
               rel="noopener noreferrer"
-              className="col-span-2 inline-flex min-h-12 items-center justify-center gap-2 rounded-apple-md bg-primary px-4 text-[0.9375rem] font-semibold text-white hover:bg-primary-hover"
+              className={cn(buttonVariants({ variant: "primary", size: "md" }), "col-span-2")}
             >
               <Video className="size-4" aria-hidden />
               Join call
@@ -279,7 +276,7 @@ function CallCard({
               type="button"
               onClick={() => answer("decline")}
               disabled={busy !== null}
-              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-apple-md border border-ink-200 bg-white px-4 text-[0.9375rem] font-medium text-ink-800 hover:bg-ink-50 disabled:opacity-60"
+              className={cn(buttonVariants({ variant: "outline", size: "md" }), "px-4")}
             >
               <PhoneOff className="size-4" aria-hidden />
               {busy === "decline" ? "Declining…" : "Decline"}
@@ -289,7 +286,7 @@ function CallCard({
               type="button"
               onClick={() => answer("accept")}
               disabled={busy !== null}
-              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-apple-md bg-primary px-4 text-[0.9375rem] font-semibold text-white hover:bg-primary-hover disabled:opacity-60"
+              className={cn(buttonVariants({ variant: "primary", size: "md" }), "px-4")}
             >
               <Phone className="size-4" aria-hidden />
               {busy === "accept" ? "Accepting…" : "Accept"}

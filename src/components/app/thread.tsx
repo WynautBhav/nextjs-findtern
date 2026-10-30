@@ -102,7 +102,7 @@ export function Thread({
         animate={reduce || inView ? { scaleY: 1 } : { scaleY: 0 }}
         transition={{ duration: reduce ? 0 : 0.7, ease: [0.16, 1, 0.3, 1] }}
         style={{ transformOrigin: "top" }}
-        className="absolute bottom-3 left-[0.4375rem] top-3 w-px bg-gradient-to-b from-brand-200 via-brand-100 to-transparent"
+        className="absolute bottom-3 left-[0.4375rem] top-3 w-px bg-brand-100"
       />
       {shown.map((node, i) => {
         const mark = MARK[node.tone];
@@ -125,19 +125,26 @@ export function Thread({
           >
             <NodeMark tone={node.tone} dot={mark.dot} ring={mark.ring} label={mark.label} reduce={!!reduce} />
 
-            <div className="min-w-0 flex-1 pt-px">
-              <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
-                <h3 className={cn("text-[0.9375rem] font-semibold tracking-[-0.01em]", mark.text)}>
-                  {node.title}
-                </h3>
-                <span className="nums text-xs text-ink-600">{shortDate(node.at, { day: "numeric", month: "short", timeZone: "Asia/Kolkata" })}</span>
-              </div>
-
-              <p className="mt-1 text-pretty text-sm leading-relaxed text-ink-600">{node.detail}</p>
-
-              {node.with ? (
-                <p className="mt-1.5 text-xs font-medium text-ink-600">with {node.with}</p>
-              ) : null}
+            <div className="min-w-0 flex-1">
+              <h3 className={cn("text-pretty text-base font-medium leading-snug", mark.text)}>
+                {node.href && !node.action ? (
+                  // The whole row is the link: the title stretches over it, so
+                  // there is no separate "Open" line under every item.
+                  <Link
+                    href={node.href}
+                    className="rounded-apple-sm hover:text-brand-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 after:absolute after:inset-0"
+                  >
+                    {node.title}
+                  </Link>
+                ) : (
+                  node.title
+                )}
+              </h3>
+              <p className="mt-1 text-pretty text-sm text-text-subtle">{node.detail}</p>
+              <p className="nums mt-1 text-xs text-text-subtle">
+                {shortDate(node.at, { day: "numeric", month: "short", timeZone: "Asia/Kolkata" })}
+                {node.with ? ` · with ${node.with}` : null}
+              </p>
 
               {node.action && node.href ? (
                 <Link
@@ -146,14 +153,6 @@ export function Thread({
                 >
                   {node.action}
                   <ArrowRight className="size-4" aria-hidden />
-                </Link>
-              ) : node.href ? (
-                <Link
-                  href={node.href}
-                  className="apple-spring apple-pressable mt-2 inline-flex min-h-11 items-center gap-1 text-sm font-medium text-primary underline-offset-4 hover:underline"
-                >
-                  Open
-                  <ArrowRight className="size-3.5" aria-hidden />
                 </Link>
               ) : null}
             </div>
@@ -181,7 +180,7 @@ function NodeMark({
   const isAction = tone === "action";
 
   return (
-    <span className="relative mt-0.5 grid size-3.5 shrink-0 place-items-center">
+    <span className="relative mt-1 grid size-3.5 shrink-0 place-items-center">
       <span className={cn("absolute size-3.5 rounded-full ring-4", ring, dot)} aria-hidden />
       {/* Always in the markup, hidden by CSS under reduced motion: branching
           on useReducedMotion() here was React #418 (QA-002b). */}
@@ -226,21 +225,20 @@ export function StatusStrip({
     return (
       <div
         className={cn(
-          "flex flex-wrap items-center gap-x-4 gap-y-3 rounded-apple-xl border border-accent-300/60 bg-accent-100/50 px-5 py-4",
+          // The dashboard's one focal point: the only amber button on the screen.
+          "flex flex-wrap items-center gap-4 rounded-apple-xl border border-ink-200/80 bg-white p-5 lg:p-6",
           className,
         )}
       >
-        <span className="grid size-6 shrink-0 place-items-center rounded-full bg-accent-500">
-          <span className="size-1.5 rounded-full bg-white" aria-hidden />
-        </span>
-        <p className="min-w-0 flex-[1_1_16rem] text-pretty text-[0.9375rem] font-semibold text-ink-900">
+        <span className="size-2 shrink-0 rounded-full bg-accent-500" aria-hidden />
+        <p className="min-w-0 flex-[1_1_16rem] text-pretty text-base font-medium text-ink-900">
           {node.title}
-          <span className="block text-sm font-normal text-ink-600">{node.detail}</span>
+          <span className="mt-1 block text-sm font-normal text-text-subtle">{node.detail}</span>
         </p>
         {node.href ? (
           <Link
             href={node.href}
-            className={buttonClass({ variant: "dark", className: "shrink-0" })}
+            className={buttonClass({ variant: "accent", className: "shrink-0 max-sm:w-full" })}
           >
             {node.action ?? "Open"}
             <ArrowRight className="size-4" aria-hidden />

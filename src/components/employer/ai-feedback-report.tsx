@@ -4,6 +4,9 @@ import { useRef } from "react";
 import { Download, ExternalLink, FileText, Video } from "lucide-react";
 
 import { buttonClass } from "@/components/ui/button";
+import { LIGHT_TILE } from "@/components/app/primitives";
+import { ScoreScale } from "@/components/app/tiles";
+import { cn } from "@/lib/utils";
 
 export interface AiRatings {
   communication?: number;
@@ -37,8 +40,11 @@ export function AiFeedbackReport({
   ratings,
   aiFeedbackLink,
   aiRecordingLink,
+  heading,
 }: {
   candidateName: string;
+  /** The report's title; the candidate's name by default (the intern's own page says "Your scores"). */
+  heading?: string;
   findternScore: number;
   ratings: AiRatings;
   /** Kept for callers; the report shows only the scores. */
@@ -53,6 +59,9 @@ export function AiFeedbackReport({
     (a): a is typeof a & { value: number } => a.value !== null,
   );
   const assessed = score !== null || axes.length > 0;
+  const byValue = [...axes].sort((a, b) => b.value - a.value);
+  const strongest = byValue[0];
+  const weakest = byValue[byValue.length - 1];
 
   /**
    * Print this report only. A page can render several (one per candidate
@@ -80,7 +89,7 @@ export function AiFeedbackReport({
 
   if (!assessed) {
     return (
-      <section className="min-w-0 rounded-apple-xl border border-ink-200/80 bg-white p-6 shadow-xs">
+      <section className={cn("min-w-0 rounded-apple-xl border border-ink-200/80 bg-white p-6 shadow-xs", LIGHT_TILE)}>
         <div className="flex items-start gap-3">
           <div className="min-w-0">
             <h3 className="text-base font-semibold text-ink-900">AI interview results pending</h3>
@@ -96,14 +105,24 @@ export function AiFeedbackReport({
   return (
     <section
       ref={sectionRef}
-      className="min-w-0 overflow-hidden rounded-apple-xl border border-ink-200/80 bg-white shadow-xs"
+      className={cn("min-w-0 overflow-hidden rounded-apple-xl border border-ink-200/80 bg-white shadow-xs", LIGHT_TILE)}
     >
       <div className="flex flex-wrap items-start justify-between gap-4 border-b border-ink-100 p-5 sm:p-6">
         <div className="min-w-0">
-          <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-brand-700">
-            AI interview results
-          </p>
-          <h3 className="mt-1 truncate text-lg font-semibold tracking-[-0.01em] text-ink-900">{candidateName}</h3>
+          <h3 className="truncate text-lg font-semibold tracking-[-0.01em] text-ink-900">{heading ?? candidateName}</h3>
+          {strongest ? (
+            <p className="mt-1 text-sm text-ink-600">
+              AI interview. Strongest in {strongest.label}, <span className="nums">{strongest.value.toFixed(1)}</span>
+              {weakest && weakest.key !== strongest.key ? (
+                <>
+                  ; lowest in {weakest.label}, <span className="nums">{weakest.value.toFixed(1)}</span>
+                </>
+              ) : null}
+              .
+            </p>
+          ) : (
+            <p className="mt-1 text-sm text-ink-600">AI interview results</p>
+          )}
         </div>
         <div className="flex flex-wrap items-center gap-2 print:hidden">
           {aiFeedbackLink ? (
@@ -141,38 +160,18 @@ export function AiFeedbackReport({
         </div>
       </div>
 
-      <dl className="grid gap-px bg-ink-100 sm:grid-cols-2 xl:grid-cols-5">
-        <div className="bg-brand-50/60 p-5">
+      <div className="grid gap-6 p-5 sm:p-6 md:grid-cols-[minmax(0,13rem)_minmax(0,1fr)] md:gap-10">
+        <dl>
           <dt className="text-sm font-medium text-brand-800">Findtern Score</dt>
-          <dd className="mt-1 flex items-baseline gap-1">
-            <span className="nums text-3xl font-semibold tracking-[-0.02em] text-brand-700">{score !== null ? score.toFixed(1) : "–"}</span>
-            <span className="nums text-sm text-text-subtle">/10</span>
+          <dd className="mt-2 flex items-baseline gap-1">
+            <span className="nums text-6xl font-medium leading-none tracking-[-0.04em] text-brand-700">{score !== null ? score.toFixed(1) : "–"}</span>
+            <span className="nums text-base text-text-subtle">/10</span>
           </dd>
-        </div>
-        {AXES.map((axis) => {
-          const value = axes.find((a) => a.key === axis.key)?.value ?? null;
-          return (
-            <div key={axis.key} className="bg-white p-5">
-              <dt className="text-sm font-medium text-ink-600">{axis.label}</dt>
-              <dd className="mt-1">
-                {value !== null ? (
-                  <>
-                    <span className="flex items-baseline gap-1">
-                      <span className="nums text-xl font-semibold text-ink-900">{value.toFixed(1)}</span>
-                      <span className="nums text-sm text-text-subtle">/10</span>
-                    </span>
-                    <span className="mt-2 block h-1.5 overflow-hidden rounded-full bg-ink-100" aria-hidden>
-                      <span className="block h-full rounded-full bg-brand-600" style={{ width: `${value * 10}%` }} />
-                    </span>
-                  </>
-                ) : (
-                  <span className="text-sm text-text-subtle">Not rated</span>
-                )}
-              </dd>
-            </div>
-          );
-        })}
-      </dl>
+        </dl>
+
+        {/* Every part on one shared 0–10 scale, so they compare at a glance. */}
+        <ScoreScale rows={AXES.map((axis) => ({ label: axis.label, value: axes.find((a) => a.key === axis.key)?.value ?? null }))} />
+      </div>
     </section>
   );
 }

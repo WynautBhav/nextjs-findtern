@@ -95,6 +95,7 @@ export type CertificateUpload = { name: string; originalName?: string; type: str
 export const MAX_CERTIFICATE_UPLOADS = 3;
 /** At most this many marksheet files. */
 export const MAX_MARKSHEETS = 8;
+export const MAX_EXPERIENCES = 20;
 
 export type ScoreType = "cgpa" | "percentage";
 
@@ -384,7 +385,8 @@ export const LANGUAGE_LEVELS: { value: LanguageLevel; label: string }[] = [
 /** "english" → "English"; a name outside the list keeps its own spelling. */
 function languageLabel(raw: string): string {
   const v = raw.trim();
-  return LANGUAGES.find((l) => l.toLowerCase() === v.toLowerCase()) ?? v;
+  // Stored lower-case (legacy); a typed "Other" name reads back capitalised.
+  return LANGUAGES.find((l) => l.toLowerCase() === v.toLowerCase()) ?? v.charAt(0).toUpperCase() + v.slice(1);
 }
 
 /** Legacy has three levels; "conversational" (an early build of this app) reads as Basic. */
@@ -953,6 +955,13 @@ const YEAR = /^\d{4}$/;
 /** Legacy pattern, plus the country subdomains LinkedIn hands out (in.linkedin.com). */
 const LINKEDIN = /^(https?:\/\/)?([a-z]{2,3}\.)?(www\.)?linkedin\.com\/\S+$/i;
 
+/** A stored LinkedIn link as an absolute href (legacy rows often lack the scheme); null for anything else, `javascript:` included. */
+export function linkedinHref(raw: string | null | undefined): string | null {
+  const v = (raw ?? "").trim();
+  if (!LINKEDIN.test(v)) return null;
+  return /^https?:\/\//i.test(v) ? v : `https://${v}`;
+}
+
 export function scoreProblem(type: ScoreType | "", raw: string): string | null {
   const v = raw.trim().replace(/%$/, "");
   if (!v) return null;
@@ -1027,6 +1036,7 @@ export function validateStep(values: OnboardingDraft, step: number, ctx: Validat
     if (!(values.city ?? "").trim()) errors.city = "Choose the city you live in.";
     if (!values.pinCode) errors.pinCode = "Enter your 6-digit PIN code.";
     else if (!/^\d{6}$/.test(values.pinCode)) errors.pinCode = "PIN code must be 6 digits.";
+    else if (values.pinCode.startsWith("0")) errors.pinCode = "Indian PIN codes never start with 0. Check the number.";
 
     const aadhaar = (values.aadhaarNumber ?? "").replace(/\s/g, "");
     if (!aadhaar) errors.aadhaarNumber = "Aadhaar number is required.";
@@ -1124,7 +1134,7 @@ export function validateStep(values: OnboardingDraft, step: number, ctx: Validat
   if (step === 2) {
     for (const exp of values.experiences ?? []) {
       const k = `exp.${exp.id}`;
-      if (!exp.type) errors[`${k}.type`] = "Choose the type of experience.";
+      if (!EXPERIENCE_TYPES.some((t) => t.value === exp.type)) errors[`${k}.type`] = "Choose the type of experience.";
       if (!exp.company.trim()) errors[`${k}.company`] = exp.type === "Project" ? "Enter the organisation, college or client." : "Enter the company name.";
       if (!exp.role.trim()) errors[`${k}.role`] = "Enter your role or title.";
       const from = dayProblem(exp.from, today, "start date");
@@ -1153,9 +1163,11 @@ export function validateStep(values: OnboardingDraft, step: number, ctx: Validat
       const k = `lang.${l.id}`;
       const name = l.language.trim().toLowerCase();
       if (!name) errors[`${k}.language`] = "Choose a language.";
-      else if (name !== "other" && seen.has(name)) errors[`${k}.language`] = "This language is already listed.";
+      else if (name === "other") errors[`${k}.other`] = "Type the name of the language.";
+      else if (seen.has(name)) errors[`${k}.language`] = "This language is already listed.";
       seen.add(name);
       if (!l.level) errors[`${k}.level`] = "Choose a level.";
+      if (l.read === false && l.write === false && l.speak === false) errors[`${k}.skills`] = "Tick at least one of read, write or speak.";
     }
   }
 
@@ -1210,6 +1222,9 @@ export function firstOpenStep(values: OnboardingDraft, ctx: ValidationContext, s
 
 /** Values that are present and impossible. Checked on every save, drafts included. */
 export function formatProblems(values: DraftInput): string | null {
+  const linkedin = (values.linkedinUrl ?? "").trim();
+  if (linkedin && !LINKEDIN.test(linkedin)) return "Enter your LinkedIn profile link, like linkedin.com/in/your-name.";
+  if (values.pinCode?.trim().startsWith("0")) return "Indian PIN codes never start with 0. Check the number.";
   const a = values.academics;
   if (a) {
     const score = scoreProblem(a.scoreType ?? "", a.cgpa ?? "");

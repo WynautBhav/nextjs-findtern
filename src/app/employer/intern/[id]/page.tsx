@@ -24,7 +24,7 @@ import { isOpenProject, rememberedSelection } from "@/lib/employer-selection";
 import { aiInterviewLinks } from "@/lib/ai-interview-links";
 import { parseOffer } from "@/lib/offer";
 import { timezoneForLocation } from "@/lib/timezones";
-import { dateLabel, draftFromRecord, type OnboardingDraft } from "@/lib/onboarding";
+import { dateLabel, draftFromRecord, linkedinHref, type OnboardingDraft } from "@/lib/onboarding";
 import { employerProposalPill } from "@/components/app/status";
 import { DetailRow, EmptyScene, PageHead, Pill, SectionHead, Surface } from "@/components/app/primitives";
 import { ButtonLink } from "@/components/ui/button";
@@ -564,9 +564,9 @@ export default async function EmployerInternDetail({
             </dl>
             {/* LinkedIn URLs usually contain the real name, so the link stays
                 hidden until the hire unmasks the candidate. */}
-            {nameUnlocked && profile.linkedinUrl ? (
+            {nameUnlocked && linkedinHref(profile.linkedinUrl) ? (
               <a
-                href={profile.linkedinUrl}
+                href={linkedinHref(profile.linkedinUrl) ?? undefined}
                 target="_blank"
                 rel="noreferrer noopener"
                 className="mb-2 inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-brand-700 underline-offset-4 hover:underline"

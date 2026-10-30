@@ -1,7 +1,8 @@
-import { Ban, Briefcase, EyeOff, GraduationCap, MessageSquare, PhoneOff, Scale, ShieldAlert } from "lucide-react";
+import { Ban, Briefcase, ChevronDown, EyeOff, GraduationCap, MessageSquare, PhoneOff, Scale } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
-import { Surface } from "@/components/app/primitives";
+import { LIGHT_TILE, SectionHead, Surface } from "@/components/app/primitives";
+import { cn } from "@/lib/utils";
 
 /**
  * "Important Instructions" from the legacy intern proposal page
@@ -83,31 +84,42 @@ const ITEMS: Item[] = [
   },
 ];
 
-export function ImportantInstructions() {
-  return (
-    <Surface as="section" className="p-6" aria-labelledby="offer-instructions">
-      <div className="flex items-start gap-3">
-        <span className="grid size-10 shrink-0 place-items-center rounded-apple-sm bg-accent-100 text-accent-700 ring-1 ring-inset ring-accent-300/70">
-          <ShieldAlert className="size-5" aria-hidden />
-        </span>
-        <div className="min-w-0">
-          <h2 id="offer-instructions" className="text-base font-semibold tracking-[-0.01em] text-ink-900">
-            Important Instructions
-          </h2>
-          <p className="mt-0.5 text-sm text-ink-600">Before Accepting a Proposal</p>
+/** Open in full while the offer waits on an answer; folded afterwards, not a wall above a running internship. */
+export function ImportantInstructions({ folded = false }: { folded?: boolean }) {
+  if (folded) {
+    return (
+      <details className={cn("group rounded-apple-xl border border-ink-200/80 bg-white", LIGHT_TILE)}>
+        <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-5 py-4 lg:px-6 [&::-webkit-details-marker]:hidden">
+          <h2 className="text-lg font-semibold tracking-[-0.01em] text-ink-900">The rules you agreed to</h2>
+          <ChevronDown className="size-4 shrink-0 text-text-subtle transition-transform group-open:rotate-180 motion-reduce:transition-none" aria-hidden />
+        </summary>
+        <div className="px-5 pb-5 lg:px-6">
+          <Rules />
         </div>
-      </div>
+      </details>
+    );
+  }
+  return (
+    <Surface as="section" className="p-5 lg:p-6" aria-label="Important Instructions">
+      <SectionHead title="Important Instructions" hint="Before Accepting a Proposal" />
+      <Rules />
+    </Surface>
+  );
+}
 
-      <p className="mt-4 rounded-apple-sm bg-ink-50 px-4 py-3 text-pretty text-sm leading-relaxed text-ink-700">
+function Rules() {
+  return (
+    <>
+      <p className="rounded-apple-sm bg-ink-50 px-4 py-3 text-pretty text-sm leading-relaxed text-ink-700">
         By accepting an internship proposal through Findtern, you acknowledge and agree to the following restrictions and
         responsibilities:
       </p>
 
-      <ul className="mt-4 space-y-3">
+      <ul className="mt-2 divide-y divide-ink-200/80">
         {ITEMS.map(({ icon: Icon, title, lines, consequences, email, after }) => (
-          <li key={title} className="flex items-start gap-3 rounded-apple-lg border border-ink-200/80 p-4">
+          <li key={title} className="flex items-start gap-3 py-4 last:pb-0">
             <Icon className="mt-0.5 size-4 shrink-0 text-brand-700" aria-hidden />
-            <div className="min-w-0 space-y-1.5">
+            <div className="min-w-0 max-w-prose space-y-1.5">
               <h3 className="text-sm font-semibold text-ink-900">{title}</h3>
               {lines.map((line) => (
                 <p key={line} className="text-pretty text-sm leading-relaxed text-ink-700">
@@ -125,8 +137,11 @@ export function ImportantInstructions() {
                 </div>
               ) : null}
               {email ? (
-                <p className="rounded-apple-sm bg-brand-50 px-3 py-2">
-                  <a href={`mailto:${email}`} className="text-sm font-semibold text-brand-800 underline-offset-4 hover:underline">
+                <p>
+                  <a
+                    href={`mailto:${email}`}
+                    className="text-sm font-semibold text-brand-800 underline underline-offset-4 hover:decoration-2 touch:inline-flex touch:min-h-11 touch:items-center"
+                  >
                     {email}
                   </a>
                 </p>
@@ -136,6 +151,6 @@ export function ImportantInstructions() {
           </li>
         ))}
       </ul>
-    </Surface>
+    </>
   );
 }

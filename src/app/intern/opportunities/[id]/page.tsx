@@ -1,15 +1,17 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, ArrowRight, Check, MapPin } from "lucide-react";
+import { ArrowLeft, ArrowRight, Building2, Check, MapPin } from "lucide-react";
 
 import { DetailRow, PageHead, Pill, SectionHead, Surface } from "@/components/app/primitives";
 import { ButtonLink } from "@/components/ui/button";
 import { CompanyInitials } from "@/components/marketing/role-card";
+import { proposalStatus } from "@/components/app/status";
 import { requireRole } from "@/lib/auth";
 import { loadInternData, projectById } from "@/lib/intern-data";
 import { formatDayLabel } from "@/lib/format";
 import { toArray } from "@/lib/journey";
+import { readSkillRatings } from "@/lib/onboarding";
 
 import { LockedRoles, rolesGate } from "../_gate";
 import { isHiredProposal } from "@/lib/hire-status";
@@ -38,11 +40,11 @@ export default async function RoleDetail({ params }: { params: Promise<{ id: str
   const { id } = await params;
   const session = await requireRole("intern");
 
-  const role = await projectById(id, { strict: true });
+  const [role, data] = await Promise.all([projectById(id, { strict: true }), loadInternData(session.uid)]);
   if (!role) notFound();
 
-  const data = await loadInternData(session.uid);
-  const existing = data.proposals.find((p) => p.projectId === id) ?? null;
+  // A closed offer (rejected, withdrawn, expired) is not an offer: the role reads as open.
+  const existing = data.proposals.find((p) => p.projectId === id && (isHiredProposal(p) || proposalStatus(p.status).tone !== "closed")) ?? null;
   // A hire is a hire whether the status or only hiredAt says so (QA-010).
   const hired = existing ? isHiredProposal(existing) : false;
   // A role they already have an offer on stays readable; anything else waits
@@ -59,6 +61,10 @@ export default async function RoleDetail({ params }: { params: Promise<{ id: str
     }
   }
   const skills = toArray<string>(role.skills);
+  const mine = new Set(
+    readSkillRatings(data.onboarding?.skills, (data.onboarding?.extraData ?? {}) as Record<string, unknown>).map((s) => s.name.toLowerCase().trim()),
+  );
+  const has = (skill: string) => mine.has(skill.toLowerCase().trim());
   const place = [role.city, role.state].filter(Boolean).join(", ");
 
   return (
@@ -86,17 +92,17 @@ export default async function RoleDetail({ params }: { params: Promise<{ id: str
               {hired ? "Hired" : existing.status === "sent" ? "Offer waiting on you" : "Offer received"}
             </Pill>
           ) : role.fullTimeOffer ? (
-            <Pill tone="waiting">Can lead to full time</Pill>
+            <Pill tone="neutral">Can lead to full time</Pill>
           ) : null
         }
       />
 
-      <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_18rem]">
+      <div className="grid gap-x-8 gap-y-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
         <div className="min-w-0">
           {role.scopeOfWork ? (
             <Surface className="p-5 sm:p-6">
               <SectionHead title="What you would be doing" className="mb-0" />
-              <p className="mt-3 whitespace-pre-line text-pretty text-[0.9375rem] leading-relaxed text-ink-700">
+              <p className="mt-3 max-w-prose whitespace-pre-line text-pretty text-[0.9375rem] leading-relaxed text-ink-700">
                 {role.scopeOfWork}
               </p>
             </Surface>
@@ -104,11 +110,25 @@ export default async function RoleDetail({ params }: { params: Promise<{ id: str
 
           {skills.length > 0 ? (
             <Surface className="mt-4 p-5 sm:p-6">
-              <SectionHead title="What they are looking for" className="mb-0" />
+              <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                <SectionHead title="What they are looking for" className="mb-0" />
+                {/* Measured against the skills on this candidate's own profile. */}
+                <p className="nums text-sm text-ink-600">
+                  <span className="font-semibold text-ink-900">{skills.filter(has).length}</span> of {skills.length} on your profile
+                </p>
+              </div>
               <ul className="mt-3 flex flex-wrap gap-1.5">
                 {skills.map((skill) => (
                   <li key={skill}>
-                    <Pill tone="neutral">{skill}</Pill>
+                    {has(skill) ? (
+                      <Pill tone="live">
+                        <Check className="size-3.5" aria-hidden />
+                        {skill}
+                        <span className="sr-only"> (on your profile)</span>
+                      </Pill>
+                    ) : (
+                      <Pill tone="neutral">{skill}</Pill>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -130,7 +150,8 @@ export default async function RoleDetail({ params }: { params: Promise<{ id: str
                   text: "Your profile is what companies search. Everything you have filled in is what they can see.",
                 },
                 {
-                  done: true,
+                  // Not done: without an offer on this role, nobody has booked them yet.
+                  done: false,
                   text: "A company that likes your profile books an interview with you, then sends an offer.",
                 },
                 {
@@ -182,7 +203,7 @@ export default async function RoleDetail({ params }: { params: Promise<{ id: str
           </Surface>
         </div>
 
-        <aside className="space-y-4">
+        <aside>
           <Surface className="p-5">
             <SectionHead title="At a glance" className="mb-0" />
             <dl className="divide-y divide-ink-100">
@@ -190,7 +211,14 @@ export default async function RoleDetail({ params }: { params: Promise<{ id: str
                 label="Company"
                 value={
                   <span className="inline-flex items-center gap-2">
-                    <CompanyInitials name={role.companyName} className="size-8 text-xs" />
+                    {/* Initials would identify the company before the hire; a neutral mark until then. */}
+                    {hired ? (
+                      <CompanyInitials name={role.companyName} className="size-8 text-xs" />
+                    ) : (
+                      <span aria-hidden className="grid size-8 shrink-0 place-items-center rounded-full bg-ink-100 text-ink-600">
+                        <Building2 className="size-4" />
+                      </span>
+                    )}
                     {hired ? (
                       <span className="text-ink-900">{data.names[existing!.employerId] ?? role.companyName}</span>
                     ) : (
@@ -215,14 +243,14 @@ export default async function RoleDetail({ params }: { params: Promise<{ id: str
               <DetailRow label="City" value={place || "Not stated"} />
               <DetailRow label="Posted" mono value={formatDayLabel(role.createdAt)} />
             </dl>
-          </Surface>
 
-          <Surface className="p-5">
-            <SectionHead title="How you are paid" className="mb-0" />
-            <p className="mt-2 text-pretty text-sm leading-relaxed text-ink-600">
-              The stipend is written in the offer, with the joining date and hours, and you see
-              all of it before you accept.
-            </p>
+            <div className="mt-2 border-t border-ink-100 pt-5">
+              <SectionHead title="How you are paid" className="mb-0" />
+              <p className="mt-2 text-pretty text-sm leading-relaxed text-ink-600">
+                The stipend is written in the offer, with the joining date and hours, and you see
+                all of it before you accept.
+              </p>
+            </div>
           </Surface>
         </aside>
       </div>

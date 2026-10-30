@@ -1,0 +1,5 @@
+# keep the graph to app code; QA repros, agent skills and load tests add noise
+docs/
+.agents/
+.impeccable/
+loadtest/

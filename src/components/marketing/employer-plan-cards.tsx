@@ -103,7 +103,7 @@ export function EmployerPlanCards({
               ) : null}
               <div className="flex-1" />
               <ButtonLink
-                href="/employer/signup"
+                href="/signup?as=employer"
                 variant={featured ? "primary" : "outline"}
                 block
                 className="mt-6"

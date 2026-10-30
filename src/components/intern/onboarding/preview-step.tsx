@@ -179,7 +179,7 @@ function Block({ title, onEdit, children, className }: { title: string; onEdit: 
   return (
     <section className={cn("px-5 py-5 sm:px-6", className)}>
       <div className="mb-3 flex items-center justify-between gap-3">
-        <h4 className="text-2xs font-semibold uppercase tracking-[0.14em] text-text-subtle">{title}</h4>
+        <h3 className="text-sm font-semibold text-ink-900">{title}</h3>
         <button
           type="button"
           onClick={onEdit}

@@ -22,7 +22,7 @@ import { PASSWORD_HINT } from "@/lib/password-policy";
  */
 
 export function ForgotPasswordForm({ role = "intern" }: { role?: "intern" | "employer" }) {
-  const loginHref = role === "employer" ? "/employer/login" : "/login";
+  const loginHref = `/login?as=${role}`;
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
@@ -70,7 +70,7 @@ export function ForgotPasswordForm({ role = "intern" }: { role?: "intern" | "emp
           placeholder="you@gmail.com"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="mt-2 h-11 w-full rounded-lg border border-ink-200 bg-white px-3.5 text-sm text-ink-900 outline-none transition-[border-color,box-shadow] placeholder:text-ink-400 focus-visible:border-brand-600 focus-visible:ring-[3px] focus-visible:ring-brand-600/20"
+          className="mt-2 h-11 w-full rounded-lg border border-ink-200 bg-white px-3.5 text-sm text-ink-900 outline-none transition-[border-color,box-shadow] placeholder:text-ink-500 focus-visible:border-brand-600 focus-visible:ring-[3px] focus-visible:ring-brand-600/20"
         />
       </div>
 
@@ -101,7 +101,7 @@ export function ResetPasswordForm({
   token: string | null;
   role?: "intern" | "employer";
 }) {
-  const loginHref = role === "employer" ? "/employer/login" : "/login";
+  const loginHref = `/login?as=${role}`;
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [loading, setLoading] = useState(false);

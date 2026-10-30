@@ -12,8 +12,9 @@ export async function GET(req: Request) {
   if (!cfg) {
     // Back to the page the button was on, with a readable message, instead
     // of a bare JSON error.
-    const back = role === "employer" ? "/employer/login" : "/login";
-    return NextResponse.redirect(new URL(`${back}?oauthError=not_configured`, req.url));
+    const back = new URL(`/login?as=${role}`, req.url);
+    back.searchParams.set("oauthError", "not_configured");
+    return NextResponse.redirect(back);
   }
 
   // The nonce rides in the state and in an httpOnly cookie; the callback

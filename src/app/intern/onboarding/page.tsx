@@ -70,6 +70,9 @@ export default async function InternOnboarding() {
 
     if (row) {
       Object.assign(draft, draftFromRecord(row));
+      // This form never asks for bank details (Settings does, showing only the last 4), so the
+      // stored account number must not ride along in the page payload.
+      draft.bank = emptyDraft().bank;
       locked = await skillsLocked(db, session.uid, row.extraData);
       serverUpdatedAt = (row.updatedAt ?? row.createdAt)?.toISOString() ?? null;
       onboarded = isOnboarded(row, { hasPanImage, hasAadhaarImage, hasPhoto });
@@ -101,7 +104,6 @@ export default async function InternOnboarding() {
   return (
     <div>
       <PageHead
-        eyebrow={onboarded ? "Your profile" : "Set up your profile"}
         title={onboarded ? "Edit your profile" : "Complete your profile"}
         lede={
           onboarded

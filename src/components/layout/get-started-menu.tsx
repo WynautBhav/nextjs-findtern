@@ -70,7 +70,7 @@ export function GetStartedMenu({ className = "" }: { className?: string }) {
         </DropdownMenuItem>
 
         <DropdownMenuItem asChild>
-          <Link href="/employer/signup">
+          <Link href="/signup?as=employer">
             <UserPlus className="size-4 shrink-0 text-brand-600" aria-hidden />
             <span className="flex flex-col items-start gap-0.5">
               <span>Interns to hire</span>

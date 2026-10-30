@@ -21,7 +21,7 @@ const QUICK_PROMPTS = [
 const TEASER_KEY = "findtern:chat-teaser-seen";
 /** Auth and onboarding forms (see the placement note in ChatWidget). */
 const FORM_ROUTE =
-  /^\/(?:(?:employer\/)?(?:login|signup|forgot-password|reset-password|verify-email)|college\/login|(?:intern|employer)\/onboarding)(?:\/|$)/;
+  /^\/(?:login|signup|forgot-password|reset-password|verify-email|(?:intern|employer)\/onboarding)(?:\/|$)/;
 /** The nudge goes away by itself; it used to sit over the page until dismissed (QA-102). */
 const TEASER_MS = 12_000;
 
@@ -322,6 +322,9 @@ export function ChatWidget() {
   const isForm = FORM_ROUTE.test(pathname ?? "");
   const inApp = !isForm && /^\/(intern|employer|college)(\/|$)/.test(pathname ?? "");
   const hasBottomNav = !isForm && /^\/(intern|college)(\/|$)/.test(pathname ?? "");
+  // The intern console has "Ask me" in its top bar on every width, so no
+  // launcher floats over its tiles on a phone; the panel opens from there.
+  const headerOnly = !isForm && /^\/intern(\/|$)/.test(pathname ?? "");
 
   return (
     <div
@@ -514,15 +517,18 @@ export function ChatWidget() {
           "bg-brand-800 hover:bg-brand-900",
           // Labelled on every screen size (bug sheet 7, NC r30/r40: the
           // icon-only launcher was too small to notice).
-          open ? "size-14" : "h-14 min-w-14 gap-2 pl-4 pr-5 text-[0.9375rem]",
+          // 44px and labelled: big enough to notice and tap, small enough not
+          // to sit over a whole row of the page beneath it.
+          open ? "size-11" : "h-11 min-w-11 gap-1.5 pl-3 pr-4 text-sm",
           inApp && "lg:hidden",
+          headerOnly && "hidden",
         )}
       >
         {open ? (
           <X className="size-5 shrink-0" aria-hidden />
         ) : (
           <div className="relative flex shrink-0 items-center justify-center">
-            <MessageCircle className="size-6 shrink-0" aria-hidden />
+            <MessageCircle className="size-5 shrink-0" aria-hidden />
           </div>
         )}
         <span className={cn(open ? "hidden" : "font-semibold")}>Ask me</span>

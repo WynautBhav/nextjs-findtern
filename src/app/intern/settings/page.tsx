@@ -10,6 +10,7 @@ import { BankDetailsForm, type BankDetails } from "@/components/intern/bank-deta
 import { ContactDetailsForm } from "@/components/intern/contact-details-form";
 import { requireRole } from "@/lib/auth";
 import { getDb, schema } from "@/lib/db";
+import { formatDmy } from "@/lib/format";
 import { SITE } from "@/lib/content/site";
 
 export const metadata: Metadata = {
@@ -37,26 +38,30 @@ export default async function InternSettings({ searchParams }: { searchParams: P
 
   const uid = session.uid;
   const db = getDb();
-  const [row] = await db
-    .select({ extra: schema.internOnboarding.extraData })
-    .from(schema.internOnboarding)
-    .where(eq(schema.internOnboarding.userId, uid))
-    .limit(1);
+  const [[row], [user]] = await Promise.all([
+    db
+      .select({ extra: schema.internOnboarding.extraData })
+      .from(schema.internOnboarding)
+      .where(eq(schema.internOnboarding.userId, uid))
+      .limit(1),
+    db
+      .select({
+        f: schema.users.firstName,
+        l: schema.users.lastName,
+        cc: schema.users.countryCode,
+        p: schema.users.phoneNumber,
+        email: schema.users.email,
+        createdAt: schema.users.createdAt,
+      })
+      .from(schema.users)
+      .where(eq(schema.users.id, uid))
+      .limit(1),
+  ]);
   const extra = (row?.extra ?? {}) as Record<string, unknown>;
-  const initialBank = (extra.bankDetails ?? extra.bank ?? {}) as BankDetails;
+  // The full account number never leaves the server; the form gets its last 4.
+  const { accountNumber, ...bankRest } = (extra.bankDetails ?? extra.bank ?? {}) as { accountNumber?: unknown } & BankDetails;
+  const initialBank: BankDetails = { ...bankRest, accountLast4: String(accountNumber ?? "").replace(/\D/g, "").slice(-4) };
 
-  const [user] = await db
-    .select({
-      f: schema.users.firstName,
-      l: schema.users.lastName,
-      cc: schema.users.countryCode,
-      p: schema.users.phoneNumber,
-      email: schema.users.email,
-      createdAt: schema.users.createdAt,
-    })
-    .from(schema.users)
-    .where(eq(schema.users.id, uid))
-    .limit(1);
   const contact = user
     ? { firstName: user.f, lastName: user.l, countryCode: user.cc, phoneNumber: user.p }
     : { firstName: "", lastName: "", countryCode: "+91", phoneNumber: "" };
@@ -65,11 +70,11 @@ export default async function InternSettings({ searchParams }: { searchParams: P
     <div>
       <PageHead title="Settings" lede="Your contact details, where your stipend is paid, and your password." />
 
-      <div className="grid gap-x-10 gap-y-10 xl:grid-cols-[minmax(0,1fr)_20rem]">
-        <div className="min-w-0 space-y-10">
+      <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_20rem]">
+        <div className="min-w-0 space-y-8">
           <section id="details" className="scroll-mt-24">
             <SectionHead title="Your details" hint="Your email is how you sign in, so it can't be changed here." />
-            <Surface className="p-5 sm:p-6">
+            <Surface className="p-5 lg:p-6">
               <ContactDetailsForm userId={uid} initial={contact} />
             </Surface>
           </section>
@@ -81,33 +86,33 @@ export default async function InternSettings({ searchParams }: { searchParams: P
 
           <section id="password" className="scroll-mt-24">
             <SectionHead title="Password" hint="Used when you sign in with your email instead of Google." />
-            <Surface className="p-5 sm:p-6">
+            <Surface className="p-5 lg:p-6">
               <ChangePasswordForm endpoint={`/api/users/${encodeURIComponent(uid)}/change-password`} />
             </Surface>
           </section>
         </div>
 
-        <aside className="space-y-4">
+        <aside className="grid content-start gap-4 sm:grid-cols-2 xl:grid-cols-1">
           <Surface as="section" aria-labelledby="account-head" className="p-5">
             <h2 id="account-head" className="text-base font-semibold tracking-[-0.01em] text-ink-900">
               Your account
             </h2>
             <dl className="mt-2 divide-y divide-ink-100">
               <div className="py-3">
-                <dt className="text-sm text-ink-600">Sign-in email</dt>
-                <dd className="mt-0.5 break-all text-sm font-medium text-ink-900">{user?.email ?? session.email}</dd>
+                <dt className="text-sm text-text-subtle">Sign-in email</dt>
+                <dd className="mt-1 break-all text-sm font-medium text-ink-900">{user?.email ?? session.email}</dd>
               </div>
               {/* Support finds you by this; quote it when you write in (INT-31). */}
               <div className="py-3">
-                <dt className="text-sm text-ink-600">Findtern ID</dt>
-                <dd className="mt-0.5 break-all font-mono text-xs font-medium text-ink-900">{uid}</dd>
-                <dd className="mt-1 text-xs text-ink-600">Your account&apos;s reference number. Quote it when you write to support so we can find you.</dd>
+                <dt className="text-sm text-text-subtle">Findtern ID</dt>
+                <dd className="nums mt-1 select-all break-all text-sm font-medium text-ink-900">{uid}</dd>
+                <dd className="mt-1 text-pretty text-xs text-text-subtle">Your account&apos;s reference number. Quote it when you write to support so we can find you.</dd>
               </div>
               {user?.createdAt ? (
                 <DetailRow
                   label="Member since"
                   mono
-                  value={new Date(user.createdAt).toLocaleDateString("en-GB", { timeZone: "Asia/Kolkata" })}
+                  value={formatDmy(user.createdAt)}
                 />
               ) : null}
             </dl>
@@ -124,9 +129,9 @@ export default async function InternSettings({ searchParams }: { searchParams: P
             <h2 id="help-head" className="text-base font-semibold tracking-[-0.01em] text-ink-900">
               Need help?
             </h2>
-            <p className="mt-2 text-pretty text-sm leading-relaxed text-ink-600">
+            <p className="mt-2 text-pretty text-sm leading-relaxed text-text-subtle">
               Write to{" "}
-              <a href={`mailto:${SITE.email}`} className="font-medium text-primary underline-offset-4 hover:underline">
+              <a href={`mailto:${SITE.email}`} className="font-medium text-primary underline-offset-4 hover:underline touch:inline-flex touch:min-h-11 touch:items-center">
                 {SITE.email}
               </a>{" "}
               with your Findtern ID. The team replies within one working day.

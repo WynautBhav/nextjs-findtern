@@ -246,7 +246,7 @@ export function EmployerSignupForm({
               onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
               autoComplete="one-time-code"
               placeholder="000000"
-              className="apple-spring mt-2 min-h-12 w-full rounded-apple-sm border border-ink-200 bg-white px-3.5 text-center font-mono text-lg tracking-[0.5em] text-ink-900 outline-none placeholder:text-ink-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+              className="apple-spring mt-2 min-h-12 w-full rounded-apple-sm border border-ink-200 bg-white px-3.5 text-center font-mono text-lg tracking-[0.5em] text-ink-900 outline-none placeholder:text-ink-500 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
             />
           </div>
           )}

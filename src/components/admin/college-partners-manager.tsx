@@ -155,7 +155,7 @@ export function CollegeRowControls({ row }: { row: CollegeAdminRow }) {
       <div role="status" aria-live="polite">
         {issued ? (
           <p className="rounded-apple-sm border border-brand-200 bg-brand-50 px-3 py-2 text-sm text-brand-900">
-            Login for <strong>{issued.email}</strong>: password <code className="rounded bg-white px-1.5 py-0.5 font-mono">{issued.password}</code>. Shown once; send it privately. Sign in at /college/login.
+            Login for <strong>{issued.email}</strong>: password <code className="rounded bg-white px-1.5 py-0.5 font-mono">{issued.password}</code>. Shown once; send it privately. Sign in at /login?as=college.
           </p>
         ) : null}
         {error ? <p className="text-sm text-danger">{error}</p> : null}

@@ -14,7 +14,7 @@
  * without a reload (INT-31).
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowRight, CalendarCheck, CheckCircle2, Clock, Loader2, Video } from "lucide-react";
@@ -24,7 +24,6 @@ import { CountdownAgreement, type AgreementSection } from "@/components/app/coun
 import { buttonClass } from "@/components/ui/button";
 import { csrfFetch } from "@/lib/client-fetch";
 import { aiInterviewPhase, joinableLink, type AiInterviewPhase } from "@/lib/ai-interview";
-import { cn } from "@/lib/utils";
 
 /** Legacy "AI Interview: Terms & Instructions", in substance. */
 const AI_TERMS: AgreementSection[] = [
@@ -48,6 +47,11 @@ type State = { phase: AiInterviewPhase; link: string | null };
 function useAiState(internId: string | null, initial: State) {
   const router = useRouter();
   const [state, setState] = useState<State>(initial);
+  // The last phase seen, read by the poll; a setState updater must stay pure, so router.refresh lives outside it.
+  const phaseRef = useRef(initial.phase);
+  useEffect(() => {
+    phaseRef.current = state.phase;
+  }, [state.phase]);
 
   const refresh = useCallback(async () => {
     if (!internId) return;
@@ -56,10 +60,10 @@ function useAiState(internId: string | null, initial: State) {
       if (!res.ok) return;
       const body = (await res.json().catch(() => ({}))) as { phase?: AiInterviewPhase; meetingLink?: string | null };
       if (!body.phase) return;
-      setState((prev) => {
-        if (prev.phase !== body.phase) router.refresh();
-        return { phase: body.phase as AiInterviewPhase, link: joinableLink(body.meetingLink) };
-      });
+      const changed = phaseRef.current !== body.phase;
+      phaseRef.current = body.phase;
+      setState({ phase: body.phase, link: joinableLink(body.meetingLink) });
+      if (changed) router.refresh();
     } catch {
       // A failed poll keeps the last known state; the next tick tries again.
     }
@@ -239,16 +243,16 @@ export function AiInterviewJoinCard({ interviewId, status, meetingLink, internId
   const pill = PHASE_PILL[state.phase];
 
   return (
-    <Surface as="section" aria-labelledby={`ai-${interviewId}`} className="p-5 sm:p-6">
-      <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
-        <div className="flex min-w-0 items-start gap-3.5">
+    <Surface as="section" aria-labelledby={`ai-${interviewId}`} className="p-5 lg:p-6">
+      <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
+        <div className="flex min-w-0 items-start gap-3">
           <span className="grid size-11 shrink-0 place-items-center rounded-apple-md bg-brand-50 text-brand-700" aria-hidden>
             <Video className="size-5" />
           </span>
           <div className="min-w-0">
-            <h2 id={`ai-${interviewId}`} className="text-base font-semibold tracking-[-0.01em] text-ink-900">
+            <h3 id={`ai-${interviewId}`} className="text-base font-semibold tracking-[-0.01em] text-ink-900">
               AI Interview
-            </h2>
+            </h3>
             <p className="mt-1 max-w-xl text-pretty text-sm leading-relaxed text-ink-600">
               {state.phase === "scored"
                 ? "Your Findtern Score is published. Employers shortlist on it."
@@ -264,7 +268,7 @@ export function AiInterviewJoinCard({ interviewId, status, meetingLink, internId
       </div>
 
       {state.phase === "ready" && state.link ? (
-        <div className={cn("mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-ink-100 pt-4")}>
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-ink-100 pt-4">
           <p className="flex items-center gap-2 text-sm font-medium text-brand-800">
             <CheckCircle2 className="size-4" aria-hidden />
             Read the instructions, then join.
@@ -274,7 +278,7 @@ export function AiInterviewJoinCard({ interviewId, status, meetingLink, internId
       ) : null}
 
       {state.phase === "scored" ? (
-        <div className="mt-5 border-t border-ink-100 pt-4">
+        <div className="mt-4 border-t border-ink-100 pt-4">
           <Link href="/intern/record" className={buttonClass({ variant: "outline", size: "sm" })}>
             See your score
             <ArrowRight className="size-4" aria-hidden />

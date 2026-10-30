@@ -1,4 +1,5 @@
 import { Pill, Surface, WaitingNote } from "@/components/app/primitives";
+import { STAT_ROW, StatTile } from "@/components/app/tiles";
 import { dayTone } from "@/components/intern/day-status";
 import { LEGACY_DAY_STATUSES } from "@/lib/employer-timesheets";
 import { formatDayLabel } from "@/lib/format";
@@ -26,34 +27,43 @@ export function SheetView({ sheet, backHref }: { sheet: TimesheetRow; backHref: 
   const extra = Object.keys(counts).filter((k) => !(LEGACY_DAY_STATUSES as readonly string[]).includes(k));
   const hours = days.reduce((sum, d) => sum + d.hours, 0);
   const status = (sheet.status ?? "").toLowerCase();
+  // Only statuses that occur: a row of "Absent 0, Fixed off 0" was a card of nothing.
+  const others = [...LEGACY_DAY_STATUSES, ...extra].filter((s) => s !== "Present" && counts[s]);
 
   return (
     <div className="space-y-6">
+      {/* Key numbers on the shared stat row; Present is counted there, so its pill is not repeated below. */}
+      <div className={cn(STAT_ROW, "max-sm:[&>:only-child]:col-span-2")}>
+        <StatTile
+          label="Days present"
+          value={counts.Present ?? 0}
+          unit={`/${days.length}`}
+          meta={`${status === "approved" ? "Approved" : "Sent"} ${whenLabel((status === "approved" ? sheet.approvedAt : sheet.submittedAt) ?? sheet.createdAt)}`}
+        />
+        {hours > 0 ? <StatTile label="Hours logged" value={Number(hours.toFixed(1))} unit="h" index={1} /> : null}
+      </div>
+
+      {others.length > 0 || status === "submitted" ? (
       <Surface className="p-5 sm:p-6">
-        <div className="grid grid-cols-3 gap-4 sm:gap-5">
-          <Figure label="Days present" value={counts.Present ?? 0} />
-          <Figure
-            label={status === "approved" ? "Approved" : "Sent"}
-            text={formatDayLabel((status === "approved" ? sheet.approvedAt : sheet.submittedAt) ?? sheet.createdAt)}
-          />
-          {hours > 0 ? <Figure label="Hours logged" value={hours} /> : <Figure label="Days in period" value={days.length} />}
-        </div>
-        <ul className="mt-5 flex flex-wrap gap-2" aria-label="Days by status">
-          {[...LEGACY_DAY_STATUSES, ...extra].map((s) => (
-            <li key={s}>
-              <Pill tone={dayTone(s)}>
-                {s} <span className="nums">{counts[s] ?? 0}</span>
-              </Pill>
-            </li>
-          ))}
-        </ul>
+        {others.length > 0 ? (
+          <ul className="flex flex-wrap gap-2" aria-label="Other days by status">
+            {others.map((s) => (
+              <li key={s}>
+                <Pill tone={dayTone(s)}>
+                  {s} <span className="nums">{counts[s]}</span>
+                </Pill>
+              </li>
+            ))}
+          </ul>
+        ) : null}
         {status === "submitted" ? (
-          <div className="mt-5 flex flex-col gap-3 border-t border-ink-100 pt-5 sm:flex-row sm:items-center sm:justify-between">
+          <div className={cn("flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between", others.length > 0 && "mt-5 border-t border-ink-100 pt-5")}>
             <WaitingNote who="Your manager" typical="Reviews usually take about two working days, and you are notified either way." />
             <DeleteSheetButton timesheetId={sheet.id} withdraw redirectTo={backHref} size="md" />
           </div>
         ) : null}
       </Surface>
+      ) : null}
 
       {adjusted.length > 0 ? (
         <Surface className="border-info/25 bg-info-soft/60 p-5">
@@ -110,17 +120,10 @@ export function SheetView({ sheet, backHref }: { sheet: TimesheetRow; backHref: 
   );
 }
 
-function Figure({ label, value, text }: { label: string; value?: number; text?: string }) {
-  return (
-    <div>
-      <p className="text-sm font-medium text-ink-600">{label}</p>
-      {text ? (
-        <p className="mt-1.5 text-lg font-semibold text-ink-900">{text}</p>
-      ) : (
-        <p className="nums mt-1 text-3xl font-semibold leading-tight tracking-[-0.02em] text-ink-900">{value}</p>
-      )}
-    </div>
-  );
+/** "today" / "3 days ago" mid-sentence; an absolute date keeps its capital. */
+function whenLabel(value: Date | null): string {
+  const label = formatDayLabel(value);
+  return /^(Today|Yesterday|Tomorrow|In \d+ days|\d+ days ago)$/.test(label) ? label.toLowerCase() : label;
 }
 
 function Note({ label, body }: { label: string; body: string }) {

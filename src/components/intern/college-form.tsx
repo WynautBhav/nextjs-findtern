@@ -4,23 +4,15 @@ import { useEffect, useId, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { BadgeCheck, Building2, Check, CircleHelp, Minus, Search, X } from "lucide-react";
 
-import { Pill, SectionHead, Surface } from "@/components/app/primitives";
+import { LIGHT_TILE, Pill, SectionHead, Surface } from "@/components/app/primitives";
+import { useConfirm } from "@/components/app/use-confirm";
 import { buttonVariants } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
 import { csrfFetch } from "@/lib/client-fetch";
 import type { MyCollege } from "@/lib/college/membership";
 import { cn } from "@/lib/utils";
 import { PushToggle } from "./college-push";
+import { SelectField } from "./onboarding/fields";
 
 type Purpose = { id: string; label: string; detail: string };
 type Option = { id: string; name: string; city: string | null; state: string | null; isPartner: boolean };
@@ -34,7 +26,7 @@ const YEARS = [
 ];
 
 const FIELD =
-  "min-h-11 w-full rounded-apple-sm border border-ink-200 bg-white px-3.5 text-[0.9375rem] text-ink-900 placeholder:text-text-subtle focus-visible:border-brand-600 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand-600/30";
+  "min-h-11 w-full rounded-apple-sm border border-ink-200 bg-white px-3.5 text-base text-ink-900 placeholder:text-text-subtle focus-visible:border-brand-600 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand-600/30";
 
 export function CollegeForm({
   initial,
@@ -82,23 +74,35 @@ function Membership({
   const router = useRouter();
   const [leaving, setLeaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { ask, dialog } = useConfirm();
   const verified = college.status === "verified";
   const granted = purposes.filter((p) => college.purposes.includes(p.id as MyCollege["purposes"][number]));
 
   async function leave() {
+    const ok = await ask({
+      title: `Leave ${college.name}?`,
+      body: "This withdraws your consent. Your placement team stops seeing your progress and you disappear from your college's drives straight away. Your Findtern profile stays as it is.",
+      confirmLabel: "Yes, leave and withdraw consent",
+    });
+    if (!ok) return;
     setLeaving(true);
     setError(null);
-    const res = await csrfFetch("/api/intern/college", { method: "DELETE" });
-    setLeaving(false);
-    if (!res.ok) {
-      setError("Couldn't leave right now. Try again.");
-      return;
+    try {
+      const res = await csrfFetch("/api/intern/college", { method: "DELETE" });
+      if (!res.ok) {
+        setError("Couldn't leave right now. Try again.");
+        return;
+      }
+      router.refresh();
+    } catch {
+      setError("Couldn't leave. Check your connection and try again.");
+    } finally {
+      setLeaving(false);
     }
-    router.refresh();
   }
 
   return (
-    <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_22rem]">
+    <div className={cn("grid gap-8", college.isPartner && "xl:grid-cols-[minmax(0,1fr)_22rem]")}>
       <div className="min-w-0 space-y-8">
         <Surface className="p-5 sm:p-6">
           <div className="flex items-start gap-4">
@@ -171,44 +175,28 @@ function Membership({
             <button type="button" onClick={onChange} className={cn(buttonVariants({ variant: "outline", size: "md" }))}>
               Change college or choices
             </button>
-            <Dialog>
-              <DialogTrigger asChild>
-                <button type="button" className={cn(buttonVariants({ variant: "ghost", size: "md" }), "text-danger hover:bg-danger-soft")}>
-                  Leave college
-                </button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Leave {college.name}?</DialogTitle>
-                  <DialogDescription>
-                    This withdraws your consent. Your placement team stops seeing your progress and you disappear from your
-                    college&apos;s drives straight away. Your Findtern profile stays as it is.
-                  </DialogDescription>
-                </DialogHeader>
-                <DialogFooter>
-                  <DialogClose asChild>
-                    <button type="button" className={cn(buttonVariants({ variant: "light", size: "md" }))}>
-                      Stay
-                    </button>
-                  </DialogClose>
-                  <button type="button" onClick={leave} disabled={leaving} className={cn(buttonVariants({ variant: "primary", size: "md" }), "bg-danger hover:bg-danger/90")}>
-                    {leaving ? "Leaving…" : "Leave and withdraw consent"}
-                  </button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
+            <button
+              type="button"
+              onClick={leave}
+              disabled={leaving}
+              className={cn(buttonVariants({ variant: "ghost", size: "md" }), "text-danger hover:bg-danger-soft")}
+            >
+              {leaving ? "Leaving…" : "Leave college"}
+            </button>
+            {dialog}
           </div>
-          {error ? (
-            <p role="alert" className="mt-2 text-sm text-danger">
-              {error}
-            </p>
-          ) : null}
+          {/* Mounted empty, then filled, so the message is announced. */}
+          <div role="alert" className="mt-2 text-sm text-danger">
+            {error}
+          </div>
         </section>
       </div>
 
+      {/* Drives and call alerts exist only for partner colleges. */}
+      {college.isPartner ? (
       <aside className="space-y-4">
         <Surface className="p-5">
-          <p className="text-sm font-medium text-ink-600">Call alerts</p>
+          <h2 className="text-base font-semibold text-ink-900">Call alerts</h2>
           <p className="mt-1 text-sm leading-relaxed text-ink-700">
             During a drive, employers can ask you to a short video call at a few minutes&apos; notice. Alerts make sure you
             don&apos;t miss one.
@@ -216,6 +204,7 @@ function Membership({
           <PushToggle vapidKey={vapidKey} className="mt-3" />
         </Surface>
       </aside>
+      ) : null}
     </div>
   );
 }
@@ -264,38 +253,43 @@ function JoinForm({
     }
     setSaving(true);
     setError(null);
-    const res = await csrfFetch("/api/intern/college", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        collegeId: chosen.id,
-        year: year === "" ? null : year,
-        branch: branch.trim() || null,
-        purposes: chosenPurposes,
-        declaredAdult: adult,
-      }),
-    });
-    setSaving(false);
-    if (!res.ok) {
-      const body = (await res.json().catch(() => ({}))) as { error?: string };
-      setError(body.error ?? "Couldn't save. Try again.");
-      return;
+    try {
+      const res = await csrfFetch("/api/intern/college", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          collegeId: chosen.id,
+          year: year === "" ? null : year,
+          branch: branch.trim() || null,
+          purposes: chosenPurposes,
+          declaredAdult: adult,
+        }),
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        setError(body.error ?? "Couldn't save. Try again.");
+        return;
+      }
+      onSaved();
+      router.refresh();
+    } catch {
+      setError("Couldn't save. Check your connection and try again.");
+    } finally {
+      setSaving(false);
     }
-    onSaved();
-    router.refresh();
   }
 
   return (
-    <form onSubmit={submit} className="max-w-2xl space-y-8" noValidate>
+    <form onSubmit={submit} className={cn("max-w-3xl space-y-8 rounded-apple-xl border border-ink-200/80 bg-white p-5 sm:p-8", LIGHT_TILE)} noValidate>
       <section>
         <SectionHead title="College" hint="Search by name, city or AISHE code." />
         {chosen ? (
-          <Surface className="flex items-center gap-3 p-4">
+          <div className="flex items-center gap-3 rounded-apple-lg border border-ink-200/80 p-4">
             <span aria-hidden className="grid size-10 shrink-0 place-items-center rounded-apple-sm bg-brand-50 text-brand-700">
               <Building2 className="size-5" />
             </span>
             <div className="min-w-0 flex-1">
-              <p className="text-[0.9375rem] font-medium leading-snug text-ink-900">{chosen.name}</p>
+              <p className="text-base font-medium leading-snug text-ink-900">{chosen.name}</p>
               <p className="text-sm text-ink-600">
                 {[chosen.city, chosen.state].filter(Boolean).join(", ")}
                 {chosen.isPartner ? (chosen.city ? " · " : "") + "Runs drives on Findtern" : ""}
@@ -308,31 +302,21 @@ function JoinForm({
             >
               Change
             </button>
-          </Surface>
+          </div>
         ) : (
-          <CollegeSearch initialQuery={institution} onPick={setChosen} />
+          <CollegeSearch initialQuery={institution.trim().length >= 3 ? institution.trim() : ""} onPick={setChosen} />
         )}
       </section>
 
       <section className="grid gap-4 sm:grid-cols-2">
-        <div>
-          <label htmlFor={`${ids}-year`} className="mb-1.5 block text-sm font-medium text-ink-800">
-            Year of study
-          </label>
-          <select
-            id={`${ids}-year`}
-            value={year}
-            onChange={(e) => setYear(e.target.value ? Number(e.target.value) : "")}
-            className={FIELD}
-          >
-            <option value="">Choose</option>
-            {YEARS.map((y) => (
-              <option key={y.value} value={y.value}>
-                {y.label}
-              </option>
-            ))}
-          </select>
-        </div>
+        <SelectField
+          id={`${ids}-year`}
+          label="Year of study"
+          value={year === "" ? "" : String(year)}
+          onChange={(v) => setYear(v ? Number(v) : "")}
+          options={YEARS.map((y) => ({ value: String(y.value), label: y.label }))}
+          placeholder="Choose"
+        />
         <div>
           <label htmlFor={`${ids}-branch`} className="mb-1.5 block text-sm font-medium text-ink-800">
             Branch <span className="font-normal text-text-subtle">(optional)</span>
@@ -413,11 +397,10 @@ function JoinForm({
         </span>
       </label>
 
-      {error ? (
-        <p role="alert" className="text-sm font-medium text-danger">
-          {error}
-        </p>
-      ) : null}
+      {/* Mounted empty, then filled, so the message is announced. */}
+      <div role="alert" className="text-sm font-medium text-danger">
+        {error}
+      </div>
 
       <div className="flex flex-wrap gap-3">
         <button type="submit" disabled={saving} className={cn(buttonVariants({ variant: "primary", size: "md" }))}>
@@ -440,6 +423,7 @@ function CollegeSearch({ initialQuery, onPick }: { initialQuery: string; onPick:
   const [query, setQuery] = useState(initialQuery);
   const [options, setOptions] = useState<Option[]>([]);
   const [loading, setLoading] = useState(false);
+  const [failed, setFailed] = useState(false);
   const [active, setActive] = useState(0);
   const [open, setOpen] = useState(Boolean(initialQuery));
   const reqId = useRef(0);
@@ -450,10 +434,17 @@ function CollegeSearch({ initialQuery, onPick }: { initialQuery: string; onPick:
       setLoading(true);
       try {
         const res = await fetch(`/api/colleges/search?q=${encodeURIComponent(query.trim())}`);
+        if (!res.ok) throw new Error("search failed");
         const body = (await res.json().catch(() => ({}))) as { colleges?: Option[] };
         if (id === reqId.current) {
           setOptions(body.colleges ?? []);
           setActive(0);
+          setFailed(false);
+        }
+      } catch {
+        if (id === reqId.current) {
+          setOptions([]);
+          setFailed(true);
         }
       } finally {
         if (id === reqId.current) setLoading(false);
@@ -527,7 +518,7 @@ function CollegeSearch({ initialQuery, onPick }: { initialQuery: string; onPick:
         role="listbox"
         aria-label="Colleges"
         hidden={!showList}
-        className="mt-2 max-h-80 overflow-y-auto rounded-apple-lg border border-ink-200/80 bg-white p-1 shadow-[0_6px_24px_rgb(7_47_36/0.08)]"
+        className="mt-2 max-h-80 overflow-y-auto rounded-apple-lg border border-ink-200/80 bg-white p-1 shadow-sm"
       >
         {options.map((o, i) => (
           <li
@@ -544,7 +535,7 @@ function CollegeSearch({ initialQuery, onPick }: { initialQuery: string; onPick:
             )}
           >
             <span className="min-w-0">
-              <span className="block truncate text-[0.9375rem] text-ink-900">{o.name}</span>
+              <span className="block truncate text-base text-ink-900">{o.name}</span>
               <span className="block truncate text-sm text-ink-600">{[o.city, o.state].filter(Boolean).join(", ")}</span>
             </span>
             {o.isPartner ? (
@@ -559,11 +550,132 @@ function CollegeSearch({ initialQuery, onPick }: { initialQuery: string; onPick:
       <p className="mt-2 text-sm text-ink-600" role="status" aria-live="polite">
         {loading
           ? "Searching…"
-          : query.trim().length >= 2 && options.length === 0
-            ? "No college by that name yet. Check the spelling, or ask your placement office to contact Findtern."
-            : query.trim().length < 2
-              ? "Colleges that run drives on Findtern are shown first."
-              : `${options.length} match${options.length === 1 ? "" : "es"}`}
+          : failed
+            ? "Couldn't search colleges. Check your connection and keep typing to try again."
+            : query.trim().length >= 2 && options.length === 0
+              ? "No college matches. Check the spelling, or tell us about it below."
+              : query.trim().length < 2
+                ? "Colleges that run drives on Findtern are shown first."
+                : `${options.length} match${options.length === 1 ? "" : "es"}`}
+      </p>
+
+      <MissingCollege query={query.trim()} />
+    </div>
+  );
+}
+
+/* ── "My college isn't listed" ───────────────────────────────────────── */
+
+// Sits inside the join <form>, so it is not a <form> itself: Enter sends the request instead of submitting the join.
+function MissingCollege({ query }: { query: string }) {
+  const ids = useId();
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState("");
+  const [city, setCity] = useState("");
+  const [state, setState] = useState("");
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState("");
+
+  async function send() {
+    if (sending) return;
+    if (name.trim().length < 3 || city.trim().length < 2 || state.trim().length < 2) {
+      setError("Add your college's name, city and state.");
+      return;
+    }
+    setSending(true);
+    setError(null);
+    try {
+      const res = await csrfFetch("/api/intern/college/request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, city, state }),
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        setError(body.error ?? "Couldn't send. Try again.");
+        return;
+      }
+      setMessage(`Thanks. We've sent ${name.trim()} to the Findtern team. Once it's added, come back here and pick it.`);
+      setOpen(false);
+      setName("");
+      setCity("");
+      setState("");
+    } catch {
+      setError("Couldn't send. Check your connection and try again.");
+    } finally {
+      setSending(false);
+    }
+  }
+
+  const onEnter = (e: React.KeyboardEvent) => {
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    void send();
+  };
+
+  return (
+    <div className="mt-3">
+      {!open ? (
+        <button
+          type="button"
+          aria-expanded={false}
+          onClick={() => {
+            setName((n) => n || query);
+            setMessage("");
+            setOpen(true);
+          }}
+          className="inline-flex min-h-11 items-center rounded-apple-sm text-sm font-medium text-primary hover:underline focus-visible:outline-2 focus-visible:outline-brand-700"
+        >
+          {message ? "Add another college" : "My college isn&apos;t listed"}
+        </button>
+      ) : null}
+
+      {open ? (
+        <div role="group" aria-labelledby={`${ids}-h`} className="space-y-3 rounded-apple-lg border border-ink-200/80 bg-ink-50 p-4">
+          <div>
+            <p id={`${ids}-h`} className="text-sm font-semibold text-ink-900">
+              Tell us your college
+            </p>
+            <p className="mt-0.5 text-sm text-ink-600">We&apos;ll add it. You can then pick it here.</p>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="sm:col-span-2">
+              <label htmlFor={`${ids}-name`} className="mb-1.5 block text-sm font-medium text-ink-800">
+                College name
+              </label>
+              <input id={`${ids}-name`} value={name} onChange={(e) => setName(e.target.value)} onKeyDown={onEnter} maxLength={200} autoComplete="off" className={FIELD} />
+            </div>
+            <div>
+              <label htmlFor={`${ids}-city`} className="mb-1.5 block text-sm font-medium text-ink-800">
+                City
+              </label>
+              <input id={`${ids}-city`} value={city} onChange={(e) => setCity(e.target.value)} onKeyDown={onEnter} maxLength={100} autoComplete="off" className={FIELD} />
+            </div>
+            <div>
+              <label htmlFor={`${ids}-state`} className="mb-1.5 block text-sm font-medium text-ink-800">
+                State
+              </label>
+              <input id={`${ids}-state`} value={state} onChange={(e) => setState(e.target.value)} onKeyDown={onEnter} maxLength={60} autoComplete="off" className={FIELD} />
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-3">
+            <button type="button" onClick={send} disabled={sending} className={cn(buttonVariants({ variant: "primary", size: "md" }))}>
+              {sending ? "Sending…" : "Send to Findtern"}
+            </button>
+            <button type="button" onClick={() => setOpen(false)} className={cn(buttonVariants({ variant: "light", size: "md" }))}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {/* Mounted empty, then filled, so both messages are announced. */}
+      <div role="alert" className="mt-2 text-sm font-medium text-danger">
+        {error}
+      </div>
+      <p role="status" aria-live="polite" className="mt-2 text-sm font-medium text-ink-800">
+        {message}
       </p>
     </div>
   );

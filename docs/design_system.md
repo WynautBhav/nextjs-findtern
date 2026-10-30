@@ -1,3 +1,5 @@
+> **Superseded on 29 Oct 2026 by `SPECS.md` and `ARCHITECTURE.md`. Kept for history; do not follow it.**
+
 # Findtern Admin Design System Specification
 
 ## 1. Visual Thesis and Philosophy

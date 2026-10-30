@@ -24,6 +24,27 @@ export const controlClass = (error?: string, extra?: string) => cn(CONTROL, erro
 
 const LABEL = "block text-sm font-medium text-ink-800";
 
+/**
+ * Arrow / Home / End on a `role="radiogroup"`: focus moves to the neighbour and
+ * picks it (the ARIA radio pattern). Pair with `radioTab` on each radio so only
+ * one is in the Tab order.
+ */
+export function onRadioKeys(e: React.KeyboardEvent<HTMLElement>) {
+  const radios = Array.from(e.currentTarget.querySelectorAll<HTMLElement>('[role="radio"]'));
+  const at = radios.indexOf(document.activeElement as HTMLElement);
+  if (at < 0) return;
+  const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key];
+  const to = e.key === "Home" ? 0 : e.key === "End" ? radios.length - 1 : step ? (at + step + radios.length) % radios.length : -1;
+  if (to < 0) return;
+  e.preventDefault();
+  radios[to].focus();
+  // Already-checked radios are not clicked again: tapping the widest work mode steps it back.
+  if (radios[to].getAttribute("aria-checked") !== "true") radios[to].click();
+}
+
+/** Roving tabindex: the checked radio is the one tab stop, else the first. */
+export const radioTab = (checked: boolean, index: number, anyChecked: boolean) => (checked || (!anyChecked && index === 0) ? 0 : -1);
+
 export function Label({ htmlFor, children, optional }: { htmlFor?: string; children: React.ReactNode; optional?: boolean }) {
   const Tag = htmlFor ? "label" : "span";
   return (
@@ -308,9 +329,10 @@ export function Choice<T extends string>({
         aria-labelledby={`${id}-label`}
         aria-describedby={describedBy(id, error, hint)}
         aria-invalid={error ? true : undefined}
+        onKeyDown={onRadioKeys}
         className="mt-2 flex flex-wrap gap-2 outline-none"
       >
-        {options.map((o) => {
+        {options.map((o, i) => {
           const active = value === o.value;
           return (
             <button
@@ -318,6 +340,7 @@ export function Choice<T extends string>({
               type="button"
               role="radio"
               aria-checked={active}
+              tabIndex={radioTab(active, i, options.some((x) => x.value === value))}
               data-field={id}
               onClick={() => onChange(o.value)}
               className={cn(
@@ -401,7 +424,7 @@ export function EntryCard({
   return (
     <div className="rounded-apple-lg border border-ink-200/80 bg-ink-50/50 p-4 sm:p-5">
       <div className="mb-4 flex min-h-11 items-center justify-between gap-3">
-        <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-brand-700">{title}</p>
+        <p className="text-sm font-semibold text-ink-900">{title}</p>
         {onRemove ? <RemoveButton label={removeLabel} onClick={onRemove} /> : null}
       </div>
       <div className="space-y-6">{children}</div>

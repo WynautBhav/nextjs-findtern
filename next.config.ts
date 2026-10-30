@@ -49,6 +49,13 @@ const LEGACY_REDIRECTS: { from: string; to: string }[] = [
 
   { from: "/employer/proposals/:id", to: "/employer/proposal/:id" },
   { from: "/intern/login", to: "/login" },
+  // Auth pages merged into one per step, with the account type in `?as=` (30 Oct).
+  { from: "/employer/login", to: "/login?as=employer" },
+  { from: "/employer/signup", to: "/signup?as=employer" },
+  { from: "/employer/forgot-password", to: "/forgot-password?as=employer" },
+  { from: "/employer/reset-password", to: "/reset-password?as=employer" },
+  { from: "/employer/verify-email", to: "/verify-email?as=employer" },
+  { from: "/college/login", to: "/login?as=college" },
   { from: "/intern/signup", to: "/signup" },
   { from: "/intern/edit-profile", to: "/intern/onboarding" },
   { from: "/intern/dashboard/documents", to: "/intern/documents" },

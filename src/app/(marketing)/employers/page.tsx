@@ -151,7 +151,7 @@ export default async function EmployersPage() {
         }
         lead="Every candidate in the pool has been interviewed, tested and scored before you see them. You are choosing from a shortlist, not sorting a pile."
       >
-        <ButtonLink href="/employer/signup" variant="primary" size="lg">
+        <ButtonLink href="/signup?as=employer" variant="primary" size="lg">
           Start hiring
           <ArrowRight className="size-4" aria-hidden />
         </ButtonLink>

@@ -15,9 +15,10 @@ import { cn } from "@/lib/utils";
 
 /* ── Page head ──────────────────────────────────────────────────────────
  * The one page title for every role (AdminPageHeader and the employer
- * PageHeader are thin wrappers). Set on the marketing site's display scale,
- * so a signed-in page has the same voice as the page that sold it. The
- * eyebrow is optional and meant for section landings, not every screen. */
+ * PageHeader are thin wrappers). `text-2xl`, not the marketing display
+ * scale: a console page is a tool, and a 40px title pushed the work below
+ * the fold on phones (SPECS §3.2). Keep the lede for state, not for
+ * explaining the page. */
 
 export function PageHead({
   title,
@@ -33,13 +34,13 @@ export function PageHead({
   className?: string;
 }) {
   return (
-    <header className={cn("mb-8 flex flex-wrap items-end justify-between gap-x-8 gap-y-4", className)}>
+    <header className={cn("mb-6 flex flex-wrap items-end justify-between gap-4 lg:mb-8", className)}>
       <div className="min-w-0 max-w-3xl">
         {eyebrow ? (
-          <p className="mb-2.5 text-xs font-semibold uppercase tracking-[0.16em] text-brand-700">{eyebrow}</p>
+          <p className="mb-1 text-sm font-medium text-text-subtle">{eyebrow}</p>
         ) : null}
-        <h1 className="text-balance text-3xl font-semibold leading-[1.12] tracking-[-0.025em] text-ink-900">{title}</h1>
-        {lede ? <p className="mt-3 max-w-2xl text-pretty text-base leading-relaxed text-ink-600">{lede}</p> : null}
+        <h1 className="text-balance text-2xl font-semibold tracking-[-0.02em] text-ink-900">{title}</h1>
+        {lede ? <p className="mt-1 max-w-2xl text-pretty text-sm text-text-subtle">{lede}</p> : null}
       </div>
       {action ? <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:shrink-0">{action}</div> : null}
     </header>
@@ -64,7 +65,7 @@ export function HeroBand({
   title: React.ReactNode;
   lede?: React.ReactNode;
   actions?: React.ReactNode;
-  /** Figures under the copy, usually a row of `StatTile tone="onDark"`. */
+  /** Figures under the copy. */
   children?: React.ReactNode;
   className?: string;
 }) {
@@ -85,53 +86,20 @@ export function HeroBand({
   );
 }
 
-/* ── Stat tile ──────────────────────────────────────────────────────────
- * A figure that matters, set large. "0" and "None" are facts too, but the
- * caller should prefer a sentence ("No interviews yet") over a hero zero:
- * pass `value={null}` and an `empty` line. */
-
-export function StatTile({
-  label,
-  value,
-  hint,
-  empty,
-  href,
-  tone = "default",
-  className,
-}: {
-  label: string;
-  value: React.ReactNode | null;
-  hint?: React.ReactNode;
-  /** Shown in place of the figure when `value` is null. */
-  empty?: string;
-  href?: string;
-  tone?: "default" | "onDark";
-  className?: string;
-}) {
-  const dark = tone === "onDark";
-  const body = (
-    <>
-      <p className={cn("text-sm font-medium", dark ? "text-on-dark-subtle" : "text-ink-600")}>{label}</p>
-      {value === null ? (
-        <p className={cn("mt-2 text-base font-medium", dark ? "text-white/80" : "text-ink-700")}>{empty ?? "-"}</p>
-      ) : (
-        <p className={cn("nums mt-1.5 text-3xl font-semibold leading-tight tracking-[-0.02em]", dark ? "text-white" : "text-ink-900")}>{value}</p>
-      )}
-      {hint ? <p className={cn("mt-1.5 text-sm", dark ? "text-on-dark-subtle" : "text-ink-600")}>{hint}</p> : null}
-    </>
-  );
-  const cls = cn(
-    "block min-w-0 rounded-apple-lg p-5",
-    dark ? "bg-white/[0.06] ring-1 ring-inset ring-white/10" : "border border-ink-200/80 bg-white shadow-xs",
-    href && (dark ? "apple-spring hover:bg-white/[0.1]" : "apple-spring hover:border-brand-300 hover:shadow-sm"),
-    className,
-  );
-  return href ? (
-    <Link href={href} className={cls}>
-      {body}
-    </Link>
-  ) : (
-    <div className={cls}>{body}</div>
+/** One headline number in a page's figure strip (a `<dl>`): label, figure, quiet hint. */
+export function Figure({ label, value, empty, hint }: { label: string; value: React.ReactNode | null; empty: string; hint?: string }) {
+  return (
+    <div className="min-w-0">
+      <dt className="text-sm text-text-subtle">{label}</dt>
+      <dd className="mt-1">
+        {value !== null ? (
+          <span className="nums block text-3xl font-semibold tracking-tight text-ink-900">{value}</span>
+        ) : (
+          <span className="block text-base font-medium text-ink-700">{empty}</span>
+        )}
+        {hint ? <span className="mt-1 block text-xs text-text-subtle">{hint}</span> : null}
+      </dd>
+    </div>
   );
 }
 
@@ -148,10 +116,10 @@ export function SectionHead({
   className?: string;
 }) {
   return (
-    <div className={cn("mb-3 flex items-baseline justify-between gap-4", className)}>
+    <div className={cn("mb-4 flex items-baseline justify-between gap-4", className)}>
       <div className="min-w-0">
-        <h2 className="text-base font-semibold tracking-[-0.01em] text-ink-900">{title}</h2>
-        {hint ? <p className="mt-0.5 text-sm text-ink-600">{hint}</p> : null}
+        <h2 className="text-lg font-semibold tracking-[-0.01em] text-ink-900">{title}</h2>
+        {hint ? <p className="mt-1 text-sm text-text-subtle">{hint}</p> : null}
       </div>
       {action ? <div className="shrink-0">{action}</div> : null}
     </div>
@@ -159,10 +127,15 @@ export function SectionHead({
 }
 
 /* ── Surface ───────────────────────────────────────────────────────────
- * One border, one radius, one shadow step. The old screens used
+ * One border, one radius, no shadow (shadows are for things that float), except
+ * inside the light intern console, where it takes the dashboard tile look. The old screens used
  * `rounded-xl border border-ink-100 bg-white` in nine places and
  * `rounded-xl ... shadow-xs` in one, which is how a radius difference of four
  * pixels shipped unnoticed. */
+
+/** On the light console's grey canvas a card is a dashboard tile: no border, one soft shadow. */
+export const LIGHT_TILE =
+  "in-data-[tone=light]:border-transparent in-data-[tone=light]:shadow-tile";
 
 export function Surface({
   children,
@@ -177,7 +150,8 @@ export function Surface({
   return (
     <As
       className={cn(
-        "min-w-0 rounded-apple-xl border border-ink-200/80 bg-white shadow-xs",
+        "min-w-0 rounded-apple-xl border border-ink-200/80 bg-white",
+        LIGHT_TILE,
         className,
       )}
       {...rest}
@@ -216,7 +190,7 @@ export function Pill({
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset",
+        "inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-xs font-medium ring-1 ring-inset",
         TONE[tone],
         className,
       )}
@@ -237,10 +211,13 @@ export function EmptyScene({
   next,
   who,
   art,
+  as: Title = "p",
   className,
 }: {
   title: string;
   body: string;
+  /** Heading level. A paragraph by default, since most empty states sit inside a tile that already has its own h2. */
+  as?: "h2" | "h3" | "p";
   /** The action that resolves this state, if there is one. */
   next?: { label: string; href: string };
   /** Who has to do the thing. Absent means the candidate does. */
@@ -261,8 +238,8 @@ export function EmptyScene({
         className,
       )}
     >
-      {art ? <ThreadMark className="mb-5" /> : null}
-      <h2 className="text-balance text-lg font-semibold tracking-[-0.01em] text-ink-900">{title}</h2>
+      {art ? <ThreadMark className="mb-4" /> : null}
+      <Title className="text-balance text-lg font-semibold tracking-[-0.01em] text-ink-900">{title}</Title>
       <p className="mt-2 max-w-md text-pretty text-sm leading-relaxed text-ink-600">{body}</p>
       {who ? (
         // "You - send the first offer" reads as "You: send the first offer";
@@ -358,9 +335,9 @@ export function DetailRow({
   mono?: boolean;
 }) {
   return (
-    <div className="flex items-baseline justify-between gap-6 py-3">
-      <dt className="shrink-0 text-sm text-ink-600">{label}</dt>
-      <dd className={cn("min-w-0 text-right text-sm font-medium text-ink-900", mono && "tabular-nums")}>
+    <div className="flex flex-col gap-1 py-3 sm:flex-row sm:items-baseline sm:justify-between sm:gap-4">
+      <dt className="shrink-0 text-sm text-text-subtle">{label}</dt>
+      <dd className={cn("min-w-0 text-sm font-medium text-ink-900 [overflow-wrap:anywhere] sm:text-right", mono && "tabular-nums")}>
         {value}
       </dd>
     </div>
@@ -379,7 +356,7 @@ export type FilterTab = { key: string; label: string; count?: number };
 /** The one tab look (filters, view switches, record tabs): a filled pill when on. */
 export function pillTabClass(on: boolean): string {
   return cn(
-    "apple-spring inline-flex min-h-10 shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-3.5 text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 max-lg:min-h-11",
+    "apple-spring inline-flex min-h-10 shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-4 text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 max-lg:min-h-11",
     on ? "bg-brand-700 text-white" : "text-ink-600 hover:bg-ink-100 hover:text-ink-900",
   );
 }
@@ -425,7 +402,7 @@ export function FilterTabs({
           </>
         );
         return hrefFor ? (
-          <Link key={t.key} href={hrefFor(t.key)} scroll={false} aria-current={on ? "true" : undefined} className={cls}>
+          <Link key={t.key} href={hrefFor(t.key)} scroll={false} aria-current={on ? "page" : undefined} className={cls}>
             {inner}
           </Link>
         ) : (

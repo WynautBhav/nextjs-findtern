@@ -6,7 +6,8 @@ import { fteOf } from "@/lib/admin/fte";
 import { DataTable } from "@/components/admin/data-table";
 import { ProposalStatusEditor } from "@/components/admin/proposal-status-editor";
 import { StatusBadge } from "@/components/admin/status-badge";
-import { DetailRow, PageHead, Pill, SectionHead, StatTile, Surface, pillTabClass } from "@/components/app/primitives";
+import { DetailRow, PageHead, Pill, SectionHead, Surface, pillTabClass } from "@/components/app/primitives";
+import { StatTile } from "@/components/app/tiles";
 import { toQueryString } from "@/lib/admin/params";
 import type { CompanyLedger, HireLedger } from "@/lib/admin/company-ledger";
 import type { Employer, EmployerPayment, Interview, Project, Proposal } from "@/lib/db/schema";
@@ -539,10 +540,10 @@ function DuesTab({
   const { totals } = ledger;
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <StatTile label="Billed" value={formatMoney(totals.billedInrMinor, "INR", { zeroLabel: "₹0" })} hint="Paid plus still due, in INR" />
-        <StatTile label="Paid" value={formatMoney(totals.paidInrMinor, "INR", { zeroLabel: "₹0" })} hint="Every paid order" />
-        <StatTile label="Remaining" value={formatMoney(totals.remainingInrMinor, "INR", { zeroLabel: "₹0" })} hint="Unpaid offers and monthly instalments left" />
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <StatTile label="Billed" value={formatMoney(totals.billedInrMinor, "INR", { zeroLabel: "₹0" })} meta="Paid plus still due, in INR" />
+        <StatTile label="Paid" value={formatMoney(totals.paidInrMinor, "INR", { zeroLabel: "₹0" })} meta="Every paid order" />
+        <StatTile label="Remaining" value={formatMoney(totals.remainingInrMinor, "INR", { zeroLabel: "₹0" })} meta="Unpaid offers and monthly instalments left" />
       </div>
       <DataTable
         basePath={base}

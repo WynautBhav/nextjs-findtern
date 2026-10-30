@@ -29,7 +29,7 @@ export function InternRouteError({
   return (
     <div>
       <PageHead title={title} />
-      <Surface className="flex flex-col items-start gap-4 p-6 sm:flex-row sm:items-center sm:justify-between">
+      <Surface className="flex flex-col items-start gap-4 p-5 sm:flex-row lg:p-6 sm:items-center sm:justify-between">
         <div className="flex items-start gap-3">
           <span className="grid size-10 shrink-0 place-items-center rounded-apple-sm bg-danger-soft text-danger">
             <AlertCircle className="size-5" aria-hidden />

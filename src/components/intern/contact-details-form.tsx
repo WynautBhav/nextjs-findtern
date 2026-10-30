@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 
@@ -24,6 +24,7 @@ export function ContactDetailsForm({
   const [attempted, setAttempted] = useState(false);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const saveBtn = useRef<HTMLButtonElement>(null);
   const set = (k: keyof typeof v) => (value: string) => setV((s) => ({ ...s, [k]: value }));
 
   const live: Record<string, string> = {};
@@ -58,6 +59,8 @@ export function ContactDetailsForm({
       setMsg({ ok: false, text: "Couldn't save. Check your connection and try again." });
     } finally {
       setBusy(false);
+      // The button was disabled while saving, which dropped focus to <body>; put it back.
+      requestAnimationFrame(() => saveBtn.current?.focus());
     }
   }
 
@@ -92,15 +95,14 @@ export function ContactDetailsForm({
         <FieldNote id="phoneNumber" error={errors.phoneNumber} hint={phoneHint(v.countryCode)} />
       </div>
       <div className="flex flex-wrap items-center gap-3">
-        <button type="submit" disabled={busy} className={buttonClass({ variant: "primary", size: "md" })}>
+        <button ref={saveBtn} type="submit" disabled={busy} className={buttonClass({ variant: "primary", size: "md" })}>
           {busy ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
           {busy ? "Saving…" : "Save details"}
         </button>
-        {msg ? (
-          <span role="status" className={msg.ok ? "text-sm text-success" : "text-sm text-danger"}>
-            {msg.text}
-          </span>
-        ) : null}
+        {/* Mounted empty, then filled, so the result is announced. */}
+        <span role="status" className={msg?.ok ? "text-sm text-success" : "text-sm text-danger"}>
+          {msg?.text}
+        </span>
       </div>
     </form>
   );

@@ -13,7 +13,7 @@ import { aiInterviewLinks } from "@/lib/ai-interview-links";
 import { aiInterviewPhase, isScored, latestAiInterview } from "@/lib/ai-interview";
 import { getDb, schema } from "@/lib/db";
 import { loadInternData } from "@/lib/intern-data";
-import { draftFromRecord, emptyDraft, profileCompletion, type OnboardingDraft } from "@/lib/onboarding";
+import { draftFromRecord, emptyDraft, linkedinHref, profileCompletion, type OnboardingDraft } from "@/lib/onboarding";
 import { isInternPaid } from "@/lib/payments";
 import { visibleAgainAt } from "@/lib/profile-hide";
 
@@ -152,8 +152,8 @@ export default async function InternProfile() {
               <DetailRow
                 label="LinkedIn"
                 value={
-                  draft?.linkedinUrl ? (
-                    <a href={draft.linkedinUrl} target="_blank" rel="noopener noreferrer" className="font-medium text-primary underline-offset-4 hover:underline touch:inline-flex touch:min-h-11 touch:items-center">
+                  linkedinHref(draft?.linkedinUrl) ? (
+                    <a href={linkedinHref(draft?.linkedinUrl) ?? undefined} target="_blank" rel="noopener noreferrer" className="font-medium text-primary underline-offset-4 hover:underline touch:inline-flex touch:min-h-11 touch:items-center">
                       Open
                     </a>
                   ) : (

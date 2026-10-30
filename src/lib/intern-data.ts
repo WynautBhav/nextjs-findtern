@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { and, desc, eq, inArray } from "drizzle-orm";
 
 import { getDb, hasDb, schema } from "@/lib/db";
@@ -41,7 +42,8 @@ export { HIDDEN_COMPANY };
 export const AI_INTERVIEW_EMAIL = "ai-interview@findtern.ai";
 export const AI_INTERVIEW_NAME = "AI Interview";
 
-export async function loadInternData(uid: string) {
+// cache(): the intern layout and its page both call this; one render shares one read (Next "Fetching data": ORM calls).
+export const loadInternData = cache(async (uid: string) => {
   const db = getDb();
 
   const [proposals, interviews, timesheets, payouts, onboarding, document] = await Promise.all([
@@ -118,7 +120,7 @@ export async function loadInternData(uid: string) {
     ),
     money: deriveMoney(r),
   };
-}
+});
 
 /** Names of the projects behind this candidate's proposals, resolved once. */
 export async function projectNames(ids: string[]): Promise<Record<string, string>> {

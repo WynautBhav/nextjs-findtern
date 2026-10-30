@@ -1,3 +1,5 @@
+> **Superseded on 29 Oct 2026 by `SPECS.md` and `ARCHITECTURE.md`. Kept for history; do not follow it.**
+
 # Finish tracker: flawless look + full functionality
 
 Started 27 Oct 2026. Launch is delayed until this is done. The owner reviews

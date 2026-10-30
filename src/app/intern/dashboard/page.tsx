@@ -2,21 +2,26 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, GraduationCap } from "lucide-react";
 
-import { EmptyScene, HeroBand, Pill, SectionHead, StatTile, Surface } from "@/components/app/primitives";
+import { EmptyScene, PageHead, Pill } from "@/components/app/primitives";
+import { ActivityList, ScoreScale, STAT_ROW, StatTile, Tile } from "@/components/app/tiles";
 import { buttonClass } from "@/components/ui/button";
-import { StatusStrip, Thread } from "@/components/app/thread";
 import { ActivationCard } from "@/components/intern/activation-card";
 import { GettingStarted } from "@/components/intern/getting-started";
 import { MeetingJoinButton } from "@/components/intern/meeting-join";
-import { CompanyInitials } from "@/components/marketing/role-card";
 import { OpenToWorkToggle } from "@/components/intern/open-to-work-toggle";
 import { aiInterviewPhase, isAiInterview, isScored, joinableLink, latestAiInterview } from "@/lib/ai-interview";
 import { requireRole } from "@/lib/auth";
+import { cn } from "@/lib/utils";
+import { HoursPills } from "@/components/intern/home/hours-pills";
+import { NextUpTile } from "@/components/intern/home/next-up-tile";
+import { pickNextUp } from "@/components/intern/home/next-up";
+import { parseOffer } from "@/lib/offer";
+import { formatPeriodDays, isoDay, todayIst } from "@/lib/timesheet-days";
 import { getDb, schema } from "@/lib/db";
 import { eq } from "drizzle-orm";
 import { loadInternData, openProjects } from "@/lib/intern-data";
 import { isMeetingLinkLive } from "@/lib/employer-interview-rules";
-import { nextAction, slotOf } from "@/lib/journey";
+import { companyIn, hoursByMonth, hoursIn, nextAction, roleOf, slotOf } from "@/lib/journey";
 import { formatMoney, formatSlotTime, shortDate } from "@/lib/format";
 import { isInternPaid } from "@/lib/payments";
 import { isHiredProposal } from "@/lib/hire-status";
@@ -25,7 +30,6 @@ import { getInternActivationFeeMinor } from "@/lib/platform-settings";
 import { visibleAgainAt } from "@/lib/profile-hide";
 import { profileCompletion } from "@/lib/onboarding";
 import { membershipOf } from "@/lib/college/membership";
-import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = {
   title: "Home",
@@ -35,11 +39,11 @@ export const metadata: Metadata = {
 /**
  * Home.
  *
- * One main column for what is happening (the pending action once, then the
- * activity thread, then open roles while searching) and a narrow rail of
- * glanceable facts: next interview, score, profile completeness, visibility,
- * money. Nothing appears twice, and nothing shows a number it does not have:
- * no score before the interview, no "₹0 on its way".
+ * A bento (SPECS §2 dashboard exception): the key numbers first, one of them
+ * brand-filled, then the one thing waiting and the dark "Next up" date beside
+ * the hours chart, then activity and the glanceable facts. Nothing appears twice, and nothing shows a number it does
+ * not have: no score before the interview, no "₹0 on its way", no hours tile
+ * before the first timesheet.
  */
 function extraBag(onboarding: { extraData?: Record<string, unknown> | null } | null) {
   const extra = onboarding?.extraData;
@@ -75,30 +79,33 @@ function ratingsOf(onboarding: { extraData?: Record<string, unknown> | null } | 
 
 const IST = "Asia/Kolkata";
 
+
 export default async function InternHome() {
   const session = await requireRole("intern");
 
-  const data = await loadInternData(session.uid);
+  // Independent reads, in parallel. loadInternData is cache()d: the layout's call already did the work.
+  const [data, [user], activated, activationFeeMinor, college] = await Promise.all([
+    loadInternData(session.uid),
+    getDb()
+      .select({
+        first: schema.users.firstName,
+        last: schema.users.lastName,
+        email: schema.users.email,
+        countryCode: schema.users.countryCode,
+        phoneNumber: schema.users.phoneNumber,
+      })
+      .from(schema.users)
+      .where(eq(schema.users.id, session.uid))
+      .limit(1),
+    // Activation: the one-time ₹2,499 that takes a profile live. Once any paid
+    // row exists the card leaves the dashboard for good.
+    isInternPaid(session.uid),
+    getInternActivationFeeMinor(),
+    membershipOf(session.uid).catch(() => null),
+  ]);
   const action = nextAction(data.thread);
   const working = data.stage === "working";
   const open = working ? [] : await openProjects(6, { strict: true });
-
-  const [user] = await getDb()
-    .select({
-      first: schema.users.firstName,
-      last: schema.users.lastName,
-      email: schema.users.email,
-      countryCode: schema.users.countryCode,
-      phoneNumber: schema.users.phoneNumber,
-    })
-    .from(schema.users)
-    .where(eq(schema.users.id, session.uid))
-    .limit(1);
-
-  // Activation: the one-time ₹2,499 that takes a profile live. Once any paid
-  // row exists the card leaves the dashboard for good.
-  const activated = await isInternPaid(session.uid);
-  const activationFeeMinor = await getInternActivationFeeMinor();
 
   const openRoles = open.filter((p) => !data.proposals.some((mine) => mine.projectId === p.id));
 
@@ -131,7 +138,6 @@ export default async function InternHome() {
   const aiPhase = aiInterviewPhase(aiRow, isScored(data.onboarding?.extraData));
 
   const fullName = `${user?.first ?? ""} ${user?.last ?? ""}`.trim() || "Candidate";
-  const college = await membershipOf(session.uid).catch(() => null);
   const score = scoreOf(data.onboarding);
   const ratings = ratingsOf(data.onboarding);
   // Profile → activation → AI interview, in that order, until all three are done.
@@ -141,313 +147,363 @@ export default async function InternHome() {
     hasPhoto: Boolean(data.document?.profilePhotoName),
   });
   const gettingStarted = !working && (!completion.complete || !activated || aiPhase !== "scored");
-  // Legacy badge (dashboard.tsx:1031): live only when paid and scored.
+  // Whether employers can find this profile (legacy dashboard.tsx:1031: paid and
+  // scored). Someone already hired got there through a visible profile, even when
+  // the activation predates payment rows, so they never read as "pending".
   const profileStatus = !openToWork
-    ? { tone: "closed" as const, label: "Profile hidden" }
-    : activated && aiPhase === "scored"
-      ? { tone: "live" as const, label: "Profile live" }
-      : { tone: "waiting" as const, label: "Profile pending" };
+    ? { tone: "closed" as const, label: "Hidden" }
+    : (activated || working) && aiPhase === "scored"
+      ? { tone: "live" as const, label: "Visible" }
+      : { tone: "waiting" as const, label: "Not visible yet" };
 
-  // The pending action is shown once, in the strip; the thread skips it.
-  const history = action ? data.thread.filter((n) => n !== action) : data.thread;
-
-  const offersWaiting = data.proposals.filter((p) => p.status === "sent").length;
-  const showInterviewTile = !working || Boolean(upcomingInterviewItem);
   // Hours open only once the company has paid (bug sheet 7, S1 r65); an
   // accepted, unpaid offer is "working" but has nothing to log yet.
   const hired = data.proposals.some((p) => isHiredProposal(p));
-  const lede = working
+  const now = new Date();
+  const today = todayIst(now);
+
+  // The one dated thing coming: an interview, a stipend payout, or the next
+  // timesheet period opening. Same period rule as the Timesheets page.
+  const sheetOffer =
+    working && data.engagement && isHiredProposal(data.engagement)
+      ? parseOffer(data.engagement.offerDetails, data.engagement.currency)
+      : null;
+  const next = pickNextUp({
+    now,
+    interview: upcomingInterviewItem?.when ?? null,
+    payoutDue: data.money.incomingMinor > 0 ? data.money.nextExpectedAt : null,
+    sheet:
+      sheetOffer && !sheetOffer.fullTime
+        ? {
+            startDate: sheetOffer.startDate,
+            months: sheetOffer.months,
+            taken: data.timesheets
+              .filter((t) => t.proposalId === data.engagement!.id && t.periodStart && t.periodEnd)
+              .map((t) => ({ start: isoDay(t.periodStart!), end: isoDay(t.periodEnd!) })),
+          }
+        : null,
+  });
+
+  // Key numbers: only the ones this person has. The first one is brand-filled.
+  const approvedHours = data.timesheets.filter((t) => t.status === "approved").reduce((sum, t) => sum + hoursIn(t), 0);
+  const waitingHours = data.timesheets.filter((t) => t.status === "submitted").reduce((sum, t) => sum + hoursIn(t), 0);
+  const allMonths = data.timesheets.length > 0 ? hoursByMonth(data.timesheets, now, 6, sheetOffer?.startDate ? new Date(sheetOffer.startDate) : null) : null;
+  const stats: React.ComponentProps<typeof StatTile>[] = [
+    ...(data.money.paidMinor > 0
+      ? [{
+          label: "Paid to you",
+          value: formatMoney(data.money.paidMinor, "INR"),
+          meta:
+            data.money.incomingMinor > 0
+              ? `${formatMoney(data.money.incomingMinor, data.money.currency, { zeroLabel: false })} on its way` +
+                // Next up carries the due date when it is the payout.
+                (data.money.nextExpectedAt && next?.kind !== "payout"
+                  ? `, due ${shortDate(data.money.nextExpectedAt, { day: "numeric", month: "short" })}`
+                  : "")
+              : data.money.lastPaidAt
+                ? `Last paid ${shortDate(data.money.lastPaidAt, { day: "numeric", month: "short" })}`
+                : undefined,
+          href: "/intern/earnings",
+        }]
+      : []),
+    ...(data.timesheets.length > 0
+      ? [{
+          label: "Hours approved",
+          value: Number(approvedHours.toFixed(1)),
+          unit: "h",
+          meta: waitingHours > 0 ? `${Number(waitingHours.toFixed(1))} h waiting for review` : undefined,
+          href: "/intern/timesheets",
+        }]
+      : []),
+    ...(score !== null
+      ? [{ label: "Findtern Score", value: score.toFixed(1), unit: "/10", href: "/intern/record" }]
+      : []),
+  ].map((s, i) => ({ ...s, featured: i === 0, index: i }));
+
+  // The pending action is shown once, in its tile; the thread skips it.
+  const history = action ? data.thread.filter((n) => n !== action) : data.thread;
+
+  // Who this person works for, and for how long: the line the references
+  // spend on a subtitle, from rows we already have.
+  const role = working && data.engagement
+    ? `${roleOf(data.engagement.offerDetails)} at ${companyIn(data.names[data.engagement.employerId])}` +
+      (hired && data.engagement.hiredAt && data.engagement.hiredAt <= now
+        ? `, day ${Math.floor((now.getTime() - data.engagement.hiredAt.getTime()) / 86_400_000) + 1}`
+        : "")
+    : null;
+  // No status line while an action is pending: the "Waiting on you" tile says it.
+  const status = working
     ? hired
-      ? "Your internship, and anything waiting on you."
+      ? action ? undefined : "Nothing is waiting on you right now."
       : "You accepted an offer. Logging hours opens once the company completes its payment."
     : gettingStarted
-      ? "Three steps, in order, before employers can find you."
+      ? activated
+        ? "Activation is done. The AI interview is the last step before employers can find you."
+        : completion.complete
+          ? "Your profile is complete. Activation is next, and it is the only payment."
+          : "Build your profile, activate once, take the AI interview. Then employers shortlist you on your score."
       : action
-        ? "One thing is waiting on you."
+        ? undefined
         : openToWork
           ? "Nothing is waiting on you. Employers can find your profile."
           : "Nothing is waiting on you. Your profile is hidden from new employers.";
+  const lede = role ? (status ? `${role}. ${status}` : role) : status;
+
+  const interviewCompany = upcomingInterviewItem
+    ? data.names[upcomingInterviewItem.interview.employerId] ?? "the company"
+    : "";
+  const nextUp = next ? (
+    next.kind === "interview" && upcomingInterviewItem ? (
+      <NextUpTile next={next} today={today} heading={`Interview with ${interviewCompany}`} href="/intern/interviews" hrefLabel="Interviews">
+        {upcomingInterviewItem.interview.meetingLink ? (
+          <MeetingJoinButton link={upcomingInterviewItem.interview.meetingLink} block />
+        ) : (
+          <p className="text-sm text-white/75">The meeting link arrives before the start time.</p>
+        )}
+      </NextUpTile>
+    ) : next.kind === "payout" ? (
+      <NextUpTile
+        next={next}
+        today={today}
+        heading="Stipend payout due"
+        detail={`${formatMoney(data.money.incomingMinor, data.money.currency, { zeroLabel: false })} on its way`}
+        href="/intern/earnings"
+        hrefLabel="Stipend"
+      />
+    ) : (
+      <NextUpTile
+        next={next}
+        today={today}
+        heading="Your next timesheet opens"
+        detail={next.end ? `Covers ${formatPeriodDays(next.day, next.end)}` : undefined}
+        href="/intern/timesheets"
+        hrefLabel="Timesheets"
+      />
+    )
+  ) : null;
+
+  const waiting = action ? (
+    // The screen's one focal point: the only amber button.
+    <Tile title="Waiting on you" className="bg-accent-100/60">
+      <p className="text-pretty text-lg font-medium leading-snug text-ink-900">{action.title}</p>
+      <p className="mt-1 text-sm text-text-subtle">{action.detail}</p>
+      {action.href ? (
+        <Link href={action.href} className={buttonClass({ variant: "accent", className: "mt-4 w-full" })}>
+          {action.action ?? "Open"}
+          <ArrowRight className="size-4" aria-hidden />
+        </Link>
+      ) : null}
+    </Tile>
+  ) : null;
+
+  const activity = (
+    <Tile
+      title="Activity"
+      action={history.length > 0 ? { href: "/intern/record", label: "Full record" } : undefined}
+    >
+      {data.thread.length === 0 ? (
+        // Profile done, activated and scored: the next move is a company's.
+        <EmptyScene
+          title="No offers or interviews yet"
+          body="Your profile is in front of employers. When a company books an interview or sends an offer, it lands here, then your timesheets and payments."
+          next={{ label: "See open roles", href: "/intern/opportunities" }}
+          who="Waiting on employers"
+        />
+      ) : history.length === 0 ? (
+        <p className="text-sm text-ink-600">Nothing else yet.</p>
+      ) : (
+        <ActivityList nodes={history.slice(0, 5)} />
+      )}
+    </Tile>
+  );
+
+  // Roles open up once activation is paid (payment needs a complete profile).
+  const openRolesTile = openRoles.length > 0 ? (
+    <Tile title="Open roles" action={{ href: "/intern/opportunities", label: "See all open roles" }}>
+      <ul className="-mx-2 divide-y divide-ink-100">
+        {openRoles.slice(0, 5).map((p) => (
+          <li key={p.id}>
+            <Link
+              href={`/intern/opportunities/${p.id}`}
+              className="group grid min-h-14 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-apple-sm px-2 py-3 transition-colors hover:bg-ink-50"
+            >
+              {/* No company mark before a hire (bug sheet 7, S1 r27/r67). */}
+              <span className="min-w-0">
+                <span className="block truncate text-sm font-medium text-ink-900 group-hover:text-brand-700">
+                  {p.projectName}
+                </span>
+                <span className="block truncate text-xs text-text-subtle">{p.scopeOfWork}</span>
+              </span>
+              <ArrowRight className="size-4 text-ink-300 group-hover:text-brand-700" aria-hidden />
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </Tile>
+  ) : null;
+
+  // The glanceable facts: the narrow column on every state of Home.
+  const asideTiles = (
+    <>
+      {upcomingInterviewItem && next?.kind !== "interview" ? (
+        <Tile title="Next interview" action={{ href: "/intern/interviews", label: "Interviews" }}>
+          <p className="text-lg font-medium text-ink-900">{interviewCompany}</p>
+          <p className="mt-1 text-sm text-text-subtle">
+            {/* Interns always see India time, labelled (bug sheet 7, S2 r7). */}
+            {formatSlotTime(upcomingInterviewItem.when, IST)}
+          </p>
+          {upcomingInterviewItem.interview.meetingLink ? (
+            <div className="mt-4">
+              <MeetingJoinButton link={upcomingInterviewItem.interview.meetingLink} block />
+            </div>
+          ) : (
+            <p className="mt-3 text-sm text-text-subtle">The meeting link arrives before the start time.</p>
+          )}
+        </Tile>
+      ) : null}
+
+      {ratings ? (
+        <Tile title="How your score is made" action={{ href: "/intern/record", label: "Score details" }}>
+          <ScoreScale rows={ratings.map(([label, value]) => ({ label, value }))} />
+        </Tile>
+      ) : null}
+
+      {/* Before going live the journey's last stop carries this; the switch stays on Your profile. */}
+      {gettingStarted ? null : (
+        <Tile
+          title="Profile status"
+          aside={<Pill tone={profileStatus.tone}>{profileStatus.label}</Pill>}
+          action={{ href: "/intern/profile", label: "See your profile as employers do" }}
+        >
+          <OpenToWorkToggle initial={openToWork} visibleAgainAt={visibleAgain} brief />
+        </Tile>
+      )}
+
+      {college ? (
+        <Tile title="Your college" action={{ href: "/intern/college", label: "College" }}>
+          <p className="flex items-center gap-2 text-sm text-ink-700">
+            <GraduationCap className="size-4 shrink-0 text-brand-700" aria-hidden />
+            <span className="min-w-0">
+              <span className="font-medium text-ink-900">{college.name}</span>
+              {college.status === "verified" ? " · verified" : " · not verified yet"}
+            </span>
+          </p>
+        </Tile>
+      ) : working ? null : (
+        <Tile title="Is your college on Findtern?" action={{ href: "/intern/college", label: "Find your college" }}>
+          <p className="text-sm text-text-subtle">
+            Join it to be seen in your college&apos;s placement drives, where employers call students the same day.
+          </p>
+        </Tile>
+      )}
+    </>
+  );
 
   return (
     <div>
-      <HeroBand
-        eyebrow={working ? "Your internship" : gettingStarted ? "Getting started" : openToWork ? "Your profile is live" : "Your profile is hidden"}
+      {/* Template: Dashboard (SPECS §5): key numbers, then the bento. */}
+      <PageHead
         title={`Hello, ${user?.first ?? "there"}`}
         lede={lede}
-        actions={
-          action?.href ? (
-            <Link href={action.href} className={buttonClass({ variant: "accent" })}>
-              {action.action ?? "Open"}
-              <ArrowRight className="size-4" aria-hidden />
-            </Link>
-          ) : working && !hired && data.engagement ? (
-            <Link href={`/intern/proposals/${data.engagement.id}`} className={buttonClass({ variant: "outlineLight" })}>
+        action={
+          action?.href ? null : working && !hired && data.engagement ? (
+            <Link href={`/intern/proposals/${data.engagement.id}`} className={buttonClass({ variant: "outline" })}>
               See your offer
               <ArrowRight className="size-4" aria-hidden />
             </Link>
           ) : working ? (
-            // Amber means "do this now"; a sheet that is due arrives as the
-            // action above. With nothing waiting it was false urgency.
-            <Link href="/intern/timesheets" className={buttonClass({ variant: "outlineLight" })}>
+            <Link href="/intern/timesheets" className={buttonClass({ variant: "outline" })}>
               Timesheets
               <ArrowRight className="size-4" aria-hidden />
             </Link>
           ) : !gettingStarted ? (
-            <Link href="/intern/opportunities" className={buttonClass({ variant: "outlineLight" })}>
+            <Link href="/intern/opportunities" className={buttonClass({ variant: "outline" })}>
               See open roles
               <ArrowRight className="size-4" aria-hidden />
             </Link>
           ) : null
         }
-      >
-        <div className={cn("grid grid-cols-2 gap-3", showInterviewTile && "sm:grid-cols-3")}>
-          <StatTile
-            tone="onDark"
-            label="Findtern Score"
-            value={score === null ? null : <>{score.toFixed(1)}<span className="ml-0.5 text-base font-normal text-on-dark-subtle">/10</span></>}
-            empty="After your AI interview"
-            href="/intern/record"
+      />
+
+      <div className="space-y-4">
+        {gettingStarted ? (
+          <GettingStarted
+            completion={completion}
+            activated={activated}
+            feeMinor={activationFeeMinor}
+            internId={session.uid}
+            aiPhase={aiPhase}
+            aiLink={aiPhase === "ready" ? joinableLink(aiRow?.meetingLink) : null}
+            hidden={!openToWork}
+            aside={asideTiles}
+            payment={
+              <ActivationCard
+                alreadyPaid={activated}
+                testMode={paymentsAreFree()}
+                feeMinor={activationFeeMinor}
+                internId={session.uid}
+                prefill={{
+                  name: fullName,
+                  email: user?.email,
+                  contact: user ? `${user.countryCode}${user.phoneNumber}` : undefined,
+                }}
+              />
+            }
           />
-          {working ? (
-            <StatTile
-              tone="onDark"
-              label="Paid to you"
-              value={data.money.paidMinor > 0 ? formatMoney(data.money.paidMinor, "INR") : null}
-              empty="Nothing paid yet"
-              hint={
-                data.money.incomingMinor > 0
-                  ? `${formatMoney(data.money.incomingMinor, data.money.currency, { zeroLabel: false })} on its way`
-                  : undefined
-              }
-              href="/intern/earnings"
-            />
-          ) : (
-            <StatTile
-              tone="onDark"
-              label="Offers waiting on you"
-              value={offersWaiting > 0 ? offersWaiting : null}
-              empty="None right now"
-              href="/intern/proposals"
-            />
-          )}
-          {/* Not for someone already working with nothing booked: "None booked" was noise. */}
-          {showInterviewTile ? (
-            <StatTile
-              tone="onDark"
-              label="Next interview"
-              className="col-span-2 sm:col-span-1"
-              value={null}
-              empty={upcomingInterviewItem ? formatSlotTime(upcomingInterviewItem.when, IST) : "None booked"}
-              href="/intern/interviews"
-            />
-          ) : null}
-        </div>
-      </HeroBand>
+        ) : null}
 
-      <div className="grid gap-x-10 gap-y-8 xl:grid-cols-[minmax(0,1fr)_20rem]">
-        {/* ── Main column ─────────────────────────────────────────── */}
-        <div className="min-w-0 space-y-8">
-          {gettingStarted ? (
-            <GettingStarted
-              completion={completion}
-              activated={activated}
-              feeMinor={activationFeeMinor}
-              internId={session.uid}
-              aiPhase={aiPhase}
-              aiLink={aiPhase === "ready" ? joinableLink(aiRow?.meetingLink) : null}
-              payment={
-                <ActivationCard
-                  alreadyPaid={activated}
-                  testMode={paymentsAreFree()}
-                  feeMinor={activationFeeMinor}
-                  internId={session.uid}
-                  prefill={{
-                    name: fullName,
-                    email: user?.email,
-                    contact: user ? `${user.countryCode}${user.phoneNumber}` : undefined,
-                  }}
-                />
-              }
-            />
-          ) : null}
+        {stats.length > 0 ? (
+          <div className={STAT_ROW}>
+            {stats.map((s) => (
+              <StatTile key={s.label} {...s} />
+            ))}
+          </div>
+        ) : null}
 
-          <StatusStrip node={action} stage={data.stage} />
-
-          <section>
-            <SectionHead
-              title="Activity"
-              action={
-                history.length > 4 ? (
-                  <Link href="/intern/record" className="text-sm font-medium text-primary hover:underline touch:inline-flex touch:min-h-11 touch:items-center">
-                    Full record
-                  </Link>
-                ) : null
-              }
-            />
-            {data.thread.length === 0 && gettingStarted ? (
-              <p className="text-sm text-ink-600">
-                Offers, interviews, timesheets and payments appear here once your profile is live.
-              </p>
-            ) : data.thread.length === 0 ? (
-              <EmptyScene
-                title="Your activity starts with your profile"
-                body="Once your profile is filled in, every application, interview, timesheet and payment lands here in order."
-                next={{ label: "Fill in your profile", href: "/intern/onboarding" }}
-                who="About four minutes"
-              />
-            ) : history.length === 0 ? (
-              <p className="text-sm text-ink-600">Nothing else yet.</p>
-            ) : (
-              <Thread nodes={history.slice(0, 6)} compact />
-            )}
-          </section>
-
-          {/* Roles open up once activation is paid (payment needs a complete profile). */}
-          {!working && activated && openRoles.length > 0 ? (
-            <section>
-              <SectionHead
-                title="Open roles"
-                hint="Companies hiring now."
-                action={
-                  <Link href="/intern/opportunities" className="text-sm font-medium text-primary hover:underline">
-                    See all
-                  </Link>
-                }
-              />
-              <Surface as="ul" className="divide-y divide-ink-100 overflow-hidden">
-                {openRoles.slice(0, 5).map((p) => (
-                  <li key={p.id}>
-                    <Link
-                      href={`/intern/opportunities/${p.id}`}
-                      className="group grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 px-4 py-3.5 transition-colors hover:bg-ink-50/70"
-                    >
-                      <CompanyInitials name={p.companyName} />
-                      <span className="min-w-0">
-                        <span className="block truncate text-[0.9375rem] font-medium text-ink-900 group-hover:text-brand-700">
-                          {p.projectName}
-                        </span>
-                        <span className="block truncate text-sm text-ink-600">
-                          {p.scopeOfWork}
-                        </span>
-                      </span>
-                      <ArrowRight className="size-4 text-ink-300 group-hover:text-brand-700" aria-hidden />
-                    </Link>
-                  </li>
-                ))}
-              </Surface>
-            </section>
-          ) : null}
-        </div>
-
-        {/* ── Rail: glanceable facts ─────────────────────────────────── */}
-        <aside className="space-y-4">
-          {upcomingInterviewItem ? (
-            <Surface className="p-5">
-              <p className="text-sm font-medium text-ink-600">Next interview</p>
-              <p className="mt-1 text-base font-semibold text-ink-900">
-                {data.names[upcomingInterviewItem.interview.employerId] ?? "Company interview"}
-              </p>
-              <p className="mt-0.5 text-sm text-ink-600">
-                {/* Interns always see India time, labelled (bug sheet 7, S2 r7). */}
-                {formatSlotTime(upcomingInterviewItem.when, IST)}
-              </p>
-              {upcomingInterviewItem.interview.meetingLink ? (
-                <div className="mt-4">
-                  <MeetingJoinButton link={upcomingInterviewItem.interview.meetingLink} block />
-                </div>
-              ) : (
-                <p className="mt-3 text-sm text-ink-600">The meeting link arrives before the start time.</p>
-              )}
-            </Surface>
-          ) : null}
-
-          {ratings ? (
-            <Surface className="p-5">
-              <div className="flex items-baseline justify-between">
-                <h2 className="text-base font-semibold text-ink-900">How your score is made</h2>
-                <Link href="/intern/record" className="text-sm font-medium text-primary hover:underline touch:inline-flex touch:min-h-11 touch:items-center">
-                  Details
-                </Link>
+        {/* DOM order is reading order at every width: what needs you and what's
+            next lead (first on a phone, left on a desktop), the chart beside them. */}
+        {waiting || nextUp || allMonths ? (
+          <div className="grid gap-4 xl:grid-cols-3">
+            {waiting || nextUp ? (
+              <div className={cn("grid min-w-0 gap-4", waiting && nextUp && "md:max-xl:grid-cols-2", !allMonths && "xl:col-span-3 xl:grid-cols-2")}>
+                {waiting}
+                {nextUp}
               </div>
-              <dl className="mt-4 space-y-3">
-                {ratings.map(([label, v]) => (
-                  <div key={label} className="grid grid-cols-[1fr_auto] gap-x-2 text-sm">
-                    {/* dt and dd straight under the div (axe definition-list); the bar is a hidden second dd. */}
-                    <dt className="text-ink-600">{label}</dt>
-                    <dd className="nums font-semibold text-ink-900">{v.toFixed(1)}</dd>
-                    <dd className="col-span-2 mt-1.5 h-1.5 overflow-hidden rounded-full bg-ink-100" aria-hidden>
-                      <div className="h-full rounded-full bg-brand-600" style={{ width: `${Math.min(100, v * 10)}%` }} />
-                    </dd>
-                  </div>
-                ))}
-              </dl>
-            </Surface>
-          ) : null}
-
-          <Surface className="p-5">
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <p className="text-sm font-medium text-ink-600">Profile status</p>
-              <Pill tone={profileStatus.tone}>{profileStatus.label}</Pill>
-            </div>
-            <OpenToWorkToggle initial={openToWork} visibleAgainAt={visibleAgain} />
-          </Surface>
-
-          {college ? (
-            <Link
-              href="/intern/college"
-              className="apple-spring flex min-h-14 items-center gap-3 rounded-apple-xl border border-ink-200/80 bg-white px-5 py-4 text-sm text-ink-700 shadow-xs hover:border-ink-300"
-            >
-              <GraduationCap className="size-4 shrink-0 text-brand-700" aria-hidden />
-              <span className="min-w-0 flex-1">
-                <span className="font-medium text-ink-900">{college.name}</span>
-                {college.status === "verified" ? " · verified" : " · not verified yet"}
-              </span>
-              <ArrowRight className="size-4 shrink-0 text-text-subtle" aria-hidden />
-            </Link>
-          ) : (
-            <Surface className="p-5">
-              <h2 className="text-base font-semibold text-ink-900">Is your college on Findtern?</h2>
-              <p className="mt-1 text-sm leading-relaxed text-ink-600">
-                Join it to be seen in your college&apos;s placement drives, where employers call students the same day.
-              </p>
-              <Link
-                href="/intern/college"
-                className="mt-3 inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-primary hover:underline"
+            ) : null}
+            {allMonths ? (
+              <Tile
+                title="Hours by month"
+                action={{ href: "/intern/timesheets", label: "Timesheets" }}
+                className={waiting || nextUp ? "xl:col-span-2" : "xl:col-span-3"}
               >
-                Find your college
-                <ArrowRight className="size-4" aria-hidden />
-              </Link>
-            </Surface>
-          )}
+                <HoursPills months={allMonths} now={now} />
+              </Tile>
+            ) : null}
+          </div>
+        ) : null}
 
-          {!working && data.money.paidMinor > 0 ? (
-            <Surface className="p-5">
-              <p className="text-sm font-medium text-ink-600">Paid to you</p>
-              <p className="nums mt-1 text-2xl font-semibold tracking-tight text-ink-900">
-                {formatMoney(data.money.paidMinor, "INR")}
-              </p>
-              {data.money.incomingMinor > 0 ? (
-                <p className="mt-1 text-sm text-ink-600">
-                  {formatMoney(data.money.incomingMinor, data.money.currency, { zeroLabel: false })} on its way
-                  {data.money.nextExpectedAt
-                    ? `, due ${shortDate(data.money.nextExpectedAt, { day: "numeric", month: "short" })}`
-                    : ""}
-                </p>
-              ) : null}
-              <Link href="/intern/earnings" className="mt-3 inline-flex text-sm font-medium text-primary hover:underline">
-                Stipend breakdown
-              </Link>
-            </Surface>
-          ) : null}
+        {/* Before the profile is live the glanceable facts sit beside the current
+            stage, and Activity shows only once there is some. */}
+        {gettingStarted ? (
+          history.length > 0 || (activated && openRolesTile) ? (
+            <div className="grid gap-4 xl:grid-cols-2 xl:[&>:only-child]:col-span-2">
+              {history.length > 0 ? activity : null}
+              {activated ? openRolesTile : null}
+            </div>
+          ) : null
+        ) : (
+          <div className="grid gap-4 xl:grid-cols-3">
+            <div className="grid min-w-0 content-start gap-4 xl:col-span-2">
+              {activity}
+              {!working && activated ? openRolesTile : null}
+            </div>
 
-          <Link
-            href="/intern/profile"
-            className="apple-spring flex min-h-14 items-center justify-between rounded-apple-xl border border-dashed border-ink-200 px-5 py-4 text-sm font-medium text-ink-700 hover:border-brand-300 hover:bg-white"
-          >
-            See your profile as employers do
-            <ArrowRight className="size-4 text-text-subtle" aria-hidden />
-          </Link>
-        </aside>
+            {/* ── Narrow column: glanceable facts. ── */}
+            <aside className="grid min-w-0 content-start gap-4 md:grid-cols-2 md:[&>:last-child:nth-child(odd)]:col-span-2 xl:grid-cols-1 xl:[&>:last-child:nth-child(odd)]:col-span-1">
+              {asideTiles}
+            </aside>
+          </div>
+        )}
       </div>
     </div>
   );

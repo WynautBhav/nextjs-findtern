@@ -10,7 +10,9 @@ import { isPersonalEmail } from "@/lib/employer-onboarding";
 import { attachOtpProof, type SignupOtpSubject } from "@/lib/signup-otp";
 
 function fail(req: Request, path: string, code: string) {
-  const res = NextResponse.redirect(new URL(`${path}?oauthError=${code}`, req.url));
+  const to = new URL(path, req.url);
+  to.searchParams.set("oauthError", code);
+  const res = NextResponse.redirect(to);
   res.cookies.delete({ name: NONCE_COOKIE, path: "/" });
   return res;
 }
@@ -33,7 +35,7 @@ export async function GET(req: Request) {
   const stateRaw = url.searchParams.get("state");
   // Until the state is decoded the role is unknown; afterwards employer
   // failures go back to the employer door, not the candidate one.
-  let loginPath = "/login";
+  let loginPath = "/login?as=intern";
   if (!code || !stateRaw) return fail(req, loginPath, "missing_code");
 
   let state: { role?: string; next?: string; nonce?: string };
@@ -42,7 +44,7 @@ export async function GET(req: Request) {
   } catch {
     return fail(req, loginPath, "bad_state");
   }
-  if (state.role === "employer") loginPath = "/employer/login";
+  if (state.role === "employer") loginPath = "/login?as=employer";
   const nonce = (await cookies()).get(NONCE_COOKIE)?.value;
   if (!nonce || nonce !== state.nonce) return fail(req, loginPath, "bad_state");
 
@@ -74,10 +76,10 @@ export async function GET(req: Request) {
       // New company. Same shape as the candidate path below: no account is
       // created here (phone, password and terms are still missing); Google's
       // verification is recorded as a used OTP and the form on
-      // /employer/signup finishes it through the normal signup API.
-      if (isPersonalEmail(email)) return fail(req, "/employer/signup", "company_email_only");
+      // /signup?as=employer finishes it through the normal signup API.
+      if (isPersonalEmail(email)) return fail(req, "/signup?as=employer", "company_email_only");
       await recordGoogleVerification("employer", email);
-      const to = new URL("/employer/signup", req.url);
+      const to = new URL("/signup?as=employer", req.url);
       to.searchParams.set("google", "1");
       to.searchParams.set("email", email);
       const name = [givenName, familyName].filter(Boolean).join(" ");
@@ -87,7 +89,7 @@ export async function GET(req: Request) {
       await attachOtpProof(res, "employer", email);
       return res;
     }
-    if (!employer.isActive) return fail(req, "/employer/login", "inactive");
+    if (!employer.isActive) return fail(req, "/login?as=employer", "inactive");
     // Google has verified the address, so a later password login is not stuck
     // on "verify your email".
     if (!employer.emailVerified) {
@@ -101,7 +103,7 @@ export async function GET(req: Request) {
 
   // Interns sign in with Gmail only (legacy rule).
   // googlemail.com is the same Gmail service (legacy routes.ts:3166 accepted both).
-  if (!email.endsWith("@gmail.com") && !email.endsWith("@googlemail.com")) return fail(req, "/login", "gmail_only");
+  if (!email.endsWith("@gmail.com") && !email.endsWith("@googlemail.com")) return fail(req, "/login?as=intern", "gmail_only");
   // Case-insensitive, like the password sign in (INT-35).
   const [user] = await db.select().from(schema.users).where(sql`lower(${schema.users.email}) = ${email}`).limit(1);
   if (!user) {
@@ -126,7 +128,7 @@ export async function GET(req: Request) {
     await attachOtpProof(res, "intern", email);
     return res;
   }
-  if (!user.isActive) return fail(req, "/login", "inactive");
+  if (!user.isActive) return fail(req, "/login?as=intern", "inactive");
   // Google has verified the address, so an account stuck on "verify your email" is unblocked.
   if (!user.emailVerified) {
     await db.update(schema.users).set({ emailVerified: true }).where(eq(schema.users.id, user.id));

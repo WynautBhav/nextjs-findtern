@@ -182,11 +182,11 @@ function EntryPanel({
   return (
     <PanelCopy title="Sign in to enter" body="Use your Findtern employer account. New here? Creating one takes two minutes and is free.">
       <div className="flex flex-col gap-2.5">
-        <ButtonLink href={`/employer/login?next=${next}`} size="lg" block>
+        <ButtonLink href={`/login?as=employer&next=${next}`} size="lg" block>
           Sign in to enter
         </ButtonLink>
         <Link
-          href={`/employer/signup?next=${next}`}
+          href={`/signup?as=employer&next=${next}`}
           className="inline-flex min-h-11 items-center justify-center rounded-lg text-sm font-medium text-brand-700 underline-offset-4 hover:underline"
         >
           Create an employer account

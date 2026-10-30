@@ -1,4 +1,4 @@
-import { and, eq, ne } from "drizzle-orm";
+import { and, eq, ne, sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -11,6 +11,7 @@ import {
   formatProblems,
   isOnboarded,
   MAX_CERTIFICATE_UPLOADS,
+  MAX_EXPERIENCES,
   MAX_EXTRACURRICULARS,
   MAX_MARKSHEETS,
   MAX_SKILLS,
@@ -47,11 +48,11 @@ const qualification = z.object({
 });
 
 const bodySchema = z.object({
-  bio: z.string().max(2000).optional(),
-  linkedinUrl: z.string().max(300).optional(),
-  city: z.string().max(120).optional(),
-  state: z.string().max(120).optional(),
-  pinCode: z.string().max(10).optional(),
+  bio: z.string().trim().max(2000).optional(),
+  linkedinUrl: z.string().trim().max(300).optional(),
+  city: z.string().trim().max(120).optional(),
+  state: z.string().trim().max(120).optional(),
+  pinCode: z.string().trim().max(10).optional(),
   emergencyPhone: z.string().max(20).optional(),
   emergencyName: z.string().max(120).optional(),
   emergencyRelation: z.string().max(40).optional(),
@@ -64,9 +65,9 @@ const bodySchema = z.object({
   academics: z
     .object({
       qualificationLevel: z.string().max(40).optional(),
-      institution: z.string().max(200).default(""),
-      degree: z.string().max(120).default(""),
-      branch: z.string().max(120).default(""),
+      institution: z.string().trim().max(200).default(""),
+      degree: z.string().trim().max(120).default(""),
+      branch: z.string().trim().max(120).default(""),
       // Optional so an older cached client cannot blank what it never sent.
       startYear: z.string().max(4).optional(),
       yearOfGraduation: z.string().max(4).default(""),
@@ -88,21 +89,21 @@ const bodySchema = z.object({
       z.object({
         id: z.string().max(80),
         type: z.string().max(40).default(""),
-        company: z.string().max(160).default(""),
-        role: z.string().max(160).default(""),
+        company: z.string().trim().max(160).default(""),
+        role: z.string().trim().max(160).default(""),
         from: z.string().max(10).default(""),
         to: z.string().max(10).default(""),
         current: z.boolean().default(false),
         description: z.string().max(4000).default(""),
       }),
     )
-    .max(20)
+    .max(MAX_EXPERIENCES)
     .optional(),
   languages: z
     .array(
       z.object({
         id: z.string().max(80),
-        language: z.string().max(60),
+        language: z.string().trim().max(60),
         // "Conversational" is what an older cached client sends; it saves as basic.
         level: z.enum(["Native", "Professional", "Basic", "Conversational", ""]).transform((v) => (v === "Conversational" ? "Basic" : v)),
         read: z.boolean().optional(),
@@ -116,7 +117,7 @@ const bodySchema = z.object({
     .array(
       z.object({
         id: z.string().max(80),
-        activity: z.string().max(160),
+        activity: z.string().trim().max(160),
         level: z.enum(["Beginner", "Intermediate", "Advanced", ""]),
         category: z.string().max(60).optional(),
         description: z.string().max(500).optional(),
@@ -124,6 +125,7 @@ const bodySchema = z.object({
     )
     // Room for blank rows, which are dropped; at most ten are kept (legacy).
     .max(MAX_EXTRACURRICULARS + 10)
+    .refine((rows) => rows.filter((r) => r.activity.trim()).length <= MAX_EXTRACURRICULARS, `Add at most ${MAX_EXTRACURRICULARS} activities.`)
     .optional(),
   locationTypes: z.array(z.string().max(20)).max(6).optional(),
   preferredLocations: z.array(z.string().max(120)).max(5).optional(),
@@ -180,18 +182,30 @@ const FIELD_LABELS: Record<string, string> = {
   emergencyCountryCode: "The emergency contact must be an Indian (+91) number.",
   secondPocCountryCode: "Pick the country code for your second contact.",
   preferredLocations: "Pick at most 5 cities.",
+  linkedinUrl: "Your LinkedIn link is too long - paste just the profile address.",
+  skills: "Some skills could not be saved - each skill is at most 80 characters, rated Beginner, Intermediate or Advanced.",
+  skillsWithRatings: "Some skills could not be saved - each skill is at most 80 characters, rated Beginner, Intermediate or Advanced.",
+  academics: "Some academic details are in the wrong format - check the Academics step.",
+  experiences: "Some experience details are too long - company and role are at most 160 characters, the description 4000.",
+  languages: "Some language details are in the wrong format - check the Languages step.",
+  extracurriculars: "Some activity details are too long - the activity is at most 160 characters, what you achieved 500.",
+};
+
+/** Too many rows (the issue is on the list itself, not on one row's field). */
+const LIST_CAPS: Record<string, string> = {
   skills: `Pick at most ${MAX_SKILLS} key skills.`,
   skillsWithRatings: `Pick at most ${MAX_SKILLS} key skills.`,
-  academics: "Some academic details are in the wrong format - check the Academics step.",
-  experiences: "Some experience details are in the wrong format - check the Experience step.",
-  languages: "Some language details are in the wrong format - check the Languages step.",
+  experiences: `Add at most ${MAX_EXPERIENCES} experiences.`,
   extracurriculars: `Add at most ${MAX_EXTRACURRICULARS} activities.`,
+  marksheetUploads: `You can keep at most ${MAX_MARKSHEETS} marksheets. Remove one.`,
 };
 
 function friendlyIssue(issue: z.core.$ZodIssue | undefined): string {
   if (!issue) return "Some details could not be saved. Check the form and try again.";
   if (issue.code === "custom") return issue.message;
   const field = String(issue.path[0] ?? "");
+  const list = String(issue.path.at(-1) ?? "");
+  if (issue.code === "too_big" && issue.origin === "array" && LIST_CAPS[list]) return LIST_CAPS[list];
   return FIELD_LABELS[field] ?? "Some details could not be saved. Check the form and try again.";
 }
 
@@ -229,15 +243,9 @@ export async function POST(req: Request) {
   // Impossible values are refused even on a draft save; completeness is not.
   const format = formatProblems(input);
   if (format) return NextResponse.json({ error: format }, { status: 400 });
-  // Bank details are saved only in full - from Settings, or from the About Me
-  // step (which leaves them out until they are complete).
-  if (body.bank) {
-    const bank = bankProblem(body.bank);
-    if (bank) return NextResponse.json({ error: bank, step: 0 }, { status: 400 });
-  }
-
   const db = getDb();
-  // One account per identity document (legacy rule).
+  // One account per identity document (legacy rule). Older rows keep the
+  // spaces they were typed with ("2111 4222 6333"), so compare without them.
   for (const [col, value, label] of [
     [schema.internOnboarding.aadhaarNumber, body.aadhaarNumber, "Aadhaar"],
     [schema.internOnboarding.panNumber, body.panNumber, "PAN"],
@@ -246,7 +254,7 @@ export async function POST(req: Request) {
     const [clash] = await db
       .select({ id: schema.internOnboarding.id })
       .from(schema.internOnboarding)
-      .where(and(eq(col, value), ne(schema.internOnboarding.userId, session.uid)))
+      .where(and(sql`upper(regexp_replace(${col}, '[[:space:]]', '', 'g')) = ${value}`, ne(schema.internOnboarding.userId, session.uid)))
       .limit(1);
     if (clash) return conflict(`This ${label} number is already linked to another account.`, 0, label === "PAN" ? "panNumber" : "aadhaarNumber");
   }
@@ -256,6 +264,22 @@ export async function POST(req: Request) {
     .where(eq(schema.internOnboarding.userId, session.uid))
     .limit(1);
   const saved = existing ? draftFromRecord(existing) : {};
+
+  // Only a number already on file may break the "never starts with 0 or 1"
+  // rule (legacy rows, INT-30); a new one is checked on drafts too, or one
+  // draft save would make it "the stored number" and wave it through.
+  if (body.aadhaarNumber && body.aadhaarNumber !== (existing?.aadhaarNumber ?? "").replace(/\s/g, "") && /^[01]/.test(body.aadhaarNumber)) {
+    const error = "Aadhaar numbers never start with 0 or 1. Check the number.";
+    return NextResponse.json({ error, step: 0, fields: { aadhaarNumber: error } }, { status: 400 });
+  }
+
+  // Bank details are saved only in full. Settings never receives the stored
+  // account number (only its last 4), so a blank number means "keep the one on file".
+  if (body.bank) {
+    if (!body.bank.accountNumber.trim()) body.bank.accountNumber = saved.bank?.accountNumber ?? "";
+    const bank = bankProblem(body.bank);
+    if (bank) return NextResponse.json({ error: bank, step: 0 }, { status: 400 });
+  }
 
   // Files (certificates, marksheets): only keys this intern uploaded (the
   // upload route names them after the uploader) or ones already on their
@@ -318,6 +342,8 @@ export async function POST(req: Request) {
       ...base,
       ...saved,
       ...input,
+      // Acceptance is recorded once and never withdrawn (see ndaAcceptedAt below).
+      ndaAccepted: Boolean(input.ndaAccepted || (existing?.extraData as Record<string, unknown> | undefined)?.ndaAcceptedAt),
       academics: { ...base.academics, ...saved.academics, ...body.academics },
       bank: body.bank ?? saved.bank ?? base.bank,
     };

@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+
 import { LANGUAGES, LANGUAGE_LEVELS, MAX_EXTRACURRICULARS, type ExtracurricularEntry, type LanguageEntry } from "@/lib/onboarding";
 
 import { AddButton, Check, EmptyEntries, EntryCard, Field, FieldNote, Grid, SelectField } from "./fields";
@@ -9,6 +11,8 @@ import type { StepProps } from "./types";
 
 export function LanguagesStep({ values, update, errors }: StepProps) {
   const languages = values.languages ?? [];
+  // Rows where "Other" was picked keep their name box open while a listed name is being typed.
+  const [typingOther, setTypingOther] = useState<Set<string>>(() => new Set());
   const patch = (id: string, next: Partial<LanguageEntry>) =>
     update(
       "languages",
@@ -26,8 +30,8 @@ export function LanguagesStep({ values, update, errors }: StepProps) {
       ) : null}
       {languages.map((lang, i) => {
         const k = `lang.${lang.id}`;
-        // A legacy language outside the list (rare) stays selectable.
-        const options = !lang.language || LANGUAGES.some((l) => l === lang.language) ? [...LANGUAGES] : [lang.language, ...LANGUAGES];
+        // "Other" holds the typed name; a legacy language outside the list reads as Other with its name.
+        const other = typingOther.has(lang.id) || (Boolean(lang.language) && !LANGUAGES.some((l) => l === lang.language && l !== "Other"));
         return (
           <EntryCard
             key={lang.id}
@@ -40,10 +44,18 @@ export function LanguagesStep({ values, update, errors }: StepProps) {
                 id={`${k}.language`}
                 label="Language"
                 placeholder="Choose a language"
-                value={lang.language}
-                options={options.map((l) => ({ value: l, label: l }))}
-                error={errors[`${k}.language`]}
-                onChange={(v) => patch(lang.id, { language: v })}
+                value={other ? "Other" : lang.language}
+                options={LANGUAGES.map((l) => ({ value: l, label: l }))}
+                error={other ? undefined : errors[`${k}.language`]}
+                onChange={(v) => {
+                  setTypingOther((prev) => {
+                    const next = new Set(prev);
+                    if (v === "Other") next.add(lang.id);
+                    else next.delete(lang.id);
+                    return next;
+                  });
+                  patch(lang.id, { language: v });
+                }}
               />
               <SelectField
                 id={`${k}.level`}
@@ -54,8 +66,19 @@ export function LanguagesStep({ values, update, errors }: StepProps) {
                 error={errors[`${k}.level`]}
                 onChange={(v) => patch(lang.id, { level: v as LanguageEntry["level"] })}
               />
+              {other ? (
+                <Field
+                  id={`${k}.other`}
+                  label="Language name"
+                  placeholder="e.g. Bhojpuri"
+                  maxLength={60}
+                  value={lang.language === "Other" ? "" : lang.language}
+                  error={errors[`${k}.other`] ?? (lang.language === "Other" ? undefined : errors[`${k}.language`])}
+                  onChange={(v) => patch(lang.id, { language: v.trim() ? v : "Other" })}
+                />
+              ) : null}
             </Grid>
-            <fieldset>
+            <fieldset id={`${k}.skills`} tabIndex={-1} className="outline-none">
               <legend className="text-sm font-medium text-ink-800">You can</legend>
               <div className="mt-1 flex flex-wrap gap-x-6">
                 <Check checked={lang.read !== false} onChange={(v) => patch(lang.id, { read: v })}>
@@ -68,6 +91,7 @@ export function LanguagesStep({ values, update, errors }: StepProps) {
                   Speak
                 </Check>
               </div>
+              {errors[`${k}.skills`] ? <FieldNote id={`${k}.skills`} error={errors[`${k}.skills`]} /> : null}
             </fieldset>
           </EntryCard>
         );
@@ -122,6 +146,7 @@ export function ExtracurricularStep({ values, update, errors }: StepProps) {
                 id={`${k}.activity`}
                 label="Activity"
                 placeholder="e.g. NSS volunteer, Coding club lead"
+                maxLength={160}
                 value={act.activity}
                 error={errors[`${k}.activity`]}
                 onChange={(v) => patch(act.id, { activity: v })}
@@ -141,6 +166,7 @@ export function ExtracurricularStep({ values, update, errors }: StepProps) {
               label="What you achieved"
               optional
               placeholder="e.g. Ran a 200-person fest; 2nd of 50 teams"
+              maxLength={500}
               value={act.description ?? ""}
               onChange={(v) => patch(act.id, { description: v })}
             />

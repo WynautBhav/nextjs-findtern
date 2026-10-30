@@ -38,7 +38,7 @@ export default async function CollegeLayout({ children }: { children: React.Reac
       tabs={NAV[0].items}
       account={{ name: ctx.college.name, email: ctx.admin.email }}
       help={{ faqHref: "/faq", contactHref: "/contact", email: SITE.adminEmail }}
-      signOutTo="/college/login"
+      signOutTo="/login?as=college"
       initialCollapsed={(await cookies()).get(RAIL_COOKIE)?.value === "1"}
       rootCrumb={{ label: "Students", href: "/college" }}
       // Record pages read "Drives", not "Drives / Details"; no back links needed.

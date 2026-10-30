@@ -55,5 +55,6 @@ export function CountUp({
   }, [value, duration, reduce]);
 
   const shown = reduce ? value : display;
-  return <>{format ? format(shown) : Math.round(shown).toLocaleString("en-IN")}</>;
+  // Whole numbers while counting; the settled figure keeps its decimals (26.5 h must not read 27 h).
+  return <>{format ? format(shown) : shown.toLocaleString("en-IN", { maximumFractionDigits: shown === value ? 2 : 0 })}</>;
 }

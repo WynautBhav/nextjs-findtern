@@ -31,12 +31,6 @@ export function appRoutes() {
 
 const PUBLIC_AUTH = new Set([
   "/admin/login",
-  "/employer/login",
-  "/employer/signup",
-  "/employer/forgot-password",
-  "/employer/reset-password",
-  "/employer/verify-email",
-  "/college/login",
 ]);
 
 /** intern | employer | admin | public (marketing + auth pages, no session needed) */

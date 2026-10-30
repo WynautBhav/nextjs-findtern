@@ -7,7 +7,7 @@ import { suggestDistricts } from "@/lib/data/districts";
 import { CUSTOM_CITY, cascadeWorkModes, widestWorkMode } from "@/lib/onboarding";
 import { cn } from "@/lib/utils";
 
-import { FieldNote, Label, Section, controlClass } from "./fields";
+import { FieldNote, Label, Section, controlClass, onRadioKeys, radioTab } from "./fields";
 import type { StepProps } from "./types";
 
 const MODES = [
@@ -42,9 +42,10 @@ export function LocationStep({ values, update, errors }: StepProps) {
           aria-label="Work mode"
           aria-describedby={errors.locationTypes ? "locationTypes-error" : "locationTypes-hint"}
           tabIndex={-1}
+          onKeyDown={onRadioKeys}
           className="grid gap-3 outline-none sm:grid-cols-3"
         >
-          {MODES.map(({ value, label, detail, icon: Icon }) => {
+          {MODES.map(({ value, label, detail, icon: Icon }, i) => {
             const on = included.includes(value);
             return (
               <button
@@ -52,6 +53,7 @@ export function LocationStep({ values, update, errors }: StepProps) {
                 type="button"
                 role="radio"
                 aria-checked={picked === value}
+                tabIndex={radioTab(picked === value, i, picked !== null)}
                 data-field="locationTypes"
                 onClick={() => pick(value)}
                 className={cn(
@@ -94,11 +96,11 @@ export function LocationStep({ values, update, errors }: StepProps) {
       ) : null}
 
       <Section title="Your laptop">
-        <div id="hasLaptop" role="radiogroup" aria-label="Do you have a laptop?" tabIndex={-1} className="grid gap-3 outline-none sm:grid-cols-2">
+        <div id="hasLaptop" role="radiogroup" aria-label="Do you have a laptop?" tabIndex={-1} onKeyDown={onRadioKeys} className="grid gap-3 outline-none sm:grid-cols-2">
           {[
             { value: true, label: "I have a laptop", detail: "Ready to start on day one." },
             { value: false, label: "I don't have one", detail: "The employer would need to provide a system." },
-          ].map((o) => {
+          ].map((o, i) => {
             const on = values.hasLaptop === o.value;
             return (
               <button
@@ -106,6 +108,7 @@ export function LocationStep({ values, update, errors }: StepProps) {
                 type="button"
                 role="radio"
                 aria-checked={on}
+                tabIndex={radioTab(on, i, typeof values.hasLaptop === "boolean")}
                 data-field="hasLaptop"
                 onClick={() => update("hasLaptop", o.value)}
                 className={cn(

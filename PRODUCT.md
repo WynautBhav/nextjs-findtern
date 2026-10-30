@@ -1,7 +1,7 @@
 # Findtern — Product Truth
 
 Durable context for anyone designing or building in this repo. Visual decisions
-live in `docs/design_system.md` and `DESIGN.md`; this file only records what the
+live in `SPECS.md`, code rules in `ARCHITECTURE.md`; this file only records what the
 product *is*, so those files can change without this one rotting.
 
 ## What Findtern is

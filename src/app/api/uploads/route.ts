@@ -3,9 +3,11 @@ import { NextResponse } from "next/server";
 
 import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
+import { MAX_MARKSHEETS } from "@/lib/onboarding";
 import { bucketKey, clientIp, limiters } from "@/lib/security/rate-limit";
 import type { SessionData } from "@/lib/security/session";
 import { signedUrl } from "@/lib/security/sign";
+import { bytesMatchType } from "@/lib/security/sniff";
 import { put, type StoredFile } from "@/lib/security/store";
 
 export const runtime = "nodejs";
@@ -104,6 +106,13 @@ export async function POST(req: Request): Promise<Response> {
   }
   if (bytes.length === 0) return NextResponse.json({ error: "Empty file" }, { status: 400 });
   if (bytes.length > kind.max) return NextResponse.json({ error: `The file must be under ${limitMb} MB` }, { status: 413 });
+  if (!bytesMatchType(type, bytes)) {
+    return NextResponse.json({ error: "That file is not what its name says. Upload the original PDF, JPG or PNG." }, { status: 415 });
+  }
+  // The onboarding save refuses more than this, so a ninth file would block every later save.
+  if (kindName === "marksheet" && (await marksheetCount(session.uid)) >= MAX_MARKSHEETS) {
+    return NextResponse.json({ error: `You can keep at most ${MAX_MARKSHEETS} marksheets. Remove one and save your draft, then upload again.` }, { status: 409 });
+  }
 
   let contentType = type;
   let fileName = decodeFileName(req.headers.get("x-file-name") ?? "").slice(0, 120);
@@ -132,6 +141,16 @@ export async function POST(req: Request): Promise<Response> {
     },
     { status: 201, headers: noStore },
   );
+}
+
+async function marksheetCount(uid: string): Promise<number> {
+  const [row] = await getDb()
+    .select({ extra: schema.internOnboarding.extraData })
+    .from(schema.internOnboarding)
+    .where(eq(schema.internOnboarding.userId, uid))
+    .limit(1);
+  const list = ((row?.extra as { academics?: { marksheetUploads?: unknown } } | undefined)?.academics?.marksheetUploads);
+  return Array.isArray(list) ? list.length : 0;
 }
 
 /** The client percent-encodes the name so non-ASCII survives the header. */

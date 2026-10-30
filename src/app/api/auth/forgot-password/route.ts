@@ -57,10 +57,10 @@ export async function POST(req: Request) {
   });
 
   const base = publicOrigin(req);
-  const resetPath = isEmployer ? "/employer/reset-password" : "/reset-password";
+  const resetPath = isEmployer ? "/reset-password?as=employer&" : "/reset-password?";
   await sendSmtpMail({
     to: subject.email,
-    ...renderEmail(emails.passwordReset({ url: `${base}${resetPath}?token=${token}`, ttlMinutes: RESET_TTL_MINUTES })),
+    ...renderEmail(emails.passwordReset({ url: `${base}${resetPath}token=${token}`, ttlMinutes: RESET_TTL_MINUTES })),
   });
   return NextResponse.json({ ok: true });
 }

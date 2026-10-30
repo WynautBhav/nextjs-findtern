@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { AlertCircle, ArrowRight, Eye, EyeOff, Loader2 } from "lucide-react";
 
 import { Input } from "@/components/ui/input";
+import { LAST_DOOR_COOKIE } from "@/lib/auth-doors";
 
 export function LoginForm({
   endpoint,
@@ -14,6 +15,8 @@ export function LoginForm({
   googleHref,
   googleLabel,
   verifyHref,
+  rememberAs,
+  emailPlaceholder = "you@company.com",
 }: {
   endpoint: string;
   redirectTo: string;
@@ -23,6 +26,9 @@ export function LoginForm({
   googleLabel?: string;
   /** Where an unverified account goes to verify; shown with that error. */
   verifyHref?: string;
+  /** Account type /login opens on next time (see LAST_DOOR_COOKIE). */
+  rememberAs?: string;
+  emailPlaceholder?: string;
 }) {
   const router = useRouter();
   const [email, setEmail] = useState("");
@@ -47,6 +53,7 @@ export function LoginForm({
         setLoading(false);
         return;
       }
+      if (rememberAs) document.cookie = `${LAST_DOOR_COOKIE}=${rememberAs}; path=/; max-age=31536000; samesite=lax`;
       router.push(redirectTo);
       router.refresh();
     } catch {
@@ -69,7 +76,7 @@ export function LoginForm({
             {verifyHref && error === "Email not verified" ? (
               <>
                 {" "}
-                <Link href={`${verifyHref}?email=${encodeURIComponent(email)}`} className="font-semibold underline underline-offset-4">
+                <Link href={`${verifyHref}${verifyHref.includes("?") ? "&" : "?"}email=${encodeURIComponent(email)}`} className="font-semibold underline underline-offset-4">
                   Verify it now
                 </Link>
               </>
@@ -88,10 +95,10 @@ export function LoginForm({
           type="email"
           autoComplete="email"
           required
-          placeholder={endpoint.includes("/employer/") || endpoint.includes("/admin/") ? "you@company.com" : "you@gmail.com"}
+          placeholder={emailPlaceholder}
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="h-11 border-ink-200 bg-white px-3.5 placeholder:text-ink-400"
+          className="h-11 border-ink-200 bg-white px-3.5 placeholder:text-ink-500"
         />
       </div>
 
@@ -119,13 +126,13 @@ export function LoginForm({
             placeholder="••••••••"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="h-11 border-ink-200 bg-white px-3.5 pr-11 placeholder:text-ink-400"
+            className="h-11 border-ink-200 bg-white px-3.5 pr-11 placeholder:text-ink-500"
           />
           <button
             type="button"
             onClick={() => setShowPassword((v) => !v)}
             aria-label={showPassword ? "Hide password" : "Show password"}
-            className="absolute right-1 top-1/2 grid size-9 -translate-y-1/2 place-items-center rounded-md text-ink-500 transition-colors [@media(any-hover:hover)]:hover:text-ink-800"
+            className="absolute right-0 top-1/2 grid size-11 -translate-y-1/2 place-items-center rounded-md text-ink-500 transition-colors [@media(any-hover:hover)]:hover:text-ink-800"
           >
             {showPassword ? <EyeOff className="size-4" aria-hidden /> : <Eye className="size-4" aria-hidden />}
           </button>
@@ -155,14 +162,7 @@ export function LoginForm({
 
       {googleHref ? (
         <>
-          <div className="relative py-1">
-            <span className="absolute inset-0 flex items-center" aria-hidden>
-              <span className="w-full border-t border-ink-100" />
-            </span>
-            <span className="relative mx-auto block w-fit bg-white px-3 text-xs uppercase tracking-[0.12em] text-ink-600">
-              or
-            </span>
-          </div>
+          <p className="text-center text-sm text-ink-600">or</p>
           <GoogleButton href={googleHref} label={googleLabel} />
         </>
       ) : null}

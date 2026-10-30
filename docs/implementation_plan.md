@@ -1,3 +1,5 @@
+> **Superseded on 29 Oct 2026 by `SPECS.md` and `ARCHITECTURE.md`. Kept for history; do not follow it.**
+
 # Findtern Master UI/UX & Interactive System Implementation Plan
 **Platform Redesign, Interactive Capabilities, Gamification & Parity Architecture**
 

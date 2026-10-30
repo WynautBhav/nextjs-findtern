@@ -118,7 +118,7 @@ export function FeedbackFab({
         )}
       >
         <MessageCircleQuestion className={variant === "fab" ? "size-6" : "size-4"} aria-hidden />
-        {variant === "link" ? "Report a problem" : null}
+        {variant === "link" ? <span>Report a problem</span> : null}
       </button>
 
       <Dialog open={open} onOpenChange={(v) => (v ? setOpen(true) : close())}>

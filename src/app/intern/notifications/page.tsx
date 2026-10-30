@@ -2,8 +2,10 @@ import type { Metadata } from "next";
 
 import { EmptyScene, FilterTabs, PageHead, SectionHead } from "@/components/app/primitives";
 import { NotificationList, type NotificationRow } from "@/components/app/notification-list";
+import { and, desc, eq, sql } from "drizzle-orm";
+
 import { requireRole } from "@/lib/auth";
-import { notificationsFor } from "@/lib/intern-data";
+import { getDb, schema } from "@/lib/db";
 import { internNotificationHref } from "@/lib/notification-href";
 
 export const metadata: Metadata = {
@@ -28,9 +30,28 @@ export default async function InternNotifications({
   const { show } = await searchParams;
   const unreadOnly = show === "unread";
 
-  const all = await notificationsFor(session.uid, 100);
-  const unreadCount = all.filter((n) => !n.isRead).length;
-  const rows: NotificationRow[] = (unreadOnly ? all.filter((n) => !n.isRead) : all).map((n) => ({
+  // The list is capped; the counts are not, so they come from the table.
+  const db = getDb();
+  const mine = and(eq(schema.notifications.recipientType, "intern"), eq(schema.notifications.recipientId, session.uid));
+  const [list, [counts]] = await Promise.all([
+    db
+      .select()
+      .from(schema.notifications)
+      .where(unreadOnly ? and(mine, eq(schema.notifications.isRead, false)) : mine)
+      .orderBy(desc(schema.notifications.createdAt))
+      .limit(LIMIT),
+    db
+      .select({
+        total: sql<number>`count(*)::int`,
+        unread: sql<number>`(count(*) filter (where not ${schema.notifications.isRead}))::int`,
+      })
+      .from(schema.notifications)
+      .where(mine),
+  ]);
+  const total = counts?.total ?? 0;
+  const unreadCount = counts?.unread ?? 0;
+  const shown = unreadOnly ? unreadCount : total;
+  const rows: NotificationRow[] = list.map((n) => ({
     id: n.id,
     type: n.type,
     title: n.title,
@@ -56,13 +77,13 @@ export default async function InternNotifications({
       />
 
       {/* The shared tab look; hidden when All and Unread are the same list. */}
-      {unreadOnly || (unreadCount > 0 && unreadCount < all.length) ? (
+      {unreadOnly || (unreadCount > 0 && unreadCount < total) ? (
         <FilterTabs
           label="Filter notifications"
           className="mb-6"
           value={unreadOnly ? "unread" : "all"}
           tabs={[
-            { key: "all", label: "All", count: all.length },
+            { key: "all", label: "All", count: total },
             { key: "unread", label: "Unread", count: unreadCount },
           ]}
           hrefFor={(k) => (k === "unread" ? "/intern/notifications?show=unread" : "/intern/notifications")}
@@ -85,7 +106,7 @@ export default async function InternNotifications({
           />
         )
       ) : (
-        <div className="space-y-10">
+        <div className="space-y-8">
           {needsYou.length > 0 ? (
             <section>
               <SectionHead title="Needs you" hint="A decision, a document, or something waiting on your side." />
@@ -100,11 +121,18 @@ export default async function InternNotifications({
             </section>
           ) : null}
 
+          {shown > list.length ? (
+            <p className="nums text-sm text-text-subtle">
+              Showing the latest {list.length} of {shown}. Older ones are not listed here.
+            </p>
+          ) : null}
         </div>
       )}
     </div>
   );
 }
+
+const LIMIT = 100;
 
 /** Notification types that put work on the candidate's side. */
 const NEEDS_ACTION = new Set([

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { AlertCircle, Check } from "lucide-react";
 
 const field =
-  "mt-2 h-11 w-full rounded-lg border border-ink-200 bg-white px-3.5 text-sm text-ink-900 outline-none transition-[border-color,box-shadow] placeholder:text-ink-400 focus-visible:border-brand-600 focus-visible:ring-[3px] focus-visible:ring-brand-600/20";
+  "mt-2 h-11 w-full rounded-lg border border-ink-200 bg-white px-3.5 text-sm text-ink-900 outline-none transition-[border-color,box-shadow] placeholder:text-ink-500 focus-visible:border-brand-600 focus-visible:ring-[3px] focus-visible:ring-brand-600/20";
 const button =
   "h-11 w-full rounded-lg bg-brand-700 px-4 text-sm font-semibold text-white transition-colors hover:bg-brand-600 disabled:pointer-events-none disabled:opacity-60";
 

@@ -49,14 +49,14 @@ export async function requireRole(role: "intern" | "employer" | "admin"): Promis
  * the request as `x-ft-path`; without it this is the plain login page.
  */
 export async function loginUrlFor(role: "intern" | "employer" | "admin"): Promise<string> {
-  const base = role === "intern" ? "/login" : `/${role}/login`;
+  const base = role === "admin" ? "/admin/login" : `/login?as=${role}`;
   let path: string | null = null;
   try {
     path = (await headers()).get("x-ft-path");
   } catch {
     // outside a request
   }
-  return path && path.startsWith("/") && !path.startsWith("//") ? `${base}?next=${encodeURIComponent(path)}` : base;
+  return path && path.startsWith("/") && !path.startsWith("//") ? `${base}${base.includes("?") ? "&" : "?"}next=${encodeURIComponent(path)}` : base;
 }
 
 /**

@@ -1,11 +1,15 @@
 import type { Metadata } from "next";
-import { EmptyScene, PageHead, Pill, SectionHead, StatTile } from "@/components/app/primitives";
-import { FreshProofGrid, RecordCount, RecordExport } from "@/components/app/proof";
-import { Thread } from "@/components/app/thread";
-import { CountUp } from "@/components/app/count-up";
+import Link from "next/link";
+import { EmptyScene, PageHead, Surface } from "@/components/app/primitives";
+import { RecordExport } from "@/components/app/proof";
+import { RecordCertificate, RecordTimeline } from "@/components/intern/record/record-certificate";
+import { buttonClass } from "@/components/ui/button";
 import { requireRole } from "@/lib/auth";
 import { loadInternData } from "@/lib/intern-data";
-import { recordAsText } from "@/lib/journey";
+import { companyIn, recordAsText, recordTotals, roleOf } from "@/lib/journey";
+
+/** Newest entries shown before "Show older"; the download always has all of them. */
+const FIRST_PAGE = 10;
 
 export const metadata: Metadata = {
   title: "Your record",
@@ -21,12 +25,13 @@ export const metadata: Metadata = {
  * internship here should leave with something they can show, not a feeling
  * they had.
  *
- * ── Why this is not a certificate ──────────────────────────────────────
+ * ── Why it looks like a certificate but is not one ──────────────────────
  *
  * The industry is full of certificates that attest a student watched a video.
  * Those are noise, and employers have learned to discount them, so a badge
  * that says "you did some clicking" would actively waste the one asset this
- * screen is trying to build. Everything here is drawn from a row a person or
+ * screen is trying to build. The seal and the layout borrow a certificate's
+ * gravity; the content does not borrow its emptiness. Everything here is drawn from a row a person or
  * a payment created: hours a manager approved, money that reached an account,
  * an interview that actually happened, a score that was actually published.
  *
@@ -42,8 +47,9 @@ export const metadata: Metadata = {
  * impressive and would be harder to paste into anything. A text file reads as
  * a record rather than as a product screenshot, and it opens anywhere.
  */
-export default async function InternRecord() {
+export default async function InternRecord({ searchParams }: { searchParams: Promise<{ all?: string }> }) {
   const session = await requireRole("intern");
+  const showAll = (await searchParams).all === "1";
 
   const data = await loadInternData(session.uid);
   const { getDb, schema } = await import("@/lib/db");
@@ -56,55 +62,27 @@ export default async function InternRecord() {
 
   const candidate = `${user?.first ?? ""} ${user?.last ?? ""}`.trim() || "Candidate";
   const exportText = recordAsText(data.proofs, candidate);
-
-  const hoursTotal = data.proofs
-    .filter((p) => p.kind === "hours")
-    .reduce((sum, p) => {
-      const fact = p.facts.find((f) => f.label === "Hours");
-      const n = fact ? Number(fact.value) : 0;
-      return sum + (Number.isFinite(n) ? n : 0);
-    }, 0);
-
-  const paidTotal = data.proofs
-    .filter((p) => p.kind === "stipend")
-    .reduce((sum, p) => {
-      const fact = p.facts.find((f) => f.label === "Amount");
-      const n = fact ? Number(fact.value.replace(/[^\d.]/g, "")) : 0;
-      return sum + (Number.isFinite(n) ? n : 0);
-    }, 0);
+  const totals = recordTotals(data.proofs);
+  const job = data.engagement;
+  const internship = job ? `${roleOf(job.offerDetails ?? {})} at ${companyIn(data.names[job.employerId])}` : undefined;
+  const shown = showAll ? data.proofs : data.proofs.slice(0, FIRST_PAGE);
+  const older = data.proofs.length - shown.length;
 
   return (
     <div>
       <PageHead
         title="Your record"
-        lede="Everything you have done here, with the date it happened and who confirmed it. Take it with you."
-        action={<RecordExport filename={`findtern-record-${candidate.toLowerCase().replace(/\s+/g, "-")}.txt`} text={exportText} />}
+        lede="Dated, and confirmed by a person or a payment. Download it as a plain text file to attach anywhere."
+        action={
+          data.proofs.length > 0 ? (
+            <RecordExport
+              className="w-full sm:w-auto [&>button]:w-full sm:[&>button]:w-auto"
+              filename={`findtern-record-${candidate.toLowerCase().replace(/\s+/g, "-")}.txt`}
+              text={exportText}
+            />
+          ) : null
+        }
       />
-
-      {/* ── The three numbers that matter ───────────────────────────
-          Not four identical stat cards. Each one answers a question a
-          candidate actually has: how much work, how much money, how many
-          people vouch for me. */}
-      <div className="mb-8 grid gap-3 sm:grid-cols-3">
-        <StatTile
-          label="Hours a manager approved"
-          value={hoursTotal > 0 ? <CountUp value={hoursTotal} /> : null}
-          empty="None approved yet"
-          hint={hoursTotal > 0 ? "hours" : undefined}
-        />
-        <StatTile
-          label="Stipend paid to you"
-          value={paidTotal > 0 ? <CountUp value={paidTotal} currency="INR" /> : null}
-          empty="Nothing paid yet"
-          href={paidTotal > 0 ? "/intern/earnings" : undefined}
-        />
-        <StatTile
-          label="Times someone vouched"
-          value={data.proofs.length > 0 ? <CountUp value={data.proofs.length} /> : null}
-          empty="Nothing yet"
-          hint={data.proofs.length > 0 ? "records" : undefined}
-        />
-      </div>
 
       {data.proofs.length === 0 ? (
         <EmptyScene
@@ -114,48 +92,20 @@ export default async function InternRecord() {
           next={{ label: "See what is waiting", href: "/intern/dashboard" }}
         />
       ) : (
-        <>
-          <RecordCount proofs={data.proofs} />
-          <div className="mt-6">
-            {/* The proof cards are h3s; this keeps the outline h1 > h2 > h3. */}
-            <h2 className="sr-only">Your records</h2>
-            <FreshProofGrid proofs={data.proofs} />
-          </div>
-        </>
+        <div className="space-y-4 lg:space-y-6">
+          <RecordCertificate name={candidate} internship={internship} asOf={new Date()} totals={totals} />
+          <Surface className="p-5 sm:p-8">
+            <RecordTimeline proofs={shown} />
+            {older > 0 ? (
+              <div className="mt-6 border-t border-ink-100 pt-5 pl-14 sm:pl-15">
+                <Link href="/intern/record?all=1" scroll={false} className={buttonClass({ variant: "outline", size: "sm" })}>
+                  Show {older} older {older === 1 ? "item" : "items"}
+                </Link>
+              </div>
+            ) : null}
+          </Surface>
+        </div>
       )}
-
-      {/* ── The full history ────────────────────────────────────── */}
-      {data.thread.length > 0 ? (
-        <section className="mt-12 border-t border-ink-200/80 pt-8">
-          <SectionHead
-            title="Everything that has happened"
-            hint="Including the parts that are still in progress."
-          />
-          <Thread nodes={data.thread} />
-        </section>
-      ) : null}
-
-      {/* ── What is not here, and why ───────────────────────────────
-          Stating the omissions is more honest than letting someone assume the
-          record is a complete evaluation of them. */}
-      <section className="mt-12 border-t border-ink-200/80 pt-8">
-        <SectionHead title="What this record is not" />
-        <ul className="grid gap-3 sm:grid-cols-2">
-          {[
-            "It is not a certificate. Nobody here is issuing you a qualification you have not earned.",
-            "It does not rank you. There is no leaderboard and no position against other candidates.",
-            "It does not count logins. Opening this app does not add anything to it.",
-            "It does not expire. Nothing here is taken away for taking a week off.",
-          ].map((line) => (
-            <li key={line} className="flex gap-2.5 text-pretty text-sm leading-relaxed text-ink-600">
-              <Pill tone="neutral" className="mt-0.5 h-fit shrink-0">
-                No
-              </Pill>
-              <span>{line}</span>
-            </li>
-          ))}
-        </ul>
-      </section>
     </div>
   );
 }

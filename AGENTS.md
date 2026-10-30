@@ -10,6 +10,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 # Findtern project rules
 
+- **Read `ARCHITECTURE.md` and `SPECS.md` before changing code.** They are the locked plan; `SPECS.md` replaces `DESIGN.md`.
 - Mutating route handlers MUST start with `requireMutation({ req, roles, ownerId? })` from `src/lib/guards-mutation.ts`. No hand-rolled auth checks.
 - Never port legacy defects from `/home/wynautbhav/FindTern`: plaintext passwords, unauthenticated `/uploads` static, `/api/interns` IDOR.
 - Marketing pages read through `src/lib/content` accessors (async, DB-backed with TS fallback). Do not import `src/lib/content/*.ts` data files directly from pages.

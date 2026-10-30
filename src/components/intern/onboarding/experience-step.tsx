@@ -1,6 +1,6 @@
 "use client";
 
-import { EXPERIENCE_TYPES, type ExperienceEntry } from "@/lib/onboarding";
+import { EXPERIENCE_TYPES, MAX_EXPERIENCES, type ExperienceEntry } from "@/lib/onboarding";
 
 import { DateField, localToday } from "../date-input";
 import { AddButton, Check, EmptyEntries, EntryCard, Field, FieldNote, Grid, Label, SelectField, TextArea, controlClass } from "./fields";
@@ -14,15 +14,14 @@ export function ExperienceStep({ values, update, errors }: StepProps) {
       "experiences",
       experiences.map((e) => (e.id === id ? { ...e, ...next } : e)),
     );
+  const full = experiences.length >= MAX_EXPERIENCES;
   const add = () =>
+    !full &&
     update("experiences", [
       ...experiences,
       // Nothing preselected (INT-30): the type is chosen.
       { id: `exp-${Date.now()}`, type: "", company: "", role: "", from: "", to: "", current: false, description: "" },
     ]);
-  // A legacy type outside the list (rare) stays selectable.
-  const typeOptions = (type: string) =>
-    !type || EXPERIENCE_TYPES.some((t) => t.value === type) ? [...EXPERIENCE_TYPES] : [{ value: type, label: type }, ...EXPERIENCE_TYPES];
 
   if (experiences.length === 0) {
     return (
@@ -51,8 +50,9 @@ export function ExperienceStep({ values, update, errors }: StepProps) {
                 id={`${k}.type`}
                 label="Type"
                 placeholder="Choose the type"
-                value={exp.type}
-                options={typeOptions(exp.type)}
+                // A type outside the legacy four (an early build) is chosen again.
+                value={EXPERIENCE_TYPES.some((t) => t.value === exp.type) ? exp.type : ""}
+                options={[...EXPERIENCE_TYPES]}
                 error={errors[`${k}.type`]}
                 onChange={(v) => patch(exp.id, { type: v })}
               />
@@ -60,6 +60,7 @@ export function ExperienceStep({ values, update, errors }: StepProps) {
                 id={`${k}.role`}
                 label={project ? "Your role" : "Role or title"}
                 placeholder={project ? "e.g. Team lead, Developer" : "e.g. Marketing Intern"}
+                maxLength={160}
                 value={exp.role}
                 error={errors[`${k}.role`]}
                 onChange={(v) => patch(exp.id, { role: v })}
@@ -69,6 +70,7 @@ export function ExperienceStep({ values, update, errors }: StepProps) {
               id={`${k}.company`}
               label={project ? "Organisation, college or client" : "Company"}
               placeholder={project ? "e.g. your college, a client, or Self" : "e.g. Infosys"}
+              maxLength={160}
               value={exp.company}
               error={errors[`${k}.company`]}
               onChange={(v) => patch(exp.id, { company: v })}
@@ -118,7 +120,14 @@ export function ExperienceStep({ values, update, errors }: StepProps) {
           </EntryCard>
         );
       })}
-      <AddButton onClick={add}>Add another</AddButton>
+      <div className="flex flex-wrap items-center gap-3">
+        <AddButton onClick={add} disabled={full}>
+          Add another
+        </AddButton>
+        <p className="nums text-xs text-text-subtle">
+          {experiences.length} of {MAX_EXPERIENCES}
+        </p>
+      </div>
     </div>
   );
 }

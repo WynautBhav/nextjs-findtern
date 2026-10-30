@@ -202,7 +202,7 @@ export function SkillStudentsDialog({
 
         <footer className="flex flex-col gap-3 border-t border-ink-100 bg-ink-50/60 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
           <p className="text-[13px] text-ink-600">Full profiles open once you send a proposal.</p>
-          <ButtonLink href="/employer/signup" variant="primary" size="sm" className="shrink-0">
+          <ButtonLink href="/signup?as=employer" variant="primary" size="sm" className="shrink-0">
             Start hiring
             <ArrowRight className="size-3.5" aria-hidden />
           </ButtonLink>

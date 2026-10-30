@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, Briefcase, CalendarDays, MapPin } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 
 import {
   EmptyScene,
@@ -20,6 +20,7 @@ import {
 import { requireRole } from "@/lib/auth";
 import { formatJoiningDate } from "@/lib/format";
 import { loadInternData, projectNames } from "@/lib/intern-data";
+import { cn } from "@/lib/utils";
 import { canDecide, offerGroup } from "@/lib/intern-offer-view";
 import type { ProposalRow } from "@/lib/journey";
 import { FREE_DECLINES } from "@/lib/offer";
@@ -86,7 +87,7 @@ export default async function InternProposals() {
           who="Companies come to you"
         />
       ) : (
-        <div className="space-y-10">
+        <div className="space-y-6 lg:space-y-8">
           <Group
             title="Waiting on you"
             hint="Answer before the joining date; on that date an unanswered offer closes as rejected."
@@ -130,10 +131,10 @@ function Group({
   return (
     <section>
       <SectionHead title={`${title} · ${rows.length}`} hint={hint} />
-      <ul className="grid gap-4 lg:grid-cols-2">
+      <ul className={cn("grid gap-4", rows.length > 1 && "xl:grid-cols-2")}>
         {rows.map((row) => (
           <li key={row.p.id} className="min-w-0">
-            <OfferCard {...row} decision={decision} compact={compact} />
+            <OfferCard {...row} decision={decision} compact={compact} wide={rows.length === 1} />
           </li>
         ))}
       </ul>
@@ -147,68 +148,74 @@ function OfferCard({
   project,
   decision,
   compact,
+  wide,
 }: Row & {
   decision: { declinesUsed: number; guaranteeEnded: boolean };
   compact: boolean;
+  /** Alone in its group: full width, terms in one row. */
+  wide: boolean;
 }) {
   const status = proposalStatus(facts.key);
   const open = canDecide(facts.key);
   const href = `/intern/proposals/${p.id}`;
 
   return (
-    <Surface as="article" className="flex h-full flex-col p-5 sm:p-6">
-      <div className="flex flex-wrap items-center gap-2">
-        <Pill tone={status.tone}>{status.label}</Pill>
-        {facts.fullTime ? <Pill tone="live">Full Time Job Role</Pill> : null}
-        {facts.edited ? <Pill tone="new">Updated</Pill> : null}
+    <Surface as="article" className="flex h-full flex-col p-5 lg:p-6">
+      {/* The money leads the card; the status sits with the title, not above it.
+          A grid, not a wrapping flex: a long role wraps in its column and the figure stays put. */}
+      <div className="grid items-start gap-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:gap-x-8">
+        <div className="min-w-0">
+          <h3 className="text-pretty text-base font-semibold text-ink-900">
+            <Link
+              href={href}
+              className="rounded-apple-sm hover:text-brand-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
+            >
+              {facts.role}
+            </Link>
+          </h3>
+          <p className="mt-1 text-sm text-ink-600">
+            {facts.company ?? "Company shared after hire"}
+            {project ? <span className="text-text-subtle"> · {project}</span> : null}
+          </p>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <Pill tone={status.tone}>{status.label}</Pill>
+            {facts.fullTime ? <Pill tone="live">Full-time role</Pill> : null}
+            {facts.edited ? <Pill tone="new">Updated</Pill> : null}
+          </div>
+        </div>
+        <div className="sm:text-right">
+          <p className="text-sm text-ink-600">{facts.moneyLabel}</p>
+          <p className="nums mt-1 whitespace-nowrap text-4xl font-medium leading-none tracking-[-0.03em] text-ink-900">
+            {facts.amount}
+            {facts.per ? <span className="ml-1 text-base font-normal tracking-normal text-text-subtle">{facts.per}</span> : null}
+          </p>
+        </div>
       </div>
 
-      <h3 className="mt-3 text-pretty text-lg font-semibold tracking-[-0.015em] text-ink-900">
-        <Link
-          href={href}
-          className="rounded-apple-sm hover:text-brand-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
-        >
-          {facts.role}
-        </Link>
-      </h3>
-      <p className="mt-1 text-sm text-ink-600">
-        {facts.company ?? "Company shared after hire"}
-        {project ? <span className="text-text-subtle"> · {project}</span> : null}
-      </p>
-
-      <dl className="mt-5 grid grid-cols-2 gap-x-4 gap-y-4 border-t border-ink-200/80 pt-4">
+      <dl className={cn("mt-4 grid grid-cols-2 gap-4 border-t border-ink-200/80 pt-4", wide && "sm:grid-cols-3")}>
         <div className="col-span-2 sm:col-span-1">
-          <dt className="text-xs text-ink-600">{facts.moneyLabel}</dt>
-          <dd className="nums mt-0.5 text-base font-semibold text-ink-900">
-            {facts.money}
-          </dd>
-        </div>
-        <div className="col-span-2 sm:col-span-1">
-          <dt className="flex items-center gap-1.5 text-xs text-ink-600">
-            <CalendarDays className="size-3.5" aria-hidden />
+          <dt className="text-xs text-text-subtle">
             Joining date
           </dt>
-          <dd className="nums mt-0.5 text-sm font-medium text-ink-900">
+          <dd className="nums mt-1 text-sm font-medium text-ink-900">
             {formatJoiningDate(facts.startDate)}
           </dd>
         </div>
         {compact ? null : (
           <>
             <div>
-              <dt className="flex items-center gap-1.5 text-xs text-ink-600">
-                <MapPin className="size-3.5" aria-hidden />
+              <dt className="text-xs text-text-subtle">
                 {facts.fullTime ? "Location" : "Work mode"}
               </dt>
-              <dd className="mt-0.5 text-sm font-medium text-ink-900">
+              <dd className="mt-1 text-sm font-medium text-ink-900">
                 {facts.fullTime ? facts.location : modeLabel(facts.mode)}
               </dd>
             </div>
             <div>
-              <dt className="flex items-center gap-1.5 text-xs text-ink-600">
-                <Briefcase className="size-3.5" aria-hidden />
+              <dt className="text-xs text-text-subtle">
                 {facts.fullTime ? "Job mode" : "Duration"}
               </dt>
-              <dd className="mt-0.5 text-sm font-medium text-ink-900">
+              <dd className="mt-1 text-sm font-medium text-ink-900">
                 {facts.fullTime ? modeLabel(facts.mode) : facts.duration}
               </dd>
             </div>
@@ -222,7 +229,7 @@ function OfferCard({
         </p>
       ) : null}
 
-      <div className="mt-auto pt-5">
+      <div className="mt-auto pt-4">
         {open ? (
           <div className="space-y-3">
             <OfferDecision
@@ -238,7 +245,7 @@ function OfferCard({
             />
             <Link
               href={href}
-              className="inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-brand-700 hover:text-brand-800"
+              className="inline-flex min-h-11 items-center gap-1.5 rounded-apple-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 text-sm font-medium text-brand-700 hover:text-brand-800"
             >
               Read the full offer
               <ArrowRight className="size-4" aria-hidden />
@@ -247,7 +254,7 @@ function OfferCard({
         ) : (
           <Link
             href={href}
-            className="group inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-brand-700 hover:text-brand-800"
+            className="group inline-flex min-h-11 items-center gap-1.5 rounded-apple-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 text-sm font-medium text-brand-700 hover:text-brand-800"
           >
             See the offer
             <ArrowRight

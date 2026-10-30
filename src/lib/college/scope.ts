@@ -45,7 +45,7 @@ export async function getCollegeContext(): Promise<CollegeContext | null> {
 /** Page guard for /college. */
 export async function requireCollegeContext(): Promise<CollegeContext> {
   const ctx = await getCollegeContext();
-  if (!ctx) redirect("/college/login");
+  if (!ctx) redirect("/login?as=college");
   return ctx;
 }
 

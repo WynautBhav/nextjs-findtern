@@ -1,5 +1,6 @@
 import { formatDate, formatMoney, shortDate } from "./format.ts";
 import { draftFromRecord, MIN_SKILLS } from "./onboarding.ts";
+import { formatPeriodDays } from "./timesheet-days.ts";
 /**
  * The journey derivation.
  *
@@ -208,7 +209,7 @@ export function companyIn(name: string | null | undefined): string {
 /** The same, opening a sentence ("The company sent you an offer"). */
 const sentence = (who: string) => who.charAt(0).toUpperCase() + who.slice(1);
 
-const roleOf = (offer: Record<string, unknown> | null): string => {
+export const roleOf = (offer: Record<string, unknown> | null): string => {
   const v = offer?.roleTitle ?? offer?.role;
   return typeof v === "string" && v.trim() ? v.trim() : "this internship";
 };
@@ -355,7 +356,9 @@ export function buildThread(src: ProofSource, now: Date = new Date()): ThreadNod
         tone: "action",
         at: t.periodStart ?? t.createdAt,
         title: `Hours not sent for ${period}`,
-        detail: `Your draft is saved. Send it when your hours look right.`,
+        detail: hoursIn(t) > 0
+          ? `Your draft is saved. Send it when your hours look right.`
+          : `No hours logged yet. Add them, then send.`,
         href: "/intern/timesheets",
         action: "Finish and send",
       });
@@ -465,6 +468,9 @@ export type Proof = {
   /** Who verified it, when a human did. */
   issuedBy?: string;
   href?: string;
+  /** The figure behind a total, kept numeric so totals never parse display strings. */
+  hours?: number;
+  paid?: { minor: number; currency: string };
 };
 
 export const PROOF_META: Record<ProofKind, { label: string; blurb: string }> = {
@@ -553,8 +559,9 @@ export function deriveProofs(src: ProofSource): Proof[] {
         ...(workLines(t).length ? [{ label: "Work", value: workLines(t).join(", ") }] : []),
       ],
       at: t.approvedAt,
-      issuedBy: "Your manager",
+      issuedBy: "your manager",
       href: "/intern/timesheets",
+      hours: h,
     });
   }
 
@@ -572,6 +579,7 @@ export function deriveProofs(src: ProofSource): Proof[] {
       at: r.paidAt,
       issuedBy: "Findtern",
       href: "/intern/earnings",
+      paid: { minor: r.amountMinor ?? 0, currency: (r.currency ?? "INR").toUpperCase() },
     });
   }
 
@@ -591,9 +599,19 @@ export function proofAsText(proof: Proof, candidate: string): string {
     ...proof.facts.map((f) => `${f.label}: ${f.value}`),
     "",
     `Issued ${proof.at.toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}${proof.issuedBy ? ` by ${proof.issuedBy}` : ""}`,
-    `Verify at findtern.in/record`,
   ];
   return lines.join("\n");
+}
+
+/** The record's totals: approved hours, money paid per currency (never added across currencies), item count. */
+export function recordTotals(proofs: Proof[]): { items: number; hours: number; paid: { currency: string; minor: number }[] } {
+  const paid = new Map<string, number>();
+  let hours = 0;
+  for (const p of proofs) {
+    hours += p.hours ?? 0;
+    if (p.paid) paid.set(p.paid.currency, (paid.get(p.paid.currency) ?? 0) + p.paid.minor);
+  }
+  return { items: proofs.length, hours, paid: [...paid].map(([currency, minor]) => ({ currency, minor })) };
 }
 
 export function recordAsText(proofs: Proof[], candidate: string): string {
@@ -797,6 +815,44 @@ export function hoursIn(t: TimesheetRow): number {
   return entries.reduce((sum, e) => sum + (typeof e.hours === "number" ? e.hours : 0), 0);
 }
 
+export type MonthHours = { key: string; start: Date; approved: number; sent: number; draft: number };
+
+/**
+ * Hours per India-time month for the dashboard chart, oldest first, ending at
+ * `now`'s month or the latest sheet's, whichever is later (a draft for next
+ * month is real work). A sheet counts in the month its period starts;
+ * rejected sheets are left out (their hours were never accepted or re-sent).
+ */
+export function hoursByMonth(timesheets: TimesheetRow[], now: Date, maxMonths = 6, joined?: Date | null): MonthHours[] {
+  const IST_MS = 330 * 60_000;
+  const ym = (d: Date) => {
+    const ist = new Date(d.getTime() + IST_MS);
+    return ist.getUTCFullYear() * 12 + ist.getUTCMonth();
+  };
+  const starts = timesheets.flatMap((t) => (t.periodStart && t.status !== "rejected" ? [ym(t.periodStart)] : []));
+  const last = Math.max(ym(now), ...starts);
+  // Start at the month they joined (or their first sheet, if earlier), never before.
+  const first = Math.min(ym(now), joined ? ym(joined) : Infinity, ...starts);
+  const months = Math.min(maxMonths, last - first + 1);
+  const out: MonthHours[] = Array.from({ length: months }, (_, i) => {
+    const n = last - months + 1 + i;
+    const y = Math.floor(n / 12);
+    const m = n % 12;
+    // Midday on the 1st (UTC) is the 1st in India too, for the label.
+    return { key: `${y}-${String(m + 1).padStart(2, "0")}`, start: new Date(Date.UTC(y, m, 1, 12)), approved: 0, sent: 0, draft: 0 };
+  });
+  for (const t of timesheets) {
+    if (!t.periodStart || t.status === "rejected") continue;
+    const slot = out[ym(t.periodStart) - (last - months + 1)];
+    if (!slot) continue;
+    const h = hoursIn(t);
+    if (t.status === "approved") slot.approved += h;
+    else if (t.status === "submitted") slot.sent += h;
+    else slot.draft += h;
+  }
+  return out;
+}
+
 /** Distinct work the candidate described, which is the interesting part. */
 export function workLines(t: TimesheetRow, limit = 3): string[] {
   const entries = toArray<{ note?: unknown }>(t.entries);
@@ -809,18 +865,10 @@ export function workLines(t: TimesheetRow, limit = 3): string[] {
   return [...seen];
 }
 
+/** The sheet's period, worded exactly as the Timesheets page words it. */
 export function periodLabel(t: TimesheetRow): string {
-  const start = t.periodStart;
-  const end = t.periodEnd ?? t.periodStart;
-  if (!start) return "this period";
-  const sameMonth =
-    end &&
-    start.getFullYear() === end.getFullYear() &&
-    start.getMonth() === end.getMonth();
-  const a = shortDate(start, { day: "numeric", month: "short" });
-  const b = shortDate(end!, { day: "numeric", month: "short" });
-  if (sameMonth) return `${a} to ${b}`;
-  return `${a} to ${b} ${end!.getFullYear()}`;
+  if (!t.periodStart) return "this period";
+  return formatPeriodDays(t.periodStart, t.periodEnd ?? t.periodStart);
 }
 
 export function slotOf(i: InterviewRow): Date | null {

@@ -16,7 +16,7 @@ import { DOCUMENT_SLOTS, type CandidateDocument } from "@/lib/admin/candidate-do
 import { normaliseEntries, countStatuses } from "@/lib/employer-timesheets";
 import { offerScore, parseOffer } from "@/lib/offer";
 import { ProposalOfferSummary } from "@/components/admin/proposal-offer-summary";
-import { draftFromRecord } from "@/lib/onboarding";
+import { draftFromRecord, linkedinHref } from "@/lib/onboarding";
 import type { RevealField } from "@/lib/admin/identity-mask";
 import type { User as UserType, InternOnboarding, Interview, Proposal, Timesheet, InternPayout } from "@/lib/db/schema";
 import { DetailRow, EmptyScene, PageHead, Pill, pillTabClass, SectionHead, Surface } from "@/components/app/primitives";
@@ -471,9 +471,9 @@ function ProfileTab({
             <DetailRow
               label="LinkedIn"
               value={
-                draft.linkedinUrl ? (
-                  <a href={draft.linkedinUrl} target="_blank" rel="noopener noreferrer" className="break-all text-brand-700 underline-offset-4 hover:underline touch:inline-flex touch:min-h-11 touch:items-center">
-                    {draft.linkedinUrl.replace(/^https?:\/\/(www\.)?/, "")}
+                linkedinHref(draft.linkedinUrl) ? (
+                  <a href={linkedinHref(draft.linkedinUrl) ?? undefined} target="_blank" rel="noopener noreferrer" className="break-all text-brand-700 underline-offset-4 hover:underline touch:inline-flex touch:min-h-11 touch:items-center">
+                    {(draft.linkedinUrl ?? "").replace(/^https?:\/\/(www\.)?/, "")}
                   </a>
                 ) : (
                   "-"

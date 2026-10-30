@@ -11,8 +11,6 @@ export const metadata: Metadata = {
 export default function AdminLoginPage() {
   return (
     <AuthShell
-      compact
-      eyebrow="Operations"
       title="Findtern operations console."
       subtitle="Interns, employers, payments and site content. Restricted to staff accounts with an assigned role."
     >

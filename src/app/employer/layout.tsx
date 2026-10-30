@@ -61,7 +61,7 @@ const NAV_GROUPS: ConsoleNavGroup[] = [
 
 export default async function EmployerLayout({ children }: { children: React.ReactNode }) {
   const session = await getSession();
-  if (!session || session.role !== "employer") redirect("/employer/login");
+  if (!session || session.role !== "employer") redirect("/login?as=employer");
 
   let companyName = "Company Account";
   let unreadAlerts = 0;
@@ -142,7 +142,7 @@ export default async function EmployerLayout({ children }: { children: React.Rea
       }
       alerts={{ href: "/employer/alerts", count: unreadAlerts, label: "Alerts" }}
       help={{ faqHref: "/faq#employers", contactHref: "/contact", email: SITE.adminEmail }}
-      signOutTo="/employer/login"
+      signOutTo="/login?as=employer"
       initialCollapsed={(await cookies()).get(RAIL_COOKIE)?.value === "1"}
       rootCrumb={{ label: "Home", href: "/employer/dashboard" }}
       crumbParents={{

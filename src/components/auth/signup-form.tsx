@@ -316,7 +316,7 @@ export function SignupForm({
                 autoComplete="tel-national"
                 placeholder="9876543210"
                 aria-invalid={phoneTaken || undefined}
-                className="h-11 w-full rounded-lg border border-ink-200 bg-white px-3.5 text-sm text-ink-900 outline-none transition-[border-color,box-shadow] placeholder:text-ink-400 focus-visible:border-brand-600 focus-visible:ring-[3px] focus-visible:ring-brand-600/20 aria-invalid:border-danger"
+                className="h-11 w-full rounded-lg border border-ink-200 bg-white px-3.5 text-sm text-ink-900 outline-none transition-[border-color,box-shadow] placeholder:text-ink-500 focus-visible:border-brand-600 focus-visible:ring-[3px] focus-visible:ring-brand-600/20 aria-invalid:border-danger"
               />
             </div>
             {phoneTaken ? (
@@ -343,7 +343,7 @@ export function SignupForm({
               autoComplete="new-password"
               placeholder="••••••••"
               aria-describedby="password-rules"
-              className="mt-2 h-11 w-full rounded-lg border border-ink-200 bg-white px-3.5 text-sm text-ink-900 outline-none transition-[border-color,box-shadow] placeholder:text-ink-400 focus-visible:border-brand-600 focus-visible:ring-[3px] focus-visible:ring-brand-600/20"
+              className="mt-2 h-11 w-full rounded-lg border border-ink-200 bg-white px-3.5 text-sm text-ink-900 outline-none transition-[border-color,box-shadow] placeholder:text-ink-500 focus-visible:border-brand-600 focus-visible:ring-[3px] focus-visible:ring-brand-600/20"
             />
             <ul id="password-rules" className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
               {PASSWORD_RULES.map((rule) => {
@@ -434,7 +434,7 @@ export function SignupForm({
               placeholder="000000"
               aria-invalid={otpRejected ? true : undefined}
               aria-describedby={otpRejected ? "otp-error" : undefined}
-              className={`mt-2 h-12 w-full rounded-lg border bg-white px-3.5 text-center font-mono text-lg tracking-[0.5em] text-ink-900 outline-none transition-[border-color,box-shadow] placeholder:text-ink-300 focus-visible:ring-[3px] ${
+              className={`mt-2 h-12 w-full rounded-lg border bg-white px-3.5 text-center font-mono text-lg tracking-[0.5em] text-ink-900 outline-none transition-[border-color,box-shadow] placeholder:text-ink-500 focus-visible:ring-[3px] ${
                 otpRejected
                   ? "border-danger focus-visible:border-danger focus-visible:ring-danger/20"
                   : "border-ink-200 focus-visible:border-brand-600 focus-visible:ring-brand-600/20"
@@ -529,7 +529,7 @@ function TextInput({
         placeholder={placeholder}
         autoComplete={autoComplete}
         onChange={(e) => onChange(e.target.value)}
-        className="mt-2 h-11 w-full rounded-lg border border-ink-200 bg-white px-3.5 text-sm text-ink-900 outline-none transition-[border-color,box-shadow] placeholder:text-ink-400 focus-visible:border-brand-600 focus-visible:ring-[3px] focus-visible:ring-brand-600/20"
+        className="mt-2 h-11 w-full rounded-lg border border-ink-200 bg-white px-3.5 text-sm text-ink-900 outline-none transition-[border-color,box-shadow] placeholder:text-ink-500 focus-visible:border-brand-600 focus-visible:ring-[3px] focus-visible:ring-brand-600/20"
       />
     </div>
   );

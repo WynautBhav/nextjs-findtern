@@ -38,7 +38,7 @@ export function MeetingJoinButton({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className={buttonClass({ variant: "primary", size, block, className: "text-sm font-semibold" })}
+        className={buttonClass({ variant: "primary", size, block })}
       >
         <Video className="size-4" aria-hidden />
         {label}
@@ -46,7 +46,7 @@ export function MeetingJoinButton({
       <CountdownAgreement
         open={open}
         onOpenChange={setOpen}
-        title="Important Instructions"
+        title="Important instructions"
         description="Please read before joining."
         sections={MEETING_RULES}
         requireAgreement={false}

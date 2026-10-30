@@ -95,7 +95,8 @@ export function AcademicsStep({ values, update, errors }: StepProps) {
               onChange={(v) => {
                 if (v === "Other") {
                   setTypingOther(true);
-                  set({ degree: option === "Other" ? a.degree : "" });
+                  // "Other" until a name is typed, so the hint asks for the name, not a pick.
+                  set({ degree: option === "Other" && a.degree.trim() ? a.degree : "Other" });
                 } else {
                   setTypingOther(false);
                   set({ degree: v });

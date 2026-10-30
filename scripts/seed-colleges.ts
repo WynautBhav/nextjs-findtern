@@ -58,6 +58,8 @@ async function main() {
   const db = drizzle(pool, { schema });
 
   for (const c of COLLEGES) {
+    // After `db:import-colleges` the AISHE row exists under its own slug; claim it, so the insert below cannot clash on the AISHE code.
+    if (c.aisheCode) await db.update(schema.colleges).set({ slug: c.slug }).where(eq(schema.colleges.aisheCode, c.aisheCode));
     await db
       .insert(schema.colleges)
       .values(c)

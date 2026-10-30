@@ -71,7 +71,7 @@ after(async () => {
 });
 
 test("officer: signs in and sees the console", async () => {
-  await tpo.goto(`${BASE}/college/login`);
+  await tpo.goto(`${BASE}/login?as=college`);
   await tpo.getByLabel(/email/i).fill("tpo@jklu.edu.in");
   await tpo.getByLabel(/^password/i).fill(PASSWORD);
   await tpo.getByRole("button", { name: /sign in/i }).first().click();

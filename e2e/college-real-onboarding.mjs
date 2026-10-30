@@ -157,7 +157,7 @@ await check("Admin issues a new placement-officer login for JKLU", async () => {
 
 // ── 2. Officer signs in, uploads a roster ────────────────────────────────
 await check("New officer signs in to the placement console", async () => {
-  await tpo.goto(`${B}/college/login`);
+  await tpo.goto(`${B}/login?as=college`);
   await tpo.getByLabel(/email/i).fill(OFFICER.email);
   await tpo.getByLabel(/^password/i).fill(officerPassword);
   await tpo.getByRole("button", { name: /sign in/i }).first().click();

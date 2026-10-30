@@ -34,3 +34,7 @@ scripts/seed-category-students.ts
 .impeccable/build/
 .vercel
 .env*
+
+# design tool output
+.taste-skill/
+.impeccable/

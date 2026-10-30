@@ -1,3 +1,5 @@
+> **Superseded on 29 Oct 2026 by `SPECS.md` and `ARCHITECTURE.md`. Kept for history; do not follow it.**
+
 # DESIGN.md — the logged-in surfaces, rebuilt as one system
 
 ## 0. Rules in force (28 Oct 2026). Every signed-in screen follows these

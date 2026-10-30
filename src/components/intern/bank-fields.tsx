@@ -9,13 +9,15 @@ import { controlClass, Field, FieldNote, Grid, Label, Select } from "./onboardin
 export type BankValues = {
   accountHolderName: string;
   bankName: string;
+  /** A new number only; blank keeps the one on file when `accountLast4` is set. */
   accountNumber: string;
+  accountNumberConfirm: string;
   ifscCode: string;
   upiId: string;
 };
 
 /** Error keys, as `bankErrors` in lib/onboarding returns them. */
-export type BankErrorKeys = "bankAccountHolderName" | "bankName" | "bankAccountNumber" | "bankIfscCode" | "bankUpiId";
+export type BankErrorKeys = "bankAccountHolderName" | "bankName" | "bankAccountNumber" | "bankAccountNumberConfirm" | "bankIfscCode" | "bankUpiId";
 
 const OTHER = "__other";
 
@@ -29,8 +31,11 @@ export function BankFields({
   value,
   onChange,
   errors = {},
+  accountLast4 = "",
 }: {
   value: BankValues;
+  /** Last 4 digits of the stored account; the full number is never sent to the browser. */
+  accountLast4?: string;
   onChange: (patch: Partial<BankValues>) => void;
   errors?: Partial<Record<BankErrorKeys, string>>;
 }) {
@@ -90,10 +95,23 @@ export function BankFields({
         value={value.accountNumber}
         onChange={(v) => onChange({ accountNumber: v.replace(/\D/g, "").slice(0, 18) })}
         inputMode="numeric"
-        placeholder="9 to 18 digits"
+        placeholder={accountLast4 ? `•••• ${accountLast4}` : "9 to 18 digits"}
         autoComplete="off"
         inputClassName="nums"
         error={errors.bankAccountNumber}
+        hint={accountLast4 ? `Leave blank to keep the account ending ${accountLast4}.` : undefined}
+      />
+      <Field
+        id="bankAccountNumberConfirm"
+        label="Confirm account number"
+        value={value.accountNumberConfirm}
+        onChange={(v) => onChange({ accountNumberConfirm: v.replace(/\D/g, "").slice(0, 18) })}
+        inputMode="numeric"
+        autoComplete="off"
+        inputClassName="nums"
+        disabled={!value.accountNumber}
+        error={errors.bankAccountNumberConfirm}
+        hint={value.accountNumber ? "Type the account number again." : "Needed when you enter a new number."}
       />
       <Field
         id="bankIfscCode"

@@ -35,7 +35,7 @@ export async function proxy(req: NextRequest) {
   const role = rolePageFor(pathname);
   if (role) {
     if (!session || session.role !== role) {
-      const login = new URL(role === "intern" ? "/login" : "/employer/login", req.url);
+      const login = new URL(`/login?as=${role}`, req.url);
       login.searchParams.set("next", `${pathname}${search}`);
       return NextResponse.redirect(login);
     }

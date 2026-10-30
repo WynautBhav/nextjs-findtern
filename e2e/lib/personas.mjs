@@ -36,7 +36,7 @@ export const MAIN_KEYS = ["intern-hired", "employer-main", "admin", "college"];
 /** Where each role signs in. */
 export const LOGIN = {
   intern: { page: "/login", api: "/api/auth/login", body: (p) => ({ email: p.email, password: p.password }) },
-  employer: { page: "/employer/login", api: "/api/auth/employer/login", body: (p) => ({ email: p.email, password: p.password }) },
-  college: { page: "/college/login", api: "/api/auth/college/login", body: (p) => ({ email: p.email, password: p.password }) },
+  employer: { page: "/login?as=employer", api: "/api/auth/employer/login", body: (p) => ({ email: p.email, password: p.password }) },
+  college: { page: "/login?as=college", api: "/api/auth/college/login", body: (p) => ({ email: p.email, password: p.password }) },
   admin: { page: "/admin/login", api: "/api/auth/admin/login", body: (p) => ({ email: p.email, password: p.password }) },
 };

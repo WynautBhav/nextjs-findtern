@@ -49,6 +49,7 @@ export function AboutStep({ values, update, errors, documents, account, onUpload
           <Field
             id="linkedinUrl"
             label="LinkedIn profile"
+            maxLength={300}
             optional
             type="url"
             inputMode="url"

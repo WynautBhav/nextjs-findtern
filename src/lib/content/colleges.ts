@@ -26,5 +26,5 @@ export const COLLEGE_PITCH: CmsCollegePitch = {
     },
   ],
   cta: { label: "Bring Findtern to your college", href: "/contact" },
-  loginHref: "/college/login",
+  loginHref: "/login?as=college",
 };

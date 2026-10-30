@@ -18,9 +18,8 @@
  * happened and that nothing changed.
  */
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { motion, useReducedMotion } from "motion/react";
 import { AlertCircle, Check, Loader2, X } from "lucide-react";
 
 import { CountdownAgreement, FULL_TIME_ACCEPTANCE_TERMS } from "@/components/app/countdown-agreement";
@@ -64,13 +63,19 @@ export function OfferDecision({
   layout?: "rail" | "row";
 }) {
   const router = useRouter();
-  const reduce = useReducedMotion();
+  const statusRef = useRef<HTMLDivElement>(null);
   const [acceptOpen, setAcceptOpen] = useState(false);
   const [declineOpen, setDeclineOpen] = useState(false);
   const [agreed, setAgreed] = useState(false);
   const [outcome, setOutcome] = useState<Outcome | null>(null);
   const [busy, setBusy] = useState<"accept" | "decline" | null>(null);
   const [, startTransition] = useTransition();
+
+  const done = outcome && !outcome.error ? outcome : null;
+  // The buttons that had focus are gone once the result shows, so focus lands on the result.
+  useEffect(() => {
+    if (done) statusRef.current?.focus();
+  }, [done]);
 
   // Declining past the free allowance ends the refund under the guarantee;
   // it is allowed, but only after the intern has seen that consequence.
@@ -113,45 +118,46 @@ export function OfferDecision({
     }
   }
 
-  if (outcome && !outcome.error) {
-    const accepted = outcome.kind === "accepted";
-    return (
-      <motion.div
-        initial={reduce ? false : { opacity: 0, y: 6 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-        className={cn(
-          "flex items-start gap-3 rounded-apple-lg px-4 py-4",
-          accepted ? "bg-success-soft" : "bg-ink-100",
-        )}
-        role="status"
-      >
-        <span
+  const accepted = done?.kind === "accepted";
+  // Always mounted, so the result is announced when it fills in; the CSS fade is the only motion.
+  const status = (
+    <div ref={statusRef} role="status" tabIndex={-1} className="outline-none">
+      {done ? (
+        <div
           className={cn(
-            "mt-0.5 grid size-5 shrink-0 place-items-center rounded-full text-white",
-            accepted ? "bg-success" : "bg-ink-500",
+            "flex items-start gap-3 rounded-apple-lg px-4 py-4 motion-safe:animate-tile-in",
+            accepted ? "bg-success-soft" : "bg-ink-100",
           )}
         >
-          {accepted ? <Check className="size-3" strokeWidth={3.5} /> : <X className="size-3" strokeWidth={3.5} />}
-        </span>
-        <div className="min-w-0">
-          <p className="text-sm font-semibold text-ink-900">
-            {accepted ? (fullTime ? "You're hired" : "Offer accepted") : "Offer turned down"}
-          </p>
-          <p className="mt-1 text-pretty text-sm leading-relaxed text-ink-700">
-            {accepted
-              ? fullTime
-                ? `Accepting this full-time offer makes you hired${joining ? `. Join on ${joining}` : ""}.`
-                : `${company} completes the payment next. Logging hours opens once they do${joining ? `, and you start on ${joining}` : ""}.`
-              : "It stays in your offers as rejected. This can't be undone."}
-          </p>
+          <span
+            className={cn(
+              "mt-0.5 grid size-5 shrink-0 place-items-center rounded-full text-white",
+              accepted ? "bg-success" : "bg-ink-500",
+            )}
+          >
+            {accepted ? <Check className="size-3" strokeWidth={3.5} aria-hidden /> : <X className="size-3" strokeWidth={3.5} aria-hidden />}
+          </span>
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-ink-900">
+              {accepted ? (fullTime ? "You're hired" : "Offer accepted") : "Offer turned down"}
+            </p>
+            <p className="mt-1 text-pretty text-sm leading-relaxed text-ink-700">
+              {accepted
+                ? fullTime
+                  ? `Accepting this full-time offer makes you hired${joining ? `. Join on ${joining}` : ""}.`
+                  : `${company} completes the payment next. Logging hours opens once they do${joining ? `, and you start on ${joining}` : ""}.`
+                : "It stays in your offers as rejected. This can't be undone."}
+            </p>
+          </div>
         </div>
-      </motion.div>
-    );
-  }
+      ) : null}
+    </div>
+  );
 
   return (
     <div>
+      {status}
+      <div hidden={Boolean(done)}>
       {outcome?.error ? (
         <p role="alert" className="mb-4 flex items-start gap-2 rounded-apple-sm bg-danger-soft px-4 py-3 text-sm text-danger">
           <AlertCircle className="mt-px size-4 shrink-0" aria-hidden />
@@ -317,6 +323,7 @@ export function OfferDecision({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      </div>
     </div>
   );
 }

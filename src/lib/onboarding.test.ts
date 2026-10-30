@@ -12,6 +12,7 @@ import {
   formatProblems,
   isOnboarded,
   isRealDay,
+  linkedinHref,
   monthLabel,
   profileCompletion,
   scoreProblem,
@@ -526,4 +527,24 @@ test("city dropdown lists one state's districts", () => {
   assert.ok(rj.includes("Jaipur"));
   assert.ok(!rj.includes("Pune"));
   assert.deepEqual(districtsOf(""), []);
+});
+
+test("onboarding test run, 30 Oct: PIN, experience type, languages and LinkedIn rules", () => {
+  assert.match(validateStep({ ...complete(), pinCode: "000000" }, 0, ctx).pinCode, /never start with 0/);
+  assert.equal(validateStep({ ...complete(), pinCode: "302017" }, 0, ctx).pinCode, undefined);
+
+  const exp = { id: "x", type: "Hackathon", company: "ACME", role: "Dev", from: "2025-01-01", to: "2025-02-01", current: false, description: "Built it" };
+  assert.ok(validateStep({ ...complete(), experiences: [exp] }, 2, ctx)["exp.x.type"]);
+  assert.equal(validateStep({ ...complete(), experiences: [{ ...exp, type: "Project" }] }, 2, ctx)["exp.x.type"], undefined);
+
+  const lang = { id: "l", language: "Other", level: "Basic" as const, read: true, write: true, speak: true };
+  assert.match(validateStep({ ...complete(), languages: [lang] }, 4, ctx)["lang.l.other"], /name of the language/);
+  assert.deepEqual(validateStep({ ...complete(), languages: [{ ...lang, language: "Bhojpuri" }] }, 4, ctx), {});
+  assert.ok(validateStep({ ...complete(), languages: [{ ...lang, language: "Hindi", read: false, write: false, speak: false }] }, 4, ctx)["lang.l.skills"]);
+
+  assert.equal(linkedinHref("linkedin.com/in/sana"), "https://linkedin.com/in/sana");
+  assert.equal(linkedinHref("https://www.linkedin.com/in/sana"), "https://www.linkedin.com/in/sana");
+  assert.equal(linkedinHref("javascript:alert(1)"), null);
+  assert.ok(formatProblems({ linkedinUrl: "javascript:alert(1)" }));
+  assert.equal(formatProblems({ linkedinUrl: "linkedin.com/in/sana" }), null);
 });

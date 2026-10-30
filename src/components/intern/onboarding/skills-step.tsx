@@ -9,7 +9,7 @@ import { SUGGESTED_SKILLS, didYouMean, suggestSkills } from "@/lib/data/skills";
 import { MAX_SKILLS, MIN_SKILLS, type SkillWithRating } from "@/lib/onboarding";
 import { cn } from "@/lib/utils";
 
-import { FieldNote, Label, controlClass } from "./fields";
+import { FieldNote, Label, controlClass, onRadioKeys, radioTab } from "./fields";
 import type { StepProps } from "./types";
 
 const RATINGS: SkillWithRating["rating"][] = ["Beginner", "Intermediate", "Advanced"];
@@ -115,6 +115,7 @@ export function SkillsStep({ values, update, errors, skillsLocked }: StepProps) 
             // no message jumps in under a suggestion being tapped.
             data-field="skills-draft"
             value={draft}
+            maxLength={80}
             disabled={full}
             autoComplete="off"
             placeholder={full ? `You have ${MAX_SKILLS} skills - remove one to add another` : "Type a skill, e.g. React, Sales, Excel"}
@@ -167,8 +168,8 @@ export function SkillsStep({ values, update, errors, skillsLocked }: StepProps) 
                   <span className="truncate text-[0.9375rem] font-medium text-ink-900">{skill}</span>
                 </div>
                 <div className="order-3 col-span-2 flex sm:order-2 sm:col-span-1">
-                  <div role="radiogroup" aria-label={`How good are you at ${skill}?`} className="flex flex-1 rounded-apple-sm bg-ink-100 p-1 sm:flex-none">
-                    {RATINGS.map((r) => {
+                  <div role="radiogroup" aria-label={`How good are you at ${skill}?`} onKeyDown={onRadioKeys} className="flex flex-1 rounded-apple-sm bg-ink-100 p-1 sm:flex-none">
+                    {RATINGS.map((r, ri) => {
                       const on = ratingOf(skill) === r;
                       return (
                         <button
@@ -176,9 +177,10 @@ export function SkillsStep({ values, update, errors, skillsLocked }: StepProps) 
                           type="button"
                           role="radio"
                           aria-checked={on}
+                          tabIndex={radioTab(on, ri, true)}
                           onClick={() => rate(skill, r)}
                           className={cn(
-                            "apple-spring min-h-10 flex-1 rounded-apple-sm px-2.5 text-xs font-semibold sm:min-h-8 sm:flex-none",
+                            "apple-spring min-h-8 flex-1 rounded-apple-sm px-2.5 text-xs font-semibold touch:min-h-10 sm:flex-none",
                             on ? "bg-white text-brand-800 shadow-xs" : "text-ink-600 hover:text-ink-900",
                           )}
                         >
@@ -219,7 +221,7 @@ export function SkillsStep({ values, update, errors, skillsLocked }: StepProps) 
                   type="button"
                   onClick={() => setAllPicks((v) => !v)}
                   aria-expanded={allPicks}
-                  className="inline-flex min-h-11 items-center px-2 text-sm font-medium text-brand-700 underline-offset-4 hover:underline sm:min-h-9"
+                  className="inline-flex min-h-9 items-center px-2 text-sm font-medium text-brand-700 touch:min-h-11 underline-offset-4 hover:underline"
                 >
                   {allPicks ? "Show fewer" : `${picks.length - FIRST_PICKS} more`}
                 </button>
@@ -237,7 +239,7 @@ function SkillChip({ onClick, children }: { onClick: () => void; children: React
     <button
       type="button"
       onClick={onClick}
-      className="apple-spring apple-pressable inline-flex min-h-11 items-center gap-1.5 rounded-full border border-ink-200 bg-white px-3.5 text-sm text-ink-700 hover:border-brand-300 hover:bg-brand-50 hover:text-brand-800 sm:min-h-9"
+      className="apple-spring apple-pressable inline-flex min-h-9 items-center gap-1.5 rounded-full touch:min-h-11 border border-ink-200 bg-white px-3.5 text-sm text-ink-700 hover:border-brand-300 hover:bg-brand-50 hover:text-brand-800"
     >
       <Plus className="size-3.5 text-text-subtle" aria-hidden />
       {children}

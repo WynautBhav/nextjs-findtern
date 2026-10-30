@@ -166,31 +166,37 @@ export async function verifyFromRoster(collegeId: string): Promise<number> {
   return Number((before.rows[0] as { n?: number } | undefined)?.n ?? 0);
 }
 
-/** Search the college list for the student picker. */
+/**
+ * Search the college list for the student picker (~70k AISHE institutions).
+ * Every word must appear in the name or the city, so "jecrc jaipur" works;
+ * an exact AISHE code or slug ("jklu") also matches. The trigram indexes (drizzle/0008) serve
+ * the ILIKE '%word%' tests. Order: partners, names that start with the whole
+ * query, names that contain it, then A-Z.
+ */
 export async function searchColleges(q: string, limit = 12) {
-  const term = q.trim().replace(/[%_\\]/g, (c) => `\\${c}`);
+  const c = schema.colleges;
+  const pick = { id: c.id, name: c.name, city: c.city, state: c.state, isPartner: c.isPartner };
+  const esc = (t: string) => t.replace(/[%_\\]/g, (ch) => `\\${ch}`);
+  const term = q.trim().replace(/\s+/g, " ");
   if (term.length < 2) {
     return getDb()
-      .select({ id: schema.colleges.id, name: schema.colleges.name, city: schema.colleges.city, state: schema.colleges.state, isPartner: schema.colleges.isPartner })
-      .from(schema.colleges)
-      .where(and(eq(schema.colleges.isActive, true), eq(schema.colleges.isPartner, true)))
-      .orderBy(schema.colleges.sortOrder, schema.colleges.name)
+      .select(pick)
+      .from(c)
+      .where(and(eq(c.isActive, true), eq(c.isPartner, true)))
+      .orderBy(c.sortOrder, c.name)
       .limit(limit);
   }
-  // Partners first, then names starting with the term, then any match.
+  const words = term.split(" ").slice(0, 4).map((w) => `%${esc(w)}%`);
+  const everyWord = and(...words.map((w) => sql`(${c.name} ILIKE ${w} OR ${c.city} ILIKE ${w})`));
   return getDb()
-    .select({ id: schema.colleges.id, name: schema.colleges.name, city: schema.colleges.city, state: schema.colleges.state, isPartner: schema.colleges.isPartner })
-    .from(schema.colleges)
-    .where(
-      and(
-        eq(schema.colleges.isActive, true),
-        sql`(${schema.colleges.name} ILIKE ${"%" + term + "%"} OR ${schema.colleges.city} ILIKE ${term + "%"} OR ${schema.colleges.aisheCode} ILIKE ${term})`,
-      ),
-    )
+    .select(pick)
+    .from(c)
+    .where(and(eq(c.isActive, true), sql`(${everyWord} OR ${c.aisheCode} = ${term.toUpperCase()} OR ${c.slug} = ${term.toLowerCase()})`))
     .orderBy(
-      sql`${schema.colleges.isPartner} DESC`,
-      sql`(${schema.colleges.name} ILIKE ${term + "%"}) DESC`,
-      schema.colleges.name,
+      sql`${c.isPartner} DESC`,
+      sql`(${c.name} ILIKE ${esc(term) + "%"}) DESC`,
+      sql`(${c.name} ILIKE ${"%" + esc(term) + "%"}) DESC`,
+      c.name,
     )
     .limit(limit);
 }

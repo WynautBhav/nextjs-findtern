@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 
 /**
  * Profile completeness, from the same rule the payment gate uses
- * (`profileCompletion` in lib/onboarding). One rule, so the meter can never
+ * (`profileCompletion` in lib/onboarding). One rule, so this list can never
  * say "complete" while activation still refuses (INT-20).
  */
 export function CompletionList({
@@ -24,19 +24,11 @@ export function CompletionList({
         <h2 id="completion-head" className="text-base font-semibold tracking-[-0.01em] text-ink-900">
           Profile completeness
         </h2>
-        <p className="nums text-sm font-semibold text-ink-900">{pct}%</p>
+        <p className="nums text-sm font-semibold text-ink-900">
+          {pct}%<span className="sr-only"> complete</span>
+        </p>
       </div>
-      <div
-        className="mt-3 h-2 overflow-hidden rounded-full bg-ink-100"
-        role="progressbar"
-        aria-valuemin={0}
-        aria-valuemax={completion.total}
-        aria-valuenow={completion.done}
-        aria-label="Profile sections complete"
-      >
-        <div className="h-full rounded-full bg-brand-600" style={{ width: `${pct}%` }} />
-      </div>
-      <ul className="mt-4 divide-y divide-ink-100">
+      <ul className="mt-3 divide-y divide-ink-100">
         {completion.items.map((item) => (
           <li key={item.id}>
             {item.done ? (

@@ -133,7 +133,7 @@ export function PricingCalculator({
         </p>
 
         <div className="mt-auto flex flex-wrap items-center gap-x-5 gap-y-3 pt-8">
-          <ButtonLink href="/employer/signup" variant="primary" size="md">
+          <ButtonLink href="/signup?as=employer" variant="primary" size="md">
             Start hiring
           </ButtonLink>
           <ButtonLink href="/contact" variant="link" size="md" className="px-0">
