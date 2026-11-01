@@ -41,16 +41,20 @@ export class RateLimiter {
   private buckets = new Map<string, Bucket>();
   private readonly limit: number;
   private readonly windowMs: number;
+  private readonly bypassable: boolean;
 
-  constructor(limit: number, windowMs: number) {
+  /** `bypassable: false` keeps a limiter on for RATE_LIMIT_BYPASS_IPS addresses too. */
+  constructor(limit: number, windowMs: number, opts: { bypassable?: boolean } = {}) {
     this.limit = limit;
     this.windowMs = windowMs;
+    this.bypassable = opts.bypassable ?? true;
   }
 
   /**
    * @returns true when the request is allowed. Consumes one unit when it is.
    */
   take(key: string, now = Date.now()): boolean {
+    if (this.bypassable && isBypassedKey(key)) return true;
     const b = this.buckets.get(key);
     if (!b || b.resetAt <= now) {
       this.buckets.set(key, { count: 1, resetAt: now + this.windowMs });
@@ -92,7 +96,8 @@ export const limiters = {
   otpVerify: new RateLimiter(10, 15 * 60_000),
   // Wrong guesses per issued code, keyed on the code row: the per-IP limit
   // alone let a pool of IPs walk all 10^6 codes. The 5th miss burns the code.
-  otpGuess: new RateLimiter(4, 15 * 60_000),
+  // Never bypassable: it is what stops a code being brute-forced, from any address.
+  otpGuess: new RateLimiter(4, 15 * 60_000, { bypassable: false }),
   forgotPassword: new RateLimiter(3, 60 * 60_000),
   signup: new RateLimiter(5, 60 * 60_000),
   upload: new RateLimiter(20, 60 * 60_000),
@@ -118,6 +123,33 @@ export function bucketKey(ip: string, identifier?: string): string {
     ? createHash("sha256").update(identifier.toLowerCase()).digest("base64url").slice(0, 16)
     : "-";
   return `${ip}:${id}`;
+}
+
+/**
+ * RATE_LIMIT_BYPASS_IPS: comma-separated client addresses that are never
+ * rate limited, for the owner testing a staging copy from a known office or
+ * home address. Matched against the address `clientIp` resolved, so it is only
+ * as trustworthy as that (Vercel or TRUST_PROXY). "unknown" never matches, and
+ * `otpGuess` ignores it. Leave it unset in production.
+ */
+let bypassRaw: string | undefined;
+let bypassSet = new Set<string>();
+function bypassedIps(): Set<string> {
+  const raw = process.env.RATE_LIMIT_BYPASS_IPS ?? "";
+  if (raw !== bypassRaw) {
+    bypassRaw = raw;
+    bypassSet = new Set(raw.split(",").map((s) => s.trim()).filter((s) => s && s !== "unknown"));
+  }
+  return bypassSet;
+}
+
+/** True when a `bucketKey` (`<ip>:<identity hash>`) belongs to a bypassed address. */
+export function isBypassedKey(key: string): boolean {
+  const set = bypassedIps();
+  if (set.size === 0) return false;
+  // The identity part has no colon (a base64url hash or "-"), the address may (IPv6).
+  const cut = key.lastIndexOf(":");
+  return cut > 0 && set.has(key.slice(0, cut));
 }
 
 /** Wide per-address ceiling behind `takeAuth`, one bucket per route. */

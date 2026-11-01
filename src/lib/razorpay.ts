@@ -1,5 +1,7 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 
+import { isStagingOrigin } from "./origin.ts";
+
 /**
  * Razorpay over plain fetch: the app only creates orders and checks
  * signatures, which doesn't need the SDK.
@@ -49,14 +51,17 @@ export function paymentsAreFree(): boolean {
  * PAYMENTS_TEST_BUTTON=1 adds a "Test: mark as paid, no charge" button beside
  * Pay: the real amount, promo use and invoice number go through the real
  * settlement, only Razorpay is skipped. For a test database; never set it on
- * the live site. With a live Razorpay key it stays off whatever the flag says,
- * so a leaked flag can't mark orders paid (and burn GST invoice numbers) there.
+ * the live site. With a live Razorpay key it stays off unless this deployment
+ * is positively identified as staging (PUBLIC_ORIGIN set to a host other than
+ * findtern.in), so a leaked flag can't mark orders paid, or burn GST invoice
+ * numbers, on the real domain, and an unset PUBLIC_ORIGIN fails closed.
  * REMOVE this switch, both buttons and the `testPay` order-route branches
  * before launch (docs/launch-2026-10-28.md).
  */
-export function testPayEnabled(): boolean {
-  if ((process.env.PAYMENTS_TEST_BUTTON ?? "").trim() !== "1") return false;
-  return !(process.env.RAZORPAY_KEY_ID ?? "").trim().startsWith("rzp_live_");
+export function testPayEnabled(env: Record<string, string | undefined> = process.env): boolean {
+  if ((env.PAYMENTS_TEST_BUTTON ?? "").trim() !== "1") return false;
+  if (!(env.RAZORPAY_KEY_ID ?? "").trim().startsWith("rzp_live_")) return true;
+  return isStagingOrigin(env.PUBLIC_ORIGIN);
 }
 
 export function razorpayKeyId(): string | undefined {

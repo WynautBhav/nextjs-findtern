@@ -1,5 +1,6 @@
 import type { CmsBlogPost, CmsFaqItem, CmsPlan } from "@/lib/content/types";
 import { SITE } from "@/lib/content/site";
+import { isStagingOrigin } from "@/lib/origin";
 import { plainTextExcerpt } from "@/lib/richtext";
 import { tidyText } from "@/lib/text";
 
@@ -27,8 +28,7 @@ export const LOGO_URL = `${SITE_URL}/media/findtern-logo-green.png`;
  * unset value means a local or legacy build and is treated as production.
  */
 export function isStagingHost(): boolean {
-  const origin = (process.env.PUBLIC_ORIGIN ?? "").trim();
-  return origin !== "" && !origin.includes("findtern.in");
+  return isStagingOrigin();
 }
 
 export function absoluteUrl(path: string): string {
