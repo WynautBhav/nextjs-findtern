@@ -1,6 +1,7 @@
 import type { MetadataRoute } from "next";
 
 import { getBlogPosts } from "@/lib/content";
+import { openProjects } from "@/lib/intern-data";
 import { SITE_URL } from "@/lib/seo";
 
 /** Rebuilt hourly so new blog posts appear without a redeploy. */
@@ -34,8 +35,16 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: r.priority,
   }));
   const posts = await getBlogPosts().catch(() => []);
+  // Open roles are public pages with their own canonical URL, so they belong here too.
+  const roles = await openProjects(500).catch(() => []);
   return [
     ...pages,
+    ...roles.map((r) => ({
+      url: `${SITE_URL}/opportunities/${r.id}`,
+      ...(r.createdAt ? { lastModified: new Date(r.createdAt) } : {}),
+      changeFrequency: "weekly" as const,
+      priority: 0.6,
+    })),
     ...posts.map((p) => ({
       url: `${SITE_URL}/blog/${p.slug}`,
       lastModified: new Date(p.publishedAt),

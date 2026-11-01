@@ -31,7 +31,10 @@ export async function createOrder(input: {
       Authorization: `Basic ${Buffer.from(`${keyId}:${keySecret}`).toString("base64")}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ amount: input.amountMinor, currency: input.currency, receipt: input.receipt.slice(0, 40), notes }),
+    // payment_capture: 1 asks Razorpay to capture the payment itself, as the legacy app did. Without it
+    // the order follows the dashboard default: on "manual" a paid order stays authorized here, the app
+    // marks the hire as paid, and Razorpay refunds the money days later.
+    body: JSON.stringify({ amount: input.amountMinor, currency: input.currency, receipt: input.receipt.slice(0, 40), notes, payment_capture: 1 }),
   });
   const body = (await res.json().catch(() => ({}))) as { id?: string; amount?: number; currency?: string; error?: { description?: string } };
   if (!res.ok || !body.id) throw new Error(body.error?.description ?? `Razorpay order failed (${res.status})`);

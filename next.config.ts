@@ -1,6 +1,29 @@
 import type { NextConfig } from "next";
 
 /**
+ * What a page may load, as a Content-Security-Policy (sent report-only for now).
+ * Razorpay's checkout script and frame, Google Analytics / Tag Manager, the Meta
+ * pixel and Vercel's own analytics are the third parties the pages use. Inline
+ * scripts and styles are allowed because Next writes its hydration data inline;
+ * a nonce-based policy is the next step.
+ */
+const CSP = [
+  "default-src 'self'",
+  "script-src 'self' 'unsafe-inline' https://checkout.razorpay.com https://www.googletagmanager.com https://connect.facebook.net https://va.vercel-scripts.com",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: blob: https:",
+  "media-src 'self' blob: https:",
+  "font-src 'self' data:",
+  "connect-src 'self' https://api.razorpay.com https://lumberjack.razorpay.com https://*.google-analytics.com https://*.analytics.google.com https://www.googletagmanager.com https://www.facebook.com https://connect.facebook.net https://vitals.vercel-insights.com",
+  "frame-src https://api.razorpay.com https://checkout.razorpay.com",
+  "worker-src 'self'",
+  "form-action 'self'",
+  "base-uri 'self'",
+  "object-src 'none'",
+  "frame-ancestors 'none'",
+].join("; ");
+
+/**
  * Legacy URL map.
  *
  * The rewrite moved every authenticated route under a role segment
@@ -104,7 +127,14 @@ const nextConfig: NextConfig = {
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "X-Frame-Options", value: "DENY" },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-          { key: "Permissions-Policy", value: "camera=*, microphone=*, geolocation=()" },
+          // Nothing here records from the camera or microphone (AI interviews run on an
+          // external meeting link), so no other site's frame may ask for them either.
+          { key: "Permissions-Policy", value: "camera=(self), microphone=(self), geolocation=()" },
+          // HTTPS only, for a year. Browsers ignore this over plain http, so it is safe everywhere.
+          { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" },
+          // Report-only first: it logs what the policy would block (browser console) without
+          // blocking anything. Move to Content-Security-Policy once a full crawl is clean.
+          { key: "Content-Security-Policy-Report-Only", value: CSP },
         ],
       },
       {

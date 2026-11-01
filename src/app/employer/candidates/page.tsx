@@ -845,7 +845,8 @@ export default async function CandidatesPage({
                                 href={`/employer/proposal/${encodeURIComponent(rel.proposal.id)}`}
                                 variant="outline"
                                 size="sm"
-                                aria-label={proposalActionLabel(rel.proposal)}
+                                // Starts with the visible word so voice control can say it (WCAG 2.5.3).
+                                aria-label={`${rel.proposal.status === "hired" ? "Placement" : "Proposal"}: ${proposalActionLabel(rel.proposal)}`}
                               >
                                 {rel.proposal.status === "hired" ? "Placement" : "Proposal"}
                               </ButtonLink>

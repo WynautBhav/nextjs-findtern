@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { isRealDomain, isStagingOrigin } from "./origin.ts";
+import { isRealDomain, isStagingOrigin, requirePublicOrigin } from "./origin.ts";
 import { testPayEnabled } from "./razorpay.ts";
 
 const STAGING = "https://nextjs-findtern.vercel.app";
@@ -41,4 +41,19 @@ test("test pay: a live key works on staging only", () => {
   assert.equal(testPayEnabled({ ...live, PUBLIC_ORIGIN: "https://www.findtern.in" }), false);
   assert.equal(testPayEnabled({ ...live }), false, "unset origin fails closed");
   assert.equal(testPayEnabled({ ...live, PUBLIC_ORIGIN: "https://findtern.in.evil.com" }), true, "a different host is not the real site");
+});
+
+test("links are built from PUBLIC_ORIGIN, trimmed, whatever the environment", () => {
+  for (const NODE_ENV of ["production", "development", "test"]) {
+    assert.equal(requirePublicOrigin({ NODE_ENV, PUBLIC_ORIGIN: " https://findtern.in/ " }), "https://findtern.in");
+    assert.equal(requirePublicOrigin({ NODE_ENV, PUBLIC_ORIGIN: "http://localhost:4000" }), "http://localhost:4000");
+  }
+});
+
+test("without PUBLIC_ORIGIN, localhost is for development only; production refuses", () => {
+  for (const PUBLIC_ORIGIN of [undefined, "", "   ", "findtern.in", "ftp://x.in", "https://"]) {
+    assert.equal(requirePublicOrigin({ NODE_ENV: "development", PUBLIC_ORIGIN }), "http://localhost:3000", `dev: ${JSON.stringify(PUBLIC_ORIGIN)}`);
+    assert.equal(requirePublicOrigin({ PUBLIC_ORIGIN }), "http://localhost:3000", `unset NODE_ENV: ${JSON.stringify(PUBLIC_ORIGIN)}`);
+    assert.throws(() => requirePublicOrigin({ NODE_ENV: "production", PUBLIC_ORIGIN }), /PUBLIC_ORIGIN is not set/, `production: ${JSON.stringify(PUBLIC_ORIGIN)}`);
+  }
 });

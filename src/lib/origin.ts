@@ -17,6 +17,21 @@ function hostOf(origin: string | undefined): string {
   }
 }
 
+const DEV_ORIGIN = "http://localhost:3000";
+
+/**
+ * The origin to build absolute links from (emails, signed URLs, OAuth redirect
+ * URIs). PUBLIC_ORIGIN when it is a valid http(s) origin; localhost only
+ * outside production. In production a missing value throws: a reset-password
+ * email that points at localhost is worse than one that fails and is noticed.
+ */
+export function requirePublicOrigin(env: Record<string, string | undefined> = process.env): string {
+  const set = (env.PUBLIC_ORIGIN ?? "").trim().replace(/\/+$/, "");
+  if (/^https?:\/\/[^/\s]+$/i.test(set)) return set;
+  if (env.NODE_ENV === "production") throw new Error("PUBLIC_ORIGIN is not set: refusing to build a link to localhost");
+  return DEV_ORIGIN;
+}
+
 /** True only when PUBLIC_ORIGIN names the real domain. Unset or unreadable is false. */
 export function isRealDomain(origin: string | undefined = process.env.PUBLIC_ORIGIN): boolean {
   return REAL_HOSTS.has(hostOf(origin));

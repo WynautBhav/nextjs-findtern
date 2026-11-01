@@ -1,5 +1,7 @@
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 
+import { requirePublicOrigin } from "../origin.ts";
+
 /**
  * HMAC-signed tokens and URLs.
  *
@@ -166,8 +168,7 @@ export function signedUrl(
   payload: { k: string; s: string; d: string; e?: number },
   ttl = 300,
 ): string {
-  const base = process.env.PUBLIC_ORIGIN ?? "http://localhost:3000";
-  return `${base.replace(/\/$/, "")}${path}?t=${sign(payload, ttl)}`;
+  return `${requirePublicOrigin()}${path}?t=${sign(payload, ttl)}`;
 }
 
 /**

@@ -7,6 +7,7 @@ import { formatSlotTime } from "@/lib/format";
 import { requireMutation } from "@/lib/guards-mutation";
 import { employerNames, internFirstName, notify } from "@/lib/notify";
 import { normalizeMeetingLink } from "@/lib/employer-interview-rules";
+import { requirePublicOrigin } from "@/lib/origin";
 
 /**
  * Employer nudges the candidate about a scheduled interview. At most one
@@ -59,7 +60,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       greeting: `Hi ${(await internFirstName(interview.internId)) || "there"},`,
       lines: [text],
       facts: link ? [["Meet link", link]] : undefined,
-      cta: { label: "Open interviews", url: `${process.env.PUBLIC_ORIGIN ?? "http://localhost:3000"}/intern/interviews` },
+      cta: { label: "Open interviews", url: `${requirePublicOrigin()}/intern/interviews` },
     },
   });
   // A booked meeting reminds both sides (legacy routes.ts:11797): the

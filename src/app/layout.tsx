@@ -6,7 +6,7 @@ import { Suspense } from "react";
 import { AnalyticsGate } from "@/components/marketing/analytics-gate";
 import { ChatWidget } from "@/components/chat/chat-widget";
 import { JsonLd } from "@/components/seo/json-ld";
-import { isStagingHost, siteGraph } from "@/lib/seo";
+import { SITE_URL, isStagingHost, siteGraph } from "@/lib/seo";
 import "./globals.css";
 
 /**
@@ -24,8 +24,6 @@ const poppins = Poppins({
   variable: "--font-poppins",
   display: "swap",
 });
-
-const SITE_URL = "https://findtern.in";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),

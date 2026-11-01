@@ -11,6 +11,7 @@ import { requireMutation } from "@/lib/guards-mutation";
 import { sendSmtpMail } from "@/lib/mailer";
 import { employerNames, internFirstName, notify } from "@/lib/notify";
 import { parseOffer } from "@/lib/offer";
+import { requirePublicOrigin } from "@/lib/origin";
 
 const bodySchema = z.object({
   proposalId: z.string().min(1),
@@ -62,7 +63,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   // file is private, so the URL is the access-checked letter route (parties
   // and admins only), never a public /uploads path.
   const proposalId = randomUUID();
-  const origin = (process.env.PUBLIC_ORIGIN ?? "https://findtern.in").replace(/\/+$/, "");
+  const origin = requirePublicOrigin();
   const offerLetterUrl = `${origin}/api/proposals/${proposalId}/offer-letter`;
   const [intern] = await db
     .select({ first: schema.users.firstName, last: schema.users.lastName, email: schema.users.email })

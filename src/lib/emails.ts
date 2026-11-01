@@ -4,6 +4,8 @@
  * employers already receive today.
  */
 
+import { requirePublicOrigin } from "./origin.ts";
+
 export type EmailContent = {
   subject: string;
   heading: string;
@@ -28,7 +30,7 @@ const esc = (v: unknown) =>
     .replace(/'/g, "&#39;");
 
 export function origin(): string {
-  return (process.env.PUBLIC_ORIGIN ?? "http://localhost:3000").replace(/\/$/, "");
+  return requirePublicOrigin();
 }
 
 export function renderEmail(c: EmailContent): { subject: string; text: string; html: string } {

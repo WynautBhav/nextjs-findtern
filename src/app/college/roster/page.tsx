@@ -4,6 +4,7 @@ import { RosterImport } from "@/components/college/roster-import";
 import { CopyText } from "@/components/college/copy-text";
 import { yearLabel } from "@/lib/college/labels";
 import { requireCollegeContext, rosterCoverage } from "@/lib/college/scope";
+import { requirePublicOrigin } from "@/lib/origin";
 
 /** Name · roll · year · branch · email (stacks on a phone). */
 const ROSTER_GRID = "grid-cols-[minmax(0,1fr)_auto] sm:grid-cols-[minmax(0,1.3fr)_6rem_5.5rem_minmax(0,0.8fr)_minmax(0,1.5fr)]";
@@ -13,7 +14,7 @@ export const dynamic = "force-dynamic";
 export default async function RosterPage() {
   const ctx = await requireCollegeContext();
   const coverage = await rosterCoverage(ctx.college.id);
-  const origin = process.env.PUBLIC_ORIGIN ?? "http://localhost:3000";
+  const origin = requirePublicOrigin();
   const invite = [
     `Hi,`,
     ``,

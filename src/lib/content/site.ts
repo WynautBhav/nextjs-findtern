@@ -6,12 +6,23 @@
  * are fixed here.
  */
 
+/**
+ * The origin this deployment is served from. PUBLIC_ORIGIN is the one setting
+ * every host already has (links in emails, the staging check, OAuth), so the
+ * sitemap, canonicals, structured data and OG tags follow it instead of a
+ * second copy of the domain; the real domain is only the fallback.
+ */
+function siteOrigin(): string {
+  const origin = (process.env.PUBLIC_ORIGIN ?? "").trim().replace(/\/+$/, "");
+  return /^https?:\/\/[^/\s]+$/i.test(origin) ? origin : "https://findtern.in";
+}
+
 export const SITE = {
   name: "Findtern",
   tagline: "Internship Simplified",
   description:
     "Hire a verified intern for the price of a coffee, or get placed in a paid internship - or your fee back.",
-  url: "https://findtern.in",
+  url: siteOrigin(),
   /** Interns and general queries. */
   email: "communicate@findtern.in",
   /** Employers: hiring, billing and company-account queries. */

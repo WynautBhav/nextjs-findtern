@@ -4,6 +4,8 @@
  * tokens, read the profile.
  */
 
+import { requirePublicOrigin } from "./origin.ts";
+
 const AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const USERINFO_URL = "https://openidconnect.googleapis.com/v1/userinfo";
@@ -36,7 +38,7 @@ export function requestOrigin(req: Request): string | null {
 export function publicOrigin(req?: Request): string {
   const env = process.env.PUBLIC_ORIGIN?.trim();
   if (env) return env.replace(/\/+$/, "");
-  return (req && requestOrigin(req)) || "http://localhost:3000";
+  return (req && requestOrigin(req)) || requirePublicOrigin();
 }
 
 /**
@@ -101,7 +103,7 @@ export function calendarConfig(): GoogleConfig | null {
     ...base,
     redirectUri:
       process.env.FINDTERN_GOOGLE_OAUTH_REDIRECT_URI ??
-      `${process.env.PUBLIC_ORIGIN ?? "http://localhost:3000"}/google/callback`,
+      `${requirePublicOrigin()}/google/callback`,
   };
 }
 export const CALENDAR_TOKEN_OWNER = process.env.FINDTERN_GOOGLE_TOKEN_OWNER_ID || "admin";

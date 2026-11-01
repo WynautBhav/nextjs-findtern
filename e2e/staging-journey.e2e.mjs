@@ -21,10 +21,28 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { after, before, test } from "node:test";
 
+import AxeBuilder from "@axe-core/playwright";
 import { chromium, firefox, webkit } from "playwright";
 
-import { api, expectOk, pngBase64, upload, visit } from "./lib/browser.mjs";
-import { STAGING_URL, closeDb, manifest, one, own, ownedWrite, readSignupCode, rows } from "./lib/staging.mjs";
+import { api as rawApi, expectOk, pngBase64, upload, visit } from "./lib/browser.mjs";
+import { STAGING_URL, closeDb, manifest, one as rawOne, own, ownedWrite, readSignupCode, rows as rawRows } from "./lib/staging.mjs";
+
+/** Anything that takes this long is printed with what it was, so a slow run can be explained. */
+const SLOW_MS = 2500;
+function timed(label, fn) {
+  return async (...args) => {
+    const t = Date.now();
+    try {
+      return await fn(...args);
+    } finally {
+      const ms = Date.now() - t;
+      if (ms > SLOW_MS) console.log(`[slow ${label}] ${ms}ms  ${String(args[1] ?? args[0]).slice(0, 90)} ${typeof args[2] === "string" ? args[2].slice(0, 70) : ""}`);
+    }
+  };
+}
+const api = timed("page request", rawApi);
+const one = timed("database", rawOne);
+const rows = timed("database", rawRows);
 
 process.env.E2E_BASE_URL = STAGING_URL; // browser.mjs resolves paths against this
 
@@ -80,11 +98,12 @@ let currentStep = "setup";
 const EXPECTED = [
   { match: /\/api\/intern\/avatar/, why: "no photo yet before the upload step" },
   { match: /\/_vercel\/(insights|speed-insights)/, why: "analytics beacons are blocked in automation" },
+  { match: /facebook\.com\/tr/, why: "the Meta pixel beacon is aborted by the browser's tracking protection" },
 ];
 
 function track(role, page) {
   page.on("console", (m) => {
-    if (m.type() === "error" && /status of (400|409)/.test(m.text()) && /edge cases|refused|bad |second|a bad promo/i.test(currentStep)) return;
+    if (m.type() === "error" && /status of (400|409)/.test(m.text()) && /edge cases|refused|bad |second|a bad promo|cannot|before the job/i.test(currentStep)) return;
     if (m.type() === "error") issues.push({ role, step: currentStep, kind: "console", text: m.text().slice(0, 300), url: page.url() });
   });
   page.on("pageerror", (e) => issues.push({ role, step: currentStep, kind: "pageerror", text: String(e.message).slice(0, 300), url: page.url() }));
@@ -100,7 +119,7 @@ function track(role, page) {
     const url = r.url();
     if (EXPECTED.some((e) => e.match.test(url))) return;
     // Steps that probe a refusal on purpose (bad input, a second payment) expect these.
-    if ((status === 400 || status === 409) && /edge cases|refused|bad |second|a bad promo/i.test(currentStep)) return;
+    if ((status === 400 || status === 409) && /edge cases|refused|bad |second|a bad promo|cannot|before the job/i.test(currentStep)) return;
     issues.push({ role, step: currentStep, kind: "http", status, text: `${r.request().method()} ${url.replace(STAGING_URL, "")}`, url: page.url() });
   });
   page.on("requestfailed", (r) => {
@@ -122,8 +141,8 @@ function saveState() {
  * key it sets, so a resumed run (E2E_RESUME=1, same browser) skips what an
  * earlier run already did instead of creating more accounts.
  */
-function step(name, needs, provides, fn) {
-  test(name, { timeout: 180_000 }, async (t) => {
+function step(name, needs, provides, fn, timeoutMs = 180_000) {
+  test(name, { timeout: timeoutMs }, async (t) => {
     if (RESUME && provides && state[provides] !== undefined) {
       t.skip(`already done in the resumed run (${provides})`);
       return;
@@ -251,6 +270,13 @@ before(async () => {
   for (const role of ROLES) {
     const ctx = await browser.newContext({ baseURL: STAGING_URL, viewport: { width: 1440, height: 900 }, locale: "en-IN", timezoneId: "Asia/Kolkata" });
     ctx.setDefaultTimeout(20_000);
+    // The invoice is printed from a hidden frame; a real print dialog would block the run, so count the call instead.
+    await ctx.addInitScript(() => {
+      window.__printed = 0;
+      window.print = () => {
+        window.__printed++;
+      };
+    });
     pages[role] = await ctx.newPage();
     track(role, pages[role]);
   }
@@ -849,3 +875,429 @@ step("employer: pays the other offer monthly, using the test button [UI]", ["pai
   const seq = nums.map((r) => Number(String(r.invoice_number).split("/").pop()));
   assert.ok(seq[1] > seq[0], `invoice numbers go up (${nums.map((r) => r.invoice_number).join(", ")})`);
 });
+
+/* ── 8. Orders, tax invoices and the admin ledgers ────────────────────────── */
+
+/** ₹ amount in en-IN grouping: 7688000 paise -> "76,880". */
+const rupees = (minor) => (minor / 100).toLocaleString("en-IN", { minimumFractionDigits: minor % 100 ? 2 : 0 });
+const num = (text) => Number(String(text).replace(/[₹,\s]/g, "").replace("−", "-"));
+const istLongDate = (d) => new Date(d).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Kolkata" });
+
+/** Click a "Tax invoice" button; the invoice is written to a hidden frame and printed (print is stubbed), so read that frame. */
+async function readInvoice(page, invoiceNumber) {
+  await page.evaluate(() => document.querySelectorAll("iframe").forEach((f) => f.remove()));
+  await page.getByRole("row").filter({ hasText: invoiceNumber }).getByRole("button", { name: /tax invoice/i }).click();
+  await page.waitForFunction(() => [...document.querySelectorAll("iframe")].some((f) => f.contentDocument?.body?.innerText?.includes("TAX INVOICE")), null, { timeout: 15_000 });
+  const frame = page.frames().find((f) => f !== page.mainFrame());
+  return frame.locator("body").innerText();
+}
+
+function checkInvoice(text, pay, { promoDiscountMinor = 0 } = {}) {
+  assert.ok(text.includes(`Invoice #: ${pay.invoice_number}`), "the invoice carries its number");
+  const total = num(text.match(/Total paid\s*₹([\d,.]+)/)?.[1]);
+  assert.equal(Math.round(total * 100), pay.amount_minor, "the invoice total is what was charged");
+  assert.ok(text.includes(`GSTIN: ${COMPANY.gstin}`), "the buyer's GSTIN is printed");
+  assert.ok(text.includes(`Place of supply: ${COMPANY.state} (${COMPANY.gstin.slice(0, 2)})`), "place of supply follows the GSTIN state");
+  assert.ok(text.includes(`Date: ${istLongDate(pay.paid_at)}`), `the invoice is dated in India time (${istLongDate(pay.paid_at)}), like the Orders list`);
+  const taxable = num(text.match(/Taxable value\s*₹([\d,.]+)\s*\n/)?.[1]);
+  if (COMPANY.intra) {
+    assert.match(text, /CGST \(9%\)/);
+    assert.match(text, /SGST \(9%\)/);
+    assert.doesNotMatch(text, /IGST/, "same-state buyer pays CGST + SGST, never IGST");
+    const cgst = num(text.match(/CGST \(9%\)\s*₹([\d,.]+)/)?.[1]);
+    const sgst = num(text.match(/SGST \(9%\)\s*₹([\d,.]+)/)?.[1]);
+    assert.ok(Math.abs(taxable + cgst + sgst - total) < 0.011, `taxable + CGST + SGST = total (${taxable} + ${cgst} + ${sgst} vs ${total})`);
+  } else {
+    assert.match(text, /IGST \(18%\)/);
+    assert.doesNotMatch(text, /CGST|SGST/, "an out-of-state buyer pays IGST, never CGST + SGST");
+    const igst = num(text.match(/IGST \(18%\)\s*₹([\d,.]+)/)?.[1]);
+    assert.ok(Math.abs(taxable + igst - total) < 0.011, `taxable + IGST = total (${taxable} + ${igst} vs ${total})`);
+    assert.ok(Math.abs(igst - taxable * 0.18) < 0.02, "IGST is 18% of the taxable value");
+  }
+  if (promoDiscountMinor) assert.match(text, new RegExp(`Promo ${state.promoCode} applied\\s*[−-] ₹${rupees(promoDiscountMinor).replace(".", "\\.")}`));
+  else assert.doesNotMatch(text, /Promo .* applied/);
+}
+
+step("employer: Orders totals equal what was charged, and both tax invoices are right [UI]", ["paidMonthly"], "invoicesChecked", async () => {
+  const page = pages.employer;
+  const pays = await rows(`SELECT * FROM employer_payments WHERE employer_id = $1 AND status = 'paid' ORDER BY paid_at`, [state.employerId]);
+  assert.equal(pays.length, 2);
+  const paidTotal = pays.reduce((s, p) => s + p.amount_minor, 0);
+
+  await visit(page, "/employer/orders");
+  await page.getByText(new RegExp(`2 hires · ₹${rupees(paidTotal).replace(/[.,]/g, "\\$&")} paid`)).first().waitFor({ timeout: 20_000 });
+  await shot("employer-orders");
+  await page.getByRole("tab", { name: /Invoices/ }).click();
+  await page.getByRole("button", { name: /tax invoice/i }).first().waitFor();
+  assert.equal(await page.getByRole("button", { name: /tax invoice/i }).count(), 2);
+
+  const [upfront, monthly] = [pays.find((p) => p.id === state.upfrontPaymentId), pays.find((p) => p.id === state.monthlyPaymentId)];
+  checkInvoice(await readInvoice(page, upfront.invoice_number), upfront, { promoDiscountMinor: Math.floor((Math.round((await one(`SELECT offer_details FROM proposals WHERE id = $1`, [state.hiredProposalId])).offer_details.monthlyAmount * 100) * 10) / 100) });
+  checkInvoice(await readInvoice(page, monthly.invoice_number), monthly);
+  await shot("employer-invoices-tab");
+});
+
+step("admin: the ledgers list the test orders with their invoice numbers [UI]", ["invoicesChecked"], "ledgersChecked", async () => {
+  const page = pages.admin;
+  await visit(page, "/admin/transactions");
+  // The page streams in behind a skeleton; wait for the real rows.
+  await page.getByText(EMPLOYER.companyName).first().waitFor({ timeout: 45_000 }).catch(() => {});
+  const text = await page.locator("main").innerText();
+  assert.ok(text.includes(EMPLOYER.companyName), "the employer's payments are on /admin/transactions");
+  assert.match(text, /\btest\b/i, "the gateway column shows these as test payments");
+  await shot("admin-transactions");
+  const internPays = await rows(`SELECT invoice_number FROM intern_payments WHERE intern_id = ANY($1) AND status = 'paid'`, [[state.internId, state.intern2Id]]);
+  await visit(page, "/admin/intern-invoices");
+  if (internPays[0]) await page.getByText(internPays[0].invoice_number).first().waitFor({ timeout: 45_000 }).catch(() => {});
+  const inv = await page.locator("main").innerText();
+  for (const r of internPays) assert.ok(inv.includes(r.invoice_number), `${r.invoice_number} is on /admin/intern-invoices`);
+  await shot("admin-intern-invoices");
+  await visit(page, "/admin/orders");
+  await shot("admin-orders");
+});
+
+/* ── 9. Timesheets, approval, payout, earnings ────────────────────────────── */
+
+step("intern: a timesheet cannot start before the job does; after time travel it is filled and submitted [API]", ["paidUpfront"], "timesheetId", async () => {
+  const page = internPageFor(state.hiredInternId);
+  const early = await api(page, "POST", "/api/intern/timesheets", { proposalId: state.hiredProposalId });
+  assert.ok(early.status >= 400 && early.status < 500, `a timesheet before the start date is refused (got ${early.status})`);
+
+  // Time travel on our own proposal: the job started 40 days ago.
+  const start = istDate(-40);
+  await ownedWrite(
+    state.hiredProposalId,
+    `UPDATE proposals SET offer_details = jsonb_set(offer_details, '{startDate}', to_jsonb($2::text)) WHERE id = $1`,
+    [state.hiredProposalId, start],
+  );
+  await visit(page, "/intern/timesheets");
+  const created = await api(page, "POST", "/api/intern/timesheets", { proposalId: state.hiredProposalId });
+  const sheet = expectOk("POST /api/intern/timesheets", created, [201]).timesheet;
+  const entries = sheet.entries.map((e) => {
+    const dow = new Date(`${e.date}T12:00:00Z`).getUTCDay();
+    const weekend = dow === 0 || dow === 6;
+    return { date: e.date, hours: weekend ? 0 : 8, note: "", status: weekend ? "Fixed off" : "Present" };
+  });
+  expectOk("PATCH timesheet", await api(page, "PATCH", `/api/intern/timesheets/${sheet.id}`, { entries }));
+  expectOk("POST submit", await api(page, "POST", `/api/intern/timesheets/${sheet.id}/submit`));
+  const ts = await one(`SELECT * FROM timesheets WHERE id = $1`, [sheet.id]);
+  assert.equal(ts.status, "submitted");
+  assert.equal(ts.employer_id, state.employerId);
+  assert.equal(ts.entries[0].date, start, "the period starts on the joining date");
+  state.timesheetId = own(`timesheet:${sheet.id}`, sheet.id);
+
+  // Edge: a submitted sheet is locked against edits and against a second submit.
+  const edit = await api(page, "PATCH", `/api/intern/timesheets/${sheet.id}`, { entries });
+  assert.ok(edit.status >= 400 && edit.status < 500, `editing a submitted timesheet is refused (got ${edit.status})`);
+  const resubmit = await api(page, "POST", `/api/intern/timesheets/${sheet.id}/submit`);
+  assert.ok(resubmit.status >= 400 && resubmit.status < 500, `submitting twice is refused (got ${resubmit.status})`);
+  await visit(page, `/intern/timesheets`);
+  await shot("intern-timesheets");
+});
+
+step("employer: approves the timesheet on /employer/timesheets/[id] [UI]", ["timesheetId"], "approved", async () => {
+  const page = pages.employer;
+  const path = `/api/timesheets/${state.timesheetId}/decision`;
+  await visit(page, `/employer/timesheets/${state.timesheetId}`);
+  await shot("employer-timesheet");
+  await page.getByRole("button", { name: "Approve timesheet" }).click();
+  expectOk(`PATCH ${path}`, await clickFor(page, page.getByRole("button", { name: "Yes, approve and lock" }), { path, method: "PATCH" }));
+  const ts = await one(`SELECT status, approved_at FROM timesheets WHERE id = $1`, [state.timesheetId]);
+  assert.equal(ts.status, "approved");
+  assert.ok(ts.approved_at);
+  const n = await one(`SELECT 1 AS yes FROM notifications WHERE recipient_id = $1 AND type = 'timesheet_approved'`, [state.hiredInternId]);
+  assert.ok(n, "the intern was notified of the approval");
+  const edit = await api(internPageFor(state.hiredInternId), "PATCH", `/api/intern/timesheets/${state.timesheetId}`, { entries: [] });
+  assert.ok(edit.status >= 400 && edit.status < 500, `an approved timesheet cannot be edited (got ${edit.status})`);
+});
+
+step("admin: creates a payout and marks it paid; the intern sees it on /intern/earnings [API + UI]", ["approved", "adminReady"], "payoutPaid", async () => {
+  const page = pages.admin;
+  const base = `/api/admin/interns/${state.hiredInternId}/payouts`;
+  const AMOUNT = 1_234_500; // ₹12,345
+  const created = await api(page, "POST", base, {
+    amountMinor: AMOUNT,
+    currency: "INR",
+    method: "bank",
+    proposalId: state.hiredProposalId,
+    scheduledFor: istDate(0),
+    months: 1,
+    opsNote: `QA run ${RUN}`,
+  });
+  const payout = expectOk(`POST ${base}`, created, [201]).payout;
+  own(`payout:${payout.id}`, payout.id);
+  const ref = `QA-UTR-${RUN}`;
+  expectOk("PATCH payout paid", await api(page, "PATCH", `/api/admin/payouts/${payout.id}`, { status: "paid", referenceId: ref, opsNote: `QA run ${RUN}` }));
+  const row = await one(`SELECT * FROM intern_payouts WHERE id = $1`, [payout.id]);
+  assert.equal(row.status, "paid");
+  assert.equal(row.reference_id, ref);
+  assert.equal(row.amount_minor, AMOUNT);
+  assert.ok(row.paid_at);
+
+  const internPage = internPageFor(state.hiredInternId);
+  await visit(internPage, "/intern/earnings");
+  await internPage.getByText(/12,345/).first().waitFor({ timeout: 20_000 });
+  await shot("intern-earnings");
+  const n = await one(`SELECT 1 AS yes FROM notifications WHERE recipient_id = $1 AND type ILIKE '%payout%' OR (recipient_id = $1 AND type ILIKE '%stipend%')`, [state.hiredInternId]);
+  assert.ok(n, "the intern was notified of the payout");
+});
+
+/* ── 10. Full-time offer ──────────────────────────────────────────────────── */
+
+/** A tiny but valid one-page PDF, for the offer-letter upload. */
+const PDF_BASE64 = Buffer.from(
+  "%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 200 200]>>endobj\ntrailer<</Root 1 0 R/Size 4>>\n%%EOF\n",
+).toString("base64");
+
+step("employer: full-time offer to a hired intern, bad requests refused first [API]", ["approved"], "fteProposalId", async () => {
+  const page = pages.employer;
+  const path = `/api/employer/${state.employerId}/full-time-offer`;
+  const up = await upload(page, { kind: "offer_letter", base64: PDF_BASE64, type: "application/pdf", name: "offer-letter.pdf" });
+  const key = expectOk("POST /api/uploads (offer_letter)", up, [201]).key;
+  const offer = (over = {}) => ({
+    proposalId: state.hiredProposalId,
+    jobTitle: "Associate Data Analyst",
+    jobMode: "remote",
+    jobLocationCity: "",
+    jobLocationState: "",
+    timezone: "Asia/Kolkata",
+    shiftFrom: "10:00",
+    shiftTo: "18:00",
+    ctcCurrency: "INR",
+    annualCtc: 600000,
+    offerLetterKey: key,
+    ...over,
+  });
+  const bad = [
+    ["a CTC of zero", { annualCtc: 0 }],
+    ["a negative CTC", { annualCtc: -5 }],
+    ["a CTC over the cap", { annualCtc: 1_000_000_000 }],
+    ["an on-site job with no city", { jobMode: "onsite" }],
+    ["a one-letter job title", { jobTitle: "x" }],
+    ["an offer letter key of someone else's folder", { offerLetterKey: `00000000-0000-0000-0000-000000000000/${key.split("/").pop()}` }],
+    ["a proposal that was never hired", { proposalId: "00000000-0000-0000-0000-000000000000" }],
+  ];
+  for (const [label, over] of bad) {
+    const res = await api(page, "POST", path, offer(over));
+    assert.ok(res.status >= 400 && res.status < 500, `${label} is refused (got ${res.status} ${JSON.stringify(res.body).slice(0, 140)})`);
+  }
+  expectOk(`POST ${path}`, await api(page, "POST", path, offer()), [200, 201]);
+  const p = await one(
+    `SELECT id, status FROM proposals WHERE employer_id = $1 AND intern_id = $2 AND id <> $3 ORDER BY created_at DESC LIMIT 1`,
+    [state.employerId, state.hiredInternId, state.hiredProposalId],
+  );
+  assert.ok(p, "a full-time proposal row exists");
+  assert.equal(p.status, "sent");
+  state.fteProposalId = own(`fte:${p.id}`, p.id);
+});
+
+step("intern: sees the full-time offer and accepts it [UI]", ["fteProposalId"], "fteAccepted", async () => {
+  const page = internPageFor(state.hiredInternId);
+  await visit(page, `/intern/proposals/${state.fteProposalId}`);
+  await shot("intern-fte-offer");
+  await page.getByRole("button", { name: /Accept the job offer/ }).click();
+  await page.getByRole("checkbox", { name: /read, understood, and agreed/i }).check();
+  expectOk("PATCH accept FTE", await clickFor(page, page.getByRole("button", { name: /^Accept the offer/ }), { path: `/api/proposals/${state.fteProposalId}/status`, method: "PATCH" }));
+  const p = await one(`SELECT status FROM proposals WHERE id = $1`, [state.fteProposalId]);
+  assert.ok(["accepted", "hired"].includes(p.status), `the full-time offer is ${p.status}`);
+  await visit(page, "/intern/proposals");
+  await shot("intern-proposals-after-fte");
+});
+
+/* ── 11. Notifications ────────────────────────────────────────────────────── */
+
+step("notifications: each side has them in the database and on its page [UI]", ["fteAccepted"], "notificationsChecked", async () => {
+  const hired = state.hiredInternId;
+  const internTypes = (await rows(`SELECT DISTINCT type FROM notifications WHERE recipient_id = $1`, [hired])).map((r) => r.type);
+  const employerTypes = (await rows(`SELECT DISTINCT type FROM notifications WHERE recipient_id = $1`, [state.employerId])).map((r) => r.type);
+  assert.ok(internTypes.length >= 3, `the hired intern has several kinds of notification (${internTypes.join(", ")})`);
+  assert.ok(employerTypes.length >= 2, `the employer has several kinds of notification (${employerTypes.join(", ")})`);
+  const ip = internPageFor(hired);
+  await visit(ip, "/intern/notifications");
+  await ip.getByRole("heading", { level: 1 }).first().waitFor();
+  assert.ok((await ip.locator("main").innerText()).length > 120, "the intern's notifications page has content");
+  await shot("intern-notifications");
+  await visit(pages.employer, "/employer/alerts");
+  await pages.employer.getByRole("heading", { level: 1 }).first().waitFor();
+  assert.ok((await pages.employer.locator("main").innerText()).length > 120, "the employer's alerts page has content");
+  await shot("employer-alerts");
+});
+
+/* ── 12. Who may do what ──────────────────────────────────────────────────── */
+
+step("security: roles, owners and CSRF are enforced [API + UI]", ["fteAccepted"], "securityChecked", async () => {
+  const refused = (res, label) => assert.ok([401, 403, 404].includes(res.status), `${label} is refused (got ${res.status} ${JSON.stringify(res.body).slice(0, 120)})`);
+  const intern = internPageFor(state.hiredInternId);
+  const other = internPageFor(state.hiredInternId === state.internId ? state.intern2Id : state.internId);
+  const otherInternId = state.hiredInternId === state.internId ? state.intern2Id : state.internId;
+  const foreignEmployer = await one(`SELECT id FROM employers WHERE id <> $1 LIMIT 1`, [state.employerId]);
+
+  // An intern is not an employer, and not another intern.
+  refused(await api(intern, "POST", `/api/employer/${state.employerId}/payment/razorpay/order`, { currency: "INR", proposalIds: [state.hiredProposalId], mode: "upfront", testPay: true }), "an intern paying as an employer");
+  refused(await api(intern, "POST", `/api/employer/${state.employerId}/interviews`, { internId: state.hiredInternId }), "an intern booking interviews as an employer");
+  refused(await api(intern, "POST", `/api/intern/${otherInternId}/payment/razorpay/order`, { testPay: true }), "an intern paying for another intern");
+  refused(await api(intern, "PATCH", `/api/proposals/${state.otherProposalId === state.hiredProposalId ? state.proposalId : state.otherProposalId}/status`, { status: "rejected" }), "an intern answering another intern's offer");
+  refused(await api(intern, "PUT", `/api/admin/interns/${state.hiredInternId}/ratings`, { communication: 10, coding: 10, aptitude: 10, interview: 10 }), "an intern scoring themselves");
+  // An employer is not another employer, not an intern, not an admin.
+  refused(await api(pages.employer, "POST", `/api/employer/${foreignEmployer.id}/payment/razorpay/order`, { currency: "INR", proposalIds: [state.hiredProposalId], mode: "upfront", testPay: true }), "an employer paying as another company");
+  refused(await api(pages.employer, "POST", `/api/intern/${state.hiredInternId}/payment/razorpay/order`, { testPay: true }), "an employer paying as an intern");
+  refused(await api(pages.employer, "PUT", `/api/admin/interns/${state.hiredInternId}/ratings`, { communication: 1, coding: 1, aptitude: 1, interview: 1 }), "an employer rescoring a candidate");
+  refused(await api(pages.employer, "POST", `/api/admin/promo-codes`, { code: "EVIL", discountType: "percentage", discountValue: 100, appliesTo: "both" }), "an employer creating a promo code");
+  refused(await api(other, "PATCH", `/api/proposals/${state.hiredProposalId}/status`, { status: "rejected" }), "an intern answering an offer that is not theirs");
+
+  // CSRF: a signed-in browser without the token header cannot change anything.
+  const noToken = await pages.employer.evaluate(async (path) => {
+    const r = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "remove", projectId: "x", internId: "y", listType: "cart" }) });
+    return { status: r.status };
+  }, "/api/employer/cart");
+  assert.equal(noToken.status, 403, `a state change without the CSRF token is refused (got ${noToken.status})`);
+
+  // Pages: the wrong role is turned away, and so is a stranger.
+  for (const [page, path, label] of [[intern, "/employer/dashboard", "an intern on the employer area"], [intern, "/admin/dashboard", "an intern on the admin area"], [pages.employer, "/admin/dashboard", "an employer on the admin area"], [pages.employer, "/intern/dashboard", "an employer on the intern area"]]) {
+    await page.goto(`${STAGING_URL}${path}`, { waitUntil: "domcontentloaded" });
+    await page.waitForLoadState("load");
+    assert.ok(!new URL(page.url()).pathname.startsWith(path), `${label} is redirected (landed on ${new URL(page.url()).pathname})`);
+  }
+  const stranger = await (await browser.newContext({ baseURL: STAGING_URL, locale: "en-IN" })).newPage();
+  for (const path of ["/employer/dashboard", "/intern/dashboard", "/admin/dashboard", "/employer/orders", "/intern/earnings"]) {
+    await stranger.goto(`${STAGING_URL}${path}`, { waitUntil: "domcontentloaded" });
+    assert.match(new URL(stranger.url()).pathname, /login/, `${path} sends a signed-out visitor to sign in (landed on ${new URL(stranger.url()).pathname})`);
+  }
+  await stranger.goto(`${STAGING_URL}/login`, { waitUntil: "domcontentloaded" });
+  const anon = await api(stranger, "POST", `/api/employer/${state.employerId}/payment/razorpay/order`, { testPay: true });
+  assert.ok([401, 403].includes(anon.status), `a signed-out payment request is refused (got ${anon.status})`);
+  const file = await stranger.evaluate(async () => (await fetch("/api/files/legacy/anything.pdf")).status);
+  assert.ok([401, 403, 404].includes(file), `a private file is not served to a stranger (got ${file})`);
+  await stranger.context().close();
+});
+
+step("signup: wrong codes lock out (even from the rate-limit-exempt address), duplicates are refused [API]", [], "signupEdgesChecked", async () => {
+  const page = pages.admin;
+  await page.goto(`${STAGING_URL}/login`, { waitUntil: "domcontentloaded" });
+  const email = `${GMAIL_BASE}+ftqa-${BROWSER}-${RUN}-x@gmail.com`;
+  const started = Date.now();
+  const sent = await api(page, "POST", "/api/auth/signup/send-otp", { email, subjectType: "intern", purpose: "signup" });
+  assert.equal(sent.status, 200, `send-otp → ${sent.status}`);
+  const codes = [];
+  for (let i = 0; i < 6; i++) codes.push((await api(page, "POST", "/api/auth/signup/verify-otp", { email, subjectType: "intern", otp: "000000" })).status);
+  assert.deepEqual(codes.slice(0, 4), [400, 400, 400, 400], `the first wrong guesses are plain misses (${codes.join(",")})`);
+  assert.equal(codes[4], 429, `the fifth wrong guess locks the code (${codes.join(",")})`);
+  assert.notEqual(codes[5], 200, "once locked, the code cannot be guessed on");
+  void started;
+
+  // A cooldown protects the inbox: asking for another code at once is refused.
+  const again = await api(page, "POST", "/api/auth/signup/send-otp", { email, subjectType: "intern", purpose: "signup" });
+  assert.equal(again.status, 429, `asking for another code at once is refused (got ${again.status})`);
+
+  // Rules for who can register.
+  // Not exercised on purpose: the employer send-otp accepts a personal mailbox and sends it a code,
+  // so probing it would email a stranger.
+  const work = await api(page, "POST", "/api/auth/signup/send-otp", { email: `x${RUN}@findtern.in`, subjectType: "intern", purpose: "signup" });
+  assert.equal(work.status, 400, `an intern cannot register with a work address (got ${work.status})`);
+  const taken = await api(page, "GET", `/api/users/exists/phone/${INTERNS[1].phone}`);
+  assert.equal(taken.status, 200);
+  assert.equal(taken.body?.exists, true, "a phone number already on an account is reported as taken");
+  const login = await api(page, "POST", "/api/auth/login", { email: INTERNS[1].email, password: "definitely-wrong" });
+  assert.equal(login.status, 401, `a wrong password is refused (got ${login.status})`);
+});
+
+step("employer: signing out ends the session, and the back button does not bring the page back [UI]", ["employerId"], "logoutChecked", async () => {
+  const page = pages.employer;
+  await visit(page, "/employer/dashboard");
+  await page.getByRole("button", { name: "Sign out", exact: true }).first().click();
+  await page.waitForURL(/\/login|\/$/, { timeout: 20_000 });
+  await page.goBack();
+  await page.waitForLoadState("load");
+  await page.goto(`${STAGING_URL}/employer/dashboard`, { waitUntil: "domcontentloaded" });
+  assert.match(new URL(page.url()).pathname, /login/, "after signing out, the dashboard sends the visitor to sign in");
+  const res = await api(page, "POST", `/api/employer/${state.employerId}/payment/razorpay/order`, { testPay: true });
+  assert.ok([401, 403].includes(res.status), `the old session cannot pay (got ${res.status})`);
+  // Sign back in with the password, through the form, so the session is real again.
+  await visit(page, "/login?as=employer");
+  await fillForm(page, [
+    [page.getByLabel("Email", { exact: true }), EMPLOYER.email],
+    [page.locator("#password"), PASSWORD],
+  ]);
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await page.waitForURL(/\/employer\/dashboard/, { timeout: 40_000 });
+});
+
+/* ── 13. Every page a role can reach, at 1440 and 390: HTTP, overflow, accessibility ───── */
+
+const CRAWL_OUT = join(OUT, "crawl");
+mkdirSync(CRAWL_OUT, { recursive: true });
+const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+const crawlReport = [];
+/** Accessibility rules we have decided to live with, each with its reason. None yet. */
+const KNOWN_AXE = new Set();
+
+/** The pages linked from a role's own navigation, plus the ones this run created. */
+async function routesFor(page, prefix, start, extra) {
+  await visit(page, start);
+  await page.waitForLoadState("load");
+  await page.waitForTimeout(1000);
+  const hrefs = await page.$$eval("a[href]", (as) => as.map((a) => a.getAttribute("href")));
+  const found = hrefs
+    .filter((h) => h && h.startsWith(`/${prefix}/`) && !h.includes("/api/"))
+    .map((h) => h.split("#")[0].split("?")[0].replace(/\/$/, ""))
+    .filter((h) => !UUID.test(h));
+  return [...new Set([start, ...found, ...extra])];
+}
+
+async function auditPage(page, role, path) {
+  const out = [];
+  for (const [label, size] of [["1440", { width: 1440, height: 900 }], ["390", { width: 390, height: 844 }]]) {
+    await page.setViewportSize(size);
+    const startedAt = Date.now();
+    const res = await page.goto(`${STAGING_URL}${path}`, { waitUntil: "domcontentloaded", timeout: 60_000 });
+    // A page that never finishes loading is a finding, not a reason to stop looking at the rest.
+    const loaded = await page.waitForLoadState("load", { timeout: 30_000 }).then(() => true, () => false);
+    const loadMs = Date.now() - startedAt;
+    await page.waitForTimeout(1200);
+    const landed = new URL(page.url()).pathname;
+    const overflow = await page.evaluate(() => {
+      const w = window.innerWidth;
+      if (document.documentElement.scrollWidth <= w + 1) return [];
+      return [...document.querySelectorAll("body *")]
+        .filter((el) => el.getBoundingClientRect().right > w + 1 && getComputedStyle(el).position !== "fixed")
+        .slice(0, 3)
+        .map((el) => `${el.tagName.toLowerCase()}.${String(el.className).slice(0, 50)}`);
+    });
+    const axe = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"]).analyze();
+    const violations = axe.violations.map((v) => ({ id: v.id, impact: v.impact, nodes: v.nodes.length, sample: v.nodes[0]?.target?.join(" ")?.slice(0, 90) }));
+    const slug = path.replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "") || "home";
+    await page.screenshot({ path: join(CRAWL_OUT, `${BROWSER}-${role}-${slug}-${label}.png`) });
+    out.push({ role, path, width: label, status: res?.status() ?? 0, landed, overflow, violations, loaded, loadMs });
+  }
+  return out;
+}
+
+function crawlStep(role, startPath, prefix, extra) {
+  step(`${role}: every page in the navigation, at 1440 and 390 [UI]`, ["adminReady"], `crawled_${role}`, async () => {
+    const page = { intern: pages.intern, employer: pages.employer, admin: pages.admin }[role];
+    const paths = await routesFor(page, prefix, startPath, extra());
+    const results = [];
+    for (const path of paths) results.push(...(await auditPage(page, role, path)));
+    await page.setViewportSize({ width: 1440, height: 900 });
+    crawlReport.push(...results);
+    writeFileSync(join(OUT, `${BROWSER}-crawl-${role}.json`), JSON.stringify(results, null, 2));
+
+    const broken = results.filter((r) => r.status >= 400);
+    const stuck = results.filter((r) => !r.loaded);
+    const slow = results.filter((r) => r.loadMs > 8000).map((r) => `${r.path} @${r.width}: ${Math.round(r.loadMs / 1000)}s`);
+    if (slow.length) console.log(`[${BROWSER}] ${role}: slow pages (over 8 s): ${slow.join("; ")}`);
+    const bounced = results.filter((r) => !r.landed.startsWith(`/${prefix}`) && !r.landed.startsWith("/login"));
+    const wide = results.filter((r) => r.overflow.length);
+    const axeBad = results.flatMap((r) => r.violations.filter((v) => ["critical", "serious"].includes(v.impact) && !KNOWN_AXE.has(v.id)).map((v) => ({ page: `${r.path} @${r.width}`, ...v })));
+    console.log(`[${BROWSER}] ${role}: ${paths.length} pages x 2 widths; ${broken.length} http errors, ${wide.length} overflowing, ${axeBad.length} serious/critical accessibility findings`);
+    assert.deepEqual(broken.map((r) => `${r.path} -> ${r.status}`), [], "pages that returned an error");
+    assert.deepEqual(stuck.map((r) => `${r.path} @${r.width}`), [], "pages that never finished loading within 30 s");
+    assert.deepEqual(wide.map((r) => `${r.path} @${r.width}: ${r.overflow.join(", ")}`), [], "pages wider than the screen");
+    assert.deepEqual(axeBad.map((v) => `${v.page}: ${v.id} (${v.impact}) x${v.nodes} e.g. ${v.sample}`), [], "serious or critical accessibility findings");
+    void bounced;
+  }, 900_000);
+}
+
+crawlStep("intern", "/intern/dashboard", "intern", () => [`/intern/proposals/${state.hiredProposalId}`, `/intern/proposals/${state.fteProposalId}`]);
+crawlStep("employer", "/employer/dashboard", "employer", () => [`/employer/intern/${state.hiredInternId}`, `/employer/timesheets/${state.timesheetId}`, `/employer/proposal/${state.hiredProposalId}`]);
+crawlStep("admin", "/admin/dashboard", "admin", () => [`/admin/interns/${state.hiredInternId}`]);
