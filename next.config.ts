@@ -23,6 +23,9 @@ const CSP = [
   "base-uri 'self'",
   "object-src 'none'",
   "frame-ancestors 'none'",
+  // Where the browser sends what the policy would block (src/app/api/csp-report). Without it a
+  // report-only policy collects nothing, and Safari ignores it.
+  "report-uri /api/csp-report",
 ].join("; ");
 
 /**

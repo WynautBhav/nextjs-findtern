@@ -665,8 +665,15 @@ step("intern 1: opens the invitation and books a time on /intern/interviews [UI]
   await visit(page, "/intern/interviews");
   const body = await page.locator("body").innerText();
   assert.ok(!body.includes(EMPLOYER.companyName), "the interviews page hides the company before the hire");
-  await page.getByRole("list", { name: "Offered times" }).getByRole("button").first().click();
-  const res = await clickFor(page, page.getByRole("button", { name: /^Book (?!this time)/ }), { path, method: "POST" });
+  // A click before React has hydrated the page is dropped (the card highlights, nothing is selected),
+  // so choose the time again until the confirm button names it.
+  const confirm = page.getByRole("button", { name: /^Book (?!this time)/ });
+  await page.waitForLoadState("load");
+  for (let attempt = 0; attempt < 6 && !(await confirm.isVisible()); attempt++) {
+    await page.getByRole("list", { name: "Offered times" }).getByRole("button").first().click();
+    await confirm.waitFor({ state: "visible", timeout: 2500 }).catch(() => {});
+  }
+  const res = await clickFor(page, confirm, { path, method: "POST" });
   expectOk(`POST ${path}`, res);
   const iv = await one(`SELECT status, selected_slot, meeting_link FROM interviews WHERE id = $1`, [state.interviewId]);
   assert.equal(iv.status, "scheduled");

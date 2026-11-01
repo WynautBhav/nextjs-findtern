@@ -18,6 +18,7 @@ const PUBLIC = new Set([
   "auth/logout",
   "auth/reauth", // own CSRF check; getSession would refuse the session it renews
   "chat", // anonymous by design, rate limited
+  "csp-report", // browsers post violation reports without cookies or a CSRF token; log-only, size-capped, rate limited
   "auth/reset-password",
   "auth/signup",
   "auth/signup/send-otp",
