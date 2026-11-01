@@ -11,7 +11,8 @@ function hostOf(origin: string | undefined): string {
   const value = (origin ?? "").trim();
   if (!value) return "";
   try {
-    return new URL(/^https?:\/\//i.test(value) ? value : `https://${value}`).hostname.toLowerCase();
+    // A trailing dot is the same host ("findtern.in." is findtern.in), so drop it before comparing.
+    return new URL(/^https?:\/\//i.test(value) ? value : `https://${value}`).hostname.toLowerCase().replace(/\.+$/, "");
   } catch {
     return "";
   }

@@ -34,8 +34,15 @@ export function requestOrigin(req: Request): string | null {
   return `${proto}://${host}`;
 }
 
-/** Absolute origin for links in emails: PUBLIC_ORIGIN, else the request's. */
+/**
+ * Absolute origin for links in emails: PUBLIC_ORIGIN, else (development only)
+ * the request's. In production a link is never built from a request header: an
+ * attacker could send `X-Forwarded-Host: evil.example` with a victim's email on
+ * the forgot-password form and have a reset link to their own domain mailed to
+ * the victim. A missing PUBLIC_ORIGIN there throws instead.
+ */
 export function publicOrigin(req?: Request): string {
+  if (process.env.NODE_ENV === "production") return requirePublicOrigin();
   const env = process.env.PUBLIC_ORIGIN?.trim();
   if (env) return env.replace(/\/+$/, "");
   return (req && requestOrigin(req)) || requirePublicOrigin();

@@ -1301,3 +1301,39 @@ function crawlStep(role, startPath, prefix, extra) {
 crawlStep("intern", "/intern/dashboard", "intern", () => [`/intern/proposals/${state.hiredProposalId}`, `/intern/proposals/${state.fteProposalId}`]);
 crawlStep("employer", "/employer/dashboard", "employer", () => [`/employer/intern/${state.hiredInternId}`, `/employer/timesheets/${state.timesheetId}`, `/employer/proposal/${state.hiredProposalId}`]);
 crawlStep("admin", "/admin/dashboard", "admin", () => [`/admin/interns/${state.hiredInternId}`]);
+
+/* ── 14. The public site: the sitemap's pages and the sign-in pages, signed out ───────── */
+
+step("public site: every sitemap page and the sign-in pages, at 1440 and 390, no CSP violations [UI]", [], "crawled_public", async () => {
+  const ctx = await browser.newContext({ baseURL: STAGING_URL, viewport: { width: 1440, height: 900 }, locale: "en-IN", timezoneId: "Asia/Kolkata" });
+  ctx.setDefaultTimeout(20_000);
+  const page = await ctx.newPage();
+  track("public", page);
+
+  const xml = await (await fetch(`${STAGING_URL}/sitemap.xml`)).text();
+  const all = [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => new URL(m[1]).pathname.replace(/\/$/, "") || "/");
+  const fixed = all.filter((p) => !p.startsWith("/blog/") && !p.startsWith("/opportunities/"));
+  const some = (prefix) => all.filter((p) => p.startsWith(prefix)).slice(0, 3);
+  await page.goto(`${STAGING_URL}/login`, { waitUntil: "load" });
+  const authLinks = (await page.$$eval("a[href]", (as) => as.map((a) => a.getAttribute("href")))).filter((h) => h && h.startsWith("/") && !h.startsWith("/api") && !h.includes("#"));
+  const authPages = ["/login", "/login?as=employer", "/signup", "/signup?as=employer", "/admin/login", ...authLinks.filter((h) => /forgot|reset|verify/i.test(h))];
+  const paths = [...new Set([...fixed, ...some("/blog/"), ...some("/opportunities/"), ...authPages])];
+
+  const results = [];
+  for (const path of paths) results.push(...(await auditPage(page, "public", path)));
+  writeFileSync(join(OUT, `${BROWSER}-crawl-public.json`), JSON.stringify(results, null, 2));
+  await ctx.close();
+
+  const broken = results.filter((r) => r.status >= 400);
+  const stuck = results.filter((r) => !r.loaded);
+  const wide = results.filter((r) => r.overflow.length);
+  const axeBad = results.flatMap((r) => r.violations.filter((v) => ["critical", "serious"].includes(v.impact) && !KNOWN_AXE.has(v.id)).map((v) => ({ page: `${r.path} @${r.width}`, ...v })));
+  const csp = issues.filter((i) => /report.?only|content security policy/i.test(i.text));
+  writeFileSync(join(OUT, `${BROWSER}-csp-violations.json`), JSON.stringify(csp, null, 2));
+  console.log(`[${BROWSER}] public: ${paths.length} pages x 2 widths; ${broken.length} http errors, ${wide.length} overflowing, ${axeBad.length} serious/critical accessibility findings, ${csp.length} CSP report-only violations`);
+  assert.deepEqual(broken.map((r) => `${r.path} -> ${r.status}`), [], "pages that returned an error");
+  assert.deepEqual(stuck.map((r) => `${r.path} @${r.width}`), [], "pages that never finished loading within 30 s");
+  assert.deepEqual(wide.map((r) => `${r.path} @${r.width}: ${r.overflow.join(", ")}`), [], "pages wider than the screen");
+  assert.deepEqual(axeBad.map((v) => `${v.page}: ${v.id} (${v.impact}) x${v.nodes} e.g. ${v.sample}`), [], "serious or critical accessibility findings");
+  assert.deepEqual([...new Set(csp.map((i) => i.text.slice(0, 160)))], [], "things the report-only CSP would block");
+}, 900_000);

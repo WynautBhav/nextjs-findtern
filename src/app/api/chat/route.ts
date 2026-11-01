@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { SITE } from "@/lib/content/site";
 import { RateLimiter, bucketKey, clientIp } from "@/lib/security/rate-limit";
 import {
   SYSTEM_PROMPT,
@@ -73,7 +74,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ reply, source: "local-fallback" });
     } catch {
       return NextResponse.json(
-        { error: "Chat is temporarily unavailable. Please try again or write to communicate@findtern.in." },
+        { error: `Chat is temporarily unavailable. Please try again or write to ${SITE.email}.` },
         { status: 503 },
       );
     }

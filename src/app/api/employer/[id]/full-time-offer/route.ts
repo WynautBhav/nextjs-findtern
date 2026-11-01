@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { withLock } from "@/lib/advisory-lock";
+import { SITE } from "@/lib/content/site";
 import { getDb, schema } from "@/lib/db";
 import { emails } from "@/lib/emails";
 import { requireMutation } from "@/lib/guards-mutation";
@@ -167,7 +168,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       message: summary,
     });
     await sendSmtpMail({
-      to: process.env.ADMIN_ALERT_EMAIL ?? "admin@findtern.in",
+      to: process.env.ADMIN_ALERT_EMAIL ?? SITE.adminEmail,
       subject: `PPO - Full-time offer proposal from ${companyName}`,
       text: summary,
     });

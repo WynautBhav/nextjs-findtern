@@ -2,6 +2,7 @@ import { and, desc, eq, sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { SITE } from "@/lib/content/site";
 import { getDb, schema } from "@/lib/db";
 import { emails, renderEmail } from "@/lib/emails";
 import { sendSmtpMail } from "@/lib/mailer";
@@ -132,7 +133,7 @@ export async function POST(req: Request) {
     return NextResponse.json(
       {
         error:
-          "We could not send the verification email just now. Try again in a few minutes, or write to communicate@findtern.in.",
+          `We could not send the verification email just now. Try again in a few minutes, or write to ${SITE.email}.`,
         delivery: "failed",
         resendAfterSeconds: 0,
       },

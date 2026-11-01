@@ -44,10 +44,17 @@ export async function createOrder(input: {
 /**
  * Test mode (PAYMENTS_MODE=free): checkout and activation complete without
  * Razorpay and nothing is charged - for a staging copy with no gateway keys.
- * Off unless set explicitly; never set it on the live site.
+ * Off unless set explicitly; never set it on the live site. Like the test
+ * button it refuses a live Razorpay key unless the deployment is positively
+ * staging, so a leaked flag cannot mark every hire and activation as paid.
  */
-export function paymentsAreFree(): boolean {
-  return (process.env.PAYMENTS_MODE ?? "").trim().toLowerCase() === "free";
+export function paymentsAreFree(env: Record<string, string | undefined> = process.env): boolean {
+  if ((env.PAYMENTS_MODE ?? "").trim().toLowerCase() !== "free") return false;
+  return !hasLiveKey(env) || isStagingOrigin(env.PUBLIC_ORIGIN);
+}
+
+function hasLiveKey(env: Record<string, string | undefined>): boolean {
+  return (env.RAZORPAY_KEY_ID ?? "").trim().startsWith("rzp_live_");
 }
 
 /**
@@ -63,8 +70,7 @@ export function paymentsAreFree(): boolean {
  */
 export function testPayEnabled(env: Record<string, string | undefined> = process.env): boolean {
   if ((env.PAYMENTS_TEST_BUTTON ?? "").trim() !== "1") return false;
-  if (!(env.RAZORPAY_KEY_ID ?? "").trim().startsWith("rzp_live_")) return true;
-  return isStagingOrigin(env.PUBLIC_ORIGIN);
+  return !hasLiveKey(env) || isStagingOrigin(env.PUBLIC_ORIGIN);
 }
 
 export function razorpayKeyId(): string | undefined {

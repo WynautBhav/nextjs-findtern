@@ -128,10 +128,11 @@ const nextConfig: NextConfig = {
           { key: "X-Frame-Options", value: "DENY" },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
           // Nothing here records from the camera or microphone (AI interviews run on an
-          // external meeting link), so no other site's frame may ask for them either.
-          { key: "Permissions-Policy", value: "camera=(self), microphone=(self), geolocation=()" },
-          // HTTPS only, for a year. Browsers ignore this over plain http, so it is safe everywhere.
-          { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" },
+          // external meeting link; the video inputs are file pickers), so neither is allowed.
+          { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+          // HTTPS only, for a year, for this host. No includeSubDomains: every *.findtern.in
+          // host would then have to serve HTTPS first, and that has not been checked.
+          { key: "Strict-Transport-Security", value: "max-age=31536000" },
           // Report-only first: it logs what the policy would block (browser console) without
           // blocking anything. Move to Content-Security-Policy once a full crawl is clean.
           { key: "Content-Security-Policy-Report-Only", value: CSP },

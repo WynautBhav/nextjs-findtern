@@ -1,10 +1,19 @@
-import test, { afterEach } from "node:test";
+import test, { after, afterEach } from "node:test";
 import assert from "node:assert/strict";
 
 import { RateLimiter, bucketKey, isBypassedKey, takeAuth } from "./rate-limit.ts";
 
+const ORIGINAL_ORIGIN = process.env.PUBLIC_ORIGIN;
+// The bypass only works on a staging host, so the tests run as one.
+process.env.PUBLIC_ORIGIN = "https://nextjs-findtern.vercel.app";
+
 afterEach(() => {
   delete process.env.RATE_LIMIT_BYPASS_IPS;
+  process.env.PUBLIC_ORIGIN = "https://nextjs-findtern.vercel.app";
+});
+after(() => {
+  if (ORIGINAL_ORIGIN === undefined) delete process.env.PUBLIC_ORIGIN;
+  else process.env.PUBLIC_ORIGIN = ORIGINAL_ORIGIN;
 });
 
 function exhaust(limiter: RateLimiter, key: string, n: number): boolean[] {
@@ -59,4 +68,14 @@ test("unsetting the variable takes effect on the next call", () => {
   assert.deepEqual(exhaust(l, bucketKey("9.9.9.9", "a"), 3), [true, true, true]);
   delete process.env.RATE_LIMIT_BYPASS_IPS;
   assert.deepEqual(exhaust(l, bucketKey("9.9.9.9", "b"), 3), [true, false, false]);
+});
+
+test("the bypass does nothing on the real domain, or when the origin is unknown", () => {
+  process.env.RATE_LIMIT_BYPASS_IPS = "9.9.9.9";
+  for (const origin of ["https://findtern.in", "https://www.findtern.in", "https://findtern.in.", undefined, ""]) {
+    if (origin === undefined) delete process.env.PUBLIC_ORIGIN;
+    else process.env.PUBLIC_ORIGIN = origin;
+    const l = new RateLimiter(2, 60_000);
+    assert.deepEqual(exhaust(l, bucketKey("9.9.9.9", "a"), 4), [true, true, false, false], `limited on ${JSON.stringify(origin)}`);
+  }
 });

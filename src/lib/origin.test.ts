@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { isRealDomain, isStagingOrigin, requirePublicOrigin } from "./origin.ts";
-import { testPayEnabled } from "./razorpay.ts";
+import { paymentsAreFree, testPayEnabled } from "./razorpay.ts";
 
 const STAGING = "https://nextjs-findtern.vercel.app";
 
@@ -56,4 +56,24 @@ test("without PUBLIC_ORIGIN, localhost is for development only; production refus
     assert.equal(requirePublicOrigin({ PUBLIC_ORIGIN }), "http://localhost:3000", `unset NODE_ENV: ${JSON.stringify(PUBLIC_ORIGIN)}`);
     assert.throws(() => requirePublicOrigin({ NODE_ENV: "production", PUBLIC_ORIGIN }), /PUBLIC_ORIGIN is not set/, `production: ${JSON.stringify(PUBLIC_ORIGIN)}`);
   }
+});
+
+test("a trailing dot on the host does not make the real domain look like staging", () => {
+  for (const o of ["https://findtern.in.", "https://www.findtern.in..", "HTTPS://FINDTERN.IN./"]) {
+    assert.equal(isRealDomain(o), true, o);
+    assert.equal(isStagingOrigin(o), false, o);
+  }
+  const live = { PAYMENTS_TEST_BUTTON: "1", RAZORPAY_KEY_ID: "rzp_live_abc", PUBLIC_ORIGIN: "https://findtern.in." };
+  assert.equal(testPayEnabled(live), false);
+});
+
+test("free-payments mode is guarded like the test button: not with a live key off staging", () => {
+  const free = { PAYMENTS_MODE: "free" };
+  assert.equal(paymentsAreFree({}), false);
+  assert.equal(paymentsAreFree({ PAYMENTS_MODE: "paid" }), false);
+  assert.equal(paymentsAreFree({ ...free }), true, "no live key: a copy with no gateway");
+  assert.equal(paymentsAreFree({ ...free, RAZORPAY_KEY_ID: "rzp_test_x", PUBLIC_ORIGIN: "https://findtern.in" }), true);
+  assert.equal(paymentsAreFree({ ...free, RAZORPAY_KEY_ID: "rzp_live_x", PUBLIC_ORIGIN: STAGING }), true);
+  assert.equal(paymentsAreFree({ ...free, RAZORPAY_KEY_ID: "rzp_live_x", PUBLIC_ORIGIN: "https://findtern.in" }), false, "leaked flag on the real domain");
+  assert.equal(paymentsAreFree({ ...free, RAZORPAY_KEY_ID: "rzp_live_x" }), false, "unset origin fails closed");
 });
