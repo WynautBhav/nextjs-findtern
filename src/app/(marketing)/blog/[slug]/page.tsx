@@ -112,6 +112,7 @@ export default async function BlogDetailPage({
                   day: "numeric",
                   month: "long",
                   year: "numeric",
+                  timeZone: "Asia/Kolkata",
                 })}
               </time>
               <span aria-hidden className="h-1 w-1 rounded-full bg-ink-300" />

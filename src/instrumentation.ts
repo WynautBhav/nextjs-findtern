@@ -16,6 +16,12 @@ export async function register() {
     );
     if (missing.length) console.error(`[startup] Missing production env: ${missing.join(", ")}`);
 
+    // Present is not enough: "findtern.in" (no scheme) or a trailing path is not an origin.
+    // Emails, signed URLs and OAuth redirects would fail on every call while the pages looked fine.
+    if (process.env.PUBLIC_ORIGIN && !/^https?:\/\/[^/\s]+\/*$/i.test(process.env.PUBLIC_ORIGIN.trim())) {
+      console.error(`[startup] PUBLIC_ORIGIN must look like https://findtern.in (scheme and host, no path); got "${process.env.PUBLIC_ORIGIN}"`);
+    }
+
     // The two switches that make a production server quietly do nothing
     // (SYS-05): no reminders or notification jobs, and no email at all.
     // Both are right for a staging copy and wrong for the live site, so say

@@ -491,7 +491,7 @@ export default async function CompareCandidates({ searchParams }: { searchParams
                 <Cell key={c.id}>
                   <span className="nums">
                     {c.updatedAt
-                      ? new Date(c.updatedAt).toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" })
+                      ? new Date(c.updatedAt).toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "Asia/Kolkata" })
                       : "Never"}
                   </span>
                 </Cell>

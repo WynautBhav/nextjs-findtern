@@ -598,7 +598,7 @@ export function proofAsText(proof: Proof, candidate: string): string {
     "",
     ...proof.facts.map((f) => `${f.label}: ${f.value}`),
     "",
-    `Issued ${proof.at.toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}${proof.issuedBy ? ` by ${proof.issuedBy}` : ""}`,
+    `Issued ${proof.at.toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Kolkata" })}${proof.issuedBy ? ` by ${proof.issuedBy}` : ""}`,
   ];
   return lines.join("\n");
 }
@@ -927,7 +927,7 @@ function prettyRating(key: string): string {
 
 function readScheduledFor(r: PayoutRow): string | null {
   const d = readScheduledForDate(r);
-  return d ? d.toLocaleDateString("en-IN", { day: "numeric", month: "long" }) : null;
+  return d ? d.toLocaleDateString("en-IN", { day: "numeric", month: "long", timeZone: "Asia/Kolkata" }) : null;
 }
 
 export function readScheduledForDate(r: PayoutRow): Date | null {

@@ -245,12 +245,14 @@ export default async function EmployersPage() {
             <li key={n}>
               <TiltCard max={5} className="h-full rounded-2xl">
                 <article className="relative h-full overflow-hidden rounded-2xl border border-ink-200 bg-white p-6 sm:p-7">
+                  {/* A decorative step number, drawn by CSS so it is not text: it is meant to
+                      be faint (the heading below carries the step), and faint text fails contrast. */}
                   <span
                     aria-hidden
-                    className="absolute right-5 top-4 text-4xl font-bold text-ink-100"
-                  >
-                    {n}
-                  </span>
+                    data-n={n}
+                    className="absolute right-5 top-4 text-4xl font-bold text-ink-100 before:content-[attr(data-n)]"
+                  />
+
                   <span className="inline-flex size-11 items-center justify-center rounded-xl bg-brand-50 text-primary">
                     <Icon className="size-5" aria-hidden />
                   </span>

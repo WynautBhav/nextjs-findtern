@@ -154,6 +154,10 @@ export function sanitizeRichText(input: string): string {
   //     wrapper is unwrapped and its children become ordinary items.
   out = unwrapNestedListItems(out);
 
+  // 3c. A nested list exported as a sibling of the item before it
+  //     (`<li>…</li><ul>…</ul>`) is invalid; it belongs inside that item.
+  out = nestSiblingLists(out);
+
   // 4. Demote headings that are not headings.
   //
   //    Google Docs "Heading 3" is the default style a writer applies to
@@ -255,4 +259,34 @@ export function plainTextExcerpt(html: string, max = 180): string {
 export function readingMinutes(html: string): number {
   const words = html.replace(/<[^>]*>/g, " ").split(/\s+/).filter(Boolean).length;
   return Math.max(1, Math.ceil(words / 200));
+}
+
+/**
+ * A list written as a sibling of the item before it (`</li><ul>…</ul>`, which is
+ * what Google Docs exports for a nested bullet) is invalid: a list may only hold
+ * items. Move each such list inside the item it follows, so the nesting reads
+ * the way it was written and screen readers announce it as a sub-list.
+ */
+function nestSiblingLists(html: string): string {
+  const sibling = /<\/li>(\s*)(<(?:ul|ol)\b[^>]*>)/i;
+  let out = html;
+  for (let guard = 0; guard < 5000; guard++) {
+    const m = sibling.exec(out);
+    if (!m) break;
+    const listStart = m.index + m[0].length - m[2].length;
+    const tags = /<(\/?)(?:ul|ol)\b[^>]*>/gi;
+    tags.lastIndex = listStart;
+    let depth = 0;
+    let end = -1;
+    for (let t = tags.exec(out); t; t = tags.exec(out)) {
+      depth += t[1] ? -1 : 1;
+      if (depth === 0) {
+        end = tags.lastIndex;
+        break;
+      }
+    }
+    if (end < 0) break; // unbalanced: leave it alone
+    out = out.slice(0, m.index) + m[1] + out.slice(listStart, end) + "</li>" + out.slice(end);
+  }
+  return out;
 }

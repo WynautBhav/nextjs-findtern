@@ -160,7 +160,8 @@ export function CurrencyPicker({ tone = "light", className }: { tone?: "light" |
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          aria-label={`Prices shown in ${currency}. Change currency`}
+          // Starts with the visible words so voice control can say them (WCAG 2.5.3).
+          aria-label={`Prices in ${symbolFor(currency)} ${currency}. Change currency`}
           className={cn(
             "group/cur inline-flex min-h-10 items-center gap-1.5 rounded-full border px-3.5 text-sm transition-colors",
             dark

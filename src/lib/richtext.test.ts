@@ -52,3 +52,17 @@ test("gives an href-less email link its mailto", () => {
     '<p class="rt-p"><a class="rt-a" href="mailto:communicate@findtern.in">communicate@findtern.in</a></p>',
   );
 });
+
+test("a nested list written as a sibling of its item is moved inside it (valid HTML for screen readers)", () => {
+  const out = sanitizeRichText("<ol><li>First</li><ul><li>a</li><li>b</li></ul><li>Second</li><ul><li>c</li></ul></ol>");
+  assert.doesNotMatch(out, /<\/li>\s*<ul/, "no list directly after an item");
+  assert.match(out, /<li class="rt-li">First\s*<ul class="rt-ul"><li class="rt-li">a<\/li><li class="rt-li">b<\/li><\/ul><\/li>/);
+  assert.match(out, /<li class="rt-li">Second\s*<ul class="rt-ul"><li class="rt-li">c<\/li><\/ul><\/li>/);
+  // Already-correct nesting is untouched.
+  const ok = "<ul><li>x<ul><li>y</li></ul></li><li>z</li></ul>";
+  assert.equal(sanitizeRichText(ok).replace(/ class="[^"]*"/g, ""), ok);
+  // A deeper sibling list keeps its own children.
+  const deep = sanitizeRichText("<ol><li>A</li><ul><li>b<ul><li>c</li></ul></li></ul></ol>");
+  assert.doesNotMatch(deep, /<\/li>\s*<ul/);
+  assert.equal((deep.match(/<ul/g) ?? []).length, 2);
+});

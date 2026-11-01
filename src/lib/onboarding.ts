@@ -1019,8 +1019,10 @@ function certificationErrors(rows: QualificationEntry[], today: string, out: Val
 export function validateStep(values: OnboardingDraft, step: number, ctx: ValidationContext): ValidationErrors {
   const errors: ValidationErrors = {};
   const now = ctx.now ?? new Date();
-  const thisYear = now.getFullYear();
-  const today = `${thisYear}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  // "Today" is today in India: a server in UTC is a day behind from midnight to 05:30 IST, and
+  // would call a date typed as today a date in the future.
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(now);
+  const thisYear = Number(today.slice(0, 4));
 
   if (step === 0) {
     // Required again, as in legacy (onboarding.tsx:793): employers shortlist

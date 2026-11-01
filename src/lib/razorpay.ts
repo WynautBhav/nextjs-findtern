@@ -1,6 +1,6 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 
-import { isStagingOrigin } from "./origin.ts";
+import { isTestHost } from "./origin.ts";
 
 /**
  * Razorpay over plain fetch: the app only creates orders and checks
@@ -50,7 +50,7 @@ export async function createOrder(input: {
  */
 export function paymentsAreFree(env: Record<string, string | undefined> = process.env): boolean {
   if ((env.PAYMENTS_MODE ?? "").trim().toLowerCase() !== "free") return false;
-  return !hasLiveKey(env) || isStagingOrigin(env.PUBLIC_ORIGIN);
+  return !hasLiveKey(env) || isTestHost(env);
 }
 
 function hasLiveKey(env: Record<string, string | undefined>): boolean {
@@ -62,15 +62,15 @@ function hasLiveKey(env: Record<string, string | undefined>): boolean {
  * Pay: the real amount, promo use and invoice number go through the real
  * settlement, only Razorpay is skipped. For a test database; never set it on
  * the live site. With a live Razorpay key it stays off unless this deployment
- * is positively identified as staging (PUBLIC_ORIGIN set to a host other than
- * findtern.in), so a leaked flag can't mark orders paid, or burn GST invoice
+ * is a known test host (localhost, a *.vercel.app deployment, or a host listed in
+ * STAGING_HOSTS), so a leaked flag can't mark orders paid, or burn GST invoice
  * numbers, on the real domain, and an unset PUBLIC_ORIGIN fails closed.
  * REMOVE this switch, both buttons and the `testPay` order-route branches
  * before launch (docs/launch-2026-10-28.md).
  */
 export function testPayEnabled(env: Record<string, string | undefined> = process.env): boolean {
   if ((env.PAYMENTS_TEST_BUTTON ?? "").trim() !== "1") return false;
-  return !hasLiveKey(env) || isStagingOrigin(env.PUBLIC_ORIGIN);
+  return !hasLiveKey(env) || isTestHost(env);
 }
 
 export function razorpayKeyId(): string | undefined {

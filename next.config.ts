@@ -15,9 +15,11 @@ const CSP = [
   "media-src 'self' blob: https:",
   "font-src 'self' data:",
   "connect-src 'self' https://api.razorpay.com https://lumberjack.razorpay.com https://*.google-analytics.com https://*.analytics.google.com https://www.googletagmanager.com https://www.facebook.com https://connect.facebook.net https://vitals.vercel-insights.com",
-  "frame-src https://api.razorpay.com https://checkout.razorpay.com",
+  // Razorpay checkout; the Google map on /contact; Tag Manager's noscript frame; the Meta pixel's frame.
+  "frame-src https://api.razorpay.com https://checkout.razorpay.com https://www.google.com https://www.googletagmanager.com https://www.facebook.com",
   "worker-src 'self'",
-  "form-action 'self'",
+  // The Meta pixel submits a form to facebook.com/tr.
+  "form-action 'self' https://www.facebook.com",
   "base-uri 'self'",
   "object-src 'none'",
   "frame-ancestors 'none'",

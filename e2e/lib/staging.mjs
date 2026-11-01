@@ -27,7 +27,19 @@ const types = {
 /** Hosts this suite must never touch, whatever a file says. */
 const FORBIDDEN_HOSTS = new Set(["147.93.27.44"]);
 
-export const STAGING_URL = (process.env.STAGING_URL || "https://nextjs-findtern.vercel.app").replace(/\/$/, "");
+/** The staging database this suite is allowed to use; override only with STAGING_DB_HOST. */
+const STAGING_DB_HOST = process.env.STAGING_DB_HOST || "ep-mute-unit-b5ooitso-pooler.c-7.us-east-2.aws.neon.tech";
+
+/** The site under test. The real domain, or any findtern.in subdomain, is refused: this suite signs up, pays and writes. */
+function stagingUrl() {
+  const url = (process.env.STAGING_URL || "https://nextjs-findtern.vercel.app").replace(/\/$/, "");
+  const host = new URL(url).hostname.toLowerCase().replace(/\.+$/, "");
+  if (host === "findtern.in" || host.endsWith(".findtern.in")) {
+    throw new Error(`Refusing to run against ${host}: this suite creates accounts, sends email and records payments. Use the staging site.`);
+  }
+  return url;
+}
+export const STAGING_URL = stagingUrl();
 
 function stagingDatabaseUrl() {
   const file = process.env.NEON_ENV_FILE || join(homedir(), "findtern-dumps", ".neon.env");
@@ -38,27 +50,38 @@ function stagingDatabaseUrl() {
   if (!url) throw new Error("No DATABASE_URL in the Neon env file");
   const host = new URL(url).hostname;
   if (FORBIDDEN_HOSTS.has(host)) throw new Error("Refusing to run: that is the production database host");
-  if (!host.endsWith(".neon.tech")) throw new Error(`Refusing to run: "${host}" is not a Neon host`);
+  // Exactly the staging project, not "any Neon host": if production ever moves to Neon this still refuses it.
+  if (host !== STAGING_DB_HOST) throw new Error(`Refusing to run: "${host}" is not the staging database host`);
   return url;
 }
 
-let pool = null;
-function db() {
-  if (!pool) {
-    pool = new pg.Pool({ connectionString: stagingDatabaseUrl(), max: 3, options: "-c TimeZone=UTC", types, ssl: { rejectUnauthorized: true } });
+/** Reads and writes use separate pools; the read pool cannot change anything even if handed an UPDATE. */
+let readPool = null;
+let writePool = null;
+function reader() {
+  if (!readPool) {
+    readPool = new pg.Pool({ connectionString: stagingDatabaseUrl(), max: 3, options: "-c TimeZone=UTC -c default_transaction_read_only=on", types, ssl: { rejectUnauthorized: true } });
   }
-  return pool;
+  return readPool;
+}
+function writer() {
+  if (!writePool) {
+    writePool = new pg.Pool({ connectionString: stagingDatabaseUrl(), max: 1, options: "-c TimeZone=UTC", types, ssl: { rejectUnauthorized: true } });
+  }
+  return writePool;
 }
 
 export async function rows(sql, params = []) {
-  return (await db().query(sql, params)).rows;
+  return (await reader().query(sql, params)).rows;
 }
 export async function one(sql, params = []) {
   return (await rows(sql, params))[0] ?? null;
 }
 export async function closeDb() {
-  if (pool) await pool.end();
-  pool = null;
+  if (readPool) await readPool.end();
+  if (writePool) await writePool.end();
+  readPool = null;
+  writePool = null;
 }
 
 /* ── Manifest: the ids this run created ───────────────────────────────────── */
@@ -81,8 +104,22 @@ export async function ownedWrite(ownerId, sql, params) {
   if (!params.includes(ownerId)) throw new Error("Refusing to write: the statement does not filter on the owned id");
   if (!/^\s*update\s/i.test(sql)) throw new Error("ownedWrite only runs UPDATE statements");
   if (!/\bwhere\b/i.test(sql)) throw new Error("UPDATE without WHERE");
-  const res = await db().query(sql, params);
-  if (res.rowCount !== 1) throw new Error(`Expected to change 1 row, changed ${res.rowCount}`);
+  // In a transaction: if the statement touches anything other than exactly one row, it is rolled back.
+  const client = await writer().connect();
+  try {
+    await client.query("BEGIN");
+    const res = await client.query(sql, params);
+    if (res.rowCount !== 1) {
+      await client.query("ROLLBACK");
+      throw new Error(`Expected to change 1 row, would have changed ${res.rowCount}; rolled back`);
+    }
+    await client.query("COMMIT");
+  } catch (err) {
+    await client.query("ROLLBACK").catch(() => {});
+    throw err;
+  } finally {
+    client.release();
+  }
 }
 
 /* ── Signup code, read from the database ──────────────────────────────────── */

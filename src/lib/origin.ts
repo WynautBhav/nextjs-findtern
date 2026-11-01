@@ -33,6 +33,24 @@ export function requirePublicOrigin(env: Record<string, string | undefined> = pr
   return DEV_ORIGIN;
 }
 
+/**
+ * Where the test-only switches (the test payment button, free-payments mode, the
+ * rate-limit bypass) may work: this machine, a Vercel deployment, or a host
+ * named in STAGING_HOSTS. A list rather than "anything but findtern.in", so an
+ * unfamiliar production hostname (app.findtern.in, a new domain) never counts.
+ * Unset or unreadable PUBLIC_ORIGIN is not a test host.
+ */
+export function isTestHost(env: Record<string, string | undefined> = process.env): boolean {
+  const host = hostOf(env.PUBLIC_ORIGIN);
+  if (!host || isRealDomain(env.PUBLIC_ORIGIN)) return false;
+  if (host === "localhost" || host === "127.0.0.1" || host.endsWith(".vercel.app")) return true;
+  return (env.STAGING_HOSTS ?? "")
+    .split(",")
+    .map((h) => h.trim().toLowerCase().replace(/\.+$/, ""))
+    .filter(Boolean)
+    .includes(host);
+}
+
 /** True only when PUBLIC_ORIGIN names the real domain. Unset or unreadable is false. */
 export function isRealDomain(origin: string | undefined = process.env.PUBLIC_ORIGIN): boolean {
   return REAL_HOSTS.has(hostOf(origin));

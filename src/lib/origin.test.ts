@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { isRealDomain, isStagingOrigin, requirePublicOrigin } from "./origin.ts";
+import { isRealDomain, isStagingOrigin, isTestHost, requirePublicOrigin } from "./origin.ts";
 import { paymentsAreFree, testPayEnabled } from "./razorpay.ts";
 
 const STAGING = "https://nextjs-findtern.vercel.app";
@@ -40,7 +40,9 @@ test("test pay: a live key works on staging only", () => {
   assert.equal(testPayEnabled({ ...live, PUBLIC_ORIGIN: "https://findtern.in" }), false, "leaked flag on the real domain");
   assert.equal(testPayEnabled({ ...live, PUBLIC_ORIGIN: "https://www.findtern.in" }), false);
   assert.equal(testPayEnabled({ ...live }), false, "unset origin fails closed");
-  assert.equal(testPayEnabled({ ...live, PUBLIC_ORIGIN: "https://findtern.in.evil.com" }), true, "a different host is not the real site");
+  assert.equal(testPayEnabled({ ...live, PUBLIC_ORIGIN: "https://findtern.in.evil.com" }), false, "an unknown host is not a test host");
+  assert.equal(testPayEnabled({ ...live, PUBLIC_ORIGIN: "https://app.findtern.in" }), false, "nor is a production subdomain");
+  assert.equal(testPayEnabled({ ...live, PUBLIC_ORIGIN: "https://staging.findtern.in", STAGING_HOSTS: "staging.findtern.in" }), true, "unless it is named as staging");
 });
 
 test("links are built from PUBLIC_ORIGIN, trimmed, whatever the environment", () => {
@@ -76,4 +78,11 @@ test("free-payments mode is guarded like the test button: not with a live key of
   assert.equal(paymentsAreFree({ ...free, RAZORPAY_KEY_ID: "rzp_live_x", PUBLIC_ORIGIN: STAGING }), true);
   assert.equal(paymentsAreFree({ ...free, RAZORPAY_KEY_ID: "rzp_live_x", PUBLIC_ORIGIN: "https://findtern.in" }), false, "leaked flag on the real domain");
   assert.equal(paymentsAreFree({ ...free, RAZORPAY_KEY_ID: "rzp_live_x" }), false, "unset origin fails closed");
+});
+
+test("test hosts are a list: localhost, Vercel deployments, STAGING_HOSTS; never the real domain or an unknown host", () => {
+  for (const o of ["http://localhost:3000", "http://127.0.0.1:3100", STAGING, "https://nextjs-findtern-git-x-team.vercel.app"]) assert.equal(isTestHost({ PUBLIC_ORIGIN: o }), true, o);
+  for (const o of [undefined, "", "https://findtern.in", "https://www.findtern.in.", "https://app.findtern.in", "https://example.com", "https://vercel.app.evil.com", "https://evilvercel.app"]) assert.equal(isTestHost({ PUBLIC_ORIGIN: o }), false, String(o));
+  assert.equal(isTestHost({ PUBLIC_ORIGIN: "https://qa.example.com", STAGING_HOSTS: "other.example.com, QA.example.com." }), true);
+  assert.equal(isTestHost({ PUBLIC_ORIGIN: "https://findtern.in", STAGING_HOSTS: "findtern.in" }), false, "the real domain cannot be listed in");
 });

@@ -286,10 +286,10 @@ export default async function GuaranteePage() {
               <dt className="text-2xs font-semibold uppercase tracking-[0.14em] text-ink-600">
                 {t.label}
               </dt>
-              <dd className="mt-2 text-2xl font-semibold tracking-tight text-ink-900">
-                {t.value}
+              <dd className="mt-2">
+                <span className="block text-2xl font-semibold tracking-tight text-ink-900">{t.value}</span>
+                <span className="mt-1 block text-sm text-ink-600">{t.note}</span>
               </dd>
-              <p className="mt-1 text-sm text-ink-600">{t.note}</p>
             </div>
           ))}
         </dl>

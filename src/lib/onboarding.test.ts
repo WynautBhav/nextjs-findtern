@@ -548,3 +548,24 @@ test("onboarding test run, 30 Oct: PIN, experience type, languages and LinkedIn 
   assert.ok(formatProblems({ linkedinUrl: "javascript:alert(1)" }));
   assert.equal(formatProblems({ linkedinUrl: "linkedin.com/in/sana" }), null);
 });
+
+test("a date typed as today in India is accepted whatever the server's time zone is", () => {
+  const saved = process.env.TZ;
+  try {
+    const base = complete();
+    // 00:10 on 2 Nov in India is still 1 Nov in UTC and in the US.
+    const justPastMidnightIst = new Date("2026-11-01T18:40:00Z");
+    const row = (completionDate: string) => ({ id: "q1", preset: "CA", name: "CA", level: "Final", status: "Completed", issuer: "ICAI", completionDate, credentialUrl: "", scoreType: "percentage" as const, score: "80" });
+    for (const tz of ["UTC", "America/Los_Angeles", "Asia/Kolkata", "Pacific/Auckland"]) {
+      process.env.TZ = tz;
+      const c = { ...ctx, now: justPastMidnightIst };
+      const today = validateStep({ ...base, academics: { ...base.academics, professional: [row("2026-11-02")] } }, 1, c);
+      assert.equal(today["professional.q1.completionDate"], undefined, `today (2 Nov, India) is not "in the future" in ${tz}`);
+      const tomorrow = validateStep({ ...base, academics: { ...base.academics, professional: [row("2026-11-03")] } }, 1, c);
+      assert.match(tomorrow["professional.q1.completionDate"], /future/, `tomorrow still is, in ${tz}`);
+    }
+  } finally {
+    if (saved === undefined) delete process.env.TZ;
+    else process.env.TZ = saved;
+  }
+});

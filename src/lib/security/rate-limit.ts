@@ -1,6 +1,6 @@
 import { createHash, randomBytes, randomInt, timingSafeEqual } from "node:crypto";
 
-import { isStagingOrigin } from "../origin.ts";
+import { isTestHost } from "../origin.ts";
 
 /**
  * Rate limiting and OTP generation.
@@ -132,14 +132,14 @@ export function bucketKey(ip: string, identifier?: string): string {
  * rate limited, for the owner testing a staging copy from a known office or
  * home address. Matched against the address `clientIp` resolved, so it is only
  * as trustworthy as that (Vercel or TRUST_PROXY). "unknown" never matches, and
- * `otpGuess` ignores it. It only takes effect on a staging host (PUBLIC_ORIGIN
- * set to something other than findtern.in): a forwarded address that an
+ * `otpGuess` ignores it. It only takes effect on a test host (localhost, a
+ * *.vercel.app deployment, or STAGING_HOSTS): a forwarded address that an
  * attacker can influence must never lift the login limits on the real site.
  */
 let bypassRaw: string | undefined;
 let bypassSet = new Set<string>();
 function bypassedIps(): Set<string> {
-  if (!isStagingOrigin()) return new Set();
+  if (!isTestHost()) return new Set();
   const raw = process.env.RATE_LIMIT_BYPASS_IPS ?? "";
   if (raw !== bypassRaw) {
     bypassRaw = raw;
