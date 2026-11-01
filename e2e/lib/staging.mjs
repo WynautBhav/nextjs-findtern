@@ -34,8 +34,13 @@ const STAGING_DB_HOST = process.env.STAGING_DB_HOST || "ep-mute-unit-b5ooitso-po
 function stagingUrl() {
   const url = (process.env.STAGING_URL || "https://nextjs-findtern.vercel.app").replace(/\/$/, "");
   const host = new URL(url).hostname.toLowerCase().replace(/\.+$/, "");
-  if (host === "findtern.in" || host.endsWith(".findtern.in")) {
-    throw new Error(`Refusing to run against ${host}: this suite creates accounts, sends email and records payments. Use the staging site.`);
+  // An allow-list, not a deny-list: a Vercel deployment, this machine, or a host named in STAGING_ALLOW_HOSTS.
+  // Anything else (the real domain, a subdomain, the production server's address) is refused.
+  const extra = (process.env.STAGING_ALLOW_HOSTS ?? "").split(",").map((h) => h.trim().toLowerCase()).filter(Boolean);
+  const real = host === "findtern.in" || host.endsWith(".findtern.in") || FORBIDDEN_HOSTS.has(host);
+  const allowed = host === "localhost" || host === "127.0.0.1" || host.endsWith(".vercel.app") || extra.includes(host);
+  if (real || !allowed) {
+    throw new Error(`Refusing to run against ${host}: this suite creates accounts, sends email and records payments, so it only runs against a *.vercel.app staging site, localhost, or a host listed in STAGING_ALLOW_HOSTS.`);
   }
   return url;
 }
