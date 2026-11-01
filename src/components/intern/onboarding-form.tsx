@@ -170,7 +170,14 @@ export function OnboardingForm({
   for (const [k, msg] of Object.entries(live)) if (attempted.has(step) || touched.has(k)) shown[k] = msg;
   const errors = { ...shown, ...serverErrors };
 
+  // Until the first Continue the step shown follows the first one that doesn't
+  // pass, so finishing a step (a valid field, a ticked box, an upload) would
+  // move the page under the typist, and a profile that is all valid would fall
+  // back to the remembered step. Any change pins the step on screen.
+  const pinStep = () => setChosenStep((chosen) => chosen ?? step);
+
   const update: Update = (key, value) => {
+    pinStep();
     setEdits((prev) => ({ ...prev, [key]: value }));
     setDirty(true);
     if (Object.keys(serverErrors).length) setServerErrors({});
@@ -351,7 +358,10 @@ export function OnboardingForm({
                 hasPanImage={hasPanImage}
                 hasAadhaarImage={hasAadhaarImage}
                 skillsLocked={skillsLocked}
-                onUploaded={(kind) => setUploaded((prev) => (prev.includes(kind) ? prev : [...prev, kind]))}
+                onUploaded={(kind) => {
+                  pinStep();
+                  setUploaded((prev) => (prev.includes(kind) ? prev : [...prev, kind]));
+                }}
                 onJumpStep={goTo}
               />
             </div>

@@ -148,7 +148,7 @@ export function SlotPicker({
             disabled={!pick || sending || pending}
             className={buttonClass({ variant: "primary" })}
           >
-            {sending ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
+            {sending ? <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden /> : null}
             {pick ? `Book ${formatIst(pick.iso)}` : "Book this time"}
           </button>
           <p className="text-xs text-text-subtle">

@@ -16,6 +16,8 @@ import { cn } from "@/lib/utils";
 import { offerableModes, type WorkPreference } from "@/lib/work-preference";
 import { CountdownAgreement, EMPLOYER_HIRING_POLICY } from "@/components/app/countdown-agreement";
 import { DmyDateInput } from "@/components/app/dmy-date-input";
+import { onRadioKeys, radioTab } from "@/components/intern/onboarding/fields";
+import { fieldClass } from "@/components/employer/ui-tokens";
 
 /**
  * Proposal composer.
@@ -305,8 +307,8 @@ export function SendProposalForm({
           <div className="grid gap-5 sm:grid-cols-2">
             <div>
               <span className="block text-sm font-medium text-ink-800">Duration</span>
-              <div role="radiogroup" aria-label="Duration" className="mt-2 grid grid-cols-4 gap-1.5">
-                {DURATIONS.map((d) => {
+              <div role="radiogroup" aria-label="Duration" onKeyDown={onRadioKeys} className="mt-2 grid grid-cols-4 gap-1.5">
+                {DURATIONS.map((d, i) => {
                   const disabled = shortOnly && (d.value === "3m" || d.value === "6m");
                   return (
                     <button
@@ -314,6 +316,7 @@ export function SendProposalForm({
                       type="button"
                       role="radio"
                       aria-checked={duration === d.value}
+                      tabIndex={radioTab(duration === d.value, i, DURATIONS.some((x) => x.value === duration))}
                       disabled={disabled}
                       onClick={() => setDuration(d.value)}
                       className={cn(
@@ -576,7 +579,7 @@ export function SendProposalForm({
               {candidate.initials}
             </span>
             <div className="min-w-0 flex-1">
-              <p className="truncate font-semibold text-ink-900">{candidate.name}</p>
+              <p className="break-words font-semibold text-ink-900">{candidate.name}</p>
               <p className="nums flex items-center gap-1.5 text-sm text-ink-600">
                 <CircleGauge className="size-4" aria-hidden />
                 {candidate.scored ? `${candidate.score.toFixed(1)}/10 Findtern Score` : "Not scored"}
@@ -616,18 +619,21 @@ export function SendProposalForm({
               Nothing is charged now. You pay once the candidate accepts.
             </p>
 
-            {notice ? (
-              <p
-                role="status"
-                className={cn(
-                  "mt-4 flex items-start gap-2 rounded-apple-md px-3 py-2.5 text-sm",
-                  notice.tone === "ok" ? "bg-success-soft text-ink-800" : "border border-warning/25 bg-warning-soft text-ink-700",
-                )}
-              >
-                {notice.tone === "bad" ? <TriangleAlert className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden /> : null}
-                <span>{notice.text}</span>
-              </p>
-            ) : null}
+            {/* Always mounted, so the result is announced when it fills in. */}
+            <p
+              role="status"
+              className={
+                notice
+                  ? cn(
+                      "mt-4 flex items-start gap-2 rounded-apple-md px-3 py-2.5 text-sm",
+                      notice.tone === "ok" ? "bg-success-soft text-ink-800" : "border border-warning/25 bg-warning-soft text-ink-700",
+                    )
+                  : "sr-only"
+              }
+            >
+              {notice?.tone === "bad" ? <TriangleAlert className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden /> : null}
+              {notice ? <span>{notice.text}</span> : null}
+            </p>
 
             <button
               type="button"
@@ -712,10 +718,8 @@ function Row({
 
 /* ── Form primitives ────────────────────────────────────────────────────── */
 
-const FIELD_BASE =
-  "apple-spring mt-2 min-h-11 w-full rounded-apple-sm border bg-white px-3.5 text-sm text-ink-900 outline-none placeholder:text-text-subtle focus-visible:ring-2";
-const FIELD_OK = "border-ink-200 focus-visible:border-brand-500 focus-visible:ring-brand-500/20";
-const FIELD_BAD = "border-danger focus-visible:border-danger focus-visible:ring-danger/20";
+const fieldCls = (error?: boolean, extra?: string) =>
+  cn(fieldClass, "mt-2 px-3.5", error && "border-danger hover:border-danger focus-visible:border-danger focus-visible:ring-danger/20", extra);
 
 function Field({
   id,
@@ -756,7 +760,7 @@ function Field({
           onChange={onChange}
           aria-invalid={error ? true : undefined}
           aria-describedby={error ? `${id}-error` : undefined}
-          className={`${FIELD_BASE} ${error ? FIELD_BAD : FIELD_OK}`}
+          className={fieldCls(Boolean(error))}
         />
       ) : (
         <input
@@ -770,7 +774,7 @@ function Field({
           onChange={(e) => onChange(e.target.value)}
           aria-invalid={error ? true : undefined}
           aria-describedby={error ? `${id}-error` : undefined}
-          className={`${FIELD_BASE} ${error ? FIELD_BAD : FIELD_OK}`}
+          className={fieldCls(Boolean(error))}
         />
       )}
       {error ? (
@@ -809,7 +813,7 @@ function ReadOnlyField({
         value={value}
         readOnly
         inputMode={inputMode}
-        className={`${FIELD_BASE} ${FIELD_OK} cursor-not-allowed bg-ink-50 text-ink-600`}
+        className={fieldCls(false, "cursor-not-allowed bg-ink-50 text-ink-600")}
       />
     </div>
   );
@@ -844,7 +848,7 @@ function SelectField({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         aria-invalid={error ? true : undefined}
-        className={`${FIELD_BASE} ${error ? FIELD_BAD : FIELD_OK}`}
+        className={fieldCls(Boolean(error))}
       >
         {options.map((option) => (
           <option key={option.value} value={option.value} disabled={option.disabled}>
@@ -895,9 +899,7 @@ function TextArea({
         onChange={(e) => onChange(e.target.value)}
         aria-invalid={error ? true : undefined}
         aria-describedby={error ? `${id}-error` : undefined}
-        className={`mt-2 min-h-11 w-full rounded-apple-sm border bg-white px-3.5 py-2.5 text-sm leading-relaxed text-ink-900 outline-none apple-spring placeholder:text-text-subtle focus-visible:ring-2 ${
-          error ? FIELD_BAD : FIELD_OK
-        }`}
+        className={fieldCls(Boolean(error), "py-2.5 leading-relaxed")}
       />
       {error ? (
         <p id={`${id}-error`} className="mt-1.5 text-xs text-danger">

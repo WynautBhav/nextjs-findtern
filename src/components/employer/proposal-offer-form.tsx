@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Pencil } from "lucide-react";
 
@@ -20,6 +20,8 @@ import {
 import { shiftInIst, TIMEZONES } from "@/lib/timezones";
 import { offerableModes, type WorkPreference } from "@/lib/work-preference";
 import { DmyDateInput } from "@/components/app/dmy-date-input";
+import { fieldClass } from "@/components/employer/ui-tokens";
+import { cn } from "@/lib/utils";
 
 export type EditableOffer = {
   roleTitle?: string;
@@ -54,8 +56,7 @@ function tomorrowIst(): string {
   return new Date(Date.now() + 330 * 60_000 + 86_400_000).toISOString().slice(0, 10);
 }
 
-const INPUT =
-  "apple-spring min-h-11 w-full rounded-apple-sm border border-ink-200 bg-white px-3 text-sm text-ink-900 outline-none placeholder:text-text-subtle focus-visible:border-brand-500 focus-visible:ring-2 focus-visible:ring-brand-500/20";
+const INPUT = fieldClass;
 const LABEL = "mb-1.5 block text-sm font-medium text-ink-800";
 
 /**
@@ -118,16 +119,31 @@ export function ProposalOfferForm({
   const [message, setMessage] = useState(initial.message ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  // The field the message is about: marked invalid, tied to the message, and focused.
+  const [errorField, setErrorField] = useState("");
+  const uid = useId();
+  const errId = `${uid}-error`;
+  const fieldProps = (f: string) => ({
+    id: `${uid}-${f}`,
+    "aria-invalid": errorField === f ? true : undefined,
+    "aria-describedby": errorField === f ? errId : undefined,
+  });
+  const fail = (f: string, msg: string) => {
+    setErrorField(f);
+    setError(msg);
+    document.getElementById(`${uid}-${f}`)?.focus();
+  };
   const ist = flexible ? null : shiftInIst(shiftFrom, shiftTo, timezone, startDate);
 
   async function save() {
     setError("");
-    if (roleTitle.trim().length < 2) return setError("Give the role a title.");
-    if (!startDate || startDate < tomorrowIst()) return setError("Pick a start date after today.");
-    if (mode !== "remote" && (!city.trim() || !state.trim())) return setError("An on-site or hybrid role needs a city and state.");
-    if (mode === "hybrid" && !(Number(officeDays) >= 1 && homeDays >= 1)) return setError(`Split the ${week} working days between office and home.`);
-    if (!flexible && (!shiftFrom || !shiftTo || shiftFrom === shiftTo)) return setError("Pick a start and end time, or choose flexible hours.");
-    if (!message.trim()) return setError("Add a job description.");
+    setErrorField("");
+    if (roleTitle.trim().length < 2) return fail("title", "Give the role a title.");
+    if (!startDate || startDate < tomorrowIst()) return fail("start", "Pick a start date after today.");
+    if (mode !== "remote" && (!city.trim() || !state.trim())) return fail(city.trim() ? "state" : "city", "An on-site or hybrid role needs a city and state.");
+    if (mode === "hybrid" && !(Number(officeDays) >= 1 && homeDays >= 1)) return fail("office", `Split the ${week} working days between office and home.`);
+    if (!flexible && (!shiftFrom || !shiftTo || shiftFrom === shiftTo)) return fail(shiftFrom ? "shiftTo" : "shiftFrom", "Pick a start and end time, or choose flexible hours.");
+    if (!message.trim()) return fail("message", "Add a job description.");
 
     const offer: Record<string, unknown> = {
       roleTitle: roleTitle.trim(),
@@ -190,7 +206,7 @@ export function ProposalOfferForm({
       </p>
       <label className="block">
         <span className={LABEL}>Role title</span>
-        <input value={roleTitle} onChange={(e) => setRoleTitle(e.target.value)} className={INPUT} />
+        <input {...fieldProps("title")} value={roleTitle} onChange={(e) => setRoleTitle(e.target.value)} className={INPUT} />
       </label>
       <div className="grid grid-cols-2 gap-3">
         <label className="block">
@@ -205,7 +221,7 @@ export function ProposalOfferForm({
         </label>
         <label className="block">
           <span className={LABEL}>Start date</span>
-          <DmyDateInput min={tomorrowIst()} value={startDate} onChange={setStartDate} className={INPUT} />
+          <DmyDateInput {...fieldProps("start")} min={tomorrowIst()} value={startDate} onChange={setStartDate} className={INPUT} />
         </label>
         <label className="col-span-2 block">
           <span className={LABEL}>Working week</span>
@@ -289,11 +305,11 @@ export function ProposalOfferForm({
           <>
             <label className="block">
               <span className={LABEL}>City</span>
-              <input value={city} onChange={(e) => setCity(e.target.value)} className={INPUT} />
+              <input {...fieldProps("city")} value={city} onChange={(e) => setCity(e.target.value)} className={INPUT} />
             </label>
             <label className="block">
               <span className={LABEL}>State</span>
-              <input value={state} onChange={(e) => setState(e.target.value)} className={INPUT} />
+              <input {...fieldProps("state")} value={state} onChange={(e) => setState(e.target.value)} className={INPUT} />
             </label>
           </>
         ) : null}
@@ -301,7 +317,7 @@ export function ProposalOfferForm({
           <>
             <label className="block">
               <span className={LABEL}>Office days</span>
-              <select value={officeDays} onChange={(e) => setOfficeDays(e.target.value)} className={INPUT}>
+              <select {...fieldProps("office")} value={officeDays} onChange={(e) => setOfficeDays(e.target.value)} className={INPUT}>
                 {Array.from({ length: week - 1 }, (_, i) => i + 1).map((n) => (
                   <option key={n} value={String(n)}>
                     {n} a week
@@ -323,11 +339,11 @@ export function ProposalOfferForm({
           <>
             <label className="block">
               <span className={LABEL}>From</span>
-              <input type="time" value={shiftFrom} onChange={(e) => setShiftFrom(e.target.value)} className={INPUT} />
+              <input {...fieldProps("shiftFrom")} type="time" value={shiftFrom} onChange={(e) => setShiftFrom(e.target.value)} className={INPUT} />
             </label>
             <label className="block">
               <span className={LABEL}>To</span>
-              <input type="time" value={shiftTo} onChange={(e) => setShiftTo(e.target.value)} className={INPUT} />
+              <input {...fieldProps("shiftTo")} type="time" value={shiftTo} onChange={(e) => setShiftTo(e.target.value)} className={INPUT} />
             </label>
           </>
         ) : null}
@@ -352,14 +368,15 @@ export function ProposalOfferForm({
       <label className="block">
         <span className={LABEL}>Job description</span>
         <textarea
+          {...fieldProps("message")}
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           rows={5}
-          className="apple-spring w-full rounded-apple-sm border border-ink-200 bg-white px-3 py-2.5 text-sm leading-relaxed text-ink-900 outline-none focus-visible:border-brand-500 focus-visible:ring-2 focus-visible:ring-brand-500/20"
+          className={cn(fieldClass, "py-2.5 leading-relaxed")}
         />
       </label>
       {error ? (
-        <p role="alert" className="text-sm font-medium text-danger">
+        <p id={errId} role="alert" className="text-sm font-medium text-danger">
           {error}
         </p>
       ) : null}

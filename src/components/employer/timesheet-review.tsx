@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Pencil } from "lucide-react";
 
+import { KeepFocusClear } from "@/components/app/keep-focus-clear";
 import { buttonClass } from "@/components/ui/button";
 import { csrfFetch } from "@/lib/client-fetch";
 import { DAY_CODE, EMPLOYER_DAY_STATUSES, weeklyTallies, type DayDetail } from "@/lib/employer-timesheets";
@@ -45,6 +46,16 @@ export function TimesheetReview({
   const [values, setValues] = useState<Record<string, string>>(() => Object.fromEntries(days.map((d) => [d.date, d.status])));
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
+  const grid = useRef<HTMLDivElement>(null);
+  const adjust = useRef<HTMLButtonElement>(null);
+  const wasEditing = useRef(false);
+
+  // The button pressed unmounts on both switches (Adjust days, Cancel/Save), so focus moves on with it.
+  useEffect(() => {
+    if (editing) grid.current?.querySelector("select")?.focus();
+    else if (wasEditing.current) adjust.current?.focus();
+    wasEditing.current = editing;
+  }, [editing]);
 
   const shown = useMemo(
     () => days.map((d) => ({ ...d, status: values[d.date] ?? d.status, hours: (values[d.date] ?? d.status) === "Present" ? d.hours || 8 : 0 })),
@@ -101,14 +112,14 @@ export function TimesheetReview({
           </li>
         </ul>
         {editable && !editing ? (
-          <button type="button" onClick={() => setEditing(true)} className={buttonClass({ variant: "ghost", size: "sm" })}>
+          <button ref={adjust} type="button" onClick={() => setEditing(true)} className={buttonClass({ variant: "ghost", size: "sm" })}>
             <Pencil className="size-4" aria-hidden />
             Adjust days
           </button>
         ) : null}
       </div>
 
-      <div className="mt-4 space-y-3">
+      <div ref={grid} className="mt-4 space-y-3">
         {weeks.map((w) => {
           // Pad the week to Monday-Sunday so columns line up across weeks.
           const cells: (DayDetail | null)[] = Array.from({ length: 7 }, (_, i) => {
@@ -123,7 +134,7 @@ export function TimesheetReview({
                 {cells.map((d, i) =>
                   d ? (
                     <li key={d.date} className="min-w-0">
-                      <span className="block truncate text-center text-2xs font-medium uppercase tracking-wide text-text-subtle">
+                      <span className="block break-words text-center text-2xs font-medium uppercase tracking-wide text-text-subtle">
                         <span className="sm:hidden">{WEEKDAYS[i][0]}</span>
                         <span className="hidden sm:inline">{WEEKDAYS[i]}</span> <span className="nums">{dayLabel(d.date, { day: "numeric" })}</span>
                       </span>
@@ -133,7 +144,7 @@ export function TimesheetReview({
                           value={values[d.date] ?? ""}
                           onChange={(e) => setValues((v) => ({ ...v, [d.date]: e.target.value }))}
                           className={cn(
-                            "mt-1 h-11 w-full appearance-none rounded-apple-sm border text-center text-sm font-bold outline-none focus-visible:ring-2 focus-visible:ring-brand-500/30",
+                            "mt-1 h-11 w-full appearance-none rounded-apple-sm border text-center text-base md:text-sm font-bold outline-none focus-visible:ring-2 focus-visible:ring-brand-600",
                             CELL[values[d.date] ?? ""] ?? "border-dashed border-ink-300 bg-white text-text-subtle",
                             values[d.date] !== d.status && "ring-2 ring-accent-400",
                           )}
@@ -195,7 +206,7 @@ export function TimesheetReview({
       </div>
 
       {editing ? (
-        <div className="sticky bottom-4 z-10 mt-4 flex flex-wrap items-center gap-2 rounded-apple-lg border border-ink-200/80 bg-white p-3 shadow-sm">
+        <div id="timesheet-save-bar" className="sticky bottom-4 z-10 mt-4 flex flex-wrap items-center gap-2 rounded-apple-lg border border-ink-200/80 bg-white p-3 shadow-sm transition-[opacity,translate] duration-[var(--dur-quick)] ease-[var(--ease-out-quart)] starting:translate-y-2 starting:opacity-0">
           <button type="button" disabled={busy || changed.length === 0} onClick={save} className={buttonClass({ size: "sm" })}>
             {busy ? <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden /> : null}
             {changed.length ? `Save ${changed.length} change${changed.length === 1 ? "" : "s"}` : "No changes yet"}
@@ -212,13 +223,13 @@ export function TimesheetReview({
             Cancel
           </button>
           <span className="text-sm text-ink-600">The intern is told about the change.</span>
+          <KeepFocusClear of="timesheet-save-bar" />
         </div>
       ) : null}
-      {message ? (
-        <p role="status" className={cn("mt-3 text-sm", message.ok ? "text-brand-700" : "text-danger")}>
-          {message.text}
-        </p>
-      ) : null}
+      {/* Always mounted, so the result is announced when it fills in. */}
+      <p role="status" className={message ? cn("mt-3 text-sm", message.ok ? "text-brand-700" : "text-danger") : "sr-only"}>
+        {message?.text}
+      </p>
 
       {notes.length > 0 ? (
         <details className="group mt-6" open={notes.length <= 5}>

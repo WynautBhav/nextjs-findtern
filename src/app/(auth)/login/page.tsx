@@ -1,13 +1,15 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 
 import { AlertCircle } from "lucide-react";
 
 import { AuthShell } from "@/components/auth/auth-shell";
 import { DoorSwitch } from "@/components/auth/door-switch";
 import { LoginForm } from "@/components/auth/login-form";
-import { authPath, DOOR_POINTS, doorOf, LAST_DOOR_COOKIE, type Door } from "@/lib/auth-doors";
+import { getSession } from "@/lib/auth";
+import { authPath, DOOR_POINTS, doorOf, ownNext, LAST_DOOR_COOKIE, type Door } from "@/lib/auth-doors";
 import { googleLoginEnabled, oauthErrorMessage, safeNext } from "@/lib/google";
 
 export const metadata: Metadata = {
@@ -68,7 +70,9 @@ export default async function LoginPage({
   const d = DOOR[door];
   const oauthError = oauthErrorMessage(one(params.oauthError));
   // Where sign in returns to (INT-07 / EMH-37): the page that sent them here.
-  const next = safeNext(one(params.next), "");
+  const next = ownNext(safeNext(one(params.next), ""), door);
+  // Already signed in as this type: nothing to do here.
+  if ((await getSession())?.role === door) redirect(next || d.home);
   const google = door !== "college" && googleLoginEnabled() ? `/api/auth/google/start?${new URLSearchParams(next ? { role: door, next } : { role: door })}` : undefined;
 
   return (
@@ -114,7 +118,7 @@ export default async function LoginPage({
       ) : (
         <p className="mt-7 text-center text-sm text-text-subtle">
           New to Findtern?{" "}
-          <Link href={authPath("/signup", door, { next })} className="font-semibold text-brand-700 underline-offset-4 hover:underline">
+          <Link href={authPath("/signup", door, { next })} className="font-semibold text-brand-700 underline-offset-4 hover:underline touch:inline-flex touch:min-h-11 touch:items-center">
             {door === "employer" ? "Register your company" : "Create an account"}
           </Link>
         </p>

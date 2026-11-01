@@ -74,6 +74,29 @@ export type PayableCheckout = {
   prefill: { name?: string; email?: string; contact?: string };
 };
 
+type Db = ReturnType<typeof getDb>;
+type Tx = Parameters<Parameters<Db["transaction"]>[0]>[0];
+
+/**
+ * Accepted offers awaiting payment, plus hired monthly-plan placements whose
+ * next month is due. `processing` is the legacy status for an accepted offer
+ * mid-payment; without it those rows could never be paid. The order route
+ * reruns this on its locking transaction to confirm what it priced is still
+ * payable.
+ */
+export async function openProposalsWithDues(db: Db | Tx, employerId: string) {
+  const open = await db
+    .select()
+    .from(schema.proposals)
+    .where(and(eq(schema.proposals.employerId, employerId), inArray(schema.proposals.status, ["accepted", "processing", "hired"])))
+    .orderBy(desc(schema.proposals.updatedAt));
+  const payments = await db
+    .select({ status: schema.employerPayments.status, raw: schema.employerPayments.raw })
+    .from(schema.employerPayments)
+    .where(eq(schema.employerPayments.employerId, employerId));
+  return { open, dues: new Map(monthlyDues(open, payments).map((d) => [d.proposalId, d])) };
+}
+
 export async function payableCheckout(
   employerId: string,
   opts: { proposalIds?: string[]; mode?: PayMode } = {},
@@ -101,21 +124,7 @@ export async function payableCheckout(
   };
 
 
-  // Accepted offers awaiting payment, plus hired monthly-plan placements
-  // whose next month is due. `processing` is the legacy status for an accepted
-  // offer mid-payment; without it those rows could never be paid.
-  const [open, payments] = await Promise.all([
-    db
-      .select()
-      .from(schema.proposals)
-      .where(and(eq(schema.proposals.employerId, employerId), inArray(schema.proposals.status, ["accepted", "processing", "hired"])))
-      .orderBy(desc(schema.proposals.updatedAt)),
-    db
-      .select({ status: schema.employerPayments.status, raw: schema.employerPayments.raw })
-      .from(schema.employerPayments)
-      .where(eq(schema.employerPayments.employerId, employerId)),
-  ]);
-  const dues = new Map(monthlyDues(open, payments).map((d) => [d.proposalId, d]));
+  const { open, dues } = await openProposalsWithDues(db, employerId);
   const proposals = open.filter(
     (p) =>
       (p.status === "accepted" || p.status === "processing" || dues.has(p.id)) && (!opts.proposalIds?.length || opts.proposalIds.includes(p.id)),

@@ -50,9 +50,11 @@ export function CheckoutSummary({
   prefill,
   initialId,
   testMode = false,
+  testPay = false,
 }: {
   employerId: string;
   testMode?: boolean;
+  testPay?: boolean;
   lines: SummaryLine[];
   prefill: { name?: string; email?: string; contact?: string };
   /** Preselected line (?proposal=). */
@@ -108,7 +110,7 @@ export function CheckoutSummary({
                           <Pill tone="live">Accepted</Pill>
                         )}
                       </span>
-                      <span className="mt-0.5 block truncate text-sm text-ink-600">
+                      <span className="mt-0.5 block break-words text-sm text-ink-600">
                         {l.roleTitle}
                         {l.projectName && l.projectName !== l.roleTitle ? ` · ${l.projectName}` : ""}
                       </span>
@@ -124,7 +126,7 @@ export function CheckoutSummary({
                     </span>
                     <span className="nums text-left sm:text-right">
                       <span className="block text-lg font-semibold text-ink-900">{m(amountOf(l, picked), l.currency)}</span>
-                      <span className="block text-xs text-ink-500">
+                      <span className="block text-xs text-text-subtle">
                         {l.due ? "this month" : l.fullTimeCtcMinor != null ? "one-time fee" : picked === "monthly" && l.monthlyMinor != null ? "first month" : "whole engagement"}
                       </span>
                     </span>
@@ -168,7 +170,7 @@ export function CheckoutSummary({
                   />
                   <span className="min-w-0 flex-1">
                     Monthly
-                    <span className="block text-xs text-ink-500">
+                    <span className="block text-xs text-text-subtle">
                       {canMonthly
                         ? line.months > 1
                           ? `First month now, then ${line.months - 1} more monthly`
@@ -188,7 +190,7 @@ export function CheckoutSummary({
                   />
                   <span className="min-w-0 flex-1">
                     Whole engagement
-                    <span className="block text-xs text-ink-500">Paid once, now</span>
+                    <span className="block text-xs text-text-subtle">Paid once, now</span>
                   </span>
                   <span className="nums text-ink-700">{m(line.upfrontMinor, line.currency)}</span>
                 </label>
@@ -223,9 +225,10 @@ export function CheckoutSummary({
               proposalIds={[line.id]}
               mode={mode}
               testMode={testMode}
+              testPay={testPay}
             />
           </div>
-          <p className="mt-4 text-xs leading-relaxed text-ink-500">
+          <p className="mt-4 text-xs leading-relaxed text-text-subtle">
             {line.currency === "INR" ? "Prices include GST. " : "Billed in US dollars. "}
             The one-time hiring fee is never discounted.{" "}
             <Link href="/employer/orders" className="font-medium text-brand-700 underline-offset-4 hover:underline">

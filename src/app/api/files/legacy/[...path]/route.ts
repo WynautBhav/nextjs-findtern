@@ -38,6 +38,8 @@ export async function GET(_req: Request, ctx: { params: Promise<{ path: string[]
   }
 }
 
+// A company's own logo is public, matched on the whole stored path: a `LIKE` on the
+// file name alone let a company name someone else's document as its logo and publish it.
 async function canRead(path: string, folder: string | null): Promise<true | string> {
   if (folder === "company-logos") return true;
   const name = path.split("/").pop()!;
@@ -49,7 +51,7 @@ async function canRead(path: string, folder: string | null): Promise<true | stri
     UNION ALL SELECT 1 FROM website_blog_posts WHERE cover_image_url LIKE ${like} OR banner_image_url LIKE ${like} OR body LIKE ${like}
     UNION ALL SELECT 1 FROM website_happy_faces WHERE avatar_url LIKE ${like}
     UNION ALL SELECT 1 FROM website_partners WHERE logo_url LIKE ${like}
-    UNION ALL SELECT 1 FROM employers WHERE logo_url LIKE ${like}
+    UNION ALL SELECT 1 FROM employers WHERE logo_url IN (${`/uploads/${path}`}, ${`uploads/${path}`})
     LIMIT 1`);
   if (cms.rows.length) return true;
 
@@ -72,6 +74,7 @@ async function canRead(path: string, folder: string | null): Promise<true | stri
       : await db.execute(sql`
           SELECT 1 FROM proposals WHERE employer_id = ${uid} AND offer_details::text LIKE ${like}
           UNION ALL SELECT 1 FROM intern_document WHERE profile_photo_name = ${name}
+            AND (${Boolean(session.impersonator)} OR user_id IN (SELECT intern_id FROM proposals WHERE employer_id = ${uid} AND (status = 'hired' OR hired_at IS NOT NULL)))
           LIMIT 1`);
   return owned.rows.length ? true : "Forbidden";
 }

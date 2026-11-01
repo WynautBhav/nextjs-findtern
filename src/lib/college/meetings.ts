@@ -1,6 +1,7 @@
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import { randomBytes } from "node:crypto";
 
+import { withLock } from "@/lib/advisory-lock";
 import { getDb, schema } from "@/lib/db";
 import { CALENDAR_TOKEN_OWNER, calendarConfig, createMeetEvent } from "@/lib/google";
 import { origin } from "@/lib/emails";
@@ -74,37 +75,58 @@ export async function requestMeeting(input: {
   userId: string;
   inMinutes: (typeof MEETING_DELAYS)[number];
 }): Promise<{ ok: true; meeting: MeetingView } | { ok: false; error: string }> {
-  const db = getDb();
-  const open = await db
-    .select()
-    .from(schema.collegeDriveMeetings)
-    .where(
-      and(
-        eq(schema.collegeDriveMeetings.driveId, input.driveId),
-        eq(schema.collegeDriveMeetings.employerId, input.employerId),
-        eq(schema.collegeDriveMeetings.userId, input.userId),
-        inArray(schema.collegeDriveMeetings.status, ["requested", "accepted"]),
-      ),
-    );
-  if (open.some((m) => effectiveStatus(m) === "requested" || (m.status === "accepted" && m.startsAt.getTime() + MEETING_MINUTES * 60_000 > Date.now()))) {
-    return { ok: false, error: "You already have an open call with this student." };
-  }
-
+  // One request per student at a time: the check and a placeholder row run under
+  // a per-pair lock, so a double click makes one request and the second caller
+  // sees the first's row (QA-202), and so only one Meet event is ever made. The
+  // event is created after the lock is released: a Google call inside it would
+  // hold a pool connection while Google answers.
   const startsAt = new Date(Date.now() + input.inMinutes * 60_000);
-  const { link, eventId } = await meetLink(startsAt);
+  const placeholder = await withLock(`drive-meeting:${input.driveId}:${input.employerId}:${input.userId}`, async (tx) => {
+    const open = await tx
+      .select()
+      .from(schema.collegeDriveMeetings)
+      .where(
+        and(
+          eq(schema.collegeDriveMeetings.driveId, input.driveId),
+          eq(schema.collegeDriveMeetings.employerId, input.employerId),
+          eq(schema.collegeDriveMeetings.userId, input.userId),
+          inArray(schema.collegeDriveMeetings.status, ["requested", "accepted"]),
+        ),
+      );
+    // A row with no link for over two minutes is a request that never finished
+    // (a crash between the insert and the Meet event); it holds no one.
+    const live = open.filter((m) => m.meetingLink || Date.now() - m.createdAt.getTime() < 2 * 60_000);
+    if (live.some((m) => effectiveStatus(m) === "requested" || (m.status === "accepted" && m.startsAt.getTime() + MEETING_MINUTES * 60_000 > Date.now()))) {
+      return null;
+    }
+    const [inserted] = await tx
+      .insert(schema.collegeDriveMeetings)
+      .values({ driveId: input.driveId, employerId: input.employerId, userId: input.userId, startsAt })
+      .returning();
+    return inserted;
+  });
+  if (!placeholder) return { ok: false, error: "You already have an open call with this student." };
+
+  const dropPlaceholder = () => getDb().delete(schema.collegeDriveMeetings).where(eq(schema.collegeDriveMeetings.id, placeholder.id));
+  let made: { link: string | null; eventId: string | null };
+  try {
+    made = await meetLink(startsAt);
+  } catch (err) {
+    await dropPlaceholder();
+    throw err;
+  }
   // Never hand the student a call they can accept but can't join (QA-001).
-  if (!link) return { ok: false, error: "Calendar not connected; ask Findtern to connect it." };
-  const [row] = await db
-    .insert(schema.collegeDriveMeetings)
-    .values({
-      driveId: input.driveId,
-      employerId: input.employerId,
-      userId: input.userId,
-      startsAt,
-      meetingLink: link,
-      calendarEventId: eventId,
-    })
+  if (!made.link) {
+    await dropPlaceholder();
+    return { ok: false, error: "Calendar not connected; ask Findtern to connect it." };
+  }
+  const [row] = await getDb()
+    .update(schema.collegeDriveMeetings)
+    .set({ meetingLink: made.link, calendarEventId: made.eventId })
+    // Still "requested": a row the student declined in the meantime stays declined, and no one is told.
+    .where(and(eq(schema.collegeDriveMeetings.id, placeholder.id), eq(schema.collegeDriveMeetings.status, "requested")))
     .returning();
+  if (!row) return { ok: false, error: "Could not request the call." };
 
   const when = input.inMinutes === 0 ? "right now" : `in ${input.inMinutes} minutes`;
   const title = `An employer wants to talk ${when}`;
@@ -150,6 +172,8 @@ export async function meetingsForStudent(userId: string): Promise<MeetingView[]>
     .where(
       and(
         eq(schema.collegeDriveMeetings.userId, userId),
+        // A row still waiting for its Meet link (see requestMeeting) is not a call yet.
+        isNotNull(schema.collegeDriveMeetings.meetingLink),
         inArray(schema.collegeDriveMeetings.status, ["requested", "accepted"]),
         sql`${schema.collegeDriveMeetings.startsAt} > now() - interval '40 minutes'`,
       ),

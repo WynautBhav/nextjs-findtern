@@ -5,6 +5,7 @@ import { CheckCircle2, Loader2, MessageCircleQuestion } from "lucide-react";
 
 import { FileUpload } from "@/components/app/file-upload";
 import { buttonClass } from "@/components/ui/button";
+import { onRadioKeys, radioTab } from "@/components/intern/onboarding/fields";
 import { csrfFetch } from "@/lib/client-fetch";
 import {
   Dialog,
@@ -151,13 +152,14 @@ export function FeedbackFab({
             </div>
           ) : (
             <form onSubmit={submit} className="space-y-4 pt-2">
-              <div role="radiogroup" aria-label="What is this about" className="grid grid-cols-3 gap-1 rounded-apple-sm bg-ink-100 p-1">
-                {KINDS.map((k) => (
+              <div role="radiogroup" aria-label="What is this about" onKeyDown={onRadioKeys} className="grid grid-cols-3 gap-1 rounded-apple-sm bg-ink-100 p-1">
+                {KINDS.map((k, i) => (
                   <button
                     key={k.value}
                     type="button"
                     role="radio"
                     aria-checked={kind === k.value}
+                    tabIndex={radioTab(kind === k.value, i, true)}
                     onClick={() => setKind(k.value)}
                     className={cn(
                       "apple-spring inline-flex min-h-11 items-center justify-center rounded-apple-sm px-2 text-sm font-medium",
@@ -182,7 +184,7 @@ export function FeedbackFab({
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
                   placeholder="One or two lines is plenty - what you did, what you expected."
-                  className="apple-spring mt-1.5 min-h-24 w-full rounded-apple-sm border border-ink-200 bg-white p-3 text-[0.9375rem] text-ink-900 outline-none placeholder:text-ink-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+                  className="mt-1.5 min-h-24 w-full rounded-apple-sm border border-ink-200 bg-white p-3 text-base md:text-sm text-ink-900 outline-none transition-colors placeholder:text-text-subtle hover:border-ink-300 focus-visible:border-brand-600 focus-visible:ring-[3px] focus-visible:ring-brand-600/20 disabled:cursor-not-allowed disabled:bg-ink-50 disabled:text-text-subtle"
                 />
               </div>
 
@@ -240,7 +242,7 @@ export function FeedbackFab({
                   disabled={state === "sending" || !message.trim()}
                   className={buttonClass({})}
                 >
-                  {state === "sending" ? <Loader2 className="size-4 animate-spin" /> : null}
+                  {state === "sending" ? <Loader2 className="size-4 animate-spin motion-reduce:animate-none" /> : null}
                   Send report
                 </button>
               </div>

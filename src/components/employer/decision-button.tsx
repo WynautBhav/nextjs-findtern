@@ -5,8 +5,10 @@ import { useRouter } from "next/navigation";
 import { CheckCircle2, CircleSlash, Loader2 } from "lucide-react";
 
 import { buttonClass } from "@/components/ui/button";
+import { onRadioKeys, radioTab } from "@/components/intern/onboarding/fields";
 import { csrfFetch } from "@/lib/client-fetch";
 import { cn } from "@/lib/utils";
+import { fieldClass } from "@/components/employer/ui-tokens";
 
 /**
  * Approve or send back a submitted timesheet, in place. Approving takes an
@@ -56,18 +58,19 @@ export function TimesheetDecision({ timesheetId, unfilled = 0 }: { timesheetId: 
 
   return (
     <div className="space-y-3">
-      <div role="radiogroup" aria-label="Decision" className="grid grid-cols-2 gap-1 rounded-apple-md bg-ink-100 p-1">
+      <div role="radiogroup" aria-label="Decision" onKeyDown={onRadioKeys} className="grid grid-cols-2 gap-1 rounded-apple-md bg-ink-100 p-1">
         {(
           [
             ["approve", "Approve", CheckCircle2],
             ["reject", "Send back", CircleSlash],
           ] as const
-        ).map(([value, label, Icon]) => (
+        ).map(([value, label, Icon], i) => (
           <button
             key={value}
             type="button"
             role="radio"
             aria-checked={mode === value}
+            tabIndex={radioTab(mode === value, i, true)}
             onClick={() => {
               setMode(value);
               setError("");
@@ -93,7 +96,7 @@ export function TimesheetDecision({ timesheetId, unfilled = 0 }: { timesheetId: 
           rows={3}
           maxLength={1000}
           placeholder={mode === "approve" ? "Thanks - great month." : "Wednesday 12th should be a fixed off, not present."}
-          className="apple-spring w-full rounded-apple-sm border border-ink-200 bg-white px-3 py-2.5 text-sm leading-relaxed text-ink-900 outline-none placeholder:text-text-subtle focus-visible:border-brand-500 focus-visible:ring-2 focus-visible:ring-brand-500/20"
+          className={cn(fieldClass, "py-2.5 leading-relaxed")}
         />
       </label>
       {error ? (

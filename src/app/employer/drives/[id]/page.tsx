@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull } from "drizzle-orm";
 
 import { requireRole } from "@/lib/auth";
 import { driveWindow } from "@/lib/college/access";
@@ -96,7 +96,7 @@ export default async function EmployerDrivePage({ params }: { params: Promise<{ 
     db
       .select()
       .from(schema.collegeDriveMeetings)
-      .where(and(eq(schema.collegeDriveMeetings.driveId, drive.id), eq(schema.collegeDriveMeetings.employerId, session.uid)))
+      .where(and(eq(schema.collegeDriveMeetings.driveId, drive.id), eq(schema.collegeDriveMeetings.employerId, session.uid), isNotNull(schema.collegeDriveMeetings.meetingLink)))
       .orderBy(desc(schema.collegeDriveMeetings.createdAt)),
     hiredInternIds(db, session.uid),
   ]);

@@ -72,7 +72,7 @@ export default async function EmployerDrivesPage() {
                     <DriveStatePill state={state} />
                     <span className="text-xs font-medium text-text-subtle">{KIND_LABEL[drive.kind] ?? "Campus drive"}</span>
                   </div>
-                  <p className="mt-1.5 truncate text-base font-semibold text-ink-900">{drive.title}</p>
+                  <p className="mt-1.5 line-clamp-2 break-words text-base font-semibold text-ink-900">{drive.title}</p>
                   <p className="mt-0.5 text-sm text-ink-600">
                     {college.name}
                     {college.city ? `, ${college.city}` : ""} · {state === "upcoming" ? `opens ${driveTime(drive.startsAt)}` : `closes ${driveTime(drive.endsAt)}`}
@@ -87,7 +87,7 @@ export default async function EmployerDrivesPage() {
                 {open ? (
                   <Link
                     href={`/employer/drives/${drive.id}`}
-                    className="apple-spring block rounded-apple-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
+                    className="apple-spring block rounded-apple-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
                   >
                     <Surface className="transition-shadow hover:shadow-md">{body}</Surface>
                   </Link>

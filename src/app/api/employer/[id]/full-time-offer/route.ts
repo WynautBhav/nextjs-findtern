@@ -4,6 +4,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { withLock } from "@/lib/advisory-lock";
 import { getDb, schema } from "@/lib/db";
 import { emails } from "@/lib/emails";
 import { requireMutation } from "@/lib/guards-mutation";
@@ -57,20 +58,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({ error: "USD offers need International FTE approval first." }, { status: 403 });
   }
 
-  const existing = await db
-    .select({ offer: schema.proposals.offerDetails, currency: schema.proposals.currency })
-    .from(schema.proposals)
-    .where(
-      and(
-        eq(schema.proposals.employerId, id),
-        eq(schema.proposals.internId, base.internId),
-        inArray(schema.proposals.status, ["draft", "sent", "accepted", "processing", "hired"]),
-      ),
-    );
-  if (existing.some((p) => parseOffer(p.offer, p.currency).fullTime)) {
-    return NextResponse.json({ error: "You've already sent this intern a full-time offer." }, { status: 409 });
-  }
-
   // EMH-05: legacy and the admin read the letter from `offerLetterUrl`. The
   // file is private, so the URL is the access-checked letter route (parties
   // and admins only), never a public /uploads path.
@@ -84,40 +71,59 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     .limit(1);
   const internName = `${intern?.first ?? ""} ${intern?.last ?? ""}`.trim() || "Candidate";
 
-  const [proposal] = await db
-    .insert(schema.proposals)
-    .values({
-      id: proposalId,
-      employerId: id,
-      internId: base.internId,
-      projectId: base.projectId,
-      flowType: base.flowType,
-      status: "sent",
-      currency: b.ctcCurrency,
-      offerDetails: {
-        fullTimeOffer: {
-          baseProposalId: b.proposalId,
-          jobTitle: b.jobTitle,
-          jobMode: b.jobMode,
-          jobLocationCity: b.jobLocationCity,
-          jobLocationState: b.jobLocationState,
-          timezone: b.timezone,
-          shiftFrom: b.shiftFrom,
-          shiftTo: b.shiftTo,
-          ctcCurrency: b.ctcCurrency,
-          annualCtc: b.annualCtc,
-          offerLetterKey: b.offerLetterKey,
-          offerLetterUrl,
-          createdAt: new Date().toISOString(),
-        },
+  // One full-time offer per intern: checked and inserted under one lock, so two
+  // requests at once (a double click gave three offers) can't both pass.
+  const proposal = await withLock(`offer:${id}:${base.internId}`, async (tx) => {
+    const existing = await tx
+      .select({ offer: schema.proposals.offerDetails, currency: schema.proposals.currency })
+      .from(schema.proposals)
+      .where(
+        and(
+          eq(schema.proposals.employerId, id),
+          eq(schema.proposals.internId, base.internId),
+          inArray(schema.proposals.status, ["draft", "sent", "accepted", "processing", "hired"]),
+        ),
+      );
+    if (existing.some((p) => parseOffer(p.offer, p.currency).fullTime)) return null;
+    const [created] = await tx
+      .insert(schema.proposals)
+      .values({
+        id: proposalId,
+        employerId: id,
+        internId: base.internId,
+        projectId: base.projectId,
+        flowType: base.flowType,
+        status: "sent",
         currency: b.ctcCurrency,
-      },
-      skills: base.skills,
-      // The assessment the hire was made on travels with the full-time offer
-      // (legacy routes.ts:13261).
-      aiRatings: base.aiRatings ?? null,
-    })
-    .returning();
+        offerDetails: {
+          fullTimeOffer: {
+            baseProposalId: b.proposalId,
+            jobTitle: b.jobTitle,
+            jobMode: b.jobMode,
+            jobLocationCity: b.jobLocationCity,
+            jobLocationState: b.jobLocationState,
+            timezone: b.timezone,
+            shiftFrom: b.shiftFrom,
+            shiftTo: b.shiftTo,
+            ctcCurrency: b.ctcCurrency,
+            annualCtc: b.annualCtc,
+            offerLetterKey: b.offerLetterKey,
+            offerLetterUrl,
+            createdAt: new Date().toISOString(),
+          },
+          currency: b.ctcCurrency,
+        },
+        skills: base.skills,
+        // The assessment the hire was made on travels with the full-time offer
+        // (legacy routes.ts:13261).
+        aiRatings: base.aiRatings ?? null,
+      })
+      .returning();
+    return created;
+  });
+  if (!proposal) {
+    return NextResponse.json({ error: "You've already sent this intern a full-time offer." }, { status: 409 });
+  }
 
   await notify({
     to: { type: "intern", id: base.internId },

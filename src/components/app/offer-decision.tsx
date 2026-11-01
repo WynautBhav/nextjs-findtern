@@ -177,7 +177,7 @@ export function OfferDecision({
             className: cn("text-sm font-semibold", !rail && "flex-1 sm:flex-none"),
           })}
         >
-          {busy === "accept" ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <Check className="size-4" aria-hidden />}
+          {busy === "accept" ? <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden /> : <Check className="size-4" aria-hidden />}
           {fullTime ? "Accept the job offer" : "Accept this offer"}
         </button>
         <button
@@ -191,7 +191,7 @@ export function OfferDecision({
             className: cn("text-sm", !rail && "flex-1 sm:flex-none"),
           })}
         >
-          {busy === "decline" ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
+          {busy === "decline" ? <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden /> : null}
           Turn it down
         </button>
       </div>
@@ -222,7 +222,7 @@ export function OfferDecision({
               </DialogTitle>
               <DialogDescription className="text-pretty text-sm leading-relaxed text-ink-700">
                 This tells {company === "The company" ? "the company" : company} yes{joining ? ` for a start on ${joining}` : ""}. They complete the payment next.
-                You&apos;re hired, and logging hours opens, once they do. Your other open offers from this company close.
+                You&apos;re hired, and logging hours opens, once they do. Your other open offers, from any company, close when you accept: it&apos;s one internship at a time.
               </DialogDescription>
             </DialogHeader>
             <label className="flex cursor-pointer items-start gap-3 rounded-apple-lg border border-ink-200/80 bg-ink-50 p-4 text-sm text-ink-700">
@@ -259,7 +259,7 @@ export function OfferDecision({
                 disabled={busy !== null || !agreed}
                 className={buttonClass({ variant: "primary", size: "md", className: "text-sm font-semibold" })}
               >
-                {busy === "accept" ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <Check className="size-4" aria-hidden />}
+                {busy === "accept" ? <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden /> : <Check className="size-4" aria-hidden />}
                 Yes, accept
               </button>
             </DialogFooter>
@@ -317,7 +317,7 @@ export function OfferDecision({
               disabled={busy !== null}
               className={buttonClass({ variant: "dark", size: "md", className: "text-sm font-semibold" })}
             >
-              {busy === "decline" ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
+              {busy === "decline" ? <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden /> : null}
               {endsGuarantee ? "Turn it down anyway" : "Yes, turn it down"}
             </button>
           </DialogFooter>

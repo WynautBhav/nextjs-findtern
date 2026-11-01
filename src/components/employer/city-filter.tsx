@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { MapPin, X } from "lucide-react";
 
 import { districtOptions } from "@/components/employer/location-fields";
+import { fieldClass } from "@/components/employer/ui-tokens";
+import { cn } from "@/lib/utils";
 
 const MAX = 5;
 
@@ -95,7 +97,7 @@ export function CityFilter({
               setChips(chips.slice(0, -1));
             }
           }}
-          className="apple-spring min-h-11 w-full rounded-apple-sm border border-ink-200/90 bg-white/90 pl-10 pr-3.5 text-sm text-ink-900 shadow-2xs outline-none placeholder:text-text-subtle focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 disabled:bg-ink-50"
+          className={cn(fieldClass, "pl-10 pr-3.5")}
         />
         {options.length > 0 ? (
           <ul className="absolute left-0 z-20 mt-1 w-max min-w-full max-w-[18rem] overflow-hidden rounded-apple-sm border border-ink-200 bg-white shadow-sm">

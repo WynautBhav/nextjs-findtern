@@ -325,7 +325,7 @@ export default async function EmployerInternDetail({
               className="size-16 rounded-apple-lg text-xl ring-1 ring-inset ring-brand-200/70"
             />
             <div className="min-w-0">
-              <h1 className="truncate text-3xl font-semibold leading-tight tracking-[-0.025em] text-ink-900">{displayName}</h1>
+              <h1 className="break-words text-3xl font-semibold leading-tight tracking-[-0.025em] text-ink-900">{displayName}</h1>
               <p className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-[0.9375rem] text-ink-600">
                 <span className="inline-flex items-center gap-1.5">
                   <MapPin className="size-4 text-ink-400" aria-hidden />

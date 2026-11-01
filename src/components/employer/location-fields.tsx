@@ -219,23 +219,23 @@ export function CityField({
           className="absolute inset-x-0 z-30 mt-1 max-h-64 overflow-auto rounded-apple-md border border-ink-200 bg-white py-1 shadow-md"
         >
           {options.map((d, i) => (
-            <li key={`${d.district}-${d.state}`} id={`${listId}-${i}`} role="option" aria-selected={i === active || d.district === p.value}>
-              <button
-                type="button"
-                tabIndex={-1}
-                // onMouseDown so the pick lands before the input's blur.
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  pick(d);
-                }}
-                className={cn(
-                  "flex min-h-11 w-full items-center justify-between gap-3 px-3.5 py-2 text-left text-sm text-ink-800 hover:bg-ink-50",
-                  (i === active || d.district === p.value) && "bg-brand-50 text-brand-800",
-                )}
-              >
-                <span>{d.district}</span>
-                {state && STATES.includes(state) ? null : <span className="text-xs text-text-subtle">{d.state}</span>}
-              </button>
+            <li
+              key={`${d.district}-${d.state}`}
+              id={`${listId}-${i}`}
+              role="option"
+              aria-selected={i === active || d.district === p.value}
+              // onMouseDown so the pick lands before the input's blur.
+              onMouseDown={(e) => {
+                e.preventDefault();
+                pick(d);
+              }}
+              className={cn(
+                "flex min-h-11 cursor-pointer items-center justify-between gap-3 px-3.5 py-2 text-left text-sm text-ink-800 hover:bg-ink-50",
+                (i === active || d.district === p.value) && "bg-brand-50 text-brand-800",
+              )}
+            >
+              <span>{d.district}</span>
+              {state && STATES.includes(state) ? null : <span className="text-xs text-text-subtle">{d.state}</span>}
             </li>
           ))}
         </ul>

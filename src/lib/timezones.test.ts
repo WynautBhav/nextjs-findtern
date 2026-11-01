@@ -30,3 +30,12 @@ test("offer hours are shown in IST for the intern, DST included (EMH-31)", async
   assert.equal(shiftInIst("09:00", "18:00", "Asia/Kolkata", "2026-12-01"), null);
   assert.equal(shiftInIst("flexible", "flexible", "Asia/Dubai"), null);
 });
+
+test("E-B10: only a zone the runtime knows counts as a timezone", async () => {
+  const { isKnownTimezone } = await import("./timezones.ts");
+  assert.equal(isKnownTimezone("Asia/Kolkata"), true);
+  assert.equal(isKnownTimezone("America/New_York"), true);
+  assert.equal(isKnownTimezone("Atlantis/Lost"), false);
+  assert.equal(isKnownTimezone(""), false);
+  assert.equal(isKnownTimezone("not a zone"), false);
+});

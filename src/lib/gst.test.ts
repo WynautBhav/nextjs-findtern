@@ -56,3 +56,17 @@ test("parts always sum to the total", () => {
     }
   }
 });
+
+test("GSTIN: format and a real state code, nothing else gets through", async () => {
+  const { isGstinFormat } = await import("./gstin.ts");
+  assert.equal(isGstinFormat("27AAPFU0939F1ZV"), true);
+  assert.equal(isGstinFormat(" 27aapfu0939f1zv "), true, "case and spaces are forgiven");
+  assert.equal(isGstinFormat("27AAPFU0939F1XV"), false, "the 14th character is Z");
+  assert.equal(isGstinFormat("27AAPFU0939F1Z"), false);
+  assert.equal(isGstinFormat("AAAAAAAAAAAAAAA"), false);
+  assert.equal(isGstinFormat(""), false);
+  // The state prefix chooses CGST+SGST or IGST, so it must be one the register knows.
+  const { stateCodeFromGstin } = await import("./gst.ts");
+  assert.equal(stateCodeFromGstin("27AAPFU0939F1ZV"), "27");
+  assert.equal(stateCodeFromGstin("99AAPFU0939F1ZV"), null);
+});

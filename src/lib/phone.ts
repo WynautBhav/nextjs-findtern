@@ -15,6 +15,15 @@ export function normalizePhone(raw: string): string {
   return String(raw ?? "").replace(/\D/g, "");
 }
 
+/**
+ * The key two signups lock on for one number. "+91" and "91" are the same
+ * country code to the phone-in-use check, so they must be the same lock too.
+ */
+export function phoneLockKey(countryCode: string, raw: string): string {
+  const code = String(countryCode ?? "").trim() || INDIA_CODE;
+  return `${code.startsWith("+") ? code : `+${code}`}${normalizePhone(raw)}`;
+}
+
 function isJunk(digits: string): boolean {
   if (/^(\d)\1+$/.test(digits)) return true;
   const asc = "01234567890123456789";

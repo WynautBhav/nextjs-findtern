@@ -13,6 +13,8 @@
 import { TIMEZONES } from "@/lib/timezones";
 import { SLOT_MINUTES, wallNow } from "@/lib/employer-interview-rules";
 import { DmyDateInput } from "@/components/app/dmy-date-input";
+import { fieldClass } from "@/components/employer/ui-tokens";
+import { cn } from "@/lib/utils";
 
 export type Slots = [string, string, string];
 
@@ -30,19 +32,23 @@ function timeLabel(hhmm: string): string {
   return `${h % 12 === 0 ? 12 : h % 12}:${String(m).padStart(2, "0")} ${suffix}`;
 }
 
-const FIELD =
-  "apple-spring min-h-11 w-full rounded-apple-sm border border-ink-200 bg-white px-3 text-sm tabular-nums text-ink-900 outline-none focus-visible:border-brand-500 focus-visible:ring-2 focus-visible:ring-brand-500/20";
+const FIELD = cn(fieldClass, "tabular-nums");
 
 export function MeetingSlots({
   slots,
   onChange,
   timezone,
   disabled,
+  invalid,
+  describedBy,
 }: {
   slots: Slots;
   onChange: (next: Slots) => void;
   timezone: string;
   disabled?: boolean;
+  /** A message about the slots is showing: mark the controls and tie them to it. */
+  invalid?: boolean;
+  describedBy?: string;
 }) {
   // "Now" in the meeting's timezone, so today's past times are not offered.
   const now = wallNow(timezone);
@@ -72,6 +78,8 @@ export function MeetingSlots({
                 max={maxDate}
                 onChange={(iso) => set(idx, iso ? `${iso}T${time || "09:00"}` : "")}
                 aria-label={`Slot ${idx + 1} date`}
+                aria-invalid={invalid || undefined}
+                aria-describedby={invalid ? describedBy : undefined}
                 className={FIELD}
               />
               <select
@@ -79,6 +87,8 @@ export function MeetingSlots({
                 value={time}
                 onChange={(e) => set(idx, `${date || today}T${e.target.value}`)}
                 aria-label={`Slot ${idx + 1} time`}
+                aria-invalid={invalid || undefined}
+                aria-describedby={invalid ? describedBy : undefined}
                 className={FIELD}
               >
                 <option value="" disabled>

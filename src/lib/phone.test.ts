@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { isValidPhone, phoneChangeError, phoneError } from "./phone.ts";
+import { isValidPhone, phoneChangeError, phoneError, phoneLockKey } from "./phone.ts";
 
 test("Indian mobiles are 10 digits starting 6-9", () => {
   assert.equal(isValidPhone("+91", "9876543211"), true);
@@ -42,4 +42,13 @@ test("an unchanged number on file passes; a changed one is checked (EMH-46)", ()
 test("bad country codes are rejected", () => {
   assert.notEqual(phoneError("91", "9876543211"), null);
   assert.notEqual(phoneError("+abc", "9876543211"), null);
+});
+
+test("a signup lock key ignores the + on the country code and formatting in the number", () => {
+  const key = phoneLockKey("+91", "98765 43211");
+  assert.equal(key, "+919876543211");
+  assert.equal(phoneLockKey("91", "9876543211"), key);
+  assert.equal(phoneLockKey(" +91 ", "9876543211"), key);
+  assert.equal(phoneLockKey("", "9876543211"), key, "a missing code means India, as in the phone check");
+  assert.notEqual(phoneLockKey("+1", "9876543211"), key);
 });

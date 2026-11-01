@@ -8,6 +8,9 @@ import { AlertCircle, ArrowLeft, ArrowRight, Loader2, MailCheck } from "lucide-r
 import { COUNTRY_CODE_OPTIONS, isPersonalEmail } from "@/lib/employer-onboarding";
 import { isValidPhone, phoneError, phoneHint } from "@/lib/phone";
 import { PASSWORD_RULES } from "@/lib/password-policy";
+import { fieldClass } from "@/components/employer/ui-tokens";
+import { cn } from "@/lib/utils";
+import { controlClass } from "@/components/employer/company-fields";
 
 /**
  * Employer registration.
@@ -246,7 +249,7 @@ export function EmployerSignupForm({
               onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
               autoComplete="one-time-code"
               placeholder="000000"
-              className="apple-spring mt-2 min-h-12 w-full rounded-apple-sm border border-ink-200 bg-white px-3.5 text-center font-mono text-lg tracking-[0.5em] text-ink-900 outline-none placeholder:text-ink-500 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+              className={cn(fieldClass, "mt-2 min-h-12 px-3.5 text-center font-mono text-lg md:text-lg tracking-[0.5em] placeholder:text-ink-500")}
             />
           </div>
           )}
@@ -334,13 +337,7 @@ export function EmployerSignupForm({
           placeholder="hiring@acme.com"
           aria-invalid={personal ? true : undefined}
           aria-describedby="companyEmail-note"
-          className={`apple-spring mt-2 min-h-11 w-full rounded-apple-sm border px-3.5 text-[0.9375rem] text-ink-900 outline-none placeholder:text-text-subtle focus:ring-2 ${
-            google ? "bg-ink-50 text-ink-700" : "bg-white"
-          } ${
-            personal
-              ? "border-danger focus:border-danger focus:ring-danger/20"
-              : "border-ink-200 focus:border-brand-500 focus:ring-brand-500/20"
-          }`}
+          className={controlClass(personal, cn("mt-2", google && "bg-ink-50 text-ink-700"))}
         />
         <p
           id="companyEmail-note"
@@ -365,7 +362,7 @@ export function EmployerSignupForm({
             value={countryCode}
             onChange={(e) => setCountryCode(e.target.value)}
             aria-label="Country code"
-            className="apple-spring min-h-11 w-28 shrink-0 rounded-apple-sm border border-ink-200 bg-white px-2.5 text-[0.9375rem] tabular-nums sm:w-36 text-ink-800 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+            className={controlClass(false, "w-28 shrink-0 px-2.5 tabular-nums sm:w-36")}
           >
             {COUNTRY_CODE_OPTIONS.map((option) => (
               <option key={option.code} value={option.code}>
@@ -383,7 +380,7 @@ export function EmployerSignupForm({
             onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, ""))}
             autoComplete="tel-national"
             placeholder={countryCode === "+91" ? "9876543210" : "2015550123"}
-            className="apple-spring min-h-11 w-full min-w-0 flex-1 rounded-apple-sm border border-ink-200 bg-white px-3.5 text-[0.9375rem] tabular-nums text-ink-900 outline-none placeholder:text-text-subtle focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+            className={controlClass(false, "min-w-0 flex-1 tabular-nums")}
           />
         </div>
         {phoneTaken ? (
@@ -413,7 +410,7 @@ export function EmployerSignupForm({
           autoComplete="new-password"
           placeholder="••••••••"
           aria-describedby="password-rules"
-          className="apple-spring mt-2 min-h-11 w-full rounded-apple-sm border border-ink-200 bg-white px-3.5 text-[0.9375rem] text-ink-900 outline-none placeholder:text-text-subtle focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+          className={controlClass(false, "mt-2")}
         />
         <ul id="password-rules" className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
           {PASSWORD_RULES.map((rule) => {
@@ -509,7 +506,7 @@ function TextInput({
         placeholder={placeholder}
         autoComplete={autoComplete}
         onChange={(e) => onChange(e.target.value)}
-        className="apple-spring mt-2 min-h-11 w-full rounded-apple-sm border border-ink-200 bg-white px-3.5 text-[0.9375rem] text-ink-900 outline-none placeholder:text-text-subtle focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+        className={controlClass(false, "mt-2")}
       />
     </div>
   );

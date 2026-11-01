@@ -3,6 +3,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { getDb, schema } from "@/lib/db";
+import { stateCodeFromGstin } from "@/lib/gst";
+import { GSTIN_FORMAT, GSTIN_HINT } from "@/lib/gstin";
 import { requireMutation } from "@/lib/guards-mutation";
 import { normalizePhone, phoneChangeError } from "@/lib/phone";
 import { escalationEmailDomainError, websiteDomainError } from "@/lib/company-domain";
@@ -30,7 +32,10 @@ const requiredText = (label: string) =>
 const bodySchema = z.object({
   companyName: required("companyName"),
   websiteUrl: required("websiteUrl"),
-  logoUrl: z.string().nullable().optional(),
+  // Only a logo our uploads produced: the legacy file route serves any name in
+  // logo_url to everyone, so a free string would publish any known file.
+  // Anything else is dropped (the stored logo stays), not a failed save.
+  logoUrl: z.string().regex(/^\/(api\/files\/public|uploads\/company-logos)\/[\w.-]+$/).nullable().optional().catch(undefined),
   companySize: required("companySize"),
   country: required("country"),
   state: required("state"),
@@ -84,6 +89,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       companyEmail: schema.employers.companyEmail,
       websiteUrl: schema.employers.websiteUrl,
       escalationContactEmail: schema.employers.escalationContactEmail,
+      gstNumber: schema.employers.gstNumber,
       countryCode: schema.employers.countryCode,
       phoneNumber: schema.employers.phoneNumber,
       escalationContactCountryCode: schema.employers.escalationContactCountryCode,
@@ -93,6 +99,12 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     .where(eq(schema.employers.id, id))
     .limit(1);
   if (!account) return NextResponse.json({ error: "Employer not found" }, { status: 404 });
+  // Checked when the GSTIN is entered or changed; one already on file is kept,
+  // so an older account can still save. Its state code picks CGST+SGST or IGST
+  // on the invoice, so a new one has to be a real GSTIN.
+  if (d.gstNumber && d.gstNumber !== (account.gstNumber ?? "").trim().toUpperCase() && !(GSTIN_FORMAT.test(d.gstNumber) && stateCodeFromGstin(d.gstNumber) !== null)) {
+    return NextResponse.json({ error: GSTIN_HINT }, { status: 400 });
+  }
   // Checked when the website is entered or changed; one already on file is
   // kept, so an older account with another domain can still save.
   const websiteUnchanged = (account.websiteUrl ?? "").trim() === d.websiteUrl.trim();

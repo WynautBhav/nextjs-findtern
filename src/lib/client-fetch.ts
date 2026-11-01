@@ -14,11 +14,9 @@ export async function csrfFetch(
   input: RequestInfo | URL,
   init: RequestInit = {},
 ): Promise<Response> {
-  const method = (init.method ?? "GET").toUpperCase();
-  const isMutation = !["GET", "HEAD", "OPTIONS"].includes(method);
-
-  if (!isMutation) return fetch(input, init);
-
+  // The token goes on every method, GET included: a few reads (the AI-interview
+  // poll, payment status) sit behind `requireMutation`, which checks it, and the
+  // header costs a same-origin GET nothing.
   const csrf = readCsrfCookie();
   const headers = new Headers(init.headers);
   if (csrf) headers.set("x-csrf-token", csrf);

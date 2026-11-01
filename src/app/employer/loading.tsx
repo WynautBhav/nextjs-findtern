@@ -1,26 +1,17 @@
 import { Skeleton } from "@/components/ui/skeleton";
 
 /**
- * Shown while any employer screen loads. Shaped like the common page: a
- * title and lede, a row of figures, then a list, so the frame doesn't jump
- * when the real page arrives. The shell (sidebar, top bar) stays put.
+ * Shown while any employer screen loads. Shaped like the dashboard, the most
+ * common landing: a hero band, then a list, so the frame doesn't jump when
+ * the real page arrives. The shell (sidebar, top bar) stays put.
  */
 export default function EmployerLoading() {
   return (
-    <div aria-busy="true" aria-live="polite">
+    <div aria-busy="true">
       <span className="sr-only">Loading</span>
-      <div className="mb-8 space-y-3">
+      <div className="mb-8 space-y-4 rounded-apple-xl border border-ink-200/80 bg-white px-6 py-8 sm:px-9 sm:py-10">
         <Skeleton className="h-9 w-64 max-w-full rounded-apple-sm" />
         <Skeleton className="h-5 w-[28rem] max-w-full rounded-apple-sm" />
-      </div>
-
-      <div className="mb-8 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="space-y-3 rounded-apple-lg border border-ink-200/80 bg-white p-5">
-            <Skeleton className="h-4 w-24 rounded-apple-sm" />
-            <Skeleton className="h-8 w-16 rounded-apple-sm" />
-          </div>
-        ))}
       </div>
 
       <div className="divide-y divide-ink-100 overflow-hidden rounded-apple-xl border border-ink-200/80 bg-white">

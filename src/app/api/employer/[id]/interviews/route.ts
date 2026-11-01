@@ -2,6 +2,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { withLock } from "@/lib/advisory-lock";
 import { getDb, schema } from "@/lib/db";
 import { emails } from "@/lib/emails";
 import { requireMutation } from "@/lib/guards-mutation";
@@ -78,34 +79,38 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   }
   // One open meeting per candidate per employer. A meeting whose slots have
   // all passed is stale and no longer holds the candidate (legacy R:11370).
-  const openRows = await db
-    .select()
-    .from(schema.interviews)
-    .where(
-      and(
-        eq(schema.interviews.employerId, id),
-        eq(schema.interviews.internId, b.internId),
-        inArray(schema.interviews.status, OPEN),
-      ),
-    );
-  const open = openRows.find((iv) => isBlockingInterview(iv));
-  if (open) {
+  // Checked and inserted under one lock, so two requests at once can't both
+  // book (a double click gave three pending interviews).
+  const interview = await withLock(`interview:${id}:${b.internId}`, async (tx) => {
+    const openRows = await tx
+      .select()
+      .from(schema.interviews)
+      .where(
+        and(
+          eq(schema.interviews.employerId, id),
+          eq(schema.interviews.internId, b.internId),
+          inArray(schema.interviews.status, OPEN),
+        ),
+      );
+    if (openRows.some((iv) => isBlockingInterview(iv))) return null;
+    const [created] = await tx
+      .insert(schema.interviews)
+      .values({
+        employerId: id,
+        internId: b.internId,
+        projectId: b.projectId,
+        slot1: slots[0],
+        slot2: slots[1],
+        slot3: slots[2],
+        timezone: b.timezone,
+        status: "pending",
+      })
+      .returning();
+    return created;
+  });
+  if (!interview) {
     return NextResponse.json({ error: "A meeting with this candidate is already open - finish it first." }, { status: 409 });
   }
-
-  const [interview] = await db
-    .insert(schema.interviews)
-    .values({
-      employerId: id,
-      internId: b.internId,
-      projectId: b.projectId,
-      slot1: slots[0],
-      slot2: slots[1],
-      slot3: slots[2],
-      timezone: b.timezone,
-      status: "pending",
-    })
-    .returning();
 
   await notify({
     to: { type: "intern", id: b.internId },

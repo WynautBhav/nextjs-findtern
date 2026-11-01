@@ -474,12 +474,14 @@ step("intern: picks a slot on /intern/interviews [UI]", ["interviewId"], async (
   const path = `/api/interviews/${state.interviewId}/select-slot`;
   await uiOr(
     t,
-    'slot picker "Choose this"',
+    'slot picker (select a time, then "Book ...")',
     async () => {
       await visit(page, "/intern/interviews");
       const body = await page.locator("body").innerText();
       assert.ok(!body.includes(EMPLOYER.companyName), "interviews page hides the company before hire");
-      const res = await clickFor(page, page.getByRole("button", { name: /pick this time/i }).first(), { path, method: "POST" });
+      // Two steps: select one of the offered times, then the Book button names it.
+      await page.getByRole("list", { name: "Offered times" }).getByRole("button").first().click();
+      const res = await clickFor(page, page.getByRole("button", { name: /^Book (?!this time)/ }), { path, method: "POST" });
       expectOk(`POST ${path}`, res);
     },
     async () => expectOk(`POST ${path}`, await api(page, "POST", path, { slot: 1 })),

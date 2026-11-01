@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
 import { AlertCircle } from "lucide-react";
 
@@ -8,7 +9,8 @@ import { DoorSwitch } from "@/components/auth/door-switch";
 import { GoogleButton } from "@/components/auth/login-form";
 import { SignupForm } from "@/components/auth/signup-form";
 import { EmployerSignupForm } from "@/components/employer/employer-signup-form";
-import { authPath, DOOR_POINTS, doorOf } from "@/lib/auth-doors";
+import { getSession } from "@/lib/auth";
+import { authPath, DOOR_POINTS, doorOf, ownNext } from "@/lib/auth-doors";
 import { googleLoginEnabled, oauthErrorMessage, safeNext } from "@/lib/google";
 
 export const metadata: Metadata = {
@@ -30,7 +32,9 @@ export default async function SignupPage({
   const oauthError = oauthErrorMessage(one(params.oauthError));
   // Carried through from sign in (INT-07), so a new account still lands on
   // the page that sent them.
-  const next = safeNext(one(params.next), "");
+  const next = ownNext(safeNext(one(params.next), ""), door);
+  // Already signed in as this type: a second account is not what they came for.
+  if ((await getSession())?.role === door) redirect(next || (isEmployer ? "/employer/dashboard" : "/intern/dashboard"));
   // Back from Google with a verified address and no account yet. The values
   // only prefill the form; the signup API checks the verification itself.
   const fromGoogle = one(params.google) === "1" && one(params.email);

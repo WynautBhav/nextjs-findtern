@@ -125,6 +125,16 @@ export const TIMEZONES: TimezoneOption[] = [
   }
 }
 
+/** Whether `tz` is an IANA zone this runtime knows ("Asia/Kolkata"); a made-up name throws in Intl. */
+export function isKnownTimezone(tz: string): boolean {
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: tz });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * "2026-11-03T15:30" read as wall-clock time in `tz` → the UTC instant.
  * Uses Intl to find the zone's offset at that moment (DST-aware), then

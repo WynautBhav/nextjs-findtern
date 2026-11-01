@@ -281,7 +281,7 @@ export function EmployerOnboardingForm({
                   </span>
                   <span className="min-w-0">
                     <span className="block text-xs font-medium text-ink-600">Step {i + 1} of 2</span>
-                    <span className={cn("block truncate text-sm font-semibold", state === "current" ? "text-ink-900" : "text-ink-700")}>
+                    <span className={cn("block break-words text-sm font-semibold", state === "current" ? "text-ink-900" : "text-ink-700")}>
                       {item.title}
                     </span>
                   </span>
@@ -313,8 +313,15 @@ export function EmployerOnboardingForm({
           )}
         </div>
 
-        {notice ? (
-          <FormNotice tone={notice.tone} className="mt-8">
+        <div role="status">
+          {notice?.tone === "success" ? (
+            <FormNotice tone="success" className="mt-8">
+              {notice.text}
+            </FormNotice>
+          ) : null}
+        </div>
+        {notice?.tone === "error" ? (
+          <FormNotice tone="error" className="mt-8">
             {notice.text}
           </FormNotice>
         ) : null}

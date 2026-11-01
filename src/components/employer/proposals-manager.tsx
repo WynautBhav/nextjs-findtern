@@ -16,6 +16,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { parseOffer } from "@/lib/offer";
 import { offerState } from "@/components/employer/proposal-state";
 import { cn } from "@/lib/utils";
+import { fieldClass } from "@/components/employer/ui-tokens";
 
 export type ProposalItem = {
   proposal: Proposal;
@@ -41,7 +42,8 @@ const FILTERS: { value: string; label: string; match: (status: string, lapsed: b
 ];
 
 /** Offer · pay · starts · status · actions; one row per offer at desktop. */
-const ROW_GRID = "grid-cols-[minmax(0,1fr)_auto] lg:grid-cols-[minmax(0,1fr)_11rem_6.5rem_12.5rem_9.5rem]";
+// Fixed columns need ~48rem; at lg the sidebar leaves less, so the table layout starts at xl.
+const ROW_GRID = "grid-cols-[minmax(0,1fr)_auto] xl:grid-cols-[minmax(0,1fr)_11rem_6.5rem_12.5rem_9.5rem]";
 
 function formatStart(iso: string | null): string | null {
   if (!iso || !/^\d{4}-\d{2}-\d{2}/.test(iso)) return null;
@@ -129,14 +131,13 @@ export function ProposalsManager({ initialProposals }: { initialProposals: Propo
     );
   }
 
-  const field =
-    "apple-spring min-h-11 rounded-apple-sm border border-ink-200 bg-white px-3 text-sm text-ink-900 outline-none placeholder:text-text-subtle focus-visible:border-brand-500 focus-visible:ring-2 focus-visible:ring-brand-500/20";
+  const field = cn(fieldClass, "w-auto");
 
   return (
     <div className="space-y-6">
       {/* One toolbar row: status (with counts, in place of four tiles that
           repeated them), then search and project. */}
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+      <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
         <FilterTabs
           label="Show proposals"
           value={statusFilter}
@@ -151,7 +152,7 @@ export function ProposalsManager({ initialProposals }: { initialProposals: Propo
             { key: "closed", label: "Closed", count: counts.closed },
           ]}
         />
-        <div className="flex flex-col gap-2 sm:flex-row lg:shrink-0">
+        <div className="flex flex-col gap-2 sm:flex-row xl:shrink-0">
           <label className="relative min-w-0 sm:w-64">
             <span className="sr-only">Search proposals</span>
             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-400" aria-hidden />
@@ -192,7 +193,7 @@ export function ProposalsManager({ initialProposals }: { initialProposals: Propo
         <Surface className="overflow-hidden">
           {/* Column labels for sighted scanning; every row also says what each
               figure is, so the list reads on its own to a screen reader. */}
-          <div aria-hidden className={cn(ROW_GRID, "hidden gap-x-6 border-b border-ink-100 px-5 py-2.5 text-xs font-medium text-text-subtle lg:grid")}>
+          <div aria-hidden className={cn(ROW_GRID, "hidden gap-x-6 border-b border-ink-100 px-5 py-2.5 text-xs font-medium text-text-subtle xl:grid")}>
             <span>Offer</span>
             <span className="text-right">Pay</span>
             <span>Starts</span>
@@ -239,26 +240,27 @@ export function ProposalsManager({ initialProposals }: { initialProposals: Propo
                     </p>
                   </div>
                 </div>
-                <p className="nums text-sm font-semibold text-ink-900 max-lg:col-span-2 max-lg:row-start-2 max-lg:pl-12 lg:text-right">
+                <p className="nums text-sm font-semibold text-ink-900 max-xl:col-span-2 max-xl:row-start-2 max-xl:pl-12 xl:text-right">
                   {money ?? <span className="font-normal text-text-subtle">Not set</span>}
                   {!ft ? <span className="font-normal text-ink-600"> · {offer.months} mo</span> : null}
-                  {start ? <span className="font-normal text-ink-600 lg:hidden"> · {ft ? "joins" : "starts"} {start}</span> : null}
+                  {start ? <span className="font-normal text-ink-600 xl:hidden"> · {ft ? "joins" : "starts"} {start}</span> : null}
                 </p>
-                <p className="nums text-sm text-ink-700 max-lg:hidden">
+                <p className="nums text-sm text-ink-700 max-xl:hidden">
                   {start ? (
                     <>
-                      <span className="lg:sr-only">{ft ? "Joins " : "Starts "}</span>
+                      <span className="xl:sr-only">{ft ? "Joins " : "Starts "}</span>
                       {start}
                     </>
                   ) : (
                     <span className="text-text-subtle">Not set</span>
                   )}
                 </p>
-                <div className="max-lg:col-span-2 max-lg:row-start-3 max-lg:pl-12">
+                <div className="max-xl:col-span-2 max-xl:row-start-3 max-xl:pl-12">
                   <Pill tone={state.tone} className="whitespace-nowrap">{state.label}</Pill>
                 </div>
                 {/* Above the stretched link, so these stay clickable. */}
-                <div className="relative z-10 flex items-center justify-end gap-1 max-lg:col-start-2 max-lg:row-start-1">
+                {/* Below sm the actions take their own row: beside the title they squeezed it to one letter a line at 320. */}
+                <div className="relative z-10 flex items-center justify-end gap-1 max-xl:col-start-2 max-xl:row-start-1 max-sm:col-span-2 max-sm:col-start-1 max-sm:row-start-4 max-sm:justify-start max-sm:pl-12">
                   {/* One visible action, chosen by the state; the row itself
                       opens the offer, and the menu holds only the rest (QA-120). */}
                   {state.canPay ? (
@@ -286,7 +288,7 @@ export function ProposalsManager({ initialProposals }: { initialProposals: Propo
                     />
                   ) : (
                     // Keeps the visible actions in one column when a row has no menu.
-                    <span aria-hidden className="size-10 shrink-0" />
+                    <span aria-hidden className="size-10 shrink-0 max-sm:hidden" />
                   )}
                 </div>
               </li>

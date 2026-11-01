@@ -16,13 +16,13 @@ import { cn } from "@/lib/utils";
 const buttonVariants = cva(
   [
     "relative inline-flex items-center justify-center gap-2 whitespace-nowrap",
-    "font-medium leading-none transition-[background-color,color,box-shadow,transform,border-color] duration-200",
-    "ease-ease-out-expo select-none",
+    "font-medium leading-none",
+    "ease-out-expo select-none",
     "disabled:pointer-events-none disabled:opacity-55",
     // Press feedback: scale, not a 1px translate. A single pixel is below
     // the threshold where a press registers at all.
     "active:scale-[0.97]",
-    "transition-[background-color,color,box-shadow,transform,border-color] duration-150",
+    "transition-[background-color,color,box-shadow,transform,scale,border-color,opacity] duration-150",
     "[&_svg]:pointer-events-none [&_svg]:shrink-0",
   ],
   {

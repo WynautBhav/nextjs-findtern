@@ -30,7 +30,7 @@ const LABEL = "block text-sm font-medium text-ink-800";
  * one is in the Tab order.
  */
 export function onRadioKeys(e: React.KeyboardEvent<HTMLElement>) {
-  const radios = Array.from(e.currentTarget.querySelectorAll<HTMLElement>('[role="radio"]'));
+  const radios = Array.from(e.currentTarget.querySelectorAll<HTMLElement>('[role="radio"]:not(:disabled)'));
   const at = radios.indexOf(document.activeElement as HTMLElement);
   if (at < 0) return;
   const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key];

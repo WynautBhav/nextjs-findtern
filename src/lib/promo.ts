@@ -103,6 +103,13 @@ export async function recordPromoUse(input: {
 
 export const DUPLICATE_CODE = "A promo code with this name already exists. Pick a different code.";
 
+/** Which field a signup unique_violation is about, from the index name Postgres reports. */
+export function uniqueMessage(e: unknown): string {
+  const c = (x: unknown) => (x && typeof x === "object" && "constraint" in x ? String((x as { constraint: unknown }).constraint) : "");
+  const constraint = c(e) || c((e as { cause?: unknown } | null)?.cause);
+  return constraint.includes("phone") ? "Phone number already in use" : "Email already registered";
+}
+
 /** Postgres unique_violation, whether thrown directly or wrapped by Drizzle. */
 export function isUniqueViolation(e: unknown): boolean {
   const code = (x: unknown) => (x && typeof x === "object" && "code" in x ? (x as { code: unknown }).code : undefined);

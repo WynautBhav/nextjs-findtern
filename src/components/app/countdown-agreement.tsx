@@ -146,7 +146,7 @@ function AgreementBody({
           onClick={() => void onConfirm()}
           className={buttonClass({ variant: "primary", size: "md", className: "text-sm font-semibold" })}
         >
-          {busy ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
+          {busy ? <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden /> : null}
           {left > 0 ? `${confirmLabel} (${left}s)` : confirmLabel}
         </button>
       </DialogFooter>

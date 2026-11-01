@@ -256,7 +256,7 @@ export default async function EmployerDashboard() {
                     <li key={p.id}>
                       <Link
                         href={`/employer/candidates?project=${encodeURIComponent(p.id)}`}
-                        className="group grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4 px-5 py-4 transition-colors hover:bg-ink-50/70 focus-visible:bg-ink-50 focus-visible:outline-none"
+                        className="group grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4 px-5 py-4 transition-colors hover:bg-ink-50/70 focus-visible:bg-ink-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-500"
                       >
                         <div className="min-w-0">
                           <p className="flex flex-wrap items-center gap-2">
@@ -324,7 +324,7 @@ export default async function EmployerDashboard() {
                     <li key={c.id}>
                       <Link
                         href={`/employer/intern/${encodeURIComponent(c.id)}`}
-                        className="group grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 px-4 py-3.5 transition-colors hover:bg-ink-50/70 focus-visible:bg-ink-50 focus-visible:outline-none"
+                        className="group grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 px-4 py-3.5 transition-colors hover:bg-ink-50/70 focus-visible:bg-ink-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-500"
                       >
                         <span aria-hidden className="grid size-10 place-items-center rounded-full bg-brand-50 text-sm font-semibold text-brand-800">
                           {c.initials}

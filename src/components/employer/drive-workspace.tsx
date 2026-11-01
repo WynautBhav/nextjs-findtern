@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Check, ChevronDown, Loader2, Phone, Plus, Search, Video, X } from "lucide-react";
 
 import { Pill, Surface, type Tone } from "@/components/app/primitives";
 import { ScoreBar } from "@/components/app/score-bar";
+import { useConfirm } from "@/components/app/use-confirm";
 import { CandidateAvatar } from "@/components/employer/candidate-avatar";
 import { buttonVariants } from "@/components/ui/button";
 import {
@@ -17,6 +18,7 @@ import {
 import { csrfFetch } from "@/lib/client-fetch";
 import type { MeetingView } from "@/lib/college/meetings";
 import { cn } from "@/lib/utils";
+import { fieldClass } from "@/components/employer/ui-tokens";
 
 export type DriveCandidate = {
   id: string;
@@ -35,6 +37,8 @@ export type DriveCandidate = {
 };
 
 const POLL_MS = 10_000;
+const SKILLS_SHOWN = 8;
+const SKILL_CHIP = "rounded-full bg-ink-100 px-2.5 py-1 text-xs font-medium text-ink-700";
 
 const CALL_STATUS: Record<string, { tone: Tone; label: string }> = {
   requested: { tone: "waiting", label: "Waiting for reply" },
@@ -71,6 +75,7 @@ export function DriveWorkspace({
 }) {
   const [q, setQ] = useState("");
   const [minScore, setMinScore] = useState(0);
+  const { ask, dialog: confirmDialog } = useConfirm();
   const [year, setYear] = useState<number | 0>(0);
   const [branch, setBranch] = useState("");
   const [onlyShortlisted, setOnlyShortlisted] = useState(false);
@@ -79,6 +84,7 @@ export function DriveWorkspace({
   const [meetings, setMeetings] = useState<MeetingView[]>(initialMeetings);
   const [notice, setNotice] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
   const [locked, setLocked] = useState(false);
+  const callsHeadingRef = useRef<HTMLHeadingElement>(null);
 
   const years = useMemo(() => [...new Set(candidates.map((c) => c.year).filter((y): y is number => y !== null))].sort(), [candidates]);
   const branches = useMemo(
@@ -209,6 +215,14 @@ export function DriveWorkspace({
   }
 
   async function cancelCall(meetingId: string) {
+    const name = nameOf.get(meetings.find((m) => m.id === meetingId)?.userId ?? "") ?? "this student";
+    const ok = await ask({
+      title: `Cancel the call with ${name}?`,
+      body: "They are told the call is off. To talk later, send a new call request.",
+      confirmLabel: "Yes, cancel the call",
+      cancelLabel: "Keep the call",
+    });
+    if (!ok) return;
     setNotice(null);
     const res = await csrfFetch(`/api/employer/drives/${driveId}/meetings?meeting=${encodeURIComponent(meetingId)}`, {
       method: "DELETE",
@@ -221,6 +235,8 @@ export function DriveWorkspace({
     }
     setMeetings((prev) => prev.map((m) => (m.id === meetingId ? data.meeting! : m)));
     setNotice({ tone: "ok", text: "Call cancelled. The student no longer sees the request." });
+    // The Cancel button is gone now; keep focus in the panel instead of dropping to <body>.
+    callsHeadingRef.current?.focus();
   }
 
   if (locked) {
@@ -249,7 +265,7 @@ export function DriveWorkspace({
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
                 placeholder="Skill or branch, e.g. React"
-                className="h-11 w-full rounded-lg border border-ink-200 bg-white pl-9 pr-3 text-sm text-ink-900 placeholder:text-text-subtle focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                className={cn(fieldClass, "pl-9")}
               />
             </label>
             <Select label="Minimum score" value={String(minScore)} onChange={(v) => setMinScore(Number(v))}>
@@ -318,17 +334,15 @@ export function DriveWorkspace({
           </div>
         </Surface>
 
-        {notice ? (
-          <p
-            role={notice.tone === "error" ? "alert" : "status"}
-            className={cn(
-              "mt-4 rounded-lg border px-4 py-3 text-sm",
-              notice.tone === "error" ? "border-danger/25 bg-danger-soft text-danger" : "border-brand-200 bg-brand-50 text-brand-800",
-            )}
-          >
+        {notice?.tone === "error" ? (
+          <p role="alert" className="mt-4 rounded-lg border border-danger/25 bg-danger-soft px-4 py-3 text-sm text-danger">
             {notice.text}
           </p>
         ) : null}
+        {/* Always mounted, so a success is announced when it fills in. */}
+        <p role="status" className={notice?.tone === "ok" ? "mt-4 rounded-lg border border-brand-200 bg-brand-50 px-4 py-3 text-sm text-brand-800" : "sr-only"}>
+          {notice?.tone === "ok" ? notice.text : null}
+        </p>
 
         {candidates.length === 0 ? (
           <Surface className="mt-4 p-8 text-center">
@@ -343,7 +357,8 @@ export function DriveWorkspace({
             <p className="mt-1 text-sm text-ink-600">Loosen a filter or clear them to see everyone in the drive.</p>
           </Surface>
         ) : (
-          <ul className="mt-4 grid gap-3 md:grid-cols-2">
+          // One column beside the 20rem aside at xl: two left ~86px for the name next to Shortlist.
+          <ul className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
             {visible.map((c) => (
               <CandidateRow
                 key={c.id}
@@ -359,7 +374,8 @@ export function DriveWorkspace({
         )}
       </div>
 
-      <CallsPanel meetings={meetings} nameOf={nameOf} onCancel={cancelCall} />
+      <CallsPanel meetings={meetings} nameOf={nameOf} onCancel={cancelCall} headingRef={callsHeadingRef} />
+      {confirmDialog}
     </div>
   );
 }
@@ -381,7 +397,7 @@ function Select({
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="h-11 w-full appearance-none rounded-lg border border-ink-200 bg-white pl-3 pr-9 text-sm text-ink-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+        className={cn(fieldClass, "appearance-none pr-9")}
       >
         {children}
       </select>
@@ -421,8 +437,8 @@ function CandidateRow({
       <div className="flex items-start gap-3">
         <CandidateAvatar initials={c.initials} className="size-11 rounded-xl text-sm" />
         <div className="min-w-0 flex-1">
-          <p className="flex min-w-0 items-center gap-2">
-            <span className="truncate font-semibold text-ink-900">{c.name}</span>
+          <p className="flex min-w-0 flex-wrap items-center gap-x-2">
+            <span className="min-w-0 break-words font-semibold text-ink-900">{c.name}</span>
             {c.online ? (
               <span className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-brand-800">
                 <span className="size-1.5 rounded-full bg-brand-600" aria-hidden />
@@ -430,20 +446,20 @@ function CandidateRow({
               </span>
             ) : null}
           </p>
-          <p className="truncate text-sm text-ink-600">{meta || "Year and branch not given"}</p>
+          <p className="break-words text-sm text-ink-600">{meta || "Year and branch not given"}</p>
         </div>
         <button
           type="button"
           onClick={onShortlist}
           aria-pressed={shortlisted}
-          aria-label={shortlisted ? `Remove ${c.name} from shortlist` : `Shortlist ${c.name}`}
+          aria-label={`Shortlist ${c.name}`}
           className={cn(
             "apple-spring inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-lg border px-3 text-sm font-medium",
             shortlisted ? "border-brand-200 bg-brand-50 text-brand-800" : "border-ink-200 bg-white text-ink-700 hover:bg-ink-50",
           )}
         >
           {shortlisted ? <Check className="size-4" aria-hidden /> : <Plus className="size-4" aria-hidden />}
-          {shortlisted ? "Shortlisted" : "Shortlist"}
+          Shortlist
         </button>
       </div>
 
@@ -465,12 +481,26 @@ function CandidateRow({
 
       {c.skills.length ? (
         <ul className="mt-4 flex flex-wrap gap-1.5" aria-label="Skills">
-          {c.skills.slice(0, 5).map((s) => (
-            <li key={s} className="rounded-md bg-ink-100 px-2 py-1 text-xs font-medium text-ink-700">
+          {c.skills.slice(0, SKILLS_SHOWN).map((s) => (
+            <li key={s} className={SKILL_CHIP}>
               {s}
             </li>
           ))}
         </ul>
+      ) : null}
+      {c.skills.length > SKILLS_SHOWN ? (
+        <details className="mt-1.5">
+          <summary className="inline-flex min-h-11 cursor-pointer items-center text-xs font-medium text-brand-700">
+            +{c.skills.length - SKILLS_SHOWN} more
+          </summary>
+          <ul className="flex flex-wrap gap-1.5" aria-label="More skills">
+            {c.skills.slice(SKILLS_SHOWN).map((s) => (
+              <li key={s} className={SKILL_CHIP}>
+                {s}
+              </li>
+            ))}
+          </ul>
+        </details>
       ) : null}
 
       <div className="mt-auto flex flex-wrap items-center justify-between gap-2 pt-4">
@@ -487,7 +517,8 @@ function CandidateRow({
             href={call.meetingLink}
             target="_blank"
             rel="noopener noreferrer"
-            className={buttonVariants({ size: "sm" })}
+            // Arrives by poll when the candidate accepts; fade in so it is noticed, not teleported.
+            className={cn(buttonVariants({ size: "sm" }), "starting:scale-[0.97] starting:opacity-0")}
           >
             <Video className="size-4" aria-hidden />
             Join call
@@ -531,25 +562,31 @@ function CallsPanel({
   meetings,
   nameOf,
   onCancel,
+  headingRef,
 }: {
   meetings: MeetingView[];
   nameOf: Map<string, string>;
   onCancel: (id: string) => Promise<void>;
+  headingRef: React.Ref<HTMLHeadingElement>;
 }) {
   return (
     <Surface as="section" aria-labelledby="calls-title" className="xl:sticky xl:top-24">
       <div className="border-b border-ink-100 px-4 py-3.5">
-        <h2 id="calls-title" className="text-base font-semibold text-ink-900">
+        <h2 id="calls-title" ref={headingRef} tabIndex={-1} className="text-base font-semibold text-ink-900">
           Your calls
         </h2>
         <p className="mt-0.5 text-xs text-ink-600">Updates every few seconds. A request lapses 10 minutes after its start time.</p>
+        {/* Always mounted; announces only when the number of calls changes, not on every poll. */}
+        <p role="status" className="sr-only">
+          {meetings.length} {meetings.length === 1 ? "call" : "calls"}
+        </p>
       </div>
       {meetings.length === 0 ? (
         <p className="px-4 py-6 text-sm text-ink-600">
           No calls yet. Use <span className="font-medium text-ink-800">Call</span> on a student to ask for a quick video chat.
         </p>
       ) : (
-        <ul className="max-h-[28rem] divide-y divide-ink-100 overflow-y-auto" aria-live="polite">
+        <ul className="max-h-[28rem] divide-y divide-ink-100 overflow-y-auto">
           {meetings.map((m) => {
             const s = CALL_STATUS[m.status] ?? { tone: "neutral" as Tone, label: "Call" };
             return (
@@ -562,6 +599,7 @@ function CallsPanel({
                   <button
                     type="button"
                     onClick={() => onCancel(m.id)}
+                    aria-label={`Cancel call with ${nameOf.get(m.userId) ?? "student"}`}
                     className="inline-flex min-h-11 items-center rounded-lg px-2 text-sm font-medium text-ink-600 hover:bg-ink-100 hover:text-ink-900"
                   >
                     Cancel

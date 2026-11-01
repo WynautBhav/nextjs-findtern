@@ -21,6 +21,7 @@ import { MAX_COMPARE, isOpenProject, parseIds, rememberedSelection } from "@/lib
 import { ButtonLink, buttonClass } from "@/components/ui/button";
 import { EmptyScene, PageHead, Pill } from "@/components/app/primitives";
 import { cn } from "@/lib/utils";
+import { fieldClass } from "@/components/employer/ui-tokens";
 
 export const metadata: Metadata = {
   title: "Compare candidates",
@@ -231,7 +232,7 @@ export default async function CompareCandidates({ searchParams }: { searchParams
                 <select
                   name="project"
                   defaultValue={activeProject?.id ?? ""}
-                  className="apple-spring mt-1.5 block min-h-11 w-full rounded-apple-sm border border-ink-200 bg-white px-3 text-sm text-ink-900 shadow-xs outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 sm:w-64"
+                  className={cn(fieldClass, "mt-1.5 block sm:w-64")}
                 >
                   {projects.map((p) => (
                     <option key={p.id} value={p.id}>
@@ -257,7 +258,12 @@ export default async function CompareCandidates({ searchParams }: { searchParams
       />
 
       {/* Scrolls inside itself so the header row and the label column can both stick. */}
-      <div className="max-h-[calc(100dvh-8rem)] overflow-auto rounded-apple-xl border border-ink-200/80 bg-white shadow-xs">
+      <div
+        tabIndex={0}
+        role="region"
+        aria-label="Candidate comparison"
+        className="max-h-[calc(100dvh-8rem)] overflow-auto rounded-apple-xl border border-ink-200/80 bg-white shadow-xs focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
+      >
         <table className="w-full border-separate border-spacing-0 text-left text-sm">
           <caption className="sr-only">Candidates compared side by side; the leader of each row is marked.</caption>
           <thead>

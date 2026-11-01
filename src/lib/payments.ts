@@ -358,9 +358,8 @@ export async function markInternPaidFlag(internId: string, ref: { orderId?: stri
     .where(eq(schema.internOnboarding.id, row.id));
 }
 
-/** Paid if either app says so. */
-export async function isInternPaid(internId: string): Promise<boolean> {
-  const db = getDb();
+/** Paid if either app says so. Pass a transaction to read inside it. */
+export async function isInternPaid(internId: string, db: ReturnType<typeof getDb> | Parameters<Parameters<ReturnType<typeof getDb>["transaction"]>[0]>[0] = getDb()): Promise<boolean> {
   const [paid] = await db
     .select({ id: schema.internPayments.id })
     .from(schema.internPayments)

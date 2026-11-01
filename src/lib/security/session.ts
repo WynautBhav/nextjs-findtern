@@ -326,6 +326,28 @@ export function csrfToken(): { cookie: string; header: string } {
   };
 }
 
+/**
+ * CSRF verdict for a cookie-authenticated POST that must keep working after the
+ * 12h `ft_csrf` cookie has expired (the session lives 30d): a same-origin request
+ * per Sec-Fetch-Site or Origin, neither of which page script can forge, else the token.
+ */
+export function sameOriginOrCsrf(headers: Headers, requestUrl?: string): boolean {
+  const site = headers.get("sec-fetch-site");
+  if (site === "same-origin" || site === "none") return true;
+  const origin = headers.get("origin");
+  if (origin) {
+    try {
+      const o = new URL(origin);
+      // Scheme too, so a plain-http Origin can't pass for an https site.
+      const proto = headers.get("x-forwarded-proto") ?? (requestUrl ? new URL(requestUrl).protocol.replace(":", "") : "https");
+      if (o.host === headers.get("host") && o.protocol === `${proto}:`) return true;
+    } catch {
+      // malformed Origin (including "null"): fall through to the token
+    }
+  }
+  return checkCsrf(headers.get("x-csrf-token"), headers.get("cookie"));
+}
+
 export function checkCsrf(header: string | null, cookieHeader: string | null): boolean {
   const fromHeader = header;
   const fromCookie = readCookie(cookieHeader, "ft_csrf");

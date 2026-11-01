@@ -5,7 +5,7 @@ import { useCallback, useRef, useState } from "react";
 import { buttonClass } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
-type Ask = { title: string; body: string; confirmLabel: string; destructive?: boolean };
+type Ask = { title: string; body: string; confirmLabel: string; cancelLabel?: string; destructive?: boolean };
 
 /**
  * An in-page confirm for destructive actions (admin, intern, employer), in place of
@@ -43,7 +43,7 @@ export function useConfirm() {
           {/* Cancel takes the focus: Enter on a focused delete is the one
               keyboard slip that can't be undone. */}
           <button type="button" autoFocus onClick={() => settle(false)} className={buttonClass({ variant: "outline", size: "sm" })}>
-            Cancel
+            {current?.cancelLabel ?? "Cancel"}
           </button>
           <button
             type="button"

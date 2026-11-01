@@ -70,6 +70,40 @@ test("EMH-11: placement ledger, monthly plan one of three months paid", async ()
   assert.equal(upfront.nextDue, null);
 });
 
+test("E-B06: a promo code lowers a hire's total and paid by what was taken off, so paid is what was charged", async () => {
+  const { placementLedger } = await import("./dues.ts");
+  const offerDetails = buildOffer({
+    currency: "INR",
+    roleTitle: "Backend intern",
+    mode: "remote",
+    startDate: "2026-11-02",
+    duration: "3m",
+    monthlyHours: 160,
+    hourlyRateMinor: 10_000,
+    perHireMinor: PER_HIRE_MINOR.INR,
+  });
+  const hire = { id: "p1", status: "hired", offerDetails, currency: "INR" };
+  const notes = { proposalIds: ["p1"], paymentMode: "total" };
+  const none = placementLedger(hire, [{ status: "paid", raw: { notes } }]);
+  const off = placementLedger(hire, [{ status: "paid", raw: { notes, promo: { promoCode: "SAVE", discountMinor: 100_000 } } }]);
+  assert.equal(off.totalMinor, none.totalMinor - 100_000);
+  assert.equal(off.paidMinor, none.paidMinor - 100_000);
+  assert.equal(off.dueMinor, 0);
+  assert.equal(off.status, "fully_paid");
+  // Month one of a monthly plan: the code comes off both, and the months still owed are unchanged.
+  const monthlyNotes = { proposalIds: ["p1"], paymentMode: "monthly" };
+  const m0 = placementLedger(hire, [{ status: "paid", raw: { notes: monthlyNotes } }]);
+  const m1 = placementLedger(hire, [{ status: "paid", raw: { notes: monthlyNotes, promo: { promoCode: "SAVE", discountMinor: 100_000 } } }]);
+  assert.equal(m1.paidMinor, m0.paidMinor - 100_000);
+  assert.equal(m1.dueMinor, m0.dueMinor);
+  // An old order covering several hires can't be split: the offer's figures stand.
+  const multi = placementLedger(hire, [{ status: "paid", raw: { notes: { proposalIds: ["p1", "p2"], paymentMode: "total" }, promo: { promoCode: "SAVE", discountMinor: 100_000 } } }]);
+  assert.equal(multi.totalMinor, none.totalMinor);
+  // A failed order's code counts for nothing.
+  const failed = placementLedger(hire, [{ status: "failed", raw: { notes, promo: { promoCode: "SAVE", discountMinor: 100_000 } } }]);
+  assert.equal(failed.totalMinor, none.totalMinor);
+});
+
 test("EMH-39: the full-time fee is 8.33% of CTC in whole rupees, as legacy rounds it", () => {
   // ₹7,77,777 × 8.33% = ₹64,788.82 → ₹64,789
   assert.equal(fullTimeFeeMinor(77_777_700), 6_478_900);

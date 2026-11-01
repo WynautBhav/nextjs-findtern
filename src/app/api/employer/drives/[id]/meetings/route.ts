@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull } from "drizzle-orm";
 import { z } from "zod";
 
 import { getSession } from "@/lib/auth";
@@ -22,7 +22,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
   const rows = await getDb()
     .select()
     .from(schema.collegeDriveMeetings)
-    .where(and(eq(schema.collegeDriveMeetings.driveId, loaded.drive.id), eq(schema.collegeDriveMeetings.employerId, session!.uid)))
+    .where(and(eq(schema.collegeDriveMeetings.driveId, loaded.drive.id), eq(schema.collegeDriveMeetings.employerId, session!.uid), isNotNull(schema.collegeDriveMeetings.meetingLink)))
     .orderBy(desc(schema.collegeDriveMeetings.createdAt));
   return NextResponse.json({ meetings: rows.map(toView) }, { headers: { "Cache-Control": "no-store" } });
 }

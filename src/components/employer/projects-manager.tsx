@@ -116,6 +116,9 @@ export function ProjectsManager({
     setErrors(problems);
     if (Object.keys(problems).length > 0) {
       setSaveError("Some details need a look - see the highlighted fields.");
+      // The first marked field takes focus once the errors have rendered.
+      const formEl = e.currentTarget;
+      window.requestAnimationFrame(() => formEl.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus());
       return;
     }
     setSaving(true);

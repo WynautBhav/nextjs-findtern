@@ -45,7 +45,7 @@ export function CompareToggle({
 
   if (disabledReason) {
     return (
-      <span className={buttonClass({ variant: "light", size: "md", className: "pointer-events-none opacity-70" })} aria-disabled="true" title={disabledReason}>
+      <span className={buttonClass({ variant: "light", size: "md", className: "pointer-events-none opacity-70" })} title={disabledReason}>
         <Scale className="size-4" aria-hidden />
         {disabledReason}
       </span>

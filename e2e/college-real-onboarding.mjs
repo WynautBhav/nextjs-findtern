@@ -341,12 +341,12 @@ await check("Employer sees exactly the drive's students, masked, and the score f
   return `${showing.trim()} (JKLU members with drive consent who pass rules or were added: our 5 included); 8+ filter → ${eight.trim()}`;
 });
 
-const card = (initials) => emp.locator("main ul > li").filter({ has: emp.locator(`span.truncate:text-is("${initials}")`) });
+const card = (initials) => emp.locator("main ul > li").filter({ has: emp.locator(`span.break-words:text-is("${initials}")`) });
 await check("Employer shortlists Aanya and Kunal", async () => {
   for (const i of ["AM", "KR"]) {
     const saved = emp.waitForResponse((r) => r.url().endsWith("/shortlist") && r.request().method() === "POST");
     await card(i).getByRole("button", { name: /^Shortlist / }).click();
-    await card(i).getByRole("button", { name: /from shortlist$/ }).waitFor();
+    await card(i).getByRole("button", { name: /^Shortlist /, pressed: true }).waitFor();
     assert((await saved).status() === 200, "shortlist not saved");
   }
   return psql(`select count(*) from college_drive_shortlist where drive_id='${driveId}'`) + " shortlist rows";

@@ -4,6 +4,7 @@ import { after, NextResponse } from "next/server";
 import { isHiredProposal } from "@/lib/hire-status";
 import { z } from "zod";
 
+import { withLock } from "@/lib/advisory-lock";
 import { getDb, schema } from "@/lib/db";
 import { scoreOf, toCandidateProfile } from "@/lib/employer-candidates";
 import { resolvePricing } from "@/lib/employer-pricing";
@@ -11,7 +12,10 @@ import { requireMutation } from "@/lib/guards-mutation";
 import { emails } from "@/lib/emails";
 import { employerNames, notify } from "@/lib/notify";
 import {
+  addDays,
   buildOffer,
+  isClockTime,
+  isRealDay,
   normalizeLaptop,
   offerPastStart,
   parseOffer,
@@ -25,6 +29,7 @@ import {
 import { employerRegion } from "@/lib/employer-pricing";
 import { canEmployerSeeIntern } from "@/lib/employer-pool";
 import { isProjectOpen } from "@/lib/project-locations";
+import { isKnownTimezone } from "@/lib/timezones";
 import { isBlockingInterview } from "@/lib/employer-interview-rules";
 import { modeProblem, workPreferenceOf } from "@/lib/work-preference";
 
@@ -65,6 +70,25 @@ const bodySchema = z
   skills: z.array(z.string()).max(30).default([]),
 })
   .superRefine((b, ctx) => {
+    // The route also needs the start to be after today; these keep junk out of the stored offer.
+    if (!isRealDay(b.startDate)) {
+      ctx.addIssue({ code: "custom", message: "Pick a real start date.", path: ["startDate"] });
+    } else if (b.startDate > addDays(todayIst(), 365)) {
+      ctx.addIssue({ code: "custom", message: "Pick a start date within the next year.", path: ["startDate"] });
+    }
+    // Flexible hours send "flexible" for both; otherwise both are clock times and differ.
+    const flexible = b.shiftFrom === "flexible" && b.shiftTo === "flexible";
+    if (!flexible && (!isClockTime(b.shiftFrom) || !isClockTime(b.shiftTo))) {
+      ctx.addIssue({ code: "custom", message: "Pick the working hours.", path: ["shiftFrom"] });
+    } else if (!flexible && b.shiftFrom === b.shiftTo) {
+      ctx.addIssue({ code: "custom", message: "The shift can't start and end at the same time.", path: ["shiftTo"] });
+    }
+    if (!isKnownTimezone(b.timezone)) {
+      ctx.addIssue({ code: "custom", message: "Pick a timezone from the list.", path: ["timezone"] });
+    }
+    if (!["company", "candidate"].includes(normalizeLaptop(b.laptop))) {
+      ctx.addIssue({ code: "custom", message: "Say who provides the laptop: the company or the candidate.", path: ["laptop"] });
+    }
     if (b.mode !== "remote" && (!b.city || !b.state)) {
       ctx.addIssue({ code: "custom", message: "An on-site or hybrid role needs a city and state." });
     }
@@ -80,6 +104,32 @@ const bodySchema = z
       }
     }
   });
+
+type Held = { held: string; proposalId?: string };
+
+/**
+ * What already holds this candidate for this company, from their live and
+ * hired offers: the same three rules as the checks in POST. A lapsed offer
+ * (start date passed unanswered) holds nothing (EMH-17).
+ */
+function candidateHeld(
+  rows: { id: string; status: string; offerDetails: unknown; currency: string; hiredAt: Date | null }[],
+): Held | null {
+  const live = rows.find(
+    (row) =>
+      LIVE.includes(row.status) &&
+      !((row.status === "sent" || row.status === "interview_scheduled") &&
+        offerPastStart(parseOffer(row.offerDetails, row.currency).startDate)),
+  );
+  if (live) {
+    return { held: "You already have a live offer with this candidate. Withdraw it or wait for their reply.", proposalId: live.id };
+  }
+  if (rows.some((row) => parseOffer(row.offerDetails, row.currency).fullTime)) {
+    return { held: "A full-time offer has already been sent to this candidate." };
+  }
+  if (rows.some(isHiredProposal)) return { held: "Already hired. This candidate already works with you." };
+  return null;
+}
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -227,20 +277,49 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     projectSkills: b.skills,
   });
 
-  const [proposal] = await db
-    .insert(schema.proposals)
-    .values({
-      employerId: id,
-      internId: b.internId,
-      projectId: b.projectId,
-      flowType: b.flowType,
-      currency,
-      offerDetails: { ...offerDetails, policyAcceptedAt: new Date().toISOString() },
-      aiRatings: { communication: ratings.communication, coding: ratings.coding, aptitude: ratings.aptitude, overall: score },
-      skills: b.skills,
-      status: "sent",
-    })
-    .returning();
+  // The checks above ran before this request held the candidate. Repeated and
+  // inserted under one lock, so two requests at once (a double click gave
+  // three live offers) can't both pass.
+  const created = await withLock(`offer:${id}:${b.internId}`, async (tx) => {
+    const held = candidateHeld(
+      await tx
+        .select({
+          id: schema.proposals.id,
+          status: schema.proposals.status,
+          offerDetails: schema.proposals.offerDetails,
+          currency: schema.proposals.currency,
+          hiredAt: schema.proposals.hiredAt,
+        })
+        .from(schema.proposals)
+        .where(
+          and(
+            eq(schema.proposals.employerId, id),
+            eq(schema.proposals.internId, b.internId),
+            inArray(schema.proposals.status, [...LIVE, "hired"]),
+          ),
+        ),
+    );
+    if (held) return held;
+    const [row] = await tx
+      .insert(schema.proposals)
+      .values({
+        employerId: id,
+        internId: b.internId,
+        projectId: b.projectId,
+        flowType: b.flowType,
+        currency,
+        offerDetails: { ...offerDetails, policyAcceptedAt: new Date().toISOString() },
+        aiRatings: { communication: ratings.communication, coding: ratings.coding, aptitude: ratings.aptitude, overall: score },
+        skills: b.skills,
+        status: "sent",
+      })
+      .returning();
+    return row;
+  });
+  if ("held" in created) {
+    return NextResponse.json({ error: created.held, ...(created.proposalId ? { proposalId: created.proposalId } : {}) }, { status: 409 });
+  }
+  const proposal = created;
   // The company stays hidden from the intern until it hires them. This used
   // to reveal it whenever any offer was merely open.
   const companyName = openOffers.some(isHiredProposal) ? (await employerNames(id)).company : "A company on Findtern";

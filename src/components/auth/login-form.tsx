@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AlertCircle, ArrowRight, Eye, EyeOff, Loader2 } from "lucide-react";
 
+import { ButtonAnchor, buttonClass } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { LAST_DOOR_COOKIE } from "@/lib/auth-doors";
 
@@ -35,21 +36,47 @@ export function LoginForm({
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string }>({});
   const [loading, setLoading] = useState(false);
+  const emailRef = useRef<HTMLInputElement>(null);
+  const passwordRef = useRef<HTMLInputElement>(null);
+
+  // Validate on blur and on submit (SPECS §6); the message sits under the field.
+  // Leaving a field still empty (to tap a tab, say) is not yet a mistake, so blur only checks a touched field.
+  function check(field: "email" | "password", value: string, onBlur = false): string | undefined {
+    if (onBlur && !value && !fieldErrors[field]) return undefined;
+    const msg =
+      field === "email"
+        ? /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim()) ? undefined : "Enter a valid email address."
+        : value ? undefined : "Enter your password.";
+    setFieldErrors((f) => ({ ...f, [field]: msg }));
+    return msg;
+  }
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setLoading(true);
     setError(null);
+    // Read the fields, not state: typing or a password manager's autofill
+    // before hydration never fires onChange, so state would still be empty.
+    const form = new FormData(e.currentTarget as HTMLFormElement);
+    const sent = { email: String(form.get("email") ?? "").trim(), password: String(form.get("password") ?? "") };
+    setEmail(sent.email);
+    const emailProblem = check("email", sent.email);
+    const passwordProblem = check("password", sent.password);
+    if (emailProblem || passwordProblem) {
+      (emailProblem ? emailRef : passwordRef).current?.focus();
+      return;
+    }
+    setLoading(true);
     try {
       const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify(sent),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        setError(data.error ?? "Sign in failed. Check your details and try again.");
+        setError(signInError(res.status, data.error, rememberAs));
         setLoading(false);
         return;
       }
@@ -68,7 +95,7 @@ export function LoginForm({
       {error ? (
         <div
           role="alert"
-          className="flex items-start gap-2.5 rounded-lg border border-danger/25 bg-danger-soft px-3.5 py-3 text-sm text-danger"
+          className="flex items-start gap-2 rounded-lg border border-danger/25 bg-danger-soft px-3 py-3 text-sm text-danger"
         >
           <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden />
           <span>
@@ -97,9 +124,21 @@ export function LoginForm({
           required
           placeholder={emailPlaceholder}
           value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          className="h-11 border-ink-200 bg-white px-3.5 placeholder:text-ink-500"
+          onChange={(e) => {
+            setEmail(e.target.value);
+            if (fieldErrors.email) setFieldErrors((f) => ({ ...f, email: undefined }));
+          }}
+          onBlur={(e) => check("email", e.target.value, true)}
+          ref={emailRef}
+          aria-invalid={fieldErrors.email ? true : undefined}
+          aria-describedby={fieldErrors.email ? "email-error" : undefined}
+          className="h-11 border-ink-200 bg-white px-3.5 placeholder:text-text-subtle"
         />
+        {fieldErrors.email ? (
+          <p id="email-error" className="text-sm text-danger">
+            {fieldErrors.email}
+          </p>
+        ) : null}
       </div>
 
       <div className="space-y-2">
@@ -110,7 +149,8 @@ export function LoginForm({
           {forgotHref ? (
             <Link
               href={forgotHref}
-              className="text-xs font-medium text-brand-700 underline-offset-4 hover:underline"
+              // 44px hit area without moving the row: padding paid back by negative margin.
+              className="-my-3 -mx-1 inline-flex items-center px-1 py-3 text-sm font-medium text-brand-700 underline-offset-4 hover:underline"
             >
               Forgot password?
             </Link>
@@ -125,38 +165,44 @@ export function LoginForm({
             required
             placeholder="••••••••"
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="h-11 border-ink-200 bg-white px-3.5 pr-11 placeholder:text-ink-500"
+            onChange={(e) => {
+              setPassword(e.target.value);
+              if (fieldErrors.password) setFieldErrors((f) => ({ ...f, password: undefined }));
+            }}
+            onBlur={(e) => check("password", e.target.value, true)}
+            ref={passwordRef}
+            aria-invalid={fieldErrors.password ? true : undefined}
+            aria-describedby={fieldErrors.password ? "password-error" : undefined}
+            className="h-11 border-ink-200 bg-white px-3.5 pr-11 placeholder:text-text-subtle"
           />
           <button
             type="button"
             onClick={() => setShowPassword((v) => !v)}
             aria-label={showPassword ? "Hide password" : "Show password"}
-            className="absolute right-0 top-1/2 grid size-11 -translate-y-1/2 place-items-center rounded-md text-ink-500 transition-colors [@media(any-hover:hover)]:hover:text-ink-800"
+            className="absolute right-0 top-1/2 grid size-11 -translate-y-1/2 place-items-center rounded-md text-text-subtle transition-colors [@media(any-hover:hover)]:hover:text-ink-800"
           >
             {showPassword ? <EyeOff className="size-4" aria-hidden /> : <Eye className="size-4" aria-hidden />}
           </button>
         </div>
+        {fieldErrors.password ? (
+          <p id="password-error" className="text-sm text-danger">
+            {fieldErrors.password}
+          </p>
+        ) : null}
       </div>
 
+      {/* Label stays "Sign in" while loading (SPECS §6); the spinner replaces the arrow. */}
       <button
         type="submit"
         disabled={loading}
-        className="group flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-brand-700 px-4 text-sm font-semibold text-white transition-[background-color,transform] duration-200 hover:bg-brand-600 active:translate-y-px disabled:pointer-events-none disabled:opacity-60"
+        aria-busy={loading || undefined}
+        className={buttonClass({ variant: "primary", block: true, className: "group h-11 text-sm font-semibold" })}
       >
+        Sign in
         {loading ? (
-          <>
-            <Loader2 className="size-4 animate-spin" aria-hidden />
-            Signing in…
-          </>
+          <Loader2 className="size-4 animate-spin" aria-hidden />
         ) : (
-          <>
-            Sign in
-            <ArrowRight
-              className="size-4 transition-transform duration-200 group-hover:translate-x-0.5"
-              aria-hidden
-            />
-          </>
+          <ArrowRight className="size-4 transition-transform duration-200 group-hover:translate-x-0.5" aria-hidden />
         )}
       </button>
 
@@ -170,16 +216,25 @@ export function LoginForm({
   );
 }
 
+/** What the sign-in routes' terse errors mean to the person typing. */
+function signInError(status: number, error: string | undefined, door?: string): string {
+  if (status === 400) return "Enter a valid email address and your password.";
+  if (status === 401) {
+    // The account types sign in separately, so the commonest miss is the wrong tab.
+    const other = door === "employer" ? " If this is an intern or college account, switch the account type above." : door ? " If this is a company account, switch to Company above." : "";
+    return `Wrong email or password.${other}`;
+  }
+  if (status === 429) return "Too many sign-in attempts. Try again later, or reset your password.";
+  return error ?? "Sign in failed. Check your details and try again.";
+}
+
 /** The one Google button, shared by sign in and sign up. */
 export function GoogleButton({ href, label = "Continue with Google" }: { href: string; label?: string }) {
   return (
-    <a
-      href={href}
-      className="flex h-11 w-full items-center justify-center gap-2.5 rounded-lg border border-ink-200 bg-white px-4 text-sm font-medium text-ink-800 transition-colors [@media(any-hover:hover)]:hover:bg-ink-50"
-    >
+    <ButtonAnchor href={href} variant="outline" block className="h-11 text-sm text-ink-800">
       <GoogleGlyph />
       {label}
-    </a>
+    </ButtonAnchor>
   );
 }
 

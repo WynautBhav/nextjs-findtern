@@ -1,5 +1,6 @@
 import { and, eq, inArray, ne, sql, type SQL } from "drizzle-orm";
 
+import type { Tx } from "@/lib/advisory-lock";
 import { getDb, schema } from "@/lib/db";
 import { normalizePhone } from "@/lib/phone";
 
@@ -19,18 +20,20 @@ import { normalizePhone } from "@/lib/phone";
  * "+", so both spellings match.
  *
  * `exclude` skips the caller's own rows (editing your own number, or your
- * own emergency contact) so saving an unchanged form is not refused.
+ * own emergency contact) so saving an unchanged form is not refused. Inside a
+ * transaction, pass it as `db`: a second pool connection would wait on the one
+ * the transaction holds.
  */
 export async function phoneInUseAnywhere(
   countryCode: string,
   phone: string,
   exclude: { userId?: string; employerId?: string } = {},
+  db: ReturnType<typeof getDb> | Tx = getDb(),
 ): Promise<boolean> {
   const digits = normalizePhone(phone);
   const code = String(countryCode ?? "").trim() || "+91";
   if (!digits) return false;
   const codes = code.startsWith("+") ? [code, code.slice(1)] : [code, `+${code}`];
-  const db = getDb();
   const one = { one: sql<number>`1` };
 
   const userWhere: SQL[] = [eq(schema.users.phoneNumber, digits), inArray(schema.users.countryCode, codes)];

@@ -4,12 +4,13 @@ import { and, eq, gte, inArray } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { withLock, type Tx } from "@/lib/advisory-lock";
 import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
-import { payableCheckout } from "@/lib/employer-payable";
+import { openProposalsWithDues, payableCheckout, type PayableLine } from "@/lib/employer-payable";
 import { expireStaleEmployerOrders, legacyOrderRaw, OPEN_ORDER_MINUTES, orderProposalIds, settleEmployerOrder } from "@/lib/payments";
 import { quotePromo } from "@/lib/promo";
-import { createOrder, paymentsAreFree, razorpayKeyId } from "@/lib/razorpay";
+import { createOrder, paymentsAreFree, razorpayKeyId, testPayEnabled } from "@/lib/razorpay";
 
 const bodySchema = z.object({
   currency: z.enum(["INR", "USD"]).default("INR"),
@@ -18,7 +19,80 @@ const bodySchema = z.object({
   /** How a new hire is paid; a running monthly placement always pays its due month. */
   mode: z.enum(["upfront", "monthly"]).default("upfront"),
   promoCode: z.string().trim().min(1).optional(),
+  /** The test button (PAYMENTS_TEST_BUTTON=1): settle at the real amount without Razorpay. */
+  testPay: z.boolean().optional(),
 });
+
+type Db = ReturnType<typeof getDb>;
+
+/**
+ * Why a new order can't open right now, or null. An unpaid order from the last
+ * 30 minutes already covers one of these: finish or close that one first, so
+ * the same hire, or the same due month from a second tab (EMH-26), can't be
+ * paid twice. A use of a promo code is recorded only when an order is paid, so
+ * an open order already holding the code would let a one-time code discount
+ * two hires. Runs on the db for a quick refusal, and again on the locking
+ * transaction in `openOrder`.
+ */
+async function openConflict(q: Db | Tx, employerId: string, proposalIds: string[], promoCode?: string): Promise<string | null> {
+  const since = new Date(Date.now() - OPEN_ORDER_MINUTES * 60_000);
+  const recent = await q
+    .select({ raw: schema.employerPayments.raw })
+    .from(schema.employerPayments)
+    .where(and(eq(schema.employerPayments.employerId, employerId), eq(schema.employerPayments.status, "created"), gte(schema.employerPayments.createdAt, since)));
+  const busy = new Set(recent.flatMap((r) => orderProposalIds(r.raw)));
+  // EMH-35: "processing" is legacy's mark for an offer whose checkout is
+  // open on the legacy site; a recent one is a payment in flight there.
+  const inFlight = await q
+    .select({ id: schema.proposals.id })
+    .from(schema.proposals)
+    .where(
+      and(
+        eq(schema.proposals.employerId, employerId),
+        inArray(schema.proposals.id, proposalIds),
+        eq(schema.proposals.status, "processing"),
+        gte(schema.proposals.updatedAt, since),
+      ),
+    );
+  if (proposalIds.some((pid) => busy.has(pid)) || inFlight.length > 0) {
+    return "A payment for this is already open. Finish it or wait a few minutes.";
+  }
+  if (promoCode && recent.some((r) => (r.raw as { promo?: { promoCode?: string } } | null)?.promo?.promoCode === promoCode)) {
+    return "This code is on a payment that's still open. Finish that payment, or wait 30 minutes for it to close.";
+  }
+  return null;
+}
+
+/**
+ * Check and insert as one step per employer, so two requests at once (a double
+ * click, two tabs) can't both pass the check and open two orders. Only database
+ * work runs inside the lock, on `tx`: a second pool connection or a gateway
+ * call here would hold the lock while waiting. Returns the refusal, or null
+ * once the order row is in.
+ */
+async function openOrder(
+  employerId: string,
+  paying: PayableLine[],
+  promoCode: string | undefined,
+  row: typeof schema.employerPayments.$inferInsert,
+): Promise<string | null> {
+  return withLock(`employer-pay:${employerId}`, async (tx) => {
+    const conflict = await openConflict(tx, employerId, paying.map((l) => l.id), promoCode);
+    if (conflict) return conflict;
+    // The offers were priced before the lock. A request ahead of this one may
+    // have paid them since (they read paid, not open), so confirm each is still
+    // what was owed: an accepted hire, or the same month due as when priced.
+    const { open, dues } = await openProposalsWithDues(tx, employerId);
+    const alreadyPaid = paying.some((l) =>
+      l.due
+        ? dues.get(l.id)?.monthsPaid !== l.due.monthsPaid
+        : !open.some((p) => p.id === l.id && (p.status === "accepted" || p.status === "processing")),
+    );
+    if (alreadyPaid) return "This was already paid. Refresh the page to see it under Orders.";
+    await tx.insert(schema.employerPayments).values(row);
+    return null;
+  });
+}
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -28,6 +102,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const parsed = bodySchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid input" }, { status: 400 });
   const { currency } = parsed.data;
+  if (parsed.data.testPay && !testPayEnabled()) return NextResponse.json({ error: "Test payments are off" }, { status: 403 });
 
   // Amount is recomputed from the accepted offers; the client never sends it.
   const { lines } = await payableCheckout(id, { proposalIds: parsed.data.proposalIds, mode: parsed.data.mode });
@@ -45,36 +120,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   // Abandoned orders older than 30 minutes close as "failed" (DB-05), for
   // every company: one small UPDATE, and nobody else sweeps them.
   await expireStaleEmployerOrders();
-  // An unpaid order from the last 30 minutes already covers one of these:
-  // finish or close that one first, so the same hire, or the same due month
-  // from a second tab (EMH-26), can't be paid twice.
-  const recent = await getDb()
-    .select({ raw: schema.employerPayments.raw })
-    .from(schema.employerPayments)
-    .where(
-      and(
-        eq(schema.employerPayments.employerId, id),
-        eq(schema.employerPayments.status, "created"),
-        gte(schema.employerPayments.createdAt, new Date(Date.now() - OPEN_ORDER_MINUTES * 60_000)),
-      ),
-    );
-  const busy = new Set(recent.flatMap((r) => orderProposalIds(r.raw)));
-  // EMH-35: "processing" is legacy's mark for an offer whose checkout is
-  // open on the legacy site; a recent one is a payment in flight there.
-  const inFlight = await getDb()
-    .select({ id: schema.proposals.id })
-    .from(schema.proposals)
-    .where(
-      and(
-        eq(schema.proposals.employerId, id),
-        inArray(schema.proposals.id, paying.map((l) => l.id)),
-        eq(schema.proposals.status, "processing"),
-        gte(schema.proposals.updatedAt, new Date(Date.now() - OPEN_ORDER_MINUTES * 60_000)),
-      ),
-    );
-  if (paying.some((l) => busy.has(l.id)) || inFlight.length > 0) {
-    return NextResponse.json({ error: "A payment for this is already open. Finish it or wait a few minutes." }, { status: 409 });
-  }
+  // The quick refusal; `openOrder` repeats it under the lock.
+  const early = await openConflict(getDb(), id, paying.map((l) => l.id));
+  if (early) return NextResponse.json({ error: early }, { status: 409 });
 
   // What the offers cost before any promo; the charge itself is `amountMinor`.
   const listMinor = paying.reduce((s, l) => s + l.charge.totalMinor, 0);
@@ -105,31 +153,50 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     dueProposalIds: paying.filter((l) => l.due).map((l) => l.id),
     // DB-07: legacy admin shows computedAmountMinor as the order amount, so
     // it is what is charged (0 for a free test order, net of any promo).
-    computedAmountMinor: paymentsAreFree() ? 0 : amountMinor,
+    computedAmountMinor: paymentsAreFree() && !parsed.data.testPay ? 0 : amountMinor,
     listAmountMinor: listMinor,
     discountAmountMinor: discountMinor + (promo?.discountMinor ?? 0),
   };
-  // Test mode: record the order as free and settle it straight away, through
-  // the same settlement as a real payment (hire, notifications, monthly dues).
-  if (paymentsAreFree()) {
-    const orderId = `free_test_${randomUUID()}`;
-    await getDb().insert(schema.employerPayments).values({
+  // Test mode, or the test button: record the order and settle it straight
+  // away, through the same settlement as a real payment (hire, notifications,
+  // monthly dues). Free mode charges 0; the test button keeps the real amount.
+  if (paymentsAreFree() || parsed.data.testPay) {
+    const testPay = Boolean(parsed.data.testPay);
+    const charged = testPay ? amountMinor : 0;
+    const orderId = `${testPay ? "test" : "free_test"}_${randomUUID()}`;
+    const refused = await openOrder(id, paying, promo?.promoCode, {
       employerId: id,
-      gateway: "free",
+      gateway: testPay ? "test" : "free",
       orderId,
-      amountMinor: 0,
+      amountMinor: charged,
       currency,
       status: "created",
-      raw: { notes, order: legacyOrderRaw({ id: orderId, amountMinor: 0, currency, notes }), testMode: true, ...(promo ? { promo } : {}) },
+      raw: { notes, order: legacyOrderRaw({ id: orderId, amountMinor: charged, currency, notes }), testMode: true, ...(promo ? { promo } : {}) },
     });
-    const settled = await settleEmployerOrder({ orderId, paymentId: orderId, employerId: id });
-    if (!settled.ok) return NextResponse.json({ error: settled.error }, { status: settled.status });
+    if (refused) return NextResponse.json({ error: refused }, { status: 409 });
+    // An order that never settles is closed, or it would block the next try for 30 minutes.
+    // The status guard leaves one alone once it has been paid.
+    const close = () =>
+      getDb()
+        .update(schema.employerPayments)
+        .set({ status: "failed" })
+        .where(and(eq(schema.employerPayments.orderId, orderId), eq(schema.employerPayments.employerId, id), eq(schema.employerPayments.status, "created")));
+    const settled = await settleEmployerOrder({ orderId, paymentId: orderId, employerId: id }).catch(async (e) => {
+      await close();
+      throw e;
+    });
+    if (!settled.ok) {
+      await close();
+      return NextResponse.json({ error: settled.error }, { status: settled.status });
+    }
     return NextResponse.json({ free: true });
   }
 
   try {
+    // The gateway call comes first, outside the lock. A request that loses the
+    // race leaves a Razorpay order nobody pays, which costs nothing.
     const order = await createOrder({ amountMinor, currency, receipt: `employer_${id.slice(0, 8)}_${Date.now().toString(36)}`, notes });
-    await getDb().insert(schema.employerPayments).values({
+    const refused = await openOrder(id, paying, promo?.promoCode, {
       employerId: id,
       orderId: order.id,
       amountMinor,
@@ -137,6 +204,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       status: "created",
       raw: { notes, order: legacyOrderRaw({ id: order.id, amountMinor, currency, notes }), ...(promo ? { promo } : {}) },
     });
+    if (refused) return NextResponse.json({ error: refused }, { status: 409 });
     return NextResponse.json({ orderId: order.id, amount: amountMinor, currency, keyId: razorpayKeyId() });
   } catch (e: unknown) {
     console.error("[employer/payment/razorpay/order]", e);

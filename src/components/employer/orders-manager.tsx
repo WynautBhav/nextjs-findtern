@@ -157,15 +157,31 @@ export function OrdersManager({
         }
       />
 
-      <div role="tablist" aria-label="Orders" className="-mx-1 mb-6 flex max-w-full gap-1 overflow-x-auto px-1 pb-1 [scrollbar-width:none]">
+      {/* Wraps rather than scrolling behind a hidden scrollbar (QA-131). */}
+      <div
+        role="tablist"
+        aria-label="Orders"
+        className="mb-6 flex max-w-full flex-wrap gap-1"
+        onKeyDown={(e) => {
+          // APG tabs: arrows, Home and End move between tabs; Tab leaves the list.
+          const i = tabs.findIndex((t) => t.id === tab);
+          const to = { ArrowRight: i + 1, ArrowLeft: i - 1, Home: 0, End: tabs.length - 1 }[e.key];
+          if (to === undefined) return;
+          e.preventDefault();
+          const next = tabs[(to + tabs.length) % tabs.length].id;
+          setTab(next);
+          document.getElementById(`orders-tab-${next}`)?.focus();
+        }}
+      >
         {tabs.map((t) => (
           <button
             key={t.id}
             type="button"
             role="tab"
             id={`orders-tab-${t.id}`}
+            tabIndex={tab === t.id ? 0 : -1}
             aria-selected={tab === t.id}
-            aria-controls={`orders-panel-${t.id}`}
+            aria-controls={tab === t.id ? `orders-panel-${t.id}` : undefined}
             onClick={() => setTab(t.id)}
             className={tabClass(tab === t.id)}
           >
@@ -401,7 +417,7 @@ function SchedulePanel({ hires }: { hires: HireRow[] }) {
             aria-pressed={filter === id}
             onClick={() => setFilter(id)}
             className={cn(
-              "apple-spring min-h-9 rounded-full border px-3.5 text-sm font-medium focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-brand-600/30",
+              "apple-spring min-h-9 rounded-full border px-3.5 text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600",
               filter === id ? "border-brand-700 bg-brand-700 text-white" : "border-ink-200 bg-white text-ink-700 hover:border-ink-300",
             )}
           >
@@ -413,7 +429,7 @@ function SchedulePanel({ hires }: { hires: HireRow[] }) {
       {rows.length === 0 ? (
         <EmptyScene title="Nothing matches this filter" body="No hire is in that payment state right now." className="py-10" />
       ) : (
-        <Surface className="overflow-x-auto">
+        <Surface tabIndex={0} role="region" aria-label="Hires and payments" className="overflow-x-auto focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600">
           <table className="w-full min-w-[52rem] border-collapse">
             <thead className="border-b border-ink-100 bg-ink-50/60">
               <tr>
@@ -575,7 +591,7 @@ function InvoicesPanel({ invoices }: { invoices: InvoiceRow[] }) {
       {filtered.length === 0 ? (
         <EmptyScene title="No invoice matches" body="Try another name or ID, or reset the filters to see every invoice." className="py-10" />
       ) : (
-        <Surface className="overflow-x-auto">
+        <Surface tabIndex={0} role="region" aria-label="Invoices" className="overflow-x-auto focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600">
           <table className="w-full min-w-[48rem] border-collapse">
             <thead className="border-b border-ink-100 bg-ink-50/60">
               <tr>

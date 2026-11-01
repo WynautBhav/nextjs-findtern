@@ -22,6 +22,12 @@ export function authPath(path: string, door: Door, params: Record<string, string
   return s ? `${path}?${s}` : path;
 }
 
+/** `next` (already safe) unless it is another account type's page, which would only bounce to that type's sign in. */
+export function ownNext(next: string, door: Door): string {
+  const area = /^\/(intern|employer|college|admin)(?=[/?#]|$)/.exec(next)?.[1];
+  return area && area !== door ? "" : next;
+}
+
 /** Cookie that remembers the last account type signed in, so /login opens on it. */
 export const LAST_DOOR_COOKIE = "ft_door";
 

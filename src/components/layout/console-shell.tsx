@@ -142,7 +142,11 @@ export function ConsoleShell({
   }
 
   async function signOut() {
-    await csrfFetch("/api/auth/logout", { method: "POST" });
+    const res = await csrfFetch("/api/auth/logout", { method: "POST" }).catch(() => null);
+    if (!res?.ok) {
+      window.alert("Sign out didn't go through. Check your connection and try again.");
+      return;
+    }
     // Onboarding drafts hold personal details; the next person on this browser must not see them.
     try {
       for (const k of Object.keys(window.localStorage)) if (k.startsWith("findtern:") && k.includes("-onboarding")) window.localStorage.removeItem(k);
@@ -154,6 +158,8 @@ export function ConsoleShell({
   }
 
   const light = tone === "light";
+  // The global ring (brand-700) is 2.3:1 on the dark rail; the accent clears 3:1 there.
+  const darkRing = light ? undefined : "focus-visible:outline-accent-300";
   const helpLinks: ConsoleNavItem[] = help
     ? [
         { href: help.faqHref, label: "FAQ", icon: <CircleQuestionMark className="size-5" aria-hidden /> },
@@ -202,13 +208,14 @@ export function ConsoleShell({
       <div className={cn("mt-4 shrink-0 space-y-1 border-t pt-3", light ? "border-ink-100" : "border-white/10")}>
         {/* Light rail: FAQ stays one click away; contact and email sit in the account menu. */}
         {light && helpLinks[0] ? <RailLink item={{ ...helpLinks[0], label: "Help & FAQ" }} active={false} compact={compact} light onNavigate={onNavigate} /> : null}
-        <FeedbackFab variant="link" deepLink={!onNavigate} className={cn("w-full gap-3 [&>svg]:size-5", light && "text-ink-600 hover:bg-ink-50 hover:text-ink-900", compact && "justify-center px-0 [&>span]:sr-only")} />
+        <FeedbackFab variant="link" deepLink={!onNavigate} className={cn("w-full gap-3 [&>svg]:size-5", darkRing, light && "text-ink-600 hover:bg-ink-50 hover:text-ink-900", compact && "justify-center px-0 [&>span]:sr-only")} />
         <button
           type="button"
           onClick={signOut}
           title={compact ? "Sign out" : undefined}
           className={cn(
             "apple-spring flex min-h-11 w-full items-center gap-3 rounded-apple-sm px-3 text-sm",
+            darkRing,
             light ? "text-ink-600 hover:bg-ink-50 hover:text-ink-900" : "text-on-dark-subtle hover:bg-white/8 hover:text-white",
             compact && "justify-center px-0",
           )}
@@ -234,7 +241,7 @@ export function ConsoleShell({
         {/* The hero's wash, so the rail is the same green the site greets you with. */}
         {light ? null : <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_120%_45%_at_0%_0%,rgb(22_107_84/0.45)_0%,transparent_70%)]" />}
         <div className={cn("relative flex min-h-12 items-center", collapsed ? "justify-center" : "justify-between gap-2 px-2")}>
-          <Link href={homeHref} aria-label="Findtern home" className="flex min-w-0 items-center">
+          <Link href={homeHref} aria-label="Findtern home" className={cn("flex min-w-0 items-center", darkRing)}>
             {collapsed ? (
               <span className={cn("grid size-11 place-items-center rounded-apple-md ring-1", light ? "bg-brand-50 ring-brand-100" : "bg-white/[0.06] ring-white/10")}>
                 <LogoMark variant={light ? "green" : "white"} alt="" className="size-7" />
@@ -272,7 +279,7 @@ export function ConsoleShell({
                 <SheetTitle className="sr-only">Navigation</SheetTitle>
                 <div className="flex min-h-12 items-center justify-between gap-2 px-2">
                   <Logo variant={light ? "green" : "white"} className="h-9" />
-                  <button type="button" onClick={() => setDrawer(false)} aria-label="Close navigation" className={cn("apple-spring grid size-11 place-items-center rounded-apple-sm", light ? "text-ink-600 hover:bg-ink-100 hover:text-ink-900" : "text-on-dark-subtle hover:bg-white/10 hover:text-white")}>
+                  <button type="button" onClick={() => setDrawer(false)} aria-label="Close navigation" className={cn("apple-spring grid size-11 place-items-center rounded-apple-sm", darkRing, light ? "text-ink-600 hover:bg-ink-100 hover:text-ink-900" : "text-on-dark-subtle hover:bg-white/10 hover:text-white")}>
                     <X className="size-5" aria-hidden />
                   </button>
                 </div>
@@ -413,7 +420,7 @@ function RailLink({ item, active, compact, light, onNavigate }: { item: ConsoleN
     "apple-spring apple-pressable group relative flex min-h-11 items-center gap-3 rounded-apple-sm px-3 text-[0.9375rem] tracking-[-0.01em] [@media(pointer:fine)]:min-h-10",
     light
       ? active ? "bg-brand-50 font-medium text-brand-800" : "text-ink-600 hover:bg-ink-50 hover:text-ink-900"
-      : active ? "bg-white/[0.09] font-semibold text-white" : "text-on-dark-subtle hover:bg-white/[0.06] hover:text-white",
+      : cn("focus-visible:outline-accent-300", active ? "bg-white/[0.09] font-semibold text-white" : "text-on-dark-subtle hover:bg-white/[0.06] hover:text-white"),
     compact && "justify-center px-0",
   );
   const body = (
@@ -436,7 +443,9 @@ function RailLink({ item, active, compact, light, onNavigate }: { item: ConsoleN
       {!compact && item.badge ? (
         <span className={cn("nums rounded-full px-2 py-0.5 text-2xs font-bold", light ? "bg-brand-700 text-white" : "bg-accent-500/20 text-accent-300")}>{item.badge}</span>
       ) : !compact && item.attention ? (
-        <span className="size-1.5 shrink-0 rounded-full bg-accent-400" aria-label="Needs you" />
+        <span className="size-1.5 shrink-0 rounded-full bg-accent-400">
+          <span className="sr-only">Needs you</span>
+        </span>
       ) : null}
     </>
   );

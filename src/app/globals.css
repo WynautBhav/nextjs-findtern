@@ -492,6 +492,18 @@
        header. This replaces that guess with a real token. */
     scroll-padding-top: var(--header-height, 76px);
   }
+  /* The candidates compare bar floats over the list: a control tabbed to must
+     not land underneath it (WCAG 2.4.11). */
+  html:has(#compare-bar) {
+    scroll-padding-bottom: 9rem;
+  }
+  /* Below lg the bar sits above the bottom nav and wraps to three lines at
+     320px (~13rem from the bottom). */
+  @media (width < 64rem) {
+    html:has(#compare-bar) {
+      scroll-padding-bottom: 14rem;
+    }
+  }
 
   body {
     background-color: var(--color-background);

@@ -242,7 +242,7 @@ export function TimesheetGrid({
         disabled={sendState === "sending" || missing.length > 0}
         className={buttonClass({ variant: "primary", size: "md", className: "w-full" })}
       >
-        {sendState === "sending" ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <CloudUpload className="size-4" aria-hidden />}
+        {sendState === "sending" ? <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden /> : <CloudUpload className="size-4" aria-hidden />}
         {sentBack ? "Send again for approval" : "Send for approval"}
       </button>
       {sendState === "error" ? (
@@ -546,7 +546,7 @@ function HoursField({
           onBlur={() => {
             if (invalid) setDraft(hours === 0 ? "" : String(hours));
           }}
-          className={cn(FIELD, "nums pl-3 pr-7", invalid && "border-danger focus:border-danger focus:ring-danger/20")}
+          className={cn(FIELD, "nums pl-3 pr-7", invalid && "border-danger hover:border-danger focus-visible:border-danger focus-visible:ring-danger/20")}
         />
         <span aria-hidden className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-ink-600">
           h
@@ -569,7 +569,7 @@ function parseHours(raw: string): number | null {
 }
 
 const FIELD =
-  "apple-spring h-11 w-full rounded-apple-sm border border-ink-200/80 bg-white text-sm text-ink-900 placeholder:text-text-subtle focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200";
+  "h-11 w-full rounded-apple-sm border border-ink-200 bg-white text-base md:text-sm text-ink-900 outline-none transition-colors placeholder:text-text-subtle hover:border-ink-300 focus-visible:border-brand-600 focus-visible:ring-[3px] focus-visible:ring-brand-600/20 disabled:cursor-not-allowed disabled:bg-ink-50 disabled:text-text-subtle";
 
 /** Monday-first weeks, the same weeks as the month beside them. */
 function byWeek(days: DayState[]): DayState[][] {

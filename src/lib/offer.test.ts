@@ -250,3 +250,19 @@ test("flexible hours are stored as empty times plus a flag, read back as flexibl
   assert.equal(parseOffer({ shiftFrom: "flexible", shiftTo: "flexible" }).shiftTo, "flexible");
   assert.equal(parseOffer({ shiftFrom: "09:00", shiftTo: "18:00" }).shiftFrom, "09:00");
 });
+
+test("E-B07: a start date has to be a real day, and the clock times real times", async () => {
+  const { isRealDay, isClockTime, addDays } = await import("./offer.ts");
+  assert.equal(isRealDay("2026-11-02"), true);
+  assert.equal(isRealDay("2028-02-29"), true, "leap day");
+  assert.equal(isRealDay("2026-13-45"), false);
+  assert.equal(isRealDay("2026-02-30"), false);
+  assert.equal(isRealDay("2026-1-2"), false);
+  assert.equal(isClockTime("09:30"), true);
+  assert.equal(isClockTime("23:59"), true);
+  assert.equal(isClockTime("24:00"), false);
+  assert.equal(isClockTime("9:30"), false);
+  assert.equal(isClockTime("flexible"), false);
+  assert.equal(addDays("2026-11-01", 365), "2027-11-01");
+  assert.equal(addDays("2028-02-28", 1), "2028-02-29");
+});

@@ -25,7 +25,7 @@ import { companyIn, hoursByMonth, hoursIn, nextAction, roleOf, slotOf } from "@/
 import { formatMoney, formatSlotTime, shortDate } from "@/lib/format";
 import { isInternPaid } from "@/lib/payments";
 import { isHiredProposal } from "@/lib/hire-status";
-import { paymentsAreFree } from "@/lib/razorpay";
+import { paymentsAreFree, testPayEnabled } from "@/lib/razorpay";
 import { getInternActivationFeeMinor } from "@/lib/platform-settings";
 import { visibleAgainAt } from "@/lib/profile-hide";
 import { profileCompletion } from "@/lib/onboarding";
@@ -440,6 +440,7 @@ export default async function InternHome() {
               <ActivationCard
                 alreadyPaid={activated}
                 testMode={paymentsAreFree()}
+                testPay={testPayEnabled()}
                 feeMinor={activationFeeMinor}
                 internId={session.uid}
                 prefill={{

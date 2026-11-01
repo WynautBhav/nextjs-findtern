@@ -45,6 +45,20 @@ export function paymentsAreFree(): boolean {
   return (process.env.PAYMENTS_MODE ?? "").trim().toLowerCase() === "free";
 }
 
+/**
+ * PAYMENTS_TEST_BUTTON=1 adds a "Test: mark as paid, no charge" button beside
+ * Pay: the real amount, promo use and invoice number go through the real
+ * settlement, only Razorpay is skipped. For a test database; never set it on
+ * the live site. With a live Razorpay key it stays off whatever the flag says,
+ * so a leaked flag can't mark orders paid (and burn GST invoice numbers) there.
+ * REMOVE this switch, both buttons and the `testPay` order-route branches
+ * before launch (docs/launch-2026-10-28.md).
+ */
+export function testPayEnabled(): boolean {
+  if ((process.env.PAYMENTS_TEST_BUTTON ?? "").trim() !== "1") return false;
+  return !(process.env.RAZORPAY_KEY_ID ?? "").trim().startsWith("rzp_live_");
+}
+
 export function razorpayKeyId(): string | undefined {
   return process.env.RAZORPAY_KEY_ID;
 }

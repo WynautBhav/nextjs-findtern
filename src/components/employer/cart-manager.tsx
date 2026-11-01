@@ -263,7 +263,7 @@ export function CartManager({
               disabled={busyId !== null}
               className={buttonClass({ variant: "primary", size: "sm", className: "min-h-11 bg-danger hover:bg-danger/90" })}
             >
-              {busyId ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <Trash2 className="size-4" aria-hidden />}
+              {busyId ? <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden /> : <Trash2 className="size-4" aria-hidden />}
               Remove
             </button>
           </DialogFooter>
@@ -282,11 +282,18 @@ export function CartManager({
           </DialogHeader>
 
           {meetingSuccess ? (
-            <div role="status" className="rounded-apple-md border border-brand-200 bg-brand-50 p-6 text-center">
+            <div className="rounded-apple-md border border-brand-200 bg-brand-50 p-6 text-center transition-[opacity,scale] duration-[var(--dur-standard)] ease-[var(--ease-out-quart)] starting:scale-[0.97] starting:opacity-0">
               <CheckCircle2 className="mx-auto size-8 text-brand-700" aria-hidden />
-              <p className="mt-2 text-base font-semibold text-ink-900">Meeting request sent</p>
-              <p className="mt-1 text-sm text-ink-600">It is on your Schedule as &ldquo;Waiting on candidate&rdquo; until they pick one of your times.</p>
-              <button type="button" onClick={() => setMeetingCandidate(null)} className={buttonClass({ variant: "outline", size: "sm", className: "mt-4 min-h-11" })}>
+              <p id="meeting-sent-title" className="mt-2 text-base font-semibold text-ink-900">Meeting request sent</p>
+              <p id="meeting-sent-body" className="mt-1 text-sm text-ink-600">It is on your Schedule as &ldquo;Waiting on candidate&rdquo; until they pick one of your times.</p>
+              {/* The form that held focus is gone: focus lands here and reads the result with it. */}
+              <button
+                type="button"
+                autoFocus
+                aria-describedby="meeting-sent-title meeting-sent-body"
+                onClick={() => setMeetingCandidate(null)}
+                className={buttonClass({ variant: "outline", size: "sm", className: "mt-4 min-h-11" })}
+              >
                 Done
               </button>
             </div>
@@ -328,10 +335,10 @@ export function CartManager({
                 </button>
                 <button
                   type="submit"
-                  disabled={busyId === "booking-meeting" || slots.some((s) => !s)}
+                  disabled={busyId === "booking-meeting"}
                   className={buttonClass({ variant: "primary", size: "sm", className: "min-h-11" })}
                 >
-                  {busyId === "booking-meeting" ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
+                  {busyId === "booking-meeting" ? <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden /> : null}
                   Send meeting request
                 </button>
               </DialogFooter>
@@ -473,7 +480,7 @@ function CartLine({
         ) : null}
 
         {/* Profile and remove stay in the menu (QA-124). */}
-        {busy ? <Loader2 className="ml-auto size-4 animate-spin text-text-subtle" aria-label="Removing" /> : null}
+        {busy ? <Loader2 className="ml-auto size-4 animate-spin motion-reduce:animate-none text-text-subtle" aria-label="Removing" /> : null}
         <RowMenu
           label={`More actions for ${name}`}
           className={busy ? undefined : "ml-auto"}

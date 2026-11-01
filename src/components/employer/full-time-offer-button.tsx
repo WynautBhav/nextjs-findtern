@@ -240,8 +240,8 @@ export function FullTimeOfferButton({
                 {error}
               </p>
             ) : null}
-            <button type="submit" disabled={busy || usdBlocked || !(ctc > 0)} className={buttonClass({ block: true })}>
-              {busy ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
+            <button type="submit" disabled={busy || usdBlocked} className={buttonClass({ block: true })}>
+              {busy ? <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden /> : null}
               {busy ? "Sending…" : "Send full-time offer"}
             </button>
           </form>

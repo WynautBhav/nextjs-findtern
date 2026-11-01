@@ -306,6 +306,24 @@ export function todayIst(now: Date = new Date()): string {
   return new Date(now.getTime() + 330 * 60_000).toISOString().slice(0, 10);
 }
 
+/** "2026-13-45" and "2026-02-30" look like dates but are not. */
+export function isRealDay(day: string): boolean {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(day);
+  if (!m) return false;
+  const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
+  return d.toISOString().slice(0, 10) === day;
+}
+
+/** The day `days` after the IST day `from` ("2026-11-01" + 365). */
+export function addDays(from: string, days: number): string {
+  return new Date(Date.parse(`${from}T00:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10);
+}
+
+/** "09:30": a 24-hour clock time. */
+export function isClockTime(v: string): boolean {
+  return /^([01]\d|2[0-3]):[0-5]\d$/.test(v);
+}
+
 /**
  * Legacy rule (proposals.tsx:483): an offer can be answered only while its
  * start date is still ahead. On the start day it reads as expired.

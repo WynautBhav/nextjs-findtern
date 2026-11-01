@@ -5,7 +5,7 @@
  */
 
 export const fieldClass =
-  "min-h-11 w-full rounded-apple-sm border border-ink-200 bg-white px-3 text-sm text-ink-900 outline-none transition-colors placeholder:text-text-subtle hover:border-ink-300 focus-visible:border-brand-600 focus-visible:ring-[3px] focus-visible:ring-brand-600/20 disabled:cursor-not-allowed disabled:bg-ink-50 disabled:text-text-subtle";
+  "min-h-11 w-full rounded-apple-sm border border-ink-200 bg-white px-3 text-base md:text-sm text-ink-900 outline-none transition-colors placeholder:text-text-subtle hover:border-ink-300 focus-visible:border-brand-600 focus-visible:ring-[3px] focus-visible:ring-brand-600/20 disabled:cursor-not-allowed disabled:bg-ink-50 disabled:text-text-subtle";
 
 export const labelClass = "block text-sm font-medium text-ink-800";
 
@@ -20,7 +20,7 @@ export function tabClass(active: boolean): string {
     // The same look as FilterTabs (primitives.tsx); these switch panels, so
     // they keep real tab semantics where they're used.
     "apple-spring inline-flex min-h-10 shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-3.5 text-sm font-medium touch:min-h-11",
-    "focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-brand-600/30",
+    "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600",
     active ? "bg-brand-700 text-white" : "text-ink-600 hover:bg-ink-100 hover:text-ink-900",
   ].join(" ");
 }

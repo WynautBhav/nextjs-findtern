@@ -36,7 +36,7 @@ export function DoorSwitch({
                 replace
                 scroll={false}
                 aria-current={on ? "page" : undefined}
-                className={`flex h-9 items-center justify-center rounded-lg text-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 [@media(pointer:coarse)]:h-11 ${
+                className={`flex h-9 items-center justify-center rounded-lg text-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 touch:h-11 ${
                   on ? "bg-white font-semibold text-ink-900 shadow-xs" : "font-medium text-ink-600 hover:text-ink-900"
                 }`}
               >

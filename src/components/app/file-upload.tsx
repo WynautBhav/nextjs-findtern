@@ -118,7 +118,7 @@ export function FileUpload({
       onUploaded?.({ key: data.key, url: data.url ?? "", contentType: data.contentType ?? file.type, bytes: data.bytes ?? file.size, name: file.name });
     } catch (e) {
       setState("error");
-      setError(e instanceof Error ? e.message : "Upload failed. Try again.");
+      setError(e instanceof TypeError || !(e instanceof Error) ? "Couldn't reach the server. Check your connection and try again." : e.message);
     } finally {
       if (input.current) input.current.value = "";
     }
@@ -135,12 +135,12 @@ export function FileUpload({
             variant: "outline",
             size: "sm",
             className: cn(
-              "min-h-11 cursor-pointer focus-within:ring-[3px] focus-within:ring-brand-600/20",
+              "min-h-11 cursor-pointer has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-brand-600",
               state === "busy" && "pointer-events-none opacity-60",
             ),
           })}
         >
-          {state === "busy" ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <FileUp className="size-4" aria-hidden />}
+          {state === "busy" ? <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden /> : <FileUp className="size-4" aria-hidden />}
           {state === "busy" ? "Uploading…" : name ? `Replace ${word}` : `Upload ${word}`}
           <input
             ref={input}
@@ -155,12 +155,16 @@ export function FileUpload({
             }}
           />
         </label>
-        {name ? (
-          <span className="inline-flex min-w-0 max-w-full items-center gap-1.5 text-sm text-ink-700">
-            {state === "done" ? <Check className="size-4 shrink-0 text-brand-600" aria-hidden /> : null}
-            <span className="truncate">{name}</span>
-          </span>
-        ) : null}
+        {/* Always mounted, so the success is announced when it fills in. */}
+        <span role="status" className="inline-flex min-w-0 max-w-full items-center gap-1.5 text-sm text-ink-700 empty:-mt-2">
+          {name ? (
+            <>
+              {state === "done" ? <Check className="size-4 shrink-0 text-brand-600" aria-hidden /> : null}
+              {state === "done" ? <span className="sr-only">Uploaded:</span> : null}
+              <span className="truncate">{name}</span>
+            </>
+          ) : null}
+        </span>
       </div>
       {previewUrl ? (
         <video

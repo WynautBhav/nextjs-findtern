@@ -25,6 +25,7 @@ import { hiredInternIds } from "@/lib/employer-visibility";
 import { formatSlotTime } from "@/lib/format";
 import { InterviewActions } from "@/components/employer/interview-actions";
 import { cn } from "@/lib/utils";
+import { fieldClass } from "@/components/employer/ui-tokens";
 
 export const metadata: Metadata = {
   title: "Schedule",
@@ -178,8 +179,7 @@ export default async function EmployerSchedule({ searchParams }: { searchParams:
   const filtering = Boolean(q || dateFilter || statusFilter || projectFilter || tzFilter);
   const booked = all.filter((r) => r.stage === "upcoming" || r.stage === "live").length;
   const waiting = all.filter((r) => r.stage === "awaiting_pick").length;
-  const field =
-    "apple-spring min-h-11 w-full rounded-apple-sm border border-ink-200 bg-white px-3 text-sm text-ink-900 outline-none placeholder:text-text-subtle focus-visible:border-brand-500 focus-visible:ring-2 focus-visible:ring-brand-500/20";
+  const field = fieldClass;
 
   return (
     <div>

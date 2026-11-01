@@ -38,6 +38,7 @@ import { CityFilter } from "@/components/employer/city-filter";
 import { SkillFilter } from "@/components/employer/skill-filter";
 import { CandidateCard, type FullTimeContext } from "@/components/employer/candidate-card";
 import { FilterForm, RatingSlider } from "@/components/employer/candidate-filters";
+import { KeepFocusClear } from "@/components/app/keep-focus-clear";
 import { CandidateAvatar } from "@/components/employer/candidate-avatar";
 import { candidateStatusPill, proposalActionLabel } from "@/components/employer/candidate-status";
 import { ShortlistToggle } from "@/components/employer/shortlist-toggle";
@@ -47,6 +48,7 @@ import { cn } from "@/lib/utils";
 import { compareBySortFields, parseSortFields } from "@/lib/candidate-sort";
 import { MAX_COMPARE, isOpenProject, parseIds, rememberedFilters, rememberedSelection } from "@/lib/employer-selection";
 import { RememberSelection } from "@/components/employer/remember-selection";
+import { fieldClass } from "@/components/employer/ui-tokens";
 
 /**
  * Candidate · score · (AI interview at 2xl) · actions. The skills sit under
@@ -109,8 +111,7 @@ const SORT_OPTIONS: { value: SortKey; label: string }[] = [
   ...RATING_META.map((meta) => ({ value: meta.key, label: meta.label })),
 ];
 
-const SELECT =
-  "apple-spring mt-2 min-h-11 w-full rounded-apple-sm border border-ink-200/90 bg-white px-3 text-sm text-ink-900 shadow-xs outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20";
+const SELECT = cn(fieldClass, "mt-2");
 
 /** Query keys that are filters; anything else (project, ids, fresh) is not. */
 const FILTER_KEYS = [
@@ -473,7 +474,7 @@ export default async function CandidatesPage({
 
       <div className="lg:grid lg:grid-cols-[17.5rem_minmax(0,1fr)] lg:items-start lg:gap-8">
         {/* ── Filter rail (legacy employer dashboard layout) ─────────── */}
-        <aside className="mb-6 lg:sticky lg:top-20 lg:mb-0 lg:max-h-[calc(100dvh-6rem)] lg:overflow-y-auto lg:pb-2">
+        <aside aria-label="Filters" className="mb-6 lg:sticky lg:top-20 lg:mb-0 lg:max-h-[calc(100dvh-6rem)] lg:overflow-y-auto lg:pb-2">
           <FilterForm key={queryOf(filters)} activeCount={activeFilterCount(filters)}>
             {compareIds.length > 0 ? <input type="hidden" name="ids" value={compareIds.join(",")} /> : null}
             {filters.view !== "table" ? <input type="hidden" name="view" value={filters.view} /> : null}
@@ -594,7 +595,7 @@ export default async function CandidatesPage({
                     <input type="checkbox" role="switch" name="sm" value="1" defaultChecked={filters.skillPriority} className="peer sr-only" />
                     <span
                       aria-hidden
-                      className="relative h-6 w-10 shrink-0 rounded-full bg-ink-200 transition-colors after:absolute after:left-0.5 after:top-0.5 after:size-5 after:rounded-full after:bg-white after:shadow-xs after:transition-transform peer-checked:bg-brand-700 peer-checked:after:translate-x-4 peer-focus-visible:ring-2 peer-focus-visible:ring-brand-500/40 motion-reduce:after:transition-none"
+                      className="relative h-6 w-10 shrink-0 rounded-full bg-ink-500 transition-colors after:absolute after:left-0.5 after:top-0.5 after:size-5 after:rounded-full after:bg-white after:shadow-xs after:transition-transform peer-checked:bg-brand-700 peer-checked:after:translate-x-4 peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-brand-600 motion-reduce:after:transition-none"
                     />
                   </label>
                 </div>
@@ -618,7 +619,8 @@ export default async function CandidatesPage({
           </FilterForm>
         </aside>
 
-        <div className="min-w-0">
+        {/* Phones: the compare bar sits ~13rem up (over the bottom nav, wrapping at 320px), so the last card needs room to scroll clear of it. */}
+        <div className={cn("min-w-0", compareIds.length >= 1 && "max-lg:pb-32")}>
           <RememberSelection employerId={uid} project={activeProjectId} compare={compareIds} filters={loadFailed ? undefined : filterQuery} />
           <SkillFilter
             active={effectiveSkills}
@@ -648,10 +650,12 @@ export default async function CandidatesPage({
 
           {compareIds.length >= 1 ? (
             <div
+              id="compare-bar"
               role="region"
               aria-label="Compare selection"
               className="fixed inset-x-4 bottom-24 z-40 mx-auto flex max-w-md flex-wrap items-center justify-center gap-x-4 gap-y-2 rounded-apple-xl border border-brand-200/80 bg-white/95 px-5 py-3 shadow-lg backdrop-blur-md sm:inset-x-auto sm:right-44 sm:w-max sm:max-w-none lg:bottom-6"
             >
+              <KeepFocusClear of="compare-bar" />
               <span className="text-sm font-medium text-ink-900">
                 {compareIds.length === 1
                   ? "1 selected · pick one more to compare"
@@ -671,7 +675,8 @@ export default async function CandidatesPage({
 
           <div className="mb-5 flex flex-wrap items-end justify-between gap-3 border-b border-ink-100 pb-4">
             <div className="min-w-0">
-              <p className="nums text-base font-semibold text-ink-900">
+              {/* A live count: filters apply on change, so this is how a screen reader hears the result. */}
+              <p role="status" className="nums text-base font-semibold text-ink-900">
                 {total} candidate{total === 1 ? "" : "s"}
               </p>
               {candidates.length > 0 ? (
@@ -697,7 +702,7 @@ export default async function CandidatesPage({
                   type="search"
                   defaultValue={filters.q}
                   placeholder="Keyword search"
-                  className="apple-spring min-h-11 w-full rounded-apple-sm border border-ink-200 bg-white pl-9 pr-3 text-sm text-ink-900 outline-none placeholder:text-text-subtle focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+                  className={cn(fieldClass, "pl-9")}
                 />
               </form>
               <Segmented label="Per page">
@@ -851,7 +856,8 @@ export default async function CandidatesPage({
                               <Link
                                 href={link}
                                 scroll={false}
-                                aria-label={selected ? `Remove ${name} from compare` : `Add ${name} to compare`}
+                                // Starts with the phone label ("In compare" / "Compare") so voice control can say it (2.5.3).
+                                aria-label={selected ? `In compare: remove ${name}` : `Compare ${name}`}
                                 className={buttonClass({
                                   variant: "ghost",
                                   size: "sm",
@@ -870,7 +876,7 @@ export default async function CandidatesPage({
                   </ul>
                 </Surface>
               ) : (
-                <ul className="grid gap-4 xl:grid-cols-2">
+                <ul className="grid gap-4 md:grid-cols-2 lg:grid-cols-1 2xl:grid-cols-2">
                   {candidates.map((candidate) => {
                     const rel = relations.get(candidate.id);
                     return (

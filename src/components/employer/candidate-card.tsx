@@ -57,7 +57,7 @@ export interface CandidateCardProps {
 /** The four AI interview axes as one compact meter. "-" when an axis is unrated. */
 export function RatingMeter({ ratings, className }: { ratings: Ratings; className?: string }) {
   return (
-    <dl className={cn("grid grid-cols-4 gap-x-3", className)}>
+    <dl className={cn("grid grid-cols-4 gap-x-2 sm:gap-x-3", className)}>
       {RATING_META.map((meta) => {
         const value = ratings[meta.key];
         return (
@@ -148,7 +148,7 @@ export function CandidateCard({
       href={compareHref}
       scroll={false}
       // A link, so no aria-pressed: the label carries the state.
-      aria-label={selected ? "Remove from compare" : "Add to compare"}
+      aria-label={selected ? "In compare: remove" : undefined}
       className={buttonClass({
         variant: "ghost",
         size: "sm",
@@ -166,7 +166,7 @@ export function CandidateCard({
   );
 
   return (
-    <li className="apple-spring flex min-w-0 flex-col rounded-apple-xl border border-ink-200/80 bg-white p-5 shadow-xs hover:border-brand-300 hover:shadow-sm">
+    <li className="flex min-w-0 flex-col rounded-apple-xl border border-ink-200/80 bg-white p-5 shadow-xs">
       {/* Identity, then the score as the hero on the right. */}
       <div className="flex items-start gap-4">
         <CandidateAvatar
@@ -179,7 +179,7 @@ export function CandidateCard({
             type="button"
             onClick={() => setDrawerOpen(true)}
             title={`Quick view of ${displayName}`}
-            className="max-w-full truncate rounded-apple-sm text-left text-base font-semibold tracking-[-0.01em] text-ink-900 hover:text-brand-700"
+            className="max-w-full break-words rounded-apple-sm text-left text-base font-semibold tracking-[-0.01em] text-ink-900 hover:text-brand-700"
           >
             {displayName}
           </button>
@@ -196,11 +196,11 @@ export function CandidateCard({
             ) : null}
           </p>
           {candidate.workModes.length > 0 ? (
-            <p className="mt-0.5 truncate text-sm text-ink-600">{candidate.workModes.join(" · ")}</p>
+            <p className="mt-0.5 text-sm text-ink-600">{candidate.workModes.join(" · ")}</p>
           ) : null}
         </div>
         <div className="shrink-0 text-right">
-          <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-brand-700">{band.name}</p>
+          {candidate.scored ? <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-brand-700">{band.name}</p> : null}
           <p
             className="nums mt-0.5 text-3xl font-semibold leading-none tracking-[-0.02em] text-brand-700"
             title={candidate.scored ? `Findtern Score ${candidate.score.toFixed(1)} out of 10` : "Not scored yet"}
@@ -271,7 +271,7 @@ export function CandidateCard({
                 className="size-14 rounded-apple-lg text-lg ring-1 ring-inset ring-brand-200/70"
               />
               <div className="min-w-0 flex-1">
-                <SheetTitle className="truncate text-2xl font-semibold tracking-[-0.02em] text-ink-900">{displayName}</SheetTitle>
+                <SheetTitle className="break-words text-2xl font-semibold tracking-[-0.02em] text-ink-900">{displayName}</SheetTitle>
                 <SheetDescription className="mt-1 text-sm text-ink-600">
                   {candidate.location || "Location not stated"}
                 </SheetDescription>

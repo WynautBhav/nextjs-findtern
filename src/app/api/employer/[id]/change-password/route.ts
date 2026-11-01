@@ -5,6 +5,7 @@ import { z } from "zod";
 import { getDb, schema } from "@/lib/db";
 import { hashPassword, isStrongPassword, WEAK_PASSWORD_MESSAGE, verifyPassword } from "@/lib/security/password";
 import { requireMutation } from "@/lib/guards-mutation";
+import { forgetAccountStatus } from "@/lib/account-status";
 
 const bodySchema = z.object({ currentPassword: z.string().min(1), newPassword: z.string().min(8) });
 
@@ -28,5 +29,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({ error: "Current password incorrect" }, { status: 401 });
   }
   await db.update(schema.employers).set({ password: await hashPassword(parsed.data.newPassword), passwordChangedAt: new Date() }).where(eq(schema.employers.id, id));
+  // Other sessions end now, not when the 30 s status cache runs out (INT-26).
+  forgetAccountStatus("employer", id);
   return NextResponse.json({ ok: true });
 }

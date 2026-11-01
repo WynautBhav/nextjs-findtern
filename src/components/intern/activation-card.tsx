@@ -29,7 +29,7 @@ import { loadRazorpay, RAZORPAY_THEME_COLOR } from "@/components/payments/razorp
 type Promo = { code: string; discountMinor: number };
 
 const fieldClass =
-  "h-11 min-w-0 flex-1 rounded-apple-sm border border-ink-200 bg-white px-3.5 text-[0.9375rem] text-ink-900 placeholder:text-text-subtle focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20";
+  "h-11 min-w-0 sm:flex-1 rounded-apple-sm border border-ink-200 bg-white px-3.5 text-[0.9375rem] text-ink-900 placeholder:text-text-subtle focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20";
 
 export function ActivationCard({
   internId,
@@ -37,7 +37,10 @@ export function ActivationCard({
   prefill,
   alreadyPaid = false,
   testMode = false,
+  testPay = false,
 }: {
+  /** PAYMENTS_TEST_BUTTON=1: a second button settles at the real amount without Razorpay. */
+  testPay?: boolean;
   /** PAYMENTS_MODE=free: activation completes without Razorpay. */
   testMode?: boolean;
   internId: string;
@@ -88,7 +91,7 @@ export function ActivationCard({
     }
   }
 
-  async function pay() {
+  async function pay(asTest = false) {
     setState("busy");
     setError(null);
     setNotice(null);
@@ -96,12 +99,13 @@ export function ActivationCard({
       const orderRes = await csrfFetch(`/api/intern/${encodeURIComponent(internId)}/payment/razorpay/order`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify(promo ? { promoCode: promo.code } : {}),
+        body: JSON.stringify({ ...(promo ? { promoCode: promo.code } : {}), ...(asTest ? { testPay: true } : {}) }),
       });
       const order = await orderRes.json().catch(() => ({}));
-      // 409: the server already has this profile as paid. That is the
-      // outcome we wanted, so show it instead of an error.
-      if (orderRes.status === 409) return markPaid();
+      // 409 with alreadyPaid: the server already has this profile as paid. That is
+      // the outcome we wanted, so show it instead of an error. Any other 409 (a
+      // payment still being completed) is shown as the error it is.
+      if (orderRes.status === 409 && order.alreadyPaid) return markPaid();
       if (!orderRes.ok) throw new Error(order.error ?? "Could not create the payment order.");
 
       // Full-discount code or test mode: the server already wrote a paid row.
@@ -237,7 +241,7 @@ export function ActivationCard({
 
       <button
         type="button"
-        onClick={pay}
+        onClick={() => pay()}
         disabled={state === "busy"}
         className={buttonClass({ variant: "primary", block: true, className: "mt-4" })}
       >
@@ -248,6 +252,16 @@ export function ActivationCard({
             ? "Activate free with code"
             : `Pay ${formatMoney(payable, "INR")} and go live`}
       </button>
+      {testPay && payable > 0 ? (
+        <button
+          type="button"
+          onClick={() => pay(true)}
+          disabled={state === "busy"}
+          className={buttonClass({ variant: "light", size: "sm", block: true, className: "mt-2" })}
+        >
+          Test: mark as paid, no charge ({formatMoney(payable, "INR")})
+        </button>
+      ) : null}
 
       {error ? (
         <p role="alert" className="mt-2 text-pretty text-sm leading-relaxed text-danger">
@@ -257,6 +271,8 @@ export function ActivationCard({
         <p role="status" className="mt-2 text-pretty text-sm leading-relaxed text-ink-700">
           {notice}
         </p>
+      ) : testMode ? (
+        <p className="mt-2 text-xs leading-relaxed text-ink-600">Test mode: no payment is taken.</p>
       ) : (
         <p className="mt-2 text-xs leading-relaxed text-ink-600">
           Razorpay handles the card details; this site never sees them. The amount is recomputed on the server.

@@ -15,13 +15,14 @@
  * params, and a skill picked through a plain form submit would drop all of it.
  */
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Check, Plus, Search, X } from "lucide-react";
 
 import { suggestSkills } from "@/lib/data/skills";
 import { cn } from "@/lib/utils";
+import { fieldClass } from "@/components/employer/ui-tokens";
 
 const MAX_SKILLS = 7;
 
@@ -47,6 +48,8 @@ export function SkillFilter({
   const params = useSearchParams();
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
+  const [highlight, setHighlight] = useState(-1);
+  const listId = useId();
   // Phones: the panel folds to one summary line, so the people list starts
   // on the first screen (QA-125). Always open at lg.
   const [shown, setShown] = useState(false);
@@ -56,6 +59,8 @@ export function SkillFilter({
   const options = typed ? suggestSkills(typed, 8).filter((s) => !active.includes(s)) : [];
   // Legacy let an employer add a skill outside the list ("Add "X" (Press Enter)").
   const custom = typed && !options.some((o) => o.toLowerCase() === typed.toLowerCase()) ? typed : null;
+  // What the arrow keys walk: the suggestions, then the "Add …" row.
+  const items = open ? (custom ? [...options, custom] : options) : [];
 
   /**
    * `skills` in the URL - even empty - is the employer's own pick and wins
@@ -75,6 +80,7 @@ export function SkillFilter({
     router.push(hrefWith([...active, skill]), { scroll: false });
     setQuery("");
     setOpen(false);
+    setHighlight(-1);
   }
 
   return (
@@ -139,51 +145,65 @@ export function SkillFilter({
             type="text"
             value={query}
             disabled={full}
+            role="combobox"
+            aria-expanded={items.length > 0}
+            aria-controls={listId}
+            aria-autocomplete="list"
+            aria-activedescendant={highlight >= 0 && items[highlight] ? `${listId}-${highlight}` : undefined}
             onChange={(e) => {
               setQuery(e.target.value);
               setOpen(true);
+              setHighlight(-1);
             }}
             onFocus={() => setOpen(true)}
             onBlur={() => window.setTimeout(() => setOpen(false), 120)}
             onKeyDown={(e) => {
-              if (e.key === "Enter" && typed) {
+              if ((e.key === "ArrowDown" || e.key === "ArrowUp") && items.length) {
                 e.preventDefault();
-                add(options[0] ?? typed);
+                const step = e.key === "ArrowDown" ? 1 : -1;
+                setHighlight((i) => (i < 0 && step < 0 ? items.length - 1 : (i + step + items.length) % items.length));
+              } else if (e.key === "Escape") {
+                setOpen(false);
+                setHighlight(-1);
+              } else if (e.key === "Enter" && typed) {
+                e.preventDefault();
+                add(highlight >= 0 && items[highlight] ? items[highlight] : (options[0] ?? typed));
               }
             }}
             placeholder={full ? `${MAX_SKILLS} skills max` : "Add a required skill…"}
             aria-label="Search skills to filter by"
-            className="apple-spring min-h-11 w-full rounded-apple-sm border border-ink-200 bg-ink-50 pl-9 pr-3.5 text-sm text-ink-900 outline-none placeholder:text-text-subtle focus:border-brand-500 focus:bg-white focus:ring-2 focus:ring-brand-500/20 disabled:opacity-60"
+            className={cn(fieldClass, "pl-9 pr-3.5")}
           />
           {open && (options.length > 0 || custom) ? (
-            <ul className="absolute left-0 right-0 z-20 mt-1 max-h-64 overflow-y-auto rounded-apple-sm border border-ink-200 bg-white shadow-sm">
-              {options.map((skill) => (
-                <li key={skill}>
-                  <button
-                    type="button"
-                    onMouseDown={(e) => {
-                      e.preventDefault();
-                      add(skill);
-                    }}
-                    className="apple-spring flex min-h-11 w-full items-center px-3 py-1.5 text-left text-sm text-ink-800 hover:bg-brand-50"
-                  >
-                    {skill}
-                  </button>
+            <ul id={listId} role="listbox" aria-label="Skill suggestions" className="absolute left-0 right-0 z-20 mt-1 max-h-64 overflow-y-auto rounded-apple-sm border border-ink-200 bg-white shadow-sm">
+              {options.map((skill, i) => (
+                <li
+                  key={skill}
+                  id={`${listId}-${i}`}
+                  role="option"
+                  aria-selected={i === highlight}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    add(skill);
+                  }}
+                  className={cn("apple-spring flex min-h-11 cursor-pointer items-center px-3 py-1.5 text-left text-sm text-ink-800 hover:bg-brand-50", i === highlight && "bg-brand-50")}
+                >
+                  {skill}
                 </li>
               ))}
               {custom ? (
-                <li>
-                  <button
-                    type="button"
-                    onMouseDown={(e) => {
-                      e.preventDefault();
-                      add(custom);
-                    }}
-                    className="apple-spring flex min-h-11 w-full items-center gap-1.5 px-3 py-1.5 text-left text-sm text-brand-700 hover:bg-brand-50"
-                  >
-                    <Plus className="size-3.5" aria-hidden />
-                    Add &ldquo;{custom}&rdquo; (Press Enter)
-                  </button>
+                <li
+                  id={`${listId}-${options.length}`}
+                  role="option"
+                  aria-selected={highlight === options.length}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    add(custom);
+                  }}
+                  className={cn("apple-spring flex min-h-11 cursor-pointer items-center gap-1.5 px-3 py-1.5 text-left text-sm text-brand-700 hover:bg-brand-50", highlight === options.length && "bg-brand-50")}
+                >
+                  <Plus className="size-3.5" aria-hidden />
+                  Add &ldquo;{custom}&rdquo; (Press Enter)
                 </li>
               ) : null}
             </ul>

@@ -26,6 +26,12 @@ function notesOf(raw: unknown): { ids: string[]; mode: string; dueIds: string[] 
   return { ids: Array.isArray(ids) ? ids.map(String) : [], mode: String(n.paymentMode ?? "upfront"), dueIds: due };
 }
 
+/** The promo discount an order recorded, in minor units (0 when none). */
+function promoDiscountOf(raw: unknown): number {
+  const n = Number(((raw ?? {}) as { promo?: { discountMinor?: unknown } }).promo?.discountMinor);
+  return Number.isFinite(n) && n > 0 ? Math.round(n) : 0;
+}
+
 export type Due = { proposalId: string; monthsPaid: number; months: number };
 
 export function monthlyDues(proposals: ProposalLike[], payments: PaymentLike[]): Due[] {
@@ -91,6 +97,10 @@ export function placementLedger(hire: HireLike, payments: readonly PaidOrderLike
   const monthly = lineCharge(offer, 10, "monthly", { firstPayment: false });
   let upfrontPaid = false;
   let monthsPaid = 0;
+  // What promo codes took off this hire. An order stores it (`raw.promo`), and
+  // only a one-hire order can be pinned to its hire; older multi-hire orders
+  // keep the offer's figures (see above).
+  let promoMinor = 0;
   const paidOn: string[] = [];
   for (const p of payments) {
     if (p.status !== "paid") continue;
@@ -99,12 +109,16 @@ export function placementLedger(hire: HireLike, payments: readonly PaidOrderLike
     if (!ids.includes(hire.id) && !asDue) continue;
     if (mode === "monthly" || asDue) monthsPaid += 1;
     else upfrontPaid = true;
+    if (ids.length <= 1) promoMinor += promoDiscountOf(p.raw);
     const at = p.paidAt ? new Date(p.paidAt) : null;
     if (at && !Number.isNaN(at.getTime())) paidOn.push(at.toISOString());
   }
   paidOn.sort();
   const months = offer.fullTime ? 1 : offer.months;
-  const totalMinor = upfront.totalMinor;
+  // A code lowers the cost and the amount paid by the same figure, so what is
+  // still due does not change and "paid" is what was actually charged.
+  const listMinor = upfront.totalMinor;
+  const totalMinor = Math.max(0, listMinor - promoMinor);
   const plan: PlacementLedger["plan"] = offer.fullTime
     ? "full_time"
     : upfrontPaid
@@ -116,7 +130,7 @@ export function placementLedger(hire: HireLike, payments: readonly PaidOrderLike
     plan === "upfront" || (plan === "full_time" && paidOn.length > 0)
       ? totalMinor
       : plan === "monthly"
-        ? Math.min(totalMinor, upfront.perHireMinor + monthly.totalMinor * monthsPaid)
+        ? Math.max(0, Math.min(listMinor, upfront.perHireMinor + monthly.totalMinor * monthsPaid) - promoMinor)
         : 0;
   const dueMinor = Math.max(0, totalMinor - paidMinor);
   const covered = plan === "upfront" || (plan === "full_time" && paidMinor > 0) ? months : Math.min(monthsPaid, months);

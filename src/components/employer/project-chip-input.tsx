@@ -125,22 +125,22 @@ export function ChipInput({
             className="absolute inset-x-0 top-full z-30 mt-1 max-h-60 overflow-auto rounded-apple-md border border-ink-200 bg-white py-1 shadow-md"
           >
             {options.map((option, i) => (
-              <li key={option} id={`${listId}-${i}`} role="option" aria-selected={i === active}>
-                <button
-                  type="button"
-                  tabIndex={-1}
-                  // onMouseDown so the pick lands before the input's blur.
-                  onMouseDown={(e) => {
-                    e.preventDefault();
-                    commit(option);
-                  }}
-                  className={cn(
-                    "flex min-h-11 w-full items-center px-3.5 py-2 text-left text-sm text-ink-800 hover:bg-ink-50",
-                    i === active && "bg-brand-50 text-brand-800",
-                  )}
-                >
-                  {option}
-                </button>
+              <li
+                key={option}
+                id={`${listId}-${i}`}
+                role="option"
+                aria-selected={i === active}
+                // onMouseDown so the pick lands before the input's blur.
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  commit(option);
+                }}
+                className={cn(
+                  "flex min-h-11 cursor-pointer items-center px-3.5 py-2 text-left text-sm text-ink-800 hover:bg-ink-50",
+                  i === active && "bg-brand-50 text-brand-800",
+                )}
+              >
+                {option}
               </li>
             ))}
           </ul>

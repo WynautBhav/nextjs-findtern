@@ -35,9 +35,17 @@ type Props = {
   mode?: "upfront" | "monthly";
   /** PAYMENTS_MODE=free: the order completes without Razorpay. */
   testMode?: boolean;
+  /** PAYMENTS_TEST_BUTTON=1: a second button settles at the real amount without Razorpay. */
+  testPay?: boolean;
 };
 
-export function CheckoutPay({ employerId, currency, amountMinor, prefill, proposalIds, mode = "upfront", testMode = false }: Props) {
+// fetch rejects with a TypeError ("Failed to fetch") when offline; never show that raw.
+function errorText(e: unknown, fallback: string): string {
+  if (e instanceof TypeError) return "Couldn't reach the server. Check your connection and try again.";
+  return e instanceof Error && e.message ? e.message : fallback;
+}
+
+export function CheckoutPay({ employerId, currency, amountMinor, prefill, proposalIds, mode = "upfront", testMode = false, testPay = false }: Props) {
   const router = useRouter();
   const [state, setState] = useState<"idle" | "busy" | "paid">("idle");
   const [error, setError] = useState<string | null>(null);
@@ -65,22 +73,22 @@ export function CheckoutPay({ employerId, currency, amountMinor, prefill, propos
       if (!res.ok) throw new Error(body.error ?? "That code did not work.");
       setPromo({ code: body.code, discountMinor: Number(body.discountMinor) || 0 });
     } catch (e) {
-      setPromoError(e instanceof Error ? e.message : "That code did not work.");
+      setPromoError(errorText(e, "That code did not work. Try again."));
     } finally {
       setChecking(false);
     }
   }
 
-  async function pay() {
+  async function pay(asTest = false) {
     setState("busy");
     setError(null);
     try {
       const [Razorpay, order] = await Promise.all([
-        testMode ? Promise.resolve(null) : loadRazorpay(),
+        testMode || asTest ? Promise.resolve(null) : loadRazorpay(),
         csrfFetch(`/api/employer/${encodeURIComponent(employerId)}/payment/razorpay/order`, {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ currency, promoCode: promo?.code, proposalIds, mode }),
+          body: JSON.stringify({ currency, promoCode: promo?.code, proposalIds, mode, ...(asTest ? { testPay: true } : {}) }),
         }).then(async (res) => {
           const body = await res.json().catch(() => ({}));
           if (!res.ok) throw new Error(body.error ?? "Could not create the payment order.");
@@ -134,11 +142,9 @@ export function CheckoutPay({ employerId, currency, amountMinor, prefill, propos
             setState("paid");
             router.refresh();
           } catch (e) {
-            setError(
-              e instanceof Error
-                ? `${e.message} If money was debited, it shows under Orders once the gateway confirms it.`
-                : "Payment could not be verified.",
-            );
+            // The gateway may already have debited: no "try again" here, or a second Pay can charge twice.
+            const why = e instanceof TypeError ? "Couldn't reach the server to confirm the payment." : errorText(e, "Payment could not be verified.");
+            setError(`${why} If money was debited, it shows under Orders once the gateway confirms it.`);
             setState("idle");
           }
         },
@@ -151,7 +157,7 @@ export function CheckoutPay({ employerId, currency, amountMinor, prefill, propos
 
       rzp.open();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Something went wrong starting the payment.");
+      setError(errorText(e, "Couldn't start the payment. Try again."));
       setState("idle");
     }
   }
@@ -210,7 +216,7 @@ export function CheckoutPay({ employerId, currency, amountMinor, prefill, propos
       </div>
       <button
         type="button"
-        onClick={pay}
+        onClick={() => pay()}
         disabled={state === "busy"}
         className={buttonClass({ variant: "primary", block: true, className: "nums" })}
       >
@@ -226,14 +232,24 @@ export function CheckoutPay({ employerId, currency, amountMinor, prefill, propos
           </span>
         ) : null}
       </button>
+      {testPay ? (
+        <button
+          type="button"
+          onClick={() => pay(true)}
+          disabled={state === "busy"}
+          className={buttonClass({ variant: "light", size: "sm", block: true, className: "nums mt-2" })}
+        >
+          Test: mark as paid, no charge ({formatMoney(payable, currency)})
+        </button>
+      ) : null}
       {error ? (
         <p className="mt-2 text-pretty text-xs leading-relaxed text-danger">{error}</p>
       ) : testMode ? (
-        <p className="mt-2 text-xs leading-relaxed text-ink-500">
+        <p className="mt-2 text-xs leading-relaxed text-text-subtle">
           Test mode: no payment is taken. The hire completes as if it were paid.
         </p>
       ) : (
-        <p className="mt-2 text-xs leading-relaxed text-ink-500">
+        <p className="mt-2 text-xs leading-relaxed text-text-subtle">
           Razorpay handles the card details; this site never sees them. The signature is verified
           server-side before the payment counts.
         </p>

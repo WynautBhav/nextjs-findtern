@@ -21,7 +21,7 @@
  * button; the others, the profile and Mark missed sit in its ⋯ menu.
  */
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Bell, CalendarCheck, CalendarClock, Check, Loader2, MessageSquare, UserRound, X } from "lucide-react";
 
@@ -31,6 +31,8 @@ import { isQuarterHourWall, suggestedSlots, type InterviewStage } from "@/lib/em
 import { MeetingSlots, type Slots } from "@/components/employer/meeting-slots";
 import { JoinMeetingButton } from "@/components/employer/meeting-join";
 import { RowMenu } from "@/components/app/row-menu";
+import { fieldClass } from "@/components/employer/ui-tokens";
+import { cn } from "@/lib/utils";
 
 type Panel = "none" | "reschedule" | "feedback" | "missed";
 
@@ -65,10 +67,23 @@ export function InterviewActions({
   const [notice, setNotice] = useState<string | null>(null);
   const [slots, setSlots] = useState<Slots>(["", "", ""]);
   const [feedback, setFeedback] = useState("");
+  // Which input the error is about, so it can be marked invalid and focused.
+  const [errorField, setErrorField] = useState<"slots" | "feedback" | null>(null);
+  const uid = useId();
+  const errId = `${uid}-error`;
+  const feedbackId = `${uid}-feedback`;
+  const slotsId = `${uid}-slots`;
+  function fail(field: "slots" | "feedback", msg: string) {
+    setErrorField(field);
+    setError(msg);
+    const el = document.getElementById(field === "slots" ? slotsId : feedbackId);
+    (field === "slots" ? el?.querySelector<HTMLElement>("input, select") : el)?.focus();
+  }
 
   async function post(path: string, body: unknown, label: string) {
     setBusy(label);
     setError(null);
+    setErrorField(null);
     setNotice(null);
     try {
       const res = await csrfFetch(`/api/interviews/${encodeURIComponent(interviewId)}/${path}`, {
@@ -77,10 +92,10 @@ export function InterviewActions({
         body: JSON.stringify(body ?? {}),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error ?? `Could not ${label}.`);
+      if (!res.ok) throw new Error(data.error ?? `Couldn't ${label}. Try again.`);
       return true;
     } catch (e) {
-      setError(e instanceof Error ? e.message : `Could not ${label}.`);
+      setError(e instanceof TypeError || !(e instanceof Error) ? "Couldn't reach the server. Check your connection and try again." : e.message);
       return false;
     } finally {
       setBusy(null);
@@ -110,9 +125,9 @@ export function InterviewActions({
   }
 
   async function reschedule() {
-    if (slots.some((v) => !v)) return setError("Offer three times.");
-    if (!slots.every(isQuarterHourWall)) return setError("Slots start on the hour or at :15, :30 or :45.");
-    if (new Set(slots).size !== 3) return setError("Offer three different times.");
+    if (slots.some((v) => !v)) return fail("slots", "Offer three times.");
+    if (!slots.every(isQuarterHourWall)) return fail("slots", "Slots start on the hour or at :15, :30 or :45.");
+    if (new Set(slots).size !== 3) return fail("slots", "Offer three different times.");
     // Wall-clock; the server applies the interview's timezone.
     if (await post("reschedule", { slot1: slots[0], slot2: slots[1], slot3: slots[2] }, "reschedule")) {
       setNotice("New times offered. The candidate has been told.");
@@ -122,7 +137,7 @@ export function InterviewActions({
   }
 
   async function sendFeedback() {
-    if (!feedback.trim()) return setError("Write the feedback first.");
+    if (!feedback.trim()) return fail("feedback", "Write the feedback first.");
     if (await post("feedback", { feedback: feedback.trim() }, "save the feedback")) {
       setNotice("Feedback shared with the candidate.");
       setPanel("none");
@@ -133,6 +148,7 @@ export function InterviewActions({
 
   function toggle(next: Panel) {
     setError(null);
+    setErrorField(null);
     if (next === "reschedule" && panel !== "reschedule") setSlots(suggestedSlots(Date.now(), timezone));
     setPanel(panel === next ? "none" : next);
   }
@@ -215,8 +231,8 @@ export function InterviewActions({
           <p className="mt-1 text-sm leading-relaxed text-ink-600">
             Suggested: the next quarter hour, then one and two hours after it. Change any of them. Times are in {timezone}.
           </p>
-          <div className="mt-3">
-            <MeetingSlots slots={slots} onChange={setSlots} timezone={timezone} />
+          <div id={slotsId} className="mt-3">
+            <MeetingSlots slots={slots} onChange={setSlots} timezone={timezone} invalid={errorField === "slots"} describedBy={errId} />
           </div>
           <div className="mt-4 flex flex-wrap items-center gap-2">
             <button type="button" onClick={reschedule} disabled={busy !== null} className={buttonClass({ size: "sm" })}>
@@ -232,18 +248,20 @@ export function InterviewActions({
 
       {panel === "feedback" ? (
         <div className="mt-4 rounded-apple-lg border border-ink-200/80 bg-ink-50/70 p-4">
-          <label htmlFor={`feedback-${interviewId}`} className="text-sm font-semibold text-ink-900">
+          <label htmlFor={feedbackId} className="text-sm font-semibold text-ink-900">
             Feedback for the candidate
           </label>
           <p className="mt-1 text-sm text-ink-600">Shared once, and the candidate reads it as written.</p>
           <textarea
-            id={`feedback-${interviewId}`}
+            id={feedbackId}
+            aria-invalid={errorField === "feedback" || undefined}
+            aria-describedby={errorField === "feedback" ? errId : undefined}
             value={feedback}
             onChange={(e) => setFeedback(e.target.value)}
             rows={4}
             maxLength={2000}
             placeholder="What went well, what was missing, and what happens next."
-            className="apple-spring mt-3 w-full rounded-apple-sm border border-ink-200 bg-white px-3.5 py-2.5 text-sm leading-relaxed text-ink-900 outline-none focus-visible:border-brand-500 focus-visible:ring-2 focus-visible:ring-brand-500/20"
+            className={cn(fieldClass, "mt-3 py-2.5 leading-relaxed")}
           />
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <button type="button" onClick={sendFeedback} disabled={busy !== null} className={buttonClass({ size: "sm" })}>
@@ -277,16 +295,15 @@ export function InterviewActions({
       ) : null}
 
       {error ? (
-        <p role="alert" className="mt-3 text-sm text-danger">
+        <p id={errId} role="alert" className="mt-3 text-sm text-danger">
           {error}
         </p>
       ) : null}
-      {notice ? (
-        <p role="status" className="mt-3 inline-flex items-center gap-1.5 text-sm text-brand-700">
-          <Check className="size-4" aria-hidden />
-          {notice}
-        </p>
-      ) : null}
+      {/* Always mounted, so the result is announced when it fills in. */}
+      <p role="status" className={notice ? "mt-3 inline-flex items-center gap-1.5 text-sm text-brand-700" : "sr-only"}>
+        {notice ? <Check className="size-4" aria-hidden /> : null}
+        {notice}
+      </p>
     </div>
   );
 }

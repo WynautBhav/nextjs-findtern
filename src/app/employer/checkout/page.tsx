@@ -7,7 +7,7 @@ import { payableCheckout, type PayableCheckout } from "@/lib/employer-payable";
 import { displayNameOf } from "@/lib/employer-candidates";
 import { hireFlowCounts } from "@/lib/employer-flow";
 import { expireStaleEmployerOrders } from "@/lib/payments";
-import { paymentsAreFree } from "@/lib/razorpay";
+import { paymentsAreFree, testPayEnabled } from "@/lib/razorpay";
 import { EmptyScene, PageHead } from "@/components/app/primitives";
 import { HireFlow, type HireFlowCounts } from "@/components/employer/hire-flow";
 import { CheckoutSummary } from "@/components/payments/checkout-summary";
@@ -107,6 +107,7 @@ export default async function EmployerCheckout({
         <CheckoutSummary
           employerId={uid}
           testMode={paymentsAreFree()}
+          testPay={testPayEnabled()}
           prefill={prefill}
           initialId={sp.proposal ?? sp.proposalId ?? null}
           lines={lines.map((line) => ({

@@ -9,7 +9,7 @@
  * One component covers both directions so the button and its "remove" twin can
  * never disagree about what is currently shortlisted. Before shortlisting it
  * is the card's one primary action (`emphasis="primary"`); once shortlisted it
- * steps back to an outline "Shortlisted" that removes on press.
+ * steps back to an outline button (still named "Shortlist", aria-pressed) that removes on press.
  */
 
 import { useState } from "react";
@@ -43,6 +43,7 @@ export function ShortlistToggle({
   const [error, setError] = useState<string | null>(null);
 
   async function toggle() {
+    if (busy) return;
     setBusy(true);
     setError(null);
     try {
@@ -63,11 +64,12 @@ export function ShortlistToggle({
         router.push(`/employer/proposal/${encodeURIComponent(data.proposalId)}`);
         return;
       }
-      if (!res.ok) throw new Error(data.error ?? "Could not update your shortlist.");
+      if (!res.ok) throw new Error(data.error ?? "Couldn't update the shortlist. Try again.");
       setState(!state);
       router.refresh();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not update your shortlist.");
+      // fetch rejects with a TypeError ("Failed to fetch") when offline; never show that raw.
+      setError(e instanceof TypeError || !(e instanceof Error) ? "Couldn't reach the server. Check your connection and try again." : e.message);
     } finally {
       setBusy(false);
     }
@@ -80,7 +82,8 @@ export function ShortlistToggle({
       <button
         type="button"
         onClick={toggle}
-        disabled={busy}
+        // Not `disabled`: that drops keyboard focus to the page while it saves.
+        aria-disabled={busy || undefined}
         aria-pressed={state}
         title={state ? "Remove from your shortlist" : "Add to your shortlist for this project"}
         className={buttonClass({ variant, size: size === "sm" ? "sm" : "md", block: true, className: size === "sm" ? "min-h-10" : undefined })}
@@ -92,7 +95,7 @@ export function ShortlistToggle({
         ) : (
           <Plus className="size-4" aria-hidden />
         )}
-        {state ? "Shortlisted" : "Shortlist"}
+        Shortlist
       </button>
       {error ? (
         <span role="alert" className="text-xs text-danger">

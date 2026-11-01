@@ -22,6 +22,7 @@ import { escalationEmailDomainError, websiteDomainError } from "@/lib/company-do
 import { isIndiaCountry } from "@/lib/data/countries";
 import { dialCodeFor } from "@/lib/data/dial-codes";
 import { COMPANY_SIZE_OPTIONS, ESCALATION_FIELDS, REQUIRED_COMPANY_FIELDS, isPersonalEmail, needsBillingPincode } from "@/lib/employer-onboarding";
+import { GSTIN_HINT, isGstinFormat } from "@/lib/gstin";
 import { phoneChangeError } from "@/lib/phone";
 import { timezoneForLocation } from "@/lib/timezones";
 
@@ -86,8 +87,8 @@ function validate(v: Values, saved: CompanyProfile): Record<string, string> {
       ? "Enter the 6-digit PIN code of your billing address."
       : "Required for GST invoices in India. Enter the 6-digit PIN code of your billing address.";
   }
-  if (v.gstNumber?.trim() && !/^[0-9A-Z]{15}$/i.test(v.gstNumber.trim())) {
-    errors.gstNumber = "A GST number is 15 characters, letters and digits only.";
+  if (v.gstNumber?.trim() && v.gstNumber.trim().toUpperCase() !== (saved.gstNumber ?? "").trim().toUpperCase() && !isGstinFormat(v.gstNumber)) {
+    errors.gstNumber = GSTIN_HINT;
   }
   for (const [k, label] of ESCALATION_FIELDS) {
     if (!v[k]?.trim()) errors[k] = `${label} is required.`;
@@ -179,11 +180,11 @@ export function CompanyProfileForm({
         body: JSON.stringify(body),
       });
       const data = (await res.json().catch(() => ({}))) as { error?: string };
-      if (!res.ok) throw new Error(data.error ?? "Couldn't save the profile.");
+      if (!res.ok) throw new Error(data.error ?? "Couldn't save the profile. Try again.");
       setSaved(true);
       router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Couldn't save the profile.");
+      setError(err instanceof TypeError || !(err instanceof Error) ? "Couldn't reach the server. Check your connection and try again." : err.message);
     } finally {
       setBusy(false);
     }
@@ -365,7 +366,7 @@ export function CompanyProfileForm({
 
       <div className="space-y-4 border-t border-ink-100 pt-6">
         {error ? <FormNotice tone="error">{error}</FormNotice> : null}
-        {saved ? <FormNotice tone="success">Company details saved.</FormNotice> : null}
+        <div role="status">{saved ? <FormNotice tone="success">Company details saved.</FormNotice> : null}</div>
         <button type="submit" disabled={busy} className={buttonClass({ variant: "primary", size: "md" })}>
           {busy ? <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden /> : null}
           Save company details

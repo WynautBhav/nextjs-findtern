@@ -123,7 +123,7 @@ test("employer: link → sign in → enter, sees exactly the one student", async
 test("employer: shortlists and asks for a call now", async () => {
   const card = emp.locator("main ul > li").first();
   await card.getByRole("button", { name: /^Shortlist / }).click();
-  await card.getByRole("button", { name: /from shortlist$/ }).waitFor();
+  await card.getByRole("button", { name: /^Shortlist /, pressed: true }).waitFor();
   await card.getByRole("button", { name: /Call/ }).click();
   await emp.getByRole("menuitem", { name: "Now" }).click();
   const sent = emp.getByRole("status").filter({ hasText: "Call request sent" });

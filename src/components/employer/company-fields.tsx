@@ -13,18 +13,19 @@
 
 import { AlertCircle, CheckCircle2, ChevronDown, Info } from "lucide-react";
 
+import { onRadioKeys, radioTab } from "@/components/intern/onboarding/fields";
 import { cn } from "@/lib/utils";
+import { fieldClass } from "@/components/employer/ui-tokens";
 
 /** The control recipe, shared with location-fields and phone-field. */
 export function controlClass(error?: boolean, className?: string) {
   return cn(
-    "apple-spring block min-h-11 w-full rounded-apple-sm border bg-white px-3.5 text-[0.9375rem] text-ink-900 shadow-xs outline-none",
-    "placeholder:text-text-subtle focus:ring-2 disabled:cursor-not-allowed disabled:bg-ink-50 disabled:text-text-subtle",
+    // fieldClass, with the 15px reading size, a wider inset and an error state.
+    fieldClass,
+    "block px-3.5 shadow-xs md:text-[0.9375rem]",
     // aria-readonly, not :read-only - a <select> always matches :read-only.
     "aria-readonly:cursor-default aria-readonly:bg-ink-50 aria-readonly:text-ink-600 aria-readonly:shadow-none",
-    error
-      ? "border-danger focus:border-danger focus:ring-danger/20"
-      : "border-ink-200 hover:border-ink-300 focus:border-brand-500 focus:ring-brand-500/20",
+    error && "border-danger hover:border-danger focus-visible:border-danger focus-visible:ring-danger/20",
     className,
   );
 }
@@ -250,8 +251,8 @@ export function ChoiceGroup({
         ) : null}
       </legend>
       {hint && !error ? <FieldHint id={`${id}-hint`}>{hint}</FieldHint> : null}
-      <div role="radiogroup" aria-label={label} className="mt-2.5 flex flex-wrap gap-2">
-        {options.map((o) => {
+      <div role="radiogroup" aria-label={label} onKeyDown={onRadioKeys} className="mt-2.5 flex flex-wrap gap-2">
+        {options.map((o, i) => {
           const active = value === o.value;
           return (
             <button
@@ -259,6 +260,7 @@ export function ChoiceGroup({
               type="button"
               role="radio"
               aria-checked={active}
+              tabIndex={radioTab(active, i, options.some((x) => x.value === value))}
               onClick={() => onChange(o.value)}
               className={cn(
                 "apple-spring apple-pressable inline-flex min-h-11 items-center gap-2 rounded-apple-sm border px-4 text-sm font-medium",
@@ -301,7 +303,12 @@ export function FormSection({
   );
 }
 
-/** A form-level message: what failed, what saved, or what to know. */
+/**
+ * A form-level message: what failed, what saved, or what to know. An error
+ * announces itself (role="alert"); success and info carry no role, because a
+ * live region announced only if it was already mounted, so the caller keeps a
+ * `<div role="status">` mounted and renders the notice inside it.
+ */
 export function FormNotice({
   tone,
   children,
@@ -314,7 +321,7 @@ export function FormNotice({
   const Icon = tone === "error" ? AlertCircle : tone === "success" ? CheckCircle2 : Info;
   return (
     <p
-      role={tone === "error" ? "alert" : "status"}
+      role={tone === "error" ? "alert" : undefined}
       className={cn(
         "flex items-start gap-2.5 rounded-apple-md border px-4 py-3 text-sm leading-relaxed",
         tone === "error" && "border-danger/25 bg-danger-soft text-danger",
