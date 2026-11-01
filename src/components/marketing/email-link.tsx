@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { Check, Copy } from "lucide-react";
 
 import { SITE, contactEmailFor } from "@/lib/content/site";
@@ -78,5 +78,23 @@ export function EmailLink({
  * are shared by both audiences and only know the page from its path.
  */
 export function ContactEmailLink(props: Omit<Parameters<typeof EmailLink>[0], "email">) {
-  return <EmailLink {...props} email={contactEmailFor(usePathname())} />;
+  return <EmailLink {...props} email={contactEmailFor(useHydratedPathname())} />;
+}
+
+const noSubscription = () => () => {};
+
+/**
+ * The page's path, but `null` until the browser has hydrated. The server render
+ * does not know the path of a prerendered page, so it printed communicate@ on
+ * the home page while the browser printed admin@: React error #418 (text content
+ * did not match) on every load. Both sides now start from `null`, and the real
+ * path takes over straight after hydration.
+ */
+function useHydratedPathname(): string | null {
+  const path = usePathname();
+  return useSyncExternalStore(
+    noSubscription,
+    () => path,
+    () => null,
+  );
 }

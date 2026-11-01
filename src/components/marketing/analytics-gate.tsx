@@ -15,9 +15,14 @@ import { Analytics } from "@/components/marketing/analytics";
  *
  * The admin workspace is the one exception: staff traffic is not marketing
  * traffic, and counting it skews every report the trackers feed.
+ *
+ * Nor does a staging copy report: the three ids are the live site's, so every
+ * test visit would land in the real GA4 property and the real remarketing
+ * pixel. `enabled` comes from the server layout (it knows PUBLIC_ORIGIN; the
+ * browser does not).
  */
-export function AnalyticsGate() {
+export function AnalyticsGate({ enabled = true }: { enabled?: boolean }) {
   const path = usePathname() ?? "/";
   const inAdmin = path === "/admin" || path.startsWith("/admin/");
-  return inAdmin ? null : <Analytics />;
+  return !enabled || inAdmin ? null : <Analytics />;
 }

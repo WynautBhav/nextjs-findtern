@@ -248,7 +248,9 @@ export default async function GuaranteePage() {
         }
         lead="A clear, step-by-step path from sign-up to placement — designed for confidence, transparency, and real outcomes. One fee, refunded in full if we do not place you."
       >
-        <div className="flex flex-wrap items-center gap-3">
+        {/* One block: PageHero lays its children out side by side, which pushed the chips away from the buttons. */}
+        <div className="flex flex-col items-center">
+        <div className="flex flex-wrap items-center justify-center gap-3">
           <ButtonLink href="/signup" variant="primary" size="lg">
             Sign Up Now
             <ArrowRight className="size-4" aria-hidden />
@@ -259,7 +261,7 @@ export default async function GuaranteePage() {
         </div>
 
         {/* Hero Badges */}
-        <div className="mt-8 flex flex-wrap items-center gap-4 text-xs font-semibold text-ink-700">
+        <div className="mt-8 flex flex-wrap items-center justify-center gap-4 text-xs font-semibold text-ink-700">
           <div className="inline-flex items-center gap-1.5 rounded-full border border-ink-200/80 bg-white/80 px-3.5 py-1.5 backdrop-blur-xs shadow-2xs">
             <Clock className="size-3.5 text-primary" />
             <span>18-Month Guarantee Window</span>
@@ -272,6 +274,7 @@ export default async function GuaranteePage() {
             <ShieldCheck className="size-3.5 text-primary" />
             <span>100% Refund Assurance</span>
           </div>
+        </div>
         </div>
       </PageHero>
 

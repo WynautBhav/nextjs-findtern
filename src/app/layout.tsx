@@ -100,7 +100,7 @@ export default function RootLayout({
         <SmoothScroll>{children}</SmoothScroll>
         {/* Organization + WebSite once, site-wide. Pages add their own graphs. */}
         <JsonLd data={siteGraph()} />
-        <AnalyticsGate />
+        <AnalyticsGate enabled={!isStagingHost()} />
         <ChatWidget />
       </body>
     </html>
