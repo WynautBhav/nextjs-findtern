@@ -24,7 +24,7 @@ import { after, before, test } from "node:test";
 import AxeBuilder from "@axe-core/playwright";
 import { chromium, firefox, webkit } from "playwright";
 
-import { api as rawApi, expectOk, pngBase64, upload, visit } from "./lib/browser.mjs";
+import { api as rawApi, expectOk, gotoWithRetry, pngBase64, stalls, upload, visit } from "./lib/browser.mjs";
 import { STAGING_URL, closeDb, manifest, one as rawOne, own, ownedWrite, readSignupCode, rows as rawRows } from "./lib/staging.mjs";
 
 /** Anything that takes this long is printed with what it was, so a slow run can be explained. */
@@ -300,6 +300,8 @@ after(async () => {
   writeFileSync(join(OUT, `${BROWSER}-manifest.json`), JSON.stringify({ run: RUN, browser: BROWSER, created: manifest() }, null, 2));
   writeFileSync(join(OUT, `${BROWSER}-issues.json`), JSON.stringify(issues, null, 2));
   console.log(`\n[${BROWSER}] run ${RUN}: ${issues.length} console/network issues recorded -> ${join(OUT, `${BROWSER}-issues.json`)}`);
+  writeFileSync(join(OUT, `${BROWSER}-stalls-${RUN}.json`), JSON.stringify(stalls, null, 2));
+  console.log(`[${BROWSER}] page loads that hung and were reloaded: ${stalls.length}${stalls.length ? ` (${stalls.map((s) => `${s.target.replace(STAGING_URL, "")} ${s.seconds}s`).join(", ")})` : ""}`);
   await browser?.close();
   await closeDb();
 });
@@ -960,19 +962,26 @@ step("admin: the ledgers list the test orders with their invoice numbers [UI]", 
 
 step("intern: a timesheet cannot start before the job does; after time travel it is filled and submitted [API]", ["paidUpfront"], "timesheetId", async () => {
   const page = internPageFor(state.hiredInternId);
-  const early = await api(page, "POST", "/api/intern/timesheets", { proposalId: state.hiredProposalId });
-  assert.ok(early.status >= 400 && early.status < 500, `a timesheet before the start date is refused (got ${early.status})`);
+  // Resumable: a run that stalled after creating the sheet continues with it instead of starting over.
+  const existing = await one(`SELECT id, entries FROM timesheets WHERE proposal_id = $1 ORDER BY created_at LIMIT 1`, [state.hiredProposalId]);
+  let sheet;
+  if (existing) {
+    sheet = { id: existing.id, entries: existing.entries };
+  } else {
+    const early = await api(page, "POST", "/api/intern/timesheets", { proposalId: state.hiredProposalId });
+    assert.ok(early.status >= 400 && early.status < 500, `a timesheet before the start date is refused (got ${early.status})`);
 
-  // Time travel on our own proposal: the job started 40 days ago.
-  const start = istDate(-40);
-  await ownedWrite(
-    state.hiredProposalId,
-    `UPDATE proposals SET offer_details = jsonb_set(offer_details, '{startDate}', to_jsonb($2::text)) WHERE id = $1`,
-    [state.hiredProposalId, start],
-  );
-  await visit(page, "/intern/timesheets");
-  const created = await api(page, "POST", "/api/intern/timesheets", { proposalId: state.hiredProposalId });
-  const sheet = expectOk("POST /api/intern/timesheets", created, [201]).timesheet;
+    // Time travel on our own proposal: the job started 40 days ago.
+    await ownedWrite(
+      state.hiredProposalId,
+      `UPDATE proposals SET offer_details = jsonb_set(offer_details, '{startDate}', to_jsonb($2::text)) WHERE id = $1`,
+      [state.hiredProposalId, istDate(-40)],
+    );
+    await visit(page, "/intern/timesheets");
+    const created = await api(page, "POST", "/api/intern/timesheets", { proposalId: state.hiredProposalId });
+    sheet = expectOk("POST /api/intern/timesheets", created, [201]).timesheet;
+  }
+  const start = (await one(`SELECT offer_details->>'startDate' AS d FROM proposals WHERE id = $1`, [state.hiredProposalId])).d;
   const entries = sheet.entries.map((e) => {
     const dow = new Date(`${e.date}T12:00:00Z`).getUTCDay();
     const weekend = dow === 0 || dow === 6;
@@ -1249,7 +1258,7 @@ async function auditPage(page, role, path) {
   for (const [label, size] of [["1440", { width: 1440, height: 900 }], ["390", { width: 390, height: 844 }]]) {
     await page.setViewportSize(size);
     const startedAt = Date.now();
-    const res = await page.goto(`${STAGING_URL}${path}`, { waitUntil: "domcontentloaded", timeout: 60_000 });
+    const res = await gotoWithRetry(page, `${STAGING_URL}${path}`, { timeout: 40_000 });
     // A page that never finishes loading is a finding, not a reason to stop looking at the rest.
     const loaded = await page.waitForLoadState("load", { timeout: 30_000 }).then(() => true, () => false);
     const loadMs = Date.now() - startedAt;

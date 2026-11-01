@@ -15,9 +15,30 @@ export function url(path) {
   return new URL(path, baseUrl()).toString();
 }
 
+export const stalls = [];
+
+/**
+ * A page load that hangs is reloaded once, as a person would. Every hang is
+ * still recorded in `stalls`, so the run reports it instead of hiding it.
+ */
+export async function gotoWithRetry(page, target, options = {}) {
+  for (let attempt = 1; ; attempt++) {
+    const started = Date.now();
+    try {
+      return await page.goto(target, { waitUntil: "domcontentloaded", ...options });
+    } catch (err) {
+      // A hang (timeout) or a navigation the browser aborted itself; anything else is a real error.
+      if (attempt >= 3 || !/timeout|NS_ERROR_ABORT|net::ERR_ABORTED/i.test(String(err?.name) + String(err?.message))) throw err;
+      const seconds = Math.round((Date.now() - started) / 1000);
+      stalls.push({ target, seconds, attempt, at: new Date().toISOString() });
+      console.log(`[stall] GET ${target} did not respond in ${seconds}s (attempt ${attempt}); reloading`);
+    }
+  }
+}
+
 /** Navigate and fail loudly on an error status (a 404/500 page still "loads"). */
 export async function visit(page, path, { allowRedirectTo } = {}) {
-  const res = await page.goto(url(path), { waitUntil: "domcontentloaded" });
+  const res = await gotoWithRetry(page, url(path), { timeout: 30_000 });
   const status = res?.status() ?? 0;
   if (status >= 400) throw new Error(`GET ${path} → ${status}`);
   const landed = new URL(page.url()).pathname;

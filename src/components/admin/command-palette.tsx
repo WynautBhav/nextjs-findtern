@@ -87,9 +87,10 @@ export function CommandPalette() {
         aria-label="Search admin portal (Command K)"
       >
         <Search className="size-3.5" aria-hidden />
-        <span className="hidden sm:inline">Search admin portal...</span>
+        <span className="hidden sm:inline">Search admin portal</span>
         <span className="sm:hidden">Search</span>
-        <kbd className="ml-2 hidden rounded bg-ink-100 px-1.5 py-0.5 text-2xs font-semibold text-ink-600 sm:inline">
+        {/* The shortcut hint is decoration: the accessible name above already says "Command K". */}
+        <kbd aria-hidden className="ml-2 hidden rounded bg-ink-100 px-1.5 py-0.5 text-2xs font-semibold text-ink-600 sm:inline">
           ⌘K
         </kbd>
       </button>
