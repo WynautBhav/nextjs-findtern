@@ -15,7 +15,6 @@ const MAX_FIELD = 160;
 const MAX_LINES = 10;
 // ASCII control characters, DEL and the Unicode line/paragraph separators, written as escapes in a string
 // so no raw separator character sits inside a regex literal.
-// eslint-disable-next-line no-control-regex
 const CONTROL = new RegExp("[\\u0000-\\u001f\\u007f\\u2028\\u2029]+", "g");
 
 function clean(value: unknown): string {

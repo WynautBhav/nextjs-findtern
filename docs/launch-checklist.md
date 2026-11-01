@@ -44,6 +44,8 @@ Nothing here has been done on production: staging only.
 - Paying a hire that is already paid answers "Nothing payable in this currency", which reads as a currency error.
 - The unified `/login` opens on the Intern tab; a company user sees "Wrong email or password. If this is a company account, switch to Company above." `/login?as=employer` selects Company directly.
 - Fields typed into a server-rendered form before React takes over can be wiped (first name on signup; the promo code box keeps its text but the Apply button stays disabled). Only on a slow device, and only when typing in the first second.
+- Admin-only accessibility (WCAG 2.5.3, accessible name does not contain the visible text), found by WebKit: the 'Edit <field>' buttons in the interns list (`inline-control.tsx`) and the day cells of the transactions chart (`finance-charts.tsx`). Customer-facing pages and the admin search button are clean.
+- The public home page could not be opened in Playwright's Linux WebKit build, which crashes on its hero `<video>`; every other page loads. Open it once in a real Safari.
 - Interns can delete a submitted timesheet, and employers can edit timesheet days before approving. Both are legacy rules kept on purpose.
 
 ## D. What was tested on staging (nextjs-findtern.vercel.app), and what was not

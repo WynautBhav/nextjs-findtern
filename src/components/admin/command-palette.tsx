@@ -82,14 +82,13 @@ export function CommandPalette() {
         type="button"
         onClick={() => setOpen(true)}
         className="apple-spring flex min-h-11 items-center gap-2.5 rounded-apple-sm border border-ink-200 bg-white px-3 py-1.5 text-sm text-ink-600 shadow-xs hover:border-brand-500 hover:text-ink-800"
-        // The name starts with the visible words, so "click Search admin
-        // portal" works for voice control (axe label-content-name-mismatch).
-        aria-label="Search admin portal (Command K)"
       >
         <Search className="size-3.5" aria-hidden />
+        {/* No aria-label: the name comes from the visible words plus the hidden hint, so the two can
+            never disagree (WCAG 2.5.3, and engines differ on which of two spans they count as visible). */}
         <span className="hidden sm:inline">Search admin portal</span>
         <span className="sm:hidden">Search</span>
-        {/* The shortcut hint is decoration: the accessible name above already says "Command K". */}
+        <span className="sr-only"> (Command K)</span>
         <kbd aria-hidden className="ml-2 hidden rounded bg-ink-100 px-1.5 py-0.5 text-2xs font-semibold text-ink-600 sm:inline">
           ⌘K
         </kbd>
