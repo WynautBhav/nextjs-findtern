@@ -168,7 +168,7 @@ export function taxInvoiceHtml(input: InvoiceInput): string {
   const sellerState = stateCodeFromGstin(seller.gstin) ?? SELLER_STATE_CODE;
   const split = splitGst(input.amountMinor, buyer.place, sellerState);
   const m = (minor: number) => money(minor, currency);
-  const dateStr = input.date.toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" });
+  const dateStr = input.date.toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Kolkata" });
 
   const taxRows =
     split.mode === "intra"

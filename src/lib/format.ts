@@ -88,14 +88,20 @@ export const formatCurrency = formatMoney;
  * that rule lives, so call sites use them rather than toLocale*String.
  */
 export function shortDate(date: Date, options: Intl.DateTimeFormatOptions): string {
-  return date.toLocaleDateString("en-IN", options).replace(/\bSept\b/g, "Sep");
+  return date.toLocaleDateString("en-IN", { timeZone: IST_ZONE, ...options }).replace(/\bSept\b/g, "Sep");
 }
 
 /** As shortDate, for date and time together (toLocaleString). */
 export function shortDateTime(date: Date, options: Intl.DateTimeFormatOptions): string {
-  return date.toLocaleString("en-IN", options).replace(/\bSept\b/g, "Sep");
+  return date.toLocaleString("en-IN", { timeZone: IST_ZONE, ...options }).replace(/\bSept\b/g, "Sep");
 }
 
+/**
+ * Dates are India dates. With no time zone, toLocaleDateString uses the
+ * machine's: a server in UTC and a browser in IST printed different days for
+ * the same instant (React hydration error #418, and a GST invoice dated the day
+ * before the Orders list showed).
+ */
 export function formatDate(iso: string | Date | null | undefined): string {
   if (!iso) return "-";
   const date = typeof iso === "string" ? new Date(iso) : iso;
@@ -104,6 +110,7 @@ export function formatDate(iso: string | Date | null | undefined): string {
     day: "numeric",
     month: "short",
     year: "numeric",
+    timeZone: IST_ZONE,
   }).replace(/\bSept\b/, "Sep");
 }
 
@@ -208,12 +215,12 @@ export function formatDayLabel(value: Date | string | null, now: Date = new Date
   const ahead = calendarDaysBetween(now, date);
   if (ahead === 1) return "Tomorrow";
   if (ahead > 1 && ahead < 7) return `In ${ahead} days`;
-  if (ahead >= 7) return date.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }).replace(/\bSept\b/, "Sep");
+  if (ahead >= 7) return date.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", timeZone: IST_ZONE }).replace(/\bSept\b/, "Sep");
   const days = Math.floor((now.getTime() - date.getTime()) / 86_400_000);
   if (days <= 0) return "Today";
   if (days === 1) return "Yesterday";
   if (days < 7) return `${days} days ago`;
-  return date.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }).replace(/\bSept\b/, "Sep");
+  return date.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", timeZone: IST_ZONE }).replace(/\bSept\b/, "Sep");
 }
 
 /** DD/MM/YYYY in India time: the one numeric date format (bug sheet 7, NC r24; SPECS §5). */
@@ -249,20 +256,21 @@ export function formatMonth(value: Date | string | null): string {
   if (!value) return "";
   const date = typeof value === "string" ? new Date(value) : value;
   if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleDateString("en-IN", { month: "long", year: "numeric" });
+  return date.toLocaleDateString("en-IN", { month: "long", year: "numeric", timeZone: IST_ZONE });
 }
 
 /** "1 Sep to 30 Sep 2026" without repeating a shared month. */
 export function formatRange(start: Date | string | null, end: Date | string | null): string {
   if (!start) return "Dates to be confirmed";
   const a = typeof start === "string" ? new Date(start) : start;
-  if (!end) return a.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }).replace(/\bSept\b/, "Sep");
+  if (!end) return a.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", timeZone: IST_ZONE }).replace(/\bSept\b/, "Sep");
   const b = typeof end === "string" ? new Date(end) : end;
-  const sameMonth = a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth();
-  const left = a.toLocaleDateString("en-IN", { day: "numeric", month: "short" }).replace(/\bSept\b/, "Sep");
-  const right = sameMonth
-    ? b.toLocaleDateString("en-IN", { day: "numeric", year: "numeric" })
-    : b.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }).replace(/\bSept\b/, "Sep");
+  const yearMonth = (d: Date) => d.toLocaleDateString("en-CA", { year: "numeric", month: "2-digit", timeZone: IST_ZONE });
+  const sameMonth = yearMonth(a) === yearMonth(b);
+  // A shared month is said once, at the end: "2 to 20 Nov 2026". (The day-and-year
+  // pattern alone prints "2026 (day: 20)" in en-IN, so the month stays in the end date.)
+  const left = a.toLocaleDateString("en-IN", sameMonth ? { day: "numeric", timeZone: IST_ZONE } : { day: "numeric", month: "short", timeZone: IST_ZONE }).replace(/\bSept\b/, "Sep");
+  const right = b.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", timeZone: IST_ZONE }).replace(/\bSept\b/, "Sep");
   return `${left} to ${right}`;
 }
 
