@@ -2,10 +2,11 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, BriefcaseBusiness, CalendarCheck, CreditCard, Download, FileText, RotateCcw, Search } from "lucide-react";
+import { ArrowRight, BriefcaseBusiness, CalendarCheck, CreditCard, Download, Eye, FileText, RotateCcw, Search } from "lucide-react";
 
 import { EmptyScene, PageHead, Pill, Surface, type Tone } from "@/components/app/primitives";
 import { ButtonLink, buttonClass } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { FullTimeOfferButton } from "@/components/employer/full-time-offer-button";
 import { RowMenu } from "@/components/app/row-menu";
 import { fieldClass, labelClass, tabClass, tdClass, thClass } from "@/components/employer/ui-tokens";
@@ -512,6 +513,7 @@ function InvoicesPanel({ invoices }: { invoices: InvoiceRow[] }) {
   const [currency, setCurrency] = useState("all");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
+  const [viewing, setViewing] = useState<InvoiceRow | null>(null);
   const currencies = Array.from(new Set(invoices.map((i) => i.currency)));
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
@@ -601,7 +603,7 @@ function InvoicesPanel({ invoices }: { invoices: InvoiceRow[] }) {
                 <th scope="col" className={cn(thClass, "text-right")}>Amount</th>
                 <th scope="col" className={thClass}>Paid on</th>
                 <th scope="col" className={cn(thClass, "text-right")}>
-                  <span className="sr-only">Download</span>
+                  <span className="sr-only">View or download</span>
                 </th>
               </tr>
             </thead>
@@ -621,14 +623,26 @@ function InvoicesPanel({ invoices }: { invoices: InvoiceRow[] }) {
                   </td>
                   <td className={cn(tdClass, "nums")}>{i.paidAt ? formatDate(i.paidAt) : "-"}</td>
                   <td className={cn(tdClass, "text-right")}>
-                    <button
-                      type="button"
-                      onClick={() => downloadInvoice(i.html, `Invoice-${i.number.replace(/\//g, "-")}.pdf`)}
-                      className={buttonClass({ variant: "outline", size: "sm" })}
-                    >
-                      <Download className="size-4" aria-hidden />
-                      Tax invoice
-                    </button>
+                    <div className="flex justify-end gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setViewing(i)}
+                        aria-label={`View invoice ${i.number}`}
+                        className={buttonClass({ variant: "outline", size: "sm" })}
+                      >
+                        <Eye className="size-4" aria-hidden />
+                        View
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => downloadInvoice(i.html, invoiceFileName(i))}
+                        aria-label={`Download invoice ${i.number}`}
+                        className={buttonClass({ variant: "outline", size: "sm" })}
+                      >
+                        <Download className="size-4" aria-hidden />
+                        Download
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -636,6 +650,32 @@ function InvoicesPanel({ invoices }: { invoices: InvoiceRow[] }) {
           </table>
         </Surface>
       )}
+
+      <Dialog open={viewing !== null} onOpenChange={(open) => !open && setViewing(null)}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>Tax invoice {viewing?.number}</DialogTitle>
+            <DialogDescription className="sr-only">The invoice as it prints. Use Download to save it as a PDF.</DialogDescription>
+          </DialogHeader>
+          {viewing ? (
+            // A full HTML page the server rendered. Sandboxed with no permissions, so
+            // nothing inside it can run script or reach this page.
+            <iframe title={`Invoice ${viewing.number}`} sandbox="" srcDoc={viewing.html} className="h-[65vh] w-full rounded-apple-sm border border-ink-200 bg-white" />
+          ) : null}
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={() => viewing && downloadInvoice(viewing.html, invoiceFileName(viewing))}
+              className={buttonClass({ size: "sm" })}
+            >
+              <Download className="size-4" aria-hidden />
+              Download
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
+
+const invoiceFileName = (i: Pick<InvoiceRow, "number">) => `Invoice-${i.number.replace(/\//g, "-")}.pdf`;
