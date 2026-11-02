@@ -32,8 +32,18 @@ export type InvoiceBuyer = {
   name: string;
   email?: string | null;
   gstin?: string | null;
+  /** Billing location, printed under the name; the PIN is also what decides the place of supply. */
+  city?: string | null;
+  state?: string | null;
+  country?: string | null;
+  pincode?: string | null;
   place: PlaceOfSupply;
 };
+
+/** "Jaipur, Rajasthan, India", leaving out what isn't on file. */
+export function buyerAddress(buyer: Pick<InvoiceBuyer, "city" | "state" | "country">): string {
+  return [buyer.city, buyer.state, buyer.country].map((p) => String(p ?? "").trim()).filter(Boolean).join(", ");
+}
 
 export type InvoiceInput = {
   invoiceNo: string;
@@ -255,6 +265,8 @@ export function taxInvoiceHtml(input: InvoiceInput): string {
       <div class="box">
         <strong>${esc(buyer.name)}</strong><br />
         ${buyer.email ? `Email: ${esc(buyer.email)}<br />` : ""}
+        ${buyerAddress(buyer) ? `${esc(buyerAddress(buyer))}<br />` : ""}
+        ${buyer.pincode?.trim() ? `PIN code: ${esc(buyer.pincode.trim())}<br />` : ""}
         ${buyer.gstin ? `GSTIN: ${esc(buyer.gstin)}<br />` : ""}
         Place of supply: ${esc(placeLabel(buyer.place))}
       </div>

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { displayInvoiceNumber, formatInvoiceNumber, legacyInvoiceNumber, lineRows, taxInvoiceHtml } from "./invoice.ts";
+import { placeOfSupply } from "./gst.ts";
 
 const paid = [
   { orderId: "order_b", paidAt: "2026-10-20T06:00:00Z" }, // 11:30 IST
@@ -81,4 +82,50 @@ test("a number stays within the 16 characters GST allows, digits and hyphen only
   const n = formatInvoiceNumber(new Date("2027-03-31T10:00:00Z"), 99999);
   assert.ok(n.length <= 16);
   assert.match(n, /^\d{6}-\d+$/);
+});
+
+// An invoice for one buyer, the way the Orders page builds it.
+function invoiceFor(buyer: { name: string; gstin?: string; city?: string; state?: string; country?: string; pincode?: string }, currency = "INR", amountMinor = 118_000) {
+  return taxInvoiceHtml({
+    invoiceNo: "021126-124",
+    date: new Date("2026-11-02T06:00:00Z"),
+    orderId: "order_x",
+    currency,
+    amountMinor,
+    description: "Hiring services",
+    seller: { name: "Findtern Private Limited", address: "386, Jagatpura, Jaipur", gstin: "08AAGCF2512F1Z0", email: "admin@findtern.in" },
+    buyer: { ...buyer, place: placeOfSupply({ ...buyer, currency }) },
+  });
+}
+
+test("a Rajasthan PIN code prints CGST and SGST, never IGST, and shows the PIN", () => {
+  const html = invoiceFor({ name: "Acme", city: "Jaipur", state: "Rajasthan", country: "India", pincode: "302001" });
+  assert.match(html, /CGST \(9%\)<\/span><span>₹\s?90\.00/);
+  assert.match(html, /SGST \(9%\)<\/span><span>₹\s?90\.00/);
+  assert.doesNotMatch(html, /IGST/);
+  assert.match(html, /Place of supply: Rajasthan \(08\)/);
+  assert.match(html, /Jaipur, Rajasthan, India/);
+  assert.match(html, /PIN code: 302001/);
+});
+
+test("any other state's PIN code prints IGST only", () => {
+  const html = invoiceFor({ name: "Acme", city: "Mumbai", state: "Maharashtra", country: "India", pincode: "400001" });
+  assert.match(html, /IGST \(18%\)<\/span><span>₹\s?180\.00/);
+  assert.doesNotMatch(html, /CGST|SGST/);
+  assert.match(html, /Place of supply: Maharashtra \(27\)/);
+});
+
+test("the PIN code decides the state even when the profile's state text is wrong", () => {
+  // Profile says Rajasthan, the billing PIN is Bengaluru's: IGST, Karnataka.
+  const html = invoiceFor({ name: "Acme", state: "Rajasthan", pincode: "560001" });
+  assert.match(html, /Place of supply: Karnataka \(29\)/);
+  assert.match(html, /IGST/);
+});
+
+test("a foreign client's invoice prints no GST lines but still carries the SAC", () => {
+  const html = invoiceFor({ name: "Globex", country: "United States" }, "USD", 21_000);
+  assert.match(html, /Not applicable/);
+  assert.doesNotMatch(html, /CGST|SGST|IGST \(/);
+  assert.match(html, /Outside India \(export of services\)/);
+  assert.match(html, /<td>998519<\/td>/);
 });

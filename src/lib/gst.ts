@@ -147,6 +147,7 @@ export type InvoiceBuyerProfile = {
   name: string;
   email?: string | null;
   gstin?: string | null;
+  city?: string | null;
   country?: string | null;
   pincode?: string | null;
   state?: string | null;

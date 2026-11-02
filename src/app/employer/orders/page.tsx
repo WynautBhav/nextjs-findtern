@@ -88,6 +88,7 @@ async function loadOrders(employerId: string) {
     name: employer?.companyName ?? "Customer",
     email: employer?.companyEmail,
     gstin: employer?.gstNumber,
+    city: employer?.city,
     country: employer?.country,
     pincode: employer?.billingPincode,
     state: employer?.state,

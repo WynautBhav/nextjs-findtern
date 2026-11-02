@@ -9,6 +9,7 @@ import { flattenParams, parsePageRequest, periodStart, searchAny } from "@/lib/a
 import { allows, EXPORT_PERMISSIONS } from "@/lib/admin/permissions";
 import { activeProject, realEmployerId, realEmployers } from "@/lib/admin/scope";
 import { placeOfSupply, splitGst } from "@/lib/gst";
+import { placeLabel } from "@/lib/invoice";
 import { dateRangeConditions } from "@/lib/admin/date-range";
 import { paymentPromo } from "@/lib/admin/payment-promo";
 import { filterProposals, matchesSearch, parseIstDay, proposalTimezone, type TrackerFilters } from "@/lib/admin/tracker";
@@ -367,6 +368,13 @@ async function exportPayments(search: string, params: Record<string, string>) {
     // 18% GST is included in INR amounts; USD (export) carries none.
     { header: "Amount before GST", value: (r) => (gstOf(r).baseMinor / 100).toFixed(2) },
     { header: "GST", value: (r) => ((r.amountMinor - gstOf(r).baseMinor) / 100).toFixed(2) },
+    // The split the invoice prints, for the accounts team's GST return.
+    { header: "CGST", value: (r) => (gstOf(r).cgstMinor / 100).toFixed(2) },
+    { header: "SGST", value: (r) => (gstOf(r).sgstMinor / 100).toFixed(2) },
+    { header: "IGST", value: (r) => (gstOf(r).igstMinor / 100).toFixed(2) },
+    { header: "Buyer GSTIN", value: (r) => r.gstin ?? "" },
+    { header: "Billing PIN code", value: (r) => r.pincode ?? "" },
+    { header: "Place of supply", value: (r) => placeLabel(placeOf(r)) },
     { header: "Discount", value: (r) => (paymentPromo(r.raw, undefined, r.amountMinor).discountMinor / 100).toFixed(2) },
     { header: "Promo code", value: (r) => paymentPromo(r.raw).code ?? "" },
     { header: "Status", value: (r) => r.status },
@@ -378,8 +386,10 @@ async function exportPayments(search: string, params: Record<string, string>) {
   return csvResponse(toCsv(rows, columns), csvFilename("payments"));
 }
 
-function gstOf(r: { amountMinor: number; currency: string; country: string | null; gstin: string | null; pincode: string | null; state: string | null }) {
-  return splitGst(r.amountMinor, placeOfSupply({ currency: r.currency, country: r.country, gstin: r.gstin, pincode: r.pincode, state: r.state }));
+type GstRow = { amountMinor: number; currency: string; country: string | null; gstin: string | null; pincode: string | null; state: string | null };
+const placeOf = (r: GstRow) => placeOfSupply({ currency: r.currency, country: r.country, gstin: r.gstin, pincode: r.pincode, state: r.state });
+function gstOf(r: GstRow) {
+  return splitGst(r.amountMinor, placeOf(r));
 }
 
 /** Stipend payouts to interns, honouring the payouts page filters. */

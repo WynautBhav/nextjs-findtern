@@ -70,3 +70,27 @@ test("GSTIN: format and a real state code, nothing else gets through", async () 
   assert.equal(stateCodeFromGstin("27AAPFU0939F1ZV"), "27");
   assert.equal(stateCodeFromGstin("99AAPFU0939F1ZV"), null);
 });
+
+test("every Indian metro and state capital's PIN lands in the right GST state", () => {
+  const cases: [string, string, string][] = [
+    ["302001", "08", "Jaipur"], ["313001", "08", "Udaipur"], ["324001", "08", "Kota"], ["301001", "08", "Alwar"], ["345001", "08", "Jaisalmer"],
+    ["110001", "07", "Delhi"], ["122001", "06", "Gurugram"], ["201301", "09", "Noida"], ["226001", "09", "Lucknow"],
+    ["141001", "03", "Ludhiana"], ["160017", "04", "Chandigarh"], ["171001", "02", "Shimla"], ["190001", "01", "Srinagar"], ["194101", "38", "Leh"],
+    ["248001", "05", "Dehradun"], ["380001", "24", "Ahmedabad"], ["395003", "24", "Surat"], ["400001", "27", "Mumbai"], ["411001", "27", "Pune"],
+    ["403001", "30", "Panaji"], ["560001", "29", "Bengaluru"], ["600001", "33", "Chennai"], ["682001", "32", "Kochi"], ["695001", "32", "Thiruvananthapuram"],
+    ["500001", "36", "Hyderabad"], ["520001", "37", "Vijayawada"], ["700001", "19", "Kolkata"], ["751001", "21", "Bhubaneswar"],
+    ["800001", "10", "Patna"], ["834001", "20", "Ranchi"], ["462001", "23", "Bhopal"], ["452001", "23", "Indore"], ["492001", "22", "Raipur"],
+    ["781001", "18", "Guwahati"], ["737101", "11", "Gangtok"], ["795001", "14", "Imphal"], ["799001", "16", "Agartala"],
+  ];
+  for (const [pin, code, city] of cases) assert.equal(stateCodeFromPincode(pin), code, `${city} ${pin}`);
+});
+
+test("only Rajasthan PINs (30 to 34) get CGST+SGST; the neighbours never do", () => {
+  // The tax-critical boundary: one prefix either side of Rajasthan's circle.
+  for (const pin of ["290001", "350001", "282001", "360001", "110001", "380001", "452001"]) {
+    assert.equal(splitGst(118000, placeOfSupply({ currency: "INR", pincode: pin })).mode, "inter", pin);
+  }
+  for (const pin of ["301001", "310001", "320001", "330001", "340001"]) {
+    assert.equal(splitGst(118000, placeOfSupply({ currency: "INR", pincode: pin })).mode, "intra", pin);
+  }
+});
