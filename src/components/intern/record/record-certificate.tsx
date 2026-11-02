@@ -106,7 +106,13 @@ export function RecordTimeline({ proofs }: { proofs: Proof[] }) {
               {/* h2 under the page h1; kind and date follow the title. */}
               <h2 className="text-pretty text-base font-medium text-ink-900">{proof.title}</h2>
               <p className="nums mt-0.5 text-xs text-text-subtle">
-                {meta.label} · <time dateTime={proof.at.toISOString()}>{day(proof.at)}</time>
+                {meta.label}
+                {proof.at ? (
+                  <>
+                    {" · "}
+                    <time dateTime={proof.at.toISOString()}>{day(proof.at)}</time>
+                  </>
+                ) : null}
               </p>
               <dl className="mt-3 flex flex-wrap gap-x-6 gap-y-2">
                 {proof.facts.map((fact) => (

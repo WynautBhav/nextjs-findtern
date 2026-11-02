@@ -464,7 +464,8 @@ export type Proof = {
   /** One sentence in the product's voice. Never congratulatory. */
   line: string;
   facts: ProofFact[];
-  at: Date;
+  /** When it happened; null when no date was ever stored, so no date is shown (never the epoch). */
+  at: Date | null;
   /** Who verified it, when a human did. */
   issuedBy?: string;
   href?: string;
@@ -489,14 +490,19 @@ export function deriveProofs(src: ProofSource): Proof[] {
   // per-proposal snapshots stay on the offers that froze them.
   if (src.score) {
     const bands = Object.entries(src.score.ratings).map(([k, v]) => ({ label: prettyRating(k), value: `${v}/10` }));
-    const firstOffer = src.proposals.reduce<Date | null>((a, p) => (a && a < p.createdAt ? a : p.createdAt), null);
+    // Scores set outside the auto-scorer carry no approvedAt; the AI interview that earned
+    // the score is the next best date. With neither, the card shows no date.
+    const interviewedOn = src.interviews
+      .filter((i) => i.status === "completed" && src.aiEmployerIds?.has(i.employerId))
+      .map((i) => slotOf(i) ?? i.createdAt)
+      .reduce<Date | null>((a, d) => (a && a > d ? a : d), null);
     out.push({
       id: "pf-score",
       kind: "assessment",
       title: "Findtern Score published",
       line: "One assessment. The score is public and the rate that follows from it is public too.",
       facts: [{ label: "Overall", value: `${src.score.overall}/10` }, ...bands],
-      at: src.score.at ?? firstOffer ?? new Date(0),
+      at: src.score.at ?? interviewedOn,
     });
   }
 
@@ -583,7 +589,8 @@ export function deriveProofs(src: ProofSource): Proof[] {
     });
   }
 
-  return out.sort((a, b) => b.at.getTime() - a.at.getTime());
+  // Undated cards sort last.
+  return out.sort((a, b) => (b.at?.getTime() ?? 0) - (a.at?.getTime() ?? 0));
 }
 
 /** The plain text version, which is the export. No ribbon, no confetti. */
@@ -598,7 +605,7 @@ export function proofAsText(proof: Proof, candidate: string): string {
     "",
     ...proof.facts.map((f) => `${f.label}: ${f.value}`),
     "",
-    `Issued ${proof.at.toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Kolkata" })}${proof.issuedBy ? ` by ${proof.issuedBy}` : ""}`,
+    `Issued${proof.at ? ` ${proof.at.toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Kolkata" })}` : ""}${proof.issuedBy ? ` by ${proof.issuedBy}` : ""}`,
   ];
   return lines.join("\n");
 }

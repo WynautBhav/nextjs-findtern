@@ -90,7 +90,7 @@ test("QA-004: Record has one score card, the current score, not a snapshot per p
     { label: "Overall", value: "8.8/10" },
     { label: "Coding", value: "9.3/10" },
   ]);
-  assert.equal(scores[0].at.toISOString(), "2026-08-20T00:00:00.000Z");
+  assert.equal(scores[0].at?.toISOString(), "2026-08-20T00:00:00.000Z");
   // No current score: no score card (the snapshots are not a fallback).
   assert.equal(deriveProofs({ proposals: [stale], interviews: [], timesheets: [], payouts: [], names: {} }).filter((p) => p.kind === "assessment").length, 0);
 });
@@ -164,4 +164,19 @@ test("an intern's timeline shows the company's feedback only, never the staff no
   const notes = "Staff: call back Friday\nfeedback: https://ai.example/private\nrecording: https://ai.example/r\nfeedback_text: Clear communicator.\nSolid SQL.";
   assert.equal(feedbackTextOf(notes), "Clear communicator.\nSolid SQL.");
   assert.equal(feedbackTextOf("Staff: call back Friday\nfeedback: https://ai.example/private"), "");
+});
+
+test("a score with no stored date is never dated 1 Jan 1970", () => {
+  const base = { proposals: [], timesheets: [], payouts: [], names: {}, aiEmployerIds: new Set(["ai"]) };
+  const score = { overall: 7.4, ratings: { coding: 7 }, at: null };
+  const undated = deriveProofs({ ...base, interviews: [], score }).find((p) => p.kind === "assessment");
+  assert.equal(undated?.at, null);
+  assert.match(proofAsText(undated!, "Asha"), /^Issued$/m);
+  // The AI interview that earned the score dates it when approvedAt is missing.
+  const interview = (id: string, employerId: string, day: string) => ({
+    id, employerId, projectId: null, status: "completed", slot1: new Date(day), slot2: null, slot3: null,
+    selectedSlot: null, timezone: null, meetingLink: null, notes: null, createdAt: new Date(day),
+  });
+  const dated = deriveProofs({ ...base, interviews: [interview("i1", "ai", "2026-09-10"), interview("i2", "acme", "2026-10-30")], score }).find((p) => p.kind === "assessment");
+  assert.equal(dated?.at?.toISOString(), "2026-09-10T00:00:00.000Z");
 });
