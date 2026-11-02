@@ -198,8 +198,8 @@ export default async function InternTimesheets({
                     )}
                   >
                     <span className="min-w-0">
-                      <span className="block truncate text-sm font-medium text-ink-900" title={role(p)}>{role(p)}</span>
-                      <span className="mt-1 block truncate text-xs text-text-subtle">{company(p)}</span>
+                      <span className="block break-words text-sm font-medium text-ink-900">{role(p)}</span>
+                      <span className="mt-1 block break-words text-xs text-text-subtle">{company(p)}</span>
                     </span>
                     <Pill tone={on ? "live" : "neutral"}>
                       <span className="nums">{count}</span> sheet{count === 1 ? "" : "s"}

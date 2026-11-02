@@ -177,7 +177,7 @@ function DocCard({ doc }: { doc: DocumentRow }) {
           href={doc.href}
           target="_blank"
           rel="noreferrer"
-          className="truncate rounded-apple-sm hover:text-brand-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 after:absolute after:inset-0"
+          className="break-words rounded-apple-sm hover:text-brand-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 after:absolute after:inset-0"
         >
           {doc.label}
           <span className="sr-only"> (opens in a new tab)</span>

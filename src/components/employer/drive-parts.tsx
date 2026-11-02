@@ -90,7 +90,7 @@ export function CollegeMark({
 export function CoBrand({ collegeName }: { collegeName: string }) {
   return (
     <div className="flex items-center gap-2 text-xs font-medium text-ink-600">
-      <span className="truncate">{collegeName}</span>
+      <span className="min-w-0 break-words">{collegeName}</span>
       <span aria-hidden className="text-ink-300">
         ×
       </span>

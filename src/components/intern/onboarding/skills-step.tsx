@@ -165,7 +165,7 @@ export function SkillsStep({ values, update, errors, skillsLocked }: StepProps) 
               <li key={skill} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 gap-y-2 px-4 py-3 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
                 <div className="order-1 flex min-w-0 items-center gap-3">
                   <span className="nums grid size-7 shrink-0 place-items-center rounded-full bg-brand-50 text-xs font-semibold text-brand-700">{i + 1}</span>
-                  <span className="truncate text-[0.9375rem] font-medium text-ink-900">{skill}</span>
+                  <span className="break-words text-[0.9375rem] font-medium text-ink-900">{skill}</span>
                 </div>
                 <div className="order-3 col-span-2 flex sm:order-2 sm:col-span-1">
                   <div role="radiogroup" aria-label={`How good are you at ${skill}?`} onKeyDown={onRadioKeys} className="flex flex-1 rounded-apple-sm bg-ink-100 p-1 sm:flex-none">

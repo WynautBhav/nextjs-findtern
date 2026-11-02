@@ -186,7 +186,7 @@ export function CandidateCard({
           <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink-600">
             <span className="inline-flex min-w-0 items-center gap-1">
               <MapPin className="size-3.5 shrink-0 text-ink-400" aria-hidden />
-              <span className="truncate">{candidate.city || candidate.location || "City not stated"}</span>
+              <span className="break-words">{candidate.city || candidate.location || "City not stated"}</span>
             </span>
             {candidate.hasLaptop !== null ? (
               <span className={cn("inline-flex items-center gap-1", candidate.hasLaptop ? "text-brand-800" : "text-ink-600")}>

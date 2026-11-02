@@ -34,7 +34,7 @@ export function PreviewStep({ values, update, errors, onJumpStep }: StepProps) {
             <UserRound className="size-6 text-white/80" />
           </span>
           <div className="min-w-0">
-            <p className="truncate text-lg font-semibold tracking-[-0.01em]">
+            <p className="break-words text-lg font-semibold tracking-[-0.01em]">
               {[a.degree, a.branch].filter(Boolean).join(", ") || "Your degree"}
             </p>
             <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-sm text-on-dark-subtle">

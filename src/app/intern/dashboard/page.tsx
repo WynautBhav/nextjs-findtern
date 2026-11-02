@@ -325,7 +325,7 @@ export default async function InternHome() {
             >
               {/* No company mark before a hire (bug sheet 7, S1 r27/r67). */}
               <span className="min-w-0">
-                <span className="block truncate text-sm font-medium text-ink-900 group-hover:text-brand-700">
+                <span className="block break-words text-sm font-medium text-ink-900 group-hover:text-brand-700">
                   {p.projectName}
                 </span>
                 <span className="block truncate text-xs text-text-subtle">{p.scopeOfWork}</span>

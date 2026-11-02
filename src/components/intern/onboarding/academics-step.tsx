@@ -235,7 +235,7 @@ function FileList({
             {files.map((u, i) => (
               <li key={u.name} className="flex min-h-12 items-center gap-3 pl-3.5 pr-2">
                 <FileText className="size-4 shrink-0 text-brand-600" aria-hidden />
-                <span className="min-w-0 flex-1 truncate text-sm text-ink-800">{u.originalName || `${capitalise(noun)} ${i + 1}`}</span>
+                <span className="min-w-0 flex-1 truncate text-sm text-ink-800" title={u.originalName || undefined}>{u.originalName || `${capitalise(noun)} ${i + 1}`}</span>
                 {u.size ? <span className="nums hidden shrink-0 text-xs text-text-subtle sm:inline">{Math.max(1, Math.round(u.size / 1024))} KB</span> : null}
                 <RemoveButton label={`Remove ${u.originalName || `${noun} ${i + 1}`}`} onClick={() => onChange(files.filter((x) => x.name !== u.name))} />
               </li>

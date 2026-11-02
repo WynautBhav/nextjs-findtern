@@ -262,7 +262,7 @@ export default async function CompareCandidates({ searchParams }: { searchParams
         tabIndex={0}
         role="region"
         aria-label="Candidate comparison"
-        className="max-h-[calc(100dvh-8rem)] overflow-auto rounded-apple-xl border border-ink-200/80 bg-white shadow-xs focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
+        className="relative max-h-[calc(100dvh-8rem)] overflow-auto rounded-apple-xl border border-ink-200/80 bg-white shadow-xs focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
       >
         <table className="w-full border-separate border-spacing-0 text-left text-sm">
           <caption className="sr-only">Candidates compared side by side; the leader of each row is marked.</caption>
@@ -287,10 +287,10 @@ export default async function CompareCandidates({ searchParams }: { searchParams
                     <div className="flex items-start gap-3">
                       <CandidateAvatar photoUrl={c.photoUrl} initials={c.initials} className="size-10 rounded-apple-md text-sm ring-1 ring-inset ring-brand-200/70" />
                       <div className="min-w-0 flex-1">
-                        <Link href={`/employer/intern/${encodeURIComponent(c.id)}`} className="block truncate text-base font-semibold text-ink-900 underline-offset-4 hover:text-brand-700 hover:underline">
+                        <Link href={`/employer/intern/${encodeURIComponent(c.id)}`} className="block break-words text-base font-semibold text-ink-900 underline-offset-4 hover:text-brand-700 hover:underline">
                           {name}
                         </Link>
-                        <p className="truncate text-sm text-ink-600">{c.city || c.location || "City not stated"}</p>
+                        <p className="break-words text-sm text-ink-600">{c.city || c.location || "City not stated"}</p>
                       </div>
                       <Link
                         href={removeHref(c.id)}
