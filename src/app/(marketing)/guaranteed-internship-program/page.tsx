@@ -83,7 +83,7 @@ const PROGRAM_TERMS = [
   },
   {
     title: "4. Hiding your profile",
-    text: "You can hide your profile from employers when you need a break, but never for more than 30 days at a time. The guarantee only runs while employers can see you.",
+    text: "You can hide your profile from employers when you need a break. It stays hidden until you switch it back on. The guarantee only runs while employers can see you.",
   },
   {
     title: "5. Active Engagement & Integrity",
@@ -202,7 +202,7 @@ const FAQS = [
     category: "Refund",
     question: "Can I hide my profile during the window?",
     answer:
-      "Yes, for at most 30 days at a time. While your profile is hidden employers cannot find you, so the guarantee pauses with it and resumes the day you are visible again.",
+      "Yes. It stays hidden until you switch it back on. While your profile is hidden employers cannot find you, so the guarantee pauses with it and resumes the day you are visible again.",
   },
   {
     id: "g4b",

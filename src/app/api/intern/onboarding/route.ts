@@ -210,18 +210,16 @@ function friendlyIssue(issue: z.core.$ZodIssue | undefined): string {
 }
 
 /**
- * Hiding is capped at 30 days (the guarantee only runs while employers can
- * see you). The clock starts the first time the switch goes off and is kept
- * across repeat "off" saves; switching back on clears it. The scheduler
- * (`schedulers.ts`, profile-hide job) reminds and then turns it back on.
+ * A hidden profile stays hidden until the intern switches it back on; nothing
+ * turns it on for them. `hiddenAt` records when the switch went off and is
+ * kept across repeat "off" saves.
  */
 function openToWorkPatch(next: boolean, previous: Record<string, unknown>) {
-  if (next) return { openToWork: true, hiddenAt: null, hideReminderSentAt: null };
+  if (next) return { openToWork: true, hiddenAt: null };
   const alreadyHidden = previous.openToWork === false && typeof previous.hiddenAt === "string";
   return {
     openToWork: false,
     hiddenAt: alreadyHidden ? previous.hiddenAt : new Date().toISOString(),
-    ...(alreadyHidden ? {} : { hideReminderSentAt: null }),
   };
 }
 

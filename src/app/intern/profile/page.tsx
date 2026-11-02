@@ -15,7 +15,6 @@ import { getDb, schema } from "@/lib/db";
 import { loadInternData } from "@/lib/intern-data";
 import { draftFromRecord, emptyDraft, linkedinHref, profileCompletion, type OnboardingDraft } from "@/lib/onboarding";
 import { isInternPaid } from "@/lib/payments";
-import { visibleAgainAt } from "@/lib/profile-hide";
 
 export const metadata: Metadata = {
   title: "Your profile",
@@ -98,7 +97,6 @@ export default async function InternProfile() {
     hasPhoto: Boolean(data.document?.profilePhotoName),
   });
   const aiLinks = await aiInterviewLinks(session.uid, extra);
-  const visibleAgain = openToWork ? null : visibleAgainAt(extra.hiddenAt)?.toISOString() ?? null;
 
   const emergency = draft?.emergencyPhone
     ? [draft.emergencyName, draft.emergencyRelation && `(${draft.emergencyRelation})`, `${draft.emergencyCountryCode ?? "+91"} ${draft.emergencyPhone}`]
@@ -137,7 +135,7 @@ export default async function InternProfile() {
           {!completion.complete ? <CompletionList completion={completion} /> : null}
 
           <Surface className="p-5">
-            <OpenToWorkToggle initial={openToWork} visibleAgainAt={visibleAgain} />
+            <OpenToWorkToggle initial={openToWork} />
           </Surface>
 
           <Surface as="section" aria-labelledby="private-head" className="p-5">

@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 
 import { csrfFetch } from "@/lib/client-fetch";
-import { shortDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { Switch } from "@/components/ui/switch";
 
@@ -19,14 +18,11 @@ import { Switch } from "@/components/ui/switch";
  */
 export function OpenToWorkToggle({
   initial,
-  visibleAgainAt = null,
   brief = false,
 }: {
   initial: boolean;
-  /** Dashboard: the explainer only while hidden, when it carries a date. */
+  /** Dashboard: the explainer only while hidden. */
   brief?: boolean;
-  /** ISO time the 30-day hiding limit runs out (only while hidden). */
-  visibleAgainAt?: string | null;
 }) {
   const router = useRouter();
   const [on, setOn] = useState(initial);
@@ -63,10 +59,8 @@ export function OpenToWorkToggle({
         <p className="text-[0.9375rem] font-semibold text-ink-900">Open to work</p>
         <p className={cn("mt-1 text-sm leading-relaxed text-ink-600", brief && on && "sr-only")}>
           {on
-            ? "Employers can find you in the candidate pool. You can hide for up to 30 days at a time."
-            : visibleAgainAt
-              ? `Hidden from the pool. You'll be visible again on ${shortDate(new Date(visibleAgainAt), { day: "numeric", month: "long", timeZone: "Asia/Kolkata" })}. Hiding is limited to 30 days.`
-              : "Hidden from the pool for up to 30 days. Your applications keep going."}
+            ? "Employers can find you in the candidate pool. You can hide your profile whenever you need a break."
+            : "Hidden from the pool until you switch this back on. Your applications keep going."}
         </p>
         {error ? (
           <p role="alert" className="mt-1 text-sm font-medium text-danger">

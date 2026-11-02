@@ -4,7 +4,6 @@ import { getDb, schema } from "@/lib/db";
 import { readSkills, scoreOf } from "@/lib/employer-candidates";
 import { notify } from "@/lib/notify";
 import { hasFeedbackText } from "@/lib/interview-feedback";
-import { HIDE_LIMIT_DAYS, HIDE_REMINDER_DAYS, visibleAgainAt } from "@/lib/profile-hide";
 
 /**
  * In-process jobs, ported from the legacy interviewReminderScheduler and
@@ -145,7 +144,6 @@ async function notificationJobs() {
     ["monthly profile views", monthlyProfileViews],
     ["cart inactivity", cartInactivity],
     ["weekly hire tip", weeklyHireTip],
-    ["profile hide limit", profileHideLimit],
     ["intern profile nudge", internProfileNudges],
     ["employer profile nudge", employerProfileNudges],
     ["talent spotlight", talentSpotlight],
@@ -247,64 +245,6 @@ function isoWeekNumber(d: Date): number {
   t.setUTCDate(t.getUTCDate() + 4 - (t.getUTCDay() || 7));
   const yearStart = new Date(Date.UTC(t.getUTCFullYear(), 0, 1));
   return Math.ceil(((t.getTime() - yearStart.getTime()) / 86_400_000 + 1) / 7);
-}
-
-/* ── 30-day profile hiding: remind, then switch back on ──────────────── */
-
-async function profileHideLimit(now: Date) {
-  const db = getDb();
-  // Merge only the keys this job sets, in SQL, so a concurrent edit to other
-  // extra_data keys between our read and write is not reverted.
-  const mergeExtra = (patch: Record<string, unknown>) =>
-    sql`coalesce(${schema.internOnboarding.extraData}, '{}'::jsonb) || ${JSON.stringify(patch)}::jsonb`;
-  const rows = await db
-    .select({ id: schema.internOnboarding.id, userId: schema.internOnboarding.userId, extra: schema.internOnboarding.extraData })
-    .from(schema.internOnboarding)
-    .where(sql`${schema.internOnboarding.extraData}->>'openToWork' = 'false'`);
-  for (const r of rows) {
-    const extra = (r.extra ?? {}) as Record<string, unknown>;
-    // An admin hide (DB-11) is not the candidate's 30-day pause: it stays
-    // until staff un-hide, with no reminder and no automatic return.
-    if (extra.hiddenByAdmin === true) continue;
-    let hiddenAt = typeof extra.hiddenAt === "string" ? extra.hiddenAt : null;
-    if (!hiddenAt) {
-      // Hidden before the limit existed: the clock starts now, never backdated.
-      hiddenAt = now.toISOString();
-      await db
-        .update(schema.internOnboarding)
-        .set({ extraData: mergeExtra({ hiddenAt }) })
-        .where(eq(schema.internOnboarding.id, r.id));
-      continue;
-    }
-    const until = visibleAgainAt(hiddenAt);
-    if (!until) continue;
-    const msLeft = until.getTime() - now.getTime();
-    if (msLeft <= 0) {
-      await db
-        .update(schema.internOnboarding)
-        .set({ extraData: mergeExtra({ openToWork: true, hiddenAt: null, hideReminderSentAt: null }), updatedAt: now })
-        .where(eq(schema.internOnboarding.id, r.id));
-      await notify({
-        to: { type: "intern", id: r.userId },
-        type: "profile_visible_again",
-        title: "Your profile is visible again",
-        message: `Profiles can be hidden for up to ${HIDE_LIMIT_DAYS} days, so employers can see yours again. Your placement guarantee is running.`,
-        dedupeKey: `profile_visible_again:${r.userId}:${hiddenAt}`,
-      });
-    } else if (msLeft <= HIDE_REMINDER_DAYS * 86_400_000 && !extra.hideReminderSentAt) {
-      await notify({
-        to: { type: "intern", id: r.userId },
-        type: "profile_hide_ending",
-        title: "Your profile becomes visible soon",
-        message: `Your profile has been hidden for almost ${HIDE_LIMIT_DAYS} days. It will be visible to employers again on ${until.toLocaleDateString("en-IN", { day: "numeric", month: "long", timeZone: "Asia/Kolkata" })}.`,
-        dedupeKey: `profile_hide_ending:${r.userId}:${hiddenAt}`,
-      });
-      await db
-        .update(schema.internOnboarding)
-        .set({ extraData: mergeExtra({ hideReminderSentAt: now.toISOString() }) })
-        .where(eq(schema.internOnboarding.id, r.id));
-    }
-  }
 }
 
 /** SQL: no notification with this dedupe key exists yet for the recipient, so the 6-hourly jobs skip rows already nudged. */

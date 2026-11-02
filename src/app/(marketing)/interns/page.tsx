@@ -108,7 +108,7 @@ const INTERN_FAQ = [
       category: "Guarantee",
       question: "Can I hide my profile from employers?",
       answer:
-        "Yes, when you need a break - exams, travel, a family matter. A profile can stay hidden for at most 30 days at a time, and the guarantee only runs while employers can see you.",
+        "Yes, when you need a break - exams, travel, a family matter. Your profile stays hidden until you switch it back on, and the guarantee only runs while employers can see you.",
     },
     {
       id: "i3b",

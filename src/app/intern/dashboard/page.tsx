@@ -27,7 +27,6 @@ import { isInternPaid } from "@/lib/payments";
 import { isHiredProposal } from "@/lib/hire-status";
 import { paymentsAreFree, testPayEnabled } from "@/lib/razorpay";
 import { getInternActivationFeeMinor } from "@/lib/platform-settings";
-import { visibleAgainAt } from "@/lib/profile-hide";
 import { profileCompletion } from "@/lib/onboarding";
 import { membershipOf } from "@/lib/college/membership";
 
@@ -112,9 +111,6 @@ export default async function InternHome() {
   const extra = data.onboarding?.extraData;
   const openToWork =
     !extra || typeof extra !== "object" || (extra as Record<string, unknown>).openToWork !== false;
-  const visibleAgain = openToWork
-    ? null
-    : visibleAgainAt((extra as Record<string, unknown> | null)?.hiddenAt)?.toISOString() ?? null;
 
   // Next interview: company meetings with a booked slot only. AI interview
   // rows have no slot and ~210 live ones sit in "scheduled" forever, so they
@@ -375,7 +371,7 @@ export default async function InternHome() {
           aside={<Pill tone={profileStatus.tone}>{profileStatus.label}</Pill>}
           action={{ href: "/intern/profile", label: "See your profile as employers do" }}
         >
-          <OpenToWorkToggle initial={openToWork} visibleAgainAt={visibleAgain} brief />
+          <OpenToWorkToggle initial={openToWork} brief />
         </Tile>
       )}
 
