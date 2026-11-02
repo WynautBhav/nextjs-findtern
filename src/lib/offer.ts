@@ -16,6 +16,8 @@ export type Offer = {
   currency: OfferCurrency;
   roleTitle: string;
   jd: string;
+  /** "Additional information" the employer added to the offer; empty when none. */
+  additionalInfo: string;
   mode: string;
   location: string;
   /** Off-remote only. Legacy rows store just `location: "City, State"`; split here (DB-10). */
@@ -240,6 +242,7 @@ export function parseOffer(raw: unknown, rowCurrency?: string | null): Offer {
     currency,
     roleTitle: str(o.roleTitle) || (ft ? str(ft.jobTitle) : ""),
     jd: jdToText(str(o.jd) || str(o.message)),
+    additionalInfo: str(o.additionalInfo).trim(),
     mode: str(o.mode),
     location: str(o.location) || str(o.city),
     city: place.city,
@@ -370,6 +373,7 @@ export type OfferInput = {
   currency: OfferCurrency;
   roleTitle: string;
   jd?: string;
+  additionalInfo?: string;
   mode: string;
   location?: string;
   city?: string;
@@ -403,6 +407,7 @@ export function buildOffer(input: OfferInput): Record<string, unknown> {
   return {
     roleTitle: input.roleTitle,
     jd: jdToHtml(jdToText(input.jd ?? "")),
+    ...(input.additionalInfo?.trim() ? { additionalInfo: input.additionalInfo.trim() } : {}),
     mode: input.mode,
     currency: input.currency,
     location:

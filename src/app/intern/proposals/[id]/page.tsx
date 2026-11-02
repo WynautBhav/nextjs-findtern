@@ -311,6 +311,13 @@ export default async function ProposalDetail({ params }: { params: Promise<{ id:
             )}
           </Surface>
 
+          {offer.additionalInfo ? (
+            <Surface className="p-5 lg:p-6">
+              <SectionHead title="Additional information" />
+              <p className="whitespace-pre-line text-pretty text-base leading-relaxed text-ink-700 [overflow-wrap:anywhere]">{offer.additionalInfo}</p>
+            </Surface>
+          ) : null}
+
           {!fullTime ? (
             <>
               <Surface className="p-5 lg:p-6">

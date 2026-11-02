@@ -288,6 +288,13 @@ export default async function EmployerProposalDetail({
             </Surface>
           ) : null}
 
+          {offer.additionalInfo ? (
+            <Surface as="section" className="p-6">
+              <SectionHead title="Additional information" />
+              <p className="whitespace-pre-line text-pretty text-[0.9375rem] leading-relaxed text-ink-700 [overflow-wrap:anywhere]">{offer.additionalInfo}</p>
+            </Surface>
+          ) : null}
+
           {skills.length > 0 ? (
             <Surface as="section" className="p-6">
               <SectionHead title="Skills" />
@@ -341,6 +348,7 @@ export default async function EmployerProposalDetail({
                       hourlyRateMinor: offer.hourlyRateMinor,
                       paidLeavesPerMonth: offer.paidLeavesPerMonth,
                       message: offer.jd,
+                      additionalInfo: offer.additionalInfo,
                       mode: offer.mode,
                       city: offer.city,
                       state: offer.state,

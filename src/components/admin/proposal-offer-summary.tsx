@@ -54,6 +54,7 @@ export function ProposalOfferSummary({
           <p className="text-sm text-ink-600">No offer letter uploaded.</p>
         )}
         {jd ? <JobDescription html={jd} /> : null}
+        {offer.additionalInfo ? <AdditionalInfo text={offer.additionalInfo} /> : null}
       </div>
     );
   }
@@ -86,6 +87,16 @@ export function ProposalOfferSummary({
         <DetailRow label="Paid leave a month" value={offer.paidLeavesPerMonth} mono />
       </dl>
       {jd ? <JobDescription html={jd} /> : null}
+      {offer.additionalInfo ? <AdditionalInfo text={offer.additionalInfo} /> : null}
+    </div>
+  );
+}
+
+function AdditionalInfo({ text }: { text: string }) {
+  return (
+    <div>
+      <p className="mb-2 text-sm font-semibold text-ink-900">Additional information</p>
+      <p className="whitespace-pre-line rounded-apple-md border border-ink-200/80 bg-ink-50 p-4 text-sm leading-relaxed text-ink-800 [overflow-wrap:anywhere]">{text}</p>
     </div>
   );
 }

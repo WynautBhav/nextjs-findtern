@@ -32,6 +32,7 @@ export type EditableOffer = {
   hourlyRateMinor?: number | null;
   paidLeavesPerMonth?: number;
   message?: string;
+  additionalInfo?: string;
   mode?: string;
   city?: string;
   state?: string;
@@ -116,6 +117,7 @@ export function ProposalOfferForm({
   const noLaptop = hasLaptop === false;
   const [laptop, setLaptop] = useState(noLaptop ? "company" : normalizeLaptop(initial.laptop) || "company");
   const [message, setMessage] = useState(initial.message ?? "");
+  const [additionalInfo, setAdditionalInfo] = useState(initial.additionalInfo ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   // The field the message is about: marked invalid, tied to the message, and focused.
@@ -151,6 +153,7 @@ export function ProposalOfferForm({
       weeklySchedule: schedule,
       paidLeavesPerMonth: Number(leaves) || 0,
       message: message.trim(),
+      additionalInfo: additionalInfo.trim(),
       mode,
       laptop,
       shiftFrom,
@@ -363,6 +366,18 @@ export function ProposalOfferForm({
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           rows={5}
+          className={cn(fieldClass, "py-2.5 leading-relaxed")}
+        />
+      </label>
+      <label className="block">
+        <span className={LABEL}>
+          Additional information <span className="font-normal text-text-subtle">(optional)</span>
+        </span>
+        <textarea
+          value={additionalInfo}
+          onChange={(e) => setAdditionalInfo(e.target.value)}
+          rows={3}
+          maxLength={2000}
           className={cn(fieldClass, "py-2.5 leading-relaxed")}
         />
       </label>

@@ -147,7 +147,7 @@ export function SendProposalForm({
   const [laptop, setLaptop] = useState<string>("company");
   const [paidLeaves, setPaidLeaves] = useState("2");
   const [message, setMessage] = useState("");
-  const [restrictions, setRestrictions] = useState("");
+  const [additionalInfo, setAdditionalInfo] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [notice, setNotice] = useState<{ tone: "ok" | "bad"; text: string } | null>(null);
   const [policyOpen, setPolicyOpen] = useState(false);
@@ -201,7 +201,8 @@ export function SendProposalForm({
           flowType: "direct",
           agreedToPolicy: true,
           roleTitle: roleTitle.trim(),
-          jd: [message.trim(), restrictions.trim()].filter(Boolean).join("\n\n"),
+          jd: message.trim(),
+          ...(additionalInfo.trim() ? { additionalInfo: additionalInfo.trim() } : {}),
           mode,
           location: [city.trim(), state.trim()].filter(Boolean).join(", "),
           ...(mode !== "remote" ? { city: city.trim(), state: state.trim() } : {}),
@@ -542,12 +543,12 @@ export function SendProposalForm({
             onChange={setMessage}
           />
           <TextArea
-            id="restrictions"
-            label="Anything else (optional)"
+            id="additionalInfo"
+            label="Additional information (optional)"
             rows={3}
             placeholder="No client data on personal devices. Two fixed Saturdays a month for college."
-            value={restrictions}
-            onChange={setRestrictions}
+            value={additionalInfo}
+            onChange={setAdditionalInfo}
           />
         </Step>
 

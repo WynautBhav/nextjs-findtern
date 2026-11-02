@@ -48,6 +48,7 @@ const bodySchema = z
   // Legacy required a job description, a city and state off-remote, the
   // hybrid split, a shift, a timezone and the laptop answer.
   jd: z.string().trim().min(1, "Add a job description.").max(4000),
+  additionalInfo: z.string().trim().max(2000).optional(),
   mode: z.enum(["remote", "hybrid", "onsite"]),
   location: z.string().trim().max(120).default(""),
   city: z.string().trim().max(80).default(""),

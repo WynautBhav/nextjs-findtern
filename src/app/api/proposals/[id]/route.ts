@@ -35,6 +35,8 @@ const offerSchema = z
       .refine((n) => (PAID_LEAVE_OPTIONS as readonly number[]).includes(n), "Paid leave is 0 to 3 days a month, in half days.")
       .optional(),
     message: z.string().trim().min(1, "Add a job description.").max(4000).optional(),
+    // Blank clears it.
+    additionalInfo: z.string().trim().max(2000).optional(),
     mode: z.enum(["remote", "hybrid", "onsite"]).optional(),
     city: z.string().trim().max(80).optional(),
     state: z.string().trim().max(80).optional(),

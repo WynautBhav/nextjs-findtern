@@ -282,3 +282,13 @@ test("offerTimeLeft counts down to the start of the joining day in India", () =>
   assert.equal(offerTimeLeft(null), null);
   assert.equal(offerTimeLeft("2026-02-31", new Date("2026-01-01T00:00:00Z")), null);
 });
+
+test("additional information is its own field, kept out of the job description", () => {
+  const base = { currency: "INR", roleTitle: "Data intern", mode: "remote", startDate: "2026-11-10", duration: "2m", monthlyHours: 100, hourlyRateMinor: 15_000, perHireMinor: 0 } as const;
+  const o = parseOffer(buildOffer({ ...base, jd: "Build dashboards.", additionalInfo: "  Two fixed Saturdays a month for college.  " }), "INR");
+  assert.equal(o.jd, "Build dashboards.");
+  assert.equal(o.additionalInfo, "Two fixed Saturdays a month for college.");
+  // Blank leaves no key behind, and an offer written before the field existed reads as empty.
+  assert.equal("additionalInfo" in buildOffer({ ...base, jd: "x", additionalInfo: "   " }), false);
+  assert.equal(parseOffer(legacyRow, "INR").additionalInfo, "");
+});
