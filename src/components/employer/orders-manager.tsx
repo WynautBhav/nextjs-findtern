@@ -430,8 +430,9 @@ function SchedulePanel({ hires }: { hires: HireRow[] }) {
       {rows.length === 0 ? (
         <EmptyScene title="Nothing matches this filter" body="No hire is in that payment state right now." className="py-10" />
       ) : (
-        <Surface tabIndex={0} role="region" aria-label="Hires and payments" className="overflow-x-auto focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600">
-          <table className="w-full min-w-[52rem] border-collapse">
+        /* Below lg each hire stacks into labelled lines ([data-stack], globals.css); the wide table only from lg. */
+        <Surface data-stack tabIndex={0} role="region" aria-label="Hires and payments" className="relative overflow-x-auto focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600">
+          <table className="w-full border-collapse lg:min-w-[52rem]">
             <thead className="border-b border-ink-100 bg-ink-50/60">
               <tr>
                 <th scope="col" className={thClass}>Candidate</th>
@@ -451,17 +452,19 @@ function SchedulePanel({ hires }: { hires: HireRow[] }) {
                 const m = (minor: number) => formatMoney(minor, h.currency, { zeroLabel: false });
                 return (
                   <tr key={h.proposalId}>
-                    <td className={tdClass}>
-                      <p className="font-medium text-ink-900">{h.candidateName}</p>
-                      <p className="text-sm text-ink-600">{h.projectName}</p>
-                      <Pill tone={s.tone} className="mt-1.5">{s.label}</Pill>
+                    <td data-title className={tdClass}>
+                      <div className="min-w-0 [overflow-wrap:anywhere]">
+                        <p className="font-medium text-ink-900">{h.candidateName}</p>
+                        <p className="text-sm text-ink-600">{h.projectName}</p>
+                        <Pill tone={s.tone} className="mt-1.5">{s.label}</Pill>
+                      </div>
                     </td>
-                    <td className={cn(tdClass, "nums text-right font-medium text-ink-900")}>{m(h.ledger.totalMinor)}</td>
-                    <td className={cn(tdClass, "nums text-right")}>{h.ledger.paidMinor > 0 ? m(h.ledger.paidMinor) : "-"}</td>
-                    <td className={cn(tdClass, "nums text-right font-semibold", h.ledger.dueMinor > 0 ? "text-ink-900" : "text-text-subtle")}>
+                    <td data-label="Total" className={cn(tdClass, "nums text-right font-medium text-ink-900")}>{m(h.ledger.totalMinor)}</td>
+                    <td data-label="Paid" className={cn(tdClass, "nums text-right")}>{h.ledger.paidMinor > 0 ? m(h.ledger.paidMinor) : "-"}</td>
+                    <td data-label="Left" className={cn(tdClass, "nums text-right font-semibold", h.ledger.dueMinor > 0 ? "text-ink-900" : "text-text-subtle")}>
                       {h.ledger.dueMinor > 0 ? m(h.ledger.dueMinor) : "-"}
                     </td>
-                    <td className={cn(tdClass, "nums")}>
+                    <td data-label="Paid on" className={cn(tdClass, "nums")}>
                       {h.ledger.paidOn.length ? (
                         <ul className="space-y-0.5">
                           {h.ledger.paidOn.map((d, i) => (
@@ -472,9 +475,9 @@ function SchedulePanel({ hires }: { hires: HireRow[] }) {
                         "-"
                       )}
                     </td>
-                    <td className={cn(tdClass, "nums")}>
+                    <td data-label="Next due" className={cn(tdClass, "nums")}>
                       {h.ledger.nextDue ? (
-                        <>
+                        <div>
                           {h.ledger.nextDue < today ? (
                             <span className="font-medium text-danger">Overdue since {formatDate(h.ledger.nextDue)}</span>
                           ) : (
@@ -483,7 +486,7 @@ function SchedulePanel({ hires }: { hires: HireRow[] }) {
                           <span className="block text-xs text-text-subtle">
                             Month {h.ledger.monthsPaid + 1} of {h.ledger.months}
                           </span>
-                        </>
+                        </div>
                       ) : (
                         "-"
                       )}
@@ -596,8 +599,8 @@ function InvoicesPanel({ invoices }: { invoices: InvoiceRow[] }) {
       {filtered.length === 0 ? (
         <EmptyScene title="No invoice matches" body="Try another name or ID, or reset the filters to see every invoice." className="py-10" />
       ) : (
-        <Surface tabIndex={0} role="region" aria-label="Invoices" className="relative overflow-x-auto focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600">
-          <table className="w-full min-w-[48rem] border-collapse">
+        <Surface data-stack tabIndex={0} role="region" aria-label="Invoices" className="relative overflow-x-auto focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600">
+          <table className="w-full border-collapse lg:min-w-[48rem]">
             <thead className="border-b border-ink-100 bg-ink-50">
               <tr>
                 <th scope="col" className={thClass}>Invoice</th>
@@ -605,8 +608,8 @@ function InvoicesPanel({ invoices }: { invoices: InvoiceRow[] }) {
                 <th scope="col" className={thClass}>Project</th>
                 <th scope="col" className={cn(thClass, "text-right")}>Amount</th>
                 <th scope="col" className={thClass}>Paid on</th>
-                {/* Pinned to the right edge: on a phone the table scrolls sideways and the actions must not be off-screen. */}
-                <th scope="col" className={cn(thClass, "sticky right-0 bg-ink-50 text-right shadow-[-8px_0_8px_-8px_rgb(0_0_0/0.12)]")}>
+                {/* From lg the wide table can scroll sideways, so the actions stay pinned to the right edge; below lg rows stack and nothing scrolls. */}
+                <th scope="col" className={cn(thClass, "text-right lg:sticky lg:right-0 lg:bg-ink-50 lg:shadow-[-8px_0_8px_-8px_rgb(0_0_0/0.12)]")}>
                   <span className="sr-only">View or download</span>
                 </th>
               </tr>
@@ -614,19 +617,21 @@ function InvoicesPanel({ invoices }: { invoices: InvoiceRow[] }) {
             <tbody className="divide-y divide-ink-100">
               {filtered.map((i) => (
                 <tr key={i.id}>
-                  <td className={tdClass}>
-                    <p className="nums font-medium text-ink-900">{i.number}</p>
-                    <p className="max-w-[14rem] truncate font-mono text-xs text-text-subtle" title={i.orderId}>
-                      {i.orderId}
-                    </p>
+                  <td data-title className={tdClass}>
+                    <div className="min-w-0 [overflow-wrap:anywhere]">
+                      <p className="nums font-medium text-ink-900">{i.number}</p>
+                      <p className="max-w-[14rem] truncate font-mono text-xs text-text-subtle" title={i.orderId}>
+                        {i.orderId}
+                      </p>
+                    </div>
                   </td>
-                  <td className={tdClass}>{i.candidates.join(", ") || "-"}</td>
-                  <td className={tdClass}>{i.projects.join(", ") || "-"}</td>
-                  <td className={cn(tdClass, "nums text-right font-semibold text-ink-900")}>
+                  <td data-label="Candidate" className={cn(tdClass, "[overflow-wrap:anywhere]")}>{i.candidates.join(", ") || "-"}</td>
+                  <td data-label="Project" className={cn(tdClass, "[overflow-wrap:anywhere]")}>{i.projects.join(", ") || "-"}</td>
+                  <td data-label="Amount" className={cn(tdClass, "nums text-right font-semibold text-ink-900")}>
                     {formatMoney(i.amountMinor, i.currency, { zeroLabel: false })}
                   </td>
-                  <td className={cn(tdClass, "nums")}>{i.paidAt ? formatDate(i.paidAt) : "-"}</td>
-                  <td className={cn(tdClass, "sticky right-0 bg-white text-right shadow-[-8px_0_8px_-8px_rgb(0_0_0/0.12)]")}>
+                  <td data-label="Paid on" className={cn(tdClass, "nums")}>{i.paidAt ? formatDate(i.paidAt) : "-"}</td>
+                  <td className={cn(tdClass, "text-right lg:sticky lg:right-0 lg:bg-white lg:shadow-[-8px_0_8px_-8px_rgb(0_0_0/0.12)]")}>
                     <div className="flex justify-end gap-2">
                       <button
                         type="button"
