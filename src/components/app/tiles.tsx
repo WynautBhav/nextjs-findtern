@@ -81,6 +81,7 @@ export function StatTile({
   href,
   featured = false,
   index = 0,
+  quiet = false,
 }: {
   label: string;
   value: React.ReactNode;
@@ -91,6 +92,8 @@ export function StatTile({
   featured?: boolean;
   /** Position in the row, for the entrance stagger. */
   index?: number;
+  /** The value is words, not a figure: small, fixed size. */
+  quiet?: boolean;
 }) {
   // A long figure ("₹1,20,000", "Shared in the offer letter") starts smaller and may wrap, so it never clips at 375px.
   const long = (typeof value === "string" || typeof value === "number") && String(value).length > 6;
@@ -114,7 +117,15 @@ export function StatTile({
       </div>
       {/* Sized to the tile, not the window, so a figure never breaks mid-number. */}
       <div className="@container self-end pt-3">
-        <p className={cn("nums text-[clamp(var(--fig-min),16cqi,3.25rem)] font-medium leading-none tracking-[-0.03em]", long ? "break-words [--fig-min:1.25rem]" : "whitespace-nowrap [--fig-min:2rem]", featured ? "text-white" : "text-ink-900")}>
+        <p
+          className={cn(
+            "nums font-medium",
+            quiet
+              ? "text-lg leading-snug"
+              : cn("text-[clamp(var(--fig-min),16cqi,3.25rem)] leading-none tracking-[-0.03em]", long ? "break-words [--fig-min:1.25rem]" : "whitespace-nowrap [--fig-min:2rem]"),
+            featured ? "text-white" : "text-ink-900",
+          )}
+        >
           {value}
           {unit ? <span className={cn("ml-1 text-base font-normal tracking-normal", featured ? "text-white/70" : "text-text-subtle")}>{unit}</span> : null}
         </p>

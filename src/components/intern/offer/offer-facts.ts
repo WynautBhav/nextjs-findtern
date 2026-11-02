@@ -23,6 +23,8 @@ export type OfferFacts = {
   /** `money` split for a large figure: "₹40,000" + "/ month". */
   amount: string;
   per: string;
+  /** `amount` is words ("No stipend"), not a figure: show it small, not as the big number. */
+  amountIsText: boolean;
   /** Raw joining date (YYYY-MM-DD) or null. */
   startDate: string | null;
   mode: string;
@@ -41,13 +43,16 @@ export function offerFacts(
 
   let amount: string;
   let per = "";
+  let amountIsText = false;
   if (ft) {
     amount = ft.annualCtcMinor ? formatMoney(ft.annualCtcMinor, offer.currency) : "Shared in the offer letter";
     if (ft.annualCtcMinor) per = "/ year";
+    else amountIsText = true;
   } else {
     const minor = internStipendInrMinor(offer, ctx.score);
     amount = minor == null ? "No stipend" : minor === 0 ? "Not eligible for stipend" : formatMoney(minor, "INR");
     if (minor) per = "/ month";
+    else amountIsText = true;
   }
   const money = per ? `${amount} ${per}` : amount;
 
@@ -66,6 +71,7 @@ export function offerFacts(
     money,
     amount,
     per,
+    amountIsText,
     startDate: offer.startDate,
     mode,
     location,

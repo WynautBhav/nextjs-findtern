@@ -169,7 +169,7 @@ export default async function ProposalDetail({ params }: { params: Promise<{ id:
       {/* The terms that decide an offer, as key numbers; the money is the brand tile. */}
       <div className={cn(STAT_ROW, "mb-6 lg:mb-8")}>
         {[
-          { label: fullTime ? "Annual CTC" : "Monthly stipend", value: facts.amount, unit: facts.per ? facts.per.replace(/^\/\s*/, "/") : undefined },
+          { label: fullTime ? "Annual CTC" : "Monthly stipend", value: facts.amount, unit: facts.per ? facts.per.replace(/^\/\s*/, "/") : undefined, quiet: facts.amountIsText },
           // A value and a smaller unit, so a 2-up tile on a phone never clips ("11 Oct" + "2026").
           startsOn
             ? { label: "Joining date", value: shortDate(startsOn, { day: "numeric", month: "short", timeZone: "Asia/Kolkata" }), unit: shortDate(startsOn, { year: "numeric", timeZone: "Asia/Kolkata" }) }

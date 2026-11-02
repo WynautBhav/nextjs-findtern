@@ -185,7 +185,7 @@ function OfferCard({
         </div>
         <div className="sm:text-right">
           <p className="text-sm text-ink-600">{facts.moneyLabel}</p>
-          <p className="nums mt-1 whitespace-nowrap text-4xl font-medium leading-none tracking-[-0.03em] text-ink-900">
+          <p className={cn("nums mt-1 font-medium text-ink-900", facts.amountIsText ? "text-lg leading-snug" : "whitespace-nowrap text-4xl leading-none tracking-[-0.03em]")}>
             {facts.amount}
             {facts.per ? <span className="ml-1 text-base font-normal tracking-normal text-text-subtle">{facts.per}</span> : null}
           </p>
