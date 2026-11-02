@@ -57,6 +57,33 @@ test("every mutating route handler runs a mutation guard", () => {
   assert.deepEqual(missing, [], "Add requireMutation (or requireCollegeMutation), or list the route in PUBLIC with a reason");
 });
 
+// The proxy gates every /api/admin call, but it is one switch. Each admin handler also checks the session itself,
+// so a wrong matcher or a renamed prefix can't open an export or a file download on its own.
+const ADMIN_OWN_GUARD = /\b(requireMutation|requireRole|requirePermission|legalDocRoute)\(/;
+// Reading the session guards nothing until the role is compared, so it only counts together with that comparison.
+const READS_SESSION = /\b(getSession|readSession)\(/;
+const CHECKS_ADMIN_ROLE = /\.role\s*!==?\s*"admin"/;
+const stripComments = (src: string) => src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(?<!:)\/\/.*$/gm, "");
+const ADMIN_NO_SESSION = new Map([
+  ["admin/google/callback", "Google redirects the browser here; it only stores a token when the httpOnly nonce cookie set by the admin-only connect route matches `state`"],
+]);
+
+test("every admin route checks the session itself, not only the proxy", () => {
+  const missing: string[] = [];
+  for (const file of routes(API)) {
+    const key = relative(API, file).replace(/\/route\.ts$/, "");
+    if (!key.startsWith("admin/") || ADMIN_NO_SESSION.has(key)) continue;
+    const code = stripComments(readFileSync(file, "utf8"));
+    if (!ADMIN_OWN_GUARD.test(code) && !(READS_SESSION.test(code) && CHECKS_ADMIN_ROLE.test(code))) missing.push(key);
+  }
+  assert.deepEqual(missing, [], "Call requireRole(cookie, [\"admin\"]) (reads) or requireMutation (writes), or list the route with a reason");
+});
+
+test("the admin exemption list has no stale entries", () => {
+  const keys = new Set(routes(API).map((f) => relative(API, f).replace(/\/route\.ts$/, "")));
+  assert.deepEqual([...ADMIN_NO_SESSION.keys()].filter((k) => !keys.has(k)), []);
+});
+
 test("logout refuses cross-site POSTs", () => {
   const src = readFileSync(join(API, "auth/logout/route.ts"), "utf8");
   // Source check, not a call: the route imports next/server, which node --test can't load.

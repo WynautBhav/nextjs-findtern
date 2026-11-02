@@ -66,3 +66,57 @@ test("a nested list written as a sibling of its item is moved inside it (valid H
   assert.doesNotMatch(deep, /<\/li>\s*<ul/);
   assert.equal((deep.match(/<ul/g) ?? []).length, 2);
 });
+
+test("an unterminated tag at the end becomes text, so joining bodies cannot revive it", () => {
+  const out = sanitizeRichText("<p>hi</p><img src=x onerror=alert(1)//");
+  assert.ok(!/<img/i.test(out));
+  assert.match(out, /&lt;img/);
+  assert.ok(!/<img/i.test(`${out}<p>next</p>`));
+});
+
+test("protocol-relative and backslash links lose their href", () => {
+  for (const href of ["//evil.example/x", "/\\evil.example", "/\\/evil.example", "/\t/evil.example", "/\n/evil.example", "/\r/evil.example", "\t//evil.example"]) {
+    const out = sanitizeRichText(`<a href="${href}">x</a>`);
+    assert.ok(!out.includes("href"), `${href} survived as ${out}`);
+  }
+  assert.match(sanitizeRichText('<a href="/pricing">x</a>'), /href="\/pricing"/);
+  assert.match(sanitizeRichText('<a href="https://x.test/a">x</a>'), /rel="noopener noreferrer"/);
+});
+
+test("hostile payloads never leave a live tag, handler or script URL", () => {
+  const payloads = [
+    "<script>alert(1)</script>",
+    "<scr<script>ipt>alert(1)</scr</script>ipt>",
+    "<img src=x onerror=alert(1)>",
+    '<a href="java\tscript:alert(1)">x</a>',
+    '<a href="&#106;avascript:alert(1)">x</a>',
+    '<a href="JaVaScRiPt:alert(1)">x</a>',
+    '<a href="data:text/html,<script>alert(1)</script>">x</a>',
+    '<a href="https://x.test" onclick="alert(1)">x</a>',
+    '<a href="x" title=">"><img src=x onerror=alert(1)>">y</a>',
+    '<p onmouseover="alert(1)" style="background:url(javascript:alert(1))">hi</p>',
+    "<svg onload=alert(1)>",
+    "<math><mtext><table><mglyph><style><img src=x onerror=alert(1)>",
+    '<iframe srcdoc="<script>alert(1)</script>">',
+    '<form action="javascript:alert(1)"><button formaction="javascript:alert(1)">x</button></form>',
+    '<base href="https://evil.example/">',
+    '<meta http-equiv="refresh" content="0;url=javascript:alert(1)">',
+    "<noscript><p title=\"</noscript><img src=x onerror=alert(1)>\"></noscript>",
+    "<!--><img src=x onerror=alert(1)>-->",
+    "<textarea><img src=x onerror=alert(1)></textarea>",
+    "<<img src=x onerror=alert(1)>",
+    "<p<img src=x onerror=alert(1)>>",
+    "<li><li><img src=x onerror=alert(1)>",
+    "<h3><img src=x onerror=alert(1)></h3>",
+  ];
+  const liveTag = /<(?!\/?(?:h[234]|p|ul|ol|li|strong|em|a|blockquote|hr|br|code|pre|sup|sub|b|i)[\s>])[a-z!?]/i;
+  for (const p of payloads) {
+    const out = sanitizeRichText(p);
+    assert.ok(!liveTag.test(out), `live tag in ${JSON.stringify(out)} from ${JSON.stringify(p)}`);
+    // Handlers only count inside a tag; an escaped attribute value is inert text.
+    for (const tag of out.match(/<[^>]*>/g) ?? []) {
+      assert.ok(!/\son[a-z]+\s*=|\sstyle\s*=|\ssrc\s*=|srcdoc|formaction/i.test(tag), `attribute in ${tag}`);
+      assert.ok(!/href="(?!https?:\/\/|mailto:|#|\/(?![/\\]))/i.test(tag), `unsafe href in ${tag}`);
+    }
+  }
+});

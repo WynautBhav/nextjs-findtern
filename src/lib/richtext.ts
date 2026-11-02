@@ -69,8 +69,12 @@ const VOID_CONTENT = new Set([
   "title",
 ]);
 
-/** Only href survives, and only when it is a safe scheme. */
-const SAFE_HREF = /^(https?:\/\/|mailto:|#|\/)/i;
+/** Only href survives, and only when it is a safe scheme. `//host` and `/\host`
+    are protocol-relative, so a bare "/" prefix must not be followed by either. */
+const SAFE_HREF = /^(https?:\/\/|mailto:|#|\/(?![/\\]))/i;
+
+/** A "<" that does not open or close one of the tags this file emits. */
+const STRAY_LT = new RegExp(`<(?!\\/?(?:${Object.keys(ALLOWED).join("|")})(?:\\s[^<>]*)?>)`, "g");
 
 function escapeAttr(value: string): string {
   return value
@@ -127,7 +131,8 @@ export function sanitizeRichText(input: string): string {
 
       if (tag === "a") {
         const href = /href\s*=\s*("([^"]*)"|'([^']*)')/i.exec(attrs);
-        const raw = href ? (href[2] ?? href[3] ?? "") : "";
+        // Browsers drop tab, LF and CR anywhere in a URL, so "/<TAB>/host" is "//host" to them.
+        const raw = (href ? (href[2] ?? href[3] ?? "") : "").replace(/[\u0000-\u001f\u007f]/g, "");
         if (!raw || !SAFE_HREF.test(raw.trim())) {
           return `<a${classAttr}>`;
         }
@@ -140,6 +145,12 @@ export function sanitizeRichText(input: string): string {
       return `<${tag}${classAttr}>`;
     },
   );
+
+  // 3-. Whatever "<" is left did not form a tag the walk above rebuilt (an
+  //     unterminated "<img onerror=…" at the end, "<![CDATA[", "<<"). Browsers
+  //     drop it at the end of the input, but a body joined to more HTML would
+  //     turn it into a live tag, so make it text.
+  out = out.replace(STRAY_LT, "&lt;");
 
   // 3a. An address pasted as a link without its href (Docs smart chips do
   //     this) renders as a link that goes nowhere. Give it its mailto.
