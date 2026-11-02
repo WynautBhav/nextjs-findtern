@@ -444,10 +444,11 @@ export function InlineEditor({
             setDraft(start);
             setOpen(true);
           }}
-          aria-label={`Edit ${label}`}
           className="group inline-flex min-h-9 items-center gap-2 rounded-apple-sm px-1.5 text-left text-sm text-ink-800 hover:bg-ink-50 focus-visible:outline-2 focus-visible:outline-brand-600 max-lg:min-h-11"
         >
           <span className="min-w-0">{display}</span>
+          {/* The name starts with the words on the button (WCAG 2.5.3) and then says what pressing it does. */}
+          <span className="sr-only"> (edit {label})</span>
           <Pencil className="size-3.5 shrink-0 text-text-subtle group-hover:text-brand-700" aria-hidden />
         </button>
       ) : null}

@@ -248,6 +248,32 @@ function assertNotRateLimited(label, res) {
   assert.notEqual(res.status, 429, `${label} was rate limited (429): this machine's address is not in RATE_LIMIT_BYPASS_IPS on Vercel`);
 }
 
+/**
+ * A choice made before React has hydrated the page is kept by the browser but never seen by the page, so give
+ * the page a moment first (a person needs it too). The headless runs, which have no slow-motion delay, hit this.
+ */
+async function settle(page) {
+  await page.waitForLoadState("load");
+  await page.waitForTimeout(1500);
+}
+
+/** Tick a consent box until the form's submit button wakes up (it only enables once React has seen the tick). */
+async function agreeUntilEnabled(box, button) {
+  const page = box.page();
+  await settle(page);
+  for (let attempt = 0; attempt < 6; attempt++) {
+    await box.check();
+    try {
+      await page.waitForFunction((el) => !el.disabled, await button.elementHandle(), { timeout: 2500 });
+      return;
+    } catch {
+      await box.uncheck();
+      await page.waitForTimeout(600);
+    }
+  }
+  throw new Error("The submit button never enabled after agreeing to the terms");
+}
+
 /** YYYY-MM-DD in Asia/Kolkata, `days` from today. */
 function istDate(days = 0) {
   return new Date(Date.now() + days * 86_400_000 + 5.5 * 3_600_000).toISOString().slice(0, 10);
@@ -333,7 +359,7 @@ async function signUpIntern(page, who) {
     [page.locator("#phoneNumber"), who.phone],
     [page.locator("#password"), PASSWORD],
   ]);
-  await page.getByRole("checkbox", { name: /agree/i }).check();
+  await agreeUntilEnabled(page.getByRole("checkbox", { name: /agree/i }), page.getByRole("button", { name: "Send verification code" }));
   const sent = await clickFor(page, page.getByRole("button", { name: "Send verification code" }), { path: "/api/auth/signup/send-otp", method: "POST" });
   assertNotRateLimited("send-otp", sent);
   assert.equal(sent.status, 200, `send-otp → ${sent.status} ${JSON.stringify(sent.body)}`);
@@ -551,7 +577,7 @@ async function signUpEmployer(page, who) {
     [page.locator("#phoneNumber"), who.phone],
     [page.locator("#password"), PASSWORD],
   ]);
-  await page.getByRole("checkbox", { name: /agree/i }).check();
+  await agreeUntilEnabled(page.getByRole("checkbox", { name: /agree/i }), page.getByRole("button", { name: "Send verification code" }));
   const sent = await clickFor(page, page.getByRole("button", { name: "Send verification code" }), { path: "/api/auth/signup/send-otp", method: "POST" });
   assertNotRateLimited("send-otp", sent);
   assert.equal(sent.status, 200, `send-otp → ${sent.status} ${JSON.stringify(sent.body)}`);
@@ -814,6 +840,7 @@ step("employer: pays one offer upfront with the promo, using the test button [UI
   const orderPath = `/api/employer/${state.employerId}/payment/razorpay/order`;
   await visit(page, "/employer/checkout");
   await page.getByText(/2 ready to pay/i).first().waitFor();
+  await settle(page);
   await page.getByRole("radio", { name: /Whole engagement/ }).check();
 
   const main = await page.locator("main").innerText();
@@ -879,6 +906,7 @@ step("employer: pays the other offer monthly, using the test button [UI]", ["pai
   await visit(page, "/employer/checkout");
   await page.getByText(/^Ready to pay/).first().waitFor();
   assert.equal(await page.getByRole("radio", { name: /Whole engagement|Monthly/ }).count(), 2, "one offer left, so only the two payment modes are choices");
+  await settle(page);
   await page.getByRole("radio", { name: /^Monthly/ }).check();
   const offer = await one(`SELECT offer_details FROM proposals WHERE id = $1`, [state.otherProposalId]);
   const monthlyMinor = Math.round(offer.offer_details.monthlyAmount * 100);
@@ -1667,6 +1695,7 @@ step("US employer pays in dollars with the test button; Orders and the tax invoi
   assert.doesNotMatch(main, /₹|GST/, "no rupees and no GST for a US company");
   assert.match(main, /Hiring fee \(one-time\)/, "the one-time hiring fee is a line of its own");
   assert.doesNotMatch(main, /upfront discount/i, "there is no upfront discount any more");
+  await settle(page);
   await page.getByRole("radio", { name: /^Monthly/ }).check();
   await shot("us-checkout");
   const res = await clickFor(page, page.getByRole("button", { name: /^Test: mark as paid/ }), { path: orderPath, method: "POST" });

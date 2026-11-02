@@ -80,9 +80,12 @@ async function page(path) {
   const mails = [...new Set([...p.text.matchAll(/[\w.+-]+@findtern\.in/g)].map((m) => m[0]))];
   check("S1", "r14", "For interns: every mailbox is communicate@", mails.length > 0 && mails.every((m) => m === "communicate@findtern.in") && !/mailto:admin@/i.test(p.body), mails.join(", "));
   check("S1", "r15", "For interns: no pricing card (Espresso / Cappuccino / Latte)", !/Espresso|Cappuccino|Latte/.test(p.text));
+  // The header and footer pick their mailbox from the page once the browser has it (the server cannot know
+  // the path), so only the page body is read here; the browser pass in the journey's crawl covers the rest.
   const e = await page("/employers");
-  const em = [...new Set([...e.text.matchAll(/[\w.+-]+@findtern\.in/g)].map((m) => m[0]))];
-  check("S3", "r11", "For employers: the mailbox is admin@", em.every((m) => m === "admin@findtern.in"), em.join(", "));
+  const body = text(e.body.replace(/<(header|footer)[\s\S]*?<\/\1>/gi, " "));
+  const em = [...new Set([...body.matchAll(/[\w.+-]+@findtern\.in/g)].map((m) => m[0]))];
+  check("S3", "r11", "For employers: the mailbox in the page body is admin@", em.length > 0 && em.every((m) => m === "admin@findtern.in"), em.join(", "));
 }
 // ── Legal pages ──
 {
@@ -109,6 +112,8 @@ for (const [path, rx, what] of [
   const s = await page("/signup");
   const l = await page("/login");
   check("S1", "r21", "Intern sign-up and sign-in pages show a Google option (Google itself stays off until the real domain)", /google/i.test(s.body) && /google/i.test(l.body), "");
+  const codes = (s.body.match(/<option[^>]*value="\+\d+/g) ?? []).length;
+  check("S1", "r16 (30 Oct)", "Sign-up phone prefix list is long (every country, not seven)", codes >= 150, `${codes} prefixes`);
   const g = await get("/api/auth/google/start?role=intern");
   check("NOTE", "Google", "Google start does not crash (it may redirect or refuse)", g.status < 500, `${g.status}`);
 }
