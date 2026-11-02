@@ -1341,13 +1341,16 @@ body:has([data-slot="dialog-content"][data-state="open"], [data-slot="sheet-cont
     white-space: normal;
     text-align: right;
   }
-  [data-stack] td:empty {
+  [data-stack] td:empty,
+  /* A cell whose value is just a dash: on a phone the line is dropped, so a row shows only what it has. */
+  [data-stack] td[data-empty] {
     display: none;
   }
   [data-stack] td[data-label]::before {
     content: attr(data-label);
     flex-shrink: 0;
     color: var(--color-text-subtle);
+    font-weight: 400;
     text-align: left;
   }
   [data-stack] td[data-title],

@@ -448,7 +448,9 @@ function SchedulePanel({ hires }: { hires: HireRow[] }) {
             </thead>
             <tbody className="divide-y divide-ink-100">
               {rows.map((h) => {
-                const s = STATUS[h.ledger.status];
+                // "Overdue" is the first thing a skimming eye needs, so it leads the row, not the 7th line.
+                const overdue = Boolean(h.ledger.nextDue) && (h.ledger.nextDue as string) < today && h.ledger.dueMinor > 0;
+                const s = overdue ? { label: "Overdue", tone: "waiting" as Tone } : STATUS[h.ledger.status];
                 const m = (minor: number) => formatMoney(minor, h.currency, { zeroLabel: false });
                 return (
                   <tr key={h.proposalId}>
@@ -460,11 +462,11 @@ function SchedulePanel({ hires }: { hires: HireRow[] }) {
                       </div>
                     </td>
                     <td data-label="Total" className={cn(tdClass, "nums text-right font-medium text-ink-900")}>{m(h.ledger.totalMinor)}</td>
-                    <td data-label="Paid" className={cn(tdClass, "nums text-right")}>{h.ledger.paidMinor > 0 ? m(h.ledger.paidMinor) : "-"}</td>
-                    <td data-label="Left" className={cn(tdClass, "nums text-right font-semibold", h.ledger.dueMinor > 0 ? "text-ink-900" : "text-text-subtle")}>
+                    <td data-label="Paid" data-empty={h.ledger.paidMinor > 0 ? undefined : ""} className={cn(tdClass, "nums text-right")}>{h.ledger.paidMinor > 0 ? m(h.ledger.paidMinor) : "-"}</td>
+                    <td data-label="Left" data-empty={h.ledger.dueMinor > 0 ? undefined : ""} className={cn(tdClass, "nums text-right font-semibold", h.ledger.dueMinor > 0 ? "text-ink-900" : "text-text-subtle")}>
                       {h.ledger.dueMinor > 0 ? m(h.ledger.dueMinor) : "-"}
                     </td>
-                    <td data-label="Paid on" className={cn(tdClass, "nums")}>
+                    <td data-label="Paid on" data-empty={h.ledger.paidOn.length ? undefined : ""} className={cn(tdClass, "nums")}>
                       {h.ledger.paidOn.length ? (
                         <ul className="space-y-0.5">
                           {h.ledger.paidOn.map((d, i) => (
@@ -475,7 +477,7 @@ function SchedulePanel({ hires }: { hires: HireRow[] }) {
                         "-"
                       )}
                     </td>
-                    <td data-label="Next due" className={cn(tdClass, "nums")}>
+                    <td data-label="Next due" data-empty={h.ledger.nextDue ? undefined : ""} className={cn(tdClass, "nums")}>
                       {h.ledger.nextDue ? (
                         <div>
                           {h.ledger.nextDue < today ? (
@@ -620,7 +622,7 @@ function InvoicesPanel({ invoices }: { invoices: InvoiceRow[] }) {
                   <td data-title className={tdClass}>
                     <div className="min-w-0 [overflow-wrap:anywhere]">
                       <p className="nums font-medium text-ink-900">{i.number}</p>
-                      <p className="max-w-[14rem] truncate font-mono text-xs text-text-subtle" title={i.orderId}>
+                      <p className="break-all font-mono text-xs text-text-subtle lg:max-w-[14rem] lg:truncate" title={i.orderId}>
                         {i.orderId}
                       </p>
                     </div>

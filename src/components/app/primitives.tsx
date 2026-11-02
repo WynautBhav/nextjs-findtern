@@ -39,7 +39,7 @@ export function PageHead({
         {eyebrow ? (
           <p className="mb-1 text-sm font-medium text-text-subtle">{eyebrow}</p>
         ) : null}
-        <h1 className="text-balance text-2xl font-semibold tracking-[-0.02em] text-ink-900">{title}</h1>
+        <h1 className="text-balance break-words text-2xl font-semibold tracking-[-0.02em] text-ink-900">{title}</h1>
         {lede ? <p className="mt-1 max-w-2xl text-pretty text-sm text-text-subtle">{lede}</p> : null}
       </div>
       {action ? <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:shrink-0">{action}</div> : null}
