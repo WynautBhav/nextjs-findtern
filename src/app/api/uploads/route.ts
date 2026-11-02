@@ -26,7 +26,6 @@ const KINDS: Record<string, { roles: SessionData["role"][]; types: string[]; max
   profile_photo: { roles: ["intern"], types: IMAGES, max: 5 * MB },
   aadhaar: { roles: ["intern"], types: DOCS, max: 10 * MB },
   pan: { roles: ["intern"], types: DOCS, max: 10 * MB },
-  intro_video: { roles: ["intern"], types: VIDEO, max: 50 * MB },
   marksheet: { roles: ["intern"], types: DOCS, max: 25 * MB },
   // Professional course / certification files. Stored only: the onboarding
   // save puts the key on its row (extra.academics …certificateUploads).
@@ -66,7 +65,6 @@ const DOC_COLUMNS = {
   profile_photo: ["profilePhotoName", "profilePhotoType", "profilePhotoSize"],
   aadhaar: ["aadhaarImageName", "aadhaarImageType", "aadhaarImageSize"],
   pan: ["panImageName", "panImageType", "panImageSize"],
-  intro_video: ["introVideoName", "introVideoType", "introVideoSize"],
 } as const;
 
 export async function POST(req: Request): Promise<Response> {

@@ -59,20 +59,6 @@ export function AboutStep({ values, update, errors, documents, account, onUpload
             error={errors.linkedinUrl}
             onChange={(v) => update("linkedinUrl", v.trim())}
           />
-          <div className="min-w-0">
-            <Label optional>Intro video</Label>
-            <FileUpload
-              className="mt-2"
-              kind="intro_video"
-              accept="video/mp4,video/webm,video/quicktime"
-              label="Intro video"
-              maxBytes={50 * MB}
-              preview="video"
-              current={documents.find((d) => d.label === "Intro video") ? "Intro video on file" : null}
-              hint="30 to 60 seconds about you. MP4, WebM or MOV, up to 50 MB."
-              onUploaded={() => onUploaded("intro_video")}
-            />
-          </div>
         </Grid>
       </Section>
 

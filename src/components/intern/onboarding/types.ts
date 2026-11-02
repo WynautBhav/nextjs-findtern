@@ -29,6 +29,6 @@ export type StepProps = {
   college: MyCollege | null;
   /** Skills are frozen: rated, or an AI interview is open. */
   skillsLocked: boolean;
-  onUploaded: (kind: "pan" | "aadhaar" | "profile_photo" | "intro_video") => void;
+  onUploaded: (kind: "pan" | "aadhaar" | "profile_photo") => void;
   onJumpStep: (step: number) => void;
 };
