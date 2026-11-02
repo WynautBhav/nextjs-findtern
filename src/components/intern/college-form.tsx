@@ -247,6 +247,10 @@ function JoinForm({
   const [adult, setAdult] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Which control the message is about: it is marked invalid, tied to the message, and focused.
+  const [invalid, setInvalid] = useState<"college" | "adult" | null>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
+  const errorId = `${ids}-error`;
 
   const chosenPurposes = purposes.filter((p) => agreed[p.id]).map((p) => p.id);
 
@@ -254,14 +258,19 @@ function JoinForm({
     e.preventDefault();
     if (!chosen) {
       setError("Choose your college from the list.");
+      setInvalid("college");
+      searchRef.current?.focus();
       return;
     }
     if (!adult) {
       setError("Confirm that you are 18 or older.");
+      setInvalid("adult");
+      document.getElementById(`${ids}-adult`)?.focus();
       return;
     }
     setSaving(true);
     setError(null);
+    setInvalid(null);
     try {
       const res = await csrfFetch("/api/intern/college", {
         method: "POST",
@@ -300,7 +309,7 @@ function JoinForm({
       <section>
         <SectionHead title="College" hint="Search by name, city or college code. Your placement office can tell you the code." />
         {chosen ? (
-          <div className="flex items-center gap-3 rounded-apple-lg border border-ink-200/80 p-4">
+          <div className="flex items-center gap-3 rounded-apple-xl border border-ink-200/80 p-4">
             <span aria-hidden className="grid size-10 shrink-0 place-items-center rounded-apple-sm bg-brand-50 text-brand-700">
               <Building2 className="size-5" />
             </span>
@@ -322,8 +331,13 @@ function JoinForm({
         ) : (
           <CollegeSearch
             initialQuery={!embedded && institution.trim().length >= 3 ? institution.trim() : ""}
+            inputRef={searchRef}
+            invalid={invalid === "college"}
+            describedBy={errorId}
             onPick={(o) => {
               setChosen(o);
+              setError(null);
+              setInvalid(null);
               onPicked?.(o.name);
             }}
           />
@@ -369,7 +383,7 @@ function JoinForm({
               key={p.id}
               htmlFor={`${ids}-${p.id}`}
               className={cn(
-                "flex cursor-pointer items-start gap-3 rounded-apple-lg border bg-white p-4 transition-colors",
+                "flex cursor-pointer items-start gap-3 rounded-apple-xl border bg-white p-4 transition-colors",
                 agreed[p.id] ? "border-brand-300 bg-brand-50/40" : "border-ink-200/80 hover:border-ink-300",
               )}
             >
@@ -397,7 +411,7 @@ function JoinForm({
           <summary className="inline-flex min-h-11 cursor-pointer list-none items-center font-medium text-primary hover:underline focus-visible:outline-2 focus-visible:outline-brand-700">
             Read the full notice (version {notice.version})
           </summary>
-          <div className="details-reveal mt-2 whitespace-pre-line rounded-apple-sm border border-ink-200/80 bg-ink-50 p-4 text-sm leading-relaxed text-ink-700">
+          <div className="details-reveal mt-2 whitespace-pre-line rounded-apple-sm border border-ink-200/80 p-4 text-sm leading-relaxed text-ink-700">
             {notice.text}
           </div>
         </details>
@@ -410,7 +424,10 @@ function JoinForm({
           onCheckedChange={(v) => {
             setAdult(v === true);
             setError(null);
+            setInvalid(null);
           }}
+          aria-invalid={invalid === "adult" ? true : undefined}
+          aria-describedby={invalid === "adult" ? errorId : undefined}
           className="mt-0.5 size-5"
         />
         <span className="text-sm leading-relaxed text-ink-800">
@@ -420,7 +437,7 @@ function JoinForm({
       </label>
 
       {/* Mounted empty, then filled, so the message is announced. */}
-      <div role="alert" className="text-sm font-medium text-danger">
+      <div id={errorId} role="alert" className="text-sm font-medium text-danger">
         {error}
       </div>
 
@@ -440,7 +457,20 @@ function JoinForm({
 
 /* ── Search combobox ─────────────────────────────────────────────────── */
 
-function CollegeSearch({ initialQuery, onPick }: { initialQuery: string; onPick: (o: Option) => void }) {
+function CollegeSearch({
+  initialQuery,
+  onPick,
+  inputRef,
+  invalid = false,
+  describedBy,
+}: {
+  initialQuery: string;
+  onPick: (o: Option) => void;
+  /** Lets the form focus the field when a submit fails. */
+  inputRef?: React.RefObject<HTMLInputElement | null>;
+  invalid?: boolean;
+  describedBy?: string;
+}) {
   const ids = useId();
   const [query, setQuery] = useState(initialQuery);
   const [options, setOptions] = useState<Option[]>([]);
@@ -449,7 +479,8 @@ function CollegeSearch({ initialQuery, onPick }: { initialQuery: string; onPick:
   const [active, setActive] = useState(0);
   const [open, setOpen] = useState(Boolean(initialQuery));
   const reqId = useRef(0);
-  const searchInput = useRef<HTMLInputElement>(null);
+  const ownInput = useRef<HTMLInputElement>(null);
+  const searchInput = inputRef ?? ownInput;
 
   useEffect(() => {
     const id = ++reqId.current;
@@ -513,6 +544,8 @@ function CollegeSearch({ initialQuery, onPick }: { initialQuery: string; onPick:
           aria-expanded={showList}
           aria-controls={listId}
           aria-autocomplete="list"
+          aria-invalid={invalid ? true : undefined}
+          aria-describedby={invalid ? describedBy : undefined}
           aria-activedescendant={showList && options[active] ? optionId(active) : undefined}
           value={query}
           onChange={(e) => {
@@ -668,7 +701,7 @@ function MissingCollege({ query }: { query: string }) {
       ) : null}
 
       {open ? (
-        <div role="group" aria-labelledby={`${ids}-h`} className="space-y-3 rounded-apple-lg border border-ink-200/80 bg-ink-50 p-4">
+        <div role="group" aria-labelledby={`${ids}-h`} className="space-y-3 rounded-apple-xl border border-ink-200/80 p-4">
           <div>
             <p id={`${ids}-h`} className="text-sm font-semibold text-ink-900">
               Tell us your college
