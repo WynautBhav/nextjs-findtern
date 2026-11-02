@@ -638,7 +638,7 @@ export const internPayments = pgTable("intern_payments", {
   status: text("status").notNull().default("created"),
   raw: jsonb("raw").$type<Record<string, unknown>>().default({}),
   paidAt: timestamp("paid_at"),
-  /** GST invoice number, assigned once at payment ("FT/2026-27/0001"). */
+  /** GST invoice number, assigned once at payment ("021126-124", or "FT/2026-27/0001" before 2 Nov 2026). */
   invoiceNumber: text("invoice_number").unique(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -677,7 +677,7 @@ export const employerPayments = pgTable("employer_payments", {
   status: text("status").notNull().default("created"),
   raw: jsonb("raw").$type<Record<string, unknown>>().default({}),
   paidAt: timestamp("paid_at"),
-  /** GST invoice number, assigned once at payment ("FT/2026-27/0001"). */
+  /** GST invoice number, assigned once at payment ("021126-124", or "FT/2026-27/0001" before 2 Nov 2026). */
   invoiceNumber: text("invoice_number").unique(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),

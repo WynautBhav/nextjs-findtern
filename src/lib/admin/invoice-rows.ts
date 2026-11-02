@@ -9,7 +9,7 @@ import type { InvoiceBuyerProfile } from "../gst.ts";
 /** One payment row, from either employer orders or intern activation fees. */
 export type AdminInvoiceRow = {
   id: string;
-  /** FY serial stored at payment ("FT/2026-27/0001"); null for unpaid / legacy rows. */
+  /** FY serial stored at payment ("021126-124", or "FT/2026-27/0001" before 2 Nov 2026); null for unpaid / legacy rows. */
   invoiceNumber?: string | null;
   orderId: string;
   paymentId?: string | null;

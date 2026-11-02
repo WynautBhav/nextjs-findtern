@@ -1,15 +1,16 @@
 import { and, eq, isNull, sql } from "drizzle-orm";
 
 import { getDb, schema } from "@/lib/db";
+import { formatInvoiceNumber } from "@/lib/invoice";
 
 /**
  * GST invoice numbers: one running serial per Indian financial year
- * (1 April - 31 March, IST), shared by employer orders and intern fees.
- * "FT/2026-27/0001". Assigned once, at the moment a payment is marked paid,
- * and stored - so a number never changes after it is printed.
+ * (1 April - 31 March, IST), shared by employer orders and intern fees,
+ * printed behind the settlement date: "021126-124" (formatInvoiceNumber).
+ * Assigned once, at the moment a payment is marked paid, and stored - so a
+ * number never changes after it is printed. Numbers issued before this format
+ * ("FT/2026-27/0007") keep theirs.
  */
-
-export const INVOICE_PREFIX = "FT";
 
 type Db = ReturnType<typeof getDb>;
 type Tx = Parameters<Parameters<Db["transaction"]>[0]>[0];
@@ -19,10 +20,6 @@ export function financialYear(at: Date = new Date()): string {
   const ist = new Date(at.getTime() + 330 * 60_000);
   const y = ist.getUTCMonth() >= 3 ? ist.getUTCFullYear() : ist.getUTCFullYear() - 1;
   return `${y}-${String((y + 1) % 100).padStart(2, "0")}`;
-}
-
-export function formatInvoiceNumber(fy: string, n: number): string {
-  return `${INVOICE_PREFIX}/${fy}/${String(n).padStart(4, "0")}`;
 }
 
 /**
@@ -55,7 +52,7 @@ export async function assignInvoiceNumber(
       set: { last: sql`${schema.invoiceCounters.last} + 1`, updatedAt: new Date() },
     })
     .returning({ last: schema.invoiceCounters.last });
-  const number = formatInvoiceNumber(fy, counter.last);
+  const number = formatInvoiceNumber(paidAt, counter.last);
   const updated = await db
     .update(table)
     .set({ invoiceNumber: number })

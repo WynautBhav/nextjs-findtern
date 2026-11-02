@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { displayInvoiceNumber, legacyInvoiceNumber, lineRows, taxInvoiceHtml } from "./invoice.ts";
+import { displayInvoiceNumber, formatInvoiceNumber, legacyInvoiceNumber, lineRows, taxInvoiceHtml } from "./invoice.ts";
 
 const paid = [
   { orderId: "order_b", paidAt: "2026-10-20T06:00:00Z" }, // 11:30 IST
@@ -63,4 +63,22 @@ test("EMH-08: invoice prints the per-line label, the full-time wording and the b
   assert.match(html, /8\.33% of the total mentioned CTC/);
   assert.match(html, /Send payments to/);
   assert.match(html, /KKBK0003572/);
+});
+
+test("a new invoice number is the IST date, then the running serial", () => {
+  assert.equal(formatInvoiceNumber(new Date("2026-11-02T06:00:00Z"), 124), "021126-124");
+  assert.equal(formatInvoiceNumber(new Date("2026-11-02T06:00:00Z"), 8), "021126-08");
+});
+
+test("the date is read on the IST clock, not UTC", () => {
+  // 20:00 UTC on the 1st is 01:30 IST on the 2nd.
+  assert.equal(formatInvoiceNumber(new Date("2026-11-01T20:00:00Z"), 5), "021126-05");
+  // 18:29 UTC is still the 1st in India (23:59 IST).
+  assert.equal(formatInvoiceNumber(new Date("2026-11-01T18:29:00Z"), 5), "011126-05");
+});
+
+test("a number stays within the 16 characters GST allows, digits and hyphen only", () => {
+  const n = formatInvoiceNumber(new Date("2027-03-31T10:00:00Z"), 99999);
+  assert.ok(n.length <= 16);
+  assert.match(n, /^\d{6}-\d+$/);
 });

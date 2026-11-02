@@ -59,6 +59,16 @@ export type InvoiceInput = {
 };
 
 /**
+ * "021126-124": the IST date the payment settled, then the running serial at
+ * that moment. The serial is one counter per financial year, so a number is
+ * never reused; the date in front is what the accounts team reads.
+ * 16 characters at most, digits and a hyphen only (GST rule 46).
+ */
+export function formatInvoiceNumber(paidAt: Date, serial: number): string {
+  return `${dayKey(paidAt)}-${String(serial).padStart(2, "0")}`;
+}
+
+/**
  * The invoice number to print: the FY serial stored at payment
  * (lib/invoice-number), else the old id-derived form for rows paid before
  * numbering existed and not yet backfilled.
@@ -82,7 +92,8 @@ export const LEGACY_INVOICE_TZ = "Asia/Kolkata";
 
 type PaidRef = { orderId: string; paidAt: Date | string | null };
 
-function dayKey(at: Date, timeZone: string): string {
+/** "021126": the day in DDMMYY, in the given clock (IST by default). */
+export function dayKey(at: Date, timeZone: string = LEGACY_INVOICE_TZ): string {
   const parts = new Intl.DateTimeFormat("en-GB", { timeZone, day: "2-digit", month: "2-digit", year: "2-digit" }).formatToParts(at);
   const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "00";
   return `${get("day")}${get("month")}${get("year")}`;
