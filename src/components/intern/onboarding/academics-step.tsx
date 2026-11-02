@@ -81,7 +81,6 @@ export function AcademicsStep({ values, update, errors, college }: StepProps) {
           hint="Type the full name. To be included in your college's drives, link it below."
           onChange={(v) => set({ institution: v })}
         />
-        <CollegeLink college={college} institution={a.institution} branch={a.branch} onPicked={(name) => set({ institution: name })} />
 
         <Grid>
           {hasList ? (
@@ -187,6 +186,8 @@ export function AcademicsStep({ values, update, errors, college }: StepProps) {
             />
           </Grid>
         )}
+
+        <CollegeLink college={college} institution={a.institution} branch={a.branch} onPicked={(name) => set({ institution: name })} />
       </Section>
 
       <Section title={phd ? "Certificates" : "Marksheets"} hint="Your latest semester or final marksheet. Optional - you can add several.">

@@ -3,7 +3,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { BadgeCheck, Building2, Check, CircleHelp, Minus, Search, X } from "lucide-react";
+import { BadgeCheck, Building2, Check, ChevronDown, CircleHelp, Minus, Search, X } from "lucide-react";
 
 import { LIGHT_TILE, Pill, SectionHead, Surface } from "@/components/app/primitives";
 import { useConfirm } from "@/components/app/use-confirm";
@@ -292,8 +292,8 @@ function JoinForm({
     <form
       onSubmit={submit}
       className={cn(
-        "space-y-8 border border-ink-200/80",
-        embedded ? "rounded-apple-lg bg-ink-50/60 p-4 sm:p-5" : cn("max-w-3xl rounded-apple-xl bg-white p-5 sm:p-8", LIGHT_TILE),
+        "space-y-8",
+        embedded ? "rounded-apple-lg bg-ink-50/60 p-4 sm:p-5" : cn("max-w-3xl rounded-apple-xl border border-ink-200/80 bg-white p-5 sm:p-8", LIGHT_TILE),
       )}
       noValidate
     >
@@ -321,7 +321,7 @@ function JoinForm({
           </div>
         ) : (
           <CollegeSearch
-            initialQuery={institution.trim().length >= 3 ? institution.trim() : ""}
+            initialQuery={!embedded && institution.trim().length >= 3 ? institution.trim() : ""}
             onPick={(o) => {
               setChosen(o);
               onPicked?.(o.name);
@@ -425,7 +425,7 @@ function JoinForm({
       </div>
 
       <div className="flex flex-wrap gap-3">
-        <button type="submit" disabled={saving} className={cn(buttonVariants({ variant: "primary", size: "md" }))}>
+        <button type="submit" disabled={saving} className={cn(buttonVariants({ variant: embedded ? "outline" : "primary", size: "md" }))}>
           {saving ? "Saving…" : initial ? "Save changes" : embedded ? "Link my college" : "Join college"}
         </button>
         {onCancel ? (
@@ -746,11 +746,14 @@ export function CollegeLink({
   }
   return (
     <details className="group rounded-apple-lg border border-ink-200/80 bg-white p-4">
-      <summary className="flex min-h-11 cursor-pointer list-none flex-col justify-center focus-visible:outline-2 focus-visible:outline-brand-700">
-        <span className="text-sm font-semibold text-ink-900">Link your college for placement drives (optional)</span>
-        <span className="text-sm text-ink-600">
-          Colleges run virtual drives on Findtern. Find yours by name or college code to be included.
+      <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 focus-visible:outline-2 focus-visible:outline-brand-700">
+        <span className="min-w-0">
+          <span className="block text-sm font-semibold text-ink-900">Link your college for placement drives (optional)</span>
+          <span className="block text-sm text-ink-600">
+            Colleges run virtual drives on Findtern. Find yours by name or college code to be included.
+          </span>
         </span>
+        <ChevronDown className="size-5 shrink-0 text-text-subtle transition-transform group-open:rotate-180 motion-reduce:transition-none" aria-hidden />
       </summary>
       <div className="mt-4">
         <JoinForm

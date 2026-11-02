@@ -633,15 +633,10 @@ function InvoicesPanel({ invoices }: { invoices: InvoiceRow[] }) {
                         <Eye className="size-4" aria-hidden />
                         View
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => downloadInvoice(i.html, invoiceFileName(i))}
-                        aria-label={`Download invoice ${i.number}`}
-                        className={buttonClass({ variant: "outline", size: "sm" })}
-                      >
-                        <Download className="size-4" aria-hidden />
-                        Download
-                      </button>
+                      <RowMenu
+                        label={`More actions for invoice ${i.number}`}
+                        items={[{ label: "Download", icon: <Download />, onSelect: () => downloadInvoice(i.html, invoiceFileName(i)) }]}
+                      />
                     </div>
                   </td>
                 </tr>
@@ -652,7 +647,7 @@ function InvoicesPanel({ invoices }: { invoices: InvoiceRow[] }) {
       )}
 
       <Dialog open={viewing !== null} onOpenChange={(open) => !open && setViewing(null)}>
-        <DialogContent className="max-w-4xl">
+        <DialogContent className="sm:max-w-4xl">
           <DialogHeader>
             <DialogTitle>Tax invoice {viewing?.number}</DialogTitle>
             <DialogDescription className="sr-only">The invoice as it prints. Use Download to save it as a PDF.</DialogDescription>
