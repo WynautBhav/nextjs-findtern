@@ -91,7 +91,6 @@ const LEGACY_REDIRECTS: { from: string; to: string }[] = [
   // ── Admin: legacy aliases ────────────────────────────────────────────────
   { from: "/admin", to: "/admin/dashboard" },
   { from: "/admin/contact", to: "/admin/messages" },
-  { from: "/admin/website", to: "/admin/cms" },
 ];
 
 const nextConfig: NextConfig = {

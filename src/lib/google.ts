@@ -76,8 +76,9 @@ function redirectUriFor(configured: string | undefined, defaultPath: string, req
 }
 
 export function googleConfig(req?: Request): GoogleConfig | null {
-  const clientId = process.env.GOOGLE_CLIENT_ID;
-  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+  // The legacy app read either spelling; a server `.env` carried over from it may use the GOOGLE_OAUTH_ names.
+  const clientId = process.env.GOOGLE_CLIENT_ID || process.env.GOOGLE_OAUTH_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET || process.env.GOOGLE_OAUTH_CLIENT_SECRET;
   if (!clientId || !clientSecret) return null;
   const redirectUri = redirectUriFor(process.env.GOOGLE_OAUTH_REDIRECT_URI?.trim() || undefined, "/api/auth/google/callback", req);
   return { clientId, clientSecret, redirectUri };

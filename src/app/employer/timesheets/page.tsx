@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, ne } from "drizzle-orm";
 import { ArrowRight } from "lucide-react";
 
 import { getDb, schema } from "@/lib/db";
@@ -38,10 +38,18 @@ type Row = {
  * first, oldest submission first, with one button each; everything else
  * follows newest first. Scoped by `timesheets.employer_id`, as legacy was.
  */
-export default async function EmployerTimesheets() {
+export default async function EmployerTimesheets({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const session = await requireRole("employer");
   await requireEmployerSetup(session.uid);
   const uid = session.uid;
+  // "Timesheets" on a hire's row links here with ?intern=<id>. The employer scope below still applies,
+  // so an id that isn't one of their interns simply matches nothing.
+  const internParam = (await searchParams).intern;
+  const onlyIntern = typeof internParam === "string" && /^[0-9a-f-]{36}$/i.test(internParam) ? internParam : null;
 
   let rows: Row[] = [];
   try {
@@ -51,7 +59,8 @@ export default async function EmployerTimesheets() {
       .from(schema.timesheets)
       .leftJoin(schema.proposals, eq(schema.timesheets.proposalId, schema.proposals.id))
       .leftJoin(schema.projects, eq(schema.proposals.projectId, schema.projects.id))
-      .where(eq(schema.timesheets.employerId, uid))
+      // A draft is the intern's own work in progress; the employer sees a sheet once it is sent (legacy did the same).
+      .where(and(eq(schema.timesheets.employerId, uid), ne(schema.timesheets.status, "draft"), onlyIntern ? eq(schema.timesheets.internId, onlyIntern) : undefined))
       .orderBy(desc(schema.timesheets.periodStart), desc(schema.timesheets.createdAt));
 
     if (sheets.length > 0) {
@@ -111,13 +120,31 @@ export default async function EmployerTimesheets() {
       <PageHead
         title="Timesheets"
         lede={
-          queue.length
+          onlyIntern
+            ? rows[0]
+              ? `Showing ${rows[0].name}'s timesheets only.`
+              : "Showing one intern's timesheets only."
+            : queue.length
             ? `${queue.length} timesheet${queue.length === 1 ? " is" : "s are"} waiting for your review. Interns are paid on approved days only.`
             : "Your interns log their days here each month. Approving locks them for billing and the stipend."
         }
+        action={
+          onlyIntern ? (
+            <Link href="/employer/timesheets" className={buttonClass({ variant: "outline", size: "sm" })}>
+              Show everyone
+            </Link>
+          ) : undefined
+        }
       />
 
-      {rows.length === 0 ? (
+      {rows.length === 0 && onlyIntern ? (
+        <EmptyScene
+          art
+          title="No sent timesheets for this intern"
+          body="Nothing from them is waiting here yet. A month shows up once they send it for approval. Use Show everyone, above, to see all your interns."
+          who="Your intern - nothing sent yet"
+        />
+      ) : rows.length === 0 ? (
         <EmptyScene
           art
           title="No timesheets yet"

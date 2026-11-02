@@ -30,6 +30,7 @@ function hrefFor(type: string, data: Record<string, unknown> | null): string | n
     case "proposal_declined":
     case "proposal_expired":
     case "full_time_offer_status":
+    case "full_time_fee_paid":
       return id("proposalId") ? `/employer/proposal/${id("proposalId")}` : "/employer/proposals";
     case "timesheet_submitted":
       return id("timesheetId") ? `/employer/timesheets/${id("timesheetId")}` : "/employer/timesheets";
@@ -37,6 +38,7 @@ function hrefFor(type: string, data: Record<string, unknown> | null): string | n
     case "interview_reminder":
     case "interview_feedback_request":
     case "interview_scheduled":
+    case "interview_reschedule_requested_by_intern":
     case "slot_selected":
       return "/employer/schedule";
     case "payment_completed":
@@ -46,6 +48,9 @@ function hrefFor(type: string, data: Record<string, unknown> | null): string | n
     case "cart_inactivity":
       return "/employer/cart";
     case "talent_spotlight":
+    // International FTE is applied for from a candidate's full-time offer button.
+    case "international_fte_approved":
+    case "international_fte_rejected":
       return "/employer/candidates";
     case "employer_profile_completion_nudge":
       return "/employer/account";

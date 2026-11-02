@@ -488,6 +488,16 @@ test("INT-04: a submitted, complete or scored profile counts as onboarded; a fir
   assert.equal(isOnboarded(storedComplete, allDocs), true);
 });
 
+test("M1: the agreement step is done for a scored legacy intern, who never had ndaAcceptedAt", () => {
+  const agreement = (extraData: Record<string, unknown>) =>
+    profileCompletion({ ...storedComplete, extraData }, allDocs).items.find((i) => i.id === "agreement")?.done;
+  assert.equal(agreement({}), false, "a new intern still has to accept it");
+  assert.equal(agreement({ ndaAcceptedAt: "2026-10-01T00:00:00Z" }), true);
+  assert.equal(agreement({ findternScore: 6.2 }), true, "legacy: scored");
+  assert.equal(agreement({ ratings: { interview: 7 } }), true, "legacy: interview rating");
+  assert.equal(agreement({ findternScore: 0 }), false, "a zero score is not a score");
+});
+
 /* ── Skills lock (INT-03 / INT-30) ─────────────────────────────────────── */
 
 test("skills lock: admin ratings lock; a stale AI invite does not", () => {

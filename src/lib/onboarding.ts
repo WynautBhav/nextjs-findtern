@@ -1330,7 +1330,8 @@ export function profileCompletion(row: OnboardingLike | null, docs: boolean | Co
       href: form,
     },
     { id: "laptop", label: "Laptop availability", done: d?.hasLaptop === true || d?.hasLaptop === false, href: form },
-    { id: "agreement", label: "Non-Bypass Agreement accepted", done: Boolean(extra.ndaAcceptedAt), href: form },
+    // The legacy app never wrote ndaAcceptedAt. A scored intern has been through the agreement, so don't send them back to it.
+    { id: "agreement", label: "Non-Bypass Agreement accepted", done: Boolean(extra.ndaAcceptedAt) || isScored(extra), href: form },
   ];
   const done = items.filter((i) => i.done).length;
   return { items, done, total: items.length, complete: done === items.length };
@@ -1352,8 +1353,13 @@ export function isOnboarded(row: OnboardingLike | null, docs: CompletionDocs): b
   if (!row) return false;
   const extra = obj(row.extraData);
   if (typeof extra.profileSubmittedAt === "string" && extra.profileSubmittedAt) return true;
+  if (isScored(extra)) return true;
+  return profileCompletion(row, docs).complete;
+}
+
+/** A Findtern score or an interview rating: only interns who paid for and finished the AI interview have one. */
+function isScored(extra: Record<string, unknown>): boolean {
   const score = Number(extra.findternScore);
   const interview = Number(obj(extra.ratings).interview);
-  if ((Number.isFinite(score) && score > 0) || (Number.isFinite(interview) && interview > 0)) return true;
-  return profileCompletion(row, docs).complete;
+  return (Number.isFinite(score) && score > 0) || (Number.isFinite(interview) && interview > 0);
 }

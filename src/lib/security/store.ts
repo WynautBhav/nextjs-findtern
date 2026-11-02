@@ -190,7 +190,7 @@ export function uploadRoot(): string {
  * may see each one; nothing here is a static mount. */
 
 const LEGACY_ROOT = resolve(/*turbopackIgnore: true*/ process.env.LEGACY_UPLOAD_ROOT ?? join(process.cwd(), ".legacy-uploads"));
-const LEGACY_NAME = /^(?:(academics|company-logos|support)\/)?(?:\d{10,16}-)?[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(jpe?g|png|webp|pdf|docx|mp4|webm|mov)$/i;
+const LEGACY_NAME = /^(?:(academics|company-logos|support)\/)?(?:\d{10,16}-)?[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(jpe?g|jfif|png|webp|pdf|docx|mp4|webm|mov)$/i;
 
 /** Normalised legacy path ("academics/x.jpg") or null if it isn't one. */
 export function legacyPath(raw: string): { path: string; folder: string | null } | null {
@@ -212,6 +212,7 @@ export async function readLegacy(path: string): Promise<Buffer> {
 const LEGACY_TYPES: Record<string, string> = {
   jpg: "image/jpeg",
   jpeg: "image/jpeg",
+  jfif: "image/jpeg",
   png: "image/png",
   webp: "image/webp",
   pdf: "application/pdf",
