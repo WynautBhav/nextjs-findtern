@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, BriefcaseBusiness, CalendarCheck, CreditCard, Download, Eye, FileText, RotateCcw, Search } from "lucide-react";
 
@@ -514,6 +514,9 @@ function InvoicesPanel({ invoices }: { invoices: InvoiceRow[] }) {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [viewing, setViewing] = useState<InvoiceRow | null>(null);
+  // The dialog is opened by state, not by a Radix trigger, so it is told where to hand focus back to.
+  const viewerOpener = useRef<HTMLElement | null>(null);
+  const viewerDownload = useRef<HTMLButtonElement>(null);
   const currencies = Array.from(new Set(invoices.map((i) => i.currency)));
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
@@ -595,14 +598,15 @@ function InvoicesPanel({ invoices }: { invoices: InvoiceRow[] }) {
       ) : (
         <Surface tabIndex={0} role="region" aria-label="Invoices" className="relative overflow-x-auto focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600">
           <table className="w-full min-w-[48rem] border-collapse">
-            <thead className="border-b border-ink-100 bg-ink-50/60">
+            <thead className="border-b border-ink-100 bg-ink-50">
               <tr>
                 <th scope="col" className={thClass}>Invoice</th>
                 <th scope="col" className={thClass}>Candidate</th>
                 <th scope="col" className={thClass}>Project</th>
                 <th scope="col" className={cn(thClass, "text-right")}>Amount</th>
                 <th scope="col" className={thClass}>Paid on</th>
-                <th scope="col" className={cn(thClass, "text-right")}>
+                {/* Pinned to the right edge: on a phone the table scrolls sideways and the actions must not be off-screen. */}
+                <th scope="col" className={cn(thClass, "sticky right-0 bg-ink-50 text-right shadow-[-8px_0_8px_-8px_rgb(0_0_0/0.12)]")}>
                   <span className="sr-only">View or download</span>
                 </th>
               </tr>
@@ -622,11 +626,14 @@ function InvoicesPanel({ invoices }: { invoices: InvoiceRow[] }) {
                     {formatMoney(i.amountMinor, i.currency, { zeroLabel: false })}
                   </td>
                   <td className={cn(tdClass, "nums")}>{i.paidAt ? formatDate(i.paidAt) : "-"}</td>
-                  <td className={cn(tdClass, "text-right")}>
+                  <td className={cn(tdClass, "sticky right-0 bg-white text-right shadow-[-8px_0_8px_-8px_rgb(0_0_0/0.12)]")}>
                     <div className="flex justify-end gap-2">
                       <button
                         type="button"
-                        onClick={() => setViewing(i)}
+                        onClick={(e) => {
+                          viewerOpener.current = e.currentTarget;
+                          setViewing(i);
+                        }}
                         aria-label={`View invoice ${i.number}`}
                         className={buttonClass({ variant: "outline", size: "sm" })}
                       >
@@ -647,7 +654,18 @@ function InvoicesPanel({ invoices }: { invoices: InvoiceRow[] }) {
       )}
 
       <Dialog open={viewing !== null} onOpenChange={(open) => !open && setViewing(null)}>
-        <DialogContent className="sm:max-w-4xl">
+        <DialogContent
+          className="sm:max-w-4xl"
+          // Radix would focus the first tabbable thing, the invoice iframe, and a focused iframe swallows Escape.
+          onOpenAutoFocus={(e) => {
+            e.preventDefault();
+            viewerDownload.current?.focus();
+          }}
+          onCloseAutoFocus={(e) => {
+            e.preventDefault();
+            if (viewerOpener.current?.isConnected) viewerOpener.current.focus();
+          }}
+        >
           <DialogHeader>
             <DialogTitle>Tax invoice {viewing?.number}</DialogTitle>
             <DialogDescription className="sr-only">The invoice as it prints. Use Download to save it as a PDF.</DialogDescription>
@@ -659,6 +677,7 @@ function InvoicesPanel({ invoices }: { invoices: InvoiceRow[] }) {
           ) : null}
           <div className="flex justify-end">
             <button
+              ref={viewerDownload}
               type="button"
               onClick={() => viewing && downloadInvoice(viewing.html, invoiceFileName(viewing))}
               className={buttonClass({ size: "sm" })}

@@ -78,7 +78,7 @@ export function AcademicsStep({ values, update, errors, college }: StepProps) {
           value={a.institution}
           error={errors.institution}
           autoComplete="off"
-          hint="Type the full name. To be included in your college's drives, link it below."
+          hint="Type the full name. To be included in your college's drives, join them at the end of this section."
           onChange={(v) => set({ institution: v })}
         />
 

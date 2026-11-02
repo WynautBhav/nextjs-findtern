@@ -814,6 +814,21 @@
   }
 }
 
+/* Disclosure panels (<details>): the content arrives with opacity and 4px of travel
+   over --duration-admin-base. Closing is instant. Only under no-preference. */
+@keyframes details-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  details[open] > .details-reveal {
+    animation: details-reveal var(--duration-admin-base) var(--ease-out-soft) both;
+  }
+}
+
 @keyframes bar-grow {
   from {
     transform: scaleY(0);

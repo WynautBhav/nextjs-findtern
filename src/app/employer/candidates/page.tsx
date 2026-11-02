@@ -879,7 +879,7 @@ export default async function CandidatesPage({
                   </ul>
                 </Surface>
               ) : (
-                <ul className="grid gap-4 md:grid-cols-2 lg:grid-cols-1 2xl:grid-cols-2">
+                <ul className="grid gap-4 md:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
                   {candidates.map((candidate) => {
                     const rel = relations.get(candidate.id);
                     return (

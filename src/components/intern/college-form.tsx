@@ -293,7 +293,7 @@ function JoinForm({
       onSubmit={submit}
       className={cn(
         "space-y-8",
-        embedded ? "rounded-apple-lg bg-ink-50/60 p-4 sm:p-5" : cn("max-w-3xl rounded-apple-xl border border-ink-200/80 bg-white p-5 sm:p-8", LIGHT_TILE),
+        embedded ? "" : cn("max-w-3xl rounded-apple-xl border border-ink-200/80 bg-white p-5 sm:p-8", LIGHT_TILE),
       )}
       noValidate
     >
@@ -397,7 +397,7 @@ function JoinForm({
           <summary className="inline-flex min-h-11 cursor-pointer list-none items-center font-medium text-primary hover:underline focus-visible:outline-2 focus-visible:outline-brand-700">
             Read the full notice (version {notice.version})
           </summary>
-          <div className="mt-2 whitespace-pre-line rounded-apple-sm border border-ink-200/80 bg-ink-50 p-4 text-sm leading-relaxed text-ink-700">
+          <div className="details-reveal mt-2 whitespace-pre-line rounded-apple-sm border border-ink-200/80 bg-ink-50 p-4 text-sm leading-relaxed text-ink-700">
             {notice.text}
           </div>
         </details>
@@ -426,7 +426,7 @@ function JoinForm({
 
       <div className="flex flex-wrap gap-3">
         <button type="submit" disabled={saving} className={cn(buttonVariants({ variant: embedded ? "outline" : "primary", size: "md" }))}>
-          {saving ? "Saving…" : initial ? "Save changes" : embedded ? "Link my college" : "Join college"}
+          {saving ? "Saving…" : initial ? "Save changes" : "Join college"}
         </button>
         {onCancel ? (
           <button type="button" onClick={onCancel} className={cn(buttonVariants({ variant: "light", size: "md" }))}>
@@ -449,6 +449,7 @@ function CollegeSearch({ initialQuery, onPick }: { initialQuery: string; onPick:
   const [active, setActive] = useState(0);
   const [open, setOpen] = useState(Boolean(initialQuery));
   const reqId = useRef(0);
+  const searchInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const id = ++reqId.current;
@@ -506,6 +507,7 @@ function CollegeSearch({ initialQuery, onPick }: { initialQuery: string; onPick:
       <div className="relative">
         <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-text-subtle" aria-hidden />
         <input
+          ref={searchInput}
           id={`${ids}-q`}
           role="combobox"
           aria-expanded={showList}
@@ -527,7 +529,10 @@ function CollegeSearch({ initialQuery, onPick }: { initialQuery: string; onPick:
           <button
             type="button"
             aria-label="Clear search"
-            onClick={() => setQuery("")}
+            onClick={() => {
+              setQuery("");
+              searchInput.current?.focus();
+            }}
             className="absolute right-1 top-1/2 grid size-10 -translate-y-1/2 place-items-center rounded-apple-sm text-text-subtle hover:text-ink-700 focus-visible:outline-2 focus-visible:outline-brand-700"
           >
             <X className="size-4" />
@@ -557,8 +562,8 @@ function CollegeSearch({ initialQuery, onPick }: { initialQuery: string; onPick:
             )}
           >
             <span className="min-w-0">
-              <span className="block truncate text-base text-ink-900">{o.name}</span>
-              <span className="block truncate text-sm text-ink-600">{[o.city, o.state, o.code].filter(Boolean).join(" · ")}</span>
+              <span className="block break-words text-base leading-snug text-ink-900">{o.name}</span>
+              <span className="block break-words text-sm text-ink-600">{[o.city, o.state, o.code].filter(Boolean).join(" · ")}</span>
             </span>
             {o.isPartner ? (
               <Pill tone="live" className="shrink-0">
@@ -598,6 +603,15 @@ function MissingCollege({ query }: { query: string }) {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState("");
+  const toggle = useRef<HTMLButtonElement>(null);
+  const nameInput = useRef<HTMLInputElement>(null);
+  // The toggle and the form replace each other, so whichever unmounts hands focus to the other.
+  const wasOpen = useRef(false);
+  useEffect(() => {
+    if (open) nameInput.current?.focus();
+    else if (wasOpen.current) toggle.current?.focus();
+    wasOpen.current = open;
+  }, [open]);
 
   async function send() {
     if (sending) return;
@@ -640,8 +654,8 @@ function MissingCollege({ query }: { query: string }) {
     <div className="mt-3">
       {!open ? (
         <button
+          ref={toggle}
           type="button"
-          aria-expanded={false}
           onClick={() => {
             setName((n) => n || query);
             setMessage("");
@@ -666,7 +680,7 @@ function MissingCollege({ query }: { query: string }) {
               <label htmlFor={`${ids}-name`} className="mb-1.5 block text-sm font-medium text-ink-800">
                 College name
               </label>
-              <input id={`${ids}-name`} value={name} onChange={(e) => setName(e.target.value)} onKeyDown={onEnter} maxLength={200} autoComplete="off" className={FIELD} />
+              <input ref={nameInput} id={`${ids}-name`} value={name} onChange={(e) => setName(e.target.value)} onKeyDown={onEnter} maxLength={200} autoComplete="off" className={FIELD} />
             </div>
             <div>
               <label htmlFor={`${ids}-city`} className="mb-1.5 block text-sm font-medium text-ink-800">
@@ -709,7 +723,7 @@ const PURPOSES: Purpose[] = CONSENT_PURPOSES.map((id) => ({ id, ...PURPOSE_COPY[
 const NOTICE = { version: NOTICE_VERSION, text: NOTICE_TEXT };
 
 /**
- * Optional "link my college" block under the institution field. Linking is
+ * Optional "join your college" block under the institution field. Joining is
  * what lets the college's placement team and its virtual drives find the
  * student, so it is the same join (and the same consent) as in Settings.
  * Changing or leaving it later happens there.
@@ -727,12 +741,12 @@ export function CollegeLink({
 }) {
   if (college) {
     return (
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-apple-lg border border-ink-200/80 bg-ink-50/60 p-4 text-sm">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-apple-xl border border-ink-200/80 bg-white p-5 text-sm">
         <span aria-hidden className="grid size-9 shrink-0 place-items-center rounded-apple-sm bg-brand-50 text-brand-700">
           <Building2 className="size-4" />
         </span>
         <p className="min-w-0 flex-1 text-ink-700">
-          Linked to <span className="font-medium text-ink-900">{college.name}</span>
+          You&apos;ve joined <span className="font-medium text-ink-900">{college.name}</span>
           {college.status === "verified" ? " · verified student" : ""}
         </p>
         <Link
@@ -745,17 +759,17 @@ export function CollegeLink({
     );
   }
   return (
-    <details className="group rounded-apple-lg border border-ink-200/80 bg-white p-4">
+    <details className="group rounded-apple-xl border border-ink-200/80 bg-white p-5">
       <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 focus-visible:outline-2 focus-visible:outline-brand-700">
         <span className="min-w-0">
-          <span className="block text-sm font-semibold text-ink-900">Link your college for placement drives (optional)</span>
+          <span className="block text-sm font-semibold text-ink-900">Join your college&apos;s placement drives (optional)</span>
           <span className="block text-sm text-ink-600">
             Colleges run virtual drives on Findtern. Find yours by name or college code to be included.
           </span>
         </span>
-        <ChevronDown className="size-5 shrink-0 text-text-subtle transition-transform group-open:rotate-180 motion-reduce:transition-none" aria-hidden />
+        <ChevronDown className="size-5 shrink-0 text-text-subtle transition-transform duration-[var(--duration-admin-base)] ease-[var(--ease-out-soft)] group-open:rotate-180 motion-reduce:transition-none" aria-hidden />
       </summary>
-      <div className="mt-4">
+      <div className="details-reveal mt-4">
         <JoinForm
           embedded
           initial={null}

@@ -94,7 +94,7 @@ export default async function InternSettings({ searchParams }: { searchParams: P
           <section id="college" className="scroll-mt-24">
             <SectionHead
               title="College"
-              hint="Link your college so its placement team and virtual drives can find you. Your profile itself doesn't change."
+              hint="Join your college so its placement team and virtual drives can find you. Your profile itself doesn't change."
             />
             <CollegeForm
               initial={college}
