@@ -48,6 +48,19 @@ Nothing here has been done on production: staging only.
 - The public home page could not be opened in Playwright's Linux WebKit build, which crashes on its hero `<video>`; every other page loads. Open it once in a real Safari.
 - Interns can delete a submitted timesheet, and employers can edit timesheet days before approving. Both are legacy rules kept on purpose.
 
+## C2. From bug sheet 9 (2 Nov): decide or check before launch
+
+Full results: `docs/qa/bug-sheet-9-results.md`.
+
+- **Decide:** billable days. The sheet (Sheet2 r8, marked Done) wants Mon-Sat billed on the calendar (25 days some months); `offer.ts` bills a flat 26 on purpose (owner decision 28 Oct).
+- **Decide:** Campus drives in the employer menu (30 OCT r22 says remove), Records copy and download (Sheet2 r26 says remove, 30 OCT asks what they are for), LinkedIn mandatory (Sheet4 r6 vs the earlier "not mandatory").
+- **Build or drop:** a candidate who turns off open-to-work disappears from every employer's shortlist; the sheet wants them kept and marked unavailable (Sheet2 r27).
+- **Add to the intern legal terms:** "offers turned down more than 3 times are not refundable" is on the guarantee page and the offer card but not in the terms (NEW CHANGES r7).
+- **Production data check:** interview notes where `feedback:` or `recording:` lines come after `feedback_text:` (the employer's feedback is now read to the end of the field).
+- **Production data check:** open offers sent as hybrid or on-site to candidates scoring under 6 (the remote-only rule does not touch offers that already exist).
+- **Same migration as before:** `0009_promo_usage_order_id_text` must run on production (the free-promo 500).
+- **Test machine:** browsers on a NAT64 network stall on HTTP/3; run the cross-browser journey from a normal network before trusting a timeout.
+
 ## D. What was tested on staging (nextjs-findtern.vercel.app), and what was not
 
 See the final report. In short: new accounts only; the real **Pay** button was never pressed (the key is live); Google sign-in, real Razorpay, email arrival in an inbox, the college drive flows and a real Safari were **not** tested.
