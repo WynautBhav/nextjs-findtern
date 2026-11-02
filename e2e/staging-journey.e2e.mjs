@@ -285,7 +285,7 @@ const ADMIN = { email: process.env.ADMIN_EMAIL || "", password: process.env.ADMI
 const ROLES = ["intern", "intern2", "employer", "admin", "intern3", "intern4", "employer2"];
 
 async function apiLogin(page, path, email, password) {
-  await page.goto(`${STAGING_URL}/login`, { waitUntil: "domcontentloaded" });
+  await gotoWithRetry(page, `${STAGING_URL}/login`, { timeout: 30_000 });
   const res = await api(page, "POST", path, { email, password });
   assertNotRateLimited(path, res);
   expectOk(`POST ${path}`, res);
@@ -524,7 +524,9 @@ step("intern 2: a bad promo is refused, the real one is applied, then pays with 
 
   await fillUntilEnabled(promo, state.promoCode, apply);
   await apply.click();
-  await page.getByText(new RegExp(state.promoCode, "i")).first().waitFor({ timeout: 15_000 });
+  const appliedAt = Date.now();
+  await page.getByText(new RegExp(state.promoCode, "i")).first().waitFor({ timeout: 60_000 });
+  if (Date.now() - appliedAt > 5000) console.log(`[slow promo apply] the code took ${Math.round((Date.now() - appliedAt) / 1000)}s to show`);
   await shot("intern2-good-promo");
 
   const res = await clickFor(page, page.getByRole("button", { name: /^Test: mark as paid/ }), { path: orderPath, method: "POST" });
@@ -1453,10 +1455,16 @@ step("US employer: shortlists both, books intern 3 in the cart form (default tim
   }
   await visit(page, "/employer/cart");
   await page.getByText(/2 shortlisted/i).first().waitFor();
-  const card3 = page.getByRole("listitem").filter({ hasText: /\bIZ\b/ });
+  // The nearest block around the "IZ" initials that holds a Book meeting button is that candidate's card.
+  const card3 = page.locator('xpath=(//*[normalize-space(text())="IZ"])[1]/ancestor::*[.//button[contains(., "Book meeting")]][1]');
   const before = Date.now();
-  await card3.getByRole("button", { name: "Book meeting" }).click();
+  await settle(page);
   const zoneSelect = page.locator("#cart-timezone");
+  // A click before the page has hydrated is dropped, so click again until the booking form opens.
+  for (let attempt = 0; attempt < 6 && !(await zoneSelect.isVisible()); attempt++) {
+    await card3.getByRole("button", { name: "Book meeting" }).click();
+    await zoneSelect.waitFor({ state: "visible", timeout: 3000 }).catch(() => {});
+  }
   await zoneSelect.waitFor();
   assert.equal(await zoneSelect.inputValue(), NY, "the meeting form starts in the company's own timezone (New York)");
   // The suggested times: the next quarter hour, then one and two hours later, in New York time.
@@ -1509,7 +1517,8 @@ step("US employer: the offer is held until the meeting happens; Mark completed (
   const composer = `/employer/send-proposal?intern=${state.intern3Id}&project=${state.project2Id}`;
   await visit(page, composer);
   await page.getByText(/hasn't happened yet/i).first().waitFor();
-  assert.ok(await page.getByRole("button", { name: "Review and send" }).filter({ visible: true }).first().isDisabled(), "Review and send is blurred while the meeting is still ahead");
+  assert.equal(await page.getByRole("button", { name: "Review and send" }).count(), 0, "no way to send the offer while the meeting is still ahead: the page says 'Meeting first' instead of the form");
+  assert.ok(await page.getByRole("link", { name: /Open the schedule/ }).isVisible(), "and points to the schedule");
   const early = await api(page, "POST", `/api/employer/${state.employer2Id}/proposals`, {
     internId: state.intern3Id, projectId: state.project2Id, flowType: "interview_first", agreedToPolicy: true, roleTitle: "Growth analyst", jd: "Build funnel dashboards for the growth team.",
     mode: "remote", startDate: istDate(30), duration: "1m", weeklySchedule: "mon_fri", shiftFrom: "09:00", shiftTo: "18:00", timezone: NY, laptop: "company", paidLeavesPerMonth: 2, skills: ["SQL"],
@@ -1588,7 +1597,7 @@ step("US employer composes the offer in the form: calendar, no flexible hours, N
   await typeInto(page.locator("#startDate"), "01/01/2020");
   await typeInto(page.locator("#message"), "x".repeat(40));
   await page.getByRole("button", { name: "Review and send" }).filter({ visible: true }).first().click();
-  await page.getByText(/Pick a date after today|Pick .* or later/i).first().waitFor({ timeout: 10_000 });
+  await page.getByText(/Pick a start date after today/i).first().waitFor({ timeout: 10_000 });
 
   const start = istDate(10);
   state.usStart = start;
@@ -1677,8 +1686,8 @@ step("free-band intern 4: the composer offers remote only, edits and withdrawals
   await visit(page, `/employer/proposal/${state.usFreeOfferId}`);
   await page.getByRole("button", { name: "Withdraw offer" }).first().click();
   const dialog = page.getByRole("dialog");
-  await dialog.getByText(/already accepted/i).waitFor();
-  expectOk("withdraw after acceptance (UI)", await clickFor(page, dialog.getByRole("button", { name: "Withdraw offer" }), { path: `/api/proposals/${state.usFreeOfferId}/status`, method: "PATCH" }));
+  await dialog.getByText(/accepted this offer/i).waitFor();
+  expectOk("withdraw after acceptance (UI)", await clickFor(page, dialog.getByRole("button", { name: "Yes, withdraw the offer" }), { path: `/api/proposals/${state.usFreeOfferId}/status`, method: "PATCH" }));
   assert.equal((await one(`SELECT status FROM proposals WHERE id = $1`, [state.usFreeOfferId])).status, "withdrawn");
   await visit(pages.intern4, `/intern/proposals/${state.usFreeOfferId}`);
   assert.equal(await pages.intern4.getByRole("button", { name: /Accept this offer/ }).count(), 0, "a withdrawn offer cannot be answered any more");

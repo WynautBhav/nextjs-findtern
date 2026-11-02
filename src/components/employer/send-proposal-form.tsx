@@ -927,7 +927,7 @@ function validate(draft: Draft): Record<string, string> {
   if (draft.roleTitle.trim().length < 2) errors.roleTitle = "Give the role a title.";
   if (!DURATIONS.some((d) => d.value === draft.duration)) errors.duration = "Pick a duration.";
   if (!draft.startDate) {
-    errors.startDate = "A start date is required.";
+    errors.startDate = "Pick a start date after today, as DD/MM/YYYY.";
   } else if (Number.isNaN(Date.parse(draft.startDate))) {
     errors.startDate = "That is not a date.";
   } else if (draft.startDate < draft.minStart) {

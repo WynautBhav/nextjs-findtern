@@ -28,7 +28,7 @@ export async function gotoWithRetry(page, target, options = {}) {
       return await page.goto(target, { waitUntil: "domcontentloaded", ...options });
     } catch (err) {
       // A hang (timeout) or a navigation the browser aborted itself; anything else is a real error.
-      if (attempt >= 3 || !/timeout|NS_ERROR_ABORT|net::ERR_ABORTED/i.test(String(err?.name) + String(err?.message))) throw err;
+      if (attempt >= 3 || !/timeout|timed_out|NS_ERROR_ABORT|net::ERR_ABORTED/i.test(String(err?.name) + String(err?.message))) throw err;
       const seconds = Math.round((Date.now() - started) / 1000);
       stalls.push({ target, seconds, attempt, at: new Date().toISOString() });
       console.log(`[stall] GET ${target} did not respond in ${seconds}s (attempt ${attempt}); reloading`);
