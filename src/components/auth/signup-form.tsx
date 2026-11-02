@@ -9,6 +9,7 @@ import { isValidPhone, phoneError, phoneHint } from "@/lib/phone";
 import { DIAL_CODES } from "@/lib/data/dial-codes";
 import { isPersonalEmail } from "@/lib/employer-onboarding";
 import { PASSWORD_RULES } from "@/lib/password-policy";
+import { PasswordInput } from "@/components/auth/password-input";
 
 /**
  * Intern signup: three real API calls, in order.
@@ -335,9 +336,8 @@ export function SignupForm({
             <label htmlFor="password" className="block text-sm font-medium text-ink-800">
               Password
             </label>
-            <input
+            <PasswordInput
               id="password"
-              type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               autoComplete="new-password"

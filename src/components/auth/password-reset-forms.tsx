@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { TriangleAlert } from "lucide-react";
 import { PASSWORD_HINT } from "@/lib/password-policy";
+import { PasswordInput } from "@/components/auth/password-input";
 
 /**
  * Password reset forms.
@@ -160,10 +161,9 @@ export function ResetPasswordForm({
         <label htmlFor="newPassword" className="block text-sm font-medium text-ink-800">
           New password
         </label>
-        <input
+        <PasswordInput
           id="newPassword"
           name="newPassword"
-          type="password"
           autoComplete="new-password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
@@ -179,10 +179,9 @@ export function ResetPasswordForm({
         <label htmlFor="confirmPassword" className="block text-sm font-medium text-ink-800">
           Confirm new password
         </label>
-        <input
+        <PasswordInput
           id="confirmPassword"
           name="confirmPassword"
-          type="password"
           autoComplete="new-password"
           value={confirm}
           onChange={(e) => setConfirm(e.target.value)}

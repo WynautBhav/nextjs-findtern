@@ -1364,11 +1364,12 @@ step("US employer: signs up, picks United States on the onboarding form and is g
   state.employer2Id = await signUpEmployer(page, EMPLOYER2);
   await visit(page, "/employer/onboarding");
   await page.locator("#country").waitFor();
-  // A choice made before the page hydrates is lost, so choose again until the zone line appears.
-  const zone = page.getByText(/Your timezone:/);
-  for (let attempt = 0; attempt < 6 && !(await zone.isVisible()); attempt++) {
+  // The form starts on India (a state dropdown). A choice made before the page hydrates is lost, so choose
+  // again until outside India the state becomes a plain text box.
+  const stateBox = page.locator("input#state");
+  for (let attempt = 0; attempt < 6 && !(await stateBox.isVisible()); attempt++) {
     await page.locator("#country").selectOption("United States");
-    await zone.waitFor({ state: "visible", timeout: 2500 }).catch(() => {});
+    await stateBox.waitFor({ state: "visible", timeout: 2500 }).catch(() => {});
   }
   await typeInto(page.locator("#state"), "New York");
   await typeInto(page.locator("#city"), "New York");

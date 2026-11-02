@@ -11,6 +11,7 @@ import { PASSWORD_RULES } from "@/lib/password-policy";
 import { fieldClass } from "@/components/employer/ui-tokens";
 import { cn } from "@/lib/utils";
 import { controlClass } from "@/components/employer/company-fields";
+import { PasswordInput } from "@/components/auth/password-input";
 
 /**
  * Employer registration.
@@ -401,10 +402,9 @@ export function EmployerSignupForm({
         <label htmlFor="password" className="block text-sm font-medium text-ink-800">
           Password
         </label>
-        <input
+        <PasswordInput
           id="password"
           name="password"
-          type="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           autoComplete="new-password"

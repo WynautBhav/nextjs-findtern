@@ -627,7 +627,7 @@ function MissingCollege({ query }: { query: string }) {
           }}
           className="inline-flex min-h-11 items-center rounded-apple-sm text-sm font-medium text-primary hover:underline focus-visible:outline-2 focus-visible:outline-brand-700"
         >
-          {message ? "Add another college" : "My college isn&apos;t listed"}
+          {message ? "Add another college" : "My college isn’t listed"}
         </button>
       ) : null}
 
