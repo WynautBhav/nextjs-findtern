@@ -406,9 +406,6 @@ export default async function EmployerInternDetail({
           ) : null}
           {/* EMB-12: hires and full-time offers are not compared (legacy). */}
           {compareBlocked ? null : <CompareToggle employerId={employerId} internId={profile.id} picked={comparePicks} />}
-          <a href="#ai-report" className="inline-flex min-h-11 items-center gap-1.5 px-2 text-sm font-medium text-brand-700 underline-offset-4 hover:underline">
-            AI interview report
-          </a>
         </div>
       </Surface>
 
