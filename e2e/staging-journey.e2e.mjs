@@ -67,7 +67,8 @@ function makeIntern(k) {
   const n = NOW + k * 7919;
   return {
     firstName: "Ira",
-    lastName: `Qa${letters(n, 5)}`,
+    // Different initials (IQ, IZ, IY) so the cart can tell the interns apart; they are hidden before a hire.
+    lastName: `${{ 3: "Zu", 4: "Yo" }[k] ?? "Qa"}${letters(n, 5)}`,
     email: `${GMAIL_BASE}+ftqa-${BROWSER}-${RUN}-i${k}@gmail.com`,
     phone: `9${String(digits).padStart(8, "0")}${k}`,
     emergencyPhone: `8${String(digits).padStart(8, "0")}${k}`,
@@ -75,13 +76,22 @@ function makeIntern(k) {
     pan: `${letters(Math.floor(n / 7), 5).toUpperCase()}${String(n).slice(-4)}P`,
   };
 }
-const INTERNS = { 1: makeIntern(1), 2: makeIntern(2) };
+const INTERNS = { 1: makeIntern(1), 2: makeIntern(2), 3: makeIntern(3), 4: makeIntern(4) };
 const EMPLOYER = {
   name: "Esha Employer",
   companyName: `Zentrova QA ${BROWSER} ${RUN.toUpperCase()}`,
   email: `${COMPANY_MAIL_BASE}+ftqa-${BROWSER}-${RUN}-e1@${COMPANY_MAIL_DOMAIN}`,
   phone: `8${String(digits).padStart(8, "0")}5`,
   escalationPhone: `7${String(digits).padStart(8, "0")}5`,
+};
+
+/** A second company, in the United States: New York time, dollars, no GSTIN. */
+const EMPLOYER2 = {
+  name: "Dana Employer",
+  companyName: `Brightwell US QA ${BROWSER} ${RUN.toUpperCase()}`,
+  email: `${COMPANY_MAIL_BASE}+ftqa-${BROWSER}-${RUN}-e2@${COMPANY_MAIL_DOMAIN}`,
+  phone: `9${String(digits).padStart(8, "0")}6`,
+  escalationPhone: `2125550${String(digits).slice(-3)}`,
 };
 
 /* ── State, steps, issue tracking ─────────────────────────────────────────── */
@@ -133,7 +143,7 @@ function track(role, page) {
 }
 
 function saveState() {
-  writeFileSync(STATE_FILE, JSON.stringify({ run: RUN, state, accounts: { INTERNS, EMPLOYER }, owned: manifest() }, null, 2));
+  writeFileSync(STATE_FILE, JSON.stringify({ run: RUN, state, accounts: { INTERNS, EMPLOYER, EMPLOYER2 }, owned: manifest() }, null, 2));
 }
 
 /**
@@ -246,7 +256,7 @@ function istDate(days = 0) {
 const ADMIN = { email: process.env.ADMIN_EMAIL || "", password: process.env.ADMIN_PASSWORD || "" };
 
 /** Browser-state sessions for each role; `intern2` is a second candidate for the monthly plan. */
-const ROLES = ["intern", "intern2", "employer", "admin"];
+const ROLES = ["intern", "intern2", "employer", "admin", "intern3", "intern4", "employer2"];
 
 async function apiLogin(page, path, email, password) {
   await page.goto(`${STAGING_URL}/login`, { waitUntil: "domcontentloaded" });
@@ -286,12 +296,17 @@ before(async () => {
     Object.assign(state, saved.state);
     Object.assign(INTERNS[1], saved.accounts.INTERNS[1]);
     Object.assign(INTERNS[2], saved.accounts.INTERNS[2]);
+    for (const k of [3, 4]) if (saved.accounts.INTERNS[k]) Object.assign(INTERNS[k], saved.accounts.INTERNS[k]);
     Object.assign(EMPLOYER, saved.accounts.EMPLOYER);
+    if (saved.accounts.EMPLOYER2) Object.assign(EMPLOYER2, saved.accounts.EMPLOYER2);
     for (const [id, label] of Object.entries(saved.owned)) own(label, id);
     if (state.internId) await apiLogin(pages.intern, "/api/auth/login", INTERNS[1].email, PASSWORD);
     if (state.intern2Id) await apiLogin(pages.intern2, "/api/auth/login", INTERNS[2].email, PASSWORD);
     if (state.employerId) await apiLogin(pages.employer, "/api/auth/employer/login", EMPLOYER.email, PASSWORD);
     if (state.adminReady) await apiLogin(pages.admin, "/api/auth/admin/login", ADMIN.email, ADMIN.password);
+    if (state.intern3Id) await apiLogin(pages.intern3, "/api/auth/login", INTERNS[3].email, PASSWORD);
+    if (state.intern4Id) await apiLogin(pages.intern4, "/api/auth/login", INTERNS[4].email, PASSWORD);
+    if (state.employer2Id) await apiLogin(pages.employer2, "/api/auth/employer/login", EMPLOYER2.email, PASSWORD);
     console.log(`[${BROWSER}] resumed run ${saved.run}`);
   }
 });
@@ -334,7 +349,7 @@ async function signUpIntern(page, who) {
   return own(`intern:${who.email}`, user.id);
 }
 
-async function onboardIntern(page, who) {
+async function onboardIntern(page, who, over = {}) {
   await visit(page, "/intern/onboarding");
   await page.getByText(/step 1 of/i).filter({ visible: true }).first().waitFor();
   for (const kind of ["profile_photo", "pan"]) {
@@ -378,6 +393,7 @@ async function onboardIntern(page, who) {
       openToWork: true,
       ndaAccepted: true,
       final: true,
+      ...over,
     }),
   );
 }
@@ -525,29 +541,32 @@ const COMPANY = {
   webkit: { gstin: "27AAPFU0939F1ZV", state: "Maharashtra", city: "Mumbai", pin: "400001", intra: false },
 }[BROWSER];
 
-step("employer: signs up with a company email through the form [UI]", [], "employerId", async () => {
-  const page = pages.employer;
+async function signUpEmployer(page, who) {
   const started = Date.now();
   await visit(page, "/signup?as=employer");
   await fillForm(page, [
-    [page.getByLabel("Your name"), EMPLOYER.name],
-    [page.getByLabel("Company name"), EMPLOYER.companyName],
-    [page.locator("#companyEmail"), EMPLOYER.email],
-    [page.locator("#phoneNumber"), EMPLOYER.phone],
+    [page.getByLabel("Your name"), who.name],
+    [page.getByLabel("Company name"), who.companyName],
+    [page.locator("#companyEmail"), who.email],
+    [page.locator("#phoneNumber"), who.phone],
     [page.locator("#password"), PASSWORD],
   ]);
   await page.getByRole("checkbox", { name: /agree/i }).check();
   const sent = await clickFor(page, page.getByRole("button", { name: "Send verification code" }), { path: "/api/auth/signup/send-otp", method: "POST" });
   assertNotRateLimited("send-otp", sent);
   assert.equal(sent.status, 200, `send-otp → ${sent.status} ${JSON.stringify(sent.body)}`);
-  await page.locator("#otp").fill(await readSignupCode(EMPLOYER.email, "employer", started));
+  await page.locator("#otp").fill(await readSignupCode(who.email, "employer", started));
   await page.getByRole("button", { name: /verify and create account|create account/i }).click();
   await page.waitForURL(/\/employer\/onboarding/, { timeout: 40_000 });
-  const emp = await one(`SELECT * FROM employers WHERE company_email = $1`, [EMPLOYER.email]);
+  const emp = await one(`SELECT * FROM employers WHERE company_email = $1`, [who.email]);
   assert.ok(emp, "employers row created");
-  assert.equal(emp.company_name, EMPLOYER.companyName);
+  assert.equal(emp.company_name, who.companyName);
   assert.match(emp.password, /^\$argon2/, "password is hashed");
-  state.employerId = own(`employer:${EMPLOYER.email}`, emp.id);
+  return own(`employer:${who.email}`, emp.id);
+}
+
+step("employer: signs up with a company email through the form [UI]", [], "employerId", async () => {
+  state.employerId = await signUpEmployer(pages.employer, EMPLOYER);
   await shot("employer-signup");
 });
 
@@ -1241,6 +1260,457 @@ step("employer: signing out ends the session, and the back button does not bring
   ]);
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await page.waitForURL(/\/employer\/dashboard/, { timeout: 40_000 });
+});
+
+/* ── 12b. A US company: New York time, DST, dollars; a free-band candidate; offers edited and withdrawn ── */
+
+const NY = "America/New_York";
+
+/** The UTC instant of a wall-clock "YYYY-MM-DDTHH:MM" in `tz`, worked out here so it checks the app's own conversion. */
+function zonedToUtc(local, tz) {
+  const wall = Date.parse(`${local}:00Z`);
+  const offsetAt = (t) => {
+    const p = Object.fromEntries(
+      new Intl.DateTimeFormat("en-GB", { timeZone: tz, hourCycle: "h23", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit" })
+        .formatToParts(new Date(t))
+        .filter((x) => x.type !== "literal")
+        .map((x) => [x.type, Number(x.value)]),
+    );
+    return Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second) - t;
+  };
+  let t = wall - offsetAt(wall);
+  t = wall - offsetAt(t);
+  return new Date(t);
+}
+const clockIst = (d) => new Intl.DateTimeFormat("en-IN", { hour: "numeric", minute: "2-digit", hour12: true, timeZone: "Asia/Kolkata" }).format(d);
+const dayIst = (d) => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(d);
+const dmy = (iso) => iso.split("-").reverse().join("/");
+/** "7:30 pm – 4:30 am (next day) IST": what an intern reads for a New York shift on `day`. */
+function istRange(day, from, to, tz) {
+  const start = zonedToUtc(`${day}T${from}`, tz);
+  let end = zonedToUtc(`${day}T${to}`, tz);
+  if (end <= start) end = new Date(end.getTime() + 86_400_000);
+  return `${clockIst(start)} – ${clockIst(end)}${dayIst(end) !== dayIst(start) ? " (next day)" : ""} IST`;
+}
+/** The next quarter hour after `ms` in `tz`, then +1 h and +2 h, as "YYYY-MM-DDTHH:MM" (the booking form's own rule, re-derived). */
+function suggestedWalls(ms, tz) {
+  const p = Object.fromEntries(
+    new Intl.DateTimeFormat("en-GB", { timeZone: tz, hourCycle: "h23", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })
+      .formatToParts(new Date(ms))
+      .filter((x) => x.type !== "literal")
+      .map((x) => [x.type, Number(x.value)]),
+  );
+  const quarter = 15 * 60_000;
+  const base = Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute);
+  const first = (Math.floor(base / quarter) + 1) * quarter;
+  return [first, first + 3_600_000, first + 7_200_000].map((e) => new Date(e).toISOString().slice(0, 16));
+}
+
+/** Type into a field twice, a beat apart, so React has seen the value even if the first keystrokes beat hydration. */
+async function typeInto(locator, value) {
+  const page = locator.page();
+  await page.waitForLoadState("load");
+  for (let attempt = 0; attempt < 4; attempt++) {
+    await locator.fill("");
+    await page.waitForTimeout(300);
+    await locator.fill(value);
+    await page.waitForTimeout(400);
+    if ((await locator.inputValue()) === value) return;
+  }
+  throw new Error(`The field would not keep "${value}"`);
+}
+
+/** Compose an offer in the form, agree to the policy, send it; resolves to the new proposal's id. */
+async function composeAndSend(page, { internId, startIso, message, extra }) {
+  await visit(page, `/employer/send-proposal?intern=${internId}&project=${state.project2Id}`);
+  await page.locator("#startDate").waitFor();
+  await typeInto(page.locator("#startDate"), dmy(startIso));
+  await typeInto(page.locator("#message"), message);
+  if (extra) await typeInto(page.locator("#restrictions"), extra);
+  await page.getByRole("button", { name: "Review and send" }).filter({ visible: true }).first().click();
+  await page.getByRole("checkbox", { name: /I have read and agree/i }).check();
+  const sent = await clickFor(page, page.getByRole("button", { name: "Agree and send" }), { path: `/api/employer/${state.employer2Id}/proposals`, method: "POST" });
+  assertNotRateLimited("send offer", sent);
+  const body = expectOk("POST proposals (UI)", sent, [201]);
+  await page.waitForURL(/\/employer\/proposals(\?|$)/, { timeout: 30_000 });
+  return body.proposal.id;
+}
+
+step("interns 3 (score 8) and 4 (score 4, free band): sign up, onboard, pay the fee with the test button, get scored [UI + API]", ["adminReady"], "usInternsReady", async () => {
+  state.intern3Id = await signUpIntern(pages.intern3, INTERNS[3]);
+  state.intern4Id = await signUpIntern(pages.intern4, INTERNS[4]);
+  await onboardIntern(pages.intern3, INTERNS[3]);
+  // Intern 4 says "on-site" and names a city: the free band must still only ever be offered remote work.
+  await onboardIntern(pages.intern4, INTERNS[4], { locationTypes: ["onsite"], preferredLocations: ["Pune, Maharashtra"] });
+  for (const [id, page] of [[state.intern3Id, pages.intern3], [state.intern4Id, pages.intern4]]) {
+    const res = await api(page, "POST", `/api/intern/${id}/payment/razorpay/order`, { testPay: true });
+    assertNotRateLimited("order", res);
+    assert.equal(res.status, 200, `order → ${res.status} ${JSON.stringify(res.body)}`);
+    assert.equal(res.body?.free, true);
+  }
+  for (const [id, rating] of [[state.intern3Id, 8], [state.intern4Id, 4]]) {
+    await visit(pages.admin, `/admin/interns/${id}`);
+    const res = await api(pages.admin, "PUT", `/api/admin/interns/${id}/ratings`, { communication: rating, coding: rating, aptitude: rating, interview: rating });
+    const body = expectOk(`PUT ratings ${id}`, res);
+    assert.equal(body.findternScore, rating);
+    const ob = await one(`SELECT extra_data FROM intern_onboarding WHERE user_id = $1`, [id]);
+    assert.equal(ob.extra_data.approvalStatus, "Approved", `a score of ${rating} is approved and visible`);
+  }
+  await shot("us-interns-ready");
+});
+
+step("US employer: signs up, picks United States on the onboarding form and is given New York time [UI]", [], "project2Id", async () => {
+  const page = pages.employer2;
+  state.employer2Id = await signUpEmployer(page, EMPLOYER2);
+  await visit(page, "/employer/onboarding");
+  await page.locator("#country").waitFor();
+  // A choice made before the page hydrates is lost, so choose again until the zone line appears.
+  const zone = page.getByText(/Your timezone:/);
+  for (let attempt = 0; attempt < 6 && !(await zone.isVisible()); attempt++) {
+    await page.locator("#country").selectOption("United States");
+    await zone.waitFor({ state: "visible", timeout: 2500 }).catch(() => {});
+  }
+  await typeInto(page.locator("#state"), "New York");
+  await typeInto(page.locator("#city"), "New York");
+  assert.match(await page.getByText(/Your timezone:/).innerText(), /America\/New_York/, "the company's location sets its timezone");
+  await shot("us-employer-onboarding");
+
+  const base = {
+    companyName: EMPLOYER2.companyName,
+    websiteUrl: `https://${EMPLOYER2.email.split("@")[1]}`,
+    logoUrl: null,
+    companySize: "11-50",
+    country: "United States",
+    state: "New York",
+    city: "New York",
+    primaryContactName: EMPLOYER2.name,
+    primaryContactRole: "Founder",
+    countryCode: "+1",
+    phoneNumber: `2125551${String(digits).slice(-3)}`,
+    escalationContactName: "Sam Ops",
+    escalationContactRole: "Operations lead",
+    escalationContactEmail: `ops+ftqa-${RUN}-us@findtern.in`,
+    escalationContactCountryCode: "+1",
+    escalationContactPhone: EMPLOYER2.escalationPhone,
+    billingPincode: "",
+    gstNumber: "",
+  };
+  const path = `/api/employer/${state.employer2Id}`;
+  expectOk(`PATCH ${path}`, await api(page, "PATCH", path, base));
+  const project = await api(page, "POST", `${path}/projects`, {
+    projectName: `Growth analytics ${RUN}`,
+    skills: ["Python", "SQL", "React", "Data Analysis"],
+    scopeOfWork: "upto-60",
+    fullTimeOffer: false,
+    locationType: "remote",
+    preferredLocations: [],
+    pincode: "",
+    city: "",
+    state: "",
+    timezone: NY,
+  });
+  const body = expectOk(`POST ${path}/projects`, project, [201]);
+  const emp = await one(`SELECT * FROM employers WHERE id = $1`, [state.employer2Id]);
+  assert.equal(emp.country, "United States");
+  assert.equal(emp.onboarding_completed, true);
+  state.project2Id = own(`project:us-${RUN}`, body.project.id);
+  await visit(page, "/employer/dashboard");
+});
+
+step("US employer: shortlists both, books intern 3 in the cart form (default times in New York time), intern 3 reads them in IST and picks [UI + API]", ["project2Id", "usInternsReady"], "usSlotsPicked", async () => {
+  const page = pages.employer2;
+  for (const id of [state.intern3Id, state.intern4Id]) {
+    expectOk("POST /api/employer/cart (add)", await api(page, "POST", "/api/employer/cart", { action: "add", projectId: state.project2Id, internId: id, listType: "cart" }));
+  }
+  await visit(page, "/employer/cart");
+  await page.getByText(/2 shortlisted/i).first().waitFor();
+  const card3 = page.getByRole("listitem").filter({ hasText: /\bIZ\b/ });
+  const before = Date.now();
+  await card3.getByRole("button", { name: "Book meeting" }).click();
+  const zoneSelect = page.locator("#cart-timezone");
+  await zoneSelect.waitFor();
+  assert.equal(await zoneSelect.inputValue(), NY, "the meeting form starts in the company's own timezone (New York)");
+  // The suggested times: the next quarter hour, then one and two hours later, in New York time.
+  const shown = [];
+  for (const n of [1, 2, 3]) {
+    const date = await page.getByRole("textbox", { name: `Slot ${n} date`, exact: true }).inputValue();
+    const time = await page.getByLabel(`Slot ${n} time`).inputValue();
+    shown.push(`${date.split("/").reverse().join("-")}T${time}`);
+  }
+  const wanted = [suggestedWalls(before, NY), suggestedWalls(Date.now(), NY)];
+  assert.ok(wanted.some((w) => w.join() === shown.join()), `suggested slots ${shown.join(", ")} are the next quarter hour and the two after it in New York time (${wanted[0].join(", ")})`);
+  state.slot1Wall = shown[0];
+  const res = await clickFor(page, page.getByRole("button", { name: "Send meeting request" }), { path: `/api/employer/${state.employer2Id}/interviews`, method: "POST" });
+  const sent = expectOk("POST interviews (UI)", res, [201]);
+  const iv = await one(`SELECT * FROM interviews WHERE id = $1`, [sent.interview.id]);
+  state.interview3Id = own(`interview:${state.intern3Id}`, iv.id);
+  assert.equal(iv.slot1.toISOString(), zonedToUtc(shown[0], NY).toISOString(), "the stored time is the New York wall time converted to UTC, DST included");
+  assert.equal(iv.slot3.toISOString(), zonedToUtc(shown[2], NY).toISOString());
+
+  // Intern 4: the same, through the endpoint the form calls.
+  const day = istDate(2);
+  const booked = expectOk("POST interviews (intern 4)", await api(page, "POST", `/api/employer/${state.employer2Id}/interviews`, {
+    internId: state.intern4Id, projectId: state.project2Id, timezone: NY, slot1: `${day}T09:00`, slot2: `${day}T10:00`, slot3: `${day}T11:00`,
+  }), [201]);
+  const iv4 = await one(`SELECT * FROM interviews WHERE id = $1`, [booked.interview.id]);
+  assert.equal(iv4.slot1.toISOString(), zonedToUtc(`${day}T09:00`, NY).toISOString());
+  state.interview4Id = own(`interview:${state.intern4Id}`, iv4.id);
+
+  // Intern 3 sees every time in India time and says where it was converted from.
+  const ip = pages.intern3;
+  await visit(ip, "/intern/interviews");
+  const body = await ip.locator("body").innerText();
+  assert.match(body, /converted from the company's New York time/i, "the intern is told the times are converted from New York");
+  assert.ok(!body.includes(EMPLOYER2.companyName), "the company is hidden before the hire");
+  const offered = await ip.getByRole("list", { name: "Offered times" }).innerText();
+  assert.ok(offered.toLowerCase().includes(clockIst(iv.slot1).toLowerCase()), `the first offered time reads ${clockIst(iv.slot1)} in India (got ${offered.replace(/\s+/g, " ")})`);
+  await shot("us-intern3-converted-times");
+  const confirm = ip.getByRole("button", { name: /^Book (?!this time)/ });
+  for (let attempt = 0; attempt < 6 && !(await confirm.isVisible()); attempt++) {
+    await ip.getByRole("list", { name: "Offered times" }).getByRole("button").first().click();
+    await confirm.waitFor({ state: "visible", timeout: 2500 }).catch(() => {});
+  }
+  expectOk("select-slot (intern 3)", await clickFor(ip, confirm, { path: `/api/interviews/${state.interview3Id}/select-slot`, method: "POST" }));
+  expectOk("select-slot (intern 4)", await api(pages.intern4, "POST", `/api/interviews/${state.interview4Id}/select-slot`, { slot: 1 }));
+  assert.equal((await one(`SELECT status FROM interviews WHERE id = $1`, [state.interview3Id])).status, "scheduled");
+});
+
+step("US employer: the offer is held until the meeting happens; Mark completed (live) and Mark missed then Feedback (over) release it [UI + API]", ["usSlotsPicked"], "usInterviewsDone", async () => {
+  const page = pages.employer2;
+  const composer = `/employer/send-proposal?intern=${state.intern3Id}&project=${state.project2Id}`;
+  await visit(page, composer);
+  await page.getByText(/hasn't happened yet/i).first().waitFor();
+  assert.ok(await page.getByRole("button", { name: "Review and send" }).filter({ visible: true }).first().isDisabled(), "Review and send is blurred while the meeting is still ahead");
+  const early = await api(page, "POST", `/api/employer/${state.employer2Id}/proposals`, {
+    internId: state.intern3Id, projectId: state.project2Id, flowType: "interview_first", agreedToPolicy: true, roleTitle: "Growth analyst", jd: "Build funnel dashboards for the growth team.",
+    mode: "remote", startDate: istDate(30), duration: "1m", weeklySchedule: "mon_fri", shiftFrom: "09:00", shiftTo: "18:00", timezone: NY, laptop: "company", paidLeavesPerMonth: 2, skills: ["SQL"],
+  });
+  assert.equal(early.status, 409, `an offer before the meeting is refused (got ${early.status} ${JSON.stringify(early.body).slice(0, 140)})`);
+
+  // Intern 3: the booked half hour is running now, so the schedule offers Mark completed.
+  const live = (id) => ownedWrite(id, `UPDATE interviews SET slot1 = (now() AT TIME ZONE 'UTC') - interval '5 minutes', slot2 = (now() AT TIME ZONE 'UTC') + interval '1 day', slot3 = (now() AT TIME ZONE 'UTC') + interval '2 days', selected_slot = 1 WHERE id = $1`, [id]);
+  await live(state.interview3Id);
+  await visit(page, "/employer/schedule");
+  await page.getByRole("button", { name: "Mark completed" }).first().waitFor({ timeout: 20_000 });
+  await shot("us-schedule-live");
+  await page.getByRole("button", { name: "Mark completed" }).first().click();
+  await page.getByText(/Marked as completed\. You can send a proposal now\./).waitFor({ timeout: 20_000 });
+  assert.equal((await one(`SELECT status FROM interviews WHERE id = $1`, [state.interview3Id])).status, "completed");
+
+  // Intern 4: the meeting is long over; the employer marks the candidate missed, then still leaves feedback.
+  await ownedWrite(state.interview4Id, `UPDATE interviews SET slot1 = (now() AT TIME ZONE 'UTC') - interval '3 hours', slot2 = (now() AT TIME ZONE 'UTC') - interval '2 hours 30 minutes', slot3 = (now() AT TIME ZONE 'UTC') - interval '2 hours', selected_slot = 1 WHERE id = $1`, [state.interview4Id]);
+  const missed = await api(page, "POST", `/api/interviews/${state.interview4Id}/mark-missed`, {});
+  assert.equal(missed.status, 200, `Mark missed → ${missed.status} ${JSON.stringify(missed.body)}`);
+  assert.equal((await one(`SELECT status FROM interviews WHERE id = $1`, [state.interview4Id])).status, "missed");
+  expectOk("feedback after missed", await api(page, "POST", `/api/interviews/${state.interview4Id}/feedback`, { feedback: "Did not join the call; spoke later, solid basics." }));
+  // Feedback with line breaks reaches the intern whole, with its breaks (bug sheet 30 Oct).
+  expectOk("feedback with line breaks", await api(page, "POST", `/api/interviews/${state.interview3Id}/feedback`, { feedback: "Line one: clear communicator.\nLine two: strong SQL." }));
+  const ip = pages.intern3;
+  await visit(ip, "/intern/interviews");
+  const fb = ip.getByText(/Line one: clear communicator/);
+  await fb.waitFor({ timeout: 20_000 });
+  assert.match(await fb.innerText(), /Line two: strong SQL/, "the second line of the feedback is shown to the intern, not cut at the first break");
+  assert.equal(await fb.evaluate((el) => getComputedStyle(el).whiteSpace), "pre-line", "and its line breaks are kept");
+  await shot("us-intern3-feedback");
+  state.usInterviewsDone = true;
+});
+
+step("US employer composes the offer in the form: calendar, no flexible hours, New York time and DST in the IST preview, hours from the working week [UI]", ["usInterviewsDone"], "usOfferId", async () => {
+  const page = pages.employer2;
+  await visit(page, `/employer/send-proposal?intern=${state.intern3Id}&project=${state.project2Id}`);
+  await page.locator("#startDate").waitFor();
+  await page.waitForLoadState("load");
+  const text = await page.locator("main").innerText();
+  assert.doesNotMatch(text, /flexible/i, "the flexible-hours option is gone from the composer");
+  assert.equal(await page.locator("#timezone").inputValue(), NY, "the offer's timezone is the company's (New York)");
+  assert.match(text, /\$/, "a US company is quoted in dollars");
+  assert.doesNotMatch(text, /₹/, "and never in rupees");
+
+  // The calendar: its button is there and the picker's choice lands in the field as DD/MM/YYYY.
+  await page.getByRole("button", { name: /^Open calendar/ }).first().waitFor({ state: "visible" });
+  const pick = async (iso) => {
+    for (let attempt = 0; attempt < 5; attempt++) {
+      await page.locator('input[type="date"]').first().fill(iso);
+      await page.waitForTimeout(300);
+      if ((await page.locator("#startDate").inputValue()) === dmy(iso)) return;
+    }
+    throw new Error(`The calendar's choice ${iso} never reached the start date field`);
+  };
+  // Daylight saving: 9am-6pm in New York is 7:30 pm in India after the clocks go back (winter) and 6:30 pm after they go forward.
+  const winter = istDate(10);
+  const summer = "2027-03-16";
+  await pick(winter);
+  const previewFor = async () => (await page.getByText(/The intern sees these as/).first().innerText()).replace(/\s+/g, " ");
+  assert.ok((await previewFor()).includes(istRange(winter, "09:00", "18:00", NY)), `winter preview is ${istRange(winter, "09:00", "18:00", NY)} (got ${await previewFor()})`);
+  await pick(summer);
+  assert.ok((await previewFor()).includes(istRange(summer, "09:00", "18:00", NY)), `summer preview is ${istRange(summer, "09:00", "18:00", NY)} (got ${await previewFor()})`);
+  assert.notEqual(istRange(winter, "09:00", "18:00", NY), istRange(summer, "09:00", "18:00", NY), "the two seasons differ by an hour, so DST is in play");
+  await shot("us-composer-dst");
+
+  // Hours come from the working week: 22 days (Mon-Fri) or 26 days (Mon-Sat), less paid leave, at 8 h a day.
+  await page.locator("#paidLeaves").selectOption("2");
+  await page.locator("#weeklySchedule").selectOption("mon_fri");
+  assert.equal(await page.getByLabel("Hours per month").inputValue(), "160 h");
+  await page.locator("#weeklySchedule").selectOption("mon_sat");
+  assert.equal(await page.getByLabel("Hours per month").inputValue(), "192 h");
+  await page.locator("#weeklySchedule").selectOption("mon_fri");
+
+  // A start date in the past is refused with a reason.
+  await typeInto(page.locator("#startDate"), "01/01/2020");
+  await typeInto(page.locator("#message"), "x".repeat(40));
+  await page.getByRole("button", { name: "Review and send" }).filter({ visible: true }).first().click();
+  await page.getByText(/Pick a date after today|Pick .* or later/i).first().waitFor({ timeout: 10_000 });
+
+  const start = istDate(10);
+  state.usStart = start;
+  state.usOfferId = own("proposal:us-intern3", await composeAndSend(page, {
+    internId: state.intern3Id,
+    startIso: start,
+    message: "Build funnel dashboards for the growth team, owning the weekly metrics review.",
+    extra: "No client data on personal devices.",
+  }));
+  assert.match(new URL(page.url()).pathname, /^\/employer\/proposals$/, "after sending, the employer lands on the proposals list, not back on the composer");
+  const list = await page.locator("main").innerText();
+  assert.ok(list.includes("Growth analytics") || /IZ/.test(list), "the sent offer is listed");
+  await shot("us-proposals-list");
+
+  const p = await one(`SELECT * FROM proposals WHERE id = $1`, [state.usOfferId]);
+  assert.equal(p.status, "sent");
+  assert.equal(p.currency, "USD");
+  assert.equal(p.offer_details.timezone, NY);
+  assert.equal(p.offer_details.monthlyHours, 160);
+  assert.equal(p.offer_details.monthlyAmount, Math.round(p.offer_details.hourlyRate * p.offer_details.monthlyHours * 100) / 100);
+  assert.match(String(p.offer_details.jd ?? p.offer_details.message ?? ""), /No client data on personal devices/, "the 'anything else' note is stored with the offer");
+});
+
+step("intern 3 reads the offer: IST hours, joining date, stipend is half in rupees, extra note, countdown; accepts [UI]", ["usOfferId"], "usAccepted", async () => {
+  const page = pages.intern3;
+  await visit(page, `/intern/proposals/${state.usOfferId}`);
+  const body = await page.locator("body").innerText();
+  const p = await one(`SELECT offer_details FROM proposals WHERE id = $1`, [state.usOfferId]);
+  assert.ok(!body.includes(EMPLOYER2.companyName), "the company is hidden before the hire");
+  assert.ok(body.replace(/\s+/g, " ").includes(istRange(state.usStart, "09:00", "18:00", NY)), `the intern reads the New York shift in India time (${istRange(state.usStart, "09:00", "18:00", NY)})`);
+  assert.match(body, /No client data on personal devices/, "the employer's extra note is visible to the intern");
+  assert.ok(body.includes(new Date(`${state.usStart}T00:00:00Z`).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" })) || body.includes(dmy(state.usStart)) || /Joining date/i.test(body), "the joining date is shown");
+  // The intern sees half of what the company pays, in rupees: dollars x 100 x 50%.
+  const stipend = Math.floor(Math.round(p.offer_details.monthlyAmount * 100) * 100 * 0.5) / 100;
+  assert.ok(body.includes(stipend.toLocaleString("en-IN")), `the stipend shown is half the monthly amount in rupees (₹${stipend.toLocaleString("en-IN")})`);
+  const countdown = await page.locator('[data-testid="offer-countdown"]').first().innerText();
+  const closes = Date.parse(`${state.usStart}T00:00:00+05:30`);
+  const days = Math.floor((closes - Date.now()) / 86_400_000);
+  assert.match(countdown, new RegExp(`^(${days}|${days + 1}|${days - 1}) days? left to answer`), `the countdown counts down to the joining day (got "${countdown}", expected about ${days} days)`);
+  await shot("us-intern3-offer");
+  await page.getByRole("button", { name: "Accept this offer" }).click();
+  await page.getByRole("checkbox", { name: /intern terms/i }).check();
+  expectOk("accept offer", await clickFor(page, page.getByRole("button", { name: "Yes, accept" }), { path: `/api/proposals/${state.usOfferId}/status`, method: "PATCH" }));
+  assert.equal((await one(`SELECT status FROM proposals WHERE id = $1`, [state.usOfferId])).status, "accepted");
+});
+
+step("free-band intern 4: the composer offers remote only, edits and withdrawals work before and after acceptance [UI + API]", ["usInterviewsDone"], "usFreeFlow", async () => {
+  const page = pages.employer2;
+  const composer = `/employer/send-proposal?intern=${state.intern4Id}&project=${state.project2Id}`;
+  await visit(page, composer);
+  await page.locator("#startDate").waitFor();
+  const main = await page.locator("main").innerText();
+  assert.match(main, /free Standard band/i, "the composer says why only remote is offered");
+  assert.equal(await page.getByRole("button", { name: /^(Remote|Hybrid|On-site)$/ }).count(), 1, "only Remote can be chosen");
+  assert.doesNotMatch(main, /flexible/i);
+  assert.doesNotMatch(main, /\$0(\.00)?(?!\d)/, "a free candidate shows 'Free', not $0");
+  await shot("us-free-band-composer");
+
+  const offer = (over = {}) => ({
+    internId: state.intern4Id, projectId: state.project2Id, flowType: "interview_first", agreedToPolicy: true, roleTitle: "Support analyst intern", jd: "Triage and tag support tickets for the growth team.",
+    mode: "remote", startDate: istDate(12), duration: "1m", weeklySchedule: "mon_fri", shiftFrom: "09:00", shiftTo: "18:00", timezone: NY, laptop: "company", paidLeavesPerMonth: 0, skills: ["SQL"], ...over,
+  });
+  const path = `/api/employer/${state.employer2Id}/proposals`;
+  const hybrid = await api(page, "POST", path, offer({ mode: "hybrid", city: "Pune", state: "Maharashtra", officeDays: 2, homeDays: 3 }));
+  assert.equal(hybrid.status, 400, `a hybrid offer to a free-band candidate is refused (got ${hybrid.status})`);
+  assert.match(JSON.stringify(hybrid.body), /remote work only/i);
+  const onsite = await api(page, "POST", path, offer({ mode: "onsite", city: "Pune", state: "Maharashtra" }));
+  assert.equal(onsite.status, 400, `an on-site offer is refused too (got ${onsite.status})`);
+
+  state.usFreeOfferId = own("proposal:us-intern4", await composeAndSend(page, { internId: state.intern4Id, startIso: istDate(12), message: "Triage and tag support tickets for the growth team every week.", extra: "" }));
+
+  // Edit it while it is still unanswered, in the form: no flexible-hours box, the calendar is there, and saving tells the intern.
+  await visit(page, `/employer/proposal/${state.usFreeOfferId}?edit=1`);
+  await page.getByRole("button", { name: "Save changes" }).waitFor();
+  assert.doesNotMatch(await page.locator("main").innerText(), /flexible/i, "the edit form has no flexible-hours option either");
+  assert.ok(await page.getByRole("button", { name: /^Open calendar/ }).first().isVisible(), "the edit form has the calendar too");
+  const edited = "Triage and tag support tickets, then write the weekly summary for the growth team.";
+  await typeInto(page.getByLabel("Job description"), edited);
+  expectOk("edit offer (UI)", await clickFor(page, page.getByRole("button", { name: "Save changes" }), { path: `/api/proposals/${state.usFreeOfferId}`, method: "PATCH" }));
+  const after = await one(`SELECT status, offer_details FROM proposals WHERE id = $1`, [state.usFreeOfferId]);
+  assert.equal(after.status, "sent", "an edited offer is still open");
+  assert.match(JSON.stringify(after.offer_details), /write the weekly summary/);
+
+  // The intern accepts; the company may still withdraw until it has paid, and the intern is told.
+  expectOk("accept (intern 4)", await api(pages.intern4, "PATCH", `/api/proposals/${state.usFreeOfferId}/status`, { status: "accepted", agreedToTerms: true }));
+  await visit(page, `/employer/proposal/${state.usFreeOfferId}`);
+  await page.getByRole("button", { name: "Withdraw offer" }).first().click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByText(/already accepted/i).waitFor();
+  expectOk("withdraw after acceptance (UI)", await clickFor(page, dialog.getByRole("button", { name: "Withdraw offer" }), { path: `/api/proposals/${state.usFreeOfferId}/status`, method: "PATCH" }));
+  assert.equal((await one(`SELECT status FROM proposals WHERE id = $1`, [state.usFreeOfferId])).status, "withdrawn");
+  await visit(pages.intern4, `/intern/proposals/${state.usFreeOfferId}`);
+  assert.equal(await pages.intern4.getByRole("button", { name: /Accept this offer/ }).count(), 0, "a withdrawn offer cannot be answered any more");
+  await shot("us-free-withdrawn");
+});
+
+step("US employer pays in dollars with the test button; Orders and the tax invoice are in USD with no GST [UI]", ["usAccepted"], "usPaid", async () => {
+  const page = pages.employer2;
+  const orderPath = `/api/employer/${state.employer2Id}/payment/razorpay/order`;
+  await visit(page, "/employer/checkout");
+  await page.getByText(/^Ready to pay/).first().waitFor();
+  const main = await page.locator("main").innerText();
+  assert.match(main, /\$/, "checkout is in dollars");
+  assert.doesNotMatch(main, /₹|GST/, "no rupees and no GST for a US company");
+  assert.match(main, /Hiring fee \(one-time\)/, "the one-time hiring fee is a line of its own");
+  assert.doesNotMatch(main, /upfront discount/i, "there is no upfront discount any more");
+  await page.getByRole("radio", { name: /^Monthly/ }).check();
+  await shot("us-checkout");
+  const res = await clickFor(page, page.getByRole("button", { name: /^Test: mark as paid/ }), { path: orderPath, method: "POST" });
+  assert.equal(res.status, 200, `order → ${res.status} ${JSON.stringify(res.body)}`);
+  const pay = await one(`SELECT * FROM employer_payments WHERE employer_id = $1 AND status = 'paid' ORDER BY paid_at DESC LIMIT 1`, [state.employer2Id]);
+  assert.equal(pay.currency, "USD");
+  assert.equal(pay.gateway, "test");
+  assert.match(String(pay.invoice_number), /^FT\//);
+  const offer = await one(`SELECT offer_details FROM proposals WHERE id = $1`, [state.usOfferId]);
+  assert.ok(pay.amount_minor >= Math.round(offer.offer_details.monthlyAmount * 100), "the first month plus the hiring fee was charged");
+  assert.equal((await one(`SELECT status FROM proposals WHERE id = $1`, [state.usOfferId])).status, "hired");
+  state.usPaymentId = pay.id;
+
+  await visit(page, "/employer/orders");
+  await page.getByRole("tab", { name: /Invoices/ }).click();
+  await page.getByRole("button", { name: /tax invoice/i }).first().waitFor();
+  const text = await readInvoice(page, pay.invoice_number);
+  assert.ok(text.includes(`Invoice #: ${pay.invoice_number}`));
+  assert.doesNotMatch(text, /IGST|CGST|SGST/, "no Indian GST on a US company's invoice");
+  const total = text.match(/Total paid\s*(?:US\$|USD|\$)\s*([\d,.]+)/)?.[1];
+  assert.ok(total, `the invoice has a dollar total (got: ${text.replace(/\s+/g, " ").slice(0, 400)})`);
+  assert.equal(Math.round(Number(total.replace(/,/g, "")) * 100), pay.amount_minor, "the invoice total is what was charged");
+  await shot("us-invoice-tab");
+});
+
+step("US employer: a full-time offer in dollars; the intern accepts [API + UI]", ["usPaid"], "usFteAccepted", async () => {
+  const page = pages.employer2;
+  const up = await upload(page, { kind: "offer_letter", base64: PDF_BASE64, type: "application/pdf", name: "offer-letter.pdf" });
+  const key = expectOk("POST /api/uploads (offer_letter)", up, [201]).key;
+  const path = `/api/employer/${state.employer2Id}/full-time-offer`;
+  expectOk(`POST ${path}`, await api(page, "POST", path, {
+    proposalId: state.usOfferId, jobTitle: "Growth Analyst", jobMode: "remote", jobLocationCity: "", jobLocationState: "", timezone: NY, shiftFrom: "09:00", shiftTo: "18:00",
+    ctcCurrency: "USD", annualCtc: 60000, offerLetterKey: key,
+  }), [200, 201]);
+  const p = await one(`SELECT id, status, currency FROM proposals WHERE employer_id = $1 AND intern_id = $2 AND id <> $3 ORDER BY created_at DESC LIMIT 1`, [state.employer2Id, state.intern3Id, state.usOfferId]);
+  assert.ok(p, "a full-time proposal row exists");
+  assert.equal(p.status, "sent");
+  state.usFteId = own(`fte:${p.id}`, p.id);
+  const ip = pages.intern3;
+  await visit(ip, `/intern/proposals/${state.usFteId}`);
+  await shot("us-intern3-fte");
+  await ip.getByRole("button", { name: /Accept the job offer/ }).click();
+  await ip.getByRole("checkbox", { name: /read, understood, and agreed/i }).check();
+  expectOk("accept FTE", await clickFor(ip, ip.getByRole("button", { name: /^Accept the offer/ }), { path: `/api/proposals/${state.usFteId}/status`, method: "PATCH" }));
+  assert.ok(["accepted", "hired"].includes((await one(`SELECT status FROM proposals WHERE id = $1`, [state.usFteId])).status));
 });
 
 /* ── 13. Every page a role can reach, at 1440 and 390: HTTP, overflow, accessibility ───── */

@@ -13,6 +13,7 @@ import { requireRole } from "@/lib/auth";
 import { isMeetingLinkLive, isStaleInterview } from "@/lib/employer-interview-rules";
 import { formatIst } from "@/lib/format";
 import { HIDDEN_COMPANY, loadInternData, projectNames } from "@/lib/intern-data";
+import { feedbackTextOf } from "@/lib/interview-feedback";
 import { isPast, slotOf, type InterviewRow } from "@/lib/journey";
 import { isInternPaid } from "@/lib/payments";
 
@@ -191,7 +192,7 @@ export default async function InternInterviews() {
           <Surface as="ul" className="divide-y divide-ink-100">
             {past.map((i) => {
               const outcome = pastOutcome(i);
-              const feedback = feedbackText(i.notes);
+              const feedback = feedbackTextOf(i.notes);
               const when = i.selectedSlot ? slotOf(i) : null;
               return (
                 <AgendaRow
@@ -206,7 +207,7 @@ export default async function InternInterviews() {
                   {outcome.label === "Interview done" && feedback ? (
                     <div className="mt-2 rounded-apple-md bg-brand-50/70 p-4">
                       <p className="text-xs font-medium text-brand-800">Feedback from the company</p>
-                      <p className="mt-1 text-pretty text-sm text-ink-800">{feedback}</p>
+                      <p className="mt-1 whitespace-pre-line text-pretty text-sm text-ink-800">{feedback}</p>
                     </div>
                   ) : (
                     <p className="mt-1 text-pretty text-sm text-text-subtle">{outcome.detail}</p>
@@ -251,12 +252,3 @@ function pastOutcome(i: InterviewRow): { label: string; tone: Tone; detail: stri
   return { label: "Closed", tone: "neutral", detail: "This interview is closed." };
 }
 
-/**
- * The company's feedback only: the `feedback_text:` line of the notes (legacy
- * parseNoteText). The rest of the field holds staff notes and the feedback /
- * recording links, which are not for the candidate.
- */
-function feedbackText(notes: string | null): string {
-  const line = (notes ?? "").split("\n").map((l) => l.trim()).find((l) => l.toLowerCase().startsWith("feedback_text:"));
-  return line ? line.slice("feedback_text:".length).trim() : "";
-}

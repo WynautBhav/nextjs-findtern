@@ -6,6 +6,7 @@ import { CalendarDays, Search } from "lucide-react";
 import { getDb, schema } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
 import { requireEmployerSetup } from "@/lib/employer-setup";
+import { feedbackTextOf } from "@/lib/interview-feedback";
 import {
   canLeaveFeedback,
   canMarkCompleted,
@@ -144,7 +145,7 @@ export default async function EmployerSchedule({ searchParams }: { searchParams:
       name: names.get(iv.internId) ?? "Candidate",
       initials: initials.get(iv.internId) ?? "C",
       project: iv.projectId ? (projectNames.get(iv.projectId) ?? "Project") : null,
-      feedback: feedbackOf(iv.notes),
+      feedback: feedbackTextOf(iv.notes) || null,
     };
   });
 
@@ -383,11 +384,3 @@ function requestTime(): number {
   return Date.now();
 }
 
-/** The employer's shared feedback, stored as a "feedback_text:" line in notes (EMB-11). */
-function feedbackOf(notes: string | null): string | null {
-  const raw = notes ?? "";
-  const at = raw.indexOf("feedback_text:");
-  if (at < 0) return null;
-  const text = raw.slice(at + "feedback_text:".length).trim();
-  return text || null;
-}
