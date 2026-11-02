@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { billableWorkingDays, buildOffer, internStipendInrMinor, parseOffer, scheduledMonthlyHours, weeklyScheduleOf } from "./offer.ts";
+import { billableWorkingDays, buildOffer, internStipendInrMinor, offerTimeLeft, parseOffer, scheduledMonthlyHours, weeklyScheduleOf } from "./offer.ts";
 import { lineCharge } from "./checkout.ts";
 import { monthlyDues } from "./dues.ts";
 
@@ -265,4 +265,20 @@ test("E-B07: a start date has to be a real day, and the clock times real times",
   assert.equal(isClockTime("flexible"), false);
   assert.equal(addDays("2026-11-01", 365), "2027-11-01");
   assert.equal(addDays("2028-02-28", 1), "2028-02-29");
+});
+
+test("offerTimeLeft counts down to the start of the joining day in India", () => {
+  const start = "2026-11-10"; // closes at 2026-11-09T18:30:00Z
+  const at = (iso: string) => offerTimeLeft(start, new Date(iso));
+  assert.equal(at("2026-11-06T18:30:00Z"), "3 days left");
+  assert.equal(at("2026-11-07T18:30:00Z"), "2 days left");
+  assert.equal(at("2026-11-08T18:30:01Z"), "23 hours left");
+  assert.equal(at("2026-11-08T18:30:00Z"), "1 day left");
+  assert.equal(at("2026-11-09T13:30:00Z"), "5 hours left");
+  assert.equal(at("2026-11-09T17:30:00Z"), "1 hour left");
+  assert.equal(at("2026-11-09T17:45:00Z"), "45 min left");
+  assert.equal(at("2026-11-09T18:29:30Z"), "1 min left");
+  assert.equal(at("2026-11-09T18:30:00Z"), null, "closed at the start of the joining day, like offerPastStart");
+  assert.equal(offerTimeLeft(null), null);
+  assert.equal(offerTimeLeft("2026-02-31", new Date("2026-01-01T00:00:00Z")), null);
 });

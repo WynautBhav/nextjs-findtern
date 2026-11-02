@@ -23,6 +23,7 @@ import { useRouter } from "next/navigation";
 import { AlertCircle, Check, Loader2, X } from "lucide-react";
 
 import { CountdownAgreement, FULL_TIME_ACCEPTANCE_TERMS } from "@/components/app/countdown-agreement";
+import { OfferCountdown } from "@/components/app/offer-countdown";
 import { buttonClass } from "@/components/ui/button";
 import {
   Dialog,
@@ -198,6 +199,7 @@ export function OfferDecision({
 
       {rail ? (
         <div className="mt-4 space-y-2 text-sm leading-relaxed text-ink-600">
+          <OfferCountdown startDate={startDate} />
           <p>
             <span className="font-medium text-ink-800">If you do nothing</span>, the offer stays open until the day before
             the joining date{joining ? ` (${joining})` : ""}. On the joining date it closes and is marked as rejected.

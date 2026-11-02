@@ -333,6 +333,29 @@ export function offerPastStart(startDate: string | null | undefined, now: Date =
   return /^\d{4}-\d{2}-\d{2}$/.test(day) && day <= todayIst(now);
 }
 
+/**
+ * How long an intern has left to answer, as the sheet words it ("3 days left",
+ * "20 hours left", "45 min left"). The offer closes when its start day begins in
+ * India (offerPastStart), so that is the moment counted down to. Null once it has
+ * closed or when there is no start date.
+ */
+export function offerTimeLeft(startDate: string | null | undefined, now: Date = new Date()): string | null {
+  const day = String(startDate ?? "").slice(0, 10);
+  if (!isRealDay(day)) return null;
+  const ms = Date.parse(`${day}T00:00:00+05:30`) - now.getTime();
+  if (!(ms > 0)) return null;
+  const hours = ms / 3_600_000;
+  if (hours >= 24) {
+    const days = Math.floor(hours / 24);
+    return `${days} day${days === 1 ? "" : "s"} left`;
+  }
+  if (hours >= 1) {
+    const h = Math.floor(hours);
+    return `${h} hour${h === 1 ? "" : "s"} left`;
+  }
+  return `${Math.max(1, Math.ceil(ms / 60_000))} min left`;
+}
+
 /** Formal offers an intern may decline before the guarantee ends. */
 export const FREE_DECLINES = 3;
 

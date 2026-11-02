@@ -7,7 +7,7 @@ import { getDb, schema } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
 import { requireEmployerSetup } from "@/lib/employer-setup";
 import { canEmployerSeeIntern } from "@/lib/employer-pool";
-import { displayNameOf, toCandidateProfile, type CandidateSummary } from "@/lib/employer-candidates";
+import { displayNameOf, scoreOf, toCandidateProfile, type CandidateSummary } from "@/lib/employer-candidates";
 import { hiredInternIds } from "@/lib/employer-visibility";
 import { employerRegion, resolvePricing, type Currency, type Pricing } from "@/lib/employer-pricing";
 import { EmptyScene, PageHead, Pill, Surface } from "@/components/app/primitives";
@@ -134,7 +134,7 @@ export default async function SendProposal({
           .limit(1);
 
         const profile = toCandidateProfile(user, onboarding);
-        preference = workPreferenceOf(onboarding);
+        preference = workPreferenceOf(onboarding, scoreOf(onboarding));
         let unlocked = false;
         try {
           unlocked = (await hiredInternIds(db, uid)).has(user.id);

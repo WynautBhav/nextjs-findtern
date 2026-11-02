@@ -116,11 +116,15 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   // A mode the offer already had stays allowed; a change has to fit the candidate.
   if (edits.mode !== undefined && edits.mode !== parseOffer(proposal.offerDetails ?? {}, proposal.currency).mode) {
     const [pref] = await db
-      .select({ locationTypes: schema.internOnboarding.locationTypes, preferredLocations: schema.internOnboarding.preferredLocations })
+      .select({
+        locationTypes: schema.internOnboarding.locationTypes,
+        preferredLocations: schema.internOnboarding.preferredLocations,
+        extraData: schema.internOnboarding.extraData,
+      })
       .from(schema.internOnboarding)
       .where(eq(schema.internOnboarding.userId, proposal.internId))
       .limit(1);
-    const modeIssue = modeProblem(workPreferenceOf(pref), edits.mode);
+    const modeIssue = modeProblem(workPreferenceOf(pref, Number(((pref?.extraData ?? {}) as Record<string, unknown>).findternScore ?? 0) || 0), edits.mode);
     if (modeIssue) return NextResponse.json({ error: modeIssue }, { status: 400 });
   }
   if (edits.startDate !== undefined && edits.startDate <= todayIst()) {

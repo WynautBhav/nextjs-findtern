@@ -213,7 +213,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({ error: "This candidate doesn't have a laptop. The company needs to provide one." }, { status: 400 });
   }
   // Work location follows the candidate's own preference (bug sheet 23 Oct).
-  const modeIssue = modeProblem(workPreferenceOf(onboarding), b.mode);
+  const modeIssue = modeProblem(workPreferenceOf(onboarding, scoreOf(onboarding)), b.mode);
   if (modeIssue) return NextResponse.json({ error: modeIssue }, { status: 400 });
   // A full-time offer that is still open blocks an internship proposal
   // (legacy R:12767).

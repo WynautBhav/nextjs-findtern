@@ -143,7 +143,6 @@ export function SendProposalForm({
   const homeDays = String(Math.max(0, week - (Number(officeDays) || 0)));
   const [shiftFrom, setShiftFrom] = useState("09:00");
   const [shiftTo, setShiftTo] = useState("18:00");
-  const [flexibleHours, setFlexibleHours] = useState(false);
   const laptopOptions = LAPTOP_OPTIONS.filter((l) => l.value !== "candidate" || candidateHasLaptop !== false);
   const [laptop, setLaptop] = useState<string>("company");
   const [paidLeaves, setPaidLeaves] = useState("2");
@@ -156,7 +155,7 @@ export function SendProposalForm({
 
   const rate = pricing[currency];
   // The intern reads the hours in India time (legacy composer; EMH-31).
-  const istHours = flexibleHours ? null : shiftInIst(shiftFrom, shiftTo, timezone, startDate || null);
+  const istHours = shiftInIst(shiftFrom, shiftTo, timezone, startDate || null);
   // An offer lapses on its start date, so the earliest start is tomorrow (IST).
   const minStart = useMemo(() => tomorrowIst(), []);
 
@@ -177,7 +176,7 @@ export function SendProposalForm({
       document.getElementById("projectId")?.focus();
       return;
     }
-    const problems = validate({ projectId, roleTitle, duration, startDate, minStart, mode, city, state, officeDays, homeDays, week, laptop, message, shiftFrom, shiftTo, flexibleHours, timezone });
+    const problems = validate({ projectId, roleTitle, duration, startDate, minStart, mode, city, state, officeDays, homeDays, week, laptop, message, shiftFrom, shiftTo, timezone });
     setErrors(problems);
     if (Object.keys(problems).length > 0) {
       setNotice({ tone: "bad", text: "Some details need attention before this can be sent." });
@@ -211,8 +210,8 @@ export function SendProposalForm({
           startDate,
           duration,
           weeklySchedule: schedule,
-          shiftFrom: flexibleHours ? "flexible" : shiftFrom,
-          shiftTo: flexibleHours ? "flexible" : shiftTo,
+          shiftFrom,
+          shiftTo,
           laptop,
           paidLeavesPerMonth: Number(paidLeaves) || 0,
           skills: projects.find((p) => p.id === projectId)?.skills ?? [],
@@ -405,7 +404,9 @@ export function SendProposalForm({
           <fieldset>
             <legend className="text-sm font-medium text-ink-800">Work mode</legend>
             <p className="mt-0.5 text-sm text-ink-600">
-              {modes.length < MODES.length
+              {preference.freeBand
+                ? "This candidate is in the free Standard band, which is offered for remote work only."
+                : modes.length < MODES.length
                 ? `This candidate is open to ${modes.map((m) => m.label.toLowerCase()).join(" or ")} work.`
                 : "This candidate is open to remote, hybrid or on-site work."}
             </p>
@@ -477,43 +478,30 @@ export function SendProposalForm({
 
           <fieldset>
             <legend className="text-sm font-medium text-ink-800">Working hours</legend>
-            {!flexibleHours ? (
-              <>
-                <div className="mt-2 grid grid-cols-2 gap-3 sm:max-w-sm">
-                  <Field id="shiftFrom" label="From" type="time" value={shiftFrom} error={errors.shiftFrom} onChange={setShiftFrom} />
-                  <Field id="shiftTo" label="To" type="time" value={shiftTo} error={errors.shiftTo} onChange={setShiftTo} />
-                </div>
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  {SHIFT_PRESETS.map((p) => (
-                    <button
-                      key={p.label}
-                      type="button"
-                      onClick={() => {
-                        setShiftFrom(p.from);
-                        setShiftTo(p.to);
-                      }}
-                      className={cn(
-                        "apple-spring nums min-h-11 rounded-apple-sm border px-3 text-sm font-medium",
-                        shiftFrom === p.from && shiftTo === p.to
-                          ? "border-brand-600 bg-brand-50 text-brand-800"
-                          : "border-ink-200 bg-white text-ink-700 hover:bg-ink-50",
-                      )}
-                    >
-                      {p.label}
-                    </button>
-                  ))}
-                </div>
-              </>
-            ) : null}
-            <label className="mt-3 inline-flex min-h-11 cursor-pointer items-center gap-2.5 text-sm text-ink-700">
-              <input
-                type="checkbox"
-                checked={flexibleHours}
-                onChange={(e) => setFlexibleHours(e.target.checked)}
-                className="size-4 rounded-sm border-ink-300 accent-brand-700"
-              />
-              Flexible hours, set by the intern
-            </label>
+            <div className="mt-2 grid grid-cols-2 gap-3 sm:max-w-sm">
+              <Field id="shiftFrom" label="From" type="time" value={shiftFrom} error={errors.shiftFrom} onChange={setShiftFrom} />
+              <Field id="shiftTo" label="To" type="time" value={shiftTo} error={errors.shiftTo} onChange={setShiftTo} />
+            </div>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {SHIFT_PRESETS.map((p) => (
+                <button
+                  key={p.label}
+                  type="button"
+                  onClick={() => {
+                    setShiftFrom(p.from);
+                    setShiftTo(p.to);
+                  }}
+                  className={cn(
+                    "apple-spring nums min-h-11 rounded-apple-sm border px-3 text-sm font-medium",
+                    shiftFrom === p.from && shiftTo === p.to
+                      ? "border-brand-600 bg-brand-50 text-brand-800"
+                      : "border-ink-200 bg-white text-ink-700 hover:bg-ink-50",
+                  )}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
             {istHours ? (
               <p className="nums mt-1 text-sm text-ink-600">
                 The intern sees these as <span className="font-medium text-ink-800">{istHours}</span>.
@@ -929,7 +917,6 @@ type Draft = {
   message: string;
   shiftFrom: string;
   shiftTo: string;
-  flexibleHours: boolean;
   timezone: string;
 };
 
@@ -961,12 +948,10 @@ function validate(draft: Draft): Record<string, string> {
     }
   }
 
-  if (!draft.flexibleHours) {
-    const time = /^([01]\d|2[0-3]):[0-5]\d$/;
-    if (!time.test(draft.shiftFrom)) errors.shiftFrom = "Pick a start time.";
-    if (!time.test(draft.shiftTo)) errors.shiftTo = "Pick an end time.";
-    else if (draft.shiftFrom === draft.shiftTo) errors.shiftTo = "The end time must differ from the start.";
-  }
+  const time = /^([01]\d|2[0-3]):[0-5]\d$/;
+  if (!time.test(draft.shiftFrom)) errors.shiftFrom = "Pick a start time.";
+  if (!time.test(draft.shiftTo)) errors.shiftTo = "Pick an end time.";
+  else if (draft.shiftFrom === draft.shiftTo) errors.shiftTo = "The end time must differ from the start.";
   if (!draft.timezone || draft.timezone.startsWith("group-")) errors.timezone = "Pick a timezone.";
   if (!draft.laptop) errors.laptop = "Say who provides the laptop.";
   if (draft.message.trim().length < 30) {

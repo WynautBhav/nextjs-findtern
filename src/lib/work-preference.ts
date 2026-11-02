@@ -1,5 +1,6 @@
 import { stateForDistrict } from "./data/districts.ts";
 import { workModes } from "./onboarding.ts";
+import { bandFor } from "./score.ts";
 
 /**
  * Where a candidate is willing to work, as an offer has to respect it (bug
@@ -12,9 +13,15 @@ import { workModes } from "./onboarding.ts";
 export type WorkPreference = {
   modes: string[];
   cities: { label: string; city: string; state: string }[];
+  /** A free-band (Standard, no hourly rate) candidate: remote offers only (bug sheet 30 Oct). */
+  freeBand?: boolean;
 };
 
-export function workPreferenceOf(row: { locationTypes?: unknown; preferredLocations?: unknown } | null | undefined): WorkPreference {
+export function workPreferenceOf(
+  row: { locationTypes?: unknown; preferredLocations?: unknown } | null | undefined,
+  /** The candidate's Findtern Score; 0 or missing means unscored, which is not the free band. */
+  score?: number | null,
+): WorkPreference {
   const modes = workModes(Array.isArray(row?.locationTypes) ? row.locationTypes.map(String) : []);
   const raw = Array.isArray(row?.preferredLocations) ? row.preferredLocations.map(String) : [];
   const seen = new Set<string>();
@@ -28,11 +35,13 @@ export function workPreferenceOf(row: { locationTypes?: unknown; preferredLocati
     const state = (comma === -1 ? stateForDistrict(label) ?? "" : label.slice(comma + 1)).trim();
     cities.push({ label, city, state });
   }
-  return { modes, cities };
+  const freeBand = typeof score === "number" && score > 0 && bandFor(score).rateMinor === 0;
+  return { modes, cities, ...(freeBand ? { freeBand } : {}) };
 }
 
 /** The modes an offer may use: the candidate's, or all three when they never said. */
 export function offerableModes(pref: WorkPreference): string[] {
+  if (pref.freeBand) return ["remote"];
   return pref.modes.length > 0 ? pref.modes : ["remote", "hybrid", "onsite"];
 }
 
@@ -41,5 +50,6 @@ export function modeProblem(pref: WorkPreference, mode: string): string | null {
   const allowed = offerableModes(pref);
   if (allowed.includes(mode)) return null;
   const label = (m: string) => (m === "onsite" ? "on-site" : m);
+  if (pref.freeBand) return "This candidate is in the free Standard band, which is offered for remote work only.";
   return `This candidate is open to ${allowed.map(label).join(" or ")} work only.`;
 }

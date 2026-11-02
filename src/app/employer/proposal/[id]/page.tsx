@@ -102,11 +102,12 @@ export default async function EmployerProposalDetail({
         locationTypes: schema.internOnboarding.locationTypes,
         preferredLocations: schema.internOnboarding.preferredLocations,
         hasLaptop: schema.internOnboarding.hasLaptop,
+        extraData: schema.internOnboarding.extraData,
       })
       .from(schema.internOnboarding)
       .where(eq(schema.internOnboarding.userId, proposal.internId))
       .limit(1);
-    preference = workPreferenceOf(pref);
+    preference = workPreferenceOf(pref, Number(((pref?.extraData ?? {}) as Record<string, unknown>).findternScore ?? 0) || 0);
     hasLaptop = typeof pref?.hasLaptop === "boolean" ? pref.hasLaptop : null;
   } catch (err) {
     console.error("[employer/proposal] names", err);

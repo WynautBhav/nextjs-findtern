@@ -111,7 +111,6 @@ export function ProposalOfferForm({
   const week = workingDaysPerWeek(schedule);
   const [officeDays, setOfficeDays] = useState(String(Math.min(week - 1, Math.max(1, initial.officeDays ?? 3))));
   const homeDays = Math.max(0, week - (Number(officeDays) || 0));
-  const [flexible, setFlexible] = useState(flexibleAtStart);
   const [shiftFrom, setShiftFrom] = useState(flexibleAtStart ? "09:00" : initial.shiftFrom!);
   const [shiftTo, setShiftTo] = useState(flexibleAtStart ? "18:00" : initial.shiftTo || "18:00");
   const noLaptop = hasLaptop === false;
@@ -133,7 +132,7 @@ export function ProposalOfferForm({
     setError(msg);
     document.getElementById(`${uid}-${f}`)?.focus();
   };
-  const ist = flexible ? null : shiftInIst(shiftFrom, shiftTo, timezone, startDate);
+  const ist = shiftInIst(shiftFrom, shiftTo, timezone, startDate);
 
   async function save() {
     setError("");
@@ -142,7 +141,7 @@ export function ProposalOfferForm({
     if (!startDate || startDate < tomorrowIst()) return fail("start", "Pick a start date after today.");
     if (mode !== "remote" && (!city.trim() || !state.trim())) return fail(city.trim() ? "state" : "city", "An on-site or hybrid role needs a city and state.");
     if (mode === "hybrid" && !(Number(officeDays) >= 1 && homeDays >= 1)) return fail("office", `Split the ${week} working days between office and home.`);
-    if (!flexible && (!shiftFrom || !shiftTo || shiftFrom === shiftTo)) return fail(shiftFrom ? "shiftTo" : "shiftFrom", "Pick a start and end time, or choose flexible hours.");
+    if (!shiftFrom || !shiftTo || shiftFrom === shiftTo) return fail(shiftFrom ? "shiftTo" : "shiftFrom", "Pick a start and end time.");
     if (!message.trim()) return fail("message", "Add a job description.");
 
     const offer: Record<string, unknown> = {
@@ -154,8 +153,8 @@ export function ProposalOfferForm({
       message: message.trim(),
       mode,
       laptop,
-      shiftFrom: flexible ? "flexible" : shiftFrom,
-      shiftTo: flexible ? "flexible" : shiftTo,
+      shiftFrom,
+      shiftTo,
       timezone,
     };
     if (mode !== "remote") {
@@ -331,22 +330,14 @@ export function ProposalOfferForm({
             </div>
           </>
         ) : null}
-        <label className="col-span-2 inline-flex min-h-11 cursor-pointer items-center gap-2.5 text-sm text-ink-800">
-          <input type="checkbox" checked={flexible} onChange={(e) => setFlexible(e.target.checked)} className="size-4 rounded-sm accent-brand-700" />
-          Flexible hours, set by the intern
+        <label className="block">
+          <span className={LABEL}>From</span>
+          <input {...fieldProps("shiftFrom")} type="time" value={shiftFrom} onChange={(e) => setShiftFrom(e.target.value)} className={INPUT} />
         </label>
-        {!flexible ? (
-          <>
-            <label className="block">
-              <span className={LABEL}>From</span>
-              <input {...fieldProps("shiftFrom")} type="time" value={shiftFrom} onChange={(e) => setShiftFrom(e.target.value)} className={INPUT} />
-            </label>
-            <label className="block">
-              <span className={LABEL}>To</span>
-              <input {...fieldProps("shiftTo")} type="time" value={shiftTo} onChange={(e) => setShiftTo(e.target.value)} className={INPUT} />
-            </label>
-          </>
-        ) : null}
+        <label className="block">
+          <span className={LABEL}>To</span>
+          <input {...fieldProps("shiftTo")} type="time" value={shiftTo} onChange={(e) => setShiftTo(e.target.value)} className={INPUT} />
+        </label>
         <label className="col-span-2 block">
           <span className={LABEL}>Timezone</span>
           <select value={timezone} onChange={(e) => setTimezone(e.target.value)} className={INPUT}>
