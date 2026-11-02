@@ -1090,7 +1090,9 @@ function filterParams(merged: Filters): URLSearchParams {
   if (merged.dir === "asc") next.set("dir", "asc");
   if (merged.remote !== null) next.set("remote", merged.remote ? "1" : "0");
   if (!merged.skillPriority) next.set("sm", "0");
-  if (merged.view && merged.view !== "grid") next.set("view", merged.view);
+  // Always written, even for the default: a link without any filter looks like a bare
+  // visit and restores the last remembered view, so "Cards" could never undo "Rows".
+  if (merged.view) next.set("view", merged.view);
   if (merged.pageSize && merged.pageSize !== 24) next.set("pageSize", String(merged.pageSize));
   if (!merged.projectDefaults) next.set("pf", "0");
   return next;
