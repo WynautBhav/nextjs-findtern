@@ -605,7 +605,11 @@ export function proofAsText(proof: Proof, candidate: string): string {
     "",
     ...proof.facts.map((f) => `${f.label}: ${f.value}`),
     "",
-    `Issued${proof.at ? ` ${proof.at.toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Kolkata" })}` : ""}${proof.issuedBy ? ` by ${proof.issuedBy}` : ""}`,
+    ...(proof.at || proof.issuedBy
+      ? [
+          `Issued${proof.at ? ` ${proof.at.toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Kolkata" })}` : ""}${proof.issuedBy ? ` by ${proof.issuedBy}` : ""}`,
+        ]
+      : []),
   ];
   return lines.join("\n");
 }

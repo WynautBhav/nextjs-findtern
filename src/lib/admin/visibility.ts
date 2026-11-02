@@ -7,8 +7,8 @@
  * did it (`hiddenByAdmin`), so that:
  *  - an admin "show" switches `openToWork` back on only when the admin was
  *    the one who switched it off, never overriding an intern's own choice;
- *  - the 30-day self-hide limit (schedulers.ts) can tell an admin hide from
- *    an intern's and leave it alone.
+ *  - the intern's own "open to work" switch (lib/open-to-work.ts) can tell an
+ *    admin hide from their own, and does not undo it.
  * Returns the new extraData, or null when nothing changes.
  */
 export function adminVisibilityExtra(

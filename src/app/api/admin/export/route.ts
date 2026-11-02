@@ -8,7 +8,7 @@ import { csvFilename, csvResponse, toCsv, type CsvColumn } from "@/lib/admin/csv
 import { flattenParams, parsePageRequest, periodStart, searchAny } from "@/lib/admin/params";
 import { allows, EXPORT_PERMISSIONS } from "@/lib/admin/permissions";
 import { activeProject, realEmployerId, realEmployers } from "@/lib/admin/scope";
-import { placeOfSupply, splitGst } from "@/lib/gst";
+import { placeOfSupply, sellerStateCode, splitGst } from "@/lib/gst";
 import { placeLabel } from "@/lib/invoice";
 import { dateRangeConditions } from "@/lib/admin/date-range";
 import { paymentPromo } from "@/lib/admin/payment-promo";
@@ -389,7 +389,7 @@ async function exportPayments(search: string, params: Record<string, string>) {
 type GstRow = { amountMinor: number; currency: string; country: string | null; gstin: string | null; pincode: string | null; state: string | null };
 const placeOf = (r: GstRow) => placeOfSupply({ currency: r.currency, country: r.country, gstin: r.gstin, pincode: r.pincode, state: r.state });
 function gstOf(r: GstRow) {
-  return splitGst(r.amountMinor, placeOf(r));
+  return splitGst(r.amountMinor, placeOf(r), sellerStateCode());
 }
 
 /** Stipend payouts to interns, honouring the payouts page filters. */

@@ -593,7 +593,7 @@ function InvoicesPanel({ invoices }: { invoices: InvoiceRow[] }) {
       {filtered.length === 0 ? (
         <EmptyScene title="No invoice matches" body="Try another name or ID, or reset the filters to see every invoice." className="py-10" />
       ) : (
-        <Surface tabIndex={0} role="region" aria-label="Invoices" className="overflow-x-auto focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600">
+        <Surface tabIndex={0} role="region" aria-label="Invoices" className="relative overflow-x-auto focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600">
           <table className="w-full min-w-[48rem] border-collapse">
             <thead className="border-b border-ink-100 bg-ink-50/60">
               <tr>

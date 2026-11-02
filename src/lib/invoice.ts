@@ -230,6 +230,15 @@ export function taxInvoiceHtml(input: InvoiceInput): string {
     .row.final { font-size: 16px; font-weight: bold; border-top: 2px solid #0f172a; padding-top: 12px; margin-top: 4px; color: #047857; }
     .note { font-size: 12px; color: #475569; margin-top: 16px; }
     .bank { margin-top: 32px; padding: 16px; border: 1px solid #e2e8f0; border-radius: 8px; max-width: 360px; }
+    @media screen and (max-width: 600px) {
+      body { padding: 16px; }
+      .header, .grid { display: block; }
+      .grid > div + div { margin-top: 20px; }
+      .title, .meta { text-align: left; }
+      .totals { width: 100%; }
+      th, td { padding: 10px 8px; }
+      .box, .meta { overflow-wrap: anywhere; }
+    }
     .footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid #e2e8f0; font-size: 11px; color: #94a3b8; text-align: center; }
   </style>
 </head>

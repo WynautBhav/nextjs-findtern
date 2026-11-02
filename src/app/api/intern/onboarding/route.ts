@@ -23,6 +23,7 @@ import {
   workModes,
 } from "@/lib/onboarding";
 import { contactPhoneTaken, employerHasPhone } from "@/lib/onboarding-phone";
+import { openToWorkPatch } from "@/lib/open-to-work";
 import { sameRatedSkills, skillsLocked } from "@/lib/skills-lock";
 
 const upload = z.object({
@@ -207,20 +208,6 @@ function friendlyIssue(issue: z.core.$ZodIssue | undefined): string {
   const list = String(issue.path.at(-1) ?? "");
   if (issue.code === "too_big" && issue.origin === "array" && LIST_CAPS[list]) return LIST_CAPS[list];
   return FIELD_LABELS[field] ?? "Some details could not be saved. Check the form and try again.";
-}
-
-/**
- * A hidden profile stays hidden until the intern switches it back on; nothing
- * turns it on for them. `hiddenAt` records when the switch went off and is
- * kept across repeat "off" saves.
- */
-function openToWorkPatch(next: boolean, previous: Record<string, unknown>) {
-  if (next) return { openToWork: true, hiddenAt: null };
-  const alreadyHidden = previous.openToWork === false && typeof previous.hiddenAt === "string";
-  return {
-    openToWork: false,
-    hiddenAt: alreadyHidden ? previous.hiddenAt : new Date().toISOString(),
-  };
 }
 
 const conflict = (error: string, step: number, field: string) =>

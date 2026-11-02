@@ -171,7 +171,7 @@ test("a score with no stored date is never dated 1 Jan 1970", () => {
   const score = { overall: 7.4, ratings: { coding: 7 }, at: null };
   const undated = deriveProofs({ ...base, interviews: [], score }).find((p) => p.kind === "assessment");
   assert.equal(undated?.at, null);
-  assert.match(proofAsText(undated!, "Asha"), /^Issued$/m);
+  assert.doesNotMatch(proofAsText(undated!, "Asha"), /Issued/);
   // The AI interview that earned the score dates it when approvedAt is missing.
   const interview = (id: string, employerId: string, day: string) => ({
     id, employerId, projectId: null, status: "completed", slot1: new Date(day), slot2: null, slot3: null,
