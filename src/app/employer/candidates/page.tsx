@@ -29,6 +29,7 @@ import {
 } from "@/lib/employer-candidates";
 import { candidateRelations, hiredInternIds, type CandidateRelation } from "@/lib/employer-visibility";
 import { attachPhotos, candidatePoolClauses, scoreExpr } from "@/lib/employer-pool";
+import { projectCities } from "@/lib/project-locations";
 import { requireEmployerSetup } from "@/lib/employer-setup";
 import { employerRegion, resolvePricing, type Currency } from "@/lib/employer-pricing";
 import { BANDS, PLAN_NAME, bandFor, type BandId } from "@/lib/score";
@@ -93,7 +94,7 @@ type Filters = {
   remote: boolean | null;
   /** Legacy "Maximum skill match": rank candidates with more of the chosen skills first. */
   skillPriority: boolean;
-  /** "table" is the dense ranked rows (the default); "grid" the cards. */
+  /** "grid" is the cards (the default); "table" the dense ranked rows. */
   view: "grid" | "table";
   pageSize: number;
   page: number;
@@ -224,6 +225,7 @@ export default async function CandidatesPage({
           projectName: schema.projects.projectName,
           skills: schema.projects.skills,
           city: schema.projects.city,
+          preferredLocations: schema.projects.preferredLocations,
           locationType: schema.projects.locationType,
           status: schema.projects.status,
         })
@@ -304,7 +306,7 @@ export default async function CandidatesPage({
       if (project && filters.projectDefaults) {
         if (!filters.skillsSet) skillTerms = activeProjectSkills;
         effectiveSkills = skillTerms;
-        if (!cityText && !projectRemote && project.city) cityText = project.city;
+        if (!cityText) cityText = projectCities(project).join(", ");
         if (skillTerms !== filters.skills || cityText !== filters.city) {
           projectApplied = {
             name: project.projectName,
@@ -477,7 +479,7 @@ export default async function CandidatesPage({
         <aside aria-label="Filters" className="mb-6 lg:sticky lg:top-20 lg:mb-0 lg:max-h-[calc(100dvh-6rem)] lg:overflow-y-auto lg:pb-2">
           <FilterForm key={queryOf(filters)} activeCount={activeFilterCount(filters)}>
             {compareIds.length > 0 ? <input type="hidden" name="ids" value={compareIds.join(",")} /> : null}
-            {filters.view !== "table" ? <input type="hidden" name="view" value={filters.view} /> : null}
+            {filters.view !== "grid" ? <input type="hidden" name="view" value={filters.view} /> : null}
             {filters.pageSize !== 24 ? <input type="hidden" name="pageSize" value={filters.pageSize} /> : null}
             {!filters.projectDefaults ? <input type="hidden" name="pf" value="0" /> : null}
             {filters.q ? <input type="hidden" name="q" value={filters.q} /> : null}
@@ -972,9 +974,9 @@ function readFilters(params: SearchParams): Filters {
   const ps = Number(one(params.pageSize) ?? "24");
   const pageSize = ps === 12 || ps === 48 ? ps : 24;
   const viewRaw = (one(params.view) ?? "").trim().toLowerCase();
-  // Rows by default: results are scanned and compared, and two-up cards made
-  // 24 results 6,400px tall. "list" (old full-width cards) folds into rows.
-  const view: "grid" | "table" = viewRaw === "grid" ? "grid" : "table";
+  // Cards by default (client QA, 2 Nov). Rows stay one click away; "table" and
+  // the old "list" both mean rows.
+  const view: "grid" | "table" = viewRaw === "table" || viewRaw === "list" ? "table" : "grid";
   const planRaw = (one(params.plan) ?? "").trim();
   const floor = (raw: string | string[] | undefined) => {
     const n = Number(one(raw) ?? "0");
@@ -1088,7 +1090,7 @@ function filterParams(merged: Filters): URLSearchParams {
   if (merged.dir === "asc") next.set("dir", "asc");
   if (merged.remote !== null) next.set("remote", merged.remote ? "1" : "0");
   if (!merged.skillPriority) next.set("sm", "0");
-  if (merged.view && merged.view !== "table") next.set("view", merged.view);
+  if (merged.view && merged.view !== "grid") next.set("view", merged.view);
   if (merged.pageSize && merged.pageSize !== 24) next.set("pageSize", String(merged.pageSize));
   if (!merged.projectDefaults) next.set("pf", "0");
   return next;

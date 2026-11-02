@@ -3,6 +3,7 @@ import { test } from "node:test";
 
 import {
   MAX_PROJECT_LOCATIONS,
+  projectCities,
   isProjectOpen,
   projectLocationsError,
   projectPlaceError,
@@ -60,4 +61,18 @@ test("a legacy list over the cap still saves unchanged or trimmed", () => {
   assert.equal(projectLocationsError(legacy, legacy), null);
   assert.equal(projectLocationsError(["pune", "Jaipur", "Delhi", "Goa"], legacy), null);
   assert.match(projectLocationsError(["Pune", "Jaipur", "Delhi", "Surat"], legacy) ?? "", /up to 3/);
+});
+
+test("an on-site project filters candidates by its main city and every preferred city", () => {
+  assert.deepEqual(
+    projectCities({ locationType: "onsite", city: "Jaipur", preferredLocations: ["Pune, Maharashtra", "jaipur, Rajasthan", " Delhi "] }),
+    ["Jaipur", "Pune", "Delhi"],
+  );
+  // A hybrid project with no main city still uses its preferred ones.
+  assert.deepEqual(projectCities({ locationType: "hybrid", city: null, preferredLocations: ["Indore"] }), ["Indore"]);
+});
+
+test("a remote project looks in no city", () => {
+  assert.deepEqual(projectCities({ locationType: "remote", city: "Jaipur", preferredLocations: ["Pune"] }), []);
+  assert.deepEqual(projectCities({ locationType: null, city: "Jaipur" }), []);
 });

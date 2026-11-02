@@ -9,6 +9,26 @@ export const MAX_PROJECT_LOCATIONS = 3;
 
 const key = (place: string) => place.trim().toLowerCase();
 
+/**
+ * The cities an on-site or hybrid project is looking in, for the candidates
+ * filter: its main city, then the city part of each preferred location
+ * ("Pune, Maharashtra" -> "Pune"). Remote projects look nowhere in particular.
+ */
+export function projectCities(project: { city?: string | null; locationType?: string | null; preferredLocations?: unknown }): string[] {
+  if (!project.locationType || project.locationType === "remote") return [];
+  const preferred = Array.isArray(project.preferredLocations) ? project.preferredLocations : [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of [project.city, ...preferred.map((p) => String(p ?? "").split(",")[0])]) {
+    const city = String(raw ?? "").trim();
+    if (city && !seen.has(key(city))) {
+      seen.add(key(city));
+      out.push(city);
+    }
+  }
+  return out;
+}
+
 /** Error message for this list, or null when it may be saved. */
 export function projectLocationsError(next: readonly string[], stored: readonly string[] = []): string | null {
   if (next.length <= MAX_PROJECT_LOCATIONS) return null;
