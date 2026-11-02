@@ -15,10 +15,11 @@ const TILE =
   "min-w-0 rounded-apple-xl bg-white shadow-tile";
 
 /** The round corner action. 36px, with a 44px hit area on touch. */
-export function CornerLink({ href, label, onDark = false }: { href: string; label: string; onDark?: boolean }) {
+export function CornerLink({ href, label, onDark = false, prefetch }: { href: string; label: string; onDark?: boolean; prefetch?: boolean }) {
   return (
     <Link
       href={href}
+      prefetch={prefetch}
       aria-label={label}
       title={label}
       className={cn(
@@ -44,7 +45,8 @@ export function Tile({
   title: string;
   /** One quiet line under the title. */
   description?: React.ReactNode;
-  action?: { href: string; label: string };
+  /** `prefetch: false` for a link out to the marketing site: prefetching it downloads that page's scripts (gsap among them) on every dashboard visit. */
+  action?: { href: string; label: string; prefetch?: boolean };
   /** Small control beside the title (a legend, a period). */
   aside?: React.ReactNode;
   children: React.ReactNode;

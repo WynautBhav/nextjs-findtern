@@ -265,7 +265,7 @@ function FeeTile({ fee, activated }: { fee: string; activated: boolean }) {
     <Tile
       title="Activation"
       aside={activated ? <Pill tone="live">Paid</Pill> : null}
-      action={{ href: "/guaranteed-internship-program", label: "How the 18-month guarantee works" }}
+      action={{ href: "/guaranteed-internship-program", label: "How the 18-month guarantee works", prefetch: false }}
     >
       <p className="nums text-3xl font-medium leading-none tracking-[-0.03em] text-ink-900">
         {fee}

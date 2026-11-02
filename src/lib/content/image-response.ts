@@ -6,6 +6,21 @@ const notFound = () => Response.json({ error: "Not found" }, { status: 404 });
 
 const CACHE = "public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800";
 
+/** Widths a page may ask for with `?w=`. Anything else gets the route's own maximum, so the query cannot force arbitrary resizes. */
+const WIDTHS = [96, 192, 480, 800, 1600];
+
+export function requestedWidth(url: string, max: number): number {
+  const w = Number(new URL(url).searchParams.get("w"));
+  return WIDTHS.includes(w) ? Math.min(w, max) : max;
+}
+
+/** `srcset` for an image served by a route that honours `?w=`, so a phone does not download the 1600px version. Other URLs have none. */
+export function imageSrcSet(src: string | null | undefined, widths: number[] = [480, 800, 1600]): string | undefined {
+  if (!src || !/^\/api\/(blog|cms)-image\//.test(src) || src.includes("?")) return undefined;
+  const set = widths.filter((w) => WIDTHS.includes(w)).map((w) => `${src}?w=${w} ${w}w`).join(", ");
+  return set || undefined;
+}
+
 /**
  * Serve a CMS image value. The legacy CMS stored images inline as base64 data
  * URLs; this decodes one so pages can reference it by URL. Anything stored as
@@ -38,7 +53,7 @@ export async function cmsImageResponse(
       // animated WebP, a still GIF a still one.
       body = await sharp(original, { animated: type === "image/gif" })
         .rotate()
-        .resize({ width: maxWidth, withoutEnlargement: true })
+        .resize({ width: requestedWidth(req.url, maxWidth), withoutEnlargement: true })
         .webp({ quality: 82 })
         .toBuffer();
       contentType = "image/webp";

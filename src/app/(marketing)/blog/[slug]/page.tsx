@@ -7,6 +7,7 @@ import { ButtonLink } from "@/components/ui/button";
 import { CopyLink } from "@/components/marketing/copy-link";
 import { getBlogPost, getBlogPosts } from "@/lib/content";
 import { plainTextExcerpt, readingMinutes, sanitizeRichText } from "@/lib/richtext";
+import { imageSrcSet } from "@/lib/content/image-response";
 import { tidyText } from "@/lib/text";
 import { JsonLd } from "@/components/seo/json-ld";
 import { blogPostingJsonLd, breadcrumbJsonLd } from "@/lib/seo";
@@ -129,7 +130,7 @@ export default async function BlogDetailPage({
               {/* Banners range from square to 3:1 and some carry text, so they
                   keep their own aspect ratio rather than being cropped. */}
               {/* eslint-disable-next-line @next/next/no-img-element -- served and cached by /api/blog-image */}
-              <img src={hero} alt={title} decoding="async" fetchPriority="high" className="block h-auto w-full" />
+              <img src={hero} srcSet={imageSrcSet(hero)} sizes="(min-width: 1024px) 896px, 100vw" alt={title} decoding="async" fetchPriority="high" className="block h-auto w-full" />
             </div>
           ) : null}
         </div>
@@ -160,6 +161,8 @@ export default async function BlogDetailPage({
                       // eslint-disable-next-line @next/next/no-img-element -- served and cached by /api/blog-image
                       <img
                         src={r.coverImageUrl}
+                        srcSet={imageSrcSet(r.coverImageUrl, [96, 192])}
+                        sizes="48px"
                         alt=""
                         loading="lazy"
                         decoding="async"

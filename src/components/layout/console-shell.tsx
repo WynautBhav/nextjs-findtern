@@ -56,11 +56,13 @@ export type ConsoleNavItem = {
   attention?: boolean;
   /** Other paths this item stands for (one "Legal texts" item for four pages). */
   also?: string[];
+  /** false for links out to the marketing site: prefetching one downloads that page's scripts on every console page. */
+  prefetch?: boolean;
 };
 
 export type ConsoleNavGroup = { title?: string; items: ConsoleNavItem[] };
 
-export type ConsoleMenuLink = { href: string; label: string; icon: React.ReactNode };
+export type ConsoleMenuLink = { href: string; label: string; icon: React.ReactNode; prefetch?: boolean };
 
 // The cookie name lives in `@/lib/rail`: this file is `"use client"`, and a
 // server layout importing a constant from it would receive a client reference
@@ -162,8 +164,8 @@ export function ConsoleShell({
   const darkRing = light ? undefined : "focus-visible:outline-accent-300";
   const helpLinks: ConsoleNavItem[] = help
     ? [
-        { href: help.faqHref, label: "FAQ", icon: <CircleQuestionMark className="size-5" aria-hidden /> },
-        { href: help.contactHref, label: "Contact us", icon: <MessageSquareText className="size-5" aria-hidden /> },
+        { href: help.faqHref, label: "FAQ", icon: <CircleQuestionMark className="size-5" aria-hidden />, prefetch: false },
+        { href: help.contactHref, label: "Contact us", icon: <MessageSquareText className="size-5" aria-hidden />, prefetch: false },
         { href: `mailto:${help.email}`, label: "Email us", icon: <Mail className="size-5" aria-hidden /> },
       ]
     : [];
@@ -454,7 +456,7 @@ function RailLink({ item, active, compact, light, onNavigate }: { item: ConsoleN
       {body}
     </a>
   ) : (
-    <Link href={item.href} onClick={onNavigate} aria-current={active ? "page" : undefined} title={compact ? item.label : undefined} className={className}>
+    <Link href={item.href} prefetch={item.prefetch} onClick={onNavigate} aria-current={active ? "page" : undefined} title={compact ? item.label : undefined} className={className}>
       {body}
     </Link>
   );
@@ -492,7 +494,7 @@ function AccountMenu({
         {menu.length ? <DropdownMenuSeparator /> : null}
         {menu.map((m) => (
           <DropdownMenuItem key={m.href} asChild>
-            <Link href={m.href} className="flex min-h-10 cursor-pointer items-center gap-2.5 [&_svg]:size-4 [&_svg]:text-ink-500">
+            <Link href={m.href} prefetch={m.prefetch} className="flex min-h-10 cursor-pointer items-center gap-2.5 [&_svg]:size-4 [&_svg]:text-ink-500">
               {m.icon}
               {m.label}
             </Link>

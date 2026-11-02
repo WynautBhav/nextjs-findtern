@@ -8,6 +8,7 @@ import { TiltCard } from "@/components/motion/tilt-card";
 import { getBlogPosts } from "@/lib/content";
 import type { CmsBlogPost } from "@/lib/content/types";
 import { plainTextExcerpt, readingMinutes } from "@/lib/richtext";
+import { imageSrcSet } from "@/lib/content/image-response";
 import { tidyText } from "@/lib/text";
 import { cn } from "@/lib/utils";
 import { JsonLd } from "@/components/seo/json-ld";
@@ -136,6 +137,8 @@ function Cover({ post, eager, className }: { post: CmsBlogPost; eager?: boolean;
       // eslint-disable-next-line @next/next/no-img-element -- served and cached by /api/blog-image
       <img
         src={post.coverImageUrl}
+        srcSet={imageSrcSet(post.coverImageUrl)}
+        sizes="(min-width: 1024px) 40vw, 100vw"
         alt=""
         loading={eager ? "eager" : "lazy"}
         decoding="async"

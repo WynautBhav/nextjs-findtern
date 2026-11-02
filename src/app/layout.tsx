@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from "next";
 import { Poppins } from "next/font/google";
-import { SmoothScroll } from "@/components/motion/smooth-scroll";
 import { NavigationProgress } from "@/components/layout/navigation-progress";
 import { Suspense } from "react";
 import { AnalyticsGate } from "@/components/marketing/analytics-gate";
@@ -97,7 +96,7 @@ export default function RootLayout({
         <Suspense fallback={null}>
           <NavigationProgress />
         </Suspense>
-        <SmoothScroll>{children}</SmoothScroll>
+        {children}
         {/* Organization + WebSite once, site-wide. Pages add their own graphs. */}
         <JsonLd data={siteGraph()} />
         <AnalyticsGate enabled={!isStagingHost()} />
