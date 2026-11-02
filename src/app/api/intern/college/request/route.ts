@@ -44,7 +44,7 @@ export async function POST(req: Request) {
         kind: "feedback",
         userType: "intern",
         userId: uid,
-        pageUrl: "/intern/college",
+        pageUrl: "/intern/settings#college",
         topic: "college",
         message: `College not listed\nName: ${name}\nCity: ${city}\nState: ${state}`,
       }),

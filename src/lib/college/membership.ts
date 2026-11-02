@@ -175,7 +175,7 @@ export async function verifyFromRoster(collegeId: string): Promise<number> {
  */
 export async function searchColleges(q: string, limit = 12) {
   const c = schema.colleges;
-  const pick = { id: c.id, name: c.name, city: c.city, state: c.state, isPartner: c.isPartner };
+  const pick = { id: c.id, name: c.name, city: c.city, state: c.state, isPartner: c.isPartner, code: c.aisheCode };
   const esc = (t: string) => t.replace(/[%_\\]/g, (ch) => `\\${ch}`);
   const term = q.trim().replace(/\s+/g, " ");
   if (term.length < 2) {

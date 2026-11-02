@@ -4,7 +4,7 @@ import { useState } from "react";
 import { FileText } from "lucide-react";
 
 import { FileUpload } from "@/components/app/file-upload";
-import { suggestColleges } from "@/lib/data/colleges";
+import { CollegeLink } from "@/components/intern/college-form";
 import {
   DEGREES_BY_LEVEL,
   MAX_CERTIFICATE_UPLOADS,
@@ -36,7 +36,7 @@ const SCORE_TYPES = [
 
 type Academics = OnboardingDraft["academics"];
 
-export function AcademicsStep({ values, update, errors }: StepProps) {
+export function AcademicsStep({ values, update, errors, college }: StepProps) {
   const a = values.academics;
   const set = (patch: Partial<Academics>) => update("academics", { ...a, ...patch });
   const level = a.qualificationLevel ?? "";
@@ -78,10 +78,10 @@ export function AcademicsStep({ values, update, errors }: StepProps) {
           value={a.institution}
           error={errors.institution}
           autoComplete="off"
-          hint="Start typing to pick from the list, or type the full name."
+          hint="Type the full name. To be included in your college's drives, link it below."
           onChange={(v) => set({ institution: v })}
         />
-        <CollegeSuggestions query={a.institution} onPick={(v) => set({ institution: v })} />
+        <CollegeLink college={college} institution={a.institution} branch={a.branch} onPicked={(name) => set({ institution: name })} />
 
         <Grid>
           {hasList ? (
@@ -203,28 +203,6 @@ export function AcademicsStep({ values, update, errors }: StepProps) {
       <ProfessionalCourses rows={a.professional ?? []} errors={errors} onChange={(professional) => set({ professional })} />
       <Certifications rows={a.certifications ?? []} errors={errors} onChange={(certifications) => set({ certifications })} />
     </div>
-  );
-}
-
-/** Up to six matches under the institution field, as buttons (no datalist: it renders badly on phones). */
-function CollegeSuggestions({ query, onPick }: { query: string; onPick: (value: string) => void }) {
-  const q = query.trim();
-  const hits = q.length >= 2 ? suggestColleges(q, 6).filter((c) => c.toLowerCase() !== q.toLowerCase()) : [];
-  if (hits.length === 0) return null;
-  return (
-    <ul aria-label="Matching colleges" className="-mt-3 flex flex-wrap gap-2">
-      {hits.map((c) => (
-        <li key={c}>
-          <button
-            type="button"
-            onClick={() => onPick(c)}
-            className="apple-spring inline-flex min-h-11 items-center rounded-apple-sm border border-ink-200 bg-white px-3 text-sm text-ink-700 hover:border-brand-300 hover:bg-brand-50 hover:text-brand-800 sm:min-h-9"
-          >
-            {c}
-          </button>
-        </li>
-      ))}
-    </ul>
   );
 }
 

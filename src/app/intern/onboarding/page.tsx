@@ -3,6 +3,7 @@ import { eq, desc } from "drizzle-orm";
 
 import { getDb, schema } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
+import { membershipOf, type MyCollege } from "@/lib/college/membership";
 import { emptyDraft, draftFromRecord, isOnboarded, type OnboardingDraft, type StoredDocument } from "@/lib/onboarding";
 import { skillsLocked } from "@/lib/skills-lock";
 import { EmptyScene, PageHead } from "@/components/app/primitives";
@@ -31,6 +32,7 @@ export default async function InternOnboarding() {
   let hasPanImage = false;
   let hasAadhaarImage = false;
   let hasPhoto = false;
+  let college: MyCollege | null = null;
 
   try {
     const db = getDb();
@@ -55,6 +57,8 @@ export default async function InternOnboarding() {
       .where(eq(schema.users.id, session.uid))
       .limit(1);
     if (user?.phoneNumber) account = { countryCode: user.countryCode || "+91", phoneNumber: user.phoneNumber };
+
+    college = await membershipOf(session.uid);
 
     if (record) {
       hasPanImage = Boolean(record.panImageName);
@@ -118,6 +122,7 @@ export default async function InternOnboarding() {
         serverUpdatedAt={serverUpdatedAt}
         account={account}
         skillsLocked={locked}
+        college={college}
         onboarded={onboarded}
         submittedBefore={submittedBefore}
         hasPanImage={hasPanImage}

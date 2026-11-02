@@ -8,7 +8,6 @@ import {
   CalendarCheck2,
   CircleUserRound,
   Compass,
-  GraduationCap,
   House,
   LayoutList,
   ReceiptIndianRupee,
@@ -61,7 +60,6 @@ const MORE_NAV: ConsoleNavItem[] = [
   { href: "/intern/earnings", label: "Stipend", icon: <ReceiptIndianRupee /> },
   { href: "/intern/documents", label: "Documents", icon: <BadgeCheck /> },
   { href: "/intern/profile", label: "Your profile", icon: <CircleUserRound /> },
-  { href: "/intern/college", label: "College", icon: <GraduationCap /> },
   { href: "/intern/notifications", label: "Notifications", icon: <Bell /> },
   { href: "/intern/settings", label: "Settings", icon: <Settings2 /> },
 ];

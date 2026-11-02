@@ -1,3 +1,4 @@
+import type { MyCollege } from "@/lib/college/membership";
 import type { OnboardingDraft, StoredDocument } from "@/lib/onboarding";
 
 export const STEPS = [
@@ -24,6 +25,8 @@ export type StepProps = {
   account: { countryCode: string; phoneNumber: string } | null;
   hasPanImage: boolean;
   hasAadhaarImage: boolean;
+  /** The college this student is linked to, if any. */
+  college: MyCollege | null;
   /** Skills are frozen: rated, or an AI interview is open. */
   skillsLocked: boolean;
   onUploaded: (kind: "pan" | "aadhaar" | "profile_photo" | "intro_video") => void;

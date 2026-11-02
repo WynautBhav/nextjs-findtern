@@ -380,7 +380,7 @@ export default async function InternHome() {
       )}
 
       {college ? (
-        <Tile title="Your college" action={{ href: "/intern/college", label: "College" }}>
+        <Tile title="Your college" action={{ href: "/intern/settings#college", label: "College" }}>
           <p className="flex items-center gap-2 text-sm text-ink-700">
             <GraduationCap className="size-4 shrink-0 text-brand-700" aria-hidden />
             <span className="min-w-0">
@@ -390,7 +390,7 @@ export default async function InternHome() {
           </p>
         </Tile>
       ) : working ? null : (
-        <Tile title="Is your college on Findtern?" action={{ href: "/intern/college", label: "Find your college" }}>
+        <Tile title="Is your college on Findtern?" action={{ href: "/intern/settings#college", label: "Find your college" }}>
           <p className="text-sm text-text-subtle">
             Join it to be seen in your college&apos;s placement drives, where employers call students the same day.
           </p>

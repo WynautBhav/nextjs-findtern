@@ -6,9 +6,12 @@ import { ArrowRight } from "lucide-react";
 
 import { DetailRow, PageHead, SectionHead, Surface } from "@/components/app/primitives";
 import { ChangePasswordForm } from "@/components/auth/change-password-form";
+import { CollegeForm } from "@/components/intern/college-form";
 import { BankDetailsForm, type BankDetails } from "@/components/intern/bank-details-form";
 import { ContactDetailsForm } from "@/components/intern/contact-details-form";
 import { requireRole } from "@/lib/auth";
+import { membershipOf } from "@/lib/college/membership";
+import { CONSENT_PURPOSES, NOTICE_TEXT, NOTICE_VERSION, PURPOSE_COPY } from "@/lib/college/consent-copy";
 import { getDb, schema } from "@/lib/db";
 import { formatDmy } from "@/lib/format";
 import { SITE } from "@/lib/content/site";
@@ -22,6 +25,7 @@ export const metadata: Metadata = {
 const VIEW_ANCHOR: Record<string, string> = {
   "bank-details": "bank",
   bank: "bank",
+  college: "college",
   "change-password": "password",
   password: "password",
 };
@@ -38,7 +42,7 @@ export default async function InternSettings({ searchParams }: { searchParams: P
 
   const uid = session.uid;
   const db = getDb();
-  const [[row], [user]] = await Promise.all([
+  const [[row], [user], college] = await Promise.all([
     db
       .select({ extra: schema.internOnboarding.extraData })
       .from(schema.internOnboarding)
@@ -56,11 +60,14 @@ export default async function InternSettings({ searchParams }: { searchParams: P
       .from(schema.users)
       .where(eq(schema.users.id, uid))
       .limit(1),
+    membershipOf(uid),
   ]);
   const extra = (row?.extra ?? {}) as Record<string, unknown>;
   // The full account number never leaves the server; the form gets its last 4.
   const { accountNumber, ...bankRest } = (extra.bankDetails ?? extra.bank ?? {}) as { accountNumber?: unknown } & BankDetails;
   const initialBank: BankDetails = { ...bankRest, accountLast4: String(accountNumber ?? "").replace(/\D/g, "").slice(-4) };
+
+  const institution = String((extra.academics as { institution?: unknown } | undefined)?.institution ?? extra.college ?? "");
 
   const contact = user
     ? { firstName: user.f, lastName: user.l, countryCode: user.cc, phoneNumber: user.p }
@@ -68,7 +75,7 @@ export default async function InternSettings({ searchParams }: { searchParams: P
 
   return (
     <div>
-      <PageHead title="Settings" lede="Your contact details, where your stipend is paid, and your password." />
+      <PageHead title="Settings" lede="Your contact details, where your stipend is paid, your college and your password." />
 
       <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_20rem]">
         <div className="min-w-0 space-y-8">
@@ -82,6 +89,20 @@ export default async function InternSettings({ searchParams }: { searchParams: P
           <section id="bank" className="scroll-mt-24">
             <SectionHead title="Bank account" hint="Your monthly stipend is paid into this account." />
             <BankDetailsForm initialBank={initialBank} />
+          </section>
+
+          <section id="college" className="scroll-mt-24">
+            <SectionHead
+              title="College"
+              hint="Link your college so its placement team and virtual drives can find you. Your profile itself doesn't change."
+            />
+            <CollegeForm
+              initial={college}
+              institution={institution}
+              purposes={CONSENT_PURPOSES.map((p) => ({ id: p, ...PURPOSE_COPY[p] }))}
+              notice={{ version: NOTICE_VERSION, text: NOTICE_TEXT }}
+              vapidKey={process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? ""}
+            />
           </section>
 
           <section id="password" className="scroll-mt-24">

@@ -7,6 +7,7 @@ import { ArrowLeft, ArrowRight, Check, CheckCircle2, Loader2, Lock, TriangleAler
 
 import { buttonClass } from "@/components/ui/button";
 import { csrfFetch } from "@/lib/client-fetch";
+import type { MyCollege } from "@/lib/college/membership";
 import {
   experienceType,
   toDay,
@@ -65,6 +66,7 @@ export function OnboardingForm({
   hasAadhaarImage: aadhaarOnFile = false,
   hasPhoto: photoOnFile = false,
   skillsLocked = false,
+  college = null,
   onboarded = false,
   submittedBefore = false,
 }: {
@@ -82,6 +84,8 @@ export function OnboardingForm({
   hasPhoto?: boolean;
   /** Rated or AI interview open - the skills step is read-only. */
   skillsLocked?: boolean;
+  /** The linked college, shown in the Academics step. */
+  college?: MyCollege | null;
   /** The stored profile is submitted: every save runs the full rules. */
   onboarded?: boolean;
   /** Submitted once before (or past the AI interview): steps that pass stay open. */
@@ -358,6 +362,7 @@ export function OnboardingForm({
                 hasPanImage={hasPanImage}
                 hasAadhaarImage={hasAadhaarImage}
                 skillsLocked={skillsLocked}
+                college={college}
                 onUploaded={(kind) => {
                   pinStep();
                   setUploaded((prev) => (prev.includes(kind) ? prev : [...prev, kind]));

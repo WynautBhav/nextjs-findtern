@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { BadgeCheck, Building2, Check, CircleHelp, Minus, Search, X } from "lucide-react";
 
@@ -9,13 +10,14 @@ import { useConfirm } from "@/components/app/use-confirm";
 import { buttonVariants } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { csrfFetch } from "@/lib/client-fetch";
+import { CONSENT_PURPOSES, NOTICE_TEXT, NOTICE_VERSION, PURPOSE_COPY } from "@/lib/college/consent-copy";
 import type { MyCollege } from "@/lib/college/membership";
 import { cn } from "@/lib/utils";
 import { PushToggle } from "./college-push";
 import { SelectField } from "./onboarding/fields";
 
 type Purpose = { id: string; label: string; detail: string };
-type Option = { id: string; name: string; city: string | null; state: string | null; isPartner: boolean };
+type Option = { id: string; name: string; city: string | null; state: string | null; isPartner: boolean; code: string | null };
 
 const YEARS = [
   { value: 1, label: "1st year" },
@@ -218,6 +220,9 @@ function JoinForm({
   notice,
   onCancel,
   onSaved,
+  embedded = false,
+  defaultBranch = "",
+  onPicked,
 }: {
   initial: MyCollege | null;
   institution: string;
@@ -225,14 +230,18 @@ function JoinForm({
   notice: { version: string; text: string };
   onCancel?: () => void;
   onSaved: () => void;
+  /** Inside the profile's Academics step: no card of its own, and the picked name is handed back. */
+  embedded?: boolean;
+  defaultBranch?: string;
+  onPicked?: (name: string) => void;
 }) {
   const router = useRouter();
   const ids = useId();
   const [chosen, setChosen] = useState<Option | null>(
-    initial ? { id: initial.collegeId, name: initial.name, city: initial.city, state: null, isPartner: initial.isPartner } : null,
+    initial ? { id: initial.collegeId, name: initial.name, city: initial.city, state: null, isPartner: initial.isPartner, code: null } : null,
   );
   const [year, setYear] = useState<number | "">(initial?.year ?? "");
-  const [branch, setBranch] = useState(initial?.branch ?? "");
+  const [branch, setBranch] = useState(initial?.branch ?? defaultBranch);
   // Never pre-ticked, even when changing an existing choice: consent is re-given, not carried over silently.
   const [agreed, setAgreed] = useState<Record<string, boolean>>({});
   const [adult, setAdult] = useState(false);
@@ -280,9 +289,16 @@ function JoinForm({
   }
 
   return (
-    <form onSubmit={submit} className={cn("max-w-3xl space-y-8 rounded-apple-xl border border-ink-200/80 bg-white p-5 sm:p-8", LIGHT_TILE)} noValidate>
+    <form
+      onSubmit={submit}
+      className={cn(
+        "space-y-8 border border-ink-200/80",
+        embedded ? "rounded-apple-lg bg-ink-50/60 p-4 sm:p-5" : cn("max-w-3xl rounded-apple-xl bg-white p-5 sm:p-8", LIGHT_TILE),
+      )}
+      noValidate
+    >
       <section>
-        <SectionHead title="College" hint="Search by name, city or AISHE code." />
+        <SectionHead title="College" hint="Search by name, city or college code. Your placement office can tell you the code." />
         {chosen ? (
           <div className="flex items-center gap-3 rounded-apple-lg border border-ink-200/80 p-4">
             <span aria-hidden className="grid size-10 shrink-0 place-items-center rounded-apple-sm bg-brand-50 text-brand-700">
@@ -291,7 +307,7 @@ function JoinForm({
             <div className="min-w-0 flex-1">
               <p className="text-base font-medium leading-snug text-ink-900">{chosen.name}</p>
               <p className="text-sm text-ink-600">
-                {[chosen.city, chosen.state].filter(Boolean).join(", ")}
+                {[chosen.city, chosen.state, chosen.code].filter(Boolean).join(", ")}
                 {chosen.isPartner ? (chosen.city ? " · " : "") + "Runs drives on Findtern" : ""}
               </p>
             </div>
@@ -304,7 +320,13 @@ function JoinForm({
             </button>
           </div>
         ) : (
-          <CollegeSearch initialQuery={institution.trim().length >= 3 ? institution.trim() : ""} onPick={setChosen} />
+          <CollegeSearch
+            initialQuery={institution.trim().length >= 3 ? institution.trim() : ""}
+            onPick={(o) => {
+              setChosen(o);
+              onPicked?.(o.name);
+            }}
+          />
         )}
       </section>
 
@@ -404,7 +426,7 @@ function JoinForm({
 
       <div className="flex flex-wrap gap-3">
         <button type="submit" disabled={saving} className={cn(buttonVariants({ variant: "primary", size: "md" }))}>
-          {saving ? "Saving…" : initial ? "Save changes" : "Join college"}
+          {saving ? "Saving…" : initial ? "Save changes" : embedded ? "Link my college" : "Join college"}
         </button>
         {onCancel ? (
           <button type="button" onClick={onCancel} className={cn(buttonVariants({ variant: "light", size: "md" }))}>
@@ -497,7 +519,7 @@ function CollegeSearch({ initialQuery, onPick }: { initialQuery: string; onPick:
           }}
           onFocus={() => setOpen(true)}
           onKeyDown={onKey}
-          placeholder="Start typing your college's name"
+          placeholder="Start typing your college's name or code"
           autoComplete="off"
           className={cn(FIELD, "pl-10 pr-10")}
         />
@@ -536,7 +558,7 @@ function CollegeSearch({ initialQuery, onPick }: { initialQuery: string; onPick:
           >
             <span className="min-w-0">
               <span className="block truncate text-base text-ink-900">{o.name}</span>
-              <span className="block truncate text-sm text-ink-600">{[o.city, o.state].filter(Boolean).join(", ")}</span>
+              <span className="block truncate text-sm text-ink-600">{[o.city, o.state, o.code].filter(Boolean).join(" · ")}</span>
             </span>
             {o.isPartner ? (
               <Pill tone="live" className="shrink-0">
@@ -678,5 +700,70 @@ function MissingCollege({ query }: { query: string }) {
         {message}
       </p>
     </div>
+  );
+}
+
+/* ── In the profile's Academics step ─────────────────────────────────── */
+
+const PURPOSES: Purpose[] = CONSENT_PURPOSES.map((id) => ({ id, ...PURPOSE_COPY[id] }));
+const NOTICE = { version: NOTICE_VERSION, text: NOTICE_TEXT };
+
+/**
+ * Optional "link my college" block under the institution field. Linking is
+ * what lets the college's placement team and its virtual drives find the
+ * student, so it is the same join (and the same consent) as in Settings.
+ * Changing or leaving it later happens there.
+ */
+export function CollegeLink({
+  college,
+  institution,
+  branch,
+  onPicked,
+}: {
+  college: MyCollege | null;
+  institution: string;
+  branch: string;
+  onPicked: (name: string) => void;
+}) {
+  if (college) {
+    return (
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-apple-lg border border-ink-200/80 bg-ink-50/60 p-4 text-sm">
+        <span aria-hidden className="grid size-9 shrink-0 place-items-center rounded-apple-sm bg-brand-50 text-brand-700">
+          <Building2 className="size-4" />
+        </span>
+        <p className="min-w-0 flex-1 text-ink-700">
+          Linked to <span className="font-medium text-ink-900">{college.name}</span>
+          {college.status === "verified" ? " · verified student" : ""}
+        </p>
+        <Link
+          href="/intern/settings#college"
+          className="inline-flex min-h-11 items-center rounded-apple-sm px-2 font-medium text-primary hover:underline focus-visible:outline-2 focus-visible:outline-brand-700"
+        >
+          Manage in Settings
+        </Link>
+      </div>
+    );
+  }
+  return (
+    <details className="group rounded-apple-lg border border-ink-200/80 bg-white p-4">
+      <summary className="flex min-h-11 cursor-pointer list-none flex-col justify-center focus-visible:outline-2 focus-visible:outline-brand-700">
+        <span className="text-sm font-semibold text-ink-900">Link your college for placement drives (optional)</span>
+        <span className="text-sm text-ink-600">
+          Colleges run virtual drives on Findtern. Find yours by name or college code to be included.
+        </span>
+      </summary>
+      <div className="mt-4">
+        <JoinForm
+          embedded
+          initial={null}
+          institution={institution}
+          defaultBranch={branch}
+          purposes={PURPOSES}
+          notice={NOTICE}
+          onPicked={onPicked}
+          onSaved={() => {}}
+        />
+      </div>
+    </details>
   );
 }
