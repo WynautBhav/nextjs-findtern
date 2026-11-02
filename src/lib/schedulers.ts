@@ -3,6 +3,7 @@ import { and, eq, gte, lt, lte, or, sql } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { readSkills, scoreOf } from "@/lib/employer-candidates";
 import { notify } from "@/lib/notify";
+import { hasFeedbackText } from "@/lib/interview-feedback";
 import { HIDE_LIMIT_DAYS, HIDE_REMINDER_DAYS, visibleAgainAt } from "@/lib/profile-hide";
 
 /**
@@ -420,7 +421,7 @@ async function feedbackRequests(now: Date) {
     );
   for (const i of rows) {
     if (i.employerId === "admin" || i.email === "ai-interview@findtern.ai") continue;
-    if (i.notes?.includes("feedback_text:")) continue; // already given
+    if (hasFeedbackText(i.notes)) continue; // already given
     await notify({
       to: { type: "employer", id: i.employerId },
       type: "interview_feedback_request",

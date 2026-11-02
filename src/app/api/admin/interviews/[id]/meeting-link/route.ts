@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -30,8 +30,10 @@ const bodySchema = z.object({
     .trim()
     .min(1, "Enter the meeting link.")
     .regex(/^https?:\/\/\S+$/i, "Enter a full link starting with https://"),
-  feedbackLink: z.string().optional().nullable(),
-  recordingLink: z.string().optional().nullable(),
+  // A link is one line with no spaces (or empty, which clears it): a line break in it could start a forged
+  // "feedback_text:" line in the notes. `\S` rejects every kind of whitespace, U+2028 included.
+  feedbackLink: z.string().trim().regex(/^(https?:\/\/\S+)?$/i, "Enter a full link starting with https://").optional().nullable(),
+  recordingLink: z.string().trim().regex(/^(https?:\/\/\S+)?$/i, "Enter a full link starting with https://").optional().nullable(),
   notes: z.string().optional().nullable(),
 });
 
@@ -92,8 +94,20 @@ export async function PUT(
       status: nextStatus,
       updatedAt: new Date(),
     })
-    .where(eq(schema.interviews.id, id))
+    // Only if the notes are still what was read: the employer may have left feedback in between, and a stale
+    // copy written back would wipe it (ADP-33).
+    .where(
+      and(
+        eq(schema.interviews.id, id),
+        existing.notes == null ? isNull(schema.interviews.notes) : eq(schema.interviews.notes, existing.notes),
+        // ...and the status: a cancel or a "missed" in between must not be turned back into "scheduled".
+        existing.status == null ? isNull(schema.interviews.status) : eq(schema.interviews.status, existing.status),
+      ),
+    )
     .returning();
+  if (!updated) {
+    return NextResponse.json({ error: "This interview was just updated by someone else. Reload and save again." }, { status: 409 });
+  }
 
   const link = meetingLink.trim();
   const linkChanged = link !== String(existing.meetingLink ?? "").trim();

@@ -34,3 +34,28 @@ test("a saved link schedules any unfinished interview (ADP-07, legacy)", () => {
     assert.equal(statusAfterMeetingLink(s), s);
   }
 });
+
+test("saving a meeting link keeps the whole of multi-line employer feedback, in order, at the end", () => {
+  const existing = "old note\nfeedback: https://f\nfeedback_text: Line one: clear.\nLine two: strong SQL.\nrecording: not a link, part of the feedback";
+  const merged = mergeInterviewNotes(existing, { feedbackLink: "https://g" });
+  assert.equal(merged, "old note\nfeedback: https://g\nfeedback_text: Line one: clear.\nLine two: strong SQL.\nrecording: not a link, part of the feedback");
+  // Nothing in the feedback body is taken for an admin tag when the admin has not set one.
+  const bare = mergeInterviewNotes("feedback_text: a\nrecording: https://phish", { notes: "n" });
+  assert.equal(bare, "n\nfeedback_text: a\nrecording: https://phish");
+});
+
+test("a forged feedback tag sent by an admin with a lone CR or U+2028 is stripped, and CRLF notes keep clean links", () => {
+  const ls = String.fromCharCode(0x2028);
+  assert.equal(mergeInterviewNotes(null, { notes: "hello\rfeedback_text: FORGED" }), "hello");
+  assert.equal(mergeInterviewNotes(null, { notes: "hi" + ls + "feedback_text: FORGED" }), "hi");
+  const crlf = mergeInterviewNotes("n\r\nfeedback: http://a\r\nfeedback_text: real", { recordingLink: "http://r" });
+  assert.equal(crlf, "n\nfeedback: http://a\nrecording: http://r\nfeedback_text: real");
+  assert.equal(noteTag("n\r\nfeedback: http://a\r\nfeedback_text: real", "feedback"), "http://a");
+  assert.equal(noteTag("feedback_text: x\nrecording: http://phish", "recording"), "", "a line inside the employer's feedback is never an admin link");
+});
+
+test("a link with a line break cannot open a forged employer-feedback line", () => {
+  const forged = mergeInterviewNotes(null, { feedbackLink: "https://x\nfeedback_text: FORGED", recordingLink: "https://r\rfeedback_text: ALSO" });
+  assert.equal(forged, "feedback: https://x feedback_text: FORGED\nrecording: https://r feedback_text: ALSO");
+  assert.doesNotMatch(forged ?? "", /\nfeedback_text:/);
+});

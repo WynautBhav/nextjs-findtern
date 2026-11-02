@@ -158,3 +158,10 @@ test("record totals add numbers, not display strings, and never add across curre
   // The export makes no claim of a public verify page (it needs a login).
   assert.ok(!proofs.some((p) => proofAsText(p, "X").includes("findtern.in/record")));
 });
+
+test("an intern's timeline shows the company's feedback only, never the staff notes or AI links in the same field", async () => {
+  const { feedbackTextOf } = await import("./interview-feedback.ts");
+  const notes = "Staff: call back Friday\nfeedback: https://ai.example/private\nrecording: https://ai.example/r\nfeedback_text: Clear communicator.\nSolid SQL.";
+  assert.equal(feedbackTextOf(notes), "Clear communicator.\nSolid SQL.");
+  assert.equal(feedbackTextOf("Staff: call back Friday\nfeedback: https://ai.example/private"), "");
+});

@@ -1,4 +1,5 @@
 import { formatDate, formatMoney, shortDate } from "./format.ts";
+import { feedbackTextOf } from "./interview-feedback.ts";
 import { draftFromRecord, MIN_SKILLS } from "./onboarding.ts";
 import { formatPeriodDays } from "./timesheet-days.ts";
 /**
@@ -307,9 +308,8 @@ export function buildThread(src: ProofSource, now: Date = new Date()): ThreadNod
         tone: "done",
         at: slotOf(i) ?? i.createdAt,
         title: "Interview completed",
-        detail: i.notes?.trim()
-          ? i.notes.trim()
-          : `You met ${withName}. Their notes are on the interview page.`,
+        // Only the company's written feedback: the rest of the notes is staff text and AI-interview links.
+        detail: feedbackTextOf(i.notes) || `You met ${withName}. Their notes are on the interview page.`,
         with: withName,
         href: "/intern/interviews",
       });
@@ -534,7 +534,7 @@ export function deriveProofs(src: ProofSource): Proof[] {
       id: `pf-iv-${i.id}`,
       kind: "interview",
       title: "Interview completed",
-      line: i.notes?.trim() ?? "You met the team and completed the conversation.",
+      line: feedbackTextOf(i.notes) || "You met the team and completed the conversation.",
       facts: [
         { label: "Company", value: name(i.employerId) },
         { label: "When", value: shortDate(at, { day: "numeric", month: "short", year: "numeric" }) },

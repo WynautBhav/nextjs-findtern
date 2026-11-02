@@ -124,7 +124,10 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
       .from(schema.internOnboarding)
       .where(eq(schema.internOnboarding.userId, proposal.internId))
       .limit(1);
-    const modeIssue = modeProblem(workPreferenceOf(pref, Number(((pref?.extraData ?? {}) as Record<string, unknown>).findternScore ?? 0) || 0), edits.mode);
+    // The score the offer was priced on decides the band, so a later change to the candidate's score
+    // cannot turn a free-rate offer into an on-site one (or block an honest edit).
+    const liveScore = Number(((pref?.extraData ?? {}) as Record<string, unknown>).findternScore ?? 0) || 0;
+    const modeIssue = modeProblem(workPreferenceOf(pref, offerScore(current) ?? liveScore), edits.mode);
     if (modeIssue) return NextResponse.json({ error: modeIssue }, { status: 400 });
   }
   if (edits.startDate !== undefined && edits.startDate <= todayIst()) {

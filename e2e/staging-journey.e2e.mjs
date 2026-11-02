@@ -294,6 +294,12 @@ async function apiLogin(page, path, email, password) {
 before(async () => {
   const type = { chromium, firefox, webkit }[BROWSER];
   const opts = { headless: !HEADED, slowMo: HEADED ? Number(process.env.E2E_SLOWMO || 80) : 0 };
+  // This machine reaches Vercel through NAT64, where HTTP/3 (UDP) now and then stalls a request for 30 s or more
+  // while plain HTTP/2 keeps working. E2E_NO_QUIC=1 keeps the browsers on TCP, to tell that apart from a slow site.
+  if (process.env.E2E_NO_QUIC === "1") {
+    if (BROWSER === "chromium") opts.args = ["--disable-quic"];
+    if (BROWSER === "firefox") opts.firefoxUserPrefs = { "network.http.http3.enable": false };
+  }
   if (BROWSER === "chromium") {
     try {
       browser = await type.launch({ ...opts, channel: "chrome" }); // real Google Chrome when installed
@@ -1565,7 +1571,7 @@ step("US employer composes the offer in the form: calendar, no flexible hours, N
   assert.doesNotMatch(text, /₹/, "and never in rupees");
 
   // The calendar: its button is there and the picker's choice lands in the field as DD/MM/YYYY.
-  await page.getByRole("button", { name: /^Open calendar/ }).first().waitFor({ state: "visible" });
+  await page.locator('button[aria-label^="Open calendar"]').first().waitFor({ state: "visible" });
   const pick = async (iso) => {
     for (let attempt = 0; attempt < 5; attempt++) {
       await page.locator('input[type="date"]').first().fill(iso);
@@ -1627,7 +1633,10 @@ step("intern 3 reads the offer: IST hours, joining date, stipend is half in rupe
   const body = await page.locator("body").innerText();
   const p = await one(`SELECT offer_details FROM proposals WHERE id = $1`, [state.usOfferId]);
   assert.ok(!body.includes(EMPLOYER2.companyName), "the company is hidden before the hire");
-  assert.ok(body.replace(/\s+/g, " ").includes(istRange(state.usStart, "09:00", "18:00", NY)), `the intern reads the New York shift in India time (${istRange(state.usStart, "09:00", "18:00", NY)})`);
+  // The intern's page writes it as "7:30 PM - 4:30 AM IST"; the clock times, worked out here, must be the same.
+  const shiftFrom = clockIst(zonedToUtc(`${state.usStart}T09:00`, NY));
+  const shiftTo = clockIst(zonedToUtc(`${state.usStart}T18:00`, NY));
+  assert.match(body.replace(/\s+/g, " "), new RegExp(`${shiftFrom}\\s*[-–]\\s*${shiftTo}\\s*IST`, "i"), `the intern reads the New York shift 9-6 as ${shiftFrom} - ${shiftTo} IST`);
   assert.match(body, /No client data on personal devices/, "the employer's extra note is visible to the intern");
   assert.ok(body.includes(new Date(`${state.usStart}T00:00:00Z`).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" })) || body.includes(dmy(state.usStart)) || /Joining date/i.test(body), "the joining date is shown");
   // The intern sees half of what the company pays, in rupees: dollars x 100 x 50%.
@@ -1646,6 +1655,10 @@ step("intern 3 reads the offer: IST hours, joining date, stipend is half in rupe
 
 step("free-band intern 4: the composer offers remote only, edits and withdrawals work before and after acceptance [UI + API]", ["usInterviewsDone"], "usFreeFlow", async () => {
   const page = pages.employer2;
+  // A resumed run may have left an open offer between these two accounts from the attempt that failed: close it first.
+  for (const left of await rows(`SELECT id FROM proposals WHERE employer_id = $1 AND intern_id = $2 AND status IN ('sent', 'accepted')`, [state.employer2Id, state.intern4Id])) {
+    expectOk("withdraw leftover offer", await api(page, "PATCH", `/api/proposals/${left.id}/status`, { status: "withdrawn" }));
+  }
   const composer = `/employer/send-proposal?intern=${state.intern4Id}&project=${state.project2Id}`;
   await visit(page, composer);
   await page.locator("#startDate").waitFor();
@@ -1673,7 +1686,7 @@ step("free-band intern 4: the composer offers remote only, edits and withdrawals
   await visit(page, `/employer/proposal/${state.usFreeOfferId}?edit=1`);
   await page.getByRole("button", { name: "Save changes" }).waitFor();
   assert.doesNotMatch(await page.locator("main").innerText(), /flexible/i, "the edit form has no flexible-hours option either");
-  assert.ok(await page.getByRole("button", { name: /^Open calendar/ }).first().isVisible(), "the edit form has the calendar too");
+  assert.ok(await page.locator('button[aria-label^="Open calendar"]').first().isVisible(), "the edit form has the calendar too");
   const edited = "Triage and tag support tickets, then write the weekly summary for the growth team.";
   await typeInto(page.getByLabel("Job description"), edited);
   expectOk("edit offer (UI)", await clickFor(page, page.getByRole("button", { name: "Save changes" }), { path: `/api/proposals/${state.usFreeOfferId}`, method: "PATCH" }));
@@ -1735,10 +1748,22 @@ step("US employer: a full-time offer in dollars; the intern accepts [API + UI]",
   const up = await upload(page, { kind: "offer_letter", base64: PDF_BASE64, type: "application/pdf", name: "offer-letter.pdf" });
   const key = expectOk("POST /api/uploads (offer_letter)", up, [201]).key;
   const path = `/api/employer/${state.employer2Id}/full-time-offer`;
-  expectOk(`POST ${path}`, await api(page, "POST", path, {
+  const usd = () => api(page, "POST", path, {
     proposalId: state.usOfferId, jobTitle: "Growth Analyst", jobMode: "remote", jobLocationCity: "", jobLocationState: "", timezone: NY, shiftFrom: "09:00", shiftTo: "18:00",
     ctcCurrency: "USD", annualCtc: 60000, offerLetterKey: key,
-  }), [200, 201]);
+  });
+  // A dollar offer needs Findtern's International FTE approval: refused first, then the company applies and an admin approves.
+  // (A resumed run adopts the offer an earlier attempt already sent, instead of sending a second one.)
+  const sentBefore = await one(`SELECT id FROM proposals WHERE employer_id = $1 AND intern_id = $2 AND id <> $3`, [state.employer2Id, state.intern3Id, state.usOfferId]);
+  if (!sentBefore) {
+    const before = await usd();
+    assert.equal(before.status, 403, `a USD full-time offer is refused until approved (got ${before.status} ${JSON.stringify(before.body)})`);
+    expectOk("apply for International FTE", await api(page, "POST", `/api/employer/${state.employer2Id}/international-fte`, {}));
+    assert.equal((await one(`SELECT international_fte_status AS s FROM employers WHERE id = $1`, [state.employer2Id])).s, "applied");
+    assert.equal((await usd()).status, 403, "applying is not the same as being approved");
+    expectOk("admin approves International FTE", await api(pages.admin, "PATCH", `/api/admin/companies/${state.employer2Id}`, { internationalFteStatus: "approved" }));
+    expectOk(`POST ${path}`, await usd(), [200, 201]);
+  }
   const p = await one(`SELECT id, status, currency FROM proposals WHERE employer_id = $1 AND intern_id = $2 AND id <> $3 ORDER BY created_at DESC LIMIT 1`, [state.employer2Id, state.intern3Id, state.usOfferId]);
   assert.ok(p, "a full-time proposal row exists");
   assert.equal(p.status, "sent");
@@ -1746,8 +1771,17 @@ step("US employer: a full-time offer in dollars; the intern accepts [API + UI]",
   const ip = pages.intern3;
   await visit(ip, `/intern/proposals/${state.usFteId}`);
   await shot("us-intern3-fte");
-  await ip.getByRole("button", { name: /Accept the job offer/ }).click();
-  await ip.getByRole("checkbox", { name: /read, understood, and agreed/i }).check();
+  if ((await one(`SELECT status FROM proposals WHERE id = $1`, [state.usFteId])).status !== "sent") {
+    console.log("[us full-time] the offer was already accepted by an earlier attempt; the click is not repeated");
+    return;
+  }
+  await settle(ip);
+  const agree = ip.getByRole("checkbox", { name: /read, understood, and agreed/i });
+  for (let attempt = 0; attempt < 6 && !(await agree.isVisible()); attempt++) {
+    await ip.getByRole("button", { name: /Accept the job offer/ }).click();
+    await agree.waitFor({ state: "visible", timeout: 3000 }).catch(() => {});
+  }
+  await agree.check();
   expectOk("accept FTE", await clickFor(ip, ip.getByRole("button", { name: /^Accept the offer/ }), { path: `/api/proposals/${state.usFteId}/status`, method: "PATCH" }));
   assert.ok(["accepted", "hired"].includes((await one(`SELECT status FROM proposals WHERE id = $1`, [state.usFteId])).status));
 });

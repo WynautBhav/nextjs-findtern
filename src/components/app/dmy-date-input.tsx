@@ -116,6 +116,9 @@ export function DmyDateInput({
         type="button"
         onClick={openPicker}
         disabled={rest.disabled}
+        // A mouse shortcut, hidden from assistive technology: the field itself takes the typed date, and inside a
+        // <label> a visible button would be read out as part of the field's name ("Paid from Open calendar").
+        aria-hidden
         aria-label={name ? `Open calendar, ${name}` : "Open calendar"}
         tabIndex={-1}
         className="apple-spring absolute bottom-0.5 right-0.5 grid size-10 place-items-center rounded-apple-sm text-text-subtle hover:bg-ink-100 hover:text-brand-700 disabled:pointer-events-none"

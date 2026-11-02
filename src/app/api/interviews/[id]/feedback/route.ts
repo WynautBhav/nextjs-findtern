@@ -6,6 +6,7 @@ import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
 import { notify } from "@/lib/notify";
 import { canLeaveFeedback } from "@/lib/employer-interview-rules";
+import { FEEDBACK_TAG_LINE_SQL, hasFeedbackText } from "@/lib/interview-feedback";
 
 // 1-2000 characters, as legacy (R:11277).
 const bodySchema = z.object({ feedback: z.string().trim().min(1).max(2000) });
@@ -29,7 +30,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({ error: "Feedback can be added after a scheduled interview." }, { status: 409 });
   }
   // Once, and only after the meeting is over.
-  if ((interview.notes ?? "").includes("feedback_text:")) {
+  if (hasFeedbackText(interview.notes)) {
     return NextResponse.json({ error: "Feedback has already been shared for this interview." }, { status: 409 });
   }
   if (!canLeaveFeedback(interview)) {
@@ -39,7 +40,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const updated = await db
     .update(schema.interviews)
     .set({ notes, status: interview.status === "missed" ? "missed" : "completed", updatedAt: new Date() })
-    .where(and(eq(schema.interviews.id, id), eq(schema.interviews.status, interview.status), sql`coalesce(${schema.interviews.notes}, '') not like '%feedback_text:%'`))
+    .where(and(eq(schema.interviews.id, id), eq(schema.interviews.status, interview.status), sql`coalesce(${schema.interviews.notes}, '') !~* ${FEEDBACK_TAG_LINE_SQL}`))
     .returning({ id: schema.interviews.id });
   if (updated.length === 0) return NextResponse.json({ error: "Feedback has already been shared for this interview." }, { status: 409 });
   await notify({

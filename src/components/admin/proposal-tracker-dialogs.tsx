@@ -9,6 +9,7 @@ import { ProposalStatusEditor } from "@/components/admin/proposal-status-editor"
 import { StatusBadge } from "@/components/admin/status-badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { buttonClass } from "@/components/ui/button";
+import { FEEDBACK_TAG_LINE, feedbackTextOf, normaliseNotes } from "@/lib/interview-feedback";
 
 /** "View" on a tracker row: the structured offer and the admin status override. */
 export function ProposalDetailsButton({
@@ -57,7 +58,12 @@ export function ProposalDetailsButton({
 /** Interview notes, read-only: feedback and recording links plus the employer's written feedback. */
 export function InterviewNotesButton({ title, notes }: { title: string; notes: string }) {
   const [open, setOpen] = useState(false);
-  const lines = notes.split("\n").filter((l) => l.trim());
+  // The employer's feedback is one block that runs to the end (it can have several lines); the lines before
+  // it are the admin's notes and links.
+  const clean = normaliseNotes(notes);
+  const at = clean.search(FEEDBACK_TAG_LINE);
+  const lines = (at < 0 ? clean : clean.slice(0, at)).split("\n").filter((l) => l.trim());
+  const employerFeedback = feedbackTextOf(clean);
   return (
     <>
       <button type="button" onClick={() => setOpen(true)} className={buttonClass({ variant: "ghost", size: "sm", className: "max-lg:h-11" })}>
@@ -71,8 +77,8 @@ export function InterviewNotesButton({ title, notes }: { title: string; notes: s
           </DialogHeader>
           <ul className="space-y-2 text-sm text-ink-800">
             {lines.map((line, n) => {
-              const m = /^(feedback_text|feedback|recording):\s*(.*)$/i.exec(line.trim());
-              const label = m ? ({ feedback_text: "Employer feedback", feedback: "AI feedback", recording: "Recording" } as Record<string, string>)[m[1].toLowerCase()] : null;
+              const m = /^(feedback|recording):\s*(.*)$/i.exec(line.trim());
+              const label = m ? ({ feedback: "AI feedback", recording: "Recording" } as Record<string, string>)[m[1].toLowerCase()] : null;
               const value = m ? m[2] : line;
               return (
                 <li key={n} className="rounded-apple-sm bg-ink-50 px-3 py-2">
@@ -87,6 +93,12 @@ export function InterviewNotesButton({ title, notes }: { title: string; notes: s
                 </li>
               );
             })}
+            {employerFeedback ? (
+              <li className="rounded-apple-sm bg-ink-50 px-3 py-2">
+                <span className="block text-xs font-medium text-ink-600">Employer feedback</span>
+                <span className="whitespace-pre-line break-words">{employerFeedback}</span>
+              </li>
+            ) : null}
           </ul>
         </DialogContent>
       </Dialog>
