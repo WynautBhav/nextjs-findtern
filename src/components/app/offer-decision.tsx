@@ -35,6 +35,7 @@ import {
 } from "@/components/ui/dialog";
 import { csrfFetch } from "@/lib/client-fetch";
 import { formatDate } from "@/lib/format";
+import { addDays } from "@/lib/offer";
 import { cn } from "@/lib/utils";
 
 type Outcome = { kind: "accepted" | "declined"; error?: string };
@@ -44,6 +45,7 @@ export function OfferDecision({
   roleTitle,
   company,
   startDate,
+  joiningDate,
   fullTime = false,
   declinesUsed = 0,
   freeDeclines = 3,
@@ -53,7 +55,10 @@ export function OfferDecision({
   proposalId: string;
   roleTitle: string;
   company: string;
+  /** Raw start date: the offer closes when this day begins in India. */
   startDate: string | null;
+  /** The IST day the first shift starts (YYYY-MM-DD), for all joining wording. Defaults to `startDate`. */
+  joiningDate?: string | null;
   /** Full-time offers need the binding acceptance agreement. */
   fullTime?: boolean;
   /** Offers this intern has already turned down. */
@@ -82,7 +87,10 @@ export function OfferDecision({
   // it is allowed, but only after the intern has seen that consequence.
   const endsGuarantee = declinesUsed >= freeDeclines && !guaranteeEnded;
   const freeLeft = Math.max(0, freeDeclines - declinesUsed);
-  const joining = startDate ? formatDate(startDate) : null;
+  const joiningDay = joiningDate === undefined ? startDate : joiningDate;
+  const joining = joiningDay ? formatDate(joiningDay) : null;
+  // The offer closes when the start date begins in India, so the last day to answer is the day before it.
+  const answerBy = startDate && /^\d{4}-\d{2}-\d{2}/.test(startDate) ? formatDate(addDays(startDate.slice(0, 10), -1)) : null;
   const rail = layout === "rail";
 
   async function decide(kind: "accepted" | "declined", opts: { fullTimeAgreed?: boolean } = {}) {
@@ -201,8 +209,8 @@ export function OfferDecision({
         <div className="mt-4 space-y-2 text-sm leading-relaxed text-ink-600">
           <OfferCountdown startDate={startDate} />
           <p>
-            <span className="font-medium text-ink-800">If you do nothing</span>, the offer stays open until the day before
-            the joining date{joining ? ` (${joining})` : ""}. On the joining date it closes and is marked as rejected.
+            <span className="font-medium text-ink-800">If you do nothing</span>, the offer closes
+            {answerBy ? ` after ${answerBy}` : ""} and is marked as rejected. Answer by {answerBy ?? "the date on the offer"}.
           </p>
           <p>
             {guaranteeEnded

@@ -1,6 +1,6 @@
 import { formatMoney } from "@/lib/format";
 import { HIDDEN_COMPANY } from "@/lib/intern-data";
-import { internOfferKey, offerWasEdited, type InternOfferKey } from "@/lib/intern-offer-view";
+import { internOfferKey, offerJoiningDay, offerWasEdited, type InternOfferKey } from "@/lib/intern-offer-view";
 import type { ProposalRow } from "@/lib/journey";
 import { internStipendInrMinor, parseOffer, type Offer } from "@/lib/offer";
 
@@ -27,6 +27,8 @@ export type OfferFacts = {
   amountIsText: boolean;
   /** Raw joining date (YYYY-MM-DD) or null. */
   startDate: string | null;
+  /** The IST day the first shift starts, else the raw start date. */
+  joiningDate: string | null;
   mode: string;
   location: string;
   duration: string;
@@ -73,6 +75,7 @@ export function offerFacts(
     per,
     amountIsText,
     startDate: offer.startDate,
+    joiningDate: offerJoiningDay(offer),
     mode,
     location,
     duration: `${offer.months} month${offer.months === 1 ? "" : "s"}`,

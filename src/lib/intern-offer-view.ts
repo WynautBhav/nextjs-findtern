@@ -1,6 +1,5 @@
-import { formatIstClock } from "./format.ts";
 import { isHiredProposal } from "./hire-status.ts";
-import { offerPastStart, parseOffer } from "./offer.ts";
+import { isClockTime, offerPastStart, parseOffer, type Offer } from "./offer.ts";
 import { wallTimeToUtc } from "./timezones.ts";
 
 /**
@@ -97,26 +96,31 @@ export function hybridSplit(raw: unknown): { office: number; home: number } | nu
   return office > 0 || home > 0 ? { office, home } : null;
 }
 
-const HHMM = /^(\d{1,2}):(\d{2})$/;
-const pad5 = (t: string) => t.padStart(5, "0");
 const IST_TZ = "Asia/Kolkata";
+const pad5 = (t: string) => t.trim().padStart(5, "0");
 const istDay = (d: Date) => new Intl.DateTimeFormat("en-CA", { timeZone: IST_TZ }).format(d);
-const dayNumber = (ymd: string) => Date.parse(`${ymd}T00:00:00Z`) / 86_400_000;
 
 function offerDay(startDate: string | null): string {
   return /^\d{4}-\d{2}-\d{2}/.test(startDate ?? "") ? startDate!.slice(0, 10) : new Date().toISOString().slice(0, 10);
 }
 
-/** The UTC instants of a shift on the offer's joining date (end rolls to the next day when it is not after the start). */
-function shiftInstants(from: string, to: string, tz: string | null | undefined, startDate: string | null): { start: Date; end: Date; day: string } | null {
-  if (!HHMM.test(from) || !HHMM.test(to)) return null;
+/**
+ * The UTC instants of a shift on the offer's joining date (end rolls to the next day when it is not after the start).
+ * A wall time that does not exist on a DST change day (2:30 AM on the spring-forward day) is read the way
+ * wallTimeToUtc reads it; an ambiguous one (fall back) takes the first occurrence. Pinned in the tests.
+ */
+function shiftInstants(from: string, to: string, tz: string | null | undefined, startDate: string | null): { start: Date; end: Date } | null {
+  const f = pad5(from);
+  const t = pad5(to);
+  if (!isClockTime(f) || !isClockTime(t)) return null;
   const day = offerDay(startDate);
   try {
     const zone = tz || IST_TZ;
-    const start = wallTimeToUtc(`${day}T${pad5(from)}`, zone);
-    let end = wallTimeToUtc(`${day}T${pad5(to)}`, zone);
+    const start = wallTimeToUtc(`${day}T${f}`, zone);
+    let end = wallTimeToUtc(`${day}T${t}`, zone);
     if (end.getTime() <= start.getTime()) end = new Date(end.getTime() + 24 * 3_600_000);
-    return { start, end, day };
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return null;
+    return { start, end };
   } catch {
     return null;
   }
@@ -125,27 +129,43 @@ function shiftInstants(from: string, to: string, tz: string | null | undefined, 
 /**
  * The instant the first shift starts. The joining date an intern sees is its
  * IST calendar day: 9 Nov 2:00 PM in New York is 10 Nov 12:30 AM IST, so the
- * joining date is 10 Nov. Null when the shift is missing or invalid.
+ * joining date is 10 Nov. Null when there is no real start date or the shift
+ * is missing or invalid (the caller then shows the raw start date).
  */
 export function joiningInstant(from: string, to: string, tz: string | null | undefined, startDate: string | null): Date | null {
+  if (!/^\d{4}-\d{2}-\d{2}/.test(startDate ?? "")) return null;
   return shiftInstants(from, to, tz, startDate)?.start ?? null;
 }
 
+/** The IST day (YYYY-MM-DD) the offer's first shift starts, or null when it cannot be worked out. */
+export function joiningDayIst(from: string, to: string, tz: string | null | undefined, startDate: string | null): string | null {
+  const at = joiningInstant(from, to, tz, startDate);
+  return at ? istDay(at) : null;
+}
+
+/** joiningDayIst for a parsed offer (internship or full-time shift), falling back to its raw start date. */
+export function offerJoiningDay(offer: Offer): string | null {
+  const ft = offer.fullTime;
+  const tz = ((ft?.timezone || offer.timezone || IST_TZ) as string).trim();
+  const day = ft
+    ? joiningDayIst(ft.shiftFrom, ft.shiftTo, tz, offer.startDate)
+    : joiningDayIst(offer.shiftFrom, offer.shiftTo, tz, offer.startDate);
+  return day ?? offer.startDate;
+}
+
 /**
- * A shift agreed in the offer's zone, shown in IST like the legacy page
- * (proposal-detail.tsx shiftLabelIst): converted on the joining date, so the
- * employer's DST on that day applies, and an end at or before the start runs
- * into the next day. A time that lands on a different IST day than the
- * employer's joining date is marked "(next day)" / "(previous day)", as on the
- * employer side. "9:00 AM - 6:00 PM IST", or null when not set.
+ * A shift agreed in the offer's zone, shown in IST like the employer side
+ * (timezones.ts shiftInIst): converted on the joining date, so the employer's
+ * DST on that day applies, and an end at or before the start runs into the
+ * next day. The start is never marked; the end is marked "(next day)" only
+ * when its IST day differs from the start's IST day.
+ * "9:00 AM – 6:00 PM IST", or null when not set.
  */
 export function shiftInIst(from: string, to: string, tz: string | null | undefined, startDate: string | null): string | null {
   const s = shiftInstants(from, to, tz, startDate);
   if (!s) return null;
-  const mark = (d: Date) => {
-    const diff = dayNumber(istDay(d)) - dayNumber(s.day);
-    return diff > 0 ? " (next day)" : diff < 0 ? " (previous day)" : "";
-  };
-  const clock = (d: Date) => formatIstClock(d).replace(/ IST$/, "");
-  return `${clock(s.start)}${mark(s.start)} - ${clock(s.end)}${mark(s.end)} IST`;
+  const clock = (d: Date) =>
+    new Intl.DateTimeFormat("en-IN", { hour: "numeric", minute: "2-digit", hour12: true, timeZone: IST_TZ }).format(d);
+  const next = istDay(s.end) !== istDay(s.start) ? " (next day)" : "";
+  return `${clock(s.start)} – ${clock(s.end)}${next} IST`;
 }
