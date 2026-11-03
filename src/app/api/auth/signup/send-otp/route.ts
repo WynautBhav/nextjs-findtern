@@ -7,6 +7,7 @@ import { getDb, schema } from "@/lib/db";
 import { emails, renderEmail } from "@/lib/emails";
 import { sendSmtpMail } from "@/lib/mailer";
 import { generateOtp, hashOtp, limiters, clientIp, takeAuth } from "@/lib/security/rate-limit";
+import { isPersonalEmail } from "@/lib/employer-onboarding";
 import { INTERN_EMAIL_MESSAGE, isInternEmail, SIGNUP_OTP_SUBJECTS } from "@/lib/signup-otp";
 
 const bodySchema = z.object({
@@ -40,6 +41,11 @@ export async function POST(req: Request) {
 
   if (purpose === "signup" && subjectType === "intern" && !isInternEmail(email)) {
     return NextResponse.json({ error: INTERN_EMAIL_MESSAGE }, { status: 400 });
+  }
+
+  // Same rule as employer/signup: a code for a personal mailbox could never be used.
+  if (purpose === "signup" && subjectType === "employer" && isPersonalEmail(email)) {
+    return NextResponse.json({ error: "Use your company email address" }, { status: 400 });
   }
 
   if (purpose === "verify") {
