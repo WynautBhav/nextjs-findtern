@@ -8,7 +8,7 @@ import { initialsOf } from "@/lib/employer-candidates";
 import { formatIst, formatSlotTime } from "@/lib/format";
 import { CALENDAR_TOKEN_OWNER, createMeetEvent, deleteMeetEvent } from "@/lib/google";
 import { requireMutation } from "@/lib/guards-mutation";
-import { employerNames, notify } from "@/lib/notify";
+import { employerNames, notify, resolveInterviewNotifications } from "@/lib/notify";
 import { hiredProposalSql } from "@/lib/employer-visibility";
 
 const bodySchema = z.object({ slot: z.number().int().min(1).max(3) });
@@ -88,6 +88,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     }
     return NextResponse.json({ error: "This interview is already scheduled" }, { status: 409 });
   }
+
+  await resolveInterviewNotifications(interview.internId, id);
 
   // Each side reads the time in its own zone: the company in the zone it
   // booked in, the intern always in India time, labelled IST (INW-09).

@@ -100,6 +100,25 @@ export async function employerNames(id: string): Promise<{ contact: string; comp
   return { contact: (e?.name ?? "").split(" ")[0] ?? "", company: e?.company ?? "A company on Findtern" };
 }
 
+/** Interview notifications that ask the intern to pick a slot. */
+const INTERVIEW_ACTION_TYPES = ["interview_pending", "interview_reschedule_requested_by_employer", "interview_rescheduled_by_employer"];
+
+/** Mark the intern's "pick a slot" notifications read once the interview is booked. */
+export async function resolveInterviewNotifications(internId: string, interviewId: string): Promise<void> {
+  await getDb()
+    .update(schema.notifications)
+    .set({ isRead: true, readAt: new Date() })
+    .where(
+      and(
+        eq(schema.notifications.recipientType, "intern"),
+        eq(schema.notifications.recipientId, internId),
+        eq(schema.notifications.isRead, false),
+        inArray(schema.notifications.type, INTERVIEW_ACTION_TYPES),
+        sql`${schema.notifications.data}->>'interviewId' = ${interviewId}`,
+      ),
+    );
+}
+
 /** Offer notifications that ask the intern to act. */
 const OFFER_ACTION_TYPES = ["proposal_received", "proposal_updated", "full_time_offer_received"];
 
