@@ -14,17 +14,13 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 
+import { useConfirm } from "@/components/app/use-confirm";
 import { buttonClass } from "@/components/ui/button";
 import { csrfFetch } from "@/lib/client-fetch";
+import { RATING_AXES, buildRatingsPayload, clearScorePayload, type RatingAxis } from "@/lib/ratings-payload";
 
-const AXES = [
-  { key: "communication", label: "Communication" },
-  { key: "coding", label: "Coding" },
-  { key: "aptitude", label: "Aptitude" },
-  { key: "interview", label: "AI interview" },
-] as const;
-
-type Axis = (typeof AXES)[number]["key"];
+const AXES = RATING_AXES;
+type Axis = RatingAxis;
 
 export function RatingsEditor({
   internId,
@@ -40,6 +36,7 @@ export function RatingsEditor({
   initialRecordingLink?: string | null;
 }) {
   const router = useRouter();
+  const { ask, dialog } = useConfirm();
   const [values, setValues] = useState<Record<Axis, string>>(() => ({
     communication: ratings.communication?.toString() ?? "",
     coding: ratings.coding?.toString() ?? "",
@@ -52,37 +49,7 @@ export function RatingsEditor({
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState<number | null>(null);
 
-  async function save() {
-    // Only what the admin changed is sent: saving just a link must not touch (or clear) the ratings and an imported score.
-    const payload: Record<string, unknown> = {};
-    for (const axis of AXES) {
-      const raw = values[axis.key].trim();
-      const before = ratings[axis.key]?.toString() ?? "";
-      if (raw === before) continue;
-      // An emptied box clears that rating (legacy behaviour).
-      if (!raw) {
-        payload[axis.key] = null;
-        continue;
-      }
-      const n = Number(raw);
-      if (!Number.isFinite(n) || n < 0 || n > 10) {
-        setError(`${axis.label} must be a number between 0 and 10.`);
-        return;
-      }
-      payload[axis.key] = n;
-    }
-    if (feedbackLink.trim() !== (initialFeedbackLink ?? "").trim()) payload.aiFeedbackLink = feedbackLink.trim() || null;
-    if (recordingLink.trim() !== (initialRecordingLink ?? "").trim()) payload.aiRecordingLink = recordingLink.trim() || null;
-    // Every box empty but an (imported) score remains and nothing else changed: the admin means to clear it.
-    // Null for all four is what applyRatings treats as clearing the score.
-    if (Object.keys(payload).length === 0 && score !== null && AXES.every((axis) => !values[axis.key].trim())) {
-      for (const axis of AXES) payload[axis.key] = null;
-    }
-    if (Object.keys(payload).length === 0) {
-      setError("Nothing changed.");
-      return;
-    }
-
+  async function send(payload: Record<string, unknown>) {
     setBusy(true);
     setError(null);
     try {
@@ -100,6 +67,27 @@ export function RatingsEditor({
     } finally {
       setBusy(false);
     }
+  }
+
+  async function save() {
+    // Only what the admin changed is sent: saving just a link must not touch (or clear) the ratings and an imported score.
+    const built = buildRatingsPayload({ values, ratings, feedbackLink, recordingLink, initialFeedbackLink, initialRecordingLink });
+    if (!built.ok) {
+      setError(built.error);
+      return;
+    }
+    await send(built.payload);
+  }
+
+  async function clearScore() {
+    const ok = await ask({
+      title: "Clear this Findtern Score?",
+      body: "This removes all four ratings and the score employers see and price against. Re-import or re-enter the ratings to bring it back.",
+      confirmLabel: "Clear score",
+    });
+    if (!ok) return;
+    setValues({ communication: "", coding: "", aptitude: "", interview: "" });
+    await send(clearScorePayload());
   }
 
   return (
@@ -172,15 +160,17 @@ export function RatingsEditor({
         </div>
       </div>
 
-      <button
-        type="button"
-        onClick={save}
-        disabled={busy}
-        className={buttonClass({ variant: "primary", size: "sm", className: "mt-4" })}
-      >
-        {busy ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : null}
-        Save ratings and links
-      </button>
+      <div className="mt-4 flex flex-wrap items-center gap-2">
+        <button type="button" onClick={save} disabled={busy} className={buttonClass({ variant: "primary", size: "sm" })}>
+          {busy ? <Loader2 className="size-3.5 animate-spin motion-reduce:animate-none" aria-hidden /> : null}
+          Save ratings and links
+        </button>
+        {score !== null ? (
+          <button type="button" onClick={clearScore} disabled={busy} className={buttonClass({ variant: "outline", size: "sm" })}>
+            Clear score
+          </button>
+        ) : null}
+      </div>
 
       {error ? <p role="alert" className="mt-2 text-sm text-danger">{error}</p> : null}
       {saved !== null ? (
@@ -188,6 +178,7 @@ export function RatingsEditor({
           Saved. Employers filtering by score and viewing dossier will see the updated report.
         </p>
       ) : null}
+      {dialog}
     </div>
   );
 }
