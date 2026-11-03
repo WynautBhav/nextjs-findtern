@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { cache } from "react";
+import { cache, Suspense } from "react";
 import Link from "next/link";
 import { AlertTriangle } from "lucide-react";
 
@@ -61,7 +61,9 @@ export default async function AdminPayouts({ searchParams }: { searchParams?: Pr
         }
       />
 
-      <RunDesk />
+      <Suspense fallback={<RunDeskSkeleton />}>
+        <RunDesk />
+      </Suspense>
 
       <AdminTabs
         label="Payout views"
@@ -82,11 +84,29 @@ async function RunDesk() {
   const now = new Date();
   let run: PayoutRun | null = null;
   try {
-    run = buildPayoutRun(await loadDuesOnce(), istDayKey(now));
+    // Paid-out comes from the ledger (same source as the "All payouts" strip),
+    // not from per-placement links, which most paid payouts do not carry.
+    const [dues, ledger] = await Promise.all([
+      loadDuesOnce(),
+      loadPayouts({}, { offset: 0, limit: 1, sort: "scheduled", dir: "desc" }),
+    ]);
+    run = buildPayoutRun(dues, istDayKey(now), ledger.paidMinor);
   } catch (e) {
     console.error("[admin/payouts run]", e);
   }
   return <PayoutRunDesk run={run} now={now} />;
+}
+
+function RunDeskSkeleton() {
+  return (
+    <div aria-hidden className="space-y-4">
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,6fr)_minmax(0,5fr)]">
+        <div className="h-64 animate-pulse rounded-[var(--radius-admin-card)] bg-[color:var(--admin-panel-2)]" />
+        <div className="h-64 animate-pulse rounded-[var(--radius-admin-card)] bg-[color:var(--admin-panel-2)]" />
+      </div>
+      <div className="h-36 animate-pulse rounded-[var(--radius-admin-card)] bg-[color:var(--admin-panel-2)]" />
+    </div>
+  );
 }
 
 /* ── Payouts ledger ─────────────────────────────────────────────────── */
@@ -400,7 +420,7 @@ async function DuesView({ params }: { params: Record<string, string> }) {
       <h2 className="text-lg font-semibold text-foreground">Dues by placement</h2>
       <StatGrid cols={4}>
         <StatCard featured label="Owed to interns" value={inr(totals.dueMinor)} hint={filtered ? "Matching the filters below" : "Stipend months not yet paid"} tone={totals.dueMinor > 0 ? "warning" : "neutral"} />
-        <StatCard label="Paid to interns" value={inr(totals.paidMinor)} hint={`of ${inr(totals.totalMinor)} across these placements`} />
+        <StatCard label="Paid against placements" value={inr(totals.paidMinor)} hint={`Payouts linked to these placements, of ${inr(totals.totalMinor)}`} />
         <StatCard label="Active placements" value={totals.active.toLocaleString("en-IN")} hint={`${totals.completed.toLocaleString("en-IN")} fully paid`} />
         <StatCard label="Employers still owe" value={inr(totals.employerDueInrMinor)} hint="Stipend base, before fee and GST · USD at ₹100/$" />
       </StatGrid>
