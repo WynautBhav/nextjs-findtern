@@ -19,6 +19,7 @@ import pg from "pg";
 import * as schema from "../../src/lib/db/schema.ts";
 import { createSession } from "../../src/lib/security/session.ts";
 import { generateDriveToken } from "../../src/lib/college/tokens.ts";
+import { acceptanceValues } from "../../src/lib/terms.ts";
 
 if (process.env.NODE_ENV === "production") throw new Error("Refusing to run in production");
 const N = Number(process.env.N ?? 500);
@@ -60,6 +61,7 @@ const users = await db
       phoneNumber: `7000${String(i).padStart(6, "0")}`,
       countryCode: "+00",
       password: "!disabled",
+      ...acceptanceValues(),
     })),
   )
   .returning({ id: schema.users.id, email: schema.users.email });
@@ -85,7 +87,7 @@ await db.insert(schema.collegeDrives).values({
 
 await db
   .insert(schema.collegeAdmins)
-  .values({ collegeId: college.id, name: "Load TPO", email: "tpo@loadtest.invalid", password: "!disabled" })
+  .values({ collegeId: college.id, name: "Load TPO", email: "tpo@loadtest.invalid", password: "!disabled", ...acceptanceValues() })
   .onConflictDoNothing();
 const [tpo] = await db.select().from(schema.collegeAdmins).where(eq(schema.collegeAdmins.email, "tpo@loadtest.invalid"));
 

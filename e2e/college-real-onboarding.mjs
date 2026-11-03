@@ -162,6 +162,13 @@ await check("New officer signs in to the placement console", async () => {
   await tpo.getByLabel(/^password/i).fill(officerPassword);
   await tpo.getByRole("button", { name: /sign in/i }).first().click();
   await tpo.waitForURL(`${B}/college`);
+  // A new officer has not accepted the current terms yet, so the one-time dialog may be up.
+  const terms = tpo.getByRole("dialog", { name: /updated terms/i });
+  if (await terms.waitFor({ timeout: 5_000 }).then(() => true, () => false)) {
+    await terms.getByRole("checkbox", { name: /I have read and accept/i }).check();
+    await terms.getByRole("button", { name: "Continue" }).click();
+    await terms.waitFor({ state: "detached", timeout: 30_000 });
+  }
   await tpo.getByRole("heading", { name: "JK Lakshmipat University" }).waitFor();
 });
 

@@ -29,16 +29,21 @@ export function TermsGate({ role }: { role: TermsRole }) {
   const [open, setOpen] = useState(true);
   const [agreed, setAgreed] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [signOutError, setSignOutError] = useState<string | null>(null);
   const checkRef = useRef<HTMLButtonElement>(null);
   const checkId = useId();
-  const errorId = useId();
 
   // Same call and cleanup as the console's Sign out button (console-shell.tsx).
   async function signOut() {
+    if (saving || signingOut) return;
+    setSigningOut(true);
+    setSignOutError(null);
     const res = await csrfFetch("/api/auth/logout", { method: "POST" }).catch(() => null);
     if (!res?.ok) {
-      setError("Sign out didn't go through. Check your connection and try again.");
+      setSignOutError("Sign out didn't go through. Check your connection and try again.");
+      setSigningOut(false);
       return;
     }
     try {
@@ -51,7 +56,7 @@ export function TermsGate({ role }: { role: TermsRole }) {
   }
 
   async function accept() {
-    if (!agreed || saving) return;
+    if (!agreed || saving || signingOut) return;
     setSaving(true);
     setError(null);
     try {
@@ -102,7 +107,6 @@ export function TermsGate({ role }: { role: TermsRole }) {
             id={checkId}
             checked={agreed}
             onCheckedChange={(v) => setAgreed(v === true)}
-            aria-describedby={error ? errorId : undefined}
             className="mt-0.5"
           />
           <label htmlFor={checkId} className="text-base text-ink-900">
@@ -110,24 +114,26 @@ export function TermsGate({ role }: { role: TermsRole }) {
           </label>
         </div>
 
-        {error ? (
-          <p id={errorId} role="alert" className="text-sm text-danger">
-            {error}
-          </p>
-        ) : null}
+        <p role="alert" className="text-sm text-danger empty:hidden">
+          {error}
+        </p>
 
         <button
           type="button"
           onClick={accept}
-          disabled={!agreed || saving}
+          disabled={!agreed || saving || signingOut}
           className={buttonClass({ variant: "primary", block: true })}
         >
           {saving ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
           Continue
         </button>
-        <button type="button" onClick={signOut} disabled={saving} className={buttonClass({ variant: "outline", block: true })}>
+        <button type="button" onClick={signOut} disabled={saving || signingOut} className={buttonClass({ variant: "outline", block: true })}>
+          {signingOut ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
           Sign out
         </button>
+        <p role="alert" className="text-sm text-danger empty:hidden">
+          {signOutError}
+        </p>
       </DialogContent>
     </Dialog>
   );

@@ -4,9 +4,9 @@
  *
  * Needs the situations seed (`npm run qa:seed`), which creates the one persona
  * left without acceptance (intern-terms, see lib/personas.mjs), and a running
- * app on E2E_BASE / the e2e port:
+ * app (E2E_BASE_URL):
  *
- *   node --test e2e/terms-popup.e2e.mjs
+ *   E2E_BASE_URL=http://localhost:3500 node --test e2e/terms-popup.e2e.mjs
  *
  * The test accepts the terms for that persona, so re-run the seed to reset it.
  */
@@ -15,6 +15,7 @@ import { after, before, test } from "node:test";
 
 import { chromium } from "playwright";
 
+import { closeDb, one } from "./lib/db.mjs";
 import { baseUrl } from "./lib/env.mjs";
 import { loginState, persona } from "./lib/session.mjs";
 
@@ -30,6 +31,7 @@ before(async () => {
 
 after(async () => {
   await browser?.close();
+  await closeDb();
 });
 
 test("an intern who has not accepted sees the dialog and Continue is disabled", async () => {
@@ -46,7 +48,12 @@ test("ticking the box and continuing closes it, and it stays gone after a reload
   await dialog.getByRole("button", { name: "Continue" }).click();
   await dialog.waitFor({ state: "detached", timeout: 30_000 });
 
-  await page.reload({ waitUntil: "domcontentloaded" });
+  const row = await one("select terms_accepted_version from users where email = $1", ["qa.intern.terms@qa.test"]);
+  assert.equal(row?.terms_accepted_version, "2026-11-04");
+
+  await page.reload({ waitUntil: "load" });
   await page.getByRole("main").first().waitFor({ timeout: 30_000 });
+  // Let hydration finish: the dialog is client-rendered, so counting too early would pass vacuously.
+  await page.waitForTimeout(1000);
   assert.equal(await page.getByRole("dialog", { name: /updated terms/i }).count(), 0);
 });
