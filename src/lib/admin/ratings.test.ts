@@ -115,15 +115,35 @@ test("two pending bonuses are both added, once, and the score caps at 10", () =>
   assert.equal(withBonus({ findternScore: 10, completionBonusApplied: 0, completionBonusCount: 0 }).findternScore, 10);
 });
 
-test("clearing every rating drops the score and puts the bonus back to pending", () => {
+test("clearing every rating drops the score but does not re-arm the bonus: an old sheet re-imported adds it once", () => {
   const rated = applyRatings(withBonus({}), { coding: 5 });
   assert.equal(rated.findternScore, 6);
   const cleared = applyRatings(rated, { coding: null });
   assert.equal(cleared.findternScore, undefined);
-  assert.equal(applyRatings(cleared, {}, 5).findternScore, 6);
+  assert.equal(cleared.completionBonusApplied, 1);
+  // the old sheet (exported with the bonus inside: 6) goes back in as-is, not 7
+  assert.equal(applyRatings(cleared, {}, 6).findternScore, 6);
+  // a pending bonus that was never applied stays pending through a no-op clear
+  assert.equal(applyRatings(applyRatings(withBonus({}), { coding: null }), {}, 5).findternScore, 6);
+  // legacy row (score, no counter) cleared then re-imported: still final
+  const legacyCleared = applyRatings({ findternScore: 8, completionBonusCount: 1, ratings: { coding: 7 } }, { coding: null });
+  assert.equal(applyRatings(legacyCleared, {}, 8).findternScore, 8);
+});
+
+test("a numeric-string score counts as a score", () => {
+  assert.equal(withBonus({ findternScore: "6" }).findternScore, 7);
+  assert.equal(applyRatings({ findternScore: "8", completionBonusCount: 1 }, {}, 8).findternScore, 8);
 });
 
 test("rows saved before the applied counter keep their score as final", () => {
   assert.equal(applyRatings({ findternScore: 8, completionBonusCount: 1 }, {}, 8).findternScore, 8);
   assert.equal(applyRatings({ completionBonusCount: 1 }, {}, 8).findternScore, 9);
+});
+
+test("an imported score survives a save that rates nothing and clears nothing", () => {
+  const imported = applyRatings({}, {}, 7);
+  assert.equal(applyRatings(imported, {}).findternScore, 7);
+  assert.equal(applyRatings(imported, { coding: undefined }).findternScore, 7);
+  // an explicit clear still removes it
+  assert.equal(applyRatings(applyRatings({}, { coding: 5 }), { coding: null }).findternScore, undefined);
 });

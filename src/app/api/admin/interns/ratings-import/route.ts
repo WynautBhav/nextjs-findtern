@@ -64,17 +64,26 @@ export async function POST(req: Request) {
       failures.push({ row: r.row, email: r.email, reason: "User not found" });
       continue;
     }
-    const [onb] = await db.select().from(schema.internOnboarding).where(eq(schema.internOnboarding.userId, uid)).limit(1);
-    const prevExtra = (onb?.extraData as Record<string, unknown>) ?? {};
-    const nextExtra = applyRatings(prevExtra, r.updates, r.score);
-    if (onb) {
-      await db.update(schema.internOnboarding).set({ extraData: nextExtra }).where(eq(schema.internOnboarding.id, onb.id));
-    } else {
-      // Legacy created the onboarding row when it was missing (routes.ts
-      // bulk ratings upload: userId + extraData only), so a scored intern who
-      // never opened onboarding still gets their ratings (ADP-06).
-      await db.insert(schema.internOnboarding).values({ userId: uid, extraData: nextExtra });
-    }
+    // Read and write under a row lock, so a concurrent bonus grant or webhook cannot be overwritten.
+    const { prevExtra, nextExtra } = await db.transaction(async (tx) => {
+      const [onb] = await tx
+        .select()
+        .from(schema.internOnboarding)
+        .where(eq(schema.internOnboarding.userId, uid))
+        .limit(1)
+        .for("update");
+      const prev = (onb?.extraData as Record<string, unknown>) ?? {};
+      const next = applyRatings(prev, r.updates, r.score);
+      if (onb) {
+        await tx.update(schema.internOnboarding).set({ extraData: next }).where(eq(schema.internOnboarding.id, onb.id));
+      } else {
+        // Legacy created the onboarding row when it was missing (routes.ts
+        // bulk ratings upload: userId + extraData only), so a scored intern who
+        // never opened onboarding still gets their ratings (ADP-06).
+        await tx.insert(schema.internOnboarding).values({ userId: uid, extraData: next });
+      }
+      return { prevExtra: prev, nextExtra: next };
+    });
     await afterRatingsSaved(uid, prevExtra, nextExtra);
     updated++;
   }

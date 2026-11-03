@@ -38,21 +38,32 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   if (!parsed.success) return NextResponse.json({ error: "Invalid input" }, { status: 400 });
 
   const db = getDb();
-  const [row] = await db.select().from(schema.internOnboarding).where(eq(schema.internOnboarding.userId, id)).limit(1);
-  if (!row) return NextResponse.json({ error: "Not found" }, { status: 404 });
-
   const { communication, coding, aptitude, interview } = parsed.data;
-  const prevExtra = (row.extraData as Record<string, unknown>) ?? {};
-  const updatedExtra = applyRatings(prevExtra, { communication, coding, aptitude, interview });
+  // Read and write under a row lock, so a concurrent bonus grant, import or webhook is not overwritten.
+  const outcome = await db.transaction(async (tx) => {
+    const [row] = await tx
+      .select()
+      .from(schema.internOnboarding)
+      .where(eq(schema.internOnboarding.userId, id))
+      .limit(1)
+      .for("update");
+    if (!row) return null;
+    const prevExtra = (row.extraData as Record<string, unknown>) ?? {};
+    const touched = [communication, coding, aptitude, interview].some((v) => v !== undefined);
+    const updatedExtra = touched ? applyRatings(prevExtra, { communication, coding, aptitude, interview }) : { ...prevExtra };
 
-  if (parsed.data.aiFeedbackLink !== undefined) {
-    updatedExtra.aiFeedbackLink = parsed.data.aiFeedbackLink ? parsed.data.aiFeedbackLink.trim() : null;
-  }
-  if (parsed.data.aiRecordingLink !== undefined) {
-    updatedExtra.aiRecordingLink = parsed.data.aiRecordingLink ? parsed.data.aiRecordingLink.trim() : null;
-  }
+    if (parsed.data.aiFeedbackLink !== undefined) {
+      updatedExtra.aiFeedbackLink = parsed.data.aiFeedbackLink ? parsed.data.aiFeedbackLink.trim() : null;
+    }
+    if (parsed.data.aiRecordingLink !== undefined) {
+      updatedExtra.aiRecordingLink = parsed.data.aiRecordingLink ? parsed.data.aiRecordingLink.trim() : null;
+    }
 
-  await db.update(schema.internOnboarding).set({ extraData: updatedExtra }).where(eq(schema.internOnboarding.id, row.id));
+    await tx.update(schema.internOnboarding).set({ extraData: updatedExtra }).where(eq(schema.internOnboarding.id, row.id));
+    return { prevExtra, updatedExtra };
+  });
+  if (!outcome) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  const { prevExtra, updatedExtra } = outcome;
   await afterRatingsSaved(id, prevExtra, updatedExtra);
   return NextResponse.json({ ok: true, findternScore: updatedExtra.findternScore });
 }

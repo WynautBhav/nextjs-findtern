@@ -13,7 +13,8 @@ import { placementLedger } from "@/lib/dues";
 import { placeOfSupply } from "@/lib/gst";
 import { getInvoiceSeller } from "@/lib/invoice-seller";
 import { LEGACY_INVOICE_CUTOFF, taxInvoiceHtml } from "@/lib/invoice";
-import { employerInvoice, type InvoiceHire } from "@/lib/employer-invoice";
+import { employerInvoices } from "@/lib/employer-invoice";
+import { loadInvoiceHires } from "@/lib/employer-invoice-hires";
 import { timezoneForLocation } from "@/lib/timezones";
 import { parseOffer } from "@/lib/offer";
 import { payableCheckout } from "@/lib/employer-payable";
@@ -95,12 +96,8 @@ async function loadOrders(employerId: string) {
   };
 
   const nameOf = (r: (typeof proposalRows)[number]) => `${r.firstName ?? ""} ${r.lastName ?? ""}`.trim() || "Candidate";
-  const hiresById = new Map<string, InvoiceHire>(
-    proposalRows.map((r) => [
-      r.proposal.id,
-      { proposalId: r.proposal.id, offerDetails: r.proposal.offerDetails, currency: r.proposal.currency, who: nameOf(r), projectName: r.projectName },
-    ]),
-  );
+  // The same hire loader and batch builder the admin ledger uses.
+  const hiresById = await loadInvoiceHires(db, paymentRows);
 
   // Interns who already have a live full-time offer from this company.
   const fullTimeFor = new Set(
@@ -149,13 +146,13 @@ async function loadOrders(employerId: string) {
   const seller = getInvoiceSeller();
   // Money received only: a cancelled, failed or abandoned checkout is not an
   // invoice (bug sheet 7 S1 r135), and a ₹0 test order has nothing to bill.
-  const invoices: InvoiceRow[] = paymentRows
-    .filter((p) => isPaidRow(p) && p.amountMinor > 0)
+  const paidPayments = paymentRows.filter((p) => isPaidRow(p) && p.amountMinor > 0);
+  const built = employerInvoices({ payments: paidPayments, allPayments: paymentRows, legacyPaid: paidRefs, hires: hiresById });
+  const invoices: InvoiceRow[] = paidPayments
     .map((p) => {
-      const inv = employerInvoice({ payment: p, allPayments: paymentRows, legacyPaid: paidRefs, hires: hiresById });
+      const inv = built.get(p.id)!;
       const { number, lines } = inv;
       const currency = p.currency || "INR";
-      const promo = (p.raw as { promo?: { promoCode?: string; discountMinor?: number } } | null)?.promo;
       return {
         id: p.id,
         number,
@@ -175,7 +172,7 @@ async function loadOrders(employerId: string) {
           amountMinor: p.amountMinor,
           description: inv.description,
           lines: lines.length ? lines : undefined,
-          promo: promo?.promoCode ? { code: promo.promoCode, discountMinor: promo.discountMinor ?? null } : null,
+          promo: inv.promo,
           seller,
           buyer: { ...buyer, place: placeOfSupply({ ...buyer, currency }) },
         }),

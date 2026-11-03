@@ -18,6 +18,8 @@ export type AdminInvoiceRow = {
   /** Invoice description and lines, from the same `employerInvoice` the employer's copy uses. Employer rows only. */
   invoiceDescription?: string;
   invoiceLines?: InvoiceLine[];
+  /** The promo note, from the same builder; `undefined` for rows that do not use it (intern fees). */
+  invoicePromo?: { code: string; discountMinor: number | null } | null;
   /** FY serial stored at payment ("021126-124", or "FT/2026-27/0001" before 2 Nov 2026); null for unpaid / legacy rows. */
   invoiceNumber?: string | null;
   orderId: string;

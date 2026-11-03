@@ -53,9 +53,12 @@ export function RatingsEditor({
   const [saved, setSaved] = useState<number | null>(null);
 
   async function save() {
+    // Only what the admin changed is sent: saving just a link must not touch (or clear) the ratings and an imported score.
     const payload: Record<string, unknown> = {};
     for (const axis of AXES) {
       const raw = values[axis.key].trim();
+      const before = ratings[axis.key]?.toString() ?? "";
+      if (raw === before) continue;
       // An emptied box clears that rating (legacy behaviour).
       if (!raw) {
         payload[axis.key] = null;
@@ -68,8 +71,12 @@ export function RatingsEditor({
       }
       payload[axis.key] = n;
     }
-    payload.aiFeedbackLink = feedbackLink.trim() || null;
-    payload.aiRecordingLink = recordingLink.trim() || null;
+    if (feedbackLink.trim() !== (initialFeedbackLink ?? "").trim()) payload.aiFeedbackLink = feedbackLink.trim() || null;
+    if (recordingLink.trim() !== (initialRecordingLink ?? "").trim()) payload.aiRecordingLink = recordingLink.trim() || null;
+    if (Object.keys(payload).length === 0) {
+      setError("Nothing changed.");
+      return;
+    }
 
     setBusy(true);
     setError(null);

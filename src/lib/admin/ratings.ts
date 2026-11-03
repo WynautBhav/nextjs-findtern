@@ -1,3 +1,5 @@
+import { rawScore } from "../employer-candidates.ts";
+
 export const RATING_KEYS = ["communication", "coding", "aptitude", "interview"] as const;
 
 /** A number sets the rating, `null` clears it, `undefined` leaves it alone. */
@@ -21,7 +23,7 @@ function bonusApplied(extra: Record<string, unknown>): number {
   const count = completionBonusCount(extra);
   const n = extra.completionBonusApplied;
   if (typeof n === "number" && Number.isInteger(n) && n >= 0) return Math.min(n, count);
-  return typeof extra.findternScore === "number" && Number.isFinite(extra.findternScore) ? count : 0;
+  return rawScore(extra) !== null ? count : 0;
 }
 
 /**
@@ -35,8 +37,9 @@ function bonusApplied(extra: Record<string, unknown>): number {
 export function grantCompletionBonus(extra: Record<string, unknown>): Record<string, unknown> {
   const count = completionBonusCount(extra) + 1;
   const next: Record<string, unknown> = { ...extra, completionBonusCount: count };
-  if (typeof extra.findternScore === "number" && Number.isFinite(extra.findternScore)) {
-    next.findternScore = clampRound(extra.findternScore + 1);
+  const live = rawScore(extra);
+  if (live !== null) {
+    next.findternScore = clampRound(live + 1);
     next.completionBonusApplied = bonusApplied(extra) + 1;
   } else {
     next.completionBonusApplied = bonusApplied(extra);
@@ -58,6 +61,13 @@ export function grantCompletionBonus(extra: Record<string, unknown>): Record<str
  * bonus twice. Only a bonus still pending (granted before any score existed,
  * so no exported number can contain it) is added to a given score, once; the
  * applied counter then stops it being added again.
+ *
+ * Admins must NOT hand-add +1 in a sheet for a granted bonus: the bonus is
+ * added here (or already sits in the exported number), so a hand-added +1
+ * would count twice.
+ *
+ * Clearing the score keeps `completionBonusApplied` as it was (never reset
+ * to 0): re-importing an old sheet later must not add the bonus a second time.
  */
 export function applyRatings(
   extra: Record<string, unknown>,
@@ -79,9 +89,15 @@ export function applyRatings(
         ? clampRound(values.reduce((a, b) => a + b, 0) / values.length + count)
         : null;
   const next: Record<string, unknown> = { ...extra, ratings };
+  const clearing = Object.values(updates).some((v) => v === null);
+  if (score === null && !clearing && values.length === 0) {
+    // Nothing rated and nothing cleared (a link-only save, a webhook with no usable score): an imported score stays.
+    return next;
+  }
   if (score === null) {
     delete next.findternScore;
-    if (count > 0) next.completionBonusApplied = 0;
+    // Pin the counter (legacy rows without it would otherwise read as pending once the score is gone).
+    if (count > 0) next.completionBonusApplied = bonusApplied(extra);
   } else {
     next.findternScore = score;
     if (count > 0) next.completionBonusApplied = count;
@@ -91,7 +107,7 @@ export function applyRatings(
 
 /** True when this change gives the intern their first live (> 0) score. */
 export function firstLiveScore(prev: Record<string, unknown>, next: Record<string, unknown>): boolean {
-  const live = (e: Record<string, unknown>) => typeof e.findternScore === "number" && e.findternScore > 0;
+  const live = (e: Record<string, unknown>) => (rawScore(e) ?? 0) > 0;
   return !live(prev) && live(next);
 }
 
