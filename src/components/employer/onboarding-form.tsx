@@ -41,7 +41,8 @@ import {
  * roles) are the same in both places.
  */
 
-const DRAFT_KEY = "findtern:employer-onboarding:v1";
+// Per account (v1 was one shared key, so a second company inherited the first one's draft).
+const DRAFT_KEY = "findtern:employer-onboarding:v2";
 
 const STAGES = [
   { id: "company", title: "Your company", blurb: "Who you are, and who we call when an intern needs an answer." },
@@ -75,7 +76,8 @@ export function EmployerOnboardingForm({
   const [notice, setNotice] = useState<{ tone: "error" | "success"; text: string } | null>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
 
-  const stored = useSyncExternalStore(subscribeToNothing, readDraft, () => null);
+  const draftKey = `${DRAFT_KEY}:${initial.company.companyEmail.trim().toLowerCase()}`;
+  const stored = useSyncExternalStore(subscribeToNothing, () => readDraft(draftKey), () => null);
 
   // Merged per stage, not with a top-level spread: `{ ...initial, ...draft }`
   // would let a draft that only has `company` blank out `project` entirely.
@@ -96,11 +98,11 @@ export function EmployerOnboardingForm({
   useEffect(() => {
     if (!dirty) return;
     try {
-      window.localStorage.setItem(DRAFT_KEY, JSON.stringify(values));
+      window.localStorage.setItem(draftKey, JSON.stringify(values));
     } catch {
       // Quota errors in private mode are non-fatal; state lives in memory too.
     }
-  }, [values, dirty]);
+  }, [values, dirty, draftKey]);
 
   // Patches merge onto the latest pending edit, not the render's snapshot:
   // picking a city sets the city and then the state in one tick, and the
@@ -234,7 +236,7 @@ export function EmployerOnboardingForm({
         return;
       }
       try {
-        window.localStorage.removeItem(DRAFT_KEY);
+        window.localStorage.removeItem(draftKey);
       } catch {
         // Private mode - nothing was stored.
       }
@@ -667,9 +669,9 @@ function subscribeToNothing() {
 /* Returns the raw string, not a parsed object: useSyncExternalStore compares
  * snapshots with Object.is, and JSON.parse would hand back a fresh object on
  * every call - an unconditional re-render loop. */
-function readDraft(): string | null {
+function readDraft(key: string): string | null {
   try {
-    return window.localStorage.getItem(DRAFT_KEY);
+    return window.localStorage.getItem(key);
   } catch {
     return null;
   }
