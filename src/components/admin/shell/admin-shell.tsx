@@ -176,12 +176,12 @@ export function AdminShell({
           <div key={group.title ?? i}>
             {group.title ? (
               compact ? (
-                <div aria-hidden className="mx-auto mb-1 h-px w-6 bg-ink-300" />
+                <div aria-hidden className="mx-auto mb-2 h-px w-6 bg-ink-300" />
               ) : (
-                <p className="mb-1 px-3 text-xs font-medium text-text-subtle">{group.title}</p>
+                <p className="mb-2 px-4 text-xs font-medium uppercase tracking-wide text-text-subtle">{group.title}</p>
               )
             ) : null}
-            <ul className="flex flex-col">
+            <ul className="flex flex-col gap-1">
               {group.items.map((item) => (
                 <li key={item.href}>
                   <RailLink item={item} active={activeHref === item.href.split("#")[0]} compact={compact} onNavigate={onNavigate} />
@@ -192,18 +192,18 @@ export function AdminShell({
         ))}
       </RailScroller>
 
-      <div className="mt-2 shrink-0 space-y-0.5 border-t border-ink-300/60 pt-2">
+      <div className="mt-3 shrink-0 space-y-1 border-t border-ink-300/60 pt-3">
         <FeedbackFab
           variant="link"
           deepLink={!onNavigate}
-          className={cn("w-full gap-3 text-ink-600 hover:bg-[var(--admin-panel)] hover:text-ink-900 [&>svg]:size-5 [@media(pointer:fine)]:min-h-8", compact && "justify-center px-0 [&>span]:sr-only")}
+          className={cn("w-full gap-3.5 px-4 text-ink-600 hover:bg-[var(--admin-panel)] hover:text-ink-900 [&>svg]:size-5 [@media(pointer:fine)]:min-h-10", compact && "justify-center px-0 [&>span]:sr-only")}
         />
         <button
           type="button"
           onClick={signOut}
           title={compact ? "Sign out" : undefined}
           className={cn(
-            "apple-spring flex min-h-11 w-full items-center gap-3 rounded-full px-3 text-sm text-ink-600 hover:bg-[var(--admin-panel)] hover:text-ink-900 [@media(pointer:fine)]:min-h-8",
+            "apple-spring flex min-h-11 w-full items-center gap-3.5 rounded-full px-4 text-sm text-ink-600 hover:bg-[var(--admin-panel)] hover:text-ink-900 [@media(pointer:fine)]:min-h-10",
             compact && "justify-center px-0",
           )}
         >
@@ -211,7 +211,7 @@ export function AdminShell({
           <span className={cn(compact && "sr-only")}>Sign out</span>
         </button>
         {signOutError ? (
-          <p role="alert" className="px-3 text-xs text-danger">
+          <p role="alert" className="px-4 text-xs text-danger">
             Sign out didn&apos;t go through. Check your connection and try again.
           </p>
         ) : null}
@@ -235,8 +235,8 @@ export function AdminShell({
           <aside
             aria-label="Sidebar"
             className={cn(
-              "sticky top-3 hidden h-[calc(100dvh-1.5rem)] shrink-0 flex-col px-4 py-4 transition-[width] duration-[var(--duration-admin-slow)] ease-[var(--ease-out-soft)] motion-reduce:transition-none lg:flex",
-              collapsed ? "w-[5.5rem]" : "w-64",
+              "sticky top-3 hidden h-[calc(100dvh-1.5rem)] shrink-0 flex-col px-5 py-5 transition-[width] duration-[var(--duration-admin-slow)] ease-[var(--ease-out-soft)] motion-reduce:transition-none lg:flex",
+              collapsed ? "w-[5.75rem]" : "w-72",
             )}
           >
             <div className={cn("flex min-h-10 items-center", collapsed ? "justify-center" : "gap-2 px-2")}>
@@ -376,10 +376,10 @@ function RailScroller({ children }: { children: React.ReactNode }) {
       ref={ref}
       aria-label="Main"
       className={cn(
-        "mt-2 min-h-0 flex-1 space-y-2.5 overflow-y-auto overflow-x-hidden overscroll-contain pb-0 [scrollbar-color:var(--color-ink-300)_transparent] [scrollbar-width:thin]",
+        "-mx-2 mt-3 min-h-0 flex-1 space-y-6 overflow-y-auto overflow-x-hidden overscroll-contain px-2 py-1 [scrollbar-color:var(--color-ink-300)_transparent] [scrollbar-width:thin]",
         // Fade only the edge that has more behind it; the scrollbar stays visible.
-        more && !above && "[mask-image:linear-gradient(to_bottom,black_calc(100%-1.5rem),transparent)]",
-        more && above && "[mask-image:linear-gradient(to_bottom,transparent,black_1rem,black_calc(100%-1.5rem),transparent)]",
+        more && !above && "[mask-image:linear-gradient(to_bottom,black_calc(100%-2rem),transparent)]",
+        more && above && "[mask-image:linear-gradient(to_bottom,transparent,black_1rem,black_calc(100%-2rem),transparent)]",
         !more && above && "[mask-image:linear-gradient(to_bottom,transparent,black_1rem)]",
       )}
     >
@@ -396,8 +396,9 @@ function RailLink({ item, active, compact, onNavigate }: { item: AdminNavItem; a
       aria-current={active ? "page" : undefined}
       title={compact ? item.label : undefined}
       className={cn(
-        // 44px on touch; 40px with a mouse. A short window scrolls the rail rather than squeezing the links (QA-144).
-        "apple-spring group relative flex min-h-11 items-center gap-3 rounded-full px-3 text-sm [@media(pointer:fine)]:min-h-7",
+        // 44px on touch; 40px with a mouse. A short window scrolls the rail rather than squeezing the links (QA-144),
+        // with a gap between rows and wider spacing between groups.
+        "apple-spring group relative flex min-h-11 items-center gap-3.5 rounded-full px-4 text-sm [@media(pointer:fine)]:min-h-10",
         active ? "font-semibold text-brand-700" : "text-ink-600 hover:text-ink-900",
         compact && "justify-center px-0",
       )}
