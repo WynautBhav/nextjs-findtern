@@ -8,6 +8,7 @@ import { requireMutation } from "@/lib/guards-mutation";
 import { employerNames, internFirstName, notify } from "@/lib/notify";
 import { normalizeMeetingLink } from "@/lib/employer-interview-rules";
 import { requirePublicOrigin } from "@/lib/origin";
+import { limiters } from "@/lib/security/rate-limit";
 
 /**
  * Employer nudges the candidate about a scheduled interview. At most one
@@ -24,6 +25,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (interview.employerId !== guard.session.uid) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   if (interview.status !== "scheduled" && interview.status !== "pending") {
     return NextResponse.json({ error: `This interview is already ${interview.status}` }, { status: 409 });
+  }
+
+  // One nudge per interview per 10 minutes, so it can't be used to spam the candidate.
+  if (!limiters.reminder.take(id)) {
+    return NextResponse.json({ error: "You just sent a reminder. Try again in a few minutes." }, { status: 429 });
   }
 
   const start = interview.selectedSlot ? [interview.slot1, interview.slot2, interview.slot3][interview.selectedSlot - 1] : null;

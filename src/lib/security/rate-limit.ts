@@ -108,6 +108,8 @@ export const limiters = {
   contact: new RateLimiter(8, 15 * 60_000),
   // Signup's "is this number taken?" pre-check. Unauthenticated, so it is
   // throttled to stop it being used to scan which numbers hold accounts.
+  // Employer "send reminder", keyed on the interview.
+  reminder: new RateLimiter(1, 10 * 60_000, { bypassable: false }),
   phoneLookup: new RateLimiter(10, 15 * 60_000),
 };
 
