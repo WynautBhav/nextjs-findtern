@@ -186,6 +186,9 @@ export default async function AdminInterns({
       action={
         <div className="flex flex-wrap items-center gap-2">
           <RatingsImport />
+          <Link href="/admin/interns/ai-reports" className={buttonClass({ variant: "outline" })}>
+            AI reports
+          </Link>
           <a href={exportHref} className={buttonClass({ variant: "outline" })}>
             <Download className="size-4" aria-hidden />
             Export CSV

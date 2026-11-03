@@ -116,6 +116,10 @@ export function calendarConfig(): GoogleConfig | null {
 }
 export const CALENDAR_TOKEN_OWNER = process.env.FINDTERN_GOOGLE_TOKEN_OWNER_ID || "admin";
 export const CALENDAR_SCOPES = ["https://www.googleapis.com/auth/calendar.events"];
+/** Files this app creates in Findtern's Drive (the redacted AI reports); it cannot see anything else there. */
+export const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
+/** Everything the one Findtern Google connection is asked for. */
+export const FINDTERN_GOOGLE_SCOPES = [...CALENDAR_SCOPES, DRIVE_SCOPE];
 
 /**
  * Creates an event with a Google Meet link on Findtern's calendar and
@@ -168,7 +172,7 @@ export async function deleteMeetEvent(refreshToken: string, eventId: string): Pr
   if (!res.ok && res.status !== 410) throw new Error(`Google Calendar delete failed (${res.status})`);
 }
 
-export type GoogleTokens = { access_token: string; refresh_token?: string; expires_in: number; id_token?: string };
+export type GoogleTokens = { access_token: string; refresh_token?: string; expires_in: number; id_token?: string; scope?: string };
 
 export async function exchangeCode(cfg: GoogleConfig, code: string): Promise<GoogleTokens> {
   const res = await fetch(TOKEN_URL, {

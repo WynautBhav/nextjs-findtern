@@ -14,7 +14,8 @@ const CSP = [
   "img-src 'self' data: blob: https:",
   "media-src 'self' blob: https:",
   "font-src 'self' data:",
-  "connect-src 'self' https://api.razorpay.com https://lumberjack.razorpay.com https://*.google-analytics.com https://*.analytics.google.com https://www.googletagmanager.com https://www.facebook.com https://connect.facebook.net https://vitals.vercel-insights.com",
+  // www.googleapis.com: the admin's browser sends redacted AI reports straight to Google Drive's resumable upload URL.
+  "connect-src 'self' https://www.googleapis.com https://api.razorpay.com https://lumberjack.razorpay.com https://*.google-analytics.com https://*.analytics.google.com https://www.googletagmanager.com https://www.facebook.com https://connect.facebook.net https://vitals.vercel-insights.com",
   // Razorpay checkout; the Google map on /contact; Tag Manager's noscript frame; the Meta pixel's frame.
   "frame-src https://api.razorpay.com https://checkout.razorpay.com https://www.google.com https://www.googletagmanager.com https://www.facebook.com",
   "worker-src 'self'",

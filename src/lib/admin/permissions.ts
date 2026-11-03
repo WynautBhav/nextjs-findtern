@@ -87,6 +87,7 @@ const RULES: Rule[] = [
   ["/api/admin/interns/visibility", ["interns:read"], ["interns:write"]],
   ["/api/admin/intern", INTERN_LEGAL_R, INTERN_LEGAL_W],
   ["/api/admin/interviews", ["interns:read"], ["interns:write"]],
+  ["/api/admin/ai-reports", ["interns:read"], ["interns:write"]],
   ["/api/admin/company", COMPANY_LEGAL_R, COMPANY_LEGAL_W],
   ["/api/admin/companies", ["companies:read"], ["companies:write"]],
   ["/api/admin/colleges", ["companies:read"], ["companies:write"]],

@@ -2,9 +2,9 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
 import { getDb, schema } from "@/lib/db";
-import { CALENDAR_TOKEN_OWNER, calendarConfig, exchangeCode, NONCE_COOKIE } from "@/lib/google";
+import { CALENDAR_SCOPES, CALENDAR_TOKEN_OWNER, calendarConfig, exchangeCode, NONCE_COOKIE } from "@/lib/google";
 
-/** Stores Findtern's calendar refresh token (same row the legacy app uses). */
+/** Stores Findtern's Google refresh token (same row the legacy app uses). */
 export async function GET(req: Request) {
   const url = new URL(req.url);
   const back = (q: string) => NextResponse.redirect(new URL(`/admin/settings?google=${q}`, req.url));
@@ -23,7 +23,8 @@ export async function GET(req: Request) {
     const values = {
       accessToken: t.access_token,
       refreshToken: t.refresh_token,
-      scope: "calendar.events",
+      // What Google actually granted: the person can untick Drive on the consent screen.
+      scope: t.scope ?? CALENDAR_SCOPES.join(" "),
       tokenType: "Bearer",
       expiryDate: new Date(Date.now() + t.expires_in * 1000),
       updatedAt: new Date(),
