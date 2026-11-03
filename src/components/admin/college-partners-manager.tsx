@@ -13,6 +13,8 @@ export type CollegeAdminRow = {
   name: string;
   city: string | null;
   aisheCode: string | null;
+  /** Findtern college code students search by. */
+  code: string | null;
   emailDomains: string[];
   isPartner: boolean;
   showOnWebsite: boolean;

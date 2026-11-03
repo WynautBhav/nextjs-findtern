@@ -32,6 +32,7 @@ export default async function AdminCollegesPage() {
     name: r.college.name,
     city: r.college.city,
     aisheCode: r.college.aisheCode,
+    code: r.college.code,
     emailDomains: r.college.emailDomains,
     isPartner: r.college.isPartner,
     showOnWebsite: r.college.showOnWebsite,
@@ -48,13 +49,13 @@ export default async function AdminCollegesPage() {
     <div className="space-y-6">
       <AdminPageHeader
         title="College partners"
-        subtitle="Officers see only their own college's consenting students."
+        subtitle="Officers see every student of their own college."
       />
       {list.map((r) => (
         <Panel key={r.id}>
           <PanelHeader
             title={r.name}
-            description={[r.city, r.aisheCode ? `AISHE ${r.aisheCode}` : null, r.emailDomains.length ? `@${r.emailDomains.join(", @")}` : null].filter(Boolean).join(" · ")}
+            description={[r.code ? `Code ${r.code}` : null, r.city, r.aisheCode ? `AISHE ${r.aisheCode}` : null, r.emailDomains.length ? `@${r.emailDomains.join(", @")}` : null].filter(Boolean).join(" · ")}
             action={
               <span className="nums text-sm text-text-subtle">
                 {r.members} {r.members === 1 ? "student" : "students"} · {r.roster} on roster · {r.drives} {r.drives === 1 ? "drive" : "drives"}

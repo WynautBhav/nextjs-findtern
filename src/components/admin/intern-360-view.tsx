@@ -8,6 +8,7 @@ import { csrfFetch } from "@/lib/client-fetch";
 import { toInrMinor } from "@/lib/admin/money";
 import { formatDate, formatMoney, formatSlotTime, shortDate } from "@/lib/format";
 import { StatusBadge, humanizeStatus } from "@/components/admin/status-badge";
+import { CompletionBonusButton } from "@/components/admin/completion-bonus-button";
 import { InternPayoutTools } from "@/components/admin/intern-payout-tools";
 import { owedMinor, stipendDues } from "@/lib/admin/stipend-dues";
 import { InternSkillsEditor } from "@/components/admin/intern-skills-editor";
@@ -365,6 +366,15 @@ export function Intern360View({
                               <Eye className="size-4" aria-hidden />
                               View offer
                             </button>
+                            {p.status === "hired" || p.hiredAt ? (
+                              <div className="mt-2">
+                                <CompletionBonusButton
+                                  internId={user.id}
+                                  proposalId={p.id}
+                                  grantedOn={p.completionBonusAt ? formatDate(p.completionBonusAt) : null}
+                                />
+                              </div>
+                            ) : null}
                           </td>
                         </tr>
                       );
