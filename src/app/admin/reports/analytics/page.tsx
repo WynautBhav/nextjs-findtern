@@ -1,14 +1,17 @@
 import type { Metadata } from "next";
 import { Download } from "lucide-react";
 
-import { LineDuo } from "@/components/admin/charts/line-duo";
 import { IdentityCell } from "@/components/admin/data-table";
 import { AdminLoadError, AdminPageHeader, Panel, PanelBody, PanelHeader } from "@/components/admin/panel";
 import { ADMIN_PILL_PRIMARY, ADMIN_PILL_SECONDARY } from "@/components/admin/surface";
-import { ChipLinks, DateRangeForm, ReportRange } from "@/components/admin/report-range";
-import { StatCard, StatGrid } from "@/components/admin/stat-card";
+import { ChipLinks, DateRangeForm } from "@/components/admin/report-range";
+import { ChartCard } from "@/components/admin/reports/chart-card";
+import { Funnel } from "@/components/admin/reports/funnel";
+import { PeriodBar } from "@/components/admin/reports/period-bar";
+import { RankCard } from "@/components/admin/reports/rank-card";
+import { StatStrip, trendOf } from "@/components/admin/reports/stat-strip";
+import { formatPercentDelta } from "@/lib/admin/reports-shape";
 import { StatusBadge } from "@/components/admin/status-badge";
-import { PipelineBars } from "@/components/admin/trend-chart";
 import { ButtonAnchor, ButtonLink } from "@/components/ui/button";
 import { filterHires, type Analytics, type HireFilter } from "@/lib/admin/analytics";
 import { analyticsRange, loadAnalytics } from "@/lib/admin/analytics-load";
@@ -64,7 +67,7 @@ export default async function AdminAnalyticsPage({ searchParams }: { searchParam
 
   if (!a) {
     return (
-      <div className="space-y-6 lg:space-y-8">
+      <div className="space-y-5 lg:space-y-6">
         {header}
         <Panel>
           <AdminLoadError what="hiring analytics" retryHref={BASE} />
@@ -86,100 +89,116 @@ export default async function AdminAnalyticsPage({ searchParams }: { searchParam
   const hires = filterHires(a.hiredList, hireFilter);
 
   return (
-    <div className="space-y-6 lg:space-y-8">
+    <div className="space-y-5 lg:space-y-6">
       {header}
-      <ReportRange basePath={BASE} params={params} defaultLabel="Last 18 months" />
+      <PeriodBar basePath={BASE} params={params} defaultValue="" defaultLabel="Last 18 months" />
 
-      <StatGrid cols={4}>
-        <StatCard
-          label="Signups"
-          value={formatNumber(a.totals.signups)}
-          hint={`${a.totals.activeUsers} with a real profile`}
-          delta={a.rates.monthlyGrowth == null ? undefined : `${a.rates.monthlyGrowth > 0 ? "+" : ""}${a.rates.monthlyGrowth}% vs previous period`}
-        />
-        <StatCard featured label="Hires" value={formatNumber(a.totals.hires)} hint={`${a.totals.fullTimeHires} full-time · ${a.totals.proposals} offers sent`} />
-        <StatCard
-          label="Revenue"
-          value={formatMoney(a.totals.revenueMinor, "INR", { zeroLabel: "₹0" })}
-          hint={`Companies ${formatMoney(a.totals.revenueEmployersMinor, "INR", { zeroLabel: "₹0" })} · Fees ${formatMoney(a.totals.revenueInternsMinor, "INR", { zeroLabel: "₹0" })}`}
-        />
-        <StatCard label="Avg time to hire" value={a.rates.avgHireTimeDays == null ? "-" : `${a.rates.avgHireTimeDays} days`} hint="Offer sent to employer paid" />
-      </StatGrid>
+      <StatStrip
+        stats={[
+          {
+            label: "Signups",
+            value: formatNumber(a.totals.signups),
+            note: a.rates.monthlyGrowth == null ? `${a.totals.activeUsers} with a real profile` : `vs previous period \u00b7 ${a.totals.activeUsers} with a real profile`,
+            delta: a.rates.monthlyGrowth == null ? undefined : formatPercentDelta(Math.round(a.rates.monthlyGrowth)),
+            trend: trendOf(a.rates.monthlyGrowth == null ? null : Math.round(a.rates.monthlyGrowth)),
+          },
+          { label: "Hires", value: formatNumber(a.totals.hires), accent: true, note: `${a.totals.fullTimeHires} full-time \u00b7 ${a.totals.proposals} offers sent` },
+          {
+            label: "Revenue",
+            value: formatMoney(a.totals.revenueMinor, "INR", { zeroLabel: "\u20b90" }),
+            note: `Companies ${formatMoney(a.totals.revenueEmployersMinor, "INR", { zeroLabel: "\u20b90" })} \u00b7 Fees ${formatMoney(a.totals.revenueInternsMinor, "INR", { zeroLabel: "\u20b90" })}`,
+          },
+          { label: "Avg time to hire", value: a.rates.avgHireTimeDays == null ? "-" : `${a.rates.avgHireTimeDays} days`, note: "Offer sent to employer paid" },
+        ]}
+      />
 
-      <div className="grid gap-[var(--admin-gap)] lg:grid-cols-2">
+      <div className="grid gap-[var(--admin-gap)] xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
         <Panel>
           <PanelHeader
-            title="Conversion funnel"
-            description="Interns who signed up in the range, by the furthest step they reached. Percentages are of signups; the biggest step down is the leak."
+            title="Where do signups drop out?"
+            description="Interns who signed up in the range, by the furthest step they reached. Shares are of signups."
           />
           <PanelBody>
-            <PipelineBars percentOf="first" items={a.funnel.map((f) => ({ status: f.stage, label: f.stage, count: f.value }))} />
+            <Funnel ariaLabel="Conversion funnel" steps={a.funnel.map((f) => ({ label: f.stage, count: f.value }))} />
           </PanelBody>
         </Panel>
 
-        <Panel>
-          <PanelHeader
-            title="Employer behaviour"
-            description="Active: posted a project or sent an offer in the range. Repeat: paid two or more orders in the range."
-          />
-          <PanelBody>
-            <dl className="grid gap-4 sm:grid-cols-3">
-              <Ratio label="Active employers" value={rate(a.rates.activeEmployerRate)} note={`${a.totals.activeEmployers} companies`} />
-              <Ratio label="Repeat employers" value={rate(a.rates.repeatEmployerRate)} note={`${a.totals.repeatEmployers} of the active ones`} />
-              <Ratio label="Active projects" value={rate(a.rates.activeProjectRate)} note={`${a.totals.activeProjects} of ${a.totals.projects} posted`} />
+        <div className="grid content-start gap-[var(--admin-gap)]">
+          <Panel>
+            <PanelHeader title="Employer behaviour" description="Active: posted a project or sent an offer in the range. Repeat: paid two or more orders." />
+            <PanelBody>
+              <dl className="grid grid-cols-3 gap-4">
+                <Ratio label="Active employers" value={rate(a.rates.activeEmployerRate)} note={`${a.totals.activeEmployers} companies`} />
+                <Ratio label="Repeat employers" value={rate(a.rates.repeatEmployerRate)} note={`${a.totals.repeatEmployers} of the active`} />
+                <Ratio label="Active projects" value={rate(a.rates.activeProjectRate)} note={`${a.totals.activeProjects} of ${a.totals.projects}`} />
+              </dl>
+            </PanelBody>
+          </Panel>
+          <Panel>
+            <PanelHeader title="Rates" description="Within the selected range." />
+            <dl className="mt-2 divide-y divide-[color:var(--admin-rule)] px-[var(--admin-pad-panel)] pb-2 text-sm">
+              {[
+                ["Offer success", rate(a.rates.successRate)],
+                ["Placement", rate(a.rates.placementRate)],
+                ["Interview", rate(a.rates.interviewRate)],
+                ["Profile completion", rate(a.rates.profileCompletionRate)],
+                ["Offer \u2192 hire per intern", rate(a.rates.applicationSuccessRate)],
+                ["Offers per signup", rate(a.rates.avgAppsPerUser, "")],
+                ["Projects per company", rate(a.rates.projectsPerCompany, "")],
+                ["Hires per company", rate(a.rates.hiresPerCompany, "")],
+                ["Signup growth", a.rates.monthlyGrowth == null ? "-" : `${a.rates.monthlyGrowth}%`],
+              ].map(([k, v]) => (
+                <div key={k} className="flex items-baseline justify-between gap-4 py-2">
+                  <dt className="text-text-subtle">{k}</dt>
+                  <dd className="nums text-right font-semibold text-foreground">{v}</dd>
+                </div>
+              ))}
             </dl>
-          </PanelBody>
-        </Panel>
+          </Panel>
+        </div>
       </div>
 
-      <Panel>
-        <PanelHeader title="Rates" description="Within the selected range." />
-        <PanelBody>
-          <dl className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3 xl:grid-cols-5">
-            {[
-              ["Offer success", rate(a.rates.successRate)],
-              ["Placement", rate(a.rates.placementRate)],
-              ["Interview", rate(a.rates.interviewRate)],
-              ["Profile completion", rate(a.rates.profileCompletionRate)],
-              ["Offer → hire per intern", rate(a.rates.applicationSuccessRate)],
-              ["Offers per signup", rate(a.rates.avgAppsPerUser, "")],
-              ["Projects per company", rate(a.rates.projectsPerCompany, "")],
-              ["Hires per company", rate(a.rates.hiresPerCompany, "")],
-              ["Signup growth", a.rates.monthlyGrowth == null ? "-" : `${a.rates.monthlyGrowth}%`],
-            ].map(([k, v]) => (
-              <Ratio key={k} label={k} value={v} />
-            ))}
-          </dl>
-        </PanelBody>
-      </Panel>
-
-      <Panel>
-        <PanelHeader title="Monthly performance" description="Offers sent, hires, offer success (hires ÷ offers) and interview rate per month." />
-        {a.trend.length >= 2 ? (
-          <PanelBody>
-            <LineDuo
-              ariaLabel="Offers sent and hires per month"
-              series={[
+      <div>
+        <ChartCard
+          views={[
+            {
+              key: "perf",
+              tab: "Offers and hires",
+              title: "Are offers turning into hires?",
+              note: "Offers sent and hires per month in the range. Success is hires divided by offers.",
+              unit: "Count per month",
+              format: "count",
+              series: [
                 { label: "Offers", tone: "current", points: a.trend.map((t) => ({ x: t.month, y: t.proposals })) },
                 { label: "Hires", tone: "previous", points: a.trend.map((t) => ({ x: t.month, y: t.hires })) },
-              ]}
-            />
-          </PanelBody>
-        ) : null}
-        <SimpleTable
-          minWidth="lg:min-w-[32rem]"
-          head={["Month", "Offers", "Hires", "Success", "Interview rate"]}
-          right={[1, 2, 3, 4]}
-          rows={a.trend.map((t) => [t.month, String(t.proposals), String(t.hires), `${t.successRate}%`, `${t.interviewRate}%`])}
-          empty="No months in this range."
+              ],
+            },
+          ]}
         />
-      </Panel>
-
-      <div className="grid gap-[var(--admin-gap)] lg:grid-cols-3">
-        <RankList title="Skills in demand" note="Projects asking for each skill" rows={a.skillDemand.map((s) => [s.skill, `${s.count}`])} />
-        <RankList title="Highest-paying skills" note="Average monthly offer (INR)" rows={a.highestPayingSkills.map((s) => [s.skill, formatMoney(s.avgMonthlyMinor, "INR")])} />
-        <RankList title="Demand by region" note="Projects by state or city" rows={a.regionDemand.map((r) => [r.region, `${r.count}`])} />
+        <details className="group mt-2 overflow-hidden rounded-[var(--radius-admin-card)] bg-[color:var(--admin-panel)] shadow-[var(--admin-shadow)]">
+          <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between px-[var(--admin-pad-panel)] py-3 text-sm font-medium text-foreground focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring [&::-webkit-details-marker]:hidden">
+            Month by month figures
+            <span aria-hidden className="text-text-subtle group-open:rotate-180">{"\u25be"}</span>
+          </summary>
+          <SimpleTable
+            minWidth="lg:min-w-[32rem]"
+            head={["Month", "Offers", "Hires", "Success", "Interview rate"]}
+            right={[1, 2, 3, 4]}
+            rows={a.trend.map((t) => [t.month, String(t.proposals), String(t.hires), `${t.successRate}%`, `${t.interviewRate}%`])}
+            empty="No months in this range."
+          />
+        </details>
       </div>
+
+      <RankCard
+        title="What employers are asking for"
+        description="Projects posted in the range."
+        groups={[
+          { title: "Skills in demand", note: "Projects asking for each skill", rows: a.skillDemand.map((x) => ({ label: x.skill, value: x.count })) },
+          { title: "Highest-paying skills", note: "Average monthly offer (INR)", rows: a.highestPayingSkills.map((x) => ({ label: x.skill, value: x.avgMonthlyMinor, display: formatMoney(x.avgMonthlyMinor, "INR") })) },
+          { title: "Demand by region", note: "Projects by state or city", rows: a.regionDemand.map((x) => ({ label: x.region, value: x.count })) },
+        ]}
+      />
 
       <div className="grid gap-[var(--admin-gap)] xl:grid-cols-2">
         <Panel>
@@ -286,8 +305,8 @@ export default async function AdminAnalyticsPage({ searchParams }: { searchParam
 function Ratio({ label, value, note }: { label: string; value: string; note?: string }) {
   return (
     <div>
-      <dt className="text-sm text-text-subtle">{label}</dt>
-      <dd className="nums mt-0.5 text-xl font-semibold text-foreground">{value}</dd>
+      <dt className="text-[0.8125rem] leading-snug text-text-subtle">{label}</dt>
+      <dd className="nums mt-0.5 text-2xl font-semibold tracking-[-0.02em] text-foreground">{value}</dd>
       {note ? <dd className="text-xs text-text-subtle">{note}</dd> : null}
     </div>
   );
@@ -339,30 +358,5 @@ function SimpleTable({
         </tbody>
       </table>
     </div>
-  );
-}
-
-function RankList({ title, note, rows }: { title: string; note: string; rows: [string, string][] }) {
-  return (
-    <Panel>
-      <PanelHeader title={title} description={note} />
-      <PanelBody>
-        {rows.length === 0 ? (
-          <p className="text-sm text-text-subtle">Nothing in this range.</p>
-        ) : (
-          <ol className="space-y-2 text-sm">
-            {rows.map(([label, value], i) => (
-              <li key={label} className="flex items-baseline justify-between gap-3">
-                <span className="min-w-0 truncate text-foreground">
-                  <span className="nums mr-2 text-text-subtle">{i + 1}.</span>
-                  {label}
-                </span>
-                <span className="nums shrink-0 font-semibold text-foreground">{value}</span>
-              </li>
-            ))}
-          </ol>
-        )}
-      </PanelBody>
-    </Panel>
   );
 }

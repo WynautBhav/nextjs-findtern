@@ -5,8 +5,12 @@ import { Download } from "lucide-react";
 import { IdentityCell } from "@/components/admin/data-table";
 import { AdminLoadError, AdminPageHeader, Panel, PanelHeader } from "@/components/admin/panel";
 import { ADMIN_PILL_PRIMARY, ADMIN_PILL_SECONDARY } from "@/components/admin/surface";
-import { ChipLinks, ReportRange } from "@/components/admin/report-range";
-import { StatCard, StatGrid } from "@/components/admin/stat-card";
+import { ChipLinks } from "@/components/admin/report-range";
+import { ChartCard } from "@/components/admin/reports/chart-card";
+import { PeriodBar } from "@/components/admin/reports/period-bar";
+import { StatStrip, trendOf } from "@/components/admin/reports/stat-strip";
+import { formatPercentDelta, monthlyFlows, percentChange, previousWindow } from "@/lib/admin/reports-shape";
+import { loadCollected } from "@/lib/admin/receivables-load";
 import { StatusBadge } from "@/components/admin/status-badge";
 import { ButtonAnchor, ButtonLink } from "@/components/ui/button";
 import { analyticsRange } from "@/lib/admin/analytics-load";
@@ -22,6 +26,8 @@ export const metadata: Metadata = { title: "Money in and out" };
 
 const BASE = "/admin/reports/money";
 const SHOWN = 300;
+/** Rows drawn before "Show all": long enough to be useful, short enough not to bury the page. */
+const FIRST_ROWS = 25;
 
 const STATUS_LABEL: Record<MoneyRow["status"], string> = {
   received: "Received",
@@ -60,6 +66,12 @@ export default async function AdminMoneyReportPage({ searchParams }: { searchPar
   } catch (error) {
     console.error("[admin/reports/money] load failed", error);
   }
+  const range = analyticsRange(params);
+  const prev = data ? previousWindow(range) : null;
+  // Same definition as the Reports page (loadCollected), so the delta is not a different "received".
+  const prevReceived = prev && (params.period !== "all" || params.from || params.to) ? await loadCollected(prev).then((c) => c.receivedMinor).catch(() => null) : null;
+  const receivedChange = data && prevReceived !== null ? percentChange(data.totals.receivedMinor, prevReceived) : null;
+  const view = params.view === "payables" ? "payables" : "receivables";
   const query = new URLSearchParams(params).toString();
   // A real minus sign (U+2212) glued to the figure, never a hyphen that can wrap off it.
   const inr = (m: number) => formatMoney(m, "INR", { zeroLabel: "₹0" }).replace(/^[-–−]\s*/, "\u2212");
@@ -79,8 +91,9 @@ export default async function AdminMoneyReportPage({ searchParams }: { searchPar
     />
   );
   // Filters that ride along when the period changes.
-  const keep = { receivables: params.receivables, payables: params.payables, company: params.company, candidate: params.candidate, status: params.status };
+  const keep = { receivables: params.receivables, payables: params.payables, company: params.company, candidate: params.candidate, status: params.status, view: params.view };
   const filtered = Boolean(rowFilter.company || rowFilter.candidate || rowFilter.status);
+  const flows = data ? monthlyFlows(data.receivables, data.payables) : [];
 
   return (
     <div className="space-y-6 lg:space-y-8">
@@ -104,7 +117,7 @@ export default async function AdminMoneyReportPage({ searchParams }: { searchPar
           </>
         }
       />
-      <ReportRange basePath={BASE} params={params} defaultLabel="Last 18 months" hidden={keep} />
+      <PeriodBar basePath={BASE} params={params} defaultValue="" defaultLabel="Last 18 months" hidden={keep} />
 
       {/* Candidate / company / status (ADM-15): one GET form, applies to both
           tables as you change it (no Filter button, QA-149). */}
@@ -148,26 +161,61 @@ export default async function AdminMoneyReportPage({ searchParams }: { searchPar
 
       {data ? (
         <>
-          <StatGrid cols={6} className="grid-cols-1 xl:grid-cols-3 2xl:grid-cols-5">
-            <StatCard fit label="Received" value={inr(data.totals.receivedMinor)} hint="Paid orders and activation fees" />
-            <StatCard
-              fit label="Still to collect"
-              value={inr(data.totals.dueMinor)}
-              hint={`Accepted offers and monthly instalments · ${inr(data.totals.prospectMinor)} in unpaid fees`}
-            />
-            <StatCard fit label="Paid to interns" value={inr(data.totals.paidOutMinor)} hint="Stipend payouts marked paid" />
-            <StatCard fit label="Owed to interns" value={inr(data.totals.owedMinor)} hint="Pending payouts and stipend months ahead" />
-            <StatCard
-              fit
-              featured
-              label="Net"
-              value={inr(netMinor(data.totals))}
-              hint="Received, less paid to interns, less owed to interns"
-            />
-          </StatGrid>
+          <StatStrip
+            stats={[
+              {
+                label: "Received",
+                value: inr(data.totals.receivedMinor),
+                delta: formatPercentDelta(receivedChange) || undefined,
+                trend: trendOf(receivedChange),
+                note: receivedChange === null ? "Paid orders and activation fees" : "vs the period before",
+              },
+              {
+                label: "Still to collect",
+                value: inr(data.totals.dueMinor),
+                note: `Accepted offers and instalments \u00b7 ${inr(data.totals.prospectMinor)} in unpaid fees`,
+              },
+              { label: "Paid to interns", value: inr(data.totals.paidOutMinor), note: "Stipend payouts marked paid" },
+              { label: "Owed to interns", value: inr(data.totals.owedMinor), note: "Pending payouts and stipend months ahead" },
+              { label: "Net", value: inr(netMinor(data.totals)), accent: true, note: "Received, less paid and owed to interns" },
+            ]}
+          />
 
-          <MoneyTable title="Receivables" description="Money coming in, newest first." rows={data.receivables} filter={sourceLinks("receivables", receivablesFilter)} filtered={filtered} />
-          <MoneyTable title="Payables" description="Stipends going out to interns, newest first." rows={data.payables} filter={sourceLinks("payables", payablesFilter)} filtered={filtered} />
+          <ChartCard
+            views={[
+              {
+                key: "flow",
+                tab: "Cash flow",
+                title: "Is more money coming in than going out?",
+                note: "Cash that actually moved per month in this period: payments received and stipends paid to interns. Due and upcoming amounts are not included.",
+                unit: "Rupees per month",
+                format: "inr",
+                series: [
+                  { label: "Received", tone: "current", points: flows.map((f) => ({ x: f.label, y: f.inMinor })) },
+                  { label: "Paid to interns", tone: "previous", points: flows.map((f) => ({ x: f.label, y: f.outMinor })) },
+                ],
+              },
+            ]}
+          />
+
+          <MoneyTable
+            title={view === "receivables" ? "Receivables" : "Payables"}
+            description={view === "receivables" ? "Money coming in, newest first." : "Stipends going out to interns, newest first."}
+            rows={view === "receivables" ? data.receivables : data.payables}
+            filter={view === "receivables" ? sourceLinks("receivables", receivablesFilter) : sourceLinks("payables", payablesFilter)}
+            filtered={filtered}
+            expanded={params.rows === "all"}
+            tabs={
+              <ChipLinks
+                label="Table"
+                items={[
+                  { href: link({ view: "", rows: "" }), label: `Receivables (${formatNumber(data.receivables.length)})`, current: view === "receivables" },
+                  { href: link({ view: "payables", rows: "" }), label: `Payables (${formatNumber(data.payables.length)})`, current: view === "payables" },
+                ]}
+              />
+            }
+            moreHref={link({ rows: "all" })}
+          />
         </>
       ) : (
         <Panel>
@@ -184,25 +232,32 @@ function MoneyTable({
   rows,
   filter,
   filtered,
+  expanded,
+  tabs,
+  moreHref,
 }: {
   title: string;
   description: string;
   rows: MoneyRow[];
   filter: React.ReactNode;
   filtered: boolean;
+  expanded: boolean;
+  tabs: React.ReactNode;
+  moreHref: string;
 }) {
-  const shown = rows.slice(0, SHOWN);
+  const shown = rows.slice(0, expanded ? SHOWN : FIRST_ROWS);
   const head = ["Date", "Description", "Company", "Candidate", "Status", "Amount", "Reference"];
   return (
     <Panel>
-      <PanelHeader title={`${title} (${formatNumber(rows.length)})`} description={description} action={filter} />
+      <PanelHeader title={title} description={description} action={filter} />
+      <div className="px-[var(--admin-pad-panel)] pt-3">{tabs}</div>
       {rows.length === 0 ? (
         <p className="px-[var(--admin-pad-panel)] py-10 text-center text-sm text-text-subtle">
           {filtered ? "Nothing matches these filters in this range." : "Nothing in this range."}
         </p>
       ) : (
         // Focusable, so the inner scroll can be reached from the keyboard (axe scrollable-region-focusable).
-        <div tabIndex={0} role="region" aria-label={title} data-stack className="max-h-[min(72vh,48rem)] overflow-y-auto lg:overflow-auto focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring">
+        <div tabIndex={0} role="region" aria-label={title} data-stack className="mt-3 overflow-x-auto focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring">
           <table className="w-full text-left text-sm lg:min-w-[48rem]">
             <thead>
               <tr className="border-b border-[color:var(--admin-rule)]">
@@ -242,9 +297,16 @@ function MoneyTable({
         </div>
       )}
       {rows.length > 0 ? (
-        <p className="border-t border-[color:var(--admin-rule)] px-[var(--admin-pad-panel)] py-3 text-sm text-text-subtle">
-          Showing 1–{formatNumber(shown.length)} of {formatNumber(rows.length)}
-          {rows.length > shown.length ? ". The CSV export has every row." : ""}
+        <p className="flex flex-wrap items-center justify-between gap-2 border-t border-[color:var(--admin-rule)] px-[var(--admin-pad-panel)] py-3 text-sm text-text-subtle">
+          <span>
+            Showing 1{"\u2013"}{formatNumber(shown.length)} of {formatNumber(rows.length)}
+            {rows.length > SHOWN ? ". The CSV export has every row." : ""}
+          </span>
+          {rows.length > shown.length ? (
+            <Link href={moreHref} scroll={false} className="font-medium text-foreground underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+              Show {formatNumber(Math.min(rows.length, SHOWN))} rows
+            </Link>
+          ) : null}
         </p>
       ) : null}
     </Panel>

@@ -2,6 +2,7 @@ import { lineCharge } from "../checkout.ts";
 import { monthlyDues } from "../dues.ts";
 import { parseOffer } from "../offer.ts";
 import { toInrMinor } from "./money.ts";
+import { istDayKey } from "./revenue.ts";
 import { addMonthsIso, stipendDues } from "./stipend-dues.ts";
 
 /**
@@ -56,9 +57,17 @@ const day = (d: Date | string | null | undefined) => {
 };
 
 export function computeReceivables(input: ReceivablesInput, filter: { receivables: "both" | "company" | "candidate"; payables: "both" | "company" | "candidate" }) {
-  const lo = input.since ? input.since.toISOString().slice(0, 10) : null;
-  const hi = input.until ? new Date(input.until.getTime() - 1).toISOString().slice(0, 10) : null;
+  // Date-only rows (offers, instalments, stipends) are bounded by India calendar days.
+  const lo = input.since ? istDayKey(input.since) : null;
+  const hi = input.until ? istDayKey(new Date(input.until.getTime() - 1)) : null;
   const inRange = (date: string | null) => date != null && (!lo || date >= lo) && (!hi || date <= hi);
+  // Money received is bounded by the exact instant, as revenue.ts / loadCollected do. Comparing
+  // calendar days let every payment made earlier on the boundary day into a "last 30 days" total.
+  const receivedIn = (at: Date | null | undefined) => {
+    if (!at) return false;
+    const t = new Date(at).getTime();
+    return !Number.isNaN(t) && (!input.since || t >= input.since.getTime()) && (!input.until || t < input.until.getTime());
+  };
 
   const receivables: MoneyRow[] = [];
   const payables: MoneyRow[] = [];
@@ -67,8 +76,8 @@ export function computeReceivables(input: ReceivablesInput, filter: { receivable
   if (filter.receivables !== "candidate") {
     for (const p of input.employerPayments) {
       if (p.status !== "paid") continue;
-      const date = day(p.paidAt ?? p.createdAt);
-      if (!inRange(date)) continue;
+      const date = istDayKey(p.paidAt ?? p.createdAt);
+      if (!receivedIn(p.paidAt ?? p.createdAt)) continue;
       receivables.push(
         row({
           id: `order:${p.id}`,
@@ -136,8 +145,8 @@ export function computeReceivables(input: ReceivablesInput, filter: { receivable
   if (filter.receivables !== "company") {
     for (const p of input.internPayments) {
       if (p.status !== "paid") continue;
-      const date = day(p.paidAt ?? p.createdAt);
-      if (!inRange(date)) continue;
+      const date = istDayKey(p.paidAt ?? p.createdAt);
+      if (!receivedIn(p.paidAt ?? p.createdAt)) continue;
       receivables.push(
         row({
           id: `fee:${p.id}`,
