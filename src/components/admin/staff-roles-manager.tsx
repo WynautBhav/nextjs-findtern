@@ -49,7 +49,7 @@ export interface RoleDef {
 type Staff = Omit<Admin, "password">;
 
 const field =
-  "mt-1.5 min-h-11 w-full rounded-apple-sm border border-ink-200 bg-white px-3.5 text-base sm:text-sm text-ink-900 outline-none placeholder:text-text-subtle focus-visible:border-brand-600 focus-visible:ring-2 focus-visible:ring-brand-500/20";
+  "mt-1.5 min-h-11 w-full rounded-apple-sm border border-ink-200 bg-surface px-3.5 text-base sm:text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring placeholder:text-text-subtle focus-visible:border-brand-600";
 
 const permsOf = (r: RoleDef): string[] => (Array.isArray(r.permissions) ? (r.permissions as string[]) : []);
 
@@ -250,7 +250,7 @@ export function StaffRolesManager({
                   disabled={busyId === s.id || self}
                   title={self ? "You can't change your own role" : undefined}
                   onChange={(e) => updateStaff(s.id, { role: e.target.value })}
-                  className="h-9 min-w-0 flex-1 rounded-apple-sm border border-ink-200 bg-white px-2.5 text-base sm:text-sm text-ink-800 disabled:opacity-60 max-lg:h-11 max-sm:basis-full sm:w-48 sm:flex-none"
+                  className="h-9 min-w-0 flex-1 rounded-apple-sm border border-ink-200 bg-surface px-2.5 text-base sm:text-sm text-ink-800 disabled:opacity-60 max-lg:h-11 max-sm:basis-full sm:w-48 sm:flex-none"
                 >
                   {roles.map((r) => (
                     <option key={r.key} value={r.key}>
@@ -351,14 +351,14 @@ export function StaffRolesManager({
                     <th
                       scope="rowgroup"
                       colSpan={roles.length + 1}
-                      className="border-b border-ink-100 bg-white px-4 pt-4 pb-1.5 text-left text-xs font-semibold text-ink-900"
+                      className="border-b border-ink-100 bg-card px-4 pt-4 pb-1.5 text-left text-xs font-semibold text-ink-900"
                     >
                       {group.area}
                     </th>
                   </tr>
                   {group.perms.map((perm) => (
                     <tr key={perm.key} className="hover:bg-ink-50/60">
-                      <th scope="row" className="sticky left-0 z-10 border-b border-ink-100 bg-white px-4 py-2 text-left font-normal text-ink-700">
+                      <th scope="row" className="sticky left-0 z-10 border-b border-ink-100 bg-card px-4 py-2 text-left font-normal text-ink-700">
                         {perm.label}
                       </th>
                       {roles.map((r) => {
@@ -387,7 +387,7 @@ export function StaffRolesManager({
             </tbody>
           </table>
         </div>
-        <div className="sticky bottom-0 flex flex-wrap items-center gap-3 border-t border-ink-100 bg-white/95 px-5 py-3 backdrop-blur-sm">
+        <div className="sticky bottom-0 flex flex-wrap items-center gap-3 border-t border-ink-100 bg-card/95 px-5 py-3 backdrop-blur-sm">
           <p className="min-w-0 flex-1 text-sm text-ink-600" role="status">
             {matrixSaved ??
               (dirtyKeys.length

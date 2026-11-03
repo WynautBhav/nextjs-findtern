@@ -30,10 +30,10 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { RowMenu } from "@/components/app/row-menu";
-import { Surface, SURFACE_CLASS } from "@/components/app/primitives";
+import { ADMIN_SURFACE } from "@/components/admin/surface";
 
 const inputClass =
-  "mt-1.5 min-h-11 w-full rounded-apple-sm border border-ink-200 bg-white px-3 text-base sm:text-sm text-ink-900 outline-none placeholder:text-text-subtle focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20";
+  "mt-1.5 min-h-11 w-full rounded-apple-sm border border-ink-200 bg-surface px-3 text-base sm:text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring placeholder:text-text-subtle focus:border-brand-500";
 
 /** Fixed amounts are stored as major rupees (the form takes "₹"), not minor units. */
 /** Code · discount · used · active · menu. */
@@ -323,7 +323,7 @@ export function PromoCodesManager({
   return (
     <div className="apple-admin space-y-4">
       {/* Toolbar */}
-      <div className={cn(SURFACE_CLASS, "flex flex-col gap-3 p-4 lg:flex-row lg:items-center")}>
+      <div className={cn(ADMIN_SURFACE, "flex flex-col gap-3 p-4 lg:flex-row lg:items-center")}>
         <div className="relative min-w-0 flex-1 lg:max-w-sm">
           <Search
             aria-hidden
@@ -335,7 +335,7 @@ export function PromoCodesManager({
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search codes…"
             aria-label="Search promo codes"
-            className="min-h-11 w-full rounded-apple-sm border border-ink-200 bg-white pr-10 pl-9 text-base sm:text-[0.9375rem] text-ink-900 placeholder:text-text-subtle focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 focus:outline-none [&::-webkit-search-cancel-button]:hidden"
+            className="min-h-11 w-full rounded-apple-sm border border-ink-200 bg-surface pr-10 pl-9 text-base sm:text-[0.9375rem] text-ink-900 placeholder:text-text-subtle focus:border-brand-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring [&::-webkit-search-cancel-button]:hidden"
           />
           {search ? (
             <button
@@ -354,7 +354,7 @@ export function PromoCodesManager({
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value as "all" | "active" | "inactive")}
             aria-label="Filter by status"
-            className="min-h-11 cursor-pointer rounded-apple-sm border border-ink-200 bg-white px-3 text-base sm:text-sm text-ink-700 focus:border-brand-500 focus:outline-none"
+            className="min-h-11 cursor-pointer rounded-apple-sm border border-ink-200 bg-surface px-3 text-base sm:text-sm text-ink-700 focus:border-brand-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
           >
             <option value="all">All statuses</option>
             <option value="active">Active only</option>
@@ -364,7 +364,7 @@ export function PromoCodesManager({
             value={typeFilter}
             onChange={(e) => setTypeFilter(e.target.value as "all" | "percentage" | "fixed")}
             aria-label="Filter by discount type"
-            className="min-h-11 cursor-pointer rounded-apple-sm border border-ink-200 bg-white px-3 text-base sm:text-sm text-ink-700 focus:border-brand-500 focus:outline-none"
+            className="min-h-11 cursor-pointer rounded-apple-sm border border-ink-200 bg-surface px-3 text-base sm:text-sm text-ink-700 focus:border-brand-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
           >
             <option value="all">All types</option>
             <option value="percentage">Percentage</option>
@@ -384,7 +384,7 @@ export function PromoCodesManager({
 
       {/* Ticket grid */}
       {filteredPromos.length === 0 ? (
-        <div className={SURFACE_CLASS}>
+        <div className={ADMIN_SURFACE}>
           <AdminEmpty
             title="No promo codes found"
             body={
@@ -400,7 +400,7 @@ export function PromoCodesManager({
         // Rows, not one card per code (critique A, §0 density): the state is
         // the switch alone (it was a switch and a pill), Edit and Delete are
         // in the row's menu.
-        <Surface className="overflow-hidden">
+        <div className={cn(ADMIN_SURFACE, "min-w-0 overflow-hidden")}>
           <div aria-hidden className={cn(PROMO_GRID, "hidden gap-x-6 border-b border-ink-100 px-5 py-2.5 text-xs font-medium text-text-subtle lg:grid")}>
             <span>Code</span>
             <span>Discount</span>
@@ -493,7 +493,7 @@ export function PromoCodesManager({
             );
           })}
           </ul>
-        </Surface>
+        </div>
       )}
 
       {/* Add / Edit Dialog */}

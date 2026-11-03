@@ -177,8 +177,8 @@ export function LegalDocEditor({
             disabled={!loaded}
             onChange={(e) => setTitle(e.target.value)}
             className={cn(
-              "h-11 w-full rounded-apple-sm border border-ink-200 bg-white px-3.5 text-base sm:text-[0.9375rem] font-medium text-ink-900 outline-none",
-              "focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 disabled:opacity-60",
+              "h-11 w-full rounded-apple-sm border border-ink-200 bg-surface px-3.5 text-base sm:text-[0.9375rem] font-medium text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+              "focus:border-brand-500 disabled:opacity-60",
             )}
           />
         </div>

@@ -21,7 +21,7 @@ type Person = { id: string; label: string; email: string };
 type Side = "intern" | "employer";
 
 const field =
-  "mt-1.5 min-h-11 w-full rounded-apple-sm border border-ink-200 bg-white px-3.5 text-base sm:text-sm text-ink-900 outline-none placeholder:text-text-subtle focus-visible:border-brand-600 focus-visible:ring-2 focus-visible:ring-brand-500/20";
+  "mt-1.5 min-h-11 w-full rounded-apple-sm border border-ink-200 bg-surface px-3.5 text-base sm:text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring placeholder:text-text-subtle focus-visible:border-brand-600";
 
 export function NotificationComposer({
   interns,
@@ -179,12 +179,12 @@ export function NotificationComposer({
   const segment = (active: boolean) =>
     cn(
       "inline-flex min-h-10 flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-apple-sm px-3 text-sm font-medium max-lg:min-h-11",
-      active ? "bg-white text-ink-900 shadow-xs" : "text-ink-600 hover:text-ink-800",
+      active ? "bg-card text-ink-900 shadow-xs" : "text-ink-600 hover:text-ink-800",
     );
 
   return (
     <div className="grid gap-6 xl:grid-cols-[24rem_minmax(0,1fr)]">
-      <section aria-labelledby="recipients-title" className="min-w-0 rounded-apple-xl border border-ink-200/80 bg-white p-5 shadow-xs">
+      <section aria-labelledby="recipients-title" className="min-w-0 rounded-apple-xl border border-ink-200/80 bg-card p-5 shadow-xs">
         <h2 id="recipients-title" className="text-base font-semibold text-ink-900">
           Recipients
         </h2>
@@ -289,7 +289,7 @@ export function NotificationComposer({
         </fieldset>
       </section>
 
-      <section aria-labelledby="message-title" className="min-w-0 rounded-apple-xl border border-ink-200/80 bg-white p-5 shadow-xs">
+      <section aria-labelledby="message-title" className="min-w-0 rounded-apple-xl border border-ink-200/80 bg-card p-5 shadow-xs">
         <h2 id="message-title" className="text-base font-semibold text-ink-900">
           Message
         </h2>

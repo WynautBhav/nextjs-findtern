@@ -36,7 +36,7 @@ export type EditablePlan = {
 };
 
 const inputClass =
-  "mt-1.5 h-11 w-full rounded-apple-sm border border-ink-200 bg-white px-3 text-base sm:text-sm text-ink-900 outline-none placeholder:text-text-subtle focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20";
+  "mt-1.5 h-11 w-full rounded-apple-sm border border-ink-200 bg-surface px-3 text-base sm:text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring placeholder:text-text-subtle focus:border-brand-500";
 
 const toRupees = (minor: number | null) => (minor == null ? "" : String(minor / 100));
 const toMinor = (rupees: string) => Math.round(Number(rupees || 0) * 100);

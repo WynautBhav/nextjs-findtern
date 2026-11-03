@@ -482,6 +482,108 @@
     --shadow-admin-lift: 0 2px 6px -2px rgb(0 0 0 / 0.5);
   }
 
+  /* ── Admin console, dark ops desk (owner decision 3 Nov 2026) ────────────
+     AdminShell puts `.dark` and this attribute on its root, so every
+     tokenised class below it flips through the `.dark` block above. What
+     `.dark` leaves alone is the brand ramp from 600 up and accent-700, which
+     admin code uses as text (69 places), outlines (16), borders (10) and chart
+     fills (5). The light-mode greens are 1.3-2:1 on the dark card, so the
+     ramp is lifted here (text steps measured at 7.9-11:1 on #141f1b). Brand
+     green stays on data, status and the one primary action; amber means
+     "waiting". Scoped to the attribute: intern, employer and college keep
+     their values. */
+  [data-console="admin"] {
+    --color-brand-200: #1f3d33;
+    --color-brand-600: #5fae96;
+    --color-brand-700: #7cc4ab;
+    --color-brand-800: #9bd3bf;
+    --color-brand-900: #bfe3d5;
+    --color-accent-100: #2a1f0d;
+    --color-accent-200: #3d2c0f;
+    --color-accent-700: #f5bb63;
+    /* A filled button keeps white text: #2a8068 is 4.9:1 against it. */
+    --color-primary: #2a8068;
+    --color-primary-hover: #23705a;
+    --color-ring: #7cc4ab;
+  }
+
+  /* Staggered arrival (components/admin/motion/arrive.tsx). Fill is
+     `backwards`, so with no animation (no JS, reduced motion) the element
+     simply sits in its final state. */
+  @keyframes admin-arrive {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+  }
+  .admin-arrive {
+    animation: admin-arrive var(--duration-admin-base) var(--ease-out-soft) backwards;
+    animation-delay: calc(min(var(--i, 0), 8) * 30ms);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .admin-arrive {
+      animation: none;
+    }
+  }
+
+  /* The admin console is dark on screen; paper is white. Restores the light
+     values of every token the `.dark` and admin blocks above change (it comes
+     later in the file, so it wins at equal specificity), so bars, badges and
+     charts keep their fills when printed. */
+  @media print {
+    .dark,
+    [data-console="admin"] {
+      color-scheme: light;
+      --color-background: #ffffff;
+      --color-surface: #f7faf9;
+      --color-surface-raised: #ffffff;
+      --color-foreground: #0f1a17;
+      --color-muted-foreground: #4e5f58;
+      --color-text-subtle: #5f7069;
+      --color-border: #dee6e2;
+      --color-border-strong: #c2cec8;
+      --color-primary: #0e6049;
+      --color-primary-hover: #166b54;
+      --color-primary-soft: #f0f7f4;
+      --color-on-primary: #ffffff;
+      --color-input: #dee6e2;
+      --color-ring: #166b54;
+      --color-card: #ffffff;
+      --color-card-foreground: #0f1a17;
+      --color-popover: #ffffff;
+      --color-popover-foreground: #0f1a17;
+      --color-success: #0e7a4a;
+      --color-success-soft: #e6f5ed;
+      --color-warning: #94600f;
+      --color-warning-soft: #fdf3e0;
+      --color-danger: #b3261e;
+      --color-danger-soft: #fdeceb;
+      --color-info: #1a5fa8;
+      --color-info-soft: #e9f1fa;
+      --color-brand-50: #f0f7f4;
+      --color-brand-100: #dcebe5;
+      --color-brand-200: #b9d7cc;
+      --color-brand-600: #166b54;
+      --color-brand-700: #0e6049;
+      --color-brand-800: #0a4a39;
+      --color-brand-900: #072f24;
+      --color-accent-100: #fdf3e0;
+      --color-accent-200: #fae4bd;
+      --color-accent-700: #8f5a1f;
+      --color-ink-50: #f7faf9;
+      --color-ink-100: #edf2ef;
+      --color-ink-200: #dee6e2;
+      --color-ink-300: #c2cec8;
+      --color-ink-400: #93a29b;
+      --color-ink-500: #6b7c74;
+      --color-ink-600: #4e5f58;
+      --color-ink-700: #33433d;
+      --color-ink-800: #1e2b26;
+      --color-ink-900: #0f1a17;
+      --color-ink-950: #0b1512;
+    }
+  }
+
   /* Tabular figures are set through the `nums` utility declared at the top
      level below, not here: Tailwind rejects `@utility` nested in a layer. */
 
@@ -1250,12 +1352,24 @@ body:has([data-slot="dialog-content"][data-state="open"], [data-slot="sheet-cont
       opacity 0.2s ease;
   }
 
+  /* Admin links and buttons are pressed all day: the 350ms spring is 120ms here
+     (DESIGN.md §9 caps frequent actions under 150ms). */
+  [data-console="admin"] .apple-spring {
+    transition:
+      transform var(--duration-admin-fast) var(--ease-out-soft),
+      background-color var(--duration-admin-fast) ease,
+      border-color var(--duration-admin-fast) ease,
+      box-shadow var(--duration-admin-fast) ease,
+      opacity var(--duration-admin-fast) ease;
+  }
+
   .apple-pressable:active {
     transform: scale(0.97);
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .apple-spring {
+    .apple-spring,
+    [data-console="admin"] .apple-spring {
       transition: none;
     }
     .apple-pressable:active {
@@ -1264,6 +1378,7 @@ body:has([data-slot="dialog-content"][data-state="open"], [data-slot="sheet-cont
   }
 
   /* ── Clean PDF & Print Rules ────────────────────────────────────────── */
+
   /* Single-dossier print (AiFeedbackReport): only #print-root is printed. */
   #print-root {
     display: none;
@@ -1392,4 +1507,31 @@ body:has([data-slot="dialog-content"][data-state="open"], [data-slot="sheet-cont
     min-width: 1.5rem;
     min-height: 1.5rem;
   }
+}
+
+/* ── Admin overrides for components shared with the other consoles ───────────
+   `pillTabClass`, `StatTile`/`Tile`, `EmptyScene`, the feedback dialog and the
+   outline button live in files intern and employer also use, and they assume a
+   light ground. The admin does not edit them; it re-points the few utilities
+   they rely on, here, scoped to the admin attribute (AdminShell puts it on its
+   root and on <html>, so portalled dialogs are covered). Unlayered on purpose:
+   unlayered rules beat the utilities layer whatever the specificity. */
+[data-console="admin"] .bg-brand-700 {
+  background-color: var(--color-primary);
+}
+[data-console="admin"] .hover\:bg-brand-800:hover {
+  background-color: var(--color-primary-hover);
+}
+/* The outline button's text: #2a8068 is 3.5:1 on the dark card; the lifted ramp is 8:1. */
+[data-console="admin"] .text-primary {
+  color: var(--color-brand-700);
+}
+[data-console="admin"] .bg-white,
+[data-console="admin"] .bg-white\/60,
+[data-console="admin"] .bg-white\/70 {
+  background-color: var(--color-card);
+}
+/* WCAG 1.4.11: a text field's edge needs 3:1; ink-200 on the card is 1.2:1. */
+[data-console="admin"] :is(input, select, textarea):not([type="checkbox"], [type="radio"], [type="range"], [type="file"], [type="color"], [aria-invalid="true"]):not(:focus-visible) {
+  border-color: var(--color-ink-400);
 }

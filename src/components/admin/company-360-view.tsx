@@ -6,7 +6,8 @@ import { fteOf } from "@/lib/admin/fte";
 import { DataTable } from "@/components/admin/data-table";
 import { ProposalStatusEditor } from "@/components/admin/proposal-status-editor";
 import { StatusBadge } from "@/components/admin/status-badge";
-import { DetailRow, PageHead, Pill, SectionHead, Surface, pillTabClass } from "@/components/app/primitives";
+import { DetailRow, PageHead, Pill, SectionHead, pillTabClass } from "@/components/app/primitives";
+import { ADMIN_SURFACE } from "@/components/admin/surface";
 import { StatTile } from "@/components/app/tiles";
 import { toQueryString } from "@/lib/admin/params";
 import type { CompanyLedger, HireLedger } from "@/lib/admin/company-ledger";
@@ -430,7 +431,7 @@ function ProfileTab({ company, fte }: { company: Omit<Employer, "password">; fte
   const website = company.websiteUrl ? (/^https?:\/\//i.test(company.websiteUrl) ? company.websiteUrl : `https://${company.websiteUrl}`) : null;
   return (
     <div className="grid gap-6 lg:grid-cols-2">
-      <Surface className="p-6 lg:row-span-2">
+      <div className={cn(ADMIN_SURFACE, "min-w-0 p-6 lg:row-span-2")}>
         <SectionHead title="Company information" />
         <dl className="divide-y divide-ink-100">
           <DetailRow label="Company name" value={company.companyName} />
@@ -456,9 +457,9 @@ function ProfileTab({ company, fte }: { company: Omit<Employer, "password">; fte
           <DetailRow label="GSTIN" value={company.gstNumber ? <span className="font-mono">{company.gstNumber}</span> : "-"} />
           <DetailRow label="Member since" value={formatDate(company.createdAt)} />
         </dl>
-      </Surface>
+      </div>
 
-      <Surface className="p-6">
+      <div className={cn(ADMIN_SURFACE, "min-w-0 p-6")}>
         <SectionHead title="Primary contact" hint="First point of contact" />
         <dl className="divide-y divide-ink-100">
           <DetailRow label="Name" value={company.primaryContactName || company.name || "-"} />
@@ -484,9 +485,9 @@ function ProfileTab({ company, fte }: { company: Omit<Employer, "password">; fte
           </dl>
           )}
         </div>
-      </Surface>
+      </div>
 
-      <Surface className="p-6">
+      <div className={cn(ADMIN_SURFACE, "min-w-0 p-6")}>
         <SectionHead title="Account and access" hint="Changes save as soon as you make them." />
         <dl className="divide-y divide-ink-100">
           <div className="flex flex-wrap items-center justify-between gap-3 py-3">
@@ -507,17 +508,17 @@ function ProfileTab({ company, fte }: { company: Omit<Employer, "password">; fte
             </dd>
           </div>
         </dl>
-      </Surface>
+      </div>
 
       {/* Apart from the routine switches above (critique A: Delete sat
           among them in the Account card). */}
-      <Surface className="flex flex-wrap items-center justify-between gap-3 border-danger/20 p-6">
+      <div className={cn(ADMIN_SURFACE, "min-w-0 flex flex-wrap items-center justify-between gap-3 border-danger/20 p-6")}>
         <div>
           <p className="text-sm font-semibold text-ink-900">Delete company</p>
           <p className="text-sm text-ink-600">Only possible before any proposal, interview or payment.</p>
         </div>
         <CompanyDeleteButton id={company.id} />
-      </Surface>
+      </div>
     </div>
   );
 }

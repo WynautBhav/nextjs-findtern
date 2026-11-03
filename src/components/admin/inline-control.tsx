@@ -129,7 +129,7 @@ export function InlineSelect({
           value={current}
           disabled={saving}
           onChange={(e) => change(e.target.value)}
-          className="h-9 min-w-28 rounded-apple-sm border border-ink-200 bg-white pl-2.5 pr-8 text-base font-medium sm:text-sm text-ink-800 hover:border-ink-300 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand-600 disabled:opacity-60 max-lg:h-11"
+          className="h-9 min-w-28 rounded-apple-sm border border-ink-200 bg-surface pl-2.5 pr-8 text-base font-medium sm:text-sm text-ink-800 hover:border-ink-300 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand-600 disabled:opacity-60 max-lg:h-11"
         >
           {options.map((o) => (
             <option key={o.value} value={o.value}>
@@ -293,7 +293,7 @@ export function InlineToggle({
 
 /** Shared field style for inputs inside an inline form. */
 export const inlineFieldClass =
-  "h-9 w-full rounded-apple-sm border border-ink-200 bg-white px-2.5 text-base sm:text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand-600 max-lg:h-11";
+  "h-9 w-full rounded-apple-sm border border-ink-200 bg-surface px-2.5 text-base sm:text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand-600 max-lg:h-11";
 
 function FieldInput({
   field,
@@ -316,7 +316,7 @@ function FieldInput({
             onClick={() => onChange(o.value)}
             className={cn(
               "h-9 rounded-apple-sm border px-2 text-sm font-semibold max-lg:h-11",
-              value === o.value ? "border-brand-600 bg-brand-50 text-brand-800" : "border-ink-200 bg-white text-ink-600 hover:bg-ink-50",
+              value === o.value ? "border-brand-600 bg-brand-50 text-brand-800" : "border-ink-200 bg-card text-ink-600 hover:bg-ink-50",
             )}
           >
             {o.label}
@@ -470,7 +470,7 @@ export function InlineEditor({
             animate={{ opacity: 1, y: 0 }}
             exit={reduce ? { opacity: 0 } : { opacity: 0, y: -4 }}
             transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
-            className="flex min-w-56 flex-col gap-2 rounded-apple-md border border-brand-200 bg-white p-2.5 shadow-sm"
+            className="flex min-w-56 flex-col gap-2 rounded-apple-md border border-brand-200 bg-card p-2.5 shadow-sm"
           >
             <div className={cn("grid gap-2", columns === 2 && "grid-cols-2")}>
               {fields.map((field) => (

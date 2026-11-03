@@ -1,55 +1,146 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import {
-  Search,
-  LayoutDashboard,
-  Users,
-  Building2,
   ArrowLeftRight,
   BarChart3,
-  Shield,
-  Tag,
-  MessageSquare,
-  Globe,
-  Briefcase,
-  Send,
-  CreditCard,
   Bell,
+  Briefcase,
+  Building2,
+  CreditCard,
+  FileText,
+  Globe,
+  GraduationCap,
+  History,
+  LayoutDashboard,
+  MessageSquare,
+  Receipt,
+  ScrollText,
+  Search,
+  Send,
+  Settings,
+  Shield,
+  ShoppingBag,
+  Tag,
+  UserCheck,
+  Users,
+  Zap,
 } from "lucide-react";
 
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { invoiceHref, SEARCH_MIN, type SearchResponse } from "@/lib/admin/palette-search";
 import { cn } from "@/lib/utils";
 
-type CommandItem = {
-  title: string;
-  category: string;
-  href: string;
-  icon: typeof LayoutDashboard;
+/** One sidebar link the signed-in admin may open (already permission-filtered by the layout). */
+export type PaletteItem = { href: string; label: string; group: string };
+
+type Entry = { id: string; label: string; sublabel?: string; href: string; icon: typeof Search };
+type Section = { key: string; title: string; entries: Entry[] };
+
+const ICONS: Record<string, typeof Search> = {
+  "/admin/dashboard": LayoutDashboard,
+  "/admin/proposal-tracker": Send,
+  "/admin/messages": MessageSquare,
+  "/admin/payouts": CreditCard,
+  "/admin/interns": Users,
+  "/admin/users": UserCheck,
+  "/admin/companies": Building2,
+  "/admin/colleges": GraduationCap,
+  "/admin/projects": Briefcase,
+  "/admin/orders": ShoppingBag,
+  "/admin/intern-invoices": Receipt,
+  "/admin/transactions": ArrowLeftRight,
+  "/admin/promo-codes": Tag,
+  "/admin/reports": BarChart3,
+  "/admin/cms": Globe,
+  "/admin/notifications": Bell,
+  "/admin/notification-history": History,
+  "/admin/settings": Settings,
+  "/admin/cms/terms": ScrollText,
+  "/admin/roles": Shield,
 };
 
-const COMMANDS: CommandItem[] = [
-  { title: "Dashboard", category: "Overview", href: "/admin/dashboard", icon: LayoutDashboard },
-  { title: "Proposal pipeline", category: "Overview", href: "/admin/proposal-tracker", icon: Send },
-  { title: "Messages", category: "Overview", href: "/admin/messages", icon: MessageSquare },
-  { title: "Candidates", category: "People and work", href: "/admin/interns", icon: Users },
-  { title: "Companies", category: "People and work", href: "/admin/companies", icon: Building2 },
-  { title: "Projects", category: "People and work", href: "/admin/projects", icon: Briefcase },
-  { title: "Transactions", category: "Finance", href: "/admin/transactions", icon: ArrowLeftRight },
-  { title: "Payouts", category: "Finance", href: "/admin/payouts", icon: CreditCard },
-  { title: "Promo codes", category: "Finance", href: "/admin/promo-codes", icon: Tag },
-  { title: "Reports", category: "Finance", href: "/admin/reports", icon: BarChart3 },
-  { title: "Website content", category: "Publishing", href: "/admin/cms", icon: Globe },
-  { title: "Send notification", category: "Publishing", href: "/admin/notifications", icon: Bell },
-  { title: "Roles and access", category: "Settings", href: "/admin/roles", icon: Shield },
+/**
+ * Shortcuts that jump to a filtered view. Each only appears when the page it
+ * opens (`base`) is in the admin's own nav, so it never offers a dead end.
+ * The payouts page has no overdue filter, so that action opens the ledger
+ * filtered to payouts still pending.
+ */
+const ACTIONS: { label: string; base: string; href: string }[] = [
+  { label: "Go to candidates that need a score", base: "/admin/interns", href: "/admin/interns?ai=completed&score=none" },
+  { label: "Go to pending payouts", base: "/admin/payouts", href: "/admin/payouts?status=pending" },
+  { label: "Compose a notification", base: "/admin/notifications", href: "/admin/notifications" },
 ];
 
-export function CommandPalette() {
+type SearchState = { q: string; status: "ok" | "error"; data: SearchResponse | null };
+
+const RECORD_GROUPS = [
+  { key: "candidates", title: "Candidates", icon: Users },
+  { key: "companies", title: "Companies", icon: Building2 },
+  { key: "invoices", title: "Invoices", icon: FileText },
+] as const;
+
+function sections(items: PaletteItem[], q: string, search: SearchState | null): Section[] {
+  const needle = q.toLowerCase();
+  const matches = (text: string) => !needle || text.toLowerCase().includes(needle);
+  const out: Section[] = [];
+
+  const actions = ACTIONS.filter((a) => items.some((i) => i.href === a.base) && matches(a.label)).map((a) => ({
+    id: a.href,
+    label: a.label,
+    href: a.href,
+    icon: Zap,
+  }));
+  if (actions.length) out.push({ key: "actions", title: "Actions", entries: actions });
+
+  const byGroup = new Map<string, Entry[]>();
+  for (const i of items) {
+    if (!matches(i.label) && !matches(i.group)) continue;
+    const list = byGroup.get(i.group) ?? [];
+    list.push({ id: i.href, label: i.label, href: i.href, icon: ICONS[i.href] ?? Search });
+    byGroup.set(i.group, list);
+  }
+  for (const [title, entries] of byGroup) out.push({ key: `nav-${title}`, title, entries });
+
+  if (search?.data) {
+    for (const g of RECORD_GROUPS) {
+      const hits = search.data[g.key];
+      if (!Array.isArray(hits) || hits.length === 0) continue;
+      out.push({
+        key: `rec-${g.key}`,
+        title: g.title,
+        entries: hits.map((h) => ({
+          id: `${g.key}-${h.id}`,
+          label: h.label,
+          sublabel: h.sublabel,
+          icon: g.icon,
+          href:
+            g.key === "candidates"
+              ? `/admin/interns/${encodeURIComponent(h.id)}`
+              : g.key === "companies"
+                ? `/admin/companies/${encodeURIComponent(h.id)}`
+                : invoiceHref(h as SearchResponse["invoices"][number]),
+        })),
+      });
+    }
+  }
+  return out;
+}
+
+const noopSubscribe = () => () => {};
+const isMacNow = () => /mac|iphone|ipad/i.test(navigator.platform || navigator.userAgent);
+
+export function CommandPalette({ items }: { items: PaletteItem[] }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
+  const [search, setSearch] = useState<SearchState | null>(null);
   const router = useRouter();
+
+  // null on the server and during hydration, so the hint is a neutral "K" until the browser is known.
+  const mac = useSyncExternalStore(noopSubscribe, isMacNow, () => null);
+  const hint = mac === null ? "K" : mac ? "⌘K" : "Ctrl K";
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -63,13 +154,43 @@ export function CommandPalette() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
-  const q = query.trim().toLowerCase();
-  const filtered = q === "" ? COMMANDS : COMMANDS.filter((cmd) => cmd.title.toLowerCase().includes(q) || cmd.category.toLowerCase().includes(q));
-  const current = Math.min(active, Math.max(filtered.length - 1, 0));
+  const q = query.trim();
+  const wantsSearch = q.length >= SEARCH_MIN;
+
+  // Debounced record search; typing again, closing or unmounting cancels the pending call and the request.
+  useEffect(() => {
+    if (!wantsSearch) return;
+    const controller = new AbortController();
+    const timer = window.setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/admin/search?q=${encodeURIComponent(q)}`, { signal: controller.signal, credentials: "same-origin" });
+        if (!res.ok) throw new Error(String(res.status));
+        const data = (await res.json()) as SearchResponse;
+        setSearch({ q, status: "ok", data });
+      } catch (error) {
+        if (controller.signal.aborted || (error instanceof DOMException && error.name === "AbortError")) return;
+        setSearch({ q, status: "error", data: null });
+      }
+    }, 200);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [q, wantsSearch]);
+
+  // Results belong to the query that produced them: a different query means "still searching", never stale rows.
+  const settled = wantsSearch && search?.q === q ? search : null;
+  const loading = wantsSearch && !settled;
+  const failed = settled?.status === "error";
+
+  const list = useMemo(() => sections(items, q, settled), [items, q, settled]);
+  const flat = useMemo(() => list.flatMap((s) => s.entries), [list]);
+  const current = Math.min(active, Math.max(flat.length - 1, 0));
+  const optionId = (i: number) => `admin-command-${i}`;
 
   // Keep the highlighted option on screen as the arrow keys move past the visible rows.
   useEffect(() => {
-    if (open) document.getElementById(`admin-command-${current}`)?.scrollIntoView({ block: "nearest" });
+    if (open) document.getElementById(optionId(current))?.scrollIntoView({ block: "nearest" });
   }, [open, current]);
 
   const onOpenChange = (next: boolean) => {
@@ -78,6 +199,7 @@ export function CommandPalette() {
     if (!next) {
       setQuery("");
       setActive(0);
+      setSearch(null);
     }
   };
 
@@ -87,99 +209,128 @@ export function CommandPalette() {
   };
 
   const onInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (!filtered.length) return;
+    if (!flat.length) return;
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      setActive((current + 1) % filtered.length);
+      setActive((current + 1) % flat.length);
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
-      setActive((current - 1 + filtered.length) % filtered.length);
+      setActive((current - 1 + flat.length) % flat.length);
+    } else if (e.key === "Home") {
+      e.preventDefault();
+      setActive(0);
+    } else if (e.key === "End") {
+      e.preventDefault();
+      setActive(flat.length - 1);
     } else if (e.key === "Enter") {
       e.preventDefault();
-      navigateTo(filtered[current].href);
+      navigateTo(flat[current].href);
     }
   };
+
+  const status = failed
+    ? "Search is unavailable"
+    : loading
+      ? "Searching records…"
+      : flat.length === 0
+        ? "No matches"
+        : null;
+
+  // First option number of each section, so every row's id matches its place in `flat`.
+  const starts = list.reduce<number[]>((acc, s, n) => [...acc, n === 0 ? 0 : acc[n - 1] + list[n - 1].entries.length], []);
 
   return (
     <>
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="apple-spring flex min-h-11 items-center gap-2.5 rounded-apple-sm border border-ink-200 bg-white px-3 py-1.5 text-sm text-ink-600 shadow-xs hover:border-brand-500 hover:text-ink-800"
+        className="apple-spring flex min-h-11 items-center gap-2 rounded-apple-sm border border-ink-200 bg-surface px-3 py-2 text-sm text-ink-600 hover:border-brand-500 hover:text-ink-800"
       >
-        <Search className="size-3.5" aria-hidden />
+        <Search className="size-4" aria-hidden />
         {/* No aria-label: the name comes from the visible words plus the hidden hint, so the two can
             never disagree (WCAG 2.5.3, and engines differ on which of two spans they count as visible). */}
         <span className="hidden sm:inline">Search admin portal</span>
         <span className="sm:hidden">Search</span>
         <span className="sr-only"> (Command K)</span>
-        <kbd aria-hidden className="ml-2 hidden rounded bg-ink-100 px-1.5 py-0.5 text-2xs font-semibold text-ink-600 sm:inline">
-          ⌘K
+        <kbd aria-hidden className="ml-2 hidden rounded bg-ink-100 px-1.5 py-1 text-2xs font-semibold text-ink-600 sm:inline">
+          {hint}
         </kbd>
       </button>
 
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent
-          className="top-[12%] translate-y-0 gap-0 overflow-hidden rounded-apple-xl border-ink-200/80 bg-white p-0 shadow-tile sm:max-w-lg"
-        >
+        <DialogContent className="top-[12%] translate-y-0 gap-0 overflow-hidden rounded-apple-xl border-ink-200 bg-card p-0 shadow-tile sm:max-w-lg">
           <DialogTitle className="sr-only">Search the admin portal</DialogTitle>
-          <DialogDescription className="sr-only">Type to filter, use the arrow keys to move and Enter to open.</DialogDescription>
-          <div className="flex items-center border-b border-ink-100 py-1 pl-3.5 pr-14">
-            <Search className="mr-2.5 size-4 shrink-0 text-ink-600" aria-hidden />
+          <DialogDescription className="sr-only">
+            Type to filter pages and actions. With two or more characters, candidates, companies and invoices are searched too. Use the arrow keys to move and Enter to open.
+          </DialogDescription>
+          <div className="flex items-center border-b border-ink-200 py-1 pl-3 pr-14">
+            <Search className="mr-3 size-4 shrink-0 text-ink-600" aria-hidden />
             <input
               type="text"
               role="combobox"
               aria-expanded="true"
               aria-controls="admin-command-list"
-              aria-activedescendant={filtered.length ? `admin-command-${current}` : undefined}
+              aria-activedescendant={flat.length ? optionId(current) : undefined}
               aria-autocomplete="list"
               aria-label="Search the admin portal"
               value={query}
+              maxLength={64}
               onChange={(e) => {
                 setQuery(e.target.value);
                 setActive(0);
               }}
               onKeyDown={onInputKeyDown}
-              placeholder="Jump to any section..."
+              placeholder="Jump to a page, or find a candidate, company or invoice"
               autoComplete="off"
-              className="min-h-11 w-full bg-transparent text-base text-ink-900 placeholder:text-ink-600 focus:outline-hidden sm:text-sm"
+              className="min-h-11 w-full bg-transparent text-base text-ink-900 placeholder:text-text-subtle focus:outline-hidden sm:text-sm"
             />
           </div>
 
-          <div id="admin-command-list" role="listbox" aria-label="Destinations" className="max-h-72 space-y-1 overflow-y-auto p-2">
-            {filtered.length === 0 ? (
-              <p role="status" className="px-3 py-6 text-center text-sm text-ink-600">
-                No matching destinations found
-              </p>
-            ) : (
-              filtered.map((item, i) => {
-                const Icon = item.icon;
-                return (
-                  <div
-                    key={item.href}
-                    id={`admin-command-${i}`}
-                    role="option"
-                    aria-selected={i === current}
-                    tabIndex={-1}
-                    onClick={() => navigateTo(item.href)}
-                    onMouseMove={() => setActive(i)}
-                    className={cn(
-                      "flex min-h-11 w-full cursor-pointer items-center gap-3 rounded-apple-sm px-3 py-2 text-left text-sm font-medium",
-                      i === current ? "bg-brand-50 text-brand-800" : "text-ink-700",
-                    )}
-                  >
-                    <span aria-hidden className="grid size-6 place-items-center rounded-apple-sm bg-ink-100 text-ink-600">
-                      <Icon className="size-3.5" />
-                    </span>
-                    <span className="min-w-0 flex-1 text-ink-900">{item.title}</span>
-                    <span className="rounded bg-ink-100 px-1.5 py-0.5 text-2xs text-ink-600">{item.category}</span>
+          <div className="max-h-80 overflow-y-auto p-2">
+            <div id="admin-command-list" role="listbox" aria-label="Results">
+              {list.map((section, n) => (
+                <div key={section.key} role="group" aria-labelledby={`admin-command-group-${section.key}`} className="pb-2">
+                  <div id={`admin-command-group-${section.key}`} className="px-3 py-1.5 text-xs font-medium text-text-subtle">
+                    {section.title}
                   </div>
-                );
-              })
-            )}
+                  {section.entries.map((entry, k) => {
+                    const i = starts[n] + k;
+                    const Icon = entry.icon;
+                    return (
+                      <div
+                        key={entry.id}
+                        id={optionId(i)}
+                        role="option"
+                        aria-selected={i === current}
+                        tabIndex={-1}
+                        onClick={() => navigateTo(entry.href)}
+                        onMouseMove={() => setActive(i)}
+                        className={cn(
+                          "flex min-h-11 w-full cursor-pointer items-center gap-3 rounded-apple-sm px-3 py-2 text-left text-sm",
+                          i === current ? "bg-ink-100 text-ink-900" : "text-ink-700",
+                        )}
+                      >
+                        <span aria-hidden className="grid size-6 shrink-0 place-items-center rounded-apple-sm bg-ink-100 text-ink-600">
+                          <Icon className="size-4" />
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate font-medium text-ink-900">{entry.label}</span>
+                          {entry.sublabel ? <span className="block truncate text-xs text-text-subtle">{entry.sublabel}</span> : null}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+            {status ? (
+              <p role="status" className={cn("px-3 text-center text-sm text-text-subtle", flat.length ? "py-2" : "py-6")}>
+                {status}
+              </p>
+            ) : null}
           </div>
 
-          <div aria-hidden className="flex items-center justify-between border-t border-ink-100 bg-ink-50/50 px-3.5 py-2 text-2xs text-ink-600">
+          <div aria-hidden className="flex items-center justify-between border-t border-ink-200 px-3 py-2 text-xs text-text-subtle">
             <span>↑↓ to move · Enter to open</span>
             <span>Esc to close</span>
           </div>

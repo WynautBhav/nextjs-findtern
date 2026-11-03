@@ -1,6 +1,7 @@
 import { AlertTriangle, ArrowRight, type LucideIcon } from "lucide-react";
 
-import { PageHead, ThreadMark, SURFACE_CLASS } from "@/components/app/primitives";
+import { PageHead, ThreadMark } from "@/components/app/primitives";
+import { ADMIN_SURFACE } from "@/components/admin/surface";
 import { ButtonLink } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -14,8 +15,25 @@ import { cn } from "@/lib/utils";
  * the page into a stack of competing boxes and the numbers stop being readable.
  */
 
+export type PanelVariant = "plain" | "inset" | "rail" | "well";
+
+/** Each variant's surface. Unset is the default card (`ADMIN_SURFACE` + `shadow-xs`). */
+const PANEL_VARIANT: Record<PanelVariant, string> = {
+  // No surface: heading and content sit on the page ground, flush with its edges.
+  plain:
+    "[&_[data-panel-header]]:border-b-0 [&_[data-panel-header]]:px-0 [&_[data-panel-body]]:px-0",
+  // Slightly darker than a card, no border.
+  inset: "overflow-hidden rounded-apple-xl bg-surface",
+  // Narrow side panel: card ground with a left rule only.
+  rail: "overflow-hidden border-l border-ink-200/80 bg-card",
+  // A recessed block with a hairline.
+  well: "overflow-hidden rounded-apple-xl border border-ink-200 bg-surface",
+};
+
 export function Panel({
   as: Tag = "section",
+  variant,
+  bleed = false,
   className,
   children,
   ...props
@@ -23,12 +41,17 @@ export function Panel({
   /** Render as a `<ul>` (or `<div>`) when the panel *is* the list, so a list
       of rows is not a `<ul>` nested inside a bare `<section>`. */
   as?: "section" | "ul" | "div";
+  /** Surface treatment. Leave unset for the standard card. */
+  variant?: PanelVariant;
+  /** Drops the inner padding of `PanelBody` (and `PanelHeader`'s sides), for tables and lists that run edge to edge. */
+  bleed?: boolean;
 }) {
   return (
     <Tag
       className={cn(
-        "apple-admin overflow-hidden shadow-xs",
-        SURFACE_CLASS,
+        "apple-admin",
+        variant ? PANEL_VARIANT[variant] : ["overflow-hidden shadow-xs", ADMIN_SURFACE],
+        bleed && "[&_[data-panel-body]]:p-0",
         className,
       )}
       {...props}
@@ -54,6 +77,7 @@ export function PanelHeader({
 }) {
   return (
     <header
+      data-panel-header=""
       className={cn(
         "apple-admin flex flex-wrap items-start justify-between gap-3 border-b border-ink-100 px-5 py-4",
         className,
@@ -80,7 +104,7 @@ export function PanelBody({
   ...props
 }: React.ComponentProps<"div">) {
   return (
-    <div className={cn("px-5 py-5", className)} {...props}>
+    <div data-panel-body="" className={cn("px-5 py-5", className)} {...props}>
       {children}
     </div>
   );

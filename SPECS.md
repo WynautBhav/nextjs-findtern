@@ -340,3 +340,24 @@ changed.
   as a labelled, focusable region. Admin inputs are 16px below `sm`. Errors
   name their field (`aria-invalid`, `aria-describedby`, focus) where the
   field is known. Bulk actions confirm with `useConfirm`, not `confirm()`.
+- 3 Nov 2026: owner decision: the admin console is a **full dark ops desk**,
+  admin only, replacing the light intern-style pass of 2 Nov. `AdminShell`
+  (`components/admin/shell/admin-shell.tsx`) replaces `ConsoleShell` for
+  `/admin/**`; intern, employer and college keep the shared shell and tokens
+  untouched. The shell root carries `dark` and `data-console="admin"` (and
+  puts `dark` on `<html>` so portalled dialogs, sheets and menus match); the
+  `[data-console="admin"]` block in `globals.css` lifts the brand ramp for
+  the dark ground. One ground everywhere, separated by 1px rules: no cards
+  with shadows, no gradients, no blur; the active nav item is marked by
+  brightness and a sliding highlight, not an accent bar. Admin surfaces use
+  `ADMIN_SURFACE` (`components/admin/surface.ts`), not the intern
+  `SURFACE_CLASS`. **Motion exception, admin only:** each page may have one
+  signature move of up to 600ms that explains data (a figure counting, a card
+  moving between columns, a bar filling), built with the kit in
+  `components/admin/motion` (`Count`, `Arrive`, `FlipGroup`/`FlipItem`);
+  everything else stays at the 120/180/260ms admin tokens, transform and
+  opacity only, and `prefers-reduced-motion` removes the travel (JS through
+  `MotionConfig reducedMotion="user"`, CSS through the global switch). Every
+  admin page gets its own composition ("no two pages alike"); the per-page
+  plan is in `docs/plans/admin-dark-ops-desk.md` and each wave is
+  shown to the owner before the next starts.

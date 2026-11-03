@@ -23,7 +23,7 @@ export type CollegeAdminRow = {
 };
 
 const input =
-  "h-11 w-full rounded-apple-sm border border-ink-200 bg-white px-3 text-base sm:text-sm text-ink-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20";
+  "h-11 w-full rounded-apple-sm border border-ink-200 bg-surface px-3 text-base sm:text-sm text-ink-900 focus:border-brand-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
 
 async function send(url: string, method: string, body: unknown) {
   const res = await csrfFetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).catch(() => null);
@@ -147,7 +147,7 @@ export function CollegeRowControls({ row }: { row: CollegeAdminRow }) {
           <span className="text-sm font-medium text-ink-800">Officer email</span>
           <input name="email" type="email" required className={cn(input, "mt-1")} />
         </label>
-        <button className="inline-flex min-h-11 items-center rounded-apple-sm border border-ink-200 bg-white px-4 text-sm font-medium text-ink-800 hover:bg-ink-50">
+        <button className="inline-flex min-h-11 items-center rounded-apple-sm border border-ink-200 bg-card px-4 text-sm font-medium text-ink-800 hover:bg-ink-50">
           Issue login
         </button>
       </form>
@@ -155,7 +155,7 @@ export function CollegeRowControls({ row }: { row: CollegeAdminRow }) {
       <div role="status" aria-live="polite">
         {issued ? (
           <p className="rounded-apple-sm border border-brand-200 bg-brand-50 px-3 py-2 text-sm text-brand-900">
-            Login for <strong>{issued.email}</strong>: password <code className="rounded bg-white px-1.5 py-0.5 font-mono">{issued.password}</code>. Shown once; send it privately. Sign in at /login?as=college.
+            Login for <strong>{issued.email}</strong>: password <code className="rounded bg-card px-1.5 py-0.5 font-mono">{issued.password}</code>. Shown once; send it privately. Sign in at /login?as=college.
           </p>
         ) : null}
         {error ? <p className="text-sm text-danger">{error}</p> : null}

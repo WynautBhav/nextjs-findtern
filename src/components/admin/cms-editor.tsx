@@ -30,7 +30,7 @@ import { useConfirm } from "@/components/app/use-confirm";
 export type CmsItem = Record<string, unknown> & { id: string };
 
 const fieldClass =
-  "mt-1.5 w-full rounded-apple-sm border border-ink-200 bg-white px-3 text-base sm:text-sm text-ink-900 outline-none placeholder:text-text-subtle focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20";
+  "mt-1.5 w-full rounded-apple-sm border border-ink-200 bg-surface px-3 text-base sm:text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring placeholder:text-text-subtle focus:border-brand-500";
 
 type Ctx = { open: (item: CmsItem | "new") => void; remove: (item: CmsItem) => Promise<void>; busyId: string | null };
 const EditorContext = createContext<Ctx | null>(null);
@@ -173,7 +173,7 @@ export function CmsEditorProvider({
                 {error}
               </p>
             ) : null}
-            <div className="sticky bottom-0 -mx-6 flex flex-wrap items-center gap-2 border-t border-ink-100 bg-white px-6 py-4">
+            <div className="sticky bottom-0 -mx-6 flex flex-wrap items-center gap-2 border-t border-ink-100 bg-card px-6 py-4">
               <button type="submit" disabled={busy} className={buttonClass({ variant: "primary", size: "sm" })}>
                 {busy ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
                 {busy ? "Saving…" : editing === "new" ? `Add ${def.noun}` : "Save changes"}

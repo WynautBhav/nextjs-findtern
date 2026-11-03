@@ -104,7 +104,7 @@ export function InternSkillsEditor({
                   setSaved(false);
                 }}
                 aria-label={`Level for ${skill.name}`}
-                className="rounded-apple-sm border border-ink-200 bg-white px-1.5 py-0.5 text-base text-ink-700 sm:text-xs touch:ml-auto touch:min-h-11 touch:px-2.5"
+                className="rounded-apple-sm border border-ink-200 bg-surface px-1.5 py-0.5 text-base text-ink-700 sm:text-xs touch:ml-auto touch:min-h-11 touch:px-2.5"
               >
                 {LEVELS.map((l) => (
                   <option key={l} value={l}>
@@ -146,7 +146,7 @@ export function InternSkillsEditor({
             }
           }}
           placeholder="Add a skill"
-          className="h-11 min-w-0 flex-1 rounded-apple-sm border border-ink-200 bg-white px-3 text-base sm:text-sm text-ink-900 outline-none placeholder:text-text-subtle focus-visible:border-brand-600 focus-visible:ring-2 focus-visible:ring-brand-600/20"
+          className="h-11 min-w-0 flex-1 rounded-apple-sm border border-ink-200 bg-surface px-3 text-base sm:text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring placeholder:text-text-subtle focus-visible:border-brand-600"
         />
         <button
           type="button"

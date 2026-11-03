@@ -74,7 +74,7 @@ export function ProposalStatusEditor({
           setValue(e.target.value);
           setError("");
         }}
-        className="h-9 min-w-0 flex-1 rounded-apple-sm border border-ink-200 bg-white px-2 text-sm font-medium text-ink-900 outline-none focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand-600 max-lg:h-11"
+        className="h-9 min-w-0 flex-1 rounded-apple-sm border border-ink-200 bg-surface px-2 text-sm font-medium text-ink-900 outline-none focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand-600 max-lg:h-11"
       >
         <option value="">Set status…</option>
         {options.map((option) => (

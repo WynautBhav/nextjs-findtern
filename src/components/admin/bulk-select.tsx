@@ -149,7 +149,7 @@ export function BulkSelectProvider({
       {error ? (
         <div
           role="alert"
-          className="apple-admin fixed inset-x-0 bottom-20 z-40 mx-auto flex w-fit max-w-[calc(100%-2rem)] items-start gap-2 rounded-apple-sm border border-danger/25 bg-white px-3.5 py-2.5 text-sm text-danger shadow-lg"
+          className="apple-admin fixed inset-x-0 bottom-20 z-40 mx-auto flex w-fit max-w-[calc(100%-2rem)] items-start gap-2 rounded-apple-sm border border-danger/25 bg-card px-3.5 py-2.5 text-sm text-danger shadow-lg"
         >
           <span className="flex-1">{error}</span>
           <button
@@ -168,7 +168,7 @@ export function BulkSelectProvider({
           <div
             role="region"
             aria-label={`Actions for ${selected.size} selected ${noun}`}
-            className="apple-admin pointer-events-auto flex max-w-full flex-wrap items-center gap-1.5 rounded-apple-lg border border-ink-200 bg-white py-2 pr-2 pl-4 shadow-lg"
+            className="apple-admin pointer-events-auto flex max-w-full flex-wrap items-center gap-1.5 rounded-apple-lg border border-ink-200 bg-card py-2 pr-2 pl-4 shadow-lg"
           >
             <p className="text-sm font-medium whitespace-nowrap text-ink-800">
               <span className="tabular-nums">{selected.size}</span> selected

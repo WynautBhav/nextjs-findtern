@@ -17,7 +17,7 @@ import {
   InternRatingsCell,
   InternVisibilityCell,
 } from "@/components/admin/intern-row-controls";
-import { SURFACE_CLASS } from "@/components/app/primitives";
+import { ADMIN_SURFACE } from "@/components/admin/surface";
 import { buttonClass } from "@/components/ui/button";
 
 /**
@@ -203,7 +203,7 @@ export default async function AdminInterns({
     return (
       <div>
         {header}
-        <div className={SURFACE_CLASS}>
+        <div className={ADMIN_SURFACE}>
           <AdminLoadError what="the candidate list" retryHref="/admin/interns" />
         </div>
       </div>

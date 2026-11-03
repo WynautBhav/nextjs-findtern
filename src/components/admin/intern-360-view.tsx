@@ -19,7 +19,8 @@ import { ProposalOfferSummary } from "@/components/admin/proposal-offer-summary"
 import { draftFromRecord, linkedinHref } from "@/lib/onboarding";
 import type { RevealField } from "@/lib/admin/identity-mask";
 import type { User as UserType, InternOnboarding, Interview, Proposal, Timesheet, InternPayout } from "@/lib/db/schema";
-import { DetailRow, EmptyScene, PageHead, Pill, pillTabClass, SectionHead, Surface } from "@/components/app/primitives";
+import { DetailRow, EmptyScene, PageHead, Pill, pillTabClass, SectionHead } from "@/components/app/primitives";
+import { ADMIN_SURFACE } from "@/components/admin/surface";
 import { buttonClass } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
@@ -191,7 +192,7 @@ export function Intern360View({
         action={actions}
       />
 
-      <Surface className="flex flex-wrap items-start gap-x-8 gap-y-4 p-5">
+      <div className={cn(ADMIN_SURFACE, "min-w-0 flex flex-wrap items-start gap-x-8 gap-y-4 p-5")}>
         {controls}
         {/* One derived answer to "can employers see them?": the switch said
             Live beside a "Hidden by candidate" pill (critique A). */}
@@ -200,7 +201,7 @@ export function Intern360View({
           {hiddenWhy ? <span>{hiddenWhy}</span> : null}
           <Pill tone={feePaid ? "paid" : "closed"}>{feePaid ? "Activation fee paid" : "Activation fee unpaid"}</Pill>
         </div>
-      </Surface>
+      </div>
 
       {/* The admin summary strip, as on Company detail and the lists. */}
       <StatGrid cols={4}>
@@ -318,7 +319,7 @@ export function Intern360View({
                 who="Companies act next"
               />
             ) : (
-              <Surface data-stack className="lg:overflow-x-auto">
+              <div data-stack className={cn(ADMIN_SURFACE, "min-w-0 lg:overflow-x-auto")}>
                 <table className="w-full text-left text-sm lg:min-w-[44rem]">
                   <thead className="border-b border-ink-100 bg-ink-50 text-xs font-semibold text-ink-600">
                     <tr>
@@ -370,7 +371,7 @@ export function Intern360View({
                     })}
                   </tbody>
                 </table>
-              </Surface>
+              </div>
             )}
           </div>
         ) : null}
@@ -378,7 +379,7 @@ export function Intern360View({
         {tab === "timesheets" ? <TimesheetsTab timesheets={timesheets} company={company} project={project} proposals={proposals} /> : null}
 
         {tab === "payments" ? (
-          <Surface className="p-5 sm:p-6">
+          <div className={cn(ADMIN_SURFACE, "min-w-0 p-5 sm:p-6")}>
             <SectionHead title="Stipend payouts" hint="What is owed per placement, and every payout recorded for this candidate." />
             <InternPayoutTools
               internId={user.id}
@@ -392,11 +393,11 @@ export function Intern360View({
                 }))}
               dues={dues}
             />
-          </Surface>
+          </div>
         ) : null}
 
         {tab === "bank" ? (
-          <Surface className="p-5 sm:p-6">
+          <div className={cn(ADMIN_SURFACE, "min-w-0 p-5 sm:p-6")}>
             <SectionHead
               title="Bank account for stipends"
               hint="The account number shows its last four. Reveal it only when you are making a payment; each reveal is logged."
@@ -420,7 +421,7 @@ export function Intern360View({
                 who="The candidate acts next"
               />
             )}
-          </Surface>
+          </div>
         ) : null}
       </div>
 
@@ -476,13 +477,13 @@ function ProfileTab({
   return (
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_24rem]">
       <div className="min-w-0 space-y-4">
-        <Surface className="p-5 sm:p-6">
+        <div className={cn(ADMIN_SURFACE, "min-w-0 p-5 sm:p-6")}>
           <SectionHead title="About" />
           <p className="whitespace-pre-line text-[0.9375rem] leading-relaxed text-ink-800">{draft.bio || "No bio written yet."}</p>
           {draft.previewSummary ? <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-ink-600">{draft.previewSummary}</p> : null}
-        </Surface>
+        </div>
 
-        <Surface className="p-5 sm:p-6">
+        <div className={cn(ADMIN_SURFACE, "min-w-0 p-5 sm:p-6")}>
           <SectionHead title="Profile details" hint="What the candidate entered during onboarding. Read-only." />
           <dl className="divide-y divide-ink-100">
             <DetailRow
@@ -515,9 +516,9 @@ function ProfileTab({
             ) : null}
             <DetailRow label="NDA accepted" value={typeof extra.ndaAcceptedAt === "string" ? formatDate(extra.ndaAcceptedAt) : "No"} />
           </dl>
-        </Surface>
+        </div>
 
-        <Surface className="p-5 sm:p-6">
+        <div className={cn(ADMIN_SURFACE, "min-w-0 p-5 sm:p-6")}>
           <SectionHead title="Education" />
           {a?.institution || a?.degree ? (
             <div>
@@ -561,9 +562,9 @@ function ProfileTab({
             </ul>
           ) : null}
           <p className="mt-3 text-sm text-ink-600">Marksheets and certificate files are on the Documents tab.</p>
-        </Surface>
+        </div>
 
-        <Surface className="p-5 sm:p-6">
+        <div className={cn(ADMIN_SURFACE, "min-w-0 p-5 sm:p-6")}>
           <SectionHead title="Experience" />
           {draft.experiences?.length ? (
             <ul className="divide-y divide-ink-100">
@@ -582,10 +583,10 @@ function ProfileTab({
           ) : (
             <p className="text-sm text-ink-600">No experience added.</p>
           )}
-        </Surface>
+        </div>
 
         <div className="grid gap-4 md:grid-cols-2">
-          <Surface className="p-5 sm:p-6">
+          <div className={cn(ADMIN_SURFACE, "min-w-0 p-5 sm:p-6")}>
             <SectionHead title="Languages" />
             {draft.languages?.length ? (
               <ul className="space-y-2 text-sm">
@@ -604,8 +605,8 @@ function ProfileTab({
             ) : (
               <p className="text-sm text-ink-600">None added.</p>
             )}
-          </Surface>
-          <Surface className="p-5 sm:p-6">
+          </div>
+          <div className={cn(ADMIN_SURFACE, "min-w-0 p-5 sm:p-6")}>
             <SectionHead title="Extracurricular" />
             {draft.extracurriculars?.length ? (
               <ul className="space-y-2 text-sm">
@@ -620,16 +621,16 @@ function ProfileTab({
             ) : (
               <p className="text-sm text-ink-600">None added.</p>
             )}
-          </Surface>
+          </div>
         </div>
       </div>
 
       <div className="min-w-0 space-y-4">
-        <Surface className="p-5 sm:p-6">
+        <div className={cn(ADMIN_SURFACE, "min-w-0 p-5 sm:p-6")}>
           <SectionHead title="Skills" hint="What employers see on the candidate card." />
           <InternSkillsEditor internId={internId} skills={draft.skillsWithRatings ?? skills.map((name) => ({ name, rating: "Beginner" as const }))} />
-        </Surface>
-        <Surface className="p-5 sm:p-6">
+        </div>
+        <div className={cn(ADMIN_SURFACE, "min-w-0 p-5 sm:p-6")}>
           <SectionHead title="Score and ratings" hint="The Findtern Score is the mean of the four ratings; it sets the price band." />
           <RatingsEditor
             internId={internId}
@@ -638,7 +639,7 @@ function ProfileTab({
             initialFeedbackLink={(extra.aiFeedbackLink as string) || null}
             initialRecordingLink={(extra.aiRecordingLink as string) || null}
           />
-        </Surface>
+        </div>
       </div>
     </div>
   );
@@ -651,7 +652,7 @@ function DocumentsTab({ internId, documents }: { internId: string; documents: Ca
   const href = (key: string, download = false) =>
     `/admin/interns/${encodeURIComponent(internId)}/documents/open?key=${encodeURIComponent(key)}${download ? "&download=1" : ""}`;
   return (
-    <Surface data-stack className="lg:overflow-x-auto">
+    <div data-stack className={cn(ADMIN_SURFACE, "min-w-0 lg:overflow-x-auto")}>
       <table className="w-full text-left text-sm lg:min-w-[36rem]">
         <thead className="border-b border-ink-100 bg-ink-50 text-xs font-semibold text-ink-600">
           <tr>
@@ -693,7 +694,7 @@ function DocumentsTab({ internId, documents }: { internId: string; documents: Ca
           ))}
         </tbody>
       </table>
-    </Surface>
+    </div>
   );
 }
 
@@ -713,7 +714,7 @@ function InterviewCard({
   const slots = [i.slot1, i.slot2, i.slot3];
   const zone = i.timezone && i.timezone !== IST ? i.timezone : null;
   return (
-    <Surface as="li" className="flex flex-col gap-4 p-5">
+    <li className={cn(ADMIN_SURFACE, "min-w-0 flex flex-col gap-4 p-5")}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           {company && i.employerId ? (
@@ -753,7 +754,7 @@ function InterviewCard({
           Manage links
         </button>
       </div>
-    </Surface>
+    </li>
   );
 }
 
@@ -817,7 +818,7 @@ function InterviewDialog({
     }
   }
 
-  const field = "h-11 w-full rounded-apple-sm border border-ink-200 bg-white px-3 text-base sm:text-sm text-ink-900 placeholder:text-text-subtle focus-visible:border-brand-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600/20";
+  const field = "h-11 w-full rounded-apple-sm border border-ink-200 bg-surface px-3 text-base sm:text-sm text-ink-900 placeholder:text-text-subtle focus-visible:border-brand-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
 
   return (
     <Dialog open={interview !== null} onOpenChange={(open) => !open && onClose()}>
@@ -968,7 +969,7 @@ function TimesheetsTab({
           .join(" · ");
         const unfilled = counts[""] ?? 0;
         return (
-          <Surface as="li" key={t.id} className="overflow-hidden">
+          <li key={t.id} className={cn(ADMIN_SURFACE, "min-w-0 overflow-hidden")}>
             <details className="group">
               <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-3 px-5 py-4 hover:bg-ink-50/60 focus-visible:outline-2 focus-visible:outline-brand-600 [&::-webkit-details-marker]:hidden">
                 <div className="min-w-0">
@@ -1042,7 +1043,7 @@ function TimesheetsTab({
                 </p>
               </div>
             </details>
-          </Surface>
+          </li>
         );
       })}
     </ul>
@@ -1077,7 +1078,7 @@ function FilterBar({
         <select
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className="h-11 rounded-apple-sm border border-ink-200 bg-white px-3 text-base sm:text-sm text-ink-800 focus-visible:outline-2 focus-visible:outline-brand-600"
+          className="h-11 rounded-apple-sm border border-ink-200 bg-surface px-3 text-base sm:text-sm text-ink-800 focus-visible:outline-2 focus-visible:outline-brand-600"
         >
           <option value="all">All</option>
           {options.map((o) => (

@@ -1,7 +1,8 @@
 import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
 
-import { SURFACE_CLASS } from "@/components/app/primitives";
+import { Count } from "@/components/admin/motion";
+import { ADMIN_SURFACE } from "@/components/admin/surface";
 import { cn } from "@/lib/utils";
 
 export type StatTone = "brand" | "accent" | "info" | "success" | "warning" | "neutral";
@@ -18,6 +19,20 @@ const DOT: Partial<Record<StatTone, string>> = {
   accent: "bg-accent-500",
 };
 
+/**
+ * Which way a delta string points: "+12 this week" up, "-3 vs last month"
+ * down, "0 this week" (or no sign) flat. Only an explicit sign colours it.
+ */
+function deltaTone(delta: string | undefined): string {
+  if (!delta) return "text-text-subtle";
+  const number = delta.match(/\d[\d,]*(?:\.\d+)?/);
+  if (!number || Number.parseFloat(number[0].replace(/,/g, "")) === 0) return "text-text-subtle";
+  const sign = delta.match(/^[\s₹$€£]*([+\-−–])/)?.[1];
+  if (sign === "+") return "text-success";
+  if (sign) return "text-danger";
+  return "text-text-subtle";
+}
+
 export function StatCard({
   label,
   value,
@@ -25,6 +40,7 @@ export function StatCard({
   tone = "neutral",
   delta,
   href,
+  animate = false,
 }: {
   label: string;
   value: string | number;
@@ -36,7 +52,10 @@ export function StatCard({
   delta?: string;
   /** Makes the whole tile a link. */
   href?: string;
+  /** Tween a numeric `value` from its previous figure (ignored for strings). */
+  animate?: boolean;
 }) {
+  const valueClass = "nums text-2xl font-semibold leading-tight tracking-[-0.02em] text-ink-900";
   const body = (
     <>
       <p className="flex items-center gap-2 text-sm font-medium text-ink-600">
@@ -44,8 +63,12 @@ export function StatCard({
         {label}
       </p>
       <div className="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-1">
-        <span className="nums text-2xl font-semibold leading-tight tracking-[-0.02em] text-ink-900">{value}</span>
-        {delta ? <span className="nums text-sm font-semibold text-brand-700">{delta}</span> : null}
+        {animate && typeof value === "number" ? (
+          <Count value={value} className={valueClass} />
+        ) : (
+          <span className={valueClass}>{value}</span>
+        )}
+        {delta ? <span className={cn("nums text-sm font-semibold", deltaTone(delta))}>{delta}</span> : null}
       </div>
       {hint ? <p className="mt-1 text-sm text-ink-600">{hint}</p> : null}
     </>
@@ -53,7 +76,7 @@ export function StatCard({
 
   const className = cn(
     "block min-w-0 px-5 py-4 shadow-xs",
-    SURFACE_CLASS,
+    ADMIN_SURFACE,
     href && "apple-spring hover:bg-ink-50 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand-600",
   );
 
@@ -83,14 +106,41 @@ export function StatCard({
 export function StatGrid({
   cols = 4,
   variant = "tiles",
+  layout = "grid",
+  label = "Key figures",
   className,
   children,
 }: {
   cols?: 3 | 4 | 6;
   variant?: "tiles" | "strip";
+  /**
+   * `ticker` is one horizontal strip: a single row of cells divided by 1px
+   * rules, scrolling sideways on a phone. It ignores `cols` and `variant`.
+   */
+  layout?: "grid" | "ticker";
+  /** Names the ticker strip for assistive tech (it is a focusable scroll region). */
+  label?: string;
   className?: string;
   children: React.ReactNode;
 }) {
+  if (layout === "ticker") {
+    return (
+      <div
+        // A scroll area must be reachable by keyboard when its cells are not links.
+        tabIndex={0}
+        role="region"
+        aria-label={label}
+        className={cn(
+          "flex overflow-x-auto divide-x divide-ink-200 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand-600",
+          ADMIN_SURFACE,
+          "[&>*]:min-w-40 [&>*]:flex-1 [&>*]:shrink-0 [&>*]:rounded-none [&>*]:border-0 [&>*]:shadow-none",
+          className,
+        )}
+      >
+        {children}
+      </div>
+    );
+  }
   return (
     <div
       className={cn(

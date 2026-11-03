@@ -293,7 +293,7 @@ export function InternPayoutTools({
               if (e.key === "Escape") setForm(null);
             }}
             aria-label={`Create payout for ${labelOf(form.due)}`}
-            className="space-y-4 rounded-apple-lg border border-brand-200 bg-white p-4 shadow-sm sm:p-5"
+            className="space-y-4 rounded-apple-lg border border-brand-200 bg-card p-4 shadow-sm sm:p-5"
           >
             <div>
               <p className="text-base font-semibold text-ink-900">New payout · {labelOf(form.due)}</p>

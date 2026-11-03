@@ -1,3 +1,4 @@
+import { cloneElement } from "react";
 import Link from "next/link";
 import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
 
@@ -5,16 +6,18 @@ import {
   Table,
   TableBody,
   TableCell,
+  TableFooter,
   TableHead,
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
 import { AdminEmpty } from "./panel.tsx";
+import { DataTableKeys } from "./data-table-keys.tsx";
 import { PageSizeSelect } from "./page-size-select.tsx";
 import { Pagination } from "./pagination.tsx";
 import { TableToolbar, type ToolbarFilter } from "./table-toolbar.tsx";
 import { toQueryString } from "@/lib/admin/params";
-import { SURFACE_CLASS } from "@/components/app/primitives";
+import { ADMIN_SURFACE } from "@/components/admin/surface";
 import { cn } from "@/lib/utils";
 
 /**
@@ -49,6 +52,8 @@ export type Column<T> = {
   headerClassName?: string;
   /** Column header class for right-aligned numeric columns. */
   align?: "left" | "right";
+  /** A figure column: right-aligned (header and cells) with tabular figures (`nums`). */
+  numeric?: boolean;
   /**
    * Makes the header a sort link: `?sort=<key>&dir=asc|desc`. The page reads
    * the same two params (see `parseSort`) and orders its query by them.
@@ -66,6 +71,14 @@ export function parseSort<K extends string>(
   if (!key) return fallback;
   return { key, dir: params.dir === "asc" ? "asc" : "desc" };
 }
+
+export type DataTableDensity = "comfortable" | "compact" | "ledger";
+
+const CELL_PAD: Record<DataTableDensity, string> = {
+  comfortable: "px-3 py-3",
+  compact: "px-3 py-2",
+  ledger: "px-3 py-1.5",
+};
 
 export function DataTable<T>({
   basePath,
@@ -85,6 +98,14 @@ export function DataTable<T>({
   extraControls,
   empty,
   dense = false,
+  density,
+  stickyHeader = false,
+  keyboardNav = false,
+  onRowOpen,
+  onRowPeek,
+  rowHref,
+  rowKey,
+  footer,
   className,
   caption,
   pageKey,
@@ -108,7 +129,32 @@ export function DataTable<T>({
   exportHref?: string;
   extraControls?: React.ReactNode;
   empty?: { title: string; body: string; action?: { href: string; label: string } };
+  /** Alias for `density="compact"`. */
   dense?: boolean;
+  /**
+   * Row padding. `compact` is tighter; `ledger` is tighter still and, with
+   * `numeric` columns, reads as a ledger of right-aligned figures.
+   */
+  density?: DataTableDensity;
+  /** Pins the header while the body scrolls (the table gets a viewport-bound scroll area on desktop). */
+  stickyHeader?: boolean;
+  /**
+   * Roving-focus list: j / ArrowDown and k / ArrowUp move the active row, Enter
+   * opens it (`onRowOpen`, else `rowHref`), `x` toggles the row's selection
+   * checkbox when it has one. Ignored while typing in a field or with a
+   * modifier held.
+   */
+  keyboardNav?: boolean;
+  /** Enter on the active row. A function, so only usable when DataTable is rendered from a client component; from a server page use `rowHref`. */
+  onRowOpen?: (row: T) => void;
+  /** Space on the active row (keyboardNav only). Same client-component caveat as `onRowOpen`. */
+  onRowPeek?: (row: T) => void;
+  /** Enter on the active row follows this link. Resolved on the server, so it works from any page. */
+  rowHref?: (row: T) => string;
+  /** React key per row (default: the row's index). */
+  rowKey?: (row: T) => string;
+  /** Rendered in a `<tfoot>` row spanning every column, e.g. totals. */
+  footer?: React.ReactNode;
   className?: string;
   /** Screen-reader caption; the visual header row is aria-hidden by pattern. */
   caption?: string;
@@ -120,9 +166,32 @@ export function DataTable<T>({
   perKey?: string;
 }) {
   const hasToolbar = Boolean(searchPlaceholder || filters?.length || exportHref || extraControls);
-  const cellPad = dense ? "px-3 py-2.5" : "px-3 py-3";
+  const resolvedDensity: DataTableDensity = density ?? (dense ? "compact" : "comfortable");
+  const cellPad = CELL_PAD[resolvedDensity];
+  const wrapperClass = stickyHeader
+    ? // The Table primitive's own container is the scroller, so the cap goes
+      // on it. Desktop only: below lg the table stacks and the header is hidden.
+      "lg:[&_[data-slot=table-container]]:max-h-[calc(100dvh-14rem)] lg:[&_[data-slot=table-container]]:overflow-auto lg:[&_[data-slot=table-container]]:scroll-pt-10"
+    : undefined;
   // Stacked phone layout: the first plain-text column is the row's title,
   // the others carry their header as a label.
+  // keyboardNav wraps the rows in a small client component; otherwise this stays a plain div.
+  const wrapTable = (children: React.ReactNode) =>
+    keyboardNav ? (
+      <DataTableKeys<T>
+        className={wrapperClass}
+        rows={onRowOpen || onRowPeek ? rows : undefined}
+        hrefs={rowHref ? rows.map((r) => rowHref(r)) : undefined}
+        onRowOpen={onRowOpen}
+        onRowPeek={onRowPeek}
+      >
+        {children}
+      </DataTableKeys>
+    ) : (
+      <div data-stack className={wrapperClass}>
+        {children}
+      </div>
+    );
   const labelOf = (c: Column<T>) => (typeof c.header === "string" ? c.header : c.label);
   const titleIndex = columns.findIndex((c) => typeof c.header === "string");
   const stackAttrs = (i: number) =>
@@ -132,7 +201,7 @@ export function DataTable<T>({
     <div
       className={cn(
         "apple-admin overflow-hidden shadow-xs",
-        SURFACE_CLASS,
+        ADMIN_SURFACE,
         className,
       )}
     >
@@ -171,7 +240,7 @@ export function DataTable<T>({
             stopped every list around row 8. Below lg the table stacks into
             one block per row (data-stack, globals.css) instead of scrolling
             sideways with only the name column in view. */}
-        <div data-stack>
+        {wrapTable(
         <Table className="lg:min-w-[40rem]">
           {caption ? <caption className="sr-only">{caption}</caption> : null}
           <TableHeader>
@@ -187,7 +256,8 @@ export function DataTable<T>({
                     aria-sort={dir === "asc" ? "ascending" : dir === "desc" ? "descending" : undefined}
                     className={cn(
                       "bg-ink-50 px-3 py-2.5 text-xs font-semibold tracking-[0.01em] text-ink-600",
-                      column.align === "right" && "text-right",
+                      stickyHeader && "sticky top-0 z-10 bg-card shadow-[inset_0_-1px_0_var(--color-ink-200)]",
+                      (column.align === "right" || column.numeric) && "text-right",
                       column.headerClassName,
                     )}
                   >
@@ -197,7 +267,7 @@ export function DataTable<T>({
                         scroll={false}
                         className={cn(
                           "inline-flex items-center gap-1 rounded-apple-sm hover:text-ink-900 focus-visible:outline-2 focus-visible:outline-brand-600",
-                          column.align === "right" && "flex-row-reverse",
+                          (column.align === "right" || column.numeric) && "flex-row-reverse",
                           active && "text-ink-900",
                         )}
                       >
@@ -223,7 +293,7 @@ export function DataTable<T>({
               const tr = renderRow ? (
                 renderRow(row, index)
               ) : (
-                <TableRow key={index} className={cn("border-ink-100 hover:bg-ink-50/60", rowClassName)}>
+                <TableRow key={rowKey ? rowKey(row) : index} className={cn("border-ink-100 hover:bg-ink-50/60", rowClassName)}>
                   {columns.map((column, cellIndex) => (
                     <TableCell
                       key={cellIndex}
@@ -231,7 +301,7 @@ export function DataTable<T>({
                       className={cn(
                         cellPad,
                         "text-sm text-ink-700",
-                        column.align === "right" && "nums text-right",
+                        (column.align === "right" || column.numeric) && "nums text-right",
                         column.className,
                       )}
                     >
@@ -240,11 +310,20 @@ export function DataTable<T>({
                   ))}
                 </TableRow>
               );
-              return tr;
+              return renderRow && rowKey ? cloneElement(tr, { key: rowKey(row) }) : tr;
             })}
           </TableBody>
-        </Table>
-        </div>
+          {footer ? (
+            <TableFooter className="border-ink-100 bg-ink-50 max-lg:block">
+              <TableRow className="hover:bg-transparent">
+                <TableCell colSpan={columns.length} className={cn(cellPad, "text-sm text-ink-700")}>
+                  {footer}
+                </TableCell>
+              </TableRow>
+            </TableFooter>
+          ) : null}
+        </Table>,
+        )}
         </>
       )}
 

@@ -238,7 +238,7 @@ export function MessagesInbox({ messages, filtering }: { messages: InboxMessage[
                   )}
                 >
                   {initials(m.sender?.name ?? m.name)}
-                  {m.isRead ? null : <span className="absolute -top-0.5 -right-0.5 size-2.5 rounded-full bg-info ring-2 ring-white" />}
+                  {m.isRead ? null : <span className="absolute -top-0.5 -right-0.5 size-2.5 rounded-full bg-info ring-2 ring-card" />}
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="flex items-baseline justify-between gap-3">
@@ -295,7 +295,7 @@ function MessageDetail({
   const pageHref = m.meta.pageUrl && /^(https?:\/\/|\/)/i.test(m.meta.pageUrl) ? m.meta.pageUrl : null;
   return (
     <div className="space-y-4 p-4 sm:p-6">
-      <SheetHeader className="rounded-apple-lg border border-ink-200/80 bg-white p-5 text-left shadow-xs">
+      <SheetHeader className="rounded-apple-lg border border-ink-200/80 bg-card p-5 text-left shadow-xs">
         <div className="flex items-start gap-3 pr-8">
           <span aria-hidden className="grid size-11 shrink-0 place-items-center rounded-full bg-brand-100 text-[0.9375rem] font-semibold text-brand-800">
             {initials(m.sender?.name ?? m.name)}
@@ -349,7 +349,7 @@ function MessageDetail({
         ) : null}
       </div>
 
-      <section className="overflow-hidden rounded-apple-lg border border-ink-200/80 bg-white shadow-xs">
+      <section className="overflow-hidden rounded-apple-lg border border-ink-200/80 bg-card shadow-xs">
         <div className="border-b border-ink-100 px-5 py-4">
           <p className="text-xs font-medium text-ink-600">Subject</p>
           <p className="mt-1 text-[0.9375rem] font-semibold text-ink-900">{m.subject || "No subject"}</p>
@@ -389,7 +389,7 @@ function MessageDetail({
       </section>
 
       {m.meta.files.length ? (
-        <section className="rounded-apple-lg border border-ink-200/80 bg-white p-5 shadow-xs">
+        <section className="rounded-apple-lg border border-ink-200/80 bg-card p-5 shadow-xs">
           <h3 className="text-sm font-semibold text-ink-900">
             Attachments <span className="nums font-normal text-ink-600">({m.meta.files.length})</span>
           </h3>

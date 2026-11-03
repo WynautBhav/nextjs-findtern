@@ -239,7 +239,7 @@ export default async function AdminAnalyticsPage({ searchParams }: { searchParam
               defaultValue={hireFilter.q}
               placeholder="Candidate or company"
               aria-label="Search hires"
-              className="h-9 w-52 rounded-apple-sm border border-ink-200 bg-white px-2.5 text-base sm:text-sm max-lg:h-11"
+              className="h-9 w-52 rounded-apple-sm border border-ink-200 bg-surface px-2.5 text-base sm:text-sm max-lg:h-11"
             />
             {Object.entries(params)
               .filter(([k, v]) => v && !["hq", "hiredFrom", "hiredTo"].includes(k))

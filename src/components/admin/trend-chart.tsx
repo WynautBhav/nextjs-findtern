@@ -210,7 +210,7 @@ export function TrendChart({
                       <span
                         key={series.key}
                         aria-hidden
-                        className="pointer-events-none absolute left-1/2 size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow-sm"
+                        className="pointer-events-none absolute left-1/2 size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-card shadow-sm"
                         style={{
                           top: `${(y(point[series.key]) / 100) * 100}%`,
                           backgroundColor: series.stroke,
@@ -290,7 +290,7 @@ function Tooltip({ point, xPercent }: { point: TrendPoint; xPercent: number }) {
       role="status"
       aria-live="polite"
       className={cn(
-        "pointer-events-none absolute -top-1 z-10 w-max max-w-[11rem] -translate-y-full rounded-apple-md border border-ink-200 bg-white px-2.5 py-2 shadow-md",
+        "pointer-events-none absolute -top-1 z-10 w-max max-w-[11rem] -translate-y-full rounded-apple-md border border-ink-200 bg-card px-2.5 py-2 shadow-md",
         flip ? "-translate-x-full" : "-translate-x-1/2",
       )}
       style={{ left: `${xPercent}%` }}

@@ -102,6 +102,8 @@ const RULES: Rule[] = [
   ["/api/admin/promo-codes", PROMO_R, PROMO_W],
   // Per-type check happens in the route (interns, companies, payments…).
   ["/api/admin/export", []],
+  // Command palette search: any admin may call it; the handler checks each result group's permission.
+  ["/api/admin/search", []],
   ["/api/admin/cms", ["cms:read"], ["cms:write"]],
   ["/api/admin/website", ["cms:read"], ["cms:write"]],
   ["/api/admin/ndc-clauses", INTERN_LEGAL_R, INTERN_LEGAL_W],

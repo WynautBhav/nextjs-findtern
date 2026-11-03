@@ -27,7 +27,7 @@ import {
 
 import { CommandPalette } from "@/components/admin/command-palette";
 import { LEGAL_PAGES } from "@/components/admin/legal-tabs";
-import { ConsoleShell, type ConsoleNavGroup } from "@/components/layout/console-shell";
+import { AdminShell, type AdminNavGroup } from "@/components/admin/shell/admin-shell";
 import { RAIL_COOKIE } from "@/lib/rail";
 import { allows, requiredPermissions } from "@/lib/admin/permissions";
 import { getSession } from "@/lib/auth";
@@ -47,7 +47,7 @@ export const dynamic = "force-dynamic";
  * clubbed under Settings instead of being scattered across People and
  * Content. The one-item "Work" group is folded into People & Work.
  */
-const NAV: ConsoleNavGroup[] = [
+const NAV: AdminNavGroup[] = [
   {
     title: "Overview",
     items: [
@@ -122,6 +122,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   })).filter((g) => g.items.length > 0);
 
   let unreadMessages = 0;
+  let unreadUnavailable = false;
   try {
     const db = getDb();
     const [unread] = await db
@@ -129,7 +130,10 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       .from(schema.contactMessages)
       .where(eq(schema.contactMessages.isRead, false));
     unreadMessages = Number(unread?.value ?? 0);
-  } catch {}
+  } catch {
+    // A failed count is not "zero unread": the bell says the count is unavailable.
+    unreadUnavailable = true;
+  }
 
   const withBadges = groups.map((g) => ({
     ...g,
@@ -137,24 +141,21 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   }));
 
   return (
-    <ConsoleShell
+    <AdminShell
       roleLabel="Admin"
       homeHref="/admin/dashboard"
       groups={withBadges}
       account={{ name: session.email.split("@")[0], email: session.email, subtitle: roleName(session.permissions) }}
       menu={[{ href: "/admin/account", label: "Your account", icon: <CircleUserRound /> }]}
-      topActions={<CommandPalette />}
-      alerts={{ href: "/admin/messages", count: unreadMessages, label: "Inbound messages" }}
+      topActions={<CommandPalette items={groups.flatMap((g) => g.items.map((i) => ({ href: i.href, label: i.label, group: g.title ?? "" })))} />}
+      alerts={{ href: "/admin/messages", count: unreadMessages, label: unreadUnavailable ? "Inbound messages, count unavailable" : "Inbound messages" }}
       signOutTo="/admin/login"
       initialCollapsed={(await cookies()).get(RAIL_COOKIE)?.value === "1"}
       crumbLabels={NAV_LABELS}
       rootCrumb={{ label: "Workspace", href: "/admin/dashboard" }}
-      // Detail pages read "Offers", not "Offers / Details": the title names the record.
-      crumbParents={{}}
-      tone="light"
     >
       {children}
-    </ConsoleShell>
+    </AdminShell>
   );
 }
 

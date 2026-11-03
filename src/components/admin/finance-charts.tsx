@@ -81,13 +81,13 @@ export function RevenueChart({ data }: { data: RevenuePoint[] }) {
                 className="group relative flex-1 cursor-pointer rounded focus-visible:outline-2"
               >
                 {active === index ? (
-                  <span aria-hidden className="pointer-events-none absolute left-1/2 size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow-sm" style={{ top: `${y(point.totalMinor)}%`, backgroundColor: stroke }} />
+                  <span aria-hidden className="pointer-events-none absolute left-1/2 size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-card shadow-sm" style={{ top: `${y(point.totalMinor)}%`, backgroundColor: stroke }} />
                 ) : null}
               </button>
             ))}
           </div>
           {active !== null ? (
-            <div role="status" className={cn("pointer-events-none absolute -top-1 z-10 w-max max-w-44 -translate-y-full rounded-apple-md border border-ink-200 bg-white px-2.5 py-2 shadow-md", x(active) > 62 ? "-translate-x-full" : "-translate-x-1/2")} style={{ left: `${x(active)}%` }}>
+            <div role="status" className={cn("pointer-events-none absolute -top-1 z-10 w-max max-w-44 -translate-y-full rounded-apple-md border border-ink-200 bg-card px-2.5 py-2 shadow-md", x(active) > 62 ? "-translate-x-full" : "-translate-x-1/2")} style={{ left: `${x(active)}%` }}>
               <p className="text-xs font-semibold tracking-wide text-ink-600 uppercase">{data[active].label}</p>
               <p className="mt-0.5 text-sm font-semibold text-ink-900 tabular-nums">{formatMoney(data[active].totalMinor, "INR", { short: true, zeroLabel: false })}</p>
             </div>

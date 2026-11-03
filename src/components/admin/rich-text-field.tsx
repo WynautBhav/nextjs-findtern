@@ -176,7 +176,7 @@ export function RichTextField({
               onClick={() => setMode(m)}
               className={cn(
                 "inline-flex h-8 items-center gap-1.5 rounded-apple-sm px-2.5 text-xs font-semibold max-lg:h-10",
-                mode === m ? "bg-white text-ink-900 shadow-xs" : "text-ink-600 hover:text-ink-900",
+                mode === m ? "bg-card text-ink-900 shadow-xs" : "text-ink-600 hover:text-ink-900",
               )}
             >
               {m === "visual" ? <Eye className="size-3.5" aria-hidden /> : <Code className="size-3.5" aria-hidden />}
@@ -187,7 +187,7 @@ export function RichTextField({
       </div>
 
       {mode === "visual" ? (
-        <div className="overflow-hidden rounded-apple-md border border-ink-200 bg-white focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-500/20">
+        <div className="overflow-hidden rounded-apple-md border border-ink-200 bg-surface focus-within:border-brand-500 focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ring">
           <div role="toolbar" aria-label={`${label} formatting`} className="flex flex-wrap items-center gap-0.5 border-b border-ink-100 bg-ink-50 p-1.5">
             {TOOLS.map((t) => (
               <button
@@ -199,7 +199,7 @@ export function RichTextField({
                 // Keep the selection in the editor when a tool is clicked.
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => runTool(t.name)}
-                className="grid size-8 place-items-center rounded-apple-sm text-ink-700 hover:bg-white hover:text-ink-900 max-lg:size-10 [&_svg]:size-4"
+                className="grid size-8 place-items-center rounded-apple-sm text-ink-700 hover:bg-surface-raised hover:text-ink-900 max-lg:size-10 [&_svg]:size-4"
               >
                 {t.icon}
               </button>
@@ -214,7 +214,7 @@ export function RichTextField({
                   disabled={disabled || uploading}
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => fileInput.current?.click()}
-                  className="inline-flex h-8 items-center gap-1.5 rounded-apple-sm px-2 text-xs font-semibold text-ink-700 hover:bg-white hover:text-ink-900 max-lg:h-10 [&_svg]:size-4"
+                  className="inline-flex h-8 items-center gap-1.5 rounded-apple-sm px-2 text-xs font-semibold text-ink-700 hover:bg-surface-raised hover:text-ink-900 max-lg:h-10 [&_svg]:size-4"
                 >
                   {uploading ? <Loader2 className="animate-spin" aria-hidden /> : <ImagePlus aria-hidden />}
                   Image
@@ -258,7 +258,7 @@ export function RichTextField({
           rows={18}
           spellCheck={false}
           className={cn(
-            "w-full rounded-apple-md border border-ink-200 bg-ink-950 p-4 font-mono text-xs leading-relaxed text-brand-100 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20",
+            "w-full rounded-apple-md border border-ink-200 bg-ink-950 p-4 font-mono text-xs leading-relaxed text-brand-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring focus:border-brand-500",
             minHeight,
           )}
         />

@@ -39,7 +39,7 @@ const STATUS_TONE: Record<MoneyRow["status"], string> = {
   unpaid: "inactive",
 };
 
-const field = "h-9 rounded-apple-sm border border-ink-200 bg-white px-2.5 text-base sm:text-sm text-ink-800 focus-visible:outline-2 focus-visible:outline-brand-600 max-lg:h-11";
+const field = "h-9 rounded-apple-sm border border-ink-200 bg-surface px-2.5 text-base sm:text-sm text-ink-800 focus-visible:outline-2 focus-visible:outline-brand-600 max-lg:h-11";
 
 /** Legacy receivables / payables report (routes.ts:5100-5453), with INR totals. */
 export default async function AdminMoneyReportPage({ searchParams }: { searchParams?: Promise<RawSearchParams> }) {
@@ -99,7 +99,7 @@ export default async function AdminMoneyReportPage({ searchParams }: { searchPar
 
       {/* Candidate / company / status (ADM-15): one GET form, applies to both
           tables as you change it (no Filter button, QA-149). */}
-      <AutoSubmitForm className="flex flex-wrap items-end gap-2 rounded-apple-lg border border-ink-200/80 bg-white px-4 py-3">
+      <AutoSubmitForm className="flex flex-wrap items-end gap-2 rounded-apple-lg border border-ink-200/80 bg-card px-4 py-3">
         {Object.entries(params)
           .filter(([k, v]) => v && !["company", "candidate", "status", "page"].includes(k))
           .map(([k, v]) => (

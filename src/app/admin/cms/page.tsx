@@ -194,7 +194,7 @@ export default async function AdminCmsPage({
             aria-current={t === active ? "page" : undefined}
             className={cn(
               "inline-flex min-h-10 shrink-0 items-center gap-2 whitespace-nowrap rounded-apple-sm px-4 text-sm font-medium max-lg:min-h-11",
-              t === active ? "bg-white text-ink-900 shadow-xs" : "text-ink-600 hover:text-ink-900",
+              t === active ? "bg-card text-ink-900 shadow-xs" : "text-ink-600 hover:text-ink-900",
             )}
           >
             {CMS_COLLECTIONS[t].label}
