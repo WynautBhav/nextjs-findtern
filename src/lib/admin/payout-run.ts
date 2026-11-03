@@ -34,10 +34,6 @@ export type PayoutRun = {
   /** Beyond the six weeks. */
   later: { amountMinor: number; count: number };
   flow: { receivedMinor: number; dueMinor: number; paidMinor: number };
-  /** paid / (paid + still owed), 0..1. */
-  paidFraction: number;
-  /** paid + still owed: the stipend the ring is a fraction of. */
-  totalMinor: number;
 };
 
 const ISO = /^\d{4}-\d{2}-\d{2}$/;
@@ -74,7 +70,9 @@ const distinct = (days: RunDay[]) => new Set(days.flatMap((d) => d.interns)).siz
 /**
  * `paidOutMinor` is the payout ledger's paid total (loadPayouts). Per-placement
  * `paidMinor` only counts payouts linked to a placement, so it undercounts
- * (QA: 0 of 47 paid payouts carry a link); when given, the ledger wins.
+ * (QA: 0 of 47 paid payouts carry a link); when given, the ledger wins. The two
+ * flow figures come from different sources and are never combined into a total
+ * or a percentage.
  */
 export function buildPayoutRun(rows: RunPlacement[], today: string, paidOutMinor?: number): PayoutRun {
   const byDate = new Map<string, { amountMinor: number; interns: Set<string> }>();
@@ -131,7 +129,6 @@ export function buildPayoutRun(rows: RunPlacement[], today: string, paidOutMinor
   }
 
   const paidOut = paidOutMinor != null && Number.isFinite(paidOutMinor) ? Math.max(0, paidOutMinor) : paidMinor;
-  const stipendMinor = paidOut + dueMinor;
 
   return {
     days,
@@ -141,7 +138,5 @@ export function buildPayoutRun(rows: RunPlacement[], today: string, paidOutMinor
     maxWeekMinor: weeks.reduce((m, w) => Math.max(m, w.amountMinor), 0),
     later,
     flow: { receivedMinor, dueMinor, paidMinor: paidOut },
-    paidFraction: stipendMinor > 0 ? Math.min(1, Math.max(0, paidOut / stipendMinor)) : 0,
-    totalMinor: stipendMinor,
   };
 }
