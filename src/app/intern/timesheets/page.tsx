@@ -357,7 +357,7 @@ function SheetStep({ sheet }: { sheet: TimesheetRow }) {
       {editable && sheet.managerNote ? (
         <div className="mt-3 rounded-apple-sm bg-accent-50 px-4 py-3">
           <p className="text-xs font-semibold text-accent-700">From your manager</p>
-          <p className="mt-1 text-pretty text-sm text-ink-800">{sheet.managerNote}</p>
+          <p className="mt-1 whitespace-pre-line text-pretty text-sm text-ink-800">{sheet.managerNote}</p>
         </div>
       ) : null}
 

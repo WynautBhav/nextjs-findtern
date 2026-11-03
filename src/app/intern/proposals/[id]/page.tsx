@@ -17,7 +17,7 @@ import { canAccess } from "@/lib/security/guards";
 import { getDb, hasDb, schema } from "@/lib/db";
 import { loadInternData } from "@/lib/intern-data";
 import { formatJoiningDate, shortDate } from "@/lib/format";
-import { canDecide, hybridSplit, shiftInIst } from "@/lib/intern-offer-view";
+import { canDecide, hybridSplit, joiningInstant, shiftInIst } from "@/lib/intern-offer-view";
 import { toArray } from "@/lib/journey";
 import { sanitizeRichText } from "@/lib/richtext";
 import { FREE_DECLINES, WEEKLY_SCHEDULES } from "@/lib/offer";
@@ -136,7 +136,9 @@ export default async function ProposalDetail({ params }: { params: Promise<{ id:
   const jdHtml = jd && /<[^>]+>/.test(jd) ? sanitizeRichText(jd) : "";
   const scope = (project.row?.scopeOfWork ?? "").trim();
   const joining = formatJoiningDate(offer.startDate);
-  const startsOn = offer.startDate && !Number.isNaN(new Date(offer.startDate).getTime()) ? new Date(offer.startDate) : null;
+  // The joining date is the IST day the first shift starts, which can differ from the employer's calendar day.
+  const firstShift = ft ? joiningInstant(ft.shiftFrom, ft.shiftTo, timezone, offer.startDate) : joiningInstant(offer.shiftFrom, offer.shiftTo, timezone, offer.startDate);
+  const startsOn = firstShift ?? (offer.startDate && !Number.isNaN(new Date(offer.startDate).getTime()) ? new Date(offer.startDate) : null);
   const durationParts = /^(\d+)\s+(.+)$/.exec(String(facts.duration ?? ""));
 
   return (

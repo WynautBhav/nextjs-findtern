@@ -105,7 +105,7 @@ export function TimesheetDecision({ timesheetId, unfilled = 0 }: { timesheetId: 
         </p>
       ) : null}
       {mode === "approve" && confirming ? (
-        <div className="grid grid-cols-[1fr_auto] gap-2" role="group" aria-label="Confirm approval">
+        <div className="flex flex-wrap gap-2 [&>button]:min-w-0" role="group" aria-label="Confirm approval">
           <button type="button" onClick={decide} disabled={busy} className={buttonClass({ variant: "primary", block: true })}>
             {busy ? <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden /> : null}
             Yes, approve and lock
