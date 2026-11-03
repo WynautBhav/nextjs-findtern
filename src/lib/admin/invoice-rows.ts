@@ -1,4 +1,5 @@
 import type { InvoiceBuyerProfile } from "../gst.ts";
+import type { InvoiceLine } from "../invoice.ts";
 
 /**
  * Employer orders and intern activation fees, as one row shape, plus the
@@ -9,6 +10,16 @@ import type { InvoiceBuyerProfile } from "../gst.ts";
 /** One payment row, from either employer orders or intern activation fees. */
 export type AdminInvoiceRow = {
   id: string;
+  /**
+   * The number the customer holds, from the shared `employerInvoice` (legacy DDMMYY-NN
+   * before the 28 Oct switch-over). Set by the server for employer rows; wins over `invoiceNumber`.
+   */
+  displayNumber?: string | null;
+  /** Invoice description and lines, from the same `employerInvoice` the employer's copy uses. Employer rows only. */
+  invoiceDescription?: string;
+  invoiceLines?: InvoiceLine[];
+  /** The promo note, from the same builder; `undefined` for rows that do not use it (intern fees). */
+  invoicePromo?: { code: string; discountMinor: number | null } | null;
   /** FY serial stored at payment ("021126-124", or "FT/2026-27/0001" before 2 Nov 2026); null for unpaid / legacy rows. */
   invoiceNumber?: string | null;
   orderId: string;
@@ -47,7 +58,8 @@ export const isPaidRow = (r: Pick<AdminInvoiceRow, "status">) => r.status === "p
 export const hasTaxInvoice = (r: Pick<AdminInvoiceRow, "status" | "amountMinor">) => isPaidRow(r) && r.amountMinor > 0;
 
 /** The number shown in the table and searched: the stored serial, or the PDF's fallback for paid rows. */
-export function displayInvoiceNumber(r: Pick<AdminInvoiceRow, "id" | "invoiceNumber" | "status" | "amountMinor">, prefix: string): string | null {
+export function displayInvoiceNumber(r: Pick<AdminInvoiceRow, "id" | "invoiceNumber" | "displayNumber" | "status" | "amountMinor">, prefix: string): string | null {
+  if (r.displayNumber) return r.displayNumber;
   if (r.invoiceNumber) return r.invoiceNumber;
   return hasTaxInvoice(r) ? `${prefix}-${r.id.slice(0, 8).toUpperCase()}` : null;
 }

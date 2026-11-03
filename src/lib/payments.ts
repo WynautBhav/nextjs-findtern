@@ -7,28 +7,16 @@ import { employerNames, internFirstName, notify } from "@/lib/notify";
 import { parseOffer } from "@/lib/offer";
 import { recordPromoUse } from "@/lib/promo";
 import { assignInvoiceNumber } from "@/lib/invoice-number";
+import { orderProposalIds } from "@/lib/order-ids";
 
 /**
  * Settling a paid Razorpay order. Called by the checkout verify routes and by
  * the webhook, so each step is idempotent: whichever arrives second is a no-op.
  */
 
-type Raw = Record<string, unknown> | null | undefined;
+export { orderProposalIds };
 
-/** Proposal IDs an employer order covers; same lookup as the legacy app. */
-export function orderProposalIds(raw: Raw): string[] {
-  const r = (raw ?? {}) as Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
-  const notes = r.notes ?? r.order?.notes ?? {};
-  let ids = notes.proposalIds ?? notes.proposal_ids ?? r.proposalIds ?? r.proposal_ids ?? [];
-  if (typeof ids === "string") {
-    try {
-      ids = JSON.parse(ids);
-    } catch {
-      ids = [];
-    }
-  }
-  return Array.isArray(ids) ? ids.map((v) => String(v ?? "").trim()).filter(Boolean) : [];
-}
+type Raw = Record<string, unknown> | null | undefined;
 
 /** Of those, the monthly instalments of placements that are already hired. */
 export function orderDueIds(raw: Raw): string[] {

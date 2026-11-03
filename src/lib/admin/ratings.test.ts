@@ -76,3 +76,74 @@ test("completion bonus waits for a first score and never invents one", () => {
   assert.equal(completionBonusCount({ completionBonusCount: -2 }), 0);
   assert.equal(completionBonusCount({ completionBonusCount: 1.5 }), 0);
 });
+
+const withBonus = (extra: Record<string, unknown>) => grantCompletionBonus(extra);
+
+test("bonus granted before any score is added once when the first score is imported", () => {
+  const pending = withBonus({});
+  assert.equal(pending.findternScore, undefined);
+  const imported = applyRatings(pending, {}, 7);
+  assert.equal(imported.findternScore, 8);
+  // the exported 8 imported back, and the same sheet twice, never add it again
+  assert.equal(applyRatings(imported, {}, 8).findternScore, 8);
+  assert.equal(applyRatings(imported, {}, 7).findternScore, 7);
+  assert.equal(applyRatings(applyRatings(pending, {}, 7), {}, 7).findternScore, 7);
+});
+
+test("bonus granted before the first score is also added once on the mean path", () => {
+  const pending = withBonus({});
+  const rated = applyRatings(pending, { coding: 6, aptitude: 8 });
+  assert.equal(rated.findternScore, 8); // mean 7 + 1
+  assert.equal(applyRatings(rated, {}, 8).findternScore, 8);
+  assert.equal(applyRatings(rated, { coding: 6 }).findternScore, 8);
+});
+
+test("bonus granted after a score raises it once, and a later import of that number stays", () => {
+  const scored = applyRatings({}, {}, 6);
+  const granted = withBonus(scored);
+  assert.equal(granted.findternScore, 7);
+  assert.equal(applyRatings(granted, {}, 7).findternScore, 7);
+  assert.equal(applyRatings(granted, {}, 7).findternScore, 7);
+});
+
+test("two pending bonuses are both added, once, and the score caps at 10", () => {
+  const pending = withBonus(withBonus({}));
+  assert.equal(completionBonusCount(pending), 2);
+  assert.equal(applyRatings(pending, {}, 8.5).findternScore, 10);
+  assert.equal(applyRatings(withBonus({}), {}, 10).findternScore, 10);
+  assert.equal(applyRatings(applyRatings(pending, {}, 8.5), {}, 10).findternScore, 10);
+  assert.equal(withBonus({ findternScore: 10, completionBonusApplied: 0, completionBonusCount: 0 }).findternScore, 10);
+});
+
+test("clearing every rating drops the score but does not re-arm the bonus: an old sheet re-imported adds it once", () => {
+  const rated = applyRatings(withBonus({}), { coding: 5 });
+  assert.equal(rated.findternScore, 6);
+  const cleared = applyRatings(rated, { coding: null });
+  assert.equal(cleared.findternScore, undefined);
+  assert.equal(cleared.completionBonusApplied, 1);
+  // the old sheet (exported with the bonus inside: 6) goes back in as-is, not 7
+  assert.equal(applyRatings(cleared, {}, 6).findternScore, 6);
+  // a pending bonus that was never applied stays pending through a no-op clear
+  assert.equal(applyRatings(applyRatings(withBonus({}), { coding: null }), {}, 5).findternScore, 6);
+  // legacy row (score, no counter) cleared then re-imported: still final
+  const legacyCleared = applyRatings({ findternScore: 8, completionBonusCount: 1, ratings: { coding: 7 } }, { coding: null });
+  assert.equal(applyRatings(legacyCleared, {}, 8).findternScore, 8);
+});
+
+test("a numeric-string score counts as a score", () => {
+  assert.equal(withBonus({ findternScore: "6" }).findternScore, 7);
+  assert.equal(applyRatings({ findternScore: "8", completionBonusCount: 1 }, {}, 8).findternScore, 8);
+});
+
+test("rows saved before the applied counter keep their score as final", () => {
+  assert.equal(applyRatings({ findternScore: 8, completionBonusCount: 1 }, {}, 8).findternScore, 8);
+  assert.equal(applyRatings({ completionBonusCount: 1 }, {}, 8).findternScore, 9);
+});
+
+test("an imported score survives a save that rates nothing and clears nothing", () => {
+  const imported = applyRatings({}, {}, 7);
+  assert.equal(applyRatings(imported, {}).findternScore, 7);
+  assert.equal(applyRatings(imported, { coding: undefined }).findternScore, 7);
+  // an explicit clear still removes it
+  assert.equal(applyRatings(applyRatings({}, { coding: 5 }), { coding: null }).findternScore, undefined);
+});

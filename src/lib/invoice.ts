@@ -102,11 +102,45 @@ export const LEGACY_INVOICE_TZ = "Asia/Kolkata";
 
 type PaidRef = { orderId: string; paidAt: Date | string | null };
 
-/** "021126": the day in DDMMYY, in the given clock (IST by default). */
+const dayFormatters = new Map<string, Intl.DateTimeFormat>();
+
+/** "021126": the day in DDMMYY, in the given clock (IST by default). The formatter is built once per zone (it is slow to construct). */
 export function dayKey(at: Date, timeZone: string = LEGACY_INVOICE_TZ): string {
-  const parts = new Intl.DateTimeFormat("en-GB", { timeZone, day: "2-digit", month: "2-digit", year: "2-digit" }).formatToParts(at);
+  let fmt = dayFormatters.get(timeZone);
+  if (!fmt) {
+    fmt = new Intl.DateTimeFormat("en-GB", { timeZone, day: "2-digit", month: "2-digit", year: "2-digit" });
+    dayFormatters.set(timeZone, fmt);
+  }
+  const parts = fmt.formatToParts(at);
   const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "00";
   return `${get("day")}${get("month")}${get("year")}`;
+}
+
+/**
+ * Every legacy number at once: orderId -> { number, paidAtMs }. Same rule as
+ * `legacyInvoiceNumber` (group by day, order by paid time then order id, NN is
+ * the place in the day) in one pass, instead of re-scanning every payment per
+ * invoice. The first ref wins when an order id repeats, as `findIndex` does.
+ */
+export function legacyInvoiceNumbers(paid: readonly PaidRef[], timeZone = LEGACY_INVOICE_TZ): Map<string, { number: string; paidAtMs: number }> {
+  const byDay = new Map<string, { orderId: string; ms: number }[]>();
+  for (const p of paid) {
+    if (!p.paidAt) continue;
+    const ms = new Date(p.paidAt).getTime();
+    if (Number.isNaN(ms)) continue;
+    const key = dayKey(new Date(ms), timeZone);
+    const list = byDay.get(key);
+    if (list) list.push({ orderId: p.orderId, ms });
+    else byDay.set(key, [{ orderId: p.orderId, ms }]);
+  }
+  const out = new Map<string, { number: string; paidAtMs: number }>();
+  for (const [key, list] of byDay) {
+    list.sort((a, b) => a.ms - b.ms || a.orderId.localeCompare(b.orderId));
+    list.forEach((p, i) => {
+      if (!out.has(p.orderId)) out.set(p.orderId, { number: `${key}-${String(i + 1).padStart(2, "0")}`, paidAtMs: p.ms });
+    });
+  }
+  return out;
 }
 
 /** "281026-02": legacy's number for `row`, given every employer payment paid that day. */

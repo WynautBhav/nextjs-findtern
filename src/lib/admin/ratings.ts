@@ -1,3 +1,5 @@
+import { rawScore } from "../employer-candidates.ts";
+
 export const RATING_KEYS = ["communication", "coding", "aptitude", "interview"] as const;
 
 /** A number sets the rating, `null` clears it, `undefined` leaves it alone. */
@@ -12,16 +14,35 @@ export function completionBonusCount(extra: Record<string, unknown>): number {
 }
 
 /**
+ * How many of the granted bonuses are already inside the stored score.
+ * `completionBonusApplied` records it; rows from before it existed count as
+ * applied whenever they hold a score (the old code added the bonus then, or
+ * the imported score was final) and as pending otherwise.
+ */
+function bonusApplied(extra: Record<string, unknown>): number {
+  const count = completionBonusCount(extra);
+  const n = extra.completionBonusApplied;
+  if (typeof n === "number" && Number.isInteger(n) && n >= 0) return Math.min(n, count);
+  return rawScore(extra) !== null ? count : 0;
+}
+
+/**
  * Admin grants the completion bonus for one successful internship: the count
  * goes up by one and a live score rises by 1, capped at 10. The count is kept
  * apart from the rated score so every later recompute (ratings edit, bulk
  * import, Incruiter webhook) adds it back. An intern with no score yet keeps
- * the count; it is added when their first score arrives.
+ * the bonus pending (count above `completionBonusApplied`); it is added, once,
+ * when their first score arrives.
  */
 export function grantCompletionBonus(extra: Record<string, unknown>): Record<string, unknown> {
-  const next: Record<string, unknown> = { ...extra, completionBonusCount: completionBonusCount(extra) + 1 };
-  if (typeof extra.findternScore === "number" && Number.isFinite(extra.findternScore)) {
-    next.findternScore = clampRound(extra.findternScore + 1);
+  const count = completionBonusCount(extra) + 1;
+  const next: Record<string, unknown> = { ...extra, completionBonusCount: count };
+  const live = rawScore(extra);
+  if (live !== null) {
+    next.findternScore = clampRound(live + 1);
+    next.completionBonusApplied = bonusApplied(extra) + 1;
+  } else {
+    next.completionBonusApplied = bonusApplied(extra);
   }
   return next;
 }
@@ -35,8 +56,18 @@ export function grantCompletionBonus(extra: Record<string, unknown>): Record<str
  * decimal. With no ratings left and no given score, the score is removed.
  * Each granted completion bonus (see `grantCompletionBonus`) adds 1 to a score
  * computed from the ratings, before the 0-10 clamp. A given (bulk import)
- * score is final: it is the number the admin sees and exports, which already
- * includes any bonus, so importing it back must not add the bonus twice.
+ * score is final when the stored score already includes the bonus: it is the
+ * number the admin sees and exports, so importing it back must not add the
+ * bonus twice. Only a bonus still pending (granted before any score existed,
+ * so no exported number can contain it) is added to a given score, once; the
+ * applied counter then stops it being added again.
+ *
+ * Admins must NOT hand-add +1 in a sheet for a granted bonus: the bonus is
+ * added here (or already sits in the exported number), so a hand-added +1
+ * would count twice.
+ *
+ * Clearing the score keeps `completionBonusApplied` as it was (never reset
+ * to 0): re-importing an old sheet later must not add the bonus a second time.
  */
 export function applyRatings(
   extra: Record<string, unknown>,
@@ -49,21 +80,34 @@ export function applyRatings(
     else if (typeof v === "number") ratings[k] = v;
   }
   const values = RATING_KEYS.map((k) => ratings[k]).filter((v): v is number => typeof v === "number" && Number.isFinite(v));
+  const count = completionBonusCount(extra);
+  const pending = count - bonusApplied(extra);
   const score =
     typeof explicitScore === "number" && Number.isFinite(explicitScore)
-      ? clampRound(explicitScore)
+      ? clampRound(explicitScore + pending)
       : values.length
-        ? clampRound(values.reduce((a, b) => a + b, 0) / values.length + completionBonusCount(extra))
+        ? clampRound(values.reduce((a, b) => a + b, 0) / values.length + count)
         : null;
   const next: Record<string, unknown> = { ...extra, ratings };
-  if (score === null) delete next.findternScore;
-  else next.findternScore = score;
+  const clearing = Object.values(updates).some((v) => v === null);
+  if (score === null && !clearing && values.length === 0) {
+    // Nothing rated and nothing cleared (a link-only save, a webhook with no usable score): an imported score stays.
+    return next;
+  }
+  if (score === null) {
+    delete next.findternScore;
+    // Pin the counter (legacy rows without it would otherwise read as pending once the score is gone).
+    if (count > 0) next.completionBonusApplied = bonusApplied(extra);
+  } else {
+    next.findternScore = score;
+    if (count > 0) next.completionBonusApplied = count;
+  }
   return next;
 }
 
 /** True when this change gives the intern their first live (> 0) score. */
 export function firstLiveScore(prev: Record<string, unknown>, next: Record<string, unknown>): boolean {
-  const live = (e: Record<string, unknown>) => typeof e.findternScore === "number" && e.findternScore > 0;
+  const live = (e: Record<string, unknown>) => (rawScore(e) ?? 0) > 0;
   return !live(prev) && live(next);
 }
 

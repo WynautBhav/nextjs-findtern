@@ -78,37 +78,43 @@ export async function POST(req: Request) {
   }
 
   if (internId && scores && typeof scores === "object") {
-    const [onboarding] = await db.select().from(schema.internOnboarding).where(eq(schema.internOnboarding.userId, String(internId))).limit(1);
-    if (onboarding) {
-      const pick = (...keys: string[]) => {
-        for (const k of keys) {
-          const n = Number(scores[k]);
-          if (scores[k] !== undefined && Number.isFinite(n) && n >= 0 && n <= 10) return n;
-        }
-        return undefined;
-      };
-      const updates: RatingUpdate = {
-        coding: pick("coding", "technical"),
-        aptitude: pick("aptitude", "problem_solving"),
-        interview: pick("interview", "ai_score"),
-        communication: pick("communication"),
-      };
-      const url = (v: unknown) => (typeof v === "string" && /^https:\/\//.test(v) ? v : undefined);
+    const pick = (...keys: string[]) => {
+      for (const k of keys) {
+        const n = Number(scores[k]);
+        if (scores[k] !== undefined && Number.isFinite(n) && n >= 0 && n <= 10) return n;
+      }
+      return undefined;
+    };
+    const updates: RatingUpdate = {
+      coding: pick("coding", "technical"),
+      aptitude: pick("aptitude", "problem_solving"),
+      interview: pick("interview", "ai_score"),
+      communication: pick("communication"),
+    };
+    const url = (v: unknown) => (typeof v === "string" && /^https:\/\//.test(v) ? v : undefined);
+    // Read and write under a row lock, so a concurrent bonus grant, import or admin edit is not overwritten.
+    const saved = await db.transaction(async (tx) => {
+      const [onboarding] = await tx
+        .select()
+        .from(schema.internOnboarding)
+        .where(eq(schema.internOnboarding.userId, String(internId)))
+        .limit(1)
+        .for("update");
+      if (!onboarding) return null;
       const prevExtra = (onboarding.extraData as Record<string, unknown>) ?? {};
       const extra = applyRatings(prevExtra, updates);
-      await db
+      const nextExtra = {
+        ...extra,
+        incruiterReportUrl: url(raw.reportUrl ?? raw.report_url ?? raw.pdfUrl) ?? extra.incruiterReportUrl,
+        incruiterRecordingUrl: url(raw.recordingUrl ?? raw.recording_url) ?? extra.incruiterRecordingUrl,
+      };
+      await tx
         .update(schema.internOnboarding)
-        .set({
-          extraData: {
-            ...extra,
-            incruiterReportUrl: url(raw.reportUrl ?? raw.report_url ?? raw.pdfUrl) ?? extra.incruiterReportUrl,
-            incruiterRecordingUrl: url(raw.recordingUrl ?? raw.recording_url) ?? extra.incruiterRecordingUrl,
-          },
-          updatedAt: new Date(),
-        })
+        .set({ extraData: nextExtra, updatedAt: new Date() })
         .where(eq(schema.internOnboarding.id, onboarding.id));
-      await afterRatingsSaved(String(internId), prevExtra, extra);
-    }
+      return { prevExtra, nextExtra };
+    });
+    if (saved) await afterRatingsSaved(String(internId), saved.prevExtra, saved.nextExtra);
   }
   return NextResponse.json({ ok: true });
 }

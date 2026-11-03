@@ -19,7 +19,8 @@ import {
 } from "@/lib/admin/invoice-rows";
 import { formatDate, formatMoney } from "@/lib/format";
 import { placeOfSupply, splitGst } from "@/lib/gst";
-import { downloadInvoice, invoiceNumberOf, taxInvoiceHtml, type InvoiceSeller } from "@/lib/invoice";
+import { downloadInvoice, taxInvoiceHtml, type InvoiceSeller } from "@/lib/invoice";
+import { adminInvoiceInput } from "@/lib/admin/invoice-print";
 
 /** Tonal pill actions, as the table toolbar's (no outline); 44px on touch. */
 const PILL =
@@ -37,23 +38,7 @@ const gstBase = (r: AdminInvoiceRow) => splitGst(r.amountMinor, placeOfSupply({ 
 const money = (minor: number, currency: string) => formatMoney(minor, currency === "USD" ? "USD" : "INR", { zeroLabel: false });
 
 async function printInvoice(r: AdminInvoiceRow, kind: InvoiceKind, seller: InvoiceSeller) {
-  const k = INVOICE_KINDS[kind];
-  const discount = r.discountMinor ?? 0;
-  const html = taxInvoiceHtml({
-    invoiceNo: invoiceNumberOf(r, k.invoicePrefix),
-    date: new Date(r.paidAt ?? r.createdAt ?? Date.now()),
-    orderId: r.orderId,
-    paymentId: r.paymentId,
-    currency: r.currency,
-    amountMinor: r.amountMinor,
-    description: k.description,
-    seller,
-    buyer: { ...r.buyer, place: placeOfSupply({ ...r.buyer, currency: r.currency }) },
-    sac: k.sac,
-    items: r.interns ? r.interns.split("; ").filter(Boolean) : undefined,
-    // The code, or legacy's "Discount (10%)" line for uncoded discounts (ADM-13).
-    promo: r.discountLabel || r.promoCode ? { code: r.discountLabel ?? r.promoCode ?? "", discountMinor: discount || null } : null,
-  });
+  const html = taxInvoiceHtml(adminInvoiceInput(r, kind, seller));
   await downloadInvoice(html, `Invoice-${r.orderId.slice(-8).toUpperCase()}.pdf`);
 }
 
