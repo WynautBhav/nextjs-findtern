@@ -1,4 +1,5 @@
 import { formatIst, formatMoney, shortDate, shortDateTime } from "../format.ts";
+import { parseOffer } from "../offer.ts";
 import { fullName } from "./dashboard-queues-pure.ts";
 import type { QueueGroup, QueueKey } from "./dashboard-queues.types.ts";
 import { istDayKey, istDayStart } from "./revenue.ts";
@@ -354,4 +355,138 @@ function soonest(whenIso: string, nowMs: number): string {
 export function queueRowHref(row: QueueRow, group: QueueGroup | undefined): string {
   if (row.state === "flag" && group) return group.moreHref;
   return `/admin/dashboard?desk=1&queue=${row.key}`;
+}
+
+// ------------------------------------------------------------------ hire pipeline band
+
+/**
+ * The open stages of the proposal pipeline in order, as the dashboard's pipeline band draws them.
+ * Same statuses as `PIPELINE_STAGES` in components/admin/proposal-pipeline-lanes.tsx (that file is a
+ * component, so this pure module keeps its own copy of the open stages; "Closed" is not on the home).
+ */
+export const BAND_STAGES = [
+  { key: "sent", label: "Sent", statuses: ["sent", "draft"] },
+  { key: "interview", label: "Interview", statuses: ["interview_scheduled"] },
+  { key: "accepted", label: "Accepted", statuses: ["accepted"] },
+  { key: "processing", label: "Processing", statuses: ["processing"] },
+  { key: "hired", label: "Hired", statuses: ["hired"] },
+] as const;
+
+export type BandStageKey = (typeof BAND_STAGES)[number]["key"];
+
+/** A proposal row as the loader reads it. `since` is when it last moved (updated_at). */
+export type BandRow = {
+  id: string;
+  status: string;
+  internId: string;
+  first: string | null;
+  last: string | null;
+  company: string | null;
+  since: Date | null;
+  offerDetails: unknown;
+  currency: string | null;
+};
+
+export type BandCard = {
+  id: string;
+  internId: string;
+  name: string;
+  company: string;
+  /** Whole days since it last moved; null when the row has no usable date. */
+  waitingDays: number | null;
+  valueMinor: number | null;
+  currency: string;
+};
+
+export type BandStage = {
+  key: BandStageKey;
+  label: string;
+  /** The true count in this stage, which may exceed `cards.length`. */
+  count: number;
+  /** Offer value per currency, never summed across currencies; empty when no offer has a figure. */
+  totals: { currency: string; minor: number }[];
+  /** The longest-waiting first, at most `cardLimit`. */
+  cards: BandCard[];
+  /** Days the longest-waiting card has waited; null when there are none or none is dated. */
+  oldestDays: number | null;
+};
+
+export type PipelineBand = {
+  stages: BandStage[];
+  /** All proposals on the band. */
+  total: number;
+  /** The open stage a person should look at first (see `stuckStage`), or null. */
+  stuck: BandStageKey | null;
+};
+
+/** The value the tracker shows for an offer: full-time CTC, else the total, else monthly x months. */
+export function offerValue(offerDetails: unknown, rowCurrency: string | null): { minor: number | null; currency: string } {
+  const o = parseOffer(offerDetails, rowCurrency);
+  const minor = o.fullTime ? o.fullTime.annualCtcMinor : (o.totalMinor ?? (o.monthlyMinor != null ? o.monthlyMinor * o.months : null));
+  return { minor: minor != null && Number.isFinite(minor) && minor > 0 ? Math.round(minor) : null, currency: o.currency };
+}
+
+/** Days a stage waits before the band marks it as stuck. */
+export const STUCK_AFTER_DAYS = 3;
+
+/**
+ * The stage to look at first: among the open stages (never Hired), the one whose longest-waiting card
+ * has waited the longest, if that is at least `STUCK_AFTER_DAYS`. Ties go to the stage with more cards,
+ * then to the later stage (money is closer). Null when nothing has waited that long.
+ */
+export function stuckStage(stages: BandStage[]): BandStageKey | null {
+  let best: BandStage | null = null;
+  for (const s of stages) {
+    if (s.key === "hired" || s.oldestDays == null || s.oldestDays < STUCK_AFTER_DAYS) continue;
+    if (
+      !best ||
+      s.oldestDays > (best.oldestDays ?? 0) ||
+      (s.oldestDays === (best.oldestDays ?? 0) && s.count >= best.count)
+    ) {
+      best = s;
+    }
+  }
+  return best ? best.key : null;
+}
+
+/**
+ * Groups proposal rows by stage for the band. Rows with a status that is on no stage are ignored.
+ * `hiredCount` is the all-time hired count (the rows for Hired are only the latest few, so its count
+ * cannot come from them); open stages count their rows. Cards are the longest-waiting first, except
+ * Hired, which shows the most recent.
+ */
+export function buildPipelineBand(rows: BandRow[], hiredCount: number, now: Date, cardLimit = 3): PipelineBand {
+  const stages = BAND_STAGES.map<BandStage>((def) => {
+    const mine = rows.filter((r) => (def.statuses as readonly string[]).includes(r.status));
+    const cards = mine.map<BandCard>((r) => {
+      const v = offerValue(r.offerDetails, r.currency);
+      const since = r.since && !Number.isNaN(r.since.getTime()) ? r.since : null;
+      return {
+        id: r.id,
+        internId: r.internId,
+        name: fullName(r.first, r.last),
+        company: (r.company ?? "").trim() || "Employer",
+        waitingDays: since ? Math.max(0, Math.floor((now.getTime() - since.getTime()) / DAY_MS)) : null,
+        valueMinor: v.minor,
+        currency: v.currency,
+      };
+    });
+    const byCurrency = new Map<string, number>();
+    for (const c of cards) if (c.valueMinor != null) byCurrency.set(c.currency, (byCurrency.get(c.currency) ?? 0) + c.valueMinor);
+    const waiting = cards.map((c) => c.waitingDays).filter((d): d is number => d != null);
+    const sorted =
+      def.key === "hired"
+        ? [...cards].sort((a, b) => (a.waitingDays ?? Infinity) - (b.waitingDays ?? Infinity))
+        : [...cards].sort((a, b) => (b.waitingDays ?? -1) - (a.waitingDays ?? -1));
+    return {
+      key: def.key,
+      label: def.label,
+      count: def.key === "hired" ? Math.max(0, Math.round(hiredCount)) : cards.length,
+      // Hired has only its latest few rows here, so a total over them would understate it: none is shown.
+      totals: def.key === "hired" ? [] : [...byCurrency].map(([currency, minor]) => ({ currency, minor })),
+      cards: sorted.slice(0, cardLimit),
+      oldestDays: def.key === "hired" || waiting.length === 0 ? null : Math.max(...waiting),
+    };
+  });
+  return { stages, total: stages.reduce((n, s) => n + s.count, 0), stuck: stuckStage(stages) };
 }

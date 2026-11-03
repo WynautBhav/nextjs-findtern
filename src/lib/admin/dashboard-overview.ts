@@ -1,14 +1,16 @@
-import { and, count, desc, eq, gte, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, inArray, sql } from "drizzle-orm";
 
 import { dbTimestamp, getDb, schema } from "@/lib/db";
 import { meaningfulProfile, realEmployerId, realEmployers } from "@/lib/admin/scope";
 import {
+  buildPipelineBand,
   istWeekStart,
   placementSummary,
   toNextInterview,
   weekBars,
   type ActivityInput,
   type NextInterview,
+  type PipelineBand,
   type PlacementSummary,
   type WeekBar,
 } from "@/lib/admin/dashboard-overview-pure";
@@ -162,6 +164,48 @@ async function loadCompanies(now: Date): Promise<{ total: number; fresh: number 
     .from(e)
     .where(realEmployers());
   return { total: Number(row?.total ?? 0), fresh: Number(row?.fresh ?? 0) };
+}
+
+/**
+ * The hire pipeline band: every open proposal (sent, interview, accepted, processing) with its offer,
+ * plus the all-time hired count and the latest three hires. Open stages are bounded by the live
+ * pipeline; Hired is not, so it reads its count and a short list, never every row. Real employers only.
+ * Not yet part of `loadOverview`: the dashboard's pipeline band will call it when it is built, so
+ * today's page runs no extra query for it.
+ */
+export async function loadPipelineBand(now: Date): Promise<PipelineBand> {
+  const pr = schema.proposals;
+  const base = {
+    id: pr.id,
+    status: pr.status,
+    internId: pr.internId,
+    first: schema.users.firstName,
+    last: schema.users.lastName,
+    company: schema.employers.companyName,
+    since: pr.updatedAt,
+    offerDetails: pr.offerDetails,
+    currency: pr.currency,
+  };
+  const [open, latestHired, [hired]] = await Promise.all([
+    getDb()
+      .select(base)
+      .from(pr)
+      .leftJoin(schema.users, eq(schema.users.id, pr.internId))
+      .leftJoin(schema.employers, eq(schema.employers.id, pr.employerId))
+      .where(and(inArray(pr.status, ["sent", "draft", "interview_scheduled", "accepted", "processing"]), realEmployerId(pr.employerId)))
+      .orderBy(asc(pr.updatedAt), pr.id),
+    getDb()
+      .select(base)
+      .from(pr)
+      .leftJoin(schema.users, eq(schema.users.id, pr.internId))
+      .leftJoin(schema.employers, eq(schema.employers.id, pr.employerId))
+      .where(and(eq(pr.status, "hired"), realEmployerId(pr.employerId)))
+      .orderBy(desc(pr.updatedAt), pr.id)
+      .limit(3),
+    getDb().select({ value: count() }).from(pr).where(and(eq(pr.status, "hired"), realEmployerId(pr.employerId))),
+  ]);
+  const rows = [...open, ...latestHired].map((r) => ({ ...r, since: dbTimestamp(r.since) }));
+  return buildPipelineBand(rows, Number(hired?.value ?? 0), now);
 }
 
 export async function loadOverview(now: Date) {

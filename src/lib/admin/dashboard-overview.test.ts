@@ -222,3 +222,83 @@ test("queueRowHref: queues open the desk on that queue, a state opens the page t
   assert.equal(queueRowHref(rows[0], group("calendar", { moreHref: "/admin/settings" })), "/admin/settings");
   assert.equal(queueRowHref(rows[1], undefined), "/admin/dashboard?desk=1&queue=payouts");
 });
+
+// ---------------------------------------------------------------- hire pipeline band
+
+import { BAND_STAGES, buildPipelineBand, offerValue, stuckStage, type BandRow } from "./dashboard-overview-pure.ts";
+
+const daysAgo = (n: number) => new Date(NOW.getTime() - n * 86_400_000);
+const row = (id: string, status: string, ago: number | null, extra: Partial<BandRow> = {}): BandRow => ({
+  id,
+  status,
+  internId: `i-${id}`,
+  first: "Asha",
+  last: id.toUpperCase(),
+  company: "Brightwell",
+  since: ago == null ? null : daysAgo(ago),
+  offerDetails: { monthlyAmount: 30000, duration: "6m" },
+  currency: "INR",
+  ...extra,
+});
+
+test("the band has the five open stages in pipeline order", () => {
+  assert.deepEqual(BAND_STAGES.map((s) => s.key), ["sent", "interview", "accepted", "processing", "hired"]);
+});
+
+test("offer value follows the tracker: full-time CTC, else total, else monthly x months", () => {
+  assert.equal(offerValue({ monthlyAmount: 30000, duration: "6m" }, "INR").minor, 18_000_000);
+  assert.equal(offerValue({ totalPrice: 50000, monthlyAmount: 1 }, "INR").minor, 5_000_000);
+  assert.deepEqual(offerValue({}, "USD"), { minor: null, currency: "USD" });
+});
+
+test("stages count their rows, draft joins sent, strays are ignored, oldest waits first", () => {
+  const band = buildPipelineBand(
+    [row("a", "sent", 1), row("b", "draft", 6), row("c", "interview_scheduled", 2), row("d", "accepted", 9), row("e", "rejected", 30)],
+    0,
+    NOW,
+  );
+  const by = Object.fromEntries(band.stages.map((s) => [s.key, s]));
+  assert.equal(by.sent.count, 2);
+  assert.deepEqual(by.sent.cards.map((c) => c.id), ["b", "a"]);
+  assert.equal(by.sent.oldestDays, 6);
+  assert.equal(by.interview.count, 1);
+  assert.equal(by.processing.count, 0);
+  assert.equal(by.processing.oldestDays, null);
+  assert.equal(band.total, 4); // the rejected row is on no stage
+});
+
+test("totals are per currency and are never summed across INR and USD", () => {
+  const band = buildPipelineBand(
+    [row("a", "accepted", 1), row("b", "accepted", 2, { currency: "USD", offerDetails: { monthlyAmount: 1000, duration: "3m" } })],
+    0,
+    NOW,
+  );
+  const accepted = band.stages.find((s) => s.key === "accepted");
+  assert.deepEqual(accepted?.totals.map((t) => t.currency).sort(), ["INR", "USD"]);
+  assert.equal(accepted?.totals.find((t) => t.currency === "INR")?.minor, 18_000_000);
+  assert.equal(accepted?.totals.find((t) => t.currency === "USD")?.minor, 300_000);
+});
+
+test("Hired takes its count from the all-time figure, shows the most recent, and has no total", () => {
+  const band = buildPipelineBand([row("h1", "hired", 5), row("h2", "hired", 1)], 22, NOW);
+  const hired = band.stages.find((s) => s.key === "hired");
+  assert.equal(hired?.count, 22);
+  assert.deepEqual(hired?.cards.map((c) => c.id), ["h2", "h1"]);
+  assert.deepEqual(hired?.totals, []);
+  assert.equal(hired?.oldestDays, null);
+});
+
+test("the stuck stage is the open one waiting longest, at least 3 days, never Hired", () => {
+  assert.equal(buildPipelineBand([row("a", "sent", 2), row("b", "accepted", 2)], 0, NOW).stuck, null);
+  assert.equal(buildPipelineBand([row("a", "sent", 4), row("b", "accepted", 9)], 0, NOW).stuck, "accepted");
+  assert.equal(buildPipelineBand([row("a", "sent", 5), row("b", "processing", 5)], 0, NOW).stuck, "processing"); // tie: the later stage
+  assert.equal(buildPipelineBand([row("h", "hired", 40)], 1, NOW).stuck, null);
+  assert.equal(stuckStage([]), null);
+});
+
+test("an undated row is counted, shows no waiting time and cannot make a stage stuck", () => {
+  const band = buildPipelineBand([row("a", "sent", null)], 0, NOW);
+  assert.equal(band.stages[0].count, 1);
+  assert.equal(band.stages[0].cards[0].waitingDays, null);
+  assert.equal(band.stuck, null);
+});
