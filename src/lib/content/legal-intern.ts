@@ -16,7 +16,7 @@ import type { CmsLegalDoc } from "./types";
 export const INTERN_TERMS: CmsLegalDoc = {
   id: "intern",
   title: "Intern Terms and Conditions",
-  updated: "2026-10-18",
+  updated: "2026-11-04",
   href: "/intern-terms-and-conditions",
   html: `
 <h2>1. Acceptance of Terms</h2>
@@ -66,6 +66,7 @@ export const INTERN_TERMS: CmsLegalDoc = {
 <li>Findtern guarantees every registered candidate an internship within 18 months of completing their AI interview.</li>
 <li>If we are unable to provide an internship within this period, the registration fee will be refunded in full.</li>
 <li>Refunds will be processed only after the 18-month lock-in period is completed.</li>
+<li>If you turn down more than 3 offers, you are no longer eligible for the refund. Only formal offers count, not interview requests.</li>
 <li>Placement opportunities are based on your AI interview performance and skill ratings. Stipends vary according to your Findtern score.</li>
 <li>Fees paid in India include GST at the applicable rate. Your invoice shows the GST breakup.</li>
 </ul>
