@@ -3,6 +3,7 @@ import { and, desc, eq, isNull, lt, or } from "drizzle-orm";
 
 import { getDb, schema } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
+import { requireEmployerSetup } from "@/lib/employer-setup";
 import { EmptyScene } from "@/components/app/primitives";
 import {
   OrdersManager,
@@ -38,6 +39,7 @@ export const metadata: Metadata = {
 export default async function EmployerOrdersPage() {
   const session = await requireRole("employer");
   const employerId = session.uid;
+  await requireEmployerSetup(employerId);
   const data = await loadOrders(employerId).catch((err) => {
     console.error("Failed to load employer orders data:", err);
     return null;
