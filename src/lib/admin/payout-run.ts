@@ -7,6 +7,8 @@
  */
 
 export type RunPlacement = {
+  /** Distinct interns are counted, not placements: one intern can hold several. */
+  internId: string;
   nextDate: string | null;
   monthlyShareMinor: number;
   remainingMinor: number;
@@ -15,14 +17,15 @@ export type RunPlacement = {
   employer: { months: number; monthlyInrMinor: number; dueInrMinor: number } | null;
 };
 
-export type RunDay = { date: string; amountMinor: number; count: number; overdue: boolean };
+export type RunDay = { date: string; amountMinor: number; count: number; overdue: boolean; interns: string[] };
 export type RunWeek = { start: string; end: string; amountMinor: number; count: number; days: RunDay[] };
 
 export type PayoutRun = {
   /** Every date with something due, soonest first. */
   days: RunDay[];
-  /** Earliest due date (overdue or not), null when nothing is owed. */
+  /** Earliest due date that is today or later, null when nothing is upcoming. */
   next: RunDay | null;
+  /** Everything overdue (all passed dates), distinct interns. */
   overdue: { amountMinor: number; count: number; days: number };
   /** Six seven-day windows from today. */
   weeks: RunWeek[];
@@ -31,8 +34,9 @@ export type PayoutRun = {
   /** Beyond the six weeks. */
   later: { amountMinor: number; count: number };
   flow: { receivedMinor: number; dueMinor: number; paidMinor: number };
-  /** paid / total stipend across all placements, 0..1. */
+  /** paid / (paid + still owed), 0..1. */
   paidFraction: number;
+  /** paid + still owed: the stipend the ring is a fraction of. */
   totalMinor: number;
 };
 
@@ -52,15 +56,33 @@ export function addDaysIso(iso: string, days: number): string {
 
 export const RUN_WEEKS = 6;
 
-export function buildPayoutRun(rows: RunPlacement[], today: string): PayoutRun {
-  const byDate = new Map<string, { amountMinor: number; count: number }>();
-  let totalMinor = 0;
+/** Year-aware label: the year shows whenever the date is not in today's year. */
+export function formatRunDate(iso: string, today: string, opts: { weekday?: boolean } = {}): string {
+  if (!ISO.test(iso)) return iso;
+  const sameYear = ISO.test(today) && iso.slice(0, 4) === today.slice(0, 4);
+  return new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-IN", {
+    ...(opts.weekday ? { weekday: "short" as const } : {}),
+    day: "numeric",
+    month: "short",
+    ...(sameYear ? {} : { year: "numeric" as const }),
+    timeZone: "UTC",
+  });
+}
+
+const distinct = (days: RunDay[]) => new Set(days.flatMap((d) => d.interns)).size;
+
+/**
+ * `paidOutMinor` is the payout ledger's paid total (loadPayouts). Per-placement
+ * `paidMinor` only counts payouts linked to a placement, so it undercounts
+ * (QA: 0 of 47 paid payouts carry a link); when given, the ledger wins.
+ */
+export function buildPayoutRun(rows: RunPlacement[], today: string, paidOutMinor?: number): PayoutRun {
+  const byDate = new Map<string, { amountMinor: number; interns: Set<string> }>();
   let paidMinor = 0;
   let dueMinor = 0;
   let receivedMinor = 0;
 
   for (const r of rows) {
-    totalMinor += r.totalShareMinor;
     paidMinor += r.paidMinor;
     if (r.employer) {
       receivedMinor += Math.max(0, r.employer.monthlyInrMinor * r.employer.months - r.employer.dueInrMinor);
@@ -70,21 +92,21 @@ export function buildPayoutRun(rows: RunPlacement[], today: string): PayoutRun {
     const date = r.nextDate && ISO.test(r.nextDate) ? r.nextDate : null;
     if (!date) continue;
     const amount = Math.min(r.monthlyShareMinor > 0 ? r.monthlyShareMinor : r.remainingMinor, r.remainingMinor);
-    const cur = byDate.get(date) ?? { amountMinor: 0, count: 0 };
+    const cur = byDate.get(date) ?? { amountMinor: 0, interns: new Set<string>() };
     cur.amountMinor += amount;
-    cur.count += 1;
+    cur.interns.add(r.internId);
     byDate.set(date, cur);
   }
 
   const valid = ISO.test(today);
   const days: RunDay[] = [...byDate.entries()]
     .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
-    .map(([date, v]) => ({ date, ...v, overdue: valid && date < today }));
+    .map(([date, v]) => ({ date, amountMinor: v.amountMinor, count: v.interns.size, interns: [...v.interns], overdue: valid && date < today }));
 
   const overdueDays = days.filter((d) => d.overdue);
   const overdue = {
     amountMinor: overdueDays.reduce((n, d) => n + d.amountMinor, 0),
-    count: overdueDays.reduce((n, d) => n + d.count, 0),
+    count: distinct(overdueDays),
     days: overdueDays.length,
   };
 
@@ -99,24 +121,27 @@ export function buildPayoutRun(rows: RunPlacement[], today: string): PayoutRun {
         start,
         end,
         amountMinor: inWeek.reduce((n, d) => n + d.amountMinor, 0),
-        count: inWeek.reduce((n, d) => n + d.count, 0),
+        count: distinct(inWeek),
         days: inWeek,
       });
     }
     const horizon = addDaysIso(today, RUN_WEEKS * 7);
     const beyond = days.filter((d) => d.date >= horizon);
-    later = { amountMinor: beyond.reduce((n, d) => n + d.amountMinor, 0), count: beyond.reduce((n, d) => n + d.count, 0) };
+    later = { amountMinor: beyond.reduce((n, d) => n + d.amountMinor, 0), count: distinct(beyond) };
   }
+
+  const paidOut = paidOutMinor != null && Number.isFinite(paidOutMinor) ? Math.max(0, paidOutMinor) : paidMinor;
+  const stipendMinor = paidOut + dueMinor;
 
   return {
     days,
-    next: days[0] ?? null,
+    next: days.find((d) => !d.overdue) ?? null,
     overdue,
     weeks,
     maxWeekMinor: weeks.reduce((m, w) => Math.max(m, w.amountMinor), 0),
     later,
-    flow: { receivedMinor, dueMinor, paidMinor },
-    paidFraction: totalMinor > 0 ? Math.min(1, Math.max(0, paidMinor / totalMinor)) : 0,
-    totalMinor,
+    flow: { receivedMinor, dueMinor, paidMinor: paidOut },
+    paidFraction: stipendMinor > 0 ? Math.min(1, Math.max(0, paidOut / stipendMinor)) : 0,
+    totalMinor: stipendMinor,
   };
 }

@@ -1,16 +1,12 @@
-import { ArrowDown } from "lucide-react";
-
-import { addDaysIso, istDayKey, RUN_WEEKS, type PayoutRun, type RunWeek } from "@/lib/admin/payout-run";
+import { addDaysIso, formatRunDate, istDayKey, RUN_WEEKS, type PayoutRun, type RunWeek } from "@/lib/admin/payout-run";
 import { formatMoney } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 const inr = (minor: number) => formatMoney(minor, "INR", { zeroLabel: "₹0" });
 const inrShort = (minor: number) => formatMoney(minor, "INR", { short: true, zeroLabel: "₹0" });
 
-const fmt = (iso: string, opts: Intl.DateTimeFormatOptions) =>
-  new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-IN", { ...opts, timeZone: "UTC" });
-const dayLong = (iso: string) => fmt(iso, { weekday: "short", day: "numeric", month: "short" });
-const dayShort = (iso: string) => fmt(iso, { day: "numeric", month: "short" });
+const dayLong = (iso: string, today: string) => formatRunDate(iso, today, { weekday: true });
+const dayShort = (iso: string, today: string) => formatRunDate(iso, today);
 const people = (n: number) => `${n.toLocaleString("en-IN")} ${n === 1 ? "intern" : "interns"}`;
 
 function daysBetween(a: string, b: string): number {
@@ -25,13 +21,13 @@ function relative(date: string, today: string): string {
   return `${-n} ${n === -1 ? "day" : "days"} overdue`;
 }
 
-function weekLabel(w: RunWeek) {
-  return `${dayShort(w.start)} to ${dayShort(w.end)}`;
+function weekLabel(w: RunWeek, today: string) {
+  return `${dayShort(w.start, today)} to ${dayShort(w.end, today)}`;
 }
 
 /**
  * The payout run desk: when the next payout run is and how much it moves, the
- * next six weeks of payout dates, and where the money stands (employers paid,
+ * next six weeks of payout dates, and where the money stands (billed to employers,
  * owed to interns, paid out). Every figure comes from `buildPayoutRun` over the
  * placement dues the page already loads. `run` is null when that read failed.
  */
@@ -65,8 +61,7 @@ export function PayoutRunDesk({ run, now }: { run: PayoutRun | null; now: Date }
 function Hero({ run, today }: { run: PayoutRun; today: string }) {
   const next = run.next;
   const pct = Math.round(run.paidFraction * 100);
-  const late = Boolean(next?.overdue);
-  // Everything falling on the same day as the next run, or everything overdue when the run is late.
+  // The next UPCOMING run (today or later); anything overdue is a separate amber line.
   const amount = next ? next.amountMinor : 0;
   const count = next ? next.count : 0;
 
@@ -80,16 +75,21 @@ function Hero({ run, today }: { run: PayoutRun; today: string }) {
           <h3 id="run-hero-title" className="text-sm font-medium">Next payout run</h3>
           {next ? (
             <>
-              <p className="nums mt-2 text-[2rem] font-semibold leading-none tracking-[-0.03em] sm:text-[2.5rem]">{dayLong(next.date)}</p>
+              <p className="nums mt-2 text-[2rem] font-semibold leading-none tracking-[-0.03em] sm:text-[2.5rem]">{dayLong(next.date, today)}</p>
               <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-                <span className={cn("rounded-full px-2 py-0.5 text-xs font-semibold", late ? "bg-warning-soft text-warning" : "bg-white/20 text-[color:var(--admin-tile-ink)]")}>
+                <span className="rounded-full bg-white/20 px-2 py-0.5 text-xs font-semibold text-[color:var(--admin-tile-ink)]">
                   {relative(next.date, today)}
                 </span>
               </p>
             </>
           ) : (
-            <p className="mt-2 text-[1.5rem] font-semibold leading-tight">Nothing scheduled</p>
+            <p className="mt-2 text-[1.5rem] font-semibold leading-tight">{run.overdue.count > 0 ? "Nothing upcoming" : "Nothing scheduled"}</p>
           )}
+          {run.overdue.count > 0 ? (
+            <p className="nums mt-2 inline-block rounded-full bg-warning-soft px-2 py-0.5 text-xs font-semibold text-warning">
+              Overdue: {inr(run.overdue.amountMinor)} across {people(run.overdue.count)}
+            </p>
+          ) : null}
         </div>
         <Ring pct={pct} />
       </div>
@@ -106,7 +106,7 @@ function Hero({ run, today }: { run: PayoutRun; today: string }) {
       </dl>
       <p className="nums text-xs">
         {next ? "One stipend month per intern on that date. " : ""}
-        {inr(run.flow.paidMinor)} of {inr(run.totalMinor)} stipend paid so far.
+        {inr(run.flow.paidMinor)} paid out; {inr(run.flow.dueMinor)} still owed.
       </p>
     </article>
   );
@@ -115,8 +115,8 @@ function Hero({ run, today }: { run: PayoutRun; today: string }) {
 /** Progress ring. The arc is drawn complete and swung into place (rotate + fade): transform and opacity only. */
 function Ring({ pct }: { pct: number }) {
   return (
-    <figure className="m-0 shrink-0" aria-label={`${pct} percent of all stipend paid`}>
-      <svg viewBox="0 0 120 120" role="img" aria-label={`${pct} percent of all stipend paid`} className="size-24 sm:size-28">
+    <figure className="m-0 shrink-0">
+      <svg viewBox="0 0 120 120" role="img" aria-label={`${pct} percent of stipend paid out`} className="size-24 sm:size-28">
         <circle cx="60" cy="60" r="50" fill="none" stroke="currentColor" strokeOpacity="0.25" strokeWidth="12" />
         <g className="payout-ring-sweep" style={{ ["--ring-start" as string]: `${-Math.round(pct * 3.6)}deg` }}>
           <circle
@@ -143,7 +143,7 @@ function Ring({ pct }: { pct: number }) {
 
 function Timeline({ run, today }: { run: PayoutRun; today: string }) {
   const max = Math.max(run.maxWeekMinor, run.overdue.amountMinor, 1);
-  const horizon = dayShort(addDaysIso(today, RUN_WEEKS * 7 - 1));
+  const horizon = dayShort(addDaysIso(today, RUN_WEEKS * 7 - 1), today);
 
   return (
     <article aria-labelledby="run-timeline-title" className="min-w-0 rounded-[var(--radius-admin-card)] border border-[color:var(--admin-panel-edge)] bg-[color:var(--admin-panel)] p-[var(--admin-pad-panel)] shadow-[var(--admin-shadow)]">
@@ -163,7 +163,7 @@ function Timeline({ run, today }: { run: PayoutRun; today: string }) {
           />
         ) : null}
         {run.weeks.map((w, i) => (
-          <Slot key={w.start} label={i === 0 ? "This week" : weekLabel(w)} sub={i === 0 ? weekLabel(w) : undefined} amountMinor={w.amountMinor} count={w.count} max={max} tone="ok" />
+          <Slot key={w.start} label={i === 0 ? "This week" : weekLabel(w, today)} sub={i === 0 ? weekLabel(w, today) : undefined} amountMinor={w.amountMinor} count={w.count} max={max} tone="ok" />
         ))}
       </ol>
       {run.later.count > 0 ? (
@@ -201,41 +201,34 @@ function Slot({ label, sub, amountMinor, count, max, tone }: { label: string; su
   );
 }
 
-/* ── Flow: employers paid -> owed to interns -> paid out ────────────── */
+/* ── Where the money stands: three separate figures, not a sum ───────── */
 
 function Flow({ run }: { run: PayoutRun }) {
   const steps = [
-    { key: "in", label: "Employers paid", value: run.flow.receivedMinor, hint: "Stipend base received, before fee and GST" },
+    { key: "billed", label: "Billed to employers", value: run.flow.receivedMinor, hint: "Employer months covered, at offer price. Not bank cash" },
     { key: "due", label: "Owed to interns", value: run.flow.dueMinor, hint: "Stipend months not yet paid", warn: run.flow.dueMinor > 0 },
-    { key: "out", label: "Paid to interns", value: run.flow.paidMinor, hint: `of ${inr(run.totalMinor)} across all placements`, done: true },
+    { key: "out", label: "Paid to interns", value: run.flow.paidMinor, hint: "All payouts marked paid, as in the ledger below", done: true },
   ];
   return (
     <article aria-labelledby="run-flow-title" className="flex min-w-0 flex-col rounded-[var(--radius-admin-card)] border border-[color:var(--admin-panel-edge)] bg-[color:var(--admin-panel)] p-[var(--admin-pad-panel)] shadow-[var(--admin-shadow)]">
       <h3 id="run-flow-title" className="text-base font-semibold text-foreground">Where the money stands</h3>
-      <ol className="mt-3 flex flex-1 flex-col justify-between gap-1">
-        {steps.map((s, i) => (
-          <FlowStep key={s.key} step={s} last={i === steps.length - 1} />
+      <ul className="mt-3 flex flex-1 flex-col justify-between gap-2">
+        {steps.map((s) => (
+          <FlowStep key={s.key} step={s} />
         ))}
-      </ol>
+      </ul>
     </article>
   );
 }
 
-function FlowStep({ step, last }: { step: { key: string; label: string; value: number; hint: string; warn?: boolean; done?: boolean }; last: boolean }) {
+function FlowStep({ step }: { step: { key: string; label: string; value: number; hint: string; warn?: boolean; done?: boolean } }) {
   return (
-    <>
-      <li className={cn("flex min-w-0 items-center justify-between gap-3 rounded-2xl px-4 py-3", step.done ? "bg-[color:var(--admin-bar-tint)]" : "bg-[color:var(--admin-panel-2)]", step.warn && "ring-2 ring-accent-500/70")}>
-        <div className="min-w-0">
-          <p className={cn("text-xs font-semibold uppercase tracking-wider", step.done ? "text-brand-900" : "text-text-subtle")}>{step.label}</p>
-          <p className={cn("mt-1 text-xs leading-4", step.done ? "text-brand-900" : "text-text-subtle")}>{step.hint}</p>
-        </div>
-        <p className="nums shrink-0 text-xl font-semibold leading-none tracking-[-0.02em] text-foreground sm:text-[1.5rem]">{inr(step.value)}</p>
-      </li>
-      {last ? null : (
-        <li aria-hidden className="flex justify-center text-text-subtle">
-          <ArrowDown className="size-4" />
-        </li>
-      )}
-    </>
+    <li className={cn("flex min-w-0 items-center justify-between gap-3 rounded-2xl px-4 py-3", step.done ? "bg-[color:var(--admin-bar-tint)]" : "bg-[color:var(--admin-panel-2)]", step.warn && "ring-2 ring-accent-500/70")}>
+      <div className="min-w-0">
+        <p className={cn("text-xs font-semibold uppercase tracking-wider", step.done ? "text-brand-900" : "text-text-subtle")}>{step.label}</p>
+        <p className={cn("mt-1 text-xs leading-4", step.done ? "text-brand-900" : "text-text-subtle")}>{step.hint}</p>
+      </div>
+      <p className="nums shrink-0 text-xl font-semibold leading-none tracking-[-0.02em] text-foreground sm:text-[1.5rem]">{inr(step.value)}</p>
+    </li>
   );
 }
