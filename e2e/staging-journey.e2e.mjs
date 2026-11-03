@@ -946,35 +946,37 @@ step("employer: pays the other offer monthly, using the test button [UI]", ["pai
 const rupees = (minor) => (minor / 100).toLocaleString("en-IN", { minimumFractionDigits: minor % 100 ? 2 : 0 });
 const num = (text) => Number(String(text).replace(/[₹,\s]/g, "").replace("−", "-"));
 const istLongDate = (d) => new Date(d).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Kolkata" });
+// The invoice itself prints dd-mm-yy (the reference PDF), not the long date.
+const istInvoiceDate = (d) => new Date(d).toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "2-digit", timeZone: "Asia/Kolkata" }).replace(/\//g, "-");
 
 /** Click a "Tax invoice" button; the invoice is written to a hidden frame and printed (print is stubbed), so read that frame. */
 async function readInvoice(page, invoiceNumber) {
   await page.evaluate(() => document.querySelectorAll("iframe").forEach((f) => f.remove()));
   await page.getByRole("row").filter({ hasText: invoiceNumber }).getByRole("button", { name: /tax invoice/i }).click();
-  await page.waitForFunction(() => [...document.querySelectorAll("iframe")].some((f) => f.contentDocument?.body?.innerText?.includes("TAX INVOICE")), null, { timeout: 15_000 });
+  await page.waitForFunction(() => [...document.querySelectorAll("iframe")].some((f) => f.contentDocument?.body?.innerText?.includes("INVOICE")), null, { timeout: 15_000 });
   const frame = page.frames().find((f) => f !== page.mainFrame());
   return frame.locator("body").innerText();
 }
 
 function checkInvoice(text, pay, { promoDiscountMinor = 0 } = {}) {
-  assert.ok(text.includes(`Invoice #: ${pay.invoice_number}`), "the invoice carries its number");
-  const total = num(text.match(/Total paid\s*₹([\d,.]+)/)?.[1]);
+  assert.ok(text.includes(pay.invoice_number), "the invoice carries its number");
+  const total = num(text.match(/(?:^|\n)Total\s*₹([\d,.]+)/)?.[1]);
   assert.equal(Math.round(total * 100), pay.amount_minor, "the invoice total is what was charged");
   assert.ok(text.includes(`GSTIN: ${COMPANY.gstin}`), "the buyer's GSTIN is printed");
   assert.ok(text.includes(`Place of supply: ${COMPANY.state} (${COMPANY.gstin.slice(0, 2)})`), "place of supply follows the GSTIN state");
-  assert.ok(text.includes(`Date: ${istLongDate(pay.paid_at)}`), `the invoice is dated in India time (${istLongDate(pay.paid_at)}), like the Orders list`);
-  const taxable = num(text.match(/Taxable value\s*₹([\d,.]+)\s*\n/)?.[1]);
+  assert.ok(text.includes(istInvoiceDate(pay.paid_at)), `the invoice is dated in India time (${istInvoiceDate(pay.paid_at)}), like the Orders list`);
+  const taxable = num(text.match(/Subtotal\s*₹([\d,.]+)\s*\n/)?.[1]);
   if (COMPANY.intra) {
-    assert.match(text, /CGST \(9%\)/);
-    assert.match(text, /SGST \(9%\)/);
+    assert.match(text, /CGST 9%/);
+    assert.match(text, /SGST 9%/);
     assert.doesNotMatch(text, /IGST/, "same-state buyer pays CGST + SGST, never IGST");
-    const cgst = num(text.match(/CGST \(9%\)\s*₹([\d,.]+)/)?.[1]);
-    const sgst = num(text.match(/SGST \(9%\)\s*₹([\d,.]+)/)?.[1]);
+    const cgst = num(text.match(/CGST 9%\s*₹([\d,.]+)/)?.[1]);
+    const sgst = num(text.match(/SGST 9%\s*₹([\d,.]+)/)?.[1]);
     assert.ok(Math.abs(taxable + cgst + sgst - total) < 0.011, `taxable + CGST + SGST = total (${taxable} + ${cgst} + ${sgst} vs ${total})`);
   } else {
-    assert.match(text, /IGST \(18%\)/);
+    assert.match(text, /IGST 18%/);
     assert.doesNotMatch(text, /CGST|SGST/, "an out-of-state buyer pays IGST, never CGST + SGST");
-    const igst = num(text.match(/IGST \(18%\)\s*₹([\d,.]+)/)?.[1]);
+    const igst = num(text.match(/IGST 18%\s*₹([\d,.]+)/)?.[1]);
     assert.ok(Math.abs(taxable + igst - total) < 0.011, `taxable + IGST = total (${taxable} + ${igst} vs ${total})`);
     assert.ok(Math.abs(igst - taxable * 0.18) < 0.02, "IGST is 18% of the taxable value");
   }
@@ -1735,9 +1737,9 @@ step("US employer pays in dollars with the test button; Orders and the tax invoi
   await page.getByRole("tab", { name: /Invoices/ }).click();
   await page.getByRole("button", { name: /tax invoice/i }).first().waitFor();
   const text = await readInvoice(page, pay.invoice_number);
-  assert.ok(text.includes(`Invoice #: ${pay.invoice_number}`));
+  assert.ok(text.includes(pay.invoice_number));
   assert.doesNotMatch(text, /IGST|CGST|SGST/, "no Indian GST on a US company's invoice");
-  const total = text.match(/Total paid\s*(?:US\$|USD|\$)\s*([\d,.]+)/)?.[1];
+  const total = text.match(/(?:^|\n)Total\s*(?:US\$|USD|\$)\s*([\d,.]+)/)?.[1];
   assert.ok(total, `the invoice has a dollar total (got: ${text.replace(/\s+/g, " ").slice(0, 400)})`);
   assert.equal(Math.round(Number(total.replace(/,/g, "")) * 100), pay.amount_minor, "the invoice total is what was charged");
   await shot("us-invoice-tab");
