@@ -436,6 +436,9 @@ export function buildOffer(input: OfferInput): Record<string, unknown> {
   };
 }
 
+/** How far ahead an offer start or an interview slot may be. */
+export const MAX_DAYS_AHEAD = 365;
+
 /**
  * The start-date, shift and timezone rules shared by the composer and the
  * offer edit. Pass only what is being set; each issue names its field.
@@ -449,7 +452,7 @@ export function offerTermIssues(t: {
   const out: { path: string; message: string }[] = [];
   if (t.startDate !== undefined) {
     if (!isRealDay(t.startDate)) out.push({ path: "startDate", message: "Pick a real start date." });
-    else if (t.startDate > addDays(todayIst(), 365)) out.push({ path: "startDate", message: "Pick a start date within the next year." });
+    else if (t.startDate > addDays(todayIst(), MAX_DAYS_AHEAD)) out.push({ path: "startDate", message: "Pick a start date within the next year." });
   }
   if (t.shiftFrom !== undefined || t.shiftTo !== undefined) {
     const from = t.shiftFrom ?? "";

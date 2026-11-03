@@ -2,8 +2,10 @@
  * Interview timing rules shared by the employer screens and the APIs, ported
  * from the legacy server (routes.ts 890-930, 11370, 11851, 12880).
  *
- * Kept import-free so `node --test` can exercise it without the `@/` alias.
+ * Kept free of the `@/` alias so `node --test` can exercise it without the `@/` alias.
  */
+
+import { MAX_DAYS_AHEAD } from "./offer.ts";
 
 type SlotLike = {
   status: string | null;
@@ -116,6 +118,11 @@ export function canMarkCompleted(iv: SlotLike, now: number = Date.now()): boolea
 export function hasDuplicateSlots(slots: (Date | string)[]): boolean {
   const times = slots.map((s) => new Date(s).getTime());
   return new Set(times).size !== times.length;
+}
+
+/** True when a slot is further out than an offer start may be (one year). */
+export function hasSlotTooFarAhead(slots: (Date | string)[], now: number = Date.now()): boolean {
+  return slots.some((s) => new Date(s).getTime() > now + MAX_DAYS_AHEAD * 86_400_000);
 }
 
 /** Interview slots start on the quarter hour (:00, :15, :30, :45). */

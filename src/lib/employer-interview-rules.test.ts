@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  hasSlotTooFarAhead,
   canMarkCompleted,
   canMarkMissed,
   displayInterviewStatus,
@@ -127,4 +128,10 @@ test("mark completed: a booked meeting from its start time on, never before (bug
   const done = { ...booked(h(-0.1)), status: "completed" };
   assert.equal(isBlockingInterview(done, NOW), false, "a completed meeting frees the candidate");
   assert.equal(isMeetingOver(done, NOW), true);
+});
+
+test("hasSlotTooFarAhead: slots beyond a year are refused", () => {
+  const now = Date.parse("2026-11-04T00:00:00Z");
+  assert.equal(hasSlotTooFarAhead([new Date(now + 30 * 86_400_000)], now), false);
+  assert.equal(hasSlotTooFarAhead([new Date(now + 30 * 86_400_000), new Date(now + 400 * 86_400_000)], now), true);
 });

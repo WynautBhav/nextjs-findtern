@@ -10,7 +10,7 @@ import { employerNames, internFirstName, notify } from "@/lib/notify";
 import { timezoneForLocation, wallTimeToUtc } from "@/lib/timezones";
 import { canEmployerSeeIntern } from "@/lib/employer-pool";
 import { hiredProposalSql } from "@/lib/employer-visibility";
-import { hasDuplicateSlots, isBlockingInterview, isQuarterHourWall } from "@/lib/employer-interview-rules";
+import { hasDuplicateSlots, hasSlotTooFarAhead, isBlockingInterview, isQuarterHourWall } from "@/lib/employer-interview-rules";
 import { shortDateTime } from "@/lib/format";
 
 const wall = z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/);
@@ -58,6 +58,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   }
   if (slots.some((s) => s.getTime() < Date.now())) {
     return NextResponse.json({ error: "Slots must be in the future" }, { status: 400 });
+  }
+  if (hasSlotTooFarAhead(slots)) {
+    return NextResponse.json({ error: "Pick slots within the next year." }, { status: 400 });
   }
   if (hasDuplicateSlots(slots)) {
     return NextResponse.json({ error: "Offer different times - two slots are the same." }, { status: 400 });

@@ -7,7 +7,7 @@ import { emails, icsInvite } from "@/lib/emails";
 import { requireMutation } from "@/lib/guards-mutation";
 import { employerNames, internFirstName, notify } from "@/lib/notify";
 import { wallTimeToUtc } from "@/lib/timezones";
-import { hasDuplicateSlots, isQuarterHourWall } from "@/lib/employer-interview-rules";
+import { hasDuplicateSlots, hasSlotTooFarAhead, isQuarterHourWall } from "@/lib/employer-interview-rules";
 import { CALENDAR_TOKEN_OWNER, calendarConfig, refreshAccessToken } from "@/lib/google";
 
 const wall = z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/);
@@ -48,6 +48,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     slots = wanted.map((s) => wallTimeToUtc(s, interview.timezone || "Asia/Kolkata"));
     if (slots.some((s) => s!.getTime() < Date.now())) {
       return NextResponse.json({ error: "Slots must be in the future" }, { status: 400 });
+    }
+    if (hasSlotTooFarAhead(slots as Date[])) {
+      return NextResponse.json({ error: "Pick slots within the next year." }, { status: 400 });
     }
     if (hasDuplicateSlots(slots as Date[])) {
       return NextResponse.json({ error: "Offer different times - two slots are the same." }, { status: 400 });
