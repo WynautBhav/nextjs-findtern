@@ -87,9 +87,8 @@ export function ContactForm() {
 
   const missing = [
     !v.firstName.trim() && "first name",
-    !v.lastName.trim() && "last name",
-    !v.email.includes("@") && "email address",
-    v.message.trim().length < 10 && "a message of at least 10 characters",
+        !v.email.includes("@") && "email address",
+    v.message.trim().length < 2 && "a message",
   ].filter(Boolean) as string[];
 
   const valid = missing.length === 0 && !emailProblem && !phoneProblem;
@@ -170,13 +169,12 @@ export function ContactForm() {
           />
         </Field>
 
-        <Field id={`${uid}-ln`} label="Last name" required>
+        <Field id={`${uid}-ln`} label="Last name">
           <input
             id={`${uid}-ln`}
             value={v.lastName}
             onChange={set("lastName")}
             autoComplete="family-name"
-            required
             className={inputCls}
           />
         </Field>

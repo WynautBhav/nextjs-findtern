@@ -42,7 +42,7 @@ export const SITE = {
 /** Employer-facing marketing pages, where the header and footer show the
  *  admin address instead of the intern one. Exact paths, so /employers is
  *  matched but /employer (the signed-in app) is not. */
-const EMPLOYER_PATHS = new Set(["/", "/employers", "/pricing"]);
+const EMPLOYER_PATHS = new Set(["/", "/employers"]);
 
 /** The contact address for the page at `pathname`. */
 export function contactEmailFor(pathname: string | null | undefined): string {
