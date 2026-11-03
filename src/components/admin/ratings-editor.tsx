@@ -49,7 +49,7 @@ export function RatingsEditor({
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState<number | null>(null);
 
-  async function send(payload: Record<string, unknown>) {
+  async function send(payload: Record<string, unknown>): Promise<boolean> {
     setBusy(true);
     setError(null);
     try {
@@ -62,8 +62,10 @@ export function RatingsEditor({
       if (!res.ok) throw new Error(data.error ?? "Could not save the ratings.");
       setSaved(typeof data.findternScore === "number" ? data.findternScore : null);
       router.refresh();
+      return true;
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not save the ratings.");
+      return false;
     } finally {
       setBusy(false);
     }
@@ -86,8 +88,8 @@ export function RatingsEditor({
       confirmLabel: "Clear score",
     });
     if (!ok) return;
-    setValues({ communication: "", coding: "", aptitude: "", interview: "" });
-    await send(clearScorePayload());
+    // Empty the boxes only once the server has cleared the score; on a failure they keep what was typed.
+    if (await send(clearScorePayload())) setValues({ communication: "", coding: "", aptitude: "", interview: "" });
   }
 
   return (
