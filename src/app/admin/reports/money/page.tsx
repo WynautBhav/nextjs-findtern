@@ -69,7 +69,14 @@ export default async function AdminMoneyReportPage({ searchParams }: { searchPar
   const range = analyticsRange(params);
   const prev = data ? previousWindow(range) : null;
   // Same definition as the Reports page (loadCollected), so the delta is not a different "received".
-  const prevReceived = prev && (params.period !== "all" || params.from || params.to) ? await loadCollected(prev).then((c) => c.receivedMinor).catch(() => null) : null;
+  // Like with like: the source chips pick the matching side, and a company/candidate/status filter has no comparable base.
+  const rowFiltered = Boolean(rowFilter.company || rowFilter.candidate || rowFilter.status);
+  const sideOf = (c: { receivedMinor: number; employerMinor: number; internMinor: number }) =>
+    receivablesFilter === "company" ? c.employerMinor : receivablesFilter === "candidate" ? c.internMinor : c.receivedMinor;
+  const prevReceived =
+    prev && !rowFiltered && (params.period !== "all" || params.from || params.to)
+      ? await loadCollected(prev).then(sideOf).catch(() => null)
+      : null;
   const receivedChange = data && prevReceived !== null ? percentChange(data.totals.receivedMinor, prevReceived) : null;
   const view = params.view === "payables" ? "payables" : "receivables";
   const query = new URLSearchParams(params).toString();
@@ -177,7 +184,7 @@ export default async function AdminMoneyReportPage({ searchParams }: { searchPar
               },
               { label: "Paid to interns", value: inr(data.totals.paidOutMinor), note: "Stipend payouts marked paid" },
               { label: "Owed to interns", value: inr(data.totals.owedMinor), note: "Pending payouts and stipend months ahead" },
-              { label: "Net", value: inr(netMinor(data.totals)), accent: true, note: "Received, less paid and owed to interns" },
+              { label: "Net", value: inr(netMinor(data.totals)), accent: netMinor(data.totals) >= 0, negative: netMinor(data.totals) < 0, note: "Received, less paid and owed to interns" },
             ]}
           />
 

@@ -163,7 +163,7 @@ export function computeReceivables(input: ReceivablesInput, filter: { receivable
       );
     }
     for (const o of input.unpaidProfiles) {
-      const date = day(o.createdAt);
+      const date = istDayKey(o.createdAt);
       if (!inRange(date)) continue;
       receivables.push(
         row({
@@ -186,7 +186,8 @@ export function computeReceivables(input: ReceivablesInput, filter: { receivable
   if (filter.payables !== "company") {
     for (const p of input.payouts) {
       const scheduled = (p.raw as Record<string, unknown> | null)?.scheduledFor;
-      const date = day(p.paidAt ?? (typeof scheduled === "string" ? scheduled : null) ?? p.createdAt);
+      // paidAt / createdAt are instants (India day); scheduledFor is already a date.
+      const date = p.paidAt ? istDayKey(p.paidAt) : typeof scheduled === "string" && day(scheduled) ? day(scheduled) : istDayKey(p.createdAt);
       if (!inRange(date)) continue;
       payables.push(
         row({
