@@ -187,7 +187,7 @@ export function InternPayoutTools({
     }
   }
 
-  const th = "sticky top-0 bg-ink-50 px-3 py-2.5 text-left text-xs font-semibold text-ink-600";
+  const th = "sticky top-0 bg-[color:var(--admin-panel)] px-3 py-2.5 text-left text-[0.8125rem] font-medium text-text-subtle";
   const td = "px-3 py-3 align-top text-sm text-ink-700";
 
   return (
@@ -206,11 +206,11 @@ export function InternPayoutTools({
           </p>
         ) : null}
         {dues.length === 0 ? (
-          <p className="rounded-apple-md border border-dashed border-ink-200 px-4 py-6 text-center text-sm text-ink-600">
+          <p className="rounded-apple-md bg-[color:var(--admin-panel-2)] px-4 py-6 text-center text-sm text-text-subtle">
             No hired internship placements, so nothing is owed. Full-time hires have no stipend.
           </p>
         ) : (
-          <div data-stack className="rounded-apple-md border border-ink-200/80 lg:overflow-x-auto">
+          <div data-stack className="rounded-apple-md lg:overflow-x-auto">
             <table className="w-full text-left lg:min-w-[56rem]">
               <caption className="sr-only">Stipend owed per placement</caption>
               <thead>
@@ -225,7 +225,7 @@ export function InternPayoutTools({
                   <th scope="col" className={th}><span className="sr-only">Action</span></th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-ink-100">
+              <tbody className="divide-y divide-[color:var(--admin-rule)]">
                 {dues.map((d) => {
                   const reason =
                     d.monthlyShareMinor <= 0
@@ -293,7 +293,7 @@ export function InternPayoutTools({
               if (e.key === "Escape") setForm(null);
             }}
             aria-label={`Create payout for ${labelOf(form.due)}`}
-            className="space-y-4 rounded-apple-lg border border-brand-200 bg-card p-4 shadow-sm sm:p-5"
+            className="space-y-4 rounded-apple-lg bg-[color:var(--admin-panel-2)] p-4 sm:p-5"
           >
             <div>
               <p className="text-base font-semibold text-ink-900">New payout · {labelOf(form.due)}</p>
@@ -377,11 +377,11 @@ export function InternPayoutTools({
       <section aria-labelledby="payouts-head" className="space-y-3">
         <h4 id="payouts-head" className="text-base font-semibold text-ink-900">Payouts</h4>
         {sorted.length === 0 ? (
-          <p className="rounded-apple-md border border-dashed border-ink-200 px-4 py-6 text-center text-sm text-ink-600">
+          <p className="rounded-apple-md bg-[color:var(--admin-panel-2)] px-4 py-6 text-center text-sm text-text-subtle">
             Nothing recorded yet. Create the first payout from a placement above.
           </p>
         ) : (
-          <div data-stack className="rounded-apple-md border border-ink-200/80 lg:overflow-x-auto">
+          <div data-stack className="rounded-apple-md lg:overflow-x-auto">
             <table className="w-full text-left lg:min-w-[52rem]">
               <caption className="sr-only">Payouts recorded for this intern</caption>
               <thead>
@@ -395,7 +395,7 @@ export function InternPayoutTools({
                   <th scope="col" className={th}><span className="sr-only">Action</span></th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-ink-100">
+              <tbody className="divide-y divide-[color:var(--admin-rule)]">
                 {sorted.map((p) => {
                   const raw = rawOf(p);
                   const proposalId = str(raw.proposalId) ?? str(raw.proposal_id);

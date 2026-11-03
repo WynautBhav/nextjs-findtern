@@ -152,30 +152,28 @@ function money(minor: number, currency: string): string {
 }
 
 /**
- * Taxable value per line: each line's share of the order's taxable value, by
- * its gross price; the last priced line takes the rounding so the rows add up
- * to the total exactly. Lines without a price print "Included".
+ * The price column per line, GST included, as on the printed invoice. Lines
+ * keep their own price only when those prices add up to what was paid (the
+ * stipend line already carries any promo); otherwise they print "Included"
+ * and the totals below tell the story. A single line is the whole order.
  */
 export function lineRows(
   lines: readonly InvoiceLine[],
-  baseMinor: number,
   grossMinor: number,
-): { label: string; detail?: string | null; baseMinor: number | null }[] {
+): { label: string; detail?: string | null; priceMinor: number | null }[] {
+  if (lines.length === 1) return [{ label: lines[0].label, detail: lines[0].detail, priceMinor: grossMinor }];
   const priced = lines.filter((l) => l.amountMinor != null && l.amountMinor > 0);
-  const pricedGross = priced.reduce((s, l) => s + (l.amountMinor ?? 0), 0);
-  // Prices that don't add up to what was paid (a promo, a partial split)
-  // can't be shown per line without inventing figures.
-  const split = priced.length > 0 && pricedGross === grossMinor;
-  let left = baseMinor;
-  let pricedSeen = 0;
-  return lines.map((l) => {
-    if (lines.length === 1) return { label: l.label, detail: l.detail, baseMinor };
-    if (!split || l.amountMinor == null || l.amountMinor <= 0) return { label: l.label, detail: l.detail, baseMinor: null };
-    pricedSeen += 1;
-    const share = pricedSeen === priced.length ? left : Math.round((baseMinor * l.amountMinor) / grossMinor);
-    left -= share;
-    return { label: l.label, detail: l.detail, baseMinor: share };
-  });
+  const split = priced.length > 0 && priced.reduce((sum, l) => sum + (l.amountMinor ?? 0), 0) === grossMinor;
+  return lines.map((l) => ({
+    label: l.label,
+    detail: l.detail,
+    priceMinor: split && l.amountMinor != null && l.amountMinor > 0 ? l.amountMinor : null,
+  }));
+}
+
+/** "14-10-26": the invoice date as an Indian date, day-month-year. */
+export function invoiceDate(date: Date): string {
+  return date.toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "2-digit", timeZone: "Asia/Kolkata" }).replace(/\//g, "-");
 }
 
 export function placeLabel(place: PlaceOfSupply): string {
@@ -189,164 +187,153 @@ export function taxInvoiceHtml(input: InvoiceInput): string {
   const sellerState = stateCodeFromGstin(seller.gstin) ?? SELLER_STATE_CODE;
   const split = splitGst(input.amountMinor, buyer.place, sellerState);
   const m = (minor: number) => money(minor, currency);
-  const dateStr = input.date.toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Kolkata" });
+  const dateStr = invoiceDate(input.date);
 
+  // Subtotal, then each tax, then Total: the same rows as the reference invoice (141026-01).
   const taxRows =
     split.mode === "intra"
-      ? `<div class="row"><span>CGST (9%)</span><span>${m(split.cgstMinor)}</span></div>
-         <div class="row"><span>SGST (9%)</span><span>${m(split.sgstMinor)}</span></div>`
+      ? `<div class="row"><span>CGST 9%</span><span>${m(split.cgstMinor)}</span></div>
+         <div class="row"><span>SGST 9%</span><span>${m(split.sgstMinor)}</span></div>`
       : split.mode === "inter"
-        ? `<div class="row"><span>IGST (18%)</span><span>${m(split.igstMinor)}</span></div>`
+        ? `<div class="row"><span>IGST 18%</span><span>${m(split.igstMinor)}</span></div>`
         : `<div class="row"><span>GST</span><span>Not applicable</span></div>`;
 
   const exportNote =
     split.mode === "export"
       ? `<p class="note">Export of services. Supply meant for export without payment of integrated tax.</p>`
       : "";
-  const gstinLine = seller.gstin
-    ? `GSTIN: ${esc(seller.gstin)}`
-    : `<span style="color:#b45309">GSTIN: not configured</span>`;
+  const promoNote = input.promo
+    ? `<p class="note">Promo ${esc(input.promo.code)} applied${
+        input.promo.discountMinor ? `: you saved ${m(input.promo.discountMinor)}, already taken off the prices above` : ""
+      }.</p>`
+    : "";
+  const gstLine = seller.gstin ? `GST: ${esc(seller.gstin)}` : `<span class="warn">GST: not configured</span>`;
+  const sac = esc(input.sac ?? "998519");
+  const address = buyerAddress(buyer);
+
+  const items = input.lines?.length
+    ? lineRows(input.lines, input.amountMinor).map(
+        (row) => `<tr>
+        <td><div class="item">${esc(row.label)}</div>${row.detail ? `<div class="muted">${esc(row.detail)}</div>` : ""}<div class="muted">SAC ${sac}</div></td>
+        <td class="price">${row.priceMinor == null ? "Included" : m(row.priceMinor)}</td>
+      </tr>`,
+      )
+    : [
+        `<tr>
+        <td><div class="item">${esc(input.description)}</div>${
+          input.items?.length ? `<div class="muted">${input.items.map((item) => esc(item)).join("<br />")}</div>` : ""
+        }<div class="muted">SAC ${sac}</div></td>
+        <td class="price">${m(input.amountMinor)}</td>
+      </tr>`,
+      ];
 
   return `<!doctype html>
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>Tax Invoice ${esc(input.invoiceNo)}</title>
+  <title>Invoice ${esc(input.invoiceNo)}</title>
   <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #0f172a; padding: 40px; margin: 0; background: #fff; line-height: 1.5; }
-    .header { display: flex; justify-content: space-between; border-bottom: 2px solid #e2e8f0; padding-bottom: 24px; margin-bottom: 32px; }
-    .brand { font-size: 26px; font-weight: 800; color: #047857; letter-spacing: -0.5px; }
+    @page { size: A4; margin: 0; }
+    * { box-sizing: border-box; }
+    html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    body { margin: 0; font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #0f172a; background: #fff; line-height: 1.5; }
+    .band { background: #07513c; color: #fff; padding: 36px 28px 40px; display: flex; justify-content: space-between; align-items: center; gap: 24px; }
+    .brand { display: flex; align-items: center; gap: 14px; min-width: 0; }
+    .logo { height: 40px; width: auto; filter: brightness(0) invert(1); flex: none; }
+    .seller { font-size: 12px; line-height: 1.35; overflow-wrap: anywhere; }
+    .seller strong { font-size: 14px; }
+    .word { font-size: 34px; font-weight: 800; letter-spacing: -0.5px; }
+    .body { padding: 36px 28px 28px; }
+    .meta { display: flex; justify-content: space-between; gap: 32px; margin-bottom: 32px; }
+    .k { font-size: 13px; font-weight: 600; color: #475569; }
+    .v { font-size: 15px; margin: 4px 0 16px; overflow-wrap: anywhere; }
+    .to { text-align: right; min-width: 0; }
+    .to .v { margin-bottom: 2px; }
+    .small { font-size: 12px; color: #475569; overflow-wrap: anywhere; }
+    table { width: 100%; border-collapse: collapse; }
+    thead th { background: #032a1f; color: #fff; text-align: left; padding: 10px 16px; font-size: 12px; letter-spacing: 0.03em; text-transform: uppercase; }
+    thead th:last-child { text-align: right; }
+    td { padding: 18px 16px; border-bottom: 1px solid #e2e8f0; vertical-align: top; }
+    .item { font-size: 15px; font-weight: 500; }
     .muted { font-size: 12px; color: #64748b; }
-    .title { font-size: 26px; font-weight: 800; text-align: right; }
-    .meta { font-size: 12px; color: #64748b; margin-top: 6px; text-align: right; line-height: 1.6; }
-    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-bottom: 32px; }
-    .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: #94a3b8; font-weight: 700; margin-bottom: 8px; }
-    .box { font-size: 13px; color: #334155; line-height: 1.6; }
-    table { width: 100%; border-collapse: collapse; margin-bottom: 32px; }
-    th { text-align: left; padding: 12px 16px; background: #f8fafc; font-size: 12px; text-transform: uppercase; color: #475569; border-bottom: 1px solid #cbd5e1; }
-    td { padding: 16px; border-bottom: 1px solid #e2e8f0; font-size: 13px; }
-    .totals { margin-left: auto; width: 320px; }
-    .row { display: flex; justify-content: space-between; padding: 6px 0; font-size: 13px; }
-    .row.final { font-size: 16px; font-weight: bold; border-top: 2px solid #0f172a; padding-top: 12px; margin-top: 4px; color: #047857; }
-    .note { font-size: 12px; color: #475569; margin-top: 16px; }
-    .bank { margin-top: 32px; padding: 16px; border: 1px solid #e2e8f0; border-radius: 8px; max-width: 360px; }
+    .price { text-align: right; font-weight: 700; font-size: 15px; white-space: nowrap; }
+    .sum { margin-top: 4px; }
+    .row { display: flex; justify-content: space-between; padding: 12px 16px; font-size: 14px; }
+    .row:nth-child(even) { background: #f8fafc; }
+    .row span:last-child { font-weight: 600; }
+    .row.final { font-weight: 700; }
+    .note { font-size: 12px; color: #475569; margin: 14px 16px 0; }
+    .refs { margin: 20px 16px 0; font-size: 11px; color: #94a3b8; overflow-wrap: anywhere; }
+    .warn { color: #fbbf24; }
+    .foot { background: #07513c; color: #fff; margin: 12px 28px 28px; border-radius: 0 0 18px 18px; padding: 28px; display: flex; justify-content: space-between; gap: 24px; font-size: 14px; line-height: 1.7; }
+    .foot h4 { margin: 0 0 8px; font-size: 13px; letter-spacing: 0.02em; text-transform: uppercase; }
+    .foot .r { text-align: right; overflow-wrap: anywhere; }
     @media screen and (max-width: 600px) {
-      body { padding: 16px; }
-      .header, .grid { display: block; }
-      .grid > div + div { margin-top: 20px; }
-      .title, .meta { text-align: left; }
-      .totals { width: 100%; }
-      th, td { padding: 10px 8px; }
-      .box, .meta { overflow-wrap: anywhere; }
+      .band, .meta, .foot { flex-direction: column; align-items: flex-start; }
+      .to, .foot .r { text-align: left; }
+      .band { padding: 24px 16px; }
+      .body { padding: 24px 16px; }
+      .foot { margin: 12px 16px 16px; padding: 20px; }
     }
-    .footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid #e2e8f0; font-size: 11px; color: #94a3b8; text-align: center; }
   </style>
 </head>
 <body>
-  <div class="header">
-    <div>
-      <div class="brand">Findtern</div>
-      <div class="muted">${esc(seller.name)} · ${gstinLine}</div>
+  <div class="band">
+    <div class="brand">
+      <img class="logo" src="/logo.png" alt="Findtern" />
+      <div class="seller"><strong>${esc(seller.name)}</strong><br />${esc(seller.address)}<br />${gstLine}</div>
     </div>
-    <div>
-      <div class="title">TAX INVOICE</div>
-      <div class="meta">
-        Invoice #: <strong>${esc(input.invoiceNo)}</strong><br />
-        Date: ${esc(dateStr)}<br />
-        Order ID: ${esc(input.orderId)}<br />
-        Payment ID: ${esc(input.paymentId || "Captured")}
-      </div>
-    </div>
+    <div class="word">INVOICE</div>
   </div>
 
-  <div class="grid">
-    <div>
-      <div class="label">Supplier</div>
-      <div class="box">
-        <strong>${esc(seller.name)}</strong><br />
-        ${esc(seller.address)}<br />
-        ${gstinLine}<br />
-        Email: ${esc(seller.email)}
+  <div class="body">
+    <div class="meta">
+      <div>
+        <div class="k">Invoice Date :</div>
+        <div class="v">${esc(dateStr)}</div>
+        <div class="k">Invoice Number :</div>
+        <div class="v">${esc(input.invoiceNo)}</div>
+      </div>
+      <div class="to">
+        <div class="k">Invoice to :</div>
+        <div class="v">${esc(buyer.name)}</div>
+        ${buyer.email ? `<div class="small">${esc(buyer.email)}</div>` : ""}
+        ${address ? `<div class="small">${esc(address)}</div>` : ""}
+        ${buyer.pincode?.trim() ? `<div class="small">PIN code: ${esc(buyer.pincode.trim())}</div>` : ""}
+        ${buyer.gstin ? `<div class="small">GSTIN: ${esc(buyer.gstin)}</div>` : ""}
+        <div class="small">Place of supply: ${esc(placeLabel(buyer.place))}</div>
       </div>
     </div>
-    <div>
-      <div class="label">Billed to</div>
-      <div class="box">
-        <strong>${esc(buyer.name)}</strong><br />
-        ${buyer.email ? `Email: ${esc(buyer.email)}<br />` : ""}
-        ${buyerAddress(buyer) ? `${esc(buyerAddress(buyer))}<br />` : ""}
-        ${buyer.pincode?.trim() ? `PIN code: ${esc(buyer.pincode.trim())}<br />` : ""}
-        ${buyer.gstin ? `GSTIN: ${esc(buyer.gstin)}<br />` : ""}
-        Place of supply: ${esc(placeLabel(buyer.place))}
-      </div>
+
+    <table>
+      <thead><tr><th>Item description</th><th>Price (${esc(currency)})</th></tr></thead>
+      <tbody>
+      ${items.join("")}
+      </tbody>
+    </table>
+
+    <div class="sum">
+      <div class="row"><span>Subtotal</span><span>${m(split.baseMinor)}</span></div>
+      ${taxRows}
+      <div class="row final"><span>Total</span><span>${m(split.totalMinor)}</span></div>
     </div>
+    ${promoNote}
+    ${exportNote}
+    <div class="refs">Order ref: ${esc(input.orderId)} · Payment ID: ${esc(input.paymentId || "Captured")}</div>
   </div>
 
-  <table>
-    <thead>
-      <tr>
-        <th>Description</th>
-        <th>SAC</th>
-        <th style="text-align: right">Taxable value</th>
-      </tr>
-    </thead>
-    <tbody>
-      ${
-        input.lines?.length
-          ? lineRows(input.lines, split.baseMinor, input.amountMinor)
-              .map(
-                (row, i) => `<tr>
-        <td><strong>${esc(row.label)}</strong>${row.detail ? `<br /><span class="muted">${esc(row.detail)}</span>` : ""}${
-          i === 0 ? `<br /><span class="muted">Order ref: ${esc(input.orderId)}</span>` : ""
-        }</td>
-        <td>${esc(input.sac ?? "998519")}</td>
-        <td style="text-align: right">${row.baseMinor == null ? "Included" : m(row.baseMinor)}</td>
-      </tr>`,
-              )
-              .join("")
-          : `<tr>
-        <td><strong>${esc(input.description)}</strong><br /><span class="muted">Order ref: ${esc(input.orderId)}</span>${
-          input.items?.length
-            ? `<br /><span class="muted">${input.items.map((item) => `• ${esc(item)}`).join("<br />")}</span>`
-            : ""
-        }</td>
-        <td>${esc(input.sac ?? "998519")}</td>
-        <td style="text-align: right">${m(split.baseMinor)}</td>
-      </tr>`
-      }
-    </tbody>
-  </table>
-
-  <div class="totals">
-    <div class="row"><span>Taxable value</span><span>${m(split.baseMinor)}</span></div>
-    ${taxRows}
+  <div class="foot">
     ${
-      input.promo
-        ? `<div class="row"><span>Promo ${esc(input.promo.code)} applied</span><span>${
-            input.promo.discountMinor ? `− ${m(input.promo.discountMinor)}` : "included"
-          }</span></div>`
-        : ""
-    }
-    <div class="row final"><span>Total paid</span><span>${m(split.totalMinor)}</span></div>
-  </div>
-  ${exportNote}
-  ${
-    seller.bank
-      ? `<div class="bank">
-    <div class="label">Send payments to</div>
-    <div class="box">
-      ${esc(seller.bank.accountName)}<br />
-      ${esc(seller.bank.bankName)}<br />
-      Account number: ${esc(seller.bank.accountNumber)}<br />
+      seller.bank
+        ? `<div>
+      <h4>Send payments to:</h4>
+      Bank Account No: ${esc(seller.bank.accountNumber)}<br />
+      Bank Name: ${esc(seller.bank.bankName)}<br />
       IFSC: ${esc(seller.bank.ifsc)}
-    </div>
-  </div>`
-      : ""
-  }
-
-  <div class="footer">
-    This is an electronically generated tax invoice. No signature required.<br />
-    Thank you for choosing Findtern.
+    </div>`
+        : "<div></div>"
+    }
+    <div class="r"><h4>Contact</h4>${esc(seller.email)}</div>
   </div>
 </body>
 </html>`;
@@ -361,7 +348,9 @@ export async function downloadInvoice(html: string, fileName: string): Promise<v
   const doc = frame.contentDocument;
   if (!doc || !frame.contentWindow) return;
   doc.open();
-  doc.write(html.replace("<title>", `<title>${fileName.replace(/\.pdf$/i, "")} `));
+  // The frame is about:blank: a base lets "/logo.png" resolve to this site.
+  const printable = html.replace("<head>", `<head><base href="${location.origin}/" />`);
+  doc.write(printable.replace("<title>", `<title>${fileName.replace(/\.pdf$/i, "")} `));
   doc.close();
   await new Promise((r) => setTimeout(r, 150));
   frame.contentWindow.focus();

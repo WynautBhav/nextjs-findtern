@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { aiInterviewToClose, applyRatings, readRatingsSheet } from "./ratings.ts";
+import { aiInterviewToClose, applyRatings, completionBonusCount, grantCompletionBonus, readRatingsSheet } from "./ratings.ts";
 
 test("bulk sheet: legacy headers, quoted cells, bad values flagged", () => {
   const rows = readRatingsSheet('email,communication,coding,aptitude,ai interview,findternScore\r\n"A@x.com",8,7,6,7,7.5\r\nb@x.com,11,,,,\r\n');
@@ -49,4 +49,30 @@ test("score going live closes only the latest AI interview (ADP-22)", () => {
   assert.equal(aiInterviewToClose(rows)?.id, "new");
   assert.equal(aiInterviewToClose([{ id: "a", status: "completed", createdAt: d("2026-03-01") }, rows[0]]), null);
   assert.equal(aiInterviewToClose([]), null);
+});
+
+test("completion bonus: +1 per granted internship, capped at 10", () => {
+  const once = grantCompletionBonus({ findternScore: 7.2, ratings: { coding: 7.2 } });
+  assert.equal(once.findternScore, 8.2);
+  assert.equal(completionBonusCount(once), 1);
+  assert.equal(grantCompletionBonus({ findternScore: 9.5 }).findternScore, 10);
+  assert.equal(grantCompletionBonus({ findternScore: 10 }).findternScore, 10);
+});
+
+test("completion bonus survives every recompute of the rated score", () => {
+  const granted = grantCompletionBonus({ findternScore: 7, ratings: { coding: 8, aptitude: 6 } });
+  // ratings edit / Incruiter webhook (mean) add the bonus back; a given (imported) score is final
+  assert.equal(applyRatings(granted, { coding: 8 }).findternScore, 8); // mean of 8 and 6 is 7, plus the bonus
+  assert.equal(applyRatings(granted, {}, 8).findternScore, 8); // the exported 8 imported back stays 8
+  assert.equal(applyRatings({ completionBonusCount: 3 }, { coding: 9 }).findternScore, 10);
+});
+
+test("completion bonus waits for a first score and never invents one", () => {
+  const granted = grantCompletionBonus({});
+  assert.equal(granted.findternScore, undefined);
+  assert.equal(completionBonusCount(granted), 1);
+  assert.equal(applyRatings(granted, {}).findternScore, undefined);
+  assert.equal(applyRatings(granted, { coding: 6 }).findternScore, 7);
+  assert.equal(completionBonusCount({ completionBonusCount: -2 }), 0);
+  assert.equal(completionBonusCount({ completionBonusCount: 1.5 }), 0);
 });

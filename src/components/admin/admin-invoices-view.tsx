@@ -1,6 +1,4 @@
-import Link from "next/link";
-
-import { DataTable, parseSort, type Column } from "@/components/admin/data-table";
+import { DataTable, IdentityCell, parseSort, type Column } from "@/components/admin/data-table";
 import { InvoiceCsvButton, InvoiceRowActions } from "@/components/admin/invoice-actions";
 import { DateRangeForm } from "@/components/admin/report-range";
 import { StatCard, StatGrid } from "@/components/admin/stat-card";
@@ -80,15 +78,18 @@ export function AdminInvoicesView({
       cell: (r) => {
         const n = displayInvoiceNumber(r, k.invoicePrefix);
         return (
-          <div className="min-w-0 max-w-72">
-            <Link href={`${k.hrefBase}/${r.partyId}`} className="block truncate font-medium text-ink-900 hover:text-brand-700 hover:underline" title={r.partyName}>
-              {r.partyName}
-            </Link>
-            <p className="truncate text-xs text-ink-600" title={r.partyEmail}>
-              {kind === "employer" && r.interns ? r.interns.split("; ").join(", ") : r.partyEmail}
-            </p>
-            {n ? <p className="font-mono text-xs text-text-subtle">{n}</p> : null}
-          </div>
+          <IdentityCell
+            name={r.partyName}
+            id={r.partyId}
+            href={`${k.hrefBase}/${r.partyId}`}
+            className="max-w-72"
+            sub={
+              <>
+                <span className="block truncate">{kind === "employer" && r.interns ? r.interns.split("; ").join(", ") : r.partyEmail}</span>
+                {n ? <span className="nums block truncate">{n}</span> : null}
+              </>
+            }
+          />
         );
       },
     },
@@ -98,11 +99,11 @@ export function AdminInvoicesView({
       sort: "amount",
       cell: (r) => (
         <div className="whitespace-nowrap">
-          <p className="font-semibold text-ink-900">{money(r.amountMinor, r.currency)}</p>
-          {r.amountMinor > 0 ? <p className="text-xs text-ink-600">incl. GST {money(gstOf(r), r.currency)}</p> : null}
+          <p className="nums font-semibold text-foreground">{money(r.amountMinor, r.currency)}</p>
+          {r.amountMinor > 0 ? <p className="nums text-xs text-text-subtle">incl. GST {money(gstOf(r), r.currency)}</p> : null}
           {(r.discountMinor ?? 0) > 0 || r.promoCode ? (
-            <p className="text-xs text-ink-600">
-              {r.promoCode ? <span className="font-mono font-semibold text-ink-800">{r.promoCode}</span> : null}
+            <p className="nums text-xs text-text-subtle">
+              {r.promoCode ? <span className="font-semibold text-foreground">{r.promoCode}</span> : null}
               {(r.discountMinor ?? 0) > 0 ? ` − ${money(r.discountMinor ?? 0, r.currency)}` : r.promoCode ? " · discount not recorded" : ""}
             </p>
           ) : null}
@@ -118,7 +119,7 @@ export function AdminInvoicesView({
             {r.needsReview ? <StatusBadge tone="danger" label="Needs review" /> : null}
             {r.flagOnly ? <StatusBadge tone="neutral" label="Marked paid" /> : null}
           </span>
-          {kind === "employer" ? <span className="text-xs text-ink-600">{gatewayLabel(r.gateway)}</span> : null}
+          {kind === "employer" ? <span className="text-xs text-text-subtle">{gatewayLabel(r.gateway)}</span> : null}
         </div>
       ),
     },
@@ -129,7 +130,7 @@ export function AdminInvoicesView({
         r.paidAt ? (
           <span className="nums whitespace-nowrap">Paid {formatDate(r.paidAt)}</span>
         ) : (
-          <span className="nums whitespace-nowrap text-ink-600">Created {formatDate(r.createdAt)}</span>
+          <span className="nums whitespace-nowrap text-text-subtle">Created {formatDate(r.createdAt)}</span>
         ),
     },
     {
@@ -140,9 +141,10 @@ export function AdminInvoicesView({
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-[var(--admin-gap)] lg:space-y-6">
       <StatGrid cols={3}>
         <StatCard
+          featured
           label="Collected"
           value={formatMoney(totals.collectedMinor, "INR", { zeroLabel: "₹0" })}
           hint={`${formatNumber(totals.collectedCount)} paid ${k.noun} · USD at ₹100/$${totals.markedPaidCount ? ` · ${formatNumber(totals.markedPaidCount)} marked paid elsewhere, not counted` : ""}`}

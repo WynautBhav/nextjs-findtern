@@ -3,6 +3,8 @@ import { desc, eq, sql } from "drizzle-orm";
 
 import { getDb, schema } from "@/lib/db";
 import { AdminLoadError, AdminPageHeader, Panel } from "@/components/admin/panel";
+import { ADMIN_PILL_SECONDARY } from "@/components/admin/surface";
+import { ButtonLink } from "@/components/ui/button";
 import { getInvoiceSeller } from "@/lib/invoice-seller";
 import { AdminInvoicesView, type AdminInvoiceRow } from "@/components/admin/admin-invoices-view";
 import { discountLabel, paymentPromo } from "@/lib/admin/payment-promo";
@@ -128,6 +130,12 @@ export default async function AdminInternInvoicesPage({ searchParams }: { search
     <div>
       <AdminPageHeader
         title="Intern invoices"
+        subtitle="Activation fees paid by interns, including interns marked paid outside checkout."
+        action={
+          <ButtonLink href="/admin/transactions?source=intern" variant="outline" size="sm" className={ADMIN_PILL_SECONDARY}>
+            Transactions
+          </ButtonLink>
+        }
       />
       {rows ? (
         <AdminInvoicesView kind="intern" rows={rows} seller={getInvoiceSeller()} params={params} basePath="/admin/intern-invoices" />

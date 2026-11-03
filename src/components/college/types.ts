@@ -16,7 +16,6 @@ export type StudentRow = {
   proposals: number;
   interviewsScheduled: number;
   driveMeetings: number;
-  purposes: string[];
   collegeId: string;
   leftAt: null;
 };

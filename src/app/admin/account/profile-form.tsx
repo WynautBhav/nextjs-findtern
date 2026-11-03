@@ -4,11 +4,12 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 
+import { ADMIN_PILL_PRIMARY } from "@/components/admin/surface";
 import { buttonClass } from "@/components/ui/button";
 import { csrfFetch } from "@/lib/client-fetch";
 
 const field =
-  "mt-1.5 min-h-11 w-full rounded-apple-sm border border-ink-200 bg-surface px-3.5 text-base sm:text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring placeholder:text-text-subtle focus-visible:border-brand-600";
+  "mt-1.5 min-h-11 w-full rounded-full border border-ink-300 bg-[color:var(--admin-panel)] px-4 text-base sm:text-sm text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring placeholder:text-text-subtle";
 
 /** Name and sign-in email of the signed-in admin (ADP-23). */
 export function AdminProfileForm({ name: initialName, email: initialEmail }: { name: string; email: string }) {
@@ -62,20 +63,20 @@ export function AdminProfileForm({ name: initialName, email: initialEmail }: { n
   return (
     <form onSubmit={submit} className="space-y-4">
       <div>
-        <label htmlFor="admin-name" className="block text-sm font-medium text-ink-800">
+        <label htmlFor="admin-name" className="block text-sm font-medium text-foreground">
           Name
         </label>
         <input id="admin-name" value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" required minLength={2} maxLength={80} className={field} />
       </div>
       <div>
-        <label htmlFor="admin-email" className="block text-sm font-medium text-ink-800">
+        <label htmlFor="admin-email" className="block text-sm font-medium text-foreground">
           Sign-in email
         </label>
         <input id="admin-email" {...bad("admin-email")} type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" required className={field} />
       </div>
       {emailChanged ? (
         <div>
-          <label htmlFor="admin-current" className="block text-sm font-medium text-ink-800">
+          <label htmlFor="admin-current" className="block text-sm font-medium text-foreground">
             Current password
           </label>
           <input
@@ -88,7 +89,7 @@ export function AdminProfileForm({ name: initialName, email: initialEmail }: { n
             required
             className={field}
           />
-          <p className="mt-1 text-xs text-ink-600">Needed because the email is how you sign in.</p>
+          <p className="mt-1 text-xs text-text-subtle">Needed because the email is how you sign in.</p>
         </div>
       ) : null}
       {error ? (
@@ -97,11 +98,11 @@ export function AdminProfileForm({ name: initialName, email: initialEmail }: { n
         </p>
       ) : null}
       {saved ? (
-        <p role="status" className="text-sm font-medium text-brand-700">
+        <p role="status" className="text-sm font-medium text-success">
           Saved.
         </p>
       ) : null}
-      <button type="submit" disabled={busy || !dirty} className={buttonClass({ variant: "primary", size: "sm" })}>
+      <button type="submit" disabled={busy || !dirty} className={buttonClass({ variant: "primary", size: "sm", className: ADMIN_PILL_PRIMARY })}>
         {busy ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
         Save changes
       </button>

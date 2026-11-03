@@ -1,12 +1,11 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { and, count, desc, eq, notInArray, sql, type SQL } from "drizzle-orm";
 
 import { getDb, schema } from "@/lib/db";
 import { AdminLoadError, AdminPageHeader, Panel } from "@/components/admin/panel";
-import { DataTable, type Column } from "@/components/admin/data-table";
+import { DataTable, IdentityCell, type Column } from "@/components/admin/data-table";
 import { StatusBadge, humanizeStatus } from "@/components/admin/status-badge";
-import { Pill } from "@/components/app/primitives";
+import { ADMIN_PILL_PRIMARY } from "@/components/admin/surface";
 import { ButtonLink } from "@/components/ui/button";
 import { flattenParams, parsePageRequest, searchAny, toPage } from "@/lib/admin/params";
 import { AUTO_NOTIFICATION_TYPES } from "@/lib/admin/notification-types";
@@ -60,7 +59,7 @@ export default async function AdminNotificationHistoryPage({
       title="Notification history"
       subtitle="Automatic reminders are not listed."
       action={
-        <ButtonLink href="/admin/notifications" variant="primary" size="sm">
+        <ButtonLink href="/admin/notifications" variant="primary" size="sm" className={ADMIN_PILL_PRIMARY}>
           Send a notification
         </ButtonLink>
       }
@@ -89,19 +88,14 @@ export default async function AdminNotificationHistoryPage({
     {
       header: "Recipient",
       cell: (r) => (
-        <div className="min-w-0 max-w-56">
-          <Link
-            href={r.recipientType === "employer" ? `/admin/companies/${r.recipientId}` : `/admin/interns/${r.recipientId}`}
-            className="block truncate font-medium text-ink-900 max-lg:whitespace-normal max-lg:break-words underline-offset-4 hover:text-brand-700 hover:underline"
-            title={r.recipientName ?? undefined}
-          >
-            {r.recipientName || "Deleted account"}
-          </Link>
-          <span className="flex items-center gap-1.5 text-xs text-ink-600 max-lg:flex-wrap">
-            {r.recipientType === "employer" ? "Company" : "Candidate"}
-            {r.recipientEmail ? <span className="truncate max-lg:whitespace-normal max-lg:break-all">· {r.recipientEmail}</span> : null}
-          </span>
-        </div>
+        <IdentityCell
+          name={r.recipientName || "Deleted account"}
+          id={r.recipientId}
+          size="sm"
+          className="max-w-64"
+          href={r.recipientName ? (r.recipientType === "employer" ? `/admin/companies/${r.recipientId}` : `/admin/interns/${r.recipientId}`) : undefined}
+          sub={[r.recipientType === "employer" ? "Company" : "Candidate", r.recipientEmail].filter(Boolean).join(" · ")}
+        />
       ),
     },
     {
@@ -112,13 +106,13 @@ export default async function AdminNotificationHistoryPage({
         <details className="group min-w-0 max-w-md max-lg:text-left">
           <summary className="cursor-pointer list-none">
             <span className="flex min-w-0 items-center gap-2 max-lg:flex-wrap">
-              <span className="truncate font-medium text-ink-900 max-lg:whitespace-normal max-lg:break-words">{r.title}</span>
-              <Pill tone="neutral" className="shrink-0">{humanizeStatus(r.type)}</Pill>
+              <span className="truncate font-medium text-foreground max-lg:whitespace-normal max-lg:break-words">{r.title}</span>
+              <StatusBadge tone="info" dot={false} label={humanizeStatus(r.type)} />
             </span>
-            <span className="block truncate text-ink-600 group-open:hidden max-lg:line-clamp-2 max-lg:whitespace-normal max-lg:break-words">{r.message}</span>
+            <span className="block truncate text-text-subtle group-open:hidden max-lg:line-clamp-2 max-lg:whitespace-normal max-lg:break-words">{r.message}</span>
           </summary>
-          <p className="mt-1 whitespace-pre-wrap break-words text-ink-700">{r.message}</p>
-          {r.link ? <p className="mt-1 text-xs text-ink-600">Link: {r.link}</p> : null}
+          <p className="mt-1 whitespace-pre-wrap break-words text-foreground">{r.message}</p>
+          {r.link ? <p className="mt-1 text-xs text-text-subtle">Link: {r.link}</p> : null}
         </details>
       ),
     },
@@ -128,7 +122,7 @@ export default async function AdminNotificationHistoryPage({
       cell: (r) => (
         <div className="flex flex-col items-start gap-1 max-lg:items-end">
           <StatusBadge tone={r.isRead ? "success" : "neutral"} label={r.isRead ? "Read" : "Not read yet"} />
-          <span className="nums whitespace-nowrap text-xs text-ink-600">Sent {when(r.createdAt)}</span>
+          <span className="nums whitespace-nowrap text-xs text-text-subtle">Sent {when(r.createdAt)}</span>
         </div>
       ),
     },

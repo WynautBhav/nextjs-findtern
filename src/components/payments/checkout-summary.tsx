@@ -63,8 +63,10 @@ export function CheckoutSummary({
   const [selectedId, setSelectedId] = useState(lines.find((l) => l.id === initialId)?.id ?? lines[0]?.id ?? "");
   const line = lines.find((l) => l.id === selectedId) ?? lines[0];
   const [picked, setPicked] = useState<Mode>("monthly");
+  // A promo code is for the whole engagement paid upfront: while one is applied, monthly is locked.
+  const [promoApplied, setPromoApplied] = useState(false);
 
-  const canMonthly = Boolean(line && line.monthlyMinor != null);
+  const canMonthly = Boolean(line && line.monthlyMinor != null) && !promoApplied;
   const mode: Mode = line?.due ? "monthly" : canMonthly ? picked : "upfront";
   const amountOf = (l: SummaryLine, m: Mode) =>
     l.due || (m === "monthly" && l.monthlyMinor != null) ? (l.monthlyMinor ?? 0) : l.upfrontMinor;
@@ -96,7 +98,10 @@ export function CheckoutSummary({
                     name="checkout-line"
                     className="mt-1 size-4 shrink-0 accent-brand-700"
                     checked={selected}
-                    onChange={() => setSelectedId(l.id)}
+                    onChange={() => {
+                      setSelectedId(l.id);
+                      setPromoApplied(false);
+                    }}
                   />
                   <span className="grid min-w-0 flex-1 gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
                     <span className="min-w-0">
@@ -171,7 +176,9 @@ export function CheckoutSummary({
                   <span className="min-w-0 flex-1">
                     Monthly
                     <span className="block text-xs text-text-subtle">
-                      {canMonthly
+                      {promoApplied
+                        ? "Not with a promo code"
+                        : canMonthly
                         ? line.months > 1
                           ? `First month now, then ${line.months - 1} more monthly`
                           : "One month, paid now"
@@ -226,6 +233,7 @@ export function CheckoutSummary({
               mode={mode}
               testMode={testMode}
               testPay={testPay}
+              onPromoChange={setPromoApplied}
             />
           </div>
           <p className="mt-4 text-xs leading-relaxed text-text-subtle">

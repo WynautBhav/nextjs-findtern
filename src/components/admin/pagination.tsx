@@ -70,12 +70,12 @@ export function Pagination({
     `${basePath}${toQueryString({ ...params, [pageParam]: String(target) })}`;
 
   const linkBase =
-    "apple-spring apple-pressable inline-flex h-8 min-w-8 items-center justify-center rounded-apple-sm px-2.5 text-sm font-medium nums touch:min-h-11 touch:min-w-11";
+    "apple-spring apple-pressable inline-flex h-9 min-w-9 items-center justify-center rounded-full px-3 text-sm font-medium nums focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring touch:min-h-11 touch:min-w-11";
 
   return (
     <nav
       aria-label="Pagination"
-      className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-5 py-3"
+      className="flex flex-wrap items-center justify-between gap-3 border-t border-[color:var(--admin-rule)] px-[var(--admin-pad-panel)] py-3"
     >
       <p className="text-sm text-text-subtle">
         Showing{" "}
@@ -97,10 +97,10 @@ export function Pagination({
           tabIndex={page <= 1 ? -1 : undefined}
           className={cn(
             linkBase,
-            "border border-border text-foreground",
+            "bg-[color:var(--admin-panel-2)] text-foreground",
             page <= 1
               ? "pointer-events-none opacity-40"
-              : "hover:bg-surface hover:border-border-strong",
+              : "hover:bg-[color:var(--admin-bar-tint)]",
           )}
         >
           Previous
@@ -120,8 +120,8 @@ export function Pagination({
               className={cn(
                 linkBase,
                 entry === page
-                  ? "bg-primary text-white"
-                  : "border border-border text-foreground hover:bg-surface hover:border-border-strong",
+                  ? "bg-[color:var(--admin-tile)] text-[color:var(--admin-tile-ink)]"
+                  : "text-foreground hover:bg-[color:var(--admin-panel-2)]",
               )}
             >
               {entry}
@@ -136,10 +136,10 @@ export function Pagination({
           tabIndex={page >= pages ? -1 : undefined}
           className={cn(
             linkBase,
-            "border border-border text-foreground",
+            "bg-[color:var(--admin-panel-2)] text-foreground",
             page >= pages
               ? "pointer-events-none opacity-40"
-              : "hover:bg-surface hover:border-border-strong",
+              : "hover:bg-[color:var(--admin-bar-tint)]",
           )}
         >
           Next

@@ -2,13 +2,13 @@ import { and, eq, isNull, sql } from "drizzle-orm";
 
 import { getDb, schema } from "@/lib/db";
 import { membershipFor } from "./access";
-import { NOTICE_HASH, NOTICE_VERSION, parsePurposes, type ConsentPurpose } from "./consent";
+import { parseCollegeCode } from "./code";
 
 /**
- * A student joining or leaving a college. Joining records a fresh consent
- * row (the notice hash pins what they saw) and works out whether the
- * membership is verified. Leaving withdraws consent and drops them from every
- * dashboard and drive at once.
+ * A student joining or leaving a college. Joining is the student's own choice
+ * (there is no separate consent step): it works out whether the membership is
+ * verified, and the college's officer then sees them. Leaving drops them from
+ * every dashboard and drive at once.
  */
 
 export type MyCollege = {
@@ -20,18 +20,13 @@ export type MyCollege = {
   verifiedBy: string | null;
   year: number | null;
   branch: string | null;
-  purposes: ConsentPurpose[];
 };
 
 export async function membershipOf(userId: string): Promise<MyCollege | null> {
   const [row] = await getDb()
-    .select({ m: schema.collegeMemberships, c: schema.colleges, consent: schema.collegeConsents })
+    .select({ m: schema.collegeMemberships, c: schema.colleges })
     .from(schema.collegeMemberships)
     .innerJoin(schema.colleges, eq(schema.colleges.id, schema.collegeMemberships.collegeId))
-    .leftJoin(
-      schema.collegeConsents,
-      and(eq(schema.collegeConsents.id, schema.collegeMemberships.consentId), isNull(schema.collegeConsents.withdrawnAt)),
-    )
     .where(and(eq(schema.collegeMemberships.userId, userId), isNull(schema.collegeMemberships.leftAt)))
     .limit(1);
   if (!row) return null;
@@ -44,7 +39,6 @@ export async function membershipOf(userId: string): Promise<MyCollege | null> {
     verifiedBy: row.m.verifiedBy,
     year: row.m.year,
     branch: row.m.branch,
-    purposes: parsePurposes(row.consent?.purposes),
   };
 }
 
@@ -53,9 +47,7 @@ export async function joinCollege(input: {
   collegeId: string;
   year: number | null;
   branch: string | null;
-  purposes: ConsentPurpose[];
   declaredAdult: boolean;
-  userAgent: string | null;
 }): Promise<{ ok: true; college: MyCollege } | { ok: false; error: string; status: number }> {
   if (!input.declaredAdult) {
     return {
@@ -88,23 +80,6 @@ export async function joinCollege(input: {
   });
 
   await db.transaction(async (tx) => {
-    // A new college (or new choices) is a new consent; the old one is closed, not edited.
-    await tx
-      .update(schema.collegeConsents)
-      .set({ withdrawnAt: sql`now()` })
-      .where(and(eq(schema.collegeConsents.userId, input.userId), isNull(schema.collegeConsents.withdrawnAt)));
-    const [consent] = await tx
-      .insert(schema.collegeConsents)
-      .values({
-        userId: input.userId,
-        collegeId: college.id,
-        noticeVersion: NOTICE_VERSION,
-        noticeHash: NOTICE_HASH,
-        purposes: input.purposes,
-        declaredAdult: true,
-        userAgent: input.userAgent?.slice(0, 300) ?? null,
-      })
-      .returning({ id: schema.collegeConsents.id });
     const values = {
       collegeId: college.id,
       status: proof.status,
@@ -112,7 +87,6 @@ export async function joinCollege(input: {
       // The college's roster is the source of truth for year and branch.
       year: roster?.year ?? input.year,
       branch: roster?.branch || input.branch,
-      consentId: consent.id,
       leftAt: null,
     };
     await tx
@@ -129,10 +103,6 @@ export async function joinCollege(input: {
 export async function leaveCollege(userId: string): Promise<void> {
   const db = getDb();
   await db.transaction(async (tx) => {
-    await tx
-      .update(schema.collegeConsents)
-      .set({ withdrawnAt: sql`now()` })
-      .where(and(eq(schema.collegeConsents.userId, userId), isNull(schema.collegeConsents.withdrawnAt)));
     await tx
       .update(schema.collegeMemberships)
       .set({ leftAt: sql`now()` })
@@ -168,14 +138,16 @@ export async function verifyFromRoster(collegeId: string): Promise<number> {
 
 /**
  * Search the college list for the student picker (~70k AISHE institutions).
- * Every word must appear in the name or the city, so "jecrc jaipur" works;
- * an exact AISHE code or slug ("jklu") also matches. The trigram indexes (drizzle/0008) serve
- * the ILIKE '%word%' tests. Order: partners, names that start with the whole
- * query, names that contain it, then A-Z.
+ * Findtern's own college code ("FT7KQ3M", any case) finds that college first.
+ * Otherwise every word must appear in the name or the city, so "jecrc jaipur"
+ * works; an exact AISHE code or slug ("jklu") also matches. The trigram
+ * indexes (drizzle/0008) serve the ILIKE '%word%' tests. Order: the code
+ * match, partners, names that start with the whole query, names that contain
+ * it, then A-Z.
  */
 export async function searchColleges(q: string, limit = 12) {
   const c = schema.colleges;
-  const pick = { id: c.id, name: c.name, city: c.city, state: c.state, isPartner: c.isPartner, code: c.aisheCode };
+  const pick = { id: c.id, name: c.name, city: c.city, state: c.state, isPartner: c.isPartner, code: c.code };
   const esc = (t: string) => t.replace(/[%_\\]/g, (ch) => `\\${ch}`);
   const term = q.trim().replace(/\s+/g, " ");
   if (term.length < 2) {
@@ -186,13 +158,17 @@ export async function searchColleges(q: string, limit = 12) {
       .orderBy(c.sortOrder, c.name)
       .limit(limit);
   }
+  const typedCode = parseCollegeCode(term);
   const words = term.split(" ").slice(0, 4).map((w) => `%${esc(w)}%`);
   const everyWord = and(...words.map((w) => sql`(${c.name} ILIKE ${w} OR ${c.city} ILIKE ${w})`));
+  const byCode = typedCode ? sql`${c.code} = ${typedCode}` : sql`false`;
   return getDb()
     .select(pick)
     .from(c)
-    .where(and(eq(c.isActive, true), sql`(${everyWord} OR ${c.aisheCode} = ${term.toUpperCase()} OR ${c.slug} = ${term.toLowerCase()})`))
+    .where(and(eq(c.isActive, true), sql`(${byCode} OR ${everyWord} OR ${c.aisheCode} = ${term.toUpperCase()} OR ${c.slug} = ${term.toLowerCase()})`))
     .orderBy(
+      // A bare constant is read as a column position, so the code match is ranked only when a code was typed.
+      ...(typedCode ? [sql`(${byCode}) DESC`] : []),
       sql`${c.isPartner} DESC`,
       sql`(${c.name} ILIKE ${esc(term) + "%"}) DESC`,
       sql`(${c.name} ILIKE ${"%" + esc(term) + "%"}) DESC`,

@@ -491,8 +491,10 @@
      ramp is lifted here (text steps measured at 7.9-11:1 on #141f1b). Brand
      green stays on data, status and the one primary action; amber means
      "waiting". Scoped to the attribute: intern, employer and college keep
-     their values. */
-  [data-console="admin"] {
+     their values. Dark only (4 Nov 2026): the console now has a light theme,
+     which keeps the standard brand ramp. AdminShell puts `data-admin-theme`
+     on its root and on <html>, next to `data-console`. */
+  [data-console="admin"][data-admin-theme="dark"] {
     --color-brand-200: #1f3d33;
     --color-brand-600: #5fae96;
     --color-brand-700: #7cc4ab;
@@ -505,6 +507,67 @@
     --color-primary: #2a8068;
     --color-primary-hover: #23705a;
     --color-ring: #7cc4ab;
+  }
+
+  /* ── Admin framed canvas (owner decision 4 Nov 2026, from the reference board) ──
+     The console is one rounded frame on a grey canvas; content sits on panels
+     one tone step off the frame. Admin only: nothing here reaches the intern,
+     employer or college consoles, which do not set `data-console="admin"`.
+       canvas  the page ground behind the frame
+       frame   the rounded app surface (rail, top bar, content)
+       panel   a card on the frame; panel-2 an inset on a panel (a lane, a chip row)
+       tile    the one filled brand tile per screen and the primary fill (white text >= 4.8:1)
+       deep    the dark feature card (white text >= 10:1)
+       hatch   the "not yet" stripe on a chart
+     Person tints are identity, not data: pale fill + dark ink, both >= 4.5:1. */
+  [data-console="admin"] {
+    --admin-canvas: #e4eae7;
+    --admin-frame: #f4f6f5;
+    --admin-panel: #ffffff;
+    --admin-panel-2: #eef2f0;
+    --admin-panel-edge: transparent;
+    --admin-rule: #e3e9e6;
+    --admin-tile: #0e6049;
+    --admin-tile-ink: #ffffff;
+    --admin-deep: #0a3a2c;
+    --admin-deep-ink: #e8f4ef;
+    --admin-hatch: #b4c2bb;
+    --admin-bar-tint: #c9e3d8;
+    --admin-pop: #141f1b;
+    --admin-pop-ink: #f4f6f5;
+    --admin-person-1: #fbe0d6; --admin-person-ink-1: #8a3412;
+    --admin-person-2: #f6e8b8; --admin-person-ink-2: #6b4a02;
+    --admin-person-3: #d5ecdd; --admin-person-ink-3: #14533d;
+    --admin-person-4: #d3e8f5; --admin-person-ink-4: #1b5378;
+    --admin-person-5: #e6ecc6; --admin-person-ink-5: #4a5a0c;
+    --admin-person-6: #f6d9e4; --admin-person-ink-6: #8c2a53;
+    --radius-admin-frame: 1.75rem;
+    --radius-admin-card: 1.375rem;
+    --radius-admin-pill: 999px;
+    --admin-gap: 1rem;
+    --admin-pad-panel: 1.25rem;
+    --admin-row-h: 3.5rem;
+  }
+  [data-console="admin"][data-admin-theme="dark"] {
+    --admin-canvas: #060c0a;
+    --admin-frame: #0b1512;
+    --admin-panel: #111c18;
+    --admin-panel-2: #16231e;
+    --admin-panel-edge: #1e2b26;
+    --admin-rule: #1e2b26;
+    --admin-tile: #2a8068;
+    --admin-deep: #0d2a21;
+    --admin-deep-ink: #e8f4ef;
+    --admin-hatch: #3a4a43;
+    --admin-bar-tint: #1f3d33;
+    --admin-pop: #edf2ef;
+    --admin-pop-ink: #0b1512;
+    --admin-person-1: #3a2119; --admin-person-ink-1: #f6b79d;
+    --admin-person-2: #362a0d; --admin-person-ink-2: #f0cf7e;
+    --admin-person-3: #14301f; --admin-person-ink-3: #8fd9b0;
+    --admin-person-4: #14293a; --admin-person-ink-4: #93c5e8;
+    --admin-person-5: #262f10; --admin-person-ink-5: #cddc8a;
+    --admin-person-6: #3a1a28; --admin-person-ink-6: #f0a9c6;
   }
 
   /* Staggered arrival (components/admin/motion/arrive.tsx). Fill is
@@ -580,7 +643,8 @@
      charts keep their fills when printed. */
   @media print {
     .dark,
-    [data-console="admin"] {
+    [data-console="admin"],
+    [data-console="admin"][data-admin-theme="dark"] {
       color-scheme: light;
       --color-background: #ffffff;
       --color-surface: #f7faf9;
@@ -1585,14 +1649,14 @@ body:has([data-slot="dialog-content"][data-state="open"], [data-slot="sheet-cont
                                         admin rule, 1.4.11)
    featured tile gradient               app/tiles.tsx:112 via admin/dashboard/page.tsx (until the
                                         dashboard stops using StatTile) */
-[data-console="admin"] .bg-brand-700 {
+[data-console="admin"][data-admin-theme="dark"] .bg-brand-700 {
   background-color: var(--color-primary);
 }
-[data-console="admin"] .hover\:bg-brand-800:hover {
+[data-console="admin"][data-admin-theme="dark"] .hover\:bg-brand-800:hover {
   background-color: var(--color-primary-hover);
 }
 /* The count on an active pill tab: white at 75% on the green fill is 3.4:1; solid white is 5:1. */
-[data-console="admin"] .text-white\/75 {
+[data-console="admin"][data-admin-theme="dark"] .text-white\/75 {
   color: #fff;
 }
 /* The visual editor shows the page as the public sees it, on paper. Pasted legal text carries its own
@@ -1603,12 +1667,12 @@ body:has([data-slot="dialog-content"][data-state="open"], [data-slot="sheet-cont
   color-scheme: light;
 }
 /* The outline button's text: #2a8068 is 3.5:1 on the dark card; the lifted ramp is 8:1. */
-[data-console="admin"] .text-primary {
+[data-console="admin"][data-admin-theme="dark"] .text-primary {
   color: var(--color-brand-700);
 }
-[data-console="admin"] .bg-white,
-[data-console="admin"] .bg-white\/60,
-[data-console="admin"] .bg-white\/70 {
+[data-console="admin"][data-admin-theme="dark"] .bg-white,
+[data-console="admin"][data-admin-theme="dark"] .bg-white\/60,
+[data-console="admin"][data-admin-theme="dark"] .bg-white\/70 {
   background-color: var(--color-card);
 }
 /* The featured dashboard tile (components/app/tiles.tsx:112) is brand-600 > brand-800 > brand-950
@@ -1617,11 +1681,11 @@ body:has([data-slot="dialog-content"][data-state="open"], [data-slot="sheet-cont
    white is 4.79:1 and 5.94:1. The tile's 85% label and 70% unit would fall to 3.9:1 and below, so they
    go solid white too (tiles.tsx:117, :132; the 75% note is the .text-white/75 rule above). Matches the
    gradient class by its text because that file is not edited here. */
-[data-console="admin"] [class*="bg-[linear-gradient(140deg,var(--color-brand-600)"] {
+[data-console="admin"][data-admin-theme="dark"] [class*="bg-[linear-gradient(140deg,var(--color-brand-600)"] {
   background-image: linear-gradient(140deg, var(--color-primary) 0%, var(--color-primary-hover) 100%);
 }
-[data-console="admin"] .text-white\/85,
-[data-console="admin"] .text-white\/70 {
+[data-console="admin"][data-admin-theme="dark"] .text-white\/85,
+[data-console="admin"][data-admin-theme="dark"] .text-white\/70 {
   color: #fff;
 }
 

@@ -10,6 +10,7 @@ import { getSession } from "@/lib/auth";
 import { canViewAs } from "@/lib/admin/impersonation";
 import { flattenParams } from "@/lib/admin/params";
 import { companyLedger } from "@/lib/admin/company-ledger";
+import { loadCompanyActivity, type ActivityEntry } from "@/lib/admin/record-activity";
 import { getDb, schema, withoutPassword } from "@/lib/db";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
@@ -73,8 +74,16 @@ export default async function AdminCompanyDetailPage({
   const tab = (TABS as string[]).includes(query.tab ?? "") ? (query.tab as Company360Tab) : "profile";
 
   let data: Awaited<ReturnType<typeof load>>;
+  let activities: ActivityEntry[] | null;
   try {
-    data = await load(id);
+    // The timeline loads beside the record; if it throws, the page still renders without it.
+    [data, activities] = await Promise.all([
+      load(id),
+      loadCompanyActivity(id).catch((error): ActivityEntry[] | null => {
+        console.error("[admin/companies/[id]] activity failed", error);
+        return null;
+      }),
+    ]);
   } catch (error) {
     console.error("[admin/companies/[id]]", error);
     return (
@@ -104,6 +113,7 @@ export default async function AdminCompanyDetailPage({
       payments={data.payments}
       interns={data.interns}
       ledger={ledger}
+      activities={activities}
       actions={
         <>
           <ContactEditor
@@ -116,9 +126,9 @@ export default async function AdminCompanyDetailPage({
               phoneNumber: data.company.phoneNumber,
             }}
           />
-          {viewAs ? <ViewAsButton targetType="employer" targetId={data.company.id} label="View as company" /> : null}
         </>
       }
+      viewAs={viewAs ? <ViewAsButton targetType="employer" targetId={data.company.id} label="View as company" appearance="tile" /> : null}
     />
   );
 }

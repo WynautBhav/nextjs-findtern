@@ -46,7 +46,22 @@ function stagingUrl() {
 }
 export const STAGING_URL = stagingUrl();
 
+/**
+ * STAGING_LOCAL_DB_URL: run the same journey against the local QA database
+ * (e2e/qa-serve.mjs). Loopback hosts only, so it can never reach a real one.
+ */
+function localDatabaseUrl() {
+  const url = process.env.STAGING_LOCAL_DB_URL;
+  if (!url) return null;
+  const host = new URL(url).hostname;
+  if (!["localhost", "127.0.0.1", "::1"].includes(host)) throw new Error(`STAGING_LOCAL_DB_URL must be a loopback host (got ${host})`);
+  return url;
+}
+const sslFor = () => (localDatabaseUrl() ? false : { rejectUnauthorized: true });
+
 function stagingDatabaseUrl() {
+  const local = localDatabaseUrl();
+  if (local) return local;
   const file = process.env.NEON_ENV_FILE || join(homedir(), "findtern-dumps", ".neon.env");
   const line = readFileSync(file, "utf8")
     .split("\n")
@@ -65,13 +80,13 @@ let readPool = null;
 let writePool = null;
 function reader() {
   if (!readPool) {
-    readPool = new pg.Pool({ connectionString: stagingDatabaseUrl(), max: 3, options: "-c TimeZone=UTC -c default_transaction_read_only=on", types, ssl: { rejectUnauthorized: true } });
+    readPool = new pg.Pool({ connectionString: stagingDatabaseUrl(), max: 3, options: "-c TimeZone=UTC -c default_transaction_read_only=on", types, ssl: sslFor() });
   }
   return readPool;
 }
 function writer() {
   if (!writePool) {
-    writePool = new pg.Pool({ connectionString: stagingDatabaseUrl(), max: 1, options: "-c TimeZone=UTC", types, ssl: { rejectUnauthorized: true } });
+    writePool = new pg.Pool({ connectionString: stagingDatabaseUrl(), max: 1, options: "-c TimeZone=UTC", types, ssl: sslFor() });
   }
   return writePool;
 }

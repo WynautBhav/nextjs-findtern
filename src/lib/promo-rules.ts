@@ -33,6 +33,15 @@ export function promoAudienceProblem(appliesTo: string | null | undefined, audie
   return audience === "employer" ? "This code is for interns only" : "This code is for companies only";
 }
 
+/**
+ * A promo code is for an employer paying the whole engagement upfront, never
+ * month by month: the discount comes off the stipend and a later instalment
+ * has nothing to take it from. Returns why, or null when the mode is fine.
+ */
+export function promoModeProblem(mode: "upfront" | "monthly"): string | null {
+  return mode === "monthly" ? "Promo codes only work when the whole engagement is paid upfront." : null;
+}
+
 /** Admin input: the window must not end before it starts. */
 export function promoWindowProblem(validFrom: Date | null, validUntil: Date | null): string | null {
   if (validFrom && validUntil && validUntil < validFrom) return "The end date must be on or after the start date";

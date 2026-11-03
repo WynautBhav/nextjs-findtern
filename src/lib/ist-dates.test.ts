@@ -57,6 +57,6 @@ test("a GST invoice is dated in India time, so it matches the Orders list", () =
   };
   for (const tz of ZONES) {
     process.env.TZ = tz;
-    assert.match(taxInvoiceHtml(input), /Date:<\/strong>\s*2 November 2026|Date:\s*2 November 2026/, `invoice date in ${tz}`);
+    assert.match(taxInvoiceHtml(input), /Invoice Date :<\/div>\s*<div class="v">02-11-26</, `invoice date in ${tz}`);
   }
 });

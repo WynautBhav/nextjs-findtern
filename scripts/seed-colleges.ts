@@ -24,7 +24,7 @@ import pg from "pg";
 
 import * as schema from "../src/lib/db/schema.ts";
 import { hashPassword } from "../src/lib/security/password.ts";
-import { NOTICE_HASH, NOTICE_VERSION, CONSENT_PURPOSES } from "../src/lib/college/consent.ts";
+import { withFreshCollegeCode } from "../src/lib/college/code.ts";
 import { generateDriveToken } from "../src/lib/college/tokens.ts";
 
 if (process.env.NODE_ENV === "production") throw new Error("Refusing to seed in production");
@@ -60,10 +60,13 @@ async function main() {
   for (const c of COLLEGES) {
     // After `db:import-colleges` the AISHE row exists under its own slug; claim it, so the insert below cannot clash on the AISHE code.
     if (c.aisheCode) await db.update(schema.colleges).set({ slug: c.slug }).where(eq(schema.colleges.aisheCode, c.aisheCode));
-    await db
-      .insert(schema.colleges)
-      .values(c)
-      .onConflictDoUpdate({ target: schema.colleges.slug, set: { ...c } });
+    // A new row gets a fresh Findtern code; an existing one keeps its code (not part of `set`).
+    await withFreshCollegeCode((code) =>
+      db
+        .insert(schema.colleges)
+        .values({ ...c, code })
+        .onConflictDoUpdate({ target: schema.colleges.slug, set: { ...c } }),
+    );
   }
   const [jklu] = await db.select().from(schema.colleges).where(eq(schema.colleges.slug, "jklu"));
 
@@ -179,13 +182,9 @@ async function main() {
     }),
   );
 
-  // Consent + membership for every joined student (and Sana).
+  // Membership for every joined student (and Sana).
   const members = [...inserted.map((u) => ({ id: u.id, email: u.email })), ...(sana ? [{ id: sana.id, email: sana.email }] : [])];
   for (const m of members) {
-    const [consent] = await db
-      .insert(schema.collegeConsents)
-      .values({ userId: m.id, collegeId: jklu.id, noticeVersion: NOTICE_VERSION, noticeHash: NOTICE_HASH, purposes: [...CONSENT_PURPOSES], declaredAdult: true })
-      .returning({ id: schema.collegeConsents.id });
     const r = roster.find((x) => x.email === m.email)!;
     await db.insert(schema.collegeMemberships).values({
       userId: m.id,
@@ -194,7 +193,6 @@ async function main() {
       verifiedBy: m.email.endsWith("@jklu.edu.in") ? "email_domain" : "roster",
       year: r.year,
       branch: r.branch,
-      consentId: consent.id,
     });
   }
 

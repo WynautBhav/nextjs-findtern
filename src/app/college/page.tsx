@@ -66,7 +66,7 @@ export default async function CollegeDashboard() {
     <div className="space-y-6">
       <PageHead
         title={ctx.college.name}
-        lede={`Placement console${ctx.college.city ? ` · ${ctx.college.city}` : ""}. Live from Findtern.`}
+        lede={`Placement console${ctx.college.city ? ` · ${ctx.college.city}` : ""}.${ctx.college.code ? ` College code ${ctx.college.code}: students find your college by name or this code.` : ""}`}
         // Said once, here (it was in the lede and again under the table).
         action={<Pill tone="neutral">Read-only</Pill>}
       />

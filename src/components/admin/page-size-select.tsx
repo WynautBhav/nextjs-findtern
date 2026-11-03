@@ -29,14 +29,14 @@ export function PageSizeSelect({
 
   return (
     <div className="flex items-center gap-1.5">
-      <label htmlFor={id} className="whitespace-nowrap text-xs text-text-subtle">
+      <label htmlFor={id} className="whitespace-nowrap text-[0.8125rem] text-text-subtle">
         Rows
       </label>
       <select
         id={id}
         value={String(current)}
         onChange={(e) => set(perKey, e.target.value)}
-        className="apple-spring h-9 cursor-pointer rounded-apple-sm border border-border bg-surface px-2.5 pr-7 text-base text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring sm:text-sm touch:min-h-11"
+        className="apple-spring h-10 cursor-pointer rounded-full bg-[color:var(--admin-panel-2)] pr-9 pl-4 text-base text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring sm:text-sm touch:min-h-11"
       >
         {PER_PAGE_OPTIONS.map((option) => (
           <option key={option} value={String(option)}>

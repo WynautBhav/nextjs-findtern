@@ -28,6 +28,7 @@ import {
 import { CommandPalette } from "@/components/admin/command-palette";
 import { LEGAL_PAGES } from "@/components/admin/legal-tabs";
 import { AdminShell, type AdminNavGroup } from "@/components/admin/shell/admin-shell";
+import { ADMIN_THEME_COOKIE, parseAdminTheme } from "@/lib/admin/theme";
 import { RAIL_COOKIE } from "@/lib/rail";
 import { allows, requiredPermissions } from "@/lib/admin/permissions";
 import { getSession } from "@/lib/auth";
@@ -130,6 +131,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       return null;
     }
   })();
+  const cookieStore = await cookies();
   const hasItem = (href: string) => groups.some((g) => g.items.some((i) => i.href === href));
 
   // Every figure is read independently: a failed one is `null` and shows nothing, never 0.
@@ -181,7 +183,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       menu={[{ href: "/admin/account", label: "Your account", icon: <CircleUserRound /> }]}
       topActions={<CommandPalette items={groups.flatMap((g) => g.items.map((i) => ({ href: i.href, label: i.label, group: g.title ?? "" })))} />}
       signOutTo="/admin/login"
-      initialCollapsed={(await cookies()).get(RAIL_COOKIE)?.value === "1"}
+      initialCollapsed={cookieStore.get(RAIL_COOKIE)?.value === "1"}
+      initialTheme={parseAdminTheme(cookieStore.get(ADMIN_THEME_COOKIE)?.value)}
+      unreadMessages={unreadMessages ?? 0}
       crumbLabels={NAV_LABELS}
       rootCrumb={{ label: "Workspace", href: "/admin/dashboard" }}
     >

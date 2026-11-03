@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
+import { sql } from "drizzle-orm";
 import { z } from "zod";
 
+import { withFreshCollegeCode } from "@/lib/college/code";
 import { requireMutation } from "@/lib/guards-mutation";
 import { getDb, schema } from "@/lib/db";
 import { slugify } from "@/lib/college/slug";
@@ -23,9 +25,11 @@ export async function POST(req: Request) {
   const parsed = bodySchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Check the details" }, { status: 400 });
   const d = parsed.data;
-  const [row] = await getDb()
+  // A clash on the AISHE code answers 409 below; a clash on the random Findtern code is retried with a new one.
+  const [row] = await withFreshCollegeCode((code) => getDb()
     .insert(schema.colleges)
     .values({
+      code,
       name: d.name,
       city: d.city || null,
       state: d.state || null,
@@ -36,8 +40,8 @@ export async function POST(req: Request) {
       isPartner: d.isPartner,
       showOnWebsite: d.showOnWebsite,
     })
-    .onConflictDoNothing()
-    .returning({ id: schema.colleges.id });
+    .onConflictDoNothing({ target: schema.colleges.aisheCode, where: sql`${schema.colleges.aisheCode} is not null` })
+    .returning({ id: schema.colleges.id }));
   if (!row) return NextResponse.json({ error: "A college with that AISHE code already exists" }, { status: 409 });
   return NextResponse.json({ id: row.id }, { status: 201 });
 }

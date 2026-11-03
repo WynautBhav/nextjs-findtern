@@ -4,6 +4,7 @@ import { CalendarDays } from "lucide-react";
 
 import { AdminLoadError, AdminPageHeader, Panel, PanelHeader } from "@/components/admin/panel";
 import { StatusBadge } from "@/components/admin/status-badge";
+import { ADMIN_PILL_SECONDARY } from "@/components/admin/surface";
 import { buttonClass } from "@/components/ui/button";
 import { calendarConnected as checkCalendar } from "@/lib/calendar-status";
 import { AdminPricingEditor, type EditablePlan } from "@/components/admin/admin-pricing-editor";
@@ -71,7 +72,7 @@ export default async function AdminSettingsPage() {
                   label={calendarConnected ? "Connected" : "Not connected"}
                 />
               ) : null}
-              <a href="/api/admin/google/connect" className={buttonClass({ variant: "outline", size: "sm" })}>
+              <a href="/api/admin/google/connect" className={buttonClass({ variant: "outline", size: "sm", className: ADMIN_PILL_SECONDARY })}>
                 {calendarConnected ? "Reconnect Google" : "Connect Google"}
               </a>
             </>

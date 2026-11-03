@@ -15,7 +15,6 @@ const {
 const { generateDriveToken, hashDriveToken } = await import("../college/tokens.ts");
 const { createSession, readSession } = await import("./session.ts");
 const { canAccess } = await import("./guards.ts");
-const { CONSENT_PURPOSES } = await import("../college/consent.ts");
 
 const NOW = new Date("2026-11-10T10:00:00Z").getTime();
 const HOUR = 3600_000;
@@ -35,7 +34,6 @@ const driveX = {
 };
 
 const employer = { uid: "emp-1", role: "employer" as const };
-const allPurposes = [...CONSENT_PURPOSES];
 
 function student(over: Partial<Parameters<typeof isStudentEligible>[0]> = {}) {
   return {
@@ -43,7 +41,6 @@ function student(over: Partial<Parameters<typeof isStudentEligible>[0]> = {}) {
     collegeId: "college-x",
     status: "verified" as const,
     leftAt: null,
-    purposes: allPurposes,
     year: 3,
     branch: "CSE",
     cgpa: 7.5,
@@ -131,11 +128,10 @@ test("unverified (claimed) student is hidden unless the college hand-includes th
   assert.equal(isStudentEligible(student({ status: "claimed" }), { ...driveX, includeUserIds: ["stu-1"] }), true);
 });
 
-test("consent withdrawn, never given for drives, or student left: hidden even if included", () => {
+test("a student who left is hidden even if included; there is no consent step to opt out of", () => {
   const inc = { ...driveX, includeUserIds: ["stu-1"] };
   assert.equal(isStudentEligible(student({ leftAt: new Date(NOW) }), inc), false);
-  assert.equal(isStudentEligible(student({ purposes: ["college_dashboard"] }), inc), false);
-  assert.equal(isStudentEligible(student({ purposes: [] }), inc), false);
+  assert.equal(isStudentEligible(student(), inc), true);
 });
 
 test("cutoffs: CGPA, Findtern score, year and branch; unknown CGPA fails a CGPA cutoff", () => {
@@ -213,14 +209,13 @@ test("college admin may only run drives, roster and nudges", () => {
   }
 });
 
-test("college admin sees only their own college's consenting students", () => {
+test("college admin sees every student of their own college, and nobody else's", () => {
   const admin = { uid: "ca-1", role: "college" as const };
-  const consented = { collegeId: "college-x", leftAt: null, purposes: allPurposes };
+  const consented = { collegeId: "college-x", leftAt: null as Date | null };
   assert.equal(canCollegeAdminSee(admin, "college-x", consented), true);
   assert.equal(canCollegeAdminSee(admin, "college-y", consented), false);
   assert.equal(canCollegeAdminSee(admin, "college-x", { ...consented, collegeId: "college-y" }), false);
   assert.equal(canCollegeAdminSee(admin, "college-x", { ...consented, leftAt: new Date() }), false);
-  assert.equal(canCollegeAdminSee(admin, "college-x", { ...consented, purposes: ["drive_visibility"] }), false);
   assert.equal(canCollegeAdminSee({ uid: "e", role: "employer" }, "college-x", consented), false);
   assert.equal(canCollegeAdminSee(admin, "", consented), false);
 });

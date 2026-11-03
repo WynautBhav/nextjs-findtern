@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeftRight,
@@ -137,6 +137,14 @@ export function CommandPalette({ items }: { items: PaletteItem[] }) {
   const [active, setActive] = useState(0);
   const [search, setSearch] = useState<SearchState | null>(null);
   const router = useRouter();
+  // The palette is not a DialogTrigger child, so Radix cannot restore focus itself: remember where it was opened from.
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const returnFocus = useRef<HTMLElement | null>(null);
+  const openPalette = () => {
+    const el = document.activeElement;
+    returnFocus.current = el instanceof HTMLElement && el !== document.body ? el : triggerRef.current;
+    setOpen(true);
+  };
 
   // null on the server and during hydration, so the hint is a neutral "K" until the browser is known.
   const mac = useSyncExternalStore(noopSubscribe, isMacNow, () => null);
@@ -146,7 +154,13 @@ export function CommandPalette({ items }: { items: PaletteItem[] }) {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
-        setOpen((prev) => !prev);
+        setOpen((prev) => {
+          if (!prev) {
+            const el = document.activeElement;
+            returnFocus.current = el instanceof HTMLElement && el !== document.body ? el : triggerRef.current;
+          }
+          return !prev;
+        });
       }
     };
 
@@ -244,10 +258,11 @@ export function CommandPalette({ items }: { items: PaletteItem[] }) {
       {/* The top bar's search field: a button drawn as a field, so the whole bar opens the palette. The
           combobox (role, listbox, active descendant) lives on the input inside the dialog. */}
       <button
+        ref={triggerRef}
         type="button"
         aria-haspopup="dialog"
-        onClick={() => setOpen(true)}
-        className="apple-spring flex min-h-11 items-center gap-2 rounded-apple-sm border border-ink-300 bg-card px-3 py-2 text-sm text-text-subtle hover:border-ink-400 hover:text-foreground md:w-64 lg:w-80"
+        onClick={openPalette}
+        className="apple-spring flex min-h-11 w-full items-center gap-2.5 rounded-full border border-[var(--admin-panel-edge)] bg-[var(--admin-panel)] px-4 py-2 text-sm text-text-subtle hover:text-foreground md:max-w-[26rem]"
       >
         <Search className="size-4 shrink-0" aria-hidden />
         {/* No aria-label: the name comes from the visible words plus the hidden hint, so the two can
@@ -257,13 +272,18 @@ export function CommandPalette({ items }: { items: PaletteItem[] }) {
           <span className="hidden md:inline">Search candidates, companies, pages</span>
         </span>
         <span className="sr-only"> (Command K)</span>
-        <kbd aria-hidden className="hidden shrink-0 rounded bg-ink-100 px-1.5 py-1 text-2xs font-semibold text-ink-600 md:inline">
+        <kbd aria-hidden className="hidden shrink-0 rounded-md bg-[var(--admin-panel-2)] px-1.5 py-1 font-sans text-2xs font-semibold text-ink-600 md:inline">
           {hint}
         </kbd>
       </button>
 
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="top-[12%] translate-y-0 gap-0 overflow-hidden rounded-apple-xl border-ink-200 bg-card p-0 shadow-tile sm:max-w-lg">
+        <DialogContent
+          onCloseAutoFocus={(e) => {
+            e.preventDefault();
+            (returnFocus.current ?? triggerRef.current)?.focus();
+          }}
+          className="top-[12%] translate-y-0 gap-0 overflow-hidden rounded-apple-xl border-ink-200 bg-card p-0 shadow-tile sm:max-w-lg">
           <DialogTitle className="sr-only">Search the admin portal</DialogTitle>
           <DialogDescription className="sr-only">
             Type to filter pages and actions. With two or more characters, candidates, companies and invoices are searched too. Use the arrow keys to move and Enter to open.

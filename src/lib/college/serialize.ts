@@ -19,7 +19,6 @@ export function toStudentRow(s: CollegeStudent): StudentRow {
     proposals: s.proposals,
     interviewsScheduled: s.interviewsScheduled,
     driveMeetings: s.driveMeetings,
-    purposes: [...s.purposes],
     collegeId: s.collegeId,
     leftAt: null,
   };

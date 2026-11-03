@@ -4,6 +4,7 @@ import { z } from "zod";
 import { payableCheckout } from "@/lib/employer-payable";
 import { requireMutation } from "@/lib/guards-mutation";
 import { quotePromo } from "@/lib/promo";
+import { promoModeProblem } from "@/lib/promo-rules";
 
 const bodySchema = z.object({
   code: z.string().trim().min(1),
@@ -20,6 +21,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   const parsed = bodySchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+
+  const modeProblem = promoModeProblem(parsed.data.mode);
+  if (modeProblem) return NextResponse.json({ error: modeProblem }, { status: 400 });
 
   // Priced exactly as the order route prices it: one hire, in the chosen mode.
   const { lines } = await payableCheckout(id, { proposalIds: parsed.data.proposalIds, mode: parsed.data.mode });

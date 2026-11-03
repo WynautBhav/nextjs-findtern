@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Upload } from "lucide-react";
 
 import { buttonClass } from "@/components/ui/button";
+import { ADMIN_PILL_SECONDARY } from "@/components/admin/surface";
 import { csrfFetch } from "@/lib/client-fetch";
 import { cn } from "@/lib/utils";
 
@@ -35,23 +36,23 @@ export function RatingsImport() {
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <label className={cn(buttonClass({ variant: "outline", size: "md" }), "cursor-pointer text-sm focus-within:outline-2 focus-within:outline-brand-600")}>
+      <label className={cn(buttonClass({ variant: "outline", size: "md" }), ADMIN_PILL_SECONDARY, "cursor-pointer text-sm focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ring")}>
         <Upload className="size-4" aria-hidden />
         {busy ? "Importing…" : "Import ratings"}
         <input ref={input} type="file" accept=".xlsx,.csv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" className="sr-only" disabled={busy} onChange={(e) => e.target.files?.[0] && upload(e.target.files[0])} />
       </label>
       {/* One template link with its two formats, each a real target (QA-146). */}
-      <span className="inline-flex items-center gap-1 text-sm text-ink-600">
+      <span className="inline-flex items-center gap-1 text-sm text-text-subtle">
         Template:
-        <a href="/api/admin/interns/ratings-import" className="inline-flex min-h-11 items-center px-1 font-medium text-brand-700 underline-offset-4 hover:underline">
+        <a href="/api/admin/interns/ratings-import" className="inline-flex min-h-11 items-center rounded-full px-1.5 font-medium text-foreground underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring">
           Excel
         </a>
         ·
-        <a href="/api/admin/interns/ratings-import?format=csv" className="inline-flex min-h-11 items-center px-1 font-medium text-brand-700 underline-offset-4 hover:underline">
+        <a href="/api/admin/interns/ratings-import?format=csv" className="inline-flex min-h-11 items-center rounded-full px-1.5 font-medium text-foreground underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring">
           CSV
         </a>
       </span>
-      {result ? <span role="status" className="w-full text-sm text-ink-600 sm:w-auto">{result}</span> : null}
+      {result ? <span role="status" className="w-full text-sm text-foreground sm:w-auto">{result}</span> : null}
     </div>
   );
 }

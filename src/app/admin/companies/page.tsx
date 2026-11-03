@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { and, asc, count, desc, eq, inArray, sql, type SQL } from "drizzle-orm";
 import { Download } from "lucide-react";
 
@@ -6,14 +5,15 @@ import { getDb, schema } from "@/lib/db";
 import { q } from "@/lib/college/sql";
 import { formatDate, formatMoney, formatNumber } from "@/lib/format";
 import { companyMoney } from "@/lib/admin/company-money";
-import { flattenParams, parsePageRequest, searchAny, toPage } from "@/lib/admin/params";
+import { flattenParams, parsePageRequest, searchAny, toPage, toQueryString } from "@/lib/admin/params";
 import { activeProject, inrMinorSql, realEmployerId, realEmployers } from "@/lib/admin/scope";
 import { AdminLoadError, AdminPageHeader, Panel } from "@/components/admin/panel";
-import { StatCard, StatGrid } from "@/components/admin/stat-card";
-import { DataTable, parseSort } from "@/components/admin/data-table";
+import { AdminTabs, type AdminTabItem } from "@/components/admin/admin-tabs";
+import { DataTable, IdentityCell, parseSort } from "@/components/admin/data-table";
 import { CompanyActiveToggle, CompanyFteSelect } from "@/components/admin/company-controls";
 import { StatusBadge } from "@/components/admin/status-badge";
 import { ButtonAnchor } from "@/components/ui/button";
+import { ADMIN_PILL_SECONDARY } from "@/components/admin/surface";
 
 /**
  * Companies (legacy admin-companies.tsx). Money per company is computed for
@@ -172,11 +172,12 @@ export default async function AdminCompaniesPage({
   }
 
   const exportHref = `/api/admin/export?type=companies&${new URLSearchParams(params).toString()}`;
-  const header = (
+  const headerWith = (subtitle?: string) => (
     <AdminPageHeader
       title="Companies"
+      subtitle={subtitle}
       action={
-        <ButtonAnchor href={exportHref} variant="outline" size="sm">
+        <ButtonAnchor href={exportHref} variant="outline" size="sm" className={ADMIN_PILL_SECONDARY}>
           <Download className="size-4" aria-hidden />
           Export CSV
         </ButtonAnchor>
@@ -184,6 +185,7 @@ export default async function AdminCompaniesPage({
     />
   );
 
+  const header = headerWith();
   if (!loaded) {
     return (
       <div className="space-y-6">
@@ -198,22 +200,22 @@ export default async function AdminCompaniesPage({
   const { rows, money } = loaded;
   const page = toPage(rows, loaded.total, req.page, req.perPage);
 
-  return (
-    <div className="space-y-6">
-      {header}
+  // Onboarding is a set of views (the counts were stat tiles); the rest stay filters.
+  const viewHref = (setup: string) => `/admin/companies${toQueryString({ ...params, setup, page: "" })}`;
+  const views: AdminTabItem[] = [
+    { key: "", label: "All companies", count: loaded.totalCompanies, href: viewHref("") },
+    { key: "complete", label: "Onboarded", count: loaded.setupComplete, href: viewHref("complete") },
+    { key: "incomplete", label: "Onboarding pending", count: Math.max(0, loaded.totalCompanies - loaded.setupComplete), href: viewHref("incomplete") },
+  ];
+  const activeView = params.setup === "complete" || params.setup === "incomplete" ? params.setup : "";
 
-      <StatGrid cols={4}>
-        <StatCard label="Companies" value={formatNumber(loaded.totalCompanies)} hint="Employer accounts, test accounts excluded" tone="neutral" />
-        <StatCard
-          label="Onboarded"
-          value={formatNumber(loaded.setupComplete)}
-          hint={`${loaded.totalCompanies > 0 ? Math.round((loaded.setupComplete / loaded.totalCompanies) * 100) : 0}% have posted a first project`}
-          tone="neutral"
-          href="/admin/companies?setup=complete"
-        />
-        <StatCard label="Active projects" value={formatNumber(loaded.activeProjects)} hint="Open to candidates now" tone="neutral" href="/admin/projects?status=active" />
-        <StatCard label="Companies that hired" value={formatNumber(loaded.withHires)} hint="At least one paid hire" tone="neutral" href="/admin/companies?sort=hires&dir=desc" />
-      </StatGrid>
+  return (
+    <div className="space-y-4">
+      {headerWith(
+        `${formatNumber(loaded.totalCompanies)} companies, ${formatNumber(loaded.withHires)} have hired and ${formatNumber(loaded.activeProjects)} projects are open to candidates.`,
+      )}
+
+      <AdminTabs items={views} active={activeView} label="Company views" />
 
       <DataTable
         basePath="/admin/companies"
@@ -241,14 +243,6 @@ export default async function AdminCompaniesPage({
             ],
           },
           {
-            key: "setup",
-            label: "Onboarding",
-            options: [
-              { value: "complete", label: "Complete" },
-              { value: "incomplete", label: "Pending" },
-            ],
-          },
-          {
             key: "fte",
             label: "International FTE",
             options: [
@@ -260,28 +254,29 @@ export default async function AdminCompaniesPage({
         ]}
         columns={[
           {
-            // Location, phone and joined date ride under the name; the table
-            // had 13 columns and ran 640px past a 1440 screen (critique).
+            // Contact and place ride in the sub line (the table had 13 columns); phone is its tooltip.
             header: "Company",
             sort: "name",
-            cell: (row) => (
-              <div className="min-w-0 max-w-72">
-                <Link href={`/admin/companies/${row.id}`} className="group block">
-                  <span className="flex items-center gap-2">
-                    <span className="break-words font-medium text-ink-900 group-hover:text-brand-700 group-hover:underline">{row.companyName}</span>
-                    {row.onboardingCompleted ? null : <StatusBadge tone="warning" label="Onboarding" />}
-                  </span>
-                  {/* The separator keeps the link's name "Globex Inc, Dana" for screen readers too. */}
-                  <span className="sr-only">, </span>
-                  <span className="block break-words text-xs text-ink-600">{row.primaryContactName || row.name || row.companyEmail}</span>
-                </Link>
-                <p className="nums whitespace-normal text-xs text-ink-600">
-                  {[[row.city, row.country].filter(Boolean).join(", "), `${row.countryCode ?? ""} ${row.phoneNumber ?? ""}`.trim(), `joined ${formatDate(row.createdAt)}`]
-                    .filter(Boolean)
-                    .join(" · ")}
-                </p>
-              </div>
-            ),
+            cell: (row) => {
+              const where = [row.city, row.country].filter(Boolean).join(", ");
+              const sub = [row.primaryContactName || row.name || row.companyEmail, where].filter(Boolean).join(" · ");
+              const phone = `${row.countryCode ?? ""} ${row.phoneNumber ?? ""}`.trim();
+              return (
+                <div className="min-w-0 lg:max-w-72">
+                  <IdentityCell
+                    name={row.companyName}
+                    id={row.id}
+                    href={`/admin/companies/${row.id}`}
+                    sub={<span title={[sub, phone].filter(Boolean).join(" · ")}>{sub}</span>}
+                  />
+                  {row.onboardingCompleted ? null : (
+                    <div className="mt-1.5 pl-[3.25rem]">
+                      <StatusBadge tone="warning" label="Onboarding" dot={false} className="h-5" />
+                    </div>
+                  )}
+                </div>
+              );
+            },
           },
           { header: "Projects", sort: "projects", align: "right", cell: (row) => row.projectCount },
           { header: "Proposals", sort: "proposals", align: "right", cell: (row) => row.proposalCount },
@@ -295,7 +290,7 @@ export default async function AdminCompaniesPage({
               return Number(row.paidTotal) > 0 ? (
                 <div>
                   <p className="font-medium text-ink-900">{formatMoney(Number(row.paidTotal), "INR")}</p>
-                  {m?.lastPaymentAt ? <p className="text-xs text-ink-600">last {formatDate(m.lastPaymentAt)}</p> : null}
+                  {m?.lastPaymentAt ? <p className="text-xs text-text-subtle">last {formatDate(m.lastPaymentAt)}</p> : null}
                 </div>
               ) : (
                 <span className="text-text-subtle">-</span>
@@ -310,7 +305,7 @@ export default async function AdminCompaniesPage({
               return m && m.amountLeftInrMinor > 0 ? (
                 <div>
                   <p className="font-semibold text-ink-900">{formatMoney(m.amountLeftInrMinor, "INR")}</p>
-                  {m.nextDueDate ? <p className="text-xs text-ink-600">next {formatDate(m.nextDueDate)}</p> : null}
+                  {m.nextDueDate ? <p className="text-xs text-text-subtle">next {formatDate(m.nextDueDate)}</p> : null}
                 </div>
               ) : (
                 <span className="text-text-subtle">–</span>
@@ -318,16 +313,17 @@ export default async function AdminCompaniesPage({
             },
           },
           {
-            header: "Access",
-            cell: (row) => (
-              <div className="flex flex-col items-start gap-1.5">
-                <CompanyActiveToggle id={row.id} isActive={row.isActive} />
-                <span className="flex items-center gap-2 text-xs text-ink-600">
-                  International FTE
-                  <CompanyFteSelect id={row.id} value={row.internationalFteStatus} />
-                </span>
-              </div>
-            ),
+            header: "Account",
+            cell: (row) => <CompanyActiveToggle id={row.id} isActive={row.isActive} compact />,
+          },
+          {
+            header: "International FTE",
+            cell: (row) => <CompanyFteSelect id={row.id} value={row.internationalFteStatus} pill />,
+          },
+          {
+            header: "Joined",
+            sort: "joined",
+            cell: (row) => <span className="nums whitespace-nowrap text-text-subtle">{formatDate(row.createdAt)}</span>,
           },
         ]}
       />

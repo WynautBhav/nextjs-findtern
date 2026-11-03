@@ -1,4 +1,3 @@
-import type { ConsentPurpose } from "./consent.ts";
 
 /**
  * Which students a drive shows. Pure and free of Node imports so the drive
@@ -48,21 +47,16 @@ export type StudentFacts = {
   collegeId: string;
   status: "claimed" | "verified";
   leftAt: Date | null;
-  purposes: readonly string[];
   year: number | null;
   branch: string | null;
   cgpa: number | null;
   score: number | null;
 };
 
-const DRIVE_PURPOSE: ConsentPurpose = "drive_visibility";
-export const DASHBOARD_PURPOSE: ConsentPurpose = "college_dashboard";
-
 export function isStudentEligible(s: StudentFacts, drive: DriveRules): boolean {
   // Hard boundaries: no override.
   if (!s.collegeId || s.collegeId !== drive.collegeId) return false;
   if (s.leftAt) return false;
-  if (!s.purposes.includes(DRIVE_PURPOSE)) return false;
   if (drive.excludeUserIds.includes(s.userId)) return false;
   // The college vouches for hand-included students, cutoffs or not.
   if (drive.includeUserIds.includes(s.userId)) return true;
