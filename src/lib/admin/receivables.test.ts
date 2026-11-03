@@ -50,3 +50,37 @@ test("receivables and payables with INR totals", () => {
   assert.equal(due.totals.dueMinor, 1_500_000);
   assert.equal(moneyRowFilter({ status: "bogus" }).status, "");
 });
+
+test("timestamps are dated by India day against a month window", () => {
+  const base = (over: Partial<ReceivablesInput>): ReceivablesInput => ({
+    since: new Date("2026-06-30T18:30:00Z"), // 1 Jul 00:00 IST
+    until: new Date("2026-07-31T18:30:00Z"), // 1 Aug 00:00 IST
+    employerName: () => "Acme",
+    internName: () => "Asha K",
+    scoreOf: () => 7,
+    activationFeeMinor: 249_900,
+    proposals: [],
+    employerPayments: [],
+    internPayments: [],
+    unpaidProfiles: [],
+    payouts: [],
+    ...over,
+  });
+  const payout = (id: string, at: string) => ({ id, internId: "i1", status: "paid", amountMinor: 100, currency: "INR", referenceId: null, paidAt: new Date(at), createdAt: null, raw: {} });
+  const f = { receivables: "both", payables: "both" } as const;
+  // 01:30 IST on 1 Jul is 20:00Z on 30 Jun: in July, not June.
+  const inJuly = computeReceivables(base({ payouts: [payout("a", "2026-06-30T20:00:00Z")] }), f);
+  assert.deepEqual(inJuly.payables.map((p) => p.date), ["2026-07-01"]);
+  // 01:30 IST on 1 Aug is 20:00Z on 31 Jul: out of July.
+  assert.equal(computeReceivables(base({ payouts: [payout("b", "2026-07-31T20:00:00Z")] }), f).payables.length, 0);
+  // Unpaid profile created 01:30 IST on 1 Jul is in; on 1 Aug is out.
+  assert.equal(computeReceivables(base({ unpaidProfiles: [{ userId: "i1", createdAt: new Date("2026-06-30T20:00:00Z") }] }), f).receivables[0].date, "2026-07-01");
+  assert.equal(computeReceivables(base({ unpaidProfiles: [{ userId: "i1", createdAt: new Date("2026-07-31T20:00:00Z") }] }), f).receivables.length, 0);
+  // Received is exact to the instant at both edges.
+  const fee = (id: string, at: string) => ({ id, internId: "i1", paymentId: null, status: "paid", amountMinor: 100, currency: "INR", paidAt: new Date(at), createdAt: null });
+  const got = (at: string) => computeReceivables(base({ internPayments: [fee("x", at)] }), f).receivables.length;
+  assert.equal(got("2026-06-30T18:29:59Z"), 0);
+  assert.equal(got("2026-06-30T18:30:00Z"), 1);
+  assert.equal(got("2026-07-31T18:29:59Z"), 1);
+  assert.equal(got("2026-07-31T18:30:00Z"), 0);
+});

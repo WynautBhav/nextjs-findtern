@@ -3,10 +3,10 @@ import { eq, inArray } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { computeAnalytics, type AnalyticsInput } from "@/lib/admin/analytics";
 import { periodStart } from "@/lib/admin/params";
-import { istDateRange } from "@/lib/admin/revenue";
+import { istDateRange, istMonthKeys, istMonthStart } from "@/lib/admin/revenue";
 import { meaningfulProfile, realEmployerId, realEmployers } from "@/lib/admin/scope";
 
-/** Range from `?from=&to=` (dates, inclusive), `?period=30d`, or `?period=all`; default the last 18 months (legacy). */
+/** Range from `?from=&to=` (`YYYY-MM-DD` India dates, inclusive; the date filter only sends that form), `?period=30d`, or `?period=all`; default the last 18 months (legacy). */
 export function analyticsRange(params: Record<string, string | undefined>): { since: Date | null; until: Date | null } {
   // India calendar days, inclusive, exactly as Reports and Transactions read them (lib/admin/revenue).
   const custom = istDateRange(params.from, params.to);
@@ -15,8 +15,7 @@ export function analyticsRange(params: Record<string, string | undefined>): { si
   if (preset) return { since: preset, until: null };
   if (params.period === "all") return { since: null, until: null };
   // Legacy default: the last 18 months.
-  const d = new Date();
-  return { since: new Date(d.getFullYear(), d.getMonth() - 17, 1), until: null };
+  return { since: istMonthStart(istMonthKeys(new Date(), 18)[0]), until: null };
 }
 
 /**

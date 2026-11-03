@@ -11,6 +11,8 @@ export type Stat = {
   trend?: "up" | "down" | "flat";
   /** The one figure per strip that carries the brand accent. */
   accent?: boolean;
+  /** A loss: drawn in ink with an "Out" tag, never the accent. */
+  negative?: boolean;
 };
 
 /**
@@ -38,11 +40,14 @@ export function StatStrip({ stats, label = "Key figures" }: { stats: Stat[]; lab
           <p
             className={cn(
               "nums mt-2 whitespace-nowrap font-semibold leading-[1.1] tracking-[-0.03em] text-[clamp(1.375rem,11cqi,2.25rem)]",
-              s.accent ? "text-[color:var(--admin-tile)]" : "text-foreground",
+              s.accent && !s.negative ? "text-[color:var(--admin-tile)]" : "text-foreground",
             )}
           >
             {s.value}
           </p>
+          {s.negative ? (
+            <span className="mt-1 inline-flex rounded-full bg-accent-500/15 px-2 py-0.5 text-xs font-semibold text-foreground">Out</span>
+          ) : null}
           <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[0.8125rem] leading-snug text-text-subtle">
             {s.delta ? (
               <span
