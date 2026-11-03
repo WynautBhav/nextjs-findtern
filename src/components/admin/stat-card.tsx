@@ -2,6 +2,7 @@ import type { LucideIcon } from "lucide-react";
 
 import { Count } from "@/components/admin/motion";
 import { ArrowLinkButton } from "@/components/admin/panel";
+import { statValueClass } from "@/components/admin/stat-card-class";
 import { cn } from "@/lib/utils";
 
 export type StatTone = "brand" | "accent" | "info" | "success" | "warning" | "neutral";
@@ -41,6 +42,7 @@ export function StatCard({
   href,
   animate = false,
   featured = false,
+  fit = false,
 }: {
   label: string;
   value: string | number;
@@ -56,11 +58,10 @@ export function StatCard({
   animate?: boolean;
   /** The filled brand tile (white text, inverted arrow). Use for at most one figure per row. */
   featured?: boolean;
+  /** Size the figure to the card (container query) and keep it on one line: for long money figures in narrow cards. */
+  fit?: boolean;
 }) {
-  const valueClass = cn(
-    "nums text-[2rem] font-semibold leading-none tracking-[-0.03em] sm:text-[2.5rem] lg:text-[2.75rem]",
-    featured ? "text-[color:var(--admin-tile-ink)]" : "text-foreground",
-  );
+  const valueClass = statValueClass(fit, featured);
   const deltaClass = featured ? "text-[color:var(--admin-tile-ink)]" : deltaTone(delta);
 
   return (
@@ -69,7 +70,7 @@ export function StatCard({
         "relative min-w-0 rounded-[var(--radius-admin-card)] p-[var(--admin-pad-panel)]",
         featured
           ? "bg-[color:var(--admin-tile)] text-[color:var(--admin-tile-ink)]"
-          : "border border-[color:var(--admin-panel-edge)] bg-[color:var(--admin-panel)]",
+          : "border border-[color:var(--admin-panel-edge)] bg-[color:var(--admin-panel)] shadow-[var(--admin-shadow)]",
         href && "has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ring",
       )}
     >
@@ -87,7 +88,7 @@ export function StatCard({
         </p>
         {href ? <ArrowLinkButton href={href} label={`Open ${label}`} inverted={featured} stretch /> : null}
       </div>
-      <div className="mt-3 flex flex-wrap items-baseline gap-x-2 gap-y-1">
+      <div className={cn("mt-3 flex flex-wrap items-baseline gap-x-2 gap-y-1", fit && "[container-type:inline-size]")}>
         {animate && typeof value === "number" ? (
           <Count value={value} className={valueClass} />
         ) : (

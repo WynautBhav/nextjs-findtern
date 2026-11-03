@@ -37,7 +37,7 @@ export function Gauge({
 }) {
   const hatch = `${useId()}-hatch`;
   const fill = (tone: GaugeSegment["tone"]) =>
-    tone === "done" ? "var(--admin-tile)" : tone === "progress" ? "var(--color-brand-900)" : `url(#${hatch})`;
+    tone === "done" ? "var(--admin-tile)" : tone === "progress" ? "var(--color-brand-400)" : `url(#${hatch})`;
 
   const fractions = segmentFractions(segments.map((s) => s.value));
   const empty = fractions.every((f) => f === 0);

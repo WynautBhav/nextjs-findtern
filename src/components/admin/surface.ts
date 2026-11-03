@@ -4,7 +4,7 @@
  * `--admin-panel-edge`. Tokens only, so it flips with the admin theme.
  */
 export const ADMIN_SURFACE =
-  "rounded-[var(--radius-admin-card)] border border-[color:var(--admin-panel-edge)] bg-[color:var(--admin-panel)]";
+  "rounded-[var(--radius-admin-card)] border border-[color:var(--admin-panel-edge)] bg-[color:var(--admin-panel)] shadow-[var(--admin-shadow)]";
 
 /**
  * Pill shapes for page and panel actions, applied to `ButtonLink` / `ButtonAnchor` via `className`

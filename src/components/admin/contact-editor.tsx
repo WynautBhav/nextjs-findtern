@@ -125,7 +125,7 @@ export function ContactEditor({
                   aria-label="Country code"
                   value={draft.countryCode}
                   onChange={(e) => set({ countryCode: e.target.value })}
-                  className={`${inputClass} w-24 shrink-0`}
+                  className={`${inputClass} w-28 shrink-0`}
                 >
                   {(CODES.includes(draft.countryCode) ? CODES : [draft.countryCode, ...CODES]).map((c) => (
                     <option key={c} value={c}>

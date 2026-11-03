@@ -3,6 +3,7 @@ import { and, asc, count, desc, eq, gte, inArray, sql } from "drizzle-orm";
 import { dbTimestamp, getDb, schema } from "@/lib/db";
 import { meaningfulProfile, realEmployerId, realEmployers } from "@/lib/admin/scope";
 import {
+  ACTIVITY_FETCH_LIMIT,
   buildPipelineBand,
   istWeekStart,
   placementSummary,
@@ -33,7 +34,7 @@ export async function loadActivityAndCounts(now: Date) {
       .from(schema.users)
       .where(eq(schema.users.role, "intern")),
     db
-      .select({ value: count() })
+      .select({ value: count(), fresh: sql<number>`count(*) filter (where ${schema.users.createdAt} >= ${weekAgo})` })
       .from(schema.users)
       .leftJoin(schema.internOnboarding, eq(schema.internOnboarding.userId, schema.users.id))
       .where(sql`${schema.users.role} = 'intern' and not ${meaningfulProfile()}`),
@@ -46,7 +47,7 @@ export async function loadActivityAndCounts(now: Date) {
       .from(schema.users)
       .where(eq(schema.users.role, "intern"))
       .orderBy(desc(schema.users.createdAt))
-      .limit(6),
+      .limit(ACTIVITY_FETCH_LIMIT),
     db
       .select({
         name: schema.projects.projectName,
@@ -58,7 +59,7 @@ export async function loadActivityAndCounts(now: Date) {
       .leftJoin(schema.employers, eq(schema.employers.id, schema.projects.employerId))
       .where(realEmployerId(schema.projects.employerId))
       .orderBy(desc(schema.projects.createdAt))
-      .limit(6),
+      .limit(ACTIVITY_FETCH_LIMIT),
     db
       .select({
         internId: schema.proposals.internId,
@@ -72,7 +73,7 @@ export async function loadActivityAndCounts(now: Date) {
       .leftJoin(schema.employers, eq(schema.employers.id, schema.proposals.employerId))
       .where(and(sql`${schema.proposals.status} in ('accepted', 'hired')`, realEmployerId(schema.proposals.employerId)))
       .orderBy(desc(schema.proposals.updatedAt))
-      .limit(6),
+      .limit(ACTIVITY_FETCH_LIMIT),
     db
       .select({
         employerId: schema.employerPayments.employerId,
@@ -85,13 +86,16 @@ export async function loadActivityAndCounts(now: Date) {
       .leftJoin(schema.employers, eq(schema.employers.id, schema.employerPayments.employerId))
       .where(eq(schema.employerPayments.status, "paid"))
       .orderBy(desc(schema.employerPayments.paidAt))
-      .limit(6),
+      .limit(ACTIVITY_FETCH_LIMIT),
   ]);
   const activity: ActivityInput = { recentUsers, recentProjects, recentAccepted, recentPayments };
   return {
     signups: Number(signups?.value ?? 0),
     signupsThisWeek: Number(signups?.fresh ?? 0),
     incompleteProfiles: Number(incompleteProfiles?.value ?? 0),
+    // The candidate tile counts people WITH a profile, so its "new this week" must too: sign-ups this
+    // week minus the ones still incomplete. (It used to print every sign-up, 137 against a tile of 133.)
+    profilesThisWeek: Math.max(0, Number(signups?.fresh ?? 0) - Number(incompleteProfiles?.fresh ?? 0)),
     activity,
   };
 }
@@ -170,8 +174,7 @@ async function loadCompanies(now: Date): Promise<{ total: number; fresh: number 
  * The hire pipeline band: every open proposal (sent, interview, accepted, processing) with its offer,
  * plus the all-time hired count and the latest three hires. Open stages are bounded by the live
  * pipeline; Hired is not, so it reads its count and a short list, never every row. Real employers only.
- * Not yet part of `loadOverview`: the dashboard's pipeline band will call it when it is built, so
- * today's page runs no extra query for it.
+ * `loadOverview` runs it for the dashboard's pipeline band.
  */
 export async function loadPipelineBand(now: Date): Promise<PipelineBand> {
   const pr = schema.proposals;
@@ -209,12 +212,13 @@ export async function loadPipelineBand(now: Date): Promise<PipelineBand> {
 }
 
 export async function loadOverview(now: Date) {
-  const [week, nextInterview, placements, companies] = await Promise.all([
+  const [week, nextInterview, placements, companies, pipeline] = await Promise.all([
     settleNull("week proposals", () => loadWeekProposals(now)),
     // `undefined` is "no interview booked"; `null` is "could not load".
     settleNull("next interview", async () => (await loadNextInterview(now)) ?? undefined),
     settleNull("placements", loadPlacements),
     settleNull("companies", () => loadCompanies(now)),
+    settleNull("pipeline band", () => loadPipelineBand(now)),
   ]);
-  return { week, nextInterview, placements, companies };
+  return { week, nextInterview, placements, companies, pipeline };
 }

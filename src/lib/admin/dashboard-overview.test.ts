@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import {
+  ACTIVITY_FETCH_LIMIT,
   activityWhen,
   buildActivity,
   buildKpis,
@@ -113,7 +114,7 @@ test("buildKpis: with-profile plus incomplete equals signups, and the placement 
     queueFailed: false,
     signups: 1200,
     incompleteProfiles: 300,
-    signupsThisWeek: 25,
+    profilesThisWeek: 25,
     companies: 80,
     companiesThisWeek: 3,
     placements,
@@ -124,18 +125,18 @@ test("buildKpis: with-profile plus incomplete equals signups, and the placement 
   assert.equal(by.needs.value, 17);
   assert.equal(by.needs.caption, "4 new this week");
   assert.equal(by.candidates.value, 900);
-  assert.match(by.candidates.caption, /25 new signups this week, 1,200 in all/);
+  assert.equal(by.candidates.caption, "with a profile · 25 new this week");
   assert.equal(by.companies.caption, "3 new this week");
   assert.equal(by.placements.value, placements.total);
   assert.equal(by.placements.caption, "22 paid, 13 awaiting payment");
 });
 
 test("buildKpis: a failed read drops its tile, a failed queue is said, an empty queue is honest", () => {
-  const base = { queueTotal: 0, queueFresh: 0, queueFailed: false, signups: 0, incompleteProfiles: 0, signupsThisWeek: 1, companies: null, companiesThisWeek: null, placements: null };
+  const base = { queueTotal: 0, queueFresh: 0, queueFailed: false, signups: 0, incompleteProfiles: 0, profilesThisWeek: 1, companies: null, companiesThisWeek: null, placements: null };
   const empty = buildKpis(base);
   assert.deepEqual(empty.kpis.map((k) => k.key), ["needs", "candidates"]);
   assert.equal(empty.kpis[0].caption, "Nothing waiting on the team");
-  assert.match(empty.kpis[1].caption, /1 new signup this week/);
+  assert.equal(empty.kpis[1].caption, "No finished profiles yet");
   assert.equal(buildKpis({ ...base, queueTotal: 3, queueFailed: true }).kpis[0].caption, "Some queues did not load");
   // New this week can never exceed the total it is part of.
   assert.equal(buildKpis({ ...base, queueTotal: 2, queueFresh: 9 }).kpis[0].caption, "2 new this week");
@@ -301,4 +302,55 @@ test("an undated row is counted, shows no waiting time and cannot make a stage s
   assert.equal(band.stages[0].count, 1);
   assert.equal(band.stages[0].cards[0].waitingDays, null);
   assert.equal(band.stuck, null);
+});
+
+import { greetingFor, groupActivity, relativeWhen, untilWhen } from "./dashboard-overview-pure.ts";
+
+test("candidate caption says 'all new this week' when every profile is new", () => {
+  const base = { queueTotal: 0, queueFresh: 0, queueFailed: false, signups: 5, incompleteProfiles: 0, profilesThisWeek: 5, companies: null, companiesThisWeek: null, placements: null };
+  assert.equal(buildKpis(base).kpis[1].caption, "with a profile · all new this week");
+  assert.equal(buildKpis({ ...base, signups: 9, profilesThisWeek: 5 }).kpis[1].caption, "with a profile · 5 new this week");
+});
+
+test("groupActivity folds consecutive events of one kind and leaves single ones", () => {
+  const at = (m: number) => new Date(Date.UTC(2026, 10, 4, 5, 0) - m * 60_000);
+  const offers = [1, 2, 3].map((n) => ({ internId: `u${n}`, first: "A", last: String(n), company: "Acme", date: at(n) }));
+  const items = buildActivity({
+    recentUsers: [{ id: "s1", name: "Ira", date: at(10) }],
+    recentProjects: [],
+    recentAccepted: offers,
+    recentPayments: [],
+  });
+  assert.deepEqual(items.map((i) => [i.kind, i.count ?? 1]), [["offer", 3], ["signup", 1]]);
+  assert.equal(`${items[0].name} ${items[0].verb}`, "3 offers accepted");
+  assert.equal(items[0].at.getTime(), at(1).getTime());
+  assert.equal(groupActivity([]).length, 0);
+});
+
+test("relativeWhen and untilWhen read as real, different times", () => {
+  const now = new Date("2026-11-04T10:00:00Z");
+  const ago = (ms: number) => new Date(now.getTime() - ms);
+  assert.equal(relativeWhen(ago(10_000), now), "just now");
+  assert.equal(relativeWhen(ago(12 * 60_000), now), "12 min ago");
+  assert.equal(relativeWhen(ago(90 * 60_000), now), "90 min ago");
+  assert.equal(relativeWhen(ago(3 * 3_600_000), now), "3 h ago");
+  assert.equal(relativeWhen(ago(2 * 86_400_000), now), "2 d ago");
+  assert.equal(untilWhen(new Date(now.getTime() + 20 * 60_000), now), "in 20 min");
+  assert.equal(untilWhen(new Date(now.getTime() + 5 * 3_600_000), now), "in 5 h");
+  assert.equal(untilWhen(new Date(now.getTime() + 3 * 86_400_000), now), "in 3 days");
+  assert.equal(untilWhen(ago(1000), now), null);
+});
+
+test("greetingFor uses the India clock", () => {
+  assert.equal(greetingFor(new Date("2026-11-04T03:00:00Z")), "Good morning"); // 08:30 IST
+  assert.equal(greetingFor(new Date("2026-11-04T08:00:00Z")), "Good afternoon"); // 13:30 IST
+  assert.equal(greetingFor(new Date("2026-11-04T16:00:00Z")), "Good evening"); // 21:30 IST
+});
+
+test("a group as large as the fetch limit reads 'N+' because older events may be cut off", () => {
+  const at = (m: number) => new Date(Date.UTC(2026, 10, 4, 5, 0) - m * 60_000);
+  const offers = (n: number) => Array.from({ length: n }, (_, i) => ({ internId: `u${i}`, first: "A", last: String(i), company: "Acme", date: at(i + 1) }));
+  const run = (n: number) => buildActivity({ recentUsers: [], recentProjects: [], recentAccepted: offers(n), recentPayments: [] }, 3)[0];
+  assert.equal(run(ACTIVITY_FETCH_LIMIT).name, `${ACTIVITY_FETCH_LIMIT}+ offers`);
+  assert.equal(run(ACTIVITY_FETCH_LIMIT - 1).name, `${ACTIVITY_FETCH_LIMIT - 1} offers`);
 });
