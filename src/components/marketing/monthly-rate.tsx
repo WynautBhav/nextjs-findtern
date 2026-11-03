@@ -3,11 +3,12 @@
 import type { PriceCurrency } from "@/lib/currency";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { formatMoney, formatNumber } from "@/lib/format";
-import { HOURS_PER_MONTH, WORK_MONTH } from "@/lib/plan-offer";
+import { HOURS_PER_MONTH } from "@/lib/plan-offer";
+import { HOURS_PER_DAY, WEEKLY_SCHEDULES } from "@/lib/offer";
 import { cn } from "@/lib/utils";
 
 /**
- * "₹16,000 a month at 160 hours" under an hourly rate.
+ * "₹16,000 a month at 176 hours" under an hourly rate.
  *
  * The monthly figure is derived, so the assumption behind it is part of the
  * sentence rather than hidden behind an icon: the hour count is the control,
@@ -48,7 +49,7 @@ export function MonthlyRate({
           </button>
         </TooltipTrigger>
         <TooltipContent>
-          {WORK_MONTH.hoursPerDay} hours a day × {WORK_MONTH.daysPerWeek} days a week × {WORK_MONTH.weeksPerMonth} weeks ={" "}
+          {HOURS_PER_DAY} hours a day × {WEEKLY_SCHEDULES.mon_fri.days} working days ={" "}
           {HOURS_PER_MONTH} hours.
           <br />
           {formatMoney(hourlyMinor, currency)} × {HOURS_PER_MONTH} = {formatMoney(monthly, currency)}.

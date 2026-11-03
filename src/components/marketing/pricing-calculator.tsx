@@ -13,14 +13,14 @@ import {
 import { ButtonLink } from "@/components/ui/button";
 import { useCurrency } from "@/components/marketing/region-rates";
 import { formatMoney, formatNumber, formatRate } from "@/lib/format";
-import { WORK_MONTH, monthlyHours } from "@/lib/plan-offer";
+import { HOURS_PER_DAY, WEEKLY_SCHEDULES, scheduledMonthlyHours } from "@/lib/offer";
 import type { CmsPlan } from "@/lib/content/types";
 import { cn } from "@/lib/utils";
 
 /**
  * The cost calculator, written as a sentence.
  *
- * "A Cappuccino intern working 8 hours a day, 5 days a week costs ₹16,000 a
+ * "A Cappuccino intern working 8 hours a day, 5 days a week costs ₹17,600 a
  * month." The three variables are the only words an employer has to change,
  * so they are the only controls: inline selects set in the brand colour,
  * native so a phone opens its own picker. The ledger beside the sentence
@@ -32,12 +32,11 @@ import { cn } from "@/lib/utils";
  * the part day - so only the plan and the days a week change.
  *
  * Days a week is 5 or 6 - nobody is asked whether they want someone seven
- * days a week. Weeks a month is fixed at four, the same assumption the plan
- * cards use, so the two never disagree.
+ * days a week. The month is billed as real offers are (offer.ts): 22 working
+ * days for Mon-Fri, 26 for Mon-Sat.
  */
 const DAYS = [5, 6] as const;
-/** Internships are full days. The hours are fixed, not offered as a choice. */
-const HOURS_PER_DAY = WORK_MONTH.hoursPerDay;
+const SCHEDULE = { 5: "mon_fri", 6: "mon_sat" } as const;
 
 export function PricingCalculator({
   plansInr,
@@ -54,14 +53,13 @@ export function PricingCalculator({
   const featuredIdx = Math.max(0, plans.findIndex((p) => p.isFeatured));
 
   const [planIdx, setPlanIdx] = useState(featuredIdx);
-  const hours = HOURS_PER_DAY;
-  const [days, setDays] = useState<number>(WORK_MONTH.daysPerWeek);
+    const [days, setDays] = useState<5 | 6>(5);
   const uid = useId();
 
   const plan = plans[Math.min(planIdx, plans.length - 1)];
   if (!plan) return null;
 
-  const hoursMonth = monthlyHours(hours, days);
+  const hoursMonth = scheduledMonthlyHours(SCHEDULE[days], 0);
   const monthly = plan.priceHourlyMinor * hoursMonth;
   const money = (minor: number) => formatMoney(minor, currency, { zeroLabel: false });
 
@@ -88,7 +86,7 @@ export function PricingCalculator({
             id={`${uid}-days`}
             label="Days a week"
             value={String(days)}
-            onChange={(v) => setDays(Number(v))}
+            onChange={(v) => setDays(Number(v) as 5 | 6)}
             options={DAYS.map((d) => ({ value: String(d), label: `${d} days` }))}
           />{" "}
           a week, costs
@@ -129,7 +127,7 @@ export function PricingCalculator({
         </dl>
 
         <p className="mt-4 text-xs leading-relaxed text-ink-600">
-          {formatNumber(hours)} h × {days} d × {WORK_MONTH.weeksPerMonth} weeks = {formatNumber(hoursMonth)} hours.
+          {HOURS_PER_DAY} h × {WEEKLY_SCHEDULES[SCHEDULE[days]].days} working days = {formatNumber(hoursMonth)} hours.
         </p>
 
         <div className="mt-auto flex flex-wrap items-center gap-x-5 gap-y-3 pt-8">

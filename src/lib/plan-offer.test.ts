@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { HOURS_PER_MONTH, monthlyCostMinor, monthlyHours, planHasOffer } from "./plan-offer.ts";
+import { scheduledMonthlyHours } from "./offer.ts";
+import { HOURS_PER_MONTH, planHasOffer } from "./plan-offer.ts";
 
 describe("plan offer", () => {
   it("is on when a compare-at price sits above the current price", () => {
@@ -22,16 +23,9 @@ describe("plan offer", () => {
 });
 
 describe("monthly arithmetic", () => {
-  it("uses 8 x 5 x 4 = 160 hours", () => {
-    assert.equal(HOURS_PER_MONTH, 160);
-    assert.equal(monthlyHours(8, 5), 160);
-    assert.equal(monthlyHours(8, 6), 192);
-    assert.equal(monthlyHours(4, 5), 80);
-  });
-
-  it("prices a month from the hourly rate", () => {
-    // ₹100/hr x 160 h = ₹16,000
-    assert.equal(monthlyCostMinor(10000, 8, 5), 1_600_000);
-    assert.equal(monthlyCostMinor(0, 8, 5), 0);
+  it("marketing hours equal the hours a real Mon-Fri / Mon-Sat offer bills", () => {
+    assert.equal(HOURS_PER_MONTH, 176);
+    assert.equal(HOURS_PER_MONTH, scheduledMonthlyHours("mon_fri", 0));
+    assert.equal(scheduledMonthlyHours("mon_sat", 0), 208);
   });
 });

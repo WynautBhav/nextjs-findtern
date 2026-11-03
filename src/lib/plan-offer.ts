@@ -1,4 +1,5 @@
 import type { CmsPlan } from "@/lib/content/types";
+import { scheduledMonthlyHours } from "./offer.ts";
 
 /**
  * The 2026 offer and the monthly arithmetic, in one place.
@@ -17,23 +18,6 @@ export function planHasOffer(plan: Pick<CmsPlan, "priceHourlyMinor" | "compareAt
 }
 
 /* ── Monthly arithmetic ────────────────────────────────────────────────
- * The hourly rate is the published number; the monthly figure beside it is
- * derived from one assumption set, printed wherever the figure appears so a
- * reader can check it: 8 hours a day, 5 days a week, 4 weeks a month. */
-export const WORK_MONTH = {
-  hoursPerDay: 8,
-  daysPerWeek: 5,
-  weeksPerMonth: 4,
-} as const;
-
-export const HOURS_PER_MONTH = WORK_MONTH.hoursPerDay * WORK_MONTH.daysPerWeek * WORK_MONTH.weeksPerMonth; // 160
-
-/** Hours in a month for a given weekly schedule. */
-export function monthlyHours(hoursPerDay: number, daysPerWeek: number, weeksPerMonth = WORK_MONTH.weeksPerMonth): number {
-  return Math.max(0, Math.round(hoursPerDay * daysPerWeek * weeksPerMonth));
-}
-
-/** Cost of a month of work in minor units, before the per-hire fee. */
-export function monthlyCostMinor(hourlyMinor: number, hoursPerDay: number, daysPerWeek: number): number {
-  return hourlyMinor * monthlyHours(hoursPerDay, daysPerWeek);
-}
+ * Marketing figures use the same billed month as a real offer (offer.ts):
+ * Mon–Fri is 22 working days × 8 h = 176 h, Mon–Sat 26 × 8 = 208 h. */
+export const HOURS_PER_MONTH = scheduledMonthlyHours("mon_fri", 0);

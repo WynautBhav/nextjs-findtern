@@ -38,7 +38,7 @@ export function pricingFaq(perHire: string): CmsFaqItem[] {
       category: "Pricing",
       question: "How much does an intern cost per month?",
       answer:
-        "Multiply the hourly rate by the hours you need. At 8 hours a day, 5 days a week, 4 weeks a month that is 160 hours: ₹16,000 a month on Cappuccino (₹100/hr) and ₹32,000 on Latte (₹200/hr), plus the one-time per-hire fee. The calculator on the pricing page does this for your own schedule.",
+        "Multiply the hourly rate by the hours you need. A Monday-to-Friday month is billed as 22 working days of 8 hours, 176 hours: ₹17,600 a month on Cappuccino (₹100/hr) and ₹35,200 on Latte (₹200/hr), plus the one-time per-hire fee. The calculator on the pricing page does this for your own schedule.",
       sortOrder: 3,
       isActive: true,
     },
