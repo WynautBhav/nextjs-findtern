@@ -35,10 +35,10 @@ export function MoneyCard({ money, payoutsHref }: { money: MoneyStuck; payoutsHr
   return (
     <section
       aria-labelledby="money-title"
-      className="rounded-[var(--radius-admin-card)] border border-[color:var(--admin-panel-edge)] bg-[color:var(--admin-panel)] p-[var(--admin-pad-panel)] shadow-[var(--admin-shadow)]"
+      className="h-full rounded-[var(--radius-admin-card)] border border-[color:var(--admin-panel-edge)] bg-[color:var(--admin-panel)] p-[var(--admin-pad-panel)] shadow-[var(--admin-shadow)] xl:flex xl:flex-col"
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 id="money-title" className="text-lg font-semibold leading-snug tracking-[-0.01em] text-foreground">
+        <h2 id="money-title" className="text-xl font-semibold leading-snug tracking-[-0.01em] text-foreground">
           Money
         </h2>
         {payoutsHref ? (
@@ -50,7 +50,7 @@ export function MoneyCard({ money, payoutsHref }: { money: MoneyStuck; payoutsHr
           </Link>
         ) : null}
       </div>
-      <dl className="mt-3 grid grid-cols-1 divide-y divide-[color:var(--admin-rule)] sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+      <dl className="mt-3 grid xl:my-auto grid-cols-1 divide-y divide-[color:var(--admin-rule)] sm:grid-cols-3 sm:divide-x sm:divide-y-0">
         {lines.map((l) => (
           <div key={l.key} className="py-2 first:pt-0 last:pb-0 sm:px-4 sm:py-0 sm:first:pl-0 sm:last:pr-0">
             <dt className="text-sm font-medium text-text-subtle">{l.label}</dt>

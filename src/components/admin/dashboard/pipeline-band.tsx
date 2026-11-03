@@ -34,14 +34,17 @@ function money(totals: { currency: string; minor: number }[]): string {
 function Band({ band }: { band: PipelineBand }) {
   const stuck = band.stages.find((s) => s.key === band.stuck) ?? null;
   // The people to chase: the stuck stage's longest-waiting cards, else the longest-waiting open card anywhere.
+  // One row per person: the same intern can hold two proposals in a stage.
+  const once = <T extends { card: BandCard }>(list: T[]) => list.filter((x, i) => list.findIndex((y) => y.card.internId === x.card.internId) === i);
   const chase: { card: BandCard; stage: string }[] = stuck
-    ? stuck.cards.map((card) => ({ card, stage: stuck.label }))
-    : band.stages
-        .filter((s) => s.key !== "hired")
-        .flatMap((s) => s.cards.map((card) => ({ card, stage: s.label })))
-        .filter((x) => x.card.waitingDays != null)
-        .sort((a, b) => (b.card.waitingDays ?? 0) - (a.card.waitingDays ?? 0))
-        .slice(0, 3);
+    ? once(stuck.cards.map((card) => ({ card, stage: stuck.label })))
+    : once(
+        band.stages
+          .filter((s) => s.key !== "hired")
+          .flatMap((s) => s.cards.map((card) => ({ card, stage: s.label })))
+          .filter((x) => x.card.waitingDays != null)
+          .sort((a, b) => (b.card.waitingDays ?? 0) - (a.card.waitingDays ?? 0)),
+      ).slice(0, 3);
   const weights = band.stages.map((s) => Math.max(s.count, 0));
   const sum = weights.reduce((n, w) => n + w, 0);
 
@@ -53,7 +56,7 @@ function Band({ band }: { band: PipelineBand }) {
             <span
               key={s.key}
               style={{ flexGrow: Math.max(weights[i], sum * 0.02) }}
-              className={cn("min-w-1 rounded-full", s.key === "hired" ? "bg-[color:var(--admin-tile)]" : s.key === band.stuck ? "bg-accent-500" : "bg-[color:var(--admin-bar-tint)]")}
+              className={cn("min-w-1 rounded-full", s.key === "hired" ? "bg-[color:var(--admin-tile)]" : s.key === band.stuck ? "bg-brand-500" : "bg-[color:var(--admin-bar-tint)]")}
             />
           ))}
         </div>
@@ -68,14 +71,14 @@ function Band({ band }: { band: PipelineBand }) {
               className={cn(
                 "flex min-w-0 items-center justify-between gap-2 rounded-2xl bg-[color:var(--admin-panel-2)] px-3 py-2 sm:block sm:py-3",
                 isStuck && "ring-2 ring-accent-500/70",
-                s.key === "hired" && "bg-[color:var(--admin-bar-tint)]/60",
+                s.key === "hired" && "bg-[color:var(--admin-bar-tint)]",
               )}
             >
-              <p className="text-sm font-medium text-text-subtle">{s.label}</p>
+              <p className={cn("text-xs font-semibold uppercase tracking-wider", s.key === "hired" ? "text-brand-900" : "text-text-subtle")}>{s.label}</p>
               <div className="flex items-baseline gap-2 sm:mt-1 sm:block">
                 <p className="nums text-xl font-semibold leading-none tracking-[-0.02em] text-foreground sm:text-[1.75rem]">{s.count.toLocaleString("en-IN")}</p>
-                <p className="nums truncate text-xs leading-4 text-text-subtle sm:mt-1.5" title={value || undefined}>
-                  {value || (s.key === "hired" ? "all time" : "no offer value")}
+                <p className={cn("nums truncate text-xs leading-4 sm:mt-1.5", s.key === "hired" ? "text-brand-900" : "text-text-subtle")} title={value || undefined}>
+                  {s.count === 0 ? "—" : value || (s.key === "hired" ? "all time" : "no offer value")}
                 </p>
               </div>
               {isStuck && s.oldestDays != null ? (
@@ -87,7 +90,7 @@ function Band({ band }: { band: PipelineBand }) {
       </ol>
       {chase.length > 0 ? (
         <div className="max-sm:hidden">
-          <p className="mb-1 text-xs font-medium text-text-subtle">{stuck ? `Waiting longest in ${stuck.label}` : "Waiting longest"}</p>
+          <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-text-subtle">{stuck ? `Waiting longest in ${stuck.label}` : "Waiting longest"}</p>
           <ul className="grid gap-x-4 sm:grid-cols-3">
             {chase.map(({ card, stage }) => (
               <li key={card.id} className="flex min-w-0 items-center gap-2.5 py-1">

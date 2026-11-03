@@ -44,6 +44,10 @@ export function NeedsYouPanel({
   const rows = all.filter((r) => r.state !== "clear");
   const clear = all.filter((r) => r.state === "clear");
   // The calendar flag is a state, not a share of the work: it stays out of the bar.
+  // The total counts the calendar flag as one; the rows add up to it only when the flag is named.
+  const flags = groups.filter((g) => g.flag && !g.error && g.count > 0).length;
+  const items = Math.max(0, total - flags);
+  const hidden = Math.max(0, rows.length - 3);
   const segments = groups.map((g) => ({ key: g.key, count: g.error || g.flag ? 0 : g.count, flag: false }));
 
   return (
@@ -55,7 +59,13 @@ export function NeedsYouPanel({
             <span data-testid="queue-total" className="nums font-semibold text-foreground">
               <TickCount value={total} />
             </span>{" "}
-            {total === 1 ? "item is" : "items are"} waiting
+            {flags > 0 ? (
+              <>
+                in all: {items} {items === 1 ? "item" : "items"} + {flags} {flags === 1 ? "setting" : "settings"} to fix
+              </>
+            ) : (
+              <>{total === 1 ? "item is" : "items are"} waiting</>
+            )}
           </>
         }
         action={
@@ -115,6 +125,14 @@ export function NeedsYouPanel({
             );
           })}
         </ul>
+        {hidden > 0 ? (
+          <Link
+            href="/admin/dashboard?desk=1"
+            className="-mx-2 flex min-h-11 items-center rounded-xl px-2 text-sm font-medium text-foreground underline-offset-4 outline-none hover:underline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring md:hidden"
+          >
+            +{hidden} more
+          </Link>
+        ) : null}
         {clear.length > 0 ? (
           <p
             className="px-0 text-xs leading-4 text-text-subtle"

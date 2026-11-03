@@ -303,14 +303,27 @@ test("an undated row is counted, shows no waiting time and cannot make a stage s
   assert.equal(band.stuck, null);
 });
 
-import { greetingFor, heroKey, relativeWhen, untilWhen, type Kpi } from "./dashboard-overview-pure.ts";
+import { greetingFor, groupActivity, relativeWhen, untilWhen } from "./dashboard-overview-pure.ts";
 
-test("heroKey never picks a zero tile and falls back in order", () => {
-  const k = (key: Kpi["key"], value: number): Kpi => ({ key, label: key, value, caption: "" });
-  assert.equal(heroKey([k("needs", 45), k("candidates", 133)]), "needs");
-  assert.equal(heroKey([k("needs", 0), k("candidates", 133), k("placements", 40)]), "placements");
-  assert.equal(heroKey([k("needs", 0), k("candidates", 0), k("companies", 3)]), "companies");
-  assert.equal(heroKey([k("needs", 0), k("candidates", 0)]), null);
+test("candidate caption says 'all new this week' when every profile is new", () => {
+  const base = { queueTotal: 0, queueFresh: 0, queueFailed: false, signups: 5, incompleteProfiles: 0, profilesThisWeek: 5, companies: null, companiesThisWeek: null, placements: null };
+  assert.equal(buildKpis(base).kpis[1].caption, "with a profile · all new this week");
+  assert.equal(buildKpis({ ...base, signups: 9, profilesThisWeek: 5 }).kpis[1].caption, "with a profile · 5 new this week");
+});
+
+test("groupActivity folds consecutive events of one kind and leaves single ones", () => {
+  const at = (m: number) => new Date(Date.UTC(2026, 10, 4, 5, 0) - m * 60_000);
+  const offers = [1, 2, 3].map((n) => ({ internId: `u${n}`, first: "A", last: String(n), company: "Acme", date: at(n) }));
+  const items = buildActivity({
+    recentUsers: [{ id: "s1", name: "Ira", date: at(10) }],
+    recentProjects: [],
+    recentAccepted: offers,
+    recentPayments: [],
+  });
+  assert.deepEqual(items.map((i) => [i.kind, i.count ?? 1]), [["offer", 3], ["signup", 1]]);
+  assert.equal(`${items[0].name} ${items[0].verb}`, "3 offers accepted");
+  assert.equal(items[0].at.getTime(), at(1).getTime());
+  assert.equal(groupActivity([]).length, 0);
 });
 
 test("relativeWhen and untilWhen read as real, different times", () => {
@@ -318,6 +331,7 @@ test("relativeWhen and untilWhen read as real, different times", () => {
   const ago = (ms: number) => new Date(now.getTime() - ms);
   assert.equal(relativeWhen(ago(10_000), now), "just now");
   assert.equal(relativeWhen(ago(12 * 60_000), now), "12 min ago");
+  assert.equal(relativeWhen(ago(90 * 60_000), now), "90 min ago");
   assert.equal(relativeWhen(ago(3 * 3_600_000), now), "3 h ago");
   assert.equal(relativeWhen(ago(2 * 86_400_000), now), "2 d ago");
   assert.equal(untilWhen(new Date(now.getTime() + 20 * 60_000), now), "in 20 min");

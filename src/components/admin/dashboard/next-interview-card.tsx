@@ -1,4 +1,5 @@
 import { CalendarClock, Plus, Video } from "lucide-react";
+import Link from "next/link";
 
 import { AdminAvatar } from "@/components/admin/avatar";
 import { Panel, PanelBody, PanelHeader } from "@/components/admin/panel";
@@ -74,7 +75,7 @@ export function NextInterviewCard({
                 {trackerHref ? (
                   <>
                     {" "}
-                    <a href={trackerHref} className="font-medium text-foreground underline underline-offset-4">Open interviews</a>
+                    <Link href={trackerHref} className="font-medium text-foreground underline underline-offset-4">Open interviews</Link>
                   </>
                 ) : null}
               </p>

@@ -25,7 +25,7 @@ export function RecentActivity({ items, now }: { items: (Omit<ActivityItem, "hre
               const sentence = `${item.name} ${item.verb} ${item.object}`.trim();
               const body = (
                 <>
-                  <AdminAvatar name={item.name} id={item.tintKey} size="sm" />
+                  <AdminAvatar name={item.lead ?? item.name} id={item.tintKey} size="sm" />
                   <span className="min-w-0">
                     <span className="line-clamp-2 text-sm leading-5 text-foreground" title={sentence}>
                       <span className="font-semibold">{item.name}</span> {item.verb}
@@ -38,7 +38,7 @@ export function RecentActivity({ items, now }: { items: (Omit<ActivityItem, "hre
                   </span>
                 </>
               );
-              const row = cn("grid grid-cols-[auto_minmax(0,1fr)] items-start gap-3 rounded-xl px-2 py-2 outline-none", i >= 4 && "max-sm:hidden");
+              const row = cn("grid grid-cols-[auto_minmax(0,1fr)] items-start gap-3 rounded-xl px-2 py-2 outline-none");
               return (
                 <li key={item.id} className={i >= 3 ? "max-md:hidden" : undefined}>
                   {item.href ? (

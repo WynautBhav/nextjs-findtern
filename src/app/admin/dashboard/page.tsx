@@ -13,7 +13,7 @@ import { WeekPanel } from "@/components/admin/dashboard/week-panel";
 import { Arrive } from "@/components/admin/motion";
 import { AdminLoadError, AdminPageHeader, Panel } from "@/components/admin/panel";
 import { ADMIN_PILL_PRIMARY, ADMIN_PILL_SECONDARY } from "@/components/admin/surface";
-import { findingSentence, plural } from "@/components/admin/triage/format";
+import { findingSentence } from "@/components/admin/triage/format";
 import { IncompleteProfilesLine } from "@/components/admin/triage/incomplete-profiles-line";
 import { MoneyStrip } from "@/components/admin/triage/money-strip";
 import { TriageDesk } from "@/components/admin/triage/triage-desk";
@@ -22,7 +22,7 @@ import { ButtonLink } from "@/components/ui/button";
 import { getSession } from "@/lib/auth";
 import { getDb, schema } from "@/lib/db";
 import { cn } from "@/lib/utils";
-import { buildActivity, buildKpis, heroKey } from "@/lib/admin/dashboard-overview-pure";
+import { buildActivity, buildKpis } from "@/lib/admin/dashboard-overview-pure";
 import { loadActivityAndCounts, loadOverview } from "@/lib/admin/dashboard-overview";
 import { loadDashboardQueues, QUEUE_ORDER } from "@/lib/admin/dashboard-queues";
 import type { QueueKey } from "@/lib/admin/dashboard-queues.types";
@@ -59,11 +59,13 @@ export default async function AdminDashboard({ searchParams }: { searchParams?: 
   let base: Awaited<ReturnType<typeof loadActivityAndCounts>>;
   let queues: Awaited<ReturnType<typeof loadDashboardQueues>>;
   let overview: Awaited<ReturnType<typeof loadOverview>> | null;
+  let name: string;
   try {
-    [base, queues, overview] = await Promise.all([
+    [base, queues, overview, name] = await Promise.all([
       loadActivityAndCounts(now),
       loadDashboardQueues(now),
       desk ? null : loadOverview(now),
+      desk ? "" : adminFirstName(session?.uid, session?.email),
     ]);
   } catch (error) {
     console.error("[admin/dashboard] load failed", error);
@@ -120,27 +122,20 @@ export default async function AdminDashboard({ searchParams }: { searchParams?: 
     companiesThisWeek: companies?.fresh ?? null,
     placements,
   });
-  const hero = heroKey(kpis);
   const tileHref: Record<string, string | null> = {
     needs: `${DASHBOARD}?desk=1`,
     candidates: gate("/admin/interns"),
     companies: gate("/admin/companies"),
     placements: gate(TRACKER_PROPOSALS),
   };
-  const activity = buildActivity(base.activity).map((item) => ({ ...item, href: gate(item.href) }));
-  const name = await adminFirstName(session?.uid, session?.email);
+  const activity = buildActivity(base.activity, 3).map((item) => ({ ...item, href: gate(item.href) }));
 
-  // The figures that need a person, as one line. A zero is left out, never printed.
+  // One line of figures that no card already shows: a figure on a card is never repeated here, and a zero is left out.
+  // (New this week is the hero's caption, unpaid offers and payouts due are the money card's; incomplete profiles
+  // are the candidates caption unless this week's new profiles took its place.)
   const n = (v: number) => v.toLocaleString("en-IN");
   const strip: StripItem[] = [
-    fresh > 0 ? { key: "fresh", value: n(fresh), label: "new this week", href: `${DASHBOARD}?desk=1` } : null,
-    money.employerOfferCount > 0
-      ? { key: "offers", value: n(money.employerOfferCount), label: plural(money.employerOfferCount, "offer unpaid", "offers unpaid"), href: `${DASHBOARD}?desk=1&queue=accepted` }
-      : null,
-    money.payoutCount > 0
-      ? { key: "payouts", value: n(money.payoutCount), label: plural(money.payoutCount, "payout due", "payouts due"), href: gate("/admin/payouts") }
-      : null,
-    base.incompleteProfiles > 0
+    base.incompleteProfiles > 0 && base.profilesThisWeek > 0
       ? { key: "incomplete", value: n(base.incompleteProfiles), label: "incomplete profiles", href: gate("/admin/interns?profile=incomplete") }
       : null,
   ].filter((x): x is StripItem => x !== null);
@@ -149,7 +144,7 @@ export default async function AdminDashboard({ searchParams }: { searchParams?: 
   // From xl the page is a main column and a right rail (the wrappers below are `contents` until then).
   const cell = "min-w-0 md:col-span-2 xl:col-auto";
   return (
-    <div data-admin-dash className="space-y-[var(--admin-gap)]">
+    <div data-admin-dash className="space-y-[var(--admin-gap)] [&_[data-panel-header]_h2]:text-xl">
       <GreetingHeader
         name={name}
         now={now}
@@ -168,12 +163,12 @@ export default async function AdminDashboard({ searchParams }: { searchParams?: 
         }
       />
 
-      <div className="grid grid-cols-1 items-start gap-[var(--admin-gap)] md:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_21.5rem]">
+      <div className="grid grid-cols-1 items-start gap-[var(--admin-gap)] md:grid-cols-2 xl:items-stretch xl:grid-cols-[minmax(0,1fr)_21.5rem]">
         <div className="contents xl:flex xl:min-w-0 xl:flex-col xl:gap-[var(--admin-gap)]">
           <Arrive index={0} className={cn(cell, "order-1 xl:order-none")}>
             <div className="grid grid-cols-2 gap-[var(--admin-gap)] md:grid-cols-4">
               {kpis.map((k) => (
-                <DashTile key={k.key} label={k.label} value={k.value} hint={k.caption} href={tileHref[k.key] ?? undefined} featured={k.key === hero} />
+                <DashTile key={k.key} label={k.label} value={k.value} hint={k.caption} href={tileHref[k.key] ?? undefined} featured={k.key === "needs"} clear={k.key === "needs" && k.value === 0} />
               ))}
             </div>
           </Arrive>
@@ -188,7 +183,7 @@ export default async function AdminDashboard({ searchParams }: { searchParams?: 
               <PlacementsGauge summary={placements} href={gate(TRACKER_PROPOSALS)} />
             </Arrive>
           </div>
-          <Arrive index={6} className={cn(cell, "order-8 xl:order-none")}>
+          <Arrive index={6} className={cn(cell, "order-8 xl:order-none xl:flex-1 xl:[&>*]:h-full")}>
             <MoneyCard money={money} payoutsHref={gate("/admin/payouts")} />
           </Arrive>
         </div>
@@ -200,7 +195,7 @@ export default async function AdminDashboard({ searchParams }: { searchParams?: 
           <Arrive index={3} className="order-4 min-w-0 md:col-span-1 xl:order-none">
             <NextInterviewCard interview={nextInterview} trackerHref={gate(TRACKER_INTERVIEWS)} now={now} />
           </Arrive>
-          <Arrive index={4} className={cn(cell, "order-5 xl:order-none")}>
+          <Arrive index={7} className={cn(cell, "order-5 xl:order-none xl:flex-1 xl:[&>*]:h-full")}>
             <RecentActivity items={activity} now={now} />
           </Arrive>
         </aside>

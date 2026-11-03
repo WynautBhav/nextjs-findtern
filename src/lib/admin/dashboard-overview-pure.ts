@@ -157,21 +157,10 @@ export type KpiInput = {
 /** "with a profile", then what is new and what is not finished; zero parts are left out. */
 function candidateCaption(withProfile: number, fresh: number, incomplete: number): string {
   const parts = ["with a profile"];
-  if (fresh > 0) parts.push(`${COUNT.format(fresh)} new this week`);
+  if (fresh > 0 && fresh >= withProfile) parts.push("all new this week");
+  else if (fresh > 0) parts.push(`${COUNT.format(fresh)} new this week`);
   else if (incomplete > 0) parts.push(`${COUNT.format(incomplete)} incomplete`);
   return withProfile > 0 ? parts.join(" · ") : "No finished profiles yet";
-}
-
-/**
- * The one filled tile: the first tile, in order of how much it matters to the desk, that is not zero.
- * A zero is never the hero; when everything is zero there is no hero.
- */
-export function heroKey(kpis: Kpi[]): Kpi["key"] | null {
-  for (const key of ["needs", "placements", "candidates", "companies"] as const) {
-    const k = kpis.find((x) => x.key === key);
-    if (k && k.value > 0) return key;
-  }
-  return null;
 }
 
 /** Greeting by India clock hour. */
@@ -180,17 +169,17 @@ export function greetingFor(now: Date): string {
   return hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
 }
 
-/** "just now", "12 min ago", "3 h ago", "2 d ago", else the date. Future times read "just now". */
+/** "just now", "12 min ago" (up to 2 h), "3 h ago", "2 d ago", else the date. Future times read "just now". */
 export function relativeWhen(at: Date, now: Date): string {
   const sec = Math.max(0, Math.floor((now.getTime() - at.getTime()) / 1000));
   if (sec < 60) return "just now";
-  if (sec < 3600) return `${Math.floor(sec / 60)} min ago`;
+  if (sec < 7200) return `${Math.floor(sec / 60)} min ago`;
   if (sec < 86_400) return `${Math.floor(sec / 3600)} h ago`;
   if (sec < 7 * 86_400) return `${Math.floor(sec / 86_400)} d ago`;
   return shortDate(at, { day: "numeric", month: "short" });
 }
 
-/** "in 2 h", "in 1 day", "in 5 days"; null for a time already past. */
+/** "in 20 min", "in 5 h" (under 48 h), "in 3 days"; null for a time already past. */
 export function untilWhen(at: Date, now: Date): string | null {
   const ms = at.getTime() - now.getTime();
   if (!Number.isFinite(ms) || ms <= 0) return null;
@@ -216,7 +205,7 @@ export function buildKpis(input: KpiInput): { kpis: Kpi[]; withProfile: number }
   const kpis: Kpi[] = [
     {
       key: "needs",
-      label: "Needs you today",
+      label: "Needs you",
       value: whole(input.queueTotal),
       caption: input.queueFailed
         ? "Some queues did not load"
@@ -275,13 +264,17 @@ export type ActivityItem = {
   status: { label: string; tone: "success" | "info" | "warning" | "neutral" };
   at: Date;
   href: string;
+  /** More than 1 when consecutive events of one kind are folded into this row ("6 offers accepted"). */
+  count?: number;
+  /** The newest person or company in a folded row; names the avatar, since `name` is then a phrase. */
+  lead?: string;
 };
 
 const MONEY = (minor: number, currency: string | null) =>
   formatMoney(minor, currency === "USD" ? "USD" : "INR", { zeroLabel: "₹0" });
 
 /** The four sources merged, newest first, capped. Rows with no date are dropped: they cannot be placed in time. */
-export function buildActivity(input: ActivityInput, limit = 6): ActivityItem[] {
+export function buildActivity(input: ActivityInput, limit = 5): ActivityItem[] {
   const items: ActivityItem[] = [];
   input.recentPayments.forEach((p, i) => {
     if (!p.date) return;
@@ -339,7 +332,34 @@ export function buildActivity(input: ActivityInput, limit = 6): ActivityItem[] {
       href: `/admin/interns/${u.id}`,
     });
   });
-  return items.sort((a, b) => b.at.getTime() - a.at.getTime() || a.id.localeCompare(b.id)).slice(0, Math.max(0, limit));
+  const sorted = items.sort((a, b) => b.at.getTime() - a.at.getTime() || a.id.localeCompare(b.id));
+  return groupActivity(sorted).slice(0, Math.max(0, limit));
+}
+
+const GROUP: Record<ActivityKind, { one: string; many: string; verb: string; href: string }> = {
+  payment: { one: "payment", many: "payments", verb: "received", href: "/admin/orders" },
+  offer: { one: "offer", many: "offers", verb: "accepted", href: "/admin/proposal-tracker" },
+  project: { one: "project", many: "projects", verb: "posted", href: "/admin/companies" },
+  signup: { one: "candidate", many: "candidates", verb: "signed up", href: "/admin/interns" },
+};
+
+/** Runs of two or more consecutive events of one kind become one row ("6 offers accepted"), at the newest time. */
+export function groupActivity(items: ActivityItem[]): ActivityItem[] {
+  const out: ActivityItem[] = [];
+  for (let i = 0; i < items.length; ) {
+    let j = i + 1;
+    while (j < items.length && items[j].kind === items[i].kind) j++;
+    const n = j - i;
+    if (n < 2) {
+      out.push(items[i]);
+    } else {
+      const head = items[i];
+      const g = GROUP[head.kind];
+      out.push({ ...head, id: `group:${head.id}`, name: `${n} ${g.many}`, lead: head.name, verb: g.verb, object: "", count: n, href: g.href });
+    }
+    i = j;
+  }
+  return out;
 }
 
 /** "Today, 14:20", "Yesterday, 09:05" or "5 Nov", all India time. */
