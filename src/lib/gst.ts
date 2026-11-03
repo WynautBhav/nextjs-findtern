@@ -133,6 +133,13 @@ export function stateCodeFromName(state: string | null | undefined): string | nu
   return state ? (NAME_TO_CODE[normalise(state)] ?? null) : null;
 }
 
+/** The GSTIN's state digits decide CGST+SGST vs IGST, so they must match the chosen state. A state we cannot map is not judged. */
+export function gstinStateError(gstin: string | null | undefined, state: string | null | undefined): string | null {
+  const g = stateCodeFromGstin(gstin);
+  const s = stateCodeFromName(state);
+  return g && s && g !== s ? `This GSTIN starts with ${g} (${STATE_NAMES[g]}), but the state is ${state?.trim()}. Check both.` : null;
+}
+
 export type Buyer = {
   currency: "INR" | "USD" | string;
   country?: string | null;

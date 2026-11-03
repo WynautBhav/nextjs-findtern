@@ -13,6 +13,7 @@ import { PhoneField } from "@/components/employer/phone-field";
 import { ProjectFields, projectFormErrors, type ProjectBaseline } from "@/components/employer/project-fields";
 import { csrfFetch } from "@/lib/client-fetch";
 import { escalationEmailDomainError, websiteDomainError } from "@/lib/company-domain";
+import { gstinStateError } from "@/lib/gst";
 import { isIndiaCountry } from "@/lib/data/countries";
 import { dialCodeFor } from "@/lib/data/dial-codes";
 import { phoneChangeError } from "@/lib/phone";
@@ -615,6 +616,9 @@ function companyErrors(c: CompanyDraft, saved: CompanyDraft): Record<string, str
   }
   if (c.gstNumber.trim() && !/^[0-9A-Z]{15}$/.test(c.gstNumber.trim())) {
     errors.gstNumber = "A GST number is 15 characters, letters and digits only.";
+  } else if (c.gstNumber.trim() && (c.gstNumber.trim() !== saved.gstNumber.trim() || c.state.trim() !== saved.state.trim())) {
+    const problem = gstinStateError(c.gstNumber, c.state);
+    if (problem) errors.gstNumber = problem;
   }
   if (c.primaryContactName.trim().length < 2) errors.primaryContactName = "A primary contact name is required.";
   if (c.primaryContactRole.trim().length < 2) errors.primaryContactRole = "Their role is required, e.g. Talent acquisition.";

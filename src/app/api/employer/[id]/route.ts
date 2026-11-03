@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { getDb, schema } from "@/lib/db";
-import { stateCodeFromGstin } from "@/lib/gst";
+import { gstinStateError, stateCodeFromGstin } from "@/lib/gst";
 import { GSTIN_FORMAT, GSTIN_HINT } from "@/lib/gstin";
 import { requireMutation } from "@/lib/guards-mutation";
 import { normalizePhone, phoneChangeError } from "@/lib/phone";
@@ -90,6 +90,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       websiteUrl: schema.employers.websiteUrl,
       escalationContactEmail: schema.employers.escalationContactEmail,
       gstNumber: schema.employers.gstNumber,
+      state: schema.employers.state,
       countryCode: schema.employers.countryCode,
       phoneNumber: schema.employers.phoneNumber,
       escalationContactCountryCode: schema.employers.escalationContactCountryCode,
@@ -105,6 +106,10 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (d.gstNumber && d.gstNumber !== (account.gstNumber ?? "").trim().toUpperCase() && !(GSTIN_FORMAT.test(d.gstNumber) && stateCodeFromGstin(d.gstNumber) !== null)) {
     return NextResponse.json({ error: GSTIN_HINT }, { status: 400 });
   }
+  // A new GSTIN or state must agree with each other; a mismatch already on file is kept.
+  const gstChanged = d.gstNumber !== (account.gstNumber ?? "").trim().toUpperCase() || d.state.trim() !== (account.state ?? "").trim();
+  const stateProblem = gstChanged ? gstinStateError(d.gstNumber, d.state) : null;
+  if (stateProblem) return NextResponse.json({ error: stateProblem }, { status: 400 });
   // Checked when the website is entered or changed; one already on file is
   // kept, so an older account with another domain can still save.
   const websiteUnchanged = (account.websiteUrl ?? "").trim() === d.websiteUrl.trim();

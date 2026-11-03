@@ -22,6 +22,7 @@ import { escalationEmailDomainError, websiteDomainError } from "@/lib/company-do
 import { isIndiaCountry } from "@/lib/data/countries";
 import { dialCodeFor } from "@/lib/data/dial-codes";
 import { COMPANY_SIZE_OPTIONS, ESCALATION_FIELDS, REQUIRED_COMPANY_FIELDS, isPersonalEmail, needsBillingPincode } from "@/lib/employer-onboarding";
+import { gstinStateError } from "@/lib/gst";
 import { GSTIN_HINT, isGstinFormat } from "@/lib/gstin";
 import { phoneChangeError } from "@/lib/phone";
 import { timezoneForLocation } from "@/lib/timezones";
@@ -89,6 +90,9 @@ function validate(v: Values, saved: CompanyProfile): Record<string, string> {
   }
   if (v.gstNumber?.trim() && v.gstNumber.trim().toUpperCase() !== (saved.gstNumber ?? "").trim().toUpperCase() && !isGstinFormat(v.gstNumber)) {
     errors.gstNumber = GSTIN_HINT;
+  } else if (v.gstNumber?.trim() && (v.gstNumber.trim().toUpperCase() !== (saved.gstNumber ?? "").trim().toUpperCase() || v.state?.trim() !== (saved.state ?? "").trim())) {
+    const problem = gstinStateError(v.gstNumber, v.state);
+    if (problem) errors.gstNumber = problem;
   }
   for (const [k, label] of ESCALATION_FIELDS) {
     if (!v[k]?.trim()) errors[k] = `${label} is required.`;

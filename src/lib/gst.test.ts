@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { placeOfSupply, splitGst, stateCodeFromPincode } from "./gst.ts";
+import { gstinStateError, placeOfSupply, splitGst, stateCodeFromPincode } from "./gst.ts";
 
 test("PIN codes resolve to GST state codes", () => {
   assert.equal(stateCodeFromPincode("302001"), "08"); // Jaipur
@@ -93,4 +93,10 @@ test("only Rajasthan PINs (30 to 34) get CGST+SGST; the neighbours never do", ()
   for (const pin of ["301001", "310001", "320001", "330001", "340001"]) {
     assert.equal(splitGst(118000, placeOfSupply({ currency: "INR", pincode: pin })).mode, "intra", pin);
   }
+});
+
+test("a GSTIN must agree with the chosen state", () => {
+  assert.match(gstinStateError("27AAPFU0939F1ZV", "Rajasthan") ?? "", /27 \(Maharashtra\)/);
+  assert.equal(gstinStateError("08AAPFU0939F1ZV", "Rajasthan"), null);
+  assert.equal(gstinStateError("08AAPFU0939F1ZV", "Atlantis"), null);
 });
