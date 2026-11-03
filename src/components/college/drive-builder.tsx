@@ -81,7 +81,6 @@ export function DriveBuilder({
     return { inside, outside };
   }, [students, rules]);
 
-  const noDriveConsent = students.filter((s) => !s.purposes.includes("drive_visibility")).length;
   const list = (view === "in" ? split.inside : split.outside).filter((s) =>
     `${s.name} ${s.rollNo ?? ""} ${s.branch ?? ""}`.toLowerCase().includes(q.trim().toLowerCase()),
   );
@@ -295,17 +294,11 @@ export function DriveBuilder({
               <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search" className={cn(field, "pl-9")} />
             </label>
           </div>
-          {noDriveConsent > 0 ? (
-            <p className="mt-3 text-sm text-text-subtle">
-              {noDriveConsent} student{noDriveConsent === 1 ? " hasn't" : "s haven't"} agreed to be shown in drives and can&apos;t be added.
-            </p>
-          ) : null}
           <ul className="mt-3 max-h-[28rem] divide-y divide-ink-100 overflow-y-auto rounded-apple-sm border border-ink-100">
             {list.length === 0 ? <li className="px-4 py-8 text-center text-sm text-text-subtle">Nobody here.</li> : null}
             {list.map((s) => {
               const included = d.includeUserIds.includes(s.userId);
               const excluded = d.excludeUserIds.includes(s.userId);
-              const canShow = s.purposes.includes("drive_visibility");
               return (
                 <li key={s.userId} className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5">
                   <div className="min-w-0">
@@ -320,12 +313,10 @@ export function DriveBuilder({
                     <button type="button" onClick={() => toggle(s.userId, included ? "rules" : "exclude")} className="min-h-11 rounded-apple-sm px-3 text-sm font-medium text-ink-700 hover:bg-ink-100">
                       {included ? "Undo add" : "Remove"}
                     </button>
-                  ) : canShow ? (
+                  ) : (
                     <button type="button" onClick={() => toggle(s.userId, excluded ? "rules" : "include")} className="min-h-11 rounded-apple-sm px-3 text-sm font-medium text-brand-700 hover:bg-brand-50">
                       {excluded ? "Undo remove" : "Add anyway"}
                     </button>
-                  ) : (
-                    <span className="text-xs text-text-subtle">No drive consent</span>
                   )}
                 </li>
               );

@@ -3,20 +3,18 @@
 import { useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { BadgeCheck, Building2, Check, ChevronDown, CircleHelp, Minus, Search, X } from "lucide-react";
+import { BadgeCheck, Building2, ChevronDown, Search, X } from "lucide-react";
 
 import { LIGHT_TILE, Pill, SectionHead, Surface } from "@/components/app/primitives";
 import { useConfirm } from "@/components/app/use-confirm";
 import { buttonVariants } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { csrfFetch } from "@/lib/client-fetch";
-import { CONSENT_PURPOSES, NOTICE_TEXT, NOTICE_VERSION, PURPOSE_COPY } from "@/lib/college/consent-copy";
 import type { MyCollege } from "@/lib/college/membership";
 import { cn } from "@/lib/utils";
 import { PushToggle } from "./college-push";
 import { SelectField } from "./onboarding/fields";
 
-type Purpose = { id: string; label: string; detail: string };
 type Option = { id: string; name: string; city: string | null; state: string | null; isPartner: boolean; code: string | null };
 
 const YEARS = [
@@ -33,27 +31,21 @@ const FIELD =
 export function CollegeForm({
   initial,
   institution,
-  purposes,
-  notice,
   vapidKey,
 }: {
   initial: MyCollege | null;
   institution: string;
-  purposes: Purpose[];
-  notice: { version: string; text: string };
   vapidKey: string;
 }) {
   const [editing, setEditing] = useState(!initial);
 
   if (initial && !editing) {
-    return <Membership college={initial} purposes={purposes} vapidKey={vapidKey} onChange={() => setEditing(true)} />;
+    return <Membership college={initial} vapidKey={vapidKey} onChange={() => setEditing(true)} />;
   }
   return (
     <JoinForm
       initial={initial}
       institution={institution}
-      purposes={purposes}
-      notice={notice}
       onCancel={initial ? () => setEditing(false) : undefined}
       onSaved={() => setEditing(false)}
     />
@@ -64,12 +56,10 @@ export function CollegeForm({
 
 function Membership({
   college,
-  purposes,
   vapidKey,
   onChange,
 }: {
   college: MyCollege;
-  purposes: Purpose[];
   vapidKey: string;
   onChange: () => void;
 }) {
@@ -78,13 +68,12 @@ function Membership({
   const [error, setError] = useState<string | null>(null);
   const { ask, dialog } = useConfirm();
   const verified = college.status === "verified";
-  const granted = purposes.filter((p) => college.purposes.includes(p.id as MyCollege["purposes"][number]));
 
   async function leave() {
     const ok = await ask({
       title: `Leave ${college.name}?`,
-      body: "This withdraws your consent. Your placement team stops seeing your progress and you disappear from your college's drives straight away. Your Findtern profile stays as it is.",
-      confirmLabel: "Yes, leave and withdraw consent",
+      body: "You leave this college. Your placement team stops seeing you and you disappear from its drives straight away. Your Findtern profile stays as it is.",
+      confirmLabel: "Yes, leave this college",
     });
     if (!ok) return;
     setLeaving(true);
@@ -147,35 +136,9 @@ function Membership({
         </Surface>
 
         <section>
-          <SectionHead title="What you've agreed to" hint="You can change this at any time." />
-          <Surface as="ul" className="divide-y divide-ink-100">
-            {purposes.map((p) => {
-              const on = granted.some((g) => g.id === p.id);
-              return (
-                <li key={p.id} className="flex items-start gap-3 px-5 py-4">
-                  <span
-                    aria-hidden
-                    className={cn(
-                      "mt-0.5 grid size-5 shrink-0 place-items-center rounded-full text-xs font-bold",
-                      on ? "bg-brand-700 text-white" : "bg-ink-100 text-text-subtle",
-                    )}
-                  >
-                    {on ? <Check className="size-3" strokeWidth={3} /> : <Minus className="size-3" />}
-                  </span>
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-ink-900">
-                      {p.label}
-                      <span className="sr-only">{on ? ": agreed" : ": not agreed"}</span>
-                    </p>
-                    <p className="mt-0.5 text-sm leading-relaxed text-ink-600">{p.detail}</p>
-                  </div>
-                </li>
-              );
-            })}
-          </Surface>
           <div className="mt-4 flex flex-wrap gap-3">
             <button type="button" onClick={onChange} className={cn(buttonVariants({ variant: "outline", size: "md" }))}>
-              Change college or choices
+              Change college
             </button>
             <button
               type="button"
@@ -216,8 +179,6 @@ function Membership({
 function JoinForm({
   initial,
   institution,
-  purposes,
-  notice,
   onCancel,
   onSaved,
   embedded = false,
@@ -226,8 +187,6 @@ function JoinForm({
 }: {
   initial: MyCollege | null;
   institution: string;
-  purposes: Purpose[];
-  notice: { version: string; text: string };
   onCancel?: () => void;
   onSaved: () => void;
   /** Inside the profile's Academics step: no card of its own, and the picked name is handed back. */
@@ -242,8 +201,6 @@ function JoinForm({
   );
   const [year, setYear] = useState<number | "">(initial?.year ?? "");
   const [branch, setBranch] = useState(initial?.branch ?? defaultBranch);
-  // Never pre-ticked, even when changing an existing choice: consent is re-given, not carried over silently.
-  const [agreed, setAgreed] = useState<Record<string, boolean>>({});
   const [adult, setAdult] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -251,8 +208,6 @@ function JoinForm({
   const [invalid, setInvalid] = useState<"college" | "adult" | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const errorId = `${ids}-error`;
-
-  const chosenPurposes = purposes.filter((p) => agreed[p.id]).map((p) => p.id);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -279,7 +234,6 @@ function JoinForm({
           collegeId: chosen.id,
           year: year === "" ? null : year,
           branch: branch.trim() || null,
-          purposes: chosenPurposes,
           declaredAdult: adult,
         }),
       });
@@ -307,7 +261,7 @@ function JoinForm({
       noValidate
     >
       <section>
-        <SectionHead title="College" hint="Search by name, city or college code. Your placement office can tell you the code." />
+        <SectionHead title="College" hint="Type your college's name, or the code your placement office gave you." />
         {chosen ? (
           <div className="flex items-center gap-3 rounded-apple-xl border border-ink-200/80 p-4">
             <span aria-hidden className="grid size-10 shrink-0 place-items-center rounded-apple-sm bg-brand-50 text-brand-700">
@@ -371,51 +325,6 @@ function JoinForm({
           If your college has you on its student list, the year and branch on that list are used instead.
         </p>
       </section>
-
-      <fieldset>
-        <legend className="text-base font-semibold tracking-[-0.01em] text-ink-900">What your college can do</legend>
-        <p className="mt-0.5 text-sm text-ink-600">
-          Tick what you&apos;re happy with. Each is separate, and you can withdraw either one later.
-        </p>
-        <div className="mt-3 space-y-3">
-          {purposes.map((p) => (
-            <label
-              key={p.id}
-              htmlFor={`${ids}-${p.id}`}
-              className={cn(
-                "flex cursor-pointer items-start gap-3 rounded-apple-xl border bg-white p-4 transition-colors",
-                agreed[p.id] ? "border-brand-300 bg-brand-50/40" : "border-ink-200/80 hover:border-ink-300",
-              )}
-            >
-              <Checkbox
-                id={`${ids}-${p.id}`}
-                checked={Boolean(agreed[p.id])}
-                onCheckedChange={(v) => setAgreed((a) => ({ ...a, [p.id]: v === true }))}
-                className="mt-0.5 size-5"
-              />
-              <span className="min-w-0">
-                <span className="block text-sm font-medium text-ink-900">{p.label}</span>
-                <span className="mt-0.5 block text-sm leading-relaxed text-ink-600">{p.detail}</span>
-              </span>
-            </label>
-          ))}
-        </div>
-        {chosenPurposes.length === 0 ? (
-          <p className="mt-2 flex items-start gap-1.5 text-sm leading-relaxed text-ink-600">
-            <CircleHelp className="mt-0.5 size-3.5 shrink-0" aria-hidden />
-            With neither ticked, your college is saved on your profile but its placement team can&apos;t see you and you won&apos;t
-            appear in its drives.
-          </p>
-        ) : null}
-        <details className="group mt-4 rounded-apple-sm text-sm">
-          <summary className="inline-flex min-h-11 cursor-pointer list-none items-center font-medium text-primary hover:underline focus-visible:outline-2 focus-visible:outline-brand-700">
-            Read the full notice (version {notice.version})
-          </summary>
-          <div className="details-reveal mt-2 whitespace-pre-line rounded-apple-sm border border-ink-200/80 p-4 text-sm leading-relaxed text-ink-700">
-            {notice.text}
-          </div>
-        </details>
-      </fieldset>
 
       <label htmlFor={`${ids}-adult`} className="flex cursor-pointer items-start gap-3">
         <Checkbox
@@ -533,7 +442,7 @@ function CollegeSearch({
   return (
     <div>
       <label htmlFor={`${ids}-q`} className="sr-only">
-        Search for your college
+        College name or code
       </label>
       <div className="relative">
         <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-text-subtle" aria-hidden />
@@ -554,7 +463,7 @@ function CollegeSearch({
           }}
           onFocus={() => setOpen(true)}
           onKeyDown={onKey}
-          placeholder="Start typing your college's name or code"
+          placeholder="College name or code"
           autoComplete="off"
           className={cn(FIELD, "pl-10 pr-10")}
         />
@@ -752,13 +661,10 @@ function MissingCollege({ query }: { query: string }) {
 
 /* ── In the profile's Academics step ─────────────────────────────────── */
 
-const PURPOSES: Purpose[] = CONSENT_PURPOSES.map((id) => ({ id, ...PURPOSE_COPY[id] }));
-const NOTICE = { version: NOTICE_VERSION, text: NOTICE_TEXT };
-
 /**
  * Optional "join your college" block under the institution field. Joining is
  * what lets the college's placement team and its virtual drives find the
- * student, so it is the same join (and the same consent) as in Settings.
+ * student, so it is the same join as in Settings.
  * Changing or leaving it later happens there.
  */
 export function CollegeLink({
@@ -808,8 +714,6 @@ export function CollegeLink({
           initial={null}
           institution={institution}
           defaultBranch={branch}
-          purposes={PURPOSES}
-          notice={NOTICE}
           onPicked={onPicked}
           onSaved={() => {}}
         />

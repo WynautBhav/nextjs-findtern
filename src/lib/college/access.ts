@@ -1,6 +1,5 @@
 import type { Role } from "../security/session.ts";
 import { tokenMatches } from "./tokens.ts";
-import { DASHBOARD_PURPOSE } from "./eligibility.ts";
 
 export { isStudentEligible, readEligibility, normBranch, type DriveEligibility, type StudentFacts } from "./eligibility.ts";
 
@@ -16,11 +15,12 @@ export { isStudentEligible, readEligibility, normBranch, type DriveEligibility, 
  *    stored hash; afterwards the employer's "joined" row is their pass, and
  *    issuing a new link clears those rows (QA-200).
  *  - An employer sees a student only if the student is a verified (or
- *    hand-included) member of the drive's college, consented to drive
- *    visibility, has not left, and meets the cutoffs. Exclude beats include;
- *    include beats cutoffs. Nothing beats the college boundary or consent.
- *  - A college admin sees only their own college's students who consented to
- *    the dashboard purpose. They can never write student data.
+ *    hand-included) member of the drive's college, has not left, and meets
+ *    the cutoffs. Exclude beats include; include beats cutoffs. Nothing beats
+ *    the college boundary.
+ *  - A college admin sees every student who joined their own college (joining
+ *    is the student's choice; there is no separate consent step). They can
+ *    never write student data.
  */
 
 type SessionLike = { uid: string; role: Role } | null | undefined;
@@ -146,10 +146,10 @@ export function collegeAdminMay(action: string): boolean {
 export function canCollegeAdminSee(
   session: SessionLike,
   adminCollegeId: string,
-  student: { collegeId: string; leftAt: Date | null; purposes: readonly string[] },
+  student: { collegeId: string; leftAt: Date | null },
 ): boolean {
   if (!session || session.role !== "college") return false;
   if (!adminCollegeId || student.collegeId !== adminCollegeId) return false;
   if (student.leftAt) return false;
-  return student.purposes.includes(DASHBOARD_PURPOSE);
+  return true;
 }

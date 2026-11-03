@@ -1,5 +1,5 @@
 /**
- * Load-test fixture: a "Load Test College" with N consenting students, each
+ * Load-test fixture: a "Load Test College" with N joined students, each
  * with a minted session + CSRF pair, plus one placement officer for the SSE
  * probe. Writes the credentials to OUT (keep it outside the repo).
  *
@@ -18,7 +18,6 @@ import pg from "pg";
 
 import * as schema from "../../src/lib/db/schema.ts";
 import { createSession } from "../../src/lib/security/session.ts";
-import { NOTICE_HASH, NOTICE_VERSION, CONSENT_PURPOSES } from "../../src/lib/college/consent.ts";
 import { generateDriveToken } from "../../src/lib/college/tokens.ts";
 
 if (process.env.NODE_ENV === "production") throw new Error("Refusing to run in production");
@@ -67,12 +66,8 @@ const users = await db
 
 for (let i = 0; i < users.length; i += 250) {
   const chunk = users.slice(i, i + 250);
-  const consents = await db
-    .insert(schema.collegeConsents)
-    .values(chunk.map((u) => ({ userId: u.id, collegeId: college.id, noticeVersion: NOTICE_VERSION, noticeHash: NOTICE_HASH, purposes: [...CONSENT_PURPOSES], declaredAdult: true })))
-    .returning({ id: schema.collegeConsents.id, userId: schema.collegeConsents.userId });
   await db.insert(schema.collegeMemberships).values(
-    consents.map((c) => ({ userId: c.userId, collegeId: college.id, status: "verified", verifiedBy: "email_domain", year: 3, consentId: c.id })),
+    chunk.map((u) => ({ userId: u.id, collegeId: college.id, status: "verified", verifiedBy: "email_domain", year: 3 })),
   );
 }
 

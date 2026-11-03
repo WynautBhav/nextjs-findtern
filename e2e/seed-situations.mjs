@@ -406,16 +406,11 @@ async function seedCollege(ids) {
   for (const eid of [ids.employerMain, ids.employerHeavy]) {
     await db().query(`INSERT INTO college_drive_employers (drive_id, employer_id) VALUES ($1,$2) ON CONFLICT DO NOTHING`, [drive.id, eid]);
   }
-  // The hired intern is a verified JKLU student, with consent.
-  const consent = await one(`SELECT notice_version, notice_hash, purposes FROM college_consents LIMIT 1`);
+  // The hired intern is a verified JKLU student, .
   await db().query(`DELETE FROM college_memberships WHERE user_id = $1`, [ids.internHired]);
-  const c = await one(
-    `INSERT INTO college_consents (user_id, college_id, notice_version, notice_hash, purposes, declared_adult) VALUES ($1,$2,$3,$4,$5,true) RETURNING id`,
-    [ids.internHired, drive.college_id, consent.notice_version, consent.notice_hash, JSON.stringify(consent.purposes)],
-  );
   await db().query(
-    `INSERT INTO college_memberships (user_id, college_id, status, verified_by, year, branch, consent_id) VALUES ($1,$2,'verified','roster',3,'CSE',$3)`,
-    [ids.internHired, drive.college_id, c.id],
+    `INSERT INTO college_memberships (user_id, college_id, status, verified_by, year, branch) VALUES ($1,$2,'verified','roster',3,'CSE')`,
+    [ids.internHired, drive.college_id],
   );
   await db().query(`INSERT INTO college_roster (college_id, email, name, roll_no, year, branch) VALUES ($1,'ritika.launchtest@gmail.com','Ritika Verma','22JK901',3,'CSE') ON CONFLICT DO NOTHING`, [drive.college_id]);
   // Accepted calls: one with a join link, one without (the QA-001 state), one still requested.

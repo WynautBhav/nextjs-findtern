@@ -11,7 +11,6 @@ import { BankDetailsForm, type BankDetails } from "@/components/intern/bank-deta
 import { ContactDetailsForm } from "@/components/intern/contact-details-form";
 import { requireRole } from "@/lib/auth";
 import { membershipOf } from "@/lib/college/membership";
-import { CONSENT_PURPOSES, NOTICE_TEXT, NOTICE_VERSION, PURPOSE_COPY } from "@/lib/college/consent-copy";
 import { getDb, schema } from "@/lib/db";
 import { formatDmy } from "@/lib/format";
 import { SITE } from "@/lib/content/site";
@@ -99,8 +98,6 @@ export default async function InternSettings({ searchParams }: { searchParams: P
             <CollegeForm
               initial={college}
               institution={institution}
-              purposes={CONSENT_PURPOSES.map((p) => ({ id: p, ...PURPOSE_COPY[p] }))}
-              notice={{ version: NOTICE_VERSION, text: NOTICE_TEXT }}
               vapidKey={process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? ""}
             />
           </section>

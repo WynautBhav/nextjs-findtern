@@ -19,6 +19,7 @@ import { join } from "node:path";
 import { gunzipSync } from "node:zlib";
 
 import pg from "pg";
+import { generateCollegeCode } from "../src/lib/college/code.ts";
 
 if (process.env.NODE_ENV === "production") throw new Error("Refusing to import with NODE_ENV=production");
 
@@ -74,15 +75,23 @@ async function main() {
   const stat = { inserted: 0, updated: 0, adopted: 0, unchanged: 0 };
   try {
     await client.query("BEGIN");
-    const { rows: existing } = await client.query<{ id: string; aishe_code: string | null; slug: string; name: string; city: string | null }>(
-      "SELECT id, aishe_code, slug, name, city FROM colleges",
+    const { rows: existing } = await client.query<{ id: string; aishe_code: string | null; slug: string; name: string; city: string | null; code: string | null }>(
+      "SELECT id, aishe_code, slug, name, city, code FROM colleges",
     );
     const slugs = new Set(existing.map((e) => e.slug));
     const haveCode = new Set(existing.filter((e) => e.aishe_code).map((e) => e.aishe_code as string));
     // Hand-added rows with no code, by name + city.
     const uncoded = new Map(existing.filter((e) => !e.aishe_code).map((e) => [key(e.name, e.city), e.id]));
+    // Findtern college codes already taken; every new row gets a fresh one (unique index colleges_code_unique).
+    const takenCodes = new Set(existing.map((e) => e.code).filter((c): c is string => Boolean(c)));
+    const newCode = () => {
+      for (;;) {
+        const c = generateCollegeCode();
+        if (!takenCodes.has(c)) return takenCodes.add(c), c;
+      }
+    };
 
-    const fresh: (Row & { slug: string })[] = [];
+    const fresh: (Row & { slug: string; fcode: string })[] = [];
     for (const r of rows) {
       const adoptId = haveCode.has(r.code) ? undefined : uncoded.get(key(r.name, r.city));
       if (adoptId) {
@@ -92,7 +101,7 @@ async function main() {
         continue;
       }
       if (haveCode.has(r.code)) {
-        fresh.push({ ...r, slug: "" }); // existing row: slug is never rewritten, the upsert only refreshes name/city/state
+        fresh.push({ ...r, slug: "", fcode: newCode() }); // existing row: slug is never rewritten, the upsert only refreshes name/city/state
         continue;
       }
       // name, then name-city, then name-code: the code is unique, so the last always works.
@@ -100,14 +109,14 @@ async function main() {
       const candidates = [base, slugify(`${r.name} ${r.city ?? ""}`), `${base.slice(0, 70)}-${r.code.toLowerCase()}`];
       const slug = candidates.find((c) => c && !slugs.has(c)) ?? `${r.code.toLowerCase()}`;
       slugs.add(slug);
-      fresh.push({ ...r, slug });
+      fresh.push({ ...r, slug, fcode: newCode() });
     }
 
     for (let i = 0; i < fresh.length; i += BATCH) {
       const b = fresh.slice(i, i + BATCH);
       const res = await client.query<{ inserted: boolean }>(
-        `INSERT INTO colleges (name, city, state, aishe_code, slug)
-         SELECT * FROM unnest($1::text[], $2::text[], $3::text[], $4::text[], $5::text[])
+        `INSERT INTO colleges (name, city, state, aishe_code, slug, code)
+         SELECT * FROM unnest($1::text[], $2::text[], $3::text[], $4::text[], $5::text[], $6::text[])
          ON CONFLICT (aishe_code) WHERE aishe_code IS NOT NULL DO UPDATE
            -- A casing-only difference keeps the stored name (hand-curated names such as "JECRC University").
            SET name = CASE WHEN lower(colleges.name) = lower(excluded.name) THEN colleges.name ELSE excluded.name END,
@@ -115,7 +124,7 @@ async function main() {
            WHERE NOT colleges.is_partner
              AND (lower(colleges.name), colleges.city, colleges.state) IS DISTINCT FROM (lower(excluded.name), excluded.city, excluded.state)
          RETURNING (xmax = 0) AS inserted`,
-        [b.map((r) => r.name), b.map((r) => r.city), b.map((r) => r.state), b.map((r) => r.code), b.map((r) => r.slug)],
+        [b.map((r) => r.name), b.map((r) => r.city), b.map((r) => r.state), b.map((r) => r.code), b.map((r) => r.slug), b.map((r) => r.fcode)],
       );
       for (const r of res.rows) stat[r.inserted ? "inserted" : "updated"]++;
     }

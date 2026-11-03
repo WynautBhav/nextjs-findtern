@@ -5,6 +5,27 @@ export type RatingUpdate = Partial<Record<(typeof RATING_KEYS)[number], number |
 
 const clampRound = (n: number) => Math.round(Math.min(10, Math.max(0, n)) * 10) / 10;
 
+/** Completed internships that each earned the intern +1 (max score stays 10). */
+export function completionBonusCount(extra: Record<string, unknown>): number {
+  const n = extra.completionBonusCount;
+  return typeof n === "number" && Number.isInteger(n) && n > 0 ? n : 0;
+}
+
+/**
+ * Admin grants the completion bonus for one successful internship: the count
+ * goes up by one and a live score rises by 1, capped at 10. The count is kept
+ * apart from the rated score so every later recompute (ratings edit, bulk
+ * import, Incruiter webhook) adds it back. An intern with no score yet keeps
+ * the count; it is added when their first score arrives.
+ */
+export function grantCompletionBonus(extra: Record<string, unknown>): Record<string, unknown> {
+  const next: Record<string, unknown> = { ...extra, completionBonusCount: completionBonusCount(extra) + 1 };
+  if (typeof extra.findternScore === "number" && Number.isFinite(extra.findternScore)) {
+    next.findternScore = clampRound(extra.findternScore + 1);
+  }
+  return next;
+}
+
 /**
  * Merge new AI-interview ratings into `extraData`.
  *
@@ -12,6 +33,8 @@ const clampRound = (n: number) => Math.round(Math.min(10, Math.max(0, n)) * 10) 
  * import column), otherwise the mean of the four core ratings only - older
  * `overall` / `academic` keys never count - clamped to 0-10 and rounded to one
  * decimal. With no ratings left and no given score, the score is removed.
+ * Each granted completion bonus (see `grantCompletionBonus`) adds 1 on top,
+ * before the 0-10 clamp.
  */
 export function applyRatings(
   extra: Record<string, unknown>,
@@ -24,12 +47,13 @@ export function applyRatings(
     else if (typeof v === "number") ratings[k] = v;
   }
   const values = RATING_KEYS.map((k) => ratings[k]).filter((v): v is number => typeof v === "number" && Number.isFinite(v));
-  const score =
+  const base =
     typeof explicitScore === "number" && Number.isFinite(explicitScore)
-      ? clampRound(explicitScore)
+      ? explicitScore
       : values.length
-        ? clampRound(values.reduce((a, b) => a + b, 0) / values.length)
+        ? values.reduce((a, b) => a + b, 0) / values.length
         : null;
+  const score = base === null ? null : clampRound(base + completionBonusCount(extra));
   const next: Record<string, unknown> = { ...extra, ratings };
   if (score === null) delete next.findternScore;
   else next.findternScore = score;

@@ -12,7 +12,6 @@ import {
   type AccessResult,
   type StudentFacts,
 } from "./access";
-import { parsePurposes } from "./consent";
 
 /**
  * Every college-scoped read goes through here. The SQL narrows to one
@@ -106,7 +105,6 @@ async function loadMembers(collegeId: string): Promise<CollegeStudent[]> {
       coalesce(r.year, ${m.year}) AS year,
       coalesce(nullif(r.branch, ''), nullif(${m.branch}, ''), ${o.extraData}->'academics'->>'specialization') AS branch,
       r.roll_no AS roll_no,
-      c.purposes AS purposes,
       ${u.firstName} AS first_name, ${u.lastName} AS last_name, ${u.email} AS email,
       ${cgpaSql()} AS cgpa,
       ${findternScoreSql()} AS score,
@@ -121,7 +119,6 @@ async function loadMembers(collegeId: string): Promise<CollegeStudent[]> {
     FROM ${m}
     JOIN ${u} ON ${u.id} = ${m.userId}
     LEFT JOIN ${o} ON ${o.userId} = ${m.userId}
-    LEFT JOIN ${schema.collegeConsents} c ON c.id = ${m.consentId} AND c.withdrawn_at IS NULL
     LEFT JOIN ${schema.collegePresence} p ON p.user_id = ${m.userId}
     LEFT JOIN ${schema.collegeRoster} r ON r.college_id = ${m.collegeId} AND r.email = lower(${u.email})
     WHERE ${m.collegeId} = ${collegeId} AND ${m.leftAt} IS NULL
@@ -137,7 +134,6 @@ async function loadMembers(collegeId: string): Promise<CollegeStudent[]> {
     year: num(r.year),
     branch: (r.branch as string | null) || null,
     rollNo: (r.roll_no as string | null) ?? null,
-    purposes: parsePurposes(r.purposes),
     firstName: String(r.first_name ?? ""),
     lastName: String(r.last_name ?? ""),
     email: String(r.email ?? ""),
@@ -153,7 +149,7 @@ async function loadMembers(collegeId: string): Promise<CollegeStudent[]> {
   }));
 }
 
-/** Students a placement officer may see: their college, consented to the dashboard. */
+/** Students a placement officer may see: everyone who joined their college. */
 export async function studentsForCollegeAdmin(ctx: CollegeContext): Promise<CollegeStudent[]> {
   const rows = await loadMembers(ctx.college.id);
   return rows.filter((s) => canCollegeAdminSee(ctx.session, ctx.college.id, s));
@@ -232,10 +228,8 @@ export async function presenceSnapshot(collegeId: string, userIds?: string[]): P
     FROM ${m}
     JOIN ${schema.users} u ON u.id = ${m.userId}
     LEFT JOIN ${schema.collegeRoster} r ON r.college_id = ${m.collegeId} AND r.email = lower(u.email)
-    JOIN ${schema.collegeConsents} c ON c.id = ${m.consentId} AND c.withdrawn_at IS NULL
     LEFT JOIN ${schema.collegePresence} p ON p.user_id = ${m.userId}
     WHERE ${m.collegeId} = ${collegeId} AND ${m.leftAt} IS NULL
-      AND c.purposes ? 'college_dashboard'
   `);
   let rows = res.rows as Row[];
   if (userIds) {

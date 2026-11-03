@@ -24,7 +24,7 @@ export function internNotificationHref(type: string, data: unknown): string | nu
     const id = idFrom(data, "proposalId");
     return id ? `/intern/proposals/${encodeURIComponent(id)}` : "/intern/proposals";
   }
-  if (t === "ai_interview_scores_live") return "/intern/record";
+  if (t === "ai_interview_scores_live" || t === "internship_completed") return "/intern/record";
   if (t.startsWith("interview_") || t.startsWith("ai_interview_") || t === "meeting_scheduled") {
     return "/intern/interviews";
   }

@@ -2,7 +2,7 @@
  * College Partners, the real onboarding story (40 steps): Findtern staff issue
  * a new JKLU officer login, the officer uploads a roster, 5 brand-new students
  * sign up through the signup form (OTP read from the dev mail log), save
- * academics, get AI interview ratings, pick JKLU with consent; the officer
+ * academics, get AI interview ratings, pick JKLU; the officer
  * builds a drive; an employer joins, shortlists, calls; students accept and
  * decline on phones; the officer watches presence, nudges, opens a recording
  * (audited); one student withdraws; the link is closed; a claimed student is
@@ -92,7 +92,7 @@ function latestOtp(email) {
 const emails = STUDENTS.map((s) => `'${s.email}'`).join(",");
 const ids = psql(`select string_agg(quote_literal(id), ',') from users where email in (${emails})`);
 if (ids) {
-  for (const t of ["college_presence", "college_memberships", "college_consents", "college_drive_meetings", "college_drive_shortlist", "college_nudges", "push_subscriptions"])
+  for (const t of ["college_presence", "college_memberships", "college_drive_meetings", "college_drive_shortlist", "college_nudges", "push_subscriptions"])
     psql(`delete from ${t} where user_id in (${ids})`);
   psql(`delete from notifications where recipient_id in (${ids})`);
   psql(`delete from college_audit_log where subject_user_id in (${ids})`);
@@ -237,20 +237,16 @@ await check("Findtern enters AI interview results for 3 students (admin ratings)
   return done.join(", ");
 });
 
-// ── 4. Students pick JKLU and consent ─────────────────────────────────────
+// ── 4. Students pick JKLU ─────────────────────────────────────
 for (const s of STUDENTS) {
-  await check(`${s.first} picks JKLU on /intern/college and gives both consents`, async () => {
+  await check(`${s.first} picks JKLU on /intern/college and ticks 18+`, async () => {
     const p = stu[s.key];
     await p.goto(`${B}/intern/college`);
-    const box = p.getByRole("combobox", { name: "Search for your college" });
+    const box = p.getByRole("combobox", { name: "College name or code" });
     await box.fill("JK Lak");
     await p.getByRole("option", { name: /JK Lakshmipat University/ }).first().click();
-    const states = await p.getByRole("checkbox").evaluateAll((els) => els.map((e) => e.getAttribute("aria-checked") ?? String(e.checked)));
-    assert(!states.includes("true"), "a consent box was pre-ticked");
     await p.getByLabel("Year of study").selectOption(s.year);
     await p.getByLabel(/Branch/).fill(s.branch);
-    await p.getByRole("checkbox", { name: /Share my progress/ }).click();
-    await p.getByRole("checkbox", { name: /Show my profile to employers/ }).click();
     await p.getByRole("checkbox", { name: /18 or older/ }).click();
     await p.getByRole("button", { name: "Join college" }).click();
     await p.getByText(/Verified student|Not verified yet/).first().waitFor();
@@ -338,7 +334,7 @@ await check("Employer sees exactly the drive's students, masked, and the score f
   const eight = await emp.getByText(/^Showing \d+ of \d+ students/).innerText();
   await emp.getByLabel("Minimum score").selectOption("0");
   await shot(emp, "06-employer-workspace");
-  return `${showing.trim()} (JKLU members with drive consent who pass rules or were added: our 5 included); 8+ filter → ${eight.trim()}`;
+  return `${showing.trim()} (JKLU members who pass rules or were added: our 5 included); 8+ filter → ${eight.trim()}`;
 });
 
 const card = (initials) => emp.locator("main ul > li").filter({ has: emp.locator(`span.break-words:text-is("${initials}")`) });
@@ -464,12 +460,12 @@ await check("Officer opens Aanya's page and her recording; the view is audited",
   return `303 → ${r.headers().location}`;
 });
 
-// ── 10. Consent withdrawal ───────────────────────────────────────────────
-await check("Priya leaves the college (withdraws consent) from her phone", async () => {
+// ── 10. Leaving the college ───────────────────────────────────────────────
+await check("Priya leaves the college from her phone", async () => {
   await stu.priya.goto(`${B}/intern/college`);
   await stu.priya.getByRole("button", { name: "Leave college" }).click();
-  await stu.priya.getByRole("button", { name: "Leave and withdraw consent" }).click();
-  await stu.priya.getByRole("combobox", { name: "Search for your college" }).waitFor();
+  await stu.priya.getByRole("button", { name: "Yes, leave this college" }).click();
+  await stu.priya.getByRole("combobox", { name: "College name or code" }).waitFor();
 });
 
 await check("Priya disappears at once: officer dashboard, her page, and the employer's drive", async () => {
@@ -488,7 +484,7 @@ await check("Priya disappears at once: officer dashboard, her page, and the empl
 // ── 11. Security spot checks with the real sessions ──────────────────────
 await check("Officer cannot write student data (scores, college membership)", async () => {
   const a = await api(tpo, "PUT", `/api/admin/interns/${userId.aanya}/ratings`, { coding: 10 });
-  const b = await api(tpo, "POST", "/api/intern/college", { collegeId: "x", year: 3, branch: "x", purposes: [], declaredAdult: true });
+  const b = await api(tpo, "POST", "/api/intern/college", { collegeId: "x", year: 3, branch: "x", declaredAdult: true });
   assert([401, 403].includes(a.status) && b.status === 403, `ratings ${a.status}, join ${b.status}`);
   return `ratings → ${a.status}, membership → ${b.status}`;
 });
