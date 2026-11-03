@@ -60,6 +60,7 @@ export default async function InternProposals() {
     }));
   const groups = {
     open: rows.filter((r) => offerGroup(r.facts.key) === "open"),
+    accepted: rows.filter((r) => offerGroup(r.facts.key) === "accepted"),
     active: rows.filter((r) => offerGroup(r.facts.key) === "active"),
     closed: rows.filter((r) => offerGroup(r.facts.key) === "closed"),
   };
@@ -95,7 +96,13 @@ export default async function InternProposals() {
             decision={decision}
           />
           <Group
-            title="Accepted and hired"
+            title="Accepted, awaiting payment"
+            hint="You said yes. You're hired once the company pays."
+            rows={groups.accepted}
+            decision={decision}
+          />
+          <Group
+            title="Hired"
             rows={groups.active}
             decision={decision}
           />

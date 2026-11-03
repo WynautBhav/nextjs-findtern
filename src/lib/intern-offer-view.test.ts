@@ -22,7 +22,8 @@ test("an open offer waits on the intern until its joining date", () => {
 
 test("processing reads as accepted (INW-21)", () => {
   assert.equal(internOfferKey({ status: "processing", offerDetails: internship() }, now), "accepted");
-  assert.equal(offerGroup("accepted"), "active");
+  assert.equal(offerGroup("accepted"), "accepted");
+  assert.equal(offerGroup("hired"), "active");
   assert.ok(!canDecide("accepted"));
 });
 

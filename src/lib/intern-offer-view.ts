@@ -52,9 +52,10 @@ export function canDecide(key: InternOfferKey): boolean {
 }
 
 /** Grouping on the offers list. */
-export function offerGroup(key: InternOfferKey): "open" | "active" | "closed" {
+export function offerGroup(key: InternOfferKey): "open" | "accepted" | "active" | "closed" {
   if (key === "sent" || key === "interview_scheduled") return "open";
-  if (key === "accepted" || key === "hired" || key === "fulltime_hired") return "active";
+  if (key === "accepted") return "accepted";
+  if (key === "hired" || key === "fulltime_hired") return "active";
   return "closed";
 }
 
