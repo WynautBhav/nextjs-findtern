@@ -1769,3 +1769,25 @@ body:has([data-slot="dialog-content"][data-state="open"], [data-slot="sheet-cont
     transition: none;
   }
 }
+
+/* ── Admin payouts: the payout run desk ──────────────────────────────
+   One signature move: the progress ring swings into place (rotate + fade),
+   and the week bars grow from the left (scaleX). Transform and opacity only;
+   nothing moves for people who ask for reduced motion. */
+@media (prefers-reduced-motion: no-preference) {
+  [data-console="admin"] .payout-ring-sweep {
+    transform-origin: 60px 60px;
+    animation: payout-ring-sweep 600ms var(--ease-out-soft, cubic-bezier(0.22, 1, 0.36, 1)) both;
+  }
+  [data-console="admin"] .payout-bar {
+    animation: payout-bar-grow 400ms var(--ease-out-soft, cubic-bezier(0.22, 1, 0.36, 1)) 200ms both;
+  }
+  @keyframes payout-ring-sweep {
+    from { transform: rotate(var(--ring-start, -90deg)); opacity: 0; }
+    30% { opacity: 1; }
+    to { transform: rotate(0deg); opacity: 1; }
+  }
+  @keyframes payout-bar-grow {
+    from { transform: scaleX(0); }
+  }
+}

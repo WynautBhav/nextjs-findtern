@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { cache } from "react";
 import Link from "next/link";
 import { AlertTriangle } from "lucide-react";
 
@@ -9,6 +10,7 @@ import { AdminTabs } from "@/components/admin/admin-tabs";
 import { ADMIN_PILL_SECONDARY } from "@/components/admin/surface";
 import { ButtonLink } from "@/components/ui/button";
 import { DateRangeForm } from "@/components/admin/date-range-form";
+import { PayoutRunDesk } from "@/components/admin/payouts/payout-run-desk";
 import { StatCard, StatGrid } from "@/components/admin/stat-card";
 import { StatusBadge } from "@/components/admin/status-badge";
 import { flattenParams, parsePageRequest, toQueryString, type RawSearchParams } from "@/lib/admin/params";
@@ -24,11 +26,15 @@ import {
   type PayoutRow,
   type PlacementDueRow,
 } from "@/lib/admin/payout-list";
+import { buildPayoutRun, istDayKey, type PayoutRun } from "@/lib/admin/payout-run";
 import { formatDate, formatMoney } from "@/lib/format";
 
 export const metadata: Metadata = { title: "Intern payouts" };
 
 const BASE = "/admin/payouts";
+
+/** One read of the placement dues per request: the run desk and the dues tab share it. */
+const loadDuesOnce = cache(loadPlacementDues);
 const inr = (minor: number) => formatMoney(minor, "INR", { zeroLabel: "₹0" });
 
 /**
@@ -55,6 +61,8 @@ export default async function AdminPayouts({ searchParams }: { searchParams?: Pr
         }
       />
 
+      <RunDesk />
+
       <AdminTabs
         label="Payout views"
         active={tab}
@@ -67,6 +75,18 @@ export default async function AdminPayouts({ searchParams }: { searchParams?: Pr
       {tab === "payouts" ? <PayoutsView params={params} /> : <DuesView params={params} />}
     </div>
   );
+}
+
+/** The payout run desk above both tabs. A failed read hides the figures, never the lists. */
+async function RunDesk() {
+  const now = new Date();
+  let run: PayoutRun | null = null;
+  try {
+    run = buildPayoutRun(await loadDuesOnce(), istDayKey(now));
+  } catch (e) {
+    console.error("[admin/payouts run]", e);
+  }
+  return <PayoutRunDesk run={run} now={now} />;
 }
 
 /* ── Payouts ledger ─────────────────────────────────────────────────── */
@@ -173,26 +193,26 @@ async function PayoutsView({ params }: { params: Record<string, string> }) {
 
   return (
     <>
-      <StatGrid cols={3}>
-        <StatCard
-          featured
+      <h2 className="text-lg font-semibold text-foreground">All payouts</h2>
+      <dl className="grid grid-cols-3 divide-x divide-[color:var(--admin-rule)] rounded-[var(--radius-admin-card)] border border-[color:var(--admin-panel-edge)] bg-[color:var(--admin-panel)] shadow-[var(--admin-shadow)]">
+        <LedgerFigure
           label="Paid out"
           value={inr(data.paidMinor)}
-          hint={filtered ? "Matching the filters below" : "All recorded payouts · USD at ₹100/$"}
+          hint={filtered ? "Matching the filters" : "USD at ₹100/$"}
         />
-        <StatCard
+        <LedgerFigure
           label="Waiting to be paid"
           value={inr(data.pendingMinor)}
-          hint={`${data.pendingCount.toLocaleString("en-IN")} pending ${data.pendingCount === 1 ? "payout" : "payouts"}`}
-          tone={data.pendingCount > 0 ? "warning" : "neutral"}
+          hint={`${data.pendingCount.toLocaleString("en-IN")} pending`}
+          warn={data.pendingCount > 0}
         />
-        <StatCard
+        <LedgerFigure
           label="Failed transfers"
           value={data.failedCount.toLocaleString("en-IN")}
-          hint={data.failedCount > 0 ? "Create a new payout from the placement's dues to retry" : "None"}
-          tone={data.failedCount > 0 ? "warning" : "neutral"}
+          hint={data.failedCount > 0 ? "Retry from Dues by placement" : "None"}
+          warn={data.failedCount > 0}
         />
-      </StatGrid>
+      </dl>
 
       <DataTable<PayoutRow>
         basePath={BASE}
@@ -241,6 +261,17 @@ async function PayoutsView({ params }: { params: Record<string, string> }) {
   );
 }
 
+/** One figure in the ledger strip; amber only when something is waiting or failed. */
+function LedgerFigure({ label, value, hint, warn = false }: { label: string; value: string; hint: string; warn?: boolean }) {
+  return (
+    <div className="min-w-0 px-3 py-3 sm:px-5 sm:py-4">
+      <dt className="text-xs font-medium text-text-subtle sm:text-sm">{label}</dt>
+      <dd className="nums mt-1 truncate text-lg font-semibold leading-none tracking-[-0.02em] text-foreground sm:text-2xl">{value}</dd>
+      <dd className={warn ? "mt-1.5 text-xs leading-4 text-warning" : "mt-1.5 text-xs leading-4 text-text-subtle"}>{hint}</dd>
+    </div>
+  );
+}
+
 /** Created-date range (DD/MM/YYYY, applies itself). */
 function DateRange({ params }: { params: Record<string, string> }) {
   return <DateRangeForm params={params} fromLabel="Created from" />;
@@ -254,7 +285,7 @@ async function DuesView({ params }: { params: Record<string, string> }) {
 
   let all: PlacementDueRow[];
   try {
-    all = await loadPlacementDues();
+    all = await loadDuesOnce();
   } catch (e) {
     console.error("[admin/payouts dues]", e);
     return (
@@ -366,6 +397,7 @@ async function DuesView({ params }: { params: Record<string, string> }) {
 
   return (
     <>
+      <h2 className="text-lg font-semibold text-foreground">Dues by placement</h2>
       <StatGrid cols={4}>
         <StatCard featured label="Owed to interns" value={inr(totals.dueMinor)} hint={filtered ? "Matching the filters below" : "Stipend months not yet paid"} tone={totals.dueMinor > 0 ? "warning" : "neutral"} />
         <StatCard label="Paid to interns" value={inr(totals.paidMinor)} hint={`of ${inr(totals.totalMinor)} across these placements`} />
