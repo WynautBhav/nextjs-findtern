@@ -64,8 +64,6 @@ test("finished placements and ones without a date add no run day but totals stil
   assert.equal(run.next, null);
   assert.equal(run.flow.dueMinor, 2000_00);
   assert.equal(run.flow.paidMinor, 9000_00);
-  assert.equal(run.totalMinor, 11000_00); // paid + still owed
-  assert.equal(run.paidFraction, 9000 / 11000);
 });
 
 test("employer money received is what the employer has covered, never negative", () => {
@@ -81,7 +79,6 @@ test("employer money received is what the employer has covered, never negative",
 
 test("empty input and a bad today are safe", () => {
   const run = buildPayoutRun([], "");
-  assert.equal(run.paidFraction, 0);
   assert.deepEqual(run.weeks, []);
   assert.equal(run.next, null);
   assert.equal(buildPayoutRun([row({ nextDate: "2026-11-01" })], "").overdue.count, 0);
@@ -136,8 +133,6 @@ test("paid out comes from the ledger when given, even if no payout is linked to 
   const run = buildPayoutRun(rows, TODAY, 766_220_00);
   assert.equal(run.flow.paidMinor, 766_220_00);
   assert.equal(run.flow.dueMinor, 4000_00);
-  assert.equal(run.totalMinor, 770_220_00);
-  assert.ok(run.paidFraction > 0.99 && run.paidFraction <= 1);
   assert.equal(buildPayoutRun(rows, TODAY, 0).flow.paidMinor, 0);
 });
 

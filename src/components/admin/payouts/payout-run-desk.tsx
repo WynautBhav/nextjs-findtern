@@ -56,11 +56,10 @@ export function PayoutRunDesk({ run, now }: { run: PayoutRun | null; now: Date }
   );
 }
 
-/* ── Hero: the next run and how much of the stipend is paid ─────────── */
+/* ── Hero: the next run, with paid out and still owed beside it ───────── */
 
 function Hero({ run, today }: { run: PayoutRun; today: string }) {
   const next = run.next;
-  const pct = Math.round(run.paidFraction * 100);
   // The next UPCOMING run (today or later); anything overdue is a separate amber line.
   const amount = next ? next.amountMinor : 0;
   const count = next ? next.count : 0;
@@ -70,7 +69,7 @@ function Hero({ run, today }: { run: PayoutRun; today: string }) {
       aria-labelledby="run-hero-title"
       className="relative flex min-w-0 flex-col justify-between gap-5 overflow-hidden rounded-[var(--radius-admin-card)] bg-[color:var(--admin-tile)] bg-[linear-gradient(145deg,color-mix(in_srgb,var(--admin-tile),white_16%)_0%,var(--admin-tile)_65%)] p-[var(--admin-pad-panel)] text-[color:var(--admin-tile-ink)] shadow-[0_14px_30px_-16px_rgb(14_96_73/0.7)]"
     >
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-col items-start justify-between gap-4 sm:flex-row">
         <div className="min-w-0">
           <h3 id="run-hero-title" className="text-sm font-medium">Next payout run</h3>
           {next ? (
@@ -91,7 +90,7 @@ function Hero({ run, today }: { run: PayoutRun; today: string }) {
             </p>
           ) : null}
         </div>
-        <Ring pct={pct} />
+        <Standing run={run} />
       </div>
 
       <dl className="grid grid-cols-2 gap-3">
@@ -104,38 +103,24 @@ function Hero({ run, today }: { run: PayoutRun; today: string }) {
           <dd className="nums mt-1 text-[1.5rem] font-semibold leading-none tracking-[-0.02em] sm:text-[1.75rem]">{count.toLocaleString("en-IN")}</dd>
         </div>
       </dl>
-      <p className="nums text-xs">
-        {next ? "One stipend month per intern on that date. " : ""}
-        {inr(run.flow.paidMinor)} paid out; {inr(run.flow.dueMinor)} still owed.
-      </p>
+      {next ? <p className="text-xs">One stipend month per intern on that date.</p> : null}
     </article>
   );
 }
 
-/** Progress ring. The arc is drawn complete and swung into place (rotate + fade): transform and opacity only. */
-function Ring({ pct }: { pct: number }) {
+/** The two ledger-side figures, side by side and never combined: they come from different sources. */
+function Standing({ run }: { run: PayoutRun }) {
   return (
-    <figure className="m-0 shrink-0">
-      <svg viewBox="0 0 120 120" role="img" aria-label={`${pct} percent of stipend paid out`} className="size-24 sm:size-28">
-        <circle cx="60" cy="60" r="50" fill="none" stroke="currentColor" strokeOpacity="0.25" strokeWidth="12" />
-        <g className="payout-ring-sweep" style={{ ["--ring-start" as string]: `${-Math.round(pct * 3.6)}deg` }}>
-          <circle
-            cx="60"
-            cy="60"
-            r="50"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="12"
-            strokeLinecap="round"
-            pathLength={100}
-            strokeDasharray={`${Math.max(pct, pct > 0 ? 1 : 0)} 100`}
-            transform="rotate(-90 60 60)"
-          />
-        </g>
-        <text x="60" y="58" textAnchor="middle" fontSize="26" fontWeight="600" fill="currentColor">{pct}%</text>
-        <text x="60" y="78" textAnchor="middle" fontSize="11" fill="currentColor">paid</text>
-      </svg>
-    </figure>
+    <dl className="grid w-full shrink-0 grid-cols-2 gap-x-4 gap-y-3 rounded-2xl bg-white/15 p-4 sm:w-auto sm:min-w-[15rem] sm:grid-cols-1">
+      <div>
+        <dt className="text-xs font-medium uppercase tracking-wider">Paid out (all time)</dt>
+        <dd className="nums mt-1 text-[1.25rem] font-semibold leading-none tracking-[-0.02em] sm:text-[1.5rem]">{inr(run.flow.paidMinor)}</dd>
+      </div>
+      <div>
+        <dt className="text-xs font-medium uppercase tracking-wider">Still owed on placements</dt>
+        <dd className="nums mt-1 text-[1.25rem] font-semibold leading-none tracking-[-0.02em] sm:text-[1.5rem]">{inr(run.flow.dueMinor)}</dd>
+      </div>
+    </dl>
   );
 }
 
