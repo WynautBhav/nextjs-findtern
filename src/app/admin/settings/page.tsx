@@ -53,7 +53,7 @@ export default async function AdminSettingsPage() {
   const [pricing, calendarConnected] = await Promise.all([loadPricing(), checkCalendar()]);
 
   const calendar = (
-      <Panel className="max-w-3xl">
+      <Panel>
         <PanelHeader
           title="Google Calendar (Meet links)"
           icon={CalendarDays}

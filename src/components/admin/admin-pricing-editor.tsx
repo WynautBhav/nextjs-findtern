@@ -13,7 +13,6 @@ import { inrMinorToUsdMinor, savingsPercent } from "@/lib/currency";
 import { formatMoney } from "@/lib/format";
 import type { CmsPlanFeature } from "@/lib/content/types";
 import { cn } from "@/lib/utils";
-import { FilterTabs } from "@/components/app/primitives";
 import { useConfirm } from "@/components/app/use-confirm";
 
 /**
@@ -62,7 +61,6 @@ export function AdminPricingEditor({
   const router = useRouter();
   const [seeding, setSeeding] = useState(false);
   const [seedError, setSeedError] = useState<string | null>(null);
-  const [activePlan, setActivePlan] = useState(plans[0]?.id ?? "");
 
   async function seed() {
     setSeeding(true);
@@ -78,8 +76,10 @@ export function AdminPricingEditor({
 
   return (
     <div className="space-y-6">
-      <div className="max-w-3xl">
+      {/* Header band: the fee on the left, a read-only summary of the saved rate card on the right. */}
+      <div className="grid items-stretch gap-[var(--admin-gap,1rem)] lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
         <ActivationFeePanel initialMinor={activationFeeMinor} />
+        <RateCardSummary plans={plans} />
       </div>
 
       {plans.length === 0 ? (
@@ -104,19 +104,42 @@ export function AdminPricingEditor({
           </div>
         </Panel>
       ) : (
-        // One plan at a time (three ~1300px forms side by side, each with
-        // its own Save, before). All stay mounted, so switching tabs keeps
-        // unsaved edits.
-        <div className="space-y-4">
-          <FilterTabs label="Plan" tabs={plans.map((p) => ({ key: p.id, label: p.displayName }))} value={activePlan} onChange={setActivePlan} />
+        // Plan cards across the full width: one column on a phone, two on a tablet, three on a
+        // desktop. Each card keeps its own form and Save.
+        <div className="grid items-start gap-[var(--admin-gap,1rem)] md:grid-cols-2 min-[1200px]:grid-cols-3">
           {plans.map((plan) => (
-            <div key={plan.id} hidden={plan.id !== activePlan} className="max-w-3xl">
-              <PlanEditor plan={plan} />
-            </div>
+            <PlanEditor key={plan.id} plan={plan} />
           ))}
         </div>
       )}
     </div>
+  );
+}
+
+/** The saved rate card at a glance (from the loaded rows; edits show here after a save). */
+function RateCardSummary({ plans }: { plans: EditablePlan[] }) {
+  return (
+    <Panel>
+      <PanelHeader title="Rate card" description="As saved: what the public pricing page shows." icon={IndianRupee} />
+      {plans.length === 0 ? (
+        <p className="px-5 py-4 text-sm text-ink-600">No plans yet.</p>
+      ) : (
+        <ul className="divide-y divide-[color:var(--admin-rule)] px-5 pb-2 text-sm">
+          {plans.map((p) => (
+            <li key={p.id} className="flex items-center justify-between gap-3 py-2.5">
+              <span className="min-w-0 truncate font-medium text-ink-800">
+                {p.displayName}
+                {p.isFeatured ? <Star className="ml-1.5 inline size-3.5 text-accent-500" aria-label="Most popular" /> : null}
+                {!p.isActive ? <span className="ml-2 text-xs font-normal text-text-subtle">off</span> : null}
+              </span>
+              <span className="nums shrink-0 text-ink-600">
+                {formatMoney(p.priceHourlyMinor, "INR")}/hr · {formatMoney(p.perHireChargeMinor, "INR")}/hire
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Panel>
   );
 }
 
@@ -173,7 +196,7 @@ function ActivationFeePanel({ initialMinor }: { initialMinor: number }) {
       />
       {dialog}
       <form onSubmit={save} noValidate className="flex flex-wrap items-end gap-3 px-5 py-4">
-        <label className="block w-48 text-sm font-medium text-ink-800">
+        <label className="block w-full max-w-48 text-sm font-medium text-ink-800">
           Fee (₹)
           <input
             id="activation-fee"
@@ -279,7 +302,7 @@ function PlanEditor({ plan }: { plan: EditablePlan }) {
   }
 
   return (
-    <Panel className={cn(featured && "ring-2 ring-brand-500")}>
+    <Panel className={cn("@container", featured && "ring-2 ring-brand-500")}>
       <PanelHeader
         title={plan.displayName}
         description={`slug: ${plan.slug}`}
@@ -449,7 +472,7 @@ function PriceRow({
   const bad = (id: string) => (badId === id ? ({ "aria-invalid": true, "aria-describedby": errorId } as const) : {});
   const clean = (v: string) => v.replace(/[^\d.]/g, "");
   return (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+    <div className="grid grid-cols-1 gap-3 @md:grid-cols-2">
       <label className="block text-sm font-medium text-ink-800">
         {label}
         <input id={ids[0]} {...bad(ids[0])} inputMode="decimal" value={now} onChange={(e) => onNow(clean(e.target.value))} className={inputClass} />
