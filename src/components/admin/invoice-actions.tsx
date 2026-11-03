@@ -19,7 +19,7 @@ import {
 } from "@/lib/admin/invoice-rows";
 import { formatDate, formatMoney } from "@/lib/format";
 import { placeOfSupply, splitGst } from "@/lib/gst";
-import { downloadInvoice, invoiceNumberOf, taxInvoiceHtml, type InvoiceSeller } from "@/lib/invoice";
+import { downloadInvoice, taxInvoiceHtml, type InvoiceSeller } from "@/lib/invoice";
 
 /** Tonal pill actions, as the table toolbar's (no outline); 44px on touch. */
 const PILL =
@@ -40,17 +40,20 @@ async function printInvoice(r: AdminInvoiceRow, kind: InvoiceKind, seller: Invoi
   const k = INVOICE_KINDS[kind];
   const discount = r.discountMinor ?? 0;
   const html = taxInvoiceHtml({
-    invoiceNo: invoiceNumberOf(r, k.invoicePrefix),
+    // The same number the customer holds (employer: from the shared builder, DDMMYY-NN for legacy payments).
+    invoiceNo: displayInvoiceNumber(r, k.invoicePrefix) ?? "",
     date: new Date(r.paidAt ?? r.createdAt ?? Date.now()),
     orderId: r.orderId,
     paymentId: r.paymentId,
     currency: r.currency,
     amountMinor: r.amountMinor,
-    description: k.description,
+    description: r.invoiceDescription ?? k.description,
     seller,
     buyer: { ...r.buyer, place: placeOfSupply({ ...r.buyer, currency: r.currency }) },
     sac: k.sac,
-    items: r.interns ? r.interns.split("; ").filter(Boolean) : undefined,
+    // Employer rows print the employer's own lines; intern fees keep the single SAC 999293 line.
+    lines: r.invoiceLines?.length ? r.invoiceLines : undefined,
+    items: !r.invoiceLines?.length && r.interns ? r.interns.split("; ").filter(Boolean) : undefined,
     // The code, or legacy's "Discount (10%)" line for uncoded discounts (ADM-13).
     promo: r.discountLabel || r.promoCode ? { code: r.discountLabel ?? r.promoCode ?? "", discountMinor: discount || null } : null,
   });

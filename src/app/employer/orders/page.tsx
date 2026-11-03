@@ -12,13 +12,12 @@ import {
 import { placementLedger } from "@/lib/dues";
 import { placeOfSupply } from "@/lib/gst";
 import { getInvoiceSeller } from "@/lib/invoice-seller";
-import { displayInvoiceNumber, LEGACY_INVOICE_CUTOFF, taxInvoiceHtml, type InvoiceLine } from "@/lib/invoice";
+import { LEGACY_INVOICE_CUTOFF, taxInvoiceHtml } from "@/lib/invoice";
+import { employerInvoice, type InvoiceHire } from "@/lib/employer-invoice";
 import { timezoneForLocation } from "@/lib/timezones";
 import { parseOffer } from "@/lib/offer";
-import { hireInvoiceLines } from "@/lib/invoice-lines";
 import { payableCheckout } from "@/lib/employer-payable";
-import { expireStaleEmployerOrders, orderProposalIds } from "@/lib/payments";
-import { formatMoney } from "@/lib/format";
+import { expireStaleEmployerOrders } from "@/lib/payments";
 import { isPaidRow } from "@/lib/admin/invoice-rows";
 
 export const metadata: Metadata = {
@@ -95,8 +94,13 @@ async function loadOrders(employerId: string) {
     state: employer?.state,
   };
 
-  const byId = new Map(proposalRows.map((r) => [r.proposal.id, r]));
   const nameOf = (r: (typeof proposalRows)[number]) => `${r.firstName ?? ""} ${r.lastName ?? ""}`.trim() || "Candidate";
+  const hiresById = new Map<string, InvoiceHire>(
+    proposalRows.map((r) => [
+      r.proposal.id,
+      { proposalId: r.proposal.id, offerDetails: r.proposal.offerDetails, currency: r.proposal.currency, who: nameOf(r), projectName: r.projectName },
+    ]),
+  );
 
   // Interns who already have a live full-time offer from this company.
   const fullTimeFor = new Set(
@@ -148,43 +152,8 @@ async function loadOrders(employerId: string) {
   const invoices: InvoiceRow[] = paymentRows
     .filter((p) => isPaidRow(p) && p.amountMinor > 0)
     .map((p) => {
-      const ids = orderProposalIds(p.raw);
-      const rows = ids.map((id) => byId.get(id)).filter((r): r is NonNullable<typeof r> => Boolean(r));
-      const monthly = ((p.raw as { notes?: { paymentMode?: string } } | null)?.notes?.paymentMode ?? "") === "monthly";
-      const lines: InvoiceLine[] = rows.flatMap((r) => {
-        const offer = parseOffer(r.proposal.offerDetails, r.proposal.currency);
-        const who = nameOf(r);
-        if (offer.fullTime) {
-          return [
-            {
-              label: `${who} - Full time consulting fee (8.33% of the total mentioned CTC)`,
-              detail: offer.fullTime.annualCtcMinor
-                ? `${offer.roleTitle || "Full-time role"} · Annual CTC ${formatMoney(offer.fullTime.annualCtcMinor, offer.currency, { zeroLabel: false })}`
-                : offer.roleTitle || null,
-              amountMinor: rows.length === 1 ? p.amountMinor : null,
-            },
-          ];
-        }
-        // Payments for this hire that settled before this one: the first carries the hiring fee.
-        const paymentIndex = paymentRows.filter(
-          (o) =>
-            o.id !== p.id &&
-            isPaidRow(o) &&
-            orderProposalIds(o.raw).includes(r.proposal.id) &&
-            Boolean(o.paidAt && p.paidAt) &&
-            (o.paidAt!.getTime() < p.paidAt!.getTime() || (o.paidAt!.getTime() === p.paidAt!.getTime() && o.orderId < p.orderId)),
-        ).length;
-        return hireInvoiceLines({
-          who,
-          roleTitle: offer.roleTitle,
-          projectName: r.projectName ?? "Project",
-          offer,
-          monthly,
-          paymentIndex,
-          chargedMinor: rows.length === 1 ? p.amountMinor : null,
-        });
-      });
-      const number = displayInvoiceNumber(p, paidRefs);
+      const inv = employerInvoice({ payment: p, allPayments: paymentRows, legacyPaid: paidRefs, hires: hiresById });
+      const { number, lines } = inv;
       const currency = p.currency || "INR";
       const promo = (p.raw as { promo?: { promoCode?: string; discountMinor?: number } } | null)?.promo;
       return {
@@ -195,8 +164,8 @@ async function loadOrders(employerId: string) {
         paidAt: p.paidAt ? p.paidAt.toISOString() : null,
         amountMinor: p.amountMinor,
         currency,
-        candidates: rows.map(nameOf),
-        projects: Array.from(new Set(rows.map((r) => r.projectName ?? "Project"))),
+        candidates: inv.hireNames,
+        projects: inv.projects,
         html: taxInvoiceHtml({
           invoiceNo: number,
           date: p.paidAt ?? new Date(),
@@ -204,7 +173,7 @@ async function loadOrders(employerId: string) {
           paymentId: p.paymentId,
           currency,
           amountMinor: p.amountMinor,
-          description: `Intern hiring services${monthly ? " - monthly instalment" : ""}`,
+          description: inv.description,
           lines: lines.length ? lines : undefined,
           promo: promo?.promoCode ? { code: promo.promoCode, discountMinor: promo.discountMinor ?? null } : null,
           seller,

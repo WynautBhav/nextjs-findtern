@@ -6,7 +6,8 @@ import { AdminLoadError, AdminPageHeader, Panel } from "@/components/admin/panel
 import { ADMIN_PILL_SECONDARY } from "@/components/admin/surface";
 import { ButtonLink } from "@/components/ui/button";
 import { getInvoiceSeller } from "@/lib/invoice-seller";
-import { orderProposalIds } from "@/lib/payments";
+import { orderProposalIds } from "@/lib/order-ids";
+import { employerInvoice, needsLegacyNumber, type InvoiceHire } from "@/lib/employer-invoice";
 import { AdminInvoicesView, type AdminInvoiceRow } from "@/components/admin/admin-invoices-view";
 import { discountLabel, paymentPromo } from "@/lib/admin/payment-promo";
 import { flattenParams, type RawSearchParams } from "@/lib/admin/params";
@@ -48,21 +49,45 @@ async function loadOrders(): Promise<{ rows: AdminInvoiceRow[]; uncounted: Set<s
 
   // Which interns each order paid for (legacy showed them on every order).
   const proposalIds = Array.from(new Set(rawOrders.flatMap((o) => orderProposalIds(o.raw))));
-  const internByProposal = new Map<string, string>();
+  const hires = new Map<string, InvoiceHire>();
   if (proposalIds.length > 0) {
     const named = await db
-      .select({ id: schema.proposals.id, first: schema.users.firstName, last: schema.users.lastName })
+      .select({
+        id: schema.proposals.id,
+        offerDetails: schema.proposals.offerDetails,
+        currency: schema.proposals.currency,
+        first: schema.users.firstName,
+        last: schema.users.lastName,
+        projectName: schema.projects.projectName,
+      })
       .from(schema.proposals)
       .leftJoin(schema.users, eq(schema.users.id, schema.proposals.internId))
+      .leftJoin(schema.projects, eq(schema.projects.id, schema.proposals.projectId))
       .where(inArray(schema.proposals.id, proposalIds));
-    for (const p of named) internByProposal.set(p.id, `${p.first ?? ""} ${p.last ?? ""}`.trim() || "Candidate");
+    for (const p of named) {
+      hires.set(p.id, {
+        proposalId: p.id,
+        offerDetails: p.offerDetails,
+        currency: p.currency,
+        who: `${p.first ?? ""} ${p.last ?? ""}`.trim() || "Candidate",
+        projectName: p.projectName,
+      });
+    }
   }
+  const internByProposal = new Map([...hires].map(([id, h]) => [id, h.who]));
+  // The same builder the employer's Orders page calls, so number and lines match their copy.
+  const legacyPaid = rawOrders.filter(needsLegacyNumber);
 
   const uncounted = new Set(rawOrders.filter((o) => isTestEmployer({ id: o.employerId, companyEmail: o.companyEmail })).map((o) => o.id));
   const rows = rawOrders.map((o) => {
     // New-app promo objects and legacy order notes (ADM-02/13).
     const promo = paymentPromo(o.raw, undefined, o.amountMinor);
+    const invoiced = o.status === "paid" && o.amountMinor > 0;
+    const inv = invoiced ? employerInvoice({ payment: o, allPayments: rawOrders, legacyPaid, hires }) : null;
     return {
+      displayNumber: inv?.number ?? null,
+      invoiceDescription: inv?.description,
+      invoiceLines: inv?.lines,
       id: o.id,
       invoiceNumber: o.invoiceNumber,
       orderId: o.orderId,
