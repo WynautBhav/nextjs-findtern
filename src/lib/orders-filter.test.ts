@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { filterHires } from "./orders-filter.ts";
+import { filterHires, matchesQuery } from "./orders-filter.ts";
 
 const hires = [
   { candidateName: "Asha Rao", projectName: "Mobile App" },
@@ -31,4 +31,25 @@ test("does not mutate or alias the input", () => {
   const out = filterHires(hires, "");
   assert.notEqual(out, hires);
   assert.equal(hires.length, 3);
+});
+
+test("diacritics fold on both sides: 'jose' finds 'José' and vice versa", () => {
+  const rows = [{ candidateName: "José Álvarez", projectName: "Web" }];
+  assert.equal(filterHires(rows, "jose alvarez").length, 1);
+  assert.equal(filterHires([{ candidateName: "Jose", projectName: "Web" }], "JOSÉ").length, 1);
+});
+
+test("the 'Project' placeholder is not searchable, but roleTitle is", () => {
+  const rows = [
+    { candidateName: "Asha", projectName: "Project", roleTitle: "Designer" },
+    { candidateName: "Ben", projectName: "Real Project", roleTitle: "Engineer" },
+  ];
+  assert.deepEqual(filterHires(rows, "project").map((h) => h.candidateName), ["Ben"]);
+  assert.deepEqual(filterHires(rows, "designer").map((h) => h.candidateName), ["Asha"]);
+});
+
+test("matchesQuery needs every word, across fields, ignoring empty fields", () => {
+  assert.equal(matchesQuery("inr 2026", ["FT/1", "INR", null, "2026-10-01"]), true);
+  assert.equal(matchesQuery("usd 2026", ["FT/1", "INR", "2026-10-01"]), false);
+  assert.equal(matchesQuery("  ", []), true);
 });

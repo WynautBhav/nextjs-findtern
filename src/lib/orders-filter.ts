@@ -1,16 +1,29 @@
-/** Client-side search for the employer Orders "Hires" and "Payment schedule" tabs. */
+/** Client-side search shared by the employer Orders tabs (Hires, Payment schedule, Invoices). */
 
-export type HireSearchable = { candidateName: string; projectName: string };
+export type HireSearchable = { candidateName: string; projectName: string; roleTitle?: string };
+
+/** The loader's stand-in for a hire with no project name; never searchable. */
+const PROJECT_PLACEHOLDER = "Project";
+
+/** Lowercase, accent-folded text: "José" -> "jose". */
+export function normalizeSearch(text: string): string {
+  return text.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
+}
 
 /**
- * Keep the hires whose candidate name or project name contains every
- * whitespace-separated word of `query` (case-insensitive). A blank query keeps all.
+ * True when every whitespace-separated word of `query` appears in at least
+ * one of `fields` (both sides case- and accent-insensitive). A blank query matches.
  */
+export function matchesQuery(query: string, fields: readonly (string | null | undefined)[]): boolean {
+  const words = normalizeSearch(query).split(/\s+/).filter(Boolean);
+  if (words.length === 0) return true;
+  const hay = normalizeSearch(fields.filter(Boolean).join(" "));
+  return words.every((w) => hay.includes(w));
+}
+
+/** Keep the hires whose candidate, project or role matches every word of `query`. */
 export function filterHires<T extends HireSearchable>(hires: readonly T[], query: string): T[] {
-  const words = query.toLowerCase().split(/\s+/).filter(Boolean);
-  if (words.length === 0) return [...hires];
-  return hires.filter((h) => {
-    const hay = `${h.candidateName} ${h.projectName}`.toLowerCase();
-    return words.every((w) => hay.includes(w));
-  });
+  return hires.filter((h) =>
+    matchesQuery(query, [h.candidateName, h.projectName === PROJECT_PLACEHOLDER ? "" : h.projectName, h.roleTitle]),
+  );
 }

@@ -16,7 +16,7 @@ import type { CmsLegalDoc } from "./types";
 export const INTERN_TERMS: CmsLegalDoc = {
   id: "intern",
   title: "Intern Terms and Conditions",
-  updated: "2026-10-18",
+  updated: "2026-11-04",
   href: "/intern-terms-and-conditions",
   html: `
 <h2>1. Acceptance of Terms</h2>
