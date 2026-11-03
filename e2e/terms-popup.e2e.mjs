@@ -11,6 +11,7 @@
  * The test accepts the terms for that persona, so re-run the seed to reset it.
  */
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { after, before, test } from "node:test";
 
 import { chromium } from "playwright";
@@ -18,6 +19,13 @@ import { chromium } from "playwright";
 import { closeDb, one } from "./lib/db.mjs";
 import { baseUrl } from "./lib/env.mjs";
 import { loginState, persona } from "./lib/session.mjs";
+
+// .mjs cannot import the TypeScript module (no loader here), so read the constant from its
+// source: the test then follows src/lib/terms.ts instead of a second hard-coded date.
+const CURRENT_TERMS_VERSION = /export const CURRENT_TERMS_VERSION\s*=\s*"([^"]+)"/.exec(
+  readFileSync(new URL("../src/lib/terms.ts", import.meta.url), "utf8"),
+)?.[1];
+assert.ok(CURRENT_TERMS_VERSION, "could not read CURRENT_TERMS_VERSION from src/lib/terms.ts");
 
 let browser;
 let context;
@@ -49,7 +57,7 @@ test("ticking the box and continuing closes it, and it stays gone after a reload
   await dialog.waitFor({ state: "detached", timeout: 30_000 });
 
   const row = await one("select terms_accepted_version from users where email = $1", ["qa.intern.terms@qa.test"]);
-  assert.equal(row?.terms_accepted_version, "2026-11-04");
+  assert.equal(row?.terms_accepted_version, CURRENT_TERMS_VERSION);
 
   await page.reload({ waitUntil: "load" });
   await page.getByRole("main").first().waitFor({ timeout: 30_000 });
