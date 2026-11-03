@@ -167,7 +167,8 @@ export async function searchColleges(q: string, limit = 12) {
     .from(c)
     .where(and(eq(c.isActive, true), sql`(${byCode} OR ${everyWord} OR ${c.aisheCode} = ${term.toUpperCase()} OR ${c.slug} = ${term.toLowerCase()})`))
     .orderBy(
-      sql`(${byCode}) DESC`,
+      // A bare constant is read as a column position, so the code match is ranked only when a code was typed.
+      ...(typedCode ? [sql`(${byCode}) DESC`] : []),
       sql`${c.isPartner} DESC`,
       sql`(${c.name} ILIKE ${esc(term) + "%"}) DESC`,
       sql`(${c.name} ILIKE ${"%" + esc(term) + "%"}) DESC`,
