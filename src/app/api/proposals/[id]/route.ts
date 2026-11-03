@@ -12,6 +12,7 @@ import {
   jdToHtml,
   normalizeLaptop,
   offerScore,
+  offerTermIssues,
   PAID_LEAVE_OPTIONS,
   parseOffer,
   placeOf,
@@ -132,6 +133,20 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     const modeIssue = modeProblem(workPreferenceOf(pref, offerScore(current) ?? liveScore), edits.mode);
     if (modeIssue) return NextResponse.json({ error: modeIssue }, { status: 400 });
   }
+  const storedShift = shiftFields(String(current.shiftFrom ?? ""), String(current.shiftTo ?? ""));
+  const touchesShift = edits.shiftFrom !== undefined || edits.shiftTo !== undefined;
+  // Same checks as the composer; an edit of one end is judged against the stored other end.
+  const termIssue = offerTermIssues({
+    startDate: edits.startDate,
+    timezone: edits.timezone,
+    ...(touchesShift
+      ? {
+          shiftFrom: edits.shiftFrom ?? (String(storedShift.shiftFrom) || "flexible"),
+          shiftTo: edits.shiftTo ?? (String(storedShift.shiftTo) || "flexible"),
+        }
+      : {}),
+  })[0];
+  if (termIssue) return NextResponse.json({ error: termIssue.message }, { status: 400 });
   if (edits.startDate !== undefined && edits.startDate <= todayIst()) {
     return NextResponse.json({ error: "Pick a start date after today." }, { status: 400 });
   }

@@ -1,4 +1,5 @@
 import { INR_PER_USD } from "./currency.ts";
+import { isKnownTimezone } from "./timezones.ts";
 
 /**
  * `proposals.offer_details`, typed.
@@ -433,4 +434,34 @@ export function buildOffer(input: OfferInput): Record<string, unknown> {
     candidateScore: input.candidateScore ?? null,
     projectSkills: input.projectSkills ?? [],
   };
+}
+
+/**
+ * The start-date, shift and timezone rules shared by the composer and the
+ * offer edit. Pass only what is being set; each issue names its field.
+ */
+export function offerTermIssues(t: {
+  startDate?: string;
+  shiftFrom?: string;
+  shiftTo?: string;
+  timezone?: string;
+}): { path: string; message: string }[] {
+  const out: { path: string; message: string }[] = [];
+  if (t.startDate !== undefined) {
+    if (!isRealDay(t.startDate)) out.push({ path: "startDate", message: "Pick a real start date." });
+    else if (t.startDate > addDays(todayIst(), 365)) out.push({ path: "startDate", message: "Pick a start date within the next year." });
+  }
+  if (t.shiftFrom !== undefined || t.shiftTo !== undefined) {
+    const from = t.shiftFrom ?? "";
+    const to = t.shiftTo ?? "";
+    // Flexible hours send "flexible" for both; otherwise both are clock times and differ.
+    if (!(from === "flexible" && to === "flexible")) {
+      if (!isClockTime(from) || !isClockTime(to)) out.push({ path: "shiftFrom", message: "Pick the working hours." });
+      else if (from === to) out.push({ path: "shiftTo", message: "The shift can't start and end at the same time." });
+    }
+  }
+  if (t.timezone !== undefined && !isKnownTimezone(t.timezone)) {
+    out.push({ path: "timezone", message: "Pick a timezone from the list." });
+  }
+  return out;
 }

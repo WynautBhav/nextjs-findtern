@@ -12,11 +12,9 @@ import { requireMutation } from "@/lib/guards-mutation";
 import { emails } from "@/lib/emails";
 import { employerNames, notify } from "@/lib/notify";
 import {
-  addDays,
   buildOffer,
-  isClockTime,
-  isRealDay,
   normalizeLaptop,
+  offerTermIssues,
   offerPastStart,
   parseOffer,
   PAID_LEAVE_OPTIONS,
@@ -29,7 +27,6 @@ import {
 import { employerRegion } from "@/lib/employer-pricing";
 import { canEmployerSeeIntern } from "@/lib/employer-pool";
 import { isProjectOpen } from "@/lib/project-locations";
-import { isKnownTimezone } from "@/lib/timezones";
 import { isBlockingInterview } from "@/lib/employer-interview-rules";
 import { modeProblem, workPreferenceOf } from "@/lib/work-preference";
 
@@ -72,21 +69,7 @@ const bodySchema = z
 })
   .superRefine((b, ctx) => {
     // The route also needs the start to be after today; these keep junk out of the stored offer.
-    if (!isRealDay(b.startDate)) {
-      ctx.addIssue({ code: "custom", message: "Pick a real start date.", path: ["startDate"] });
-    } else if (b.startDate > addDays(todayIst(), 365)) {
-      ctx.addIssue({ code: "custom", message: "Pick a start date within the next year.", path: ["startDate"] });
-    }
-    // Flexible hours send "flexible" for both; otherwise both are clock times and differ.
-    const flexible = b.shiftFrom === "flexible" && b.shiftTo === "flexible";
-    if (!flexible && (!isClockTime(b.shiftFrom) || !isClockTime(b.shiftTo))) {
-      ctx.addIssue({ code: "custom", message: "Pick the working hours.", path: ["shiftFrom"] });
-    } else if (!flexible && b.shiftFrom === b.shiftTo) {
-      ctx.addIssue({ code: "custom", message: "The shift can't start and end at the same time.", path: ["shiftTo"] });
-    }
-    if (!isKnownTimezone(b.timezone)) {
-      ctx.addIssue({ code: "custom", message: "Pick a timezone from the list.", path: ["timezone"] });
-    }
+    for (const i of offerTermIssues(b)) ctx.addIssue({ code: "custom", message: i.message, path: [i.path] });
     if (!["company", "candidate"].includes(normalizeLaptop(b.laptop))) {
       ctx.addIssue({ code: "custom", message: "Say who provides the laptop: the company or the candidate.", path: ["laptop"] });
     }
