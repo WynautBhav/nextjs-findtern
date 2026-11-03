@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, CheckCircle2, Download, Eye, EyeOff, FileText, Link2, Loader2, Video } from "lucide-react";
+import { CheckCircle2, Download, Eye, EyeOff, File as FileIcon, FileText, Link2, Loader2, Mail, Phone, Video } from "lucide-react";
 
 import { csrfFetch } from "@/lib/client-fetch";
 import { toInrMinor } from "@/lib/admin/money";
@@ -20,12 +20,17 @@ import { ProposalOfferSummary } from "@/components/admin/proposal-offer-summary"
 import { draftFromRecord, linkedinHref } from "@/lib/onboarding";
 import type { RevealField } from "@/lib/admin/identity-mask";
 import type { User as UserType, InternOnboarding, Interview, Proposal, Timesheet, InternPayout } from "@/lib/db/schema";
-import { DetailRow, EmptyScene, PageHead, Pill, pillTabClass, SectionHead } from "@/components/app/primitives";
-import { ADMIN_SURFACE } from "@/components/admin/surface";
+import { DetailRow, EmptyScene, Pill, SectionHead } from "@/components/app/primitives";
+import { AdminAvatar } from "@/components/admin/avatar";
+import { AdminTabs } from "@/components/admin/admin-tabs";
+import { InfoList, InfoRow, QuickAction, RecordCard, RecordLayout } from "@/components/admin/record-layout";
+import { latestActivityAt, telHref } from "@/lib/admin/record-activity-format";
+import type { ActivityEntry } from "@/lib/admin/record-activity.types";
+import { ADMIN_PILL_SECONDARY, ADMIN_SURFACE } from "@/components/admin/surface";
 import { buttonClass } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
-import { StatCard, StatGrid } from "@/components/admin/stat-card";
+import { StatCard } from "@/components/admin/stat-card";
 
 /**
  * Candidate 360: everything staff need about one candidate on one page.
@@ -52,10 +57,14 @@ export type Intern360Props = {
   initialTab?: string;
   feePaid: boolean;
   profileComplete: boolean;
-  /** Edit contact, View as. */
+  /** Pill buttons beside the title (Edit contact). */
   actions?: React.ReactNode;
-  /** Review, visibility and account controls. */
-  controls?: React.ReactNode;
+  /** The "View as candidate" tile, shown with the card's quick actions. */
+  viewAs?: React.ReactNode;
+  /** Review, visibility and account controls; each shows read-only when absent. */
+  controls?: { review?: React.ReactNode; visibility?: React.ReactNode; account?: React.ReactNode };
+  /** The Activities timeline; null when it could not be loaded. */
+  activities: ActivityEntry[] | null;
 };
 
 const TAB_KEYS = ["profile", "documents", "interviews", "proposals", "timesheets", "payments", "bank"] as const;
@@ -67,7 +76,9 @@ const PROPOSAL_STATUSES = ["sent", "interview_scheduled", "accepted", "hired", "
 
 export function Intern360View({
   actions,
+  viewAs,
   controls,
+  activities,
   user,
   onboarding,
   documents,
@@ -83,7 +94,6 @@ export function Intern360View({
   profileComplete,
 }: Intern360Props) {
   const [tab, setTab] = useState<TabKey>(() => TAB_KEYS.find((k) => k === initialTab) ?? "profile");
-  const [photoFailed, setPhotoFailed] = useState(false);
   const [selectedProposal, setSelectedProposal] = useState<Proposal | null>(null);
   const [selectedInterview, setSelectedInterview] = useState<Interview | null>(null);
   const [interviewFilter, setInterviewFilter] = useState("all");
@@ -124,7 +134,7 @@ export function Intern360View({
   const project = (id: string | null | undefined) => (id && projectNames[id]) || null;
 
   const fullName = `${user.firstName} ${user.lastName}`.trim() || "Candidate";
-  const initials = `${user.firstName.charAt(0)}${user.lastName.charAt(0)}`.toUpperCase() || "?";
+  const callHref = telHref(user.countryCode || "+91", user.phoneNumber);
   const location = [draft?.city, draft?.state].filter(Boolean).join(", ");
 
   const tabs: { key: TabKey; label: string; count?: number }[] = [
@@ -142,297 +152,260 @@ export function Intern360View({
   const proposalStatuses = [...new Set([...PROPOSAL_STATUSES, ...proposals.map((p) => p.status)])];
   const filteredProposals = proposals.filter((p) => proposalFilter === "all" || p.status === proposalFilter);
 
-  return (
-    <div className="space-y-6">
-      <Link
-        href="/admin/interns"
-        className="inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-brand-700 underline-offset-4 hover:underline"
-      >
-        <ArrowLeft className="size-4" aria-hidden />
-        All candidates
-      </Link>
-
-      <PageHead
-        className="mb-6"
-        title={
-          <span className="flex items-center gap-4">
-            {hasPhoto && !photoFailed ? (
-              // eslint-disable-next-line @next/next/no-img-element -- access-checked API route, not a static asset
-              <img
-                src={`/api/intern/avatar?id=${encodeURIComponent(user.id)}`}
-                alt=""
-                onError={() => setPhotoFailed(true)}
-                // A failure before hydration never fires onError; catch it here.
-                ref={(el) => {
-                  if (el && el.complete && el.naturalWidth === 0) setPhotoFailed(true);
-                }}
-                className="size-16 shrink-0 rounded-full object-cover ring-1 ring-ink-200"
-              />
-            ) : (
-              <span aria-hidden className="grid size-16 shrink-0 place-items-center rounded-full bg-brand-100 text-xl font-semibold text-brand-800">
-                {initials}
-              </span>
-            )}
-            <span className="min-w-0 break-words">{fullName}</span>
+  const info = (
+    <InfoList>
+      <InfoRow label="Email">
+        <a href={`mailto:${user.email}`} className="break-all underline-offset-4 hover:underline touch:inline-flex touch:min-h-11 touch:items-center">
+          {user.email}
+        </a>
+      </InfoRow>
+      <InfoRow label="Phone">
+        {user.phoneNumber ? (
+          <span className="nums">
+            {user.countryCode || "+91"} {user.phoneNumber}
           </span>
-        }
-        lede={
-          <span className="flex flex-wrap gap-x-3 gap-y-1 text-[0.9375rem]">
-            <a href={`mailto:${user.email}`} className="break-all underline-offset-4 hover:underline touch:inline-flex touch:min-h-11 touch:items-center">
-              {user.email}
-            </a>
-            {user.phoneNumber ? (
-              <span className="nums">
-                {user.countryCode || "+91"} {user.phoneNumber}
-              </span>
-            ) : null}
-            {location ? <span>{location}</span> : null}
-            <span>Joined {formatDate(user.createdAt)}</span>
-          </span>
-        }
-        action={actions}
-      />
-
-      <div className={cn(ADMIN_SURFACE, "min-w-0 flex flex-wrap items-start gap-x-8 gap-y-4 p-5")}>
-        {controls}
-        {/* One derived answer to "can employers see them?": the switch said
-            Live beside a "Hidden by candidate" pill (critique A). */}
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 self-center text-sm text-ink-600">
+        ) : (
+          <span className="font-normal text-text-subtle">Not given</span>
+        )}
+      </InfoRow>
+      <InfoRow label="Location">{location || <span className="font-normal text-text-subtle">Not given</span>}</InfoRow>
+      {onboarding ? (
+        <InfoRow label="Review status">
+          {controls?.review ?? <StatusBadge value={String(extra.approvalStatus ?? "Pending")} />}
+        </InfoRow>
+      ) : null}
+      <InfoRow label="Employer visibility">
+        <div className="flex flex-col items-start gap-2">
+          {controls?.visibility ?? <StatusBadge value={user.profileVisibility === "hidden" ? "hidden" : "live"} />}
+          {/* One derived answer to "can employers see them?", with the first reason when not. */}
           <Pill tone={visibleToEmployers ? "live" : "waiting"}>{visibleToEmployers ? "Employers can see them" : "Employers can't see them"}</Pill>
-          {hiddenWhy ? <span>{hiddenWhy}</span> : null}
-          <Pill tone={feePaid ? "paid" : "closed"}>{feePaid ? "Activation fee paid" : "Activation fee unpaid"}</Pill>
+          {hiddenWhy ? <span className="text-sm font-normal text-text-subtle">{hiddenWhy}</span> : null}
         </div>
-      </div>
+      </InfoRow>
+      <InfoRow label="Account">{controls?.account ?? <StatusBadge value={user.isActive ? "active" : "inactive"} />}</InfoRow>
+      <InfoRow label="Activation fee">
+        <Pill tone={feePaid ? "paid" : "closed"}>{feePaid ? "Paid" : "Unpaid"}</Pill>
+      </InfoRow>
+    </InfoList>
+  );
 
-      {/* The admin summary strip, as on Company detail and the lists. */}
-      <StatGrid cols={4}>
-        <StatCard
-          label="Findtern Score"
-          value={score === null ? "-" : `${score.toFixed(1)}/10`}
-          hint={
-            score === null
-              ? "Not scored yet"
-              : `Comm ${ratings.communication ?? "-"} · Coding ${ratings.coding ?? "-"} · Apt ${ratings.aptitude ?? "-"} · AI ${ratings.interview ?? "-"}`
+  return (
+    <RecordLayout
+      title={fullName}
+      subtitle={`Created on ${formatDate(user.createdAt)}`}
+      backHref="/admin/interns"
+      backLabel="All candidates"
+      actions={actions}
+      left={
+        <RecordCard
+          avatar={<AdminAvatar name={fullName} id={user.id} photoUrl={hasPhoto ? `/api/intern/avatar?id=${encodeURIComponent(user.id)}` : null} size="xl" />}
+          name={fullName}
+          idLine={`Joined ${formatDate(user.createdAt)}`}
+          lastActivityAt={latestActivityAt(activities)}
+          quickActions={
+            <>
+              <QuickAction href={`mailto:${user.email}`} label={`Email ${fullName}`}>
+                <Mail className="size-5" aria-hidden />
+              </QuickAction>
+              {callHref ? (
+                <QuickAction href={callHref} label={`Call ${fullName}`}>
+                  <Phone className="size-5" aria-hidden />
+                </QuickAction>
+              ) : null}
+              {viewAs}
+            </>
           }
+          info={info}
+          activities={activities}
         />
-        <StatCard label="Proposals" value={proposals.length} hint={hiredCount ? `${hiredCount} hired` : proposals.length ? "None hired" : "None yet"} />
-        <StatCard label="Interviews" value={interviews.length} hint={scheduledCount ? `${scheduledCount} scheduled` : interviews.length ? "None scheduled" : "None yet"} />
-        <StatCard
-          label="Paid to candidate"
-          value={formatMoney(paidMinor, "INR", { zeroLabel: "₹0" })}
-          hint={owedTotalMinor > 0 ? `${formatMoney(owedTotalMinor, "INR")} still owed` : paidMinor > 0 ? "Nothing owed" : "Nothing paid yet"}
-          tone={owedTotalMinor > 0 ? "warning" : "neutral"}
+      }
+    >
+      <div className="@container min-w-0 space-y-[var(--admin-gap)]">
+        <AdminTabs
+          label="Candidate record"
+          items={tabs.map((t) => ({ ...t, controls: `panel-${t.key}` }))}
+          active={tab}
+          onSelect={(key) => setTab(key as TabKey)}
         />
-      </StatGrid>
 
-      <div
-        role="tablist"
-        aria-label="Candidate record"
-        onKeyDown={(e) => {
-          // WAI-ARIA tabs: arrows, Home and End move focus and activate; focus wraps.
-          const i = tabs.findIndex((t) => t.key === tab);
-          let next = -1;
-          if (e.key === "ArrowRight") next = (i + 1) % tabs.length;
-          else if (e.key === "ArrowLeft") next = (i - 1 + tabs.length) % tabs.length;
-          else if (e.key === "Home") next = 0;
-          else if (e.key === "End") next = tabs.length - 1;
-          if (next < 0) return;
-          e.preventDefault();
-          setTab(tabs[next].key);
-          document.getElementById(`tab-${tabs[next].key}`)?.focus();
-        }}
-        className="-mx-1 flex max-w-full gap-1 overflow-x-auto px-1 pb-1 [scrollbar-width:none]">
-        {tabs.map((t) => (
-          <button
-            key={t.key}
-            type="button"
-            role="tab"
-            id={`tab-${t.key}`}
-            aria-selected={tab === t.key}
-            tabIndex={tab === t.key ? 0 : -1}
-            aria-controls={tab === t.key ? `panel-${t.key}` : undefined}
-            onClick={() => setTab(t.key)}
-            className={pillTabClass(tab === t.key)}
-          >
-            {t.label}
-            {t.count !== undefined ? (
-              <span className={cn("nums text-xs", tab === t.key ? "text-white/75" : "text-text-subtle")}>
-                {t.count}
-              </span>
-            ) : null}
-          </button>
-        ))}
-      </div>
+        {/* Four figures; two across until the column is wide enough for four. */}
+        <div className="grid grid-cols-2 gap-[var(--admin-gap)] @2xl:grid-cols-4 [&_.leading-none]:text-[1.75rem]">
+          <StatCard
+            featured
+            label="Findtern Score"
+            value={score === null ? "-" : `${score.toFixed(1)}/10`}
+            hint={
+              score === null
+                ? "Not scored yet"
+                : `Comm ${ratings.communication ?? "-"} · Coding ${ratings.coding ?? "-"} · Apt ${ratings.aptitude ?? "-"} · AI ${ratings.interview ?? "-"}`
+            }
+          />
+          <StatCard label="Proposals" value={proposals.length} hint={hiredCount ? `${hiredCount} hired` : proposals.length ? "None hired" : "None yet"} />
+          <StatCard label="Interviews" value={interviews.length} hint={scheduledCount ? `${scheduledCount} scheduled` : interviews.length ? "None scheduled" : "None yet"} />
+          <StatCard
+            label="Paid to candidate"
+            value={formatMoney(paidMinor, "INR", { zeroLabel: "₹0" })}
+            hint={owedTotalMinor > 0 ? `${formatMoney(owedTotalMinor, "INR")} still owed` : paidMinor > 0 ? "Nothing owed" : "Nothing paid yet"}
+            tone={owedTotalMinor > 0 ? "warning" : "neutral"}
+          />
+        </div>
 
-      <div role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`}>
-        {tab === "profile" ? (
-          <ProfileTab internId={user.id} onboarding={onboarding} draft={draft} extra={extra} ratings={ratings} score={score} skills={skills} />
-        ) : null}
+        <div role="tabpanel" id={`panel-${tab}`} aria-label={tabs.find((t) => t.key === tab)?.label} className="min-w-0">
+          {tab === "profile" ? (
+            <ProfileTab internId={user.id} onboarding={onboarding} draft={draft} extra={extra} ratings={ratings} score={score} skills={skills} />
+          ) : null}
 
-        {tab === "documents" ? <DocumentsTab internId={user.id} documents={documents} /> : null}
+          {tab === "documents" ? <DocumentsTab internId={user.id} documents={documents} /> : null}
 
-        {tab === "interviews" ? (
-          <div className="space-y-4">
-            <FilterBar
-              label="Interview status"
-              value={interviewFilter}
-              onChange={setInterviewFilter}
-              options={interviewStatuses}
-              count={filteredInterviews.length}
-              noun="interview"
-            />
-            {filteredInterviews.length === 0 ? (
-              <EmptyScene
-                title={interviews.length ? "No interviews with this status" : "No interviews yet"}
-                body={interviews.length ? "Pick another status to see the rest." : "Interviews appear here once a company or the AI interview books one."}
-                who="Companies and the candidate act next"
+          {tab === "interviews" ? (
+            <div className="space-y-4">
+              <FilterBar
+                label="Interview status"
+                value={interviewFilter}
+                onChange={setInterviewFilter}
+                options={interviewStatuses}
+                count={filteredInterviews.length}
+                noun="interview"
               />
-            ) : (
-              <ul className="grid gap-3 lg:grid-cols-2">
-                {filteredInterviews.map((i) => (
-                  <InterviewCard
-                    key={i.id}
-                    interview={i}
-                    company={company(i.employerId)}
-                    project={project(i.projectId)}
-                    onManage={() => setSelectedInterview(i)}
-                  />
-                ))}
-              </ul>
-            )}
-          </div>
-        ) : null}
-
-        {tab === "proposals" ? (
-          <div className="space-y-4">
-            <FilterBar
-              label="Proposal status"
-              value={proposalFilter}
-              onChange={setProposalFilter}
-              options={proposalStatuses}
-              count={filteredProposals.length}
-              noun="proposal"
-            />
-            {filteredProposals.length === 0 ? (
-              <EmptyScene
-                title={proposals.length ? "No proposals with this status" : "No proposals yet"}
-                body={proposals.length ? "Pick another status to see the rest." : "Offers from companies appear here."}
-                who="Companies act next"
-              />
-            ) : (
-              <div data-stack className={cn(ADMIN_SURFACE, "min-w-0 lg:overflow-x-auto")}>
-                <table className="w-full text-left text-sm lg:min-w-[44rem]">
-                  <thead className="border-b border-ink-100 bg-ink-50 text-xs font-semibold text-ink-600">
-                    <tr>
-                      <th scope="col" className="px-4 py-2.5">Company and project</th>
-                      <th scope="col" className="px-4 py-2.5">Type</th>
-                      <th scope="col" className="px-4 py-2.5 text-right">Monthly / CTC</th>
-                      <th scope="col" className="px-4 py-2.5">Starts</th>
-                      <th scope="col" className="px-4 py-2.5">Status</th>
-                      <th scope="col" className="px-4 py-2.5">Sent</th>
-                      <th scope="col" className="px-4 py-2.5"><span className="sr-only">Actions</span></th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-ink-100">
-                    {filteredProposals.map((p) => {
-                      const offer = parseOffer(p.offerDetails, p.currency);
-                      return (
-                        <tr key={p.id} className="hover:bg-ink-50/60">
-                          <td data-title className="px-4 py-3 [overflow-wrap:anywhere]">
-                            {p.employerId && company(p.employerId) ? (
-                              <Link href={`/admin/companies/${p.employerId}`} className="font-semibold text-ink-900 underline-offset-4 [overflow-wrap:anywhere] hover:underline">
-                                {company(p.employerId)}
-                              </Link>
-                            ) : (
-                              <span className="font-semibold text-ink-900">Company</span>
-                            )}
-                            <p className="text-ink-600">{offer.roleTitle || project(p.projectId) || "Project"}</p>
-                          </td>
-                          <td data-label="Type" className="px-4 py-3 text-ink-700">{offer.fullTime ? "Full-time" : "Internship"}</td>
-                          <td data-label="Monthly / CTC" data-empty={(offer.fullTime ? offer.fullTime.annualCtcMinor : offer.monthlyMinor) ? undefined : ""} className="nums px-4 py-3 text-right font-medium text-ink-900">
-                            {offer.fullTime
-                              ? offer.fullTime.annualCtcMinor
-                                ? `${formatMoney(offer.fullTime.annualCtcMinor, offer.currency)} a year`
-                                : "-"
-                              : offer.monthlyMinor
-                                ? formatMoney(offer.monthlyMinor, offer.currency)
-                                : "-"}
-                          </td>
-                          <td data-label="Starts" data-empty={offer.startDate ? undefined : ""} className="nums whitespace-nowrap px-4 py-3 text-ink-700">{offer.startDate ? formatDate(offer.startDate) : "-"}</td>
-                          <td data-label="Status" className="px-4 py-3"><StatusBadge value={p.status} /></td>
-                          <td data-label="Sent" className="nums whitespace-nowrap px-4 py-3 text-ink-600">{formatDate(p.createdAt)}</td>
-                          <td className="px-4 py-3 text-right">
-                            <button type="button" onClick={() => setSelectedProposal(p)} className={buttonClass({ variant: "outline", size: "sm" })}>
-                              <Eye className="size-4" aria-hidden />
-                              View offer
-                            </button>
-                            {p.status === "hired" || p.hiredAt ? (
-                              <div className="mt-2">
-                                <CompletionBonusButton
-                                  internId={user.id}
-                                  proposalId={p.id}
-                                  grantedOn={p.completionBonusAt ? formatDate(p.completionBonusAt) : null}
-                                />
-                              </div>
-                            ) : null}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        ) : null}
-
-        {tab === "timesheets" ? <TimesheetsTab timesheets={timesheets} company={company} project={project} proposals={proposals} /> : null}
-
-        {tab === "payments" ? (
-          <div className={cn(ADMIN_SURFACE, "min-w-0 p-5 sm:p-6")}>
-            <SectionHead title="Stipend payouts" hint="What is owed per placement, and every payout recorded for this candidate." />
-            <InternPayoutTools
-              internId={user.id}
-              payouts={payouts}
-              placements={proposals
-                .filter((p) => p.status === "hired" || p.hiredAt)
-                .map((p) => ({
-                  id: p.id,
-                  employerId: p.employerId ?? "",
-                  label: `${company(p.employerId) ?? "Company"} · ${project(p.projectId) ?? "Project"}`,
-                }))}
-              dues={dues}
-            />
-          </div>
-        ) : null}
-
-        {tab === "bank" ? (
-          <div className={cn(ADMIN_SURFACE, "min-w-0 p-5 sm:p-6")}>
-            <SectionHead
-              title="Bank account for stipends"
-              hint="The account number shows its last four. Reveal it only when you are making a payment; each reveal is logged."
-            />
-            {draft?.bank && (draft.bank.accountNumber || draft.bank.upiId) ? (
-              <dl className="divide-y divide-ink-100">
-                <DetailRow label="Account holder" value={draft.bank.accountHolderName || "-"} />
-                <DetailRow label="Bank" value={draft.bank.bankName || "-"} />
-                <DetailRow label="IFSC" value={draft.bank.ifscCode || "-"} mono />
-                <DetailRow
-                  label="Account number"
-                  value={<RevealValue internId={user.id} field="bank" masked={draft.bank.accountNumber} label="account number" />}
-                  mono
+              {filteredInterviews.length === 0 ? (
+                <EmptyScene
+                  title={interviews.length ? "No interviews with this status" : "No interviews yet"}
+                  body={interviews.length ? "Pick another status to see the rest." : "Interviews appear here once a company or the AI interview books one."}
+                  who="Companies and the candidate act next"
                 />
-                <DetailRow label="UPI ID" value={draft.bank.upiId || "-"} mono />
-              </dl>
-            ) : (
-              <EmptyScene
-                title="No bank details yet"
-                body="The candidate adds these on the About step of their profile. Stipends can't be paid until they do."
-                who="The candidate acts next"
+              ) : (
+                <ul className="grid gap-3 @3xl:grid-cols-2">
+                  {filteredInterviews.map((i) => (
+                    <InterviewCard
+                      key={i.id}
+                      interview={i}
+                      company={company(i.employerId)}
+                      project={project(i.projectId)}
+                      onManage={() => setSelectedInterview(i)}
+                    />
+                  ))}
+                </ul>
+              )}
+            </div>
+          ) : null}
+
+          {tab === "proposals" ? (
+            <div className="space-y-4">
+              <FilterBar
+                label="Proposal status"
+                value={proposalFilter}
+                onChange={setProposalFilter}
+                options={proposalStatuses}
+                count={filteredProposals.length}
+                noun="proposal"
               />
-            )}
-          </div>
-        ) : null}
+              {filteredProposals.length === 0 ? (
+                <EmptyScene
+                  title={proposals.length ? "No proposals with this status" : "No proposals yet"}
+                  body={proposals.length ? "Pick another status to see the rest." : "Offers from companies appear here."}
+                  who="Companies act next"
+                />
+              ) : (
+                <ul className={cn(ADMIN_SURFACE, "min-w-0 divide-y divide-[color:var(--admin-rule)]")}>
+                  {filteredProposals.map((p) => {
+                    const offer = parseOffer(p.offerDetails, p.currency);
+                    const amount = offer.fullTime
+                      ? offer.fullTime.annualCtcMinor
+                        ? `${formatMoney(offer.fullTime.annualCtcMinor, offer.currency)} a year`
+                        : "-"
+                      : offer.monthlyMinor
+                        ? formatMoney(offer.monthlyMinor, offer.currency)
+                        : "-";
+                    return (
+                      // PROPOSAL ROW (start): one <li> per proposal. Left = who and what, right = status and the
+                      // actions cluster. A component for this row goes inside the "row actions" div below.
+                      <li key={p.id} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3 p-[var(--admin-pad-panel)]">
+                        <div className="min-w-0 flex-1 basis-64">
+                          {p.employerId && company(p.employerId) ? (
+                            <Link href={`/admin/companies/${p.employerId}`} className="font-semibold text-foreground underline-offset-4 [overflow-wrap:anywhere] hover:underline">
+                              {company(p.employerId)}
+                            </Link>
+                          ) : (
+                            <span className="font-semibold text-foreground">Company</span>
+                          )}
+                          <p className="text-sm text-text-subtle [overflow-wrap:anywhere]">{offer.roleTitle || project(p.projectId) || "Project"}</p>
+                          <p className="nums mt-1 text-sm text-foreground">
+                            {offer.fullTime ? "Full-time" : "Internship"} · {amount}
+                            {offer.startDate ? ` · starts ${formatDate(offer.startDate)}` : ""} · sent {formatDate(p.createdAt)}
+                          </p>
+                        </div>
+                        <StatusBadge value={p.status} />
+                        {/* row actions */}
+                        <div className="flex items-center gap-2">
+                          <button type="button" onClick={() => setSelectedProposal(p)} className={cn(buttonClass({ variant: "outline", size: "sm" }), ADMIN_PILL_SECONDARY)}>
+                            <Eye className="size-4" aria-hidden />
+                            View offer
+                          </button>
+                          {p.status === "hired" || p.hiredAt ? (
+                            <CompletionBonusButton
+                              internId={user.id}
+                              proposalId={p.id}
+                              grantedOn={p.completionBonusAt ? formatDate(p.completionBonusAt) : null}
+                            />
+                          ) : null}
+                        </div>
+                      </li>
+                      // PROPOSAL ROW (end)
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+          ) : null}
+
+          {tab === "timesheets" ? <TimesheetsTab timesheets={timesheets} company={company} project={project} proposals={proposals} /> : null}
+
+          {tab === "payments" ? (
+            <div className={cn(ADMIN_SURFACE, "min-w-0 p-5 sm:p-6")}>
+              <SectionHead title="Stipend payouts" hint="What is owed per placement, and every payout recorded for this candidate." />
+              <InternPayoutTools
+                internId={user.id}
+                payouts={payouts}
+                placements={proposals
+                  .filter((p) => p.status === "hired" || p.hiredAt)
+                  .map((p) => ({
+                    id: p.id,
+                    employerId: p.employerId ?? "",
+                    label: `${company(p.employerId) ?? "Company"} · ${project(p.projectId) ?? "Project"}`,
+                  }))}
+                dues={dues}
+              />
+            </div>
+          ) : null}
+
+          {tab === "bank" ? (
+            <div className={cn(ADMIN_SURFACE, "min-w-0 p-5 sm:p-6")}>
+              <SectionHead
+                title="Bank account for stipends"
+                hint="The account number shows its last four. Reveal it only when you are making a payment; each reveal is logged."
+              />
+              {draft?.bank && (draft.bank.accountNumber || draft.bank.upiId) ? (
+                <dl className="divide-y divide-[color:var(--admin-rule)]">
+                  <DetailRow label="Account holder" value={draft.bank.accountHolderName || "-"} />
+                  <DetailRow label="Bank" value={draft.bank.bankName || "-"} />
+                  <DetailRow label="IFSC" value={draft.bank.ifscCode || "-"} mono />
+                  <DetailRow
+                    label="Account number"
+                    value={<RevealValue internId={user.id} field="bank" masked={draft.bank.accountNumber} label="account number" />}
+                    mono
+                  />
+                  <DetailRow label="UPI ID" value={draft.bank.upiId || "-"} mono />
+                </dl>
+              ) : (
+                <EmptyScene
+                  title="No bank details yet"
+                  body="The candidate adds these on the About step of their profile. Stipends can't be paid until they do."
+                  who="The candidate acts next"
+                />
+              )}
+            </div>
+          ) : null}
+        </div>
       </div>
 
       <ProposalDialog
@@ -448,7 +421,7 @@ export function Intern360View({
         company={company(selectedInterview?.employerId)}
         extra={extra}
       />
-    </div>
+    </RecordLayout>
   );
 }
 
@@ -485,12 +458,27 @@ function ProfileTab({
   const phone = (cc: string | undefined, n: string | undefined) => (n ? `${cc || "+91"} ${n}` : "");
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_24rem]">
+    <div className="min-w-0 space-y-4">
       <div className="min-w-0 space-y-4">
         <div className={cn(ADMIN_SURFACE, "min-w-0 p-5 sm:p-6")}>
           <SectionHead title="About" />
           <p className="whitespace-pre-line text-[0.9375rem] leading-relaxed text-ink-800">{draft.bio || "No bio written yet."}</p>
           {draft.previewSummary ? <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-ink-600">{draft.previewSummary}</p> : null}
+        </div>
+
+        <div className={cn(ADMIN_SURFACE, "min-w-0 p-5 sm:p-6")}>
+          <SectionHead title="Skills" hint="What employers see on the candidate card." />
+          <InternSkillsEditor internId={internId} skills={draft.skillsWithRatings ?? skills.map((name) => ({ name, rating: "Beginner" as const }))} />
+        </div>
+        <div className={cn(ADMIN_SURFACE, "min-w-0 p-5 sm:p-6")}>
+          <SectionHead title="Score and ratings" hint="The Findtern Score is the mean of the four ratings; it sets the price band." />
+          <RatingsEditor
+            internId={internId}
+            ratings={ratings}
+            score={score}
+            initialFeedbackLink={(extra.aiFeedbackLink as string) || null}
+            initialRecordingLink={(extra.aiRecordingLink as string) || null}
+          />
         </div>
 
         <div className={cn(ADMIN_SURFACE, "min-w-0 p-5 sm:p-6")}>
@@ -595,7 +583,7 @@ function ProfileTab({
           )}
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-4 @xl:grid-cols-2">
           <div className={cn(ADMIN_SURFACE, "min-w-0 p-5 sm:p-6")}>
             <SectionHead title="Languages" />
             {draft.languages?.length ? (
@@ -635,22 +623,6 @@ function ProfileTab({
         </div>
       </div>
 
-      <div className="min-w-0 space-y-4">
-        <div className={cn(ADMIN_SURFACE, "min-w-0 p-5 sm:p-6")}>
-          <SectionHead title="Skills" hint="What employers see on the candidate card." />
-          <InternSkillsEditor internId={internId} skills={draft.skillsWithRatings ?? skills.map((name) => ({ name, rating: "Beginner" as const }))} />
-        </div>
-        <div className={cn(ADMIN_SURFACE, "min-w-0 p-5 sm:p-6")}>
-          <SectionHead title="Score and ratings" hint="The Findtern Score is the mean of the four ratings; it sets the price band." />
-          <RatingsEditor
-            internId={internId}
-            ratings={ratings}
-            score={score}
-            initialFeedbackLink={(extra.aiFeedbackLink as string) || null}
-            initialRecordingLink={(extra.aiRecordingLink as string) || null}
-          />
-        </div>
-      </div>
     </div>
   );
 }
@@ -661,50 +633,42 @@ function DocumentsTab({ internId, documents }: { internId: string; documents: Ca
   const missing = DOCUMENT_SLOTS.filter((slot) => !documents.some((d) => d.label === slot));
   const href = (key: string, download = false) =>
     `/admin/interns/${encodeURIComponent(internId)}/documents/open?key=${encodeURIComponent(key)}${download ? "&download=1" : ""}`;
+  const round =
+    "apple-spring grid size-9 shrink-0 place-items-center rounded-full bg-[color:var(--admin-panel-2)] text-foreground hover:bg-[color:var(--admin-tile)] hover:text-[color:var(--admin-tile-ink)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring touch:size-11";
   return (
-    <div data-stack className={cn(ADMIN_SURFACE, "min-w-0 lg:overflow-x-auto")}>
-      <table className="w-full text-left text-sm lg:min-w-[36rem]">
-        <thead className="border-b border-ink-100 bg-ink-50 text-xs font-semibold text-ink-600">
-          <tr>
-            <th scope="col" className="px-4 py-2.5">Document</th>
-            <th scope="col" className="px-4 py-2.5">Group</th>
-            <th scope="col" className="px-4 py-2.5 text-right">Size</th>
-            <th scope="col" className="px-4 py-2.5"><span className="sr-only">Actions</span></th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-ink-100">
-          {documents.map((d) => (
-            <tr key={d.key} className="hover:bg-ink-50/60">
-              <td data-title className="px-4 py-3 font-medium text-ink-900 [overflow-wrap:anywhere]">{d.label}</td>
-              <td data-label="Group" className="px-4 py-3 text-ink-600">{d.group}</td>
-              <td data-label="Size" data-empty={d.size ? undefined : ""} className="nums px-4 py-3 text-right text-ink-600">{d.size ? fileSize(d.size) : "-"}</td>
-              <td className="px-4 py-3">
-                <span className="flex justify-end gap-1.5">
-                  <a href={href(d.key)} target="_blank" rel="noopener noreferrer" className={buttonClass({ variant: "outline", size: "sm" })}>
-                    <Eye className="size-4" aria-hidden />
-                    View
-                  </a>
-                  <a href={href(d.key, true)} className={buttonClass({ variant: "ghost", size: "sm" })}>
-                    <Download className="size-4" aria-hidden />
-                    Download
-                  </a>
-                </span>
-              </td>
-            </tr>
-          ))}
-          {missing.map((slot) => (
-            <tr key={slot}>
-              <td data-title className="px-4 py-3 text-ink-700 [overflow-wrap:anywhere]">{slot}</td>
-              <td data-label="Group" className="px-4 py-3 text-ink-600">{slot === "Aadhaar card" || slot === "PAN card" ? "Identity" : "Media"}</td>
-              <td data-empty className="px-4 py-3 text-right text-text-subtle">-</td>
-              <td className="px-4 py-3 text-right">
-                <Pill tone="closed">Not uploaded</Pill>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <ul className={cn(ADMIN_SURFACE, "min-w-0 divide-y divide-[color:var(--admin-rule)]")}>
+      {documents.map((d) => (
+        <li key={d.key} className="flex items-center gap-3 p-[var(--admin-pad-panel)]">
+          <span aria-hidden className="grid size-11 shrink-0 place-items-center rounded-2xl bg-[color:var(--admin-panel-2)] text-foreground">
+            <FileIcon className="size-5" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="font-semibold text-foreground [overflow-wrap:anywhere]">{d.label}</p>
+            <p className="nums text-sm text-text-subtle">
+              {[d.group, d.contentType ? d.contentType.split("/").pop()?.toUpperCase() : null, d.size ? fileSize(d.size) : null].filter(Boolean).join(" · ")}
+            </p>
+          </div>
+          <a href={href(d.key)} target="_blank" rel="noopener noreferrer" aria-label={`View ${d.label}`} title="View" className={round}>
+            <Eye className="size-4" aria-hidden />
+          </a>
+          <a href={href(d.key, true)} aria-label={`Download ${d.label}`} title="Download" className={round}>
+            <Download className="size-4" aria-hidden />
+          </a>
+        </li>
+      ))}
+      {missing.map((slot) => (
+        <li key={slot} className="flex items-center gap-3 p-[var(--admin-pad-panel)]">
+          <span aria-hidden className="grid size-11 shrink-0 place-items-center rounded-2xl bg-[color:var(--admin-panel-2)] text-text-subtle">
+            <FileIcon className="size-5" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="font-medium text-foreground [overflow-wrap:anywhere]">{slot}</p>
+            <p className="text-sm text-text-subtle">{slot === "Aadhaar card" || slot === "PAN card" ? "Identity" : "Media"}</p>
+          </div>
+          <Pill tone="closed">Not uploaded</Pill>
+        </li>
+      ))}
+    </ul>
   );
 }
 

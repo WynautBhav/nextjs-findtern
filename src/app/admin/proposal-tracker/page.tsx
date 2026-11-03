@@ -10,6 +10,7 @@ import { formatNumber } from "@/lib/format";
 import { AdminLoadError, AdminPageHeader, Panel } from "@/components/admin/panel";
 import { DateRangeForm } from "@/components/admin/date-range-form";
 import { ProposalTrackerView, TRACKER_TABS, type TrackerTab } from "@/components/admin/proposal-tracker-view";
+import { ADMIN_PILL_SECONDARY } from "@/components/admin/surface";
 import { ButtonAnchor } from "@/components/ui/button";
 
 /**
@@ -117,6 +118,7 @@ export default async function AdminProposalTrackerPage({
           }
           variant="outline"
           size="sm"
+          className={ADMIN_PILL_SECONDARY}
         >
           <Download className="size-4" aria-hidden />
           {tab === "hired" ? "Export hires" : "Export CSV"}
@@ -185,8 +187,8 @@ export default async function AdminProposalTrackerPage({
           repeated the tab counts below (critique). */}
       <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
         <DateRangeForm params={params} />
-        <p className="nums pb-2 text-sm text-ink-600">
-          <span className="font-medium text-ink-900">{rangeLabel}</span>
+        <p className="nums pb-2 text-sm text-text-subtle">
+          <span className="font-medium text-foreground">{rangeLabel}</span>
           {" · "}
           {formatNumber(won)} accepted or hired
           {rate === null ? "" : ` (${rate}% of decided offers, ${formatNumber(lost)} declined)`}

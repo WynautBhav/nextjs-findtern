@@ -1,15 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Clock, ExternalLink, FileText, Globe, Loader2, Mail, MailOpen, Paperclip, Reply, Trash2, Video } from "lucide-react";
+import { ArrowLeft, Clock, ExternalLink, FileText, Globe, Loader2, Mail, MailOpen, MessageSquare, Paperclip, Reply, Trash2, Video } from "lucide-react";
 
+import { AdminAvatar } from "@/components/admin/avatar";
 import { AdminEmpty } from "@/components/admin/panel";
-import { StatusBadge } from "@/components/admin/status-badge";
-import { Pill } from "@/components/app/primitives";
+import { StatusBadge, type StatusTone } from "@/components/admin/status-badge";
+import { ADMIN_PILL_PRIMARY, ADMIN_PILL_SECONDARY } from "@/components/admin/surface";
 import { buttonClass } from "@/components/ui/button";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import type { ContactFile, ContactMeta } from "@/lib/admin/contact-meta";
 import { csrfFetch } from "@/lib/client-fetch";
 import { formatNumber, shortDate, shortDateTime } from "@/lib/format";
@@ -57,9 +57,10 @@ function when(iso: string | null, withTime = false): string {
   return withTime ? shortDateTime(date, { ...day, hour: "2-digit", minute: "2-digit", hour12: true }) : shortDate(date, day);
 }
 
-function initials(name: string): string {
-  const parts = name.trim().split(/\s+/);
-  return `${parts[0]?.charAt(0) ?? ""}${parts[1]?.charAt(0) ?? ""}`.toUpperCase() || "?";
+const FOCUS = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
+
+function kindTone(m: InboxMessage): StatusTone {
+  return m.meta.kind === "report" ? "warning" : m.meta.kind === "feedback" ? "info" : "neutral";
 }
 
 export function MessagesInbox({ messages, filtering }: { messages: InboxMessage[]; filtering: boolean }) {
@@ -76,10 +77,23 @@ export function MessagesInbox({ messages, filtering }: { messages: InboxMessage[
     setRows(messages);
     setSelected(new Set());
   }
+  const paneRef = useRef<HTMLDivElement>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const open = rows.find((m) => m.id === openId) ?? null;
+  // On a phone the reading pane replaces the list, so move focus into it; on a
+  // wide screen both are visible and the row keeps focus.
+  useEffect(() => {
+    if (openId && !window.matchMedia("(min-width: 1024px)").matches) paneRef.current?.focus();
+  }, [openId]);
+
+  function closePane() {
+    const id = openId;
+    setOpenId(null);
+    if (id) requestAnimationFrame(() => document.getElementById(`msg-row-${id}`)?.focus());
+  }
+
   const allSelected = rows.length > 0 && rows.every((m) => selected.has(m.id));
 
   async function send(method: "PATCH" | "DELETE", ids: string[], isRead?: boolean): Promise<boolean> {
@@ -170,116 +184,131 @@ export function MessagesInbox({ messages, filtering }: { messages: InboxMessage[
   const selectedIds = [...selected];
 
   return (
-    <div>
+    <div className="lg:grid lg:grid-cols-[minmax(20rem,26rem)_minmax(0,1fr)]">
       {dialog}
-      {/* Bulk bar replaces the select-all row while a selection exists. */}
-      <div className="flex min-h-12 flex-wrap items-center gap-2 border-b border-ink-100 bg-ink-50/60 px-5 py-2">
-        <label className="inline-flex min-h-9 items-center gap-2.5 text-sm font-medium text-ink-700 max-lg:min-h-11">
-          <input
-            type="checkbox"
-            checked={allSelected}
-            onChange={() => setSelected(allSelected ? new Set() : new Set(rows.map((m) => m.id)))}
-            className="size-4 rounded-sm accent-brand-700"
-          />
-          {selected.size ? `${formatNumber(selected.size)} selected` : "Select all on this page"}
-        </label>
-        {selected.size ? (
-          <div className="flex flex-wrap items-center gap-1.5 sm:ml-auto">
-            <button type="button" disabled={busy} onClick={() => setRead(selectedIds, true)} className={buttonClass({ variant: "outline", size: "sm" })}>
-              <MailOpen className="size-4" aria-hidden />
-              Mark read
-            </button>
-            <button type="button" disabled={busy} onClick={() => setRead(selectedIds, false)} className={buttonClass({ variant: "outline", size: "sm" })}>
-              <Mail className="size-4" aria-hidden />
-              Mark unread
-            </button>
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => remove(selectedIds)}
-              className={cn(buttonClass({ variant: "ghost", size: "sm" }), "text-danger hover:bg-danger-soft")}
-            >
-              <Trash2 className="size-4" aria-hidden />
-              Delete
-            </button>
-            {busy ? <Loader2 className="size-4 animate-spin text-text-subtle" aria-label="Saving" /> : null}
-          </div>
-        ) : null}
-      </div>
-      {error && !open ? (
-        <p role="alert" className="border-b border-danger/20 bg-danger-soft px-5 py-2.5 text-sm font-medium text-danger">
-          {error}
-        </p>
-      ) : null}
-
-      <ul className="divide-y divide-ink-100">
-        {rows.map((m) => {
-          const role = roleLabel(m);
-          return (
-            <li key={m.id} className={cn("flex items-start gap-3 px-5 py-3.5 hover:bg-ink-50/60", selected.has(m.id) && "bg-brand-50/50")}>
-              {/* The label is the 44px target; negative margins keep the box
-                  where it was (QA-146). */}
-              <label className="-m-3 flex size-11 shrink-0 cursor-pointer items-start justify-center pt-3 max-lg:-m-2.5 max-lg:items-center max-lg:pt-0">
-                <input
-                  type="checkbox"
-                  aria-label={`Select message from ${m.name}`}
-                  checked={selected.has(m.id)}
-                  onChange={() => toggle(m.id)}
-                  className="mt-1 size-4 shrink-0 rounded-sm accent-brand-700 max-lg:mt-0 max-lg:size-5"
-                />
-              </label>
+      {/* List column. Below lg it hides while a message is open (the reading pane takes its place). */}
+      <div className={cn("min-w-0 lg:border-r lg:border-[color:var(--admin-rule)]", open && "max-lg:hidden")}>
+        {/* Bulk bar replaces the select-all row while a selection exists. */}
+        <div className="flex min-h-12 flex-wrap items-center gap-2 px-[var(--admin-pad-panel)] py-2">
+          <label className="inline-flex min-h-9 items-center gap-2.5 text-sm font-medium text-foreground max-lg:min-h-11">
+            <input
+              type="checkbox"
+              checked={allSelected}
+              onChange={() => setSelected(allSelected ? new Set() : new Set(rows.map((m) => m.id)))}
+              className="size-4 rounded-sm accent-[color:var(--admin-tile)]"
+            />
+            {selected.size ? `${formatNumber(selected.size)} selected` : "Select all on this page"}
+          </label>
+          {selected.size ? (
+            <div className="flex flex-wrap items-center gap-1.5 sm:ml-auto">
+              <button type="button" disabled={busy} onClick={() => setRead(selectedIds, true)} className={buttonClass({ variant: "outline", size: "sm", className: ADMIN_PILL_SECONDARY })}>
+                <MailOpen className="size-4" aria-hidden />
+                Mark read
+              </button>
+              <button type="button" disabled={busy} onClick={() => setRead(selectedIds, false)} className={buttonClass({ variant: "outline", size: "sm", className: ADMIN_PILL_SECONDARY })}>
+                <Mail className="size-4" aria-hidden />
+                Mark unread
+              </button>
               <button
                 type="button"
-                onClick={() => openMessage(m)}
-                className="flex min-w-0 flex-1 items-start gap-3 text-left focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-600"
+                disabled={busy}
+                onClick={() => remove(selectedIds)}
+                className={cn(buttonClass({ variant: "ghost", size: "sm" }), "rounded-full text-danger hover:bg-danger-soft")}
               >
-                {/* The row's visible text is its name (sender, date, subject),
-                    so voice control can say what it sees; only "unread" is added. */}
-                {m.isRead ? null : <span className="sr-only">Unread. </span>}
-                <span
-                  aria-hidden
-                  className={cn(
-                    "relative grid size-9 shrink-0 place-items-center rounded-full text-sm font-semibold",
-                    m.isRead ? "bg-ink-100 text-ink-600" : "bg-brand-100 text-brand-800",
-                  )}
+                <Trash2 className="size-4" aria-hidden />
+                Delete
+              </button>
+              {busy ? <Loader2 className="size-4 animate-spin text-text-subtle" aria-label="Saving" /> : null}
+            </div>
+          ) : null}
+        </div>
+        {error && !open ? (
+          <p role="alert" className="mx-[var(--admin-pad-panel)] mb-2 rounded-2xl bg-danger-soft px-4 py-2.5 text-sm font-medium text-danger">
+            {error}
+          </p>
+        ) : null}
+
+        <ul className="px-2 pb-2 lg:max-h-[min(46rem,calc(100dvh-17rem))] lg:overflow-y-auto">
+          {rows.map((m) => {
+            const name = m.sender?.name ?? m.name;
+            const isOpen = m.id === openId;
+            return (
+              <li
+                key={m.id}
+                className={cn(
+                  "flex items-start gap-1 rounded-2xl px-2 py-3 hover:bg-[color:var(--admin-panel-2)]",
+                  (isOpen || selected.has(m.id)) && "bg-[color:var(--admin-panel-2)]",
+                )}
+              >
+                {/* The label is the 44px target; negative margins keep the box
+                    where it was (QA-146). */}
+                <label className="flex size-11 shrink-0 cursor-pointer items-start justify-center pt-2.5 max-lg:items-center max-lg:pt-0">
+                  <input
+                    type="checkbox"
+                    aria-label={`Select message from ${m.name}`}
+                    checked={selected.has(m.id)}
+                    onChange={() => toggle(m.id)}
+                    className="mt-1 size-4 shrink-0 rounded-sm accent-[color:var(--admin-tile)] max-lg:mt-0 max-lg:size-5"
+                  />
+                </label>
+                <button
+                  type="button"
+                  id={`msg-row-${m.id}`}
+                  onClick={() => openMessage(m)}
+                  aria-current={isOpen ? "true" : undefined}
+                  className={cn("flex min-w-0 flex-1 items-start gap-3 rounded-xl text-left", FOCUS)}
                 >
-                  {initials(m.sender?.name ?? m.name)}
-                  {m.isRead ? null : <span className="absolute -top-0.5 -right-0.5 size-2.5 rounded-full bg-info ring-2 ring-card" />}
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="flex items-baseline justify-between gap-3">
-                    <span className={cn("break-words text-[0.9375rem] text-ink-900", m.isRead ? "font-medium" : "font-semibold")}>
-                      {m.sender?.name ?? m.name}
+                  {/* The row's visible text is its name (sender, date, subject),
+                      so voice control can say what it sees; only "unread" is added. */}
+                  {m.isRead ? null : <span className="sr-only">Unread. </span>}
+                  <AdminAvatar name={name} id={m.email} size="md" className="mt-0.5" />
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-center justify-between gap-3">
+                      <span className={cn("flex min-w-0 items-center gap-2 text-[0.9375rem] text-foreground", m.isRead ? "font-medium" : "font-semibold")}>
+                        <span className="truncate">{name}</span>
+                        {m.isRead ? null : <span aria-hidden className="size-2 shrink-0 rounded-full bg-[color:var(--admin-tile)]" />}
+                      </span>
+                      <span className="nums shrink-0 text-xs text-text-subtle">{when(m.createdAt)}</span>
                     </span>
-                    <span className="nums shrink-0 text-xs text-ink-600">{when(m.createdAt)}</span>
-                  </span>
-                  <span className={cn("mt-0.5 block truncate text-sm", m.isRead ? "text-ink-600" : "font-medium text-ink-900")}>
-                    {m.subject || "No subject"}
-                  </span>
-                  <span className="mt-1 block truncate text-sm text-ink-600">{m.meta.body || "(no text)"}</span>
-                  <span className="mt-2 flex flex-wrap items-center gap-1.5">
-                    <Pill tone={m.meta.kind === "report" ? "waiting" : m.meta.kind === "feedback" ? "new" : "neutral"}>{kindLabel(m)}</Pill>
-                    {role ? <Pill tone="closed">{role}</Pill> : null}
+                    <span className={cn("mt-0.5 block truncate text-sm text-foreground", m.isRead ? "" : "font-medium")}>{m.subject || "No subject"}</span>
+                    <span className="mt-0.5 block truncate text-sm text-text-subtle">{m.meta.body || "(no text)"}</span>
                     {m.meta.files.length ? (
-                      <span className="inline-flex items-center gap-1 text-xs text-ink-600">
+                      <span className="mt-1.5 inline-flex items-center gap-1 text-xs text-text-subtle">
                         <Paperclip className="size-3.5" aria-hidden />
                         <span className="nums">{formatNumber(m.meta.files.length)}</span>
                         <span className="sr-only">attachments</span>
                       </span>
                     ) : null}
                   </span>
-                </span>
-              </button>
-            </li>
-          );
-        })}
-      </ul>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
 
-      <Sheet open={Boolean(open)} onOpenChange={(v) => !v && setOpenId(null)}>
-        <SheetContent side="right" className="w-full overflow-y-auto bg-ink-50 p-0 sm:max-w-xl">
-          {open ? <MessageDetail m={open} busy={busy} error={error} onRead={(v) => setRead([open.id], v)} onDelete={() => remove([open.id])} /> : null}
-        </SheetContent>
-      </Sheet>
+      {/* Reading pane. */}
+      <div className={cn("min-w-0 lg:max-h-[min(50rem,calc(100dvh-14rem))] lg:overflow-y-auto", !open && "max-lg:hidden")}>
+        {open ? (
+          <MessageDetail
+            m={open}
+            busy={busy}
+            error={error}
+            paneRef={paneRef}
+            onBack={closePane}
+            onRead={(v) => setRead([open.id], v)}
+            onDelete={() => remove([open.id])}
+          />
+        ) : (
+          <div className="flex h-full min-h-72 flex-col items-center justify-center px-6 py-14 text-center">
+            <span aria-hidden className="mb-3 grid size-12 place-items-center rounded-full bg-[color:var(--admin-panel-2)] text-text-subtle">
+              <MessageSquare className="size-5" />
+            </span>
+            <p className="text-base font-semibold text-foreground">Select a message</p>
+            <p className="mt-1 max-w-xs text-sm text-text-subtle">Opening one marks it read and shows the full text and attachments here.</p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -288,62 +317,74 @@ function MessageDetail({
   m,
   busy,
   error,
+  paneRef,
+  onBack,
   onRead,
   onDelete,
 }: {
   m: InboxMessage;
   busy: boolean;
   error: string | null;
+  paneRef: React.RefObject<HTMLDivElement | null>;
+  onBack: () => void;
   onRead: (isRead: boolean) => void;
   onDelete: () => void;
 }) {
   const role = roleLabel(m);
+  const name = m.sender?.name ?? m.name;
   const pageHref = m.meta.pageUrl && /^(https?:\/\/|\/)/i.test(m.meta.pageUrl) ? m.meta.pageUrl : null;
   return (
-    <div className="space-y-4 p-4 sm:p-6">
-      <SheetHeader className="rounded-apple-lg border border-ink-200/80 bg-card p-5 text-left shadow-xs">
-        <div className="flex items-start gap-3 pr-8">
-          <span aria-hidden className="grid size-11 shrink-0 place-items-center rounded-full bg-brand-100 text-[0.9375rem] font-semibold text-brand-800">
-            {initials(m.sender?.name ?? m.name)}
-          </span>
-          <div className="min-w-0 flex-1">
-            <SheetTitle className="text-lg font-semibold text-ink-900">{m.sender?.name ?? m.name}</SheetTitle>
-            <SheetDescription className="mt-0.5 text-sm break-all text-ink-600">
-              {m.email}
-              {m.phone ? ` · ${m.phone}` : ""}
-            </SheetDescription>
-            <div className="mt-2 flex flex-wrap items-center gap-1.5">
-              <StatusBadge tone={m.isRead ? "neutral" : "warning"} label={m.isRead ? "Read" : "Unread"} />
-              <Pill tone={m.meta.kind === "report" ? "waiting" : m.meta.kind === "feedback" ? "new" : "neutral"}>{kindLabel(m)}</Pill>
-              {role ? <Pill tone="closed">{role}</Pill> : null}
-            </div>
+    <article aria-label={`Message from ${name}`} className="space-y-5 p-[var(--admin-pad-panel)]">
+      <button
+        type="button"
+        onClick={onBack}
+        className={cn(buttonClass({ variant: "ghost", size: "sm" }), "-ml-2 rounded-full lg:hidden max-lg:h-11")}
+      >
+        <ArrowLeft className="size-4" aria-hidden />
+        Back to inbox
+      </button>
+
+      <header className="flex items-start gap-3">
+        <AdminAvatar name={name} id={m.email} size="lg" />
+        <div className="min-w-0 flex-1">
+          <h2 ref={paneRef} tabIndex={-1} className="break-words text-lg font-semibold text-foreground outline-none">
+            {name}
+          </h2>
+          <p className="mt-0.5 break-all text-sm text-text-subtle">
+            {m.email}
+            {m.phone ? ` · ${m.phone}` : ""}
+          </p>
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            <StatusBadge tone={m.isRead ? "neutral" : "warning"} label={m.isRead ? "Read" : "Unread"} />
+            <StatusBadge tone={kindTone(m)} label={kindLabel(m)} dot={false} />
+            {role ? <StatusBadge tone="neutral" label={role} dot={false} /> : null}
           </div>
         </div>
-        {m.sender ? (
-          <Link href={m.sender.href} className={cn(buttonClass({ variant: "outline", size: "sm" }), "mt-4 self-start")}>
-            Open {m.sender.role === "intern" ? "candidate" : "company"} record
-            <ExternalLink className="size-3.5" aria-hidden />
-          </Link>
-        ) : null}
-      </SheetHeader>
+      </header>
 
       <div className="flex flex-wrap items-center gap-2">
         <a
           href={`mailto:${m.email}?subject=${encodeURIComponent(`Re: ${m.subject || "Findtern enquiry"}`)}`}
-          className={buttonClass({ variant: "primary", size: "sm" })}
+          className={buttonClass({ variant: "primary", size: "sm", className: ADMIN_PILL_PRIMARY })}
         >
           <Reply className="size-4" aria-hidden />
           Reply by email
         </a>
-        <button type="button" disabled={busy} onClick={() => onRead(!m.isRead)} className={buttonClass({ variant: "outline", size: "sm" })}>
+        <button type="button" disabled={busy} onClick={() => onRead(!m.isRead)} className={buttonClass({ variant: "outline", size: "sm", className: ADMIN_PILL_SECONDARY })}>
           {m.isRead ? <Mail className="size-4" aria-hidden /> : <MailOpen className="size-4" aria-hidden />}
           {m.isRead ? "Mark unread" : "Mark read"}
         </button>
+        {m.sender ? (
+          <Link href={m.sender.href} className={buttonClass({ variant: "outline", size: "sm", className: ADMIN_PILL_SECONDARY })}>
+            Open {m.sender.role === "intern" ? "candidate" : "company"} record
+            <ExternalLink className="size-3.5" aria-hidden />
+          </Link>
+        ) : null}
         <button
           type="button"
           disabled={busy}
           onClick={onDelete}
-          className={cn(buttonClass({ variant: "ghost", size: "sm" }), "ml-auto text-danger hover:bg-danger-soft")}
+          className={cn(buttonClass({ variant: "ghost", size: "sm" }), "rounded-full text-danger hover:bg-danger-soft sm:ml-auto")}
         >
           <Trash2 className="size-4" aria-hidden />
           Delete
@@ -355,11 +396,12 @@ function MessageDetail({
         ) : null}
       </div>
 
-      <section className="overflow-hidden rounded-apple-lg border border-ink-200/80 bg-card shadow-xs">
-        <div className="border-b border-ink-100 px-5 py-4">
-          <p className="text-xs font-medium text-ink-600">Subject</p>
-          <p className="mt-1 text-[0.9375rem] font-semibold text-ink-900">{m.subject || "No subject"}</p>
-          <dl className="mt-3 grid gap-1.5 text-sm text-ink-600">
+      {/* The thread: subject and time, then the message as one bubble. */}
+      <section aria-label="Message" className="space-y-3">
+        <div>
+          <p className="text-xs font-medium text-text-subtle">Subject</p>
+          <p className="mt-0.5 text-base font-semibold text-foreground">{m.subject || "No subject"}</p>
+          <dl className="mt-2 grid gap-1.5 text-sm text-text-subtle">
             <div className="flex items-center gap-2">
               <Clock className="size-3.5 shrink-0" aria-hidden />
               <dt className="sr-only">Received</dt>
@@ -371,7 +413,7 @@ function MessageDetail({
                 <dt className="sr-only">Sent from page</dt>
                 <dd className="min-w-0 truncate">
                   {pageHref ? (
-                    <a href={pageHref} target="_blank" rel="noreferrer noopener" className="text-brand-700 underline-offset-4 hover:underline" title={m.meta.pageUrl}>
+                    <a href={pageHref} target="_blank" rel="noreferrer noopener" className="rounded-sm text-brand-700 underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-ring" title={m.meta.pageUrl}>
                       {m.meta.pageUrl}
                     </a>
                   ) : (
@@ -382,22 +424,24 @@ function MessageDetail({
             ) : null}
             {m.meta.topic ? (
               <div className="flex items-center gap-2">
-                <dt className="text-ink-600">Topic:</dt>
-                <dd className="font-medium capitalize text-ink-800">{m.meta.topic}</dd>
+                <dt>Topic:</dt>
+                <dd className="font-medium capitalize text-foreground">{m.meta.topic}</dd>
               </div>
             ) : null}
           </dl>
         </div>
-        <div className="px-5 py-4">
-          <p className="text-xs font-medium text-ink-600">Message</p>
-          <p className="mt-2 text-[0.9375rem] leading-relaxed whitespace-pre-wrap break-words text-ink-800">{m.meta.body || "(no text)"}</p>
+        <div className="flex items-end gap-2.5">
+          <AdminAvatar name={name} id={m.email} size="sm" className="mb-0.5" />
+          <p className="max-w-[min(100%,40rem)] rounded-[1.25rem] rounded-bl-md bg-[color:var(--admin-panel-2)] px-4 py-3 text-[0.9375rem] leading-relaxed whitespace-pre-wrap break-words text-foreground">
+            {m.meta.body || "(no text)"}
+          </p>
         </div>
       </section>
 
       {m.meta.files.length ? (
-        <section className="rounded-apple-lg border border-ink-200/80 bg-card p-5 shadow-xs">
-          <h3 className="text-sm font-semibold text-ink-900">
-            Attachments <span className="nums font-normal text-ink-600">({m.meta.files.length})</span>
+        <section aria-labelledby={`att-${m.id}`}>
+          <h3 id={`att-${m.id}`} className="text-sm font-semibold text-foreground">
+            Attachments <span className="nums font-normal text-text-subtle">({m.meta.files.length})</span>
           </h3>
           <ul className="mt-3 grid gap-3 sm:grid-cols-2">
             {m.meta.files.map((f) => (
@@ -406,27 +450,30 @@ function MessageDetail({
           </ul>
         </section>
       ) : null}
-    </div>
+    </article>
   );
 }
 
 function Attachment({ file }: { file: ContactFile }) {
   return (
-    <li className="min-w-0 overflow-hidden rounded-apple-md border border-ink-200/80">
+    <li className="min-w-0 space-y-2">
       {file.type === "image" ? (
-        <a href={file.href} target="_blank" rel="noreferrer" className="block bg-ink-50">
+        <a href={file.href} target="_blank" rel="noreferrer" className={cn("block overflow-hidden rounded-2xl bg-[color:var(--admin-panel-2)]", FOCUS)}>
           {/* Admin-only file route; next/image can't forward the session. */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={file.href} alt={`Attachment ${file.name}`} loading="lazy" className="h-36 w-full object-contain" />
         </a>
       ) : file.type === "video" ? (
-        <video src={file.href} controls preload="metadata" className="h-36 w-full bg-ink-50" />
+        <video src={file.href} controls preload="metadata" className="h-36 w-full rounded-2xl bg-[color:var(--admin-panel-2)]" />
       ) : null}
       <a
         href={file.href}
         target="_blank"
         rel="noreferrer"
-        className="flex min-h-11 items-center gap-2 px-3 py-2 text-sm font-medium text-brand-700 hover:bg-brand-50"
+        className={cn(
+          "inline-flex min-h-11 max-w-full items-center gap-2 rounded-full bg-[color:var(--admin-panel-2)] px-4 py-2 text-sm font-medium text-foreground hover:bg-[color:var(--admin-bar-tint)]",
+          FOCUS,
+        )}
       >
         {file.type === "video" ? <Video className="size-4 shrink-0" aria-hidden /> : file.type === "image" ? <Paperclip className="size-4 shrink-0" aria-hidden /> : <FileText className="size-4 shrink-0" aria-hidden />}
         <span className="min-w-0 truncate" title={file.name}>

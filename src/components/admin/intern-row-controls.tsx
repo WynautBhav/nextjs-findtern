@@ -1,5 +1,6 @@
 import { InlineEditor, InlineSelect, InlineToggle } from "@/components/admin/inline-control";
 import type { InlineField } from "@/lib/admin/inline-request";
+import type { StatusTone } from "@/components/admin/status-badge";
 
 /**
  * Row-level controls for the candidate and user lists and the Candidate 360
@@ -14,10 +15,14 @@ const APPROVAL = [
   { value: "Rejected", label: "Rejected" },
 ] as const;
 
-export function InternApprovalCell({ internId, value }: { internId: string; value: string }) {
+const APPROVAL_TONES: Record<string, StatusTone> = { Pending: "warning", Approved: "success", Rejected: "danger" };
+
+/** `pill` draws the select as a pastel pill tinted by the review state (lists); it stays a labelled `<select>`. */
+export function InternApprovalCell({ internId, value, pill = false }: { internId: string; value: string; pill?: boolean }) {
   return (
     <InlineSelect
       label="Review status"
+      tones={pill ? APPROVAL_TONES : undefined}
       value={APPROVAL.some((o) => o.value === value) ? value : "Pending"}
       options={APPROVAL}
       request={{ url: `/api/admin/interns/${encodeURIComponent(internId)}/approval`, method: "PUT", valueKey: "approvalStatus" }}
@@ -25,9 +30,11 @@ export function InternApprovalCell({ internId, value }: { internId: string; valu
   );
 }
 
-export function InternVisibilityCell({ internId, live }: { internId: string; live: boolean }) {
+export function InternVisibilityCell({ internId, live, compact = false }: { internId: string; live: boolean; compact?: boolean }) {
   return (
     <InlineToggle
+      compact={compact}
+      icons="eye"
       on={live}
       onLabel="Live"
       offLabel="Hidden"
@@ -44,10 +51,11 @@ export function InternVisibilityCell({ internId, live }: { internId: string; liv
  * Active / inactive. Candidates go through `/api/users/[id]/…`; companies
  * through the company PATCH, which also clears their cached sign-in status.
  */
-export function AccountActiveCell({ id, kind, active }: { id: string; kind: "intern" | "employer"; active: boolean }) {
+export function AccountActiveCell({ id, kind, active, compact = false }: { id: string; kind: "intern" | "employer"; active: boolean; compact?: boolean }) {
   const enc = encodeURIComponent(id);
   return (
     <InlineToggle
+      compact={compact}
       on={active}
       onLabel="Active"
       offLabel="Inactive"
@@ -97,7 +105,7 @@ export function InternRatingsCell({
       note="Empty clears that rating. The score is their mean."
       display={
         score === null ? (
-          <span className="text-ink-600">Not scored</span>
+          <span className="text-text-subtle">Not scored</span>
         ) : (
           <span className="nums font-semibold text-ink-900">
             {score.toFixed(1)}

@@ -11,12 +11,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { AdminAvatar } from "./avatar.tsx";
 import { AdminEmpty } from "./panel.tsx";
 import { DataTableKeys } from "./data-table-keys.tsx";
 import { PageSizeSelect } from "./page-size-select.tsx";
 import { Pager } from "./pagination.tsx";
 import { SortSelect } from "./sort-select.tsx";
 import { hasActiveFilters } from "./table-state.ts";
+import { ADMIN_SURFACE } from "./surface.ts";
 import { TableToolbar, type ToolbarFilter } from "./table-toolbar.tsx";
 import { toQueryString } from "@/lib/admin/params";
 import { cn } from "@/lib/utils";
@@ -25,8 +27,10 @@ import { cn } from "@/lib/utils";
  * DataTable - the shared shell for every admin list. It composes the headless
  * parts (`table-state.ts` / `useUrlTableState`, `TableToolbar`, `SortSelect`,
  * `PageSizeSelect`, `Pager`), which a redesigned page can also use on its own.
- * The shell itself is flat: a 1px `border-border` rule on the page ground, no
- * shadow (SPECS 3 Nov). A page that wants a lifted ground passes `className`.
+ * The shell is the white admin panel (`ADMIN_SURFACE`), so callers must not
+ * wrap it in another card. Header: 13px grey sentence case, no band. Rows:
+ * `--admin-row-h` tall with a faint `--admin-rule` underline and a tone-step
+ * hover. Use `IdentityCell` for a person/company column.
  *
  * Owns the chrome (toolbar row, header, pager) so each page only
  * declares its columns and how to render a row. That is what stops the three
@@ -79,11 +83,67 @@ export function parseSort<K extends string>(
 
 export type DataTableDensity = "comfortable" | "compact" | "ledger";
 
+/** First and last cells line up with the panel's own padding. */
+const EDGE_PAD = "first:pl-[var(--admin-pad-panel)] last:pr-[var(--admin-pad-panel)]";
+
 const CELL_PAD: Record<DataTableDensity, string> = {
   comfortable: "px-3 py-3",
   compact: "px-3 py-2",
   ledger: "px-3 py-1.5",
 };
+
+/** Row height from the density token (desktop table only: the phone stack sizes itself). */
+const ROW_H: Record<DataTableDensity, string> = {
+  comfortable: "lg:h-[var(--admin-row-h)]",
+  compact: "lg:h-11",
+  ledger: "lg:h-9",
+};
+
+/**
+ * Identity cell: avatar, name and an optional second line (email, college).
+ * Drop it into a column's `cell`. `href` makes the name a link. Name and sub
+ * truncate on desktop and wrap in the stacked phone layout.
+ */
+export function IdentityCell({
+  name,
+  id,
+  photoUrl,
+  sub,
+  href,
+  size = "md",
+  className,
+}: {
+  name: string | null | undefined;
+  /** Stable key for the avatar tint (falls back to the name). */
+  id?: string | number | null;
+  photoUrl?: string | null;
+  /** Second line, e.g. an email or "Pune, IIT Bombay". */
+  sub?: React.ReactNode;
+  href?: string;
+  size?: "sm" | "md";
+  className?: string;
+}) {
+  const label = name?.trim() || "Unnamed";
+  const nameClass = "block truncate text-sm font-medium text-foreground";
+  return (
+    <div className={cn("flex min-w-0 items-center gap-3", className)}>
+      <AdminAvatar name={name} id={id} photoUrl={photoUrl} size={size} />
+      <div className="min-w-0">
+        {href ? (
+          <Link
+            href={href}
+            className={cn(nameClass, "rounded-sm hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring")}
+          >
+            {label}
+          </Link>
+        ) : (
+          <span className={nameClass}>{label}</span>
+        )}
+        {sub ? <span className="block truncate text-[0.8125rem] text-text-subtle">{sub}</span> : null}
+      </div>
+    </div>
+  );
+}
 
 export function DataTable<T>({
   basePath,
@@ -216,9 +276,17 @@ export function DataTable<T>({
     i === titleIndex ? { "data-title": "" } : labelOf(columns[i]) ? { "data-label": labelOf(columns[i]) } : {};
 
   return (
-    <div className={cn("apple-admin overflow-hidden border border-border", className)}>
+    <div
+      className={cn(
+        "apple-admin overflow-hidden",
+        ADMIN_SURFACE,
+        // Rows a caller renders itself (`renderRow`) get the same rule and hover.
+        "[&_[data-slot=table-row]]:border-[color:var(--admin-rule)] [&_tbody_[data-slot=table-row]:hover]:bg-[color:var(--admin-panel-2)]",
+        className,
+      )}
+    >
       {hasToolbar ? (
-        <div className="flex flex-wrap items-end justify-between gap-3 border-b border-border px-5 py-3.5">
+        <div className="flex flex-wrap items-end justify-between gap-3 px-[var(--admin-pad-panel)] pt-[var(--admin-pad-panel)] pb-3">
           {/* On a phone the filters take the full row and Rows drops below
               them, so a long select never runs into the label (QA-141). */}
           <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2.5 max-sm:basis-full">
@@ -234,7 +302,7 @@ export function DataTable<T>({
           <PageSizeSelect perKey={perKey ?? "per"} pageKey={pageKey ?? "page"} />
         </div>
       ) : sortOptions.length ? (
-        <div className="border-b border-border px-5 py-3 lg:hidden">
+        <div className="px-[var(--admin-pad-panel)] pt-[var(--admin-pad-panel)] pb-3 lg:hidden">
           <SortSelect options={sortOptions} />
         </div>
       ) : null}
@@ -278,8 +346,10 @@ export function DataTable<T>({
                     scope="col"
                     aria-sort={dir === "asc" ? "ascending" : dir === "desc" ? "descending" : undefined}
                     className={cn(
-                      "bg-surface px-3 py-2.5 text-xs font-semibold tracking-[0.01em] text-text-subtle",
-                      stickyHeader && "sticky top-0 z-10 bg-card shadow-[inset_0_-1px_0_var(--color-border)]",
+                      "h-11 bg-transparent px-3 py-2.5 text-[0.8125rem] font-medium text-text-subtle",
+                      EDGE_PAD,
+                      stickyHeader &&
+                        "sticky top-0 z-10 bg-[color:var(--admin-panel)] shadow-[inset_0_-1px_0_var(--admin-rule)]",
                       (column.align === "right" || column.numeric) && "text-right",
                       column.headerClassName,
                     )}
@@ -289,7 +359,7 @@ export function DataTable<T>({
                         href={`${basePath}${toQueryString({ ...params, sort: column.sort, dir: nextDir, [pageKey ?? "page"]: "" })}`}
                         scroll={false}
                         className={cn(
-                          "inline-flex items-center gap-1 rounded-apple-sm hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring",
+                          "inline-flex items-center gap-1 rounded-full hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
                           (column.align === "right" || column.numeric) && "flex-row-reverse",
                           active && "text-foreground",
                         )}
@@ -316,13 +386,14 @@ export function DataTable<T>({
               const tr = renderRow ? (
                 renderRow(row, index)
               ) : (
-                <TableRow key={rowKey ? rowKey(row) : index} className={cn("border-border hover:bg-surface/60", rowClassName)}>
+                <TableRow key={rowKey ? rowKey(row) : index} className={cn("border-[color:var(--admin-rule)] hover:bg-[color:var(--admin-panel-2)]", ROW_H[resolvedDensity], rowClassName)}>
                   {columns.map((column, cellIndex) => (
                     <TableCell
                       key={cellIndex}
                       {...stackAttrs(cellIndex)}
                       className={cn(
                         cellPad,
+                        EDGE_PAD,
                         "text-sm text-foreground",
                         (column.align === "right" || column.numeric) && "nums text-right",
                         column.className,
@@ -337,9 +408,9 @@ export function DataTable<T>({
             })}
           </TableBody>
           {footer ? (
-            <TableFooter className="border-border bg-surface max-lg:block">
+            <TableFooter className="border-[color:var(--admin-rule)] bg-[color:var(--admin-panel-2)] max-lg:block">
               <TableRow className="hover:bg-transparent">
-                <TableCell colSpan={columns.length} className={cn(cellPad, "text-sm text-foreground")}>
+                <TableCell colSpan={columns.length} className={cn(cellPad, EDGE_PAD, "text-sm text-foreground")}>
                   {footer}
                 </TableCell>
               </TableRow>

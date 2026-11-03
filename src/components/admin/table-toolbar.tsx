@@ -123,10 +123,10 @@ export function TableToolbar({
           value={value}
           onChange={(e) => setParam(filter.key, e.target.value || null)}
           className={cn(
-            "apple-spring h-9 max-w-56 cursor-pointer truncate rounded-apple-sm border bg-surface px-2.5 pr-7 text-base sm:text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring touch:min-h-11 max-sm:w-full max-sm:max-w-full",
+            "apple-spring h-10 max-w-56 cursor-pointer truncate rounded-full pr-9 pl-4 text-base sm:text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring touch:min-h-11 max-sm:w-full max-sm:max-w-full",
             value
-              ? "border-brand-300 font-medium text-brand-800"
-              : "border-border text-foreground",
+              ? "bg-[color:var(--admin-bar-tint)] font-medium text-foreground"
+              : "bg-[color:var(--admin-panel-2)] text-foreground",
           )}
         >
           <option value="">{filter.allLabel ?? `All ${lowerFirst(filter.label)}`}</option>
@@ -149,7 +149,7 @@ export function TableToolbar({
         <div className="relative w-full min-w-[12rem] flex-1 sm:w-auto sm:max-w-xs">
           <Search
             aria-hidden
-            className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-text-subtle"
+            className="pointer-events-none absolute top-1/2 left-4 size-4 -translate-y-1/2 text-text-subtle"
           />
           <input
             ref={inputRef}
@@ -164,7 +164,7 @@ export function TableToolbar({
             }}
             placeholder={searchPlaceholder}
             aria-label={searchPlaceholder}
-            className="h-9 w-full rounded-apple-sm border border-border bg-surface pr-8 pl-9 text-base sm:text-sm text-foreground placeholder:text-text-subtle focus:border-brand-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring touch:min-h-11 [&::-webkit-search-cancel-button]:hidden"
+            className="h-10 w-full rounded-full bg-[color:var(--admin-panel-2)] pr-11 pl-10 text-base sm:text-sm text-foreground placeholder:text-text-subtle focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring touch:min-h-11 [&::-webkit-search-cancel-button]:hidden"
           />
           {term ? (
             <button
@@ -174,7 +174,7 @@ export function TableToolbar({
                 inputRef.current?.focus();
               }}
               aria-label="Clear search"
-              className="apple-spring absolute top-1/2 right-2 flex min-h-11 min-w-11 -translate-y-1/2 items-center justify-center rounded-apple-sm p-1 text-text-subtle hover:text-foreground"
+              className="apple-spring absolute top-1/2 right-1 flex size-9 -translate-y-1/2 items-center justify-center rounded-full p-1 text-text-subtle hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring touch:size-11"
             >
               <X className="size-3.5" />
             </button>
@@ -192,11 +192,11 @@ export function TableToolbar({
             onClick={() => setFiltersOpen((o) => !o)}
             aria-expanded={filtersOpen}
             aria-controls={filtersId}
-            className="apple-spring inline-flex h-9 items-center gap-1.5 rounded-apple-sm border border-border bg-card px-3 text-sm font-medium text-foreground hover:bg-surface touch:min-h-11"
+            className="apple-spring inline-flex h-10 items-center gap-1.5 rounded-full bg-[color:var(--admin-panel-2)] px-4 text-sm font-medium text-foreground hover:bg-[color:var(--admin-bar-tint)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring touch:min-h-11"
           >
             <SlidersHorizontal className="size-4" aria-hidden />
             {filtersOpen ? "Fewer filters" : "More filters"}
-            {foldedActive ? <span className="nums rounded-full bg-brand-50 px-1.5 text-xs text-brand-800">{foldedActive}</span> : null}
+            {foldedActive ? <span className="nums rounded-full bg-[color:var(--admin-bar-tint)] px-1.5 text-xs text-foreground">{foldedActive}</span> : null}
           </button>
         ) : null}
         {foldable && filtersOpen ? (
@@ -210,7 +210,7 @@ export function TableToolbar({
         {exportHref ? (
           <a
             href={exportHref}
-            className="apple-spring apple-pressable ml-auto inline-flex h-9 items-center gap-1.5 rounded-apple-sm border border-border bg-card px-3 text-sm font-medium text-foreground hover:bg-surface touch:min-h-11"
+            className="apple-spring apple-pressable ml-auto inline-flex h-10 items-center gap-1.5 rounded-full bg-[color:var(--admin-panel-2)] px-4 text-sm font-medium text-foreground hover:bg-[color:var(--admin-bar-tint)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring touch:min-h-11"
           >
             CSV
           </a>
@@ -226,13 +226,13 @@ export function TableToolbar({
               key={chip.key}
               type="button"
               onClick={() => setParam(chip.key, null)}
-              className="apple-spring group inline-flex min-h-11 items-center gap-1 rounded-full border border-brand-200 bg-brand-50 py-0.5 pr-1.5 pl-2.5 text-xs font-medium text-brand-800 hover:border-brand-300 hover:bg-brand-100"
+              className="apple-spring group inline-flex min-h-11 items-center gap-1 rounded-full bg-[color:var(--admin-bar-tint)] py-0.5 pr-2.5 pl-3 text-xs font-medium text-foreground hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
             >
-              <span className="text-brand-600">{chip.label}:</span>
+              <span className="text-text-subtle">{chip.label}:</span>
               {chip.value}
               <X
                 aria-hidden
-                className="size-3 text-brand-500 apple-spring group-hover:text-brand-800"
+                className="size-3 text-text-subtle apple-spring group-hover:text-foreground"
               />
               <span className="sr-only">Remove filter</span>
             </button>
@@ -240,7 +240,7 @@ export function TableToolbar({
           <button
             type="button"
             onClick={clearAll}
-            className="apple-spring ml-1 inline-flex min-h-11 items-center text-xs font-medium text-text-subtle underline underline-offset-2 hover:text-foreground"
+            className="apple-spring ml-1 inline-flex min-h-11 items-center rounded-full px-2 text-xs font-medium text-text-subtle underline underline-offset-2 hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
           >
             Clear all
           </button>

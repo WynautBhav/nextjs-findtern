@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Download, Eye, Loader2 } from "lucide-react";
 
 import { StatusBadge } from "@/components/admin/status-badge";
+import { cn } from "@/lib/utils";
 import { buttonClass } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { downloadCsv } from "@/lib/admin/csv";
@@ -19,6 +20,12 @@ import {
 import { formatDate, formatMoney } from "@/lib/format";
 import { placeOfSupply, splitGst } from "@/lib/gst";
 import { downloadInvoice, invoiceNumberOf, taxInvoiceHtml, type InvoiceSeller } from "@/lib/invoice";
+
+/** Tonal pill actions, as the table toolbar's (no outline); 44px on touch. */
+const PILL =
+  "apple-spring inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-sm font-medium text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:opacity-60 touch:min-h-11";
+const PILL_TONAL = cn(PILL, "bg-[color:var(--admin-panel-2)] hover:bg-[color:var(--admin-bar-tint)]");
+const PILL_QUIET = cn(PILL, "hover:bg-[color:var(--admin-panel-2)]");
 
 /**
  * Row actions for the two admin ledgers: the tax invoice (paid rows with
@@ -70,7 +77,7 @@ export function InvoiceRowActions({ row, kind, seller }: { row: AdminInvoiceRow;
   }
 
   const invoiceButton = (
-    <button type="button" onClick={print} disabled={printing} className={buttonClass({ variant: "outline", size: "sm" })}>
+    <button type="button" onClick={print} disabled={printing} className={PILL_TONAL}>
       {printing ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : <Download className="size-3.5" aria-hidden />}
       Invoice
     </button>
@@ -80,7 +87,7 @@ export function InvoiceRowActions({ row, kind, seller }: { row: AdminInvoiceRow;
     <div className="flex flex-col items-end gap-1">
       <div className="flex items-center justify-end gap-1.5">
         {invoiceable ? invoiceButton : null}
-        <button type="button" onClick={() => setOpen(true)} className={buttonClass({ variant: "ghost", size: "sm" })}>
+        <button type="button" onClick={() => setOpen(true)} className={PILL_QUIET}>
           <Eye className="size-3.5" aria-hidden />
           View
         </button>
@@ -100,10 +107,10 @@ export function InvoiceRowActions({ row, kind, seller }: { row: AdminInvoiceRow;
           <dl className="divide-y divide-ink-100 text-sm">
             <Detail label="Invoice no.">{displayInvoiceNumber(row, k.invoicePrefix) ?? "No invoice (not paid)"}</Detail>
             <Detail label="Order ID">
-              <span className="font-mono text-xs break-all">{row.orderId}</span>
+              <span className="nums text-xs break-all">{row.orderId}</span>
             </Detail>
             <Detail label="Payment ID">
-              <span className="font-mono text-xs break-all">{row.paymentId || "Not captured"}</span>
+              <span className="nums text-xs break-all">{row.paymentId || "Not captured"}</span>
             </Detail>
             <Detail label="Gateway">{gatewayLabel(row.gateway)}</Detail>
             <Detail label={k.party}>{row.partyName}</Detail>
@@ -177,7 +184,7 @@ export function InvoiceCsvButton({ rows, kind }: { rows: AdminInvoiceRow[]; kind
           { header: "Created at", value: (r) => r.createdAt },
         ])
       }
-      className={buttonClass({ variant: "outline", size: "sm" })}
+      className={PILL_TONAL}
     >
       <Download className="size-3.5" aria-hidden />
       Export CSV

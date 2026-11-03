@@ -187,10 +187,10 @@ export function RichTextField({
   return (
     <div>
       <div className="mb-2 flex items-center justify-between gap-3">
-        <label htmlFor={id} className="text-sm font-medium text-ink-800">
+        <label htmlFor={id} className="text-sm font-medium text-foreground">
           {label}
         </label>
-        <div role="group" aria-label="Editor mode" className="flex items-center gap-0.5 rounded-apple-sm bg-ink-100 p-0.5">
+        <div role="group" aria-label="Editor mode" className="flex items-center gap-0.5 rounded-full bg-[color:var(--admin-panel-2)] p-0.5">
           {(["visual", "html"] as const).map((m) => (
             <button
               key={m}
@@ -198,8 +198,8 @@ export function RichTextField({
               aria-pressed={mode === m}
               onClick={() => setMode(m)}
               className={cn(
-                "inline-flex h-8 items-center gap-1.5 rounded-apple-sm px-2.5 text-xs font-semibold max-lg:h-10",
-                mode === m ? "bg-card text-ink-900 shadow-xs" : "text-ink-600 hover:text-ink-900",
+                "inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-xs font-semibold max-lg:h-10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+                mode === m ? "bg-[color:var(--admin-tile)] text-[color:var(--admin-tile-ink)]" : "text-text-subtle hover:text-foreground",
               )}
             >
               {m === "visual" ? <Eye className="size-3.5" aria-hidden /> : <Code className="size-3.5" aria-hidden />}
@@ -210,8 +210,8 @@ export function RichTextField({
       </div>
 
       {mode === "visual" ? (
-        <div className="overflow-hidden rounded-apple-md border border-ink-200 bg-surface focus-within:border-brand-500 focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ring">
-          <div role="toolbar" aria-label={`${label} formatting`} className="flex flex-wrap items-center gap-0.5 border-b border-ink-100 bg-ink-50 p-1.5">
+        <div className="overflow-hidden rounded-2xl border border-ink-300 bg-[color:var(--admin-panel)] focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ring">
+          <div role="toolbar" aria-label={`${label} formatting`} className="flex flex-wrap items-center gap-0.5 bg-[color:var(--admin-panel-2)] p-1.5">
             {TOOLS.map((t) => (
               <button
                 key={t.label}
@@ -223,16 +223,16 @@ export function RichTextField({
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => runTool(t.name)}
                 aria-expanded={t.name === "link" ? linkOpen : undefined}
-                className="grid size-8 place-items-center rounded-apple-sm text-ink-700 hover:bg-surface-raised hover:text-ink-900 max-lg:size-10 [&_svg]:size-4"
+                className="grid size-8 place-items-center rounded-full text-foreground hover:bg-[color:var(--admin-panel)] focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring disabled:opacity-50 max-lg:size-10 [&_svg]:size-4"
               >
                 {t.icon}
               </button>
             ))}
           </div>
           {linkOpen ? (
-            <div className="border-b border-ink-100 bg-surface-raised px-3 py-2.5">
+            <div className="bg-[color:var(--admin-panel-2)] px-3 pt-1 pb-2.5">
               <div className="flex flex-wrap items-center gap-2">
-                <label htmlFor={`${id}-link`} className="text-sm font-medium text-ink-800">
+                <label htmlFor={`${id}-link`} className="text-sm font-medium text-foreground">
                   Link address
                 </label>
                 <input
@@ -257,16 +257,16 @@ export function RichTextField({
                       closeLink();
                     }
                   }}
-                  className="h-9 min-w-0 flex-1 basis-56 rounded-apple-sm border border-ink-200 bg-surface px-3 text-base text-ink-900 placeholder:text-text-subtle focus-visible:border-brand-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring aria-invalid:border-danger max-lg:h-11 sm:text-sm"
+                  className="h-9 min-w-0 flex-1 basis-56 rounded-full border border-ink-300 bg-[color:var(--admin-panel)] px-4 text-base text-foreground placeholder:text-text-subtle focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring aria-invalid:border-danger max-lg:h-11 sm:text-sm"
                 />
-                <button type="button" onClick={applyLink} className="inline-flex h-9 items-center rounded-apple-sm bg-primary px-3 text-sm font-semibold text-on-primary hover:bg-primary-hover max-lg:h-11">
+                <button type="button" onClick={applyLink} className="inline-flex h-9 items-center rounded-full bg-primary px-4 text-sm font-semibold text-on-primary hover:bg-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring max-lg:h-11">
                   Add link
                 </button>
-                <button type="button" onClick={() => closeLink()} className="inline-flex h-9 items-center rounded-apple-sm px-3 text-sm font-semibold text-ink-700 hover:bg-ink-100 max-lg:h-11">
+                <button type="button" onClick={() => closeLink()} className="inline-flex h-9 items-center rounded-full px-4 text-sm font-semibold text-foreground hover:bg-[color:var(--admin-panel)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring max-lg:h-11">
                   Cancel
                 </button>
               </div>
-              <p id={linkHintId} className="mt-1.5 text-xs text-ink-600">
+              <p id={linkHintId} className="mt-1.5 text-xs text-text-subtle">
                 {LINK_RULE}
               </p>
               {linkError ? (
@@ -287,7 +287,11 @@ export function RichTextField({
             onInput={emit}
             onBlur={emit}
             className={cn(
-              "prose prose-sm max-w-none overflow-y-auto px-5 py-4 text-sm leading-relaxed text-ink-900 outline-none max-h-[36rem] [&_img]:max-w-full [&_img]:rounded-apple-sm",
+              // Paper-white on purpose, in both themes: the text is what the public
+              // page will show, so it is edited on a light sheet with dark ink.
+              "max-h-[36rem] max-w-none overflow-y-auto bg-white px-5 py-4 text-sm leading-relaxed text-black outline-none",
+              "[&_a]:text-black [&_a]:underline [&_blockquote]:border-l-4 [&_blockquote]:border-black/30 [&_blockquote]:pl-4 [&_h2]:text-xl [&_h2]:font-semibold [&_h3]:text-lg [&_h3]:font-semibold",
+              "[&_img]:max-w-full [&_li]:ml-5 [&_ol]:list-decimal [&_p+p]:mt-2 [&_ul]:list-disc [&_h2]:mt-3 [&_h3]:mt-3",
               minHeight,
             )}
           />
@@ -301,7 +305,7 @@ export function RichTextField({
           rows={18}
           spellCheck={false}
           className={cn(
-            "w-full rounded-apple-md border border-ink-200 bg-ink-950 p-4 font-mono text-xs leading-relaxed text-brand-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring focus:border-brand-500",
+            "w-full rounded-2xl border border-ink-300 bg-[color:var(--admin-panel)] p-4 text-sm leading-relaxed text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
             minHeight,
           )}
         />

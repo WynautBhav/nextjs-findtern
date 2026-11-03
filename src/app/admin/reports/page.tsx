@@ -1,11 +1,12 @@
 import { and, count, eq, gte, lt, sql } from "drizzle-orm";
 import type { AnyPgColumn } from "drizzle-orm/pg-core";
-import Link from "next/link";
-import { BarChart3, Download, FileSpreadsheet, TrendingUp, IndianRupee } from "lucide-react";
+import { Download } from "lucide-react";
 
 import { getDb, schema } from "@/lib/db";
 import { hiringFunnel } from "@/lib/admin/funnel";
 import { AdminPageHeader, Panel, PanelHeader, PanelBody } from "@/components/admin/panel";
+import { AdminTabs } from "@/components/admin/admin-tabs";
+import { ADMIN_PILL_PRIMARY, ADMIN_PILL_SECONDARY } from "@/components/admin/surface";
 import { StatCard, StatGrid } from "@/components/admin/stat-card";
 import { TrendChart, PipelineBars, type TrendPoint } from "@/components/admin/trend-chart";
 import { formatMoney, formatNumber } from "@/lib/format";
@@ -14,8 +15,8 @@ import { meaningfulProfile, realEmployerId, realEmployers } from "@/lib/admin/sc
 import { istDateRange, istKeySql, istMonthKeys, istMonthLabel, istMonthStart, utcSql } from "@/lib/admin/revenue";
 import { loadCollected, loadReceiptBuckets } from "@/lib/admin/receivables-load";
 import { RevenueChart, type RevenuePoint } from "@/components/admin/finance-charts";
-import { ChipLinks, DateRangeForm } from "@/components/admin/report-range";
-import { buttonClass } from "@/components/ui/button";
+import { DateRangeForm } from "@/components/admin/report-range";
+import { ButtonLink } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 export default async function AdminReportsPage({
@@ -167,37 +168,40 @@ export default async function AdminReportsPage({
   const currentPeriod = params.from || params.to ? "custom" : (params.period ?? "");
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 lg:space-y-8">
       <AdminPageHeader
         title="Reports"
+        subtitle={`${formatMoney(totalRevenue, "INR", { zeroLabel: "₹0" })} collected and ${formatNumber(totalHires)} ${totalHires === 1 ? "hire" : "hires"} in the selected period.`}
         action={
           <>
-            <Link href="/admin/reports/analytics" className={buttonClass({ variant: "outline", size: "sm" })}>
-              <BarChart3 className="size-4" aria-hidden />
+            <ButtonLink href="/admin/reports/analytics" variant="primary" size="sm" className={ADMIN_PILL_PRIMARY}>
               Hiring analytics
-            </Link>
-            <Link href="/admin/reports/money" className={buttonClass({ variant: "outline", size: "sm" })}>
-              <IndianRupee className="size-4" aria-hidden />
+            </ButtonLink>
+            <ButtonLink href="/admin/reports/money" variant="outline" size="sm" className={ADMIN_PILL_SECONDARY}>
               Money in and out
-            </Link>
+            </ButtonLink>
           </>
         }
       />
 
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <ChipLinks
-          label="Period"
-          items={[{ value: "", label: "All time" }, ...PERIOD_OPTIONS].map((o) => ({
-            href: periodHref(o.value),
-            label: o.label,
-            current: currentPeriod === o.value,
-          }))}
-        />
+      <div className="flex flex-wrap items-end gap-x-6 gap-y-3">
+        <div className="min-w-0 flex-1 basis-80">
+          <AdminTabs
+            label="Period"
+            active={currentPeriod || "all"}
+            items={[{ value: "", label: "All time" }, ...PERIOD_OPTIONS].map((o) => ({
+              key: o.value || "all",
+              label: o.label,
+              href: periodHref(o.value),
+            }))}
+          />
+        </div>
         <DateRangeForm params={{ from: params.from ?? "", to: params.to ?? "" }} drop={["period"]} />
       </div>
 
       <StatGrid cols={4}>
         <StatCard
+          featured
           label="Revenue collected"
           value={formatMoney(totalRevenue, "INR", { zeroLabel: "₹0" })}
           hint="Paid orders and intern fees · USD at ₹100/$"
@@ -229,12 +233,11 @@ export default async function AdminReportsPage({
         </PanelBody>
       </Panel>
 
-      <div className="grid gap-4 xl:grid-cols-2">
+      <div className="grid gap-[var(--admin-gap)] xl:grid-cols-2">
         <Panel>
           <PanelHeader
             title="Proposals and interviews"
             description="Monthly counts for the last six months, whatever period is picked above. Solid line is proposals sent, dashed is interviews booked."
-            icon={TrendingUp}
           />
           <PanelBody>
             <TrendChart data={trend} />
@@ -244,7 +247,6 @@ export default async function AdminReportsPage({
           <PanelHeader
             title="Revenue collected"
             description="Each point is one month's paid orders plus intern fees (India time), in INR."
-            icon={IndianRupee}
           />
           <PanelBody>
             <RevenueChart data={revenueTrend} />
@@ -252,21 +254,24 @@ export default async function AdminReportsPage({
         </Panel>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-[var(--admin-gap)] md:grid-cols-2">
         <RankBars title="Candidates by state" description="Onboarded candidates by home state, all time. Longest bar is the largest pool." rows={states} />
         <RankBars title="Projects by work mode" description="All projects by remote, hybrid or on-site, all time." rows={formats} capitalize />
       </div>
 
       <Panel>
-        <PanelHeader title="Raw data exports" description="CSV files for offline analysis. Each file has every row (up to 10,000), not just one page." icon={FileSpreadsheet} />
-        <ul className="grid gap-3 p-5 sm:grid-cols-2 xl:grid-cols-3">
+        <PanelHeader title="Raw data exports" description="CSV files for offline analysis. Each file has every row (up to 10,000), not just one page." />
+        <ul className="grid gap-3 p-[var(--admin-pad-panel)] sm:grid-cols-2 xl:grid-cols-3">
           {exports.map((item) => (
-            <li key={item.title} className="flex flex-col justify-between gap-4 rounded-apple-lg border border-ink-200/80 p-4">
+            <li key={item.title} className="flex flex-col justify-between gap-4 rounded-[var(--radius-admin-card)] bg-[color:var(--admin-panel-2)] p-4">
               <div>
-                <p className="text-[0.9375rem] font-semibold text-ink-900">{item.title}</p>
-                <p className="mt-1 text-sm leading-relaxed text-ink-600">{item.body}</p>
+                <p className="text-[0.9375rem] font-semibold text-foreground">{item.title}</p>
+                <p className="mt-1 text-sm leading-relaxed text-text-subtle">{item.body}</p>
               </div>
-              <a href={item.href} className={cn(buttonClass({ variant: "outline", size: "sm" }), "self-start")}>
+              <a
+                href={item.href}
+                className="apple-spring inline-flex h-10 items-center gap-1.5 self-start rounded-full bg-[color:var(--admin-panel)] px-4 text-sm font-medium text-foreground hover:bg-[color:var(--admin-bar-tint)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring touch:min-h-11"
+              >
                 <Download className="size-4" aria-hidden />
                 Download CSV
               </a>
@@ -295,17 +300,17 @@ function RankBars({
       <PanelHeader title={title} description={description} />
       <PanelBody>
         {rows.length === 0 ? (
-          <p className="text-sm text-ink-600">No data yet.</p>
+          <p className="text-sm text-text-subtle">No data yet.</p>
         ) : (
           <ul className="space-y-3">
             {rows.map((r) => (
               <li key={r.label}>
                 <div className="mb-1 flex items-baseline justify-between gap-3 text-sm">
-                  <span className={cn("truncate font-medium text-ink-800", capitalize && "capitalize")}>{r.label}</span>
-                  <span className="nums shrink-0 font-semibold text-ink-900">{formatNumber(r.count)}</span>
+                  <span className={cn("truncate font-medium text-foreground", capitalize && "capitalize")}>{r.label}</span>
+                  <span className="nums shrink-0 font-semibold text-foreground">{formatNumber(r.count)}</span>
                 </div>
-                <div aria-hidden className="h-1.5 overflow-hidden rounded-full bg-ink-100">
-                  <div className="h-full rounded-full bg-brand-600" style={{ width: `${(r.count / max) * 100}%` }} />
+                <div aria-hidden className="h-2.5 overflow-hidden rounded-full bg-[color:var(--admin-panel-2)]">
+                  <div className="h-full rounded-full bg-[color:var(--admin-tile)]" style={{ width: `${(r.count / max) * 100}%` }} />
                 </div>
               </li>
             ))}

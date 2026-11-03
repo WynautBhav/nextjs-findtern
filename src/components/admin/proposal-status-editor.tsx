@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 
 import { useConfirm } from "@/components/app/use-confirm";
+import { ADMIN_PILL_PRIMARY } from "@/components/admin/surface";
 import { buttonClass } from "@/components/ui/button";
 import { csrfFetch } from "@/lib/client-fetch";
 
@@ -93,7 +94,7 @@ export function ProposalStatusEditor({
           setValue(e.target.value);
           setError("");
         }}
-        className="h-9 min-w-0 flex-1 rounded-apple-sm border border-ink-200 bg-surface px-2 text-sm font-medium text-ink-900 outline-none focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand-600 max-lg:h-11"
+        className="h-10 min-w-0 flex-1 rounded-full border border-ink-300 bg-[color:var(--admin-panel)] px-3.5 text-sm font-medium text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring max-lg:h-11"
       >
         <option value="">Set status…</option>
         {options.map((option) => (
@@ -106,7 +107,7 @@ export function ProposalStatusEditor({
         type="button"
         onClick={save}
         disabled={saving || !value}
-        className={buttonClass({ variant: "primary", size: "sm", className: "max-lg:h-11" })}
+        className={buttonClass({ variant: "primary", size: "sm", className: `${ADMIN_PILL_PRIMARY} max-lg:h-11` })}
       >
         {saving ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : "Save"}
       </button>

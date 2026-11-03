@@ -19,16 +19,17 @@ export default async function AdminPromoCodesPage() {
     console.error("[admin/promo-codes] load failed", error);
   }
 
-  const header = (
+  const header = (subtitle?: string) => (
     <AdminPageHeader
       title="Promo codes"
+      subtitle={subtitle ?? "Discount codes for intern activation fees and employer orders."}
     />
   );
 
   if (!rows) {
     return (
       <div>
-        {header}
+        {header()}
         <Panel>
           <AdminLoadError what="promo codes" retryHref="/admin/promo-codes" />
         </Panel>
@@ -43,10 +44,10 @@ export default async function AdminPromoCodesPage() {
 
   return (
     <div className="space-y-6">
-      {header}
+      {header(`${formatNumber(activeCount)} of ${formatNumber(totalCodes)} ${totalCodes === 1 ? "code is" : "codes are"} active, with ${formatNumber(totalRedemptions)} ${totalRedemptions === 1 ? "redemption" : "redemptions"} so far.`)}
 
       <StatGrid cols={4}>
-        <StatCard label="Active codes" value={formatNumber(activeCount)} hint={`${formatNumber(totalCodes)} codes in all`} />
+        <StatCard featured label="Active codes" value={formatNumber(activeCount)} hint={`${formatNumber(totalCodes)} codes in all`} />
         <StatCard label="Total redemptions" value={formatNumber(totalRedemptions)} hint="Paid orders and fees that used a code" />
         <StatCard
           label="Uses per code"

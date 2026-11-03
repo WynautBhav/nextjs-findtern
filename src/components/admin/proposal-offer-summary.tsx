@@ -1,6 +1,7 @@
 import { FileDown } from "lucide-react";
 
 import { DetailRow } from "@/components/app/primitives";
+import { ADMIN_PILL_SECONDARY } from "@/components/admin/surface";
 import { ButtonAnchor } from "@/components/ui/button";
 import { formatDate, formatMoney } from "@/lib/format";
 import { parseOffer, WEEKLY_SCHEDULES } from "@/lib/offer";
@@ -35,7 +36,7 @@ export function ProposalOfferSummary({
     const ft = offer.fullTime;
     return (
       <div className="space-y-5">
-        <dl className="divide-y divide-ink-100">
+        <dl className="divide-y divide-[color:var(--admin-rule)]">
           <DetailRow label="Offer" value="Full-time" />
           <DetailRow label="Role" value={offer.roleTitle || "-"} />
           <DetailRow label="Annual CTC" value={money(ft.annualCtcMinor)} mono />
@@ -46,12 +47,12 @@ export function ProposalOfferSummary({
           <DetailRow label="Timezone" value={ft.timezone || offer.timezone || "-"} />
         </dl>
         {ft.offerLetterKey || ft.offerLetterUrl ? (
-          <ButtonAnchor href={`/api/proposals/${proposalId}/offer-letter`} target="_blank" rel="noopener noreferrer" variant="outline" size="sm">
+          <ButtonAnchor href={`/api/proposals/${proposalId}/offer-letter`} target="_blank" rel="noopener noreferrer" variant="outline" size="sm" className={ADMIN_PILL_SECONDARY}>
             <FileDown className="size-4" aria-hidden />
             Offer letter
           </ButtonAnchor>
         ) : (
-          <p className="text-sm text-ink-600">No offer letter uploaded.</p>
+          <p className="text-sm text-text-subtle">No offer letter uploaded.</p>
         )}
         {jd ? <JobDescription html={jd} /> : null}
         {offer.additionalInfo ? <AdditionalInfo text={offer.additionalInfo} /> : null}
@@ -61,7 +62,7 @@ export function ProposalOfferSummary({
 
   return (
     <div className="space-y-5">
-      <dl className="divide-y divide-ink-100">
+      <dl className="divide-y divide-[color:var(--admin-rule)]">
         <DetailRow label="Offer" value={`Internship · ${offer.months} month${offer.months === 1 ? "" : "s"}`} />
         <DetailRow label="Role" value={offer.roleTitle || "-"} />
         <DetailRow
@@ -95,8 +96,8 @@ export function ProposalOfferSummary({
 function AdditionalInfo({ text }: { text: string }) {
   return (
     <div>
-      <p className="mb-2 text-sm font-semibold text-ink-900">Additional information</p>
-      <p className="whitespace-pre-line rounded-apple-md border border-ink-200/80 bg-ink-50 p-4 text-sm leading-relaxed text-ink-800 [overflow-wrap:anywhere]">{text}</p>
+      <p className="mb-2 text-sm font-semibold text-foreground">Additional information</p>
+      <p className="whitespace-pre-line rounded-[var(--radius-admin-card)] bg-[color:var(--admin-panel-2)] p-4 text-sm leading-relaxed text-foreground [overflow-wrap:anywhere]">{text}</p>
     </div>
   );
 }
@@ -104,9 +105,9 @@ function AdditionalInfo({ text }: { text: string }) {
 function JobDescription({ html }: { html: string }) {
   return (
     <div>
-      <p className="mb-2 text-sm font-semibold text-ink-900">Job description</p>
+      <p className="mb-2 text-sm font-semibold text-foreground">Job description</p>
       <div
-        className="prose-sm max-h-72 overflow-y-auto rounded-apple-md border border-ink-200/80 bg-ink-50 p-4 text-sm leading-relaxed text-ink-800 [&_li]:ml-5 [&_ol]:list-decimal [&_p+p]:mt-2 [&_ul]:list-disc"
+        className="prose-sm max-h-72 overflow-y-auto rounded-[var(--radius-admin-card)] bg-[color:var(--admin-panel-2)] p-4 text-sm leading-relaxed text-foreground [&_li]:ml-5 [&_ol]:list-decimal [&_p+p]:mt-2 [&_ul]:list-disc"
         // Allowlist-sanitised (lib/richtext), the same as blog bodies.
         dangerouslySetInnerHTML={{ __html: html }}
       />

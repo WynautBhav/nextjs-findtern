@@ -41,12 +41,15 @@ export function PayoutEditor({
   initialReference,
   initialNote,
   status,
+  onSaved,
 }: {
   payoutId: string;
   initialReference: string | null;
   initialNote?: string | null;
   /** Current status; when given and not pending, nothing is rendered. */
   status?: string;
+  /** Called once after the ledger accepted the change, before the page refreshes (the dashboard peek uses it to clear the row). */
+  onSaved?: () => void;
 }) {
   const router = useRouter();
   const { ask, dialog } = useConfirm();
@@ -99,6 +102,7 @@ export function PayoutEditor({
       setError(result.error);
       return;
     }
+    onSaved?.();
     setOpen(false);
     triggerRef.current?.focus();
     router.refresh();

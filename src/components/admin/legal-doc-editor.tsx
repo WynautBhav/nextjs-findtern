@@ -5,6 +5,7 @@ import { Check, ExternalLink, Loader2, Save } from "lucide-react";
 
 import { Panel, PanelHeader } from "@/components/admin/panel";
 import { RichTextField } from "@/components/admin/rich-text-field";
+import { ADMIN_PILL_PRIMARY, ADMIN_PILL_SECONDARY } from "@/components/admin/surface";
 import { buttonClass } from "@/components/ui/button";
 import { pickNdaClause, type NdaClause as Clause } from "@/lib/admin/legal-docs";
 import { csrfFetch } from "@/lib/client-fetch";
@@ -119,7 +120,7 @@ export function LegalDocEditor({
         action={
           <>
             {publicHref ? (
-              <a href={publicHref} target="_blank" rel="noreferrer" className={buttonClass({ variant: "ghost", size: "sm" })}>
+              <a href={publicHref} target="_blank" rel="noreferrer" className={buttonClass({ variant: "outline", size: "sm", className: ADMIN_PILL_SECONDARY })}>
                 View live <ExternalLink className="size-3.5" aria-hidden />
               </a>
             ) : null}
@@ -127,7 +128,7 @@ export function LegalDocEditor({
               type="button"
               onClick={save}
               disabled={saving || !loaded}
-              className={buttonClass({ variant: "primary", size: "sm" })}
+              className={buttonClass({ variant: "primary", size: "sm", className: ADMIN_PILL_PRIMARY })}
             >
               {saving ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <Save className="size-4" aria-hidden />}
               {saving ? "Saving…" : "Save changes"}
@@ -136,21 +137,21 @@ export function LegalDocEditor({
         }
       />
 
-      <div className="space-y-5 px-5 py-5">
+      <div className="space-y-5 p-[var(--admin-pad-panel)]">
         {loadFailed ? (
-          <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-apple-md bg-danger-soft px-4 py-3 text-sm text-danger">
+          <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-danger-soft px-4 py-3 text-sm text-danger">
             <span>Couldn&apos;t load the live version, so saving is off to protect it. Nothing was changed.</span>
-            <button type="button" onClick={() => setAttempt((n) => n + 1)} className={buttonClass({ variant: "outline", size: "sm" })}>
+            <button type="button" onClick={() => setAttempt((n) => n + 1)} className={buttonClass({ variant: "outline", size: "sm", className: ADMIN_PILL_SECONDARY })}>
               Try again
             </button>
           </div>
         ) : !loaded ? (
-          <p className="flex items-center gap-2 text-sm text-ink-600">
+          <p className="flex items-center gap-2 text-sm text-text-subtle">
             <Loader2 className="size-4 animate-spin" aria-hidden /> Loading the live version…
           </p>
         ) : null}
         {error ? (
-          <p role="alert" className="rounded-apple-md bg-danger-soft px-4 py-3 text-sm text-danger">
+          <p role="alert" className="rounded-2xl bg-danger-soft px-4 py-3 text-sm text-danger">
             {error}
           </p>
         ) : null}
@@ -161,13 +162,13 @@ export function LegalDocEditor({
           </p>
         ) : null}
         {clauseInactive ? (
-          <p className="rounded-apple-md bg-accent-100 px-4 py-3 text-sm text-accent-700">
+          <p className="rounded-2xl bg-warning-soft px-4 py-3 text-sm text-warning">
             No clause is switched on, so the public page shows the built-in text. Saving edits this inactive clause.
           </p>
         ) : null}
 
         <div>
-          <label htmlFor="legal-title" className="mb-1.5 block text-sm font-medium text-ink-800">
+          <label htmlFor="legal-title" className="mb-1.5 block text-sm font-medium text-foreground">
             Document title
           </label>
           <input
@@ -177,8 +178,8 @@ export function LegalDocEditor({
             disabled={!loaded}
             onChange={(e) => setTitle(e.target.value)}
             className={cn(
-              "h-11 w-full rounded-apple-sm border border-ink-200 bg-surface px-3.5 text-base sm:text-[0.9375rem] font-medium text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
-              "focus:border-brand-500 disabled:opacity-60",
+              "h-11 w-full rounded-full border border-ink-300 bg-[color:var(--admin-panel)] px-4 text-base sm:text-[0.9375rem] font-medium text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+              "disabled:opacity-60",
             )}
           />
         </div>

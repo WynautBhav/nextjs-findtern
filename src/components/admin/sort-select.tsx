@@ -44,7 +44,7 @@ export function SortSelect({
           if (parsed) setSort(parsed.sort, parsed.dir);
           else setSort(null);
         }}
-        className="apple-spring h-9 max-w-56 cursor-pointer truncate rounded-apple-sm border border-border bg-surface px-2.5 pr-7 text-base text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring sm:text-sm touch:min-h-11 max-sm:w-full max-sm:max-w-full"
+        className="apple-spring h-10 max-w-56 cursor-pointer truncate rounded-full bg-[color:var(--admin-panel-2)] pr-9 pl-4 text-base text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring sm:text-sm touch:min-h-11 max-sm:w-full max-sm:max-w-full"
       >
         <option value="">Default order</option>
         {options.map((option) => (

@@ -2,14 +2,15 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { AlertTriangle } from "lucide-react";
 
-import { DataTable, parseSort, type Column } from "@/components/admin/data-table";
+import { DataTable, IdentityCell, parseSort, type Column } from "@/components/admin/data-table";
 import { AdminLoadError, AdminPageHeader, Panel } from "@/components/admin/panel";
 import { PayoutEditor } from "@/components/admin/payout-editor";
-import { pillTabClass } from "@/components/app/primitives";
+import { AdminTabs } from "@/components/admin/admin-tabs";
+import { ADMIN_PILL_SECONDARY } from "@/components/admin/surface";
+import { ButtonLink } from "@/components/ui/button";
 import { DateRangeForm } from "@/components/admin/date-range-form";
 import { StatCard, StatGrid } from "@/components/admin/stat-card";
 import { StatusBadge } from "@/components/admin/status-badge";
-import { Pill } from "@/components/app/primitives";
 import { flattenParams, parsePageRequest, toQueryString, type RawSearchParams } from "@/lib/admin/params";
 import {
   DUE_FILTERS,
@@ -46,25 +47,22 @@ export default async function AdminPayouts({ searchParams }: { searchParams?: Pr
     <div className="space-y-6">
       <AdminPageHeader
         title="Payouts"
+        subtitle="Stipend money going out to interns: settle each payout against the bank statement, and see what is still owed on every placement."
+        action={
+          <ButtonLink href="/admin/transactions?view=payouts" variant="outline" size="sm" className={ADMIN_PILL_SECONDARY}>
+            Transactions
+          </ButtonLink>
+        }
       />
 
-      <nav aria-label="Payout views" className="flex gap-1">
-        {(
-          [
-            { key: "payouts", label: "Payouts" },
-            { key: "dues", label: "Dues by placement" },
-          ] as const
-        ).map((t) => (
-          <Link
-            key={t.key}
-            href={`${BASE}?tab=${t.key}`}
-            aria-current={tab === t.key ? "page" : undefined}
-            className={pillTabClass(tab === t.key)}
-          >
-            {t.label}
-          </Link>
-        ))}
-      </nav>
+      <AdminTabs
+        label="Payout views"
+        active={tab}
+        items={[
+          { key: "payouts", label: "Payouts", href: `${BASE}?tab=payouts` },
+          { key: "dues", label: "Dues by placement", href: `${BASE}?tab=dues` },
+        ]}
+      />
 
       {tab === "payouts" ? <PayoutsView params={params} /> : <DuesView params={params} />}
     </div>
@@ -100,18 +98,17 @@ async function PayoutsView({ params }: { params: Record<string, string> }) {
   const columns: Column<PayoutRow>[] = [
     {
       header: "Intern",
-      // Cells do not wrap by default; this one carries the long company and project line, and the Mark paid action is the last column.
-      className: "whitespace-normal",
       cell: (r) => (
-        <span className="block min-w-0">
-          <Link href={`/admin/interns/${r.internId}`} className="font-medium text-ink-900 underline-offset-4 hover:underline">
-            {r.internName || "Candidate"}
-          </Link>
-          <span className="block text-xs text-ink-600">
-            {r.companyName ? (
+        <IdentityCell
+          name={r.internName || "Candidate"}
+          id={r.internId}
+          href={`/admin/interns/${r.internId}`}
+          className="max-w-72"
+          sub={
+            r.companyName ? (
               <>
                 {r.employerId ? (
-                  <Link href={`/admin/companies/${r.employerId}`} className="underline-offset-4 hover:underline">
+                  <Link href={`/admin/companies/${r.employerId}`} className="rounded-sm underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
                     {r.companyName}
                   </Link>
                 ) : (
@@ -121,20 +118,20 @@ async function PayoutsView({ params }: { params: Record<string, string> }) {
               </>
             ) : (
               r.internEmail
-            )}
-          </span>
-        </span>
+            )
+          }
+        />
       ),
     },
     {
       header: "Amount",
       sort: "amount",
-      align: "right",
+      numeric: true,
       className: "whitespace-nowrap",
       cell: (r) => (
         <>
-          <span className="font-semibold text-ink-900">{formatMoney(r.amountMinor, r.currency === "USD" ? "USD" : "INR", { zeroLabel: "₹0" })}</span>
-          {r.currency === "USD" ? <span className="block text-xs font-normal text-ink-600">{inr(r.inrMinor)}</span> : null}
+          <span className="font-semibold text-foreground">{formatMoney(r.amountMinor, r.currency === "USD" ? "USD" : "INR", { zeroLabel: "₹0" })}</span>
+          {r.currency === "USD" ? <span className="block text-xs font-normal text-text-subtle">{inr(r.inrMinor)}</span> : null}
         </>
       ),
     },
@@ -143,7 +140,7 @@ async function PayoutsView({ params }: { params: Record<string, string> }) {
       cell: (r) => (
         <span className="flex flex-col items-start gap-1 max-lg:items-end">
           <StatusBadge status={r.status} />
-          <span className="text-xs text-ink-600" title={r.opsNote ?? undefined}>
+          <span className="text-xs text-text-subtle" title={r.opsNote ?? undefined}>
             {payoutSourceLabel(r.source)}
             {r.opsNote ? ` · ${r.opsNote}` : ""}
           </span>
@@ -165,7 +162,7 @@ async function PayoutsView({ params }: { params: Record<string, string> }) {
         ) : r.scheduledFor ? (
           <>Due {formatDate(r.scheduledFor)}</>
         ) : (
-          <span className="text-ink-600">Added {r.createdAt ? formatDate(r.createdAt) : "–"}</span>
+          <span className="text-text-subtle">Added {r.createdAt ? formatDate(r.createdAt) : "–"}</span>
         ),
     },
     {
@@ -178,6 +175,7 @@ async function PayoutsView({ params }: { params: Record<string, string> }) {
     <>
       <StatGrid cols={3}>
         <StatCard
+          featured
           label="Paid out"
           value={inr(data.paidMinor)}
           hint={filtered ? "Matching the filters below" : "All recorded payouts · USD at ₹100/$"}
@@ -280,23 +278,28 @@ async function DuesView({ params }: { params: Record<string, string> }) {
     {
       header: "Placement",
       cell: (d) => (
-        <span className="block min-w-0 max-w-72">
-          <Link href={`/admin/interns/${d.internId}?tab=payments`} className="font-medium text-ink-900 underline-offset-4 hover:underline">
-            {d.internName}
-          </Link>
-          <span className="block truncate text-xs text-ink-600">
-            <Link href={`/admin/companies/${d.employerId}`} className="underline-offset-4 hover:underline">
-              {d.companyName}
-            </Link>
-            {d.projectName ? ` · ${d.projectName}` : ""}
-          </span>
-          {d.startDate ? <span className="nums block text-xs text-ink-600">Started {formatDate(d.startDate)}</span> : null}
-        </span>
+        <IdentityCell
+          name={d.internName}
+          id={d.internId}
+          href={`/admin/interns/${d.internId}?tab=payments`}
+          className="max-w-72"
+          sub={
+            <>
+              <span className="block truncate">
+                <Link href={`/admin/companies/${d.employerId}`} className="rounded-sm underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+                  {d.companyName}
+                </Link>
+                {d.projectName ? ` · ${d.projectName}` : ""}
+              </span>
+              {d.startDate ? <span className="nums block truncate">Started {formatDate(d.startDate)}</span> : null}
+            </>
+          }
+        />
       ),
     },
     {
       header: "Stipend",
-      align: "right",
+      numeric: true,
       cell: (d) => (
         <span className="block whitespace-nowrap">
           {d.monthlyShareMinor > 0 ? (
@@ -304,20 +307,20 @@ async function DuesView({ params }: { params: Record<string, string> }) {
           ) : (
             <span className="text-text-subtle">None (score below 6)</span>
           )}
-          <span className="nums flex items-center justify-end gap-1.5 text-xs text-ink-600 max-lg:justify-start">
+          <span className="nums flex items-center justify-end gap-1.5 text-xs text-text-subtle max-lg:justify-start">
             {d.paidMonths} of {d.months} paid
-            {d.remainingMonths <= 0 ? <Pill tone="paid">Done</Pill> : null}
+            {d.remainingMonths <= 0 ? <StatusBadge tone="success" label="Done" /> : null}
           </span>
         </span>
       ),
     },
     {
       header: "Due",
-      align: "right",
+      numeric: true,
       cell: (d) => (
         <span className="block whitespace-nowrap">
-          {d.remainingMinor > 0 ? <span className="font-semibold text-ink-900">{inr(d.remainingMinor)}</span> : <span className="text-text-subtle">–</span>}
-          <span className="nums block text-xs text-ink-600">
+          {d.remainingMinor > 0 ? <span className="font-semibold text-foreground">{inr(d.remainingMinor)}</span> : <span className="text-text-subtle">–</span>}
+          <span className="nums block text-xs text-text-subtle">
             {inr(d.paidMinor)} of {inr(d.totalShareMinor)} paid
           </span>
         </span>
@@ -328,7 +331,7 @@ async function DuesView({ params }: { params: Record<string, string> }) {
       className: "nums whitespace-nowrap",
       cell: (d) =>
         d.pending ? (
-          <Pill tone="waiting">Payout pending</Pill>
+          <StatusBadge tone="warning" label="Payout pending" />
         ) : d.nextDate && d.remainingMinor > 0 ? (
           formatDate(d.nextDate)
         ) : (
@@ -344,12 +347,12 @@ async function DuesView({ params }: { params: Record<string, string> }) {
               {d.employer.paidInFull ? "In full" : `${d.employer.paidMonths} of ${d.employer.months} months`}
             </span>
             {d.employer.dueMinor > 0 ? (
-              <span className="nums block text-xs text-ink-600">
+              <span className="nums block text-xs text-text-subtle">
                 {formatMoney(d.employer.dueMinor, d.employer.currency)} still to pay
               </span>
             ) : null}
             {d.aheadOfEmployer ? (
-              <span className="mt-1 flex items-center gap-1 text-xs font-medium text-accent-700">
+              <span className="mt-1 flex items-center gap-1 text-xs font-medium text-warning">
                 <AlertTriangle className="size-3.5 shrink-0" aria-hidden />
                 Next month not paid by employer yet
               </span>
@@ -364,7 +367,7 @@ async function DuesView({ params }: { params: Record<string, string> }) {
   return (
     <>
       <StatGrid cols={4}>
-        <StatCard label="Owed to interns" value={inr(totals.dueMinor)} hint={filtered ? "Matching the filters below" : "Stipend months not yet paid"} tone={totals.dueMinor > 0 ? "warning" : "neutral"} />
+        <StatCard featured label="Owed to interns" value={inr(totals.dueMinor)} hint={filtered ? "Matching the filters below" : "Stipend months not yet paid"} tone={totals.dueMinor > 0 ? "warning" : "neutral"} />
         <StatCard label="Paid to interns" value={inr(totals.paidMinor)} hint={`of ${inr(totals.totalMinor)} across these placements`} />
         <StatCard label="Active placements" value={totals.active.toLocaleString("en-IN")} hint={`${totals.completed.toLocaleString("en-IN")} fully paid`} />
         <StatCard label="Employers still owe" value={inr(totals.employerDueInrMinor)} hint="Stipend base, before fee and GST · USD at ₹100/$" />
@@ -401,8 +404,8 @@ async function DuesView({ params }: { params: Record<string, string> }) {
             : { title: "No hired placements yet", body: "Once an employer pays for a hire, the placement and its stipend months appear here." }
         }
       />
-      <p className="text-sm text-ink-600">
-        To pay a month, open the intern and use <span className="font-medium text-ink-800">Create payout</span> on the placement&apos;s row: it is prefilled with the
+      <p className="text-sm text-text-subtle">
+        To pay a month, open the intern and use <span className="font-medium text-foreground">Create payout</span> on the placement&apos;s row: it is prefilled with the
         month owed and refuses a second payout while one is pending.
       </p>
     </>

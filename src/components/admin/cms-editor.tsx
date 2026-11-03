@@ -7,6 +7,7 @@ import { ExternalLink, Loader2, Pencil, Plus, Trash2, X } from "lucide-react";
 import { RichTextField } from "@/components/admin/rich-text-field";
 import { sendInline } from "@/components/admin/inline-control";
 import { FileUpload } from "@/components/app/file-upload";
+import { ADMIN_PILL_PRIMARY } from "@/components/admin/surface";
 import { buttonClass } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import {
@@ -30,7 +31,7 @@ import { useConfirm } from "@/components/app/use-confirm";
 export type CmsItem = Record<string, unknown> & { id: string };
 
 const fieldClass =
-  "mt-1.5 w-full rounded-apple-sm border border-ink-200 bg-surface px-3 text-base sm:text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring placeholder:text-text-subtle focus:border-brand-500";
+  "mt-1.5 w-full rounded-full border border-ink-300 bg-[color:var(--admin-panel)] px-4 text-base sm:text-sm text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring placeholder:text-text-subtle";
 
 type Ctx = { open: (item: CmsItem | "new") => void; remove: (item: CmsItem) => Promise<void>; busyId: string | null };
 const EditorContext = createContext<Ctx | null>(null);
@@ -136,7 +137,7 @@ export function CmsEditorProvider({
     <EditorContext.Provider value={{ open, remove, busyId }}>
       {dialog}
       {listError ? (
-        <p role="alert" className="mb-4 flex items-start justify-between gap-3 rounded-apple-md bg-danger-soft px-4 py-3 text-sm text-danger">
+        <p role="alert" className="mb-4 flex items-start justify-between gap-3 rounded-2xl bg-danger-soft px-4 py-3 text-sm text-danger">
           {listError}
           <button type="button" aria-label="Dismiss" onClick={() => setListError(null)} className="shrink-0">
             <X className="size-4" aria-hidden />
@@ -147,11 +148,11 @@ export function CmsEditorProvider({
 
       <Sheet open={editing !== null} onOpenChange={(o) => !o && !busy && setEditing(null)}>
         <SheetContent side="right" className={cn("w-full overflow-y-auto", wide ? "sm:max-w-3xl" : "sm:max-w-lg")}>
-          <SheetHeader className="border-b border-ink-100 px-6 py-5">
-            <SheetTitle className="text-lg tracking-[-0.01em] text-ink-900">
+          <SheetHeader className="px-6 py-5">
+            <SheetTitle className="text-lg tracking-[-0.01em] text-foreground">
               {editing === "new" ? `New ${def.noun}` : `Edit ${def.noun}`}
             </SheetTitle>
-            <SheetDescription className="text-sm text-ink-600">
+            <SheetDescription className="text-sm text-text-subtle">
               {def.toggle
                 ? "Saved changes show on the public site on its next load. Hide an entry instead of deleting it to keep it for later."
                 : "Drafts stay private. Published posts show on the blog on its next load."}
@@ -169,16 +170,16 @@ export function CmsEditorProvider({
               />
             ))}
             {error ? (
-              <p role="alert" className="rounded-apple-md bg-danger-soft px-4 py-3 text-sm text-danger">
+              <p role="alert" className="rounded-2xl bg-danger-soft px-4 py-3 text-sm text-danger">
                 {error}
               </p>
             ) : null}
-            <div className="sticky bottom-0 -mx-6 flex flex-wrap items-center gap-2 border-t border-ink-100 bg-card px-6 py-4">
-              <button type="submit" disabled={busy} className={buttonClass({ variant: "primary", size: "sm" })}>
+            <div className="sticky bottom-0 -mx-6 flex flex-wrap items-center gap-2 bg-card px-6 py-4 shadow-[inset_0_1px_0_var(--admin-rule)]">
+              <button type="submit" disabled={busy} className={buttonClass({ variant: "primary", size: "sm", className: ADMIN_PILL_PRIMARY })}>
                 {busy ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
                 {busy ? "Saving…" : editing === "new" ? `Add ${def.noun}` : "Save changes"}
               </button>
-              <button type="button" disabled={busy} onClick={() => setEditing(null)} className={buttonClass({ variant: "ghost", size: "sm" })}>
+              <button type="button" disabled={busy} onClick={() => setEditing(null)} className={buttonClass({ variant: "ghost", size: "sm", className: "rounded-full px-4 hover:bg-[color:var(--admin-panel-2)]" })}>
                 Cancel
               </button>
             </div>
@@ -207,7 +208,7 @@ function FieldInput({
     return <RichTextField label={f.label} value={value} onChange={onChange} />;
   }
   const label = (
-    <label htmlFor={inputId} className="block text-sm font-medium text-ink-800">
+    <label htmlFor={inputId} className="block text-sm font-medium text-foreground">
       {f.label}
       {f.required ? <span className="text-danger"> *</span> : <span className="font-normal text-text-subtle"> (optional)</span>}
     </label>
@@ -219,7 +220,7 @@ function FieldInput({
     <div>
       {label}
       {f.kind === "textarea" ? (
-        <textarea id={inputId} rows={5} value={value} onChange={(e) => onChange(e.target.value)} className={cn(fieldClass, "py-2.5 leading-relaxed")} />
+        <textarea id={inputId} rows={5} value={value} onChange={(e) => onChange(e.target.value)} className={cn(fieldClass, "rounded-2xl py-2.5 leading-relaxed")} />
       ) : f.kind === "select" ? (
         <select id={inputId} value={value} onChange={(e) => onChange(e.target.value)} className={cn(fieldClass, "h-11")}>
           {!(f.options ?? []).includes(value) && value ? <option value={value}>{value} (legacy value)</option> : null}
@@ -237,10 +238,10 @@ function FieldInput({
           min={f.kind === "number" ? 0 : undefined}
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className={cn(fieldClass, "h-11", f.name === "slug" && "font-mono")}
+          className={cn(fieldClass, "h-11")}
         />
       )}
-      {f.hint ? <p className="mt-1.5 text-xs text-ink-600">{f.hint}</p> : null}
+      {f.hint ? <p className="mt-1.5 text-xs text-text-subtle">{f.hint}</p> : null}
     </div>
   );
 }
@@ -266,7 +267,7 @@ function ImageInput({
     <div>
       {label}
       <div className="mt-1.5 flex items-start gap-3">
-        <span className="grid size-16 shrink-0 place-items-center overflow-hidden rounded-apple-md border border-ink-200 bg-ink-50">
+        <span className="grid size-16 shrink-0 place-items-center overflow-hidden rounded-2xl bg-[color:var(--admin-panel-2)]">
           {src ? (
             // eslint-disable-next-line @next/next/no-img-element -- admin preview of arbitrary stored images
             <img src={src} alt="" className="size-full object-contain" />
@@ -292,7 +293,7 @@ function ImageInput({
               onUploaded={(r) => onChange(r.url)}
             />
             {value ? (
-              <button type="button" onClick={() => onChange("")} className={buttonClass({ variant: "ghost", size: "sm" })}>
+              <button type="button" onClick={() => onChange("")} className={buttonClass({ variant: "ghost", size: "sm", className: "rounded-full hover:bg-[color:var(--admin-panel-2)]" })}>
                 <X className="size-3.5" aria-hidden />
                 Remove
               </button>
@@ -309,7 +310,7 @@ function ImageInput({
 export function CmsAddButton({ noun }: { noun: string }) {
   const { open } = useEditor();
   return (
-    <button type="button" onClick={() => open("new")} className={buttonClass({ variant: "primary", size: "sm" })}>
+    <button type="button" onClick={() => open("new")} className={buttonClass({ variant: "primary", size: "sm", className: ADMIN_PILL_PRIMARY })}>
       <Plus className="size-4" aria-hidden />
       Add {noun}
     </button>
@@ -322,11 +323,11 @@ export function CmsRowActions({ item, viewHref }: { item: CmsItem; viewHref?: st
   return (
     <span className="flex items-center justify-end gap-1">
       {viewHref ? (
-        <a href={viewHref} target="_blank" rel="noreferrer" aria-label="View on the website" className={buttonClass({ variant: "ghost", size: "iconSm" })}>
+        <a href={viewHref} target="_blank" rel="noreferrer" aria-label="View on the website" className={buttonClass({ variant: "ghost", size: "iconSm", className: "rounded-full" })}>
           <ExternalLink className="size-4" aria-hidden />
         </a>
       ) : null}
-      <button type="button" onClick={() => open(item)} className={buttonClass({ variant: "ghost", size: "sm" })}>
+      <button type="button" onClick={() => open(item)} className={buttonClass({ variant: "ghost", size: "sm", className: "rounded-full px-3 hover:bg-[color:var(--admin-panel-2)]" })}>
         <Pencil className="size-3.5" aria-hidden />
         Edit
       </button>
@@ -335,7 +336,7 @@ export function CmsRowActions({ item, viewHref }: { item: CmsItem; viewHref?: st
         aria-label="Delete"
         disabled={busy}
         onClick={() => void remove(item)}
-        className={cn(buttonClass({ variant: "ghost", size: "iconSm" }), "text-text-subtle hover:bg-danger-soft hover:text-danger")}
+        className={cn(buttonClass({ variant: "ghost", size: "iconSm", className: "rounded-full" }), "text-text-subtle hover:bg-danger-soft hover:text-danger")}
       >
         {busy ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <Trash2 className="size-4" aria-hidden />}
       </button>

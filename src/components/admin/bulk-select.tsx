@@ -186,14 +186,14 @@ export function BulkSelectProvider({
       {error ? (
         <div
           role="alert"
-          className="apple-admin fixed inset-x-0 bottom-20 z-40 mx-auto flex w-fit max-w-[calc(100%-2rem)] items-start gap-2 rounded-apple-sm border border-danger/25 bg-card px-3.5 py-2.5 text-sm text-danger shadow-lg"
+          className="apple-admin fixed inset-x-0 bottom-20 z-40 mx-auto flex w-fit max-w-[calc(100%-2rem)] items-start gap-2 rounded-[var(--radius-admin-card)] bg-danger-soft px-4 py-2.5 text-sm text-danger shadow-lg"
         >
           <span className="flex-1">{error}</span>
           <button
             type="button"
             onClick={() => setError(null)}
             aria-label="Dismiss error"
-            className="rounded p-0.5 transition-colors hover:bg-danger-soft"
+            className="grid size-6 place-items-center rounded-full transition-colors hover:bg-danger/15 focus-visible:outline-2 focus-visible:outline-ring touch:size-11"
           >
             <X className="size-3.5" />
           </button>
@@ -212,13 +212,13 @@ export function BulkSelectProvider({
             }}
             role="region"
             aria-label={`Actions for ${selected.size} selected ${noun}`}
-            className="apple-admin pointer-events-auto flex max-w-full flex-wrap items-center gap-1.5 rounded-apple-lg border border-border bg-card py-2 pr-2 pl-4 shadow-lg"
+            className="apple-admin pointer-events-auto flex max-w-full flex-wrap items-center gap-1.5 rounded-[1.75rem] bg-[color:var(--admin-pop)] py-1.5 pr-1.5 pl-5 text-[color:var(--admin-pop-ink)] shadow-lg"
           >
-            <p className="text-sm font-medium whitespace-nowrap text-foreground">
+            <p className="text-sm font-medium whitespace-nowrap">
               <span className="tabular-nums">{selected.size}</span> selected
             </p>
 
-            <span aria-hidden className="h-5 w-px bg-border" />
+            <span aria-hidden className="h-5 w-px bg-[color:var(--admin-pop-ink)]/25" />
 
             {actions.map((action) => {
               const Icon = action.icon ? ICONS[action.icon] : null;
@@ -229,10 +229,10 @@ export function BulkSelectProvider({
                   disabled={running !== null}
                   onClick={() => run(action)}
                   className={cn(
-                    "apple-spring inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-apple-sm px-2.5 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50 touch:min-h-11 touch:min-w-11 touch:px-3",
+                    "apple-spring inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full px-3.5 text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[color:var(--admin-pop-ink)] disabled:cursor-not-allowed disabled:opacity-50 touch:min-h-11 touch:min-w-11 touch:px-4",
                     action.tone === "danger"
-                      ? "text-danger hover:bg-danger-soft"
-                      : "text-foreground hover:bg-muted",
+                      ? "bg-danger-soft text-danger hover:opacity-90"
+                      : "hover:bg-[color:var(--admin-pop-ink)]/15",
                   )}
                 >
                   {Icon ? <Icon className="size-4" aria-hidden /> : null}
@@ -245,7 +245,7 @@ export function BulkSelectProvider({
               type="button"
               onClick={clear}
               aria-label="Clear selection"
-              className="apple-spring inline-flex cursor-pointer items-center justify-center rounded-apple-sm p-1.5 text-text-subtle hover:bg-muted hover:text-foreground touch:min-h-11 touch:min-w-11"
+              className="apple-spring inline-flex size-9 cursor-pointer items-center justify-center rounded-full opacity-80 hover:bg-[color:var(--admin-pop-ink)]/15 hover:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[color:var(--admin-pop-ink)] touch:size-11"
             >
               <X className="size-4" />
             </button>

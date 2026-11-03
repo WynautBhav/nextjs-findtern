@@ -3,7 +3,9 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { Check, Loader2, Pencil, X } from "lucide-react";
+import { Ban, Check, ChevronDown, Eye, EyeOff, Loader2, Pencil, UserCheck, X } from "lucide-react";
+
+import type { StatusTone } from "@/components/admin/status-badge";
 
 import { buttonClass } from "@/components/ui/button";
 import { csrfFetch } from "@/lib/client-fetch";
@@ -67,6 +69,15 @@ function ErrorText({ id, message }: { id: string; message: string | null }) {
   );
 }
 
+/** The pastel fills of `StatusBadge`, for a control that has to stay a real `<select>` / `<button>`. */
+const PILL_TONE: Record<StatusTone, { pill: string; dot: string }> = {
+  success: { pill: "bg-success-soft text-success", dot: "bg-success" },
+  warning: { pill: "bg-warning-soft text-warning", dot: "bg-warning" },
+  danger: { pill: "bg-danger-soft text-danger", dot: "bg-danger" },
+  info: { pill: "bg-info-soft text-info", dot: "bg-info" },
+  neutral: { pill: "bg-ink-100 text-ink-700", dot: "bg-ink-500" },
+};
+
 /* ── Select ─────────────────────────────────────────────────────────── */
 
 /**
@@ -79,6 +90,7 @@ export function InlineSelect({
   options,
   request,
   refresh = false,
+  tones,
   className,
 }: {
   /** Accessible name (the column header is not attached to the control). */
@@ -88,6 +100,11 @@ export function InlineSelect({
   request: InlineRequest;
   /** Re-run the server component after a save (when other cells derive from it). */
   refresh?: boolean;
+  /**
+   * Draws the select as a pastel pill tinted by its value (`{ Approved: "success" }`).
+   * It stays a real, labelled `<select>`. Omit for the plain field.
+   */
+  tones?: Record<string, StatusTone>;
   className?: string;
 }) {
   const router = useRouter();
@@ -129,7 +146,15 @@ export function InlineSelect({
           value={current}
           disabled={saving}
           onChange={(e) => change(e.target.value)}
-          className="h-9 min-w-28 rounded-apple-sm border border-ink-200 bg-surface pl-2.5 pr-8 text-base font-medium sm:text-sm text-ink-800 hover:border-ink-300 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand-600 disabled:opacity-60 max-lg:h-11"
+          className={cn(
+            tones
+              ? cn(
+                  "h-8 min-w-28 cursor-pointer appearance-none rounded-full border-0 pl-3 pr-8 text-base font-medium sm:text-[0.8125rem] hover:opacity-90 [&>option]:bg-[color:var(--admin-panel)] [&>option]:text-foreground",
+                  PILL_TONE[tones[current] ?? "neutral"].pill,
+                )
+              : "h-9 min-w-28 rounded-apple-sm border border-ink-200 bg-surface pl-2.5 pr-8 text-base font-medium sm:text-sm text-ink-800 hover:border-ink-300",
+            "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 disabled:opacity-60 max-lg:h-11",
+          )}
         >
           {options.map((o) => (
             <option key={o.value} value={o.value}>
@@ -137,6 +162,7 @@ export function InlineSelect({
             </option>
           ))}
         </select>
+        {tones ? <ChevronDown className="pointer-events-none absolute right-2.5 size-3.5 opacity-70" aria-hidden /> : null}
         {saving ? <Loader2 className="pointer-events-none absolute right-7 size-3.5 animate-spin text-text-subtle" aria-hidden /> : null}
       </span>
       <ErrorText id={errorId} message={error} />
@@ -166,6 +192,8 @@ export function InlineToggle({
   offRequest,
   confirmOff,
   refresh = false,
+  compact = false,
+  icons = "account",
 }: {
   on: boolean;
   onLabel: string;
@@ -180,6 +208,13 @@ export function InlineToggle({
   /** Ask before switching off (destructive direction). */
   confirmOff?: string;
   refresh?: boolean;
+  /**
+   * One line: a pastel state pill and an icon button that flips it. The button
+   * keeps its name ("Hide", "Deactivate") as `aria-label` and tooltip.
+   */
+  compact?: boolean;
+  /** Which icon pair the compact button wears: eye / eye-off, or account check / ban. */
+  icons?: "eye" | "account";
 }) {
   const router = useRouter();
   const errorId = useId();
@@ -230,6 +265,64 @@ export function InlineToggle({
       return;
     }
     if (refresh) router.refresh();
+  }
+
+  if (compact) {
+    const tone = PILL_TONE[state ? "success" : "neutral"];
+    const verb = state ? turnOffLabel : turnOnLabel;
+    const Icon = icons === "eye" ? (state ? EyeOff : Eye) : state ? Ban : UserCheck;
+    return (
+      <span className="inline-flex flex-col gap-1">
+        <span className="inline-flex items-center gap-1 whitespace-nowrap">
+          <span className={cn("inline-flex h-6 items-center gap-1.5 rounded-full px-2.5 text-xs font-medium", tone.pill)}>
+            <span aria-hidden className={cn("size-1.5 rounded-full", tone.dot)} />
+            {state ? onLabel : offLabel}
+          </span>
+          {asking ? (
+            <span
+              role="group"
+              aria-label={confirmOff}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") {
+                  e.stopPropagation();
+                  cancel();
+                }
+              }}
+              className="inline-flex items-center gap-1"
+            >
+              <button
+                type="button"
+                onClick={() => void flip(true)}
+                className={cn(buttonClass({ variant: "ghost", size: "sm" }), "h-8 rounded-full px-3 text-danger hover:bg-danger-soft max-lg:h-11")}
+              >
+                Yes, {turnOffLabel.toLowerCase()}
+              </button>
+              <button type="button" autoFocus onClick={cancel} className={cn(buttonClass({ variant: "ghost", size: "sm" }), "h-8 rounded-full px-3 max-lg:h-11")}>
+                Cancel
+              </button>
+            </span>
+          ) : (
+            <button
+              ref={toggleRef}
+              type="button"
+              onClick={() => void flip()}
+              disabled={saving}
+              aria-label={verb}
+              title={verb}
+              aria-describedby={error ? errorId : undefined}
+              className={cn(
+                "grid size-8 shrink-0 cursor-pointer place-items-center rounded-full text-text-subtle hover:bg-[color:var(--admin-panel-2)] hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring disabled:opacity-60 max-lg:size-11",
+                state && "hover:bg-danger-soft hover:text-danger",
+              )}
+            >
+              {saving ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <Icon className="size-4" aria-hidden />}
+            </button>
+          )}
+        </span>
+        {asking && confirmOff ? <span className="max-w-64 whitespace-normal text-xs text-text-subtle">{confirmOff}</span> : null}
+        <ErrorText id={errorId} message={error} />
+      </span>
+    );
   }
 
   return (
@@ -444,7 +537,7 @@ export function InlineEditor({
             setDraft(start);
             setOpen(true);
           }}
-          className="group inline-flex min-h-9 items-center gap-2 rounded-apple-sm px-1.5 text-left text-sm text-ink-800 hover:bg-ink-50 focus-visible:outline-2 focus-visible:outline-brand-600 max-lg:min-h-11"
+          className="group inline-flex min-h-9 items-center gap-2 rounded-full px-2.5 text-left text-sm text-ink-800 hover:bg-[color:var(--admin-panel-2)] focus-visible:outline-2 focus-visible:outline-brand-600 max-lg:min-h-11"
         >
           <span className="min-w-0">{display}</span>
           {/* The name starts with the words on the button (WCAG 2.5.3) and then says what pressing it does. */}
@@ -470,7 +563,7 @@ export function InlineEditor({
             animate={{ opacity: 1, y: 0 }}
             exit={reduce ? { opacity: 0 } : { opacity: 0, y: -4 }}
             transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
-            className="flex min-w-56 flex-col gap-2 rounded-apple-md border border-brand-200 bg-card p-2.5 shadow-sm"
+            className="flex min-w-56 flex-col gap-2 rounded-[var(--radius-admin-card)] bg-[color:var(--admin-panel-2)] p-3"
           >
             <div className={cn("grid gap-2", columns === 2 && "grid-cols-2")}>
               {fields.map((field) => (

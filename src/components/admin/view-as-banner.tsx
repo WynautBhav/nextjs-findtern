@@ -32,7 +32,7 @@ export function ViewAsBanner({ viewing, admin }: { viewing: string; admin: strin
   return (
     <div
       role="status"
-      className="fixed inset-x-4 bottom-4 z-[60] mx-auto flex max-w-xl flex-wrap items-center gap-3 rounded-apple-xl border border-accent-300 bg-ink-950 px-4 py-3 text-sm text-white shadow-2xl sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2"
+      className="fixed inset-x-4 bottom-4 z-[60] mx-auto flex max-w-xl flex-wrap items-center gap-3 rounded-[1.375rem] bg-ink-950 px-5 py-3 text-sm text-white shadow-2xl sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2"
     >
       <Eye className="size-4 shrink-0 text-accent-300" aria-hidden />
       <p className="min-w-0 flex-1">
@@ -46,7 +46,7 @@ export function ViewAsBanner({ viewing, admin }: { viewing: string; admin: strin
         type="button"
         onClick={exit}
         disabled={busy}
-        className={buttonClass({ variant: "white", size: "sm", className: "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-300" })}
+        className={buttonClass({ variant: "white", size: "sm", className: "rounded-full px-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-300" })}
       >
         {busy ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : <LogOut className="size-3.5" aria-hidden />}
         Exit

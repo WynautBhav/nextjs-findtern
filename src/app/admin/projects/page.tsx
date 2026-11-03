@@ -5,13 +5,14 @@ import { Download } from "lucide-react";
 import { getDb, schema } from "@/lib/db";
 import { q } from "@/lib/college/sql";
 import { formatDate, formatNumber } from "@/lib/format";
-import { flattenParams, parsePageRequest, searchAny, toPage } from "@/lib/admin/params";
+import { flattenParams, parsePageRequest, searchAny, toPage, toQueryString } from "@/lib/admin/params";
 import { activeProject, realEmployerId } from "@/lib/admin/scope";
 import { AdminLoadError, AdminPageHeader, Panel } from "@/components/admin/panel";
-import { StatCard, StatGrid } from "@/components/admin/stat-card";
-import { DataTable, parseSort } from "@/components/admin/data-table";
+import { AdminTabs, type AdminTabItem } from "@/components/admin/admin-tabs";
+import { DataTable, IdentityCell, parseSort } from "@/components/admin/data-table";
 import { StatusBadge } from "@/components/admin/status-badge";
 import { ButtonAnchor } from "@/components/ui/button";
+import { ADMIN_PILL_SECONDARY } from "@/components/admin/surface";
 
 /**
  * Projects (legacy admin-projects.tsx). "Active" is the shared rule: any
@@ -98,17 +99,19 @@ export default async function AdminProjectsPage({
   }
 
   const exportHref = `/api/admin/export?type=projects&${new URLSearchParams(params).toString()}`;
-  const header = (
+  const headerWith = (subtitle?: string) => (
     <AdminPageHeader
       title="Projects"
+      subtitle={subtitle}
       action={
-        <ButtonAnchor href={exportHref} variant="outline" size="sm">
+        <ButtonAnchor href={exportHref} variant="outline" size="sm" className={ADMIN_PILL_SECONDARY}>
           <Download className="size-4" aria-hidden />
           Export CSV
         </ButtonAnchor>
       }
     />
   );
+  const header = headerWith();
   if (!loaded) {
     return (
       <div className="space-y-6">
@@ -123,28 +126,32 @@ export default async function AdminProjectsPage({
   const page = toPage(loaded.rows, loaded.total, req.page, req.perPage);
   const filtered = Boolean(req.search || params.status || params.type);
 
-  return (
-    <div className="space-y-6">
-      {header}
+  // Active / closed / full-time are views (the counts were stat tiles); the filters keep the same URL keys.
+  const viewHref = (patch: Record<string, string>) => `/admin/projects${toQueryString({ ...params, status: "", type: "", ...patch, page: "" })}`;
+  const views: AdminTabItem[] = [
+    { key: "all", label: "All projects", count: loaded.all, href: viewHref({}) },
+    { key: "active", label: "Active", count: loaded.active, href: viewHref({ status: "active" }) },
+    { key: "closed", label: "Closed", count: Math.max(0, loaded.all - loaded.active), href: viewHref({ status: "closed" }) },
+    { key: "full_time", label: "Full-time potential", count: loaded.fullTime, href: viewHref({ type: "full_time" }) },
+  ];
+  const activeView =
+    params.status === "active" && !params.type
+      ? "active"
+      : params.status === "closed" && !params.type
+        ? "closed"
+        : params.type === "full_time" && !params.status
+          ? "full_time"
+          : !params.status && !params.type
+            ? "all"
+            : "";
 
-      <StatGrid cols={4}>
-        <StatCard label="Projects" value={formatNumber(loaded.all)} hint="Posted by real companies" tone="neutral" />
-        <StatCard
-          label="Active"
-          value={formatNumber(loaded.active)}
-          hint="Open to candidates, blank status included"
-          tone="neutral"
-          href="/admin/projects?status=active"
-        />
-        <StatCard
-          label="Full-time potential"
-          value={formatNumber(loaded.fullTime)}
-          hint={`${loaded.all > 0 ? Math.round((loaded.fullTime / loaded.all) * 100) : 0}% of all projects`}
-          tone="neutral"
-          href="/admin/projects?type=full_time"
-        />
-        <StatCard label="Proposals sent" value={formatNumber(loaded.proposals)} hint="Across every project" tone="neutral" href="/admin/proposal-tracker" />
-      </StatGrid>
+  return (
+    <div className="space-y-4">
+      {headerWith(
+        `${formatNumber(loaded.all)} projects, ${formatNumber(loaded.active)} open to candidates, with ${formatNumber(loaded.proposals)} proposals sent across them.`,
+      )}
+
+      <AdminTabs items={views} active={activeView} label="Project views" />
 
       <DataTable
         basePath="/admin/projects"
@@ -164,14 +171,6 @@ export default async function AdminProjectsPage({
         }
         filters={[
           {
-            key: "status",
-            label: "Status",
-            options: [
-              { value: "active", label: "Active" },
-              { value: "closed", label: "Closed" },
-            ],
-          },
-          {
             key: "type",
             label: "Offer type",
             options: [
@@ -187,11 +186,11 @@ export default async function AdminProjectsPage({
             cell: (row) => (
               // Long names wrap to two lines rather than widen the table past
               // its card at 1440 (QA-140).
-              <div className="min-w-0 max-w-xs whitespace-normal">
-                <p className="line-clamp-2 break-words font-medium text-ink-900" title={row.projectName}>
+              <div className="min-w-0 whitespace-normal lg:max-w-xs">
+                <p className="line-clamp-2 break-words font-medium text-foreground" title={row.projectName}>
                   {row.projectName}
                 </p>
-                <p className="truncate text-xs text-ink-600" title={(row.skills ?? []).join(", ")}>
+                <p className="truncate text-[0.8125rem] text-text-subtle" title={(row.skills ?? []).join(", ")}>
                   {row.skills?.length ? row.skills.slice(0, 4).join(", ") : "No skills listed"}
                 </p>
               </div>
@@ -201,33 +200,34 @@ export default async function AdminProjectsPage({
             header: "Company",
             sort: "company",
             cell: (row) => (
-              <Link href={`/admin/companies/${row.employerId}?tab=projects`} className="block max-w-44 whitespace-normal break-words font-medium text-brand-700 hover:underline">
-                {row.employerName}
-              </Link>
+              <IdentityCell name={row.employerName} id={row.employerId} href={`/admin/companies/${row.employerId}?tab=projects`} size="sm" className="lg:max-w-52" />
             ),
           },
           {
             header: "Where",
             cell: (row) => (
-              <div className="min-w-0 max-w-36">
+              <div className="min-w-0 lg:max-w-36">
                 <p className="truncate capitalize">{row.locationType || "Remote"}</p>
-                {row.city || row.timezone ? <p className="truncate text-xs text-ink-600">{row.city || row.timezone}</p> : null}
+                {row.city || row.timezone ? <p className="truncate text-[0.8125rem] text-text-subtle">{row.city || row.timezone}</p> : null}
               </div>
             ),
           },
-          { header: "Type", cell: (row) => <span className="whitespace-normal">{row.fullTimeOffer ? "Full-time potential" : "Internship"}</span> },
+          {
+            header: "Type",
+            cell: (row) => <StatusBadge tone={row.fullTimeOffer ? "info" : "neutral"} label={row.fullTimeOffer ? "Full-time potential" : "Internship"} dot={false} />,
+          },
           {
             header: "Proposals",
             sort: "proposals",
-            align: "right",
+            numeric: true,
             cell: (row) => (
-              <Link href={`/admin/proposal-tracker?company=${row.employerId}`} className="font-medium text-ink-900 hover:text-brand-700 hover:underline">
+              <Link href={`/admin/proposal-tracker?company=${row.employerId}`} className="font-medium text-foreground hover:underline">
                 {row.proposalCount}
               </Link>
             ),
           },
           { header: "Status", cell: (row) => <StatusBadge value={row.isActive ? "active" : "closed"} /> },
-          { header: "Posted", sort: "posted", cell: (row) => <span className="nums whitespace-nowrap">{formatDate(row.createdAt)}</span> },
+          { header: "Posted", sort: "posted", cell: (row) => <span className="nums whitespace-nowrap text-text-subtle">{formatDate(row.createdAt)}</span> },
         ]}
       />
     </div>

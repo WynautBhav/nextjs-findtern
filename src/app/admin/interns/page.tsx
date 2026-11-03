@@ -1,13 +1,13 @@
-import Link from "next/link";
 import { Download } from "lucide-react";
 
 import { RatingsImport } from "@/components/admin/ratings-import";
 import { formatDate, formatMoney } from "@/lib/format";
-import { flattenParams, parsePageRequest, toPage } from "@/lib/admin/params";
+import { flattenParams, parsePageRequest, toPage, toQueryString } from "@/lib/admin/params";
 import { INTERN_SORTS as SORTS, loadInterns, type InternRow as Row } from "@/lib/admin/intern-query";
 import { matchesDue, todayIstIso } from "@/lib/admin/intern-list";
-import { AdminLoadError, AdminPageHeader, AttentionBanner } from "@/components/admin/panel";
-import { DataTable, type Column } from "@/components/admin/data-table";
+import { AdminLoadError, AdminPageHeader } from "@/components/admin/panel";
+import { AdminTabs, type AdminTabItem } from "@/components/admin/admin-tabs";
+import { DataTable, IdentityCell, type Column } from "@/components/admin/data-table";
 import type { ToolbarFilter } from "@/components/admin/table-toolbar";
 import { StatusBadge, humanizeStatus } from "@/components/admin/status-badge";
 import { BulkSelectProvider, RowCheckbox, SelectAllCheckbox, type BulkActionSpec } from "@/components/admin/bulk-select";
@@ -17,7 +17,7 @@ import {
   InternRatingsCell,
   InternVisibilityCell,
 } from "@/components/admin/intern-row-controls";
-import { ADMIN_SURFACE } from "@/components/admin/surface";
+import { ADMIN_PILL_SECONDARY, ADMIN_SURFACE } from "@/components/admin/surface";
 import { buttonClass } from "@/components/ui/button";
 
 /**
@@ -180,13 +180,14 @@ export default async function AdminInterns({
   const dir: "asc" | "desc" = params.dir === "asc" || params.dir === "desc" ? params.dir : sortKey === "name" || sortKey === "email" || sortKey === "next" ? "asc" : "desc";
   const exportHref = `/api/admin/export?type=interns&${new URLSearchParams(params).toString()}`;
 
-  const header = (
+  const headerWith = (subtitle?: string) => (
     <AdminPageHeader
       title="Candidates"
+      subtitle={subtitle}
       action={
         <div className="flex flex-wrap items-center gap-2">
           <RatingsImport />
-          <a href={exportHref} className={buttonClass({ variant: "outline" })}>
+          <a href={exportHref} className={buttonClass({ variant: "outline", className: ADMIN_PILL_SECONDARY })}>
             <Download className="size-4" aria-hidden />
             Export CSV
           </a>
@@ -194,6 +195,7 @@ export default async function AdminInterns({
       }
     />
   );
+  const header = headerWith();
 
   let data: Awaited<ReturnType<typeof loadInterns>>;
   try {
@@ -214,6 +216,31 @@ export default async function AdminInterns({
   const page = toPage(rows, total, req.page, req.perPage);
   const today = todayIstIso();
 
+  // Saved views: shortcuts onto the same URL filters the toolbar sets. Other
+  // filters, search and sort are kept; the page resets.
+  const viewHref = (patch: Record<string, string>) =>
+    `/admin/interns${toQueryString({ ...params, approval: "", profile: "", hired: "", ...patch, page: "" })}`;
+  const views: AdminTabItem[] = [
+    { key: "all", label: "All candidates", count: signups, href: viewHref({}) },
+    { key: "pending", label: "Pending review", href: viewHref({ approval: "Pending" }) },
+    { key: "incomplete", label: "Incomplete profile", count: incomplete, href: viewHref({ profile: "incomplete" }) },
+    { key: "hired", label: "Hired", href: viewHref({ hired: "yes" }) },
+  ];
+  const activeView =
+    params.approval === "Pending" && !params.profile && !params.hired
+      ? "pending"
+      : params.profile === "incomplete" && !params.approval && !params.hired
+        ? "incomplete"
+        : params.hired === "yes" && !params.approval && !params.profile
+          ? "hired"
+          : !params.approval && !params.profile && !params.hired
+            ? "all"
+            : "";
+  const finding =
+    incomplete > 0
+      ? `${incomplete.toLocaleString("en-IN")} of ${signups.toLocaleString("en-IN")} candidates have not finished onboarding, so employers can't see them yet.`
+      : `${signups.toLocaleString("en-IN")} candidates.`;
+
   const columns: Column<Row>[] = [
     {
       header: <SelectAllCheckbox ids={rows.map((r) => r.id)} noun="candidates" />,
@@ -224,34 +251,27 @@ export default async function AdminInterns({
     {
       header: "Candidate",
       sort: "name",
-      cell: (row) => (
-        <div className="flex items-center gap-3">
-          <span aria-hidden className="grid size-9 shrink-0 place-items-center rounded-full bg-brand-100 text-xs font-semibold text-brand-800">
-            {row.firstName.charAt(0)}
-            {row.lastName.charAt(0)}
-          </span>
-          <div className="min-w-0">
-            <Link
+      cell: (row) => {
+        const name = `${row.firstName} ${row.lastName}`.trim();
+        return (
+          <div className="min-w-0 lg:max-w-60">
+            <IdentityCell
+              name={name}
+              id={row.id}
               href={`/admin/interns/${row.id}`}
-              className="block max-w-52 truncate font-semibold text-ink-900 underline-offset-4 hover:underline"
-              title={`${row.firstName} ${row.lastName}`}
-            >
-              {row.firstName} {row.lastName}
-            </Link>
-            <p className="max-w-52 truncate text-sm text-ink-600" title={row.email}>
-              {row.email}
-            </p>
-            {/* Joined rides here, not in its own column ("Newest first" still sorts by it). */}
-            <p className="nums max-w-52 whitespace-normal text-xs text-ink-600">
-              {row.createdAt ? `Joined ${formatDate(row.createdAt)}` : ""}
-              {/* Only the exceptions: a complete, paid profile is the norm. */}
-              {!row.hasProfile ? <span className="text-accent-700"> · profile incomplete</span> : null}
-              {row.hasProfile && !row.feePaid ? " · fee unpaid" : null}
-              {!row.openToWork && row.visibility !== "hidden" ? " · hidden by candidate" : null}
-            </p>
+              sub={<span title={row.email}>{row.email}</span>}
+            />
+            {/* Only the exceptions: a complete, paid profile is the norm. */}
+            {!row.hasProfile || (row.hasProfile && !row.feePaid) || (!row.openToWork && row.visibility !== "hidden") ? (
+              <div className="mt-1.5 flex flex-wrap gap-1 pl-[3.25rem]">
+                {!row.hasProfile ? <StatusBadge tone="warning" label="Profile incomplete" dot={false} className="h-5" /> : null}
+                {row.hasProfile && !row.feePaid ? <StatusBadge tone="warning" label="Fee unpaid" dot={false} className="h-5" /> : null}
+                {!row.openToWork && row.visibility !== "hidden" ? <StatusBadge tone="neutral" label="Hidden by candidate" dot={false} className="h-5" /> : null}
+              </div>
+            ) : null}
           </div>
-        </div>
-      ),
+        );
+      },
     },
     {
       header: "Score",
@@ -266,11 +286,11 @@ export default async function AdminInterns({
               score={row.score}
             />
           ) : (
-            <span className="text-ink-600">No profile</span>
+            <span className="text-text-subtle">No profile</span>
           )}
           {/* Only when it is not done: "Completed" under every score was noise. */}
           {row.aiStatus !== "completed" ? (
-            <span className="max-w-28 whitespace-normal text-xs text-ink-600">AI interview: {AI_STATUS_LABEL[row.aiStatus] ?? humanizeStatus(row.aiStatus)}</span>
+            <span className="max-w-28 whitespace-normal text-xs text-text-subtle">AI interview: {AI_STATUS_LABEL[row.aiStatus] ?? humanizeStatus(row.aiStatus)}</span>
           ) : null}
         </div>
       ),
@@ -278,7 +298,7 @@ export default async function AdminInterns({
     {
       header: "Review",
       cell: (row) =>
-        row.hasOnboarding ? <InternApprovalCell internId={row.id} value={row.approval ?? "Pending"} /> : <span className="text-text-subtle">-</span>,
+        row.hasOnboarding ? <InternApprovalCell internId={row.id} value={row.approval ?? "Pending"} pill /> : <span className="text-text-subtle">-</span>,
     },
     {
       header: "Offer",
@@ -287,7 +307,7 @@ export default async function AdminInterns({
           <div className="flex flex-col items-start gap-1 whitespace-nowrap">
             <StatusBadge value={row.hired ? "hired" : row.offerStatus} />
             {row.hired || row.fullTime ? (
-              <span className="text-xs text-ink-600">
+              <span className="text-xs text-text-subtle">
                 {row.fullTime ? "Full-time" : "Internship"}
                 {row.hired ? ` · ${row.projectStatus === "completed" ? "Completed" : "Ongoing"}` : ""}
               </span>
@@ -307,10 +327,10 @@ export default async function AdminInterns({
           <div className="flex flex-col items-end gap-1 whitespace-nowrap">
             <span className="font-semibold text-ink-900">{formatMoney(row.money.owedMinor, "INR", { zeroLabel: "₹0" })} due</span>
             {row.money.pendingPayoutMinor > 0 ? (
-              <span className="text-xs text-ink-600">{formatMoney(row.money.pendingPayoutMinor, "INR")} pending</span>
+              <span className="text-xs text-text-subtle">{formatMoney(row.money.pendingPayoutMinor, "INR")} pending</span>
             ) : null}
             {row.money.nextDate ? (
-              <span className="nums flex items-center gap-1.5 text-xs text-ink-600">
+              <span className="nums flex items-center gap-1.5 text-xs text-text-subtle">
                 {matchesDue(row.money.nextDate, "overdue", today) ? <StatusBadge tone="danger" label="Overdue" /> : null}
                 next {formatDate(row.money.nextDate)}
               </span>
@@ -321,21 +341,28 @@ export default async function AdminInterns({
         ),
     },
     {
+      // One line per row: a state pill and an icon button for each of
+      // visibility and account (buttons keep their names: Hide/Show, Deactivate/Activate).
       header: "Access",
       cell: (row) => (
-        <div className="flex flex-col items-start gap-1 whitespace-nowrap">
-          <InternVisibilityCell internId={row.id} live={row.visibility !== "hidden"} />
-          <AccountActiveCell id={row.id} kind="intern" active={row.isActive} />
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <InternVisibilityCell internId={row.id} live={row.visibility !== "hidden"} compact />
+          <AccountActiveCell id={row.id} kind="intern" active={row.isActive} compact />
         </div>
       ),
+    },
+    {
+      header: "Joined",
+      sort: "created",
+      cell: (row) => <span className="nums whitespace-nowrap text-text-subtle">{row.createdAt ? formatDate(row.createdAt) : "-"}</span>,
     },
   ];
 
   return (
     <div>
-      {header}
+      {headerWith(finding)}
       <div className="space-y-4">
-        <AttentionBanner count={incomplete} total={signups} noun="interns" href="/admin/interns?profile=incomplete" />
+        <AdminTabs items={views} active={activeView} label="Candidate views" />
         <BulkSelectProvider actions={ACTIONS} noun="interns">
           <DataTable<Row>
             basePath="/admin/interns"
@@ -350,7 +377,7 @@ export default async function AdminInterns({
             caption="Candidates"
             searchPlaceholder="Search name, email or phone…"
             filters={FILTERS}
-            rowClassName="group/row align-top"
+            rowClassName="group/row"
             empty={{
               title: "No candidates match",
               body: "Try a different search, or clear the filters to see everyone.",

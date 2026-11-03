@@ -3,6 +3,8 @@ import { desc, eq, inArray } from "drizzle-orm";
 
 import { getDb, schema } from "@/lib/db";
 import { AdminLoadError, AdminPageHeader, Panel } from "@/components/admin/panel";
+import { ADMIN_PILL_SECONDARY } from "@/components/admin/surface";
+import { ButtonLink } from "@/components/ui/button";
 import { getInvoiceSeller } from "@/lib/invoice-seller";
 import { orderProposalIds } from "@/lib/payments";
 import { AdminInvoicesView, type AdminInvoiceRow } from "@/components/admin/admin-invoices-view";
@@ -107,6 +109,12 @@ export default async function AdminOrdersPage({ searchParams }: { searchParams?:
     <div>
       <AdminPageHeader
         title="Orders"
+        subtitle="Every employer checkout, paid or not. Test employers are listed but never counted as revenue."
+        action={
+          <ButtonLink href="/admin/transactions" variant="outline" size="sm" className={ADMIN_PILL_SECONDARY}>
+            Transactions
+          </ButtonLink>
+        }
       />
       {rows ? (
         <AdminInvoicesView kind="employer" rows={rows} seller={getInvoiceSeller()} params={params} basePath="/admin/orders" uncounted={uncounted} />

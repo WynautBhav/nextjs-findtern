@@ -7,8 +7,7 @@ import { realEmployers } from "@/lib/admin/scope";
 
 import { getDb, schema } from "@/lib/db";
 import { AdminEmpty, AdminLoadError, AdminPageHeader, Panel, PanelHeader, PanelBody } from "@/components/admin/panel";
-import { Pill } from "@/components/app/primitives";
-import { humanizeStatus } from "@/components/admin/status-badge";
+import { StatusBadge, humanizeStatus } from "@/components/admin/status-badge";
 import { NotificationComposer } from "@/components/admin/notification-composer";
 
 export const metadata: Metadata = { title: "Notifications" };
@@ -140,7 +139,7 @@ async function render(query: string, header: React.ReactNode) {
         <PanelHeader
           title="Recently sent"
           description="The 15 newest notifications people sent (automatic reminders are left out)."
-          action={<Link href="/admin/notification-history" className="text-sm font-medium text-brand-700 underline-offset-4 hover:underline touch:inline-flex touch:min-h-11 touch:items-center">Full history</Link>}
+          action={<Link href="/admin/notification-history" className="text-sm font-medium text-foreground underline underline-offset-4 hover:text-brand-700 touch:inline-flex touch:min-h-11 touch:items-center">Full history</Link>}
         />
         <PanelBody className="p-0">
           {history.length === 0 ? (
@@ -149,14 +148,14 @@ async function render(query: string, header: React.ReactNode) {
               body="Notifications you send from the composer above will be listed here."
             />
           ) : (
-            <ul className="divide-y divide-ink-100">
+            <ul className="divide-y divide-[color:var(--admin-rule)]">
               {history.map((n) => (
-                <li key={n.id} className="px-5 py-3">
+                <li key={n.id} className="px-[var(--admin-pad-panel)] py-3.5">
                   <div className="flex flex-wrap items-baseline justify-between gap-2">
-                    <p className="min-w-0 text-sm font-medium text-ink-900">{n.title}</p>
-                    <p className="nums flex items-center gap-2 text-xs text-ink-600">
-                      <Pill tone="closed">{n.recipientType === "employer" ? "Company" : "Candidate"}</Pill>
-                      <Pill tone="neutral">{humanizeStatus(n.type)}</Pill>
+                    <p className="min-w-0 text-sm font-medium text-foreground">{n.title}</p>
+                    <p className="nums flex items-center gap-2 text-xs text-text-subtle">
+                      <StatusBadge tone="neutral" dot={false} label={n.recipientType === "employer" ? "Company" : "Candidate"} />
+                      <StatusBadge tone="info" dot={false} label={humanizeStatus(n.type)} />
                       {n.createdAt
                         ? new Date(n.createdAt).toLocaleString("en-IN", {
                             day: "2-digit",
@@ -169,7 +168,7 @@ async function render(query: string, header: React.ReactNode) {
                         : "-"}
                     </p>
                   </div>
-                  <p className="mt-1 line-clamp-2 text-sm leading-relaxed text-ink-600">{n.message}</p>
+                  <p className="mt-1 line-clamp-2 text-sm leading-relaxed text-text-subtle">{n.message}</p>
                 </li>
               ))}
             </ul>

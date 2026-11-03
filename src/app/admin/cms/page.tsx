@@ -1,13 +1,12 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { asc, count, desc } from "drizzle-orm";
 
 import { CmsAddButton, CmsEditorProvider, CmsRowActions, type CmsItem } from "@/components/admin/cms-editor";
+import { AdminTabs } from "@/components/admin/admin-tabs";
 import { DataTable, type Column } from "@/components/admin/data-table";
 import { InlineToggle } from "@/components/admin/inline-control";
 import { AdminLoadError, AdminPageHeader, Panel } from "@/components/admin/panel";
 import { StatusBadge } from "@/components/admin/status-badge";
-import { Pill } from "@/components/app/primitives";
 import { CMS_COLLECTIONS, CMS_TYPES, cmsImageSrc, matchesCmsSearch, type CmsType } from "@/lib/admin/cms-collections";
 import { CMS_TABLES, cmsListColumns } from "@/lib/admin/cms-tables";
 import { flattenParams, parsePageRequest, toPage } from "@/lib/admin/params";
@@ -45,7 +44,7 @@ function dateIn(value: unknown): string {
 
 function Thumb({ src }: { src: string | null }) {
   return (
-    <span className="grid size-10 shrink-0 place-items-center overflow-hidden rounded-apple-sm border border-ink-200/80 bg-ink-50">
+    <span className="grid size-10 shrink-0 place-items-center overflow-hidden rounded-xl bg-[color:var(--admin-panel-2)]">
       {src ? (
         // eslint-disable-next-line @next/next/no-img-element -- stored CMS images, any origin or inline
         <img src={src} alt="" loading="lazy" className="size-full object-contain" />
@@ -87,10 +86,10 @@ function columnsFor(type: CmsType): Column<CmsItem>[] {
       <span className="flex min-w-0 items-center gap-3">
         {def.image ? <Thumb src={cmsImageSrc(type, row.id, def.image, row[def.image])} /> : null}
         <span className="min-w-0">
-          <span className="block truncate font-medium text-ink-900" title={String(row[def.title] ?? "")}>
+          <span className="block truncate font-medium text-foreground" title={String(row[def.title] ?? "")}>
             {String(row[def.title] ?? "") || "Untitled"}
           </span>
-          {type === "testimonial" && row.title ? <span className="block truncate text-xs text-ink-600">{String(row.title)}</span> : null}
+          {type === "testimonial" && row.title ? <span className="block truncate text-xs text-text-subtle">{String(row.title)}</span> : null}
         </span>
       </span>
     ),
@@ -115,7 +114,7 @@ function columnsFor(type: CmsType): Column<CmsItem>[] {
         titled("Question"),
         {
           header: "Shown to",
-          cell: (row) => <Pill tone={row.category === "Employer" ? "new" : "live"}>{String(row.category ?? "-").trim() || "-"}</Pill>,
+          cell: (row) => <StatusBadge tone={row.category === "Employer" ? "info" : "success"} dot={false} label={String(row.category ?? "-").trim() || "-"} />,
         },
         order,
         status,
@@ -124,7 +123,7 @@ function columnsFor(type: CmsType): Column<CmsItem>[] {
     case "blog":
       return [
         titled("Post"),
-        text("Slug", "slug", "font-mono text-xs"),
+        text("Slug", "slug", "text-xs text-text-subtle"),
         {
           header: "Status",
           cell: (row) => (
@@ -186,22 +185,12 @@ export default async function AdminCmsPage({
         subtitle="Prices live under Pricing and fees; legal texts under Settings."
       />
 
-      <nav aria-label="Content types" className="mb-6 flex max-w-full gap-1 overflow-x-auto rounded-apple-md bg-ink-100 p-1">
-        {CMS_TYPES.map((t) => (
-          <Link
-            key={t}
-            href={`/admin/cms?tab=${t}`}
-            aria-current={t === active ? "page" : undefined}
-            className={cn(
-              "inline-flex min-h-10 shrink-0 items-center gap-2 whitespace-nowrap rounded-apple-sm px-4 text-sm font-medium max-lg:min-h-11",
-              t === active ? "bg-card text-ink-900 shadow-xs" : "text-ink-600 hover:text-ink-900",
-            )}
-          >
-            {CMS_COLLECTIONS[t].label}
-            {counts[t] !== undefined ? <span className="nums text-xs text-text-subtle">{counts[t]}</span> : null}
-          </Link>
-        ))}
-      </nav>
+      <AdminTabs
+        label="Content types"
+        className="mb-6"
+        active={active}
+        items={CMS_TYPES.map((t) => ({ key: t, label: CMS_COLLECTIONS[t].label, count: counts[t], href: `/admin/cms?tab=${t}` }))}
+      />
 
       {all === null ? (
         <Panel>

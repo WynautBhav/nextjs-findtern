@@ -1,37 +1,38 @@
 "use client";
 
 /**
- * The admin console's own frame (owner decision, 3 Nov 2026: a full dark ops
- * desk, admin only). It replaces `ConsoleShell` for `/admin/**`; intern,
- * employer and college keep the shared shell untouched.
+ * The admin console's own frame (owner decisions: dark ops desk 3 Nov 2026, then the framed light
+ * canvas from the reference board with a light/dark toggle, 4 Nov 2026). It replaces
+ * `ConsoleShell` for `/admin/**`; intern, employer and college keep the shared shell untouched.
  *
- * - One ground everywhere. The rail and the top bar sit on the page ground and
- *   are divided from it by 1px rules, never by cards, gradients or blur.
- * - The active item is marked by brightness plus one highlight that slides
- *   between items (the layoutId below). No accent pill, no left bar.
- * - The root carries `dark`, which flips every tokenised class beneath it. Radix
- *   dialogs, sheets and menus portal to <body>, outside this element, so the
- *   same class is put on <html> while the shell is mounted.
- * - The rail's collapsed state lives in a cookie the server layout reads
- *   (`RAIL_COOKIE` from `@/lib/rail`: this file is "use client", and a server
- *   layout importing a constant from it would receive a client reference).
- * - The rail is the live work queue: items carry a count (`badge`), and a
- *   numeric one ticks to its new value through `Count` when the server layout
- *   re-renders. A count that could not be read is simply not passed, never 0.
- * - Reduced motion: `MotionConfig` honours the OS setting for every JS
- *   animation in the console; the CSS switch in globals.css covers the rest.
+ * - One rounded frame on a grey canvas (`--admin-canvas`, `--admin-frame`, globals.css). The rail
+ *   and the top bar sit on the frame with no rules; content sits on panels one tone step off it.
+ *   Below `lg` the canvas inset and the frame radius drop to nothing.
+ * - The active rail item is marked by a 3px brand bar on the frame's edge plus brand text; the bar
+ *   slides between items (the layoutId below).
+ * - The theme (light default) lives in the `ft_admin_theme` cookie the server layout reads, so the
+ *   first paint is right. The root carries `data-admin-theme` and, when dark, `dark`, which flips
+ *   every tokenised class beneath it. Radix dialogs, sheets and menus portal to <body>, outside
+ *   this element, so the same attribute and class are put on <html> while the shell is mounted.
+ * - The rail's collapsed state lives in a cookie too (`RAIL_COOKIE` from `@/lib/rail`: this file is
+ *   "use client", and a server layout importing a constant from it would receive a client reference).
+ * - The rail is the live work queue: items carry a count (`badge`), and a numeric one ticks to its
+ *   new value through `Count` when the server layout re-renders. A count that could not be read is
+ *   simply not passed, never 0.
+ * - Reduced motion: `MotionConfig` honours the OS setting for every JS animation in the console;
+ *   the CSS switch in globals.css covers the rest.
  */
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { LayoutGroup, MotionConfig, motion } from "motion/react";
-import { ChevronDown, ChevronsLeft, ChevronsRight, LogOut, Menu, X } from "lucide-react";
+import { ChevronDown, ChevronsLeft, ChevronsRight, LogOut, Menu, MessageSquare, Moon, Sun, X } from "lucide-react";
 
+import { AdminAvatar } from "@/components/admin/avatar";
 import { ADMIN_DUR, ADMIN_EASE, Count, seconds } from "@/components/admin/motion";
 import { FeedbackFab } from "@/components/app/feedback-fab";
 import { Logo, LogoMark } from "@/components/brand/logo";
-import { InternAvatar } from "@/components/intern/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -42,6 +43,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { breadcrumbsFor } from "@/lib/breadcrumbs";
+import { ADMIN_THEME_COOKIE, type AdminTheme } from "@/lib/admin/theme";
 import { csrfFetch } from "@/lib/client-fetch";
 import { RAIL_COOKIE } from "@/lib/rail";
 import { cn } from "@/lib/utils";
@@ -78,6 +80,8 @@ export function AdminShell({
   topActions,
   signOutTo,
   initialCollapsed = false,
+  initialTheme = "light",
+  unreadMessages = 0,
   crumbLabels = {},
   rootCrumb,
   children,
@@ -89,6 +93,9 @@ export function AdminShell({
   topActions?: React.ReactNode;
   signOutTo: string;
   initialCollapsed?: boolean;
+  initialTheme?: AdminTheme;
+  /** Unread contact messages, for the dot on the top bar's messages button. */
+  unreadMessages?: number;
   crumbLabels?: Record<string, string>;
   rootCrumb: { label: string; href: string };
   children: React.ReactNode;
@@ -97,21 +104,24 @@ export function AdminShell({
   const router = useRouter();
   const [drawer, setDrawer] = useState(false);
   const [collapsed, setCollapsed] = useState(initialCollapsed);
+  const [theme, setTheme] = useState<AdminTheme>(initialTheme);
   const [signOutError, setSignOutError] = useState(false);
 
   // Portalled surfaces (dialogs, sheets, menus, the command palette) render under <body>: they
-  // get the dark tokens and the admin token block through <html>.
+  // get the theme and the admin token block through <html>. Re-run when the toggle flips.
   useEffect(() => {
     const root = document.documentElement;
-    root.classList.add("dark");
+    root.classList.toggle("dark", theme === "dark");
     root.dataset.console = "admin";
-    root.style.colorScheme = "dark";
+    root.dataset.adminTheme = theme;
+    root.style.colorScheme = theme;
     return () => {
       root.classList.remove("dark");
       delete root.dataset.console;
+      delete root.dataset.adminTheme;
       root.style.colorScheme = "";
     };
-  }, []);
+  }, [theme]);
 
   const allItems = groups.flatMap((g) => g.items);
   // The longest matching href wins, so /admin/interns/terms doesn't also light up /admin/interns.
@@ -139,6 +149,12 @@ export function AdminShell({
     document.cookie = `${RAIL_COOKIE}=${next ? "1" : "0"}; path=/; max-age=31536000; samesite=lax`;
   }
 
+  function toggleTheme() {
+    const next: AdminTheme = theme === "dark" ? "light" : "dark";
+    setTheme(next);
+    document.cookie = `${ADMIN_THEME_COOKIE}=${next}; path=/; max-age=31536000; samesite=lax`;
+  }
+
   async function signOut() {
     setSignOutError(false);
     const res = await csrfFetch("/api/auth/logout", { method: "POST" }).catch(() => null);
@@ -150,6 +166,9 @@ export function AdminShell({
     router.refresh();
   }
 
+  const logoVariant = theme === "dark" ? "white" : "green";
+  const messagesHref = allItems.find((i) => i.href === "/admin/messages")?.href;
+
   const rail = (compact: boolean, instance: string, onNavigate?: () => void) => (
     <LayoutGroup id={instance}>
       <RailScroller>
@@ -157,7 +176,7 @@ export function AdminShell({
           <div key={group.title ?? i}>
             {group.title ? (
               compact ? (
-                <div aria-hidden className="mx-auto mb-2 h-px w-6 bg-ink-200" />
+                <div aria-hidden className="mx-auto mb-2 h-px w-6 bg-[var(--admin-rule)]" />
               ) : (
                 <p className="mb-2 px-3 text-xs font-medium text-text-subtle">{group.title}</p>
               )
@@ -173,18 +192,18 @@ export function AdminShell({
         ))}
       </RailScroller>
 
-      <div className="mt-4 shrink-0 space-y-1 border-t border-ink-200 pt-3">
+      <div className="mt-3 shrink-0 space-y-1 pt-1">
         <FeedbackFab
           variant="link"
           deepLink={!onNavigate}
-          className={cn("w-full gap-3 text-ink-600 hover:bg-ink-100 hover:text-ink-900 [&>svg]:size-5", compact && "justify-center px-0 [&>span]:sr-only")}
+          className={cn("w-full gap-3 text-ink-600 hover:bg-[var(--admin-panel)] hover:text-ink-900 [&>svg]:size-5", compact && "justify-center px-0 [&>span]:sr-only")}
         />
         <button
           type="button"
           onClick={signOut}
           title={compact ? "Sign out" : undefined}
           className={cn(
-            "apple-spring flex min-h-11 w-full items-center gap-3 rounded-apple-sm px-3 text-sm text-ink-600 hover:bg-ink-100 hover:text-ink-900",
+            "apple-spring flex min-h-11 w-full items-center gap-3 rounded-full px-3 text-sm text-ink-600 hover:bg-[var(--admin-panel)] hover:text-ink-900",
             compact && "justify-center px-0",
           )}
         >
@@ -200,71 +219,95 @@ export function AdminShell({
     </LayoutGroup>
   );
 
+  const circle =
+    "apple-spring relative grid size-11 shrink-0 place-items-center rounded-full border border-[var(--admin-panel-edge)] bg-[var(--admin-panel)] text-ink-700 hover:text-ink-900";
+
   return (
     <MotionConfig reducedMotion="user">
       <div
         data-console="admin"
-        className="dark apple-admin min-h-[100dvh] overflow-x-clip bg-surface text-foreground lg:flex"
-        style={{ colorScheme: "dark" }}
+        data-admin-theme={theme}
+        className={cn("apple-admin min-h-[100dvh] bg-[var(--admin-canvas)] text-foreground lg:p-3", theme === "dark" && "dark")}
+        style={{ colorScheme: theme }}
       >
-        {/* ── Desktop rail ─────────────────────────────────────────────── */}
-        <aside
-          aria-label="Sidebar"
-          className={cn(
-            "sticky top-0 hidden h-[100dvh] shrink-0 flex-col border-r border-ink-200 bg-surface px-3 py-5 transition-[width] duration-[var(--duration-admin-slow)] ease-[var(--ease-out-soft)] motion-reduce:transition-none lg:flex",
-            collapsed ? "w-[4.75rem]" : "w-64",
-          )}
-        >
-          <div className={cn("flex min-h-12 items-center", collapsed ? "justify-center" : "gap-2 px-2")}>
-            <Link href={homeHref} aria-label="Findtern home" className="flex min-w-0 items-center">
-              {collapsed ? <LogoMark variant="white" alt="" className="size-7" /> : <Logo variant="white" priority className="h-9" />}
-            </Link>
-          </div>
-          <div className="flex min-h-0 flex-1 flex-col">{rail(collapsed, "desk")}</div>
-          <button
-            type="button"
-            onClick={toggleRail}
-            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-            aria-expanded={!collapsed}
-            className="apple-spring absolute -right-3.5 top-[4.25rem] z-10 grid size-7 place-items-center rounded-full border border-ink-300 bg-card text-ink-600 hover:text-ink-900"
+        <div className="relative min-h-[100dvh] overflow-x-clip bg-[var(--admin-frame)] lg:flex lg:min-h-[calc(100dvh-1.5rem)] lg:overflow-clip lg:rounded-[var(--radius-admin-frame)]">
+          {/* ── Desktop rail ───────────────────────────────────────────── */}
+          <aside
+            aria-label="Sidebar"
+            className={cn(
+              "sticky top-3 hidden h-[calc(100dvh-1.5rem)] shrink-0 flex-col px-4 py-5 transition-[width] duration-[var(--duration-admin-slow)] ease-[var(--ease-out-soft)] motion-reduce:transition-none lg:flex",
+              collapsed ? "w-[5.5rem]" : "w-64",
+            )}
           >
-            {collapsed ? <ChevronsRight className="size-4" aria-hidden /> : <ChevronsLeft className="size-4" aria-hidden />}
-          </button>
-        </aside>
-
-        {/* ── Content column ───────────────────────────────────────────── */}
-        <div className="flex min-w-0 flex-1 flex-col">
-          <header className="sticky top-0 z-30 border-b border-ink-200 bg-surface">
-            <div className="flex h-14 items-center gap-2 px-[clamp(1rem,3vw,2rem)]">
-              <Sheet open={drawer} onOpenChange={setDrawer}>
-                <SheetTrigger asChild>
-                  <button
-                    type="button"
-                    aria-label={waiting > 0 ? `Open navigation, ${waiting} waiting` : "Open navigation"}
-                    className="apple-spring relative -ml-2 grid size-11 place-items-center rounded-apple-sm text-ink-700 hover:bg-ink-100 lg:hidden"
-                  >
-                    <Menu className="size-5" aria-hidden />
-                    {waiting > 0 ? <span aria-hidden className="absolute right-2.5 top-2.5 size-2 rounded-full bg-accent-400 ring-2 ring-surface" /> : null}
-                  </button>
-                </SheetTrigger>
-                <SheetContent side="left" showCloseButton={false} aria-modal="true" className="flex w-[19rem] flex-col border-r border-ink-200 bg-surface p-4 text-foreground">
-                  <SheetTitle className="sr-only">Navigation</SheetTitle>
-                  <div className="flex min-h-12 items-center justify-between gap-2 px-2">
-                    <Logo variant="white" className="h-9" />
-                    <button type="button" onClick={() => setDrawer(false)} aria-label="Close navigation" className="apple-spring grid size-11 place-items-center rounded-apple-sm text-ink-600 hover:bg-ink-100 hover:text-ink-900">
-                      <X className="size-5" aria-hidden />
-                    </button>
-                  </div>
-                  {rail(false, "drawer", () => setDrawer(false))}
-                </SheetContent>
-              </Sheet>
-              <Link href={homeHref} aria-label="Findtern home" className="flex min-h-11 min-w-0 items-center lg:hidden">
-                <Logo variant="white" priority className="h-8" />
+            <div className={cn("flex min-h-12 items-center", collapsed ? "justify-center" : "gap-2 px-2")}>
+              <Link href={homeHref} aria-label="Findtern home" className="flex min-w-0 items-center">
+                {collapsed ? <LogoMark variant={logoVariant} alt="" className="size-8" /> : <Logo variant={logoVariant} priority className="h-9" />}
               </Link>
+            </div>
+            <div className="flex min-h-0 flex-1 flex-col">{rail(collapsed, "desk")}</div>
+            <button
+              type="button"
+              onClick={toggleRail}
+              aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+              aria-expanded={!collapsed}
+              className="apple-spring absolute -right-3.5 top-[4.25rem] z-10 grid size-7 place-items-center rounded-full border border-ink-300 bg-[var(--admin-panel)] text-ink-600 hover:text-ink-900"
+            >
+              {collapsed ? <ChevronsRight className="size-4" aria-hidden /> : <ChevronsLeft className="size-4" aria-hidden />}
+            </button>
+          </aside>
 
-              {/* Desktop, nested routes only: the way back up. A list page's H1 already says where you are. */}
+          {/* ── Content column ─────────────────────────────────────────── */}
+          <div className="flex min-w-0 flex-1 flex-col">
+            <header className="sticky top-0 z-30 bg-[var(--admin-frame)]">
+              <div className="flex h-[4.5rem] items-center gap-2 px-[clamp(1rem,3vw,2rem)] sm:gap-3">
+                <Sheet open={drawer} onOpenChange={setDrawer}>
+                  <SheetTrigger asChild>
+                    <button
+                      type="button"
+                      aria-label={waiting > 0 ? `Open navigation, ${waiting} waiting` : "Open navigation"}
+                      className={cn(circle, "-ml-1 lg:hidden")}
+                    >
+                      <Menu className="size-5" aria-hidden />
+                      {waiting > 0 ? <span aria-hidden className="absolute right-2 top-2 size-2 rounded-full bg-accent-400 ring-2 ring-[var(--admin-panel)]" /> : null}
+                    </button>
+                  </SheetTrigger>
+                  <SheetContent side="left" showCloseButton={false} aria-modal="true" className="flex w-[19rem] flex-col border-r border-ink-200 bg-[var(--admin-frame)] p-4 text-foreground">
+                    <SheetTitle className="sr-only">Navigation</SheetTitle>
+                    <div className="flex min-h-12 items-center justify-between gap-2 px-2">
+                      <Logo variant={logoVariant} className="h-9" />
+                      <button type="button" onClick={() => setDrawer(false)} aria-label="Close navigation" className="apple-spring grid size-11 place-items-center rounded-full text-ink-600 hover:bg-[var(--admin-panel)] hover:text-ink-900">
+                        <X className="size-5" aria-hidden />
+                      </button>
+                    </div>
+                    {rail(false, "drawer", () => setDrawer(false))}
+                  </SheetContent>
+                </Sheet>
+
+                <div className="min-w-0 flex-1">{topActions}</div>
+
+                <div className="flex shrink-0 items-center gap-2">
+                  {messagesHref ? (
+                    <Link href={messagesHref} className={circle} aria-label={unreadMessages > 0 ? `Messages, ${unreadMessages} unread` : "Messages"}>
+                      <MessageSquare className="size-[1.15rem]" aria-hidden />
+                      {unreadMessages > 0 ? <span aria-hidden className="absolute right-2.5 top-2.5 size-2 rounded-full bg-accent-400 ring-2 ring-[var(--admin-panel)]" /> : null}
+                    </Link>
+                  ) : null}
+                  <button type="button" onClick={toggleTheme} aria-pressed={theme === "dark"} aria-label="Dark mode" className={circle}>
+                    {theme === "dark" ? <Moon className="size-[1.15rem]" aria-hidden /> : <Sun className="size-[1.15rem]" aria-hidden />}
+                  </button>
+                  <AccountMenu account={account} menu={menu} onSignOut={signOut} />
+                </div>
+              </div>
+            </header>
+
+            <main
+              id="main"
+              tabIndex={-1}
+              className="mx-auto w-full min-w-0 max-w-[90rem] flex-1 px-[clamp(1rem,3vw,2rem)] pb-16 pt-2 outline-none"
+            >
+              {/* Nested routes only: the way back up. A list page's H1 already says where you are. */}
               {nested ? (
-                <nav aria-label="Breadcrumb" className="hidden min-w-0 items-center gap-2 text-sm lg:flex">
+                <nav aria-label="Breadcrumb" className="mb-4 flex min-w-0 items-center gap-2 text-sm">
                   <Link href={rootCrumb.href} className="apple-spring shrink-0 font-medium text-ink-600 hover:text-ink-900">
                     {rootCrumb.label}
                   </Link>
@@ -286,21 +329,9 @@ export function AdminShell({
                   })}
                 </nav>
               ) : null}
-
-              <div className="ml-auto flex shrink-0 items-center gap-2">
-                {topActions}
-                <AccountMenu account={account} menu={menu} onSignOut={signOut} />
-              </div>
-            </div>
-          </header>
-
-          <main
-            id="main"
-            tabIndex={-1}
-            className="mx-auto w-full min-w-0 max-w-[90rem] flex-1 px-[clamp(1rem,4vw,2.5rem)] pb-24 pt-6 outline-none lg:pt-8"
-          >
-            {children}
-          </main>
+              {children}
+            </main>
+          </div>
         </div>
       </div>
     </MotionConfig>
@@ -359,20 +390,21 @@ function RailLink({ item, active, compact, onNavigate }: { item: AdminNavItem; a
       title={compact ? item.label : undefined}
       className={cn(
         // 44px on touch; 40px with a mouse. A short window scrolls the rail rather than squeezing the links (QA-144).
-        "apple-spring group relative flex min-h-11 items-center gap-3 rounded-apple-sm px-3 text-sm [@media(pointer:fine)]:min-h-10",
-        active ? "font-medium text-ink-900" : "text-ink-600 hover:text-ink-900",
+        "apple-spring group relative flex min-h-11 items-center gap-3 rounded-full px-3 text-sm [@media(pointer:fine)]:min-h-10",
+        active ? "font-semibold text-brand-700" : "text-ink-600 hover:text-ink-900",
         compact && "justify-center px-0",
       )}
     >
       {active ? (
-        <motion.span layoutId="admin-nav-active" transition={SLIDE} aria-hidden className="absolute inset-0 rounded-apple-sm bg-ink-100" />
+        // The mark rides the frame's own edge (the rail has 16px padding), 3px wide, sliding between items.
+        <motion.span layoutId="admin-nav-active" transition={SLIDE} aria-hidden className="absolute -left-4 top-1/2 h-6 w-[3px] -translate-y-1/2 rounded-r-full bg-brand-700" />
       ) : (
-        <span aria-hidden className="absolute inset-0 rounded-apple-sm bg-ink-100/0 transition-colors duration-[var(--duration-admin-fast)] group-hover:bg-ink-100/60" />
+        <span aria-hidden className="absolute inset-0 rounded-full bg-[var(--admin-panel)] opacity-0 transition-opacity duration-[var(--duration-admin-fast)] group-hover:opacity-70" />
       )}
-      <span className={cn("relative shrink-0 [&_svg]:size-5", active ? "text-ink-900" : "text-ink-500 group-hover:text-ink-900")}>
+      <span className={cn("relative shrink-0 [&_svg]:size-5", active ? "text-brand-700" : "text-ink-500 group-hover:text-ink-900")}>
         {item.icon}
         {compact && (item.attention || item.badge) ? (
-          <span aria-hidden className="absolute -right-1 -top-1 size-2 rounded-full bg-accent-400 ring-2 ring-surface" />
+          <span aria-hidden className="absolute -right-1 -top-1 size-2 rounded-full bg-accent-400 ring-2 ring-[var(--admin-frame)]" />
         ) : null}
       </span>
       <span className={cn("relative min-w-0 flex-1 truncate", compact && "sr-only")}>{item.label}</span>
@@ -383,7 +415,7 @@ function RailLink({ item, active, compact, onNavigate }: { item: AdminNavItem; a
         </span>
       ) : null}
       {!compact && item.badge ? (
-        <span className="nums relative rounded-full bg-ink-200 px-2 py-0.5 text-2xs font-semibold text-ink-900">
+        <span className="nums relative rounded-full bg-[var(--admin-deep)] px-2 py-0.5 text-2xs font-semibold text-[var(--admin-deep-ink)]">
           {typeof item.badge === "number" ? <Count value={item.badge} format={formatBadge} /> : item.badge}
           {item.badgeNote ? <span className="sr-only"> {item.badgeNote}</span> : null}
         </span>
@@ -409,12 +441,13 @@ function AccountMenu({
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         {/* Named by its text, not an aria-label: the label never matched the initials a phone shows. */}
-        <button type="button" className="apple-spring flex min-h-11 items-center gap-2 rounded-apple-sm pl-1 pr-1 text-sm font-medium text-ink-800 hover:bg-ink-100 sm:pr-2">
-          <span aria-hidden>
-            <Avatar name={account.name} photoUrl={account.photoUrl} />
+        <button type="button" className="apple-spring flex min-h-11 items-center gap-2.5 rounded-full text-left text-sm hover:bg-[var(--admin-panel)] md:pr-3">
+          <AdminAvatar name={account.name} id={account.email} photoUrl={account.photoUrl} size="md" />
+          <span className="hidden min-w-0 md:block">
+            <span className="block max-w-[11rem] truncate font-semibold leading-tight text-ink-900">{account.name}</span>
+            <span className="block max-w-[11rem] truncate text-xs leading-tight text-text-subtle">{account.email}</span>
           </span>
-          <span className="sr-only md:not-sr-only md:block md:max-w-[11rem] md:truncate">{account.name}</span>
-          <span className="sr-only">, account menu</span>
+          <span className="sr-only">{account.name}, account menu</span>
           <ChevronDown className="hidden size-4 text-text-subtle md:block" aria-hidden />
         </button>
       </DropdownMenuTrigger>
@@ -441,15 +474,4 @@ function AccountMenu({
       </DropdownMenuContent>
     </DropdownMenu>
   );
-}
-
-/** The person's own photo, or their initials. A missing photo never renders as somebody else's face. */
-function Avatar({ name, photoUrl }: { name: string; photoUrl?: string | null }) {
-  const initials = name
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((p) => p[0]?.toUpperCase() ?? "")
-    .join("");
-  return <InternAvatar src={photoUrl ?? null} initials={initials || "?"} className="size-9 rounded-full text-xs" />;
 }
