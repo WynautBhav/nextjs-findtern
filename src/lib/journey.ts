@@ -380,7 +380,7 @@ export function buildThread(src: ProofSource, now: Date = new Date()): ThreadNod
         tone: "done",
         at: t.rejectedAt ?? t.createdAt,
         title: `Hours for ${period} need another look`,
-        detail: t.managerNote?.trim() ?? `${sentence(withName)} asked for a change to this period.`,
+        detail: t.managerNote?.trim() || `${sentence(withName)} asked for a change to this period.`,
         href: "/intern/timesheets",
         action: "Open and fix",
       });

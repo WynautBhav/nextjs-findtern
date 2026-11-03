@@ -178,7 +178,7 @@ function belongsTo(p: PayoutRow, proposalId: string, soleId: string | null): boo
 }
 
 function Engagement({ card, payouts }: { card: EngagementEarnings; payouts: PayoutRow[] }) {
-  const description = `${card.company} · ${card.months} month${card.months === 1 ? "" : "s"}${card.startDate ? ` from ${formatJoiningDate(card.startDate)}` : ""}`;
+  const description = `${card.company} · ${card.months} month${card.months === 1 ? "" : "s"}${card.joiningDate ? ` from ${formatJoiningDate(card.joiningDate)}` : ""}`;
   const offer = { href: `/intern/proposals/${encodeURIComponent(card.proposalId)}`, label: "The offer" };
 
   if (!card.eligible || !card.monthlyMinor) {

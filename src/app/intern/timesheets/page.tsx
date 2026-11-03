@@ -14,6 +14,7 @@ import { formatJoiningDate, shortDate } from "@/lib/format";
 import { isHiredProposal } from "@/lib/hire-status";
 import { loadInternData } from "@/lib/intern-data";
 import { hoursIn, isAcceptedStatus, toArray, type ProposalRow, type TimesheetRow } from "@/lib/journey";
+import { realJoiningDay } from "@/lib/intern-offer-view";
 import { parseOffer } from "@/lib/offer";
 import { formatPeriodDays, isoDay, periodDays, todayIst } from "@/lib/timesheet-days";
 import { cn } from "@/lib/utils";
@@ -165,6 +166,7 @@ export default async function InternTimesheets({
       />
     );
 
+  const joiningDay = realJoiningDay(offer);
   const periods = offer.startDate ? engagementPeriods(offer.startDate, offer.months) : [];
   const nextLine =
     "error" in next
@@ -177,7 +179,7 @@ export default async function InternTimesheets({
     <div>
       <PageHead
         title="Timesheets"
-        lede={`${role(selected)} at ${company(selected)}, ${offer.months} month${offer.months === 1 ? "" : "s"}${offer.startDate ? ` from ${formatJoiningDate(offer.startDate)}` : ""}.`}
+        lede={`${role(selected)} at ${company(selected)}, ${offer.months} month${offer.months === 1 ? "" : "s"}${joiningDay ? ` from ${formatJoiningDate(joiningDay)}` : ""}.`}
       />
 
       {hires.length > 1 ? (
@@ -357,7 +359,7 @@ function SheetStep({ sheet }: { sheet: TimesheetRow }) {
       {editable && sheet.managerNote ? (
         <div className="mt-3 rounded-apple-sm bg-accent-50 px-4 py-3">
           <p className="text-xs font-semibold text-accent-700">From your manager</p>
-          <p className="mt-1 text-pretty text-sm text-ink-800">{sheet.managerNote}</p>
+          <p className="mt-1 whitespace-pre-wrap text-pretty text-sm text-ink-800">{sheet.managerNote}</p>
         </div>
       ) : null}
 

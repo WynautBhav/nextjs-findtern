@@ -1,5 +1,6 @@
 import { isHiredProposal } from "./hire-status.ts";
 import { payoutState, readScheduledForDate, type PayoutRow, type ProposalRow } from "./journey.ts";
+import { offerJoiningDay } from "./intern-offer-view.ts";
 import { internStipendInrMinor, parseOffer, stipendEligible } from "./offer.ts";
 
 /**
@@ -18,6 +19,8 @@ export type EngagementEarnings = {
   roleTitle: string;
   company: string;
   startDate: string | null;
+  /** The IST day the first shift starts, else the raw start date. */
+  joiningDate: string | null;
   months: number;
   /** The intern's monthly stipend in INR paise; null when the offer has no amount. */
   monthlyMinor: number | null;
@@ -92,6 +95,7 @@ export function earningsEngagements(
       roleTitle: offer.roleTitle || "Internship",
       company: names[p.employerId] || "Your company",
       startDate: offer.startDate,
+      joiningDate: offerJoiningDay(offer),
       months: offer.months,
       monthlyMinor,
       eligible,

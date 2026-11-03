@@ -198,7 +198,7 @@ function OfferCard({
             Joining date
           </dt>
           <dd className="nums mt-1 text-sm font-medium text-ink-900">
-            {formatJoiningDate(facts.startDate)}
+            {formatJoiningDate(facts.joiningDate)}
           </dd>
         </div>
         {compact ? null : (
@@ -238,6 +238,7 @@ function OfferCard({
               roleTitle={facts.role}
               company={facts.company ?? "The company"}
               startDate={facts.startDate}
+              joiningDate={facts.joiningDate}
               fullTime={facts.fullTime}
               declinesUsed={decision.declinesUsed}
               freeDeclines={FREE_DECLINES}
