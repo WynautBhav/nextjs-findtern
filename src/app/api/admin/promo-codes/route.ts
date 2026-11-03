@@ -8,10 +8,10 @@ import { DUPLICATE_CODE, isUniqueViolation } from "@/lib/promo";
 import { PROMO_APPLIES_TO, promoWindowProblem } from "@/lib/promo-rules";
 
 const bodySchema = z.object({
-  code: z.string().min(2),
+  code: z.string().trim().min(2, "Code must be at least 2 characters"),
   description: z.string().nullish(),
   discountType: z.enum(["percentage", "fixed"]),
-  discountValue: z.number().int().positive(),
+  discountValue: z.number("Enter a discount value").int("Discount must be a whole number").positive("Discount must be greater than 0"),
   maxUsages: z.number().int().positive("Max uses must be at least 1").nullish(),
   minOrderAmountMinor: z.number().int().min(0, "Minimum order can't be negative").nullish(),
   validFrom: z.string().datetime().nullish(),
