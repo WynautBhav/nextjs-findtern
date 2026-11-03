@@ -14,6 +14,9 @@ export const users = pgTable("users", {
   phoneNumber: text("phone_number").notNull(),
   password: text("password").notNull(),
   agreedToTerms: boolean("agreed_to_terms").notNull().default(false),
+  // Which version of the terms this account last accepted (src/lib/terms.ts), and when. Null = never.
+  termsAcceptedVersion: text("terms_accepted_version"),
+  termsAcceptedAt: timestamp("terms_accepted_at", { withTimezone: true }),
   // intern | employee
   role: text("role").notNull().default("intern"),
   // Admin-controlled marketplace visibility. `live` interns appear in the
@@ -69,6 +72,9 @@ export const employers = pgTable("employers", {
   password: text("password").notNull(),
   passwordChangedAt: timestamp("password_changed_at").defaultNow(),
   agreedToTerms: boolean("agreed_to_terms").notNull().default(false),
+  // Which version of the terms this account last accepted (src/lib/terms.ts), and when. Null = never.
+  termsAcceptedVersion: text("terms_accepted_version"),
+  termsAcceptedAt: timestamp("terms_accepted_at", { withTimezone: true }),
   logoUrl: text("logo_url"),
   websiteUrl: text("website_url"),
   companySize: text("company_size"),
@@ -937,6 +943,9 @@ export const collegeAdmins = pgTable("college_admins", {
   password: text("password").notNull(),
   isActive: boolean("is_active").notNull().default(true),
   lastLoginAt: timestamp("last_login_at"),
+  // Which version of the terms this account last accepted (src/lib/terms.ts), and when. Null = never.
+  termsAcceptedVersion: text("terms_accepted_version"),
+  termsAcceptedAt: timestamp("terms_accepted_at", { withTimezone: true }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => ({
   collegeAdminsEmailUnique: uniqueIndex("college_admins_email_unique").on(t.email),

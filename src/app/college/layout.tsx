@@ -3,9 +3,11 @@ import { cookies } from "next/headers";
 import { LayoutDashboard, ListChecks, Megaphone } from "lucide-react";
 
 import { ConsoleShell, type ConsoleNavGroup } from "@/components/layout/console-shell";
+import { TermsGate } from "@/components/app/terms-gate";
 import { RAIL_COOKIE } from "@/lib/rail";
 import { requireCollegeContext } from "@/lib/college/scope";
 import { SITE } from "@/lib/content/site";
+import { shouldShowTermsPrompt } from "@/lib/terms";
 
 export const metadata: Metadata = {
   title: "Placement console",
@@ -47,6 +49,7 @@ export default async function CollegeLayout({ children }: { children: React.Reac
       crumbParents={{ "/college/students": { label: "Students", href: "/college" } }}
     >
       {children}
+      {shouldShowTermsPrompt({ acceptedVersion: ctx.admin.termsAcceptedVersion }) ? <TermsGate role="college" /> : null}
     </ConsoleShell>
   );
 }

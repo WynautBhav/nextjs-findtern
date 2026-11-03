@@ -18,6 +18,7 @@ import {
 import { ConsoleShell, type ConsoleNavItem } from "@/components/layout/console-shell";
 import { RAIL_COOKIE } from "@/lib/rail";
 import { ViewAsBanner } from "@/components/admin/view-as-banner";
+import { TermsGate } from "@/components/app/terms-gate";
 import { CollegeLive } from "@/components/intern/college-live";
 import { getSession } from "@/lib/auth";
 import { getDb, schema } from "@/lib/db";
@@ -25,6 +26,8 @@ import { membershipOf } from "@/lib/college/membership";
 import { loadInternData } from "@/lib/intern-data";
 import { nextAction, type Stage } from "@/lib/journey";
 import { SITE } from "@/lib/content/site";
+import { shouldShowTermsPrompt } from "@/lib/terms";
+import { internTermsVersion } from "@/lib/terms-state";
 
 export const metadata = { title: "Findtern" };
 
@@ -82,9 +85,10 @@ export default async function InternLayout({ children }: { children: React.React
   if (!session || session.role !== "intern") redirect("/login?as=intern");
 
   // Independent reads, in parallel. loadInternData is cache()d, so the page's own call reuses this one.
-  const [data, name, [unread], college] = await Promise.all([
+  const [data, name, termsVersion, [unread], college] = await Promise.all([
     loadInternData(session.uid),
     fullName(session.uid),
+    internTermsVersion(session.uid),
     getDb()
       .select({ value: count() })
       .from(schema.notifications)
@@ -143,6 +147,7 @@ export default async function InternLayout({ children }: { children: React.React
         />
       ) : null}
       {children}
+      {shouldShowTermsPrompt({ acceptedVersion: termsVersion, impersonating: !!session.impersonator }) ? <TermsGate role="intern" /> : null}
     </ConsoleShell>
   );
 }

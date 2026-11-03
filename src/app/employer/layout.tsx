@@ -20,10 +20,12 @@ import {
 import { ConsoleShell, type ConsoleNavGroup } from "@/components/layout/console-shell";
 import { RAIL_COOKIE } from "@/lib/rail";
 import { ViewAsBanner } from "@/components/admin/view-as-banner";
+import { TermsGate } from "@/components/app/terms-gate";
 import { getSession } from "@/lib/auth";
 import { getDb, schema } from "@/lib/db";
 import { SITE } from "@/lib/content/site";
 import { q } from "@/lib/college/sql";
+import { shouldShowTermsPrompt } from "@/lib/terms";
 
 const NAV_GROUPS: ConsoleNavGroup[] = [
   {
@@ -60,14 +62,17 @@ export default async function EmployerLayout({ children }: { children: React.Rea
   let companyName = "Company Account";
   let unreadAlerts = 0;
   let cartCount = 0;
+  // Unknown (a failed read) must not trap someone behind a pop-up they may have already accepted.
+  let termsVersion: string | null | undefined;
   try {
     const db = getDb();
     const [emp] = await db
-      .select({ companyName: schema.employers.companyName })
+      .select({ companyName: schema.employers.companyName, termsVersion: schema.employers.termsAcceptedVersion })
       .from(schema.employers)
       .where(eq(schema.employers.id, session.uid))
       .limit(1);
     if (emp?.companyName) companyName = emp.companyName;
+    termsVersion = emp?.termsVersion ?? null;
 
     const [unread] = await db
       .select({ value: count() })
@@ -142,6 +147,7 @@ export default async function EmployerLayout({ children }: { children: React.Rea
       banner={session.impersonator ? <ViewAsBanner viewing={companyName} admin={session.impersonator.email} /> : null}
     >
       {children}
+      {termsVersion !== undefined && shouldShowTermsPrompt({ acceptedVersion: termsVersion, impersonating: !!session.impersonator }) ? <TermsGate role="employer" /> : null}
     </ConsoleShell>
   );
 }
