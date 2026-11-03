@@ -37,6 +37,8 @@ type Props = {
   testMode?: boolean;
   /** PAYMENTS_TEST_BUTTON=1: a second button settles at the real amount without Razorpay. */
   testPay?: boolean;
+  /** Tells the page whether a promo is applied, so it can lock the monthly option. */
+  onPromoChange?: (applied: boolean) => void;
 };
 
 // fetch rejects with a TypeError ("Failed to fetch") when offline; never show that raw.
@@ -45,7 +47,7 @@ function errorText(e: unknown, fallback: string): string {
   return e instanceof Error && e.message ? e.message : fallback;
 }
 
-export function CheckoutPay({ employerId, currency, amountMinor, prefill, proposalIds, mode = "upfront", testMode = false, testPay = false }: Props) {
+export function CheckoutPay({ employerId, currency, amountMinor, prefill, proposalIds, mode = "upfront", testMode = false, testPay = false, onPromoChange }: Props) {
   const router = useRouter();
   const [state, setState] = useState<"idle" | "busy" | "paid">("idle");
   const [error, setError] = useState<string | null>(null);
@@ -54,12 +56,19 @@ export function CheckoutPay({ employerId, currency, amountMinor, prefill, propos
   const [promoError, setPromoError] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
   const payable = promo ? amountMinor - promo.discountMinor : amountMinor;
+  // Promo codes are for upfront payment only; the server refuses them on monthly too.
+  const needsUpfront = mode === "monthly";
+  const hintId = `promo-hint-${currency}`;
+  const setPromoApplied = (next: { code: string; discountMinor: number } | null) => {
+    setPromo(next);
+    onPromoChange?.(next !== null);
+  };
 
   async function applyCode() {
     if (!code.trim()) return;
     setChecking(true);
     setPromoError(null);
-    setPromo(null);
+    setPromoApplied(null);
     try {
       const res = await csrfFetch(
         `/api/employer/${encodeURIComponent(employerId)}/payment/validate-promo`,
@@ -71,7 +80,7 @@ export function CheckoutPay({ employerId, currency, amountMinor, prefill, propos
       );
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body.error ?? "That code did not work.");
-      setPromo({ code: body.code, discountMinor: Number(body.discountMinor) || 0 });
+      setPromoApplied({ code: body.code, discountMinor: Number(body.discountMinor) || 0 });
     } catch (e) {
       setPromoError(errorText(e, "That code did not work. Try again."));
     } finally {
@@ -188,23 +197,29 @@ export function CheckoutPay({ employerId, currency, amountMinor, prefill, propos
               value={code}
               onChange={(e) => {
                 setCode(e.target.value.toUpperCase());
-                if (promo) setPromo(null);
+                if (promo) setPromoApplied(null);
               }}
               placeholder="Promo code"
               autoComplete="off"
+              disabled={needsUpfront}
+              aria-describedby={needsUpfront ? hintId : undefined}
               className={cn(fieldClass, "pl-8 uppercase placeholder:normal-case")}
             />
           </div>
           <button
             type="button"
             onClick={applyCode}
-            disabled={!code.trim() || checking || state === "busy"}
+            disabled={!code.trim() || checking || state === "busy" || needsUpfront}
             className={buttonClass({ variant: "outline", size: "sm", className: "min-h-11" })}
           >
             {checking ? <Loader2 className="size-4 animate-spin" aria-hidden /> : "Apply"}
           </button>
         </div>
-        {promoError ? (
+        {needsUpfront ? (
+          <p id={hintId} className="mt-1.5 text-xs text-text-subtle">
+            Promo codes only work when the whole engagement is paid upfront.
+          </p>
+        ) : promoError ? (
           <p className="mt-1.5 text-xs text-danger" role="alert">
             {promoError}
           </p>

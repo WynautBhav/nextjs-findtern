@@ -28,19 +28,72 @@ test("EMH-09: payments invoiced by legacy keep their legacy number; new ones kee
   assert.equal(displayInvoiceNumber(rollback, [rollback]), "031126-01");
 });
 
-test("EMH-08: one row per hire, taxable values add up to the order's", () => {
+test("EMH-08: one row per hire, each at its own GST-inclusive price that adds up to the order's", () => {
   const rows = lineRows(
     [
       { label: "A - Intern", amountMinor: 100_000 },
       { label: "B - Intern", amountMinor: 200_000 },
     ],
-    254_237,
     300_000,
   );
-  assert.equal(rows[0].baseMinor! + rows[1].baseMinor!, 254_237);
+  assert.deepEqual(rows.map((r) => r.priceMinor), [100_000, 200_000]);
   // Prices that don't add up to what was paid aren't split.
-  const promo = lineRows([{ label: "A", amountMinor: 100_000 }, { label: "B", amountMinor: 100_000 }], 100_000, 150_000);
-  assert.deepEqual(promo.map((r) => r.baseMinor), [null, null]);
+  const promo = lineRows([{ label: "A", amountMinor: 100_000 }, { label: "B", amountMinor: 100_000 }], 150_000);
+  assert.deepEqual(promo.map((r) => r.priceMinor), [null, null]);
+  // One line is the whole order.
+  assert.deepEqual(lineRows([{ label: "A", amountMinor: null }], 500_000).map((r) => r.priceMinor), [500_000]);
+});
+
+test("the invoice follows the reference PDF: header band, dd-mm-yy date, Subtotal / CGST / SGST / Total, bank footer", () => {
+  const html = taxInvoiceHtml({
+    invoiceNo: "141026-01",
+    date: new Date("2026-10-14T06:00:00Z"),
+    orderId: "order_x",
+    currency: "INR",
+    amountMinor: 500_000,
+    description: "Hiring services",
+    lines: [{ label: "Abhinav Parashar \u2014 Marketing Intern", detail: "2m", amountMinor: 500_000 }],
+    seller: {
+      name: "Findtern Private Limited",
+      address: "386, Jagatpura, Jaipur, Rajasthan (302017)",
+      gstin: "08AAGCF2512F1Z0",
+      email: "admin@findtern.in",
+      bank: { accountName: "Findtern Private Limited", bankName: "Kotak Mahindra Bank", accountNumber: "5949973545", ifsc: "KKBK0003572" },
+    },
+    buyer: { name: "Test Account", email: "abhinav@findtern.in", place: { kind: "india", stateCode: "08", stateName: "Rajasthan" } },
+  });
+  assert.match(html, />INVOICE</);
+  assert.match(html, /Invoice Date :<\/div>\s*<div class="v">14-10-26</);
+  assert.match(html, /Invoice Number :<\/div>\s*<div class="v">141026-01</);
+  assert.match(html, /Invoice to :/);
+  assert.match(html, /GST: 08AAGCF2512F1Z0/);
+  assert.match(html, /Item description/);
+  assert.match(html, /Price \(INR\)/);
+  assert.match(html, /Abhinav Parashar \u2014 Marketing Intern/);
+  assert.match(html, /Subtotal<\/span><span>₹\s?4,237\.29/);
+  assert.match(html, /CGST 9%<\/span><span>₹\s?381\.36/);
+  assert.match(html, /SGST 9%<\/span><span>₹\s?381\.35/);
+  assert.match(html, /Total<\/span><span>₹\s?5,000\.00/);
+  assert.match(html, /Bank Account No: 5949973545/);
+  assert.match(html, /Bank Name: Kotak Mahindra Bank/);
+  assert.match(html, /IFSC: KKBK0003572/);
+  assert.match(html, /admin@findtern\.in/);
+});
+
+test("a promo is noted under the totals and never changes the arithmetic rows", () => {
+  const html = taxInvoiceHtml({
+    invoiceNo: "141026-02",
+    date: new Date("2026-10-14T06:00:00Z"),
+    orderId: "order_p",
+    currency: "INR",
+    amountMinor: 400_000,
+    description: "Hiring services",
+    promo: { code: "WELCOME", discountMinor: 100_000 },
+    seller: { name: "Findtern Private Limited", address: "Jaipur", gstin: "08AAGCF2512F1Z0", email: "admin@findtern.in" },
+    buyer: { name: "Acme", place: { kind: "india", stateCode: "08", stateName: "Rajasthan" } },
+  });
+  assert.match(html, /Promo WELCOME applied: you saved ₹\s?1,000\.00/);
+  assert.match(html, /Total<\/span><span>₹\s?4,000\.00/);
 });
 
 test("EMH-08: invoice prints the per-line label, the full-time wording and the bank block", () => {
@@ -62,7 +115,7 @@ test("EMH-08: invoice prints the per-line label, the full-time wording and the b
     buyer: { name: "Acme", place: { kind: "india", stateCode: "08", stateName: "Rajasthan" } },
   });
   assert.match(html, /8\.33% of the total mentioned CTC/);
-  assert.match(html, /Send payments to/);
+  assert.match(html, /Send payments to:/);
   assert.match(html, /KKBK0003572/);
 });
 
@@ -100,8 +153,8 @@ function invoiceFor(buyer: { name: string; gstin?: string; city?: string; state?
 
 test("a Rajasthan PIN code prints CGST and SGST, never IGST, and shows the PIN", () => {
   const html = invoiceFor({ name: "Acme", city: "Jaipur", state: "Rajasthan", country: "India", pincode: "302001" });
-  assert.match(html, /CGST \(9%\)<\/span><span>₹\s?90\.00/);
-  assert.match(html, /SGST \(9%\)<\/span><span>₹\s?90\.00/);
+  assert.match(html, /CGST 9%<\/span><span>₹\s?90\.00/);
+  assert.match(html, /SGST 9%<\/span><span>₹\s?90\.00/);
   assert.doesNotMatch(html, /IGST/);
   assert.match(html, /Place of supply: Rajasthan \(08\)/);
   assert.match(html, /Jaipur, Rajasthan, India/);
@@ -110,7 +163,7 @@ test("a Rajasthan PIN code prints CGST and SGST, never IGST, and shows the PIN",
 
 test("any other state's PIN code prints IGST only", () => {
   const html = invoiceFor({ name: "Acme", city: "Mumbai", state: "Maharashtra", country: "India", pincode: "400001" });
-  assert.match(html, /IGST \(18%\)<\/span><span>₹\s?180\.00/);
+  assert.match(html, /IGST 18%<\/span><span>₹\s?180\.00/);
   assert.doesNotMatch(html, /CGST|SGST/);
   assert.match(html, /Place of supply: Maharashtra \(27\)/);
 });
@@ -125,7 +178,7 @@ test("the PIN code decides the state even when the profile's state text is wrong
 test("a foreign client's invoice prints no GST lines but still carries the SAC", () => {
   const html = invoiceFor({ name: "Globex", country: "United States" }, "USD", 21_000);
   assert.match(html, /Not applicable/);
-  assert.doesNotMatch(html, /CGST|SGST|IGST \(/);
+  assert.doesNotMatch(html, /CGST|SGST|IGST \d/);
   assert.match(html, /Outside India \(export of services\)/);
-  assert.match(html, /<td>998519<\/td>/);
+  assert.match(html, /SAC 998519/);
 });

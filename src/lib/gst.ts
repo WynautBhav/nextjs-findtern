@@ -194,7 +194,8 @@ export function splitGst(
   const baseMinor = Math.round(totalMinor / (1 + GST_RATE));
   const taxMinor = totalMinor - baseMinor;
   if (place.kind === "india" && place.stateCode === sellerStateCode) {
-    const cgstMinor = Math.floor(taxMinor / 2);
+    // An odd paisa goes to CGST, as on the reference invoice (141026-01: CGST 381.36, SGST 381.35).
+    const cgstMinor = Math.ceil(taxMinor / 2);
     return { baseMinor, cgstMinor, sgstMinor: taxMinor - cgstMinor, igstMinor: 0, totalMinor, mode: "intra" };
   }
   return { baseMinor, cgstMinor: 0, sgstMinor: 0, igstMinor: taxMinor, totalMinor, mode: "inter" };

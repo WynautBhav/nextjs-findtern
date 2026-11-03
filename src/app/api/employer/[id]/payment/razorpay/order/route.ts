@@ -10,6 +10,7 @@ import { requireMutation } from "@/lib/guards-mutation";
 import { openProposalsWithDues, payableCheckout, type PayableLine } from "@/lib/employer-payable";
 import { expireStaleEmployerOrders, legacyOrderRaw, OPEN_ORDER_MINUTES, orderProposalIds, settleEmployerOrder } from "@/lib/payments";
 import { quotePromo } from "@/lib/promo";
+import { promoModeProblem } from "@/lib/promo-rules";
 import { createOrder, paymentsAreFree, razorpayKeyId, testPayEnabled } from "@/lib/razorpay";
 
 const bodySchema = z.object({
@@ -113,6 +114,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   }
   // A due month is monthly whatever was asked; dues.ts counts these orders.
   const mode = paying.some((l) => l.due) ? "monthly" : parsed.data.mode;
+  // Promo codes are for upfront payment only (3 Nov 2026), whatever the client asked.
+  if (parsed.data.promoCode) {
+    const modeProblem = promoModeProblem(mode);
+    if (modeProblem) return NextResponse.json({ error: modeProblem }, { status: 400 });
+  }
 
   if (paying.some((l) => l.charge.totalMinor <= 0)) {
     return NextResponse.json({ error: "One of these offers has no amount to pay. Edit it before checking out." }, { status: 400 });

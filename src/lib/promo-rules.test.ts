@@ -60,3 +60,9 @@ test("promo audience and window", async () => {
   assert.equal(promoWindowProblem(new Date("2026-11-01"), new Date("2026-11-01")), null);
   assert.equal(promoWindowProblem(null, new Date("2026-11-01")), null);
 });
+
+test("a promo code is for upfront payment only", async () => {
+  const { promoModeProblem } = await import("./promo-rules.ts");
+  assert.equal(promoModeProblem("upfront"), null);
+  assert.match(promoModeProblem("monthly") ?? "", /upfront/);
+});
