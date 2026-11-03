@@ -1789,6 +1789,8 @@ body:has([data-slot="dialog-content"][data-state="open"], [data-slot="sheet-cont
   }
   @keyframes payout-bar-grow {
     from { transform: scaleX(0); }
+  }
+}
 
 /* ---- Admin reports: staggered card rise (transform and opacity only) ---- */
 @media (prefers-reduced-motion: no-preference) {
