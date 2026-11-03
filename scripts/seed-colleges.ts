@@ -23,6 +23,7 @@ import { eq, inArray, like, sql } from "drizzle-orm";
 import pg from "pg";
 
 import * as schema from "../src/lib/db/schema.ts";
+import { acceptanceValues } from "../src/lib/terms.ts";
 import { hashPassword } from "../src/lib/security/password.ts";
 import { withFreshCollegeCode } from "../src/lib/college/code.ts";
 import { generateDriveToken } from "../src/lib/college/tokens.ts";
@@ -101,8 +102,8 @@ async function main() {
   const pw = await hashPassword(PASSWORD);
   await db
     .insert(schema.collegeAdmins)
-    .values({ collegeId: jklu.id, name: "Bhavesh Sharma", email: "tpo@jklu.edu.in", password: pw })
-    .onConflictDoUpdate({ target: schema.collegeAdmins.email, set: { collegeId: jklu.id, password: pw, isActive: true } });
+    .values({ collegeId: jklu.id, name: "Bhavesh Sharma", email: "tpo@jklu.edu.in", password: pw, ...acceptanceValues() })
+    .onConflictDoUpdate({ target: schema.collegeAdmins.email, set: { collegeId: jklu.id, password: pw, isActive: true, ...acceptanceValues() } });
   const [tpo] = await db.select().from(schema.collegeAdmins).where(eq(schema.collegeAdmins.email, "tpo@jklu.edu.in"));
 
   // 72 on the roster; the first 60 have joined Findtern.
@@ -132,6 +133,7 @@ async function main() {
         countryCode: "+91",
         password: pw,
         agreedToTerms: true,
+        ...acceptanceValues(),
       })),
     )
     .returning();

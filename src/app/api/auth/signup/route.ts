@@ -10,6 +10,7 @@ import { normalizePhone, phoneError, phoneLockKey } from "@/lib/phone";
 import { hasVerifiedSignupOtp, INTERN_EMAIL_MESSAGE, isInternEmail } from "@/lib/signup-otp";
 import { phoneInUseAnywhere } from "@/lib/phone-owner";
 import { isUniqueViolation, uniqueMessage } from "@/lib/promo";
+import { acceptanceValues } from "@/lib/terms";
 
 const bodySchema = z.object({
   firstName: z.string().min(2),
@@ -74,6 +75,7 @@ export async function POST(req: Request) {
           phoneNumber,
           password,
           agreedToTerms: true,
+          ...acceptanceValues(),
           emailVerified: true,
         })
         .returning();

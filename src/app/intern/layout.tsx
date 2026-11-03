@@ -18,6 +18,7 @@ import {
 import { ConsoleShell, type ConsoleNavItem } from "@/components/layout/console-shell";
 import { RAIL_COOKIE } from "@/lib/rail";
 import { ViewAsBanner } from "@/components/admin/view-as-banner";
+import { TermsGate } from "@/components/app/terms-gate";
 import { CollegeLive } from "@/components/intern/college-live";
 import { getSession } from "@/lib/auth";
 import { getDb, schema } from "@/lib/db";
@@ -25,6 +26,7 @@ import { membershipOf } from "@/lib/college/membership";
 import { loadInternData } from "@/lib/intern-data";
 import { nextAction, type Stage } from "@/lib/journey";
 import { SITE } from "@/lib/content/site";
+import { shouldShowTermsPrompt } from "@/lib/terms";
 
 export const metadata = { title: "Findtern" };
 
@@ -82,7 +84,7 @@ export default async function InternLayout({ children }: { children: React.React
   if (!session || session.role !== "intern") redirect("/login?as=intern");
 
   // Independent reads, in parallel. loadInternData is cache()d, so the page's own call reuses this one.
-  const [data, name, [unread], college] = await Promise.all([
+  const [data, { name, termsVersion }, [unread], college] = await Promise.all([
     loadInternData(session.uid),
     fullName(session.uid),
     getDb()
@@ -143,19 +145,28 @@ export default async function InternLayout({ children }: { children: React.React
         />
       ) : null}
       {children}
+      {termsVersion !== undefined && shouldShowTermsPrompt({ acceptedVersion: termsVersion, impersonating: !!session.impersonator }) ? <TermsGate role="intern" /> : null}
     </ConsoleShell>
   );
 }
 
-/** The session carries the email only, so the name is one indexed read. */
-async function fullName(uid: string): Promise<string> {
-  const db = getDb();
-  const [row] = await db
-    .select({ first: schema.users.firstName, last: schema.users.lastName })
-    .from(schema.users)
-    .where(eq(schema.users.id, uid))
-    .limit(1);
-  const name = `${row?.first ?? ""} ${row?.last ?? ""}`.trim();
-  return name || "Candidate";
+/**
+ * The session carries the email only, so the name is one indexed read, and the
+ * accepted terms version rides along. A failed read leaves the version
+ * undefined, which never shows the pop-up (fail open, like the employer layout).
+ */
+async function fullName(uid: string): Promise<{ name: string; termsVersion: string | null | undefined }> {
+  try {
+    const db = getDb();
+    const [row] = await db
+      .select({ first: schema.users.firstName, last: schema.users.lastName, termsVersion: schema.users.termsAcceptedVersion })
+      .from(schema.users)
+      .where(eq(schema.users.id, uid))
+      .limit(1);
+    const name = `${row?.first ?? ""} ${row?.last ?? ""}`.trim();
+    return { name: name || "Candidate", termsVersion: row?.termsVersion ?? null };
+  } catch {
+    return { name: "Candidate", termsVersion: undefined };
+  }
 }
 
