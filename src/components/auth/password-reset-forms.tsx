@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { TriangleAlert } from "lucide-react";
+import { CircleCheck, TriangleAlert } from "lucide-react";
 import { PASSWORD_HINT } from "@/lib/password-policy";
 import { PasswordInput } from "@/components/auth/password-input";
 
@@ -133,29 +133,32 @@ export function ResetPasswordForm({
     }
   }
 
+  if (done) {
+    return (
+      <div role="status" className="space-y-5">
+        <div className="flex items-start gap-2.5 rounded-lg border border-success/25 bg-success-soft px-3.5 py-3 text-sm leading-relaxed text-ink-700">
+          <CircleCheck className="mt-0.5 size-4 shrink-0 text-success" aria-hidden />
+          <div>Password updated. You can now sign in with it.</div>
+        </div>
+        <Link
+          href={loginHref}
+          className="flex h-11 w-full items-center justify-center rounded-lg bg-brand-700 px-4 text-sm font-semibold text-white transition-colors hover:bg-brand-600"
+        >
+          Sign in
+        </Link>
+      </div>
+    );
+  }
+
   return (
     <form className="space-y-5" noValidate onSubmit={onSubmit}>
-      {done ? (
-        <Notice>
-          Password updated.{" "}
-          <Link href={loginHref} className="font-medium underline underline-offset-4">
-            Sign in
-          </Link>
-          .
-        </Notice>
-      ) : null}
       {error ? <Notice>{error}</Notice> : null}
 
-      {token ? (
-        <p className="break-all rounded-lg bg-ink-50 px-3.5 py-3 font-mono text-2xs leading-relaxed text-ink-600">
-          Token from link: {token}
-        </p>
-      ) : (
+      {!token ? (
         <p className="rounded-lg border border-warning/25 bg-warning-soft px-3.5 py-3 text-sm text-ink-700">
-          This link has no <code className="font-mono">token</code> query parameter, so there is
-          nothing to redeem even once the endpoint exists.
+          This reset link is incomplete. Request a new one from the sign-in page.
         </p>
-      )}
+      ) : null}
 
       <div>
         <label htmlFor="newPassword" className="block text-sm font-medium text-ink-800">
