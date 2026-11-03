@@ -3,14 +3,14 @@ import { eq, inArray } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { computeAnalytics, type AnalyticsInput } from "@/lib/admin/analytics";
 import { periodStart } from "@/lib/admin/params";
+import { istDateRange } from "@/lib/admin/revenue";
 import { meaningfulProfile, realEmployerId, realEmployers } from "@/lib/admin/scope";
 
 /** Range from `?from=&to=` (dates, inclusive), `?period=30d`, or `?period=all`; default the last 18 months (legacy). */
 export function analyticsRange(params: Record<string, string | undefined>): { since: Date | null; until: Date | null } {
-  const valid = (v?: string) => (v && !Number.isNaN(Date.parse(v)) ? new Date(v) : null);
-  const from = valid(params.from);
-  const to = valid(params.to);
-  if (from || to) return { since: from, until: to ? new Date(to.getTime() + 86_400_000) : null };
+  // India calendar days, inclusive, exactly as Reports and Transactions read them (lib/admin/revenue).
+  const custom = istDateRange(params.from, params.to);
+  if (custom.since || custom.until) return custom;
   const preset = periodStart(params.period);
   if (preset) return { since: preset, until: null };
   if (params.period === "all") return { since: null, until: null };
