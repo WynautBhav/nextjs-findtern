@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, CheckCircle2, IndianRupee, Loader2, Plus, Save, Star, Trash2 } from "lucide-react";
 
@@ -104,12 +104,15 @@ export function AdminPricingEditor({
           </div>
         </Panel>
       ) : (
-        // Plan cards across the full width: one column on a phone, two on a tablet, three on a
-        // desktop. Each card keeps its own form and Save.
-        <div className="grid items-start gap-[var(--admin-gap,1rem)] md:grid-cols-2 min-[1200px]:grid-cols-3">
-          {plans.map((plan) => (
-            <PlanEditor key={plan.id} plan={plan} />
-          ))}
+        // Columns follow the width of this area, not the viewport: the admin sidebar takes ~340px,
+        // so a viewport breakpoint left the third card alone on its own row at 1440. One column
+        // when narrow, two from 36rem, three from 56rem. Each card keeps its own form and Save.
+        <div className="@container">
+          <div className="grid items-start gap-[var(--admin-gap,1rem)] @xl:grid-cols-2 @4xl:grid-cols-3">
+            {plans.map((plan) => (
+              <PlanEditor key={plan.id} plan={plan} />
+            ))}
+          </div>
         </div>
       )}
     </div>
@@ -237,6 +240,52 @@ function PlanEditor({ plan }: { plan: EditablePlan }) {
   const [badField, setBadField] = useState<string | null>(null);
   const fid = (k: string) => `${plan.id}-${k}`;
 
+  // Re-sync from the server copy after router.refresh(). Featured is its own effect: saving
+  // another card as "Most popular" un-features this one on the server, and that must not
+  // wipe whatever is half-typed here.
+  // (Adjusting state during render, keyed on the server copy, rather than in an effect.)
+  const [seenFeatured, setSeenFeatured] = useState(plan.isFeatured);
+  if (seenFeatured !== plan.isFeatured) {
+    setSeenFeatured(plan.isFeatured);
+    setFeatured(plan.isFeatured);
+  }
+  const serverSig = JSON.stringify({ ...plan, isFeatured: null });
+  const [seenSig, setSeenSig] = useState(serverSig);
+  if (seenSig !== serverSig) {
+    setSeenSig(serverSig);
+    setName(plan.displayName);
+    setHourly(toRupees(plan.priceHourlyMinor));
+    setHourlyWas(toRupees(plan.compareAtHourlyMinor));
+    setPerHire(toRupees(plan.perHireChargeMinor));
+    setPerHireWas(toRupees(plan.compareAtPerHireMinor));
+    setDuration(plan.internshipDuration);
+    setFeatures([0, 1, 2].map((i) => plan.features[i] ?? ""));
+    setFeatureList(plan.featureList);
+    setActive(plan.isActive);
+  }
+
+  const dirty =
+    name.trim() !== plan.displayName.trim() ||
+    toMinor(hourly) !== plan.priceHourlyMinor ||
+    toMinor(perHire) !== plan.perHireChargeMinor ||
+    toMinorOrNull(hourlyWas) !== plan.compareAtHourlyMinor ||
+    toMinorOrNull(perHireWas) !== plan.compareAtPerHireMinor ||
+    duration !== plan.internshipDuration ||
+    features.some((v, i) => v !== (plan.features[i] ?? "")) ||
+    JSON.stringify(featureList.filter((f) => f.label.trim())) !== JSON.stringify(plan.featureList) ||
+    featured !== plan.isFeatured ||
+    active !== plan.isActive;
+
+  useEffect(() => {
+    if (!dirty) return;
+    const warn = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [dirty]);
+
   const hourlySave = savingsPercent(toMinor(hourly), toMinorOrNull(hourlyWas));
   const perHireSave = savingsPercent(toMinor(perHire), toMinorOrNull(perHireWas));
 
@@ -282,7 +331,9 @@ function PlanEditor({ plan }: { plan: EditablePlan }) {
           internshipDuration: duration,
           features,
           featureList: featureList.filter((f) => f.label.trim()),
-          isFeatured: featured,
+          // Only when the admin changed it: re-sending a stale value would re-feature this
+          // plan and un-feature whichever card was saved as "Most popular" since.
+          ...(featured !== plan.isFeatured ? { isFeatured: featured } : {}),
           isActive: active,
         }),
       });
@@ -307,10 +358,17 @@ function PlanEditor({ plan }: { plan: EditablePlan }) {
         title={plan.displayName}
         description={`slug: ${plan.slug}`}
         action={
-          <label className="flex items-center gap-2 text-sm font-medium text-ink-700">
-            Active
-            <Switch checked={active} onCheckedChange={setActive} aria-label="Plan is active" />
-          </label>
+          <div className="flex items-center gap-3">
+            {dirty ? (
+              <span className="rounded-full bg-accent-100 px-2 py-0.5 text-xs font-medium text-accent-700">
+                Unsaved changes
+              </span>
+            ) : null}
+            <label className="flex items-center gap-2 text-sm font-medium text-ink-700">
+              Active
+              <Switch checked={active} onCheckedChange={setActive} aria-label="Plan is active" />
+            </label>
+          </div>
         }
       />
       {dialog}
