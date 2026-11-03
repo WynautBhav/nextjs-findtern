@@ -32,7 +32,7 @@ export function PayoutEditor({
     <InlineEditor
       label="payout status"
       value={{ status: "paid", referenceId: initialReference ?? "", opsNote: initialNote ?? "" }}
-      display={<span className="whitespace-nowrap font-medium text-brand-800">Mark paid or failed</span>}
+      display={<span className="font-medium text-brand-800">Mark paid or failed</span>}
       fields={[
         {
           key: "status",

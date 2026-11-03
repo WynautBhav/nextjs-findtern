@@ -16,17 +16,19 @@ import { getSession } from "@/lib/auth";
 import { calendarMissing } from "@/lib/calendar-status";
 import { formatMoney, shortDate } from "@/lib/format";
 import { AdminEmpty, AdminLoadError, AttentionBanner, Panel } from "@/components/admin/panel";
-import { StatCard, StatGrid } from "@/components/admin/stat-card";
-import { HeroBand, SectionHead } from "@/components/app/primitives";
+import { TrendChart } from "@/components/admin/trend-chart";
+import { DetailRow, PageHead } from "@/components/app/primitives";
+import { STAT_ROW, StatTile, Tile } from "@/components/app/tiles";
 import { ButtonLink } from "@/components/ui/button";
 import { inrMinorSql, meaningfulProfile, realEmployerId, realEmployers, TEST_EMPLOYER_ID, AI_INTERVIEW_EMAIL } from "@/lib/admin/scope";
 import { attentionTotal } from "@/lib/admin/dashboard";
 
 /**
- * Admin home (DESIGN.md §6): one hero number that answers "what needs me
- * today", the queue of things a person owes someone directly under it, then
- * the hiring funnel and the supporting figures. Full lists live on their own
- * pages.
+ * Admin home, a bento like the intern home (SPECS §2 dashboard exception):
+ * the key numbers first with one brand tile ("Needs you", the count a person
+ * owes someone today), then the queue beside a six-month pipeline chart, then
+ * recent activity beside the leftover figures. Nothing appears twice. Full
+ * lists live on their own pages.
  */
 
 type Task = {
@@ -90,6 +92,7 @@ async function loadDashboard(uid: string | null) {
     recentProjects,
     recentAccepted,
     recentPayments,
+    trend,
   ] = await Promise.all([
     uid
       ? db.select({ name: schema.admins.name }).from(schema.admins).where(eq(schema.admins.id, uid)).limit(1)
@@ -285,6 +288,24 @@ async function loadDashboard(uid: string | null) {
       .where(eq(schema.employerPayments.status, "paid"))
       .orderBy(desc(schema.employerPayments.paidAt))
       .limit(5),
+    // Proposals and interviews created per month, the last six months, bucketed
+    // in India time (the columns hold UTC without a zone).
+    db
+      .execute<{ label: string; proposals: number; interviews: number }>(sql`
+        SELECT to_char(m.month, 'Mon') AS label,
+          (SELECT count(*)::int FROM ${schema.proposals}
+            WHERE ${realEmployerId(schema.proposals.employerId)}
+              AND date_trunc('month', (${schema.proposals.createdAt} AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Kolkata') = m.month) AS proposals,
+          (SELECT count(*)::int FROM ${schema.interviews}
+            WHERE ${realEmployerId(schema.interviews.employerId)}
+              AND date_trunc('month', (${schema.interviews.createdAt} AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Kolkata') = m.month) AS interviews
+        FROM generate_series(
+          date_trunc('month', now() AT TIME ZONE 'Asia/Kolkata') - interval '5 months',
+          date_trunc('month', now() AT TIME ZONE 'Asia/Kolkata'),
+          interval '1 month'
+        ) AS m(month)
+        ORDER BY m.month`)
+      .then((r) => r.rows),
   ]);
 
   return {
@@ -312,6 +333,7 @@ async function loadDashboard(uid: string | null) {
     recentProjects,
     recentAccepted,
     recentPayments,
+    trend,
   };
 }
 
@@ -455,188 +477,187 @@ export default async function AdminDashboard() {
   const today = d.now.toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long", timeZone: "Asia/Kolkata" });
 
   return (
-    <div className="space-y-10">
-      <HeroBand
+    <div className="space-y-4 lg:space-y-5">
+      <PageHead
         eyebrow={today}
         title={`${greeting(d.now)}${firstName ? `, ${firstName}` : ""}`}
-        lede={
-          owed.total > 0
-            ? "These are the things someone is waiting on the team for, most urgent first."
-            : "Nothing is waiting on the team right now."
-        }
-        actions={
+        lede={owed.total > 0 ? "Most urgent first." : "Nothing is waiting on the team right now."}
+        action={
           <>
-            <ButtonLink href="/admin/proposal-tracker" variant={owed.total > 0 ? "outlineLight" : "accent"}>
+            <ButtonLink href="/admin/proposal-tracker" variant="outline" size="sm">
               Proposal pipeline
               <ArrowRight className="size-4" aria-hidden />
             </ButtonLink>
-            <ButtonLink href="/admin/reports" variant="outlineLight">
+            <ButtonLink href="/admin/reports" variant="outline" size="sm">
               Reports
             </ButtonLink>
           </>
         }
-      >
-        <div className="flex flex-wrap items-end gap-x-6 gap-y-2">
-          <p className="nums text-5xl font-semibold leading-none tracking-[-0.03em] text-white">
-            {owed.total > 0 ? owed.total.toLocaleString("en-IN") : "All clear"}
-          </p>
-          <div className="pb-1 text-sm text-on-dark-subtle">
-            <p className="font-medium text-white/90">
-              {owed.total > 0 ? plural(owed.total, "item needs a person today", "items need a person today") : "No open items"}
-            </p>
-            <p className="nums">
-              {owed.fresh > 0 ? `+${owed.fresh.toLocaleString("en-IN")} came in during the last 7 days` : "Nothing new in the last 7 days"}
-            </p>
-          </div>
-        </div>
-      </HeroBand>
+      />
 
-      {/* Needs a person: the band comes first, before any figure. */}
-      <section aria-labelledby="attention-head">
-        <h2 id="attention-head" className="sr-only">
-          Needs attention
-        </h2>
-        {tasks.length ? (
-          <Panel as="ul" className="divide-y divide-ink-100">
-            {tasks.map((t, i) => (
-              <li key={t.key} className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:gap-4">
-                <span
-                  className={
-                    i === 0
-                      ? "grid size-9 shrink-0 place-items-center rounded-full bg-accent-100 text-accent-700"
-                      : "grid size-9 shrink-0 place-items-center rounded-full bg-ink-100 text-ink-600"
-                  }
-                >
-                  <t.Icon className="size-4" aria-hidden />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="text-[0.9375rem] font-medium text-ink-900">
-                    {t.flag ? null : <span className="nums font-semibold">{t.count.toLocaleString("en-IN")} </span>}
-                    {t.label}
-                  </p>
-                  <p className="mt-0.5 text-sm text-ink-600">
-                    {t.detail}
-                    {t.fresh ? <span className="nums"> {t.fresh} new this week.</span> : null}
-                  </p>
-                </div>
-                <ButtonLink href={t.href} variant={i === 0 ? "primary" : "outline"} size="sm" className="self-start sm:self-auto">
-                  {t.cta}
-                  <ArrowRight className="size-4" aria-hidden />
-                </ButtonLink>
-              </li>
-            ))}
-          </Panel>
-        ) : (
-          <Panel>
+      <div className={STAT_ROW}>
+        <StatTile
+          featured
+          index={0}
+          label="Needs you today"
+          value={owed.total.toLocaleString("en-IN")}
+          meta={
+            owed.total === 0
+              ? "All clear"
+              : owed.fresh > 0
+                ? `+${owed.fresh.toLocaleString("en-IN")} in the last 7 days`
+                : plural(owed.total, "item", "items") + ", none new this week"
+          }
+        />
+        <StatTile
+          index={1}
+          label="Interns with a profile"
+          value={n(d.candidates).toLocaleString("en-IN")}
+          meta={`${n(d.candidatesNew) ? `+${n(d.candidatesNew)} this week · ` : ""}${n(d.signups).toLocaleString("en-IN")} signups`}
+          href="/admin/interns"
+        />
+        <StatTile
+          index={2}
+          label="Hiring companies"
+          value={n(d.companies).toLocaleString("en-IN")}
+          meta={n(d.companiesNew) ? `+${n(d.companiesNew)} this week` : "Active, onboarding finished"}
+          href="/admin/companies"
+        />
+        <StatTile
+          index={3}
+          label="Placements"
+          value={(accepted + hired).toLocaleString("en-IN")}
+          meta={`${hired} paid · ${accepted} awaiting payment`}
+          href="/admin/proposal-tracker?tab=proposals"
+        />
+        <StatTile
+          index={4}
+          label="Revenue"
+          value={formatMoney(n(d.revenue), "INR", { zeroLabel: "₹0" })}
+          meta={n(d.revenueWeek) ? `${formatMoney(n(d.revenueWeek), "INR")} in the last 7 days` : "Nothing in the last 7 days"}
+          href="/admin/transactions"
+        />
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:gap-5">
+        {/* Needs a person: what someone is waiting on the team for. */}
+        <Tile title="Needs you" description={tasks.length ? "What someone is waiting on the team for." : undefined}>
+          {tasks.length ? (
+            <ul className="-mt-1 divide-y divide-ink-100">
+              {tasks.map((t, i) => (
+                <li key={t.key} className="flex flex-col gap-3 py-3.5 sm:flex-row sm:items-center sm:gap-4">
+                  <span
+                    aria-hidden
+                    className={
+                      i === 0
+                        ? "grid size-9 shrink-0 place-items-center rounded-full bg-accent-100 text-accent-700"
+                        : "grid size-9 shrink-0 place-items-center rounded-full bg-ink-100 text-ink-600"
+                    }
+                  >
+                    <t.Icon className="size-4" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-pretty text-[0.9375rem] font-medium text-ink-900">
+                      {t.flag ? null : <span className="nums font-semibold">{t.count.toLocaleString("en-IN")} </span>}
+                      {t.label}
+                    </p>
+                    <p className="mt-0.5 text-pretty text-sm text-ink-600">
+                      {t.detail}
+                      {t.fresh ? <span className="nums"> {t.fresh} new this week.</span> : null}
+                    </p>
+                  </div>
+                  <ButtonLink href={t.href} variant={i === 0 ? "primary" : "outline"} size="sm" className="self-start sm:self-auto">
+                    {t.cta}
+                    <ArrowRight className="size-4" aria-hidden />
+                  </ButtonLink>
+                </li>
+              ))}
+            </ul>
+          ) : (
             <AdminEmpty
               title="Nothing is waiting on the team"
               body="Due payouts, interviews without a link, unscored candidates and unread messages show up here the moment they appear."
             />
-          </Panel>
-        )}
-        <div className="mt-3">
-          <AttentionBanner
-            count={n(d.incompleteProfiles)}
-            total={n(d.signups)}
-            noun="signups"
-            href="/admin/interns?profile=incomplete"
-          />
-        </div>
-      </section>
+          )}
+          <div className="mt-3">
+            <AttentionBanner
+              count={n(d.incompleteProfiles)}
+              total={n(d.signups)}
+              noun="signups"
+              href="/admin/interns?profile=incomplete"
+            />
+          </div>
+        </Tile>
 
-      {/* Supporting figures */}
-      <section>
-        <SectionHead title="Supporting figures" hint="All time unless the tile says otherwise." />
-        <StatGrid cols={4}>
-          <StatCard
-            label="Interns with a profile"
-            value={n(d.candidates).toLocaleString("en-IN")}
-            delta={n(d.candidatesNew) ? `+${n(d.candidatesNew)} this week` : undefined}
-            hint={`${n(d.signups).toLocaleString("en-IN")} signups in total`}
-            href="/admin/interns"
-          />
-          <StatCard
-            label="Hiring companies"
-            value={n(d.companies).toLocaleString("en-IN")}
-            delta={n(d.companiesNew) ? `+${n(d.companiesNew)} this week` : undefined}
-            hint="Active, onboarding finished"
-            href="/admin/companies"
-          />
-          <StatCard
-            label="Placements"
-            value={(accepted + hired).toLocaleString("en-IN")}
-            hint={`${hired} paid · ${accepted} awaiting payment`}
-            href="/admin/proposal-tracker?tab=proposals"
-          />
-          <StatCard
-            label="Revenue"
-            value={formatMoney(n(d.revenue), "INR", { zeroLabel: "₹0" })}
-            hint={n(d.revenueWeek) ? `${formatMoney(n(d.revenueWeek), "INR")} in the last 7 days` : "Nothing in the last 7 days"}
-            href="/admin/transactions"
-          />
-          <StatCard
-            label="Scheduled interviews"
-            value={n(d.interviewsUpcoming).toLocaleString("en-IN")}
-            hint="Employer interviews still to happen"
-            href="/admin/proposal-tracker?tab=interviews"
-          />
-          <StatCard
-            label="All interviews"
-            value={n(d.interviewsAll).toLocaleString("en-IN")}
-            hint={`${Number(d.interviewsAll?.completed ?? 0).toLocaleString("en-IN")} completed`}
-            href="/admin/proposal-tracker?tab=interviews"
-          />
-          <StatCard
-            label="Full-time potential"
-            value={Number(d.projectsTotal?.fullTime ?? 0).toLocaleString("en-IN")}
-            hint={`of ${n(d.projectsTotal).toLocaleString("en-IN")} projects offer a full-time role`}
-            href="/admin/projects"
-          />
-          <StatCard
-            label="Avg hiring speed"
-            value={speed == null ? "-" : `${speed} ${speed === 1 ? "day" : "days"}`}
-            hint={
-              speed == null
-                ? "No hires with usable dates yet"
-                : `Offer sent to hire, over ${speedN} of ${speedTotal} hires${
+        <div className="flex flex-col gap-4 lg:gap-5">
+          <Tile
+            title="Proposals and interviews"
+            description="Created each month, last six months. The current month is still in progress."
+            action={{ href: "/admin/reports/analytics", label: "Open analytics" }}
+          >
+            <TrendChart data={d.trend} height={200} />
+          </Tile>
+          <Tile title="Also worth knowing" className="flex-1">
+            <dl className="-mt-2 divide-y divide-ink-100">
+              <DetailRow label="Scheduled interviews" value={n(d.interviewsUpcoming).toLocaleString("en-IN")} mono />
+              <DetailRow
+                label="All interviews"
+                value={`${n(d.interviewsAll).toLocaleString("en-IN")} · ${Number(d.interviewsAll?.completed ?? 0).toLocaleString("en-IN")} completed`}
+                mono
+              />
+              <DetailRow
+                label="Full-time potential"
+                value={`${Number(d.projectsTotal?.fullTime ?? 0).toLocaleString("en-IN")} of ${n(d.projectsTotal).toLocaleString("en-IN")} projects`}
+                mono
+              />
+              <DetailRow
+                label="Avg hiring speed"
+                value={speed == null ? "-" : `${speed} ${speed === 1 ? "day" : "days"}`}
+                mono
+              />
+            </dl>
+            <p className="mt-3 text-pretty text-xs text-text-subtle">
+              {speed == null
+                ? "No hires with usable dates yet."
+                : `Hiring speed is offer sent to hire, over ${speedN} of ${speedTotal} hires${
                     speedTotal > speedN ? " (the rest have a hire date before the offer)" : ""
-                  }`
-            }
-          />
-        </StatGrid>
-      </section>
+                  }.`}
+            </p>
+          </Tile>
+        </div>
+      </div>
 
       {/* What just happened */}
-      <section>
-        <SectionHead title="Recent activity" />
-        {events.length ? (
-          <Panel as="ul" className="divide-y divide-ink-100">
-            {events.map((e, i) => (
-              <li key={`${e.href}-${i}`}>
-                <Link
-                  href={e.href}
-                  className="grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-4 px-5 py-3 transition-colors hover:bg-ink-50/70"
-                >
-                  <span className="flex min-w-0 flex-col gap-0.5 sm:flex-row sm:items-baseline sm:gap-2">
-                    <span className="shrink-0 whitespace-nowrap text-sm font-medium text-ink-900">{e.label}</span>
-                    <span className="min-w-0 truncate text-sm text-ink-600">{e.detail}</span>
-                  </span>
-                  <span className="nums whitespace-nowrap text-xs text-ink-600">
-                    {e.date ? shortDate(e.date, { day: "numeric", month: "short", timeZone: "Asia/Kolkata" }) : "-"}
-                  </span>
-                </Link>
-              </li>
-            ))}
-          </Panel>
-        ) : (
-          <Panel>
+      <div>
+        <Tile title="Recent activity">
+          {events.length ? (
+            <ul className="-mx-2">
+              {events.map((e, i) => (
+                <li key={`${e.href}-${i}`}>
+                  <Link
+                    href={e.href}
+                    className="grid min-h-12 grid-cols-[minmax(0,1fr)_auto] items-baseline gap-4 rounded-apple-sm px-2 py-2.5 transition-colors hover:bg-ink-50"
+                  >
+                    <span className="flex min-w-0 flex-col gap-0.5 sm:flex-row sm:items-baseline sm:gap-2">
+                      <span className="shrink-0 text-sm font-medium text-ink-900">{e.label}</span>
+                      <span className="min-w-0 text-pretty text-sm text-ink-600 [overflow-wrap:anywhere]">{e.detail}</span>
+                    </span>
+                    <span className="nums whitespace-nowrap text-xs text-ink-600">
+                      {e.date ? shortDate(e.date, { day: "numeric", month: "short", timeZone: "Asia/Kolkata" }) : "-"}
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          ) : (
             <AdminEmpty
               title="Nothing yet"
               body="Payments, accepted offers, new projects and sign-ups will show up here as they happen."
             />
-          </Panel>
-        )}
-      </section>
+          )}
+        </Tile>
+
+      </div>
     </div>
   );
 }

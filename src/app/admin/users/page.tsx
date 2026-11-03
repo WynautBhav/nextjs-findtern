@@ -11,7 +11,7 @@ import { AdminLoadError, AdminPageHeader } from "@/components/admin/panel";
 import { DataTable, type Column } from "@/components/admin/data-table";
 import type { ToolbarFilter } from "@/components/admin/table-toolbar";
 import { AccountActiveCell } from "@/components/admin/intern-row-controls";
-import { Pill } from "@/components/app/primitives";
+import { Pill, SURFACE_CLASS } from "@/components/app/primitives";
 import { buttonClass } from "@/components/ui/button";
 
 export const metadata: Metadata = {
@@ -71,7 +71,7 @@ export default async function AdminUsersPage({
     return (
       <div>
         {header}
-        <div className="apple-panel bg-white">
+        <div className={SURFACE_CLASS}>
           <AdminLoadError what="the user list" retryHref="/admin/users" />
         </div>
       </div>

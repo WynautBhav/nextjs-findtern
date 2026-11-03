@@ -223,7 +223,23 @@ export function Intern360View({
         />
       </StatGrid>
 
-      <div role="tablist" aria-label="Candidate record" className="-mx-1 flex max-w-full gap-1 overflow-x-auto px-1 pb-1 [scrollbar-width:none]">
+      <div
+        role="tablist"
+        aria-label="Candidate record"
+        onKeyDown={(e) => {
+          // WAI-ARIA tabs: arrows, Home and End move focus and activate; focus wraps.
+          const i = tabs.findIndex((t) => t.key === tab);
+          let next = -1;
+          if (e.key === "ArrowRight") next = (i + 1) % tabs.length;
+          else if (e.key === "ArrowLeft") next = (i - 1 + tabs.length) % tabs.length;
+          else if (e.key === "Home") next = 0;
+          else if (e.key === "End") next = tabs.length - 1;
+          if (next < 0) return;
+          e.preventDefault();
+          setTab(tabs[next].key);
+          document.getElementById(`tab-${tabs[next].key}`)?.focus();
+        }}
+        className="-mx-1 flex max-w-full gap-1 overflow-x-auto px-1 pb-1 [scrollbar-width:none]">
         {tabs.map((t) => (
           <button
             key={t.key}
@@ -231,7 +247,8 @@ export function Intern360View({
             role="tab"
             id={`tab-${t.key}`}
             aria-selected={tab === t.key}
-            aria-controls={`panel-${t.key}`}
+            tabIndex={tab === t.key ? 0 : -1}
+            aria-controls={tab === t.key ? `panel-${t.key}` : undefined}
             onClick={() => setTab(t.key)}
             className={pillTabClass(tab === t.key)}
           >
@@ -301,8 +318,8 @@ export function Intern360View({
                 who="Companies act next"
               />
             ) : (
-              <Surface className="overflow-x-auto">
-                <table className="w-full min-w-[44rem] text-left text-sm">
+              <Surface data-stack className="lg:overflow-x-auto">
+                <table className="w-full text-left text-sm lg:min-w-[44rem]">
                   <thead className="border-b border-ink-100 bg-ink-50 text-xs font-semibold text-ink-600">
                     <tr>
                       <th scope="col" className="px-4 py-2.5">Company and project</th>
@@ -319,9 +336,9 @@ export function Intern360View({
                       const offer = parseOffer(p.offerDetails, p.currency);
                       return (
                         <tr key={p.id} className="hover:bg-ink-50/60">
-                          <td className="px-4 py-3">
+                          <td data-title className="px-4 py-3 [overflow-wrap:anywhere]">
                             {p.employerId && company(p.employerId) ? (
-                              <Link href={`/admin/companies/${p.employerId}`} className="font-semibold text-ink-900 underline-offset-4 hover:underline">
+                              <Link href={`/admin/companies/${p.employerId}`} className="font-semibold text-ink-900 underline-offset-4 [overflow-wrap:anywhere] hover:underline">
                                 {company(p.employerId)}
                               </Link>
                             ) : (
@@ -329,8 +346,8 @@ export function Intern360View({
                             )}
                             <p className="text-ink-600">{offer.roleTitle || project(p.projectId) || "Project"}</p>
                           </td>
-                          <td className="px-4 py-3 text-ink-700">{offer.fullTime ? "Full-time" : "Internship"}</td>
-                          <td className="nums px-4 py-3 text-right font-medium text-ink-900">
+                          <td data-label="Type" className="px-4 py-3 text-ink-700">{offer.fullTime ? "Full-time" : "Internship"}</td>
+                          <td data-label="Monthly / CTC" data-empty={(offer.fullTime ? offer.fullTime.annualCtcMinor : offer.monthlyMinor) ? undefined : ""} className="nums px-4 py-3 text-right font-medium text-ink-900">
                             {offer.fullTime
                               ? offer.fullTime.annualCtcMinor
                                 ? `${formatMoney(offer.fullTime.annualCtcMinor, offer.currency)} a year`
@@ -339,9 +356,9 @@ export function Intern360View({
                                 ? formatMoney(offer.monthlyMinor, offer.currency)
                                 : "-"}
                           </td>
-                          <td className="nums whitespace-nowrap px-4 py-3 text-ink-700">{offer.startDate ? formatDate(offer.startDate) : "-"}</td>
-                          <td className="px-4 py-3"><StatusBadge value={p.status} /></td>
-                          <td className="nums whitespace-nowrap px-4 py-3 text-ink-600">{formatDate(p.createdAt)}</td>
+                          <td data-label="Starts" data-empty={offer.startDate ? undefined : ""} className="nums whitespace-nowrap px-4 py-3 text-ink-700">{offer.startDate ? formatDate(offer.startDate) : "-"}</td>
+                          <td data-label="Status" className="px-4 py-3"><StatusBadge value={p.status} /></td>
+                          <td data-label="Sent" className="nums whitespace-nowrap px-4 py-3 text-ink-600">{formatDate(p.createdAt)}</td>
                           <td className="px-4 py-3 text-right">
                             <button type="button" onClick={() => setSelectedProposal(p)} className={buttonClass({ variant: "outline", size: "sm" })}>
                               <Eye className="size-4" aria-hidden />
@@ -634,8 +651,8 @@ function DocumentsTab({ internId, documents }: { internId: string; documents: Ca
   const href = (key: string, download = false) =>
     `/admin/interns/${encodeURIComponent(internId)}/documents/open?key=${encodeURIComponent(key)}${download ? "&download=1" : ""}`;
   return (
-    <Surface className="overflow-x-auto">
-      <table className="w-full min-w-[36rem] text-left text-sm">
+    <Surface data-stack className="lg:overflow-x-auto">
+      <table className="w-full text-left text-sm lg:min-w-[36rem]">
         <thead className="border-b border-ink-100 bg-ink-50 text-xs font-semibold text-ink-600">
           <tr>
             <th scope="col" className="px-4 py-2.5">Document</th>
@@ -647,9 +664,9 @@ function DocumentsTab({ internId, documents }: { internId: string; documents: Ca
         <tbody className="divide-y divide-ink-100">
           {documents.map((d) => (
             <tr key={d.key} className="hover:bg-ink-50/60">
-              <td className="px-4 py-3 font-medium text-ink-900">{d.label}</td>
-              <td className="px-4 py-3 text-ink-600">{d.group}</td>
-              <td className="nums px-4 py-3 text-right text-ink-600">{d.size ? fileSize(d.size) : "-"}</td>
+              <td data-title className="px-4 py-3 font-medium text-ink-900 [overflow-wrap:anywhere]">{d.label}</td>
+              <td data-label="Group" className="px-4 py-3 text-ink-600">{d.group}</td>
+              <td data-label="Size" data-empty={d.size ? undefined : ""} className="nums px-4 py-3 text-right text-ink-600">{d.size ? fileSize(d.size) : "-"}</td>
               <td className="px-4 py-3">
                 <span className="flex justify-end gap-1.5">
                   <a href={href(d.key)} target="_blank" rel="noopener noreferrer" className={buttonClass({ variant: "outline", size: "sm" })}>
@@ -666,9 +683,9 @@ function DocumentsTab({ internId, documents }: { internId: string; documents: Ca
           ))}
           {missing.map((slot) => (
             <tr key={slot}>
-              <td className="px-4 py-3 text-ink-700">{slot}</td>
-              <td className="px-4 py-3 text-ink-600">{slot === "Aadhaar card" || slot === "PAN card" ? "Identity" : "Media"}</td>
-              <td className="px-4 py-3 text-right text-text-subtle">-</td>
+              <td data-title className="px-4 py-3 text-ink-700 [overflow-wrap:anywhere]">{slot}</td>
+              <td data-label="Group" className="px-4 py-3 text-ink-600">{slot === "Aadhaar card" || slot === "PAN card" ? "Identity" : "Media"}</td>
+              <td data-empty className="px-4 py-3 text-right text-text-subtle">-</td>
               <td className="px-4 py-3 text-right">
                 <Pill tone="closed">Not uploaded</Pill>
               </td>
@@ -800,7 +817,7 @@ function InterviewDialog({
     }
   }
 
-  const field = "h-11 w-full rounded-apple-sm border border-ink-200 bg-white px-3 text-sm text-ink-900 placeholder:text-text-subtle focus-visible:border-brand-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600/20";
+  const field = "h-11 w-full rounded-apple-sm border border-ink-200 bg-white px-3 text-base sm:text-sm text-ink-900 placeholder:text-text-subtle focus-visible:border-brand-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600/20";
 
   return (
     <Dialog open={interview !== null} onOpenChange={(open) => !open && onClose()}>
@@ -991,8 +1008,8 @@ function TimesheetsTab({
                     ) : null}
                   </dl>
                 ) : null}
-                <div className="overflow-x-auto">
-                  <table className="w-full min-w-[28rem] text-left text-sm">
+                <div data-stack className="lg:overflow-x-auto">
+                  <table className="w-full text-left text-sm lg:min-w-[28rem]">
                     <thead className="text-xs font-semibold text-ink-600">
                       <tr className="border-b border-ink-100">
                         <th scope="col" className="py-2 pr-4">Day</th>
@@ -1006,12 +1023,12 @@ function TimesheetsTab({
                         const x = extras.get(d.date);
                         return (
                           <tr key={d.date}>
-                            <td className="nums whitespace-nowrap py-2 pr-4 text-ink-800">
+                            <td data-title className="nums whitespace-nowrap py-2 pr-4 text-ink-800">
                               {shortDate(new Date(`${d.date}T00:00:00Z`), { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" })}
                             </td>
-                            <td className="py-2 pr-4">{d.status ? <span className="text-ink-800">{d.status}</span> : <span className="text-text-subtle">Not filled</span>}</td>
-                            <td className="nums py-2 pr-4 text-right text-ink-700">{x?.hours ?? "-"}</td>
-                            <td className="py-2 text-ink-700">{x?.note || ""}</td>
+                            <td data-label="Status" className="py-2 pr-4">{d.status ? <span className="text-ink-800">{d.status}</span> : <span className="text-text-subtle">Not filled</span>}</td>
+                            <td data-label="Hours" data-empty={x?.hours != null ? undefined : ""} className="nums py-2 pr-4 text-right text-ink-700">{x?.hours ?? "-"}</td>
+                            <td data-label="Note" className="py-2 text-ink-700 [overflow-wrap:anywhere]">{x?.note || ""}</td>
                           </tr>
                         );
                       })}
@@ -1060,7 +1077,7 @@ function FilterBar({
         <select
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className="h-11 rounded-apple-sm border border-ink-200 bg-white px-3 text-sm text-ink-800 focus-visible:outline-2 focus-visible:outline-brand-600"
+          className="h-11 rounded-apple-sm border border-ink-200 bg-white px-3 text-base sm:text-sm text-ink-800 focus-visible:outline-2 focus-visible:outline-brand-600"
         >
           <option value="all">All</option>
           {options.map((o) => (

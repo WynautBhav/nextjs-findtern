@@ -80,7 +80,7 @@ export default async function CollegeDashboard() {
         />
       ) : null}
 
-      <StatGrid cols={4}>
+      <StatGrid cols={4} variant="strip">
         <StatCard
           label="Joined Findtern"
           value={coverage.rosterSize ? `${coverage.joined}/${coverage.rosterSize}` : students.length}

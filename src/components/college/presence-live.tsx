@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Radio } from "lucide-react";
 
-import { Pill } from "@/components/app/primitives";
+import { Pill, SURFACE_CLASS } from "@/components/app/primitives";
 import { NudgeButton } from "./nudge-button";
 import { shortDateTime } from "@/lib/format";
 
@@ -62,7 +62,7 @@ export function PresenceLive({
   const dupes = new Set([...seen].filter(([, n]) => n > 1).map(([name]) => name));
 
   return (
-    <section aria-labelledby="live-drive" className="apple-panel overflow-hidden bg-white">
+    <section aria-labelledby="live-drive" className={`overflow-hidden ${SURFACE_CLASS}`}>
       <div className="flex flex-wrap items-start justify-between gap-4 border-b border-ink-100 px-5 py-4">
         <div className="min-w-0">
           <p className="flex items-center gap-2 text-sm font-semibold text-brand-700">

@@ -8,7 +8,7 @@ import { buttonClass } from "@/components/ui/button";
 import { csrfFetch } from "@/lib/client-fetch";
 
 const field =
-  "mt-1.5 min-h-11 w-full rounded-apple-sm border border-ink-200 bg-white px-3.5 text-sm text-ink-900 outline-none placeholder:text-text-subtle focus-visible:border-brand-600 focus-visible:ring-2 focus-visible:ring-brand-500/20";
+  "mt-1.5 min-h-11 w-full rounded-apple-sm border border-ink-200 bg-white px-3.5 text-base sm:text-sm text-ink-900 outline-none placeholder:text-text-subtle focus-visible:border-brand-600 focus-visible:ring-2 focus-visible:ring-brand-500/20";
 
 /** Name and sign-in email of the signed-in admin (ADP-23). */
 export function AdminProfileForm({ name: initialName, email: initialEmail }: { name: string; email: string }) {
@@ -18,15 +18,20 @@ export function AdminProfileForm({ name: initialName, email: initialEmail }: { n
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** The input the error is about (its id), so it is marked invalid and focused. */
+  const [errorField, setErrorField] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
   const emailChanged = email.trim().toLowerCase() !== initialEmail.trim().toLowerCase();
   const dirty = name.trim() !== initialName.trim() || emailChanged;
 
+  const bad = (id: string) => (errorField === id ? ({ "aria-invalid": true, "aria-describedby": "admin-account-error" } as const) : {});
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
     setError(null);
+    setErrorField(null);
     setSaved(false);
     try {
       const res = await csrfFetch("/api/admin/account", {
@@ -36,7 +41,12 @@ export function AdminProfileForm({ name: initialName, email: initialEmail }: { n
       });
       const data = (await res.json().catch(() => null)) as { error?: string } | null;
       if (!res.ok) {
-        setError(data?.error ?? "Not saved. Try again.");
+        const message = data?.error ?? "Not saved. Try again.";
+        // Only the two failures the API names by field; anything else stays a form-level alert.
+        const field = res.status === 409 ? "admin-email" : /password/i.test(message) ? "admin-current" : null;
+        setError(message);
+        setErrorField(field);
+        if (field) document.getElementById(field)?.focus();
         return;
       }
       setSaved(true);
@@ -61,7 +71,7 @@ export function AdminProfileForm({ name: initialName, email: initialEmail }: { n
         <label htmlFor="admin-email" className="block text-sm font-medium text-ink-800">
           Sign-in email
         </label>
-        <input id="admin-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" required className={field} />
+        <input id="admin-email" {...bad("admin-email")} type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" required className={field} />
       </div>
       {emailChanged ? (
         <div>
@@ -70,6 +80,7 @@ export function AdminProfileForm({ name: initialName, email: initialEmail }: { n
           </label>
           <input
             id="admin-current"
+            {...bad("admin-current")}
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
@@ -81,7 +92,7 @@ export function AdminProfileForm({ name: initialName, email: initialEmail }: { n
         </div>
       ) : null}
       {error ? (
-        <p role="alert" className="text-sm font-medium text-danger">
+        <p id="admin-account-error" role="alert" className="text-sm font-medium text-danger">
           {error}
         </p>
       ) : null}

@@ -87,9 +87,9 @@ export function RevenueChart({ data }: { data: RevenuePoint[] }) {
             ))}
           </div>
           {active !== null ? (
-            <div role="status" className={cn("pointer-events-none absolute -top-1 z-10 w-max max-w-44 -translate-y-full rounded-lg border border-ink-200 bg-white px-2.5 py-2 shadow-md", x(active) > 62 ? "-translate-x-full" : "-translate-x-1/2")} style={{ left: `${x(active)}%` }}>
+            <div role="status" className={cn("pointer-events-none absolute -top-1 z-10 w-max max-w-44 -translate-y-full rounded-apple-md border border-ink-200 bg-white px-2.5 py-2 shadow-md", x(active) > 62 ? "-translate-x-full" : "-translate-x-1/2")} style={{ left: `${x(active)}%` }}>
               <p className="text-xs font-semibold tracking-wide text-ink-600 uppercase">{data[active].label}</p>
-              <p className="mt-0.5 text-sm font-bold text-ink-900 tabular-nums">{formatMoney(data[active].totalMinor, "INR", { short: true, zeroLabel: false })}</p>
+              <p className="mt-0.5 text-sm font-semibold text-ink-900 tabular-nums">{formatMoney(data[active].totalMinor, "INR", { short: true, zeroLabel: false })}</p>
             </div>
           ) : null}
         </div>
@@ -143,7 +143,7 @@ export function VolumeBars({ data }: { data: VolumePoint[] }) {
             onBlur={() => setActive(null)}
             className="group flex h-full flex-1 flex-col items-center justify-end gap-1.5 rounded focus-visible:outline-2"
           >
-            <span className={cn("text-xs font-bold tabular-nums", active === index ? "text-ink-900" : "text-ink-600")}>
+            <span className={cn("text-xs font-semibold tabular-nums", active === index ? "text-ink-900" : "text-ink-600")}>
               {point.count}
             </span>
             <span

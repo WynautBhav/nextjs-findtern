@@ -30,10 +30,10 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { RowMenu } from "@/components/app/row-menu";
-import { Surface } from "@/components/app/primitives";
+import { Surface, SURFACE_CLASS } from "@/components/app/primitives";
 
 const inputClass =
-  "mt-1.5 min-h-11 w-full rounded-apple-sm border border-ink-200 bg-white px-3 text-sm text-ink-900 outline-none placeholder:text-text-subtle focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20";
+  "mt-1.5 min-h-11 w-full rounded-apple-sm border border-ink-200 bg-white px-3 text-base sm:text-sm text-ink-900 outline-none placeholder:text-text-subtle focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20";
 
 /** Fixed amounts are stored as major rupees (the form takes "₹"), not minor units. */
 /** Code · discount · used · active · menu. */
@@ -63,6 +63,8 @@ export function PromoCodesManager({
   const [editingPromo, setEditingPromo] = useState<PromoCode | null>(null);
   const [saving, setSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+  /** The dialog field (its id) the error is about, so it is marked invalid and focused. */
+  const [errorField, setErrorField] = useState<string | null>(null);
 
   // Form state
   const [code, setCode] = useState("");
@@ -98,6 +100,7 @@ export function PromoCodesManager({
     setIsActive(true);
     setAppliesTo("intern");
     setErrorMsg("");
+    setErrorField(null);
     setModalOpen(true);
   }
 
@@ -118,31 +121,42 @@ export function PromoCodesManager({
     setIsActive(promo.isActive);
     setAppliesTo(promo.appliesTo === "intern" || promo.appliesTo === "employer" ? promo.appliesTo : "both");
     setErrorMsg("");
+    setErrorField(null);
     setModalOpen(true);
   }
+
+  function invalid(message: string, field: string) {
+    setErrorMsg(message);
+    setErrorField(field);
+    document.getElementById(field)?.focus();
+  }
+
+  /** aria-invalid and the link to the dialog's error text, for the field the error is about. */
+  const bad = (id: string) => (errorField === id ? ({ "aria-invalid": true, "aria-describedby": "promo-error" } as const) : {});
 
   async function handleSavePromo(e: React.FormEvent) {
     e.preventDefault();
     setErrorMsg("");
+    setErrorField(null);
 
     const trimmedCode = code.trim().toUpperCase();
     if (!trimmedCode) {
-      setErrorMsg("Promo code is required.");
+      invalid("Promo code is required.", "promo-code");
       return;
     }
     const valNum = Number(discountValue);
     // Fixed amounts are typed in rupees and stored in paise.
     const stored = discountType === "fixed" ? Math.round(valNum * 100) : valNum;
     if (isNaN(valNum) || valNum <= 0) {
-      setErrorMsg("Please provide a valid discount value greater than 0.");
+      invalid("Please provide a valid discount value greater than 0.", "promo-value");
       return;
     }
     if (discountType === "percentage" && valNum > 100) {
-      setErrorMsg("Percentage discount cannot exceed 100%.");
+      invalid("Percentage discount cannot exceed 100%.", "promo-value");
       return;
     }
     if (validFrom && validUntil && new Date(validUntil) < new Date(validFrom)) {
-      setErrorMsg("The end date must be on or after the start date.");
+      invalid("The end date must be on or after the start date.", "promo-until");
       return;
     }
 
@@ -309,7 +323,7 @@ export function PromoCodesManager({
   return (
     <div className="apple-admin space-y-4">
       {/* Toolbar */}
-      <div className="apple-panel flex flex-col gap-3 bg-white p-4 lg:flex-row lg:items-center">
+      <div className={cn(SURFACE_CLASS, "flex flex-col gap-3 p-4 lg:flex-row lg:items-center")}>
         <div className="relative min-w-0 flex-1 lg:max-w-sm">
           <Search
             aria-hidden
@@ -321,7 +335,7 @@ export function PromoCodesManager({
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search codes…"
             aria-label="Search promo codes"
-            className="min-h-11 w-full rounded-apple-sm border border-ink-200 bg-white pr-10 pl-9 text-[0.9375rem] text-ink-900 placeholder:text-text-subtle focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 focus:outline-none [&::-webkit-search-cancel-button]:hidden"
+            className="min-h-11 w-full rounded-apple-sm border border-ink-200 bg-white pr-10 pl-9 text-base sm:text-[0.9375rem] text-ink-900 placeholder:text-text-subtle focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 focus:outline-none [&::-webkit-search-cancel-button]:hidden"
           />
           {search ? (
             <button
@@ -340,7 +354,7 @@ export function PromoCodesManager({
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value as "all" | "active" | "inactive")}
             aria-label="Filter by status"
-            className="min-h-11 cursor-pointer rounded-apple-sm border border-ink-200 bg-white px-3 text-sm text-ink-700 focus:border-brand-500 focus:outline-none"
+            className="min-h-11 cursor-pointer rounded-apple-sm border border-ink-200 bg-white px-3 text-base sm:text-sm text-ink-700 focus:border-brand-500 focus:outline-none"
           >
             <option value="all">All statuses</option>
             <option value="active">Active only</option>
@@ -350,7 +364,7 @@ export function PromoCodesManager({
             value={typeFilter}
             onChange={(e) => setTypeFilter(e.target.value as "all" | "percentage" | "fixed")}
             aria-label="Filter by discount type"
-            className="min-h-11 cursor-pointer rounded-apple-sm border border-ink-200 bg-white px-3 text-sm text-ink-700 focus:border-brand-500 focus:outline-none"
+            className="min-h-11 cursor-pointer rounded-apple-sm border border-ink-200 bg-white px-3 text-base sm:text-sm text-ink-700 focus:border-brand-500 focus:outline-none"
           >
             <option value="all">All types</option>
             <option value="percentage">Percentage</option>
@@ -370,7 +384,7 @@ export function PromoCodesManager({
 
       {/* Ticket grid */}
       {filteredPromos.length === 0 ? (
-        <div className="apple-panel bg-white">
+        <div className={SURFACE_CLASS}>
           <AdminEmpty
             title="No promo codes found"
             body={
@@ -499,7 +513,7 @@ export function PromoCodesManager({
 
           <form onSubmit={handleSavePromo} className="space-y-4 pt-2">
             {errorMsg && (
-              <div role="alert" className="rounded-apple-sm border border-danger/30 bg-danger-soft p-3 text-sm font-medium text-danger">
+              <div id="promo-error" role="alert" className="rounded-apple-sm border border-danger/30 bg-danger-soft p-3 text-sm font-medium text-danger">
                 {errorMsg}
               </div>
             )}
@@ -510,6 +524,7 @@ export function PromoCodesManager({
               </label>
               <input
                 id="promo-code"
+                {...bad("promo-code")}
                 type="text"
                 required
                 value={code}
@@ -533,7 +548,7 @@ export function PromoCodesManager({
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
                 <label htmlFor="promo-type" className="block text-sm font-semibold text-ink-800">
                   Type
@@ -554,6 +569,7 @@ export function PromoCodesManager({
                 </label>
                 <input
                   id="promo-value"
+                {...bad("promo-value")}
                   type="number"
                   min="1"
                   max={discountType === "percentage" ? "100" : undefined}
@@ -565,7 +581,7 @@ export function PromoCodesManager({
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
                 <label htmlFor="promo-max" className="block text-sm font-semibold text-ink-800">
                   Max uses <span className="font-normal text-ink-600">(blank ∞)</span>
@@ -596,7 +612,7 @@ export function PromoCodesManager({
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
                 <label htmlFor="promo-from" className="block text-sm font-semibold text-ink-800">
                   From <span className="font-normal text-ink-600">(optional)</span>
@@ -615,6 +631,7 @@ export function PromoCodesManager({
                 </label>
                 <input
                   id="promo-until"
+                {...bad("promo-until")}
                   type="datetime-local"
                   value={validUntil}
                   onChange={(e) => setValidUntil(e.target.value)}

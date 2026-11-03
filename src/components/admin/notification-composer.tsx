@@ -21,7 +21,7 @@ type Person = { id: string; label: string; email: string };
 type Side = "intern" | "employer";
 
 const field =
-  "mt-1.5 min-h-11 w-full rounded-apple-sm border border-ink-200 bg-white px-3.5 text-sm text-ink-900 outline-none placeholder:text-text-subtle focus-visible:border-brand-600 focus-visible:ring-2 focus-visible:ring-brand-500/20";
+  "mt-1.5 min-h-11 w-full rounded-apple-sm border border-ink-200 bg-white px-3.5 text-base sm:text-sm text-ink-900 outline-none placeholder:text-text-subtle focus-visible:border-brand-600 focus-visible:ring-2 focus-visible:ring-brand-500/20";
 
 export function NotificationComposer({
   interns,
@@ -49,6 +49,8 @@ export function NotificationComposer({
   const [dataJson, setDataJson] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** The field the current error is about (its id), so it can be marked invalid and focused. */
+  const [errorField, setErrorField] = useState<string | null>(null);
   const [sent, setSent] = useState<string | null>(null);
 
   const sides: Side[] = audience === "both" ? ["intern", "employer"] : [audience];
@@ -86,11 +88,26 @@ export function NotificationComposer({
     });
   }
 
+  function fail(message: string, field: string | null = null) {
+    setError(message);
+    setErrorField(field);
+    if (field) {
+      const el = document.getElementById(field);
+      // The JSON box sits in a closed <details>; focus does nothing on a hidden element.
+      el?.closest("details")?.setAttribute("open", "");
+      el?.focus();
+    }
+  }
+
+  /** aria-invalid and the link to the error text, for the field the error is about. */
+  const bad = (id: string) => (errorField === id ? ({ "aria-invalid": true, "aria-describedby": "notif-error" } as const) : {});
+
   async function send() {
     setSent(null);
+    setErrorField(null);
     const empty = sides.find((s) => countFor(s) === 0);
     if (empty) {
-      setError(
+      fail(
         audience === "both"
           ? `Pick at least one ${empty === "intern" ? "candidate" : "company"}, or tick Everyone on that side.`
           : "Pick at least one recipient, or tick Everyone.",
@@ -98,7 +115,7 @@ export function NotificationComposer({
       return;
     }
     if (!title.trim() || !message.trim()) {
-      setError("A title and a message are both required.");
+      fail("A title and a message are both required.", title.trim() ? "notif-message" : "notif-title");
       return;
     }
     let data: Record<string, unknown> = {};
@@ -108,13 +125,13 @@ export function NotificationComposer({
         if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error();
         data = parsed as Record<string, unknown>;
       } catch {
-        setError('Extra data must be a JSON object, for example {"proposalId": "…"}.');
+        fail('Extra data must be a JSON object, for example {"proposalId": "…"}.', "notif-data");
         return;
       }
     }
     if (link.trim()) {
       if (!link.trim().startsWith("/") || link.trim().startsWith("//")) {
-        setError("The link must be a path on this site, starting with / (for example /intern/proposals).");
+        fail("The link must be a path on this site, starting with / (for example /intern/proposals).", "notif-link");
         return;
       }
       data = { ...data, link: link.trim() };
@@ -261,8 +278,8 @@ export function NotificationComposer({
                   <label className="flex min-h-11 cursor-pointer items-center gap-2.5 rounded-apple-sm px-2 py-1.5 hover:bg-ink-50">
                     <input type="checkbox" checked={picked[side].has(p.id)} onChange={() => toggle(p.id)} className="size-4 shrink-0 accent-brand-700" />
                     <span className="min-w-0">
-                      <span className="block truncate text-sm text-ink-800">{p.label || p.email}</span>
-                      <span className="block truncate text-xs text-ink-600">{p.email}</span>
+                      <span className="block break-words text-sm text-ink-800">{p.label || p.email}</span>
+                      <span className="block break-all text-xs text-ink-600">{p.email}</span>
                     </span>
                   </label>
                 </li>
@@ -281,7 +298,7 @@ export function NotificationComposer({
             <label htmlFor="notif-title" className="block text-sm font-medium text-ink-800">
               Title
             </label>
-            <input id="notif-title" value={title} maxLength={200} onChange={(e) => setTitle(e.target.value)} placeholder="Timesheets are open for this month" className={field} />
+            <input id="notif-title" {...bad("notif-title")} value={title} maxLength={200} onChange={(e) => setTitle(e.target.value)} placeholder="Timesheets are open for this month" className={field} />
           </div>
           <div>
             <label htmlFor="notif-type" className="block text-sm font-medium text-ink-800">
@@ -310,6 +327,7 @@ export function NotificationComposer({
         </label>
         <textarea
           id="notif-message"
+          {...bad("notif-message")}
           value={message}
           maxLength={4000}
           onChange={(e) => setMessage(e.target.value)}
@@ -321,12 +339,14 @@ export function NotificationComposer({
         <label htmlFor="notif-link" className="mt-4 block text-sm font-medium text-ink-800">
           Link <span className="font-normal text-ink-600">(optional)</span>
         </label>
-        <input id="notif-link" value={link} onChange={(e) => setLink(e.target.value)} placeholder="/intern/proposals" className={field} />
+        <input id="notif-link" {...bad("notif-link")} value={link} onChange={(e) => setLink(e.target.value)} placeholder="/intern/proposals" className={field} />
         <p className="mt-1 text-xs text-ink-600">Where tapping the notification takes them: a page on this site.</p>
 
         <details className="mt-4 rounded-apple-sm border border-ink-200/80 px-3.5 py-2.5">
           <summary className="cursor-pointer text-sm font-medium text-ink-800">Advanced: data for developers</summary>
           <textarea
+            id="notif-data"
+            {...bad("notif-data")}
             aria-label="Extra data as JSON"
             value={dataJson}
             onChange={(e) => setDataJson(e.target.value)}
@@ -346,7 +366,7 @@ export function NotificationComposer({
         </div>
 
         {error ? (
-          <p role="alert" className="mt-3 text-sm font-medium text-danger">
+          <p id="notif-error" role="alert" className="mt-3 text-sm font-medium text-danger">
             {error}
           </p>
         ) : null}

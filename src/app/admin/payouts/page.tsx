@@ -100,6 +100,8 @@ async function PayoutsView({ params }: { params: Record<string, string> }) {
   const columns: Column<PayoutRow>[] = [
     {
       header: "Intern",
+      // Cells do not wrap by default; this one carries the long company and project line, and the Mark paid action is the last column.
+      className: "whitespace-normal",
       cell: (r) => (
         <span className="block min-w-0">
           <Link href={`/admin/interns/${r.internId}`} className="font-medium text-ink-900 underline-offset-4 hover:underline">

@@ -39,7 +39,7 @@ const STATUS_TONE: Record<MoneyRow["status"], string> = {
   unpaid: "inactive",
 };
 
-const field = "h-9 rounded-apple-sm border border-ink-200 bg-white px-2.5 text-sm text-ink-800 focus-visible:outline-2 focus-visible:outline-brand-600 max-lg:h-11";
+const field = "h-9 rounded-apple-sm border border-ink-200 bg-white px-2.5 text-base sm:text-sm text-ink-800 focus-visible:outline-2 focus-visible:outline-brand-600 max-lg:h-11";
 
 /** Legacy receivables / payables report (routes.ts:5100-5453), with INR totals. */
 export default async function AdminMoneyReportPage({ searchParams }: { searchParams?: Promise<RawSearchParams> }) {
@@ -183,8 +183,8 @@ function MoneyTable({
         </p>
       ) : (
         // Focusable, so the inner scroll can be reached from the keyboard (axe scrollable-region-focusable).
-        <div tabIndex={0} role="region" aria-label={title} className="max-h-[min(72vh,48rem)] overflow-auto focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand-600">
-          <table className="w-full min-w-[48rem] text-left text-sm">
+        <div tabIndex={0} role="region" aria-label={title} data-stack className="max-h-[min(72vh,48rem)] overflow-y-auto lg:overflow-auto focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand-600">
+          <table className="w-full text-left text-sm lg:min-w-[48rem]">
             <thead>
               <tr className="border-b border-ink-100">
                 {head.map((h) => (
@@ -201,17 +201,17 @@ function MoneyTable({
             <tbody>
               {shown.map((r) => (
                 <tr key={r.id} className="border-b border-ink-100 last:border-0 hover:bg-ink-50/60">
-                  <td className="nums whitespace-nowrap px-3 py-2.5 pl-5 text-ink-700">{formatDate(r.date)}</td>
-                  <td className="px-3 py-2.5 text-ink-800">{r.description}</td>
-                  <td className="px-3 py-2.5 text-ink-700">{r.companyName ?? "-"}</td>
-                  <td className="px-3 py-2.5 text-ink-700">{r.candidateName ?? "-"}</td>
-                  <td className="px-3 py-2.5">
+                  <td data-label="Date" className="nums px-3 py-2.5 pl-5 text-ink-700 lg:whitespace-nowrap">{formatDate(r.date)}</td>
+                  <td data-title className="px-3 py-2.5 text-ink-800 [overflow-wrap:anywhere]">{r.description}</td>
+                  <td data-label="Company" data-empty={r.companyName ? undefined : ""} className="px-3 py-2.5 text-ink-700 [overflow-wrap:anywhere]">{r.companyName ?? "-"}</td>
+                  <td data-label="Candidate" data-empty={r.candidateName ? undefined : ""} className="px-3 py-2.5 text-ink-700 [overflow-wrap:anywhere]">{r.candidateName ?? "-"}</td>
+                  <td data-label="Status" className="px-3 py-2.5">
                     <StatusBadge value={STATUS_TONE[r.status]} label={STATUS_LABEL[r.status]} />
                   </td>
-                  <td className="nums whitespace-nowrap px-3 py-2.5 text-right font-semibold text-ink-900">
+                  <td data-label="Amount" className="nums px-3 py-2.5 text-right font-semibold lg:whitespace-nowrap text-ink-900">
                     {formatMoney(r.amountMinor, r.currency === "USD" ? "USD" : "INR", { zeroLabel: false })}
                   </td>
-                  <td className="px-3 py-2.5 pr-5 font-mono text-xs text-ink-600">{r.reference ?? ""}</td>
+                  <td data-label="Reference" className="px-3 py-2.5 pr-5 font-mono text-xs text-ink-600 [overflow-wrap:anywhere]">{r.reference ?? ""}</td>
                 </tr>
               ))}
             </tbody>

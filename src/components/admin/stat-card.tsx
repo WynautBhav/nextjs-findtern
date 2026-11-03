@@ -1,14 +1,14 @@
 import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
 
+import { SURFACE_CLASS } from "@/components/app/primitives";
 import { cn } from "@/lib/utils";
 
 export type StatTone = "brand" | "accent" | "info" | "success" | "warning" | "neutral";
 
 /**
- * A figure in a summary strip. Inside `StatGrid` the figures share one
- * bordered strip with hairline dividers (one object, read left to right)
- * rather than a row of separate cards; standalone it is a card. The tone
+ * A figure in a summary row: a `Surface` tile (the intern dashboard's
+ * look), alone or inside `StatGrid`. The tone
  * marks a figure that needs someone (warning) with a dot by its label;
  * `icon` is accepted for old callers and not drawn (decorative chips were
  * the loudest thing on 13 screens).
@@ -52,7 +52,8 @@ export function StatCard({
   );
 
   const className = cn(
-    "block min-w-0 rounded-apple-lg border border-ink-200/80 bg-white px-5 py-4 shadow-xs",
+    "block min-w-0 px-5 py-4 shadow-xs",
+    SURFACE_CLASS,
     href && "apple-spring hover:bg-ink-50 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand-600",
   );
 
@@ -68,10 +69,12 @@ export function StatCard({
 }
 
 /**
- * Responsive summary strip. `cols` is the desktop column count. The cells
- * share one border; the 1px gap over an ink background draws the dividers,
- * so the column counts below keep every row full (an empty cell would show
- * as a grey block).
+ * Responsive summary row. `cols` is the desktop column count. The default
+ * is separate tiles 16px apart, as on the intern dashboard. `variant="strip"`
+ * is the old joined strip (one border, hairline dividers) for the college
+ * console, which keeps its dark shell: the 1px gap over an ink background
+ * draws the dividers, so the column counts below keep every row full (an
+ * empty cell would show as a grey block).
  *
  * The widest layout waits for `xl`, not `lg`: the sidebar appears at `lg`
  * (1024px) and takes ~248px, so a 4-up grid at exactly 1024 would get ~165px
@@ -79,18 +82,22 @@ export function StatCard({
  */
 export function StatGrid({
   cols = 4,
+  variant = "tiles",
   className,
   children,
 }: {
   cols?: 3 | 4 | 6;
+  variant?: "tiles" | "strip";
   className?: string;
   children: React.ReactNode;
 }) {
   return (
     <div
       className={cn(
-        "grid gap-px overflow-hidden rounded-apple-lg border border-ink-200/80 bg-ink-200/70 shadow-xs",
-        "[&>*]:rounded-none [&>*]:border-0 [&>*]:shadow-none",
+        "grid",
+        variant === "tiles"
+          ? "gap-4"
+          : "gap-px overflow-hidden rounded-apple-lg border border-ink-200/80 bg-ink-200/70 shadow-xs [&>*]:rounded-none [&>*]:border-0 [&>*]:shadow-none",
         cols === 3 && "grid-cols-1 sm:grid-cols-3",
         cols === 4 && "grid-cols-2 xl:grid-cols-4",
         cols === 6 && "grid-cols-2 sm:grid-cols-3 xl:grid-cols-6",

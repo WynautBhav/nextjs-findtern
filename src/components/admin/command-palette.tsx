@@ -17,8 +17,10 @@ import {
   Send,
   CreditCard,
   Bell,
-  X,
 } from "lucide-react";
+
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { cn } from "@/lib/utils";
 
 type CommandItem = {
   title: string;
@@ -46,16 +48,14 @@ const COMMANDS: CommandItem[] = [
 export function CommandPalette() {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const [active, setActive] = useState(0);
   const router = useRouter();
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
         setOpen((prev) => !prev);
-      }
-      if (e.key === "Escape") {
-        setOpen(false);
       }
     };
 
@@ -63,17 +63,41 @@ export function CommandPalette() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
-  const filtered = query.trim() === ""
-    ? COMMANDS
-    : COMMANDS.filter((cmd) =>
-        cmd.title.toLowerCase().includes(query.toLowerCase()) ||
-        cmd.category.toLowerCase().includes(query.toLowerCase())
-      );
+  const q = query.trim().toLowerCase();
+  const filtered = q === "" ? COMMANDS : COMMANDS.filter((cmd) => cmd.title.toLowerCase().includes(q) || cmd.category.toLowerCase().includes(q));
+  const current = Math.min(active, Math.max(filtered.length - 1, 0));
+
+  // Keep the highlighted option on screen as the arrow keys move past the visible rows.
+  useEffect(() => {
+    if (open) document.getElementById(`admin-command-${current}`)?.scrollIntoView({ block: "nearest" });
+  }, [open, current]);
+
+  const onOpenChange = (next: boolean) => {
+    setOpen(next);
+    // A fresh search each time; Radix returns focus to the trigger on close.
+    if (!next) {
+      setQuery("");
+      setActive(0);
+    }
+  };
 
   const navigateTo = (href: string) => {
-    setOpen(false);
-    setQuery("");
+    onOpenChange(false);
     router.push(href);
+  };
+
+  const onInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!filtered.length) return;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setActive((current + 1) % filtered.length);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setActive((current - 1 + filtered.length) % filtered.length);
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      navigateTo(filtered[current].href);
+    }
   };
 
   return (
@@ -94,68 +118,73 @@ export function CommandPalette() {
         </kbd>
       </button>
 
-      {open ? (
-        <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 bg-black/40 backdrop-blur-xs p-4">
-          <div
-            className="apple-panel w-full max-w-lg overflow-hidden bg-white animate-in fade-in-0 zoom-in-95 duration-150"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Command Menu"
-          >
-            <div className="flex items-center border-b border-ink-100 px-3.5 py-2.5">
-              <Search className="size-4 text-text-subtle mr-2.5 shrink-0" />
-              <input
-                type="text"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Jump to any section or command..."
-                autoFocus
-                className="w-full bg-transparent text-sm text-ink-900 placeholder:text-text-subtle focus:outline-hidden"
-              />
-              <button
-                type="button"
-                onClick={() => setOpen(false)}
-                className="rounded-md p-1 text-ink-600 hover:bg-ink-100 hover:text-ink-700"
-              >
-                <X className="size-4" />
-              </button>
-            </div>
-
-            <div className="max-h-72 overflow-y-auto p-2 space-y-1">
-              {filtered.length === 0 ? (
-                <p className="px-3 py-6 text-center text-xs text-ink-600">
-                  No matching destinations found
-                </p>
-              ) : (
-                filtered.map((item) => {
-                  const Icon = item.icon;
-                  return (
-                    <button
-                      key={item.href}
-                      type="button"
-                      onClick={() => navigateTo(item.href)}
-                      className="apple-spring apple-pressable flex min-h-11 w-full items-center gap-3 rounded-apple-sm px-3 py-2 text-left text-sm font-medium text-ink-700 hover:bg-brand-50 hover:text-brand-800"
-                    >
-                      <span className="grid size-6 place-items-center rounded-apple-sm bg-ink-100 text-ink-600">
-                        <Icon className="size-3.5" />
-                      </span>
-                      <span className="flex-1 truncate text-ink-900">{item.title}</span>
-                      <span className="rounded bg-ink-100 px-1.5 py-0.5 text-2xs text-ink-600">
-                        {item.category}
-                      </span>
-                    </button>
-                  );
-                })
-              )}
-            </div>
-
-            <div className="flex items-center justify-between border-t border-ink-100 bg-ink-50/50 px-3.5 py-2 text-2xs text-ink-600">
-              <span>Navigate with arrow keys or click</span>
-              <span>Press Escape to close</span>
-            </div>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent
+          className="top-[12%] translate-y-0 gap-0 overflow-hidden rounded-apple-xl border-ink-200/80 bg-white p-0 shadow-tile sm:max-w-lg"
+        >
+          <DialogTitle className="sr-only">Search the admin portal</DialogTitle>
+          <DialogDescription className="sr-only">Type to filter, use the arrow keys to move and Enter to open.</DialogDescription>
+          <div className="flex items-center border-b border-ink-100 py-1 pl-3.5 pr-14">
+            <Search className="mr-2.5 size-4 shrink-0 text-ink-600" aria-hidden />
+            <input
+              type="text"
+              role="combobox"
+              aria-expanded="true"
+              aria-controls="admin-command-list"
+              aria-activedescendant={filtered.length ? `admin-command-${current}` : undefined}
+              aria-autocomplete="list"
+              aria-label="Search the admin portal"
+              value={query}
+              onChange={(e) => {
+                setQuery(e.target.value);
+                setActive(0);
+              }}
+              onKeyDown={onInputKeyDown}
+              placeholder="Jump to any section..."
+              autoComplete="off"
+              className="min-h-11 w-full bg-transparent text-base text-ink-900 placeholder:text-ink-600 focus:outline-hidden sm:text-sm"
+            />
           </div>
-        </div>
-      ) : null}
+
+          <div id="admin-command-list" role="listbox" aria-label="Destinations" className="max-h-72 space-y-1 overflow-y-auto p-2">
+            {filtered.length === 0 ? (
+              <p role="status" className="px-3 py-6 text-center text-sm text-ink-600">
+                No matching destinations found
+              </p>
+            ) : (
+              filtered.map((item, i) => {
+                const Icon = item.icon;
+                return (
+                  <div
+                    key={item.href}
+                    id={`admin-command-${i}`}
+                    role="option"
+                    aria-selected={i === current}
+                    tabIndex={-1}
+                    onClick={() => navigateTo(item.href)}
+                    onMouseMove={() => setActive(i)}
+                    className={cn(
+                      "flex min-h-11 w-full cursor-pointer items-center gap-3 rounded-apple-sm px-3 py-2 text-left text-sm font-medium",
+                      i === current ? "bg-brand-50 text-brand-800" : "text-ink-700",
+                    )}
+                  >
+                    <span aria-hidden className="grid size-6 place-items-center rounded-apple-sm bg-ink-100 text-ink-600">
+                      <Icon className="size-3.5" />
+                    </span>
+                    <span className="min-w-0 flex-1 text-ink-900">{item.title}</span>
+                    <span className="rounded bg-ink-100 px-1.5 py-0.5 text-2xs text-ink-600">{item.category}</span>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          <div aria-hidden className="flex items-center justify-between border-t border-ink-100 bg-ink-50/50 px-3.5 py-2 text-2xs text-ink-600">
+            <span>↑↓ to move · Enter to open</span>
+            <span>Esc to close</span>
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

@@ -42,8 +42,9 @@ export function formatMoney(
 
   if (opts.short && Math.abs(value) >= 1000) {
     if (cur === "INR") {
+      // One decimal at most, dropped when whole, so 1.5L and 2L stay distinct (a chart axis printed "2L" twice).
       return Math.abs(value) >= 100000
-        ? `₹${(value / 100000).toFixed(Math.abs(value) >= 1000000 ? 1 : 0)}L`
+        ? `₹${Math.round((value / 100000) * 10) / 10}L`
         : `₹${(value / 1000).toFixed(Math.abs(value) >= 10000 ? 0 : 1)}k`;
     }
     return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", notation: "compact", maximumFractionDigits: 1 }).format(value);

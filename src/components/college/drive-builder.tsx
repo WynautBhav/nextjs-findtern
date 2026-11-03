@@ -9,7 +9,7 @@ import { fromLocalInput } from "@/lib/college/ist";
 import { COHORTS, yearLabel } from "@/lib/college/labels";
 import { csrfFetch } from "@/lib/client-fetch";
 import { cn } from "@/lib/utils";
-import { PageHead } from "@/components/app/primitives";
+import { PageHead, SURFACE_CLASS } from "@/components/app/primitives";
 
 import { ShareLink } from "./share-link";
 import type { StudentRow } from "./types";
@@ -146,7 +146,7 @@ export function DriveBuilder({
         <ShareLink url={link} collegeName={collegeName} driveTitle={d.title} startsAt={fromLocalInput(d.startsAt)} endsAt={fromLocalInput(d.endsAt)} kind={d.kind} />
       ) : null}
 
-      <section className="apple-panel bg-white">
+      <section className={SURFACE_CLASS}>
         <header className="border-b border-ink-100 px-5 py-4">
           <h2 className="text-lg font-semibold tracking-[-0.02em] text-ink-900">The drive</h2>
         </header>
@@ -198,7 +198,7 @@ export function DriveBuilder({
         </div>
       </section>
 
-      <section className="apple-panel bg-white">
+      <section className={SURFACE_CLASS}>
         {live ? (
           <p role="note" className="border-b border-accent-300/60 bg-accent-100/60 px-5 py-3 text-sm text-accent-700">
             This drive is live. Tightening the rules removes students from employers&apos; lists, including anyone they shortlisted or are about to call.

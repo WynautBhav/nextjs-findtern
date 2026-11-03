@@ -142,7 +142,7 @@ export function TableToolbar({
           value={value}
           onChange={(e) => setParam(filter.key, e.target.value || null)}
           className={cn(
-            "apple-spring h-9 max-w-56 cursor-pointer truncate rounded-apple-sm border bg-white px-2.5 pr-7 text-sm focus:ring-2 focus:ring-brand-500/20 focus:outline-none max-lg:min-h-11 max-sm:w-full max-sm:max-w-full",
+            "apple-spring h-9 max-w-56 cursor-pointer truncate rounded-apple-sm border bg-white px-2.5 pr-7 text-base sm:text-sm focus:ring-2 focus:ring-brand-500/20 focus:outline-none max-lg:min-h-11 max-sm:w-full max-sm:max-w-full",
             value
               ? "border-brand-300 font-medium text-brand-800"
               : "border-ink-200 text-ink-700",
@@ -183,7 +183,7 @@ export function TableToolbar({
             }}
             placeholder={searchPlaceholder}
             aria-label={searchPlaceholder}
-            className="h-9 w-full rounded-apple-sm border border-ink-200 bg-white pr-8 pl-9 text-sm text-ink-900 placeholder:text-text-subtle focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 focus:outline-none max-lg:min-h-11 [&::-webkit-search-cancel-button]:hidden"
+            className="h-9 w-full rounded-apple-sm border border-ink-200 bg-white pr-8 pl-9 text-base sm:text-sm text-ink-900 placeholder:text-text-subtle focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 focus:outline-none max-lg:min-h-11 [&::-webkit-search-cancel-button]:hidden"
           />
           {term ? (
             <button

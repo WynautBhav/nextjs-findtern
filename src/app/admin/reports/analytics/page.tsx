@@ -150,7 +150,7 @@ export default async function AdminAnalyticsPage({ searchParams }: { searchParam
       <Panel>
         <PanelHeader title="Monthly performance" description="Offers sent, hires, offer success (hires ÷ offers) and interview rate per month." />
         <SimpleTable
-          minWidth="min-w-[32rem]"
+          minWidth="lg:min-w-[32rem]"
           head={["Month", "Offers", "Hires", "Success", "Interview rate"]}
           right={[1, 2, 3, 4]}
           rows={a.trend.map((t) => [t.month, String(t.proposals), String(t.hires), `${t.successRate}%`, `${t.interviewRate}%`])}
@@ -181,7 +181,7 @@ export default async function AdminAnalyticsPage({ searchParams }: { searchParam
             }
           />
           <SimpleTable
-            minWidth="min-w-[32rem]"
+            minWidth="lg:min-w-[32rem]"
             head={["Company", "Status", "Projects", "Offers", "Internship / FT hires", "Conversion"]}
             right={[2, 3, 4, 5]}
             rows={companies.map((c) => [
@@ -201,7 +201,7 @@ export default async function AdminAnalyticsPage({ searchParams }: { searchParam
         <Panel>
           <PanelHeader title="Top candidates" description="By hires, then interviews, then offers received (all time)." />
           <SimpleTable
-            minWidth="min-w-[30rem]"
+            minWidth="lg:min-w-[30rem]"
             head={["Candidate", "Offers received", "Interviews", "Placed", "Status"]}
             right={[1, 2, 3]}
             rows={a.topInterns.map((i) => [
@@ -239,7 +239,7 @@ export default async function AdminAnalyticsPage({ searchParams }: { searchParam
               defaultValue={hireFilter.q}
               placeholder="Candidate or company"
               aria-label="Search hires"
-              className="h-9 w-52 rounded-apple-sm border border-ink-200 bg-white px-2.5 text-sm max-lg:h-11"
+              className="h-9 w-52 rounded-apple-sm border border-ink-200 bg-white px-2.5 text-base sm:text-sm max-lg:h-11"
             />
             {Object.entries(params)
               .filter(([k, v]) => v && !["hq", "hiredFrom", "hiredTo"].includes(k))
@@ -254,7 +254,7 @@ export default async function AdminAnalyticsPage({ searchParams }: { searchParam
           <DateRangeForm params={params} fromKey="hiredFrom" toKey="hiredTo" fromLabel="Hired from" />
         </div>
         <SimpleTable
-          minWidth="min-w-[30rem]"
+          minWidth="lg:min-w-[30rem]"
           head={["Candidate", "Company", "Type", "Hired"]}
           right={[3]}
           rows={hires.map((h) => [
@@ -299,7 +299,7 @@ function SimpleTable({
   if (rows.length === 0) return <p className="px-5 py-8 text-center text-sm text-ink-600">{empty}</p>;
   return (
     // Focusable, so the inner scroll can be reached from the keyboard (axe scrollable-region-focusable).
-    <div tabIndex={0} role="region" aria-label={`${head[0]} table`} className="max-h-[32rem] overflow-auto focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand-600">
+    <div tabIndex={0} role="region" aria-label={`${head[0]} table`} data-stack className="max-h-[32rem] overflow-y-auto lg:overflow-auto focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand-600">
       <table className={cn("w-full text-left text-sm", minWidth)}>
         <thead>
           <tr className="border-b border-ink-100">
@@ -314,7 +314,12 @@ function SimpleTable({
           {rows.map((r, ri) => (
             <tr key={ri} className="border-b border-ink-100 last:border-0 hover:bg-ink-50/60">
               {r.map((cell, i) => (
-                <td key={i} className={cn("px-3 py-2.5 text-ink-700 first:pl-5 last:pr-5", right.includes(i) && "nums text-right")}>
+                <td
+                  key={i}
+                  {...(i === 0 ? { "data-title": "" } : { "data-label": head[i] })}
+                  {...(cell === "-" || cell === "–" || cell === "—" ? { "data-empty": "" } : {})}
+                  className={cn("px-3 py-2.5 text-ink-700 [overflow-wrap:anywhere] first:pl-5 last:pr-5", right.includes(i) && "nums text-right")}
+                >
                   {cell}
                 </td>
               ))}

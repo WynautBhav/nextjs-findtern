@@ -137,6 +137,9 @@ export function SectionHead({
 export const LIGHT_TILE =
   "in-data-[tone=light]:border-transparent in-data-[tone=light]:shadow-tile";
 
+/** The card look as a class string, for blocks that are not a `Surface` element (Panel, DataTable, a toolbar). */
+export const SURFACE_CLASS = `rounded-apple-xl border border-ink-200/80 bg-white ${LIGHT_TILE}`;
+
 export function Surface({
   children,
   className,
@@ -149,11 +152,7 @@ export function Surface({
 } & React.HTMLAttributes<HTMLElement>) {
   return (
     <As
-      className={cn(
-        "min-w-0 rounded-apple-xl border border-ink-200/80 bg-white",
-        LIGHT_TILE,
-        className,
-      )}
+      className={cn("min-w-0", SURFACE_CLASS, className)}
       {...rest}
     >
       {children}

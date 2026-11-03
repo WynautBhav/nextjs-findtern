@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useMemo, useState, useTransitio
 import { useRouter } from "next/navigation";
 import { Ban, Check, Eye, EyeOff, X } from "lucide-react";
 
+import { useConfirm } from "@/components/app/use-confirm";
 import { Checkbox } from "@/components/ui/checkbox";
 import { csrfFetch } from "@/lib/client-fetch";
 import { cn } from "@/lib/utils";
@@ -71,6 +72,7 @@ export function BulkSelectProvider({
 }) {
   const router = useRouter();
   const [, startTransition] = useTransition();
+  const { ask, dialog } = useConfirm();
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [running, setRunning] = useState<string | null>(null);
@@ -101,7 +103,13 @@ export function BulkSelectProvider({
 
     if (action.confirm) {
       const message = action.confirm.replace("{n}", String(ids.length));
-      if (!confirm(message)) return;
+      const ok = await ask({
+        title: `${action.label} ${ids.length} selected?`,
+        body: message,
+        confirmLabel: action.label,
+        destructive: action.tone === "danger",
+      });
+      if (!ok) return;
     }
 
     setRunning(action.label);
@@ -136,6 +144,7 @@ export function BulkSelectProvider({
   return (
     <BulkSelectContext.Provider value={value}>
       {children}
+      {dialog}
 
       {error ? (
         <div

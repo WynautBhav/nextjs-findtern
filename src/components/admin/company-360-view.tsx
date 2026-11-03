@@ -109,7 +109,7 @@ export function Company360View({
               <span className="flex flex-wrap gap-x-5 gap-y-1.5 text-sm text-ink-600">
                 <span className="inline-flex min-w-0 items-center gap-1.5">
                   <Mail className="size-4 shrink-0 text-text-subtle" aria-hidden />
-                  <span className="truncate">{company.companyEmail}</span>
+                  <span className="break-all">{company.companyEmail}</span>
                 </span>
                 <span className="nums inline-flex items-center gap-1.5">
                   <Phone className="size-4 shrink-0 text-text-subtle" aria-hidden />

@@ -31,7 +31,7 @@ function toDmy(iso: string | undefined): string {
 }
 
 const field =
-  "h-9 w-32 rounded-apple-sm border border-ink-200 bg-white px-2.5 text-sm tabular-nums text-ink-800 placeholder:text-text-subtle focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand-600 max-lg:h-11";
+  "h-9 w-32 rounded-apple-sm border border-ink-200 bg-white px-2.5 text-base sm:text-sm tabular-nums text-ink-800 placeholder:text-text-subtle focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand-600 max-lg:h-11";
 
 export function DateRangeForm({
   params,

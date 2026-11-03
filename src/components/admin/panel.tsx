@@ -1,13 +1,15 @@
 import { AlertTriangle, ArrowRight, type LucideIcon } from "lucide-react";
 
-import { PageHead, ThreadMark } from "@/components/app/primitives";
+import { PageHead, ThreadMark, SURFACE_CLASS } from "@/components/app/primitives";
 import { ButtonLink } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 /**
  * Panel - the one container every admin block sits in.
  *
- * Restrained on purpose: white surface, hairline border, `--shadow-xs`. The
+ * Restrained on purpose: the `Surface` look (white, hairline border, `shadow-xs`
+ * on the college's dark shell; the soft `shadow-tile` and no border on the
+ * light console's grey canvas, which overrides it). The
  * dashboard has six of these on screen at once, so any heavier treatment turns
  * the page into a stack of competing boxes and the numbers stop being readable.
  */
@@ -25,7 +27,8 @@ export function Panel({
   return (
     <Tag
       className={cn(
-        "apple-panel apple-admin overflow-hidden bg-white",
+        "apple-admin overflow-hidden shadow-xs",
+        SURFACE_CLASS,
         className,
       )}
       {...props}

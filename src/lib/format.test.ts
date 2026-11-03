@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { companyInitials, formatDayLabel } from "./format.ts";
+import { companyInitials, formatDayLabel, formatMoney } from "./format.ts";
 
 test("company initials: two letters, legal suffixes skipped", () => {
   assert.equal(companyInitials("Northwind Labs"), "NL");
@@ -58,4 +58,11 @@ test("employer slots convert to IST, DST-correct and labelled", async () => {
   assert.equal(formatIst(midnight, { year: true }), "Sat 11 Jul 2026, 12:00 AM IST");
   assert.equal(formatIst(null), "Time to be confirmed");
   assert.equal(formatIst("not a date"), "Time to be confirmed");
+});
+
+test("short INR amounts keep whole and half lakhs apart on a chart axis", () => {
+  assert.equal(formatMoney(15000000, "INR", { short: true }), "₹1.5L");
+  assert.equal(formatMoney(20000000, "INR", { short: true }), "₹2L");
+  assert.equal(formatMoney(150000000, "INR", { short: true }), "₹15L");
+  assert.equal(formatMoney(5000000, "INR", { short: true }), "₹50k");
 });

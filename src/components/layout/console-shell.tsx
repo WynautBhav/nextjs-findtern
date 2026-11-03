@@ -252,7 +252,7 @@ export function ConsoleShell({
               <Logo variant={light ? "green" : "white"} priority className="h-10" />
             )}
           </Link>
-          {!collapsed && roleLabel ? <RoleChip label={roleLabel} /> : null}
+          {!collapsed && roleLabel ? <RoleChip label={roleLabel} light={light} /> : null}
         </div>
         <div className="relative flex min-h-0 flex-1 flex-col">{rail(collapsed)}</div>
         <button
@@ -548,9 +548,15 @@ function TabBar({ tabs, pathname }: { tabs: ConsoleNavItem[]; pathname: string }
   );
 }
 
-function RoleChip({ label }: { label: string }) {
+function RoleChip({ label, light }: { label: string; light: boolean }) {
   return (
-    <span className="shrink-0 rounded-full border border-accent-400/30 bg-accent-500/15 px-2 py-0.5 text-2xs font-bold uppercase tracking-wider text-accent-300">
+    <span
+      className={cn(
+        "shrink-0 rounded-full border px-2 py-0.5 text-2xs font-bold uppercase tracking-wider",
+        // accent-300 is 1.6:1 on white; the light rail takes the "waiting" pill colours.
+        light ? "border-accent-300/70 bg-accent-100 text-accent-700" : "border-accent-400/30 bg-accent-500/15 text-accent-300",
+      )}
+    >
       {label}
     </span>
   );

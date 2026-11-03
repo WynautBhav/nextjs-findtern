@@ -49,7 +49,7 @@ export interface RoleDef {
 type Staff = Omit<Admin, "password">;
 
 const field =
-  "mt-1.5 min-h-11 w-full rounded-apple-sm border border-ink-200 bg-white px-3.5 text-sm text-ink-900 outline-none placeholder:text-text-subtle focus-visible:border-brand-600 focus-visible:ring-2 focus-visible:ring-brand-500/20";
+  "mt-1.5 min-h-11 w-full rounded-apple-sm border border-ink-200 bg-white px-3.5 text-base sm:text-sm text-ink-900 outline-none placeholder:text-text-subtle focus-visible:border-brand-600 focus-visible:ring-2 focus-visible:ring-brand-500/20";
 
 const permsOf = (r: RoleDef): string[] => (Array.isArray(r.permissions) ? (r.permissions as string[]) : []);
 
@@ -234,10 +234,10 @@ export function StaffRolesManager({
                 </span>
                 <span className="min-w-0 flex-1 basis-[calc(100%-3rem)] sm:basis-auto">
                   <span className="flex items-center gap-2">
-                    <span className="truncate text-[0.9375rem] font-medium text-ink-900">{s.name || "Staff member"}</span>
+                    <span className="break-words text-[0.9375rem] font-medium text-ink-900">{s.name || "Staff member"}</span>
                     {self ? <Pill tone="new">You</Pill> : null}
                   </span>
-                  <span className="block truncate text-sm text-ink-600">{s.email}</span>
+                  <span className="block break-all text-sm text-ink-600">{s.email}</span>
                 </span>
                 <label className="sr-only" htmlFor={`role-${s.id}`}>
                   Role for {s.email}
@@ -250,7 +250,7 @@ export function StaffRolesManager({
                   disabled={busyId === s.id || self}
                   title={self ? "You can't change your own role" : undefined}
                   onChange={(e) => updateStaff(s.id, { role: e.target.value })}
-                  className="h-9 min-w-0 flex-1 rounded-apple-sm border border-ink-200 bg-white px-2.5 text-sm text-ink-800 disabled:opacity-60 max-lg:h-11 max-sm:basis-full sm:w-48 sm:flex-none"
+                  className="h-9 min-w-0 flex-1 rounded-apple-sm border border-ink-200 bg-white px-2.5 text-base sm:text-sm text-ink-800 disabled:opacity-60 max-lg:h-11 max-sm:basis-full sm:w-48 sm:flex-none"
                 >
                   {roles.map((r) => (
                     <option key={r.key} value={r.key}>
@@ -301,7 +301,12 @@ export function StaffRolesManager({
             </button>
           }
         />
-        <div className="overflow-x-auto">
+        <div
+          tabIndex={0}
+          role="region"
+          aria-label="Permissions by role"
+          className="overflow-x-auto focus-visible:outline-2 focus-visible:outline-brand-600"
+        >
           <table className="w-full min-w-[40rem] border-separate border-spacing-0 text-sm">
             <caption className="sr-only">Permissions by role</caption>
             <thead>

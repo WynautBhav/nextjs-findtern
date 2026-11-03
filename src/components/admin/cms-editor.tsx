@@ -30,7 +30,7 @@ import { useConfirm } from "@/components/app/use-confirm";
 export type CmsItem = Record<string, unknown> & { id: string };
 
 const fieldClass =
-  "mt-1.5 w-full rounded-apple-sm border border-ink-200 bg-white px-3 text-sm text-ink-900 outline-none placeholder:text-text-subtle focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20";
+  "mt-1.5 w-full rounded-apple-sm border border-ink-200 bg-white px-3 text-base sm:text-sm text-ink-900 outline-none placeholder:text-text-subtle focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20";
 
 type Ctx = { open: (item: CmsItem | "new") => void; remove: (item: CmsItem) => Promise<void>; busyId: string | null };
 const EditorContext = createContext<Ctx | null>(null);

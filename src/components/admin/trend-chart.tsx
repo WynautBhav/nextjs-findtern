@@ -290,7 +290,7 @@ function Tooltip({ point, xPercent }: { point: TrendPoint; xPercent: number }) {
       role="status"
       aria-live="polite"
       className={cn(
-        "pointer-events-none absolute -top-1 z-10 w-max max-w-[11rem] -translate-y-full rounded-lg border border-ink-200 bg-white px-2.5 py-2 shadow-md",
+        "pointer-events-none absolute -top-1 z-10 w-max max-w-[11rem] -translate-y-full rounded-apple-md border border-ink-200 bg-white px-2.5 py-2 shadow-md",
         flip ? "-translate-x-full" : "-translate-x-1/2",
       )}
       style={{ left: `${xPercent}%` }}

@@ -210,8 +210,8 @@ export function InternPayoutTools({
             No hired internship placements, so nothing is owed. Full-time hires have no stipend.
           </p>
         ) : (
-          <div className="overflow-x-auto rounded-apple-md border border-ink-200/80">
-            <table className="w-full min-w-[56rem] text-left">
+          <div data-stack className="rounded-apple-md border border-ink-200/80 lg:overflow-x-auto">
+            <table className="w-full text-left lg:min-w-[56rem]">
               <caption className="sr-only">Stipend owed per placement</caption>
               <thead>
                 <tr>
@@ -237,15 +237,15 @@ export function InternPayoutTools({
                           : null;
                   return (
                     <tr key={d.proposalId}>
-                      <td className={cn(td, "font-medium text-ink-900")}>{labelOf(d)}</td>
-                      <td className={cn(td, "nums whitespace-nowrap")}>
+                      <td data-title className={cn(td, "font-medium text-ink-900 max-lg:[overflow-wrap:anywhere]")}>{labelOf(d)}</td>
+                      <td data-label="Months paid" className={cn(td, "nums whitespace-nowrap")}>
                         {d.paidMonths} of {d.months}
                       </td>
-                      <td className={cn(td, "nums whitespace-nowrap text-right")}>{d.monthlyShareMinor > 0 ? inr(d.monthlyShareMinor) : "None"}</td>
-                      <td className={cn(td, "nums whitespace-nowrap text-right")}>{inr(d.paidMinor ?? 0)}</td>
-                      <td className={cn(td, "nums whitespace-nowrap text-right font-semibold text-ink-900")}>{inr(d.remainingMinor)}</td>
-                      <td className={cn(td, "nums whitespace-nowrap")}>{d.nextDate ? formatDate(d.nextDate) : "-"}</td>
-                      <td className={td}>
+                      <td data-label="Monthly" className={cn(td, "nums whitespace-nowrap text-right")}>{d.monthlyShareMinor > 0 ? inr(d.monthlyShareMinor) : "None"}</td>
+                      <td data-label="Paid" className={cn(td, "nums whitespace-nowrap text-right")}>{inr(d.paidMinor ?? 0)}</td>
+                      <td data-label="Due" className={cn(td, "nums whitespace-nowrap text-right font-semibold text-ink-900")}>{inr(d.remainingMinor)}</td>
+                      <td data-label="Next date" data-empty={d.nextDate ? undefined : ""} className={cn(td, "nums whitespace-nowrap")}>{d.nextDate ? formatDate(d.nextDate) : "-"}</td>
+                      <td data-label="Employer paid" data-empty={d.employer ? undefined : ""} className={td}>
                         {d.employer ? (
                           <>
                             <span className="nums">{d.employer.paidInFull ? "In full" : `${d.employer.paidMonths} of ${d.employer.months} months`}</span>
@@ -381,8 +381,8 @@ export function InternPayoutTools({
             Nothing recorded yet. Create the first payout from a placement above.
           </p>
         ) : (
-          <div className="overflow-x-auto rounded-apple-md border border-ink-200/80">
-            <table className="w-full min-w-[52rem] text-left">
+          <div data-stack className="rounded-apple-md border border-ink-200/80 lg:overflow-x-auto">
+            <table className="w-full text-left lg:min-w-[52rem]">
               <caption className="sr-only">Payouts recorded for this intern</caption>
               <thead>
                 <tr>
@@ -403,23 +403,26 @@ export function InternPayoutTools({
                   const scheduled = str(raw.scheduledFor) ?? str(raw.scheduled_for);
                   return (
                     <tr key={p.id}>
-                      <td className={cn(td, "nums whitespace-nowrap")}>{scheduled ? formatDate(scheduled) : "-"}</td>
-                      <td className={td}>
-                        {proposalId ? placementLabel.get(proposalId) ?? "Placement" : <span className="text-text-subtle">Not linked</span>}
-                        {opsNote ? (
-                          <span className="block max-w-64 truncate text-xs text-ink-600" title={opsNote}>
-                            {opsNote}
-                          </span>
-                        ) : null}
+                      <td data-title className={cn(td, "nums whitespace-nowrap")}>{scheduled ? formatDate(scheduled) : "-"}</td>
+                      <td data-label="Placement" className={cn(td, "max-lg:[overflow-wrap:anywhere]")}>
+                        {/* One block, so below lg the note sits under the name instead of in its own flex column. */}
+                        <div className="min-w-0 max-lg:text-right">
+                          {proposalId ? placementLabel.get(proposalId) ?? "Placement" : <span className="text-text-subtle">Not linked</span>}
+                          {opsNote ? (
+                            <span className="block max-w-64 truncate text-xs text-ink-600 max-lg:max-w-none max-lg:whitespace-normal max-lg:break-words" title={opsNote}>
+                              {opsNote}
+                            </span>
+                          ) : null}
+                        </div>
                       </td>
-                      <td className={cn(td, "nums whitespace-nowrap text-right font-semibold text-ink-900")}>
+                      <td data-label="Amount" className={cn(td, "nums whitespace-nowrap text-right font-semibold text-ink-900")}>
                         {formatMoney(p.amountMinor, p.currency === "USD" ? "USD" : "INR", { zeroLabel: "₹0" })}
                       </td>
-                      <td className={td}>
+                      <td data-label="Status" className={td}>
                         <StatusBadge status={p.status} />
                       </td>
-                      <td className={cn(td, "nums")}>{p.referenceId ?? <span className="text-text-subtle">-</span>}</td>
-                      <td className={cn(td, "nums whitespace-nowrap")}>{p.paidAt ? formatDate(p.paidAt) : "-"}</td>
+                      <td data-label="Reference" data-empty={p.referenceId ? undefined : ""} className={cn(td, "nums max-lg:[overflow-wrap:anywhere]")}>{p.referenceId ?? <span className="text-text-subtle">-</span>}</td>
+                      <td data-label="Paid on" data-empty={p.paidAt ? undefined : ""} className={cn(td, "nums whitespace-nowrap")}>{p.paidAt ? formatDate(p.paidAt) : "-"}</td>
                       <td className={cn(td, "text-right")}>
                         {p.status === "pending" ? (
                           <PayoutEditor payoutId={p.id} status={p.status} initialReference={p.referenceId} initialNote={opsNote} />

@@ -36,7 +36,7 @@ export type EditablePlan = {
 };
 
 const inputClass =
-  "mt-1.5 h-11 w-full rounded-apple-sm border border-ink-200 bg-white px-3 text-sm text-ink-900 outline-none placeholder:text-text-subtle focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20";
+  "mt-1.5 h-11 w-full rounded-apple-sm border border-ink-200 bg-white px-3 text-base sm:text-sm text-ink-900 outline-none placeholder:text-text-subtle focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20";
 
 const toRupees = (minor: number | null) => (minor == null ? "" : String(minor / 100));
 const toMinor = (rupees: string) => Math.round(Number(rupees || 0) * 100);
@@ -149,11 +149,13 @@ function ActivationFeePanel({ initialMinor }: { initialMinor: number }) {
             inputMode="decimal"
             value={rupees}
             onChange={(e) => setRupees(e.target.value.replace(/[^\d.]/g, ""))}
+            aria-invalid={error ? true : undefined}
+            aria-describedby={error ? "activation-fee-error" : undefined}
             className={inputClass}
           />
         </label>
         <SaveButton state={state} onClick={save} />
-        {error ? <p role="alert" className="w-full text-sm text-danger">{error}</p> : null}
+        {error ? <p id="activation-fee-error" role="alert" className="w-full text-sm text-danger">{error}</p> : null}
       </div>
     </Panel>
   );
@@ -351,7 +353,7 @@ function PriceRow({
 }) {
   const clean = (v: string) => v.replace(/[^\d.]/g, "");
   return (
-    <div className="grid grid-cols-2 gap-3">
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
       <label className="block text-sm font-medium text-ink-800">
         {label}
         <input inputMode="decimal" value={now} onChange={(e) => onNow(clean(e.target.value))} className={inputClass} />

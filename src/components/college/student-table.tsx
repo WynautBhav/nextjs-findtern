@@ -7,7 +7,7 @@ import { Search } from "lucide-react";
 import { ONLINE_WINDOW_MS } from "@/lib/college/constants";
 import { COHORTS, aiStatusLabel, ago, yearLabel } from "@/lib/college/labels";
 import { cn } from "@/lib/utils";
-import { Pill, pillTabClass } from "@/components/app/primitives";
+import { Pill, SURFACE_CLASS, pillTabClass } from "@/components/app/primitives";
 import { NudgeButton } from "./nudge-button";
 import type { StudentRow } from "./types";
 
@@ -56,7 +56,7 @@ export function StudentTable({ students, now }: { students: StudentRow[]; now: n
     filter === "no_interview" ? rows.map((r) => r.userId) : filter === "offers" ? rows.map((r) => r.userId) : [];
 
   return (
-    <section aria-labelledby="students-heading" className="apple-panel overflow-hidden bg-white">
+    <section aria-labelledby="students-heading" className={cn("overflow-hidden", SURFACE_CLASS)}>
       <header className="flex flex-col gap-4 border-b border-ink-100 px-5 py-4">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>

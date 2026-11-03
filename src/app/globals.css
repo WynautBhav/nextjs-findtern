@@ -1303,7 +1303,8 @@ body:has([data-slot="dialog-content"][data-state="open"], [data-slot="sheet-cont
     .rounded-2xl,
     .rounded-xl,
     .rounded-\[20px\],
-    .apple-panel {
+    .apple-panel,
+    .apple-admin [class*="shadow-tile"] {
       border: 1px solid #cbd5e1 !important;
       box-shadow: none !important;
       break-inside: avoid;
@@ -1361,6 +1362,14 @@ body:has([data-slot="dialog-content"][data-state="open"], [data-slot="sheet-cont
   [data-stack] td[data-title] {
     padding-bottom: 0.5rem;
     font-size: 0.9375rem;
+  }
+  /* Names and emails wrap in a stacked row instead of ending in an ellipsis
+     that hides the data (the desktop cell keeps `truncate`). */
+  [data-stack] .truncate {
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+    overflow-wrap: anywhere;
   }
   /* Links in a stacked row are tap targets on a phone: names and counts
      were 20-24px high (QA-146). */

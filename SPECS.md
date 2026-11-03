@@ -8,9 +8,9 @@ owner decision, and log the change in §9.
 work end to end → clear UX → a calm, premium look. A screen that looks
 good but loses data has failed.
 
-**In scope:** `/intern/**` and `/employer/**`. Admin and college keep
-working and follow the same rules whenever a shared file changes, but they
-are not being redesigned in this pass.
+**In scope:** `/intern/**`, `/employer/**` and, from 2 Nov 2026, `/admin/**`
+(§9). College keeps working and follows the same rules whenever a shared
+file changes, but is not being redesigned in this pass.
 
 ---
 
@@ -106,7 +106,9 @@ Secondary text is `text-text-subtle`, never `ink-400/500`.
 
 - Page background `surface` (ink-50). A card is white with
   `border-ink-200/80` and **no shadow**. Shadows only on floating things
-  (menus, dialogs, sheets, toasts).
+  (menus, dialogs, sheets, toasts). Exception: under `tone="light"` (intern
+  and admin consoles) a card is the §2 dashboard tile: borderless with one
+  soft shadow (`LIGHT_TILE`).
 - Radius: controls `rounded-apple-sm`, cards `rounded-apple-xl`. Nothing else.
 - A card is a container you can act on as a unit. A section of reading
   content is not a card: it is a heading plus content on the page
@@ -321,3 +323,20 @@ changed.
   own @container: containment on the tile switches subgrid off). Home: an
   odd last tile in the side column spans both columns. AI scores use one
   `ScoreScale` on Home and Interviews; it stacks in narrow tiles.
+- 2 Nov 2026: owner decision: admin is redesigned to the intern standard
+  and run through the full `/design-pipeline`. Branch `ui/admin-redesign`.
+  The admin console gets `ConsoleShell tone="light"`; `Panel`, `DataTable`,
+  `StatCard` and `StatGrid` take the `Surface` look (`SURFACE_CLASS`) and
+  keep their props, so the 25 admin pages change at the primitive level.
+- 2 Nov 2026: admin Part 4 (`ui/admin-redesign`). Admin home is a bento like
+  the intern home (§2 dashboard exception): one `HeroBand`-free page head,
+  a key-number row (`STAT_ROW`/`StatTile`) whose one brand tile is "Needs you
+  today", the needs list beside a six-month proposals-and-interviews chart
+  (`TrendChart`, buckets in India time), then the leftover figures beside a
+  full-width recent-activity list. Nothing appears twice. The command palette
+  is on `ui/dialog` (focus trap and return, labelled, combobox with arrow
+  keys and Enter). Raw admin tables stack below `lg` with `data-stack`
+  (names and emails wrap there); the staff permission matrix keeps scrolling
+  as a labelled, focusable region. Admin inputs are 16px below `sm`. Errors
+  name their field (`aria-invalid`, `aria-describedby`, focus) where the
+  field is known. Bulk actions confirm with `useConfirm`, not `confirm()`.

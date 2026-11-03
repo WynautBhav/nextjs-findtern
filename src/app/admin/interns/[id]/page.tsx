@@ -10,6 +10,7 @@ import { redactIdentity } from "@/lib/admin/identity-mask";
 import { AdminLoadError, AdminPageHeader } from "@/components/admin/panel";
 import { getSession } from "@/lib/auth";
 import { canViewAs } from "@/lib/admin/impersonation";
+import { SURFACE_CLASS } from "@/components/app/primitives";
 import { allows } from "@/lib/admin/permissions";
 import { listCandidateDocuments } from "@/lib/admin/candidate-documents-list";
 import { getDb, schema, withoutPassword } from "@/lib/db";
@@ -47,7 +48,7 @@ export default async function AdminInternDetail({
     return (
       <div>
         <AdminPageHeader title="Candidate" />
-        <div className="apple-panel bg-white">
+        <div className={SURFACE_CLASS}>
           <AdminLoadError what="this candidate" retryHref={`/admin/interns/${encodeURIComponent(id)}`} />
         </div>
       </div>

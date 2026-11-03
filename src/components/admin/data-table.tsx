@@ -14,6 +14,7 @@ import { PageSizeSelect } from "./page-size-select.tsx";
 import { Pagination } from "./pagination.tsx";
 import { TableToolbar, type ToolbarFilter } from "./table-toolbar.tsx";
 import { toQueryString } from "@/lib/admin/params";
+import { SURFACE_CLASS } from "@/components/app/primitives";
 import { cn } from "@/lib/utils";
 
 /**
@@ -130,7 +131,8 @@ export function DataTable<T>({
   return (
     <div
       className={cn(
-        "apple-panel apple-admin overflow-hidden bg-white",
+        "apple-admin overflow-hidden shadow-xs",
+        SURFACE_CLASS,
         className,
       )}
     >

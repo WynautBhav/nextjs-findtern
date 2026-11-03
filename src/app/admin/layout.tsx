@@ -151,6 +151,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       rootCrumb={{ label: "Workspace", href: "/admin/dashboard" }}
       // Detail pages read "Offers", not "Offers / Details": the title names the record.
       crumbParents={{}}
+      tone="light"
     >
       {children}
     </ConsoleShell>
