@@ -201,7 +201,7 @@ export default async function EmployerProposalDetail({
             <Surface as="section" className="px-6 pb-2 pt-5">
               <SectionHead title="Terms" />
               <dl className="divide-y divide-ink-100">
-                <DetailRow label="Hourly rate" value={offer.hourlyRateMinor ? `${formatMoney(offer.hourlyRateMinor, currency)} an hour` : "-"} mono />
+                <DetailRow label="Hourly rate" value={offer.hourlyRateMinor ? `${formatMoney(offer.hourlyRateMinor, currency)} an hour` : offer.hourlyRateMinor === 0 ? "Free" : "-"} mono />
                 <DetailRow
                   label="Monthly amount"
                   value={
@@ -210,6 +210,8 @@ export default async function EmployerProposalDetail({
                         {formatMoney(offer.monthlyMinor, currency)}
                         {currency === "INR" ? <span className="ml-1 text-xs font-normal text-text-subtle">(includes GST)</span> : null}
                       </>
+                    ) : offer.hourlyRateMinor === 0 ? (
+                      "Free"
                     ) : (
                       "-"
                     )

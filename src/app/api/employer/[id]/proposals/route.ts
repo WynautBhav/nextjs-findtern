@@ -41,10 +41,10 @@ const bodySchema = z
   currency: z.enum(["INR", "USD"]).optional(),
   /** The hiring-policy agreement shown before every proposal. */
   agreedToPolicy: z.literal(true, { message: "Agree to Findtern's hiring policies to send a proposal." }),
-  roleTitle: z.string().trim().min(2).max(120),
+  roleTitle: z.string().trim().min(2, "Enter a role title of at least 2 characters.").max(120, "Keep the role title under 120 characters."),
   // Legacy required a job description, a city and state off-remote, the
   // hybrid split, a shift, a timezone and the laptop answer.
-  jd: z.string().trim().min(1, "Add a job description.").max(4000),
+  jd: z.string().trim().min(1, "Add a job description.").max(4000, "Keep the job description under 4000 characters."),
   additionalInfo: z.string().trim().max(2000).optional(),
   mode: z.enum(["remote", "hybrid", "onsite"]),
   location: z.string().trim().max(120).default(""),
@@ -53,7 +53,7 @@ const bodySchema = z
   officeDays: z.number().int().min(1).max(6).optional(),
   homeDays: z.number().int().min(1).max(6).optional(),
   startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  duration: z.enum(["1m", "2m", "3m", "6m"]),
+  duration: z.enum(["1m", "2m", "3m", "6m"], "Pick a duration of 1, 2, 3 or 6 months."),
   /** Ignored: hours follow the schedule and paid leave (scheduledMonthlyHours). */
   monthlyHours: z.number().optional(),
   weeklySchedule: z.enum(Object.keys(WEEKLY_SCHEDULES) as [WeeklySchedule, ...WeeklySchedule[]]).default("mon_fri"),

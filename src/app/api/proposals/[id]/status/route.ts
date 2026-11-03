@@ -67,7 +67,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
 
   if (!allowed.includes(status)) {
     return NextResponse.json(
-      { error: `A ${session.role} cannot set a proposal to "${status}"` },
+      { error: `${session.role === "employer" ? "An" : "A"} ${session.role} cannot set a proposal to "${status}"` },
       { status: 403 },
     );
   }

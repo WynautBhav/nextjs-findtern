@@ -27,15 +27,15 @@ import {
 // Same rules as the composer (api/employer/[id]/proposals), field by field.
 const offerSchema = z
   .object({
-    roleTitle: z.string().trim().min(2).max(120).optional(),
-    duration: z.enum(["1m", "2m", "3m", "6m"]).optional(),
+    roleTitle: z.string().trim().min(2, "Enter a role title of at least 2 characters.").max(120, "Keep the role title under 120 characters.").optional(),
+    duration: z.enum(["1m", "2m", "3m", "6m"], "Pick a duration of 1, 2, 3 or 6 months.").optional(),
     startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use a date like 2026-11-01.").optional(),
     weeklySchedule: z.enum(Object.keys(WEEKLY_SCHEDULES) as [WeeklySchedule, ...WeeklySchedule[]]).optional(),
     paidLeavesPerMonth: z
       .number()
       .refine((n) => (PAID_LEAVE_OPTIONS as readonly number[]).includes(n), "Paid leave is 0 to 3 days a month, in half days.")
       .optional(),
-    message: z.string().trim().min(1, "Add a job description.").max(4000).optional(),
+    message: z.string().trim().min(1, "Add a job description.").max(4000, "Keep the job description under 4000 characters.").optional(),
     // Blank clears it.
     additionalInfo: z.string().trim().max(2000).optional(),
     mode: z.enum(["remote", "hybrid", "onsite"]).optional(),
