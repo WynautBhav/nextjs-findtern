@@ -266,7 +266,7 @@ async function main() {
   if (ONLY) routes = routes.filter((r) => r.includes(ONLY));
   log(`${routes.length} routes from src/app; origin ${ORIGIN}; browsers ${BROWSERS.join(",")}`);
 
-  const personas = PERSONAS.filter((p) => !arg("personas") || arg("personas").split(",").includes(p.key));
+  const personas = PERSONAS.filter((p) => !p.pendingTerms).filter((p) => !arg("personas") || arg("personas").split(",").includes(p.key));
 
   // Log in once per browser × persona.
   const states = {};

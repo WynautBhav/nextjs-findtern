@@ -27,6 +27,8 @@ import { pngBase64 } from "./lib/browser.mjs";
 import { closeDb, db, one, rows } from "./lib/db.mjs";
 import { ARTIFACTS, ROOT } from "./lib/env.mjs";
 
+// Mirrors CURRENT_TERMS_VERSION in src/lib/terms.ts: seeded accounts have accepted it so the pop-up never blocks a run.
+const TERMS_VERSION = "2026-11-04";
 const ARGON = { memoryCost: 19456, timeCost: 2, parallelism: 1 };
 const log = (...a) => console.log("[seed]", ...a);
 const DAY = 86_400_000;
@@ -141,13 +143,13 @@ async function wipe(email, table, emailCol) {
 let phoneSeq = 7000000000;
 const nextPhone = () => String(phoneSeq++);
 
-async function mkIntern(p, { first = "Qa", last = "Intern", extra, onboarding = true, visibility = "live", skills, experience, docs = true } = {}) {
+async function mkIntern(p, { first = "Qa", last = "Intern", extra, onboarding = true, visibility = "live", skills, experience, docs = true, termsPending = false } = {}) {
   await wipe(p.email, "users", "email");
   const pw = await hash(p.password, ARGON);
   const u = await one(
-    `INSERT INTO users (first_name, last_name, email, email_verified, is_active, country_code, phone_number, password, agreed_to_terms, role, profile_visibility)
-     VALUES ($1,$2,$3,true,true,'+91',$4,$5,true,'intern',$6) RETURNING id`,
-    [first, last, p.email, nextPhone(), pw, visibility],
+    `INSERT INTO users (first_name, last_name, email, email_verified, is_active, country_code, phone_number, password, agreed_to_terms, role, profile_visibility, terms_accepted_version, terms_accepted_at)
+     VALUES ($1,$2,$3,true,true,'+91',$4,$5,true,'intern',$6,$7,$8) RETURNING id`,
+    [first, last, p.email, nextPhone(), pw, visibility, termsPending ? null : TERMS_VERSION, termsPending ? null : new Date()],
   );
   if (onboarding) {
     await db().query(
@@ -181,9 +183,9 @@ async function mkEmployer(p, { name = "Neha QA", company = "Acme Robotics QA", c
   const pw = await hash(p.password, ARGON);
   const e = await one(
     `INSERT INTO employers (name, company_name, company_email, email_verified, country_code, phone_number, password, agreed_to_terms,
-       website_url, company_size, country, city, state, billing_pincode, primary_contact_name, primary_contact_role, setup_completed, onboarding_completed, is_active)
-     VALUES ($1,$2,$3,true,$4,$5,$6,true,'https://example.com','11-50',$7,'Bengaluru','Karnataka','560001',$1,'Founder',$8,$8,true) RETURNING id`,
-    [name, company, p.email, intl ? "+1" : "+91", nextPhone(), pw, country, complete],
+       website_url, company_size, country, city, state, billing_pincode, primary_contact_name, primary_contact_role, setup_completed, onboarding_completed, is_active, terms_accepted_version, terms_accepted_at)
+     VALUES ($1,$2,$3,true,$4,$5,$6,true,'https://example.com','11-50',$7,'Bengaluru','Karnataka','560001',$1,'Founder',$8,$8,true,$9,now()) RETURNING id`,
+    [name, company, p.email, intl ? "+1" : "+91", nextPhone(), pw, country, complete, TERMS_VERSION],
   );
   return e.id;
 }
@@ -368,6 +370,8 @@ async function seedPersonas() {
   }
 
   out.internLow = await mkIntern(by["intern-lowscore"], { first: "Low", last: "Score", extra: extraFor({ score: 4.5, approval: "Pending" }) });
+  // The one account that still owes the terms acceptance (e2e/terms-popup.e2e.mjs).
+  out.internTerms = await mkIntern(by["intern-terms"], { first: "Terms", last: "Pending", extra: extraFor({ score: 8 }), termsPending: true });
   out.internHidden = await mkIntern(by["intern-hidden"], { first: "Hidden", last: "ByAdmin", extra: extraFor({ score: 8 }), visibility: "hidden" });
 
   // --- USD employer with a USD offer and interview. ---
@@ -444,6 +448,11 @@ async function main() {
   if (!process.argv.includes("--no-scrub")) await scrub();
   const ids = await seedPersonas();
   await seedCollege(ids);
+  // Copied live rows and the college seed predate the pop-up; only the intern-terms persona stays unaccepted.
+  const pending = PERSONAS.filter((p) => p.pendingTerms).map((p) => p.email.toLowerCase());
+  for (const [table, col] of [["users", "email"], ["employers", "company_email"], ["college_admins", "email"]]) {
+    await db().query(`UPDATE ${table} SET terms_accepted_version = $1, terms_accepted_at = now() WHERE terms_accepted_version IS NULL AND NOT (lower(${col}) = ANY($2))`, [TERMS_VERSION, pending]);
+  }
   const counts = await one(
     `SELECT (SELECT count(*) FROM users)::int users, (SELECT count(*) FROM employers)::int employers, (SELECT count(*) FROM proposals)::int proposals,
             (SELECT count(*) FROM interviews)::int interviews, (SELECT count(*) FROM timesheets)::int timesheets`);

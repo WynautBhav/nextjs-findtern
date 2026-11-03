@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useId, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ExternalLink, Loader2 } from "lucide-react";
 
@@ -9,6 +9,12 @@ import { buttonClass } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { csrfFetch } from "@/lib/client-fetch";
 import { termsHrefFor, type TermsRole } from "@/lib/terms";
+
+const SIGN_OUT_TO: Record<TermsRole, string> = {
+  intern: "/login?as=intern",
+  employer: "/login?as=employer",
+  college: "/login?as=college",
+};
 
 /**
  * One-time "we redesigned the site and updated the terms" prompt. The layout
@@ -24,8 +30,25 @@ export function TermsGate({ role }: { role: TermsRole }) {
   const [agreed, setAgreed] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const checkRef = useRef<HTMLButtonElement>(null);
   const checkId = useId();
   const errorId = useId();
+
+  // Same call and cleanup as the console's Sign out button (console-shell.tsx).
+  async function signOut() {
+    const res = await csrfFetch("/api/auth/logout", { method: "POST" }).catch(() => null);
+    if (!res?.ok) {
+      setError("Sign out didn't go through. Check your connection and try again.");
+      return;
+    }
+    try {
+      for (const k of Object.keys(window.localStorage)) if (k.startsWith("findtern:") && k.includes("-onboarding")) window.localStorage.removeItem(k);
+    } catch {
+      // Storage blocked: nothing was saved there either.
+    }
+    router.replace(SIGN_OUT_TO[role]);
+    router.refresh();
+  }
 
   async function accept() {
     if (!agreed || saving) return;
@@ -49,12 +72,15 @@ export function TermsGate({ role }: { role: TermsRole }) {
         onEscapeKeyDown={(e) => e.preventDefault()}
         onPointerDownOutside={(e) => e.preventDefault()}
         onInteractOutside={(e) => e.preventDefault()}
-        aria-describedby="terms-gate-desc"
+        onOpenAutoFocus={(e) => {
+          e.preventDefault();
+          checkRef.current?.focus();
+        }}
         className="max-h-[calc(100dvh-2rem)] overflow-y-auto"
       >
         <DialogHeader>
           <DialogTitle className="text-xl leading-snug text-ink-900">Findtern has a new look and updated terms</DialogTitle>
-          <DialogDescription id="terms-gate-desc" className="text-base text-ink-600">
+          <DialogDescription className="text-base text-ink-600">
             We redesigned the site and updated our terms of service. Please read them and accept to keep using your account.
           </DialogDescription>
         </DialogHeader>
@@ -72,6 +98,7 @@ export function TermsGate({ role }: { role: TermsRole }) {
 
         <div className="flex items-start gap-3">
           <Checkbox
+            ref={checkRef}
             id={checkId}
             checked={agreed}
             onCheckedChange={(v) => setAgreed(v === true)}
@@ -97,6 +124,9 @@ export function TermsGate({ role }: { role: TermsRole }) {
         >
           {saving ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
           Continue
+        </button>
+        <button type="button" onClick={signOut} disabled={saving} className={buttonClass({ variant: "outline", block: true })}>
+          Sign out
         </button>
       </DialogContent>
     </Dialog>

@@ -129,8 +129,8 @@ export async function startServer(log = console.log) {
   // Canary: a row that exists only in the QA database must be visible through the app.
   const digits = String(Date.now()).slice(-10);
   const row = await one(
-    `INSERT INTO users (first_name, last_name, email, country_code, phone_number, password, role, is_active)
-     VALUES ('QA', 'Canary', $1, '+999', $2, '!canary-cannot-sign-in', 'intern', false) RETURNING id`,
+    `INSERT INTO users (first_name, last_name, email, country_code, phone_number, password, role, is_active, terms_accepted_version, terms_accepted_at)
+     VALUES ('QA', 'Canary', $1, '+999', $2, '!canary-cannot-sign-in', 'intern', false, '2026-11-04', now()) RETURNING id`,
     [`qa-canary-${digits}@qa.invalid`, digits],
   );
   try {

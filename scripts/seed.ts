@@ -16,6 +16,7 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import pg from "pg";
 
 import * as schema from "../src/lib/db/schema.ts";
+import { acceptanceValues } from "../src/lib/terms.ts";
 import { hashPassword } from "../src/lib/security/password.ts";
 import { PRICING_PLANS } from "../src/lib/content/home.ts";
 import { lineCharge } from "../src/lib/checkout.ts";
@@ -186,6 +187,7 @@ async function main() {
     setupCompleted: true,
     onboardingCompleted: true,
     isActive: true,
+    ...acceptanceValues(),
   }));
 
   const insertedEmployers = await db.insert(schema.employers).values(employerInserts).returning();
@@ -253,6 +255,7 @@ async function main() {
       agreedToTerms: true,
       role: "intern",
       profileVisibility: visibility,
+      ...acceptanceValues(),
     });
   }
 

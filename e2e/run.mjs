@@ -111,8 +111,8 @@ async function waitReady(timeoutMs = 90_000) {
 async function canary() {
   const digits = String(Date.now()).slice(-10);
   const row = await one(
-    `INSERT INTO users (first_name, last_name, email, country_code, phone_number, password, role, is_active)
-     VALUES ('E2E', 'Canary', $1, '+999', $2, '!canary-cannot-sign-in', 'intern', false) RETURNING id`,
+    `INSERT INTO users (first_name, last_name, email, country_code, phone_number, password, role, is_active, terms_accepted_version, terms_accepted_at)
+     VALUES ('E2E', 'Canary', $1, '+999', $2, '!canary-cannot-sign-in', 'intern', false, '2026-11-04', now()) RETURNING id`,
     [`e2e-canary-${digits}@e2e.invalid`, digits],
   );
   try {

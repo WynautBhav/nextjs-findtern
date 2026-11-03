@@ -21,6 +21,8 @@ export const PERSONAS = [
   { key: "intern-heavy", role: "intern", situation: "heavy", email: "qa.intern.heavy@qa.test", password: SITUATION_PASSWORD },
   { key: "intern-longtext", role: "intern", situation: "longtext", email: "qa.intern.longtext@qa.test", password: SITUATION_PASSWORD },
   { key: "intern-lowscore", role: "intern", situation: "lowscore", email: "qa.intern.lowscore@qa.test", password: SITUATION_PASSWORD },
+  // Has NOT accepted the terms: the only account that sees the pop-up (e2e/terms-popup.e2e.mjs). Left out of the crawl.
+  { key: "intern-terms", role: "intern", situation: "terms", email: "qa.intern.terms@qa.test", password: SITUATION_PASSWORD, pendingTerms: true },
   { key: "intern-hidden", role: "intern", situation: "hidden", email: "qa.intern.hidden@qa.test", password: SITUATION_PASSWORD },
 
   { key: "employer-empty", role: "employer", situation: "empty", email: "qa.employer.empty@qa.test", password: SITUATION_PASSWORD },
