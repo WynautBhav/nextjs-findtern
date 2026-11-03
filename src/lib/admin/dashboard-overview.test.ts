@@ -113,7 +113,7 @@ test("buildKpis: with-profile plus incomplete equals signups, and the placement 
     queueFailed: false,
     signups: 1200,
     incompleteProfiles: 300,
-    signupsThisWeek: 25,
+    profilesThisWeek: 25,
     companies: 80,
     companiesThisWeek: 3,
     placements,
@@ -124,18 +124,18 @@ test("buildKpis: with-profile plus incomplete equals signups, and the placement 
   assert.equal(by.needs.value, 17);
   assert.equal(by.needs.caption, "4 new this week");
   assert.equal(by.candidates.value, 900);
-  assert.match(by.candidates.caption, /25 new signups this week, 1,200 in all/);
+  assert.equal(by.candidates.caption, "with a profile · 25 new this week");
   assert.equal(by.companies.caption, "3 new this week");
   assert.equal(by.placements.value, placements.total);
   assert.equal(by.placements.caption, "22 paid, 13 awaiting payment");
 });
 
 test("buildKpis: a failed read drops its tile, a failed queue is said, an empty queue is honest", () => {
-  const base = { queueTotal: 0, queueFresh: 0, queueFailed: false, signups: 0, incompleteProfiles: 0, signupsThisWeek: 1, companies: null, companiesThisWeek: null, placements: null };
+  const base = { queueTotal: 0, queueFresh: 0, queueFailed: false, signups: 0, incompleteProfiles: 0, profilesThisWeek: 1, companies: null, companiesThisWeek: null, placements: null };
   const empty = buildKpis(base);
   assert.deepEqual(empty.kpis.map((k) => k.key), ["needs", "candidates"]);
   assert.equal(empty.kpis[0].caption, "Nothing waiting on the team");
-  assert.match(empty.kpis[1].caption, /1 new signup this week/);
+  assert.equal(empty.kpis[1].caption, "No finished profiles yet");
   assert.equal(buildKpis({ ...base, queueTotal: 3, queueFailed: true }).kpis[0].caption, "Some queues did not load");
   // New this week can never exceed the total it is part of.
   assert.equal(buildKpis({ ...base, queueTotal: 2, queueFresh: 9 }).kpis[0].caption, "2 new this week");
@@ -301,4 +301,33 @@ test("an undated row is counted, shows no waiting time and cannot make a stage s
   assert.equal(band.stages[0].count, 1);
   assert.equal(band.stages[0].cards[0].waitingDays, null);
   assert.equal(band.stuck, null);
+});
+
+import { greetingFor, heroKey, relativeWhen, untilWhen, type Kpi } from "./dashboard-overview-pure.ts";
+
+test("heroKey never picks a zero tile and falls back in order", () => {
+  const k = (key: Kpi["key"], value: number): Kpi => ({ key, label: key, value, caption: "" });
+  assert.equal(heroKey([k("needs", 45), k("candidates", 133)]), "needs");
+  assert.equal(heroKey([k("needs", 0), k("candidates", 133), k("placements", 40)]), "placements");
+  assert.equal(heroKey([k("needs", 0), k("candidates", 0), k("companies", 3)]), "companies");
+  assert.equal(heroKey([k("needs", 0), k("candidates", 0)]), null);
+});
+
+test("relativeWhen and untilWhen read as real, different times", () => {
+  const now = new Date("2026-11-04T10:00:00Z");
+  const ago = (ms: number) => new Date(now.getTime() - ms);
+  assert.equal(relativeWhen(ago(10_000), now), "just now");
+  assert.equal(relativeWhen(ago(12 * 60_000), now), "12 min ago");
+  assert.equal(relativeWhen(ago(3 * 3_600_000), now), "3 h ago");
+  assert.equal(relativeWhen(ago(2 * 86_400_000), now), "2 d ago");
+  assert.equal(untilWhen(new Date(now.getTime() + 20 * 60_000), now), "in 20 min");
+  assert.equal(untilWhen(new Date(now.getTime() + 5 * 3_600_000), now), "in 5 h");
+  assert.equal(untilWhen(new Date(now.getTime() + 3 * 86_400_000), now), "in 3 days");
+  assert.equal(untilWhen(ago(1000), now), null);
+});
+
+test("greetingFor uses the India clock", () => {
+  assert.equal(greetingFor(new Date("2026-11-04T03:00:00Z")), "Good morning"); // 08:30 IST
+  assert.equal(greetingFor(new Date("2026-11-04T08:00:00Z")), "Good afternoon"); // 13:30 IST
+  assert.equal(greetingFor(new Date("2026-11-04T16:00:00Z")), "Good evening"); // 21:30 IST
 });

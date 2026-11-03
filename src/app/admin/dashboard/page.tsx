@@ -1,22 +1,28 @@
+import { eq } from "drizzle-orm";
 import { ArrowLeft } from "lucide-react";
 
+import { DashTile } from "@/components/admin/dashboard/dash-tile";
+import { GreetingHeader, type StripItem } from "@/components/admin/dashboard/greeting-header";
 import { MoneyCard } from "@/components/admin/dashboard/money-card";
 import { NeedsYouPanel } from "@/components/admin/dashboard/needs-you-panel";
 import { NextInterviewCard } from "@/components/admin/dashboard/next-interview-card";
+import { PipelineBandCard } from "@/components/admin/dashboard/pipeline-band";
 import { PlacementsGauge } from "@/components/admin/dashboard/placements-gauge";
 import { RecentActivity } from "@/components/admin/dashboard/recent-activity";
 import { WeekPanel } from "@/components/admin/dashboard/week-panel";
+import { Arrive } from "@/components/admin/motion";
 import { AdminLoadError, AdminPageHeader, Panel } from "@/components/admin/panel";
-import { StatCard, StatGrid } from "@/components/admin/stat-card";
 import { ADMIN_PILL_PRIMARY, ADMIN_PILL_SECONDARY } from "@/components/admin/surface";
-import { findingSentence } from "@/components/admin/triage/format";
+import { findingSentence, plural } from "@/components/admin/triage/format";
 import { IncompleteProfilesLine } from "@/components/admin/triage/incomplete-profiles-line";
 import { MoneyStrip } from "@/components/admin/triage/money-strip";
 import { TriageDesk } from "@/components/admin/triage/triage-desk";
 import { WorkQueueButton } from "@/components/admin/triage/work-queue-button";
 import { ButtonLink } from "@/components/ui/button";
 import { getSession } from "@/lib/auth";
-import { buildActivity, buildKpis } from "@/lib/admin/dashboard-overview-pure";
+import { getDb, schema } from "@/lib/db";
+import { cn } from "@/lib/utils";
+import { buildActivity, buildKpis, heroKey } from "@/lib/admin/dashboard-overview-pure";
 import { loadActivityAndCounts, loadOverview } from "@/lib/admin/dashboard-overview";
 import { loadDashboardQueues, QUEUE_ORDER } from "@/lib/admin/dashboard-queues";
 import type { QueueKey } from "@/lib/admin/dashboard-queues.types";
@@ -24,9 +30,9 @@ import { flattenParams, type RawSearchParams } from "@/lib/admin/params";
 import { allows, requiredPermissions } from "@/lib/admin/permissions";
 
 /**
- * Admin home. The default view is the overview: four KPI tiles (the first, "Needs you today", is the
- * one filled tile), the week's proposals, the next interview, the seven queues as rows, recent
- * activity, the placements gauge and the one dark money card. `?desk=1` is the full triage desk (the
+ * Admin home. The default view is the overview: a greeting with one line of figures, four KPI tiles
+ * (one filled, never a zero), the hire pipeline band, the money card, the week and the placements gauge in
+ * the main column, and a right rail with what needs you, the next interview and recent activity. `?desk=1` is the full triage desk (the
  * queue as a keyboard-driven list with a record peek), which only loads there; `&queue=<key>` opens it
  * on one queue.
  *
@@ -102,18 +108,19 @@ export default async function AdminDashboard({ searchParams }: { searchParams?: 
     );
   }
 
-  const { week, nextInterview, placements, companies } = overview ?? { week: null, nextInterview: null, placements: null, companies: null };
+  const { week, nextInterview, placements, companies, pipeline } = overview ?? { week: null, nextInterview: null, placements: null, companies: null, pipeline: null };
   const { kpis } = buildKpis({
     queueTotal: total,
     queueFresh: fresh,
     queueFailed: groups.some((g) => g.error),
     signups: base.signups,
     incompleteProfiles: base.incompleteProfiles,
-    signupsThisWeek: base.signupsThisWeek,
+    profilesThisWeek: base.profilesThisWeek,
     companies: companies?.total ?? null,
     companiesThisWeek: companies?.fresh ?? null,
     placements,
   });
+  const hero = heroKey(kpis);
   const tileHref: Record<string, string | null> = {
     needs: `${DASHBOARD}?desk=1`,
     candidates: gate("/admin/interns"),
@@ -121,12 +128,32 @@ export default async function AdminDashboard({ searchParams }: { searchParams?: 
     placements: gate(TRACKER_PROPOSALS),
   };
   const activity = buildActivity(base.activity).map((item) => ({ ...item, href: gate(item.href) }));
+  const name = await adminFirstName(session?.uid, session?.email);
 
+  // The figures that need a person, as one line. A zero is left out, never printed.
+  const n = (v: number) => v.toLocaleString("en-IN");
+  const strip: StripItem[] = [
+    fresh > 0 ? { key: "fresh", value: n(fresh), label: "new this week", href: `${DASHBOARD}?desk=1` } : null,
+    money.employerOfferCount > 0
+      ? { key: "offers", value: n(money.employerOfferCount), label: plural(money.employerOfferCount, "offer unpaid", "offers unpaid"), href: `${DASHBOARD}?desk=1&queue=accepted` }
+      : null,
+    money.payoutCount > 0
+      ? { key: "payouts", value: n(money.payoutCount), label: plural(money.payoutCount, "payout due", "payouts due"), href: gate("/admin/payouts") }
+      : null,
+    base.incompleteProfiles > 0
+      ? { key: "incomplete", value: n(base.incompleteProfiles), label: "incomplete profiles", href: gate("/admin/interns?profile=incomplete") }
+      : null,
+  ].filter((x): x is StripItem => x !== null);
+
+  // Phone order: figures, pipeline, what needs you, interview, activity, then the week, placements and money.
+  // From xl the page is a main column and a right rail (the wrappers below are `contents` until then).
+  const cell = "min-w-0 md:col-span-2 xl:col-auto";
   return (
-    <div>
-      <AdminPageHeader
-        title="Dashboard"
-        subtitle={finding}
+    <div data-admin-dash className="space-y-[var(--admin-gap)]">
+      <GreetingHeader
+        name={name}
+        now={now}
+        strip={strip}
         action={
           <>
             <ButtonLink href={`${DASHBOARD}?desk=1`} variant="primary" size="md" className={ADMIN_PILL_PRIMARY}>
@@ -141,44 +168,58 @@ export default async function AdminDashboard({ searchParams }: { searchParams?: 
         }
       />
 
-      <div className="space-y-[var(--admin-gap)]">
-        <StatGrid>
-          {kpis.map((k) => (
-            <StatCard
-              key={k.key}
-              label={k.label}
-              value={k.value}
-              hint={k.caption}
-              href={tileHref[k.key] ?? undefined}
-              featured={k.key === "needs"}
-            />
-          ))}
-        </StatGrid>
-
-        <div className="grid grid-cols-1 gap-[var(--admin-gap)] lg:grid-cols-12">
-          <div className="min-w-0 lg:col-span-6 xl:col-span-4 [&>*]:h-full">
-            <WeekPanel data={week} href={gate(TRACKER_PROPOSALS)} />
+      <div className="grid grid-cols-1 items-start gap-[var(--admin-gap)] md:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_21.5rem]">
+        <div className="contents xl:flex xl:min-w-0 xl:flex-col xl:gap-[var(--admin-gap)]">
+          <Arrive index={0} className={cn(cell, "order-1 xl:order-none")}>
+            <div className="grid grid-cols-2 gap-[var(--admin-gap)] md:grid-cols-4">
+              {kpis.map((k) => (
+                <DashTile key={k.key} label={k.label} value={k.value} hint={k.caption} href={tileHref[k.key] ?? undefined} featured={k.key === hero} />
+              ))}
+            </div>
+          </Arrive>
+          <Arrive index={1} className={cn(cell, "order-2 xl:order-none")}>
+            <PipelineBandCard band={pipeline} href={gate(TRACKER_PROPOSALS)} />
+          </Arrive>
+          <div className="contents xl:grid xl:grid-cols-2 xl:items-start xl:gap-[var(--admin-gap)]">
+            <Arrive index={4} className="order-6 min-w-0 md:col-span-1 xl:order-none">
+              <WeekPanel data={week} href={gate(TRACKER_PROPOSALS)} />
+            </Arrive>
+            <Arrive index={5} className="order-7 min-w-0 md:col-span-1 xl:order-none">
+              <PlacementsGauge summary={placements} href={gate(TRACKER_PROPOSALS)} />
+            </Arrive>
           </div>
-          <div className="min-w-0 lg:col-span-6 xl:col-span-4 [&>*]:h-full">
-            <NextInterviewCard interview={nextInterview} trackerHref={gate(TRACKER_INTERVIEWS)} />
-          </div>
-          <div className="min-w-0 lg:col-span-12 xl:col-span-4 [&>*]:h-full">
-            <NeedsYouPanel groups={groups} total={total} nowMs={now.getTime()} canOpen={can} />
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 gap-[var(--admin-gap)] lg:grid-cols-12">
-          <div className="min-w-0 lg:col-span-12 xl:col-span-5 [&>*]:h-full">
-            <RecentActivity items={activity} now={now} />
-          </div>
-          <div className="min-w-0 lg:col-span-6 xl:col-span-3 [&>*]:h-full">
-            <PlacementsGauge summary={placements} href={gate(TRACKER_PROPOSALS)} />
-          </div>
-          <div className="min-w-0 lg:col-span-6 xl:col-span-4 [&>*]:h-full">
+          <Arrive index={6} className={cn(cell, "order-8 xl:order-none")}>
             <MoneyCard money={money} payoutsHref={gate("/admin/payouts")} />
-          </div>
+          </Arrive>
         </div>
+
+        <aside aria-label="Today" className="contents xl:flex xl:min-w-0 xl:flex-col xl:gap-[var(--admin-gap)]">
+          <Arrive index={2} className="order-3 min-w-0 md:col-span-1 xl:order-none">
+            <NeedsYouPanel groups={groups} total={total} nowMs={now.getTime()} canOpen={can} />
+          </Arrive>
+          <Arrive index={3} className="order-4 min-w-0 md:col-span-1 xl:order-none">
+            <NextInterviewCard interview={nextInterview} trackerHref={gate(TRACKER_INTERVIEWS)} now={now} />
+          </Arrive>
+          <Arrive index={4} className={cn(cell, "order-5 xl:order-none")}>
+            <RecentActivity items={activity} now={now} />
+          </Arrive>
+        </aside>
       </div>
     </div>
   );
+}
+
+/** The signed-in admin's first name for the greeting: `admins.name`, else the email's local part. */
+async function adminFirstName(uid: string | undefined, email: string | undefined): Promise<string> {
+  let full: string | null = null;
+  if (uid) {
+    try {
+      const [row] = await getDb().select({ name: schema.admins.name }).from(schema.admins).where(eq(schema.admins.id, uid)).limit(1);
+      full = row?.name?.trim() || null;
+    } catch {
+      full = null;
+    }
+  }
+  const first = (full ?? email?.split("@")[0] ?? "").split(/\s+/)[0];
+  return first || "there";
 }

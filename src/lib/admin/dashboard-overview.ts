@@ -33,7 +33,7 @@ export async function loadActivityAndCounts(now: Date) {
       .from(schema.users)
       .where(eq(schema.users.role, "intern")),
     db
-      .select({ value: count() })
+      .select({ value: count(), fresh: sql<number>`count(*) filter (where ${schema.users.createdAt} >= ${weekAgo})` })
       .from(schema.users)
       .leftJoin(schema.internOnboarding, eq(schema.internOnboarding.userId, schema.users.id))
       .where(sql`${schema.users.role} = 'intern' and not ${meaningfulProfile()}`),
@@ -92,6 +92,9 @@ export async function loadActivityAndCounts(now: Date) {
     signups: Number(signups?.value ?? 0),
     signupsThisWeek: Number(signups?.fresh ?? 0),
     incompleteProfiles: Number(incompleteProfiles?.value ?? 0),
+    // The candidate tile counts people WITH a profile, so its "new this week" must too: sign-ups this
+    // week minus the ones still incomplete. (It used to print every sign-up, 137 against a tile of 133.)
+    profilesThisWeek: Math.max(0, Number(signups?.fresh ?? 0) - Number(incompleteProfiles?.fresh ?? 0)),
     activity,
   };
 }
@@ -170,8 +173,7 @@ async function loadCompanies(now: Date): Promise<{ total: number; fresh: number 
  * The hire pipeline band: every open proposal (sent, interview, accepted, processing) with its offer,
  * plus the all-time hired count and the latest three hires. Open stages are bounded by the live
  * pipeline; Hired is not, so it reads its count and a short list, never every row. Real employers only.
- * Not yet part of `loadOverview`: the dashboard's pipeline band will call it when it is built, so
- * today's page runs no extra query for it.
+ * `loadOverview` runs it for the dashboard's pipeline band.
  */
 export async function loadPipelineBand(now: Date): Promise<PipelineBand> {
   const pr = schema.proposals;
@@ -209,12 +211,13 @@ export async function loadPipelineBand(now: Date): Promise<PipelineBand> {
 }
 
 export async function loadOverview(now: Date) {
-  const [week, nextInterview, placements, companies] = await Promise.all([
+  const [week, nextInterview, placements, companies, pipeline] = await Promise.all([
     settleNull("week proposals", () => loadWeekProposals(now)),
     // `undefined` is "no interview booked"; `null` is "could not load".
     settleNull("next interview", async () => (await loadNextInterview(now)) ?? undefined),
     settleNull("placements", loadPlacements),
     settleNull("companies", () => loadCompanies(now)),
+    settleNull("pipeline band", () => loadPipelineBand(now)),
   ]);
-  return { week, nextInterview, placements, companies };
+  return { week, nextInterview, placements, companies, pipeline };
 }

@@ -69,7 +69,7 @@ export function StatCard({
         "relative min-w-0 rounded-[var(--radius-admin-card)] p-[var(--admin-pad-panel)]",
         featured
           ? "bg-[color:var(--admin-tile)] text-[color:var(--admin-tile-ink)]"
-          : "border border-[color:var(--admin-panel-edge)] bg-[color:var(--admin-panel)]",
+          : "border border-[color:var(--admin-panel-edge)] bg-[color:var(--admin-panel)] shadow-[var(--admin-shadow)]",
         href && "has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ring",
       )}
     >

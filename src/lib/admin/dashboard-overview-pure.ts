@@ -146,13 +146,60 @@ export type KpiInput = {
   queueFailed: boolean;
   signups: number;
   incompleteProfiles: number;
-  signupsThisWeek: number;
+  /** Sign-ups this week that have a profile (the tile counts profiles, so this is never above it). */
+  profilesThisWeek: number;
   companies: number | null;
   companiesThisWeek: number | null;
   placements: PlacementSummary | null;
 };
 
-const noun = (n: number, one: string, many: string) => (n === 1 ? one : many);
+
+/** "with a profile", then what is new and what is not finished; zero parts are left out. */
+function candidateCaption(withProfile: number, fresh: number, incomplete: number): string {
+  const parts = ["with a profile"];
+  if (fresh > 0) parts.push(`${COUNT.format(fresh)} new this week`);
+  else if (incomplete > 0) parts.push(`${COUNT.format(incomplete)} incomplete`);
+  return withProfile > 0 ? parts.join(" · ") : "No finished profiles yet";
+}
+
+/**
+ * The one filled tile: the first tile, in order of how much it matters to the desk, that is not zero.
+ * A zero is never the hero; when everything is zero there is no hero.
+ */
+export function heroKey(kpis: Kpi[]): Kpi["key"] | null {
+  for (const key of ["needs", "placements", "candidates", "companies"] as const) {
+    const k = kpis.find((x) => x.key === key);
+    if (k && k.value > 0) return key;
+  }
+  return null;
+}
+
+/** Greeting by India clock hour. */
+export function greetingFor(now: Date): string {
+  const hour = Number(new Intl.DateTimeFormat("en-GB", { hour: "2-digit", hourCycle: "h23", timeZone: "Asia/Kolkata" }).format(now));
+  return hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+}
+
+/** "just now", "12 min ago", "3 h ago", "2 d ago", else the date. Future times read "just now". */
+export function relativeWhen(at: Date, now: Date): string {
+  const sec = Math.max(0, Math.floor((now.getTime() - at.getTime()) / 1000));
+  if (sec < 60) return "just now";
+  if (sec < 3600) return `${Math.floor(sec / 60)} min ago`;
+  if (sec < 86_400) return `${Math.floor(sec / 3600)} h ago`;
+  if (sec < 7 * 86_400) return `${Math.floor(sec / 86_400)} d ago`;
+  return shortDate(at, { day: "numeric", month: "short" });
+}
+
+/** "in 2 h", "in 1 day", "in 5 days"; null for a time already past. */
+export function untilWhen(at: Date, now: Date): string | null {
+  const ms = at.getTime() - now.getTime();
+  if (!Number.isFinite(ms) || ms <= 0) return null;
+  const min = Math.round(ms / 60_000);
+  if (min < 60) return `in ${Math.max(1, min)} min`;
+  if (min < 48 * 60) return `in ${Math.round(min / 60)} h`;
+  const d = Math.round(min / 1440);
+  return `in ${d} days`;
+}
 const COUNT = new Intl.NumberFormat("en-IN");
 
 /**
@@ -179,9 +226,9 @@ export function buildKpis(input: KpiInput): { kpis: Kpi[]; withProfile: number }
     },
     {
       key: "candidates",
-      label: "Candidates with a profile",
+      label: "Candidates",
       value: withProfile,
-      caption: `${COUNT.format(whole(input.signupsThisWeek))} new ${noun(whole(input.signupsThisWeek), "signup", "signups")} this week, ${COUNT.format(signups)} in all`,
+      caption: candidateCaption(withProfile, Math.min(whole(input.profilesThisWeek), withProfile), incomplete),
     },
   ];
   if (input.companies != null) {

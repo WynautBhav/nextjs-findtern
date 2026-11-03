@@ -8,20 +8,21 @@ import type { PlacementSummary } from "@/lib/admin/dashboard-overview-pure";
  */
 export function PlacementsGauge({ summary, href }: { summary: PlacementSummary | null; href: string | null }) {
   return (
-    <Panel className="h-full" aria-labelledby="placements-title">
+    <Panel aria-labelledby="placements-title">
       <PanelHeader
         title={<span id="placements-title">Placements</span>}
-        description={summary ? `${summary.total} in all: employer paid, or accepted and waiting` : undefined}
+        description={summary ? `${summary.total} in all` : undefined}
         linkHref={href ?? undefined}
         linkLabel="Open placements in the proposal pipeline"
       />
-      <PanelBody>
+      <PanelBody className="pt-2">
         {summary ? (
           <Gauge
             segments={summary.segments}
             centerValue={`${summary.paidPct}%`}
             centerLabel="paid"
             ariaLabel="Placements by payment"
+            className="max-w-[16rem] max-md:max-w-[11rem]"
           />
         ) : (
           <p role="alert" className="text-sm text-foreground">

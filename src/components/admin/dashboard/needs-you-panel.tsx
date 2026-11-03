@@ -39,11 +39,15 @@ export function NeedsYouPanel({
   nowMs: number;
   canOpen: (href: string) => boolean;
 }) {
-  const rows = queueRows(groups, nowMs);
-  const segments = groups.map((g) => ({ key: g.key, count: g.error ? 0 : g.count, flag: !!g.flag }));
+  const all = queueRows(groups, nowMs);
+  // Live rows first; a queue at zero is not a row, it is one line saying how many are clear.
+  const rows = all.filter((r) => r.state !== "clear");
+  const clear = all.filter((r) => r.state === "clear");
+  // The calendar flag is a state, not a share of the work: it stays out of the bar.
+  const segments = groups.map((g) => ({ key: g.key, count: g.error || g.flag ? 0 : g.count, flag: false }));
 
   return (
-    <Panel className="h-full" aria-labelledby="needs-you-title">
+    <Panel aria-labelledby="needs-you-title">
       <PanelHeader
         title={<span id="needs-you-title">Needs you</span>}
         description={
@@ -63,10 +67,10 @@ export function NeedsYouPanel({
           </Link>
         }
       />
-      <PanelBody className="space-y-3">
+      <PanelBody className="space-y-2 pt-2">
         <OwedBar segments={segments} />
         <ul className="-mx-2">
-          {rows.map((row) => {
+          {rows.map((row, rowIndex) => {
             const group = groups.find((g) => g.key === row.key);
             const Icon = ICON[row.key];
             const href = queueRowHref(row, group);
@@ -90,11 +94,13 @@ export function NeedsYouPanel({
                   <span data-testid={`queue-count-${row.key}`} className="nums text-base font-semibold text-foreground">
                     <Count value={row.count} />
                   </span>
+                ) : row.state === "flag" ? (
+                  <span className="rounded-full bg-warning-soft px-2.5 py-0.5 text-xs font-medium text-warning">Fix</span>
                 ) : null}
               </>
             );
             return (
-              <li key={row.key}>
+              <li key={row.key} className={rowIndex >= 3 ? "max-md:hidden" : undefined}>
                 {link ? (
                   <Link
                     href={href}
@@ -109,6 +115,15 @@ export function NeedsYouPanel({
             );
           })}
         </ul>
+        {clear.length > 0 ? (
+          <p
+            className="px-0 text-xs leading-4 text-text-subtle"
+            title={clear.map((r) => r.label).join("; ")}
+          >
+            {rows.length === 0 ? "Everything is clear: " : ""}
+            {clear.length} {clear.length === 1 ? "queue is" : "queues are"} clear
+          </p>
+        ) : null}
       </PanelBody>
     </Panel>
   );

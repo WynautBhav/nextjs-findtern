@@ -18,7 +18,7 @@ import { ADMIN_PILL_PRIMARY, ADMIN_PILL_SECONDARY } from "./surface.ts";
 export type PanelVariant = "plain" | "inset" | "rail" | "well";
 
 const PANEL_DEFAULT =
-  "overflow-hidden rounded-[var(--radius-admin-card)] border border-[color:var(--admin-panel-edge)] bg-[color:var(--admin-panel)]";
+  "overflow-hidden rounded-[var(--radius-admin-card)] border border-[color:var(--admin-panel-edge)] bg-[color:var(--admin-panel)] shadow-[var(--admin-shadow)]";
 
 /** Each variant's surface. Unset is the white panel default. */
 const PANEL_VARIANT: Record<PanelVariant, string> = {
