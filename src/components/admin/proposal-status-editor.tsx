@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 
+import { useConfirm } from "@/components/app/use-confirm";
 import { buttonClass } from "@/components/ui/button";
 import { csrfFetch } from "@/lib/client-fetch";
 
@@ -22,6 +23,20 @@ const OPEN_OPTIONS = [
 ];
 const ACCEPTED_OPTIONS = [{ value: "withdrawn", label: "Cancel (unpaid)" }];
 
+/** The two moves that end a live offer for a party who did not ask for it. */
+const CONFIRM: Record<string, { title: string; body: string; confirmLabel: string }> = {
+  rejected: {
+    title: "Reject this offer for the candidate?",
+    body: "The candidate is emailed that Findtern closed the offer. They cannot accept it afterwards.",
+    confirmLabel: "Yes, reject it",
+  },
+  withdrawn: {
+    title: "Cancel this unpaid offer?",
+    body: "The candidate has already accepted. Cancelling withdraws the offer and the employer is not charged.",
+    confirmLabel: "Yes, cancel it",
+  },
+};
+
 export function ProposalStatusEditor({
   proposalId,
   status,
@@ -30,6 +45,7 @@ export function ProposalStatusEditor({
   status: string;
 }) {
   const router = useRouter();
+  const { ask, dialog } = useConfirm();
   const [value, setValue] = useState<string>("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -41,6 +57,8 @@ export function ProposalStatusEditor({
 
   async function save() {
     if (!value) return;
+    const confirm = CONFIRM[value];
+    if (confirm && !(await ask(confirm))) return;
     setSaving(true);
     setError("");
     try {
@@ -64,6 +82,7 @@ export function ProposalStatusEditor({
 
   return (
     <div className="flex min-w-44 flex-wrap items-center gap-1.5">
+      {dialog}
       <label className="sr-only" htmlFor={`ps-${proposalId}`}>
         Set proposal status
       </label>

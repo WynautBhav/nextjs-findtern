@@ -8,9 +8,11 @@ import { hiringFunnel } from "@/lib/admin/funnel";
 import { AdminPageHeader, Panel, PanelHeader, PanelBody } from "@/components/admin/panel";
 import { StatCard, StatGrid } from "@/components/admin/stat-card";
 import { TrendChart, PipelineBars, type TrendPoint } from "@/components/admin/trend-chart";
-import { formatMoney, formatNumber, shortDateTime } from "@/lib/format";
+import { formatMoney, formatNumber } from "@/lib/format";
 import { flattenParams, PERIOD_OPTIONS, periodStart } from "@/lib/admin/params";
-import { inrMinorSql, meaningfulProfile, realEmployerId, realEmployers } from "@/lib/admin/scope";
+import { meaningfulProfile, realEmployerId, realEmployers } from "@/lib/admin/scope";
+import { istDateRange, istKeySql, istMonthKeys, istMonthLabel, istMonthStart, utcSql } from "@/lib/admin/revenue";
+import { loadCollected, loadReceiptBuckets } from "@/lib/admin/receivables-load";
 import { RevenueChart, type RevenuePoint } from "@/components/admin/finance-charts";
 import { ChipLinks, DateRangeForm } from "@/components/admin/report-range";
 import { buttonClass } from "@/components/ui/button";
@@ -23,14 +25,15 @@ export default async function AdminReportsPage({
 }) {
   const params = flattenParams(await searchParams);
   // A custom from-to range wins over the preset period.
-  const validDate = (v?: string) => (v && !Number.isNaN(Date.parse(v)) ? new Date(v) : null);
-  const rangeFrom = validDate(params.from);
-  const rangeTo = validDate(params.to);
-  const since = rangeFrom ?? (rangeTo ? null : periodStart(params.period));
-  const until = rangeTo ? new Date(rangeTo.getTime() + 86_400_000) : null;
+  // `from` / `to` are India dates, inclusive (lib/admin/revenue).
+  const range = istDateRange(params.from, params.to);
+  const since = range.since ?? (range.until ? null : (periodStart(params.period) ?? null));
+  const until = range.until;
   /** Totals respect the chosen period; trend charts always show six months. */
   const from = (col: AnyPgColumn) => and(since ? gte(col, since) : undefined, until ? lt(col, until) : undefined);
   const db = getDb();
+  // Six India months ending now, for every monthly trend on the page.
+  const buckets = istMonthKeys(new Date(), 6).map((key) => ({ key, label: istMonthLabel(key) }));
   // Test employers (the internal "admin" one and the AI-interview one) are not real activity.
   const realProposal = realEmployerId(schema.proposals.employerId);
   const realInterview = realEmployerId(schema.interviews.employerId);
@@ -46,7 +49,7 @@ export default async function AdminReportsPage({
     projectTypesRaw,
     proposalsMonthly,
     interviewsMonthly,
-    [revenueTotal],
+    revenueTotal,
     revenueMonthly,
   ] = await Promise.all([
     db.select({ c: count() }).from(schema.users).where(and(eq(schema.users.role, "intern"), from(schema.users.createdAt))),
@@ -78,41 +81,23 @@ export default async function AdminReportsPage({
       .orderBy(sql`count(*) desc`),
     db
       .select({
-        month: sql<string>`to_char(date_trunc('month', ${schema.proposals.createdAt}), 'YYYY-MM')`,
+        month: istKeySql(schema.proposals.createdAt, "month"),
         c: count(),
       })
       .from(schema.proposals)
-      .where(sql`${schema.proposals.createdAt} >= date_trunc('month', now()) - interval '5 months'`)
+      .where(sql`${schema.proposals.createdAt} >= ${utcSql(istMonthStart(buckets[0].key))}`)
       .groupBy(sql`1`),
     db
       .select({
-        month: sql<string>`to_char(date_trunc('month', ${schema.interviews.createdAt}), 'YYYY-MM')`,
+        month: istKeySql(schema.interviews.createdAt, "month"),
         c: count(),
       })
       .from(schema.interviews)
-      .where(and(realInterview, sql`${schema.interviews.createdAt} >= date_trunc('month', now()) - interval '5 months'`))
+      .where(and(realInterview, sql`${schema.interviews.createdAt} >= ${utcSql(istMonthStart(buckets[0].key))}`))
       .groupBy(sql`1`),
-    // Revenue: paid employer orders + intern fees in the period, USD converted.
-    db
-      .select({
-        total: sql<number>`(
-          coalesce((select sum(${inrMinorSql(schema.employerPayments.amountMinor, schema.employerPayments.currency)}) from ${schema.employerPayments} where ${and(eq(schema.employerPayments.status, "paid"), from(schema.employerPayments.paidAt))}), 0)
-          + coalesce((select sum(${inrMinorSql(schema.internPayments.amountMinor, schema.internPayments.currency)}) from ${schema.internPayments} where ${and(eq(schema.internPayments.status, "paid"), from(schema.internPayments.paidAt))}), 0)
-        )::bigint`,
-      })
-      .from(sql`(select 1) as one`),
-    Promise.all(
-      ([schema.employerPayments, schema.internPayments] as const).map((t) =>
-        db
-          .select({
-            month: sql<string>`to_char(date_trunc('month', ${t.paidAt} AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata'), 'YYYY-MM')`,
-            total: sql<number>`coalesce(sum(${inrMinorSql(t.amountMinor, t.currency)}), 0)::bigint`,
-          })
-          .from(t)
-          .where(and(eq(t.status, "paid"), sql`${t.paidAt} >= date_trunc('month', now()) - interval '5 months'`))
-          .groupBy(sql`1`),
-      ),
-    ).then((sets) => sets.flat()),
+    // Revenue: one definition (lib/admin/revenue), the period's receipts and six India months of them.
+    loadCollected({ since, until }),
+    loadReceiptBuckets("month", 6),
   ]);
 
   const totalSignups = Number(signupsTotal?.c ?? 0);
@@ -128,21 +113,10 @@ export default async function AdminReportsPage({
 
   // Six monthly buckets, zero-filled - the trend chart needs continuity,
   // not just the months that happen to have rows.
-  const now = new Date();
-  const buckets: { key: string; label: string }[] = [];
-  for (let i = 5; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    buckets.push({
-      key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`,
-      label: shortDateTime(d, { month: "short" }),
-    });
-  }
   const proposalsByMonth = new Map(proposalsMonthly.map((r) => [r.month, Number(r.c)]));
   const interviewsByMonth = new Map(interviewsMonthly.map((r) => [r.month, Number(r.c)]));
-  const revenueByMonth = new Map<string, number>();
-  for (const r of revenueMonthly) revenueByMonth.set(r.month, (revenueByMonth.get(r.month) ?? 0) + Number(r.total));
-  const revenueTrend: RevenuePoint[] = buckets.map((b) => ({ label: b.label, totalMinor: revenueByMonth.get(b.key) ?? 0 }));
-  const totalRevenue = Number(revenueTotal?.total ?? 0);
+  const revenueTrend: RevenuePoint[] = buckets.map((b) => ({ label: b.label, totalMinor: revenueMonthly.get(b.key)?.totalMinor ?? 0 }));
+  const totalRevenue = revenueTotal.receivedMinor;
   const trend: TrendPoint[] = buckets.map((b) => ({
     label: b.label,
     proposals: proposalsByMonth.get(b.key) ?? 0,

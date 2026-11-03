@@ -1,4 +1,4 @@
-import { Panel, PanelBody, PanelHeader } from "@/components/admin/panel";
+import { Panel, PanelBody, PanelHeader } from "@/components/college/panel";
 import { PageHead, Surface } from "@/components/app/primitives";
 import { RosterImport } from "@/components/college/roster-import";
 import { CopyText } from "@/components/college/copy-text";

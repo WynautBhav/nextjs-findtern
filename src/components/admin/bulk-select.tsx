@@ -1,13 +1,14 @@
 "use client";
 
-import { createContext, useCallback, useContext, useMemo, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Ban, Check, Eye, EyeOff, X } from "lucide-react";
 
 import { useConfirm } from "@/components/app/use-confirm";
 import { Checkbox } from "@/components/ui/checkbox";
 import { csrfFetch } from "@/lib/client-fetch";
 import { cn } from "@/lib/utils";
+import { selectionScope } from "./table-state.ts";
 
 /**
  * Bulk selection, as context around server-rendered table children.
@@ -21,6 +22,10 @@ import { cn } from "@/lib/utils";
  * problems at once. The selection state is client-side and interactive, while
  * every cell stays a server component - so the table still streams from the
  * database and ships zero client JavaScript for its contents.
+ *
+ * The selection is scoped to the query string: changing the page, sort, search
+ * or any filter clears it, so an action can never reach rows the admin can no
+ * longer see. "Select all" is explicitly the visible page.
  *
  * Actions are described by a serializable spec (endpoint + payload) rather than
  * a callback, for the same reason: the page cannot hand the client a function.
@@ -74,9 +79,20 @@ export function BulkSelectProvider({
   const [, startTransition] = useTransition();
   const { ask, dialog } = useConfirm();
 
-  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const searchParams = useSearchParams();
+  const scope = selectionScope(searchParams);
+
   const [running, setRunning] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [selectedScope, setSelectedScope] = useState(scope);
+  // Derived-state reset during render (no effect, no stale frame): a new query
+  // string means a different set of rows.
+  if (scope !== selectedScope) {
+    setSelectedScope(scope);
+    setSelected(new Set());
+    setError(null);
+  }
 
   const toggle = useCallback((id: string) => {
     setSelected((current) => {
@@ -87,10 +103,18 @@ export function BulkSelectProvider({
     });
   }, []);
 
+  // Compares against the visible ids, not set sizes: a selection of the same
+  // size from elsewhere must not read as "all selected".
   const toggleAll = useCallback((ids: string[]) => {
-    setSelected((current) =>
-      current.size === ids.length ? new Set() : new Set(ids),
-    );
+    setSelected((current) => {
+      const all = ids.length > 0 && ids.every((id) => current.has(id));
+      const next = new Set(current);
+      for (const id of ids) {
+        if (all) next.delete(id);
+        else next.add(id);
+      }
+      return next;
+    });
   }, []);
 
   const clear = useCallback(() => setSelected(new Set()), []);
@@ -136,6 +160,17 @@ export function BulkSelectProvider({
     }
   }
 
+  const barVisible = selected.size > 0 && actions.length > 0;
+  const barHadFocus = useRef(false);
+  // When the bar unmounts while it held focus, focus would fall to <body>:
+  // put it back on the header checkbox instead.
+  useEffect(() => {
+    if (barVisible || !barHadFocus.current) return;
+    barHadFocus.current = false;
+    if (document.activeElement && document.activeElement !== document.body) return;
+    document.querySelector<HTMLElement>("[data-bulk-anchor]")?.focus();
+  }, [barVisible]);
+
   const value = useMemo(
     () => ({ selected, toggle, toggleAll, clear, isSelected }),
     [selected, toggle, toggleAll, clear, isSelected],
@@ -144,6 +179,8 @@ export function BulkSelectProvider({
   return (
     <BulkSelectContext.Provider value={value}>
       {children}
+      {/* Keeps the last rows and the pager clear of the fixed bar. */}
+      {barVisible ? <div aria-hidden className="h-24 touch:h-28" /> : null}
       {dialog}
 
       {error ? (
@@ -163,18 +200,25 @@ export function BulkSelectProvider({
         </div>
       ) : null}
 
-      {selected.size > 0 && actions.length > 0 ? (
+      {barVisible ? (
         <div className="pointer-events-none fixed inset-x-0 bottom-4 z-40 flex justify-center px-4">
           <div
+            onFocus={() => {
+              barHadFocus.current = true;
+            }}
+            onBlur={(e) => {
+              // A removed button reports a null relatedTarget; only a real move elsewhere counts.
+              if (e.relatedTarget instanceof Node && !e.currentTarget.contains(e.relatedTarget)) barHadFocus.current = false;
+            }}
             role="region"
             aria-label={`Actions for ${selected.size} selected ${noun}`}
-            className="apple-admin pointer-events-auto flex max-w-full flex-wrap items-center gap-1.5 rounded-apple-lg border border-ink-200 bg-card py-2 pr-2 pl-4 shadow-lg"
+            className="apple-admin pointer-events-auto flex max-w-full flex-wrap items-center gap-1.5 rounded-apple-lg border border-border bg-card py-2 pr-2 pl-4 shadow-lg"
           >
-            <p className="text-sm font-medium whitespace-nowrap text-ink-800">
+            <p className="text-sm font-medium whitespace-nowrap text-foreground">
               <span className="tabular-nums">{selected.size}</span> selected
             </p>
 
-            <span aria-hidden className="h-5 w-px bg-ink-200" />
+            <span aria-hidden className="h-5 w-px bg-border" />
 
             {actions.map((action) => {
               const Icon = action.icon ? ICONS[action.icon] : null;
@@ -185,10 +229,10 @@ export function BulkSelectProvider({
                   disabled={running !== null}
                   onClick={() => run(action)}
                   className={cn(
-                    "apple-spring inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-apple-sm px-2.5 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50",
+                    "apple-spring inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-apple-sm px-2.5 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50 touch:min-h-11 touch:min-w-11 touch:px-3",
                     action.tone === "danger"
                       ? "text-danger hover:bg-danger-soft"
-                      : "text-ink-700 hover:bg-ink-100",
+                      : "text-foreground hover:bg-muted",
                   )}
                 >
                   {Icon ? <Icon className="size-4" aria-hidden /> : null}
@@ -201,7 +245,7 @@ export function BulkSelectProvider({
               type="button"
               onClick={clear}
               aria-label="Clear selection"
-              className="apple-spring cursor-pointer rounded-apple-sm p-1.5 text-ink-600 hover:bg-ink-100 hover:text-ink-700"
+              className="apple-spring inline-flex cursor-pointer items-center justify-center rounded-apple-sm p-1.5 text-text-subtle hover:bg-muted hover:text-foreground touch:min-h-11 touch:min-w-11"
             >
               <X className="size-4" />
             </button>
@@ -232,13 +276,14 @@ export function SelectAllCheckbox({
     <Checkbox
       checked={allSelected ? true : onPage > 0 ? "indeterminate" : false}
       onCheckedChange={() => toggleAll(ids)}
+      data-bulk-anchor=""
       aria-label={`Select all ${ids.length} ${noun} on this page`}
     />
   );
 }
 
 /** Per-row checkbox. The only client component in the table body. */
-export function RowCheckbox({ id }: { id: string }) {
+export function RowCheckbox({ id, label }: { id: string; /** The row's name, so the box reads "Select Asha Rao" rather than "Select row". */ label?: string }) {
   const { isSelected, toggle } = useBulkSelect();
   const checked = isSelected(id);
 
@@ -246,7 +291,7 @@ export function RowCheckbox({ id }: { id: string }) {
     <Checkbox
       checked={checked}
       onCheckedChange={() => toggle(id)}
-      aria-label="Select row"
+      aria-label={label ? `Select ${label}` : "Select row"}
       className={cn(
         "transition-opacity",
         // Shown on hover with a mouse; always on touch, which has no hover (QA-146).

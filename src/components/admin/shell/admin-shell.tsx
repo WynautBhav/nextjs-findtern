@@ -15,6 +15,9 @@
  * - The rail's collapsed state lives in a cookie the server layout reads
  *   (`RAIL_COOKIE` from `@/lib/rail`: this file is "use client", and a server
  *   layout importing a constant from it would receive a client reference).
+ * - The rail is the live work queue: items carry a count (`badge`), and a
+ *   numeric one ticks to its new value through `Count` when the server layout
+ *   re-renders. A count that could not be read is simply not passed, never 0.
  * - Reduced motion: `MotionConfig` honours the OS setting for every JS
  *   animation in the console; the CSS switch in globals.css covers the rest.
  */
@@ -23,8 +26,9 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { LayoutGroup, MotionConfig, motion } from "motion/react";
-import { Bell, ChevronDown, ChevronsLeft, ChevronsRight, LogOut, Menu, X } from "lucide-react";
+import { ChevronDown, ChevronsLeft, ChevronsRight, LogOut, Menu, X } from "lucide-react";
 
+import { ADMIN_DUR, ADMIN_EASE, Count, seconds } from "@/components/admin/motion";
 import { FeedbackFab } from "@/components/app/feedback-fab";
 import { Logo, LogoMark } from "@/components/brand/logo";
 import { InternAvatar } from "@/components/intern/avatar";
@@ -46,8 +50,10 @@ export type AdminNavItem = {
   href: string;
   label: string;
   icon: React.ReactNode;
-  /** A count beside the label (unread messages). */
+  /** A count beside the label (unread messages, payouts due). A number ticks via `Count`; zero shows nothing. */
   badge?: number | string;
+  /** Said after the count to assistive tech ("due", "awaiting a score"): "Payouts 3 due". */
+  badgeNote?: string;
   /** A quiet dot: this needs someone, without turning it into a score. */
   attention?: boolean;
   /** Other paths this item stands for (one "Legal texts" item for four pages). */
@@ -58,16 +64,17 @@ export type AdminNavGroup = { title?: string; items: AdminNavItem[] };
 
 export type AdminMenuLink = { href: string; label: string; icon: React.ReactNode };
 
-/** Same spring the rest of the admin uses, so the highlight and the sheets agree. */
-const SLIDE = { duration: 0.18, ease: [0.22, 1, 0.36, 1] as const };
+/** The shared admin timing, so the highlight and the sheets agree. */
+const SLIDE = { duration: seconds(ADMIN_DUR.base), ease: ADMIN_EASE };
+
+/** A queue count reads "99+" past 99 so the pill never grows wide. */
+const formatBadge = (n: number) => (n > 99 ? "99+" : String(Math.round(n)));
 
 export function AdminShell({
-  roleLabel,
   homeHref,
   groups,
   account,
   menu = [],
-  alerts,
   topActions,
   signOutTo,
   initialCollapsed = false,
@@ -75,12 +82,10 @@ export function AdminShell({
   rootCrumb,
   children,
 }: {
-  roleLabel?: string;
   homeHref: string;
   groups: AdminNavGroup[];
   account: { name: string; email: string; subtitle?: string; photoUrl?: string | null };
   menu?: AdminMenuLink[];
-  alerts?: { href: string; count: number; label?: string };
   topActions?: React.ReactNode;
   signOutTo: string;
   initialCollapsed?: boolean;
@@ -122,6 +127,11 @@ export function AdminShell({
     "",
     {},
   ).filter((c) => c.href !== rootCrumb.href);
+  // A top-level page's H1 already says where you are, so the trail only appears on nested routes
+  // (a record, a legal text): /admin/companies has none, /admin/companies/<id> has "Workspace / Companies".
+  const nested = pathname.split("/").filter(Boolean).length > 2;
+  // Anything waiting in the rail, for the phone's menu button (the rail is behind it below lg).
+  const waiting = allItems.reduce((n, i) => n + (typeof i.badge === "number" ? i.badge : 0), 0);
 
   function toggleRail() {
     const next = !collapsed;
@@ -201,17 +211,14 @@ export function AdminShell({
         <aside
           aria-label="Sidebar"
           className={cn(
-            "sticky top-0 hidden h-[100dvh] shrink-0 flex-col border-r border-ink-200 bg-surface px-3 py-5 transition-[width] duration-200 ease-[cubic-bezier(.22,1,.36,1)] motion-reduce:transition-none lg:flex",
+            "sticky top-0 hidden h-[100dvh] shrink-0 flex-col border-r border-ink-200 bg-surface px-3 py-5 transition-[width] duration-[var(--duration-admin-slow)] ease-[var(--ease-out-soft)] motion-reduce:transition-none lg:flex",
             collapsed ? "w-[4.75rem]" : "w-64",
           )}
         >
-          <div className={cn("flex min-h-12 items-center", collapsed ? "justify-center" : "justify-between gap-2 px-2")}>
+          <div className={cn("flex min-h-12 items-center", collapsed ? "justify-center" : "gap-2 px-2")}>
             <Link href={homeHref} aria-label="Findtern home" className="flex min-w-0 items-center">
               {collapsed ? <LogoMark variant="white" alt="" className="size-7" /> : <Logo variant="white" priority className="h-9" />}
             </Link>
-            {!collapsed && roleLabel ? (
-              <span className="shrink-0 rounded-full border border-ink-300 px-2 py-0.5 text-xs font-medium text-ink-600">{roleLabel}</span>
-            ) : null}
           </div>
           <div className="flex min-h-0 flex-1 flex-col">{rail(collapsed, "desk")}</div>
           <button
@@ -231,8 +238,13 @@ export function AdminShell({
             <div className="flex h-14 items-center gap-2 px-[clamp(1rem,3vw,2rem)]">
               <Sheet open={drawer} onOpenChange={setDrawer}>
                 <SheetTrigger asChild>
-                  <button type="button" aria-label="Open navigation" className="apple-spring -ml-2 grid size-11 place-items-center rounded-apple-sm text-ink-700 hover:bg-ink-100 lg:hidden">
+                  <button
+                    type="button"
+                    aria-label={waiting > 0 ? `Open navigation, ${waiting} waiting` : "Open navigation"}
+                    className="apple-spring relative -ml-2 grid size-11 place-items-center rounded-apple-sm text-ink-700 hover:bg-ink-100 lg:hidden"
+                  >
                     <Menu className="size-5" aria-hidden />
+                    {waiting > 0 ? <span aria-hidden className="absolute right-2.5 top-2.5 size-2 rounded-full bg-accent-400 ring-2 ring-surface" /> : null}
                   </button>
                 </SheetTrigger>
                 <SheetContent side="left" showCloseButton={false} aria-modal="true" className="flex w-[19rem] flex-col border-r border-ink-200 bg-surface p-4 text-foreground">
@@ -250,41 +262,33 @@ export function AdminShell({
                 <Logo variant="white" priority className="h-8" />
               </Link>
 
-              {/* Desktop: where you are */}
-              <nav aria-label="Breadcrumb" className="hidden min-w-0 flex-1 items-center gap-2 text-sm lg:flex">
-                <Link href={rootCrumb.href} className="apple-spring shrink-0 font-medium text-ink-600 hover:text-ink-900">
-                  {rootCrumb.label}
-                </Link>
-                {crumbs.map((crumb, index) => (
-                  <span key={crumb.href} className="flex min-w-0 items-center gap-2">
-                    <span aria-hidden className="text-ink-400">/</span>
-                    {index === crumbs.length - 1 ? (
-                      <span aria-current="page" className="truncate font-semibold text-ink-900">{crumb.label}</span>
-                    ) : crumb.link ? (
-                      <Link href={crumb.href} className="apple-spring truncate font-medium text-ink-600 hover:text-ink-900">{crumb.label}</Link>
-                    ) : (
-                      <span className="truncate font-medium text-ink-600">{crumb.label}</span>
-                    )}
-                  </span>
-                ))}
-              </nav>
+              {/* Desktop, nested routes only: the way back up. A list page's H1 already says where you are. */}
+              {nested ? (
+                <nav aria-label="Breadcrumb" className="hidden min-w-0 items-center gap-2 text-sm lg:flex">
+                  <Link href={rootCrumb.href} className="apple-spring shrink-0 font-medium text-ink-600 hover:text-ink-900">
+                    {rootCrumb.label}
+                  </Link>
+                  {crumbs.map((crumb) => {
+                    // The page itself, not just the last label: a record's parent list stays a link.
+                    const here = crumb.href === pathname;
+                    return (
+                      <span key={crumb.href} className="flex min-w-0 items-center gap-2">
+                        <span aria-hidden className="text-ink-400">/</span>
+                        {here ? (
+                          <span aria-current="page" className="truncate font-semibold text-ink-900">{crumb.label}</span>
+                        ) : crumb.link ? (
+                          <Link href={crumb.href} className="apple-spring truncate font-medium text-ink-600 hover:text-ink-900">{crumb.label}</Link>
+                        ) : (
+                          <span className="truncate font-medium text-ink-600">{crumb.label}</span>
+                        )}
+                      </span>
+                    );
+                  })}
+                </nav>
+              ) : null}
 
               <div className="ml-auto flex shrink-0 items-center gap-2">
                 {topActions}
-                {alerts ? (
-                  <Link
-                    href={alerts.href}
-                    aria-label={alerts.count > 0 ? `${alerts.label ?? "Notifications"}, ${alerts.count} unread` : alerts.label ?? "Notifications"}
-                    className="apple-spring relative grid size-11 place-items-center rounded-apple-sm text-ink-600 hover:bg-ink-100 hover:text-ink-900"
-                  >
-                    <Bell className="size-5" aria-hidden />
-                    {alerts.count > 0 ? (
-                      <span className="nums absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-accent-500 px-1 text-2xs font-semibold text-brand-950 ring-2 ring-surface">
-                        {alerts.count > 99 ? "99+" : alerts.count}
-                      </span>
-                    ) : null}
-                  </Link>
-                ) : null}
                 <AccountMenu account={account} menu={menu} onSignOut={signOut} />
               </div>
             </div>
@@ -372,8 +376,17 @@ function RailLink({ item, active, compact, onNavigate }: { item: AdminNavItem; a
         ) : null}
       </span>
       <span className={cn("relative min-w-0 flex-1 truncate", compact && "sr-only")}>{item.label}</span>
+      {compact && item.badge ? (
+        <span className="sr-only">
+          {typeof item.badge === "number" ? formatBadge(item.badge) : item.badge}
+          {item.badgeNote ? ` ${item.badgeNote}` : ""}
+        </span>
+      ) : null}
       {!compact && item.badge ? (
-        <span className="nums relative rounded-full bg-ink-200 px-2 py-0.5 text-2xs font-semibold text-ink-900">{item.badge}</span>
+        <span className="nums relative rounded-full bg-ink-200 px-2 py-0.5 text-2xs font-semibold text-ink-900">
+          {typeof item.badge === "number" ? <Count value={item.badge} format={formatBadge} /> : item.badge}
+          {item.badgeNote ? <span className="sr-only"> {item.badgeNote}</span> : null}
+        </span>
       ) : !compact && item.attention ? (
         <span className="relative size-1.5 shrink-0 rounded-full bg-accent-400">
           <span className="sr-only">Needs you</span>

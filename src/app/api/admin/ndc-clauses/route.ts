@@ -6,6 +6,7 @@ import { z } from "zod";
 import { getSession } from "@/lib/auth";
 import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
+import { sanitizeRichText } from "@/lib/richtext";
 
 const bodySchema = z.object({
   title: z.string().min(1),
@@ -32,8 +33,11 @@ export async function POST(req: Request) {
   const parsed = bodySchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Invalid input" }, { status: 400 });
 
+  const bodyHtml = sanitizeRichText(parsed.data.bodyHtml);
+  if (!bodyHtml.replace(/<[^>]*>/g, "").trim()) return NextResponse.json({ error: "Clause text is required" }, { status: 400 });
+
   const db = getDb();
-  const [clause] = await db.insert(schema.internNonDisclosureClauses).values(parsed.data).returning();
+  const [clause] = await db.insert(schema.internNonDisclosureClauses).values({ ...parsed.data, bodyHtml }).returning();
   revalidatePath("/", "layout"); // the public NDA page reads these
   return NextResponse.json({ clause }, { status: 201 });
 }

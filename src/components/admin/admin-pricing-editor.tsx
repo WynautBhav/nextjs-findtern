@@ -14,6 +14,7 @@ import { formatMoney } from "@/lib/format";
 import type { CmsPlanFeature } from "@/lib/content/types";
 import { cn } from "@/lib/utils";
 import { FilterTabs } from "@/components/app/primitives";
+import { useConfirm } from "@/components/app/use-confirm";
 
 /**
  * Rate card editor. Admins type rupees; the API stores paise. USD is never
@@ -40,6 +41,15 @@ const inputClass =
 
 const toRupees = (minor: number | null) => (minor == null ? "" : String(minor / 100));
 const toMinor = (rupees: string) => Math.round(Number(rupees || 0) * 100);
+/** Paise for a typed rupee amount; null when it is blank, not a number, or beyond what the API stores. */
+function parseRupees(raw: string): number | null {
+  const t = raw.trim();
+  if (!/^(\d+\.?\d*|\.\d+)$/.test(t)) return null;
+  const minor = Math.round(Number(t) * 100);
+  return Number.isFinite(minor) && minor <= 100_000_000 ? minor : null;
+}
+const PRICE_ERROR = "Enter a price in rupees, like 450 or 99.50.";
+
 const toMinorOrNull = (rupees: string) => (rupees.trim() === "" ? null : toMinor(rupees));
 
 export function AdminPricingEditor({
@@ -112,27 +122,46 @@ export function AdminPricingEditor({
 
 function ActivationFeePanel({ initialMinor }: { initialMinor: number }) {
   const router = useRouter();
+  const { ask, dialog } = useConfirm();
   const [rupees, setRupees] = useState(toRupees(initialMinor));
   const [state, setState] = useState<"idle" | "saving" | "saved">("idle");
   const [error, setError] = useState<string | null>(null);
 
-  async function save() {
-    setState("saving");
-    setError(null);
-    const res = await csrfFetch("/api/admin/pricing", {
-      method: "PUT",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ internActivationFeeMinor: toMinor(rupees) }),
-    });
-    if (!res.ok) {
-      const body = await res.json().catch(() => ({}));
-      setError(body.error ?? "Could not save.");
-      setState("idle");
+  async function save(e: React.FormEvent) {
+    e.preventDefault();
+    const fee = parseRupees(rupees);
+    if (fee === null || fee <= 0) {
+      setError(fee === 0 ? "The fee must be above zero." : PRICE_ERROR);
+      document.getElementById("activation-fee")?.focus();
       return;
     }
-    setState("saved");
-    router.refresh();
-    setTimeout(() => setState("idle"), 2500);
+    const ok = await ask({
+      title: "Publish this activation fee?",
+      body: `New candidates are charged ${formatMoney(fee, "INR")} (GST-inclusive) from now on.`,
+      confirmLabel: "Yes, publish",
+    });
+    if (!ok) return;
+    setState("saving");
+    setError(null);
+    try {
+      const res = await csrfFetch("/api/admin/pricing", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ internActivationFeeMinor: fee }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        setError(body.error ?? "Could not save.");
+        setState("idle");
+        return;
+      }
+      setState("saved");
+      router.refresh();
+      setTimeout(() => setState("idle"), 2500);
+    } catch {
+      setError("Not saved: the network request failed.");
+      setState("idle");
+    }
   }
 
   return (
@@ -142,27 +171,33 @@ function ActivationFeePanel({ initialMinor }: { initialMinor: number }) {
         description="Charged once to a candidate for the AI interview and onboarding. GST-inclusive. Promo codes apply on top."
         icon={IndianRupee}
       />
-      <div className="flex flex-wrap items-end gap-3 px-5 py-4">
+      {dialog}
+      <form onSubmit={save} noValidate className="flex flex-wrap items-end gap-3 px-5 py-4">
         <label className="block w-48 text-sm font-medium text-ink-800">
           Fee (₹)
           <input
+            id="activation-fee"
             inputMode="decimal"
             value={rupees}
-            onChange={(e) => setRupees(e.target.value.replace(/[^\d.]/g, ""))}
+            onChange={(e) => {
+              setRupees(e.target.value.replace(/[^\d.]/g, ""));
+              setError(null);
+            }}
             aria-invalid={error ? true : undefined}
             aria-describedby={error ? "activation-fee-error" : undefined}
             className={inputClass}
           />
         </label>
-        <SaveButton state={state} onClick={save} />
+        <SaveButton state={state} />
         {error ? <p id="activation-fee-error" role="alert" className="w-full text-sm text-danger">{error}</p> : null}
-      </div>
+      </form>
     </Panel>
   );
 }
 
 function PlanEditor({ plan }: { plan: EditablePlan }) {
   const router = useRouter();
+  const { ask, dialog } = useConfirm();
   const [name, setName] = useState(plan.displayName);
   const [hourly, setHourly] = useState(toRupees(plan.priceHourlyMinor));
   const [hourlyWas, setHourlyWas] = useState(toRupees(plan.compareAtHourlyMinor));
@@ -175,39 +210,72 @@ function PlanEditor({ plan }: { plan: EditablePlan }) {
   const [active, setActive] = useState(plan.isActive);
   const [state, setState] = useState<"idle" | "saving" | "saved">("idle");
   const [error, setError] = useState<string | null>(null);
+  /** The price field (its id) the error is about, so it is marked invalid and focused. */
+  const [badField, setBadField] = useState<string | null>(null);
+  const fid = (k: string) => `${plan.id}-${k}`;
 
   const hourlySave = savingsPercent(toMinor(hourly), toMinorOrNull(hourlyWas));
   const perHireSave = savingsPercent(toMinor(perHire), toMinorOrNull(perHireWas));
 
-  async function save() {
+  async function save(e: React.FormEvent) {
+    e.preventDefault();
+    // A blank or garbled price must never be coerced to ₹0 and published.
+    const checks: [string, string, boolean][] = [
+      ["hourly", hourly, true],
+      ["perHire", perHire, true],
+      ["hourlyWas", hourlyWas, false],
+      ["perHireWas", perHireWas, false],
+    ];
+    for (const [key, raw, required] of checks) {
+      if ((required || raw.trim() !== "") && parseRupees(raw) === null) {
+        setBadField(fid(key));
+        setError(PRICE_ERROR);
+        document.getElementById(fid(key))?.focus();
+        return;
+      }
+    }
+    const hourlyMinor = parseRupees(hourly)!;
+    const perHireMinor = parseRupees(perHire)!;
+    const ok = await ask({
+      title: `Publish new prices for ${name.trim() || plan.displayName}?`,
+      body: `${formatMoney(hourlyMinor, "INR")} per hour and ${formatMoney(perHireMinor, "INR")} per hire${active ? "" : " (the plan is switched off)"}. The public pricing page updates straight away.`,
+      confirmLabel: "Yes, publish",
+    });
+    if (!ok) return;
     setState("saving");
     setError(null);
-    const res = await csrfFetch("/api/admin/pricing", {
-      method: "PATCH",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        id: plan.id,
-        displayName: name,
-        priceHourlyMinor: toMinor(hourly),
-        compareAtHourlyMinor: toMinorOrNull(hourlyWas),
-        perHireChargeMinor: toMinor(perHire),
-        compareAtPerHireMinor: toMinorOrNull(perHireWas),
-        internshipDuration: duration,
-        features,
-        featureList: featureList.filter((f) => f.label.trim()),
-        isFeatured: featured,
-        isActive: active,
-      }),
-    });
-    if (!res.ok) {
-      const body = await res.json().catch(() => ({}));
-      setError(body.error ?? "Could not save.");
+    setBadField(null);
+    try {
+      const res = await csrfFetch("/api/admin/pricing", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          id: plan.id,
+          displayName: name,
+          priceHourlyMinor: hourlyMinor,
+          compareAtHourlyMinor: parseRupees(hourlyWas),
+          perHireChargeMinor: perHireMinor,
+          compareAtPerHireMinor: parseRupees(perHireWas),
+          internshipDuration: duration,
+          features,
+          featureList: featureList.filter((f) => f.label.trim()),
+          isFeatured: featured,
+          isActive: active,
+        }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        setError(body.error ?? "Could not save.");
+        setState("idle");
+        return;
+      }
+      setState("saved");
+      router.refresh();
+      setTimeout(() => setState("idle"), 2500);
+    } catch {
+      setError("Not saved: the network request failed.");
       setState("idle");
-      return;
     }
-    setState("saved");
-    router.refresh();
-    setTimeout(() => setState("idle"), 2500);
   }
 
   return (
@@ -222,7 +290,8 @@ function PlanEditor({ plan }: { plan: EditablePlan }) {
           </label>
         }
       />
-      <div className="space-y-4 px-5 py-4">
+      {dialog}
+      <form onSubmit={save} noValidate className="space-y-4 px-5 py-4">
         {plan.isActive && !active && isLegacyTier(plan.features[1]) ? (
           <Warning>
             Switching this plan off also removes the {describeLegacyBand(plan.features[1])} price on the legacy site
@@ -238,17 +307,35 @@ function PlanEditor({ plan }: { plan: EditablePlan }) {
           label="Hourly rate (₹/hr)"
           now={hourly}
           was={hourlyWas}
-          onNow={setHourly}
-          onWas={setHourlyWas}
+          onNow={(v) => {
+            setHourly(v);
+            setBadField(null);
+          }}
+          onWas={(v) => {
+            setHourlyWas(v);
+            setBadField(null);
+          }}
           save={hourlySave}
+          ids={[fid("hourly"), fid("hourlyWas")]}
+          badId={badField}
+          errorId={fid("error")}
         />
         <PriceRow
           label="Per-hire charge (₹)"
           now={perHire}
           was={perHireWas}
-          onNow={setPerHire}
-          onWas={setPerHireWas}
+          onNow={(v) => {
+            setPerHire(v);
+            setBadField(null);
+          }}
+          onWas={(v) => {
+            setPerHireWas(v);
+            setBadField(null);
+          }}
           save={perHireSave}
+          ids={[fid("perHire"), fid("perHireWas")]}
+          badId={badField}
+          errorId={fid("error")}
         />
 
         <label className="block text-sm font-medium text-ink-800">
@@ -328,10 +415,10 @@ function PlanEditor({ plan }: { plan: EditablePlan }) {
             USD: {formatMoney(inrMinorToUsdMinor(toMinor(hourly)), "USD")}/hr ·{" "}
             {formatMoney(inrMinorToUsdMinor(toMinor(perHire)), "USD")} per hire
           </p>
-          <SaveButton state={state} onClick={save} />
+          <SaveButton state={state} />
         </div>
-        {error ? <p role="alert" className="text-sm text-danger">{error}</p> : null}
-      </div>
+        {error ? <p id={fid("error")} role="alert" className="text-sm text-danger">{error}</p> : null}
+      </form>
     </Panel>
   );
 }
@@ -343,6 +430,9 @@ function PriceRow({
   onNow,
   onWas,
   save,
+  ids,
+  badId,
+  errorId,
 }: {
   label: string;
   now: string;
@@ -350,17 +440,25 @@ function PriceRow({
   onNow: (v: string) => void;
   onWas: (v: string) => void;
   save: number | null;
+  /** DOM ids of the "now" and "was" inputs. */
+  ids: [string, string];
+  /** The id of the input the current error is about, if it is one of these. */
+  badId: string | null;
+  errorId: string;
 }) {
+  const bad = (id: string) => (badId === id ? ({ "aria-invalid": true, "aria-describedby": errorId } as const) : {});
   const clean = (v: string) => v.replace(/[^\d.]/g, "");
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
       <label className="block text-sm font-medium text-ink-800">
         {label}
-        <input inputMode="decimal" value={now} onChange={(e) => onNow(clean(e.target.value))} className={inputClass} />
+        <input id={ids[0]} {...bad(ids[0])} inputMode="decimal" value={now} onChange={(e) => onNow(clean(e.target.value))} className={inputClass} />
       </label>
       <label className="block text-sm font-medium text-ink-800">
         Struck-through &ldquo;was&rdquo;
         <input
+          id={ids[1]}
+          {...bad(ids[1])}
           inputMode="decimal"
           value={was}
           placeholder="none"
@@ -375,11 +473,10 @@ function PriceRow({
   );
 }
 
-function SaveButton({ state, onClick }: { state: "idle" | "saving" | "saved"; onClick: () => void }) {
+function SaveButton({ state }: { state: "idle" | "saving" | "saved" }) {
   return (
     <button
-      type="button"
-      onClick={onClick}
+      type="submit"
       disabled={state === "saving"}
       className={buttonClass({ variant: "primary", size: "sm" })}
     >

@@ -12,6 +12,17 @@ export const AUTO_NOTIFICATION_TYPES = [
   "intern_onboarding_reminder",
 ];
 
+/**
+ * A notification link is a page on this site. The first character after "/"
+ * must be a letter or digit, which rejects "//host" and "/\host" (both read
+ * as another origin by browsers) and "/" followed by whitespace or controls.
+ * Shared by the composer and the API route so they cannot disagree.
+ */
+export const NOTIFICATION_LINK_RULE = "The link must be a path on this site, like /intern/proposals.";
+export function isSafeNotificationLink(link: unknown): link is string {
+  return typeof link === "string" && /^\/[A-Za-z0-9][^\s\\]*$/.test(link);
+}
+
 /** One side of a send: everyone active, or a picked list of ids. */
 export type AudienceSide = { all: boolean; ids: string[] };
 

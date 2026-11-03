@@ -2,14 +2,13 @@ import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
 
 import { Count } from "@/components/admin/motion";
-import { ADMIN_SURFACE } from "@/components/admin/surface";
 import { cn } from "@/lib/utils";
 
 export type StatTone = "brand" | "accent" | "info" | "success" | "warning" | "neutral";
 
 /**
- * A figure in a summary row: a `Surface` tile (the intern dashboard's
- * look), alone or inside `StatGrid`. The tone
+ * A figure in a summary row: a flat tile with a 1px rule (no shadow, no
+ * ground of its own), alone or inside `StatGrid`. The tone
  * marks a figure that needs someone (warning) with a dot by its label;
  * `icon` is accepted for old callers and not drawn (decorative chips were
  * the loudest thing on 13 screens).
@@ -55,10 +54,10 @@ export function StatCard({
   /** Tween a numeric `value` from its previous figure (ignored for strings). */
   animate?: boolean;
 }) {
-  const valueClass = "nums text-2xl font-semibold leading-tight tracking-[-0.02em] text-ink-900";
+  const valueClass = "nums text-2xl font-semibold leading-tight tracking-[-0.02em] text-foreground";
   const body = (
     <>
-      <p className="flex items-center gap-2 text-sm font-medium text-ink-600">
+      <p className="flex items-center gap-2 text-sm font-medium text-text-subtle">
         {DOT[tone] ? <span aria-hidden className={cn("size-1.5 shrink-0 rounded-full", DOT[tone])} /> : null}
         {label}
       </p>
@@ -70,14 +69,13 @@ export function StatCard({
         )}
         {delta ? <span className={cn("nums text-sm font-semibold", deltaTone(delta))}>{delta}</span> : null}
       </div>
-      {hint ? <p className="mt-1 text-sm text-ink-600">{hint}</p> : null}
+      {hint ? <p className="mt-1 text-sm text-text-subtle">{hint}</p> : null}
     </>
   );
 
   const className = cn(
-    "block min-w-0 px-5 py-4 shadow-xs",
-    ADMIN_SURFACE,
-    href && "apple-spring hover:bg-ink-50 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand-600",
+    "block min-w-0 border border-border px-5 py-4",
+    href && "apple-spring hover:bg-surface focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring",
   );
 
   if (href) {
@@ -131,8 +129,7 @@ export function StatGrid({
         role="region"
         aria-label={label}
         className={cn(
-          "flex overflow-x-auto divide-x divide-ink-200 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand-600",
-          ADMIN_SURFACE,
+          "flex overflow-x-auto divide-x divide-border border border-border focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring",
           "[&>*]:min-w-40 [&>*]:flex-1 [&>*]:shrink-0 [&>*]:rounded-none [&>*]:border-0 [&>*]:shadow-none",
           className,
         )}
@@ -147,7 +144,7 @@ export function StatGrid({
         "grid",
         variant === "tiles"
           ? "gap-4"
-          : "gap-px overflow-hidden rounded-apple-lg border border-ink-200/80 bg-ink-200/70 shadow-xs [&>*]:rounded-none [&>*]:border-0 [&>*]:shadow-none",
+          : "gap-px overflow-hidden border border-border bg-border [&>*]:rounded-none [&>*]:border-0 [&>*]:bg-background [&>*]:shadow-none",
         cols === 3 && "grid-cols-1 sm:grid-cols-3",
         cols === 4 && "grid-cols-2 xl:grid-cols-4",
         cols === 6 && "grid-cols-2 sm:grid-cols-3 xl:grid-cols-6",

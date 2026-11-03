@@ -526,6 +526,54 @@
     }
   }
 
+  /* A fill that grows from a fixed edge (components/admin/motion/reveal.tsx).
+     The keyframe names only the starting scale; the end is the element's own
+     transform, so the final value is in the server HTML. Transform only.
+     Delay: 40ms a step, 8 steps at most. */
+  @keyframes admin-reveal-x {
+    from {
+      transform: scaleX(0);
+    }
+  }
+  @keyframes admin-reveal-y {
+    from {
+      transform: scaleY(0);
+    }
+  }
+  /* The reduced-motion alternative: no travel, a short fade (also Count's change cue). */
+  @keyframes admin-fade {
+    from {
+      opacity: 0;
+    }
+  }
+  .admin-reveal {
+    animation-duration: var(--duration-admin-slow);
+    animation-timing-function: var(--ease-out-soft);
+    animation-fill-mode: backwards;
+    animation-delay: calc(min(var(--i, 0), 8) * 40ms);
+  }
+  .admin-reveal[data-axis="x"] {
+    transform-origin: left center;
+    animation-name: admin-reveal-x;
+  }
+  .admin-reveal[data-axis="y"] {
+    transform-origin: center bottom;
+    animation-name: admin-reveal-y;
+  }
+  .admin-fade {
+    animation: admin-fade var(--duration-admin-fast) ease-out;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    /* Lands on the final state at once, with at most a 120ms opacity change. The
+       global 0.01ms switch further down skips these classes so this fade is the cue. */
+    .admin-reveal[data-axis] {
+      animation-name: admin-fade;
+      animation-duration: var(--duration-admin-fast);
+      animation-timing-function: ease-out;
+      animation-delay: 0ms;
+    }
+  }
+
   /* The admin console is dark on screen; paper is white. Restores the light
      values of every token the `.dark` and admin blocks above change (it comes
      later in the file, so it wins at equal specificity), so bars, badges and
@@ -1020,7 +1068,9 @@ body:has([data-slot="dialog-content"][data-state="open"], [data-slot="sheet-cont
     scroll-behavior: auto;
   }
 
-  *,
+  /* The admin motion kit (.admin-reveal, .admin-fade) is excluded: each piece
+     defines its own reduced path (a 120ms opacity fade at most). */
+  *:not(.admin-reveal, .admin-fade),
   *::before,
   *::after {
     animation-duration: 0.01ms !important;
@@ -1509,18 +1559,48 @@ body:has([data-slot="dialog-content"][data-state="open"], [data-slot="sheet-cont
   }
 }
 
-/* ── Admin overrides for components shared with the other consoles ───────────
+/* ── Admin compatibility shim for components shared with the other consoles ──
    `pillTabClass`, `StatTile`/`Tile`, `EmptyScene`, the feedback dialog and the
    outline button live in files intern and employer also use, and they assume a
    light ground. The admin does not edit them; it re-points the few utilities
    they rely on, here, scoped to the admin attribute (AdminShell puts it on its
    root and on <html>, so portalled dialogs are covered). Unlayered on purpose:
-   unlayered rules beat the utilities layer whatever the specificity. */
+   unlayered rules beat the utilities layer whatever the specificity.
+
+   This is a shim for pages not yet redesigned. New admin work must not depend
+   on it (use semantic tokens: bg-card, text-foreground, text-primary-on...).
+   Delete each rule when its last caller below is gone. Callers, as of 3 Nov:
+
+   .bg-brand-700 / .hover:bg-brand-800  components/app/primitives.tsx:359 (pillTabClass,
+                                        every admin FilterTabs and legal tab), thread.tsx:58
+                                        and tiles.tsx:216/229/275 (dots, legend, avatar fills)
+   .text-white/75                       intern-360-view.tsx:258, company-360-view.tsx:164,
+                                        app/primitives.tsx:399 (the count on an active tab),
+                                        tiles.tsx:135 (the featured tile's note)
+   [role=textbox][contenteditable]      admin/rich-text-field.tsx:339 (the visual editor)
+   .text-primary                        ui/button.tsx outline/ghost/link variants, timesheet-grid.tsx:229
+   .bg-white, /60, /70                  ui/button.tsx:36 (outline), app/feedback-fab.tsx:117/167/187,
+                                        app/notification-list.tsx:122, app/thread.tsx:229
+   text-field edge                      every input, select and textarea (not a shim: a permanent
+                                        admin rule, 1.4.11)
+   featured tile gradient               app/tiles.tsx:112 via admin/dashboard/page.tsx (until the
+                                        dashboard stops using StatTile) */
 [data-console="admin"] .bg-brand-700 {
   background-color: var(--color-primary);
 }
 [data-console="admin"] .hover\:bg-brand-800:hover {
   background-color: var(--color-primary-hover);
+}
+/* The count on an active pill tab: white at 75% on the green fill is 3.4:1; solid white is 5:1. */
+[data-console="admin"] .text-white\/75 {
+  color: #fff;
+}
+/* The visual editor shows the page as the public sees it, on paper. Pasted legal text carries its own
+   inline colour (#000), which is unreadable on the dark ground. */
+[data-console="admin"] [role="textbox"][contenteditable] {
+  background-color: #fff;
+  color: #0f1a17;
+  color-scheme: light;
 }
 /* The outline button's text: #2a8068 is 3.5:1 on the dark card; the lifted ramp is 8:1. */
 [data-console="admin"] .text-primary {
@@ -1531,7 +1611,33 @@ body:has([data-slot="dialog-content"][data-state="open"], [data-slot="sheet-cont
 [data-console="admin"] .bg-white\/70 {
   background-color: var(--color-card);
 }
+/* The featured dashboard tile (components/app/tiles.tsx:112) is brand-600 > brand-800 > brand-950
+   with white text. Under admin the lifted ramp makes the first two stops #5fae96 and #9bd3bf, which
+   puts white at 2.63:1 and 1.68:1. Pin the stops to the filled-button pair, #2a8068 > #23705a: solid
+   white is 4.79:1 and 5.94:1. The tile's 85% label and 70% unit would fall to 3.9:1 and below, so they
+   go solid white too (tiles.tsx:117, :132; the 75% note is the .text-white/75 rule above). Matches the
+   gradient class by its text because that file is not edited here. */
+[data-console="admin"] [class*="bg-[linear-gradient(140deg,var(--color-brand-600)"] {
+  background-image: linear-gradient(140deg, var(--color-primary) 0%, var(--color-primary-hover) 100%);
+}
+[data-console="admin"] .text-white\/85,
+[data-console="admin"] .text-white\/70 {
+  color: #fff;
+}
+
+/* ── Admin permanent rules (not shims) ─────────────────────────────────────── */
 /* WCAG 1.4.11: a text field's edge needs 3:1; ink-200 on the card is 1.2:1. */
 [data-console="admin"] :is(input, select, textarea):not([type="checkbox"], [type="radio"], [type="range"], [type="file"], [type="color"], [aria-invalid="true"]):not(:focus-visible) {
   border-color: var(--color-ink-400);
+}
+/* A checkbox's edge, same rule: --color-input (#1e2b26) is 1.4:1 on the card; ink-400 is 3.8:1.
+   A checked or mixed box keeps its primary edge. */
+[data-console="admin"] [data-slot="checkbox"]:not([data-state="checked"], [data-state="indeterminate"], [aria-invalid="true"], :focus-visible) {
+  border-color: var(--color-ink-400);
+}
+/* One focus ring for the whole console: --color-ring (#7cc4ab, 8.3:1 on the card). The global ring
+   uses --color-primary (3.5:1) and a few components pick brand-600 or ring themselves; unlayered, this
+   wins over all three. Width and offset stay as each element sets them (the global 2px / 3px). */
+[data-console="admin"] :focus-visible {
+  outline-color: var(--color-ring);
 }

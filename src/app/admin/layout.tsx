@@ -32,6 +32,8 @@ import { RAIL_COOKIE } from "@/lib/rail";
 import { allows, requiredPermissions } from "@/lib/admin/permissions";
 import { getSession } from "@/lib/auth";
 import { getDb, schema } from "@/lib/db";
+import { badgeFor, settleCount } from "@/lib/admin/queue-badge";
+import { loadQueueCounts } from "@/lib/admin/queue-counts";
 
 /**
  * The admin console is per-request (session-gated, live counts) and must
@@ -121,34 +123,63 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     items: g.items.filter((i) => allows(session.permissions, requiredPermissions(i.href))),
   })).filter((g) => g.items.length > 0);
 
-  let unreadMessages = 0;
-  let unreadUnavailable = false;
-  try {
-    const db = getDb();
-    const [unread] = await db
-      .select({ value: count() })
-      .from(schema.contactMessages)
-      .where(eq(schema.contactMessages.isRead, false));
-    unreadMessages = Number(unread?.value ?? 0);
-  } catch {
-    // A failed count is not "zero unread": the bell says the count is unavailable.
-    unreadUnavailable = true;
-  }
+  const db = (() => {
+    try {
+      return getDb();
+    } catch {
+      return null;
+    }
+  })();
+  const hasItem = (href: string) => groups.some((g) => g.items.some((i) => i.href === href));
 
+  // Every figure is read independently: a failed one is `null` and shows nothing, never 0.
+  const [unreadMessages, adminName, queue] = await Promise.all([
+    hasItem("/admin/messages") && db
+      ? settleCount(async () => {
+          const [unread] = await db.select({ value: count() }).from(schema.contactMessages).where(eq(schema.contactMessages.isRead, false));
+          return unread?.value ?? 0;
+        })
+      : null,
+    // The name on the account menu is `admins.name`; the email's local part is the fallback.
+    db && session.uid
+      ? db
+          .select({ name: schema.admins.name })
+          .from(schema.admins)
+          .where(eq(schema.admins.id, session.uid))
+          .limit(1)
+          .then((rows) => rows[0]?.name?.trim() || null)
+          .catch(() => null)
+      : null,
+    loadQueueCounts({
+      payouts: hasItem("/admin/payouts"),
+      candidates: hasItem("/admin/interns"),
+      pipeline: hasItem("/admin/proposal-tracker"),
+    }),
+  ]);
+
+  // The rail is the live queue: the badge on each item is the number the dashboard's "Needs you" list
+  // counts for it. One indicator per number, so the top bar carries no second copy.
+  const BADGES: Record<string, { count: number | null; note: string }> = {
+    "/admin/messages": { count: unreadMessages, note: "unread" },
+    "/admin/payouts": { count: queue.payouts, note: "due" },
+    "/admin/interns": { count: queue.candidates, note: "awaiting a score" },
+    "/admin/proposal-tracker": { count: queue.pipeline, note: "need action" },
+  };
   const withBadges = groups.map((g) => ({
     ...g,
-    items: g.items.map((i) => (i.href === "/admin/messages" && unreadMessages > 0 ? { ...i, badge: unreadMessages > 99 ? "99+" : unreadMessages } : i)),
+    items: g.items.map((i) => {
+      const badge = badgeFor(BADGES[i.href]?.count);
+      return badge ? { ...i, badge, badgeNote: BADGES[i.href].note } : i;
+    }),
   }));
 
   return (
     <AdminShell
-      roleLabel="Admin"
       homeHref="/admin/dashboard"
       groups={withBadges}
-      account={{ name: session.email.split("@")[0], email: session.email, subtitle: roleName(session.permissions) }}
+      account={{ name: adminName ?? session.email.split("@")[0], email: session.email, subtitle: roleName(session.permissions) }}
       menu={[{ href: "/admin/account", label: "Your account", icon: <CircleUserRound /> }]}
       topActions={<CommandPalette items={groups.flatMap((g) => g.items.map((i) => ({ href: i.href, label: i.label, group: g.title ?? "" })))} />}
-      alerts={{ href: "/admin/messages", count: unreadMessages, label: unreadUnavailable ? "Inbound messages, count unavailable" : "Inbound messages" }}
       signOutTo="/admin/login"
       initialCollapsed={(await cookies()).get(RAIL_COOKIE)?.value === "1"}
       crumbLabels={NAV_LABELS}

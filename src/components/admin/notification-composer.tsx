@@ -13,7 +13,9 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Search, Send } from "lucide-react";
 
+import { useConfirm } from "@/components/app/use-confirm";
 import { buttonClass } from "@/components/ui/button";
+import { NOTIFICATION_LINK_RULE, isSafeNotificationLink } from "@/lib/admin/notification-types";
 import { csrfFetch } from "@/lib/client-fetch";
 import { cn } from "@/lib/utils";
 
@@ -37,6 +39,7 @@ export function NotificationComposer({
   query?: string;
 }) {
   const router = useRouter();
+  const { ask, dialog } = useConfirm();
   const [audience, setAudience] = useState<"intern" | "employer" | "both">("intern");
   const [viewing, setViewing] = useState<Side>("intern");
   const [query, setQuery] = useState(serverQuery);
@@ -130,12 +133,22 @@ export function NotificationComposer({
       }
     }
     if (link.trim()) {
-      if (!link.trim().startsWith("/") || link.trim().startsWith("//")) {
-        fail("The link must be a path on this site, starting with / (for example /intern/proposals).", "notif-link");
+      if (!isSafeNotificationLink(link.trim())) {
+        fail(NOTIFICATION_LINK_RULE, "notif-link");
         return;
       }
       data = { ...data, link: link.trim() };
     }
+
+    const who = sides
+      .map((s) => `${countFor(s).toLocaleString("en-IN")} ${s === "intern" ? (countFor(s) === 1 ? "candidate" : "candidates") : countFor(s) === 1 ? "company" : "companies"}`)
+      .join(" and ");
+    const ok = await ask({
+      title: `Send this to ${who}?`,
+      body: `"${title.trim()}" appears in each recipient's bell straight away and cannot be recalled.`,
+      confirmLabel: `Yes, send to ${total.toLocaleString("en-IN")}`,
+    });
+    if (!ok) return;
 
     setBusy(true);
     setError(null);
@@ -184,6 +197,7 @@ export function NotificationComposer({
 
   return (
     <div className="grid gap-6 xl:grid-cols-[24rem_minmax(0,1fr)]">
+      {dialog}
       <section aria-labelledby="recipients-title" className="min-w-0 rounded-apple-xl border border-ink-200/80 bg-card p-5 shadow-xs">
         <h2 id="recipients-title" className="text-base font-semibold text-ink-900">
           Recipients

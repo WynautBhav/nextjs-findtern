@@ -1,46 +1,42 @@
 "use client";
 
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useTransition } from "react";
+import { useId } from "react";
 
 import { PER_PAGE_OPTIONS } from "@/lib/admin/params";
+import { parsePer } from "./table-state.ts";
+import { useUrlTableState } from "./use-url-table-state.ts";
 
 /**
  * Rows-per-page control.
  *
  * Separate from the toolbar because it is a display preference rather than a
  * filter - "Clear all" deliberately preserves it, whereas it wipes every
- * chip. Changing it resets to page 1, since page 9 of the old size is rarely a
- * valid page of the new one.
+ * chip. Changing it resets to the table's own page key, since page 9 of the
+ * old size is rarely a valid page of the new one.
  */
-export function PageSizeSelect({ pageKey = "per" }: { pageKey?: string }) {
-  const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const [, startTransition] = useTransition();
-
-  const current = Number(searchParams.get(pageKey) ?? "25");
-  const pageParam = pageKey === "per" ? "page" : "pper";
-
-  function change(value: string) {
-    const next = new URLSearchParams(searchParams.toString());
-    next.set(pageKey, value);
-    next.delete(pageParam);
-    startTransition(() => {
-      router.replace(`${pathname}?${next.toString()}`, { scroll: false });
-    });
-  }
+export function PageSizeSelect({
+  perKey = "per",
+  pageKey = "page",
+}: {
+  /** Query key holding the page size. */
+  perKey?: string;
+  /** Query key holding the page number this control resets. */
+  pageKey?: string;
+}) {
+  const id = useId();
+  const { searchParams, set } = useUrlTableState({ perKey, pageKey });
+  const current = parsePer(searchParams.get(perKey), PER_PAGE_OPTIONS, 25);
 
   return (
     <div className="flex items-center gap-1.5">
-      <label htmlFor="per" className="whitespace-nowrap text-xs text-text-subtle">
+      <label htmlFor={id} className="whitespace-nowrap text-xs text-text-subtle">
         Rows
       </label>
       <select
-        id="per"
-        value={String(PER_PAGE_OPTIONS.includes(current as 10) ? current : 25)}
-        onChange={(e) => change(e.target.value)}
-        className="apple-spring h-9 cursor-pointer rounded-apple-sm border border-ink-200 bg-surface px-2.5 pr-7 text-base sm:text-sm text-ink-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring max-lg:min-h-11"
+        id={id}
+        value={String(current)}
+        onChange={(e) => set(perKey, e.target.value)}
+        className="apple-spring h-9 cursor-pointer rounded-apple-sm border border-border bg-surface px-2.5 pr-7 text-base text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring sm:text-sm touch:min-h-11"
       >
         {PER_PAGE_OPTIONS.map((option) => (
           <option key={option} value={String(option)}>

@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { getSession } from "@/lib/auth";
+import { sanitizeRichText } from "@/lib/richtext";
 import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
 
@@ -41,9 +42,15 @@ export function legalDocRoute(table: LegalTable, defaultTitle: string) {
       return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid input" }, { status: 400 });
     }
 
+    // Stored HTML is rendered to the public: only the sanitiser's allowlist is written.
+    const bodyHtml = sanitizeRichText(parsed.data.bodyHtml);
+    if (!bodyHtml.replace(/<[^>]*>/g, "").trim()) {
+      return NextResponse.json({ error: "Terms text is required" }, { status: 400 });
+    }
+
     const db = getDb();
     const [existing] = await db.select({ id: table.id }).from(table).orderBy(desc(table.updatedAt), desc(table.createdAt)).limit(1);
-    const values = { title: parsed.data.title, bodyHtml: parsed.data.bodyHtml, updatedAt: new Date() };
+    const values = { title: parsed.data.title, bodyHtml, updatedAt: new Date() };
     if (existing) await db.update(table).set(values).where(eq(table.id, existing.id));
     else await db.insert(table).values(values);
     revalidatePath("/", "layout");

@@ -3,7 +3,7 @@ import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { CMS_COLLECTIONS, CMS_TYPES, validateCmsValues, type CmsType, type CmsValues } from "@/lib/admin/cms-collections";
+import { CMS_COLLECTIONS, CMS_TYPES, sanitizeCmsValues, validateCmsValues, type CmsType, type CmsValues } from "@/lib/admin/cms-collections";
 import { CMS_TABLES } from "@/lib/admin/cms-tables";
 import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
@@ -34,7 +34,7 @@ function normalise(type: CmsType, values: CmsValues, prevStatus?: string | null)
       if (v.status !== "published") v.publishedAt = null;
     }
   }
-  return v;
+  return sanitizeCmsValues(type, v);
 }
 
 const typeSchema = z.object({ type: z.enum(CMS_TYPES as [CmsType, ...CmsType[]]) });

@@ -3,12 +3,14 @@ import { Skeleton } from "@/components/ui/skeleton";
 /**
  * The shape every admin page shares: a title row, then rows. It does not draw a
  * KPI strip or icon chips (most pages have neither), so a list page no longer
- * flashes a dashboard on its way in. Announced once to assistive tech.
+ * flashes a dashboard on its way in. Announced once to assistive tech
+ * (`role="status"` with a screen-reader label). This is the generic fallback;
+ * a redesigned page ships its own `loading.tsx` in the page's own shape.
  */
 export default function AdminLoading() {
   return (
     <div role="status" aria-busy="true" className="space-y-6">
-      <span className="sr-only">Loading</span>
+      <span className="sr-only">Loading this page</span>
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="space-y-1">
           <Skeleton className="h-7 w-48 rounded-apple-sm" />

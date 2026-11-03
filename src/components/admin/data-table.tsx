@@ -14,14 +14,19 @@ import {
 import { AdminEmpty } from "./panel.tsx";
 import { DataTableKeys } from "./data-table-keys.tsx";
 import { PageSizeSelect } from "./page-size-select.tsx";
-import { Pagination } from "./pagination.tsx";
+import { Pager } from "./pagination.tsx";
+import { SortSelect } from "./sort-select.tsx";
+import { hasActiveFilters } from "./table-state.ts";
 import { TableToolbar, type ToolbarFilter } from "./table-toolbar.tsx";
 import { toQueryString } from "@/lib/admin/params";
-import { ADMIN_SURFACE } from "@/components/admin/surface";
 import { cn } from "@/lib/utils";
 
 /**
- * DataTable - the shared shell for every admin list.
+ * DataTable - the shared shell for every admin list. It composes the headless
+ * parts (`table-state.ts` / `useUrlTableState`, `TableToolbar`, `SortSelect`,
+ * `PageSizeSelect`, `Pager`), which a redesigned page can also use on its own.
+ * The shell itself is flat: a 1px `border-border` rule on the page ground, no
+ * shadow (SPECS 3 Nov). A page that wants a lifted ground passes `className`.
  *
  * Owns the chrome (toolbar row, header, pager) so each page only
  * declares its columns and how to render a row. That is what stops the three
@@ -166,6 +171,19 @@ export function DataTable<T>({
   perKey?: string;
 }) {
   const hasToolbar = Boolean(searchPlaceholder || filters?.length || exportHref || extraControls);
+  // Below lg the header row is hidden, so sortable columns also get a select.
+  const sortOptions = columns.flatMap((c) =>
+    c.sort ? [{ value: c.sort, label: typeof c.header === "string" ? c.header : (c.label ?? c.sort) }] : [],
+  );
+  const filterKeys = (filters ?? []).map((f) => f.key);
+  const filtered = hasActiveFilters(params, filterKeys);
+  const clearHref = (() => {
+    const kept = { ...params };
+    delete kept.q;
+    delete kept[pageKey ?? "page"];
+    for (const key of filterKeys) delete kept[key];
+    return `${basePath}${toQueryString(kept)}`;
+  })();
   const resolvedDensity: DataTableDensity = density ?? (dense ? "compact" : "comfortable");
   const cellPad = CELL_PAD[resolvedDensity];
   const wrapperClass = stickyHeader
@@ -198,15 +216,9 @@ export function DataTable<T>({
     i === titleIndex ? { "data-title": "" } : labelOf(columns[i]) ? { "data-label": labelOf(columns[i]) } : {};
 
   return (
-    <div
-      className={cn(
-        "apple-admin overflow-hidden shadow-xs",
-        ADMIN_SURFACE,
-        className,
-      )}
-    >
+    <div className={cn("apple-admin overflow-hidden border border-border", className)}>
       {hasToolbar ? (
-        <div className="flex flex-wrap items-end justify-between gap-3 border-b border-ink-100 px-5 py-3.5">
+        <div className="flex flex-wrap items-end justify-between gap-3 border-b border-border px-5 py-3.5">
           {/* On a phone the filters take the full row and Rows drops below
               them, so a long select never runs into the label (QA-141). */}
           <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2.5 max-sm:basis-full">
@@ -215,20 +227,31 @@ export function DataTable<T>({
               filters={filters}
               exportHref={exportHref}
               extra={extraControls}
+              pageKey={pageKey ?? "page"}
+              sortOptions={sortOptions}
             />
           </div>
-          <PageSizeSelect pageKey={perKey ?? "per"} />
+          <PageSizeSelect perKey={perKey ?? "per"} pageKey={pageKey ?? "page"} />
+        </div>
+      ) : sortOptions.length ? (
+        <div className="border-b border-border px-5 py-3 lg:hidden">
+          <SortSelect options={sortOptions} />
         </div>
       ) : null}
 
       {rows.length === 0 ? (
-        empty ? (
+        // "Nothing matches" (clearable) and "no data yet" are different
+        // states; a filtered empty list must not read as an empty database.
+        filtered ? (
+          <AdminEmpty
+            title="Nothing matches"
+            body="No rows fit the current search and filters. Clear them to see everything."
+            action={{ href: clearHref, label: "Clear search and filters" }}
+          />
+        ) : empty ? (
           <AdminEmpty {...empty} />
         ) : (
-          <AdminEmpty
-            title="No results"
-            body="Nothing matches the current search and filters."
-          />
+          <AdminEmpty title="No data yet" body={`There are no ${noun} here yet.`} />
         )
       ) : (
         <>
@@ -255,8 +278,8 @@ export function DataTable<T>({
                     scope="col"
                     aria-sort={dir === "asc" ? "ascending" : dir === "desc" ? "descending" : undefined}
                     className={cn(
-                      "bg-ink-50 px-3 py-2.5 text-xs font-semibold tracking-[0.01em] text-ink-600",
-                      stickyHeader && "sticky top-0 z-10 bg-card shadow-[inset_0_-1px_0_var(--color-ink-200)]",
+                      "bg-surface px-3 py-2.5 text-xs font-semibold tracking-[0.01em] text-text-subtle",
+                      stickyHeader && "sticky top-0 z-10 bg-card shadow-[inset_0_-1px_0_var(--color-border)]",
                       (column.align === "right" || column.numeric) && "text-right",
                       column.headerClassName,
                     )}
@@ -266,9 +289,9 @@ export function DataTable<T>({
                         href={`${basePath}${toQueryString({ ...params, sort: column.sort, dir: nextDir, [pageKey ?? "page"]: "" })}`}
                         scroll={false}
                         className={cn(
-                          "inline-flex items-center gap-1 rounded-apple-sm hover:text-ink-900 focus-visible:outline-2 focus-visible:outline-brand-600",
+                          "inline-flex items-center gap-1 rounded-apple-sm hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring",
                           (column.align === "right" || column.numeric) && "flex-row-reverse",
-                          active && "text-ink-900",
+                          active && "text-foreground",
                         )}
                       >
                         {column.header}
@@ -293,14 +316,14 @@ export function DataTable<T>({
               const tr = renderRow ? (
                 renderRow(row, index)
               ) : (
-                <TableRow key={rowKey ? rowKey(row) : index} className={cn("border-ink-100 hover:bg-ink-50/60", rowClassName)}>
+                <TableRow key={rowKey ? rowKey(row) : index} className={cn("border-border hover:bg-surface/60", rowClassName)}>
                   {columns.map((column, cellIndex) => (
                     <TableCell
                       key={cellIndex}
                       {...stackAttrs(cellIndex)}
                       className={cn(
                         cellPad,
-                        "text-sm text-ink-700",
+                        "text-sm text-foreground",
                         (column.align === "right" || column.numeric) && "nums text-right",
                         column.className,
                       )}
@@ -314,9 +337,9 @@ export function DataTable<T>({
             })}
           </TableBody>
           {footer ? (
-            <TableFooter className="border-ink-100 bg-ink-50 max-lg:block">
+            <TableFooter className="border-border bg-surface max-lg:block">
               <TableRow className="hover:bg-transparent">
-                <TableCell colSpan={columns.length} className={cn(cellPad, "text-sm text-ink-700")}>
+                <TableCell colSpan={columns.length} className={cn(cellPad, "text-sm text-foreground")}>
                   {footer}
                 </TableCell>
               </TableRow>
@@ -327,19 +350,17 @@ export function DataTable<T>({
         </>
       )}
 
-      {rows.length > 0 ? (
-        <Pagination
-          page={page}
-          pages={pages}
-          total={total}
-          perPage={perPage}
-          rowsShown={rows.length}
-          params={params}
-          basePath={basePath}
-          noun={noun}
-          pageKey={pageKey ?? "page"}
-        />
-      ) : null}
+      <Pager
+        page={page}
+        pages={pages}
+        total={total}
+        perPage={perPage}
+        rowsShown={rows.length}
+        params={params}
+        basePath={basePath}
+        noun={noun}
+        pageKey={pageKey ?? "page"}
+      />
     </div>
   );
 }

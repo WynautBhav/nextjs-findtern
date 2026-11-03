@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Plus } from "lucide-react";
 
-import { Panel } from "@/components/admin/panel";
+import { Panel } from "@/components/college/panel";
 import { driveWindow } from "@/lib/college/access";
 import { drivesOverview } from "@/lib/college/drives";
 import { DRIVE_KIND_LABEL } from "@/lib/college/labels";

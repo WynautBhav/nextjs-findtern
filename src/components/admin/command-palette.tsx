@@ -241,18 +241,23 @@ export function CommandPalette({ items }: { items: PaletteItem[] }) {
 
   return (
     <>
+      {/* The top bar's search field: a button drawn as a field, so the whole bar opens the palette. The
+          combobox (role, listbox, active descendant) lives on the input inside the dialog. */}
       <button
         type="button"
+        aria-haspopup="dialog"
         onClick={() => setOpen(true)}
-        className="apple-spring flex min-h-11 items-center gap-2 rounded-apple-sm border border-ink-200 bg-surface px-3 py-2 text-sm text-ink-600 hover:border-brand-500 hover:text-ink-800"
+        className="apple-spring flex min-h-11 items-center gap-2 rounded-apple-sm border border-ink-300 bg-card px-3 py-2 text-sm text-text-subtle hover:border-ink-400 hover:text-foreground md:w-64 lg:w-80"
       >
-        <Search className="size-4" aria-hidden />
+        <Search className="size-4 shrink-0" aria-hidden />
         {/* No aria-label: the name comes from the visible words plus the hidden hint, so the two can
             never disagree (WCAG 2.5.3, and engines differ on which of two spans they count as visible). */}
-        <span className="hidden sm:inline">Search admin portal</span>
-        <span className="sm:hidden">Search</span>
+        <span className="min-w-0 flex-1 truncate text-left">
+          <span className="md:hidden">Search</span>
+          <span className="hidden md:inline">Search candidates, companies, pages</span>
+        </span>
         <span className="sr-only"> (Command K)</span>
-        <kbd aria-hidden className="ml-2 hidden rounded bg-ink-100 px-1.5 py-1 text-2xs font-semibold text-ink-600 sm:inline">
+        <kbd aria-hidden className="hidden shrink-0 rounded bg-ink-100 px-1.5 py-1 text-2xs font-semibold text-ink-600 md:inline">
           {hint}
         </kbd>
       </button>

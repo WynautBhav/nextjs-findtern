@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useId, useRef, useState, useTransition } from "react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useId, useRef, useState } from "react";
 import { Search, SlidersHorizontal, X } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { SortSelect, type SortOption } from "./sort-select.tsx";
+import { useUrlTableState } from "./use-url-table-state.ts";
 
 /**
  * Table toolbar: search, facet filters, page size, and the active-filter chips.
@@ -14,8 +15,11 @@ import { cn } from "@/lib/utils";
  * and both of them see the same rows - which is also what makes the CSV export
  * honest, since the download reads the same query string the table does.
  *
- * Search is debounced at 300ms and always resets to page 1. Paging to page 6
+ * Search is debounced at 300ms and always resets to page 1 (the table's own
+ * `pageKey`, so a second table on the page keeps its page). Paging to page 6
  * and then typing a narrower query used to leave you on an empty page 6.
+ * "Clear all" removes only the search and filters: sort, rows per page and
+ * custom keys survive.
  */
 
 export type ToolbarFilter = {
@@ -33,6 +37,8 @@ export function TableToolbar({
   exportHref,
   extra,
   searchKey = "q",
+  pageKey = "page",
+  sortOptions,
 }: {
   searchPlaceholder?: string;
   filters?: ToolbarFilter[];
@@ -41,11 +47,12 @@ export function TableToolbar({
   /** Extra controls rendered after the filters. */
   extra?: React.ReactNode;
   searchKey?: string;
+  /** Query key holding this table's page number (reset on every filter change). */
+  pageKey?: string;
+  /** Sortable columns, offered as a select below `lg` where the header row is hidden. */
+  sortOptions?: SortOption[];
 }) {
-  const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const [, startTransition] = useTransition();
+  const { searchParams, set: setParam, clear, keys } = useUrlTableState({ searchKey, pageKey });
 
   const [term, setTerm] = useState(searchParams.get(searchKey) ?? "");
   const filtersId = useId();
@@ -69,25 +76,6 @@ export function TableToolbar({
     setLastUrlTerm(urlTerm);
     setTerm(urlTerm);
   }
-
-  /**
-   * Merge one key into the URL. `null` removes it. Page resets to 1 unless the
-   * caller is explicitly changing the page number.
-   */
-  const setParam = useCallback(
-    (key: string, value: string | null, opts: { keepPage?: boolean } = {}) => {
-      const next = new URLSearchParams(searchParams.toString());
-      if (value === null || value === "") next.delete(key);
-      else next.set(key, value);
-      if (!opts.keepPage) next.delete("page");
-
-      const qs = next.toString();
-      startTransition(() => {
-        router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
-      });
-    },
-    [pathname, router, searchParams],
-  );
 
   // Debounce the search box. The first render is skipped so that simply landing
   // on a filtered URL does not immediately fire a redundant navigation.
@@ -115,15 +103,8 @@ export function TableToolbar({
   const hasFilters = activeChips.length > 0;
 
   function clearAll() {
-    const next = new URLSearchParams();
-    // Per-page is a display preference, not a filter - keep it.
-    const per = searchParams.get("per");
-    if (per) next.set("per", per);
-    const qs = next.toString();
     setTerm("");
-    startTransition(() => {
-      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
-    });
+    clear(filters.map((f) => f.key));
   }
 
   const renderFilter = (filter: ToolbarFilter) => {
@@ -142,10 +123,10 @@ export function TableToolbar({
           value={value}
           onChange={(e) => setParam(filter.key, e.target.value || null)}
           className={cn(
-            "apple-spring h-9 max-w-56 cursor-pointer truncate rounded-apple-sm border bg-surface px-2.5 pr-7 text-base sm:text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring max-lg:min-h-11 max-sm:w-full max-sm:max-w-full",
+            "apple-spring h-9 max-w-56 cursor-pointer truncate rounded-apple-sm border bg-surface px-2.5 pr-7 text-base sm:text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring touch:min-h-11 max-sm:w-full max-sm:max-w-full",
             value
               ? "border-brand-300 font-medium text-brand-800"
-              : "border-ink-200 text-ink-700",
+              : "border-border text-foreground",
           )}
         >
           <option value="">{filter.allLabel ?? `All ${lowerFirst(filter.label)}`}</option>
@@ -183,7 +164,7 @@ export function TableToolbar({
             }}
             placeholder={searchPlaceholder}
             aria-label={searchPlaceholder}
-            className="h-9 w-full rounded-apple-sm border border-ink-200 bg-surface pr-8 pl-9 text-base sm:text-sm text-ink-900 placeholder:text-text-subtle focus:border-brand-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring max-lg:min-h-11 [&::-webkit-search-cancel-button]:hidden"
+            className="h-9 w-full rounded-apple-sm border border-border bg-surface pr-8 pl-9 text-base sm:text-sm text-foreground placeholder:text-text-subtle focus:border-brand-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring touch:min-h-11 [&::-webkit-search-cancel-button]:hidden"
           />
           {term ? (
             <button
@@ -193,7 +174,7 @@ export function TableToolbar({
                 inputRef.current?.focus();
               }}
               aria-label="Clear search"
-              className="apple-spring absolute top-1/2 right-2 flex min-h-11 min-w-11 -translate-y-1/2 items-center justify-center rounded-apple-sm p-1 text-ink-600 hover:text-ink-700"
+              className="apple-spring absolute top-1/2 right-2 flex min-h-11 min-w-11 -translate-y-1/2 items-center justify-center rounded-apple-sm p-1 text-text-subtle hover:text-foreground"
             >
               <X className="size-3.5" />
             </button>
@@ -204,13 +185,14 @@ export function TableToolbar({
         {/* Three filters show; the rest fold behind "More filters" at every
             width (eleven selects in three rows pushed the list a screen down). */}
         {shown.map(renderFilter)}
+        {sortOptions?.length ? <SortSelect options={sortOptions} keys={keys} /> : null}
         {foldable ? (
           <button
             type="button"
             onClick={() => setFiltersOpen((o) => !o)}
             aria-expanded={filtersOpen}
             aria-controls={filtersId}
-            className="apple-spring inline-flex h-9 items-center gap-1.5 rounded-apple-sm border border-ink-200 bg-card px-3 text-sm font-medium text-ink-700 hover:bg-ink-50 max-lg:min-h-11"
+            className="apple-spring inline-flex h-9 items-center gap-1.5 rounded-apple-sm border border-border bg-card px-3 text-sm font-medium text-foreground hover:bg-surface touch:min-h-11"
           >
             <SlidersHorizontal className="size-4" aria-hidden />
             {filtersOpen ? "Fewer filters" : "More filters"}
@@ -228,7 +210,7 @@ export function TableToolbar({
         {exportHref ? (
           <a
             href={exportHref}
-            className="apple-spring apple-pressable ml-auto inline-flex h-9 items-center gap-1.5 rounded-apple-sm border border-ink-200 bg-card px-3 text-sm font-medium text-ink-700 hover:bg-ink-50 max-lg:min-h-11"
+            className="apple-spring apple-pressable ml-auto inline-flex h-9 items-center gap-1.5 rounded-apple-sm border border-border bg-card px-3 text-sm font-medium text-foreground hover:bg-surface touch:min-h-11"
           >
             CSV
           </a>
@@ -258,7 +240,7 @@ export function TableToolbar({
           <button
             type="button"
             onClick={clearAll}
-            className="apple-spring ml-1 inline-flex min-h-11 items-center text-xs font-medium text-ink-600 underline underline-offset-2 hover:text-ink-800"
+            className="apple-spring ml-1 inline-flex min-h-11 items-center text-xs font-medium text-text-subtle underline underline-offset-2 hover:text-foreground"
           >
             Clear all
           </button>

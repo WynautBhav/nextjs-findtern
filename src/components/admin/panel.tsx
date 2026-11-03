@@ -1,23 +1,21 @@
 import { AlertTriangle, ArrowRight, type LucideIcon } from "lucide-react";
 
 import { PageHead, ThreadMark } from "@/components/app/primitives";
-import { ADMIN_SURFACE } from "@/components/admin/surface";
 import { ButtonLink } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 /**
  * Panel - the one container every admin block sits in.
  *
- * Restrained on purpose: the `Surface` look (white, hairline border, `shadow-xs`
- * on the college's dark shell; the soft `shadow-tile` and no border on the
- * light console's grey canvas, which overrides it). The
- * dashboard has six of these on screen at once, so any heavier treatment turns
- * the page into a stack of competing boxes and the numbers stop being readable.
+ * Flat on purpose (SPECS 3 Nov: one ground, 1px rules, no shadows): the default
+ * is a 1px `border-border` outline on the page ground, nothing else. A page
+ * that wants a lifted ground passes `className="bg-card"` itself. The college
+ * console has its own copy (`components/college/panel.tsx`).
  */
 
 export type PanelVariant = "plain" | "inset" | "rail" | "well";
 
-/** Each variant's surface. Unset is the default card (`ADMIN_SURFACE` + `shadow-xs`). */
+/** Each variant's surface. Unset is the flat 1px-rule default. */
 const PANEL_VARIANT: Record<PanelVariant, string> = {
   // No surface: heading and content sit on the page ground, flush with its edges.
   plain:
@@ -25,9 +23,9 @@ const PANEL_VARIANT: Record<PanelVariant, string> = {
   // Slightly darker than a card, no border.
   inset: "overflow-hidden rounded-apple-xl bg-surface",
   // Narrow side panel: card ground with a left rule only.
-  rail: "overflow-hidden border-l border-ink-200/80 bg-card",
+  rail: "overflow-hidden border-l border-border",
   // A recessed block with a hairline.
-  well: "overflow-hidden rounded-apple-xl border border-ink-200 bg-surface",
+  well: "overflow-hidden rounded-apple-xl border border-border bg-surface",
 };
 
 export function Panel({
@@ -41,7 +39,7 @@ export function Panel({
   /** Render as a `<ul>` (or `<div>`) when the panel *is* the list, so a list
       of rows is not a `<ul>` nested inside a bare `<section>`. */
   as?: "section" | "ul" | "div";
-  /** Surface treatment. Leave unset for the standard card. */
+  /** Surface treatment. Leave unset for the flat 1px-rule default. */
   variant?: PanelVariant;
   /** Drops the inner padding of `PanelBody` (and `PanelHeader`'s sides), for tables and lists that run edge to edge. */
   bleed?: boolean;
@@ -50,7 +48,7 @@ export function Panel({
     <Tag
       className={cn(
         "apple-admin",
-        variant ? PANEL_VARIANT[variant] : ["overflow-hidden shadow-xs", ADMIN_SURFACE],
+        variant ? PANEL_VARIANT[variant] : "overflow-hidden border border-border",
         bleed && "[&_[data-panel-body]]:p-0",
         className,
       )}
@@ -79,15 +77,15 @@ export function PanelHeader({
     <header
       data-panel-header=""
       className={cn(
-        "apple-admin flex flex-wrap items-start justify-between gap-3 border-b border-ink-100 px-5 py-4",
+        "apple-admin flex flex-wrap items-start justify-between gap-3 border-b border-border px-5 py-4",
         className,
       )}
     >
       <div className="flex min-w-0 items-start gap-3">
         <div className="min-w-0">
-          <h2 className="text-base font-semibold tracking-[-0.01em] text-ink-900">{title}</h2>
+          <h2 className="text-base font-semibold tracking-[-0.01em] text-foreground">{title}</h2>
           {description ? (
-            <p className="mt-0.5 text-sm leading-relaxed text-ink-600">
+            <p className="mt-0.5 text-sm leading-relaxed text-text-subtle">
               {description}
             </p>
           ) : null}
@@ -156,8 +154,8 @@ export function AdminEmpty({
       ) : (
         <ThreadMark className="mb-4" />
       )}
-      <p className="text-balance text-base font-semibold tracking-[-0.01em] text-ink-900">{title}</p>
-      <p className="mt-1.5 max-w-md text-pretty text-sm leading-relaxed text-ink-600">{body}</p>
+      <p className="text-balance text-base font-semibold tracking-[-0.01em] text-foreground">{title}</p>
+      <p className="mt-1.5 max-w-md text-pretty text-sm leading-relaxed text-text-subtle">{body}</p>
       {action ? (
         <ButtonLink href={action.href} variant="primary" size="sm" className="mt-5">
           {action.label}
@@ -184,8 +182,8 @@ export function AdminLoadError({
       <span aria-hidden className="mb-4 grid size-11 place-items-center rounded-full bg-danger-soft text-danger">
         <AlertTriangle className="size-5" />
       </span>
-      <p className="text-base font-semibold text-ink-900">Couldn&apos;t load {what}</p>
-      <p className="mt-1.5 max-w-md text-sm leading-relaxed text-ink-600">
+      <p className="text-base font-semibold text-foreground">Couldn&apos;t load {what}</p>
+      <p className="mt-1.5 max-w-md text-sm leading-relaxed text-text-subtle">
         The database didn&apos;t answer. Nothing was changed. Try again in a moment; if it keeps failing, check the server logs.
       </p>
       {retryHref ? (
@@ -226,9 +224,9 @@ export function AttentionBanner({
         <span aria-hidden className="mt-2 size-2 shrink-0 rounded-full bg-accent-500" />
         {/* One paragraph, not three spans: the count used to wrap onto its own
             line at tablet widths. Inline <strong>s wrap with the sentence. */}
-        <p className="min-w-0 leading-relaxed text-ink-800">
-          <strong className="nums font-semibold text-ink-900">{count.toLocaleString("en-IN")}</strong> of{" "}
-          <strong className="nums font-semibold text-ink-900">{total.toLocaleString("en-IN")}</strong> {noun}{" "}
+        <p className="min-w-0 leading-relaxed text-foreground">
+          <strong className="nums font-semibold text-foreground">{count.toLocaleString("en-IN")}</strong> of{" "}
+          <strong className="nums font-semibold text-foreground">{total.toLocaleString("en-IN")}</strong> {noun}{" "}
           {count === 1 ? "has" : "have"} not finished onboarding, so employers can&apos;t see them yet.
         </p>
       </div>

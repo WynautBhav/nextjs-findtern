@@ -218,7 +218,7 @@ export default async function AdminInterns({
     {
       header: <SelectAllCheckbox ids={rows.map((r) => r.id)} noun="candidates" />,
       headerClassName: "w-10",
-      cell: (row) => <RowCheckbox id={row.id} />,
+      cell: (row) => <RowCheckbox id={row.id} label={`${row.firstName} ${row.lastName}`.trim()} />,
       className: "w-10",
     },
     {

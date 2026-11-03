@@ -204,7 +204,7 @@ function FieldInput({
 }) {
   const inputId = `cms-${f.name}`;
   if (f.kind === "richtext") {
-    return <RichTextField label={f.label} value={value} onChange={onChange} imageUpload />;
+    return <RichTextField label={f.label} value={value} onChange={onChange} />;
   }
   const label = (
     <label htmlFor={inputId} className="block text-sm font-medium text-ink-800">

@@ -8,12 +8,14 @@ import { orderProposalIds } from "@/lib/payments";
 import { AdminInvoicesView, type AdminInvoiceRow } from "@/components/admin/admin-invoices-view";
 import { discountLabel, paymentPromo } from "@/lib/admin/payment-promo";
 import { flattenParams, type RawSearchParams } from "@/lib/admin/params";
+import { isTestEmployer } from "@/lib/admin/scope";
 
 export const metadata: Metadata = {
   title: "Employer Orders · Admin Ledger",
 };
 
-async function loadOrders(): Promise<AdminInvoiceRow[]> {
+/** Rows plus the ids of test-employer orders: listed, but not revenue (lib/admin/revenue). */
+async function loadOrders(): Promise<{ rows: AdminInvoiceRow[]; uncounted: Set<string> }> {
   const db = getDb();
 
   const rawOrders = await db
@@ -54,7 +56,8 @@ async function loadOrders(): Promise<AdminInvoiceRow[]> {
     for (const p of named) internByProposal.set(p.id, `${p.first ?? ""} ${p.last ?? ""}`.trim() || "Candidate");
   }
 
-  return rawOrders.map((o) => {
+  const uncounted = new Set(rawOrders.filter((o) => isTestEmployer({ id: o.employerId, companyEmail: o.companyEmail })).map((o) => o.id));
+  const rows = rawOrders.map((o) => {
     // New-app promo objects and legacy order notes (ADM-02/13).
     const promo = paymentPromo(o.raw, undefined, o.amountMinor);
     return {
@@ -87,13 +90,15 @@ async function loadOrders(): Promise<AdminInvoiceRow[]> {
       },
     };
   });
+  return { rows, uncounted };
 }
 
 export default async function AdminOrdersPage({ searchParams }: { searchParams?: Promise<RawSearchParams> }) {
   const params = flattenParams(await searchParams);
   let rows: AdminInvoiceRow[] | null = null;
+  let uncounted: Set<string> | undefined;
   try {
-    rows = await loadOrders();
+    ({ rows, uncounted } = await loadOrders());
   } catch (error) {
     console.error("[admin/orders] load failed", error);
   }
@@ -104,7 +109,7 @@ export default async function AdminOrdersPage({ searchParams }: { searchParams?:
         title="Orders"
       />
       {rows ? (
-        <AdminInvoicesView kind="employer" rows={rows} seller={getInvoiceSeller()} params={params} basePath="/admin/orders" />
+        <AdminInvoicesView kind="employer" rows={rows} seller={getInvoiceSeller()} params={params} basePath="/admin/orders" uncounted={uncounted} />
       ) : (
         <Panel>
           <AdminLoadError what="employer orders" retryHref="/admin/orders" />

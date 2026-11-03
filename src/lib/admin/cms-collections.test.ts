@@ -10,6 +10,7 @@ import {
   imageError,
   matchesCmsSearch,
   normaliseFaqCategory,
+  sanitizeCmsValues,
   slugError,
   validateCmsValues,
 } from "./cms-collections.ts";
@@ -88,4 +89,20 @@ test("search matches every word across text fields; image src routes inline imag
   assert.equal(cmsImageSrc("partner", "p 1", "logoUrl", `${INLINE_IMAGE_PREFIX}9`), "/api/admin/cms/image?type=partner&id=p%201&field=logoUrl");
   assert.equal(cmsImageSrc("partner", "p1", "logoUrl", "https://x/y.png"), "https://x/y.png");
   assert.equal(cmsImageSrc("partner", "p1", "logoUrl", ""), null);
+});
+
+test("richtext fields are sanitised before they are stored: no <img onerror>, no <script>", () => {
+  const dirty = '<p>Hi</p><img src=x onerror="alert(1)"><script>alert(2)</script><a href="javascript:alert(3)" onclick="x()">go</a>';
+  const out = sanitizeCmsValues("blog", { title: "T", body: dirty, excerpt: "<b>plain</b>" });
+  const body = String(out.body);
+  assert.doesNotMatch(body, /<img|onerror|<script|alert\(2\)|javascript:|onclick/i);
+  assert.match(body, /Hi/);
+  // Only richtext fields are touched.
+  assert.equal(out.title, "T");
+  assert.equal(out.excerpt, "<b>plain</b>");
+});
+
+test("sanitising twice changes nothing more (a re-saved post is stable)", () => {
+  const once = String(sanitizeCmsValues("blog", { body: "<h2>Intro</h2><p>One <strong>two</strong> <a href=\"https://x.com\">x</a></p><ul><li>a</li></ul>" }).body);
+  assert.equal(String(sanitizeCmsValues("blog", { body: once }).body), once);
 });

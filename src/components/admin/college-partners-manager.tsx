@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { csrfFetch } from "@/lib/client-fetch";
 import { cn } from "@/lib/utils";
 import { buttonClass } from "@/components/ui/button";
+import { useConfirm } from "@/components/app/use-confirm";
 
 export type CollegeAdminRow = {
   id: string;
@@ -95,17 +96,55 @@ export function AddCollegeForm() {
 
 export function CollegeRowControls({ row }: { row: CollegeAdminRow }) {
   const router = useRouter();
+  const { ask, dialog } = useConfirm();
   const [issued, setIssued] = useState<{ email: string; password: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   async function toggle(key: "isPartner" | "showOnWebsite" | "isActive", value: boolean) {
+    if (key === "isActive" && !value) {
+      const ok = await ask({
+        title: `Deactivate ${row.name}?`,
+        body: "Its officers can no longer use the college console, and it drops out of the website strip and the college list.",
+        confirmLabel: "Yes, deactivate",
+      });
+      if (!ok) return;
+    }
     const r = await send(`/api/admin/colleges/${row.id}`, "PATCH", { [key]: value });
     if (!r.ok) setError(String(r.json.error ?? "Couldn't save"));
     router.refresh();
   }
 
+  const issueForm = (
+    <form
+      className="flex flex-wrap items-end gap-2"
+      onSubmit={async (e) => {
+        e.preventDefault();
+        const f = new FormData(e.currentTarget);
+        setError(null);
+        const r = await send(`/api/admin/colleges/${row.id}/admins`, "POST", { name: f.get("name"), email: f.get("email") });
+        if (!r.ok) return setError(String(r.json.error ?? "Couldn't create the login"));
+        setIssued({ email: String(r.json.email), password: String(r.json.password) });
+        (e.target as HTMLFormElement).reset();
+        router.refresh();
+      }}
+    >
+      <label className="min-w-40 flex-1">
+        <span className="text-sm font-medium text-ink-800">Officer name</span>
+        <input name="name" required className={cn(input, "mt-1")} />
+      </label>
+      <label className="min-w-52 flex-1">
+        <span className="text-sm font-medium text-ink-800">Officer email</span>
+        <input name="email" type="email" required className={cn(input, "mt-1")} />
+      </label>
+      <button className="inline-flex min-h-11 items-center rounded-apple-sm border border-ink-200 bg-card px-4 text-sm font-medium text-ink-800 hover:bg-ink-50">
+        Issue login
+      </button>
+    </form>
+  );
+
   return (
     <div className="space-y-3">
+      {dialog}
       <div className="flex flex-wrap gap-4 text-sm">
         {(
           [
@@ -121,37 +160,19 @@ export function CollegeRowControls({ row }: { row: CollegeAdminRow }) {
         ))}
       </div>
       {/* Folded away once the college has an officer (an empty form sat
-          under the existing one); open from the start when it has none. */}
-      <details open={row.officers.length === 0} className="group">
-        <summary className="inline-flex min-h-11 cursor-pointer list-none items-center text-sm font-medium text-brand-700 hover:underline group-open:sr-only">
-          Issue another officer login
-        </summary>
-      <form
-        className="flex flex-wrap items-end gap-2"
-        onSubmit={async (e) => {
-          e.preventDefault();
-          const f = new FormData(e.currentTarget);
-          setError(null);
-          const r = await send(`/api/admin/colleges/${row.id}/admins`, "POST", { name: f.get("name"), email: f.get("email") });
-          if (!r.ok) return setError(String(r.json.error ?? "Couldn't create the login"));
-          setIssued({ email: String(r.json.email), password: String(r.json.password) });
-          (e.target as HTMLFormElement).reset();
-          router.refresh();
-        }}
-      >
-        <label className="min-w-40 flex-1">
-          <span className="text-sm font-medium text-ink-800">Officer name</span>
-          <input name="name" required className={cn(input, "mt-1")} />
-        </label>
-        <label className="min-w-52 flex-1">
-          <span className="text-sm font-medium text-ink-800">Officer email</span>
-          <input name="email" type="email" required className={cn(input, "mt-1")} />
-        </label>
-        <button className="inline-flex min-h-11 items-center rounded-apple-sm border border-ink-200 bg-card px-4 text-sm font-medium text-ink-800 hover:bg-ink-50">
-          Issue login
-        </button>
-      </form>
-      </details>
+          under the existing one); shown outright when it has none. The summary
+          stays visible while open: hiding it left a focusable control nobody
+          could see. */}
+      {row.officers.length === 0 ? (
+        issueForm
+      ) : (
+        <details>
+          <summary className="inline-flex min-h-11 cursor-pointer list-none items-center rounded-apple-sm text-sm font-medium text-brand-700 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+            Issue another officer login
+          </summary>
+          <div className="pt-2">{issueForm}</div>
+        </details>
+      )}
       <div role="status" aria-live="polite">
         {issued ? (
           <p className="rounded-apple-sm border border-brand-200 bg-brand-50 px-3 py-2 text-sm text-brand-900">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef } from "react";
+import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 
 import { cn } from "@/lib/utils";
@@ -10,10 +10,17 @@ import { cn } from "@/lib/utils";
  *
  * `DataTable` is a server component and its rows are server-rendered (often by
  * a caller's `renderRow`), so this wrapper cannot own the rows. It wraps them
- * instead and drives the `<table>` the way a listbox works: the table takes
- * focus and `aria-activedescendant` points at the active row, whose id is set
- * here. The active row is marked `data-active`, which the class below turns
- * into the `bg-ink-100` highlight.
+ * and keeps the table a plain table (no `role="grid"` swap): each row's
+ * primary link (the first `<a href>`; the `<tr>` itself when it has none) is
+ * the row's focus target, and only the active row's target is in the tab order
+ * (`tabIndex` 0, the rest -1). So Tab enters the list once and leaves it once.
+ *
+ * With focus on a row's target: j / ArrowDown and k / ArrowUp move to the next
+ * or previous row, Enter opens (`onRowOpen`, else `rowHref`; a real link just
+ * follows its own href), `x` toggles the row's selection checkbox, and Space
+ * peeks only when an `onRowPeek` handler exists (otherwise Space is left
+ * alone). Ignored while typing in a field or with a modifier held; keys
+ * pressed on a button or checkbox inside a row keep their own meaning.
  *
  * `onRowOpen` / `onRowPeek` are functions, so they only work when `DataTable`
  * is rendered from a client component. From a server page use `rowHref`, which
@@ -26,6 +33,9 @@ function isTyping(el: EventTarget | null) {
   if (!(el instanceof HTMLElement)) return false;
   return Boolean(el.closest("input, select, textarea, [contenteditable]:not([contenteditable=false])"));
 }
+
+const ROW = "tbody > tr";
+const PRIMARY_LINK = "a[href]";
 
 export function DataTableKeys<T>({
   rows,
@@ -45,9 +55,8 @@ export function DataTableKeys<T>({
   children: React.ReactNode;
 }) {
   const router = useRouter();
-  const baseId = useId();
   const wrapRef = useRef<HTMLDivElement>(null);
-  const activeRef = useRef(-1);
+  const activeRef = useRef(0);
   const latest = useRef({ rows, hrefs, onRowOpen, onRowPeek, router });
 
   // Keep the key handler reading current props without re-binding it.
@@ -55,104 +64,92 @@ export function DataTableKeys<T>({
     latest.current = { rows, hrefs, onRowOpen, onRowPeek, router };
   });
 
-  // Row ids and the active mark follow whatever the server last rendered
-  // (paging and sorting re-render the rows, sometimes reusing DOM nodes).
-  // `aria-activedescendant` is only honoured on widget roles, not on a plain table: this table is
-  // driven like a grid while keyboard navigation is on (it keeps its caption as its name).
+  // Re-apply the roving tabindex after every render: paging and sorting
+  // re-render the rows, sometimes reusing DOM nodes.
   useEffect(() => {
-    const table = wrapRef.current?.querySelector("table");
-    if (!table) return;
-    table.setAttribute("role", "grid");
-    return () => table.removeAttribute("role");
-  }, []);
-
-  useEffect(() => {
-    const table = wrapRef.current?.querySelector("table");
-    if (!table) return;
-    const trs = Array.from(table.querySelectorAll<HTMLElement>("tbody > tr"));
+    const trs = rowEls(wrapRef.current);
+    if (activeRef.current >= trs.length) activeRef.current = Math.max(0, trs.length - 1);
     trs.forEach((tr, i) => {
-      tr.id = `${baseId}-row-${i}`;
-      tr.toggleAttribute("data-active", i === activeRef.current && document.activeElement === table);
+      focusTarget(tr).tabIndex = i === activeRef.current ? 0 : -1;
     });
-    if (activeRef.current >= trs.length) activeRef.current = -1;
-    const active = trs[activeRef.current];
-    if (active && document.activeElement === table) table.setAttribute("aria-activedescendant", active.id);
-    else table.removeAttribute("aria-activedescendant");
   });
 
   useEffect(() => {
-    const table = wrapRef.current?.querySelector("table");
-    if (!table) return;
-    table.tabIndex = 0;
+    const wrap = wrapRef.current;
+    if (!wrap) return;
 
-    const rowEls = () => Array.from(table.querySelectorAll<HTMLElement>("tbody > tr"));
-
-    const setActive = (next: number) => {
-      const trs = rowEls();
-      if (!trs.length) return;
+    const moveTo = (trs: HTMLElement[], next: number) => {
       const i = Math.max(0, Math.min(trs.length - 1, next));
+      trs.forEach((tr, n) => {
+        focusTarget(tr).tabIndex = n === i ? 0 : -1;
+      });
       activeRef.current = i;
-      trs.forEach((tr, n) => tr.toggleAttribute("data-active", n === i));
-      table.setAttribute("aria-activedescendant", trs[i].id);
+      focusTarget(trs[i]).focus();
       trs[i].scrollIntoView({ block: "nearest" });
     };
 
-    const onFocus = () => {
-      const trs = rowEls();
-      if (!trs.length) return;
-      setActive(activeRef.current < 0 ? 0 : activeRef.current);
+    const rowOf = (el: EventTarget | null) =>
+      el instanceof HTMLElement ? (el.closest(ROW) as HTMLElement | null) : null;
+
+    const onFocusIn = (e: FocusEvent) => {
+      const tr = rowOf(e.target);
+      const trs = rowEls(wrap);
+      trs.forEach((row) => row.toggleAttribute("data-active", row === tr));
+      const i = tr ? trs.indexOf(tr) : -1;
+      if (i >= 0) {
+        activeRef.current = i;
+        trs.forEach((row, n) => {
+          focusTarget(row).tabIndex = n === i ? 0 : -1;
+        });
+      }
     };
-    const onBlur = () => {
-      rowEls().forEach((tr) => tr.removeAttribute("data-active"));
-      table.removeAttribute("aria-activedescendant");
+    const onFocusOut = (e: FocusEvent) => {
+      const tr = rowOf(e.target);
+      if (tr && !(e.relatedTarget instanceof Node && tr.contains(e.relatedTarget))) tr.removeAttribute("data-active");
     };
 
     const onKeyDown = (e: KeyboardEvent) => {
-      // Only keys pressed on the table itself; a link or button inside a row keeps its own keys.
-      if (e.target !== table || isTyping(e.target) || e.defaultPrevented || !NO_MOD(e)) return;
-      const trs = rowEls();
-      if (!trs.length) return;
-      const cur = activeRef.current;
+      if (isTyping(e.target) || e.defaultPrevented || !NO_MOD(e)) return;
+      const tr = rowOf(e.target);
+      // Only keys pressed on the row's own focus target; a button or checkbox inside a row keeps its own keys.
+      if (!tr || e.target !== focusTarget(tr)) return;
+      const trs = rowEls(wrap);
+      const cur = trs.indexOf(tr);
+      if (cur < 0) return;
       const { rows: data, hrefs: links, onRowOpen: open, onRowPeek: peek, router: r } = latest.current;
+      const row = data?.[cur];
 
       switch (e.key) {
         case "j":
         case "ArrowDown":
           e.preventDefault();
-          setActive(cur + 1);
+          moveTo(trs, cur + 1);
           break;
         case "k":
         case "ArrowUp":
           e.preventDefault();
-          setActive(cur < 0 ? 0 : cur - 1);
+          moveTo(trs, cur - 1);
           break;
-        case "Enter": {
-          if (cur < 0) return;
-          const row = data?.[cur];
+        case "Enter":
           if (open && row !== undefined) {
             e.preventDefault();
             open(row);
-          } else if (links?.[cur]) {
+          } else if (e.target instanceof HTMLTableRowElement && links?.[cur]) {
+            // No link in the row: the row itself is the target. A real link follows its own href.
             e.preventDefault();
             r.push(links[cur]);
           }
           break;
-        }
-        case " ": {
-          if (cur < 0) return;
-          const row = data?.[cur];
+        case " ":
+          // Without a peek handler Space keeps its default (scrolls the page, or presses a button).
           if (peek && row !== undefined) {
             e.preventDefault();
             peek(row);
-          } else if (peek) {
-            e.preventDefault();
           }
           break;
-        }
         case "x": {
-          if (cur < 0) return;
           // Only where the row already has a selection checkbox (BulkSelect).
-          const box = trs[cur]?.querySelector<HTMLElement>('[role="checkbox"], input[type="checkbox"]');
+          const box = tr.querySelector<HTMLElement>('[role="checkbox"], input[type="checkbox"]');
           if (box) {
             e.preventDefault();
             box.click();
@@ -162,14 +159,13 @@ export function DataTableKeys<T>({
       }
     };
 
-    table.addEventListener("keydown", onKeyDown);
-    table.addEventListener("focus", onFocus);
-    table.addEventListener("blur", onBlur);
+    wrap.addEventListener("keydown", onKeyDown);
+    wrap.addEventListener("focusin", onFocusIn);
+    wrap.addEventListener("focusout", onFocusOut);
     return () => {
-      table.removeEventListener("keydown", onKeyDown);
-      table.removeEventListener("focus", onFocus);
-      table.removeEventListener("blur", onBlur);
-      table.removeAttribute("tabindex");
+      wrap.removeEventListener("keydown", onKeyDown);
+      wrap.removeEventListener("focusin", onFocusIn);
+      wrap.removeEventListener("focusout", onFocusOut);
     };
   }, []);
 
@@ -178,12 +174,21 @@ export function DataTableKeys<T>({
       ref={wrapRef}
       data-stack
       className={cn(
-        "[&_table:focus-visible]:outline-2 [&_table:focus-visible]:-outline-offset-2 [&_table:focus-visible]:outline-brand-600",
-        "[&_tbody_tr[data-active]]:bg-ink-100 [&_tbody_tr[data-active]_[role=checkbox]]:opacity-100",
+        "[&_tbody_tr:focus-visible]:outline-2 [&_tbody_tr:focus-visible]:-outline-offset-2 [&_tbody_tr:focus-visible]:outline-ring",
+        "[&_tbody_tr[data-active]]:bg-muted [&_tbody_tr[data-active]_[role=checkbox]]:opacity-100",
         className,
       )}
     >
       {children}
     </div>
   );
+}
+
+function rowEls(wrap: HTMLElement | null) {
+  return wrap ? Array.from(wrap.querySelectorAll<HTMLElement>(ROW)) : [];
+}
+
+/** A row's primary link, else the row itself. */
+function focusTarget(tr: HTMLElement): HTMLElement {
+  return tr.querySelector<HTMLElement>(PRIMARY_LINK) ?? tr;
 }

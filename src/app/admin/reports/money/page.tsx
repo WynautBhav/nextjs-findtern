@@ -11,7 +11,8 @@ import { analyticsRange } from "@/lib/admin/analytics-load";
 import { flattenParams, type RawSearchParams } from "@/lib/admin/params";
 import { MONEY_STATUSES, moneyRowFilter, narrowReceivables, type MoneyRow, type Receivables } from "@/lib/admin/receivables";
 import { loadReceivables, moneyFilter } from "@/lib/admin/receivables-load";
-import { formatDate, formatMoney } from "@/lib/format";
+import { netMinor } from "@/lib/admin/revenue";
+import { formatDate, formatMoney, formatNumber } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { AutoSubmitForm } from "@/components/app/auto-submit-form";
 
@@ -136,7 +137,7 @@ export default async function AdminMoneyReportPage({ searchParams }: { searchPar
 
       {data ? (
         <>
-          <StatGrid cols={4}>
+          <StatGrid cols={6}>
             <StatCard label="Received" value={inr(data.totals.receivedMinor)} hint="Paid orders and activation fees" />
             <StatCard
               label="Still to collect"
@@ -145,6 +146,11 @@ export default async function AdminMoneyReportPage({ searchParams }: { searchPar
             />
             <StatCard label="Paid to interns" value={inr(data.totals.paidOutMinor)} hint="Stipend payouts marked paid" />
             <StatCard label="Owed to interns" value={inr(data.totals.owedMinor)} hint="Pending payouts and stipend months ahead" />
+            <StatCard
+              label="Net"
+              value={inr(netMinor(data.totals))}
+              hint="Received, less paid to interns, less owed to interns"
+            />
           </StatGrid>
 
           <MoneyTable title="Receivables" description="Money coming in, newest first." rows={data.receivables} filter={sourceLinks("receivables", receivablesFilter)} filtered={filtered} />
@@ -176,7 +182,7 @@ function MoneyTable({
   const head = ["Date", "Description", "Company", "Candidate", "Status", "Amount", "Reference"];
   return (
     <Panel>
-      <PanelHeader title={`${title} (${rows.length.toLocaleString("en-IN")})`} description={description} action={filter} />
+      <PanelHeader title={`${title} (${formatNumber(rows.length)})`} description={description} action={filter} />
       {rows.length === 0 ? (
         <p className="px-5 py-10 text-center text-sm text-ink-600">
           {filtered ? "Nothing matches these filters in this range." : "Nothing in this range."}
@@ -220,7 +226,7 @@ function MoneyTable({
       )}
       {rows.length > 0 ? (
         <p className="border-t border-ink-100 px-5 py-3 text-sm text-ink-600">
-          Showing 1–{shown.length.toLocaleString("en-IN")} of {rows.length.toLocaleString("en-IN")}
+          Showing 1–{formatNumber(shown.length)} of {formatNumber(rows.length)}
           {rows.length > shown.length ? ". The CSV export has every row." : ""}
         </p>
       ) : null}

@@ -52,19 +52,24 @@ export function ContactEditor({
   async function save() {
     setSaving(true);
     setError(null);
-    const res = await csrfFetch("/api/admin/contact", {
-      method: "PATCH",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ targetType, targetId, ...draft }),
-    });
-    const body = await res.json().catch(() => ({}));
-    setSaving(false);
-    if (!res.ok) {
-      setError(body.error ?? "Could not save.");
-      return;
+    try {
+      const res = await csrfFetch("/api/admin/contact", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ targetType, targetId, ...draft }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(body.error ?? "Could not save.");
+        return;
+      }
+      setOpen(false);
+      router.refresh();
+    } catch {
+      setError("Not saved: the network request failed.");
+    } finally {
+      setSaving(false);
     }
-    setOpen(false);
-    router.refresh();
   }
 
   return (

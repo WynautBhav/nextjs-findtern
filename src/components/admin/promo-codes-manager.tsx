@@ -30,6 +30,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { RowMenu } from "@/components/app/row-menu";
+import { useConfirm } from "@/components/app/use-confirm";
 import { ADMIN_SURFACE } from "@/components/admin/surface";
 
 const inputClass =
@@ -51,7 +52,14 @@ export function PromoCodesManager({
   initialPromoCodes: PromoCode[];
 }) {
   const router = useRouter();
+  const { ask, dialog: confirmDialog } = useConfirm();
   const [promos, setPromos] = useState<PromoCode[]>(initialPromoCodes);
+  // router.refresh() hands down a new list; without this the rows kept the first render's copy.
+  const [seenPromos, setSeenPromos] = useState(initialPromoCodes);
+  if (seenPromos !== initialPromoCodes) {
+    setSeenPromos(initialPromoCodes);
+    setPromos(initialPromoCodes);
+  }
 
   // Search & Filter state
   const [search, setSearch] = useState("");
@@ -78,9 +86,7 @@ export function PromoCodesManager({
   const [isActive, setIsActive] = useState(true);
   const [appliesTo, setAppliesTo] = useState<"intern" | "employer" | "both">("intern");
 
-  // Delete Dialog state
-  const [deleteTarget, setDeleteTarget] = useState<PromoCode | null>(null);
-  const [deleting, setDeleting] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   // Copy feedback
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
@@ -270,34 +276,39 @@ export function PromoCodesManager({
     }
   }
 
-  async function handleDeleteConfirm() {
-    if (!deleteTarget) return;
-    setDeleting(true);
-
+  async function handleDelete(promo: PromoCode) {
+    const ok = await ask({
+      title: `Delete ${promo.code}?`,
+      body: "This removes the voucher permanently. Orders already placed keep their discount.",
+      confirmLabel: "Delete",
+    });
+    if (!ok) return;
+    setDeletingId(promo.id);
+    setRowError(null);
     try {
-      const res = await csrfFetch(`/api/admin/promo-codes/${deleteTarget.id}`, {
-        method: "DELETE",
-      });
-
+      const res = await csrfFetch(`/api/admin/promo-codes/${promo.id}`, { method: "DELETE" });
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
         throw new Error(errData.error || "Failed to delete promo code.");
       }
-
-      setPromos((prev) => prev.filter((p) => p.id !== deleteTarget.id));
-      setDeleteTarget(null);
+      setPromos((prev) => prev.filter((p) => p.id !== promo.id));
       router.refresh();
     } catch (err: unknown) {
-      setRowError({ id: deleteTarget.id, message: err instanceof Error ? err.message : "Failed to delete" });
-      setDeleteTarget(null);
+      setRowError({ id: promo.id, message: err instanceof Error ? err.message : "Failed to delete" });
     } finally {
-      setDeleting(false);
+      setDeletingId(null);
     }
   }
 
-  function copyToClipboard(text: string) {
-    navigator.clipboard?.writeText(text);
-    setCopiedCode(text);
+  async function copyToClipboard(promo: PromoCode) {
+    setRowError(null);
+    try {
+      await navigator.clipboard.writeText(promo.code);
+    } catch {
+      setRowError({ id: promo.id, message: "Couldn't copy. Select the code and copy it by hand." });
+      return;
+    }
+    setCopiedCode(promo.code);
     setTimeout(() => setCopiedCode(null), 2000);
   }
 
@@ -423,7 +434,7 @@ export function PromoCodesManager({
                     </span>
                     <button
                       type="button"
-                      onClick={() => copyToClipboard(promo.code)}
+                      onClick={() => void copyToClipboard(promo)}
                       title="Copy code"
                       aria-label={`Copy code ${promo.code}`}
                       className={buttonClass({ variant: "ghost", size: "iconSm", className: "text-text-subtle" })}
@@ -466,7 +477,7 @@ export function PromoCodesManager({
                     label={`More actions for ${promo.code}`}
                     items={[
                       { label: "Edit code", onSelect: () => openEditModal(promo), icon: <Edit2 /> },
-                      { label: "Delete code", onSelect: () => setDeleteTarget(promo), icon: <Trash2 />, destructive: true },
+                      { label: "Delete code", onSelect: () => void handleDelete(promo), icon: <Trash2 />, destructive: true },
                     ]}
                   />
                 </div>
@@ -477,7 +488,8 @@ export function PromoCodesManager({
                   </button>
                   <button
                     type="button"
-                    onClick={() => setDeleteTarget(promo)}
+                    disabled={deletingId === promo.id}
+                    onClick={() => void handleDelete(promo)}
                     aria-label={`Delete ${promo.code}`}
                     className={buttonClass({ variant: "ghost", size: "iconSm", className: "text-ink-600 hover:bg-danger-soft hover:text-danger" })}
                   >
@@ -688,38 +700,7 @@ export function PromoCodesManager({
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation Dialog */}
-      <Dialog open={deleteTarget !== null} onOpenChange={(open) => !open && setDeleteTarget(null)}>
-        <DialogContent className="apple-admin max-w-sm">
-          <DialogHeader>
-            <DialogTitle className="text-lg font-semibold tracking-[-0.02em] text-danger">
-              Delete {deleteTarget?.code}?
-            </DialogTitle>
-            <DialogDescription className="text-sm">
-              This removes the voucher permanently. Orders already placed keep their discount.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="pt-2">
-            <button
-              type="button"
-              disabled={deleting}
-              onClick={() => setDeleteTarget(null)}
-              className={buttonClass({ variant: "ghost", size: "md" })}
-            >
-              Keep
-            </button>
-            <button
-              type="button"
-              disabled={deleting}
-              onClick={handleDeleteConfirm}
-              className={buttonClass({ variant: "primary", size: "md", className: "bg-danger hover:bg-danger/90" })}
-            >
-              {deleting && <Loader2 className="size-4 animate-spin" />}
-              Delete
-            </button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {confirmDialog}
     </div>
   );
 }

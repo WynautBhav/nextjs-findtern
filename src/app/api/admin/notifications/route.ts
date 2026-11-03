@@ -5,7 +5,7 @@ import { z } from "zod";
 import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
 import { realEmployers } from "@/lib/admin/scope";
-import { cleanNotificationType, normaliseAudience } from "@/lib/admin/notification-types";
+import { NOTIFICATION_LINK_RULE, cleanNotificationType, isSafeNotificationLink, normaliseAudience } from "@/lib/admin/notification-types";
 
 const side = z.object({ all: z.boolean().default(false), ids: z.array(z.string()).max(5000).default([]) });
 
@@ -36,8 +36,8 @@ export async function POST(req: Request) {
   const d = parsed.data;
   if (JSON.stringify(d.data).length > 4000) return NextResponse.json({ error: "Data is too large (4 KB max)." }, { status: 400 });
   const link = d.data.link;
-  if (link !== undefined && (typeof link !== "string" || !link.startsWith("/") || link.startsWith("//"))) {
-    return NextResponse.json({ error: "A link must be a path on this site, starting with /." }, { status: 400 });
+  if (link !== undefined && !isSafeNotificationLink(link)) {
+    return NextResponse.json({ error: NOTIFICATION_LINK_RULE }, { status: 400 });
   }
 
   const audience = normaliseAudience(d);

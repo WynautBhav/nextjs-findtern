@@ -1,9 +1,10 @@
-import { eq, inArray } from "drizzle-orm";
+import { eq, inArray, sql, type SQL } from "drizzle-orm";
 
 import { getDb, schema } from "@/lib/db";
 import { getInternActivationFeeMinor } from "@/lib/platform-settings";
 import { computeReceivables } from "@/lib/admin/receivables";
-import { meaningfulProfile, realEmployerId, realEmployers } from "@/lib/admin/scope";
+import { inrMinorSql, meaningfulProfile, realEmployerId, realEmployers } from "@/lib/admin/scope";
+import { istDayKeys, istDayStart, istKeySql, istMonthKeys, istMonthStart, PAID_STATUS, receivedAtSql, utcSql, type Bucket } from "@/lib/admin/revenue";
 
 export type MoneyFilter = "both" | "company" | "candidate";
 
@@ -104,4 +105,71 @@ export async function loadReceivables(
     },
     filter,
   );
+}
+
+// ----------------------------------------------------------------------
+// The one money layer, over the database (definitions: lib/admin/revenue.ts).
+
+/** Every paid employer order and intern fee as (source, inr_minor, received_at); test employers excluded. */
+function paidReceipts(): SQL {
+  const ep = schema.employerPayments;
+  const ip = schema.internPayments;
+  return sql`(
+    SELECT 'employer' AS source, ${inrMinorSql(ep.amountMinor, ep.currency)} AS inr_minor, ${receivedAtSql(ep.paidAt, ep.createdAt)} AS received_at
+      FROM ${ep} WHERE ${ep.status} = ${PAID_STATUS} AND ${realEmployerId(ep.employerId)}
+    UNION ALL
+    SELECT 'intern', ${inrMinorSql(ip.amountMinor, ip.currency)}, ${receivedAtSql(ip.paidAt, ip.createdAt)}
+      FROM ${ip} WHERE ${ip.status} = ${PAID_STATUS}
+  ) receipts`;
+}
+
+const within = (since: Date | null, until: Date | null): SQL => sql`${since ? sql`received_at >= ${utcSql(since)}` : sql`true`} AND ${until ? sql`received_at < ${utcSql(until)}` : sql`true`}`;
+
+export type Collected = { receivedMinor: number; receivedCount: number; employerMinor: number; internMinor: number };
+
+/** Money received (paid rows, INR) with received_at in [since, until); null bounds are open. */
+export async function loadCollected(range: { since?: Date | null; until?: Date | null } = {}): Promise<Collected> {
+  const { rows } = await getDb().execute<{ total: string | number; n: string | number; employer: string | number; intern: string | number }>(sql`
+    SELECT coalesce(sum(inr_minor), 0)::bigint AS total,
+           count(*)::int AS n,
+           coalesce(sum(inr_minor) FILTER (WHERE source = 'employer'), 0)::bigint AS employer,
+           coalesce(sum(inr_minor) FILTER (WHERE source = 'intern'), 0)::bigint AS intern
+      FROM ${paidReceipts()} WHERE ${within(range.since ?? null, range.until ?? null)}`);
+  const r = rows[0];
+  return { receivedMinor: Number(r?.total ?? 0), receivedCount: Number(r?.n ?? 0), employerMinor: Number(r?.employer ?? 0), internMinor: Number(r?.intern ?? 0) };
+}
+
+/** Received in the last `days` India days including today (the "last 7 days" window). */
+export function loadCollectedLastDays(days: number, now: Date = new Date()): Promise<Collected> {
+  return loadCollected({ since: istDayStart(istDayKeys(now, days)[0]) });
+}
+
+/** Received per India month / day, as maps keyed `YYYY-MM` / `YYYY-MM-DD`. */
+export async function loadReceiptBuckets(unit: "month" | "day", count: number, now: Date = new Date()): Promise<Map<string, Bucket>> {
+  const keys = unit === "month" ? istMonthKeys(now, count) : istDayKeys(now, count);
+  const since = unit === "month" ? istMonthStart(keys[0]) : istDayStart(keys[0]);
+  const { rows } = await getDb().execute<{ key: string; total: string | number; n: string | number }>(sql`
+    SELECT ${istKeySql(sql`received_at`, unit)} AS key, coalesce(sum(inr_minor), 0)::bigint AS total, count(*)::int AS n
+      FROM ${paidReceipts()} WHERE ${within(since, null)} GROUP BY 1`);
+  return new Map(rows.map((r) => [r.key, { totalMinor: Number(r.total), count: Number(r.n) }]));
+}
+
+/** Payouts to interns: settled (paid) and still pending, INR. */
+export async function loadPayoutTotals() {
+  const p = schema.internPayouts;
+  const { rows } = await getDb().execute<{ paid: string | number; paid_n: string | number; pending: string | number; pending_n: string | number; n: string | number }>(sql`
+    SELECT coalesce(sum(${inrMinorSql(p.amountMinor, p.currency)}) FILTER (WHERE ${p.status} = ${PAID_STATUS}), 0)::bigint AS paid,
+           count(*) FILTER (WHERE ${p.status} = ${PAID_STATUS})::int AS paid_n,
+           coalesce(sum(${inrMinorSql(p.amountMinor, p.currency)}) FILTER (WHERE ${p.status} = 'pending'), 0)::bigint AS pending,
+           count(*) FILTER (WHERE ${p.status} = 'pending')::int AS pending_n,
+           count(*)::int AS n
+      FROM ${p}`);
+  const r = rows[0];
+  return {
+    paidOutMinor: Number(r?.paid ?? 0),
+    paidOutCount: Number(r?.paid_n ?? 0),
+    pendingMinor: Number(r?.pending ?? 0),
+    pendingCount: Number(r?.pending_n ?? 0),
+    totalCount: Number(r?.n ?? 0),
+  };
 }

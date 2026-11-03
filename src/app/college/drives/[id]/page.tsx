@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 
-import { Panel, PanelBody, PanelHeader } from "@/components/admin/panel";
+import { Panel, PanelBody, PanelHeader } from "@/components/college/panel";
 import { PageHead } from "@/components/app/primitives";
 import { DriveBuilder } from "@/components/college/drive-builder";
 import { toLocalInput } from "@/lib/college/ist";

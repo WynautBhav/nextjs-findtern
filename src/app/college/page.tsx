@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { and, eq, gt, isNull, lte, sql } from "drizzle-orm";
 
-import { StatCard, StatGrid } from "@/components/admin/stat-card";
+import { StatCard, StatGrid } from "@/components/college/stat-card";
 import { PresenceLive } from "@/components/college/presence-live";
 import { StudentTable } from "@/components/college/student-table";
 import { aiStatusLabel } from "@/lib/college/labels";

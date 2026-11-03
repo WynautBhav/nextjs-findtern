@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useId, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { KeyRound, Loader2, Pencil, Plus, Trash2, UserPlus } from "lucide-react";
 
@@ -10,9 +10,10 @@ import type { Admin } from "@/lib/db/schema";
 import { Panel, PanelHeader } from "@/components/admin/panel";
 import { Pill } from "@/components/app/primitives";
 import { buttonClass } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
-import { PASSWORD_HINT } from "@/lib/password-policy";
+import { PASSWORD_HINT, isStrongPassword, WEAK_PASSWORD_MESSAGE } from "@/lib/password-policy";
 import { useConfirm } from "@/components/app/use-confirm";
 
 const AREA_LABEL: Record<string, string> = {
@@ -102,6 +103,7 @@ export function StaffRolesManager({
   const [busyId, setBusyId] = useState<string | null>(null);
   const [staffError, setStaffError] = useState<string | null>(null);
   const [staffNote, setStaffNote] = useState<string | null>(null);
+  const [resetTarget, setResetTarget] = useState<Staff | null>(null);
 
   const [staffSheet, setStaffSheet] = useState(false);
   const [roleSheet, setRoleSheet] = useState<{ mode: "new" } | { mode: "rename"; key: string } | null>(null);
@@ -157,6 +159,21 @@ export function StaffRolesManager({
     }
   }
 
+  async function changeRole(s: Staff, nextRole: string) {
+    if (nextRole === s.role) return;
+    const roleName = roles.find((r) => r.key === nextRole)?.name ?? nextRole;
+    const toSuper = nextRole === "super_admin";
+    const ok = await ask({
+      title: toSuper ? `Make ${s.email} a super admin?` : `Change ${s.email} to ${roleName}?`,
+      body: toSuper
+        ? "A super admin has every permission, including managing staff and roles. Only do this for someone you trust with the whole console."
+        : "Their access changes within a minute. Anything their new role does not allow is no longer available to them.",
+      confirmLabel: toSuper ? "Yes, make super admin" : "Yes, change role",
+    });
+    if (!ok) return;
+    await updateStaff(s.id, { role: nextRole });
+  }
+
   async function updateStaff(id: string, body: { role?: string; password?: string }) {
     setBusyId(id);
     setStaffError(null);
@@ -168,7 +185,6 @@ export function StaffRolesManager({
       return;
     }
     if (body.role) setStaff((prev) => prev.map((s) => (s.id === id ? { ...s, role: body.role! } : s)));
-    if (body.password) setStaffNote("Password updated. Share it with them securely; they can change it under Your account.");
   }
 
   async function removeStaff(s: Staff) {
@@ -249,7 +265,7 @@ export function StaffRolesManager({
                   value={s.role ?? ""}
                   disabled={busyId === s.id || self}
                   title={self ? "You can't change your own role" : undefined}
-                  onChange={(e) => updateStaff(s.id, { role: e.target.value })}
+                  onChange={(e) => void changeRole(s, e.target.value)}
                   className="h-9 min-w-0 flex-1 rounded-apple-sm border border-ink-200 bg-surface px-2.5 text-base sm:text-sm text-ink-800 disabled:opacity-60 max-lg:h-11 max-sm:basis-full sm:w-48 sm:flex-none"
                 >
                   {roles.map((r) => (
@@ -264,8 +280,8 @@ export function StaffRolesManager({
                       type="button"
                       disabled={busyId === s.id}
                       onClick={() => {
-                        const pw = window.prompt(`New password for ${s.email}. ${PASSWORD_HINT}`);
-                        if (pw) void updateStaff(s.id, { password: pw });
+                        setStaffNote(null);
+                        setResetTarget(s);
                       }}
                       className={buttonClass({ variant: "ghost", size: "sm" })}
                     >
@@ -419,6 +435,14 @@ export function StaffRolesManager({
         </div>
       </Panel>
 
+      <ResetPasswordDialog
+        target={resetTarget}
+        onClose={() => setResetTarget(null)}
+        onDone={() => {
+          setResetTarget(null);
+          setStaffNote("Password updated. Share it with them securely; they can change it under Your account.");
+        }}
+      />
       <AddStaffSheet
         open={staffSheet}
         onOpenChange={setStaffSheet}
@@ -439,6 +463,129 @@ export function StaffRolesManager({
         }}
       />
     </div>
+  );
+}
+
+/**
+ * A new password for someone else, typed twice and masked. It was a
+ * window.prompt, which shows what is typed, cannot show the rules, and has no
+ * place for the server's refusal.
+ */
+function ResetPasswordDialog({
+  target,
+  onClose,
+  onDone,
+}: {
+  target: Staff | null;
+  onClose: () => void;
+  onDone: () => void;
+}) {
+  const uid = useId();
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<{ message: string; field: "password" | "confirm" | "form" } | null>(null);
+  const [opened, setOpened] = useState<Staff | null>(null);
+  if (opened !== target) {
+    setOpened(target);
+    setPassword("");
+    setConfirm("");
+    setError(null);
+  }
+
+  const rulesId = `${uid}-rules`;
+  const errorId = `${uid}-error`;
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!target) return;
+    if (!isStrongPassword(password)) {
+      setError({ message: WEAK_PASSWORD_MESSAGE, field: "password" });
+      document.getElementById(`${uid}-pw`)?.focus();
+      return;
+    }
+    if (password !== confirm) {
+      setError({ message: "The two passwords don't match.", field: "confirm" });
+      document.getElementById(`${uid}-confirm`)?.focus();
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    const result = await call("/api/admin/staff", "PATCH", { id: target.id, password });
+    setBusy(false);
+    if (!result.ok) {
+      setError({ message: result.error ?? "Not saved.", field: "form" });
+      return;
+    }
+    onDone();
+  }
+
+  return (
+    <Dialog open={target !== null} onOpenChange={(open) => (!open && !busy ? onClose() : undefined)}>
+      <DialogContent className="sm:max-w-md">
+        <form onSubmit={submit} noValidate className="grid gap-4">
+          <DialogHeader>
+            <DialogTitle>Reset password</DialogTitle>
+            <DialogDescription>
+              Set a new password for {target?.email}. Share it with them securely.
+            </DialogDescription>
+          </DialogHeader>
+          <div>
+            <label htmlFor={`${uid}-pw`} className="block text-sm font-medium text-ink-800">
+              New password
+            </label>
+            <input
+              id={`${uid}-pw`}
+              type="password"
+              autoComplete="new-password"
+              value={password}
+              onChange={(e) => {
+                setPassword(e.target.value);
+                setError(null);
+              }}
+              aria-invalid={error?.field === "password" ? true : undefined}
+              aria-describedby={error?.field === "password" ? `${rulesId} ${errorId}` : rulesId}
+              className={field}
+            />
+            <p id={rulesId} className="mt-1 text-xs text-ink-600">
+              {PASSWORD_HINT}
+            </p>
+          </div>
+          <div>
+            <label htmlFor={`${uid}-confirm`} className="block text-sm font-medium text-ink-800">
+              Confirm new password
+            </label>
+            <input
+              id={`${uid}-confirm`}
+              type="password"
+              autoComplete="new-password"
+              value={confirm}
+              onChange={(e) => {
+                setConfirm(e.target.value);
+                setError(null);
+              }}
+              aria-invalid={error?.field === "confirm" ? true : undefined}
+              aria-describedby={error?.field === "confirm" ? errorId : undefined}
+              className={field}
+            />
+          </div>
+          {error ? (
+            <p id={errorId} role="alert" className="text-sm font-medium text-danger">
+              {error.message}
+            </p>
+          ) : null}
+          <DialogFooter>
+            <button type="button" onClick={onClose} disabled={busy} className={buttonClass({ variant: "ghost", size: "sm" })}>
+              Cancel
+            </button>
+            <button type="submit" disabled={busy} className={buttonClass({ variant: "primary", size: "sm" })}>
+              {busy ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <KeyRound className="size-4" aria-hidden />}
+              Set password
+            </button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
 

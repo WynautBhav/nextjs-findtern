@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { cleanNotificationType, normaliseAudience } from "./notification-types.ts";
+import { cleanNotificationType, isSafeNotificationLink, normaliseAudience } from "./notification-types.ts";
 
 test("picked ids: trimmed, blanks and duplicates dropped (ADP-26)", () => {
   const a = normaliseAudience({ recipientType: "intern", recipientIds: [" a ", "a", "", "  ", "b"] });
@@ -32,4 +32,11 @@ test("type is a short slug, defaulting to custom", () => {
   assert.equal(cleanNotificationType("  Promo Offer! "), "promo_offer");
   assert.equal(cleanNotificationType(""), "custom");
   assert.equal(cleanNotificationType("update"), "update");
+});
+
+test("notification links: on-site paths only, no protocol-relative or backslash tricks", () => {
+  for (const ok of ["/intern/proposals", "/employer/orders?x=1#top", "/a"]) assert.equal(isSafeNotificationLink(ok), true, ok);
+  for (const bad of ["//evil.com", "/\\evil.com", "/ /x", "/", "", "https://evil.com", "javascript:alert(1)", "/\n/evil.com", "/\t/evil.com", "intern/x", 5, null, undefined]) {
+    assert.equal(isSafeNotificationLink(bad), false, String(bad));
+  }
 });

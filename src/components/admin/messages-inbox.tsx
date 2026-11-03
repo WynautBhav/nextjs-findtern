@@ -12,6 +12,7 @@ import { buttonClass } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import type { ContactFile, ContactMeta } from "@/lib/admin/contact-meta";
 import { csrfFetch } from "@/lib/client-fetch";
+import { formatNumber, shortDate, shortDateTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { useConfirm } from "@/components/app/use-confirm";
 
@@ -50,13 +51,10 @@ function roleLabel(m: InboxMessage): string | null {
 
 function when(iso: string | null, withTime = false): string {
   if (!iso) return "-";
-  return new Date(iso).toLocaleString("en-IN", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    ...(withTime ? { hour: "2-digit", minute: "2-digit", hour12: true } : {}),
-    timeZone: "Asia/Kolkata",
-  });
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "-";
+  const day = { day: "2-digit", month: "2-digit", year: "numeric" } as const;
+  return withTime ? shortDateTime(date, { ...day, hour: "2-digit", minute: "2-digit", hour12: true }) : shortDate(date, day);
 }
 
 function initials(name: string): string {
@@ -69,12 +67,15 @@ export function MessagesInbox({ messages, filtering }: { messages: InboxMessage[
   const router = useRouter();
   const [rows, setRows] = useState(messages);
   const [seen, setSeen] = useState(messages);
-  if (seen !== messages) {
-    setSeen(messages);
-    setRows(messages);
-  }
   const [openId, setOpenId] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  if (seen !== messages) {
+    // A new page or filter brings different rows; a selection kept from the
+    // old ones would let a bulk delete hit messages that are no longer shown.
+    setSeen(messages);
+    setRows(messages);
+    setSelected(new Set());
+  }
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -113,9 +114,9 @@ export function MessagesInbox({ messages, filtering }: { messages: InboxMessage[
 
   async function remove(ids: string[]) {
     const ok = await ask({
-      title: ids.length === 1 ? "Delete this message?" : `Delete ${ids.length} messages?`,
+      title: ids.length === 1 ? "Delete this message?" : `Delete ${formatNumber(ids.length)} messages?`,
       body: "Deleted messages are gone from the inbox for everyone. This can't be undone.",
-      confirmLabel: ids.length === 1 ? "Yes, delete it" : `Yes, delete ${ids.length}`,
+      confirmLabel: ids.length === 1 ? "Yes, delete it" : `Yes, delete ${formatNumber(ids.length)}`,
     });
     if (!ok) return;
     if (!(await send("DELETE", ids))) return;
@@ -127,20 +128,25 @@ export function MessagesInbox({ messages, filtering }: { messages: InboxMessage[
 
   function openMessage(m: InboxMessage) {
     setOpenId(m.id);
-    // Opening a message reads it (legacy inbox did the same). Silent: a
-    // read-only role can still open it, it just stays unread.
+    setError(null);
+    // Opening a message reads it (legacy inbox did the same). A failure is
+    // shown in the message, so it is clear why it is still marked unread.
     if (!m.isRead) {
       void csrfFetch("/api/admin/messages", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: m.id, isRead: true }),
       })
-        .then((res) => {
-          if (!res.ok) return;
+        .then(async (res) => {
+          if (!res.ok) {
+            const data = (await res.json().catch(() => null)) as { error?: string } | null;
+            setError(data?.error ?? "Couldn't mark this message as read.");
+            return;
+          }
           setRows((prev) => prev.map((x) => (x.id === m.id ? { ...x, isRead: true } : x)));
           router.refresh();
         })
-        .catch(() => undefined);
+        .catch(() => setError("Couldn't mark this message as read: the network request failed."));
     }
   }
 
@@ -175,7 +181,7 @@ export function MessagesInbox({ messages, filtering }: { messages: InboxMessage[
             onChange={() => setSelected(allSelected ? new Set() : new Set(rows.map((m) => m.id)))}
             className="size-4 rounded-sm accent-brand-700"
           />
-          {selected.size ? `${selected.size} selected` : "Select all on this page"}
+          {selected.size ? `${formatNumber(selected.size)} selected` : "Select all on this page"}
         </label>
         {selected.size ? (
           <div className="flex flex-wrap items-center gap-1.5 sm:ml-auto">
@@ -257,7 +263,7 @@ export function MessagesInbox({ messages, filtering }: { messages: InboxMessage[
                     {m.meta.files.length ? (
                       <span className="inline-flex items-center gap-1 text-xs text-ink-600">
                         <Paperclip className="size-3.5" aria-hidden />
-                        <span className="nums">{m.meta.files.length}</span>
+                        <span className="nums">{formatNumber(m.meta.files.length)}</span>
                         <span className="sr-only">attachments</span>
                       </span>
                     ) : null}
@@ -414,7 +420,7 @@ function Attachment({ file }: { file: ContactFile }) {
           <img src={file.href} alt={`Attachment ${file.name}`} loading="lazy" className="h-36 w-full object-contain" />
         </a>
       ) : file.type === "video" ? (
-        <video src={file.href} controls preload="metadata" className="h-36 w-full bg-ink-900" />
+        <video src={file.href} controls preload="metadata" className="h-36 w-full bg-ink-50" />
       ) : null}
       <a
         href={file.href}

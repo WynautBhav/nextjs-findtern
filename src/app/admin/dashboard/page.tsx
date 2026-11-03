@@ -20,8 +20,9 @@ import { TrendChart } from "@/components/admin/trend-chart";
 import { DetailRow, PageHead } from "@/components/app/primitives";
 import { STAT_ROW, StatTile, Tile } from "@/components/app/tiles";
 import { ButtonLink } from "@/components/ui/button";
-import { inrMinorSql, meaningfulProfile, realEmployerId, realEmployers, TEST_EMPLOYER_ID, AI_INTERVIEW_EMAIL } from "@/lib/admin/scope";
+import { meaningfulProfile, realEmployerId, realEmployers, TEST_EMPLOYER_ID, AI_INTERVIEW_EMAIL } from "@/lib/admin/scope";
 import { attentionTotal } from "@/lib/admin/dashboard";
+import { loadCollected, loadCollectedLastDays } from "@/lib/admin/receivables-load";
 
 /**
  * Admin home, a bento like the intern home (SPECS §2 dashboard exception):
@@ -120,25 +121,9 @@ async function loadDashboard(uid: string | null) {
       .select({ value: count() })
       .from(schema.employers)
       .where(and(realEmployers(), eq(schema.employers.isActive, true), eq(schema.employers.onboardingCompleted, true), gte(schema.employers.createdAt, weekAgo))),
-    // Paid employer orders plus intern fees, USD converted (same as Reports).
-    db.execute<{ value: number }>(sql`
-      SELECT coalesce(sum(v), 0)::bigint AS value FROM (
-        SELECT ${inrMinorSql(schema.employerPayments.amountMinor, schema.employerPayments.currency)} AS v
-          FROM ${schema.employerPayments} WHERE ${schema.employerPayments.status} = 'paid'
-        UNION ALL
-        SELECT ${inrMinorSql(schema.internPayments.amountMinor, schema.internPayments.currency)}
-          FROM ${schema.internPayments} WHERE ${schema.internPayments.status} = 'paid'
-      ) t`).then((r) => r.rows),
-    db.execute<{ value: number }>(sql`
-      SELECT coalesce(sum(v), 0)::bigint AS value FROM (
-        SELECT ${inrMinorSql(schema.employerPayments.amountMinor, schema.employerPayments.currency)} AS v
-          FROM ${schema.employerPayments}
-          WHERE ${schema.employerPayments.status} = 'paid' AND ${schema.employerPayments.paidAt} >= ${weekAgo}
-        UNION ALL
-        SELECT ${inrMinorSql(schema.internPayments.amountMinor, schema.internPayments.currency)}
-          FROM ${schema.internPayments}
-          WHERE ${schema.internPayments.status} = 'paid' AND ${schema.internPayments.paidAt} >= ${weekAgo}
-      ) t`).then((r) => r.rows),
+    // Revenue: the one money layer (lib/admin/revenue); the week is the last 7 India days, as on Transactions.
+    loadCollected().then((c) => [{ value: c.receivedMinor }]),
+    loadCollectedLastDays(7).then((c) => [{ value: c.receivedMinor }]),
     db
       .select({ value: count() })
       .from(schema.users)
@@ -533,8 +518,8 @@ export default async function AdminDashboard() {
         <StatTile
           index={4}
           label="Revenue"
-          value={formatMoney(n(d.revenue), "INR", { zeroLabel: "₹0" })}
-          meta={n(d.revenueWeek) ? `${formatMoney(n(d.revenueWeek), "INR")} in the last 7 days` : "Nothing in the last 7 days"}
+          value={formatMoney(n(d.revenue), "INR", { zeroLabel: "₹0", decimals: 0 })}
+          meta={n(d.revenueWeek) ? `${formatMoney(n(d.revenueWeek), "INR", { decimals: 0 })} in the last 7 days` : "Nothing in the last 7 days"}
           href="/admin/transactions"
         />
       </div>

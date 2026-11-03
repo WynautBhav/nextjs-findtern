@@ -5,7 +5,6 @@ import { InvoiceCsvButton, InvoiceRowActions } from "@/components/admin/invoice-
 import { DateRangeForm } from "@/components/admin/report-range";
 import { StatCard, StatGrid } from "@/components/admin/stat-card";
 import { StatusBadge } from "@/components/admin/status-badge";
-import { toInrMinor } from "@/lib/admin/money";
 import {
   displayInvoiceNumber,
   filterInvoiceRows,
@@ -20,7 +19,8 @@ import {
   type InvoiceSort,
 } from "@/lib/admin/invoice-rows";
 import { parsePageRequest } from "@/lib/admin/params";
-import { formatDate, formatMoney } from "@/lib/format";
+import { ledgerTotals } from "@/lib/admin/revenue";
+import { formatDate, formatMoney, formatNumber } from "@/lib/format";
 import { placeOfSupply, splitGst } from "@/lib/gst";
 import type { InvoiceSeller } from "@/lib/invoice";
 
@@ -41,12 +41,15 @@ export function AdminInvoicesView({
   seller,
   params,
   basePath,
+  uncounted,
 }: {
   kind: InvoiceKind;
   rows: AdminInvoiceRow[];
   seller: InvoiceSeller;
   params: Record<string, string>;
   basePath: string;
+  /** Row ids that are listed but are not customers' money (test employers). */
+  uncounted?: ReadonlySet<string>;
 }) {
   const k = INVOICE_KINDS[kind];
   const req = parsePageRequest(params);
@@ -59,10 +62,10 @@ export function AdminInvoicesView({
 
   // One currency: USD converted at ₹100/$. Over the filtered rows, so the
   // tiles agree with the table under them.
-  const paid = filtered.filter(isPaidRow);
-  const paidMinor = paid.reduce((s, r) => s + toInrMinor(r.amountMinor, r.currency), 0);
-  const pendingMinor = filtered.filter((r) => !isPaidRow(r)).reduce((s, r) => s + toInrMinor(r.amountMinor, r.currency), 0);
-  const discountMinor = paid.reduce((s, r) => s + toInrMinor(r.discountMinor ?? 0, r.currency), 0);
+  // Collected, discounts and not-collected come from the one money layer
+  // (lib/admin/revenue): paid payment rows only, so they reconcile with
+  // Transactions, Reports and the Dashboard.
+  const totals = ledgerTotals(filtered, uncounted);
 
   const money = (minor: number, currency: string) => formatMoney(minor, currency === "USD" ? "USD" : "INR", { zeroLabel: false });
   const gstOf = (r: AdminInvoiceRow) => r.amountMinor - splitGst(r.amountMinor, placeOfSupply({ ...r.buyer, currency: r.currency })).baseMinor;
@@ -141,20 +144,20 @@ export function AdminInvoicesView({
       <StatGrid cols={3}>
         <StatCard
           label="Collected"
-          value={formatMoney(paidMinor, "INR", { zeroLabel: "₹0" })}
-          hint={`${paid.length.toLocaleString("en-IN")} paid ${k.noun} · USD at ₹100/$`}
+          value={formatMoney(totals.collectedMinor, "INR", { zeroLabel: "₹0" })}
+          hint={`${formatNumber(totals.collectedCount)} paid ${k.noun} · USD at ₹100/$${totals.markedPaidCount ? ` · ${formatNumber(totals.markedPaidCount)} marked paid elsewhere, not counted` : ""}`}
           tone="neutral"
         />
         <StatCard
           label="Discounts given"
-          value={formatMoney(discountMinor, "INR", { zeroLabel: "₹0" })}
+          value={formatMoney(totals.discountMinor, "INR", { zeroLabel: "₹0" })}
           hint="Promo codes and legacy discounts on paid rows"
           tone="neutral"
         />
         <StatCard
           label="Not collected"
-          value={formatMoney(pendingMinor, "INR", { zeroLabel: "₹0" })}
-          hint={`${(filtered.length - paid.length).toLocaleString("en-IN")} unpaid, failed or abandoned`}
+          value={formatMoney(totals.notCollectedMinor, "INR", { zeroLabel: "₹0" })}
+          hint={`${formatNumber(totals.notCollectedCount)} unpaid, failed or abandoned`}
           tone="neutral"
         />
       </StatGrid>

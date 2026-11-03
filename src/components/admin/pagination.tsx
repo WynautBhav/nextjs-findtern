@@ -70,20 +70,20 @@ export function Pagination({
     `${basePath}${toQueryString({ ...params, [pageParam]: String(target) })}`;
 
   const linkBase =
-    "apple-spring apple-pressable inline-flex h-8 min-w-8 items-center justify-center rounded-apple-sm px-2.5 text-sm font-medium nums max-lg:min-h-11 max-lg:min-w-11";
+    "apple-spring apple-pressable inline-flex h-8 min-w-8 items-center justify-center rounded-apple-sm px-2.5 text-sm font-medium nums touch:min-h-11 touch:min-w-11";
 
   return (
     <nav
       aria-label="Pagination"
-      className="flex flex-wrap items-center justify-between gap-3 border-t border-ink-100 px-5 py-3"
+      className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-5 py-3"
     >
-      <p className="text-sm text-ink-600">
+      <p className="text-sm text-text-subtle">
         Showing{" "}
-        <span className="nums font-medium text-ink-800">
+        <span className="nums font-medium text-foreground">
           {from.toLocaleString("en-IN")}–{to.toLocaleString("en-IN")}
         </span>{" "}
         of{" "}
-        <span className="nums font-medium text-ink-800">
+        <span className="nums font-medium text-foreground">
           {total.toLocaleString("en-IN")}
         </span>{" "}
         {noun}
@@ -97,10 +97,10 @@ export function Pagination({
           tabIndex={page <= 1 ? -1 : undefined}
           className={cn(
             linkBase,
-            "border border-ink-200 text-ink-700",
+            "border border-border text-foreground",
             page <= 1
-              ? "pointer-events-none text-ink-300"
-              : "hover:bg-ink-50 hover:border-ink-300",
+              ? "pointer-events-none opacity-40"
+              : "hover:bg-surface hover:border-border-strong",
           )}
         >
           Previous
@@ -108,7 +108,7 @@ export function Pagination({
 
         {pageWindow(page, pages).map((entry, index) =>
           entry === "gap" ? (
-            <span key={`gap-${index}`} aria-hidden className="px-1 text-ink-600">
+            <span key={`gap-${index}`} aria-hidden className="px-1 text-text-subtle">
               …
             </span>
           ) : (
@@ -121,7 +121,7 @@ export function Pagination({
                 linkBase,
                 entry === page
                   ? "bg-primary text-white"
-                  : "border border-ink-200 text-ink-700 hover:bg-ink-50 hover:border-ink-300",
+                  : "border border-border text-foreground hover:bg-surface hover:border-border-strong",
               )}
             >
               {entry}
@@ -136,10 +136,10 @@ export function Pagination({
           tabIndex={page >= pages ? -1 : undefined}
           className={cn(
             linkBase,
-            "border border-ink-200 text-ink-700",
+            "border border-border text-foreground",
             page >= pages
-              ? "pointer-events-none text-ink-300"
-              : "hover:bg-ink-50 hover:border-ink-300",
+              ? "pointer-events-none opacity-40"
+              : "hover:bg-surface hover:border-border-strong",
           )}
         >
           Next
@@ -147,4 +147,14 @@ export function Pagination({
       </div>
     </nav>
   );
+}
+
+/**
+ * Pager - `Pagination` that renders nothing for an empty result, so a table
+ * (or a hand-rolled list) can drop it in unconditionally. Takes the table's
+ * own `pageKey`, which is what lets two tables share one page.
+ */
+export function Pager(props: React.ComponentProps<typeof Pagination>) {
+  if (props.total === 0 || props.rowsShown === 0) return null;
+  return <Pagination {...props} />;
 }

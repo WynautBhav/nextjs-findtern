@@ -5,6 +5,7 @@ import { z } from "zod";
 
 import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
+import { sanitizeRichText } from "@/lib/richtext";
 
 const bodySchema = z.object({
   title: z.string().min(1).optional(),
@@ -21,8 +22,14 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   const parsed = bodySchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Invalid input" }, { status: 400 });
 
+  const values = { ...parsed.data };
+  if (values.bodyHtml !== undefined) {
+    values.bodyHtml = sanitizeRichText(values.bodyHtml);
+    if (!values.bodyHtml.replace(/<[^>]*>/g, "").trim()) return NextResponse.json({ error: "Clause text is required" }, { status: 400 });
+  }
+
   const db = getDb();
-  await db.update(schema.internNonDisclosureClauses).set({ ...parsed.data, updatedAt: new Date() }).where(eq(schema.internNonDisclosureClauses.id, id));
+  await db.update(schema.internNonDisclosureClauses).set({ ...values, updatedAt: new Date() }).where(eq(schema.internNonDisclosureClauses.id, id));
   revalidatePath("/", "layout"); // the public NDA page reads these
   return NextResponse.json({ ok: true });
 }

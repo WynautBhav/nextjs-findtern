@@ -1,10 +1,10 @@
-import { and, asc, count, desc, eq, gte, sql, type AnyColumn, type SQL, type SQLWrapper } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, sql, type AnyColumn, type SQL } from "drizzle-orm";
 
 import Link from "next/link";
 
 import { getDb, schema } from "@/lib/db";
 import { q } from "@/lib/college/sql";
-import { formatDate, formatMoney, formatNumber, shortDateTime } from "@/lib/format";
+import { formatDate, formatMoney, formatNumber } from "@/lib/format";
 import { flattenParams, parsePageRequest, PERIOD_OPTIONS, periodStart, searchAny, toPage, type RawSearchParams } from "@/lib/admin/params";
 import { AdminLoadError, AdminPageHeader, Panel, PanelBody, PanelHeader } from "@/components/admin/panel";
 import { StatCard, StatGrid } from "@/components/admin/stat-card";
@@ -13,7 +13,8 @@ import { StatusBadge } from "@/components/admin/status-badge";
 import { ChipLinks, DateRangeForm } from "@/components/admin/report-range";
 import { dateRangeConditions } from "@/lib/admin/date-range";
 import { gatewayLabel } from "@/lib/admin/invoice-rows";
-import { inrMinorSql } from "@/lib/admin/scope";
+import { fillBuckets, istDayKeys, istMonthKeys, istMonthLabel, istWeekdayLabel } from "@/lib/admin/revenue";
+import { loadCollected, loadPayoutTotals, loadReceiptBuckets } from "@/lib/admin/receivables-load";
 import { PayoutEditor } from "@/components/admin/payout-editor";
 import { RevenueChart, VolumeBars, type RevenuePoint, type VolumePoint } from "@/components/admin/finance-charts";
 
@@ -29,82 +30,25 @@ type View = "employer" | "intern" | "payouts";
 const money = (minor: number, currency: string) => formatMoney(minor, currency === "USD" ? "USD" : "INR", { zeroLabel: false });
 
 async function loadMetrics() {
-  const db = getDb();
-  const [[paymentMetrics], [payoutMetrics], [pending]] = await Promise.all([
-    // Inflow = money actually received (paid rows only), employer orders plus
-    // intern activation fees, USD converted at ₹100/$ - never mixed raw.
-    db
-      .select({
-        totalAmount: sql<number>`(
-          coalesce((select sum(${inrMinorSql(sql`ep.amount_minor`, sql`ep.currency`)}) from ${schema.employerPayments} ep where ep.status = 'paid'), 0)
-          + coalesce((select sum(${inrMinorSql(sql`ip.amount_minor`, sql`ip.currency`)}) from ${schema.internPayments} ip where ip.status = 'paid'), 0)
-        )::bigint`,
-        paidCount: sql<number>`(
-          (select count(*) from ${schema.employerPayments} ep where ep.status = 'paid')
-          + (select count(*) from ${schema.internPayments} ip where ip.status = 'paid')
-        )::int`,
-      })
-      .from(sql`(select 1) as one`),
-    db
-      .select({
-        // Outflow = payouts that actually left (paid), converted.
-        totalAmount: sql<number>`coalesce(sum(case when ${schema.internPayouts.status} = 'paid' then ${inrMinorSql(schema.internPayouts.amountMinor, schema.internPayouts.currency)} end), 0)::bigint`,
-        paidCount: sql<number>`coalesce(count(case when ${schema.internPayouts.status} = 'paid' then 1 end), 0)::int`,
-        totalCount: sql<number>`count(*)::int`,
-      })
-      .from(schema.internPayouts),
-    db.select({ c: count() }).from(schema.internPayouts).where(eq(schema.internPayouts.status, "pending")),
-  ]);
+  // Received = paid rows (employer orders + intern fees), outflow = settled payouts; one definition in lib/admin/revenue.
+  const [collected, payouts] = await Promise.all([loadCollected(), loadPayoutTotals()]);
   return {
-    inflowMinor: Number(paymentMetrics?.totalAmount ?? 0),
-    inflowCount: Number(paymentMetrics?.paidCount ?? 0),
-    outflowMinor: Number(payoutMetrics?.totalAmount ?? 0),
-    outflowPaid: Number(payoutMetrics?.paidCount ?? 0),
-    outflowTotal: Number(payoutMetrics?.totalCount ?? 0),
-    pendingPayouts: Number(pending?.c ?? 0),
+    inflowMinor: collected.receivedMinor,
+    inflowCount: collected.receivedCount,
+    outflowMinor: payouts.paidOutMinor,
+    outflowPaid: payouts.paidOutCount,
+    outflowTotal: payouts.totalCount,
+    pendingPayouts: payouts.pendingCount,
   };
 }
 
-/** Monthly collected revenue (6 months) and daily paid volume (7 days), India time. */
+/** Monthly collected revenue (6 India months) and daily paid volume (7 India days). */
 async function loadCharts(): Promise<{ revenue: RevenuePoint[]; volume: VolumePoint[] }> {
-  const db = getDb();
   const now = new Date();
-  const monthStart = new Date(now.getFullYear(), now.getMonth() - 5, 1);
-  const weekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6);
-  const ist = (col: SQLWrapper) => sql`(${col} AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')`;
-  const bucket = (fmt: "month" | "day", since: Date) =>
-    Promise.all(
-      ([schema.employerPayments, schema.internPayments] as const).map((t) =>
-        db
-          .select({
-            key: sql<string>`to_char(date_trunc(${fmt}, ${ist(t.paidAt)}), ${fmt === "month" ? "YYYY-MM" : "YYYY-MM-DD"})`,
-            total: sql<number>`coalesce(sum(${inrMinorSql(t.amountMinor, t.currency)}), 0)::bigint`,
-            n: sql<number>`count(*)::int`,
-          })
-          .from(t)
-          .where(and(eq(t.status, "paid"), gte(t.paidAt, since)))
-          .groupBy(sql`1`),
-      ),
-    ).then((sets) => {
-      const merged = new Map<string, { total: number; n: number }>();
-      for (const row of sets.flat()) {
-        const hit = merged.get(row.key) ?? { total: 0, n: 0 };
-        merged.set(row.key, { total: hit.total + Number(row.total), n: hit.n + Number(row.n) });
-      }
-      return merged;
-    });
-  const [monthly, daily] = await Promise.all([bucket("month", monthStart), bucket("day", weekStart)]);
-  const pad = (n: number) => String(n).padStart(2, "0");
+  const [monthly, daily] = await Promise.all([loadReceiptBuckets("month", 6, now), loadReceiptBuckets("day", 7, now)]);
   return {
-    revenue: Array.from({ length: 6 }, (_, i) => {
-      const d = new Date(now.getFullYear(), now.getMonth() - 5 + i, 1);
-      return { label: shortDateTime(d, { month: "short" }), totalMinor: monthly.get(`${d.getFullYear()}-${pad(d.getMonth() + 1)}`)?.total ?? 0 };
-    }),
-    volume: Array.from({ length: 7 }, (_, i) => {
-      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6 + i);
-      const hit = daily.get(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`);
-      return { label: d.toLocaleString("en-IN", { weekday: "short" }), count: hit?.n ?? 0, totalMinor: hit?.total ?? 0 };
-    }),
+    revenue: fillBuckets(istMonthKeys(now, 6), monthly).map((b) => ({ label: istMonthLabel(b.key), totalMinor: b.totalMinor })),
+    volume: fillBuckets(istDayKeys(now, 7), daily).map((b) => ({ label: istWeekdayLabel(b.key), count: b.count, totalMinor: b.totalMinor })),
   };
 }
 

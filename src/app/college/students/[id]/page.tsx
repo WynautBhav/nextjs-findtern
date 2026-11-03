@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { FileText, PlayCircle, ShieldCheck } from "lucide-react";
 
-import { Panel, PanelBody, PanelHeader } from "@/components/admin/panel";
+import { Panel, PanelBody, PanelHeader } from "@/components/college/panel";
 import { NudgeButton } from "@/components/college/nudge-button";
 import { PageHead, Pill } from "@/components/app/primitives";
 import { humanizeStatus } from "@/components/app/status";

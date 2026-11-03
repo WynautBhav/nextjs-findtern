@@ -6,6 +6,8 @@
  * route share one set of rules and the rules are unit tested.
  */
 
+import { sanitizeRichText } from "../richtext.ts";
+
 export type CmsField = {
   name: string;
   label: string;
@@ -235,6 +237,20 @@ export function matchesCmsSearch(type: CmsType, item: Record<string, unknown>, n
     .map((f) => String(item[f.name] ?? "").toLowerCase())
     .join(" \u0000 ");
   return words.every((w) => hay.includes(w));
+}
+
+/**
+ * Stored HTML is rendered to the public and back into the admin editor, so a
+ * `<script>` or `onerror` saved once would run for every reader. Every
+ * richtext field goes through the same allowlist the public page renders with
+ * before it is written. Run after any normalising of plain text into <p>.
+ */
+export function sanitizeCmsValues(type: CmsType, values: Record<string, unknown>): Record<string, unknown> {
+  const out = { ...values };
+  for (const f of cmsFields(type)) {
+    if (f.kind === "richtext" && typeof out[f.name] === "string") out[f.name] = sanitizeRichText(out[f.name] as string);
+  }
+  return out;
 }
 
 /* ── Server-side validation ──────────────────────────────────────────── */
