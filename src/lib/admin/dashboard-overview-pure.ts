@@ -243,6 +243,9 @@ export function buildKpis(input: KpiInput): { kpis: Kpi[]; withProfile: number }
 
 // -------------------------------------------------------------------- activity
 
+/** Rows read per activity source; a group this big may be only the newest part of a longer run (\"6+\"). */
+export const ACTIVITY_FETCH_LIMIT = 6;
+
 export type ActivityKind = "payment" | "offer" | "project" | "signup";
 
 export type ActivityInput = {
@@ -355,7 +358,8 @@ export function groupActivity(items: ActivityItem[]): ActivityItem[] {
     } else {
       const head = items[i];
       const g = GROUP[head.kind];
-      out.push({ ...head, id: `group:${head.id}`, name: `${n} ${g.many}`, lead: head.name, verb: g.verb, object: "", count: n, href: g.href });
+      const capped = n >= ACTIVITY_FETCH_LIMIT;
+      out.push({ ...head, id: `group:${head.id}`, name: `${n}${capped ? "+" : ""} ${g.many}`, lead: head.name, verb: g.verb, object: "", count: n, href: g.href });
     }
     i = j;
   }

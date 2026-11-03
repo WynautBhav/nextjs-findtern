@@ -4,6 +4,9 @@ import { formatMoney } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { BandCard, PipelineBand } from "@/lib/admin/dashboard-overview-pure";
 
+/** The stuck stage's bar segment: brand-400 with a diagonal hatch, so it differs from Hired's solid fill by pattern too. */
+const STUCK_HATCH = { backgroundImage: "repeating-linear-gradient(135deg, rgb(255 255 255 / 0.45) 0 3px, transparent 3px 6px)" } as const;
+
 /**
  * The hire pipeline as one band: Sent, Interview, Accepted, Processing, Hired, each with its count and
  * the offer value in it (per currency, never summed across currencies). The stage that has waited
@@ -55,8 +58,8 @@ function Band({ band }: { band: PipelineBand }) {
           {band.stages.map((s, i) => (
             <span
               key={s.key}
-              style={{ flexGrow: Math.max(weights[i], sum * 0.02) }}
-              className={cn("min-w-1 rounded-full", s.key === "hired" ? "bg-[color:var(--admin-tile)]" : s.key === band.stuck ? "bg-brand-500" : "bg-[color:var(--admin-bar-tint)]")}
+              className={cn("min-w-1 rounded-full", s.key === "hired" ? "bg-[color:var(--admin-tile)]" : s.key === band.stuck ? "bg-brand-400" : "bg-[color:var(--admin-bar-tint)]")}
+              style={{ flexGrow: Math.max(weights[i], sum * 0.02), ...(s.key === band.stuck ? STUCK_HATCH : null) }}
             />
           ))}
         </div>

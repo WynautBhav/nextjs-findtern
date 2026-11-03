@@ -61,7 +61,8 @@ export default async function AdminMoneyReportPage({ searchParams }: { searchPar
     console.error("[admin/reports/money] load failed", error);
   }
   const query = new URLSearchParams(params).toString();
-  const inr = (m: number) => formatMoney(m, "INR", { zeroLabel: "₹0" });
+  // A real minus sign (U+2212) glued to the figure, never a hyphen that can wrap off it.
+  const inr = (m: number) => formatMoney(m, "INR", { zeroLabel: "₹0" }).replace(/^[-–−]\s*/, "\u2212");
   const link = (patch: Record<string, string>) => {
     const q = new URLSearchParams({ ...params, ...patch });
     for (const [k, v] of [...q.entries()]) if (!v) q.delete(k);
@@ -147,16 +148,17 @@ export default async function AdminMoneyReportPage({ searchParams }: { searchPar
 
       {data ? (
         <>
-          <StatGrid cols={6} className="xl:grid-cols-5">
-            <StatCard label="Received" value={inr(data.totals.receivedMinor)} hint="Paid orders and activation fees" />
+          <StatGrid cols={6} className="grid-cols-1 xl:grid-cols-3 2xl:grid-cols-5">
+            <StatCard fit label="Received" value={inr(data.totals.receivedMinor)} hint="Paid orders and activation fees" />
             <StatCard
-              label="Still to collect"
+              fit label="Still to collect"
               value={inr(data.totals.dueMinor)}
               hint={`Accepted offers and monthly instalments · ${inr(data.totals.prospectMinor)} in unpaid fees`}
             />
-            <StatCard label="Paid to interns" value={inr(data.totals.paidOutMinor)} hint="Stipend payouts marked paid" />
-            <StatCard label="Owed to interns" value={inr(data.totals.owedMinor)} hint="Pending payouts and stipend months ahead" />
+            <StatCard fit label="Paid to interns" value={inr(data.totals.paidOutMinor)} hint="Stipend payouts marked paid" />
+            <StatCard fit label="Owed to interns" value={inr(data.totals.owedMinor)} hint="Pending payouts and stipend months ahead" />
             <StatCard
+              fit
               featured
               label="Net"
               value={inr(netMinor(data.totals))}

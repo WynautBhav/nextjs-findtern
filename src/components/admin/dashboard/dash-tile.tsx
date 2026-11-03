@@ -18,6 +18,7 @@ export function DashTile({
   href,
   featured = false,
   clear = false,
+  unknown = false,
 }: {
   label: string;
   value: number;
@@ -25,6 +26,8 @@ export function DashTile({
   href?: string;
   featured?: boolean;
   clear?: boolean;
+  /** The figure could not be read (a queue failed): show a dash, never a zero or \"All clear\". */
+  unknown?: boolean;
 }) {
   return (
     <div
@@ -51,6 +54,8 @@ export function DashTile({
             <Check aria-hidden className="size-6 sm:size-8" strokeWidth={2.5} />
             All clear
           </span>
+        ) : unknown ? (
+          <span aria-label="Unavailable">—</span>
         ) : (
           value.toLocaleString("en-IN")
         )}

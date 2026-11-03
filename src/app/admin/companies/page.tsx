@@ -227,7 +227,7 @@ export default async function AdminCompaniesPage({
         rows={rows}
         noun="companies"
         caption="Hiring companies"
-        searchPlaceholder="Search company, contact, phone, city or country…"
+        searchPlaceholder="Search company, contact, phone or city…"
         empty={
           req.search || params.status || params.setup || params.fte
             ? { title: "No company matches", body: "Nothing matches this search and these filters. Clear a filter to widen it.", action: { href: "/admin/companies", label: "Clear filters" } }

@@ -175,7 +175,7 @@ export function AdminInvoicesView({
         columns={columns}
         noun={k.noun}
         caption={kind === "employer" ? "Employer orders" : "Intern activation payments"}
-        searchPlaceholder={kind === "employer" ? "Search company, intern, invoice, order or payment ID…" : "Search intern, email, invoice, order or code…"}
+        searchPlaceholder={kind === "employer" ? "Search company, intern, invoice or order…" : "Search intern, email, invoice or order…"}
         filters={[
           {
             key: "status",

@@ -50,7 +50,7 @@ export function MoneyCard({ money, payoutsHref }: { money: MoneyStuck; payoutsHr
           </Link>
         ) : null}
       </div>
-      <dl className="mt-3 grid xl:my-auto grid-cols-1 divide-y divide-[color:var(--admin-rule)] sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+      <dl className="mt-3 grid grid-cols-1 divide-y divide-[color:var(--admin-rule)] sm:grid-cols-3 sm:divide-x sm:divide-y-0 xl:my-auto">
         {lines.map((l) => (
           <div key={l.key} className="py-2 first:pt-0 last:pb-0 sm:px-4 sm:py-0 sm:first:pl-0 sm:last:pr-0">
             <dt className="text-sm font-medium text-text-subtle">{l.label}</dt>

@@ -146,7 +146,7 @@ export function TableToolbar({
         {/* Search -------------------------------------------------------- */}
         {/* `min-w-[12rem]` keeps the box a real search field when the row is
             tight; it wraps to its own line instead of collapsing to the icon. */}
-        <div className="relative w-full min-w-[12rem] flex-1 sm:w-auto sm:max-w-xs">
+        <div className="relative w-full min-w-[12rem] flex-1 sm:w-auto sm:max-w-md">
           <Search
             aria-hidden
             className="pointer-events-none absolute top-1/2 left-4 size-4 -translate-y-1/2 text-text-subtle"

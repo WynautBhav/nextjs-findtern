@@ -111,10 +111,11 @@ export default async function AdminDashboard({ searchParams }: { searchParams?: 
   }
 
   const { week, nextInterview, placements, companies, pipeline } = overview ?? { week: null, nextInterview: null, placements: null, companies: null, pipeline: null };
+  const queuesFailed = groups.some((g) => g.error);
   const { kpis } = buildKpis({
     queueTotal: total,
     queueFresh: fresh,
-    queueFailed: groups.some((g) => g.error),
+    queueFailed: queuesFailed,
     signups: base.signups,
     incompleteProfiles: base.incompleteProfiles,
     profilesThisWeek: base.profilesThisWeek,
@@ -168,22 +169,22 @@ export default async function AdminDashboard({ searchParams }: { searchParams?: 
           <Arrive index={0} className={cn(cell, "order-1 xl:order-none")}>
             <div className="grid grid-cols-2 gap-[var(--admin-gap)] md:grid-cols-4">
               {kpis.map((k) => (
-                <DashTile key={k.key} label={k.label} value={k.value} hint={k.caption} href={tileHref[k.key] ?? undefined} featured={k.key === "needs"} clear={k.key === "needs" && k.value === 0} />
+                <DashTile key={k.key} label={k.label} value={k.value} hint={k.caption} href={tileHref[k.key] ?? undefined} featured={k.key === "needs"} clear={k.key === "needs" && k.value === 0 && !queuesFailed} unknown={k.key === "needs" && k.value === 0 && queuesFailed} />
               ))}
             </div>
           </Arrive>
           <Arrive index={1} className={cn(cell, "order-2 xl:order-none")}>
             <PipelineBandCard band={pipeline} href={gate(TRACKER_PROPOSALS)} />
           </Arrive>
-          <div className="contents xl:grid xl:grid-cols-2 xl:items-start xl:gap-[var(--admin-gap)]">
-            <Arrive index={4} className="order-6 min-w-0 md:col-span-1 xl:order-none">
+          <div className="contents xl:grid xl:grid-cols-2 xl:items-stretch xl:gap-[var(--admin-gap)]">
+            <Arrive index={5} className="order-6 min-w-0 md:col-span-1 xl:order-none xl:[&>*]:h-full">
               <WeekPanel data={week} href={gate(TRACKER_PROPOSALS)} />
             </Arrive>
-            <Arrive index={5} className="order-7 min-w-0 md:col-span-1 xl:order-none">
+            <Arrive index={6} className="order-7 min-w-0 md:col-span-1 xl:order-none xl:[&>*]:h-full">
               <PlacementsGauge summary={placements} href={gate(TRACKER_PROPOSALS)} />
             </Arrive>
           </div>
-          <Arrive index={6} className={cn(cell, "order-8 xl:order-none xl:flex-1 xl:[&>*]:h-full")}>
+          <Arrive index={7} className={cn(cell, "order-8 xl:order-none xl:flex-1 xl:[&>*]:h-full")}>
             <MoneyCard money={money} payoutsHref={gate("/admin/payouts")} />
           </Arrive>
         </div>
@@ -195,7 +196,7 @@ export default async function AdminDashboard({ searchParams }: { searchParams?: 
           <Arrive index={3} className="order-4 min-w-0 md:col-span-1 xl:order-none">
             <NextInterviewCard interview={nextInterview} trackerHref={gate(TRACKER_INTERVIEWS)} now={now} />
           </Arrive>
-          <Arrive index={7} className={cn(cell, "order-5 xl:order-none xl:flex-1 xl:[&>*]:h-full")}>
+          <Arrive index={4} className={cn(cell, "order-5 xl:order-none xl:flex-1 xl:[&>*]:h-full")}>
             <RecentActivity items={activity} now={now} />
           </Arrive>
         </aside>

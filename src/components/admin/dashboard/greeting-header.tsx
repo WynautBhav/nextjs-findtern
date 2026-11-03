@@ -52,7 +52,7 @@ export function GreetingHeader({
           </ul>
         ) : null}
       </div>
-      <div className="flex flex-wrap items-center gap-2 max-sm:w-full [&>*]:max-sm:flex-1">{action}</div>
+      <div className="flex flex-wrap items-center gap-2 max-sm:w-full [&>*]:max-sm:min-w-0 [&>*]:max-sm:flex-1 [&>*]:max-sm:px-3">{action}</div>
     </header>
   );
 }

@@ -41,6 +41,7 @@ export function StatCard({
   href,
   animate = false,
   featured = false,
+  fit = false,
 }: {
   label: string;
   value: string | number;
@@ -56,9 +57,12 @@ export function StatCard({
   animate?: boolean;
   /** The filled brand tile (white text, inverted arrow). Use for at most one figure per row. */
   featured?: boolean;
+  /** Size the figure to the card (container query) and keep it on one line: for long money figures in narrow cards. */
+  fit?: boolean;
 }) {
   const valueClass = cn(
-    "nums text-[2rem] font-semibold leading-none tracking-[-0.03em] sm:text-[2.5rem] lg:text-[2.75rem]",
+    "nums font-semibold leading-none tracking-[-0.03em]",
+    fit ? "whitespace-nowrap text-[clamp(1.375rem,13cqi,2.75rem)]" : "text-[2rem] sm:text-[2.5rem] lg:text-[2.75rem]",
     featured ? "text-[color:var(--admin-tile-ink)]" : "text-foreground",
   );
   const deltaClass = featured ? "text-[color:var(--admin-tile-ink)]" : deltaTone(delta);
@@ -87,7 +91,7 @@ export function StatCard({
         </p>
         {href ? <ArrowLinkButton href={href} label={`Open ${label}`} inverted={featured} stretch /> : null}
       </div>
-      <div className="mt-3 flex flex-wrap items-baseline gap-x-2 gap-y-1">
+      <div className={cn("mt-3 flex flex-wrap items-baseline gap-x-2 gap-y-1", fit && "[container-type:inline-size]")}>
         {animate && typeof value === "number" ? (
           <Count value={value} className={valueClass} />
         ) : (

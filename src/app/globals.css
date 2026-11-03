@@ -1709,12 +1709,20 @@ body:has([data-slot="dialog-content"][data-state="open"], [data-slot="sheet-cont
   outline-color: var(--color-ring);
 }
 
+/* A select's right padding clears the chevron. Unlayered on purpose: Tailwind 4's `px-*` is
+   `padding-inline`, which beats the layered rule below, and the chevron then sits on the text. Plain
+   native selects only (a `data-slot` or `appearance-none` one is left alone); a `pe-*` or `pr-*` class
+   on the control is no longer needed and, being unlayered here, this rule wins over it too. */
+[data-console="admin"] select:not([data-slot]):not([class*="appearance-none"]) {
+  padding-inline-end: 2.25rem;
+}
+
 /* ── Admin: native selects and checkboxes ──
    Brand-green check, rounded box, a chevron on the select; no layout change. Admin console only, and
    only the plain native control: a component with its own `data-slot` or `appearance-none` is left alone.
    In the components layer, so any utility class on a control still wins. */
 @layer components {
-  [data-console="admin"] input[type="checkbox"]:not([data-slot]) {
+  [data-console="admin"] input[type="checkbox"]:not([data-slot]):not([class*="appearance-none"]) {
     appearance: none;
     display: inline-grid;
     place-content: center;
@@ -1726,7 +1734,7 @@ body:has([data-slot="dialog-content"][data-state="open"], [data-slot="sheet-cont
     border-radius: 0.375rem;
     background-color: var(--admin-panel);
   }
-  [data-console="admin"] input[type="checkbox"]:not([data-slot])::after {
+  [data-console="admin"] input[type="checkbox"]:not([data-slot]):not([class*="appearance-none"])::after {
     content: "";
     inline-size: 0.3rem;
     block-size: 0.55rem;
@@ -1735,11 +1743,11 @@ body:has([data-slot="dialog-content"][data-state="open"], [data-slot="sheet-cont
     transform: rotate(45deg) scale(0);
     transition: transform 120ms ease;
   }
-  [data-console="admin"] input[type="checkbox"]:not([data-slot]):checked {
+  [data-console="admin"] input[type="checkbox"]:not([data-slot]):not([class*="appearance-none"]):checked {
     background-color: var(--admin-tile);
     border-color: var(--admin-tile);
   }
-  [data-console="admin"] input[type="checkbox"]:not([data-slot]):checked::after {
+  [data-console="admin"] input[type="checkbox"]:not([data-slot]):not([class*="appearance-none"]):checked::after {
     transform: rotate(45deg) scale(1);
   }
   [data-console="admin"] select:not([data-slot]):not([class*="appearance-none"]) {
@@ -1757,7 +1765,7 @@ body:has([data-slot="dialog-content"][data-state="open"], [data-slot="sheet-cont
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  [data-console="admin"] input[type="checkbox"]:not([data-slot])::after {
+  [data-console="admin"] input[type="checkbox"]:not([data-slot]):not([class*="appearance-none"])::after {
     transition: none;
   }
 }

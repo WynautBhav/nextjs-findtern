@@ -57,15 +57,15 @@ export function NeedsYouPanel({
         description={
           <>
             <span data-testid="queue-total" className="nums font-semibold text-foreground">
-              <TickCount value={total} />
+              <TickCount value={items} />
             </span>{" "}
+            {items === 1 ? "item" : "items"} waiting
             {flags > 0 ? (
               <>
-                in all: {items} {items === 1 ? "item" : "items"} + {flags} {flags === 1 ? "setting" : "settings"} to fix
+                {" · "}
+                <span className="nums font-semibold text-foreground">{flags}</span> {flags === 1 ? "setting" : "settings"} to fix
               </>
-            ) : (
-              <>{total === 1 ? "item is" : "items are"} waiting</>
-            )}
+            ) : null}
           </>
         }
         action={

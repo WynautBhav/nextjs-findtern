@@ -3,6 +3,7 @@ import { and, asc, count, desc, eq, gte, inArray, sql } from "drizzle-orm";
 import { dbTimestamp, getDb, schema } from "@/lib/db";
 import { meaningfulProfile, realEmployerId, realEmployers } from "@/lib/admin/scope";
 import {
+  ACTIVITY_FETCH_LIMIT,
   buildPipelineBand,
   istWeekStart,
   placementSummary,
@@ -46,7 +47,7 @@ export async function loadActivityAndCounts(now: Date) {
       .from(schema.users)
       .where(eq(schema.users.role, "intern"))
       .orderBy(desc(schema.users.createdAt))
-      .limit(6),
+      .limit(ACTIVITY_FETCH_LIMIT),
     db
       .select({
         name: schema.projects.projectName,
@@ -58,7 +59,7 @@ export async function loadActivityAndCounts(now: Date) {
       .leftJoin(schema.employers, eq(schema.employers.id, schema.projects.employerId))
       .where(realEmployerId(schema.projects.employerId))
       .orderBy(desc(schema.projects.createdAt))
-      .limit(6),
+      .limit(ACTIVITY_FETCH_LIMIT),
     db
       .select({
         internId: schema.proposals.internId,
@@ -72,7 +73,7 @@ export async function loadActivityAndCounts(now: Date) {
       .leftJoin(schema.employers, eq(schema.employers.id, schema.proposals.employerId))
       .where(and(sql`${schema.proposals.status} in ('accepted', 'hired')`, realEmployerId(schema.proposals.employerId)))
       .orderBy(desc(schema.proposals.updatedAt))
-      .limit(6),
+      .limit(ACTIVITY_FETCH_LIMIT),
     db
       .select({
         employerId: schema.employerPayments.employerId,
@@ -85,7 +86,7 @@ export async function loadActivityAndCounts(now: Date) {
       .leftJoin(schema.employers, eq(schema.employers.id, schema.employerPayments.employerId))
       .where(eq(schema.employerPayments.status, "paid"))
       .orderBy(desc(schema.employerPayments.paidAt))
-      .limit(6),
+      .limit(ACTIVITY_FETCH_LIMIT),
   ]);
   const activity: ActivityInput = { recentUsers, recentProjects, recentAccepted, recentPayments };
   return {

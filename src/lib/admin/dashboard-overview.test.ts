@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import {
+  ACTIVITY_FETCH_LIMIT,
   activityWhen,
   buildActivity,
   buildKpis,
@@ -344,4 +345,12 @@ test("greetingFor uses the India clock", () => {
   assert.equal(greetingFor(new Date("2026-11-04T03:00:00Z")), "Good morning"); // 08:30 IST
   assert.equal(greetingFor(new Date("2026-11-04T08:00:00Z")), "Good afternoon"); // 13:30 IST
   assert.equal(greetingFor(new Date("2026-11-04T16:00:00Z")), "Good evening"); // 21:30 IST
+});
+
+test("a group as large as the fetch limit reads 'N+' because older events may be cut off", () => {
+  const at = (m: number) => new Date(Date.UTC(2026, 10, 4, 5, 0) - m * 60_000);
+  const offers = (n: number) => Array.from({ length: n }, (_, i) => ({ internId: `u${i}`, first: "A", last: String(i), company: "Acme", date: at(i + 1) }));
+  const run = (n: number) => buildActivity({ recentUsers: [], recentProjects: [], recentAccepted: offers(n), recentPayments: [] }, 3)[0];
+  assert.equal(run(ACTIVITY_FETCH_LIMIT).name, `${ACTIVITY_FETCH_LIMIT}+ offers`);
+  assert.equal(run(ACTIVITY_FETCH_LIMIT - 1).name, `${ACTIVITY_FETCH_LIMIT - 1} offers`);
 });

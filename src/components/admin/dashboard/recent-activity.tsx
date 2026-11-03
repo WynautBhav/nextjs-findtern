@@ -1,3 +1,4 @@
+import { CreditCard, FolderPlus, Handshake, UserPlus, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 
 import { AdminAvatar } from "@/components/admin/avatar";
@@ -6,6 +7,8 @@ import { StatusBadge } from "@/components/admin/status-badge";
 import { relativeWhen, type ActivityItem } from "@/lib/admin/dashboard-overview-pure";
 import { formatIst } from "@/lib/format";
 import { cn } from "@/lib/utils";
+
+const KIND_ICON: Record<ActivityItem["kind"], LucideIcon> = { payment: CreditCard, offer: Handshake, project: FolderPlus, signup: UserPlus };
 
 /**
  * What happened lately: an avatar tinted by the person or company, "name verb object" (two lines, then a
@@ -25,7 +28,17 @@ export function RecentActivity({ items, now }: { items: (Omit<ActivityItem, "hre
               const sentence = `${item.name} ${item.verb} ${item.object}`.trim();
               const body = (
                 <>
-                  <AdminAvatar name={item.lead ?? item.name} id={item.tintKey} size="sm" />
+                  {item.count ? (
+                    // A grouped row is about several people: a kind icon, not the lead person's initials.
+                    <span aria-hidden className="grid size-8 place-items-center rounded-full bg-[color:var(--admin-panel-2)] text-foreground">
+                      {(() => {
+                        const Icon = KIND_ICON[item.kind];
+                        return <Icon className="size-4" />;
+                      })()}
+                    </span>
+                  ) : (
+                    <AdminAvatar name={item.name} id={item.tintKey} size="sm" />
+                  )}
                   <span className="min-w-0">
                     <span className="line-clamp-2 text-sm leading-5 text-foreground" title={sentence}>
                       <span className="font-semibold">{item.name}</span> {item.verb}
