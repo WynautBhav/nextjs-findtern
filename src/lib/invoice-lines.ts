@@ -29,7 +29,9 @@ export function hireInvoiceLines(input: {
   paymentIndex: number;
   chargedMinor?: number | null;
 }): InvoiceLine[] {
-  const { who, roleTitle, projectName, offer, monthly, paymentIndex } = input;
+  const { roleTitle, projectName, offer, monthly, paymentIndex } = input;
+  // A nameless or deleted candidate still reads "Candidate — Designer", never "— Designer".
+  const who = input.who.trim() || "Candidate";
   const first = paymentIndex === 0;
   // Score 10: the mode was already allowed when the order was made.
   const charge = lineCharge(offer, 10, monthly ? "monthly" : "upfront", { firstPayment: first });

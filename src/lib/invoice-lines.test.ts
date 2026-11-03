@@ -39,3 +39,11 @@ test("a promo comes off the stipend, never the hiring fee", () => {
   assert.equal(net[1].amountMinor, fee);
   assert.equal(net[0].amountMinor, 2_000_000);
 });
+
+test("a nameless candidate prints 'Candidate', never a bare dash", () => {
+  for (const who of ["", "   "]) {
+    const lines = hireInvoiceLines({ who, roleTitle: "Designer", projectName: "Brand", offer, monthly: true, paymentIndex: 0 });
+    assert.equal(lines[0].label, "Candidate \u2014 Designer");
+    assert.equal(lines[1].label, "Candidate \u2014 One-time hiring fee");
+  }
+});

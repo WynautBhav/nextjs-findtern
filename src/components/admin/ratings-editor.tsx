@@ -73,6 +73,11 @@ export function RatingsEditor({
     }
     if (feedbackLink.trim() !== (initialFeedbackLink ?? "").trim()) payload.aiFeedbackLink = feedbackLink.trim() || null;
     if (recordingLink.trim() !== (initialRecordingLink ?? "").trim()) payload.aiRecordingLink = recordingLink.trim() || null;
+    // Every box empty but an (imported) score remains and nothing else changed: the admin means to clear it.
+    // Null for all four is what applyRatings treats as clearing the score.
+    if (Object.keys(payload).length === 0 && score !== null && AXES.every((axis) => !values[axis.key].trim())) {
+      for (const axis of AXES) payload[axis.key] = null;
+    }
     if (Object.keys(payload).length === 0) {
       setError("Nothing changed.");
       return;
