@@ -33,6 +33,9 @@ type Stage = "details" | "otp" | "creating";
 /** Resend is allowed once a minute (the API refuses sooner). */
 const RESEND_SECONDS = 60;
 
+// Same cap as the profile edit API (api/users/[id]).
+const NAME_MAX = 60;
+
 export function SignupForm({
   google = null,
   next,
@@ -218,6 +221,7 @@ export function SignupForm({
               value={firstName}
               onChange={setFirstName}
               autoComplete="given-name"
+              maxLength={NAME_MAX}
             />
             <TextInput
               id="lastName"
@@ -225,6 +229,7 @@ export function SignupForm({
               value={lastName}
               onChange={setLastName}
               autoComplete="family-name"
+              maxLength={NAME_MAX}
             />
           </div>
 
@@ -507,6 +512,7 @@ function TextInput({
   type = "text",
   placeholder,
   autoComplete,
+  maxLength,
 }: {
   id: string;
   label: string;
@@ -515,6 +521,7 @@ function TextInput({
   type?: string;
   placeholder?: string;
   autoComplete?: string;
+  maxLength?: number;
 }) {
   return (
     <div>
@@ -528,6 +535,7 @@ function TextInput({
         value={value}
         placeholder={placeholder}
         autoComplete={autoComplete}
+        maxLength={maxLength}
         onChange={(e) => onChange(e.target.value)}
         className="mt-2 h-11 w-full rounded-lg border border-ink-200 bg-white px-3.5 text-sm text-ink-900 outline-none transition-[border-color,box-shadow] placeholder:text-ink-500 focus-visible:border-brand-600 focus-visible:ring-[3px] focus-visible:ring-brand-600/20"
       />

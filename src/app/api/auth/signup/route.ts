@@ -13,8 +13,8 @@ import { isUniqueViolation, uniqueMessage } from "@/lib/promo";
 import { acceptanceValues } from "@/lib/terms";
 
 const bodySchema = z.object({
-  firstName: z.string().min(2),
-  lastName: z.string().min(2),
+  firstName: z.string().trim().min(2).max(60),
+  lastName: z.string().trim().min(2).max(60),
   email: z.string().trim().toLowerCase().email(),
   countryCode: z.string().trim().default("+91"),
   phoneNumber: z.string().min(6),
