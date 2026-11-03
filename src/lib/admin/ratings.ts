@@ -33,8 +33,10 @@ export function grantCompletionBonus(extra: Record<string, unknown>): Record<str
  * import column), otherwise the mean of the four core ratings only - older
  * `overall` / `academic` keys never count - clamped to 0-10 and rounded to one
  * decimal. With no ratings left and no given score, the score is removed.
- * Each granted completion bonus (see `grantCompletionBonus`) adds 1 on top,
- * before the 0-10 clamp.
+ * Each granted completion bonus (see `grantCompletionBonus`) adds 1 to a score
+ * computed from the ratings, before the 0-10 clamp. A given (bulk import)
+ * score is final: it is the number the admin sees and exports, which already
+ * includes any bonus, so importing it back must not add the bonus twice.
  */
 export function applyRatings(
   extra: Record<string, unknown>,
@@ -47,13 +49,12 @@ export function applyRatings(
     else if (typeof v === "number") ratings[k] = v;
   }
   const values = RATING_KEYS.map((k) => ratings[k]).filter((v): v is number => typeof v === "number" && Number.isFinite(v));
-  const base =
+  const score =
     typeof explicitScore === "number" && Number.isFinite(explicitScore)
-      ? explicitScore
+      ? clampRound(explicitScore)
       : values.length
-        ? values.reduce((a, b) => a + b, 0) / values.length
+        ? clampRound(values.reduce((a, b) => a + b, 0) / values.length + completionBonusCount(extra))
         : null;
-  const score = base === null ? null : clampRound(base + completionBonusCount(extra));
   const next: Record<string, unknown> = { ...extra, ratings };
   if (score === null) delete next.findternScore;
   else next.findternScore = score;

@@ -28,7 +28,7 @@ Demo logins (all use password `Findtern@2026`):
 
 ## Code map
 - **Schema:** `src/lib/db/schema.ts` (the "College partners" section), migration `drizzle/0007_college_partners.sql`
-- **Rules (pure, tested):** `src/lib/college/access.ts`, `eligibility.ts`, `tokens.ts`, `consent.ts`, `roster.ts`
+- **Rules (pure, tested):** `src/lib/college/access.ts`, `eligibility.ts`, `tokens.ts`, `code.ts`, `roster.ts`
 - **Every scoped read:** `src/lib/college/scope.ts`. Officer writes: `guard.ts` (`requireCollegeMutation`)
 - **Presence:** `POST /api/intern/college/heartbeat` (30 s); `GET /api/college/presence/stream` (SSE)
 - **Calls:** `src/lib/college/meetings.ts`. Uses Findtern's Google Meet; in dev without Google it falls back to a Jitsi room

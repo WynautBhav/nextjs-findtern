@@ -61,10 +61,10 @@ test("completion bonus: +1 per granted internship, capped at 10", () => {
 
 test("completion bonus survives every recompute of the rated score", () => {
   const granted = grantCompletionBonus({ findternScore: 7, ratings: { coding: 8, aptitude: 6 } });
-  // ratings edit / Incruiter webhook (mean) and bulk import (explicit) both add the bonus back
+  // ratings edit / Incruiter webhook (mean) add the bonus back; a given (imported) score is final
   assert.equal(applyRatings(granted, { coding: 8 }).findternScore, 8); // mean of 8 and 6 is 7, plus the bonus
-  assert.equal(applyRatings(granted, {}, 6).findternScore, 7);
-  assert.equal(applyRatings({ completionBonusCount: 3 }, {}, 9).findternScore, 10);
+  assert.equal(applyRatings(granted, {}, 8).findternScore, 8); // the exported 8 imported back stays 8
+  assert.equal(applyRatings({ completionBonusCount: 3 }, { coding: 9 }).findternScore, 10);
 });
 
 test("completion bonus waits for a first score and never invents one", () => {
