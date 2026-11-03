@@ -47,6 +47,8 @@ export function NeedsYouPanel({
   // The total counts the calendar flag as one; the rows add up to it only when the flag is named.
   const flags = groups.filter((g) => g.flag && !g.error && g.count > 0).length;
   const items = Math.max(0, total - flags);
+  // Every queue failed: there is no count to give, and "0 items waiting" would read as good news.
+  const allFailed = groups.length > 0 && groups.every((g) => g.error);
   const hidden = Math.max(0, rows.length - 3);
   const segments = groups.map((g) => ({ key: g.key, count: g.error || g.flag ? 0 : g.count, flag: false }));
 
@@ -55,18 +57,22 @@ export function NeedsYouPanel({
       <PanelHeader
         title={<span id="needs-you-title">Needs you</span>}
         description={
-          <>
-            <span data-testid="queue-total" className="nums font-semibold text-foreground">
-              <TickCount value={items} />
-            </span>{" "}
-            {items === 1 ? "item" : "items"} waiting
-            {flags > 0 ? (
-              <>
-                {" · "}
-                <span className="nums font-semibold text-foreground">{flags}</span> {flags === 1 ? "setting" : "settings"} to fix
-              </>
-            ) : null}
-          </>
+          allFailed ? (
+            "The queues did not load"
+          ) : (
+            <>
+              <span data-testid="queue-total" className="nums font-semibold text-foreground">
+                <TickCount value={items} />
+              </span>{" "}
+              {items === 1 ? "item" : "items"} waiting
+              {flags > 0 ? (
+                <>
+                  {" · "}
+                  <span className="nums font-semibold text-foreground">{flags}</span> {flags === 1 ? "setting" : "settings"} to fix
+                </>
+              ) : null}
+            </>
+          )
         }
         action={
           <Link

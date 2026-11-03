@@ -2,6 +2,7 @@ import type { LucideIcon } from "lucide-react";
 
 import { Count } from "@/components/admin/motion";
 import { ArrowLinkButton } from "@/components/admin/panel";
+import { statValueClass } from "@/components/admin/stat-card-class";
 import { cn } from "@/lib/utils";
 
 export type StatTone = "brand" | "accent" | "info" | "success" | "warning" | "neutral";
@@ -60,11 +61,7 @@ export function StatCard({
   /** Size the figure to the card (container query) and keep it on one line: for long money figures in narrow cards. */
   fit?: boolean;
 }) {
-  const valueClass = cn(
-    "nums font-semibold leading-none tracking-[-0.03em]",
-    fit ? "whitespace-nowrap text-[clamp(1.375rem,13cqi,2.75rem)]" : "text-[2rem] sm:text-[2.5rem] lg:text-[2.75rem]",
-    featured ? "text-[color:var(--admin-tile-ink)]" : "text-foreground",
-  );
+  const valueClass = statValueClass(fit, featured);
   const deltaClass = featured ? "text-[color:var(--admin-tile-ink)]" : deltaTone(delta);
 
   return (

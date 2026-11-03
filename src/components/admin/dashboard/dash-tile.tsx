@@ -55,7 +55,10 @@ export function DashTile({
             All clear
           </span>
         ) : unknown ? (
-          <span aria-label="Unavailable">—</span>
+          <>
+            <span aria-hidden>—</span>
+            <span className="sr-only">Unavailable</span>
+          </>
         ) : (
           value.toLocaleString("en-IN")
         )}

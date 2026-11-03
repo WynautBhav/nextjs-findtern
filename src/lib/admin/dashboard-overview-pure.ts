@@ -269,8 +269,6 @@ export type ActivityItem = {
   href: string;
   /** More than 1 when consecutive events of one kind are folded into this row ("6 offers accepted"). */
   count?: number;
-  /** The newest person or company in a folded row; names the avatar, since `name` is then a phrase. */
-  lead?: string;
 };
 
 const MONEY = (minor: number, currency: string | null) =>
@@ -359,7 +357,7 @@ export function groupActivity(items: ActivityItem[]): ActivityItem[] {
       const head = items[i];
       const g = GROUP[head.kind];
       const capped = n >= ACTIVITY_FETCH_LIMIT;
-      out.push({ ...head, id: `group:${head.id}`, name: `${n}${capped ? "+" : ""} ${g.many}`, lead: head.name, verb: g.verb, object: "", count: n, href: g.href });
+      out.push({ ...head, id: `group:${head.id}`, name: `${n}${capped ? "+" : ""} ${g.many}`, verb: g.verb, object: "", count: n, href: g.href });
     }
     i = j;
   }
