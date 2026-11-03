@@ -55,7 +55,7 @@ export function formatMoney(
     style: "currency",
     currency: cur,
     maximumFractionDigits: digits,
-    minimumFractionDigits: opts.decimals ?? 0,
+    minimumFractionDigits: digits, // paise must keep both digits: 2249.1 -> 2,249.10
   }).format(value);
 }
 

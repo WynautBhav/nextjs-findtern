@@ -66,3 +66,9 @@ test("short INR amounts keep whole and half lakhs apart on a chart axis", () => 
   assert.equal(formatMoney(150000000, "INR", { short: true }), "₹15L");
   assert.equal(formatMoney(5000000, "INR", { short: true }), "₹50k");
 });
+
+test("formatMoney keeps two decimals for paise and none for whole rupees", () => {
+  assert.equal(formatMoney(224910, "INR"), "₹2,249.10");
+  assert.equal(formatMoney(-24990, "INR"), "-₹249.90");
+  assert.equal(formatMoney(249900, "INR"), "₹2,499");
+});
