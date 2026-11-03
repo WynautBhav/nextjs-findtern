@@ -14,7 +14,7 @@ import { formatJoiningDate, shortDate } from "@/lib/format";
 import { isHiredProposal } from "@/lib/hire-status";
 import { loadInternData } from "@/lib/intern-data";
 import { hoursIn, isAcceptedStatus, toArray, type ProposalRow, type TimesheetRow } from "@/lib/journey";
-import { offerJoiningDay } from "@/lib/intern-offer-view";
+import { realJoiningDay } from "@/lib/intern-offer-view";
 import { parseOffer } from "@/lib/offer";
 import { formatPeriodDays, isoDay, periodDays, todayIst } from "@/lib/timesheet-days";
 import { cn } from "@/lib/utils";
@@ -166,6 +166,7 @@ export default async function InternTimesheets({
       />
     );
 
+  const joiningDay = realJoiningDay(offer);
   const periods = offer.startDate ? engagementPeriods(offer.startDate, offer.months) : [];
   const nextLine =
     "error" in next
@@ -178,7 +179,7 @@ export default async function InternTimesheets({
     <div>
       <PageHead
         title="Timesheets"
-        lede={`${role(selected)} at ${company(selected)}, ${offer.months} month${offer.months === 1 ? "" : "s"}${offer.startDate ? ` from ${formatJoiningDate(offerJoiningDay(offer))}` : ""}.`}
+        lede={`${role(selected)} at ${company(selected)}, ${offer.months} month${offer.months === 1 ? "" : "s"}${joiningDay ? ` from ${formatJoiningDate(joiningDay)}` : ""}.`}
       />
 
       {hires.length > 1 ? (

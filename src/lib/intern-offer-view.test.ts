@@ -109,3 +109,11 @@ test("DST change days: the zone's offset on that day applies", () => {
   // 2:30 AM does not exist that day. It is pinned as read today (as 1:30 AM EST, 12:00 pm IST), not rejected.
   assert.equal(shiftInIst("02:30", "04:00", "America/New_York", "2026-03-08"), "12:00 pm – 1:30 pm IST");
 });
+
+test("realJoiningDay is null for a placeholder start date, a day otherwise", async () => {
+  const { realJoiningDay } = await import("./intern-offer-view.ts");
+  const { parseOffer } = await import("./offer.ts");
+  assert.equal(realJoiningDay(parseOffer(internship({ startDate: "To be agreed" }), "INR")), null);
+  assert.equal(realJoiningDay(parseOffer(internship({ startDate: "" }), "INR")), null);
+  assert.equal(realJoiningDay(parseOffer(internship({ startDate: "2026-11-01" }), "INR")), "2026-11-01");
+});

@@ -1,5 +1,5 @@
 import { isHiredProposal } from "./hire-status.ts";
-import { isClockTime, offerPastStart, parseOffer, type Offer } from "./offer.ts";
+import { isClockTime, isRealDay, offerPastStart, parseOffer, type Offer } from "./offer.ts";
 import { wallTimeToUtc } from "./timezones.ts";
 
 /**
@@ -151,6 +151,12 @@ export function offerJoiningDay(offer: Offer): string | null {
     ? joiningDayIst(ft.shiftFrom, ft.shiftTo, tz, offer.startDate)
     : joiningDayIst(offer.shiftFrom, offer.shiftTo, tz, offer.startDate);
   return day ?? offer.startDate;
+}
+
+/** offerJoiningDay, but only a real calendar day: null for "To be agreed" or any other placeholder. */
+export function realJoiningDay(offer: Offer): string | null {
+  const day = offerJoiningDay(offer);
+  return day && isRealDay(day) ? day : null;
 }
 
 /**

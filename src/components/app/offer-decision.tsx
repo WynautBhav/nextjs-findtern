@@ -208,10 +208,12 @@ export function OfferDecision({
       {rail ? (
         <div className="mt-4 space-y-2 text-sm leading-relaxed text-ink-600">
           <OfferCountdown startDate={startDate} />
-          <p>
-            <span className="font-medium text-ink-800">If you do nothing</span>, the offer closes
-            {answerBy ? ` after ${answerBy}` : ""} and is marked as rejected. Answer by {answerBy ?? "the date on the offer"}.
-          </p>
+          {answerBy ? (
+            <p>
+              <span className="font-medium text-ink-800">If you do nothing</span>, the offer closes after {answerBy} and is
+              marked as rejected. Answer by {answerBy}.
+            </p>
+          ) : null}
           <p>
             {guaranteeEnded
               ? "Your placement guarantee has ended, so declines no longer affect a refund."
