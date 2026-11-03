@@ -8,16 +8,13 @@ import {
   FileText,
   ShoppingCart,
   CalendarDays,
-  Bell,
   Building2,
   Users,
   GitCompare,
   ShoppingBag,
   Clock,
-  Send,
   KeyRound,
   Receipt,
-  GraduationCap,
 } from "lucide-react";
 
 import { ConsoleShell, type ConsoleNavGroup } from "@/components/layout/console-shell";
@@ -35,7 +32,6 @@ const NAV_GROUPS: ConsoleNavGroup[] = [
       { href: "/employer/dashboard", label: "Dashboard", icon: <LayoutDashboard /> },
       { href: "/employer/candidates", label: "Candidates", icon: <Users /> },
       { href: "/employer/compare", label: "Compare", icon: <GitCompare /> },
-      { href: "/employer/drives", label: "Campus drives", icon: <GraduationCap /> },
       { href: "/employer/projects", label: "Projects", icon: <FolderKanban /> },
     ],
   },
@@ -43,7 +39,6 @@ const NAV_GROUPS: ConsoleNavGroup[] = [
     title: "Proposals & Hiring",
     items: [
       { href: "/employer/proposals", label: "Proposals", icon: <FileText /> },
-      { href: "/employer/send-proposal", label: "Send proposal", icon: <Send /> },
       { href: "/employer/schedule", label: "Schedule", icon: <CalendarDays /> },
       { href: "/employer/timesheets", label: "Timesheets", icon: <Clock /> },
     ],
@@ -53,7 +48,6 @@ const NAV_GROUPS: ConsoleNavGroup[] = [
     items: [
       { href: "/employer/cart", label: "Shortlist", icon: <ShoppingBag /> },
       { href: "/employer/orders", label: "Orders", icon: <ShoppingCart /> },
-      { href: "/employer/alerts", label: "Alerts", icon: <Bell /> },
       { href: "/employer/account", label: "Company profile", icon: <Building2 /> },
     ],
   },
@@ -107,11 +101,7 @@ export default async function EmployerLayout({ children }: { children: React.Rea
   const groups = NAV_GROUPS.map((g) => ({
     ...g,
     items: g.items.map((i) =>
-      i.href === "/employer/cart" && cartCount > 0
-        ? { ...i, badge: cartCount }
-        : i.href === "/employer/alerts" && unreadAlerts > 0
-          ? { ...i, badge: unreadAlerts > 99 ? "99+" : unreadAlerts }
-          : i,
+      i.href === "/employer/cart" && cartCount > 0 ? { ...i, badge: cartCount } : i,
     ),
   }));
 

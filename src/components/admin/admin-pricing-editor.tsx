@@ -410,7 +410,7 @@ function PlanEditor({ plan }: { plan: EditablePlan }) {
           Mark as &ldquo;Most popular&rdquo;
         </label>
 
-        <div className="flex items-center justify-between gap-3 border-t border-ink-100 pt-4">
+        <div className="flex items-center justify-between gap-3 border-t border-[color:var(--admin-rule)] pt-4">
           <p className="nums text-xs text-ink-600">
             USD: {formatMoney(inrMinorToUsdMinor(toMinor(hourly)), "USD")}/hr ·{" "}
             {formatMoney(inrMinorToUsdMinor(toMinor(perHire)), "USD")} per hire

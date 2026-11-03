@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { csrfFetch } from "@/lib/client-fetch";
 import { cn } from "@/lib/utils";
 import { buttonClass } from "@/components/ui/button";
+import { ADMIN_PILL_PRIMARY } from "@/components/admin/surface";
 import { useConfirm } from "@/components/app/use-confirm";
 
 export type CollegeAdminRow = {
@@ -60,30 +61,30 @@ export function AddCollegeForm() {
       }}
     >
       <label className="md:col-span-2">
-        <span className="text-sm font-medium text-ink-800">College name</span>
+        <span className="text-sm font-medium text-foreground">College name</span>
         <input name="name" required minLength={3} className={cn(input, "mt-1")} placeholder="JK Lakshmipat University" />
       </label>
       <label>
-        <span className="text-sm font-medium text-ink-800">City</span>
+        <span className="text-sm font-medium text-foreground">City</span>
         <input name="city" className={cn(input, "mt-1")} />
       </label>
       <label>
-        <span className="text-sm font-medium text-ink-800">State</span>
+        <span className="text-sm font-medium text-foreground">State</span>
         <input name="state" className={cn(input, "mt-1")} />
       </label>
       <label>
-        <span className="text-sm font-medium text-ink-800">AISHE code</span>
+        <span className="text-sm font-medium text-foreground">AISHE code</span>
         <input name="aishe" className={cn(input, "mt-1")} placeholder="U-0657" />
       </label>
       <label>
-        <span className="text-sm font-medium text-ink-800">Student email domains</span>
+        <span className="text-sm font-medium text-foreground">Student email domains</span>
         <input name="domains" className={cn(input, "mt-1")} placeholder="jklu.edu.in" />
       </label>
-      <label className="flex min-h-11 items-center gap-2 text-sm text-ink-800 md:col-span-2">
+      <label className="flex min-h-11 items-center gap-2 text-sm text-foreground md:col-span-2">
         <input type="checkbox" name="website" className="size-4 accent-brand-700" /> Show in the website&apos;s College partners strip
       </label>
       <div className="flex items-center gap-3 md:col-span-2">
-        <button disabled={busy} className={buttonClass({ className: "disabled:opacity-60" })}>
+        <button disabled={busy} className={buttonClass({ className: cn(ADMIN_PILL_PRIMARY, "disabled:opacity-60") })}>
           {busy ? "Adding…" : "Add partner college"}
         </button>
         <span role="status" className="text-sm text-danger">
@@ -129,14 +130,14 @@ export function CollegeRowControls({ row }: { row: CollegeAdminRow }) {
       }}
     >
       <label className="min-w-40 flex-1">
-        <span className="text-sm font-medium text-ink-800">Officer name</span>
+        <span className="text-sm font-medium text-foreground">Officer name</span>
         <input name="name" required className={cn(input, "mt-1")} />
       </label>
       <label className="min-w-52 flex-1">
-        <span className="text-sm font-medium text-ink-800">Officer email</span>
+        <span className="text-sm font-medium text-foreground">Officer email</span>
         <input name="email" type="email" required className={cn(input, "mt-1")} />
       </label>
-      <button className="inline-flex min-h-11 items-center rounded-apple-sm border border-ink-200 bg-card px-4 text-sm font-medium text-ink-800 hover:bg-ink-50">
+      <button className="inline-flex min-h-11 cursor-pointer items-center rounded-full bg-[color:var(--admin-panel-2)] px-5 text-sm font-medium text-foreground hover:bg-[color:var(--admin-bar-tint)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
         Issue login
       </button>
     </form>
@@ -145,7 +146,7 @@ export function CollegeRowControls({ row }: { row: CollegeAdminRow }) {
   return (
     <div className="space-y-3">
       {dialog}
-      <div className="flex flex-wrap gap-4 text-sm">
+      <div className="flex flex-wrap gap-2 text-sm">
         {(
           [
             ["isPartner", "Partner (has a console)", row.isPartner],
@@ -153,7 +154,7 @@ export function CollegeRowControls({ row }: { row: CollegeAdminRow }) {
             ["isActive", "Active", row.isActive],
           ] as const
         ).map(([key, label, value]) => (
-          <label key={key} className="flex min-h-11 items-center gap-2 text-ink-800">
+          <label key={key} className="flex min-h-11 cursor-pointer items-center gap-2 rounded-full bg-[color:var(--admin-panel-2)] px-4 text-foreground hover:bg-[color:var(--admin-bar-tint)] has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ring">
             <input type="checkbox" checked={value} onChange={(e) => toggle(key, e.target.checked)} className="size-4 accent-brand-700" />
             {label}
           </label>
@@ -167,7 +168,7 @@ export function CollegeRowControls({ row }: { row: CollegeAdminRow }) {
         issueForm
       ) : (
         <details>
-          <summary className="inline-flex min-h-11 cursor-pointer list-none items-center rounded-apple-sm text-sm font-medium text-brand-700 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+          <summary className="inline-flex min-h-11 cursor-pointer list-none items-center rounded-full px-1 text-sm font-medium text-foreground underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
             Issue another officer login
           </summary>
           <div className="pt-2">{issueForm}</div>
@@ -175,8 +176,8 @@ export function CollegeRowControls({ row }: { row: CollegeAdminRow }) {
       )}
       <div role="status" aria-live="polite">
         {issued ? (
-          <p className="rounded-apple-sm border border-brand-200 bg-brand-50 px-3 py-2 text-sm text-brand-900">
-            Login for <strong>{issued.email}</strong>: password <code className="rounded bg-card px-1.5 py-0.5 font-mono">{issued.password}</code>. Shown once; send it privately. Sign in at /login?as=college.
+          <p className="rounded-[var(--radius-admin-card)] bg-success-soft px-4 py-3 text-sm text-foreground">
+            Login for <strong>{issued.email}</strong>: password <code className="rounded bg-[color:var(--admin-panel)] px-1.5 py-0.5 font-mono">{issued.password}</code>. Shown once; send it privately. Sign in at /login?as=college.
           </p>
         ) : null}
         {error ? <p className="text-sm text-danger">{error}</p> : null}

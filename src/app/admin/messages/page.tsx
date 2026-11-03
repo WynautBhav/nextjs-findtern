@@ -194,7 +194,7 @@ export default async function AdminMessagesPage({
       />
 
       <Panel>
-        <div className="flex flex-wrap items-center gap-2.5 border-b border-ink-100 px-5 py-3.5">{filters}</div>
+        <div className="flex flex-wrap items-center gap-2.5 px-[var(--admin-pad-panel)] pt-[var(--admin-pad-panel)] pb-2">{filters}</div>
         {loaded && page ? (
           <>
             <MessagesInbox messages={page.rows} filtering={filtering} />

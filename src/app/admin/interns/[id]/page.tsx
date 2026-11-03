@@ -13,6 +13,7 @@ import { canViewAs } from "@/lib/admin/impersonation";
 import { ADMIN_SURFACE } from "@/components/admin/surface";
 import { allows } from "@/lib/admin/permissions";
 import { listCandidateDocuments } from "@/lib/admin/candidate-documents-list";
+import { loadInternActivity, type ActivityEntry } from "@/lib/admin/record-activity";
 import { getDb, schema, withoutPassword } from "@/lib/db";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
@@ -41,8 +42,16 @@ export default async function AdminInternDetail({
   const session = await getSession();
 
   let data: Awaited<ReturnType<typeof load>>;
+  let activities: ActivityEntry[] | null;
   try {
-    data = await load(id);
+    // The timeline loads beside the record; if it throws, the page still renders without it.
+    [data, activities] = await Promise.all([
+      load(id),
+      loadInternActivity(id).catch((err): ActivityEntry[] | null => {
+        console.error("[admin/interns/[id]] activity failed", err);
+        return null;
+      }),
+    ]);
   } catch (err) {
     console.error("[admin/interns/[id]] load failed", err);
     return (
@@ -69,6 +78,7 @@ export default async function AdminInternDetail({
       documents={listCandidateDocuments(documents, extra)}
       hasPhoto={Boolean(documents?.profilePhotoName)}
       initialTab={typeof tab === "string" ? tab : undefined}
+      activities={activities}
       {...rest}
       actions={
         <>
@@ -85,28 +95,17 @@ export default async function AdminInternDetail({
               }}
             />
           ) : null}
-          {viewAs ? <ViewAsButton targetType="intern" targetId={user.id} label="View as candidate" /> : null}
         </>
       }
+      viewAs={viewAs ? <ViewAsButton targetType="intern" targetId={user.id} label="View as candidate" appearance="tile" /> : null}
       controls={
-        canWrite ? (
-          <div key="controls" className="flex flex-wrap items-start gap-x-8 gap-y-4">
-            {onboarding ? (
-              <div key="review">
-                <p className="mb-1.5 text-xs font-medium text-ink-600">Review</p>
-                <InternApprovalCell internId={user.id} value={String(extra.approvalStatus ?? "Pending")} />
-              </div>
-            ) : null}
-            <div key="visibility">
-              <p className="mb-1.5 text-xs font-medium text-ink-600">Employer visibility</p>
-              <InternVisibilityCell internId={user.id} live={user.profileVisibility !== "hidden"} />
-            </div>
-            <div key="account">
-              <p className="mb-1.5 text-xs font-medium text-ink-600">Account</p>
-              <AccountActiveCell id={user.id} kind="intern" active={user.isActive} />
-            </div>
-          </div>
-        ) : null
+        canWrite
+          ? {
+              review: onboarding ? <InternApprovalCell internId={user.id} value={String(extra.approvalStatus ?? "Pending")} /> : undefined,
+              visibility: <InternVisibilityCell internId={user.id} live={user.profileVisibility !== "hidden"} />,
+              account: <AccountActiveCell id={user.id} kind="intern" active={user.isActive} />,
+            }
+          : undefined
       }
     />
   );

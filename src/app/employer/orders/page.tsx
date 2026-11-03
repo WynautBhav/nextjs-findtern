@@ -15,6 +15,7 @@ import { getInvoiceSeller } from "@/lib/invoice-seller";
 import { displayInvoiceNumber, LEGACY_INVOICE_CUTOFF, taxInvoiceHtml, type InvoiceLine } from "@/lib/invoice";
 import { timezoneForLocation } from "@/lib/timezones";
 import { parseOffer } from "@/lib/offer";
+import { hireInvoiceLines } from "@/lib/invoice-lines";
 import { payableCheckout } from "@/lib/employer-payable";
 import { expireStaleEmployerOrders, orderProposalIds } from "@/lib/payments";
 import { formatMoney } from "@/lib/format";
@@ -150,22 +151,38 @@ async function loadOrders(employerId: string) {
       const ids = orderProposalIds(p.raw);
       const rows = ids.map((id) => byId.get(id)).filter((r): r is NonNullable<typeof r> => Boolean(r));
       const monthly = ((p.raw as { notes?: { paymentMode?: string } } | null)?.notes?.paymentMode ?? "") === "monthly";
-      const lines: InvoiceLine[] = rows.map((r) => {
+      const lines: InvoiceLine[] = rows.flatMap((r) => {
         const offer = parseOffer(r.proposal.offerDetails, r.proposal.currency);
         const who = nameOf(r);
-        return offer.fullTime
-          ? {
+        if (offer.fullTime) {
+          return [
+            {
               label: `${who} - Full time consulting fee (8.33% of the total mentioned CTC)`,
               detail: offer.fullTime.annualCtcMinor
                 ? `${offer.roleTitle || "Full-time role"} · Annual CTC ${formatMoney(offer.fullTime.annualCtcMinor, offer.currency, { zeroLabel: false })}`
                 : offer.roleTitle || null,
               amountMinor: rows.length === 1 ? p.amountMinor : null,
-            }
-          : {
-              label: `${who} - ${offer.roleTitle || r.projectName || "Internship"}`,
-              detail: `${r.projectName ?? "Project"} · ${monthly ? "Monthly instalment" : `${offer.months} month${offer.months === 1 ? "" : "s"}, paid in full`}`,
-              amountMinor: rows.length === 1 ? p.amountMinor : null,
-            };
+            },
+          ];
+        }
+        // Payments for this hire that settled before this one: the first carries the hiring fee.
+        const paymentIndex = paymentRows.filter(
+          (o) =>
+            o.id !== p.id &&
+            isPaidRow(o) &&
+            orderProposalIds(o.raw).includes(r.proposal.id) &&
+            Boolean(o.paidAt && p.paidAt) &&
+            (o.paidAt!.getTime() < p.paidAt!.getTime() || (o.paidAt!.getTime() === p.paidAt!.getTime() && o.orderId < p.orderId)),
+        ).length;
+        return hireInvoiceLines({
+          who,
+          roleTitle: offer.roleTitle,
+          projectName: r.projectName ?? "Project",
+          offer,
+          monthly,
+          paymentIndex,
+          chargedMinor: rows.length === 1 ? p.amountMinor : null,
+        });
       });
       const number = displayInvoiceNumber(p, paidRefs);
       const currency = p.currency || "INR";

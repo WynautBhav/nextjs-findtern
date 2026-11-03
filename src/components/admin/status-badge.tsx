@@ -1,5 +1,4 @@
 import { cn } from "@/lib/utils";
-import { Pill, type Tone } from "@/components/app/primitives";
 import { humanizeStatus } from "@/components/app/status";
 
 export { humanizeStatus };
@@ -7,18 +6,17 @@ export { humanizeStatus };
 export type StatusTone = "success" | "warning" | "danger" | "info" | "neutral";
 
 /**
- * Admin tones render through the one `Pill` (DESIGN.md §0: status always via
- * Pill tones). `danger` is the only tone Pill has no slot for: failures and
- * rejections keep a red pill so a failed payout never reads like a closed one.
+ * A pastel pill: the tone's soft fill with the same hue's text and dot. The
+ * soft/ink pairs are the semantic feedback tokens, which flip with the theme
+ * and keep text at 4.5:1 or better in both (neutral uses the ink ramp).
  */
-const PILL_TONE: Record<StatusTone, Tone> = {
-  success: "live",
-  warning: "waiting",
-  danger: "neutral",
-  info: "new",
-  neutral: "closed",
+const TONE_CLASS: Record<StatusTone, { pill: string; dot: string }> = {
+  success: { pill: "bg-success-soft text-success", dot: "bg-success" },
+  warning: { pill: "bg-warning-soft text-warning", dot: "bg-warning" },
+  danger: { pill: "bg-danger-soft text-danger", dot: "bg-danger" },
+  info: { pill: "bg-info-soft text-info", dot: "bg-info" },
+  neutral: { pill: "bg-ink-100 text-ink-700", dot: "bg-ink-500" },
 };
-const DANGER = "bg-danger-soft text-danger ring-danger/25";
 
 const TONE_BY_STATUS: Record<string, StatusTone> = {
   // accounts / visibility
@@ -78,6 +76,7 @@ export function StatusBadge({
   status,
   tone,
   label,
+  dot = true,
   className,
 }: {
   /** Raw status from the database. Ignored when `tone` is given. */
@@ -87,19 +86,26 @@ export function StatusBadge({
   /** Force a tone, for values the map does not cover. */
   tone?: StatusTone;
   label?: string;
+  /** The 6px leading dot (default on). Colour is never the only signal: the label is always printed. */
+  dot?: boolean;
   className?: string;
 }) {
   const val = value ?? status;
   const resolved = tone ?? toneForStatus(val);
   const text = label ?? (val ? humanizeStatus(val) : "None");
+  const classes = TONE_CLASS[resolved];
 
   return (
-    <Pill
-      tone={!tone && val?.toLowerCase() === "paid" ? "paid" : PILL_TONE[resolved]}
-      className={cn("shrink-0 whitespace-nowrap", resolved === "danger" && DANGER, className)}
+    <span
+      className={cn(
+        "inline-flex h-6 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 text-xs font-medium",
+        classes.pill,
+        className,
+      )}
     >
+      {dot ? <span aria-hidden className={cn("size-1.5 shrink-0 rounded-full", classes.dot)} /> : null}
       {text}
-    </Pill>
+    </span>
   );
 }
 
@@ -118,7 +124,7 @@ export function BooleanBadge({
   falseTone?: StatusTone;
 }) {
   if (value === null || value === undefined) {
-    return <StatusBadge tone="neutral" label="-" />;
+    return <StatusBadge tone="neutral" label="-" dot={false} />;
   }
   return (
     <StatusBadge

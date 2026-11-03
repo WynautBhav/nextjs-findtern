@@ -1,12 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowLeft, Download } from "lucide-react";
+import { Download } from "lucide-react";
 
+import { IdentityCell } from "@/components/admin/data-table";
 import { AdminLoadError, AdminPageHeader, Panel, PanelHeader } from "@/components/admin/panel";
+import { ADMIN_PILL_PRIMARY, ADMIN_PILL_SECONDARY } from "@/components/admin/surface";
 import { ChipLinks, ReportRange } from "@/components/admin/report-range";
 import { StatCard, StatGrid } from "@/components/admin/stat-card";
 import { StatusBadge } from "@/components/admin/status-badge";
-import { buttonClass } from "@/components/ui/button";
+import { ButtonAnchor, ButtonLink } from "@/components/ui/button";
 import { analyticsRange } from "@/lib/admin/analytics-load";
 import { flattenParams, type RawSearchParams } from "@/lib/admin/params";
 import { MONEY_STATUSES, moneyRowFilter, narrowReceivables, type MoneyRow, type Receivables } from "@/lib/admin/receivables";
@@ -40,7 +42,8 @@ const STATUS_TONE: Record<MoneyRow["status"], string> = {
   unpaid: "inactive",
 };
 
-const field = "h-9 rounded-apple-sm border border-ink-200 bg-surface px-2.5 text-base sm:text-sm text-ink-800 focus-visible:outline-2 focus-visible:outline-brand-600 max-lg:h-11";
+const field =
+  "h-10 rounded-full bg-[color:var(--admin-panel-2)] px-4 text-base sm:text-sm text-foreground placeholder:text-text-subtle focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring touch:min-h-11";
 
 /** Legacy receivables / payables report (routes.ts:5100-5453), with INR totals. */
 export default async function AdminMoneyReportPage({ searchParams }: { searchParams?: Promise<RawSearchParams> }) {
@@ -79,20 +82,24 @@ export default async function AdminMoneyReportPage({ searchParams }: { searchPar
   const filtered = Boolean(rowFilter.company || rowFilter.candidate || rowFilter.status);
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 lg:space-y-8">
       <AdminPageHeader
         title="Money in and out"
         subtitle="Amounts keep their currency; totals are in INR (USD at ₹100/$)."
         action={
           <>
-            <Link href="/admin/reports" className={buttonClass({ variant: "outline", size: "sm" })}>
-              <ArrowLeft className="size-4" aria-hidden />
+            <ButtonLink href="/admin/reports" variant="outline" size="sm" className={ADMIN_PILL_SECONDARY}>
               Reports
-            </Link>
-            <a href={`/api/admin/reports/money?${query}${query ? "&" : ""}format=csv`} className={buttonClass({ variant: "outline", size: "sm" })}>
+            </ButtonLink>
+            <ButtonAnchor
+              href={`/api/admin/reports/money?${query}${query ? "&" : ""}format=csv`}
+              variant="primary"
+              size="sm"
+              className={ADMIN_PILL_PRIMARY}
+            >
               <Download className="size-4" aria-hidden />
               Export CSV
-            </a>
+            </ButtonAnchor>
           </>
         }
       />
@@ -100,21 +107,21 @@ export default async function AdminMoneyReportPage({ searchParams }: { searchPar
 
       {/* Candidate / company / status (ADM-15): one GET form, applies to both
           tables as you change it (no Filter button, QA-149). */}
-      <AutoSubmitForm className="flex flex-wrap items-end gap-2 rounded-apple-lg border border-ink-200/80 bg-card px-4 py-3">
+      <AutoSubmitForm className="flex flex-wrap items-end gap-3">
         {Object.entries(params)
           .filter(([k, v]) => v && !["company", "candidate", "status", "page"].includes(k))
           .map(([k, v]) => (
             <input key={k} type="hidden" name={k} value={v} />
           ))}
-        <label className="flex flex-col gap-1 text-xs font-medium text-ink-600">
+        <label className="flex flex-col gap-1 text-xs font-medium text-text-subtle">
           Company
           <input name="company" defaultValue={rowFilter.company} placeholder="Any company" className={cn(field, "w-48")} />
         </label>
-        <label className="flex flex-col gap-1 text-xs font-medium text-ink-600">
+        <label className="flex flex-col gap-1 text-xs font-medium text-text-subtle">
           Candidate
           <input name="candidate" defaultValue={rowFilter.candidate} placeholder="Any candidate" className={cn(field, "w-48")} />
         </label>
-        <label className="flex flex-col gap-1 text-xs font-medium text-ink-600">
+        <label className="flex flex-col gap-1 text-xs font-medium text-text-subtle">
           Status
           <select name="status" defaultValue={rowFilter.status} className={field}>
             <option value="">Any status</option>
@@ -129,7 +136,10 @@ export default async function AdminMoneyReportPage({ searchParams }: { searchPar
           Apply filters
         </button>
         {filtered ? (
-          <Link href={link({ company: "", candidate: "", status: "" })} className={cn(buttonClass({ variant: "ghost", size: "sm" }), "max-lg:h-11")}>
+          <Link
+            href={link({ company: "", candidate: "", status: "" })}
+            className="apple-spring inline-flex h-10 items-center rounded-full px-4 text-sm font-medium text-foreground hover:bg-[color:var(--admin-panel-2)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring touch:min-h-11"
+          >
             Clear
           </Link>
         ) : null}
@@ -137,7 +147,7 @@ export default async function AdminMoneyReportPage({ searchParams }: { searchPar
 
       {data ? (
         <>
-          <StatGrid cols={6}>
+          <StatGrid cols={6} className="xl:grid-cols-5">
             <StatCard label="Received" value={inr(data.totals.receivedMinor)} hint="Paid orders and activation fees" />
             <StatCard
               label="Still to collect"
@@ -147,6 +157,7 @@ export default async function AdminMoneyReportPage({ searchParams }: { searchPar
             <StatCard label="Paid to interns" value={inr(data.totals.paidOutMinor)} hint="Stipend payouts marked paid" />
             <StatCard label="Owed to interns" value={inr(data.totals.owedMinor)} hint="Pending payouts and stipend months ahead" />
             <StatCard
+              featured
               label="Net"
               value={inr(netMinor(data.totals))}
               hint="Received, less paid to interns, less owed to interns"
@@ -184,20 +195,20 @@ function MoneyTable({
     <Panel>
       <PanelHeader title={`${title} (${formatNumber(rows.length)})`} description={description} action={filter} />
       {rows.length === 0 ? (
-        <p className="px-5 py-10 text-center text-sm text-ink-600">
+        <p className="px-[var(--admin-pad-panel)] py-10 text-center text-sm text-text-subtle">
           {filtered ? "Nothing matches these filters in this range." : "Nothing in this range."}
         </p>
       ) : (
         // Focusable, so the inner scroll can be reached from the keyboard (axe scrollable-region-focusable).
-        <div tabIndex={0} role="region" aria-label={title} data-stack className="max-h-[min(72vh,48rem)] overflow-y-auto lg:overflow-auto focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand-600">
+        <div tabIndex={0} role="region" aria-label={title} data-stack className="max-h-[min(72vh,48rem)] overflow-y-auto lg:overflow-auto focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring">
           <table className="w-full text-left text-sm lg:min-w-[48rem]">
             <thead>
-              <tr className="border-b border-ink-100">
+              <tr className="border-b border-[color:var(--admin-rule)]">
                 {head.map((h) => (
                   <th
                     key={h}
                     scope="col"
-                    className={cn("sticky top-0 z-10 bg-ink-50 px-3 py-2.5 text-xs font-semibold text-ink-600 first:pl-5 last:pr-5", h === "Amount" && "text-right")}
+                    className={cn("sticky top-0 z-10 bg-[color:var(--admin-panel)] px-3 py-2.5 text-[0.8125rem] font-medium text-text-subtle first:pl-[var(--admin-pad-panel)] last:pr-[var(--admin-pad-panel)]", h === "Amount" && "text-right")}
                   >
                     {h}
                   </th>
@@ -206,18 +217,22 @@ function MoneyTable({
             </thead>
             <tbody>
               {shown.map((r) => (
-                <tr key={r.id} className="border-b border-ink-100 last:border-0 hover:bg-ink-50/60">
-                  <td data-label="Date" className="nums px-3 py-2.5 pl-5 text-ink-700 lg:whitespace-nowrap">{formatDate(r.date)}</td>
-                  <td data-title className="px-3 py-2.5 text-ink-800 [overflow-wrap:anywhere]">{r.description}</td>
-                  <td data-label="Company" data-empty={r.companyName ? undefined : ""} className="px-3 py-2.5 text-ink-700 [overflow-wrap:anywhere]">{r.companyName ?? "-"}</td>
-                  <td data-label="Candidate" data-empty={r.candidateName ? undefined : ""} className="px-3 py-2.5 text-ink-700 [overflow-wrap:anywhere]">{r.candidateName ?? "-"}</td>
+                <tr key={r.id} className="border-b border-[color:var(--admin-rule)] last:border-0 hover:bg-[color:var(--admin-panel-2)]">
+                  <td data-label="Date" className="nums px-3 py-2.5 text-foreground first:pl-[var(--admin-pad-panel)] lg:whitespace-nowrap">{formatDate(r.date)}</td>
+                  <td data-title className="px-3 py-2.5 text-foreground [overflow-wrap:anywhere]">{r.description}</td>
+                  <td data-label="Company" data-empty={r.companyName ? undefined : ""} className="px-3 py-2.5 text-foreground [overflow-wrap:anywhere]">
+                    {r.companyName ? <IdentityCell name={r.companyName} size="sm" /> : <span className="text-text-subtle">-</span>}
+                  </td>
+                  <td data-label="Candidate" data-empty={r.candidateName ? undefined : ""} className="px-3 py-2.5 text-foreground [overflow-wrap:anywhere]">
+                    {r.candidateName ? <IdentityCell name={r.candidateName} size="sm" /> : <span className="text-text-subtle">-</span>}
+                  </td>
                   <td data-label="Status" className="px-3 py-2.5">
                     <StatusBadge value={STATUS_TONE[r.status]} label={STATUS_LABEL[r.status]} />
                   </td>
-                  <td data-label="Amount" className="nums px-3 py-2.5 text-right font-semibold lg:whitespace-nowrap text-ink-900">
+                  <td data-label="Amount" className="nums px-3 py-2.5 text-right font-semibold text-foreground lg:whitespace-nowrap">
                     {formatMoney(r.amountMinor, r.currency === "USD" ? "USD" : "INR", { zeroLabel: false })}
                   </td>
-                  <td data-label="Reference" className="px-3 py-2.5 pr-5 font-mono text-xs text-ink-600 [overflow-wrap:anywhere]">{r.reference ?? ""}</td>
+                  <td data-label="Reference" className="nums px-3 py-2.5 text-[0.8125rem] text-text-subtle [overflow-wrap:anywhere] last:pr-[var(--admin-pad-panel)]">{r.reference ?? ""}</td>
                 </tr>
               ))}
             </tbody>
@@ -225,7 +240,7 @@ function MoneyTable({
         </div>
       )}
       {rows.length > 0 ? (
-        <p className="border-t border-ink-100 px-5 py-3 text-sm text-ink-600">
+        <p className="border-t border-[color:var(--admin-rule)] px-[var(--admin-pad-panel)] py-3 text-sm text-text-subtle">
           Showing 1–{formatNumber(shown.length)} of {formatNumber(rows.length)}
           {rows.length > shown.length ? ". The CSV export has every row." : ""}
         </p>

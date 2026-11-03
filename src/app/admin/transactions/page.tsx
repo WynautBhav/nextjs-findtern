@@ -1,16 +1,17 @@
 import { and, asc, count, desc, eq, gte, sql, type AnyColumn, type SQL } from "drizzle-orm";
 
-import Link from "next/link";
-
 import { getDb, schema } from "@/lib/db";
 import { q } from "@/lib/college/sql";
 import { formatDate, formatMoney, formatNumber } from "@/lib/format";
 import { flattenParams, parsePageRequest, PERIOD_OPTIONS, periodStart, searchAny, toPage, type RawSearchParams } from "@/lib/admin/params";
 import { AdminLoadError, AdminPageHeader, Panel, PanelBody, PanelHeader } from "@/components/admin/panel";
+import { AdminTabs } from "@/components/admin/admin-tabs";
+import { ButtonLink } from "@/components/ui/button";
+import { ADMIN_PILL_SECONDARY } from "@/components/admin/surface";
 import { StatCard, StatGrid } from "@/components/admin/stat-card";
-import { DataTable, parseSort } from "@/components/admin/data-table";
+import { DataTable, IdentityCell, parseSort } from "@/components/admin/data-table";
 import { StatusBadge } from "@/components/admin/status-badge";
-import { ChipLinks, DateRangeForm } from "@/components/admin/report-range";
+import { DateRangeForm } from "@/components/admin/report-range";
 import { dateRangeConditions } from "@/lib/admin/date-range";
 import { gatewayLabel } from "@/lib/admin/invoice-rows";
 import { fillBuckets, istDayKeys, istMonthKeys, istMonthLabel, istWeekdayLabel } from "@/lib/admin/revenue";
@@ -81,13 +82,26 @@ export default async function AdminTransactionsPage({ searchParams }: { searchPa
   }
 
   return (
-    <div className="space-y-8">
-      <AdminPageHeader title="Transactions" />
+    <div className="space-y-6 lg:space-y-8">
+      <AdminPageHeader
+        title="Transactions"
+        subtitle={
+          metrics
+            ? `${formatMoney(metrics.inflowMinor, "INR", { compact: true, zeroLabel: "₹0" })} received, ${formatMoney(metrics.outflowMinor, "INR", { compact: true, zeroLabel: "₹0" })} paid out to interns, ${formatNumber(metrics.pendingPayouts)} ${metrics.pendingPayouts === 1 ? "payout" : "payouts"} waiting for a bank reference.`
+            : "Money in from employers and interns, and money out to interns."
+        }
+        action={
+          <ButtonLink href="/admin/reports/money" variant="outline" size="sm" className={ADMIN_PILL_SECONDARY}>
+            Money in and out
+          </ButtonLink>
+        }
+      />
 
       {metrics ? (
         <StatGrid cols={4}>
           <StatCard
             label="Received"
+            featured
             value={formatMoney(metrics.inflowMinor, "INR", { compact: true, zeroLabel: "₹0" })}
             hint={`${formatNumber(metrics.inflowCount)} paid receipts · USD at ₹100/$`}
           />
@@ -114,7 +128,7 @@ export default async function AdminTransactionsPage({ searchParams }: { searchPa
         </Panel>
       )}
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-[var(--admin-gap)] lg:grid-cols-2">
         <Panel>
           <PanelHeader
             title="Revenue collected"
@@ -125,19 +139,20 @@ export default async function AdminTransactionsPage({ searchParams }: { searchPa
         <Panel>
           <PanelHeader
             title="Payments, last 7 days"
-            description="Bar height is the number of paid transactions that day (India time); hover a bar for the amount."
+            description="Bar height is the number of paid transactions that day (India time). Today is filled, empty days are hatched."
           />
           <PanelBody>{charts ? <VolumeBars data={charts.volume} /> : <ChartError />}</PanelBody>
         </Panel>
       </div>
 
-      <section className="space-y-3">
-        <ChipLinks
+      <section className="space-y-4">
+        <AdminTabs
           label="Ledger view"
+          active={view}
           items={[
-            { href: "/admin/transactions", label: "Employer payments", current: view === "employer" },
-            { href: "/admin/transactions?source=intern", label: "Intern fees", current: view === "intern" },
-            { href: "/admin/transactions?view=payouts", label: "Intern payouts", current: view === "payouts" },
+            { key: "employer", href: "/admin/transactions", label: "Employer payments" },
+            { key: "intern", href: "/admin/transactions?source=intern", label: "Intern fees" },
+            { key: "payouts", href: "/admin/transactions?view=payouts", label: "Intern payouts" },
           ]}
         />
         {table}
@@ -147,7 +162,7 @@ export default async function AdminTransactionsPage({ searchParams }: { searchPa
 }
 
 function ChartError() {
-  return <p className="py-12 text-center text-sm text-danger">This chart couldn&apos;t be loaded. The tables below are unaffected.</p>;
+  return <p className="py-12 text-center text-sm font-medium text-danger">This chart couldn&apos;t be loaded. The tables below are unaffected.</p>;
 }
 
 function exportHref(type: string, params: Record<string, string>) {
@@ -233,20 +248,13 @@ async function EmployerPaymentsTable({ params }: { params: Record<string, string
       columns={[
         {
           header: "Company",
-          cell: (row) => (
-            <div className="min-w-0 max-w-60">
-              <Link href={`/admin/companies/${row.employerId}`} className="block truncate font-medium text-ink-900 hover:text-brand-700 hover:underline">
-                {row.companyName}
-              </Link>
-              <p className="truncate text-xs text-ink-600">{row.companyEmail}</p>
-            </div>
-          ),
+          cell: (row) => <IdentityCell name={row.companyName} id={row.employerId} sub={row.companyEmail} href={`/admin/companies/${row.employerId}`} />,
         },
-        { header: "Amount", align: "right", sort: "amount", cell: (row) => <span className="font-semibold text-ink-900">{money(row.amountMinor, row.currency)}</span> },
+        { header: "Amount", numeric: true, sort: "amount", cell: (row) => <span className="font-semibold">{money(row.amountMinor, row.currency)}</span> },
         { header: "Gateway", cell: (row) => gatewayLabel(row.gateway) },
-        { header: "Order ID", cell: (row) => <span className="font-mono text-xs text-ink-700">{row.orderId}</span> },
+        { header: "Order ID", cell: (row) => <span className="nums break-all text-[0.8125rem] text-text-subtle">{row.orderId}</span> },
         { header: "Status", cell: (row) => <StatusBadge value={row.status} /> },
-        { header: "Date", align: "right", sort: "date", cell: (row) => formatDate((row.paidAt ?? row.createdAt)?.toISOString() ?? null) },
+        { header: "Date", numeric: true, sort: "date", cell: (row) => formatDate((row.paidAt ?? row.createdAt)?.toISOString() ?? null) },
       ]}
     />
   );
@@ -309,20 +317,13 @@ async function InternFeesTable({ params }: { params: Record<string, string> }) {
       columns={[
         {
           header: "Intern",
-          cell: (row) => (
-            <div className="min-w-0 max-w-60">
-              <Link href={`/admin/interns/${row.internId}`} className="block truncate font-medium text-ink-900 hover:text-brand-700 hover:underline">
-                {row.name.trim() || "Candidate"}
-              </Link>
-              <p className="truncate text-xs text-ink-600">{row.email}</p>
-            </div>
-          ),
+          cell: (row) => <IdentityCell name={row.name.trim() || "Candidate"} id={row.internId} sub={row.email} href={`/admin/interns/${row.internId}`} />,
         },
-        { header: "Amount", align: "right", sort: "amount", cell: (row) => <span className="font-semibold text-ink-900">{money(row.amountMinor, row.currency)}</span> },
+        { header: "Amount", numeric: true, sort: "amount", cell: (row) => <span className="font-semibold">{money(row.amountMinor, row.currency)}</span> },
         { header: "Gateway", cell: (row) => gatewayLabel(row.gateway) },
-        { header: "Order ID", cell: (row) => <span className="font-mono text-xs text-ink-700">{row.orderId}</span> },
+        { header: "Order ID", cell: (row) => <span className="nums break-all text-[0.8125rem] text-text-subtle">{row.orderId}</span> },
         { header: "Status", cell: (row) => <StatusBadge value={row.status} /> },
-        { header: "Date", align: "right", sort: "date", cell: (row) => formatDate((row.paidAt ?? row.createdAt)?.toISOString() ?? null) },
+        { header: "Date", numeric: true, sort: "date", cell: (row) => formatDate((row.paidAt ?? row.createdAt)?.toISOString() ?? null) },
       ]}
     />
   );
@@ -398,20 +399,13 @@ async function PayoutsTable({ params }: { params: Record<string, string> }) {
       columns={[
         {
           header: "Intern",
-          cell: (row) => (
-            <div className="min-w-0 max-w-60">
-              <Link href={`/admin/interns/${row.internId}`} className="block truncate font-medium text-ink-900 hover:text-brand-700 hover:underline">
-                {row.name.trim() || "Candidate"}
-              </Link>
-              <p className="truncate text-xs text-ink-600">{row.company || row.email}</p>
-            </div>
-          ),
+          cell: (row) => <IdentityCell name={row.name.trim() || "Candidate"} id={row.internId} sub={row.company || row.email} href={`/admin/interns/${row.internId}`} />,
         },
-        { header: "Amount", align: "right", sort: "amount", cell: (row) => <span className="font-semibold text-ink-900">{money(row.amountMinor, row.currency)}</span> },
-        { header: "Method", cell: (row) => (row.method ? row.method.toUpperCase() : "-") },
-        { header: "Bank reference", cell: (row) => <span className="font-mono text-xs text-ink-700">{row.referenceId || "Not yet"}</span> },
+        { header: "Amount", numeric: true, sort: "amount", cell: (row) => <span className="font-semibold">{money(row.amountMinor, row.currency)}</span> },
+        { header: "Method", cell: (row) => (row.method ? row.method.toUpperCase() : <span className="text-text-subtle">-</span>) },
+        { header: "Bank reference", cell: (row) => (row.referenceId ? <span className="nums break-all text-[0.8125rem] text-text-subtle">{row.referenceId}</span> : <span className="text-text-subtle">Not yet</span>) },
         { header: "Status", cell: (row) => <StatusBadge value={row.status} /> },
-        { header: "Date", align: "right", sort: "date", cell: (row) => (row.paidAt ? `Paid ${formatDate(row.paidAt.toISOString())}` : formatDate(row.createdAt?.toISOString() ?? null)) },
+        { header: "Date", numeric: true, sort: "date", cell: (row) => (row.paidAt ? `Paid ${formatDate(row.paidAt.toISOString())}` : formatDate(row.createdAt?.toISOString() ?? null)) },
         {
           header: "Update",
           cell: (row) => (row.status === "pending" ? <PayoutEditor payoutId={row.id} initialReference={row.referenceId} status={row.status} /> : <span className="text-text-subtle">-</span>),

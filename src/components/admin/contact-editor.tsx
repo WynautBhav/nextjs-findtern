@@ -13,12 +13,14 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { buttonClass } from "@/components/ui/button";
+import { ADMIN_PILL_PRIMARY, ADMIN_PILL_SECONDARY } from "@/components/admin/surface";
+import { cn } from "@/lib/utils";
 import { csrfFetch } from "@/lib/client-fetch";
 import { isValidPhone, phoneError, phoneHint } from "@/lib/phone";
 import { DIAL_CODE_VALUES } from "@/lib/data/dial-codes";
 
 const inputClass =
-  "mt-1.5 h-11 w-full rounded-apple-sm border border-ink-200 bg-surface px-3 text-base sm:text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring placeholder:text-text-subtle focus:border-brand-500";
+  "mt-1.5 h-11 w-full rounded-full border border-ink-300 bg-[color:var(--admin-panel)] px-4 text-base sm:text-sm text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring placeholder:text-text-subtle";
 
 const CODES = DIAL_CODE_VALUES;
 
@@ -81,7 +83,7 @@ export function ContactEditor({
           setError(null);
           setOpen(true);
         }}
-        className={buttonClass({ variant: "outline", size: "sm" })}
+        className={cn(buttonClass({ variant: "outline", size: "sm" }), ADMIN_PILL_SECONDARY)}
       >
         <Pencil className="size-4" aria-hidden />
         Edit contact
@@ -97,27 +99,27 @@ export function ContactEditor({
           <div className="space-y-4">
             {targetType === "intern" ? (
               <div className="grid gap-3 sm:grid-cols-2">
-                <label className="block text-sm font-medium text-ink-800">
+                <label className="block text-sm font-medium text-foreground">
                   First name
                   <input value={draft.firstName ?? ""} onChange={(e) => set({ firstName: e.target.value })} className={inputClass} />
                 </label>
-                <label className="block text-sm font-medium text-ink-800">
+                <label className="block text-sm font-medium text-foreground">
                   Last name
                   <input value={draft.lastName ?? ""} onChange={(e) => set({ lastName: e.target.value })} className={inputClass} />
                 </label>
               </div>
             ) : (
-              <label className="block text-sm font-medium text-ink-800">
+              <label className="block text-sm font-medium text-foreground">
                 Contact name
                 <input value={draft.name ?? ""} onChange={(e) => set({ name: e.target.value })} className={inputClass} />
               </label>
             )}
-            <label className="block text-sm font-medium text-ink-800">
+            <label className="block text-sm font-medium text-foreground">
               Email {targetType === "employer" ? "(login)" : ""}
               <input type="email" value={draft.email} onChange={(e) => set({ email: e.target.value })} className={inputClass} />
             </label>
             <div>
-              <span className="block text-sm font-medium text-ink-800">Phone</span>
+              <span className="block text-sm font-medium text-foreground">Phone</span>
               <div className="flex gap-2">
                 <select
                   aria-label="Country code"
@@ -140,7 +142,7 @@ export function ContactEditor({
                   className={inputClass}
                 />
               </div>
-              <p className={`mt-1 text-xs ${phoneOk ? "text-ink-600" : "text-danger"}`}>
+              <p className={`mt-1 text-xs ${phoneOk ? "text-text-subtle" : "text-danger"}`}>
                 {phoneOk ? phoneHint(draft.countryCode) : phoneError(draft.countryCode, draft.phoneNumber)}
               </p>
             </div>
@@ -151,7 +153,7 @@ export function ContactEditor({
               type="button"
               onClick={save}
               disabled={saving || !phoneOk}
-              className={buttonClass({ variant: "primary", size: "sm" })}
+              className={buttonClass({ variant: "primary", size: "sm", className: ADMIN_PILL_PRIMARY })}
             >
               {saving ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
               Save changes

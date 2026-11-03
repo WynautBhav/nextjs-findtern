@@ -26,9 +26,12 @@ const FTE_OPTIONS = [
   { value: "approved", label: "Approved" },
 ] as const;
 
-export function CompanyFteSelect({ id, value, refresh = false }: { id: string; value: string; refresh?: boolean }) {
+const FTE_TONES = { none: "neutral", applied: "info", approved: "success" } as const;
+
+export function CompanyFteSelect({ id, value, refresh = false, pill = false }: { id: string; value: string; refresh?: boolean; pill?: boolean }) {
   return (
     <InlineSelect
+      tones={pill ? FTE_TONES : undefined}
       label="International FTE status"
       value={fteOf(value)}
       options={FTE_OPTIONS}
@@ -38,9 +41,10 @@ export function CompanyFteSelect({ id, value, refresh = false }: { id: string; v
   );
 }
 
-export function CompanyActiveToggle({ id, isActive, refresh = false }: { id: string; isActive: boolean; refresh?: boolean }) {
+export function CompanyActiveToggle({ id, isActive, refresh = false, compact = false }: { id: string; isActive: boolean; refresh?: boolean; compact?: boolean }) {
   return (
     <InlineToggle
+      compact={compact}
       on={isActive}
       onLabel="Active"
       offLabel="Inactive"

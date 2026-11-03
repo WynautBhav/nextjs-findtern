@@ -31,7 +31,7 @@ function toDmy(iso: string | undefined): string {
 }
 
 const field =
-  "h-9 w-32 rounded-apple-sm border border-ink-200 bg-surface px-2.5 text-base sm:text-sm tabular-nums text-ink-800 placeholder:text-text-subtle focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand-600 max-lg:h-11";
+  "h-10 w-36 rounded-full bg-[color:var(--admin-panel-2)] px-4 text-base sm:text-sm tabular-nums text-foreground placeholder:text-text-subtle focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring touch:min-h-11";
 
 export function DateRangeForm({
   params,
@@ -70,7 +70,7 @@ export function DateRangeForm({
           [toLabel, params[toKey], setTo],
         ] as const
       ).map(([label, initial, set]) => (
-        <label key={label} className="flex flex-col gap-1 text-xs font-medium text-ink-600">
+        <label key={label} className="flex flex-col gap-1 text-xs font-medium text-text-subtle">
           {label}
           {/* Uncontrolled on purpose: AutoSubmitForm compares the value with
               its defaultValue to tell an edit from a plain focus-and-leave. */}

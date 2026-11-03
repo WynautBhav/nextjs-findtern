@@ -31,7 +31,7 @@ import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { RowMenu } from "@/components/app/row-menu";
 import { useConfirm } from "@/components/app/use-confirm";
-import { ADMIN_SURFACE } from "@/components/admin/surface";
+import { ADMIN_PILL_PRIMARY, ADMIN_SURFACE } from "@/components/admin/surface";
 
 const inputClass =
   "mt-1.5 min-h-11 w-full rounded-apple-sm border border-ink-200 bg-surface px-3 text-base sm:text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring placeholder:text-text-subtle focus:border-brand-500";
@@ -334,11 +334,11 @@ export function PromoCodesManager({
   return (
     <div className="apple-admin space-y-4">
       {/* Toolbar */}
-      <div className={cn(ADMIN_SURFACE, "flex flex-col gap-3 p-4 lg:flex-row lg:items-center")}>
+      <div className={cn(ADMIN_SURFACE, "flex flex-col gap-3 p-[var(--admin-pad-panel)] lg:flex-row lg:items-center")}>
         <div className="relative min-w-0 flex-1 lg:max-w-sm">
           <Search
             aria-hidden
-            className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-text-subtle"
+            className="pointer-events-none absolute top-1/2 left-4 size-4 -translate-y-1/2 text-text-subtle"
           />
           <input
             type="search"
@@ -346,14 +346,14 @@ export function PromoCodesManager({
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search codes…"
             aria-label="Search promo codes"
-            className="min-h-11 w-full rounded-apple-sm border border-ink-200 bg-surface pr-10 pl-9 text-base sm:text-[0.9375rem] text-ink-900 placeholder:text-text-subtle focus:border-brand-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring [&::-webkit-search-cancel-button]:hidden"
+            className="h-10 w-full rounded-full bg-[color:var(--admin-panel-2)] pr-11 pl-10 text-base sm:text-sm text-foreground placeholder:text-text-subtle focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring touch:min-h-11 [&::-webkit-search-cancel-button]:hidden"
           />
           {search ? (
             <button
               type="button"
               onClick={() => setSearch("")}
               aria-label="Clear search"
-              className="absolute top-1/2 right-0 flex min-h-11 min-w-11 -translate-y-1/2 items-center justify-center rounded-apple-sm text-ink-600 hover:text-ink-800"
+              className="absolute top-1/2 right-0 flex min-h-11 min-w-11 -translate-y-1/2 items-center justify-center rounded-full text-text-subtle hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
             >
               <X className="size-4" />
             </button>
@@ -365,7 +365,7 @@ export function PromoCodesManager({
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value as "all" | "active" | "inactive")}
             aria-label="Filter by status"
-            className="min-h-11 cursor-pointer rounded-apple-sm border border-ink-200 bg-surface px-3 text-base sm:text-sm text-ink-700 focus:border-brand-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+            className="h-10 cursor-pointer rounded-full bg-[color:var(--admin-panel-2)] pr-9 pl-4 text-base sm:text-sm text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring touch:min-h-11"
           >
             <option value="all">All statuses</option>
             <option value="active">Active only</option>
@@ -375,7 +375,7 @@ export function PromoCodesManager({
             value={typeFilter}
             onChange={(e) => setTypeFilter(e.target.value as "all" | "percentage" | "fixed")}
             aria-label="Filter by discount type"
-            className="min-h-11 cursor-pointer rounded-apple-sm border border-ink-200 bg-surface px-3 text-base sm:text-sm text-ink-700 focus:border-brand-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+            className="h-10 cursor-pointer rounded-full bg-[color:var(--admin-panel-2)] pr-9 pl-4 text-base sm:text-sm text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring touch:min-h-11"
           >
             <option value="all">All types</option>
             <option value="percentage">Percentage</option>
@@ -386,7 +386,7 @@ export function PromoCodesManager({
         <button
           type="button"
           onClick={openCreateModal}
-          className={buttonClass({ variant: "primary", size: "md", className: "lg:ml-auto" })}
+          className={buttonClass({ variant: "primary", size: "md", className: cn(ADMIN_PILL_PRIMARY, "lg:ml-auto") })}
         >
           <Plus className="size-4" />
           New code
@@ -412,24 +412,24 @@ export function PromoCodesManager({
         // the switch alone (it was a switch and a pill), Edit and Delete are
         // in the row's menu.
         <div className={cn(ADMIN_SURFACE, "min-w-0 overflow-hidden")}>
-          <div aria-hidden className={cn(PROMO_GRID, "hidden gap-x-6 border-b border-ink-100 px-5 py-2.5 text-xs font-medium text-text-subtle lg:grid")}>
+          <div aria-hidden className={cn(PROMO_GRID, "hidden gap-x-6 border-b border-[color:var(--admin-rule)] px-[var(--admin-pad-panel)] py-2.5 text-[0.8125rem] font-medium text-text-subtle lg:grid")}>
             <span>Code</span>
             <span>Discount</span>
             <span>Used</span>
             <span>Active</span>
             <span />
           </div>
-          <ul className="divide-y divide-ink-100">
+          <ul className="divide-y divide-[color:var(--admin-rule)]">
           {filteredPromos.map((promo) => {
             const max = promo.maxUsages;
             const used = promo.usedCount;
             const pct = max ? Math.min(100, Math.round((used / max) * 100)) : 0;
             const isCopied = copiedCode === promo.code;
             return (
-              <li key={promo.id} className={cn(PROMO_GRID, "grid items-center gap-x-6 gap-y-2 px-5 py-4")}>
+              <li key={promo.id} className={cn(PROMO_GRID, "grid items-center gap-x-6 gap-y-2 px-[var(--admin-pad-panel)] py-4")}>
                 <div className="min-w-0">
                   <p className="flex items-center gap-1">
-                    <span className={cn("truncate font-mono text-[0.9375rem] font-semibold tracking-[0.04em]", promo.isActive ? "text-ink-900" : "text-ink-600")}>
+                    <span className={cn("truncate text-[0.9375rem] font-semibold tracking-[0.04em]", promo.isActive ? "text-foreground" : "text-text-subtle")}>
                       {promo.code}
                     </span>
                     <button
@@ -457,8 +457,8 @@ export function PromoCodesManager({
                     {max ? ` of ${max.toLocaleString("en-IN")}` : " · no limit"}
                   </p>
                   {max ? (
-                    <div aria-hidden className="mt-1.5 h-1 max-w-40 overflow-hidden rounded-full bg-ink-100">
-                      <div className="h-full rounded-full bg-brand-600" style={{ width: `${pct}%` }} />
+                    <div aria-hidden className="mt-1.5 h-2 max-w-40 overflow-hidden rounded-full bg-[color:var(--admin-panel-2)]">
+                      <div className="h-full rounded-full bg-[color:var(--admin-tile)]" style={{ width: `${pct}%` }} />
                     </div>
                   ) : null}
                   <p className="mt-1 text-xs text-ink-600">
@@ -482,7 +482,11 @@ export function PromoCodesManager({
                   />
                 </div>
                 <div className="flex gap-2 lg:hidden max-lg:col-span-2">
-                  <button type="button" onClick={() => openEditModal(promo)} className={buttonClass({ variant: "outline", size: "sm" })}>
+                  <button
+                    type="button"
+                    onClick={() => openEditModal(promo)}
+                    className="apple-spring inline-flex h-10 items-center gap-1.5 rounded-full bg-[color:var(--admin-panel-2)] px-4 text-sm font-medium text-foreground hover:bg-[color:var(--admin-bar-tint)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring touch:min-h-11"
+                  >
                     <Edit2 className="size-4" />
                     Edit
                   </button>
@@ -525,7 +529,7 @@ export function PromoCodesManager({
 
           <form onSubmit={handleSavePromo} className="space-y-4 pt-2">
             {errorMsg && (
-              <div id="promo-error" role="alert" className="rounded-apple-sm border border-danger/30 bg-danger-soft p-3 text-sm font-medium text-danger">
+              <div id="promo-error" role="alert" className="rounded-apple-sm bg-danger-soft p-3 text-sm font-medium text-danger">
                 {errorMsg}
               </div>
             )}
@@ -542,7 +546,7 @@ export function PromoCodesManager({
                 value={code}
                 onChange={(e) => setCode(e.target.value.toUpperCase())}
                 placeholder="WELCOME20"
-                className={`${inputClass} font-mono uppercase tracking-[0.08em]`}
+                className={`${inputClass} uppercase tracking-[0.08em]`}
               />
             </div>
 

@@ -24,6 +24,7 @@ import { after, before, test } from "node:test";
 import AxeBuilder from "@axe-core/playwright";
 import { chromium, firefox, webkit } from "playwright";
 
+import { singleWindow } from "./lib/one-window.mjs";
 import { api as rawApi, expectOk, gotoWithRetry, pngBase64, stalls, upload, visit } from "./lib/browser.mjs";
 import { STAGING_URL, closeDb, manifest, one as rawOne, own, ownedWrite, readSignupCode, rows as rawRows } from "./lib/staging.mjs";
 
@@ -101,6 +102,9 @@ const STATE_FILE = join(OUT, `${BROWSER}-state.json`);
 const RESUME = process.env.E2E_RESUME === "1";
 const issues = []; // console errors, page errors, failed or 4xx/5xx requests, per page
 let browser;
+let oneWindow = null;
+/** One window, roles taking turns, unless E2E_ONE_WINDOW=0. */
+const ONE_WINDOW = process.env.E2E_ONE_WINDOW !== "0";
 const pages = {};
 let currentStep = "setup";
 
@@ -111,26 +115,27 @@ const EXPECTED = [
   { match: /facebook\.com\/tr/, why: "the Meta pixel beacon is aborted by the browser's tracking protection" },
 ];
 
-function track(role, page) {
+function track(roleOrFn, page) {
+  const roleNow = () => (typeof roleOrFn === "function" ? roleOrFn() : roleOrFn);
   page.on("console", (m) => {
     if (m.type() === "error" && /status of (400|409)/.test(m.text()) && /edge cases|refused|bad |second|a bad promo|cannot|before the job/i.test(currentStep)) return;
-    if (m.type() === "error") issues.push({ role, step: currentStep, kind: "console", text: m.text().slice(0, 300), url: page.url() });
+    if (m.type() === "error") issues.push({ role: roleNow(), step: currentStep, kind: "console", text: m.text().slice(0, 300), url: page.url() });
   });
-  page.on("pageerror", (e) => issues.push({ role, step: currentStep, kind: "pageerror", text: String(e.message).slice(0, 300), url: page.url() }));
+  page.on("pageerror", (e) => issues.push({ role: roleNow(), step: currentStep, kind: "pageerror", text: String(e.message).slice(0, 300), url: page.url() }));
   page.on("response", (r) => {
     const status = r.status();
     // A request that took long is a finding even when it succeeded (a hung
     // signup call is what a person would feel as "the site is broken").
     const took = r.request().timing().responseEnd;
     if (took > 3000) {
-      issues.push({ role, step: currentStep, kind: "slow", text: `${r.request().method()} ${r.url().replace(STAGING_URL, "")} took ${Math.round(took / 1000)}s`, url: page.url() });
+      issues.push({ role: roleNow(), step: currentStep, kind: "slow", text: `${r.request().method()} ${r.url().replace(STAGING_URL, "")} took ${Math.round(took / 1000)}s`, url: page.url() });
     }
     if (status < 400) return;
     const url = r.url();
     if (EXPECTED.some((e) => e.match.test(url))) return;
     // Steps that probe a refusal on purpose (bad input, a second payment) expect these.
     if ((status === 400 || status === 409) && /edge cases|refused|bad |second|a bad promo|cannot|before the job/i.test(currentStep)) return;
-    issues.push({ role, step: currentStep, kind: "http", status, text: `${r.request().method()} ${url.replace(STAGING_URL, "")}`, url: page.url() });
+    issues.push({ role: roleNow(), step: currentStep, kind: "http", status, text: `${r.request().method()} ${url.replace(STAGING_URL, "")}`, url: page.url() });
   });
   page.on("requestfailed", (r) => {
     const url = r.url();
@@ -138,7 +143,7 @@ function track(role, page) {
     // Next aborts its own link prefetches when the page navigates away first.
     if (url.includes("_rsc=") && r.failure()?.errorText === "net::ERR_ABORTED") return;
     if (/NS_BINDING_ABORTED|cancelled/i.test(r.failure()?.errorText ?? "") && url.includes("_rsc=")) return;
-    issues.push({ role, step: currentStep, kind: "requestfailed", text: `${r.method()} ${url.replace(STAGING_URL, "")} ${r.failure()?.errorText}`, url: page.url() });
+    issues.push({ role: roleNow(), step: currentStep, kind: "requestfailed", text: `${r.method()} ${url.replace(STAGING_URL, "")} ${r.failure()?.errorText}`, url: page.url() });
   });
 }
 
@@ -176,6 +181,12 @@ function step(name, needs, provides, fn, timeoutMs = 180_000) {
 
 async function shot(name) {
   const safe = name.replace(/[^a-z0-9]+/gi, "-").slice(0, 70);
+  if (oneWindow) {
+    // One window: only what is on screen. Taking every role's turn would reload the page the step is working on.
+    const role = oneWindow.activeRole() ?? "setup";
+    if (!oneWindow.real.isClosed()) await oneWindow.real.screenshot({ path: join(OUT, `${BROWSER}-${safe}-${role}.png`), fullPage: true }).catch((err) => console.log(`[shot] ${safe}: ${String(err.message).slice(0, 80)}`));
+    return;
+  }
   for (const [role, page] of Object.entries(pages)) {
     try {
       if (!page.isClosed()) await page.screenshot({ path: join(OUT, `${BROWSER}-${safe}-${role}.png`), fullPage: true });
@@ -309,7 +320,7 @@ before(async () => {
   } else {
     browser = await type.launch(opts);
   }
-  for (const role of ROLES) {
+  const newRoleContext = async () => {
     const ctx = await browser.newContext({ baseURL: STAGING_URL, viewport: { width: 1440, height: 900 }, locale: "en-IN", timezoneId: "Asia/Kolkata" });
     ctx.setDefaultTimeout(20_000);
     // The invoice is printed from a hidden frame; a real print dialog would block the run, so count the call instead.
@@ -319,8 +330,18 @@ before(async () => {
         window.__printed++;
       };
     });
-    pages[role] = await ctx.newPage();
-    track(role, pages[role]);
+    return ctx;
+  };
+  if (ONE_WINDOW) {
+    // One window for every login: roles take turns (e2e/lib/one-window.mjs).
+    oneWindow = await singleWindow({ context: await newRoleContext(), roles: ROLES, origin: STAGING_URL, track });
+    Object.assign(pages, oneWindow.pages);
+  } else {
+    for (const role of ROLES) {
+      const ctx = await newRoleContext();
+      pages[role] = await ctx.newPage();
+      track(role, pages[role]);
+    }
   }
 
   if (RESUME && existsSync(STATE_FILE)) {
@@ -459,7 +480,7 @@ step("intern 1: dashboard shows the test button, pays with it, gets an invoice n
   assert.equal(pay.status, "paid");
   assert.equal(pay.gateway, "test");
   assert.ok(pay.amount_minor > 0, "the real amount was settled, not zero");
-  assert.match(String(pay.invoice_number), /^FT\//, `invoice number "${pay.invoice_number}" looks like FT/FY/NNNN`);
+  assert.match(String(pay.invoice_number), /^\d{6}-\d{2,}$/, `invoice number "${pay.invoice_number}" looks like DDMMYY-serial`);
   const ob = await one(`SELECT extra_data FROM intern_onboarding WHERE user_id = $1`, [state.internId]);
   assert.equal(ob.extra_data.payment?.isPaid, true, "legacy isPaid flag set");
   state.internFeeMinor = pay.amount_minor;
@@ -542,7 +563,7 @@ step("intern 2: a bad promo is refused, the real one is applied, then pays with 
   const discount = Math.floor((state.internFeeMinor * 10) / 100);
   const pay = await one(`SELECT * FROM intern_payments WHERE intern_id = $1 AND status = 'paid'`, [state.intern2Id]);
   assert.equal(pay.amount_minor, state.internFeeMinor - discount, "charged the fee less 10%");
-  assert.match(String(pay.invoice_number), /^FT\//);
+  assert.match(String(pay.invoice_number), /^\d{6}-\d{2,}$/);
   const promoRow = await one(`SELECT used_count FROM promo_codes WHERE id = $1`, [state.promoId]);
   assert.equal(promoRow.used_count, 1, "the code's use was recorded");
   const use = await one(`SELECT discount_applied_minor FROM promo_code_usages WHERE promo_code_id = $1 AND user_id = $2`, [state.promoId, state.intern2Id]);
@@ -873,7 +894,7 @@ step("employer: pays one offer upfront with the promo, using the test button [UI
   const pay = await one(`SELECT * FROM employer_payments WHERE employer_id = $1 AND status = 'paid' ORDER BY paid_at DESC LIMIT 1`, [state.employerId]);
   assert.equal(pay.gateway, "test");
   assert.equal(pay.amount_minor, expected, `charged the first month less 10%, plus the full hiring fee (${expected})`);
-  assert.match(String(pay.invoice_number), /^FT\//, `invoice number "${pay.invoice_number}"`);
+  assert.match(String(pay.invoice_number), /^\d{6}-\d{2,}$/, `invoice number "${pay.invoice_number}"`);
   assert.equal(pay.raw?.notes?.paymentMode, "total", "stored as total: the whole engagement paid at once");
   assert.equal(pay.raw?.promo?.promoCode, state.promoCode);
   const paidProposalId = pay.raw.notes.proposalIds[0];
@@ -929,14 +950,15 @@ step("employer: pays the other offer monthly, using the test button [UI]", ["pai
   assert.equal(pay.amount_minor, monthlyMinor + fee * 100, "first month plus the hiring fee, no promo");
   assert.equal(pay.raw?.notes?.paymentMode, "monthly");
   assert.deepEqual(pay.raw.notes.proposalIds, [state.otherProposalId]);
-  assert.match(String(pay.invoice_number), /^FT\//);
+  assert.match(String(pay.invoice_number), /^\d{6}-\d{2,}$/);
   assert.notEqual(pay.invoice_number, state.upfrontInvoice, "each payment gets its own invoice number");
   const p = await one(`SELECT status FROM proposals WHERE id = $1`, [state.otherProposalId]);
   assert.equal(p.status, "hired");
   state.monthlyInvoice = pay.invoice_number;
   state.monthlyPaymentId = pay.id;
   const nums = await rows(`SELECT invoice_number FROM employer_payments WHERE employer_id = $1 AND status = 'paid' ORDER BY paid_at`, [state.employerId]);
-  const seq = nums.map((r) => Number(String(r.invoice_number).split("/").pop()));
+  // DDMMYY-serial: payments of one run settle on one day, so the serial is what goes up.
+  const seq = nums.map((r) => Number(String(r.invoice_number).split("-").pop()));
   assert.ok(seq[1] > seq[0], `invoice numbers go up (${nums.map((r) => r.invoice_number).join(", ")})`);
 });
 
@@ -1234,7 +1256,8 @@ step("security: roles, owners and CSRF are enforced [API + UI]", ["fteAccepted"]
     await page.waitForLoadState("load");
     assert.ok(!new URL(page.url()).pathname.startsWith(path), `${label} is redirected (landed on ${new URL(page.url()).pathname})`);
   }
-  const stranger = await (await browser.newContext({ baseURL: STAGING_URL, locale: "en-IN" })).newPage();
+  const strangerCtx = ONE_WINDOW ? null : await browser.newContext({ baseURL: STAGING_URL, locale: "en-IN" });
+  const stranger = ONE_WINDOW ? oneWindow.guest("stranger") : await strangerCtx.newPage();
   for (const path of ["/employer/dashboard", "/intern/dashboard", "/admin/dashboard", "/employer/orders", "/intern/earnings"]) {
     await stranger.goto(`${STAGING_URL}${path}`, { waitUntil: "domcontentloaded" });
     assert.match(new URL(stranger.url()).pathname, /login/, `${path} sends a signed-out visitor to sign in (landed on ${new URL(stranger.url()).pathname})`);
@@ -1244,7 +1267,7 @@ step("security: roles, owners and CSRF are enforced [API + UI]", ["fteAccepted"]
   assert.ok([401, 403].includes(anon.status), `a signed-out payment request is refused (got ${anon.status})`);
   const file = await stranger.evaluate(async () => (await fetch("/api/files/legacy/anything.pdf")).status);
   assert.ok([401, 403, 404].includes(file), `a private file is not served to a stranger (got ${file})`);
-  await stranger.context().close();
+  await strangerCtx?.close();
 });
 
 step("signup: wrong codes lock out (even from the rate-limit-exempt address), duplicates are refused [API]", [], "signupEdgesChecked", async () => {
@@ -1362,7 +1385,7 @@ async function composeAndSend(page, { internId, startIso, message, extra }) {
   await page.locator("#startDate").waitFor();
   await typeInto(page.locator("#startDate"), dmy(startIso));
   await typeInto(page.locator("#message"), message);
-  if (extra) await typeInto(page.locator("#restrictions"), extra);
+  if (extra) await typeInto(page.locator("#additionalInfo"), extra);
   await page.getByRole("button", { name: "Review and send" }).filter({ visible: true }).first().click();
   await page.getByRole("checkbox", { name: /I have read and agree/i }).check();
   const sent = await clickFor(page, page.getByRole("button", { name: "Agree and send" }), { path: `/api/employer/${state.employer2Id}/proposals`, method: "POST" });
@@ -1725,7 +1748,7 @@ step("US employer pays in dollars with the test button; Orders and the tax invoi
   const pay = await one(`SELECT * FROM employer_payments WHERE employer_id = $1 AND status = 'paid' ORDER BY paid_at DESC LIMIT 1`, [state.employer2Id]);
   assert.equal(pay.currency, "USD");
   assert.equal(pay.gateway, "test");
-  assert.match(String(pay.invoice_number), /^FT\//);
+  assert.match(String(pay.invoice_number), /^\d{6}-\d{2,}$/);
   const offer = await one(`SELECT offer_details FROM proposals WHERE id = $1`, [state.usOfferId]);
   assert.ok(pay.amount_minor >= Math.round(offer.offer_details.monthlyAmount * 100), "the first month plus the hiring fee was charged");
   assert.equal((await one(`SELECT status FROM proposals WHERE id = $1`, [state.usOfferId])).status, "hired");
@@ -1827,7 +1850,8 @@ async function auditPage(page, role, path) {
         .slice(0, 3)
         .map((el) => `${el.tagName.toLowerCase()}.${String(el.className).slice(0, 50)}`);
     });
-    const axe = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"]).analyze();
+    await page.bringToFront();
+    const axe = await new AxeBuilder({ page: page.__real ?? page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"]).analyze();
     const violations = axe.violations.map((v) => ({ id: v.id, impact: v.impact, nodes: v.nodes.length, sample: v.nodes[0]?.target?.join(" ")?.slice(0, 90) }));
     const slug = path.replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "") || "home";
     await page.screenshot({ path: join(CRAWL_OUT, `${BROWSER}-${role}-${slug}-${label}.png`) });
@@ -1869,10 +1893,10 @@ crawlStep("admin", "/admin/dashboard", "admin", () => [`/admin/interns/${state.h
 /* ── 14. The public site: the sitemap's pages and the sign-in pages, signed out ───────── */
 
 step("public site: every sitemap page and the sign-in pages, at 1440 and 390, no CSP violations [UI]", [], "crawled_public", async () => {
-  const ctx = await browser.newContext({ baseURL: STAGING_URL, viewport: { width: 1440, height: 900 }, locale: "en-IN", timezoneId: "Asia/Kolkata" });
-  ctx.setDefaultTimeout(20_000);
-  const page = await ctx.newPage();
-  track("public", page);
+  const ctx = ONE_WINDOW ? null : await browser.newContext({ baseURL: STAGING_URL, viewport: { width: 1440, height: 900 }, locale: "en-IN", timezoneId: "Asia/Kolkata" });
+  ctx?.setDefaultTimeout(20_000);
+  const page = ONE_WINDOW ? oneWindow.guest("public") : await ctx.newPage();
+  if (!ONE_WINDOW) track("public", page);
 
   const xml = await (await fetch(`${STAGING_URL}/sitemap.xml`)).text();
   const all = [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => new URL(m[1]).pathname.replace(/\/$/, "") || "/");
@@ -1893,7 +1917,7 @@ step("public site: every sitemap page and the sign-in pages, at 1440 and 390, no
   const results = [];
   for (const path of paths) results.push(...(await auditPage(page, "public", path)));
   writeFileSync(join(OUT, `${BROWSER}-crawl-public.json`), JSON.stringify(results, null, 2));
-  await ctx.close();
+  await ctx?.close();
 
   const broken = results.filter((r) => r.status >= 400);
   const stuck = results.filter((r) => !r.loaded);

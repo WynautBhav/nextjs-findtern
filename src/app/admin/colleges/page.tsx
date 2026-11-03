@@ -1,12 +1,22 @@
 import { desc, eq, sql } from "drizzle-orm";
 
-import { AdminPageHeader, Panel, PanelBody, PanelHeader } from "@/components/admin/panel";
+import { AdminEmpty, AdminPageHeader, Panel, PanelBody, PanelHeader } from "@/components/admin/panel";
+import { IdentityCell } from "@/components/admin/data-table";
 import { AddCollegeForm, CollegeRowControls, type CollegeAdminRow } from "@/components/admin/college-partners-manager";
 import { getDb, schema } from "@/lib/db";
 import { q } from "@/lib/college/sql";
 import { formatDate } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
+
+/** A count as a quiet pill, in place of a loose "12 students · 4 on roster" line. */
+function CountChip({ n, one, many }: { n: number; one: string; many: string }) {
+  return (
+    <span className="nums inline-flex h-6 items-center whitespace-nowrap rounded-full bg-[color:var(--admin-panel-2)] px-2.5 text-xs font-medium text-foreground">
+      {n.toLocaleString("en-IN")} {n === 1 ? one : many}
+    </span>
+  );
+}
 
 export default async function AdminCollegesPage() {
   const db = getDb();
@@ -44,30 +54,43 @@ export default async function AdminCollegesPage() {
       .map((o) => ({ name: o.name, email: o.email, lastLoginAt: o.lastLoginAt?.toISOString() ?? null })),
   }));
 
+  const partners = list.filter((r) => r.isPartner).length;
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <AdminPageHeader
         title="College partners"
-        subtitle="Officers see only their own college's consenting students."
+        subtitle={`${list.length} ${list.length === 1 ? "college" : "colleges"}, ${partners} with a console. Officers see only their own college's consenting students.`}
+        className="mb-2 lg:mb-4"
       />
+      {list.length === 0 ? (
+        <Panel>
+          <AdminEmpty title="No partner colleges yet" body="Add the first one below, then issue its placement officer a login." />
+        </Panel>
+      ) : null}
       {list.map((r) => (
         <Panel key={r.id}>
           <PanelHeader
             title={r.name}
             description={[r.city, r.aisheCode ? `AISHE ${r.aisheCode}` : null, r.emailDomains.length ? `@${r.emailDomains.join(", @")}` : null].filter(Boolean).join(" · ")}
             action={
-              <span className="nums text-sm text-text-subtle">
-                {r.members} {r.members === 1 ? "student" : "students"} · {r.roster} on roster · {r.drives} {r.drives === 1 ? "drive" : "drives"}
+              <span className="flex flex-wrap items-center gap-1.5">
+                <CountChip n={r.members} one="student" many="students" />
+                <CountChip n={r.roster} one="on roster" many="on roster" />
+                <CountChip n={r.drives} one="drive" many="drives" />
               </span>
             }
           />
           <PanelBody className="space-y-3">
             {r.officers.length ? (
-              <ul className="text-sm text-ink-800">
+              <ul className="grid gap-2 text-sm sm:grid-cols-2">
                 {r.officers.map((o) => (
                   <li key={o.email}>
-                    {o.name} · {o.email}
-                    <span className="text-text-subtle"> · {o.lastLoginAt ? `last signed in ${formatDate(o.lastLoginAt)}` : "never signed in"}</span>
+                    <IdentityCell
+                      name={o.name}
+                      id={o.email}
+                      size="sm"
+                      sub={`${o.email} · ${o.lastLoginAt ? `last signed in ${formatDate(o.lastLoginAt)}` : "never signed in"}`}
+                    />
                   </li>
                 ))}
               </ul>
@@ -82,9 +105,9 @@ export default async function AdminCollegesPage() {
           ~450px above the colleges themselves (critique A). */}
       <Panel>
         <details open={list.length === 0} className="group">
-          <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between px-5 text-sm font-semibold text-ink-900 hover:bg-ink-50">
+          <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between px-[var(--admin-pad-panel)] text-sm font-semibold text-foreground hover:bg-[color:var(--admin-panel-2)] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring">
             Add a partner college
-            <span aria-hidden className="text-brand-700 group-open:hidden">Open</span>
+            <span aria-hidden className="rounded-full bg-[color:var(--admin-panel-2)] px-3 py-1 text-xs font-medium group-open:hidden">Open</span>
           </summary>
           <PanelBody>
             <AddCollegeForm />

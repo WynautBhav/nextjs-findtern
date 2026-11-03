@@ -1,21 +1,25 @@
 import Link from "next/link";
-import { ArrowLeft, ExternalLink, Globe, Mail, MapPin, Phone } from "lucide-react";
+import { ExternalLink, Globe, Mail, Phone } from "lucide-react";
 
 import { CompanyActiveToggle, CompanyDeleteButton, CompanyFteSelect } from "@/components/admin/company-controls";
 import { fteOf } from "@/lib/admin/fte";
 import { DataTable } from "@/components/admin/data-table";
 import { ProposalStatusEditor } from "@/components/admin/proposal-status-editor";
 import { StatusBadge } from "@/components/admin/status-badge";
-import { DetailRow, PageHead, Pill, SectionHead, pillTabClass } from "@/components/app/primitives";
+import { DetailRow, Pill, SectionHead } from "@/components/app/primitives";
+import { AdminAvatar } from "@/components/admin/avatar";
+import { AdminTabs } from "@/components/admin/admin-tabs";
+import { InfoList, InfoRow, QuickAction, RecordCard, RecordLayout } from "@/components/admin/record-layout";
+import { latestActivityAt, telHref } from "@/lib/admin/record-activity-format";
+import type { ActivityEntry } from "@/lib/admin/record-activity.types";
 import { ADMIN_SURFACE } from "@/components/admin/surface";
-import { StatTile } from "@/components/app/tiles";
 import { toQueryString } from "@/lib/admin/params";
 import type { CompanyLedger, HireLedger } from "@/lib/admin/company-ledger";
 import type { Employer, EmployerPayment, Interview, Project, Proposal } from "@/lib/db/schema";
 import { formatDate, formatMoney, formatSlotTime } from "@/lib/format";
 import { parseOffer } from "@/lib/offer";
 import { cn } from "@/lib/utils";
-import { StatCard, StatGrid } from "@/components/admin/stat-card";
+import { StatCard } from "@/components/admin/stat-card";
 
 /**
  * Company 360 (legacy admin-company-detail.tsx): a profile first (ADP-04),
@@ -49,6 +53,8 @@ export function Company360View({
   interns,
   ledger,
   actions,
+  viewAs,
+  activities,
 }: {
   tab: Company360Tab;
   params: Record<string, string>;
@@ -59,7 +65,12 @@ export function Company360View({
   payments: EmployerPayment[];
   interns: InternLite[];
   ledger: CompanyLedger;
+  /** Pill buttons beside the title (Edit contact). */
   actions?: React.ReactNode;
+  /** The "View as company" tile, shown with the card's quick actions. */
+  viewAs?: React.ReactNode;
+  /** The Activities timeline; null when it could not be loaded. */
+  activities: ActivityEntry[] | null;
 }) {
   const base = `/admin/companies/${company.id}`;
   const internName = new Map(interns.map((u) => [u.id, `${u.firstName ?? ""} ${u.lastName ?? ""}`.trim() || u.email || "Candidate"]));
@@ -83,94 +94,113 @@ export function Company360View({
     { key: "hired", label: "Hired", count: hired.length },
   ];
 
-  const location = [company.city, company.state].filter(Boolean).join(", ");
+  const location = [company.city, company.state, company.country].filter(Boolean).join(", ");
+  const callHref = telHref(company.countryCode, company.phoneNumber);
+  const logo = company.logoUrl && /^(\/(?!\/)|https:\/\/)/.test(company.logoUrl) ? company.logoUrl : null;
+  const website = company.websiteUrl ? (/^https?:\/\//i.test(company.websiteUrl) ? company.websiteUrl : `https://${company.websiteUrl}`) : null;
+
+  const info = (
+    <InfoList>
+      <InfoRow label="Status">
+        <span className="flex flex-wrap items-center gap-2">
+          <StatusBadge value={company.isActive ? "active" : "inactive"} />
+          <Pill tone={company.onboardingCompleted ? "live" : "waiting"}>
+            {company.onboardingCompleted ? "Onboarding complete" : "Onboarding pending"}
+          </Pill>
+          {fte !== "none" ? <Pill tone={fte === "approved" ? "paid" : "waiting"}>International FTE {fte}</Pill> : null}
+        </span>
+      </InfoRow>
+      <InfoRow label="Primary contact">{company.primaryContactName || company.name || <span className="font-normal text-text-subtle">Not given</span>}</InfoRow>
+      <InfoRow label="Email">
+        <a href={`mailto:${company.companyEmail}`} className="break-all underline-offset-4 hover:underline touch:inline-flex touch:min-h-11 touch:items-center">
+          {company.companyEmail}
+        </a>
+      </InfoRow>
+      <InfoRow label="Phone">
+        {company.phoneNumber ? (
+          <span className="nums">
+            {company.countryCode} {company.phoneNumber}
+          </span>
+        ) : (
+          <span className="font-normal text-text-subtle">Not given</span>
+        )}
+      </InfoRow>
+      <InfoRow label="Location">{location || <span className="font-normal text-text-subtle">Not given</span>}</InfoRow>
+      <InfoRow label="Website">
+        {website ? (
+          <a href={website} target="_blank" rel="noopener noreferrer" className="break-all underline-offset-4 hover:underline touch:inline-flex touch:min-h-11 touch:items-center">
+            {company.websiteUrl}
+          </a>
+        ) : (
+          <span className="font-normal text-text-subtle">Not given</span>
+        )}
+      </InfoRow>
+      <InfoRow label="Company size">{company.companySize || <span className="font-normal text-text-subtle">Not given</span>}</InfoRow>
+    </InfoList>
+  );
 
   return (
-    <div className="min-w-0 space-y-8">
-      <div>
-        <Link
-          href="/admin/companies"
-          className="mb-4 inline-flex items-center gap-1.5 rounded-apple-sm text-sm font-medium text-ink-600 hover:text-ink-900 focus-visible:outline-2 focus-visible:outline-brand-600"
-        >
-          <ArrowLeft className="size-4" aria-hidden />
-          All companies
-        </Link>
-        <PageHead
-          className="mb-0"
-          title={company.companyName}
-          lede={
-            <span className="flex flex-col gap-3">
-              <span className="flex flex-wrap items-center gap-2">
-                <StatusBadge value={company.isActive ? "active" : "inactive"} />
-                <Pill tone={company.onboardingCompleted ? "live" : "waiting"}>
-                  {company.onboardingCompleted ? "Onboarding complete" : "Onboarding pending"}
-                </Pill>
-                {fte !== "none" ? <Pill tone={fte === "approved" ? "paid" : "waiting"}>International FTE {fte}</Pill> : null}
-              </span>
-              <span className="flex flex-wrap gap-x-5 gap-y-1.5 text-sm text-ink-600">
-                <span className="inline-flex min-w-0 items-center gap-1.5">
-                  <Mail className="size-4 shrink-0 text-text-subtle" aria-hidden />
-                  <span className="break-all">{company.companyEmail}</span>
-                </span>
-                <span className="nums inline-flex items-center gap-1.5">
-                  <Phone className="size-4 shrink-0 text-text-subtle" aria-hidden />
-                  {company.countryCode} {company.phoneNumber}
-                </span>
-                {location || company.country ? (
-                  <span className="inline-flex items-center gap-1.5">
-                    <MapPin className="size-4 shrink-0 text-text-subtle" aria-hidden />
-                    {[location, company.country].filter(Boolean).join(" · ")}
-                  </span>
-                ) : null}
-              </span>
-            </span>
+    <RecordLayout
+      title={company.companyName}
+      subtitle={`Created on ${formatDate(company.createdAt)}`}
+      backHref="/admin/companies"
+      backLabel="All companies"
+      actions={actions}
+      left={
+        <RecordCard
+          avatar={<AdminAvatar name={company.companyName} id={company.id} photoUrl={logo} size="xl" />}
+          name={company.companyName}
+          idLine={`Company · ID ${company.id.slice(0, 8)}`}
+          lastActivityAt={latestActivityAt(activities)}
+          quickActions={
+            <>
+              <QuickAction href={`mailto:${company.companyEmail}`} label={`Email ${company.companyName}`}>
+                <Mail className="size-5" aria-hidden />
+              </QuickAction>
+              {callHref ? (
+                <QuickAction href={callHref} label={`Call ${company.companyName}`}>
+                  <Phone className="size-5" aria-hidden />
+                </QuickAction>
+              ) : null}
+              {viewAs}
+            </>
           }
-          action={actions}
+          info={info}
+          activities={activities}
         />
-      </div>
-
-      {/* The admin summary strip, as on the list pages (four separate tiles before). */}
-      <StatGrid cols={4}>
-        <StatCard label="Projects" value={projects.length} hint={`${activeProjects} active`} href={`${base}?tab=projects`} />
-        <StatCard label="Proposals sent" value={proposals.length} hint={`${hired.length} hired`} href={`${base}?tab=proposals`} />
-        <StatCard label="Interviews" value={interviews.length} hint={upcoming ? `${upcoming} upcoming` : "None upcoming"} href={`${base}?tab=interviews`} />
-        <StatCard
-          label="Paid to date"
-          value={formatMoney(ledger.totals.paidInrMinor, "INR", { zeroLabel: "₹0" })}
-          hint={
-            ledger.totals.remainingInrMinor > 0
-              ? `${formatMoney(ledger.totals.remainingInrMinor, "INR")} still due of ${formatMoney(ledger.totals.billedInrMinor, "INR")}`
-              : "Nothing due"
-          }
-          tone={ledger.totals.remainingInrMinor > 0 ? "warning" : "neutral"}
-          href={`${base}?tab=dues`}
+      }
+    >
+      <div className="@container min-w-0 space-y-[var(--admin-gap)]">
+        {/* Link tabs: ?tab= stays in the URL, so a tab can be shared and the back button works. */}
+        <AdminTabs
+          label="Company records"
+          active={tab}
+          items={tabs.map((t) => ({
+            key: t.key,
+            label: t.label,
+            count: t.count,
+            href: `${base}${toQueryString({ tab: t.key === "profile" ? "" : t.key })}`,
+          }))}
         />
-      </StatGrid>
 
-      <nav aria-label="Company records" className="-mx-1 overflow-x-auto px-1">
-        <ul className="flex min-w-max gap-1 pb-1">
-          {tabs.map((t) => {
-            const active = t.key === tab;
-            return (
-              <li key={t.key}>
-                <Link
-                  href={`${base}${toQueryString({ tab: t.key === "profile" ? "" : t.key })}`}
-                  scroll={false}
-                  aria-current={active ? "page" : undefined}
-                  className={pillTabClass(active)}
-                >
-                  {t.label}
-                  {t.count !== undefined ? (
-                    <span className={cn("nums text-xs", active ? "text-white/75" : "text-text-subtle")}>
-                      {t.count}
-                    </span>
-                  ) : null}
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
-      </nav>
+        {/* Four figures; two across until the column is wide enough for four. */}
+        <div className="grid grid-cols-2 gap-[var(--admin-gap)] @2xl:grid-cols-4 [&_.leading-none]:text-[1.75rem]">
+          <StatCard label="Projects" value={projects.length} hint={`${activeProjects} active`} href={`${base}?tab=projects`} />
+          <StatCard label="Proposals sent" value={proposals.length} hint={`${hired.length} hired`} href={`${base}?tab=proposals`} />
+          <StatCard label="Interviews" value={interviews.length} hint={upcoming ? `${upcoming} upcoming` : "None upcoming"} href={`${base}?tab=interviews`} />
+          <StatCard
+            featured
+            label="Paid to date"
+            value={formatMoney(ledger.totals.paidInrMinor, "INR", { zeroLabel: "₹0" })}
+            hint={
+              ledger.totals.remainingInrMinor > 0
+                ? `${formatMoney(ledger.totals.remainingInrMinor, "INR")} still due of ${formatMoney(ledger.totals.billedInrMinor, "INR")}`
+                : "Nothing due"
+            }
+            tone={ledger.totals.remainingInrMinor > 0 ? "warning" : "neutral"}
+            href={`${base}?tab=dues`}
+          />
+        </div>
 
       {tab === "profile" ? <ProfileTab company={company} fte={fte} /> : null}
 
@@ -360,7 +390,7 @@ export function Company360View({
           caption="Payments by this company"
           empty={{ title: "No payments", body: "No order has been opened by this company. Paid and unfinished checkouts both appear here." }}
           columns={[
-            { header: "Order", cell: (p) => <span className="font-mono text-xs text-ink-800">{p.orderId || p.id.slice(0, 10)}</span> },
+            { header: "Order", cell: (p) => <span className="nums text-xs text-ink-800">{p.orderId || p.id.slice(0, 10)}</span> },
             {
               header: "Candidates",
               cell: (p) => {
@@ -423,15 +453,16 @@ export function Company360View({
           ]}
         />
       ) : null}
-    </div>
+      </div>
+    </RecordLayout>
   );
 }
 
 function ProfileTab({ company, fte }: { company: Omit<Employer, "password">; fte: "none" | "applied" | "approved" }) {
   const website = company.websiteUrl ? (/^https?:\/\//i.test(company.websiteUrl) ? company.websiteUrl : `https://${company.websiteUrl}`) : null;
   return (
-    <div className="grid gap-6 lg:grid-cols-2">
-      <div className={cn(ADMIN_SURFACE, "min-w-0 p-6 lg:row-span-2")}>
+    <div className="grid gap-[var(--admin-gap)] @3xl:grid-cols-2">
+      <div className={cn(ADMIN_SURFACE, "min-w-0 p-5 @3xl:row-span-2")}>
         <SectionHead title="Company information" />
         <dl className="divide-y divide-ink-100">
           <DetailRow label="Company name" value={company.companyName} />
@@ -454,12 +485,12 @@ function ProfileTab({ company, fte }: { company: Omit<Employer, "password">; fte
           <DetailRow label="City / state" value={[company.city, company.state].filter(Boolean).join(", ") || "-"} />
           <DetailRow label="Country" value={company.country || "-"} />
           <DetailRow label="Billing PIN" value={company.billingPincode || "-"} mono />
-          <DetailRow label="GSTIN" value={company.gstNumber ? <span className="font-mono">{company.gstNumber}</span> : "-"} />
+          <DetailRow label="GSTIN" value={company.gstNumber ? <span className="nums">{company.gstNumber}</span> : "-"} />
           <DetailRow label="Member since" value={formatDate(company.createdAt)} />
         </dl>
       </div>
 
-      <div className={cn(ADMIN_SURFACE, "min-w-0 p-6")}>
+      <div className={cn(ADMIN_SURFACE, "min-w-0 p-5")}>
         <SectionHead title="Primary contact" hint="First point of contact" />
         <dl className="divide-y divide-ink-100">
           <DetailRow label="Name" value={company.primaryContactName || company.name || "-"} />
@@ -487,7 +518,7 @@ function ProfileTab({ company, fte }: { company: Omit<Employer, "password">; fte
         </div>
       </div>
 
-      <div className={cn(ADMIN_SURFACE, "min-w-0 p-6")}>
+      <div className={cn(ADMIN_SURFACE, "min-w-0 p-5")}>
         <SectionHead title="Account and access" hint="Changes save as soon as you make them." />
         <dl className="divide-y divide-ink-100">
           <div className="flex flex-wrap items-center justify-between gap-3 py-3">
@@ -512,7 +543,7 @@ function ProfileTab({ company, fte }: { company: Omit<Employer, "password">; fte
 
       {/* Apart from the routine switches above (critique A: Delete sat
           among them in the Account card). */}
-      <div className={cn(ADMIN_SURFACE, "min-w-0 flex flex-wrap items-center justify-between gap-3 border-danger/20 p-6")}>
+      <div className={cn(ADMIN_SURFACE, "min-w-0 flex flex-wrap items-center justify-between gap-3 p-5")}>
         <div>
           <p className="text-sm font-semibold text-ink-900">Delete company</p>
           <p className="text-sm text-ink-600">Only possible before any proposal, interview or payment.</p>
@@ -541,10 +572,10 @@ function DuesTab({
   const { totals } = ledger;
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <StatTile label="Billed" value={formatMoney(totals.billedInrMinor, "INR", { zeroLabel: "₹0" })} meta="Paid plus still due, in INR" />
-        <StatTile label="Paid" value={formatMoney(totals.paidInrMinor, "INR", { zeroLabel: "₹0" })} meta="Every paid order" />
-        <StatTile label="Remaining" value={formatMoney(totals.remainingInrMinor, "INR", { zeroLabel: "₹0" })} meta="Unpaid offers and monthly instalments left" />
+      <div className="grid grid-cols-1 gap-[var(--admin-gap)] @xl:grid-cols-3 [&_.leading-none]:text-[1.75rem]">
+        <StatCard label="Billed" value={formatMoney(totals.billedInrMinor, "INR", { zeroLabel: "₹0" })} hint="Paid plus still due, in INR" />
+        <StatCard label="Paid" value={formatMoney(totals.paidInrMinor, "INR", { zeroLabel: "₹0" })} hint="Every paid order" />
+        <StatCard label="Remaining" value={formatMoney(totals.remainingInrMinor, "INR", { zeroLabel: "₹0" })} hint="Unpaid offers and monthly instalments left" />
       </div>
       <DataTable
         basePath={base}
