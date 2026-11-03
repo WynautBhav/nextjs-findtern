@@ -14,6 +14,7 @@ import { downloadCsv } from "@/lib/admin/csv";
 import type { PlacementLedger } from "@/lib/dues";
 import { formatDate, formatMoney } from "@/lib/format";
 import { downloadInvoice } from "@/lib/invoice";
+import { filterHires } from "@/lib/orders-filter";
 import { cn } from "@/lib/utils";
 import { DmyDateInput } from "@/components/app/dmy-date-input";
 import { todayIst } from "@/lib/offer";
@@ -212,6 +213,40 @@ export function OrdersManager({
   );
 }
 
+/* ── Shared search for the Hires and Payment schedule tabs ─────────── */
+
+function HireSearch({ value, onChange, shown, total }: { value: string; onChange: (v: string) => void; shown: number; total: number }) {
+  return (
+    <div className="mb-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end lg:grid-cols-[minmax(0,1.6fr)_auto]">
+      <label className={labelClass}>
+        Search
+        <span className="relative mt-1.5 block">
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-400" aria-hidden />
+          <input
+            type="search"
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            placeholder="Candidate or project"
+            className={cn(fieldClass, "pl-9")}
+          />
+        </span>
+      </label>
+      <button
+        type="button"
+        disabled={!value}
+        onClick={() => onChange("")}
+        className={buttonClass({ variant: "ghost", size: "sm", className: "min-h-11" })}
+      >
+        <RotateCcw className="size-4" aria-hidden />
+        Reset
+      </button>
+      <p className="sr-only" role="status">
+        {value.trim() ? `${shown} of ${total} shown` : ""}
+      </p>
+    </div>
+  );
+}
+
 /* ── Hires ─────────────────────────────────────────────────────────── */
 
 function HiresPanel({
@@ -229,6 +264,8 @@ function HiresPanel({
 }) {
   // The full-time offer dialog, opened from a row's menu.
   const [ftFor, setFtFor] = useState<string | null>(null);
+  const [q, setQ] = useState("");
+  const rows = useMemo(() => filterHires(hires, q), [hires, q]);
   if (hires.length === 0) {
     return (
       <EmptyScene
@@ -242,7 +279,7 @@ function HiresPanel({
   }
 
   function exportCsv() {
-    downloadCsv("findtern-hires", hires, [
+    downloadCsv("findtern-hires", rows, [
       { header: "Candidate", value: (h) => h.candidateName },
       { header: "Email", value: (h) => h.candidateEmail ?? "" },
       { header: "Role", value: (h) => h.roleTitle },
@@ -262,17 +299,22 @@ function HiresPanel({
 
   return (
     <div>
+      <HireSearch value={q} onChange={setQ} shown={rows.length} total={hires.length} />
       <div className="mb-3 flex items-center justify-between gap-4">
         <p className="text-sm text-ink-600">
-          <span className="nums font-medium text-ink-900">{hires.length}</span> {hires.length === 1 ? "placement" : "placements"}
+          <span className="nums font-medium text-ink-900">{rows.length}</span> {rows.length === 1 ? "placement" : "placements"}
+          {rows.length !== hires.length ? ` of ${hires.length}` : ""}
         </p>
         <button type="button" onClick={exportCsv} className={buttonClass({ variant: "outline", size: "sm" })}>
           <Download className="size-4" aria-hidden />
           Export hires (CSV)
         </button>
       </div>
+      {rows.length === 0 ? (
+        <EmptyScene title="No hire matches" body="Try another candidate or project name, or reset the search." className="py-10" />
+      ) : (
       <Surface as="ul" className="divide-y divide-ink-100 overflow-hidden">
-        {hires.map((h) => {
+        {rows.map((h) => {
           // Pay only where checkout can bill this placement; otherwise the
           // link opened a checkout for a different hire (QA-139).
           const due = h.ledger.dueMinor > 0 && payableIds.includes(h.proposalId);
@@ -372,6 +414,7 @@ function HiresPanel({
           );
         })}
       </Surface>
+      )}
     </div>
   );
 }
@@ -388,7 +431,8 @@ type ScheduleFilter = "all" | "partially_paid" | "fully_paid";
 function SchedulePanel({ hires }: { hires: HireRow[] }) {
   const today = todayIst();
   const [filter, setFilter] = useState<ScheduleFilter>("all");
-  const rows = hires.filter((h) => filter === "all" || h.ledger.status === filter);
+  const [q, setQ] = useState("");
+  const rows = useMemo(() => filterHires(hires, q).filter((h) => filter === "all" || h.ledger.status === filter), [hires, q, filter]);
 
   if (hires.length === 0) {
     return (
@@ -404,6 +448,7 @@ function SchedulePanel({ hires }: { hires: HireRow[] }) {
 
   return (
     <div>
+      <HireSearch value={q} onChange={setQ} shown={rows.length} total={hires.length} />
       <div className="mb-3 flex flex-wrap items-center gap-2" role="group" aria-label="Filter by payment state">
         {(
           [
@@ -428,7 +473,7 @@ function SchedulePanel({ hires }: { hires: HireRow[] }) {
       </div>
 
       {rows.length === 0 ? (
-        <EmptyScene title="Nothing matches this filter" body="No hire is in that payment state right now." className="py-10" />
+        <EmptyScene title="Nothing matches" body="No hire matches this search and payment state. Try another name or reset the filters." className="py-10" />
       ) : (
         /* Below lg each hire stacks into labelled lines ([data-stack], globals.css); the wide table only from lg. */
         <Surface data-stack tabIndex={0} role="region" aria-label="Hires and payments" className="relative overflow-x-auto focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600">
