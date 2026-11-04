@@ -6,6 +6,7 @@ import { bonusDueDate, completionBonusPlan, isEngagementComplete } from "@/lib/c
 import { isoDay, todayIst } from "@/lib/timesheet-days";
 import { parseOffer } from "@/lib/offer";
 import { incentivePlan } from "@/lib/college/wallet";
+import { formatMoney } from "@/lib/format";
 import { notify } from "@/lib/notify";
 import type { Tx } from "@/lib/advisory-lock";
 
@@ -87,7 +88,7 @@ export function notifyCompleted(proposalId: string, r: Extract<CompletionResult,
     to: { type: "intern", id: r.internId },
     type: "internship_completed",
     title: "Internship completed: +1 Findtern Score",
-    message: `Your internship is complete. Your Findtern Score went up by 1 (the maximum is 10) and a ₹${r.amountMinor / 100} completion bonus is on its way.`,
+    message: `Your internship is complete. Your Findtern Score went up by 1 (the maximum is 10) and a ${formatMoney(r.amountMinor, "INR", { zeroLabel: false })} completion bonus is on its way.`,
     data: { proposalId, findternScore: r.next.findternScore ?? null },
     dedupeKey: `internship_completed:${proposalId}`,
   }).catch(() => undefined);
