@@ -49,8 +49,10 @@ function benefitLabel(promo: PromoCode): string {
 
 export function PromoCodesManager({
   initialPromoCodes,
+  canWrite,
 }: {
   initialPromoCodes: PromoCode[];
+  canWrite: boolean;
 }) {
   const router = useRouter();
   const { ask, dialog: confirmDialog } = useConfirm();
@@ -390,14 +392,14 @@ export function PromoCodesManager({
           </select>
         </div>
 
-        <button
+        {canWrite ? <button
           type="button"
           onClick={openCreateModal}
           className={buttonClass({ variant: "primary", size: "md", className: cn(ADMIN_PILL_PRIMARY, "lg:ml-auto") })}
         >
           <Plus className="size-4" />
           New code
-        </button>
+        </button> : null}
       </div>
 
       {/* Ticket grid */}
@@ -475,11 +477,12 @@ export function PromoCodesManager({
                 <div className="max-lg:col-start-2 max-lg:row-start-1 max-lg:justify-self-end">
                   <Switch
                     checked={promo.isActive}
+                    disabled={!canWrite}
                     onCheckedChange={() => handleToggleActive(promo)}
                     aria-label={`${promo.code} active`}
                   />
                 </div>
-                <div className="max-lg:hidden">
+                {canWrite ? <><div className="max-lg:hidden">
                   <RowMenu
                     label={`More actions for ${promo.code}`}
                     items={[
@@ -506,7 +509,7 @@ export function PromoCodesManager({
                   >
                     <Trash2 className="size-4" />
                   </button>
-                </div>
+                </div></> : null}
                 {rowError?.id === promo.id ? (
                   <p role="alert" className="text-sm font-medium text-danger lg:col-span-5 max-lg:col-span-2">
                     {rowError.message}

@@ -5,6 +5,8 @@ import type { PromoCode } from "@/lib/db/schema";
 import { AdminLoadError, AdminPageHeader, Panel } from "@/components/admin/panel";
 import { StatCard, StatGrid } from "@/components/admin/stat-card";
 import { PromoCodesManager } from "@/components/admin/promo-codes-manager";
+import { getSession } from "@/lib/auth";
+import { canWrite } from "@/lib/admin/permissions";
 import { formatNumber } from "@/lib/format";
 
 export const metadata = {
@@ -57,7 +59,7 @@ export default async function AdminPromoCodesPage() {
         <StatCard label="Used up" value={formatNumber(exhausted)} hint="Codes at their usage limit" />
       </StatGrid>
 
-      <PromoCodesManager initialPromoCodes={rows} />
+      <PromoCodesManager initialPromoCodes={rows} canWrite={canWrite((await getSession())?.permissions, "/admin/promo-codes")} />
     </div>
   );
 }
