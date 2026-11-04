@@ -17,9 +17,7 @@ import { periodDays, todayIst } from "@/lib/timesheet-days";
  * id.
  *
  * Day statuses are the four legacy writes and counts (INW-05): no "Leave".
- * A day after today may carry a status, as legacy allowed (INW-24: a sheet
- * goes once every day is filled), but not hours or a note: those describe
- * work that has happened.
+ * A day after today (IST) can carry nothing: no status, hours or note.
  */
 
 const entrySchema = z.object({
@@ -63,8 +61,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const inPeriod = new Set(periodDays(sheet.periodStart, sheet.periodEnd));
   const today = todayIst();
   const entries = parsed.data.entries.filter((e) => inPeriod.size === 0 || inPeriod.has(e.date));
-  if (entries.some((e) => e.date > today && (e.hours > 0 || e.note.trim() !== ""))) {
-    return NextResponse.json({ error: "Hours and notes are for days that have already happened." }, { status: 400 });
+  if (entries.some((e) => e.date > today && (e.status !== "" || e.hours > 0 || e.note.trim() !== ""))) {
+    return NextResponse.json({ error: "You can mark a day once it has happened." }, { status: 400 });
   }
 
   // INW-23, legacy routes.ts:13733: editing a sheet that was sent back makes

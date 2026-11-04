@@ -40,3 +40,18 @@ test("a period reads by its calendar days, whatever the server's zone", async ()
   assert.equal(formatPeriodDays(new Date("2026-10-26T00:00:00.000Z"), new Date("2026-11-25T23:59:59.999Z")), "26 Oct – 25 Nov 2026", "B5: IST must not roll the end to 26 Nov");
   assert.equal(formatPeriodDays(null, "2027-01-17"), "");
 });
+
+test("month-end send rule: period end day, IST boundary", async () => {
+  const { canSendOn, periodSendableFrom } = await import("./timesheet-days.ts");
+  const end = new Date("2026-11-25T23:59:59.999Z"); // stored end bound
+  assert.equal(periodSendableFrom(end), "2026-11-25");
+  assert.equal(canSendOn("2026-11-24", end), false); // day before
+  assert.equal(canSendOn("2026-11-25", end), true); // last day
+  assert.equal(canSendOn("2026-11-26", end), true);
+  // 23:30 IST on the 24th is 18:00Z the 24th: still the 24th in India; 00:30 IST on the 25th is 19:00Z on the 24th.
+  assert.equal(canSendOn(todayIst(new Date("2026-11-24T18:00:00Z")), end), false);
+  assert.equal(canSendOn(todayIst(new Date("2026-11-24T19:00:00Z")), end), true);
+  // Future vs today
+  assert.equal("2026-11-25" > todayIst(new Date("2026-11-24T18:00:00Z")), true);
+  assert.equal("2026-11-25" > todayIst(new Date("2026-11-24T19:00:00Z")), false);
+});
