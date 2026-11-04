@@ -71,9 +71,9 @@ export function collegeCodeEditProblem(
   return changed ? COLLEGE_CODE_LOCKED : null;
 }
 
-export const COLLEGE_CODE_UNDELETABLE = "This is a college's code. Remove it from the Colleges screen.";
+export const COLLEGE_CODE_UNDELETABLE = "This is a college's code. College codes are managed on the Colleges screen.";
 
-/** A college's code is deleted with its college, never on its own. */
+/** A college's code is never deleted on its own; it is managed on the Colleges screen. */
 export const collegeCodeDeleteProblem = (collegeId: string | null | undefined): string | null => (collegeId ? COLLEGE_CODE_UNDELETABLE : null);
 
 /** Admin input: the window must not end before it starts. */
