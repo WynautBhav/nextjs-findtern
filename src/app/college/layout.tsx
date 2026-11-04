@@ -49,7 +49,7 @@ export default async function CollegeLayout({ children }: { children: React.Reac
       crumbParents={{ "/college/students": { label: "Students", href: "/college" } }}
     >
       {children}
-      {shouldShowTermsPrompt({ acceptedVersion: ctx.admin.termsAcceptedVersion }) ? <TermsGate role="college" /> : null}
+      <TermsGate role="college" initialOpen={shouldShowTermsPrompt({ acceptedVersion: ctx.admin.termsAcceptedVersion })} />
     </ConsoleShell>
   );
 }

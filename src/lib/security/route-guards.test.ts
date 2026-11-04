@@ -113,10 +113,18 @@ test("the public list has no stale entries", () => {
   assert.deepEqual([...PUBLIC].filter((k) => !keys.has(k)), []);
 });
 
-test("requireMutation enforces terms; only the accept route opts out", () => {
+test("requireMutation enforces terms; only accept and presence opt out", () => {
   const guard = readFileSync(join(API, "../../lib/guards-mutation.ts"), "utf8");
   assert.match(guard, /terms_required/, "guard must return terms_required");
   assert.match(guard, /isTermsCurrent/, "guard must check the account's accepted version");
   const optOut = routes(API).filter((f) => /allowPendingTerms:\s*true/.test(readFileSync(f, "utf8"))).map((f) => relative(API, f));
-  assert.deepEqual(optOut, ["terms/accept/route.ts"]);
+  assert.deepEqual(optOut, ["intern/college/heartbeat/route.ts", "terms/accept/route.ts"]);
+});
+
+test("csrfFetch opens the terms pop-up in place, never reloads", () => {
+  const src = readFileSync(join(API, "../../lib/client-fetch.ts"), "utf8");
+  assert.match(src, /findtern:terms-required/);
+  assert.doesNotMatch(src, /location\.reload/);
+  const gate = readFileSync(join(API, "../../components/app/terms-gate.tsx"), "utf8");
+  assert.match(gate, /addEventListener\("findtern:terms-required"/);
 });

@@ -84,7 +84,9 @@ export async function requireMutation(input: {
   // Server-side twin of the terms pop-up: writes wait until the current terms are accepted.
   if (
     !allowPendingTerms &&
-    termsBlocksRequest({ role: session.role, method: req.method, impersonating: Boolean(session.impersonator), accepted: await isTermsCurrent(session.role, session.uid) })
+    !session.impersonator &&
+    !["GET", "HEAD", "OPTIONS"].includes(req.method) &&
+    termsBlocksRequest({ role: session.role, method: req.method, impersonating: false, accepted: await isTermsCurrent(session.role, session.uid) })
   ) {
     return {
       ok: false,

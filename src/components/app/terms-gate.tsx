@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ExternalLink, Loader2 } from "lucide-react";
 
@@ -24,9 +24,9 @@ const SIGN_OUT_TO: Record<TermsRole, string> = {
  * Acceptance is required, so nothing dismisses it: no close button, Escape and
  * outside clicks are ignored. Focus is trapped inside by the dialog primitive.
  */
-export function TermsGate({ role }: { role: TermsRole }) {
+export function TermsGate({ role, initialOpen = true }: { role: TermsRole; initialOpen?: boolean }) {
   const router = useRouter();
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(initialOpen);
   const [agreed, setAgreed] = useState(false);
   const [saving, setSaving] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
@@ -34,6 +34,13 @@ export function TermsGate({ role }: { role: TermsRole }) {
   const [signOutError, setSignOutError] = useState<string | null>(null);
   const checkRef = useRef<HTMLButtonElement>(null);
   const checkId = useId();
+
+  // csrfFetch fires this when a write is refused because the terms moved on mid-session.
+  useEffect(() => {
+    const show = () => setOpen(true);
+    window.addEventListener("findtern:terms-required", show);
+    return () => window.removeEventListener("findtern:terms-required", show);
+  }, []);
 
   // Same call and cleanup as the console's Sign out button (console-shell.tsx).
   async function signOut() {

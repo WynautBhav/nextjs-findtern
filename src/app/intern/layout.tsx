@@ -145,7 +145,7 @@ export default async function InternLayout({ children }: { children: React.React
         />
       ) : null}
       {children}
-      {termsVersion !== undefined && shouldShowTermsPrompt({ acceptedVersion: termsVersion, impersonating: !!session.impersonator }) ? <TermsGate role="intern" /> : null}
+      <TermsGate role="intern" initialOpen={termsVersion !== undefined && shouldShowTermsPrompt({ acceptedVersion: termsVersion, impersonating: !!session.impersonator })} />
     </ConsoleShell>
   );
 }

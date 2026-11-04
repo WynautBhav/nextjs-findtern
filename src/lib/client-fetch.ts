@@ -22,10 +22,10 @@ export async function csrfFetch(
   if (csrf) headers.set("x-csrf-token", csrf);
 
   const res = await fetch(input, { ...init, headers });
-  // The terms moved on mid-session: reload so the layout mounts the terms pop-up (it only mounts when behind).
+  // Terms moved on mid-session: open the pop-up in place (TermsGate listens); a reload would drop unsaved input.
   if (res.status === 403 && typeof window !== "undefined") {
     const body = await res.clone().json().catch(() => null);
-    if (body?.code === "terms_required") window.location.reload();
+    if (body?.code === "terms_required") window.dispatchEvent(new CustomEvent("findtern:terms-required"));
   }
   return res;
 }

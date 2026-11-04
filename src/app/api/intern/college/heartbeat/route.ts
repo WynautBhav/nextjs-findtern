@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
  * student's page needs no second poll and no open stream.
  */
 export async function POST(req: Request) {
-  const guard = await requireMutation({ req, roles: ["intern"] });
+  const guard = await requireMutation({ req, roles: ["intern"], allowPendingTerms: true });
   if (!guard.ok) return guard.response;
   const uid = guard.session.uid;
   const db = getDb();
