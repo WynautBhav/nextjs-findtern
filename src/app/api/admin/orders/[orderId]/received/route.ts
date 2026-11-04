@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 
 import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
+import { receivedRefusal } from "@/lib/order-received";
 
 /** Accounts marks an order's money as received in the bank (legacy raw.receivedAt). */
 export async function POST(req: Request, { params }: { params: Promise<{ orderId: string }> }) {
@@ -13,6 +14,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ orderId
   const db = getDb();
   const [order] = await db.select().from(schema.employerPayments).where(eq(schema.employerPayments.orderId, orderId)).limit(1);
   if (!order) return NextResponse.json({ error: "Order not found" }, { status: 404 });
+  const refusal = receivedRefusal(order);
+  if (refusal) return NextResponse.json({ error: refusal }, { status: 409 });
   await db
     .update(schema.employerPayments)
     .set({ raw: { ...((order.raw ?? {}) as Record<string, unknown>), receivedAt: new Date().toISOString(), receivedBy: guard.session.email } })
