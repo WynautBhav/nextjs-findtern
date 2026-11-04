@@ -71,6 +71,11 @@ export function collegeCodeEditProblem(
   return changed ? COLLEGE_CODE_LOCKED : null;
 }
 
+export const COLLEGE_CODE_UNDELETABLE = "This is a college's code. Remove it from the Colleges screen.";
+
+/** A college's code is deleted with its college, never on its own. */
+export const collegeCodeDeleteProblem = (collegeId: string | null | undefined): string | null => (collegeId ? COLLEGE_CODE_UNDELETABLE : null);
+
 /** Admin input: the window must not end before it starts. */
 export function promoWindowProblem(validFrom: Date | null, validUntil: Date | null): string | null {
   if (validFrom && validUntil && validUntil < validFrom) return "The end date must be on or after the start date";

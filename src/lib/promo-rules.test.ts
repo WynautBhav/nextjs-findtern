@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { collegeCodeEditProblem, COLLEGE_CODE_LOCKED, employerPromoTooLarge, promoDiscount, promoProblem, type PromoRow } from "./promo-rules.ts";
+import { collegeCodeDeleteProblem, COLLEGE_CODE_UNDELETABLE, collegeCodeEditProblem, COLLEGE_CODE_LOCKED, employerPromoTooLarge, promoDiscount, promoProblem, type PromoRow } from "./promo-rules.ts";
 
 const base: PromoRow = {
   code: "TEST",
@@ -91,4 +91,9 @@ test("the general editor cannot change a college code's discount, audience or ca
   // An ordinary code is free to change.
   assert.equal(collegeCodeEditProblem({ ...college, collegeId: null }, { discountValue: 50, maxUsages: 5 }), null);
   assert.equal(collegeCodeEditProblem(null, { discountValue: 50 }), null);
+});
+
+test("a college's promo code cannot be deleted on its own", () => {
+  assert.equal(collegeCodeDeleteProblem("college-1"), COLLEGE_CODE_UNDELETABLE);
+  assert.equal(collegeCodeDeleteProblem(null), null);
 });

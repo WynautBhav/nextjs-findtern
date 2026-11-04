@@ -5,7 +5,7 @@ import { z } from "zod";
 import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
 import { DUPLICATE_CODE, isUniqueViolation } from "@/lib/promo";
-import { collegeCodeEditProblem, PROMO_APPLIES_TO, promoWindowProblem } from "@/lib/promo-rules";
+import { collegeCodeDeleteProblem, collegeCodeEditProblem, PROMO_APPLIES_TO, promoWindowProblem } from "@/lib/promo-rules";
 
 // Omitted = leave as is; null = clear.
 const bodySchema = z.object({
@@ -93,6 +93,9 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
   const guard = await requireMutation({ req, roles: ["admin"] });
   if (!guard.ok) return guard.response;
   const db = getDb();
+  const [row] = await db.select({ collegeId: schema.promoCodes.collegeId }).from(schema.promoCodes).where(eq(schema.promoCodes.id, id)).limit(1);
+  const locked = collegeCodeDeleteProblem(row?.collegeId);
+  if (locked) return NextResponse.json({ error: locked }, { status: 403 });
   await db.delete(schema.promoCodes).where(eq(schema.promoCodes.id, id));
   return NextResponse.json({ ok: true });
 }
