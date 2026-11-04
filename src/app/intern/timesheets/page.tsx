@@ -89,7 +89,7 @@ export default async function InternTimesheets({
           lede={
             (owner ? `${role(owner)} at ${company(owner)}. ` : "") +
             (editable
-              ? "Pick a status for every day. Hours and a line on what you did are optional. Send it once every day is marked; you don't have to wait for the period to end."
+              ? "Pick a status for every day. Hours and a line on what you did are optional. You can send it on the last day of the period, once every day is marked."
               : status === "approved"
                 ? "Approved by your manager. Every day is shown as it was approved."
                 : "With your manager. Every day is shown as it stands now.")

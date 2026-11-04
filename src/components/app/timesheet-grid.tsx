@@ -10,11 +10,8 @@
  * (day, then the four statuses, then that column); on a wide screen it is
  * one line under column headings.
  *
- * Rules, all legacy (INW-06 / INW-24): the sheet goes for approval once
- * every day has a status. Hours are optional and the period does not have
- * to be over, so days ahead can be marked too (a planned holiday, the
- * weekend). Hours and notes stay with days that have happened; a day
- * ahead shows when its column opens.
+ * Rules: the sheet goes for approval once every day has a status, and only
+ * from the period's last day (IST). Days ahead cannot be marked at all.
  *
  * Autosave: every change is written after a short pause and the indicator
  * says which of saving / saved / not saved is true. Sending always saves
@@ -29,7 +26,7 @@ import { AlertCircle, Check, CloudUpload, Loader2 } from "lucide-react";
 import { csrfFetch } from "@/lib/client-fetch";
 import { LEGACY_DAY_STATUSES, editableDayStatus, unfilledDays, type LegacyDayStatus } from "@/lib/employer-timesheets";
 import { defaultDayStatus, holidayName } from "@/lib/holidays";
-import { dayParts, periodDays, todayIst, weekdayOf } from "@/lib/timesheet-days";
+import { canSendOn, dayParts, periodDays, periodSendableFrom, todayIst, weekdayOf } from "@/lib/timesheet-days";
 import { Surface } from "@/components/app/primitives";
 import { DAY_MARK, DayCalendar } from "@/components/app/tiles";
 import { buttonClass } from "@/components/ui/button";
@@ -87,6 +84,8 @@ export function TimesheetGrid({
 
   const missing = useMemo(() => unfilledDays(dates, days), [dates, days]);
   const totalHours = useMemo(() => days.reduce((sum, d) => sum + (Number.isFinite(d.hours) ? d.hours : 0), 0), [days]);
+  const canSend = !periodEnd || canSendOn(todayIso, periodEnd);
+  const sendOpens = periodEnd ? dayParts(periodSendableFrom(periodEnd)).date : "";
   const sentBack = status === "rejected";
 
   function update(date: string, patch: Partial<DayState>) {
@@ -222,7 +221,9 @@ export function TimesheetGrid({
 
   const sendBlock = (
     <div className="space-y-3">
-      {missing.length > 0 ? (
+      {!canSend ? (
+        <p className="text-sm text-ink-600">You can send this on {sendOpens}.</p>
+      ) : missing.length > 0 ? (
         <p className="text-sm text-ink-600">
           Every day needs a status before it can go.{" "}
           {firstMissing ? (
@@ -239,7 +240,7 @@ export function TimesheetGrid({
       <button
         type="button"
         onClick={send}
-        disabled={sendState === "sending" || missing.length > 0}
+        disabled={sendState === "sending" || !canSend || missing.length > 0}
         className={buttonClass({ variant: "primary", size: "md", className: "w-full" })}
       >
         {sendState === "sending" ? <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden /> : <CloudUpload className="size-4" aria-hidden />}
@@ -453,11 +454,13 @@ function DayRow({
               key={s}
               type="button"
               aria-pressed={on}
+              disabled={future}
               onClick={() => update(day.date, { status: s })}
               className={cn(
-                "apple-spring min-h-10 touch:min-h-11 rounded-[calc(var(--radius-apple-md)-4px)] px-1 text-sm leading-tight",
+                "apple-spring min-h-10 min-w-0 touch:min-h-11 rounded-[calc(var(--radius-apple-md)-4px)] px-1 text-sm leading-tight",
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400",
                 on ? "bg-white font-semibold text-ink-900 shadow-xs" : "font-medium text-ink-600 hover:bg-white/60 hover:text-ink-900",
+                "disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent",
               )}
             >
               {s}
@@ -470,7 +473,7 @@ function DayRow({
         // The server takes hours and notes only for days that have happened.
         <div className="flex min-w-0 @xl:col-start-2 @5xl:col-start-4">
           <p className="flex h-11 w-full items-center rounded-apple-sm border border-dashed border-ink-200 px-3 text-sm text-text-subtle">
-            Remark opens on {parts.date}
+            Opens on {parts.date}
           </p>
         </div>
       ) : (
@@ -641,7 +644,7 @@ function toEntries(days: DayState[], todayIso: string): Entry[] {
     const happened = d.date <= todayIso;
     return {
       date: d.date,
-      status: d.status,
+      status: happened ? d.status : "",
       hours: happened && d.status === "Present" ? d.hours : 0,
       note: happened ? d.note.slice(0, 400) : "",
     };

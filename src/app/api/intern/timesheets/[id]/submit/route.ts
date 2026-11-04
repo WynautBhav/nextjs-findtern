@@ -6,14 +6,14 @@ import { emails } from "@/lib/emails";
 import { unfilledDays } from "@/lib/employer-timesheets";
 import { requireMutation } from "@/lib/guards-mutation";
 import { employerNames, notify } from "@/lib/notify";
-import { formatPeriodDays, periodDays } from "@/lib/timesheet-days";
+import { canSendOn, formatPeriodDays, periodDays, periodSendableFrom, todayIst, dayParts } from "@/lib/timesheet-days";
 
 /**
  * Send a timesheet for approval.
  *
  * Legacy rule (routes.ts:13760, INW-06 / INW-24): it goes once every day of
- * the period has one of the four statuses. Hours are not required, and the
- * period does not have to be over.
+ * the period has one of the four statuses and the period's last day (IST)
+ * has come. Hours are not required.
  *
  * A sheet that was sent back can be resent as it is (legacy saved before
  * sending, which made it a draft); resending clears the old rejection date
@@ -37,6 +37,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!sheet) return NextResponse.json({ error: "Not found" }, { status: 404 });
   if (sheet.status !== "draft" && sheet.status !== "rejected") {
     return NextResponse.json({ error: "Only draft or rejected timesheets can be submitted" }, { status: 400 });
+  }
+
+  if (sheet.periodEnd && !canSendOn(todayIst(), sheet.periodEnd)) {
+    return NextResponse.json(
+      { error: `You can send this timesheet from ${dayParts(periodSendableFrom(sheet.periodEnd)).date}.` },
+      { status: 409 },
+    );
   }
 
   const rows = Array.isArray(sheet.entries) ? (sheet.entries as unknown[]) : [];

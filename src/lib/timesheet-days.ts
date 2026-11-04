@@ -52,6 +52,16 @@ export function todayIst(now: Date = new Date()): string {
   }).format(now);
 }
 
+/** The first day a period's timesheet can be sent: its last day. */
+export function periodSendableFrom(periodEnd: Date | string): string {
+  return toDay(periodEnd);
+}
+
+/** Month-end rule: sendable from the period's last day (IST), not before. */
+export function canSendOn(today: string, periodEnd: Date | string): boolean {
+  return today >= periodSendableFrom(periodEnd);
+}
+
 /**
  * A period by its calendar days: "18 Oct – 17 Nov 2026", "1 – 31 Oct 2026",
  * "18 Dec 2026 – 17 Jan 2027". Read in UTC, like `periodDays`, so the
