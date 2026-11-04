@@ -187,7 +187,7 @@ export function CollegeRowControls({ row }: { row: CollegeAdminRow }) {
           <div className="pt-2">{issueForm}</div>
         </details>
       )}
-      <details>
+      {row.isPartner && <details>
         <summary className="inline-flex min-h-11 cursor-pointer list-none items-center rounded-full px-1 text-sm font-medium text-foreground underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
           Edit name, city, AISHE code
         </summary>
@@ -218,7 +218,7 @@ export function CollegeRowControls({ row }: { row: CollegeAdminRow }) {
             Save
           </button>
         </form>
-      </details>
+      </details>}
       <div role="status" aria-live="polite">
         {issued ? (
           <p className="rounded-[var(--radius-admin-card)] bg-success-soft px-4 py-3 text-sm text-foreground">

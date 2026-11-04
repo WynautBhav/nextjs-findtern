@@ -26,6 +26,11 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Check the details" }, { status: 400 });
   const { id } = await ctx.params;
   const db = getDb();
+  // scripts/import-colleges.ts rewrites name/city/AISHE code on non-partner rows, so edits there would be undone (or re-create the old code as a duplicate).
+  if (["name", "city", "aisheCode"].some((k) => parsed.data[k as "name"] !== undefined)) {
+    const [cur] = await db.select({ isPartner: schema.colleges.isPartner }).from(schema.colleges).where(eq(schema.colleges.id, id)).limit(1);
+    if (cur && !cur.isPartner && !parsed.data.isPartner) return NextResponse.json({ error: "Only partner colleges can be renamed or re-coded; the directory import owns the rest." }, { status: 409 });
+  }
   // slug and Findtern code are never touched, so the college's URLs and code stay put.
   const set = { ...parsed.data, ...(parsed.data.aisheCode !== undefined ? { aisheCode: parsed.data.aisheCode?.toUpperCase() || null } : {}), ...(parsed.data.city !== undefined ? { city: parsed.data.city || null } : {}) };
   let row: { id: string } | undefined;
