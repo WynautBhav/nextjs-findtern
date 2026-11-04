@@ -68,6 +68,8 @@ export type Column<T> = {
    * the same two params (see `parseSort`) and orders its query by them.
    */
   sort?: string;
+  /** Direction of the first click on this header (default: the reverse of the current one, desc when unsorted). */
+  firstDir?: "asc" | "desc";
 };
 
 /** Reads `sort` / `dir` from the URL, keeping only keys the page allows. */
@@ -339,7 +341,7 @@ export function DataTable<T>({
               {columns.map((column, index) => {
                 const active = column.sort && params.sort === column.sort;
                 const dir = active ? (params.dir === "asc" ? "asc" : "desc") : null;
-                const nextDir = dir === "desc" ? "asc" : "desc";
+                const nextDir = dir ? (dir === "desc" ? "asc" : "desc") : (column.firstDir ?? "desc");
                 return (
                   <TableHead
                     key={index}

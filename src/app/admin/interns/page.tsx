@@ -354,6 +354,7 @@ export default async function AdminInterns({
     {
       header: "Candidate",
       sort: "name",
+      firstDir: "asc",
       className: "lg:sticky lg:left-0 z-[1] bg-[color:var(--admin-panel)]",
       headerClassName: "lg:sticky lg:left-0 z-[1] bg-[color:var(--admin-panel)]",
       cell: (row) => (
