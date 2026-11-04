@@ -10,8 +10,8 @@ import { paymentIndexMismatch } from "@/lib/dues";
 import { requireMutation } from "@/lib/guards-mutation";
 import { openProposalsWithDues, payableCheckout, type PayableLine } from "@/lib/employer-payable";
 import { expireStaleEmployerOrders, legacyOrderRaw, OPEN_ORDER_MINUTES, orderProposalIds, settleEmployerOrder } from "@/lib/payments";
+import { orderModeProblem } from "@/lib/order-mode";
 import { quotePromo } from "@/lib/promo";
-import { promoModeProblem } from "@/lib/promo-rules";
 import { createOrder, paymentsAreFree, razorpayKeyId, testPayEnabled } from "@/lib/razorpay";
 
 const bodySchema = z.object({
@@ -116,21 +116,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (paymentIndexMismatch(paying, parsed.data.paymentIndex)) {
     return NextResponse.json({ error: "This month is already paid. Refresh the page to see it under Orders." }, { status: 409 });
   }
-  // Pay-at-start monthly is gone for new hires (a stale tab from before the change gets a clear refusal).
-  if (parsed.data.mode === "monthly" && paying.some((l) => !l.due)) {
-    return NextResponse.json({ error: "Monthly payment is now made at the end of each month. Refresh the page." }, { status: 400 });
-  }
-  if (parsed.data.mode === "postpaid") {
-    const blocked = paying.find((l) => !l.due && l.charge.monthlyBlocked)?.charge.monthlyBlocked;
-    if (blocked) return NextResponse.json({ error: blocked }, { status: 400 });
-  }
-  // A due month is monthly whatever was asked; dues.ts counts these orders.
-  const mode = paying.some((l) => l.due) ? "monthly" : parsed.data.mode;
-  // Promo codes are for upfront payment only (3 Nov 2026), whatever the client asked.
-  if (parsed.data.promoCode) {
-    const modeProblem = promoModeProblem(mode === "upfront" ? "upfront" : "monthly");
-    if (modeProblem) return NextResponse.json({ error: modeProblem }, { status: 400 });
-  }
+  // Pay-at-start monthly gone, postpaid for a score under 6 or full-time, promo with month-end payment (order-mode.ts).
+  const modeCheck = orderModeProblem({ mode: parsed.data.mode, paying, hasPromo: Boolean(parsed.data.promoCode) });
+  if (!modeCheck.ok) return NextResponse.json({ error: modeCheck.error }, { status: modeCheck.status });
+  const mode = modeCheck.mode;
 
   if (paying.some((l) => l.charge.totalMinor <= 0)) {
     return NextResponse.json({ error: "One of these offers has no amount to pay. Edit it before checking out." }, { status: 400 });
