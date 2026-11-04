@@ -50,6 +50,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     .select({
       id: schema.internPayouts.id,
       internId: schema.internPayouts.internId,
+      kind: schema.internPayouts.kind,
       status: schema.internPayouts.status,
       amountMinor: schema.internPayouts.amountMinor,
       currency: schema.internPayouts.currency,
@@ -124,7 +125,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   let next = null;
   if (to === "paid") {
     // Queue first: the row is already "paid", so a retry would 409 and never queue.
-    next = await queueNextMonth(db, existing.internId, existing);
+    // A completion bonus is a one-off: no next month.
+    if (existing.kind === "stipend") next = await queueNextMonth(db, existing.internId, existing);
     try {
       await notifyStipendPaid(id);
     } catch (err) {
