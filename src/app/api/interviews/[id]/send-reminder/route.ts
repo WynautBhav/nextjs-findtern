@@ -6,13 +6,13 @@ import { hiredProposalSql } from "@/lib/employer-visibility";
 import { formatSlotTime } from "@/lib/format";
 import { requireMutation } from "@/lib/guards-mutation";
 import { employerNames, internFirstName, notify } from "@/lib/notify";
-import { normalizeMeetingLink } from "@/lib/employer-interview-rules";
+import { isMeetingOver, isStaleInterview, normalizeMeetingLink } from "@/lib/employer-interview-rules";
 import { requirePublicOrigin } from "@/lib/origin";
 import { limiters } from "@/lib/security/rate-limit";
 
 /**
  * Employer nudges the candidate about a scheduled interview. At most one
- * reminder per interview per day (dedupe key), so it can't be used to spam.
+ * reminder per interview per 10 minutes (limiter) and per day (dedupe key).
  */
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -25,6 +25,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (interview.employerId !== guard.session.uid) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   if (interview.status !== "scheduled" && interview.status !== "pending") {
     return NextResponse.json({ error: `This interview is already ${interview.status}` }, { status: 409 });
+  }
+
+  // A meeting that is running now can still be nudged; one that is over, or an invite whose slots all passed, cannot.
+  if (interview.status === "pending" ? isStaleInterview(interview) : isMeetingOver(interview)) {
+    return NextResponse.json({ error: "This interview's time has passed. Offer new times instead." }, { status: 409 });
   }
 
   // One nudge per interview per 10 minutes, so it can't be used to spam the candidate.
