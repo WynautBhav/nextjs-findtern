@@ -82,10 +82,15 @@ export async function PUT(
   // Legacy AI interviews sit on employer id "admin"; ours on the synthetic employer.
   const isAi = existing.employerId === "admin" || employer?.email === AI_EMAIL;
 
+  // Company interviews only: the link follows the candidate's pick (#20). AI interviews have no slots.
+  if (!isAi && !existing.selectedSlot) {
+    return NextResponse.json({ error: "The candidate hasn't picked a time yet. The link is created when they do." }, { status: 409 });
+  }
+
   const currentStatus = String(existing.status ?? "").toLowerCase();
   // Legacy rule (ADP-07, decided): any unfinished interview, employer or AI,
   // becomes "scheduled" once it has a link.
-  const nextStatus = statusAfterMeetingLink(existing.status);
+  const nextStatus = statusAfterMeetingLink(existing.status, Boolean(existing.selectedSlot) || isAi);
 
   const [updated] = await db
     .update(schema.interviews)

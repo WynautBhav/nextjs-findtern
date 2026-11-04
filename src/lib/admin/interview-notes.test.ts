@@ -35,6 +35,11 @@ test("a saved link schedules any unfinished interview (ADP-07, legacy)", () => {
   }
 });
 
+test("without a picked slot a saved link never schedules the interview (#20)", () => {
+  assert.equal(statusAfterMeetingLink("pending", false), "pending");
+  assert.equal(statusAfterMeetingLink("pending", true), "scheduled");
+});
+
 test("saving a meeting link keeps the whole of multi-line employer feedback, in order, at the end", () => {
   const existing = "old note\nfeedback: https://f\nfeedback_text: Line one: clear.\nLine two: strong SQL.\nrecording: not a link, part of the feedback";
   const merged = mergeInterviewNotes(existing, { feedbackLink: "https://g" });

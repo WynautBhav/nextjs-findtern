@@ -67,8 +67,9 @@ export function noteTag(notes: string | null | undefined, tag: "feedback" | "rec
  * cancelled) becomes "scheduled",
  * for employer and AI interviews alike.
  */
-export function statusAfterMeetingLink(current: string | null | undefined): string {
+export function statusAfterMeetingLink(current: string | null | undefined, hasSlot = true): string {
   const status = String(current ?? "").trim().toLowerCase();
-  if (["completed", "missed", "expired", "cancelled", "canceled"].includes(status)) return String(current);
+  // #20: no picked slot, no "scheduled": the link is made when the candidate picks a time.
+  if (!hasSlot || ["completed", "missed", "expired", "cancelled", "canceled"].includes(status)) return String(current);
   return "scheduled";
 }

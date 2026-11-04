@@ -500,7 +500,7 @@ function InterviewsTab({ params, page, perPage, search, pickers, rows }: TabProp
         },
         {
           header: "Meeting link",
-          cell: (i) => <MeetingLinkCell interviewId={i.id} link={i.meetingLink} locked={FINISHED_INTERVIEW.includes(i.status.toLowerCase())} />,
+          cell: (i) => <MeetingLinkCell interviewId={i.id} link={i.meetingLink} locked={FINISHED_INTERVIEW.includes(i.status.toLowerCase())} awaitingSlot={!i.selectedSlot} />,
         },
         {
           header: "",
