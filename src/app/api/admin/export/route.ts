@@ -5,8 +5,11 @@ import { getDb, schema } from "@/lib/db";
 import { q } from "@/lib/college/sql";
 import { INTERN_SORTS, loadInterns } from "@/lib/admin/intern-query";
 import { csvFilename, csvResponse, toCsv, type CsvColumn } from "@/lib/admin/csv";
+import { internSheet, needsBank, needsBankExport, parseCols } from "@/lib/admin/intern-columns";
+import { todayIstIso } from "@/lib/admin/intern-list";
+import { buildXlsx, XLSX_MIME } from "@/lib/xlsx";
 import { flattenParams, parsePageRequest, periodStart, searchAny } from "@/lib/admin/params";
-import { allows, EXPORT_PERMISSIONS } from "@/lib/admin/permissions";
+import { allows, BANK_EXPORT_PERMISSIONS, EXPORT_PERMISSIONS } from "@/lib/admin/permissions";
 import { activeProject, realEmployerId, realEmployers } from "@/lib/admin/scope";
 import { placeOfSupply, sellerStateCode, splitGst } from "@/lib/gst";
 import { formatIstStamp } from "@/lib/format";
@@ -18,7 +21,7 @@ import { parseOffer } from "@/lib/offer";
 import { getSession } from "@/lib/auth";
 
 /**
- * Admin CSV export.
+ * Admin export (CSV; the Candidates one is an .xlsx of the visible columns).
  *
  * The export honours the exact filters on screen. This matters: an export that
  * ignores the filter means the person reconciling the file is working from a
@@ -59,7 +62,7 @@ export async function GET(req: Request) {
 
   switch (type) {
     case "interns":
-      return exportInterns(req2.search, params);
+      return exportInterns(req2.search, params, session);
     case "companies":
       return exportCompanies(req2.search, params);
     case "projects":
@@ -77,9 +80,9 @@ export async function GET(req: Request) {
   }
 }
 
-async function exportInterns(search: string, params: Record<string, string>) {
+async function exportInterns(search: string, params: Record<string, string>, session: NonNullable<Awaited<ReturnType<typeof readSession>>>) {
   // The list's own query (filters, sort, money facts), only without paging,
-  // so the file holds exactly the rows the screen shows.
+  // so the file holds exactly the rows the screen shows, in the visible columns.
   const sortKey = INTERN_SORTS.find((k) => k === params.sort) ?? "created";
   const dir: "asc" | "desc" =
     params.dir === "asc" || params.dir === "desc"
@@ -87,32 +90,41 @@ async function exportInterns(search: string, params: Record<string, string>) {
       : sortKey === "name" || sortKey === "email" || sortKey === "next"
         ? "asc"
         : "desc";
-  const { rows } = await loadInterns(params, { search, limit: MAX_ROWS, offset: 0 }, sortKey, dir);
-  const rupees = (minor: number | null | undefined) => (minor ? (minor / 100).toFixed(2) : "");
+  const cols = parseCols(params.cols);
+  const fullAccountNumbers = needsBankExport(cols);
+  if (fullAccountNumbers && !allows(session.permissions, BANK_EXPORT_PERMISSIONS)) {
+    return new NextResponse("Exporting account numbers needs the Record payouts permission. Hide Account number to export the rest.", { status: 403 });
+  }
+  const { rows, total } = await loadInterns(params, { search, limit: MAX_ROWS, offset: 0 }, sortKey, dir, {
+    bank: needsBank(cols),
+    fullAccount: fullAccountNumbers,
+  });
+  if (total > MAX_ROWS) return new NextResponse("More than 10,000 candidates match; narrow the filters.", { status: 400 });
 
-  const columns: CsvColumn<(typeof rows)[number]>[] = [
-    { header: "First name", value: (r) => r.firstName },
-    { header: "Last name", value: (r) => r.lastName },
-    { header: "Email", value: (r) => r.email },
-    { header: "Joined", value: (r) => (r.createdAt ? r.createdAt.toISOString() : "") },
-    { header: "Profile complete", value: (r) => (r.hasProfile ? "yes" : "no") },
-    { header: "Account", value: (r) => (r.isActive ? "active" : "inactive") },
-    { header: "Directory", value: (r) => r.visibility },
-    { header: "Open to work", value: (r) => (r.openToWork ? "yes" : "no") },
-    { header: "Review", value: (r) => r.approval ?? "Pending" },
-    { header: "AI interview", value: (r) => r.aiStatus },
-    { header: "Findtern Score", value: (r) => (r.score != null ? r.score.toFixed(1) : "") },
-    { header: "Activation fee", value: (r) => (r.feePaid ? "paid" : "unpaid") },
-    { header: "Offer status", value: (r) => r.offerStatus ?? "" },
-    { header: "Offer type", value: (r) => (r.hired || r.offerStatus ? (r.fullTime ? "full-time" : "internship") : "") },
-    { header: "Hired", value: (r) => (r.hired ? "yes" : "no") },
-    { header: "Internship status", value: (r) => r.projectStatus ?? "" },
-    { header: "Next payout date", value: (r) => r.money?.nextDate ?? "" },
-    { header: "Left to pay (INR)", value: (r) => rupees(r.money?.owedMinor) },
-    { header: "Pending payout (INR)", value: (r) => rupees(r.money?.pendingPayoutMinor) },
-  ];
+  // Fail closed: no audit row, no file.
+  const filters = Object.fromEntries(Object.entries(params).filter(([k]) => k !== "cols"));
+  try {
+    await getDb().insert(schema.adminAuditLog).values({
+      adminId: session.uid,
+      action: "export.interns",
+      targetType: "intern",
+      targetId: null,
+      meta: { columns: [...cols], rows: rows.length, fullAccountNumbers, filters },
+    });
+  } catch (err) {
+    console.error("[admin/export] audit insert failed", err);
+    return NextResponse.json({ error: "Could not record the export" }, { status: 500 });
+  }
 
-  return csvResponse(toCsv(rows, columns), csvFilename("interns"));
+  const sheet = internSheet(rows, cols);
+  return new Response(new Uint8Array(buildXlsx("Interns", sheet.rows, sheet.moneyCols)), {
+    headers: {
+      "Content-Type": XLSX_MIME,
+      "Content-Disposition": `attachment; filename="interns-${todayIstIso()}.xlsx"`,
+      "Cache-Control": "private, no-store",
+      "X-Content-Type-Options": "nosniff",
+    },
+  });
 }
 
 async function exportCompanies(search: string, params: Record<string, string>) {

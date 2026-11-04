@@ -201,6 +201,7 @@ export async function loadInterns(
     return {
       ...(rest as typeof r),
       ratings: r.ratings && typeof r.ratings === "object" ? r.ratings : null,
+      interviewAt: r.interviewAt ? new Date(r.interviewAt) : null, // a raw sql column is not type-mapped
       money: money.get(r.id) ?? null,
       ...(opts.bank
         ? {
