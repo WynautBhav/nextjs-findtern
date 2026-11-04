@@ -8,6 +8,8 @@ import { ADMIN_PILL_SECONDARY } from "@/components/admin/surface";
 import { buttonClass } from "@/components/ui/button";
 import { calendarConnected as checkCalendar } from "@/lib/calendar-status";
 import { AdminPricingEditor, type EditablePlan } from "@/components/admin/admin-pricing-editor";
+import { getSession } from "@/lib/auth";
+import { canWrite } from "@/lib/admin/permissions";
 import { getDb, schema } from "@/lib/db";
 import { getInternActivationFeeMinor } from "@/lib/platform-settings";
 
@@ -51,6 +53,7 @@ async function loadPricing(): Promise<{ plans: EditablePlan[]; activationFeeMino
 
 export default async function AdminSettingsPage() {
   const [pricing, calendarConnected] = await Promise.all([loadPricing(), checkCalendar()]);
+  const mayEdit = canWrite((await getSession())?.permissions, "/api/admin/pricing");
 
   const calendar = (
       <Panel>
@@ -90,7 +93,9 @@ export default async function AdminSettingsPage() {
       {/* While disconnected it is the dashboard's top attention item, so it
           leads here too; once connected it sits at the end. */}
       {calendarConnected === false ? calendar : null}
-      {pricing ? (
+      {pricing && !mayEdit ? (
+        <p className="text-sm text-text-subtle">Editing prices needs the Edit website content permission.</p>
+      ) : pricing ? (
         <AdminPricingEditor plans={pricing.plans} activationFeeMinor={pricing.activationFeeMinor} />
       ) : (
         <Panel>

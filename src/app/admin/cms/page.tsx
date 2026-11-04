@@ -11,6 +11,8 @@ import { CMS_COLLECTIONS, CMS_TYPES, cmsImageSrc, matchesCmsSearch, type CmsType
 import { CMS_TABLES, cmsListColumns } from "@/lib/admin/cms-tables";
 import { flattenParams, parsePageRequest, toPage } from "@/lib/admin/params";
 import { getDb } from "@/lib/db";
+import { getSession } from "@/lib/auth";
+import { canWrite } from "@/lib/admin/permissions";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = {
@@ -53,11 +55,11 @@ function Thumb({ src }: { src: string | null }) {
   );
 }
 
-function columnsFor(type: CmsType): Column<CmsItem>[] {
+function columnsFor(type: CmsType, mayEdit: boolean): Column<CmsItem>[] {
   const def = CMS_COLLECTIONS[type];
   const status: Column<CmsItem> = {
     header: "On the website",
-    cell: (row) => (
+    cell: (row) => !mayEdit ? <span>{row.isActive !== false ? "Live" : "Hidden"}</span> : (
       <InlineToggle
         on={row.isActive !== false}
         onLabel="Live"
@@ -72,7 +74,7 @@ function columnsFor(type: CmsType): Column<CmsItem>[] {
   const actions: Column<CmsItem> = {
     header: <span className="sr-only">Actions</span>,
     headerClassName: "w-px",
-    cell: (row) => (
+    cell: (row) => !mayEdit ? null : (
       <CmsRowActions
         item={row}
         viewHref={type === "blog" && row.status === "published" ? `/blog/${encodeURIComponent(String(row.slug))}` : null}
@@ -158,6 +160,7 @@ export default async function AdminCmsPage({
   const active = (CMS_TYPES as string[]).includes(params.tab ?? "") ? (params.tab as CmsType) : "testimonial";
   const def = CMS_COLLECTIONS[active];
   const req = parsePageRequest(params);
+  const mayEdit = canWrite((await getSession())?.permissions, "/api/admin/cms");
 
   let all: CmsItem[] | null = null;
   let counts: Partial<Record<CmsType, number>> = {};
@@ -205,12 +208,12 @@ export default async function AdminCmsPage({
             pages={page.pages}
             total={page.total}
             perPage={req.perPage}
-            columns={columnsFor(active)}
+            columns={columnsFor(active, mayEdit)}
             rows={rows}
             noun={def.label.toLowerCase()}
             caption={def.label}
             searchPlaceholder={`Search ${def.label.toLowerCase()}…`}
-            extraControls={<CmsAddButton noun={def.noun} />}
+            extraControls={mayEdit ? <CmsAddButton noun={def.noun} /> : undefined}
             empty={
               req.search
                 ? { title: `No ${def.label.toLowerCase()} match "${req.search}"`, body: "Try a shorter search, or clear it to see every entry." }
