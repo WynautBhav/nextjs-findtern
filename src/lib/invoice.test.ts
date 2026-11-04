@@ -44,7 +44,7 @@ test("EMH-08: one row per hire, each at its own GST-inclusive price that adds up
   assert.deepEqual(lineRows([{ label: "A", amountMinor: null }], 500_000).map((r) => r.priceMinor), [500_000]);
 });
 
-test("the invoice follows the reference PDF: header band, dd-mm-yy date, Subtotal / CGST / SGST / Total, bank footer", () => {
+test("the invoice follows the reference PDF: header band, dd-mm-yy date, Taxable value / CGST / SGST / Total, bank footer", () => {
   const html = taxInvoiceHtml({
     invoiceNo: "141026-01",
     date: new Date("2026-10-14T06:00:00Z"),
@@ -70,7 +70,7 @@ test("the invoice follows the reference PDF: header band, dd-mm-yy date, Subtota
   assert.match(html, /Item description/);
   assert.match(html, /Price \(INR\)/);
   assert.match(html, /Abhinav Parashar \u2014 Marketing Intern/);
-  assert.match(html, /Subtotal<\/span><span>₹\s?4,237\.29/);
+  assert.match(html, /Taxable value<\/span><span>₹\s?4,237\.29/);
   assert.match(html, /CGST 9%<\/span><span>₹\s?381\.36/);
   assert.match(html, /SGST 9%<\/span><span>₹\s?381\.35/);
   assert.match(html, /Total<\/span><span>₹\s?5,000\.00/);

@@ -223,7 +223,7 @@ export function taxInvoiceHtml(input: InvoiceInput): string {
   const m = (minor: number) => money(minor, currency);
   const dateStr = invoiceDate(input.date);
 
-  // Subtotal, then each tax, then Total: the same rows as the reference invoice (141026-01).
+  // Taxable value, then each tax, then Total: the same rows as the reference invoice (141026-01).
   const taxRows =
     split.mode === "intra"
       ? `<div class="row"><span>CGST 9%</span><span>${m(split.cgstMinor)}</span></div>
@@ -347,7 +347,7 @@ export function taxInvoiceHtml(input: InvoiceInput): string {
     </table>
 
     <div class="sum">
-      <div class="row"><span>Subtotal</span><span>${m(split.baseMinor)}</span></div>
+      <div class="row"><span>Taxable value</span><span>${m(split.baseMinor)}</span></div>
       ${taxRows}
       <div class="row final"><span>Total</span><span>${m(split.totalMinor)}</span></div>
     </div>
