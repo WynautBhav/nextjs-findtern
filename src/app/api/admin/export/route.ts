@@ -193,7 +193,7 @@ async function exportCompanies(search: string, params: Record<string, string>) {
     { header: "Onboarding complete", value: (r) => (r.onboardingCompleted ? "yes" : "no") },
     { header: "International FTE", value: (r) => (r.internationalFteStatus && r.internationalFteStatus !== "none" && r.internationalFteStatus !== "rejected" ? r.internationalFteStatus : "") },
     { header: "Account", value: (r) => (r.isActive ? "active" : "inactive") },
-    { header: "Joined", value: (r) => (r.createdAt ? r.createdAt.toISOString() : "") },
+    { header: "Joined (IST)", value: (r) => formatIstStamp(r.createdAt) },
   ];
 
   return csvResponse(toCsv(rows, columns), csvFilename("companies"));
@@ -244,7 +244,7 @@ async function exportProjects(search: string, params: Record<string, string>) {
     { header: "Location type", value: (r) => r.locationType ?? "" },
     { header: "City", value: (r) => r.city ?? "" },
     { header: "Skills", value: (r) => (r.skills ?? []).join("; ") },
-    { header: "Posted", value: (r) => (r.createdAt ? r.createdAt.toISOString() : "") },
+    { header: "Posted (IST)", value: (r) => formatIstStamp(r.createdAt) },
   ];
 
   return csvResponse(toCsv(rows, columns), csvFilename("projects"));
