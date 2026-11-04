@@ -39,8 +39,9 @@ export async function POST(req: Request) {
       and(
         eq(schema.collegeDrives.collegeId, m.collegeId),
         isNull(schema.collegeDrives.revokedAt),
-        lte(schema.collegeDrives.startsAt, sql`now()`),
-        gt(schema.collegeDrives.endsAt, sql`now()`),
+        // timestamp columns hold UTC wall time; a bare now() would read them in the DB session zone.
+        lte(schema.collegeDrives.startsAt, sql`(now() AT TIME ZONE 'UTC')`),
+        gt(schema.collegeDrives.endsAt, sql`(now() AT TIME ZONE 'UTC')`),
       ),
     )
     .orderBy(schema.collegeDrives.endsAt)
