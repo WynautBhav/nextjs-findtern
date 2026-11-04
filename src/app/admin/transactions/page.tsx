@@ -17,6 +17,8 @@ import { gatewayLabel } from "@/lib/admin/invoice-rows";
 import { fillBuckets, istDayKeys, istMonthKeys, istMonthLabel, istWeekdayLabel } from "@/lib/admin/revenue";
 import { loadCollected, loadPayoutTotals, loadReceiptBuckets } from "@/lib/admin/receivables-load";
 import { PayoutEditor } from "@/components/admin/payout-editor";
+import { getSession } from "@/lib/auth";
+import { allows } from "@/lib/admin/permissions";
 import { RevenueChart, VolumeBars, type RevenuePoint, type VolumePoint } from "@/components/admin/finance-charts";
 
 /**
@@ -331,6 +333,7 @@ async function InternFeesTable({ params }: { params: Record<string, string> }) {
 
 async function PayoutsTable({ params }: { params: Record<string, string> }) {
   const db = getDb();
+  const canPay = allows((await getSession())?.permissions, ["transactions:write"]);
   const req = parsePageRequest(params);
   const company = sql`coalesce((select e.company_name from ${schema.employers} e where e.id::text = ${q(schema.internPayouts, schema.internPayouts.raw)}->>'employerId'), '')`;
   const conditions = [
@@ -408,7 +411,7 @@ async function PayoutsTable({ params }: { params: Record<string, string> }) {
         { header: "Date", numeric: true, sort: "date", cell: (row) => (row.paidAt ? `Paid ${formatDate(row.paidAt.toISOString())}` : formatDate(row.createdAt?.toISOString() ?? null)) },
         {
           header: "Update",
-          cell: (row) => (row.status === "pending" ? <PayoutEditor payoutId={row.id} initialReference={row.referenceId} status={row.status} /> : <span className="text-text-subtle">-</span>),
+          cell: (row) => (canPay && row.status === "pending" ? <PayoutEditor payoutId={row.id} initialReference={row.referenceId} status={row.status} /> : <span className="text-text-subtle">-</span>),
         },
       ]}
     />

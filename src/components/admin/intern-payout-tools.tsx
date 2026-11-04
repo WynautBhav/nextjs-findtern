@@ -56,7 +56,10 @@ export function InternPayoutTools({
   payouts,
   placements = [],
   dues: initialDues = [],
+  canPay = false,
 }: {
+  /** transactions:write; without it the create / mark-paid / resend buttons are left out. */
+  canPay?: boolean;
   internId: string;
   payouts: Payout[];
   /** Hired proposals, for labels before the dues load. */
@@ -266,7 +269,7 @@ export function InternPayoutTools({
                       <td className={cn(td, "whitespace-nowrap text-right")}>
                         {reason ? (
                           <Pill tone={reason === "Payout pending" ? "waiting" : "closed"}>{reason}</Pill>
-                        ) : (
+                        ) : !canPay ? null : (
                           <button
                             type="button"
                             onClick={() => open(d)}
@@ -424,7 +427,7 @@ export function InternPayoutTools({
                       <td data-label="Reference" data-empty={p.referenceId ? undefined : ""} className={cn(td, "nums max-lg:[overflow-wrap:anywhere]")}>{p.referenceId ?? <span className="text-text-subtle">-</span>}</td>
                       <td data-label="Paid on" data-empty={p.paidAt ? undefined : ""} className={cn(td, "nums whitespace-nowrap")}>{p.paidAt ? formatDate(p.paidAt) : "-"}</td>
                       <td className={cn(td, "text-right")}>
-                        {p.status === "pending" ? (
+                        {!canPay ? null : p.status === "pending" ? (
                           <PayoutEditor payoutId={p.id} status={p.status} initialReference={p.referenceId} initialNote={opsNote} />
                         ) : p.status === "paid" ? (
                           <button

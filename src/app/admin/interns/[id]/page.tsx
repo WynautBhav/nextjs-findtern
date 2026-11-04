@@ -80,6 +80,8 @@ export default async function AdminInternDetail({
       initialTab={typeof tab === "string" ? tab : undefined}
       activities={activities}
       {...rest}
+      canWrite={canWrite}
+      canPay={allows(session?.permissions, ["transactions:write"])}
       actions={
         <>
           {canWrite ? (

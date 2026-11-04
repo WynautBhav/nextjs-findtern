@@ -66,6 +66,10 @@ export type Intern360Props = {
   controls?: { review?: React.ReactNode; visibility?: React.ReactNode; account?: React.ReactNode };
   /** The Activities timeline; null when it could not be loaded. */
   activities: ActivityEntry[] | null;
+  /** interns:write. Without it the edit, clear and reveal controls are left out (the server rejects them anyway). */
+  canWrite?: boolean;
+  /** transactions:write: payout buttons. */
+  canPay?: boolean;
 };
 
 const TAB_KEYS = ["profile", "documents", "interviews", "proposals", "timesheets", "payments", "bank"] as const;
@@ -93,6 +97,8 @@ export function Intern360View({
   initialTab,
   feePaid,
   profileComplete,
+  canWrite = false,
+  canPay = false,
 }: Intern360Props) {
   const [tab, setTab] = useState<TabKey>(() => TAB_KEYS.find((k) => k === initialTab) ?? "profile");
   const [selectedProposal, setSelectedProposal] = useState<Proposal | null>(null);
@@ -253,7 +259,7 @@ export function Intern360View({
 
         <div role="tabpanel" id={`panel-${tab}`} aria-label={tabs.find((t) => t.key === tab)?.label} className="min-w-0">
           {tab === "profile" ? (
-            <ProfileTab internId={user.id} onboarding={onboarding} draft={draft} extra={extra} ratings={ratings} score={score} skills={skills} />
+            <ProfileTab canWrite={canWrite} internId={user.id} onboarding={onboarding} draft={draft} extra={extra} ratings={ratings} score={score} skills={skills} />
           ) : null}
 
           {tab === "documents" ? <DocumentsTab internId={user.id} documents={documents} /> : null}
@@ -342,7 +348,7 @@ export function Intern360View({
                             <Eye className="size-4" aria-hidden />
                             View offer
                           </button>
-                          {p.status === "hired" || p.hiredAt ? (
+                          {canWrite && (p.status === "hired" || p.hiredAt) ? (
                             <CompletionBonusButton
                               internId={user.id}
                               proposalId={p.id}
@@ -375,6 +381,7 @@ export function Intern360View({
                     label: `${company(p.employerId) ?? "Company"} · ${project(p.projectId) ?? "Project"}`,
                   }))}
                 dues={dues}
+                canPay={canPay}
               />
             </div>
           ) : null}
@@ -392,7 +399,7 @@ export function Intern360View({
                   <DetailRow label="IFSC" value={draft.bank.ifscCode || "-"} mono />
                   <DetailRow
                     label="Account number"
-                    value={<RevealValue internId={user.id} field="bank" masked={draft.bank.accountNumber} label="account number" />}
+                    value={<RevealValue canWrite={canWrite} internId={user.id} field="bank" masked={draft.bank.accountNumber} label="account number" />}
                     mono
                   />
                   <DetailRow label="UPI ID" value={draft.bank.upiId || "-"} mono />
@@ -421,6 +428,7 @@ export function Intern360View({
         onSaved={setSelectedInterview}
         company={company(selectedInterview?.employerId)}
         extra={extra}
+        canWrite={canWrite}
       />
     </RecordLayout>
   );
@@ -436,7 +444,9 @@ function ProfileTab({
   ratings,
   score,
   skills,
+  canWrite,
 }: {
+  canWrite: boolean;
   internId: string;
   onboarding: InternOnboarding | null;
   draft: ReturnType<typeof draftFromRecord> | null;
@@ -469,17 +479,27 @@ function ProfileTab({
 
         <div className={cn(ADMIN_SURFACE, "min-w-0 p-5 sm:p-6")}>
           <SectionHead title="Skills" hint="What employers see on the candidate card." />
-          <InternSkillsEditor internId={internId} skills={draft.skillsWithRatings ?? skills.map((name) => ({ name, rating: "Beginner" as const }))} />
+          {canWrite ? (
+            <InternSkillsEditor internId={internId} skills={draft.skillsWithRatings ?? skills.map((name) => ({ name, rating: "Beginner" as const }))} />
+          ) : (
+            <p className="text-sm text-ink-800">{skills.join(", ") || "-"}</p>
+          )}
         </div>
         <div className={cn(ADMIN_SURFACE, "min-w-0 p-5 sm:p-6")}>
           <SectionHead title="Score and ratings" hint="The Findtern Score is the mean of the four ratings; it sets the price band." />
-          <RatingsEditor
-            internId={internId}
-            ratings={ratings}
-            score={score}
-            initialFeedbackLink={(extra.aiFeedbackLink as string) || null}
-            initialRecordingLink={(extra.aiRecordingLink as string) || null}
-          />
+          {canWrite ? (
+            <RatingsEditor
+              internId={internId}
+              ratings={ratings}
+              score={score}
+              initialFeedbackLink={(extra.aiFeedbackLink as string) || null}
+              initialRecordingLink={(extra.aiRecordingLink as string) || null}
+            />
+          ) : (
+            <p className="text-sm text-ink-800">
+              Score {score ?? "-"} · Comm {ratings.communication ?? "-"} · Coding {ratings.coding ?? "-"} · Apt {ratings.aptitude ?? "-"} · AI {ratings.interview ?? "-"}
+            </p>
+          )}
         </div>
 
         <div className={cn(ADMIN_SURFACE, "min-w-0 p-5 sm:p-6")}>
@@ -501,8 +521,8 @@ function ProfileTab({
             <DetailRow label="Work modes" value={draft.locationTypes?.length ? draft.locationTypes.map((m) => MODE[m] ?? m).join(", ") : "-"} />
             <DetailRow label="Preferred cities" value={draft.preferredLocations?.length ? draft.preferredLocations.join(", ") : "-"} />
             <DetailRow label="Has a laptop" value={yesNo(draft.hasLaptop)} />
-            <DetailRow label="Aadhaar number" value={<RevealValue internId={internId} field="aadhaar" masked={draft.aadhaarNumber} label="Aadhaar number" />} mono />
-            <DetailRow label="PAN" value={<RevealValue internId={internId} field="pan" masked={draft.panNumber} label="PAN" />} mono />
+            <DetailRow label="Aadhaar number" value={<RevealValue canWrite={canWrite} internId={internId} field="aadhaar" masked={draft.aadhaarNumber} label="Aadhaar number" />} mono />
+            <DetailRow label="PAN" value={<RevealValue canWrite={canWrite} internId={internId} field="pan" masked={draft.panNumber} label="PAN" />} mono />
             <DetailRow
               label="Emergency contact"
               value={[draft.emergencyName, draft.emergencyRelation, phone(draft.emergencyCountryCode, draft.emergencyPhone)].filter(Boolean).join(" · ") || "-"}
@@ -739,7 +759,9 @@ function InterviewDialog({
   onSaved,
   company,
   extra,
+  canWrite,
 }: {
+  canWrite: boolean;
   interview: Interview | null;
   onClose: () => void;
   onSaved: (i: Interview) => void;
@@ -810,7 +832,7 @@ function InterviewDialog({
               <label htmlFor="iv-meeting" className="block text-sm font-medium text-ink-800">
                 Meeting link
               </label>
-              <input id="iv-meeting" type="url" value={meeting} onChange={(e) => setMeeting(e.target.value)} placeholder="https://meet.google.com/… or Incruiter link" className={cn(field, "mt-1")} />
+              <input id="iv-meeting" readOnly={!canWrite} type="url" value={meeting} onChange={(e) => setMeeting(e.target.value)} placeholder="https://meet.google.com/… or Incruiter link" className={cn(field, "mt-1")} />
               <p className="mt-1 text-xs text-text-subtle">
                 For an AI interview, saving a link opens it to the candidate. For a company interview, both sides are notified.
               </p>
@@ -820,19 +842,21 @@ function InterviewDialog({
                 <label htmlFor="iv-feedback" className="block text-sm font-medium text-ink-800">
                   Report (PDF URL)
                 </label>
-                <input id="iv-feedback" type="url" value={feedback} onChange={(e) => setFeedback(e.target.value)} className={cn(field, "mt-1")} />
+                <input id="iv-feedback" readOnly={!canWrite} type="url" value={feedback} onChange={(e) => setFeedback(e.target.value)} className={cn(field, "mt-1")} />
               </div>
               <div>
                 <label htmlFor="iv-recording" className="block text-sm font-medium text-ink-800">
                   Recording URL
                 </label>
-                <input id="iv-recording" type="url" value={recording} onChange={(e) => setRecording(e.target.value)} className={cn(field, "mt-1")} />
+                <input id="iv-recording" readOnly={!canWrite} type="url" value={recording} onChange={(e) => setRecording(e.target.value)} className={cn(field, "mt-1")} />
               </div>
             </div>
-            <button type="button" onClick={save} disabled={saving || !meeting.trim()} className={buttonClass({ variant: "primary", block: true })}>
-              {saving ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <CheckCircle2 className="size-4" aria-hidden />}
-              Save links
-            </button>
+            {canWrite ? (
+              <button type="button" onClick={save} disabled={saving || !meeting.trim()} className={buttonClass({ variant: "primary", block: true })}>
+                {saving ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <CheckCircle2 className="size-4" aria-hidden />}
+                Save links
+              </button>
+            ) : null}
             {msg ? (
               <p role={msg.ok ? "status" : "alert"} className={cn("rounded-apple-sm px-3 py-2 text-sm", msg.ok ? "bg-success-soft text-success" : "bg-danger-soft text-danger")}>
                 {msg.text}
@@ -1077,11 +1101,12 @@ function fileSize(bytes: number): string {
  * An identity number as it arrives (last four only), with a Reveal that asks
  * the audit-logged route for the full value (QA-003). Hide forgets it again.
  */
-function RevealValue({ internId, field, masked, label }: { internId: string; field: RevealField; masked: string | undefined; label: string }) {
+function RevealValue({ canWrite, internId, field, masked, label }: { canWrite: boolean; internId: string; field: RevealField; masked: string | undefined; label: string }) {
   const [full, setFull] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   if (!masked) return <>-</>;
+  if (!canWrite) return <>{masked}</>;
 
   async function reveal() {
     setBusy(true);

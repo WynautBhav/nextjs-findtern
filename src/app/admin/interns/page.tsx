@@ -202,7 +202,7 @@ export default async function AdminInterns({
       subtitle={subtitle}
       action={
         <div className="flex flex-wrap items-center gap-2">
-          <RatingsImport />
+          {allows(session?.permissions, ["interns:write"]) ? <RatingsImport /> : null}
           <Link href="/admin/interns/ai-reports" className={buttonClass({ variant: "outline", className: ADMIN_PILL_SECONDARY })}>
             AI reports
           </Link>

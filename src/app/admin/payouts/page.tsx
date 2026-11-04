@@ -28,6 +28,8 @@ import {
 } from "@/lib/admin/payout-list";
 import { buildPayoutRun, istDayKey, type PayoutRun } from "@/lib/admin/payout-run";
 import { formatDate, formatMoney } from "@/lib/format";
+import { getSession } from "@/lib/auth";
+import { allows } from "@/lib/admin/permissions";
 
 export const metadata: Metadata = { title: "Intern payouts" };
 
@@ -112,6 +114,7 @@ function RunDeskSkeleton() {
 /* ── Payouts ledger ─────────────────────────────────────────────────── */
 
 async function PayoutsView({ params }: { params: Record<string, string> }) {
+  const canPay = allows((await getSession())?.permissions, ["transactions:write"]);
   const req = parsePageRequest(params);
   const sort = parseSort(params, PAYOUT_SORTS, { key: "scheduled", dir: "desc" });
 
@@ -207,7 +210,7 @@ async function PayoutsView({ params }: { params: Record<string, string> }) {
     },
     {
       header: <span className="sr-only">Action</span>,
-      cell: (r) => <PayoutEditor payoutId={r.id} status={r.status} initialReference={r.referenceId} initialNote={r.opsNote} />,
+      cell: (r) => (canPay ? <PayoutEditor payoutId={r.id} status={r.status} initialReference={r.referenceId} initialNote={r.opsNote} /> : <span className="text-text-subtle">-</span>),
     },
   ];
 
