@@ -6,6 +6,7 @@ import { getDb, schema } from "@/lib/db";
 import { CALENDAR_TOKEN_OWNER, calendarConfig, createMeetEvent } from "@/lib/google";
 import { origin } from "@/lib/emails";
 import { notify } from "@/lib/notify";
+import { pickMeetingLink } from "./meeting-link";
 import { sendPush } from "./push";
 
 /**
@@ -74,6 +75,7 @@ export async function requestMeeting(input: {
   employerId: string;
   userId: string;
   inMinutes: (typeof MEETING_DELAYS)[number];
+  manualLink?: string | null;
 }): Promise<{ ok: true; meeting: MeetingView } | { ok: false; error: string }> {
   // One request per student at a time: the check and a placeholder row run under
   // a per-pair lock, so a double click makes one request and the second caller
@@ -110,7 +112,7 @@ export async function requestMeeting(input: {
   const dropPlaceholder = () => getDb().delete(schema.collegeDriveMeetings).where(eq(schema.collegeDriveMeetings.id, placeholder.id));
   let made: { link: string | null; eventId: string | null };
   try {
-    made = await meetLink(startsAt);
+    made = await pickMeetingLink(input.manualLink, () => meetLink(startsAt));
   } catch (err) {
     await dropPlaceholder();
     throw err;
