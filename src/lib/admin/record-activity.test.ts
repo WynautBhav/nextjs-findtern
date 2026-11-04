@@ -55,6 +55,8 @@ test("isoOrNull and formatAmount", () => {
   assert.equal(isoOrNull(new Date("2026-11-01T10:00:00Z")), "2026-11-01T10:00:00.000Z");
   assert.ok(formatAmount(500000, "INR").includes("5,000"));
   assert.equal(formatAmount(null, "INR"), "");
+  assert.equal(formatAmount(224910, "INR"), "₹2,249.10"); // paise keep both digits
+  assert.equal(formatAmount(100040, "USD"), "$1,000.40");
 });
 
 const proposal = (extra: Partial<ProposalRow> = {}): ProposalRow => ({

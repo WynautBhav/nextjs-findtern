@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 
 import { csrfFetch } from "@/lib/client-fetch";
-import { formatDate } from "@/lib/format";
+import { formatDate, formatMoney } from "@/lib/format";
 import type { PromoCode } from "@/lib/db/schema";
 import { AdminEmpty } from "@/components/admin/panel";
 import { buttonClass } from "@/components/ui/button";
@@ -43,7 +43,7 @@ const PROMO_GRID = "grid-cols-[minmax(0,1fr)_auto] lg:grid-cols-[minmax(0,1.3fr)
 function benefitLabel(promo: PromoCode): string {
   return promo.discountType === "percentage"
     ? `${promo.discountValue}% off`
-    : `₹${(Number(promo.discountValue) / 100).toLocaleString("en-IN")} off`;
+    : `${formatMoney(Number(promo.discountValue), "INR", { zeroLabel: false })} off`;
 }
 
 export function PromoCodesManager({
@@ -448,7 +448,7 @@ export function PromoCodesManager({
                   <p className="nums font-semibold text-ink-900">{benefitLabel(promo)}</p>
                   <p className="text-xs text-ink-600">
                     {promo.appliesTo === "intern" ? "Interns only" : promo.appliesTo === "employer" ? "Companies only" : "Interns and companies"}
-                    {promo.minOrderAmountMinor ? ` · min ₹${Math.round(promo.minOrderAmountMinor / 100).toLocaleString("en-IN")}` : ""}
+                    {promo.minOrderAmountMinor ? ` · min ${formatMoney(promo.minOrderAmountMinor, "INR", { zeroLabel: false })}` : ""}
                   </p>
                 </div>
                 <div className="max-lg:col-span-2">

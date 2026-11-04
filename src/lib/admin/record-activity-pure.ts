@@ -1,3 +1,4 @@
+import { formatMoney } from "../format.ts";
 import type { ActivityEntry } from "./record-activity.types.ts";
 
 /**
@@ -48,8 +49,9 @@ export function formatAmount(amountMinor: number | null | undefined, currency: s
   if (!Number.isFinite(minor)) return "";
   const code = clean(currency).toUpperCase() || "INR";
   const major = minor / 100;
+  if (code === "INR" || code === "USD") return formatMoney(minor, code, { zeroLabel: false });
   try {
-    return new Intl.NumberFormat("en-IN", { style: "currency", currency: code, maximumFractionDigits: major % 1 === 0 ? 0 : 2 }).format(major);
+    return new Intl.NumberFormat("en-IN", { style: "currency", currency: code, minimumFractionDigits: major % 1 === 0 ? 0 : 2, maximumFractionDigits: major % 1 === 0 ? 0 : 2 }).format(major);
   } catch {
     return `${major.toLocaleString("en-IN")} ${code}`;
   }

@@ -1,6 +1,7 @@
 import { internStipendInrMinor, parseOffer, stipendEligible, type Offer } from "../offer.ts";
 import { isHiredProposal } from "../hire-status.ts";
 import { toInrMinor } from "./money.ts";
+import { formatMoney } from "../format.ts";
 
 /**
  * What Findtern owes an intern per hired placement, month by month (legacy
@@ -313,7 +314,7 @@ export function payoutRefusal(due: StipendDue | undefined, amountMinor: number):
   if (due.remainingMinor <= 0 || due.remainingMonths <= 0) return "Nothing is left to pay on this placement.";
   if (!Number.isInteger(amountMinor) || amountMinor <= 0) return "Enter an amount greater than zero.";
   const cap = payoutCapMinor(due);
-  if (amountMinor > cap) return `That is more than one month's stipend still owed (at most ₹${(cap / 100).toLocaleString("en-IN")}).`;
+  if (amountMinor > cap) return `That is more than one month's stipend still owed (at most ${formatMoney(cap, "INR", { zeroLabel: false })}).`;
   return null;
 }
 
