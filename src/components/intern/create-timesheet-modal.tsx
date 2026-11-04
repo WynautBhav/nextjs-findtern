@@ -88,7 +88,7 @@ export function CreateTimesheetModal({
             <DialogTitle>Start a timesheet</DialogTitle>
             <DialogDescription>
               Periods follow your internship month by month from your joining date. Mark each day,
-              then send it to your manager once every day has a status.
+              then send it to your manager on the last day of the period, once every day is marked.
             </DialogDescription>
           </DialogHeader>
 

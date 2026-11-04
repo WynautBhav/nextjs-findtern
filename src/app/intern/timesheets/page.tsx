@@ -251,7 +251,7 @@ export default async function InternTimesheets({
               {[
                 "Start a timesheet. Each one covers a month of your internship, counted from your joining date.",
                 "Mark every day Present, Absent, Fixed off or Holiday. Weekends and public holidays come pre-marked.",
-                "Send it once every day is marked. Your manager approves it or sends it back with a note.",
+                "You can send it on the last day of the period, once every day is marked. Your manager approves it or sends it back with a note.",
                 "Changed your mind? Withdraw a sheet that is still waiting, fix it, and send it again.",
               ].map((line, i) => (
                 <li key={i} className="flex gap-3">
