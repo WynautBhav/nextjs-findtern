@@ -120,7 +120,7 @@ export async function requestMeeting(input: {
   // Never hand the student a call they can accept but can't join (QA-001).
   if (!made.link) {
     await dropPlaceholder();
-    return { ok: false, error: "Calendar not connected; ask Findtern to connect it." };
+    return { ok: false, error: "Google Calendar is not connected. Paste a meeting link instead." };
   }
   const [row] = await getDb()
     .update(schema.collegeDriveMeetings)
