@@ -40,3 +40,10 @@ export function acceptanceTableFor(role: TermsRole): "users" | "employers" | "co
 export function acceptanceValues(at: Date = new Date()): { termsAcceptedVersion: string; termsAcceptedAt: Date } {
   return { termsAcceptedVersion: CURRENT_TERMS_VERSION, termsAcceptedAt: at };
 }
+
+/** Writes from an account behind on the terms are refused; reads and admin staff are not. */
+export function termsBlocksRequest(input: { role: string; method: string; impersonating?: boolean; accepted: boolean }): boolean {
+  if (input.accepted || input.impersonating) return false;
+  if (input.role !== "intern" && input.role !== "employer" && input.role !== "college") return false;
+  return !["GET", "HEAD", "OPTIONS"].includes(input.method.toUpperCase());
+}

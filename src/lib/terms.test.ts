@@ -42,3 +42,21 @@ test("acceptance stamps the server's version and the given time, so signup and t
   assert.deepEqual(acceptanceValues(at), { termsAcceptedVersion: CURRENT_TERMS_VERSION, termsAcceptedAt: at });
   assert.equal(shouldShowTermsPrompt({ acceptedVersion: acceptanceValues(at).termsAcceptedVersion }), false);
 });
+
+import { termsBlocksRequest } from "./terms.ts";
+
+test("terms enforcement: accepted users are never blocked", () => {
+  for (const role of ["intern", "employer", "college"]) assert.equal(termsBlocksRequest({ role, method: "POST", accepted: true }), false);
+});
+
+test("terms enforcement: a user behind is blocked on writes only", () => {
+  for (const role of ["intern", "employer", "college"]) {
+    for (const method of ["POST", "PATCH", "PUT", "DELETE"]) assert.equal(termsBlocksRequest({ role, method, accepted: false }), true);
+    for (const method of ["GET", "HEAD", "OPTIONS"]) assert.equal(termsBlocksRequest({ role, method, accepted: false }), false);
+  }
+});
+
+test("terms enforcement: admin staff and View-as sessions are never blocked", () => {
+  assert.equal(termsBlocksRequest({ role: "admin", method: "POST", accepted: false }), false);
+  assert.equal(termsBlocksRequest({ role: "intern", method: "POST", impersonating: true, accepted: false }), false);
+});

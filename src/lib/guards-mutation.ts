@@ -4,6 +4,8 @@ import { checkCsrf } from "@/lib/security/session";
 import { getSession } from "@/lib/auth";
 import type { SessionData } from "@/lib/security/session";
 import { canAccess } from "@/lib/security/guards";
+import { isTermsCurrent } from "@/lib/account-status";
+import { termsBlocksRequest } from "@/lib/terms";
 import { allows, requiredPermissions } from "@/lib/admin/permissions";
 
 /**
@@ -29,11 +31,13 @@ export async function requireMutation(input: {
   /** Only the "exit View as" route sets this. Every other write is refused
    *  while an admin is viewing as someone else. */
   allowImpersonated?: boolean;
+  /** Only the terms-accept route: it is how a user gets current. */
+  allowPendingTerms?: boolean;
 }): Promise<
   | { ok: true; session: SessionData }
   | { ok: false; response: NextResponse }
 > {
-  const { req, roles, ownerId, allowImpersonated } = input;
+  const { req, roles, ownerId, allowImpersonated, allowPendingTerms } = input;
 
   if (!checkCsrf(req.headers.get("x-csrf-token"), req.headers.get("cookie"))) {
     return {
@@ -74,6 +78,17 @@ export async function requireMutation(input: {
     return {
       ok: false,
       response: NextResponse.json({ error: "Insufficient role" }, { status: 403 }),
+    };
+  }
+
+  // Server-side twin of the terms pop-up: writes wait until the current terms are accepted.
+  if (
+    !allowPendingTerms &&
+    termsBlocksRequest({ role: session.role, method: req.method, impersonating: Boolean(session.impersonator), accepted: await isTermsCurrent(session.role, session.uid) })
+  ) {
+    return {
+      ok: false,
+      response: NextResponse.json({ code: "terms_required", error: "Accept the updated terms to continue." }, { status: 403 }),
     };
   }
 

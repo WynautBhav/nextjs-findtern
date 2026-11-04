@@ -112,3 +112,11 @@ test("the public list has no stale entries", () => {
   const keys = new Set(routes(API).map((f) => relative(API, f).replace(/\/route\.ts$/, "")));
   assert.deepEqual([...PUBLIC].filter((k) => !keys.has(k)), []);
 });
+
+test("requireMutation enforces terms; only the accept route opts out", () => {
+  const guard = readFileSync(join(API, "../../lib/guards-mutation.ts"), "utf8");
+  assert.match(guard, /terms_required/, "guard must return terms_required");
+  assert.match(guard, /isTermsCurrent/, "guard must check the account's accepted version");
+  const optOut = routes(API).filter((f) => /allowPendingTerms:\s*true/.test(readFileSync(f, "utf8"))).map((f) => relative(API, f));
+  assert.deepEqual(optOut, ["terms/accept/route.ts"]);
+});

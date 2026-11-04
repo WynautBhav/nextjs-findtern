@@ -2,6 +2,7 @@ import { and, eq, isNull, ne, or } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
 import { getDb, schema } from "@/lib/db";
+import { forgetAccountStatus } from "@/lib/account-status";
 import { requireMutation } from "@/lib/guards-mutation";
 import { acceptanceTableFor, acceptanceValues, CURRENT_TERMS_VERSION, type TermsRole } from "@/lib/terms";
 
@@ -15,7 +16,7 @@ export const dynamic = "force-dynamic";
  * accepted-at time.
  */
 export async function POST(req: Request) {
-  const guard = await requireMutation({ req, roles: ["intern", "employer", "college"] });
+  const guard = await requireMutation({ req, roles: ["intern", "employer", "college"], allowPendingTerms: true });
   if (!guard.ok) return guard.response;
   const { uid, role } = guard.session as { uid: string; role: TermsRole };
 
@@ -29,5 +30,6 @@ export async function POST(req: Request) {
         or(isNull(table.termsAcceptedVersion), ne(table.termsAcceptedVersion, CURRENT_TERMS_VERSION)),
       ),
     );
+  forgetAccountStatus(role, uid);
   return NextResponse.json({ ok: true, version: CURRENT_TERMS_VERSION });
 }

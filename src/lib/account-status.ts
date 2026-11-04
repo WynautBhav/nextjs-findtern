@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 
 import { getDb, schema } from "@/lib/db";
 import { passwordVersion } from "@/lib/security/session";
+import { CURRENT_TERMS_VERSION } from "@/lib/terms";
 
 /**
  * Deactivated accounts lose their existing sessions, not just future logins.
@@ -18,16 +19,16 @@ const TTL_MS = 30_000;
  * process, whichever bundle reads or clears it.
  */
 const store = globalThis as typeof globalThis & {
-  __ftAccountStatus?: Map<string, { active: boolean; pv: string | null; at: number }>;
+  __ftAccountStatus?: Map<string, { active: boolean; pv: string | null; terms?: string | null; at: number }>;
   __ftAdminPerms?: Map<string, { perms: string[] | null; at: number }>;
 };
 const cache = (store.__ftAccountStatus ??= new Map());
 
-async function readStatus(role: string, uid: string): Promise<{ active: boolean; pv: string | null } | undefined> {
+async function readStatus(role: string, uid: string): Promise<{ active: boolean; pv: string | null; terms?: string | null } | undefined> {
   const key = `${role}:${uid}`;
   const hit = cache.get(key);
   if (hit && Date.now() - hit.at < TTL_MS) return hit;
-  let status: { active: boolean; pv: string | null };
+  let status: { active: boolean; pv: string | null; terms?: string | null };
   try {
     if (role === "admin") {
       const [row] = await getDb().select({ password: schema.admins.password }).from(schema.admins).where(eq(schema.admins.id, uid)).limit(1);
@@ -35,20 +36,20 @@ async function readStatus(role: string, uid: string): Promise<{ active: boolean;
     } else if (role === "college") {
       // A placement officer is locked out when either they or their college is switched off.
       const [row] = await getDb()
-        .select({ admin: schema.collegeAdmins.isActive, college: schema.colleges.isActive, password: schema.collegeAdmins.password })
+        .select({ admin: schema.collegeAdmins.isActive, college: schema.colleges.isActive, password: schema.collegeAdmins.password, terms: schema.collegeAdmins.termsAcceptedVersion })
         .from(schema.collegeAdmins)
         .innerJoin(schema.colleges, eq(schema.colleges.id, schema.collegeAdmins.collegeId))
         .where(eq(schema.collegeAdmins.id, uid))
         .limit(1);
-      status = { active: Boolean(row?.admin && row?.college), pv: row ? passwordVersion(row.password) : null };
+      status = { active: Boolean(row?.admin && row?.college), pv: row ? passwordVersion(row.password) : null, terms: row?.terms };
     } else {
       const table = role === "intern" ? schema.users : schema.employers;
       const [row] = await getDb()
-        .select({ isActive: table.isActive, password: table.password })
+        .select({ isActive: table.isActive, password: table.password, terms: table.termsAcceptedVersion })
         .from(table)
         .where(eq(table.id, uid))
         .limit(1);
-      status = { active: Boolean(row?.isActive), pv: row ? passwordVersion(row.password) : null };
+      status = { active: Boolean(row?.isActive), pv: row ? passwordVersion(row.password) : null, terms: row?.terms };
     }
   } catch {
     return undefined; // a DB outage fails every request anyway; don't cache it
@@ -73,6 +74,21 @@ export async function isPasswordVersionCurrent(role: string, uid: string, pv: st
   const status = await readStatus(role, uid);
   if (!status) return true; // lookup failed: same fail-open as isAccountActive
   return status.pv === pv;
+}
+
+/**
+ * Whether the account has accepted the current terms. Fails open on a lookup
+ * failure, like isAccountActive. A cached "behind" is re-read first, so a user
+ * who just accepted (maybe via another server instance) is never refused on a stale answer.
+ */
+export async function isTermsCurrent(role: string, uid: string): Promise<boolean> {
+  if (role !== "intern" && role !== "employer" && role !== "college") return true;
+  let status = await readStatus(role, uid);
+  if (status && status.terms !== CURRENT_TERMS_VERSION) {
+    forgetAccountStatus(role, uid);
+    status = await readStatus(role, uid);
+  }
+  return status ? status.terms === CURRENT_TERMS_VERSION : true;
 }
 
 export function forgetAccountStatus(role: string, uid: string) {

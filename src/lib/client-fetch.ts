@@ -21,7 +21,13 @@ export async function csrfFetch(
   const headers = new Headers(init.headers);
   if (csrf) headers.set("x-csrf-token", csrf);
 
-  return fetch(input, { ...init, headers });
+  const res = await fetch(input, { ...init, headers });
+  // The terms moved on mid-session: reload so the layout mounts the terms pop-up (it only mounts when behind).
+  if (res.status === 403 && typeof window !== "undefined") {
+    const body = await res.clone().json().catch(() => null);
+    if (body?.code === "terms_required") window.location.reload();
+  }
+  return res;
 }
 
 function readCsrfCookie(): string | null {
