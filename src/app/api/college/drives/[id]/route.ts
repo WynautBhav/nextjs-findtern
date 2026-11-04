@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { requireCollegeMutation } from "@/lib/college/guard";
 import { driveInput } from "@/lib/college/drive-input";
 import { driveForCollegeAdmin } from "@/lib/college/scope";
+import { driveDataOpen } from "@/lib/college/serialize";
 import { getDb, schema } from "@/lib/db";
 
 /** Edit dates, eligibility and the include/exclude lists. The link is unchanged. */
@@ -13,6 +14,10 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   const { id } = await ctx.params;
   const drive = await driveForCollegeAdmin(g.ctx, id);
   if (!drive) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  // C12: once a drive has ended or been revoked it is closed. Editing dates would reopen its student data.
+  if (!driveDataOpen(drive)) {
+    return NextResponse.json({ error: "This drive is over, so it can no longer be edited." }, { status: 409 });
+  }
   const parsed = driveInput.safeParse(await req.json().catch(() => null));
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Check the drive details" }, { status: 400 });
