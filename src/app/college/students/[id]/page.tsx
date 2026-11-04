@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { after } from "next/server";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { FileText, PlayCircle, ShieldCheck } from "lucide-react";
 
@@ -8,7 +9,7 @@ import { PageHead, Pill } from "@/components/app/primitives";
 import { humanizeStatus } from "@/components/app/status";
 import { aiInterviewLinks } from "@/lib/ai-interview-links";
 import { aiStatusLabel, cohortGoal, yearLabel, ago } from "@/lib/college/labels";
-import { requireCollegeContext, studentForCollegeAdmin } from "@/lib/college/scope";
+import { auditCollegeView, requireCollegeContext, studentForCollegeAdmin } from "@/lib/college/scope";
 import { getDb, schema } from "@/lib/db";
 import { parseOffer } from "@/lib/offer";
 import { realEmployerId } from "@/lib/admin/scope";
@@ -55,7 +56,7 @@ export default async function CollegeStudentPage({ params }: { params: Promise<{
       .select({ action: schema.collegeAuditLog.action, at: schema.collegeAuditLog.createdAt, who: schema.collegeAdmins.name })
       .from(schema.collegeAuditLog)
       .leftJoin(schema.collegeAdmins, eq(schema.collegeAdmins.id, schema.collegeAuditLog.actorId))
-      .where(and(eq(schema.collegeAuditLog.subjectUserId, id), eq(schema.collegeAuditLog.collegeId, ctx.college.id)))
+      .where(and(eq(schema.collegeAuditLog.subjectUserId, id), eq(schema.collegeAuditLog.collegeId, ctx.college.id), inArray(schema.collegeAuditLog.action, ["view_report", "view_recording"])))
       .orderBy(desc(schema.collegeAuditLog.createdAt))
       .limit(5),
   ]);
@@ -63,6 +64,14 @@ export default async function CollegeStudentPage({ params }: { params: Promise<{
   // An ended or revoked drive no longer shows its calls (C12).
   const calls = allCalls.filter((c) => driveDataOpen(c.d));
   const profile = tpoProfile(student.status, onboarding, user ? `${user.cc} ${user.phone}` : null);
+  // One audit row per full-profile view, written after the response so it never blocks the page.
+  if (profile) {
+    after(() =>
+      auditCollegeView({ collegeId: ctx.college.id, actorType: "college_admin", actorId: ctx.admin.id }, "view_profile", id).catch((err) =>
+        console.error("[college-audit] view_profile", err),
+      ),
+    );
+  }
   const artifacts = canOpenArtifacts(student.status);
   const extra = (onboarding?.extraData as Record<string, unknown>) ?? {};
   const ratings = (extra.ratings as Record<string, number>) ?? {};
