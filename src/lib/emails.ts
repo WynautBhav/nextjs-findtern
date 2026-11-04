@@ -228,6 +228,19 @@ export const emails = {
     signoff: "Team Findtern\nTransparent payments, zero confusion\nwww.findtern.in",
   }),
 
+  completionBonusPaid: (o: { internName: string; role: string; amount: string }): EmailContent => ({
+    subject: "Completion bonus transferred | Findtern",
+    heading: "Your completion bonus is on its way",
+    greeting: hi(o.internName),
+    lines: [
+      `Congratulations on completing ${o.role}. Your Findtern completion bonus has been transferred.`,
+      "If you don’t see it in your account right away, allow standard bank processing time.",
+    ],
+    facts: [["Amount", o.amount]],
+    cta: { label: "View earnings", url: `${origin()}/intern/earnings` },
+    signoff: "Team Findtern\nTransparent payments, zero confusion\nwww.findtern.in",
+  }),
+
   fullTimeOfferReceived: (o: { internName: string; companyName: string; role: string; proposalId: string }): EmailContent => ({
     subject: "Full-time job offer received | Findtern",
     heading: "You have a full-time offer",

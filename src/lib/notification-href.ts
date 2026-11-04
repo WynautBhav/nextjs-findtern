@@ -29,7 +29,7 @@ export function internNotificationHref(type: string, data: unknown): string | nu
     return "/intern/interviews";
   }
   if (t.startsWith("timesheet_")) return "/intern/timesheets";
-  if (t === "stipend_paid" || t.startsWith("payout_")) return "/intern/earnings";
+  if (t === "stipend_paid" || t === "completion_bonus_paid" || t.startsWith("payout_")) return "/intern/earnings";
   if (t === "payment_completed" || t === "go_live_fee_paid") return "/intern/dashboard";
   if (t === "profile_completion_nudge") return "/intern/onboarding";
   if (t === "profile_visible_again" || t === "profile_hide_ending") return "/intern/dashboard";

@@ -411,7 +411,8 @@ export async function notifyStipendPaid(payoutId: string) {
   const db = getDb();
   const [p] = await db.select().from(schema.internPayouts).where(eq(schema.internPayouts.id, payoutId)).limit(1);
   if (!p || p.status !== "paid") return;
-  const proposalId = typeof p.raw?.proposalId === "string" ? p.raw.proposalId : null;
+  // A completion bonus has no placement link in raw (stipend code must not match it); its hire is bonusProposalId.
+  const proposalId = typeof p.raw?.proposalId === "string" ? p.raw.proposalId : p.bonusProposalId;
   let role = "your internship";
   if (proposalId) {
     const [pr] = await db
@@ -430,6 +431,7 @@ export async function notifyStipendPaid(payoutId: string) {
       message: `${amount} completion bonus has been sent to your bank account.`,
       data: { payoutId },
       dedupeKey: `completion_bonus_paid:${payoutId}`,
+      email: emails.completionBonusPaid({ internName: await internFirstName(p.internId), role, amount }),
     });
     return;
   }
