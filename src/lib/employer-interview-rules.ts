@@ -54,6 +54,11 @@ export function isStaleInterview(iv: SlotLike, now: number = Date.now()): boolea
   return times.length > 0 && times.every((t) => t < now);
 }
 
+/** A pending invite with no slots left to pick (cleared by a reschedule): nothing to remind about. */
+export function hasNoSlotsToPick(iv: SlotLike): boolean {
+  return iv.status === "pending" && slotTimes(iv).length === 0;
+}
+
 /**
  * When the meeting is over: the picked slot plus the meeting length, or -
  * while the candidate has not picked yet - the last offered slot plus it.

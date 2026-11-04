@@ -11,6 +11,7 @@ import {
   isMeetingLinkLive,
   isMeetingOver,
   reminderWindow,
+  hasNoSlotsToPick,
   isStaleInterview,
   meetingTime,
 } from "./employer-interview-rules.ts";
@@ -144,4 +145,10 @@ test("reminderWindow: same key inside 10 minutes, a new one after", () => {
   assert.equal(reminderWindow(t), reminderWindow(t + 9 * 60_000));
   assert.notEqual(reminderWindow(t), reminderWindow(t + 10 * 60_000));
   assert.notEqual(reminderWindow(t), reminderWindow(t - 60_000 * 31));
+});
+
+test("a pending interview with no slots left has nothing to remind about", () => {
+  assert.equal(hasNoSlotsToPick({ status: "pending", slot1: null, slot2: null, slot3: null }), true);
+  assert.equal(hasNoSlotsToPick({ status: "pending", slot1: h(3), slot2: null, slot3: null }), false);
+  assert.equal(hasNoSlotsToPick({ status: "scheduled", slot1: null, slot2: null, slot3: null }), false);
 });

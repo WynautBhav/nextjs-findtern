@@ -6,7 +6,7 @@ import { hiredProposalSql } from "@/lib/employer-visibility";
 import { formatSlotTime } from "@/lib/format";
 import { requireMutation } from "@/lib/guards-mutation";
 import { employerNames, internFirstName, notify } from "@/lib/notify";
-import { isMeetingOver, isStaleInterview, normalizeMeetingLink, reminderWindow } from "@/lib/employer-interview-rules";
+import { hasNoSlotsToPick, isMeetingOver, isStaleInterview, normalizeMeetingLink, reminderWindow } from "@/lib/employer-interview-rules";
 import { requirePublicOrigin } from "@/lib/origin";
 import { limiters } from "@/lib/security/rate-limit";
 
@@ -27,6 +27,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (interview.status !== "scheduled" && interview.status !== "pending") {
     return NextResponse.json({ error: `This interview is already ${interview.status}` }, { status: 409 });
   }
+
+  if (hasNoSlotsToPick(interview)) return NextResponse.json({ error: "There are no times left to pick. Offer new times first." }, { status: 409 });
 
   // A meeting that is running now can still be nudged; one that is over, or an invite whose slots all passed, cannot.
   if (interview.status === "pending" ? isStaleInterview(interview) : isMeetingOver(interview)) {
