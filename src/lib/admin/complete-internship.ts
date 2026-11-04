@@ -5,6 +5,7 @@ import { grantCompletionBonus } from "@/lib/admin/ratings";
 import { bonusDueDate, completionBonusPlan, isEngagementComplete } from "@/lib/completion-bonus";
 import { isoDay, todayIst } from "@/lib/timesheet-days";
 import { parseOffer } from "@/lib/offer";
+import { incentivePlan } from "@/lib/college/wallet";
 import { notify } from "@/lib/notify";
 import type { Tx } from "@/lib/advisory-lock";
 
@@ -66,6 +67,17 @@ export async function completeInternship(tx: Tx, proposalId: string, by: string 
     notes: offer.roleTitle || null,
     raw: { source: "completion_bonus", bandId: plan.bandId, scheduledFor: bonusDueDate(todayIst()) },
   });
+  // College incentive: once per proposal (unique index); skipped quietly when the intern isn't a verified member of a partner college.
+  const [m] = await tx
+    .select({ collegeId: schema.collegeMemberships.collegeId, status: schema.collegeMemberships.status, leftAt: schema.collegeMemberships.leftAt, isPartner: schema.colleges.isPartner })
+    .from(schema.collegeMemberships)
+    .innerJoin(schema.colleges, eq(schema.colleges.id, schema.collegeMemberships.collegeId))
+    .where(eq(schema.collegeMemberships.userId, p.internId))
+    .limit(1);
+  const inc = incentivePlan(m, plan.scoreBefore);
+  if (m && inc) {
+    await tx.insert(schema.collegeWalletEntries).values({ collegeId: m.collegeId, kind: "incentive", amountMinor: inc.amountMinor, proposalId, internId: p.internId, bandId: inc.bandId }).onConflictDoNothing();
+  }
   return { completed: true, prev, next, internId: p.internId, amountMinor: plan.amountMinor, bandId: plan.bandId, scoreBefore: plan.scoreBefore };
 }
 
