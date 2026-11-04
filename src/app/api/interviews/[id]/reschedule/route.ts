@@ -37,7 +37,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({ error: `This interview is already ${interview.status}` }, { status: 409 });
   }
 
-  let slots: (Date | null)[] = [interview.slot1, interview.slot2, interview.slot3];
+  // Intern request: drop the old slots, or the intern could re-pick one at once; the employer offers new ones.
+  let slots: (Date | null)[] = [null, null, null];
   if (byEmployer) {
     const wanted = [parsed.data.slot1, parsed.data.slot2, parsed.data.slot3].filter((s): s is string => Boolean(s));
     // Same rule as booking: three times, on the quarter hour.

@@ -106,6 +106,8 @@ test("interview stage drives the schedule's actions", async () => {
   const at = (status: string, slot: Date, selectedSlot: number | null = 1) => ({ status, slot1: slot, slot2: null, slot3: null, selectedSlot });
   assert.equal(interviewStage(at("pending", h(2), null), NOW), "awaiting_pick");
   assert.equal(interviewStage(at("pending", h(-2), null), NOW), "expired");
+  // Intern asked to reschedule: no slots left, still waiting (not expired, not pickable).
+  assert.equal(interviewStage({ status: "pending", slot1: null, slot2: null, slot3: null, selectedSlot: null }, NOW), "awaiting_pick");
   assert.equal(interviewStage(at("scheduled", h(1)), NOW), "upcoming");
   assert.equal(interviewStage(at("scheduled", h(-0.25)), NOW), "live");
   assert.equal(interviewStage(at("scheduled", h(-1)), NOW), "over");
