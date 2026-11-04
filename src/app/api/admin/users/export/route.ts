@@ -4,13 +4,14 @@ import { csvFilename, csvResponse, toCsv } from "@/lib/admin/csv";
 import { flattenParams } from "@/lib/admin/params";
 import { allows } from "@/lib/admin/permissions";
 import { loadAccounts, USER_SORTS, type UserSort } from "@/lib/admin/users-list";
-import { requireRole } from "@/lib/security/guards";
+import { getSession } from "@/lib/auth";
 
 /** CSV of the Registered Users list, with the filters on screen. A read: no CSRF. */
 export async function GET(req: Request) {
-  const guard = requireRole(req.headers.get("cookie") ?? "", ["admin"]);
-  if (!guard.ok) return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
-  const permissions = guard.session.permissions;
+  // Live role (not the login cookie): a demoted admin loses exports at once.
+  const session = await getSession();
+  if (!session || session.role !== "admin") return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
+  const permissions = session.permissions;
   if (!allows(permissions, ["users:read"])) {
     return new NextResponse("Your role doesn't include this export.", { status: 403 });
   }

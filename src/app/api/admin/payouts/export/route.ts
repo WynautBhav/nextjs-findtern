@@ -16,7 +16,7 @@ import {
   type PayoutRow,
 } from "@/lib/admin/payout-list";
 import { todayIst } from "@/lib/timesheet-days";
-import { requireRole } from "@/lib/security/guards";
+import { getSession } from "@/lib/auth";
 
 /**
  * CSV of the /admin/payouts lists, with exactly the filters on screen.
@@ -38,9 +38,10 @@ const day = (d: Date | string | null | undefined) => {
 };
 
 export async function GET(req: Request) {
-  const guard = requireRole(req.headers.get("cookie") ?? "", ["admin"]);
-  if (!guard.ok) return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
-  if (!allows(guard.session.permissions, EXPORT_PERMISSIONS.payouts ?? null)) {
+  // Live role (not the login cookie): a demoted admin loses exports at once.
+  const session = await getSession();
+  if (!session || session.role !== "admin") return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
+  if (!allows(session.permissions, EXPORT_PERMISSIONS.payouts ?? null)) {
     return new NextResponse("Your role doesn't include this export. Ask a super admin for access.", { status: 403 });
   }
 

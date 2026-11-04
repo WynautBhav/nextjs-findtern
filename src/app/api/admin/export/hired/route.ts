@@ -8,7 +8,7 @@ import { allows, EXPORT_PERMISSIONS } from "@/lib/admin/permissions";
 import { realEmployerId } from "@/lib/admin/scope";
 import { filterProposals, matchesSearch, parseIstDay, proposalTimezone } from "@/lib/admin/tracker";
 import { parseOffer } from "@/lib/offer";
-import { requireRole } from "@/lib/security/guards";
+import { getSession } from "@/lib/auth";
 
 /**
  * Hired candidates as CSV (ADP-25; legacy had internship and full-time hire
@@ -20,9 +20,10 @@ import { requireRole } from "@/lib/security/guards";
 const iso = (d: Date | null | undefined) => (d ? d.toISOString().slice(0, 10) : "");
 
 export async function GET(req: Request) {
-  const guard = requireRole(req.headers.get("cookie") ?? "", ["admin"]);
-  if (!guard.ok) return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
-  if (!allows(guard.session.permissions, EXPORT_PERMISSIONS.proposals)) {
+  // Live role (not the login cookie): a demoted admin loses exports at once.
+  const session = await getSession();
+  if (!session || session.role !== "admin") return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
+  if (!allows(session.permissions, EXPORT_PERMISSIONS.proposals)) {
     return new NextResponse("Your role doesn't include this export. Ask a super admin for access.", { status: 403 });
   }
 

@@ -14,7 +14,7 @@ import { dateRangeConditions } from "@/lib/admin/date-range";
 import { paymentPromo } from "@/lib/admin/payment-promo";
 import { filterProposals, matchesSearch, parseIstDay, proposalTimezone, type TrackerFilters } from "@/lib/admin/tracker";
 import { parseOffer } from "@/lib/offer";
-import { requireRole } from "@/lib/security/guards";
+import { getSession } from "@/lib/auth";
 
 /**
  * Admin CSV export.
@@ -35,18 +35,17 @@ import { requireRole } from "@/lib/security/guards";
 
 const MAX_ROWS = 10_000;
 
-/** Both light and dark cookies carry the signed session, so try both. */
-function readSession(req: Request) {
-  const cookie = req.headers.get("cookie") ?? "";
-  const guard = requireRole(cookie, ["admin"]);
-  return guard.ok ? guard.session : null;
+/** The live session (role re-read from the DB), admin only. */
+async function readSession() {
+  const session = await getSession();
+  return !session || session.role !== "admin" ? null : session;
 }
 
 export async function GET(req: Request) {
   const url = new URL(req.url);
   const type = url.searchParams.get("type") ?? "interns";
 
-  const session = readSession(req);
+  const session = await readSession();
   if (!session) {
     return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
   }
