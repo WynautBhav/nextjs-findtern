@@ -379,6 +379,8 @@ export default async function AdminInterns({
       header:
         c.key === "pending" ? (
           <span title="Payouts already created and not yet marked paid. For what is still owed over the placement, see Left to pay.">{c.label}</span>
+        ) : c.key === "left" ? (
+          <span title="Paid is every payout made. Left is what is still owed on placements, so Total minus Paid can differ from Left.">{c.label}</span>
         ) : (
           c.label
         ),
