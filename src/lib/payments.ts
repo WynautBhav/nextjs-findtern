@@ -5,6 +5,7 @@ import { emails } from "@/lib/emails";
 import { formatMoney } from "@/lib/format";
 import { employerNames, internFirstName, notify } from "@/lib/notify";
 import { parseOffer } from "@/lib/offer";
+import { applyPendingRatings } from "@/lib/admin/score-live";
 import { recordPromoUse } from "@/lib/promo";
 import { assignInvoiceNumber } from "@/lib/invoice-number";
 import { orderProposalIds } from "@/lib/order-ids";
@@ -300,6 +301,7 @@ export async function settleInternOrder(input: {
     });
   }
   await markInternPaidFlag(payment.internId, { orderId: input.orderId, paymentId: input.paymentId });
+  await applyPendingRatings(payment.internId).catch((e) => console.error("[settleInternOrder] pending ratings", e));
   return { ok: true };
 }
 
@@ -359,7 +361,9 @@ export async function isInternPaid(internId: string, db: ReturnType<typeof getDb
     .from(schema.internOnboarding)
     .where(eq(schema.internOnboarding.userId, internId))
     .limit(1);
-  return ((row?.extraData as Record<string, any> | null)?.payment?.isPaid ?? false) === true; // eslint-disable-line @typescript-eslint/no-explicit-any
+  // Same rule as feePaidSql: boolean true or the string "true" (SQL `->>` reads both as 'true').
+  const flag = (row?.extraData as Record<string, any> | null)?.payment?.isPaid; // eslint-disable-line @typescript-eslint/no-explicit-any
+  return flag === true || flag === "true";
 }
 
 /** What the intern actually paid for activation (the row the invoice and email use), or null when no paid row exists. */

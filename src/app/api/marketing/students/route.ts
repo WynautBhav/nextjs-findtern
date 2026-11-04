@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { and, desc, eq } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
+import { candidatePoolClauses } from "@/lib/employer-pool";
 import { initialsOf } from "@/lib/employer-candidates";
 import { draftFromRecord } from "@/lib/onboarding";
 
@@ -121,11 +122,7 @@ export async function GET(req: Request) {
       .from(schema.internOnboarding)
       .innerJoin(schema.users, eq(schema.users.id, schema.internOnboarding.userId))
       .where(
-        and(
-          eq(schema.users.role, "intern"),
-          eq(schema.users.isActive, true),
-          eq(schema.users.profileVisibility, "live"),
-        ),
+        and(...candidatePoolClauses()),
       )
       .orderBy(desc(schema.internOnboarding.updatedAt))
       .limit(300);

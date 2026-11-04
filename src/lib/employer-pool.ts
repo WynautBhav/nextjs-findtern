@@ -2,6 +2,7 @@ import { eq, inArray, isNotNull, and, or, sql, type SQL } from "drizzle-orm";
 
 import { getDb, schema } from "./db";
 import type { CandidateProfile } from "./employer-candidates";
+import { feePaidSql } from "./fee-paid-sql";
 import { hiredProposalSql } from "./employer-visibility";
 
 /**
@@ -33,6 +34,8 @@ export function candidatePoolClauses(): SQL[] {
     // approval status at all was scored in the legacy admin, which never
     // wrote one: the score is its approval there (EMB-02), so it counts.
     sql`COALESCE(${schema.internOnboarding.extraData}->>'approvalStatus', 'Approved') = 'Approved'`,
+    // The score only follows the paid AI interview; a scored but unpaid intern stays hidden.
+    feePaidSql(schema.users.id, schema.internOnboarding.extraData),
   ];
 }
 

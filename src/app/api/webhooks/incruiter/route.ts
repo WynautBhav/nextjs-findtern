@@ -3,9 +3,10 @@ import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 
-import { applyRatings, type RatingUpdate } from "@/lib/admin/ratings";
+import { applyRatings, holdPendingResult, type RatingUpdate } from "@/lib/admin/ratings";
 import { afterRatingsSaved } from "@/lib/admin/score-live";
 import { getDb, schema } from "@/lib/db";
+import { isInternPaid } from "@/lib/payments";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -102,11 +103,22 @@ export async function POST(req: Request) {
         .for("update");
       if (!onboarding) return null;
       const prevExtra = (onboarding.extraData as Record<string, unknown>) ?? {};
+      const reportUrl = url(raw.reportUrl ?? raw.report_url ?? raw.pdfUrl);
+      const recordingUrl = url(raw.recordingUrl ?? raw.recording_url);
+      // Legacy guard: no score without the paid interview. Keep the result; paying applies it.
+      if (!(await isInternPaid(String(internId), tx))) {
+        console.warn("[incruiter webhook] unpaid intern, result held", internId);
+        await tx
+          .update(schema.internOnboarding)
+          .set({ extraData: holdPendingResult(prevExtra, { updates, reportUrl, recordingUrl }), updatedAt: new Date() })
+          .where(eq(schema.internOnboarding.id, onboarding.id));
+        return null;
+      }
       const extra = applyRatings(prevExtra, updates);
       const nextExtra = {
         ...extra,
-        incruiterReportUrl: url(raw.reportUrl ?? raw.report_url ?? raw.pdfUrl) ?? extra.incruiterReportUrl,
-        incruiterRecordingUrl: url(raw.recordingUrl ?? raw.recording_url) ?? extra.incruiterRecordingUrl,
+        incruiterReportUrl: reportUrl ?? extra.incruiterReportUrl,
+        incruiterRecordingUrl: recordingUrl ?? extra.incruiterRecordingUrl,
       };
       await tx
         .update(schema.internOnboarding)

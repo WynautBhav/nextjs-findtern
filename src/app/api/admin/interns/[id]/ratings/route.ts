@@ -5,6 +5,7 @@ import { z } from "zod";
 import { getDb, schema } from "@/lib/db";
 import { applyRatings } from "@/lib/admin/ratings";
 import { afterRatingsSaved } from "@/lib/admin/score-live";
+import { isInternPaid } from "@/lib/payments";
 import { requireMutation } from "@/lib/guards-mutation";
 
 /**
@@ -39,6 +40,9 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 
   const db = getDb();
   const { communication, coding, aptitude, interview } = parsed.data;
+  if ([communication, coding, aptitude, interview].some((v) => typeof v === "number") && !(await isInternPaid(id))) {
+    return NextResponse.json({ error: "Activation fee not paid, so this candidate can't be scored yet" }, { status: 409 });
+  }
   // Read and write under a row lock, so a concurrent bonus grant, import or webhook is not overwritten.
   const outcome = await db.transaction(async (tx) => {
     const [row] = await tx
