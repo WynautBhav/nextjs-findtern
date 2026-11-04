@@ -9,7 +9,8 @@ import { sendSmtpMail } from "@/lib/mailer";
 import { parseOffer } from "@/lib/offer";
 
 /**
- * Re-send the "stipend transferred" email for a paid payout (legacy
+ * Re-send the "stipend transferred" email for a paid payout, or the "completion
+ * bonus transferred" email when the payout is a completion bonus (legacy
  * `send-stipend-email`, routes.ts:8703). Deliberately bypasses the
  * notification dedupe: the in-app notice already exists, this is only the
  * email, for an intern who says it never arrived.
@@ -26,7 +27,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     .where(and(eq(schema.internPayouts.id, payoutId), eq(schema.internPayouts.internId, id)))
     .limit(1);
   if (!payout) return NextResponse.json({ error: "Unknown payout" }, { status: 404 });
-  if (payout.status !== "paid") return NextResponse.json({ error: "Only a paid payout has a stipend email" }, { status: 409 });
+  if (payout.status !== "paid") return NextResponse.json({ error: "Only a paid payout has a transfer email" }, { status: 409 });
 
   const [user] = await db
     .select({ email: schema.users.email, firstName: schema.users.firstName })
@@ -37,7 +38,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   // Role name: the placement's title, then the payout notes, as legacy did.
   let role = (payout.notes ?? "").trim() || "your internship";
-  const proposalId = typeof payout.raw?.proposalId === "string" ? payout.raw.proposalId : null;
+  const proposalId = typeof payout.raw?.proposalId === "string" ? payout.raw.proposalId : payout.bonusProposalId;
   if (proposalId) {
     const [pr] = await db
       .select({ offer: schema.proposals.offerDetails, currency: schema.proposals.currency })
@@ -47,13 +48,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     role = (pr && parseOffer(pr.offer, pr.currency).roleTitle) || role;
   }
 
-  const mail = renderEmail(
-    emails.stipendTransferred({
-      internName: (user.firstName ?? "").trim(),
-      role,
-      amount: formatMoney(payout.amountMinor, payout.currency as "INR" | "USD", { zeroLabel: false }),
-    }),
-  );
+  const content = {
+    internName: (user.firstName ?? "").trim(),
+    role,
+    amount: formatMoney(payout.amountMinor, payout.currency as "INR" | "USD", { zeroLabel: false }),
+  };
+  const mail = renderEmail(payout.kind === "completion_bonus" ? emails.completionBonusPaid(content) : emails.stipendTransferred(content));
   try {
     await sendSmtpMail({ to: user.email, ...mail });
   } catch {
