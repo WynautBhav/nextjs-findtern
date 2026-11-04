@@ -3,7 +3,7 @@ import { and, eq, or } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { notify } from "@/lib/notify";
 
-import { aiInterviewToClose, firstLiveScore } from "./ratings";
+import { aiInterviewToClose, firstLiveScore, releasePendingResult } from "./ratings";
 
 const AI_EMAIL = "ai-interview@findtern.ai";
 
@@ -79,4 +79,17 @@ export async function afterRatingsSaved(
   } catch (err) {
     console.error("[ratings] score-live follow-up failed", err);
   }
+}
+
+/** After the activation fee is paid: apply any InCruiter result held while unpaid. */
+export async function applyPendingRatings(internId: string): Promise<void> {
+  const out = await getDb().transaction(async (tx) => {
+    const [row] = await tx.select().from(schema.internOnboarding).where(eq(schema.internOnboarding.userId, internId)).limit(1).for("update");
+    const prev = (row?.extraData as Record<string, unknown> | null) ?? {};
+    const next = releasePendingResult(prev);
+    if (!row || !next) return null;
+    await tx.update(schema.internOnboarding).set({ extraData: next, updatedAt: new Date() }).where(eq(schema.internOnboarding.id, row.id));
+    return { prev, next };
+  });
+  if (out) await afterRatingsSaved(internId, out.prev, out.next);
 }

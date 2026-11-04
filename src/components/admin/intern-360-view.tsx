@@ -8,6 +8,7 @@ import { csrfFetch } from "@/lib/client-fetch";
 import { toInrMinor } from "@/lib/admin/money";
 import { formatDate, formatMoney, formatSlotTime, shortDate } from "@/lib/format";
 import { StatusBadge, humanizeStatus } from "@/components/admin/status-badge";
+import { MarkPaidButton } from "@/components/admin/mark-paid-button";
 import { CompletionBonusButton } from "@/components/admin/completion-bonus-button";
 import { InternPayoutTools } from "@/components/admin/intern-payout-tools";
 import { owedMinor, stipendDues } from "@/lib/admin/stipend-dues";
@@ -194,6 +195,7 @@ export function Intern360View({
       <InfoRow label="Account">{controls?.account ?? <StatusBadge value={user.isActive ? "active" : "inactive"} />}</InfoRow>
       <InfoRow label="Activation fee">
         <Pill tone={feePaid ? "paid" : "closed"}>{feePaid ? "Paid" : "Unpaid"}</Pill>
+        {!feePaid && canWrite ? <MarkPaidButton internId={user.id} /> : null}
       </InfoRow>
     </InfoList>
   );

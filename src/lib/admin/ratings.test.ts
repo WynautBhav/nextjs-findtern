@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { aiInterviewToClose, applyRatings, completionBonusCount, grantCompletionBonus, readRatingsSheet } from "./ratings.ts";
+import { aiInterviewToClose, applyRatings, completionBonusCount, grantCompletionBonus, holdPendingResult, releasePendingResult, readRatingsSheet } from "./ratings.ts";
 
 test("bulk sheet: legacy headers, quoted cells, bad values flagged", () => {
   const rows = readRatingsSheet('email,communication,coding,aptitude,ai interview,findternScore\r\n"A@x.com",8,7,6,7,7.5\r\nb@x.com,11,,,,\r\n');
@@ -146,4 +146,16 @@ test("an imported score survives a save that rates nothing and clears nothing", 
   assert.equal(applyRatings(imported, { coding: undefined }).findternScore, 7);
   // an explicit clear still removes it
   assert.equal(applyRatings(applyRatings({}, { coding: 5 }), { coding: null }).findternScore, undefined);
+});
+
+test("unpaid webhook result is held, not applied; paying applies it once", () => {
+  const held = holdPendingResult({ other: 1 }, { updates: { coding: 8, aptitude: 6, interview: undefined }, reportUrl: "https://r" });
+  assert.equal(held.findternScore, undefined);
+  assert.equal(held.ratings, undefined);
+  assert.equal(held.other, 1);
+  const done = releasePendingResult(held)!;
+  assert.equal(done.findternScore, 7);
+  assert.equal(done.incruiterReportUrl, "https://r");
+  assert.equal("incruiterPending" in done, false);
+  assert.equal(releasePendingResult(done), null);
 });

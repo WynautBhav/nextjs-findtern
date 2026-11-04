@@ -40,7 +40,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 
   const db = getDb();
   const { communication, coding, aptitude, interview } = parsed.data;
-  if ([communication, coding, aptitude, interview].some((v) => v !== undefined) && !(await isInternPaid(id))) {
+  if ([communication, coding, aptitude, interview].some((v) => typeof v === "number") && !(await isInternPaid(id))) {
     return NextResponse.json({ error: "Activation fee not paid, so this candidate can't be scored yet" }, { status: 409 });
   }
   // Read and write under a row lock, so a concurrent bonus grant, import or webhook is not overwritten.

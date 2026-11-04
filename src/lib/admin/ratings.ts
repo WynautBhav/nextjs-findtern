@@ -105,6 +105,25 @@ export function applyRatings(
   return next;
 }
 
+type PendingResult = { updates: RatingUpdate; reportUrl?: string; recordingUrl?: string };
+
+/** Unpaid intern: keep what InCruiter sent, apply nothing. A newer result replaces an older pending one. */
+export function holdPendingResult(extra: Record<string, unknown>, r: PendingResult, receivedAt = new Date()): Record<string, unknown> {
+  const updates = Object.fromEntries(Object.entries(r.updates).filter(([, v]) => typeof v === "number"));
+  return { ...extra, incruiterPending: { updates, reportUrl: r.reportUrl, recordingUrl: r.recordingUrl, receivedAt: receivedAt.toISOString() } };
+}
+
+/** Once paid: apply a held result and drop the pending key. Null when nothing is held. */
+export function releasePendingResult(extra: Record<string, unknown>): Record<string, unknown> | null {
+  const held = extra.incruiterPending as (PendingResult & { receivedAt?: string }) | undefined;
+  if (!held || typeof held !== "object") return null;
+  const { incruiterPending: _drop, ...rest } = extra; // eslint-disable-line @typescript-eslint/no-unused-vars
+  const next = applyRatings(rest, held.updates ?? {});
+  if (held.reportUrl) next.incruiterReportUrl = held.reportUrl;
+  if (held.recordingUrl) next.incruiterRecordingUrl = held.recordingUrl;
+  return next;
+}
+
 /** True when this change gives the intern their first live (> 0) score. */
 export function firstLiveScore(prev: Record<string, unknown>, next: Record<string, unknown>): boolean {
   const live = (e: Record<string, unknown>) => (rawScore(e) ?? 0) > 0;

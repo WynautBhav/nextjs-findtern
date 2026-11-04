@@ -5,6 +5,7 @@ import { emails } from "@/lib/emails";
 import { formatMoney } from "@/lib/format";
 import { employerNames, internFirstName, notify } from "@/lib/notify";
 import { parseOffer } from "@/lib/offer";
+import { applyPendingRatings } from "@/lib/admin/score-live";
 import { recordPromoUse } from "@/lib/promo";
 import { assignInvoiceNumber } from "@/lib/invoice-number";
 import { orderProposalIds } from "@/lib/order-ids";
@@ -300,6 +301,7 @@ export async function settleInternOrder(input: {
     });
   }
   await markInternPaidFlag(payment.internId, { orderId: input.orderId, paymentId: input.paymentId });
+  await applyPendingRatings(payment.internId).catch((e) => console.error("[settleInternOrder] pending ratings", e));
   return { ok: true };
 }
 
