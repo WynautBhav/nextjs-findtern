@@ -304,3 +304,10 @@ test("offerTermIssues: the composer and the edit share one set of start/shift/ti
   assert.equal(offerTermIssues({ startDate: day(900) })[0]?.message, "Pick a start date within the next year.");
   assert.equal(offerTermIssues({ startDate: "2026-02-31" })[0]?.message, "Pick a real start date.");
 });
+
+test("a no-stipend offer keeps a real 0", () => {
+  const o = parseOffer({ monthlyAmount: 0, hourlyRate: 0 }, "INR");
+  assert.equal(o.monthlyMinor, 0);
+  assert.equal(o.hourlyRateMinor, 0);
+  assert.equal(parseOffer({ monthlyAmount: -5 }, "INR").monthlyMinor, null);
+});

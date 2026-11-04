@@ -68,6 +68,12 @@ const toMinor = (major: unknown) => {
   return n != null && n > 0 ? Math.round(n * 100) : null;
 };
 
+// A real 0 (a no-stipend internship) must survive, unlike the other amounts.
+const toMinorKeepZero = (major: unknown) => {
+  const n = num(major);
+  return n != null && n >= 0 ? Math.round(n * 100) : null;
+};
+
 /**
  * Billable hours come from the working week, not from a typed number (bug
  * sheet 22 Oct; legacy employer-send-proposal.tsx:533-659): working days in a
@@ -260,9 +266,9 @@ export function parseOffer(raw: unknown, rowCurrency?: string | null): Offer {
     timezone: str(o.timezone),
     laptop: normalizeLaptop(o.laptop),
     paidLeavesPerMonth: num(o.paidLeavesPerMonth) ?? 0,
-    monthlyMinor: toMinor(o.monthlyAmount ?? o.monthly_amount),
+    monthlyMinor: toMinorKeepZero(o.monthlyAmount ?? o.monthly_amount),
     totalMinor: toMinor(o.totalPrice),
-    hourlyRateMinor: toMinor(o.hourlyRate),
+    hourlyRateMinor: toMinorKeepZero(o.hourlyRate),
     perHireMinor: perHireOf(o, monthsOf(duration)),
     fullTime: ft
       ? {
