@@ -51,7 +51,8 @@ export async function loadInterns(
   req: { search: string; limit: number; offset: number },
   sortKey: InternSortKey,
   dir: "asc" | "desc",
-  opts: { bank?: boolean; fullAccount?: boolean } = {},
+  /** `maxRows`: count first and return no rows when more match (the export's cap; refusing is cheap, loading is not). */
+  opts: { bank?: boolean; fullAccount?: boolean; maxRows?: number } = {},
 ) {
   const db = getDb();
   const o = schema.internOnboarding;
@@ -146,6 +147,11 @@ export async function loadInterns(
             : sortKey === "next"
               ? [order(valuesOf((m) => m.nextDate, "date"))]
               : [dir === "asc" ? asc(u.createdAt) : desc(u.createdAt)];
+
+  if (opts.maxRows != null) {
+    const [c] = await db.select({ c: count() }).from(u).leftJoin(o, eq(o.userId, u.id)).where(where);
+    if (Number(c?.c ?? 0) > opts.maxRows) return { rows: [] as InternRow[], total: Number(c?.c ?? 0), signups: 0, incomplete: 0 };
+  }
 
   const [rawRows, [totalRow], [signupsRow], [incompleteRow]] = await Promise.all([
     db

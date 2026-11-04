@@ -598,7 +598,9 @@ export const interviews = pgTable("interviews", {
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (t) => ({
+  interviewsInternIdx: index("interviews_intern_id_idx").on(t.internId),
+}));
 
 export type Interview = typeof interviews.$inferSelect;
 export type InsertInterview = typeof interviews.$inferInsert;
@@ -648,7 +650,9 @@ export const internPayments = pgTable("intern_payments", {
   invoiceNumber: text("invoice_number").unique(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (t) => ({
+  internPaymentsInternIdx: index("intern_payments_intern_id_idx").on(t.internId),
+}));
 
 export type InternPayment = typeof internPayments.$inferSelect;
 export type InsertInternPayment = typeof internPayments.$inferInsert;
@@ -757,7 +761,9 @@ export const proposals = pgTable("proposals", {
   /** Set once when staff grant the completion bonus (+1 Findtern Score) for this hire. */
   completionBonusAt: timestamp("completion_bonus_at"),
   completionBonusBy: varchar("completion_bonus_by"),
-});
+}, (t) => ({
+  proposalsInternIdx: index("proposals_intern_id_idx").on(t.internId),
+}));
 
 export type Proposal = typeof proposals.$inferSelect;
 

@@ -98,6 +98,7 @@ async function exportInterns(search: string, params: Record<string, string>, ses
   const { rows, total } = await loadInterns(params, { search, limit: MAX_ROWS, offset: 0 }, sortKey, dir, {
     bank: needsBank(cols),
     fullAccount: fullAccountNumbers,
+    maxRows: MAX_ROWS,
   });
   if (total > MAX_ROWS) return new NextResponse("More than 10,000 candidates match; narrow the filters.", { status: 400 });
 
