@@ -11,6 +11,9 @@ import { AdminLoadError, AdminPageHeader, Panel } from "@/components/admin/panel
 import { AdminTabs, type AdminTabItem } from "@/components/admin/admin-tabs";
 import { DataTable, IdentityCell, parseSort } from "@/components/admin/data-table";
 import { CompanyActiveToggle, CompanyFteSelect } from "@/components/admin/company-controls";
+import { getSession } from "@/lib/auth";
+import { fteOf } from "@/lib/admin/fte";
+import { canWrite } from "@/lib/admin/permissions";
 import { StatusBadge } from "@/components/admin/status-badge";
 import { ButtonAnchor } from "@/components/ui/button";
 import { ADMIN_PILL_SECONDARY } from "@/components/admin/surface";
@@ -34,6 +37,7 @@ export default async function AdminCompaniesPage({
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const params = flattenParams(await searchParams);
+  const mayWrite = canWrite((await getSession())?.permissions, "/admin/companies");
   const req = parsePageRequest(params);
   const sort = parseSort(params, SORTS, { key: "joined", dir: "desc" });
 
@@ -315,11 +319,11 @@ export default async function AdminCompaniesPage({
           },
           {
             header: "Account",
-            cell: (row) => <CompanyActiveToggle id={row.id} isActive={row.isActive} compact />,
+            cell: (row) => (mayWrite ? <CompanyActiveToggle id={row.id} isActive={row.isActive} compact /> : <span>{row.isActive ? "Active" : "Inactive"}</span>),
           },
           {
             header: "International FTE",
-            cell: (row) => <CompanyFteSelect id={row.id} value={row.internationalFteStatus} pill />,
+            cell: (row) => (mayWrite ? <CompanyFteSelect id={row.id} value={row.internationalFteStatus} pill /> : <span>{{ none: "Not approved", applied: "Applied", approved: "Approved" }[fteOf(row.internationalFteStatus)]}</span>),
           },
           {
             header: "Joined",

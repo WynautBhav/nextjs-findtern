@@ -53,6 +53,7 @@ export function Company360View({
   interns,
   ledger,
   actions,
+  canWrite,
   viewAs,
   activities,
 }: {
@@ -67,6 +68,8 @@ export function Company360View({
   ledger: CompanyLedger;
   /** Pill buttons beside the title (Edit contact). */
   actions?: React.ReactNode;
+  /** Without it the account switches and Delete are shown as plain text or left out. */
+  canWrite: boolean;
   /** The "View as company" tile, shown with the card's quick actions. */
   viewAs?: React.ReactNode;
   /** The Activities timeline; null when it could not be loaded. */
@@ -202,7 +205,7 @@ export function Company360View({
           />
         </div>
 
-      {tab === "profile" ? <ProfileTab company={company} fte={fte} /> : null}
+      {tab === "profile" ? <ProfileTab company={company} fte={fte} canWrite={canWrite} /> : null}
 
       {tab === "projects" ? (
         <DataTable
@@ -458,7 +461,7 @@ export function Company360View({
   );
 }
 
-function ProfileTab({ company, fte }: { company: Omit<Employer, "password">; fte: "none" | "applied" | "approved" }) {
+function ProfileTab({ company, fte, canWrite }: { company: Omit<Employer, "password">; fte: "none" | "applied" | "approved"; canWrite: boolean }) {
   const website = company.websiteUrl ? (/^https?:\/\//i.test(company.websiteUrl) ? company.websiteUrl : `https://${company.websiteUrl}`) : null;
   return (
     <div className="grid gap-[var(--admin-gap)] @3xl:grid-cols-2">
@@ -524,7 +527,7 @@ function ProfileTab({ company, fte }: { company: Omit<Employer, "password">; fte
           <div className="flex flex-wrap items-center justify-between gap-3 py-3">
             <dt className="text-sm text-ink-600">Sign-in</dt>
             <dd>
-              <CompanyActiveToggle id={company.id} isActive={company.isActive} refresh />
+              {canWrite ? <CompanyActiveToggle id={company.id} isActive={company.isActive} refresh /> : <span className="text-sm">{company.isActive ? "Active" : "Inactive"}</span>}
             </dd>
           </div>
           <div className="flex flex-wrap items-center justify-between gap-3 py-3">
@@ -535,7 +538,7 @@ function ProfileTab({ company, fte }: { company: Omit<Employer, "password">; fte
               </span>
             </dt>
             <dd>
-              <CompanyFteSelect id={company.id} value={company.internationalFteStatus} refresh />
+              {canWrite ? <CompanyFteSelect id={company.id} value={company.internationalFteStatus} refresh /> : <span className="text-sm">{fte === "approved" ? "Approved" : fte === "applied" ? "Applied" : "Not approved"}</span>}
             </dd>
           </div>
         </dl>
@@ -543,13 +546,13 @@ function ProfileTab({ company, fte }: { company: Omit<Employer, "password">; fte
 
       {/* Apart from the routine switches above (critique A: Delete sat
           among them in the Account card). */}
-      <div className={cn(ADMIN_SURFACE, "min-w-0 flex flex-wrap items-center justify-between gap-3 p-5")}>
+      {canWrite ? <div className={cn(ADMIN_SURFACE, "min-w-0 flex flex-wrap items-center justify-between gap-3 p-5")}>
         <div>
           <p className="text-sm font-semibold text-ink-900">Delete company</p>
           <p className="text-sm text-ink-600">Only possible before any proposal, interview or payment.</p>
         </div>
         <CompanyDeleteButton id={company.id} />
-      </div>
+      </div> : null}
     </div>
   );
 }

@@ -7,6 +7,7 @@ import { ViewAsButton } from "@/components/admin/view-as-button";
 import { AdminLoadError, Panel } from "@/components/admin/panel";
 import { Company360View, type Company360Tab } from "@/components/admin/company-360-view";
 import { getSession } from "@/lib/auth";
+import { canWrite } from "@/lib/admin/permissions";
 import { canViewAs } from "@/lib/admin/impersonation";
 import { flattenParams } from "@/lib/admin/params";
 import { companyLedger } from "@/lib/admin/company-ledger";
@@ -95,6 +96,7 @@ export default async function AdminCompanyDetailPage({
   if (!data) notFound();
 
   const session = await getSession();
+  const mayWrite = canWrite(session?.permissions, "/admin/companies");
   const viewAs = await canViewAs(session?.uid, session?.permissions);
 
   const scores = new Map(
@@ -114,7 +116,9 @@ export default async function AdminCompanyDetailPage({
       interns={data.interns}
       ledger={ledger}
       activities={activities}
+      canWrite={mayWrite}
       actions={
+        mayWrite ? (
         <>
           <ContactEditor
             targetType="employer"
@@ -127,6 +131,7 @@ export default async function AdminCompanyDetailPage({
             }}
           />
         </>
+        ) : null
       }
       viewAs={viewAs ? <ViewAsButton targetType="employer" targetId={data.company.id} label="View as company" appearance="tile" /> : null}
     />
