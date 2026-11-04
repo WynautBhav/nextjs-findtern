@@ -132,8 +132,8 @@ export default async function RosterPage({ searchParams }: { searchParams?: Prom
               <nav aria-label="Pagination" className="flex items-center justify-between gap-3 border-t border-ink-100 px-5 py-3 text-sm">
                 <span className="nums text-text-subtle">Page {page} of {pages} · {coverage.notJoined.length.toLocaleString("en-IN")} not joined</span>
                 <span className="flex gap-4 font-medium text-brand-700">
-                  {page > 1 ? <Link href={`?page=${page - 1}`}>Previous</Link> : null}
-                  {page < pages ? <Link href={`?page=${page + 1}`}>Next</Link> : null}
+                  {page > 1 ? <Link href={`?page=${page - 1}`} className="inline-flex min-h-11 items-center rounded-full px-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">Previous</Link> : null}
+                  {page < pages ? <Link href={`?page=${page + 1}`} className="inline-flex min-h-11 items-center rounded-full px-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">Next</Link> : null}
                 </span>
               </nav>
             ) : null}

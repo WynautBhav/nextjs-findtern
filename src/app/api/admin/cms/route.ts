@@ -56,11 +56,11 @@ export async function POST(req: Request) {
   if (!guard.ok) return guard.response;
   const b = await body(req);
   if (!b) return NextResponse.json({ error: "Unknown content type" }, { status: 400 });
+  if (b.raw.isActive !== undefined && typeof b.raw.isActive !== "boolean") {
+    return NextResponse.json({ error: "isActive must be true or false" }, { status: 400 });
+  }
   const checked = validateCmsValues(b.type, b.raw, { partial: false });
   if (!checked.ok) return NextResponse.json({ error: checked.error }, { status: 400 });
-  if (b.raw.isActive !== undefined && typeof b.raw.isActive !== "boolean") {
-    return NextResponse.json({ error: "Invalid input" }, { status: 400 });
-  }
   const values = normalise(b.type, checked.values);
   if (typeof b.raw.isActive === "boolean" && CMS_COLLECTIONS[b.type].toggle) values.isActive = b.raw.isActive;
   if (b.type === "blog" && values.body == null) values.body = "";
@@ -82,7 +82,7 @@ export async function PATCH(req: Request) {
   const id = typeof b?.raw.id === "string" ? b.raw.id : null;
   if (!b || !id) return NextResponse.json({ error: "Invalid input" }, { status: 400 });
   if (b.raw.isActive !== undefined && typeof b.raw.isActive !== "boolean") {
-    return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+    return NextResponse.json({ error: "isActive must be true or false" }, { status: 400 });
   }
 
   const db = getDb();

@@ -7,8 +7,8 @@ import { canGrant, PERMISSIONS } from "@/lib/admin/permissions";
 import { requireMutation } from "@/lib/guards-mutation";
 
 const bodySchema = z.object({
-  key: z.string().regex(/^[A-Za-z0-9_]{2,}$/, "Role key: 2 or more letters, numbers or underscores"),
-  name: z.string().min(2, "Give the role a name of 2 or more letters"),
+  key: z.string().regex(/^[A-Za-z0-9_]{2,40}$/, "Role key: 2 to 40 letters, numbers or underscores"),
+  name: z.string().min(2, "Give the role a name of 2 or more letters").max(80, "Role name is 80 characters at most"),
   permissions: z.array(z.enum(["*", ...PERMISSIONS.map((p) => p.key)] as [string, ...string[]], "Unknown permission")).default([]),
 });
 

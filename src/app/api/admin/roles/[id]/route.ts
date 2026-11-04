@@ -8,7 +8,7 @@ import { canGrant, PERMISSIONS } from "@/lib/admin/permissions";
 import { requireMutation } from "@/lib/guards-mutation";
 
 const bodySchema = z.object({
-  name: z.string().min(2).optional(),
+  name: z.string().min(2).max(80).optional(),
   permissions: z.array(z.enum(["*", ...PERMISSIONS.map((p) => p.key)] as [string, ...string[]])).optional(),
 });
 
