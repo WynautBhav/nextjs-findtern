@@ -228,3 +228,19 @@ test("QA-152: a day between two sheets is offered as itself, and only that day",
   const aligned = [taken[0], { start: "2026-10-18", end: "2026-11-17" }];
   assert.deepEqual(timesheetPeriod(null, "2026-09-18", 3, "2026-10-28", aligned), { error: "The next period hasn't started yet." });
 });
+
+test("B3: a Present day stored with hours 0 counts 8 h, so the tile total matches the weekly rows", async () => {
+  const { dayDetails, weeklyTallies } = await import("./employer-timesheets.ts");
+  const days = dayDetails(
+    [
+      { date: "2026-09-01", status: "Present", hours: 0 },
+      { date: "2026-09-02", status: "Present", hours: 4 },
+      { date: "2026-09-03", status: "Absent", hours: 0 },
+    ],
+    new Date("2026-09-01T00:00:00Z"),
+    new Date("2026-09-03T23:59:59.999Z"),
+  );
+  const total = days.reduce((n, d) => n + d.hours, 0);
+  assert.equal(total, 12);
+  assert.equal(weeklyTallies(days).reduce((n, w) => n + w.hours, 0), total);
+});

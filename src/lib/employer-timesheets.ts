@@ -134,7 +134,8 @@ export function dayDetails(entries: unknown, periodStart: Date | null, periodEnd
   }
   return normaliseEntries(entries, periodStart, periodEnd).map((d) => {
     const x = extra.get(d.date);
-    const hours = x?.hours ?? (d.status === "Present" ? DEFAULT_DAY_HOURS : 0);
+    // A Present day with no hours (missing or 0) is a legacy 8-hour day, same as the review grid's weekly rows.
+    const hours = x?.hours && x.hours > 0 ? x.hours : DEFAULT_DAY_HOURS;
     return { ...d, hours: d.status === "Present" ? hours : 0, note: x?.note ?? "" };
   });
 }
