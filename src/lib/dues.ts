@@ -165,7 +165,8 @@ export function placementLedger(hire: HireLike, payments: readonly PaidOrderLike
           ? postpaidDueOn(postpaidAnchor(offer.startDate, hire.hiredAt), months, covered + 1)
           : addMonths(offer.startDate, covered)
         : null,
-    endsOn: offer.fullTime ? null : addMonths(offer.startDate, offer.months),
+    // The last period's end (as the instalments and timesheets count it), not start + months, which is a day later.
+    endsOn: offer.fullTime ? null : (postpaidDueOn(offer.startDate, offer.months, offer.months) ?? addMonths(offer.startDate, offer.months)),
     status: dueMinor === 0 && paidMinor > 0 ? "fully_paid" : paidMinor > 0 ? "partially_paid" : "unpaid",
   };
 }
