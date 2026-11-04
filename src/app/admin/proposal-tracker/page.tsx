@@ -11,6 +11,7 @@ import { AdminLoadError, AdminPageHeader, Panel } from "@/components/admin/panel
 import { DateRangeForm } from "@/components/admin/date-range-form";
 import { ProposalTrackerView, TRACKER_TABS, type TrackerTab } from "@/components/admin/proposal-tracker-view";
 import { ADMIN_PILL_SECONDARY } from "@/components/admin/surface";
+import { isAiInterview } from "@/lib/admin/interview-notes";
 import { ButtonAnchor } from "@/components/ui/button";
 
 /**
@@ -77,6 +78,7 @@ async function load() {
         internEmail: schema.users.email,
         employerId: schema.interviews.employerId,
         companyName: schema.employers.companyName,
+        companyEmail: schema.employers.companyEmail,
         projectId: schema.interviews.projectId,
         projectName: schema.projects.projectName,
       })
@@ -86,7 +88,7 @@ async function load() {
       .leftJoin(schema.projects, eq(schema.projects.id, schema.interviews.projectId))
       .orderBy(desc(schema.interviews.createdAt)),
   ]);
-  return { employers, proposals, interviews };
+  return { employers, proposals, interviews: interviews.map(({ companyEmail, ...i }) => ({ ...i, isAi: isAiInterview(i.employerId, companyEmail) })) };
 }
 
 type TrackerData = Awaited<ReturnType<typeof load>>;

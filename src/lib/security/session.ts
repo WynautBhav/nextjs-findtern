@@ -165,6 +165,9 @@ export function renewSession(
  * reveals nothing about the password, and it changes whenever the stored
  * value does, whichever app changed it.
  */
+/** A session with no `pv` predates the check. College ones are rejected (a reset must end them); other roles keep theirs. */
+export const acceptsPvlessSession = (role: string) => role !== "college";
+
 export function passwordVersion(storedPassword: string): string {
   return createHmac("sha256", secret()).update(`pv:${storedPassword ?? ""}`).digest("base64url").slice(0, 16);
 }

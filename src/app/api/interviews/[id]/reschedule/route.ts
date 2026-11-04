@@ -5,7 +5,7 @@ import { z } from "zod";
 import { getDb, schema } from "@/lib/db";
 import { emails, icsInvite } from "@/lib/emails";
 import { requireMutation } from "@/lib/guards-mutation";
-import { employerNames, internFirstName, notify } from "@/lib/notify";
+import { internFirstName, notify } from "@/lib/notify";
 import { wallTimeToUtc } from "@/lib/timezones";
 import { hasDuplicateSlots, hasSlotTooFarAhead, isQuarterHourWall } from "@/lib/employer-interview-rules";
 import { CALENDAR_TOKEN_OWNER, calendarConfig, refreshAccessToken } from "@/lib/google";
@@ -14,12 +14,12 @@ const wall = z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/);
 const bodySchema = z.object({ slot1: wall.optional(), slot2: wall.optional(), slot3: wall.optional() });
 
 /**
- * Employer: offer new slots (wall-clock times in the interview's timezone).
- * Intern: ask the employer for new slots. Either way it goes back to pending.
+ * Employer: offer new slots (wall-clock times in the interview's timezone); it goes back to pending.
+ * Interns cannot reschedule (#21).
  */
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const guard = await requireMutation({ req, roles: ["employer", "intern"] });
+  const guard = await requireMutation({ req, roles: ["employer"] });
   if (!guard.ok) return guard.response;
   const { session } = guard;
 
@@ -29,42 +29,37 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const db = getDb();
   const [interview] = await db.select().from(schema.interviews).where(eq(schema.interviews.id, id)).limit(1);
   if (!interview) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  const byEmployer = session.role === "employer";
-  if ((byEmployer ? interview.employerId : interview.internId) !== session.uid) {
+  if (interview.employerId !== session.uid) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
   if (!["pending", "scheduled"].includes(interview.status)) {
     return NextResponse.json({ error: `This interview is already ${interview.status}` }, { status: 409 });
   }
 
-  // Intern request: drop the old slots, or the intern could re-pick one at once; the employer offers new ones.
-  let slots: (Date | null)[] = [null, null, null];
-  if (byEmployer) {
-    const wanted = [parsed.data.slot1, parsed.data.slot2, parsed.data.slot3].filter((s): s is string => Boolean(s));
-    // Same rule as booking: three times, on the quarter hour.
-    if (wanted.length !== 3) return NextResponse.json({ error: "Offer three time slots." }, { status: 400 });
-    if (!wanted.every(isQuarterHourWall)) {
-      return NextResponse.json({ error: "Slots start on the hour or at :15, :30 or :45." }, { status: 400 });
-    }
-    slots = wanted.map((s) => wallTimeToUtc(s, interview.timezone || "Asia/Kolkata"));
-    if (slots.some((s) => s!.getTime() < Date.now())) {
-      return NextResponse.json({ error: "Slots must be in the future" }, { status: 400 });
-    }
-    if (hasSlotTooFarAhead(slots as Date[])) {
-      return NextResponse.json({ error: "Pick slots within the next year." }, { status: 400 });
-    }
-    if (hasDuplicateSlots(slots as Date[])) {
-      return NextResponse.json({ error: "Offer different times - two slots are the same." }, { status: 400 });
-    }
+  const wanted = [parsed.data.slot1, parsed.data.slot2, parsed.data.slot3].filter((s): s is string => Boolean(s));
+  // Same rule as booking: three times, on the quarter hour.
+  if (wanted.length !== 3) return NextResponse.json({ error: "Offer three time slots." }, { status: 400 });
+  if (!wanted.every(isQuarterHourWall)) {
+    return NextResponse.json({ error: "Slots start on the hour or at :15, :30 or :45." }, { status: 400 });
+  }
+  const slots = wanted.map((s) => wallTimeToUtc(s, interview.timezone || "Asia/Kolkata"));
+  if (slots.some((s) => s!.getTime() < Date.now())) {
+    return NextResponse.json({ error: "Slots must be in the future" }, { status: 400 });
+  }
+  if (hasSlotTooFarAhead(slots as Date[])) {
+    return NextResponse.json({ error: "Pick slots within the next year." }, { status: 400 });
+  }
+  if (hasDuplicateSlots(slots as Date[])) {
+    return NextResponse.json({ error: "Offer different times - two slots are the same." }, { status: 400 });
   }
 
   // Only if still open: a meeting marked completed or missed in between must not be reset to pending.
   const reset = await db
     .update(schema.interviews)
     .set({
-      slot1: slots[0] ?? null,
-      slot2: slots[1] ?? null,
-      slot3: slots[2] ?? null,
+      slot1: slots[0],
+      slot2: slots[1],
+      slot3: slots[2],
       status: "pending",
       selectedSlot: null,
       meetingLink: null,
@@ -83,21 +78,23 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     after(() => deleteCalendarEvent(eventId).catch((e) => console.error("[reschedule] calendar delete", e)));
   }
 
-  // An AI interview's "employer" is the synthetic `admin` row - nobody to
-  // tell (legacy R:11717 skipped it too).
-  if (!byEmployer && interview.employerId === "admin") return NextResponse.json({ ok: true });
-
   // A booked slot put an invite in each side's calendar; withdraw the
   // recipient's copy (same per-party uid as select-slot sent).
   const bookedStart =
     interview.status === "scheduled" && interview.selectedSlot
       ? [interview.slot1, interview.slot2, interview.slot3][interview.selectedSlot - 1]
       : null;
-  const cancelFor = (party: "intern" | "employer") =>
-    bookedStart
+  await notify({
+    to: { type: "intern", id: interview.internId },
+    type: "interview_rescheduled_by_employer",
+    title: "Interview rescheduled",
+    message: "The company offered new times. Pick the one that works for you.",
+    data: { interviewId: id },
+    email: emails.interviewRescheduled({ name: await internFirstName(interview.internId), byEmployer: true }),
+    attachments: bookedStart
       ? [
           icsInvite({
-            uid: `${id}-${party}`,
+            uid: `${id}-intern`,
             start: bookedStart,
             end: new Date(bookedStart.getTime() + 30 * 60_000),
             title: "Findtern interview (cancelled)",
@@ -106,29 +103,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
             sequence: Math.floor(Date.now() / 1000),
           }),
         ]
-      : undefined;
-
-  await notify(
-    byEmployer
-      ? {
-          to: { type: "intern", id: interview.internId },
-          type: "interview_rescheduled_by_employer",
-          title: "Interview rescheduled",
-          message: "The company offered new times. Pick the one that works for you.",
-          data: { interviewId: id },
-          email: emails.interviewRescheduled({ name: await internFirstName(interview.internId), byEmployer: true }),
-          attachments: cancelFor("intern"),
-        }
-      : {
-          to: { type: "employer", id: interview.employerId },
-          type: "interview_reschedule_requested_by_intern",
-          title: "Reschedule requested",
-          message: "The candidate asked to reschedule. Offer new slots.",
-          data: { interviewId: id },
-          email: emails.interviewRescheduled({ name: (await employerNames(interview.employerId)).contact, byEmployer: false }),
-          attachments: cancelFor("employer"),
-        },
-  );
+      : undefined,
+  });
   return NextResponse.json({ ok: true });
 }
 

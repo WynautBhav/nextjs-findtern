@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 
 import { getDb, schema } from "@/lib/db";
-import { passwordVersion } from "@/lib/security/session";
+import { acceptsPvlessSession, passwordVersion } from "@/lib/security/session";
 import { CURRENT_TERMS_VERSION } from "@/lib/terms";
 
 /**
@@ -67,10 +67,10 @@ export async function isAccountActive(role: string, uid: string): Promise<boolea
 /**
  * Whether a session minted with password version `pv` is still current: a
  * password change (here or on the legacy site) ends every other session on
- * the account (INT-26). Sessions without a version predate the check.
+ * the account (INT-26). Sessions without a version predate the check; for colleges they are rejected.
  */
 export async function isPasswordVersionCurrent(role: string, uid: string, pv: string | undefined): Promise<boolean> {
-  if (!pv) return true;
+  if (!pv) return acceptsPvlessSession(role);
   const status = await readStatus(role, uid);
   if (!status) return true; // lookup failed: same fail-open as isAccountActive
   return status.pv === pv;

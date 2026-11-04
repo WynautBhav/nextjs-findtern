@@ -51,7 +51,7 @@ export default async function AdminCollegesPage({
     .limit(req.perPage)
     .offset((page - 1) * req.perPage);
   const officers = await db
-    .select({ collegeId: schema.collegeAdmins.collegeId, name: schema.collegeAdmins.name, email: schema.collegeAdmins.email, lastLoginAt: schema.collegeAdmins.lastLoginAt })
+    .select({ id: schema.collegeAdmins.id, collegeId: schema.collegeAdmins.collegeId, name: schema.collegeAdmins.name, email: schema.collegeAdmins.email, lastLoginAt: schema.collegeAdmins.lastLoginAt })
     .from(schema.collegeAdmins)
     .where(sql`${schema.collegeAdmins.isActive} AND ${inArray(schema.collegeAdmins.collegeId, rows.map((r) => r.college.id).concat(""))}`);
 
@@ -70,7 +70,7 @@ export default async function AdminCollegesPage({
     drives: r.drives,
     officers: officers
       .filter((o) => o.collegeId === r.college.id)
-      .map((o) => ({ name: o.name, email: o.email, lastLoginAt: o.lastLoginAt?.toISOString() ?? null })),
+      .map((o) => ({ id: o.id, name: o.name, email: o.email, lastLoginAt: o.lastLoginAt?.toISOString() ?? null })),
   }));
 
   const pg = toPage(list, total, req.page, req.perPage);

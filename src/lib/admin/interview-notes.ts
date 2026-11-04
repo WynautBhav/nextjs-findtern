@@ -13,6 +13,12 @@
 
 import { FEEDBACK_TAG_LINE, normaliseNotes } from "../interview-feedback.ts";
 
+export const AI_EMAIL = "ai-interview@findtern.ai";
+
+/** Legacy AI interviews sit on employer id "admin"; ours on the synthetic AI employer. They have no slots. */
+export const isAiInterview = (employerId: string | null | undefined, employerEmail: string | null | undefined) =>
+  employerId === "admin" || employerEmail === AI_EMAIL;
+
 const TAGGED = /^(feedback|recording): /;
 const EMPLOYER_FEEDBACK = /^feedback_text:/i;
 
@@ -67,8 +73,9 @@ export function noteTag(notes: string | null | undefined, tag: "feedback" | "rec
  * cancelled) becomes "scheduled",
  * for employer and AI interviews alike.
  */
-export function statusAfterMeetingLink(current: string | null | undefined): string {
+export function statusAfterMeetingLink(current: string | null | undefined, hasSlot = true): string {
   const status = String(current ?? "").trim().toLowerCase();
-  if (["completed", "missed", "expired", "cancelled", "canceled"].includes(status)) return String(current);
+  // #20: no picked slot, no "scheduled": the link is made when the candidate picks a time.
+  if (!hasSlot || ["completed", "missed", "expired", "cancelled", "canceled"].includes(status)) return String(current);
   return "scheduled";
 }

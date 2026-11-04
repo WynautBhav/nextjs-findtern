@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { isAiInterview } from "@/lib/admin/interview-notes";
 import { notFound } from "next/navigation";
 import { and, desc, eq, getTableColumns, inArray } from "drizzle-orm";
 
@@ -136,7 +137,7 @@ async function load(id: string) {
   const projectIds = [...new Set([...proposals.map((p) => p.projectId), ...interviews.map((i) => i.projectId)].filter((v): v is string => Boolean(v)))];
   const [employers, projects] = await Promise.all([
     employerIds.length
-      ? db.select({ id: schema.employers.id, name: schema.employers.companyName }).from(schema.employers).where(inArray(schema.employers.id, employerIds))
+      ? db.select({ id: schema.employers.id, name: schema.employers.companyName, email: schema.employers.companyEmail }).from(schema.employers).where(inArray(schema.employers.id, employerIds))
       : Promise.resolve([]),
     projectIds.length
       ? db.select({ id: schema.projects.id, name: schema.projects.projectName }).from(schema.projects).where(inArray(schema.projects.id, projectIds))
@@ -154,6 +155,7 @@ async function load(id: string) {
     proposals,
     timesheets,
     payouts,
+    aiInterviewIds: interviews.filter((i) => isAiInterview(i.employerId, employers.find((e) => e.id === i.employerId)?.email)).map((i) => i.id),
     employerNames: Object.fromEntries(employers.map((e) => [e.id, e.name])),
     projectNames: Object.fromEntries(projects.map((p) => [p.id, p.name])),
     feePaid: Boolean(paidFee) || payment.isPaid === true,

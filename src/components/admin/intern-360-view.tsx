@@ -53,6 +53,7 @@ export type Intern360Props = {
   timesheets: Timesheet[];
   payouts: InternPayout[];
   employerNames: Record<string, string>;
+  aiInterviewIds: string[];
   projectNames: Record<string, string>;
   /** Tab to open first (`?tab=` deep link, e.g. "payments"). */
   initialTab?: string;
@@ -93,6 +94,7 @@ export function Intern360View({
   timesheets,
   payouts,
   employerNames,
+  aiInterviewIds,
   projectNames,
   initialTab,
   feePaid,
@@ -427,6 +429,7 @@ export function Intern360View({
         onClose={() => setSelectedInterview(null)}
         onSaved={setSelectedInterview}
         company={company(selectedInterview?.employerId)}
+        isAi={Boolean(selectedInterview && aiInterviewIds.includes(selectedInterview.id))}
         extra={extra}
         canWrite={canWrite}
       />
@@ -758,9 +761,11 @@ function InterviewDialog({
   onClose,
   onSaved,
   company,
+  isAi,
   extra,
   canWrite,
 }: {
+  isAi: boolean;
   canWrite: boolean;
   interview: Interview | null;
   onClose: () => void;
@@ -784,6 +789,9 @@ function InterviewDialog({
     setRecording(notes.match(/recording:\s*(https?:\/\/\S+)/i)?.[1] ?? ((extra.aiRecordingLink as string) || ""));
     setMsg(null);
   }
+
+  // #20: a company interview gets its link when the candidate picks a time (AI interviews have no company).
+  const awaitingSlot = Boolean(interview && !isAi && !interview.selectedSlot);
 
   async function save() {
     if (!interview) return;
@@ -832,9 +840,11 @@ function InterviewDialog({
               <label htmlFor="iv-meeting" className="block text-sm font-medium text-ink-800">
                 Meeting link
               </label>
-              <input id="iv-meeting" readOnly={!canWrite} type="url" value={meeting} onChange={(e) => setMeeting(e.target.value)} placeholder="https://meet.google.com/… or Incruiter link" className={cn(field, "mt-1")} />
+              <input id="iv-meeting" readOnly={!canWrite || awaitingSlot} type="url" value={meeting} onChange={(e) => setMeeting(e.target.value)} placeholder="https://meet.google.com/… or Incruiter link" className={cn(field, "mt-1")} />
               <p className="mt-1 text-xs text-text-subtle">
-                For an AI interview, saving a link opens it to the candidate. For a company interview, both sides are notified.
+                {awaitingSlot
+                  ? "The link is created when the candidate picks a time."
+                  : "For an AI interview, saving a link opens it to the candidate. For a company interview, both sides are notified."}
               </p>
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
@@ -852,7 +862,7 @@ function InterviewDialog({
               </div>
             </div>
             {canWrite ? (
-              <button type="button" onClick={save} disabled={saving || !meeting.trim()} className={buttonClass({ variant: "primary", block: true })}>
+              <button type="button" onClick={save} disabled={saving || !meeting.trim() || awaitingSlot} className={buttonClass({ variant: "primary", block: true })}>
                 {saving ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <CheckCircle2 className="size-4" aria-hidden />}
                 Save links
               </button>

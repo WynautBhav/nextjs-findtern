@@ -110,10 +110,12 @@ export function InterviewNotesButton({ title, notes }: { title: string; notes: s
  * The meeting link, edited in the row. Saving it marks an unfinished
  * interview "scheduled" (legacy rule, ADP-07) and tells both sides.
  */
-export function MeetingLinkCell({ interviewId, link, locked }: { interviewId: string; link: string | null; locked: boolean }) {
+export function MeetingLinkCell({ interviewId, link, locked, awaitingSlot = false }: { interviewId: string; link: string | null; locked: boolean; awaitingSlot?: boolean }) {
   if (locked) {
     return link ? <LinkOut href={link} /> : <span className="text-sm text-text-subtle">No link</span>;
   }
+  // #20: the link is created when the candidate picks a time; the server refuses one before that.
+  if (awaitingSlot && !link) return <span className="text-sm text-text-subtle">Waiting for the candidate to pick a time</span>;
   return (
     <InlineEditor
       label="meeting link"
@@ -134,7 +136,7 @@ export function MeetingLinkCell({ interviewId, link, locked }: { interviewId: st
           label: "Meeting link",
           type: "text",
           placeholder: "https://meet.google.com/…",
-          hint: "Saving marks the interview scheduled and notifies both sides.",
+          hint: "Saving notifies both sides.",
         },
       ]}
       request={{ url: `/api/admin/interviews/${interviewId}/meeting-link`, method: "PUT" }}

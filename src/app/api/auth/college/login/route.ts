@@ -39,9 +39,10 @@ export async function POST(req: Request) {
 
   const set: Partial<typeof schema.collegeAdmins.$inferInsert> = { lastLoginAt: new Date() };
   if (needsRehash(row.admin.password)) set.password = await hashPassword(parsed.data.password);
+  // The session carries the password version, so an admin reset (#29) ends it. Sessions from before this have none and run out on their own.
   await db.update(schema.collegeAdmins).set(set).where(eq(schema.collegeAdmins.id, row.admin.id));
 
   const res = NextResponse.json({ ok: true, redirect: "/college" });
   await issueCsrfCookie(res);
-  return withSession(res, { uid: row.admin.id, role: "college", email: row.admin.email });
+  return withSession(res, { uid: row.admin.id, role: "college", email: row.admin.email, password: set.password ?? row.admin.password });
 }

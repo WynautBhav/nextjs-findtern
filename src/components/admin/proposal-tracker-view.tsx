@@ -64,6 +64,7 @@ type InterviewItem = {
   companyName: string | null;
   projectId: string | null;
   projectName: string | null;
+  isAi: boolean;
 };
 
 type EmployerItem = { id: string; companyName: string; companyEmail: string; city: string | null; country: string | null; isActive: boolean };
@@ -500,7 +501,7 @@ function InterviewsTab({ params, page, perPage, search, pickers, rows }: TabProp
         },
         {
           header: "Meeting link",
-          cell: (i) => <MeetingLinkCell interviewId={i.id} link={i.meetingLink} locked={FINISHED_INTERVIEW.includes(i.status.toLowerCase())} />,
+          cell: (i) => <MeetingLinkCell interviewId={i.id} link={i.meetingLink} locked={FINISHED_INTERVIEW.includes(i.status.toLowerCase())} awaitingSlot={!i.isAi && !i.selectedSlot} />,
         },
         {
           header: "",
