@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
 import { getDb, schema } from "@/lib/db";
@@ -16,9 +16,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ orderId
   if (!order) return NextResponse.json({ error: "Order not found" }, { status: 404 });
   const refusal = receivedRefusal(order);
   if (refusal) return NextResponse.json({ error: refusal }, { status: 409 });
-  await db
+  // The guard is in the UPDATE too, so two admins clicking at once keep the first stamp.
+  const stamped = await db
     .update(schema.employerPayments)
     .set({ raw: { ...((order.raw ?? {}) as Record<string, unknown>), receivedAt: new Date().toISOString(), receivedBy: guard.session.email } })
-    .where(eq(schema.employerPayments.id, order.id));
+    .where(and(eq(schema.employerPayments.id, order.id), sql`(${schema.employerPayments.raw}->>'receivedAt') is null`))
+    .returning({ id: schema.employerPayments.id });
+  if (stamped.length === 0) return NextResponse.json({ error: "This order is already marked received." }, { status: 409 });
   return NextResponse.json({ ok: true });
 }
