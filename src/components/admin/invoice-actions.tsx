@@ -17,7 +17,7 @@ import {
   type AdminInvoiceRow,
   type InvoiceKind,
 } from "@/lib/admin/invoice-rows";
-import { formatDate, formatMoney } from "@/lib/format";
+import { formatDate, formatIst, formatMoney } from "@/lib/format";
 import { placeOfSupply, splitGst } from "@/lib/gst";
 import { downloadInvoice, taxInvoiceHtml, type InvoiceSeller } from "@/lib/invoice";
 import { adminInvoiceInput } from "@/lib/admin/invoice-print";
@@ -141,6 +141,9 @@ function Detail({ label, children }: { label: string; children: React.ReactNode 
   );
 }
 
+/** The screen's clock (IST), not the UTC ISO string: an accountant reads 4 Nov, not 3 Nov. */
+const istOrBlank = (iso: string | null | undefined) => (iso ? formatIst(iso, { year: true }) : "");
+
 /** CSV of every row the current filters keep (not just this page). */
 export function InvoiceCsvButton({ rows, kind }: { rows: AdminInvoiceRow[]; kind: InvoiceKind }) {
   const k = INVOICE_KINDS[kind];
@@ -165,8 +168,8 @@ export function InvoiceCsvButton({ rows, kind }: { rows: AdminInvoiceRow[]; kind
           { header: "Promo code", value: (r) => r.promoCode ?? "" },
           { header: "Status", value: (r) => r.status },
           { header: "Needs review", value: (r) => (r.needsReview ? "yes" : "") },
-          { header: "Paid at", value: (r) => r.paidAt },
-          { header: "Created at", value: (r) => r.createdAt },
+          { header: "Paid at", value: (r) => istOrBlank(r.paidAt) },
+          { header: "Created at", value: (r) => istOrBlank(r.createdAt) },
         ])
       }
       className={PILL_TONAL}
