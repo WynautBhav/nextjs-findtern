@@ -221,7 +221,7 @@ function Row({ s, now }: { s: StudentRow; now: number }) {
         </Link>
         <p className="mt-0.5 text-xs text-text-subtle">
           {[s.rollNo, yearLabel(s.year), s.branch].filter(Boolean).join(" · ")}
-          {s.status !== "verified" ? <span className="ml-1.5 font-medium text-accent-700">· not on roster</span> : null}
+          {s.status !== "verified" ? <span className="ml-1.5 font-medium text-accent-700">· Claimed, not verified</span> : <span className="ml-1.5 font-medium text-success">· Verified</span>}
         </p>
       </td>
       <td className="px-3 py-3">
