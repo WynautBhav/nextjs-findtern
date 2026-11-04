@@ -7,9 +7,11 @@ import { FREE_DECLINES, offerPastStart, parseOffer } from "./offer.ts";
  *
  * A miss is an offer the intern turned down, or let lapse unanswered past its
  * start day. More than FREE_DECLINES misses (the 4th) end the guarantee.
- * Not counted: employer withdrawal, sibling auto-expiry, admin-set "expired"
- * or admin-set "rejected" (no `declinedBy: intern` stamp).
- * Derived on read: no scheduler, no stored expiry.
+ * Only a lapsed `sent` offer counts: an `interview_scheduled` one may be stuck
+ * on the employer never holding the interview. A lapse is stamped
+ * `offerDetails.lapsedAt` when the row later leaves `sent` (sibling auto-expiry,
+ * withdraw, admin expire) and still counts. Not counted: other withdrawals or
+ * expiries, admin-set "rejected" (no `declinedBy: intern` stamp).
  */
 export type GuaranteeProposal = { status: string | null; offerDetails: unknown; currency?: string | null };
 
@@ -20,7 +22,10 @@ export function guaranteeMisses(proposals: GuaranteeProposal[], now: Date = new 
     const status = (p.status ?? "").toLowerCase();
     if (status === "rejected") {
       if (((p.offerDetails ?? {}) as Record<string, unknown>).declinedBy === "intern") declined += 1;
-    } else if ((status === "sent" || status === "interview_scheduled") && offerPastStart(parseOffer(p.offerDetails, p.currency).startDate, now)) {
+    } else if (
+      typeof ((p.offerDetails ?? {}) as Record<string, unknown>).lapsedAt === "string" ||
+      (status === "sent" && offerPastStart(parseOffer(p.offerDetails, p.currency).startDate, now))
+    ) {
       lapsed += 1;
     }
   }

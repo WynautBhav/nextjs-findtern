@@ -1,4 +1,4 @@
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, sql } from "drizzle-orm";
 import { Download } from "lucide-react";
 
 import { getDb, schema } from "@/lib/db";
@@ -87,10 +87,13 @@ async function load() {
       .leftJoin(schema.employers, eq(schema.employers.id, schema.interviews.employerId))
       .leftJoin(schema.projects, eq(schema.projects.id, schema.interviews.projectId))
       .orderBy(desc(schema.interviews.createdAt)),
-    db.select({ userId: schema.internOnboarding.userId, extraData: schema.internOnboarding.extraData }).from(schema.internOnboarding),
+    db
+      .select({ userId: schema.internOnboarding.userId, endedAt: sql<string | null>`${schema.internOnboarding.extraData}->>'guaranteeEndedAt'` })
+      .from(schema.internOnboarding)
+      .where(sql`${schema.internOnboarding.extraData} ? 'guaranteeEndedAt'`),
   ]);
   // From every proposal, not the filtered page rows: same inputs as the intern's own offer page.
-  const noGuarantee = ineligibleInterns(proposals, new Map(onboarding.map((o) => [o.userId, o.extraData])));
+  const noGuarantee = ineligibleInterns(proposals, new Map(onboarding.map((o) => [o.userId, { guaranteeEndedAt: o.endedAt }])));
   return { noGuarantee, employers, proposals, interviews: interviews.map(({ companyEmail, ...i }) => ({ ...i, isAi: isAiInterview(i.employerId, companyEmail) })) };
 }
 

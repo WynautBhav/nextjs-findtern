@@ -1,4 +1,4 @@
-import { and, eq, inArray, ne } from "drizzle-orm";
+import { and, eq, inArray, ne, sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -9,7 +9,7 @@ import { emails } from "@/lib/emails";
 import { initialsOf } from "@/lib/employer-candidates";
 import { employerNames, internFirstName, notify, resolveOfferNotifications } from "@/lib/notify";
 import { guaranteeEnded, guaranteeMisses } from "@/lib/guarantee";
-import { FREE_DECLINES, offerPastStart, parseOffer } from "@/lib/offer";
+import { FREE_DECLINES, offerPastStart, parseOffer, todayIst } from "@/lib/offer";
 import { hasOpenOrderFor, OPEN_ORDER_MINUTES } from "@/lib/payments";
 
 /**
@@ -184,8 +184,10 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
       return { ...base, termsAcceptedAt: now, ...(offer.fullTime ? { fullTimeTermsAcceptedAt: now } : {}) };
     }
     if (internDecline) return { ...base, declinedBy: "intern", declinedAt: now };
-    if (session.role === "admin") return { ...base, closedByAdminAt: now, closedByAdminStatus: status };
-    return null;
+    // Keep a lapsed `sent` offer countable once it leaves `sent` (withdraw / admin expire).
+    const lapse = proposal.status === "sent" && offerPastStart(offer.startDate) ? { lapsedAt: now } : {};
+    if (session.role === "admin") return { ...base, ...lapse, closedByAdminAt: now, closedByAdminStatus: status };
+    return lapse.lapsedAt ? { ...base, ...lapse } : null;
   };
   const details = stampedDetails();
 
@@ -242,7 +244,12 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     if (status === "accepted") {
       expired = await tx
           .update(schema.proposals)
-          .set({ status: "expired", updatedAt: new Date() })
+          .set({
+            status: "expired",
+            updatedAt: new Date(),
+            // Durable lapse stamp: a `sent` sibling past its start day still counts as a miss.
+            offerDetails: sql`CASE WHEN ${schema.proposals.status} = 'sent' AND left(${schema.proposals.offerDetails}->>'startDate', 10) <= ${todayIst()} THEN ${schema.proposals.offerDetails} || jsonb_build_object('lapsedAt', now()) ELSE ${schema.proposals.offerDetails} END`,
+          })
           .where(
             and(
               eq(schema.proposals.internId, proposal.internId),
