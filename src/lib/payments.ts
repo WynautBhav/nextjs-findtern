@@ -8,7 +8,8 @@ import { parseOffer } from "@/lib/offer";
 import { applyPendingRatings } from "@/lib/admin/score-live";
 import { recordPromoUse } from "@/lib/promo";
 import { SEATS_USED_UP } from "@/lib/promo-rules";
-import { consentProblem, membershipFromPromo, PROMO_CONSENT_VERSION, promoConsentHash } from "@/lib/college/promo-membership";
+import { PROMO_CONSENT_VERSION } from "@/lib/college/promo-consent";
+import { consentProblem, membershipFromPromo, promoConsentHash } from "@/lib/college/promo-membership";
 import { assignInvoiceNumber } from "@/lib/invoice-number";
 import { orderProposalIds } from "@/lib/order-ids";
 
@@ -260,9 +261,10 @@ class SettleRefused extends Error {
 /** The code is the proof: verify the student with that college and record the 18+ consent, in the settlement's transaction. */
 async function verifyByCollegeCode(tx: Parameters<Parameters<ReturnType<typeof getDb>["transaction"]>[0]>[0], userId: string, collegeId: string) {
   const [existing] = await tx.select().from(schema.collegeMemberships).where(eq(schema.collegeMemberships.userId, userId)).limit(1);
+  const [college] = await tx.select({ name: schema.colleges.name }).from(schema.colleges).where(eq(schema.colleges.id, collegeId)).limit(1);
   const [consent] = await tx
     .insert(schema.collegeConsents)
-    .values({ userId, collegeId, noticeVersion: PROMO_CONSENT_VERSION, noticeHash: promoConsentHash(), purposes: ["college_code_verification"], declaredAdult: true })
+    .values({ userId, collegeId, noticeVersion: PROMO_CONSENT_VERSION, noticeHash: promoConsentHash(college?.name ?? "your college"), purposes: ["college_code_verification"], declaredAdult: true })
     .returning({ id: schema.collegeConsents.id });
   const values = { ...membershipFromPromo(existing ?? null, collegeId), consentId: consent.id };
   await tx

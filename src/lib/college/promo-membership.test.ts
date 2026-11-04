@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import test from "node:test";
 import { PgDialect } from "drizzle-orm/pg-core";
 
-import { consentProblem, membershipFromPromo } from "./promo-membership.ts";
+import { promoConsentNotice } from "./promo-consent.ts";
+import { consentProblem, membershipFromPromo, promoConsentHash } from "./promo-membership.ts";
 import { generateTpoCode } from "./code.ts";
 import { SEATS_USED_UP, promoProblem, seatCapProblem, seatFreeWhere } from "../promo-rules.ts";
 
@@ -33,6 +35,13 @@ test("admin cap edit: never below the seats used, whole number, at least 1", () 
 test("18+ consent is required with a college code", () => {
   assert.equal(consentProblem(true), null);
   for (const v of [false, undefined, "true", 1, null]) assert.ok(consentProblem(v));
+});
+
+test("the stored consent hash is of the exact wording shown, with the college name", () => {
+  const shown = promoConsentNotice("IIT Example");
+  assert.match(shown, /placement office of IIT Example, which pays/);
+  assert.equal(promoConsentHash("IIT Example"), createHash("sha256").update(shown).digest("hex"));
+  assert.notEqual(promoConsentHash("IIT Example"), promoConsentHash("NIT Other"));
 });
 
 test("verification: new, same college, other college", () => {

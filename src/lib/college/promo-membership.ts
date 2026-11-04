@@ -1,11 +1,11 @@
 import { createHash } from "node:crypto";
 
+import { promoConsentNotice } from "./promo-consent.ts";
+
 /** Pure rules for a student verified by their college's TPO code (WP9$). No DB. */
 
-export const PROMO_CONSENT_NOTICE =
-  "I confirm I am 18 or older. I agree to share my Findtern profile and scores with my college's placement office, and that my college pays my AI interview fee.";
-export const PROMO_CONSENT_VERSION = "promo-v1";
-export const promoConsentHash = () => createHash("sha256").update(PROMO_CONSENT_NOTICE).digest("hex");
+/** Hash of the notice exactly as the student saw it (see promo-consent.ts). */
+export const promoConsentHash = (collegeName: string) => createHash("sha256").update(promoConsentNotice(collegeName)).digest("hex");
 
 /** The 18+ tick is required before a college code can be used. */
 export function consentProblem(declaredAdult: unknown): string | null {

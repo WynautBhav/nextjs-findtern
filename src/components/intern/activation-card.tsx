@@ -21,6 +21,7 @@ import { BadgeIndianRupee, Check, Loader2 } from "lucide-react";
 
 import { buttonClass } from "@/components/ui/button";
 import { AiInterviewAction } from "@/components/intern/ai-interview-join-card";
+import { promoConsentNotice } from "@/lib/college/promo-consent";
 import { csrfFetch } from "@/lib/client-fetch";
 import { formatMoney } from "@/lib/format";
 import { loadRazorpay, RAZORPAY_THEME_COLOR } from "@/components/payments/razorpay-client";
@@ -244,7 +245,7 @@ export function ActivationCard({
         <label className="mt-3 flex min-h-11 items-start gap-3 text-sm leading-relaxed text-ink-700">
           <input type="checkbox" checked={adult} onChange={(e) => setAdult(e.target.checked)} className="mt-1 size-5 shrink-0 accent-brand-700" />
           <span>
-            I confirm I am 18 or older. I agree to share my Findtern profile and scores with the placement office of {promo.collegeName}, which pays my AI interview fee.
+            {promoConsentNotice(promo.collegeName)}
           </span>
         </label>
       ) : null}
