@@ -88,6 +88,8 @@ export type PayoutRow = {
   status: string | null;
   referenceId: string | null;
   notes: string | null;
+  /** "stipend" | "completion_bonus"; absent on rows built by hand. */
+  kind?: string | null;
   paidAt: Date | null;
   createdAt: Date;
 };
@@ -405,7 +407,7 @@ export function buildThread(src: ProofSource, now: Date = new Date()): ThreadNod
         kind: "payout",
         tone: "done",
         at: r.paidAt,
-        title: "Stipend reached your account",
+        title: r.kind === "completion_bonus" ? "Completion bonus reached your account" : "Stipend reached your account",
         detail: r.referenceId ? `Reference ${r.referenceId}.` : "Paid in by bank transfer.",
         href: "/intern/earnings",
       });
@@ -576,7 +578,7 @@ export function deriveProofs(src: ProofSource): Proof[] {
     out.push({
       id: `pf-stp-${r.id}`,
       kind: "stipend",
-      title: "Stipend paid",
+      title: r.kind === "completion_bonus" ? "Completion bonus paid" : "Stipend paid",
       line: "This reached your bank account.",
       facts: [
         { label: "Amount", value: formatMoney(r.amountMinor ?? 0, r.currency ?? "INR", { zeroLabel: false }) },

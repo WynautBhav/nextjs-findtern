@@ -32,6 +32,8 @@ export type PayoutLike = {
   currency?: string | null;
   paidAt?: Date | string | null;
   createdAt?: Date | string | null;
+  /** "stipend" (default when absent: legacy rows) or "completion_bonus". */
+  kind?: string | null;
 };
 /** A paid or unpaid employer order (`employer_payments`). */
 export type OrderLike = { status: string; raw: unknown };
@@ -217,6 +219,8 @@ export function stipendDues(
   const pending = new Map<string, string>();
   const unlinkedPaid: { amountMinor: number; key: string; used: boolean }[] = [];
   for (const p of payouts) {
+    // A completion bonus is never a stipend month, linked or not.
+    if (p.kind && p.kind !== "stipend") continue;
     const id = proposalOf(p.raw);
     const status = String(p.status).toLowerCase();
     if (!id) {

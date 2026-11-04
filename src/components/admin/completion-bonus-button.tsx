@@ -32,16 +32,16 @@ export function CompletionBonusButton({
     return (
       <span className="inline-flex items-center gap-1.5 text-sm text-ink-600">
         <Award className="size-4" aria-hidden />
-        Bonus granted {grantedOn}
+        Completed {grantedOn}
       </span>
     );
   }
 
   async function grant() {
     const ok = await ask({
-      title: "Grant the completion bonus?",
-      body: "This marks the internship as successful and adds 1 to the intern's Findtern Score (maximum 10). It can be done once per hire and cannot be undone.",
-      confirmLabel: "Grant +1 score",
+      title: "Mark this internship completed?",
+      body: "Only works once every month's timesheet is approved. Adds 1 to the intern's Findtern Score (maximum 10) and queues the Findtern-paid completion bonus. Once per hire; cannot be undone.",
+      confirmLabel: "Mark completed",
     });
     if (!ok) return;
     setBusy(true);
@@ -56,7 +56,7 @@ export function CompletionBonusButton({
     <span className="inline-flex flex-col items-end gap-1">
       <button type="button" onClick={grant} disabled={busy} className={buttonClass({ variant: "outline", size: "sm" })}>
         {busy ? <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden /> : <Award className="size-4" aria-hidden />}
-        Grant completion bonus
+        Mark completed
       </button>
       {error ? (
         <span role="alert" className="max-w-56 text-right text-xs font-medium text-danger">

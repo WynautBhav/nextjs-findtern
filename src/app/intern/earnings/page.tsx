@@ -41,7 +41,9 @@ export default async function InternEarnings() {
 
   const extra = (data.onboarding?.extraData ?? {}) as Record<string, unknown>;
   const score = Number(extra.findternScore ?? 0) || 0;
-  const cards = earningsEngagements(data.proposals, data.payouts, data.names, score);
+  // A completion bonus is not a stipend month: engagement cards and month plans see stipends only.
+  const stipends = data.payouts.filter((p) => p.kind !== "completion_bonus");
+  const cards = earningsEngagements(data.proposals, stipends, data.names, score);
   const waitingOnPayment = data.proposals.filter(
     (p) => isAcceptedStatus(p.status) && !isHiredProposal(p) && !parseOffer(p.offerDetails, p.currency).fullTime,
   );
@@ -133,7 +135,7 @@ export default async function InternEarnings() {
           </Tile>
         ) : (
           cards.map((card) => (
-            <Engagement key={card.proposalId} card={card} payouts={data.payouts.filter((p) => belongsTo(p, card.proposalId, soleId))} />
+            <Engagement key={card.proposalId} card={card} payouts={stipends.filter((p) => belongsTo(p, card.proposalId, soleId))} />
           ))
         )}
 

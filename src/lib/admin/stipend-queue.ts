@@ -36,6 +36,7 @@ export async function loadPlacementDue(
       .select({
         id: schema.internPayouts.id,
         status: schema.internPayouts.status,
+        kind: schema.internPayouts.kind,
         raw: schema.internPayouts.raw,
         amountMinor: schema.internPayouts.amountMinor,
         currency: schema.internPayouts.currency,

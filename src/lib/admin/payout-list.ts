@@ -252,6 +252,7 @@ export async function loadPlacementDues(internId?: string): Promise<PlacementDue
         id: schema.internPayouts.id,
         internId: schema.internPayouts.internId,
         status: schema.internPayouts.status,
+        kind: schema.internPayouts.kind,
         raw: schema.internPayouts.raw,
         amountMinor: schema.internPayouts.amountMinor,
         currency: schema.internPayouts.currency,
@@ -307,6 +308,8 @@ export async function loadLedgerByIntern(): Promise<Map<string, { pendingMinor: 
       paidMinor: sql<number>`coalesce(sum(${inr}) FILTER (WHERE ${schema.internPayouts.status} = 'paid'), 0)::bigint`,
     })
     .from(schema.internPayouts)
+    // Left-to-pay on the Interns table is stipends only; a bonus has its own payout row.
+    .where(eq(schema.internPayouts.kind, "stipend"))
     .groupBy(schema.internPayouts.internId);
   return new Map(rows.map((r) => [r.internId, { pendingMinor: Number(r.pendingMinor), paidMinor: Number(r.paidMinor) }]));
 }

@@ -41,6 +41,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       method: schema.internPayouts.method,
       notes: schema.internPayouts.notes,
       raw: schema.internPayouts.raw,
+      kind: schema.internPayouts.kind,
     });
 
   if (updated.length === 0) {
@@ -55,7 +56,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   }
 
   // Queue first: the row is already "paid", so a retry would 409 and never queue.
-  const next = await queueNextMonth(db, id, updated[0]);
+  // A completion bonus is a one-off: no next month.
+  const next = updated[0].kind === "stipend" ? await queueNextMonth(db, id, updated[0]) : null;
   try {
     await notifyStipendPaid(payoutId);
   } catch (err) {

@@ -392,6 +392,17 @@ export async function notifyStipendPaid(payoutId: string) {
     role = (pr && parseOffer(pr.offer, pr.currency).roleTitle) || role;
   }
   const amount = formatMoney(p.amountMinor, p.currency, { zeroLabel: false });
+  if (p.kind === "completion_bonus") {
+    await notify({
+      to: { type: "intern", id: p.internId },
+      type: "completion_bonus_paid",
+      title: "Completion bonus transferred",
+      message: `${amount} completion bonus has been sent to your bank account.`,
+      data: { payoutId },
+      dedupeKey: `completion_bonus_paid:${payoutId}`,
+    });
+    return;
+  }
   await notify({
     to: { type: "intern", id: p.internId },
     type: "stipend_paid",

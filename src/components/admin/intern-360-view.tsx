@@ -128,9 +128,11 @@ export function Intern360View({
           : "";
   const visibleToEmployers = !hiddenWhy;
 
-  const paidMinor = payouts.filter((p) => p.status === "paid").reduce((sum, p) => sum + toInrMinor(p.amountMinor, p.currency), 0);
+  // A completion bonus is not a stipend month: it stays out of paid-to-date and owed.
+  const stipends = payouts.filter((p) => p.kind === "stipend");
+  const paidMinor = stipends.filter((p) => p.status === "paid").reduce((sum, p) => sum + toInrMinor(p.amountMinor, p.currency), 0);
   const dues = stipendDues(proposals, payouts, score);
-  const unlinkedPendingMinor = payouts
+  const unlinkedPendingMinor = stipends
     .filter((p) => {
       const raw = (p.raw ?? {}) as Record<string, unknown>;
       return p.status === "pending" && !raw.proposalId && !raw.proposal_id;

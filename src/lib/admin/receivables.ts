@@ -47,7 +47,7 @@ export type ReceivablesInput = {
   employerPayments: { id: string; employerId: string; orderId: string; paymentId: string | null; status: string; amountMinor: number; currency: string; paidAt: Date | null; createdAt: Date | null; raw: unknown }[];
   internPayments: { id: string; internId: string; paymentId: string | null; status: string; amountMinor: number; currency: string; paidAt: Date | null; createdAt: Date | null }[];
   unpaidProfiles: { userId: string; createdAt: Date | null }[];
-  payouts: { id: string; internId: string; status: string; amountMinor: number; currency: string; referenceId: string | null; paidAt: Date | null; createdAt: Date | null; raw: unknown }[];
+  payouts: { id: string; internId: string; status: string; amountMinor: number; currency: string; referenceId: string | null; paidAt: Date | null; createdAt: Date | null; raw: unknown; kind?: string }[];
 };
 
 const day = (d: Date | string | null | undefined) => {
@@ -195,7 +195,7 @@ export function computeReceivables(input: ReceivablesInput, filter: { receivable
           date: date!,
           source: "candidate",
           status: p.status === "paid" ? "paid" : "pending",
-          description: "Stipend payout",
+          description: p.kind === "completion_bonus" ? "Completion bonus" : "Stipend payout",
           companyName: null,
           candidateName: input.internName(p.internId),
           amountMinor: p.amountMinor,

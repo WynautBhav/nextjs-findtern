@@ -2,6 +2,9 @@ import { and, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { withLock } from "@/lib/advisory-lock";
+import { completeInternship, notifyCompleted } from "@/lib/admin/complete-internship";
+import { afterRatingsSaved } from "@/lib/admin/score-live";
 import { getDb, schema } from "@/lib/db";
 import { unfilledDays } from "@/lib/employer-timesheets";
 import { requireMutation } from "@/lib/guards-mutation";
@@ -80,21 +83,30 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   }
 
   const now = new Date();
-  const [updated] = await db
-    .update(schema.timesheets)
-    .set({
-      status: decision,
-      approvedAt: decision === "approved" ? now : null,
-      rejectedAt: decision === "rejected" ? now : null,
-      managerNote: reason?.trim() || null,
-      updatedAt: now,
-    })
-    // Guarded on the status read above: two decisions racing on the same
-    // sheet must not both win (and both notify).
-    .where(and(eq(schema.timesheets.id, id), eq(schema.timesheets.status, "submitted")))
-    .returning();
+  // One transaction: the final approval also completes the hire (+1 score, bonus payout).
+  const { updated, completion } = await withLock(`complete:${sheet.proposalId}`, async (tx) => {
+    const [row] = await tx
+      .update(schema.timesheets)
+      .set({
+        status: decision,
+        approvedAt: decision === "approved" ? now : null,
+        rejectedAt: decision === "rejected" ? now : null,
+        managerNote: reason?.trim() || null,
+        updatedAt: now,
+      })
+      // Guarded on the status read above: two decisions racing on the same
+      // sheet must not both win (and both notify).
+      .where(and(eq(schema.timesheets.id, id), eq(schema.timesheets.status, "submitted")))
+      .returning();
+    const done = row && decision === "approved" ? await completeInternship(tx, sheet.proposalId, session.uid) : null;
+    return { updated: row, completion: done };
+  });
   if (!updated) {
     return NextResponse.json({ error: "Timesheet was already decided" }, { status: 409 });
+  }
+  if (completion?.completed) {
+    await afterRatingsSaved(sheet.internId, completion.prev, completion.next).catch(() => undefined);
+    await notifyCompleted(sheet.proposalId, completion);
   }
 
   // Legacy's types and dedupe keys (routes.ts:14069, 14124), so a double

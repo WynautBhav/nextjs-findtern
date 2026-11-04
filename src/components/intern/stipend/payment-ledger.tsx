@@ -50,6 +50,7 @@ export function PaymentLedger({ payouts }: { payouts: PayoutRow[] }) {
               <tr key={p.id} className="align-top">
                 <td className="py-3 pl-5 pr-3 lg:pl-6">
                   <p className="nums font-medium text-ink-900">{when}</p>
+                  {p.kind === "completion_bonus" ? <p className="mt-0.5 text-xs font-medium text-brand-800">Completion bonus</p> : null}
                   <p className="mt-1 break-all text-xs text-text-subtle sm:hidden">{ref}</p>
                 </td>
                 <td className="nums hidden break-all px-3 py-3 text-ink-700 sm:table-cell">{ref}</td>
