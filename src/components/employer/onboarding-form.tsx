@@ -77,7 +77,7 @@ export function EmployerOnboardingForm({
   const [notice, setNotice] = useState<{ tone: "error" | "success"; text: string } | null>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
 
-  const draftKey = `${DRAFT_KEY}:${initial.company.companyEmail.trim().toLowerCase()}`;
+  const draftKey = `${DRAFT_KEY}:${employerId}`; // the id is stable and never blank; an email can be both
   const stored = useSyncExternalStore(subscribeToNothing, () => readDraft(draftKey), () => null);
 
   // Merged per stage, not with a top-level spread: `{ ...initial, ...draft }`
@@ -95,6 +95,14 @@ export function EmployerOnboardingForm({
       project: { ...initial.project, ...draft.project, ...edits.project },
     };
   }, [initial, stored, edits]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.removeItem("findtern:employer-onboarding:v1"); // the old shared draft: personal details left on shared PCs
+    } catch {
+      // Storage blocked: nothing there to remove.
+    }
+  }, []);
 
   useEffect(() => {
     if (!dirty) return;
