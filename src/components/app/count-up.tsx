@@ -27,13 +27,17 @@ export function CountUp({
   currency?: string;
   duration?: number;
 }) {
+  // Whole while counting; the settled figure keeps its paise (₹2,249.10, never ₹2,249).
   const format = currency
-    ? (n: number) =>
-        new Intl.NumberFormat(currency === "USD" ? "en-US" : "en-IN", {
+    ? (n: number) => {
+        const d = n === value && !Number.isInteger(value) ? 2 : 0;
+        return new Intl.NumberFormat(currency === "USD" ? "en-US" : "en-IN", {
           style: "currency",
           currency,
-          maximumFractionDigits: 0,
-        }).format(n)
+          minimumFractionDigits: d,
+          maximumFractionDigits: d,
+        }).format(n);
+      }
     : undefined;
   const reduce = useReducedMotion();
   const [display, setDisplay] = useState(value);

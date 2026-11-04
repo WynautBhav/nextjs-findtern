@@ -107,7 +107,7 @@ export default async function AdminTransactionsPage({ searchParams }: { searchPa
           />
           <StatCard
             label="Paid out to interns"
-            value={formatMoney(metrics.outflowMinor, "INR", { compact: true, zeroLabel: "₹0" })}
+            value={formatMoney(metrics.outflowMinor, "INR", { zeroLabel: "₹0" })}
             hint={`${formatNumber(metrics.outflowPaid)} of ${formatNumber(metrics.outflowTotal)} payouts settled`}
           />
           <StatCard
