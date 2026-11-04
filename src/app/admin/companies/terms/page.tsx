@@ -1,6 +1,8 @@
 import { Metadata } from "next";
 
 import { AdminPageHeader } from "@/components/admin/panel";
+import { allows } from "@/lib/admin/permissions";
+import { getSession } from "@/lib/auth";
 import { LegalTabs } from "@/components/admin/legal-tabs";
 import { LegalDocEditor } from "@/components/admin/legal-doc-editor";
 import { EMPLOYER_TERMS } from "@/lib/content/legal";
@@ -10,7 +12,9 @@ export const metadata: Metadata = {
   description: "Edit the Company/Employer Terms & Conditions page content.",
 };
 
-export default function AdminCompanyTermsPage() {
+export default async function AdminCompanyTermsPage() {
+  const session = await getSession();
+  const canWrite = allows(session?.permissions, ["cms:write", "companies:write"]);
   return (
     <div className="space-y-6">
       <AdminPageHeader
@@ -23,6 +27,7 @@ export default function AdminCompanyTermsPage() {
         description="This content is shown on the employer signup Terms link."
         documentKey="company_terms"
         initialContent={EMPLOYER_TERMS.html}
+        readOnly={!canWrite}
         apiEndpoint="/api/admin/company/terms"
         publicHref="/employer-terms-and-conditions"
       />
