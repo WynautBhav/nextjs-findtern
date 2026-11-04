@@ -233,3 +233,9 @@ export function normalizeMeetingLink(raw: string | null | undefined): string | n
   if (!link) return null;
   return /^https?:\/\//i.test(link) ? link : `https://${link}`;
 }
+
+/** The 10-minute reminder window `now` falls in: the dedupe key, so each window the limiter allows delivers once. */
+export const REMINDER_WINDOW_MS = 10 * 60_000;
+export function reminderWindow(now: number = Date.now()): number {
+  return Math.floor(now / REMINDER_WINDOW_MS);
+}

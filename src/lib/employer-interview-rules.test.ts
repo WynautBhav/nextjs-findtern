@@ -10,6 +10,7 @@ import {
   isBlockingInterview,
   isMeetingLinkLive,
   isMeetingOver,
+  reminderWindow,
   isStaleInterview,
   meetingTime,
 } from "./employer-interview-rules.ts";
@@ -134,4 +135,11 @@ test("hasSlotTooFarAhead: slots beyond a year are refused", () => {
   const now = Date.parse("2026-11-04T00:00:00Z");
   assert.equal(hasSlotTooFarAhead([new Date(now + 30 * 86_400_000)], now), false);
   assert.equal(hasSlotTooFarAhead([new Date(now + 30 * 86_400_000), new Date(now + 400 * 86_400_000)], now), true);
+});
+
+test("reminderWindow: same key inside 10 minutes, a new one after", () => {
+  const t = Date.UTC(2026, 10, 4, 8, 30, 0);
+  assert.equal(reminderWindow(t), reminderWindow(t + 9 * 60_000));
+  assert.notEqual(reminderWindow(t), reminderWindow(t + 10 * 60_000));
+  assert.notEqual(reminderWindow(t), reminderWindow(t - 60_000 * 31));
 });

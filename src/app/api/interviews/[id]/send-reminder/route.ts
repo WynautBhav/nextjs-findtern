@@ -6,13 +6,14 @@ import { hiredProposalSql } from "@/lib/employer-visibility";
 import { formatSlotTime } from "@/lib/format";
 import { requireMutation } from "@/lib/guards-mutation";
 import { employerNames, internFirstName, notify } from "@/lib/notify";
-import { isMeetingOver, isStaleInterview, normalizeMeetingLink } from "@/lib/employer-interview-rules";
+import { isMeetingOver, isStaleInterview, normalizeMeetingLink, reminderWindow } from "@/lib/employer-interview-rules";
 import { requirePublicOrigin } from "@/lib/origin";
 import { limiters } from "@/lib/security/rate-limit";
 
 /**
  * Employer nudges the candidate about a scheduled interview. At most one
- * reminder per interview per 10 minutes (limiter) and per day (dedupe key).
+ * reminder per interview per 10 minutes: the limiter blocks early repeats, the
+ * dedupe key (one per window) blocks a double delivery inside one window.
  */
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -58,13 +59,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const text = interview.status === "pending"
     ? `${company} is waiting for you to pick an interview slot.`
     : `Your interview with ${company} is on ${when}.`;
-  await notify({
+  const window = reminderWindow();
+  const delivered = await notify({
     to: { type: "intern", id: interview.internId },
     type: "interview_reminder",
     title: "Interview reminder",
     message: text,
     data: { interviewId: id, meetingLink: link },
-    dedupeKey: `employer_reminder:${id}:${new Date().toISOString().slice(0, 10)}`,
+    dedupeKey: `employer_reminder:${id}:${window}`,
     email: {
       subject: "Interview reminder | Findtern",
       heading: interview.status === "pending" ? "Pick your interview slot" : "Your interview is coming up",
@@ -75,7 +77,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     },
   });
   // A booked meeting reminds both sides (legacy routes.ts:11797): the
-  // employer gets an in-app note with the same once-a-day key.
+  // employer gets an in-app note keyed the same way.
   if (interview.status === "scheduled" && interview.selectedSlot && interview.employerId !== "admin") {
     await notify({
       to: { type: "employer", id: interview.employerId },
@@ -83,8 +85,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       title: "Interview reminder",
       message: when ? `Reminder: your interview is on ${when}.` : "Reminder: your interview is coming up.",
       data: { interviewId: id, internId: interview.internId, meetingLink: link },
-      dedupeKey: `manual_interview_reminder:${id}:employer:${new Date().toISOString().slice(0, 10)}`,
+      dedupeKey: `manual_interview_reminder:${id}:employer:${window}`,
     });
   }
+  // Nothing inserted = this window already delivered one; never claim a send that did not happen.
+  if (!delivered) return NextResponse.json({ error: "A reminder was just sent. Try again in a few minutes." }, { status: 429 });
   return NextResponse.json({ ok: true });
 }

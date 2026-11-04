@@ -19,7 +19,7 @@ export async function notify(n: {
   dedupeKey?: string;
   email?: EmailContent;
   attachments?: SmtpAttachment[];
-}): Promise<void> {
+}): Promise<boolean> {
   const db = getDb();
   const { type, data } = legacyShape(n.to.type, n.type, n.data ?? {});
   const inserted = await db
@@ -37,16 +37,18 @@ export async function notify(n: {
     // or another tick already wrote is a quiet no-op, never an error.
     .onConflictDoNothing()
     .returning({ id: schema.notifications.id });
-  if (inserted.length === 0 || !n.email) return;
+  if (inserted.length === 0) return false;
+  if (!n.email) return true;
 
   try {
     const address = await emailOf(n.to.type, n.to.id);
-    if (!address) return;
+    if (!address) return true;
     const mail = renderEmail(n.email);
     await sendSmtpMail({ to: address, ...mail, attachments: n.attachments });
   } catch (err) {
     console.error(`[notify] ${n.type} email failed`, err);
   }
+  return true;
 }
 
 /**
