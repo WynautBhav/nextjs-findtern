@@ -125,19 +125,26 @@ const RULES: Rule[] = [
 
 const SORTED = [...RULES].sort((a, b) => b[0].length - a[0].length);
 
+type RuleLists = { read: Permission[]; write: Permission[] | undefined };
+
+/** The read and write lists that govern a path; `null` when no rule matches. */
+function rulesFor(pathname: string): RuleLists | null {
+  // /api/admin/interns/<id>/payouts → payouts, not intern editing
+  if (/^\/api\/admin\/interns\/[^/]+\/payouts/.test(pathname)) {
+    return { read: ["transactions:read"], write: ["transactions:write"] };
+  }
+  const rule = SORTED.find(([prefix]) => pathname === prefix || pathname.startsWith(prefix.endsWith("/") ? prefix : `${prefix}/`));
+  return rule ? { read: rule[1], write: rule[2] } : null;
+}
+
 /**
  * Permissions that satisfy this request (any one is enough).
  * `null`: no rule matched, so only a super admin (`*`) may proceed.
  */
 export function requiredPermissions(pathname: string, method = "GET"): Permission[] | null {
-  // /api/admin/interns/<id>/payouts → payouts, not intern editing
-  if (/^\/api\/admin\/interns\/[^/]+\/payouts/.test(pathname)) {
-    return method === "GET" ? ["transactions:read"] : ["transactions:write"];
-  }
-  const rule = SORTED.find(([prefix]) => pathname === prefix || pathname.startsWith(prefix.endsWith("/") ? prefix : `${prefix}/`));
-  if (!rule) return null;
-  const [, read, write] = rule;
-  return method === "GET" || method === "HEAD" ? read : (write ?? read);
+  const rules = rulesFor(pathname);
+  if (!rules) return null;
+  return method === "GET" || method === "HEAD" ? rules.read : (rules.write ?? rules.read);
 }
 
 export function allows(granted: readonly string[] | undefined, needed: Permission[] | null): boolean {
@@ -147,9 +154,12 @@ export function allows(granted: readonly string[] | undefined, needed: Permissio
   return needed.length === 0 || needed.some((p) => g.includes(p));
 }
 
-/** Whether these permissions may write to a path: the same rule the proxy applies, so UI controls match the server. */
+/**
+ * Whether these permissions may write to a path: the same write rule the proxy applies, so UI controls match the server.
+ * A path with no write rule of its own is not writable (only `*`); it never falls back to the read rule.
+ */
 export function canWrite(granted: readonly string[] | undefined, pathname: string): boolean {
-  return allows(granted, requiredPermissions(pathname, "POST"));
+  return allows(granted, rulesFor(pathname)?.write ?? null);
 }
 
 /**

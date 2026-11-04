@@ -32,3 +32,33 @@ test("canWrite follows the path's write rule", () => {
   assert.equal(canWrite(["*"], "/admin/companies"), true);
   assert.equal(canWrite(undefined, "/admin/companies"), false);
 });
+
+test("canWrite is false for a path with no write rule, never the read rule", () => {
+  assert.equal(canWrite(["cms:read"], "/api/admin/cms"), false);
+  assert.equal(canWrite(["cms:write"], "/api/admin/cms"), true);
+  // Page paths that only have a read rule: the read permission must not unlock writes.
+  assert.equal(canWrite(["cms:read"], "/admin/cms"), false);
+  assert.equal(canWrite(["cms:write"], "/admin/cms"), false);
+  assert.equal(canWrite(["*"], "/admin/cms"), true);
+  assert.equal(canWrite(["*"], "/no/such/path"), true);
+  assert.equal(canWrite(["cms:write"], "/no/such/path"), false);
+});
+
+test("every page that gates controls with canWrite keeps the right answer", () => {
+  const callers: [string, string, string][] = [
+    ["/admin/interns", "interns:read", "interns:write"],
+    ["/admin/companies", "companies:read", "companies:write"],
+    ["/admin/colleges", "companies:read", "companies:write"],
+    ["/admin/promo-codes", "transactions:read", "transactions:write"],
+    ["/api/admin/cms", "cms:read", "cms:write"],
+    ["/api/admin/pricing", "cms:read", "cms:write"],
+    ["/api/admin/ai-reports", "interns:read", "interns:write"],
+  ];
+  for (const [path, read, write] of callers) {
+    assert.equal(canWrite([read], path), false, `${path} read-only`);
+    assert.equal(canWrite([write], path), true, `${path} writer`);
+    assert.equal(canWrite(["*"], path), true, `${path} super admin`);
+    assert.equal(canWrite(undefined, path), false, `${path} no session`);
+  }
+});
+
