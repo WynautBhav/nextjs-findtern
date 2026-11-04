@@ -31,7 +31,8 @@ export default async function AdminCollegesPage({
   const params = flattenParams(await searchParams);
   const perms = (await getSession())?.permissions;
   const canEdit = canWrite(perms, "/admin/colleges");
-  const canMoney = allows(perms, ["transactions:write"]);
+  // The fee-waiver code route needs companies:write (proxy) and transactions:write (route), so both gate the controls.
+  const canMoney = canEdit && allows(perms, ["transactions:write"]);
   const req = parsePageRequest(params);
   const db = getDb();
   const c = schema.colleges;
