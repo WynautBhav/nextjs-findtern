@@ -20,7 +20,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!guard.ok) return guard.response;
 
   const parsed = bodySchema.safeParse(await req.json().catch(() => null));
-  if (!parsed.success) return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+  if (!parsed.success) return NextResponse.json({ error: "Something is wrong with this request. Refresh the page and try again." }, { status: 400 });
 
   const modeProblem = promoModeProblem(parsed.data.mode);
   if (modeProblem) return NextResponse.json({ error: modeProblem }, { status: 400 });
@@ -30,7 +30,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const paying = lines.filter((l) => l.currency === parsed.data.currency);
   const orderMinor = paying.reduce((s, l) => s + l.charge.totalMinor, 0);
   const feeMinor = paying.reduce((s, l) => s + l.charge.perHireMinor, 0);
-  if (orderMinor <= 0) return NextResponse.json({ error: "Nothing payable in this currency" }, { status: 400 });
+  if (orderMinor <= 0) return NextResponse.json({ error: "There is nothing to pay on this offer right now. Refresh the page." }, { status: 400 });
 
   const quote = await quotePromo({ code: parsed.data.code, subjectId: id, orderMinor, currency: parsed.data.currency, audience: "employer", undiscountableMinor: feeMinor });
   if (!quote.ok) return NextResponse.json({ error: quote.error }, { status: quote.status });

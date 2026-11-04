@@ -15,17 +15,17 @@ import { promoModeProblem } from "@/lib/promo-rules";
 import { createOrder, paymentsAreFree, razorpayKeyId, testPayEnabled } from "@/lib/razorpay";
 
 const bodySchema = z.object({
-  currency: z.enum(["INR", "USD"]).default("INR"),
+  currency: z.enum(["INR", "USD"], { error: "Pick INR or USD." }).default("INR"),
   /** One hire per payment (legacy checkout). */
-  proposalIds: z.array(z.string().min(1)).length(1, "Pay for one hire at a time"),
+  proposalIds: z.array(z.string().min(1), { error: "Pay for one hire at a time" }).length(1, "Pay for one hire at a time"),
   /** How a new hire is paid; a running monthly placement always pays its due month. */
-  mode: z.enum(["upfront", "monthly"]).default("upfront"),
+  mode: z.enum(["upfront", "monthly"], { error: "Choose to pay upfront or monthly." }).default("upfront"),
   /** The month being paid: payments already made for this hire (0 = first). A stale second submit names a month that is already paid. */
   paymentIndex: z.number({ error: "This page is out of date. Refresh and try again." }).int().min(0),
-  promoCode: z.string().trim().min(1).optional(),
+  promoCode: z.string({ error: "Enter a valid promo code." }).trim().min(1, "Enter a valid promo code.").optional(),
   /** The test button (PAYMENTS_TEST_BUTTON=1): settle at the real amount without Razorpay. */
   testPay: z.boolean().optional(),
-});
+}, { error: "Something is wrong with this payment request. Refresh the page and try again." });
 
 type Db = ReturnType<typeof getDb>;
 
@@ -111,7 +111,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   // Amount is recomputed from the accepted offers; the client never sends it.
   const { lines } = await payableCheckout(id, { proposalIds: parsed.data.proposalIds, mode: parsed.data.mode });
   const paying = lines.filter((l) => l.currency === currency);
-  if (paying.length === 0) return NextResponse.json({ error: "Nothing payable in this currency" }, { status: 400 });
+  if (paying.length === 0) return NextResponse.json({ error: "There is nothing to pay on this offer right now. Refresh the page." }, { status: 400 });
   // Never re-price a repeat submit as the next month: refuse when the month asked for is not the one due.
   if (paymentIndexMismatch(paying, parsed.data.paymentIndex)) {
     return NextResponse.json({ error: "This month is already paid. Refresh the page to see it under Orders." }, { status: 409 });
