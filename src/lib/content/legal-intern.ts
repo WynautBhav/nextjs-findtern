@@ -57,7 +57,7 @@ export const INTERN_TERMS: CmsLegalDoc = {
 <li>Misrepresentation of skills or submitting fake documents will result in account termination.</li>
 <li>Findtern reserves the right to verify academic credentials and remove any fraudulent profiles.</li>
 <li>Findtern does not guarantee an internship. However, if your profile score is above 60%, you are eligible for a paid internship. This means that any internship you get through Findtern will be a paid one.</li>
-<li>Interns earn half the hourly rate, by your Findtern score: ₹0 an hour below 6, ₹50 an hour from 6 to 8, and ₹100 an hour at 8 and above.</li>
+<li>Interns earn half the hourly rate, by your Findtern score: ₹0 an hour below 6, ₹50 an hour from 6 up to 8, and ₹100 an hour from 8 and above.</li>
 <li>Each month's stipend (score 6 and above) is paid after that month ends.</li>
 <li>You must not share your personal information or direct contact details with clients outside of Findtern's platform. Any violation of this may lead to legal action.</li>
 </ul>
