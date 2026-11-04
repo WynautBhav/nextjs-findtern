@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import { csrfFetch } from "@/lib/client-fetch";
@@ -32,13 +33,14 @@ const input =
 async function send(url: string, method: string, body: unknown) {
   const res = await csrfFetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).catch(() => null);
   const json = (await res?.json().catch(() => null)) as Record<string, unknown> | null;
-  return { ok: Boolean(res?.ok), json: json ?? {} };
+  return { ok: Boolean(res?.ok), status: res?.status ?? 0, json: json ?? {} };
 }
 
 export function AddCollegeForm() {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [exists, setExists] = useState<string | null>(null);
   return (
     <form
       className="grid gap-3 md:grid-cols-2"
@@ -47,6 +49,7 @@ export function AddCollegeForm() {
         const f = new FormData(e.currentTarget);
         setBusy(true);
         setError(null);
+        setExists(null);
         const r = await send("/api/admin/colleges", "POST", {
           name: f.get("name"),
           city: f.get("city"),
@@ -57,7 +60,10 @@ export function AddCollegeForm() {
           showOnWebsite: f.get("website") === "on",
         });
         setBusy(false);
-        if (!r.ok) return setError(String(r.json.error ?? "Couldn't add the college"));
+        if (!r.ok) {
+          if (r.status === 409) setExists(String(f.get("aishe")).trim());
+          return setError(String(r.json.error ?? "Couldn't add the college"));
+        }
         (e.target as HTMLFormElement).reset();
         router.refresh();
       }}
@@ -92,6 +98,11 @@ export function AddCollegeForm() {
         <span role="status" className="text-sm text-danger">
           {error}
         </span>
+        {exists ? (
+          <Link href={`/admin/colleges?q=${encodeURIComponent(exists)}`} className="text-sm font-medium underline underline-offset-4">
+            Find it and make it a partner
+          </Link>
+        ) : null}
       </div>
     </form>
   );

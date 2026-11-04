@@ -1,8 +1,11 @@
-import { desc, eq, sql } from "drizzle-orm";
+import { count, desc, inArray, sql } from "drizzle-orm";
 
 import { AdminEmpty, AdminPageHeader, Panel, PanelBody, PanelHeader } from "@/components/admin/panel";
 import { IdentityCell } from "@/components/admin/data-table";
 import { AddCollegeForm, CollegeRowControls, type CollegeAdminRow } from "@/components/admin/college-partners-manager";
+import { Pagination } from "@/components/admin/pagination";
+import { TableToolbar } from "@/components/admin/table-toolbar";
+import { flattenParams, parsePageRequest, searchAny, toPage } from "@/lib/admin/params";
 import { getDb, schema } from "@/lib/db";
 import { q } from "@/lib/college/sql";
 import { formatDate } from "@/lib/format";
@@ -18,10 +21,21 @@ function CountChip({ n, one, many }: { n: number; one: string; many: string }) {
   );
 }
 
-export default async function AdminCollegesPage() {
+export default async function AdminCollegesPage({
+  searchParams,
+}: {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const params = flattenParams(await searchParams);
+  const req = parsePageRequest(params);
   const db = getDb();
   const c = schema.colleges;
   const cid = q(c, c.id);
+  // No search: partners and colleges with students. A search looks through the whole directory.
+  const where = req.search
+    ? searchAny([sql`${c.name}`, sql`${c.city}`, sql`${c.aisheCode}`, sql`${c.code}`], req.search)
+    : sql`${c.isPartner} OR EXISTS (SELECT 1 FROM ${schema.collegeMemberships} m WHERE m.college_id = ${cid} AND m.left_at IS NULL)`;
+  const [{ total }] = await db.select({ total: count() }).from(c).where(where);
   const rows = await db
     .select({
       college: c,
@@ -30,12 +44,14 @@ export default async function AdminCollegesPage() {
       drives: sql<number>`(SELECT count(*)::int FROM ${schema.collegeDrives} d WHERE d.college_id = ${cid})`,
     })
     .from(c)
-    .where(sql`${c.isPartner} OR EXISTS (SELECT 1 FROM ${schema.collegeMemberships} m WHERE m.college_id = ${cid} AND m.left_at IS NULL)`)
-    .orderBy(desc(c.isPartner), c.name);
+    .where(where)
+    .orderBy(desc(c.isPartner), c.name, c.id)
+    .limit(req.perPage)
+    .offset(req.offset);
   const officers = await db
     .select({ collegeId: schema.collegeAdmins.collegeId, name: schema.collegeAdmins.name, email: schema.collegeAdmins.email, lastLoginAt: schema.collegeAdmins.lastLoginAt })
     .from(schema.collegeAdmins)
-    .where(eq(schema.collegeAdmins.isActive, true));
+    .where(sql`${schema.collegeAdmins.isActive} AND ${inArray(schema.collegeAdmins.collegeId, rows.map((r) => r.college.id).concat(""))}`);
 
   const list: CollegeAdminRow[] = rows.map((r) => ({
     id: r.college.id,
@@ -55,17 +71,18 @@ export default async function AdminCollegesPage() {
       .map((o) => ({ name: o.name, email: o.email, lastLoginAt: o.lastLoginAt?.toISOString() ?? null })),
   }));
 
-  const partners = list.filter((r) => r.isPartner).length;
+  const pg = toPage(list, total, req.page, req.perPage);
   return (
     <div className="space-y-4">
       <AdminPageHeader
         title="College partners"
-        subtitle={`${list.length} ${list.length === 1 ? "college" : "colleges"}, ${partners} with a console. Officers see every student of their own college.`}
+        subtitle={`${total.toLocaleString("en-IN")} ${total === 1 ? "college" : "colleges"} ${req.search ? "match" : "(partners and colleges with students)"}. Search to find any college and make it a partner.`}
         className="mb-2 lg:mb-4"
       />
+      <TableToolbar searchPlaceholder="Search name, city, AISHE or college code" />
       {list.length === 0 ? (
         <Panel>
-          <AdminEmpty title="No partner colleges yet" body="Add the first one below, then issue its placement officer a login." />
+          <AdminEmpty title={req.search ? "No college matches" : "No partner colleges yet"} body={req.search ? "Try another name, city or code." : "Add the first one below, then issue its placement officer a login."} />
         </Panel>
       ) : null}
       {list.map((r) => (
@@ -102,6 +119,9 @@ export default async function AdminCollegesPage() {
           </PanelBody>
         </Panel>
       ))}
+      {total > 0 ? <Panel>
+        <Pagination page={pg.page} pages={pg.pages} total={total} perPage={req.perPage} rowsShown={list.length} params={params} basePath="/admin/colleges" noun="colleges" />
+      </Panel> : null}
       {/* Last, and folded: adding a college is rare, and the open form put
           ~450px above the colleges themselves (critique A). */}
       <Panel>
