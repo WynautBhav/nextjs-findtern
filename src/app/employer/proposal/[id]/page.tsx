@@ -138,7 +138,7 @@ export default async function EmployerProposalDetail({
       ]
     : [
         // One month's amount only (client QA) - no monthly × months total.
-        ["Monthly", offer.monthlyMinor != null ? formatMoney(offer.monthlyMinor, currency) : "-"],
+        ["Monthly", offer.monthlyMinor ? formatMoney(offer.monthlyMinor, currency) : "Free"],
         ["Hours a month", offer.monthlyHours ? `${offer.monthlyHours} h` : "-"],
         ["Starts", formatDate(offer.startDate)],
         ["Length", `${offer.months} month${offer.months === 1 ? "" : "s"}`],
@@ -201,19 +201,17 @@ export default async function EmployerProposalDetail({
             <Surface as="section" className="px-6 pb-2 pt-5">
               <SectionHead title="Terms" />
               <dl className="divide-y divide-ink-100">
-                <DetailRow label="Hourly rate" value={offer.hourlyRateMinor ? `${formatMoney(offer.hourlyRateMinor, currency)} an hour` : offer.hourlyRateMinor === 0 ? "Free" : "-"} mono />
+                <DetailRow label="Hourly rate" value={offer.hourlyRateMinor ? `${formatMoney(offer.hourlyRateMinor, currency)} an hour` : "Free"} mono />
                 <DetailRow
                   label="Monthly amount"
                   value={
-                    offer.monthlyMinor != null ? (
+                    offer.monthlyMinor ? (
                       <>
                         {formatMoney(offer.monthlyMinor, currency)}
                         {currency === "INR" ? <span className="ml-1 text-xs font-normal text-text-subtle">(includes GST)</span> : null}
                       </>
-                    ) : offer.hourlyRateMinor === 0 ? (
-                      "Free"
                     ) : (
-                      "-"
+                      "Free"
                     )
                   }
                   mono
