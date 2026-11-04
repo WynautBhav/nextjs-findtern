@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { after, NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -57,7 +57,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     }
   }
 
-  await db
+  // Only if still open: a meeting marked completed or missed in between must not be reset to pending.
+  const reset = await db
     .update(schema.interviews)
     .set({
       slot1: slots[0] ?? null,
@@ -69,7 +70,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       calendarEventId: null,
       updatedAt: new Date(),
     })
-    .where(eq(schema.interviews.id, id));
+    .where(and(eq(schema.interviews.id, id), inArray(schema.interviews.status, ["pending", "scheduled"])))
+    .returning({ id: schema.interviews.id });
+  if (reset.length === 0) return NextResponse.json({ error: "This interview changed; refresh and try again." }, { status: 409 });
 
   // The old Google Calendar / Meet event goes too, or it lingers on
   // Findtern's calendar with a dead link (EMB-23). Best effort, after the
