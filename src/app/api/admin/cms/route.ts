@@ -58,7 +58,11 @@ export async function POST(req: Request) {
   if (!b) return NextResponse.json({ error: "Unknown content type" }, { status: 400 });
   const checked = validateCmsValues(b.type, b.raw, { partial: false });
   if (!checked.ok) return NextResponse.json({ error: checked.error }, { status: 400 });
+  if (b.raw.isActive !== undefined && typeof b.raw.isActive !== "boolean") {
+    return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+  }
   const values = normalise(b.type, checked.values);
+  if (typeof b.raw.isActive === "boolean" && CMS_COLLECTIONS[b.type].toggle) values.isActive = b.raw.isActive;
   if (b.type === "blog" && values.body == null) values.body = "";
   try {
     const table = TABLES[b.type];
