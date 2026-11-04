@@ -37,5 +37,6 @@ test("a period reads by its calendar days, whatever the server's zone", async ()
   assert.equal(formatPeriodDays("2026-10-01", "2026-10-31"), "1 – 31 Oct 2026");
   assert.equal(formatPeriodDays("2026-10-18", "2026-10-18"), "18 Oct 2026", "QA-152: one day is one date");
   assert.equal(formatPeriodDays("2026-12-18", "2027-01-17"), "18 Dec 2026 – 17 Jan 2027");
+  assert.equal(formatPeriodDays(new Date("2026-10-26T00:00:00.000Z"), new Date("2026-11-25T23:59:59.999Z")), "26 Oct – 25 Nov 2026", "B5: IST must not roll the end to 26 Nov");
   assert.equal(formatPeriodDays(null, "2027-01-17"), "");
 });

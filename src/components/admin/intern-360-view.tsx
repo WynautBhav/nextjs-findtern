@@ -24,6 +24,7 @@ import { DetailRow, EmptyScene, Pill, SectionHead } from "@/components/app/primi
 import { AdminAvatar } from "@/components/admin/avatar";
 import { AdminTabs } from "@/components/admin/admin-tabs";
 import { InfoList, InfoRow, QuickAction, RecordCard, RecordLayout } from "@/components/admin/record-layout";
+import { formatPeriodDays } from "@/lib/timesheet-days";
 import { latestActivityAt, telHref } from "@/lib/admin/record-activity-format";
 import type { ActivityEntry } from "@/lib/admin/record-activity.types";
 import { ADMIN_PILL_SECONDARY, ADMIN_SURFACE } from "@/components/admin/surface";
@@ -948,7 +949,7 @@ function TimesheetsTab({
               <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-3 px-5 py-4 hover:bg-ink-50/60 focus-visible:outline-2 focus-visible:outline-brand-600 [&::-webkit-details-marker]:hidden">
                 <div className="min-w-0">
                   <p className="nums font-semibold text-ink-900">
-                    {formatDate(t.periodStart)} – {formatDate(t.periodEnd)}
+                    {formatPeriodDays(t.periodStart, t.periodEnd)}
                   </p>
                   <p className="text-sm text-ink-600">
                     {company(t.employerId) ?? "Company"}

@@ -4,6 +4,7 @@ import { alias } from "drizzle-orm/pg-core";
 import { calendarMissing } from "@/lib/calendar-status";
 import { dbTimestamp, getDb, schema } from "@/lib/db";
 import { formatMoney, shortDate, shortDateTime } from "@/lib/format";
+import { formatPeriodDays } from "@/lib/timesheet-days";
 import { AI_INTERVIEW_EMAIL, inrMinorSql, realEmployerId, TEST_EMPLOYER_ID } from "@/lib/admin/scope";
 import { loadCollectedLastDays } from "@/lib/admin/receivables-load";
 import type { DashboardQueues, MoneyStuck, QueueGroup, QueueKey, QueueRecord } from "@/lib/admin/dashboard-queues.types";
@@ -464,11 +465,10 @@ async function loadSheets(now: Date, weekAgo: Date): Promise<Result> {
       .limit(RECORD_CAP),
   ]);
 
-  const day = { day: "numeric", month: "short" } as const;
   const records = rows.map<QueueRecord>((r) => {
     const name = fullName(r.first, r.last);
     const company = (r.company ?? "").trim();
-    const period = `${shortDate(r.periodStart, day)} to ${shortDate(r.periodEnd, { ...day, year: "numeric" })}`;
+    const period = formatPeriodDays(r.periodStart, r.periodEnd);
     const since = r.submittedAt ?? r.updatedAt;
     return {
       id: `sheets:${r.id}`,

@@ -4,10 +4,9 @@ import { NextResponse } from "next/server";
 import { getDb, schema } from "@/lib/db";
 import { emails } from "@/lib/emails";
 import { unfilledDays } from "@/lib/employer-timesheets";
-import { formatDate } from "@/lib/format";
 import { requireMutation } from "@/lib/guards-mutation";
 import { employerNames, notify } from "@/lib/notify";
-import { periodDays } from "@/lib/timesheet-days";
+import { formatPeriodDays, periodDays } from "@/lib/timesheet-days";
 
 /**
  * Send a timesheet for approval.
@@ -75,7 +74,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     .where(eq(schema.users.id, sheet.internId))
     .limit(1);
   const candidate = `${u?.f ?? ""} ${u?.l ?? ""}`.trim() || "Your intern"; // hired, so the name is unmasked
-  const period = `${formatDate(sheet.periodStart)} – ${formatDate(sheet.periodEnd)}`;
+  const period = formatPeriodDays(sheet.periodStart, sheet.periodEnd);
   await notify({
     to: { type: "employer", id: sheet.employerId },
     type: "timesheet_submitted",
