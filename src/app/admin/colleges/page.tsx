@@ -9,6 +9,8 @@ import { flattenParams, parsePageRequest, searchAny, toPage } from "@/lib/admin/
 import { getDb, schema } from "@/lib/db";
 import { q } from "@/lib/college/sql";
 import { formatDate, formatMoney } from "@/lib/format";
+import { getSession } from "@/lib/auth";
+import { allows, canWrite } from "@/lib/admin/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +29,9 @@ export default async function AdminCollegesPage({
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const params = flattenParams(await searchParams);
+  const perms = (await getSession())?.permissions;
+  const canEdit = canWrite(perms, "/admin/colleges");
+  const canMoney = allows(perms, ["transactions:write"]);
   const req = parsePageRequest(params);
   const db = getDb();
   const c = schema.colleges;
@@ -125,7 +130,7 @@ export default async function AdminCollegesPage({
             ) : (
               <p className="text-sm text-text-subtle">No placement officer login yet.</p>
             )}
-            <CollegeRowControls row={r} />
+            <CollegeRowControls row={r} canEdit={canEdit} canMoney={canMoney} />
           </PanelBody>
         </Panel>
       ))}
@@ -134,7 +139,7 @@ export default async function AdminCollegesPage({
       </Panel> : null}
       {/* Last, and folded: adding a college is rare, and the open form put
           ~450px above the colleges themselves (critique A). */}
-      <Panel>
+      {canEdit ? <Panel>
         <details open={list.length === 0} className="group">
           <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between px-[var(--admin-pad-panel)] text-sm font-semibold text-foreground hover:bg-[color:var(--admin-panel-2)] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring">
             Add a partner college
@@ -144,7 +149,7 @@ export default async function AdminCollegesPage({
             <AddCollegeForm />
           </PanelBody>
         </details>
-      </Panel>
+      </Panel> : null}
     </div>
   );
 }

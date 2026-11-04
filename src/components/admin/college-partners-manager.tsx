@@ -110,7 +110,8 @@ export function AddCollegeForm() {
   );
 }
 
-export function CollegeRowControls({ row }: { row: CollegeAdminRow }) {
+/** `canEdit`: companies:write (the college routes). `canMoney`: transactions:write (the fee-waiver code and its cap). */
+export function CollegeRowControls({ row, canEdit, canMoney }: { row: CollegeAdminRow; canEdit: boolean; canMoney: boolean }) {
   const router = useRouter();
   const { ask, dialog } = useConfirm();
   const [issued, setIssued] = useState<{ email: string; password: string } | null>(null);
@@ -183,7 +184,7 @@ export function CollegeRowControls({ row }: { row: CollegeAdminRow }) {
           ] as const
         ).map(([key, label, value]) => (
           <label key={key} className="flex min-h-11 cursor-pointer items-center gap-2 rounded-full bg-[color:var(--admin-panel-2)] px-4 text-foreground hover:bg-[color:var(--admin-bar-tint)] has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ring">
-            <input type="checkbox" checked={value} onChange={(e) => toggle(key, e.target.checked)} className="size-4 accent-brand-700" />
+            <input type="checkbox" checked={value} disabled={!canEdit} onChange={(e) => toggle(key, e.target.checked)} className="size-4 accent-brand-700" />
             {label}
           </label>
         ))}
@@ -191,16 +192,16 @@ export function CollegeRowControls({ row }: { row: CollegeAdminRow }) {
       {row.officers.map((o) => (
         <div key={o.id} className="flex flex-wrap items-center gap-x-3 text-sm text-foreground">
           <span>{o.name} · {o.email}</span>
-          <button type="button" onClick={() => resetPassword(o)} aria-label={`Reset password for ${o.name}`} className="inline-flex min-h-11 cursor-pointer items-center rounded-full px-1 font-medium underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+          {canEdit ? <button type="button" onClick={() => resetPassword(o)} aria-label={`Reset password for ${o.name}`} className="inline-flex min-h-11 cursor-pointer items-center rounded-full px-1 font-medium underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
             Reset password
-          </button>
+          </button> : null}
         </div>
       ))}
       {/* Folded away once the college has an officer (an empty form sat
           under the existing one); shown outright when it has none. The summary
           stays visible while open: hiding it left a focusable control nobody
           could see. */}
-      {row.officers.length === 0 ? (
+      {!canEdit ? null : row.officers.length === 0 ? (
         issueForm
       ) : (
         <details>
@@ -210,9 +211,11 @@ export function CollegeRowControls({ row }: { row: CollegeAdminRow }) {
           <div className="pt-2">{issueForm}</div>
         </details>
       )}
-      {row.isPartner ? (
+      {row.isPartner && (canMoney || row.seatCode) ? (
         <div className="space-y-2 text-sm text-foreground">
-          {row.seatCode ? (
+          {row.seatCode && !canMoney ? (
+            <p>Fee-waiver code <code className="rounded bg-[color:var(--admin-panel)] px-1.5 py-0.5 font-mono">{row.seatCode.code}</code> · {row.seatCode.usedCount} used of {row.seatCode.maxUsages ?? "no limit"}</p>
+          ) : row.seatCode ? (
             <form
               className="flex flex-wrap items-end gap-2"
               onSubmit={async (e) => {
@@ -250,7 +253,7 @@ export function CollegeRowControls({ row }: { row: CollegeAdminRow }) {
           )}
         </div>
       ) : null}
-      {row.isPartner && <details>
+      {row.isPartner && canEdit && <details>
         <summary className="inline-flex min-h-11 cursor-pointer list-none items-center rounded-full px-1 text-sm font-medium text-foreground underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
           Edit name, city, AISHE code
         </summary>
