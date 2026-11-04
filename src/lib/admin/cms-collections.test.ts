@@ -106,3 +106,11 @@ test("sanitising twice changes nothing more (a re-saved post is stable)", () => 
   const once = String(sanitizeCmsValues("blog", { body: "<h2>Intro</h2><p>One <strong>two</strong> <a href=\"https://x.com\">x</a></p><ul><li>a</li></ul>" }).body);
   assert.equal(String(sanitizeCmsValues("blog", { body: once }).body), once);
 });
+
+test("partner and skill links refuse javascript: URLs", () => {
+  const p = { name: "A", logoUrl: "https://x.com/l.png" };
+  assert.equal(validateCmsValues("partner", { ...p, href: "javascript:alert(1)" }, { partial: false }).ok, false);
+  assert.equal(validateCmsValues("partner", { ...p, href: "https://acme.test" }, { partial: false }).ok, true);
+  assert.equal(validateCmsValues("skill", { title: "S", href: "/search?q=react" }, { partial: false }).ok, true);
+  assert.equal(validateCmsValues("skill", { title: "S", href: "data:text/html,x" }, { partial: false }).ok, false);
+});

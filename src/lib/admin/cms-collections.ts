@@ -7,12 +7,15 @@
  */
 
 import { sanitizeRichText } from "../richtext.ts";
+import { isSafeLink } from "../safe-url.ts";
 
 export type CmsField = {
   name: string;
   label: string;
   kind: "text" | "textarea" | "richtext" | "image" | "number" | "select";
   required?: boolean;
+  /** Must be an http(s) link or a site path. */
+  link?: boolean;
   options?: string[];
   hint?: string;
 };
@@ -47,7 +50,7 @@ export const CMS_COLLECTIONS = {
     fields: [
       { name: "name", label: "Brand name", kind: "text", required: true },
       { name: "logoUrl", label: "Logo", kind: "image", required: true },
-      { name: "href", label: "Website", kind: "text" },
+      { name: "href", label: "Website", kind: "text", link: true },
       { name: "sortOrder", label: "Order", kind: "number" },
     ],
   },
@@ -94,7 +97,7 @@ export const CMS_COLLECTIONS = {
       { name: "metaText", label: "Caption", kind: "text" },
       { name: "iconClass", label: "Icon name", kind: "text" },
       { name: "resourceCount", label: "Candidate count", kind: "number" },
-      { name: "href", label: "Link", kind: "text" },
+      { name: "href", label: "Link", kind: "text", link: true },
       { name: "sortOrder", label: "Order", kind: "number" },
     ],
   },
@@ -323,6 +326,9 @@ export function validateCmsValues(
       if (err) return { ok: false, error: err };
     } else if (v.length > TEXT_MAX[f.kind]) {
       return { ok: false, error: `${f.label} is too long` };
+    }
+    if ((f as CmsField).link && !isSafeLink(v, true)) {
+      return { ok: false, error: `${f.label} must start with https:// or /` };
     }
     if (type === "blog" && f.name === "slug") {
       const err = slugError(v, opts.previousSlug ?? null);

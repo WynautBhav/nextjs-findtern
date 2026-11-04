@@ -4,13 +4,14 @@ import { z } from "zod";
 
 import { requireMutation } from "@/lib/guards-mutation";
 import { forgetAccountStatus } from "@/lib/account-status";
+import { isSafeLink } from "@/lib/safe-url";
 import { getDb, schema } from "@/lib/db";
 
 const bodySchema = z.object({
   isPartner: z.boolean().optional(),
   showOnWebsite: z.boolean().optional(),
   isActive: z.boolean().optional(),
-  logoUrl: z.string().trim().url().max(500).nullable().optional(),
+  logoUrl: z.string().trim().url().max(500).refine((u) => isSafeLink(u), "Logo link must start with https://").nullable().optional(),
   emailDomains: z.array(z.string().trim().toLowerCase().regex(/^[a-z0-9.-]+\.[a-z]{2,}$/)).max(10).optional(),
 });
 
