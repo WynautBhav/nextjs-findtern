@@ -130,3 +130,10 @@ test("the Google redirect URI is on the origin the request came to", () => {
     process.env = saved;
   }
 });
+
+test("a college session minted with the password version dies when an admin resets the password (#29)", () => {
+  const { cookie } = createSession({ uid: "c1", role: "college", email: "tpo@college.edu", pv: passwordVersion("$argon2id$old") });
+  const pv = readSession(tokenOf(cookie))?.pv;
+  assert.equal(pv, passwordVersion("$argon2id$old"));
+  assert.notEqual(pv, passwordVersion("$argon2id$reset"), "account-status compares this with the stored hash");
+});

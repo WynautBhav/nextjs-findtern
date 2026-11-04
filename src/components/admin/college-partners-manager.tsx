@@ -24,7 +24,7 @@ export type CollegeAdminRow = {
   members: number;
   roster: number;
   drives: number;
-  officers: { name: string; email: string; lastLoginAt: string | null }[];
+  officers: { id: string; name: string; email: string; lastLoginAt: string | null }[];
 };
 
 const input =
@@ -128,6 +128,19 @@ export function CollegeRowControls({ row }: { row: CollegeAdminRow }) {
     router.refresh();
   }
 
+  async function resetPassword(o: CollegeAdminRow["officers"][number]) {
+    const ok = await ask({
+      title: `Reset ${o.name}'s password?`,
+      body: "They are signed out and the old password stops working. You get a new one to send them privately.",
+      confirmLabel: "Yes, reset",
+    });
+    if (!ok) return;
+    setError(null);
+    const r = await send(`/api/admin/colleges/${row.id}/admins/${o.id}/reset-password`, "POST", {});
+    if (!r.ok) return setError(String(r.json.error ?? "Couldn't reset the password"));
+    setIssued({ email: String(r.json.email), password: String(r.json.password) });
+  }
+
   const issueForm = (
     <form
       className="flex flex-wrap items-end gap-2"
@@ -173,6 +186,14 @@ export function CollegeRowControls({ row }: { row: CollegeAdminRow }) {
           </label>
         ))}
       </div>
+      {row.officers.map((o) => (
+        <div key={o.id} className="flex flex-wrap items-center gap-x-3 text-sm text-foreground">
+          <span>{o.name} · {o.email}</span>
+          <button type="button" onClick={() => resetPassword(o)} className="inline-flex min-h-11 cursor-pointer items-center rounded-full px-1 font-medium underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+            Reset password
+          </button>
+        </div>
+      ))}
       {/* Folded away once the college has an officer (an empty form sat
           under the existing one); shown outright when it has none. The summary
           stays visible while open: hiding it left a focusable control nobody
