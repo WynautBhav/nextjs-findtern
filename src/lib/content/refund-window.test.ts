@@ -2,14 +2,42 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 
+// The old intern-terms stipend range, in any spacing, dash (en, em, minus, hyphen) or "to", with or without the second ₹.
+// Alternation, not a bracket, so it also works when grep runs in a non-UTF-8 locale.
+const OLD_RANGE = "5,000[[:space:]]*(–|—|−|-|to)[[:space:]]*(₹)?[[:space:]]*12,000";
+const PATTERN = `18[ -]month|eighteen month|${OLD_RANGE}`;
+
+function grep(args: string[], input?: string): string {
+  try {
+    return execFileSync("grep", args, { encoding: "utf8", input });
+  } catch {
+    return ""; // grep exits 1 with no match
+  }
+}
+
 // The refund window is 12 months; report range labels ("Last 18 months") are a different thing.
 test("no 18-month refund window copy under src/", () => {
-  let out = "";
-  try {
-    out = execFileSync("grep", ["-rniE", "18[ -]month|eighteen month|5,000 ?[–-] ?12,000", "src", "--exclude=*.test.ts"], { encoding: "utf8" });
-  } catch {
-    /* grep exits 1 with no match */
-  }
+  const out = grep(["-rniE", PATTERN, "src", "--exclude=*.test.ts"]);
   const hits = out.split("\n").filter((l) => l && !/Last 18 months|last 18 months|analytics-load/.test(l));
   assert.deepEqual(hits, []);
+});
+
+test("the guard pattern catches the original stipend range and its spacing and dash variants", () => {
+  for (const text of [
+    "₹5,000 – ₹12,000",
+    "₹5,000–₹12,000",
+    "₹5,000 - ₹12,000",
+    "₹5,000-12,000",
+    "₹5,000 — ₹12,000",
+    "₹5,000 − 12,000",
+    "5,000 to ₹12,000",
+    "₹5,000  –  ₹ 12,000",
+    "within 18 months",
+    "18-month lock-in",
+  ]) {
+    assert.notEqual(grep(["-iE", PATTERN], `${text}\n`), "", `should match: ${text}`);
+  }
+  for (const text of ["₹5,000 hiring charge", "Last 12 months", "₹12,000 a year"]) {
+    assert.equal(grep(["-iE", PATTERN], `${text}\n`), "", `should not match: ${text}`);
+  }
 });
