@@ -172,7 +172,7 @@ export function PayoutEditor({
               Bank reference (required when paid)
               <input
                 value={reference}
-                onChange={(e) => setReference(e.target.value)}
+                onChange={(e) => { setReference(e.target.value); setError(null); }}
                 placeholder="UTR / NEFT reference"
                 maxLength={64}
                 className={fieldClass}
