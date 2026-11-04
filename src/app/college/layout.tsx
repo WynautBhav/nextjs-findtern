@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
-import { LayoutDashboard, ListChecks, Megaphone } from "lucide-react";
+import { LayoutDashboard, ListChecks, Megaphone, Wallet } from "lucide-react";
 
 import { ConsoleShell, type ConsoleNavGroup } from "@/components/layout/console-shell";
 import { TermsGate } from "@/components/app/terms-gate";
@@ -21,6 +21,7 @@ const NAV: ConsoleNavGroup[] = [
       { href: "/college", label: "Students", icon: <LayoutDashboard /> },
       { href: "/college/drives", label: "Drives", icon: <Megaphone /> },
       { href: "/college/roster", label: "Roster", icon: <ListChecks /> },
+      { href: "/college/earnings", label: "Earnings", icon: <Wallet /> },
     ],
   },
 ];

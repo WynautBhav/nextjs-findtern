@@ -8,7 +8,7 @@ import { TableToolbar } from "@/components/admin/table-toolbar";
 import { flattenParams, parsePageRequest, searchAny, toPage } from "@/lib/admin/params";
 import { getDb, schema } from "@/lib/db";
 import { q } from "@/lib/college/sql";
-import { formatDate } from "@/lib/format";
+import { formatDate, formatMoney } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
@@ -44,6 +44,7 @@ export default async function AdminCollegesPage({
       members: sql<number>`(SELECT count(*)::int FROM ${schema.collegeMemberships} m WHERE m.college_id = ${cid} AND m.left_at IS NULL)`,
       roster: sql<number>`(SELECT count(*)::int FROM ${schema.collegeRoster} r WHERE r.college_id = ${cid})`,
       drives: sql<number>`(SELECT count(*)::int FROM ${schema.collegeDrives} d WHERE d.college_id = ${cid})`,
+      balance: sql<number>`(SELECT coalesce(sum(w.amount_minor), 0)::int FROM ${schema.collegeWalletEntries} w WHERE w.college_id = ${cid})`,
     })
     .from(c)
     .where(where)
@@ -55,6 +56,7 @@ export default async function AdminCollegesPage({
     .from(schema.collegeAdmins)
     .where(sql`${schema.collegeAdmins.isActive} AND ${inArray(schema.collegeAdmins.collegeId, rows.map((r) => r.college.id).concat(""))}`);
 
+  const balances = new Map(rows.map((r) => [r.college.id, r.balance]));
   const list: CollegeAdminRow[] = rows.map((r) => ({
     id: r.college.id,
     name: r.college.name,
@@ -97,6 +99,7 @@ export default async function AdminCollegesPage({
                 <CountChip n={r.members} one="student" many="students" />
                 <CountChip n={r.roster} one="on roster" many="on roster" />
                 <CountChip n={r.drives} one="drive" many="drives" />
+                <span className="nums inline-flex h-6 items-center whitespace-nowrap rounded-full bg-[color:var(--admin-panel-2)] px-2.5 text-xs font-medium text-foreground">Wallet {formatMoney(balances.get(r.id) ?? 0)}</span>
               </span>
             }
           />
