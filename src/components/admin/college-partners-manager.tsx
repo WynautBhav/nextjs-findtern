@@ -192,7 +192,7 @@ export function CollegeRowControls({ row, canEdit, canMoney }: { row: CollegeAdm
       {row.officers.map((o) => (
         <div key={o.id} className="flex flex-wrap items-center gap-x-3 text-sm text-foreground">
           <span>{o.name} · {o.email}</span>
-          {canEdit ? <button type="button" onClick={() => resetPassword(o)} aria-label={`Reset password for ${o.name}`} className="inline-flex min-h-11 cursor-pointer items-center rounded-full px-1 font-medium underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+          {canEdit ? <button type="button" onClick={() => resetPassword(o)} aria-label={`Reset password for ${o.name}`} className="inline-flex min-h-11 cursor-pointer items-center rounded-full bg-[color:var(--admin-panel-2)] px-5 text-sm font-medium text-foreground hover:bg-[color:var(--admin-bar-tint)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
             Reset password
           </button> : null}
         </div>
@@ -205,7 +205,7 @@ export function CollegeRowControls({ row, canEdit, canMoney }: { row: CollegeAdm
         issueForm
       ) : (
         <details>
-          <summary className="inline-flex min-h-11 cursor-pointer list-none items-center rounded-full px-1 text-sm font-medium text-foreground underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+          <summary className="inline-flex min-h-11 cursor-pointer list-none items-center rounded-full bg-[color:var(--admin-panel-2)] px-5 text-sm font-medium text-foreground hover:bg-[color:var(--admin-bar-tint)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
             Issue another officer login
           </summary>
           <div className="pt-2">{issueForm}</div>
@@ -254,7 +254,7 @@ export function CollegeRowControls({ row, canEdit, canMoney }: { row: CollegeAdm
         </div>
       ) : null}
       {row.isPartner && canEdit && <details>
-        <summary className="inline-flex min-h-11 cursor-pointer list-none items-center rounded-full px-1 text-sm font-medium text-foreground underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+        <summary className="inline-flex min-h-11 cursor-pointer list-none items-center rounded-full bg-[color:var(--admin-panel-2)] px-5 text-sm font-medium text-foreground hover:bg-[color:var(--admin-bar-tint)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
           Edit name, city, AISHE code
         </summary>
         <form

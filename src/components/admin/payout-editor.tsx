@@ -141,7 +141,7 @@ export function PayoutEditor({
           }}
           aria-label="Edit payout status"
           aria-describedby={error ? errorId : undefined}
-          className="flex min-w-56 flex-col gap-2 rounded-apple-md border border-brand-200 bg-card p-2.5 shadow-sm"
+          className="flex min-w-56 max-w-full flex-col gap-2 rounded-apple-md border border-brand-200 bg-card p-2.5 shadow-sm"
         >
           <div className="grid gap-2">
             <div className="grid gap-1 text-xs font-medium text-ink-700">

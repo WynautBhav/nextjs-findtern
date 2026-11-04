@@ -426,7 +426,7 @@ export function InternPayoutTools({
                       </td>
                       <td data-label="Reference" data-empty={p.referenceId ? undefined : ""} className={cn(td, "nums max-lg:[overflow-wrap:anywhere]")}>{p.referenceId ?? <span className="text-text-subtle">-</span>}</td>
                       <td data-label="Paid on" data-empty={p.paidAt ? undefined : ""} className={cn(td, "nums whitespace-nowrap")}>{p.paidAt ? formatDate(p.paidAt) : "-"}</td>
-                      <td className={cn(td, "text-right")}>
+                      <td className={cn(td, "text-right lg:pr-5")}>
                         {!canPay ? null : p.status === "pending" ? (
                           <PayoutEditor payoutId={p.id} status={p.status} initialReference={p.referenceId} initialNote={opsNote} />
                         ) : p.status === "paid" ? (
