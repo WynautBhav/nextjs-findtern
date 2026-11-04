@@ -1,7 +1,7 @@
 import { and, eq, sql } from "drizzle-orm";
 
 import { getDb, schema } from "@/lib/db";
-import { employerPromoTooLarge, promoAudienceProblem, promoDiscount, promoProblem, type PromoAudience } from "@/lib/promo-rules";
+import { employerPromoTooLarge, promoAudienceProblem, promoDiscount, promoProblem, seatFreeWhere, type PromoAudience } from "@/lib/promo-rules";
 
 /**
  * Promo codes against a real order: shared by the intern activation payment
@@ -80,13 +80,15 @@ export async function recordPromoUse(input: {
   subjectId: string;
   orderId: string;
   discountMinor: number;
-}, db: Db | Tx = getDb()): Promise<void> {
+  /** A ₹0 order has no money to protect: refuse it when the cap is full. A paid order is never refused. */
+  enforceCap?: boolean;
+}, db: Db | Tx = getDb()): Promise<{ capped: boolean; collegeId: string | null }> {
   const [promo] = await db
-    .select({ id: schema.promoCodes.id })
+    .select({ id: schema.promoCodes.id, collegeId: schema.promoCodes.collegeId })
     .from(schema.promoCodes)
     .where(eq(schema.promoCodes.code, input.code))
     .limit(1);
-  if (!promo) return;
+  if (!promo) return { capped: false, collegeId: null };
 
   const inserted = await db
     .insert(schema.promoCodeUsages)
@@ -98,12 +100,17 @@ export async function recordPromoUse(input: {
     })
     .onConflictDoNothing()
     .returning({ id: schema.promoCodeUsages.id });
-  if (inserted.length === 0) return;
+  if (inserted.length === 0) return { capped: false, collegeId: null };
 
-  await db
+  const bump = db
     .update(schema.promoCodes)
-    .set({ usedCount: sql`${schema.promoCodes.usedCount} + 1`, updatedAt: new Date() })
-    .where(eq(schema.promoCodes.id, promo.id));
+    .set({ usedCount: sql`${schema.promoCodes.usedCount} + 1`, updatedAt: new Date() });
+  if (!input.enforceCap) {
+    await bump.where(eq(schema.promoCodes.id, promo.id));
+    return { capped: false, collegeId: promo.collegeId };
+  }
+  const took = await bump.where(seatFreeWhere(promo.id)).returning({ id: schema.promoCodes.id });
+  return { capped: took.length === 0, collegeId: promo.collegeId };
 }
 
 export const DUPLICATE_CODE = "A promo code with this name already exists. Pick a different code.";

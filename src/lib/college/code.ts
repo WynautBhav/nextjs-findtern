@@ -11,6 +11,11 @@ export function generateCollegeCode(): string {
   return out;
 }
 
+/** The TPO's fee-waiver code: 8 random characters, no "FT" prefix, so it is never mistaken for the public college code. */
+export function generateTpoCode(): string {
+  return Array.from({ length: 8 }, () => COLLEGE_CODE_ALPHABET[randomInt(COLLEGE_CODE_ALPHABET.length)]).join("");
+}
+
 /** What a student typed, if it looks like a Findtern college code ("ft7kq3m", " FT-7KQ3M "); else null. */
 export function parseCollegeCode(input: string): string | null {
   const t = input.trim().toUpperCase().replace(/[\s-]/g, "");

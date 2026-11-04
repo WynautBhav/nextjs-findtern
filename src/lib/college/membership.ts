@@ -76,7 +76,6 @@ export async function joinCollege(input: {
     email,
     emailVerified: user.emailVerified,
     domains: college.emailDomains ?? [],
-    onRoster: Boolean(roster),
   });
 
   await db.transaction(async (tx) => {
@@ -112,28 +111,19 @@ export async function leaveCollege(userId: string): Promise<void> {
 }
 
 /**
- * After a roster import: members whose email is now on the roster become
- * verified (roster is the stronger proof, so domain-verified members are
- * relabelled too, and pick up the roster's year and branch). Returns how many
- * were *newly* verified: relabelling someone already verified by college email
- * isn't news to the officer, and counting it said "60 now verified" when none were.
+ * After a roster import: members on the roster pick up its year and branch.
+ * The roster no longer verifies (the college code or college email does), so
+ * nobody is newly verified here and this returns 0.
  */
 export async function verifyFromRoster(collegeId: string): Promise<number> {
-  const match = sql`m.user_id = u.id AND m.college_id = ${collegeId} AND m.left_at IS NULL
-      AND r.college_id = ${collegeId} AND r.email = lower(u.email)`;
-  const db = getDb();
-  const before = await db.execute(sql`
-    SELECT count(*)::int AS n FROM ${schema.collegeMemberships} m, ${schema.users} u, ${schema.collegeRoster} r
-    WHERE ${match} AND m.status <> 'verified'
-  `);
-  await db.execute(sql`
-    UPDATE ${schema.collegeMemberships} m SET status = 'verified', verified_by = 'roster',
+  await getDb().execute(sql`
+    UPDATE ${schema.collegeMemberships} m SET
       year = coalesce(r.year, m.year), branch = coalesce(nullif(r.branch, ''), m.branch)
     FROM ${schema.users} u, ${schema.collegeRoster} r
-    WHERE ${match}
-      AND (m.status <> 'verified' OR m.verified_by IS DISTINCT FROM 'roster')
+    WHERE m.user_id = u.id AND m.college_id = ${collegeId} AND m.left_at IS NULL
+      AND r.college_id = ${collegeId} AND r.email = lower(u.email)
   `);
-  return Number((before.rows[0] as { n?: number } | undefined)?.n ?? 0);
+  return 0;
 }
 
 /**

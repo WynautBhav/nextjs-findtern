@@ -5,6 +5,8 @@
  * `minOrderAmountMinor` are both paise (the form multiplies rupees by 100). A USD order converts both at the
  * same ₹100 = $1 rule as every price, so one code works for both regions.
  */
+import { sql } from "drizzle-orm";
+
 import { inrMinorToUsdMinor } from "./currency.ts";
 import { formatMoney } from "./format.ts";
 
@@ -18,6 +20,8 @@ export type PromoRow = {
   validFrom: Date | null;
   validUntil: Date | null;
   isActive: boolean;
+  /** Set on a per-college TPO code: its cap is that college's free seats. */
+  collegeId?: string | null;
 };
 
 type Currency = "INR" | "USD";
@@ -52,6 +56,24 @@ function inCurrency(inrMinor: number, currency: Currency): number {
   return currency === "USD" ? inrMinorToUsdMinor(inrMinor) : inrMinor;
 }
 
+export const SEATS_USED_UP = "This college's free seats are used up";
+export const DEFAULT_COLLEGE_SEATS = 300;
+
+/** Admin edits a college's cap: a whole number of at least 1, never below the seats already used. */
+export function seatCapProblem(cap: number, usedCount: number): string | null {
+  if (!Number.isInteger(cap) || cap < 1) return "The cap must be a whole number of at least 1";
+  return cap < usedCount ? `${usedCount} seats are already used; the cap can't go below that` : null;
+}
+
+/**
+ * The seat increment's WHERE: the row only matches while a seat is free, so
+ * two students settling at once can't both take the last one (the loser's
+ * UPDATE matches no row). NULL max_usages = unlimited, as everywhere else.
+ */
+export function seatFreeWhere(promoId: string) {
+  return sql`id = ${promoId} AND (max_usages IS NULL OR used_count < max_usages)`;
+}
+
 /** Why this code cannot be used on this order, or null when it can. */
 export function promoProblem(
   row: PromoRow,
@@ -62,7 +84,7 @@ export function promoProblem(
   if (!row.isActive) return "Invalid promo code";
   if (row.validFrom && row.validFrom > now) return "Promo code is not active yet";
   if (row.validUntil && row.validUntil < now) return "Promo code expired";
-  if (row.maxUsages && row.usedCount >= row.maxUsages) return "Promo code exhausted";
+  if (row.maxUsages && row.usedCount >= row.maxUsages) return row.collegeId ? SEATS_USED_UP : "Promo code exhausted";
   if (row.minOrderAmountMinor && orderMinor < inCurrency(row.minOrderAmountMinor, currency)) {
     // ADM-14: say what the minimum is, in the order's currency.
     return `This code needs an order of at least ${formatMoney(inCurrency(row.minOrderAmountMinor, currency), currency)}`;

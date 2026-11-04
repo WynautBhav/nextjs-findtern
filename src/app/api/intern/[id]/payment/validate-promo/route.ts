@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { eq } from "drizzle-orm";
+
+import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
 import { getInternActivationFeeMinor } from "@/lib/platform-settings";
 import { quotePromo } from "@/lib/promo";
@@ -29,7 +32,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     currency: "INR",
   });
   if (!quote.ok) return NextResponse.json({ error: quote.error }, { status: quote.status });
+  const [college] = quote.promo.collegeId
+    ? await getDb().select({ name: schema.colleges.name }).from(schema.colleges).where(eq(schema.colleges.id, quote.promo.collegeId)).limit(1)
+    : [];
   return NextResponse.json({
+    // Set for a college's TPO code: the card then asks for the 18+ tick.
+    collegeName: college?.name ?? null,
     discountType: quote.promo.discountType,
     discountValue: quote.promo.discountValue,
     discountMinor: quote.discountMinor,

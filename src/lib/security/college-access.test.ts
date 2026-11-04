@@ -158,18 +158,18 @@ test("manual include overrides cutoffs; manual exclude beats everything", () => 
 
 // ── Membership proof ───────────────────────────────────────────────────
 
-test("membership: roster email match verifies", () => {
-  const m = membershipFor({ email: "Asha@Gmail.com", emailVerified: true, domains: ["jklu.edu.in"], onRoster: true });
-  assert.deepEqual(m, { status: "verified", verifiedBy: "roster" });
+test("membership: a roster match alone no longer verifies (WP9$)", () => {
+  const m = membershipFor({ email: "Asha@Gmail.com", emailVerified: true, domains: ["jklu.edu.in"] });
+  assert.deepEqual(m, { status: "claimed", verifiedBy: null });
 });
 
 test("membership: college domain verifies only when the inbox is verified", () => {
   assert.deepEqual(
-    membershipFor({ email: "asha@jklu.edu.in", emailVerified: true, domains: ["jklu.edu.in"], onRoster: false }),
+    membershipFor({ email: "asha@jklu.edu.in", emailVerified: true, domains: ["jklu.edu.in"] }),
     { status: "verified", verifiedBy: "email_domain" },
   );
   assert.deepEqual(
-    membershipFor({ email: "asha@jklu.edu.in", emailVerified: false, domains: ["jklu.edu.in"], onRoster: false }),
+    membershipFor({ email: "asha@jklu.edu.in", emailVerified: false, domains: ["jklu.edu.in"] }),
     { status: "claimed", verifiedBy: null },
   );
 });
@@ -177,14 +177,14 @@ test("membership: college domain verifies only when the inbox is verified", () =
 test("membership: lookalike domains do not verify", () => {
   for (const email of ["a@evil-jklu.edu.in", "a@jklu.edu.in.evil.com", "a@xjklu.edu.in"]) {
     assert.equal(
-      membershipFor({ email, emailVerified: true, domains: ["jklu.edu.in"], onRoster: false }).status,
+      membershipFor({ email, emailVerified: true, domains: ["jklu.edu.in"] }).status,
       "claimed",
       email,
     );
   }
   // A department subdomain of the college is still the college.
   assert.equal(
-    membershipFor({ email: "a@cse.jklu.edu.in", emailVerified: true, domains: ["jklu.edu.in"], onRoster: false }).status,
+    membershipFor({ email: "a@cse.jklu.edu.in", emailVerified: true, domains: ["jklu.edu.in"] }).status,
     "verified",
   );
 });

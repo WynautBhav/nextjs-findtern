@@ -34,7 +34,7 @@ export default async function CollegeDashboard() {
   const ctx = await requireCollegeContext();
   const now = requestTime();
 
-  const [students, coverage, [liveDrive]] = await Promise.all([
+  const [students, coverage, [liveDrive], [seat]] = await Promise.all([
     studentsForCollegeAdmin(ctx),
     rosterCoverage(ctx.college.id),
     getDb()
@@ -49,6 +49,11 @@ export default async function CollegeDashboard() {
         ),
       )
       .orderBy(schema.collegeDrives.endsAt)
+      .limit(1),
+    getDb()
+      .select({ code: schema.promoCodes.code, used: schema.promoCodes.usedCount, cap: schema.promoCodes.maxUsages })
+      .from(schema.promoCodes)
+      .where(eq(schema.promoCodes.collegeId, ctx.college.id))
       .limit(1),
   ]);
 
@@ -78,6 +83,16 @@ export default async function CollegeDashboard() {
           endsAt={liveDrive.endsAt.toISOString()}
           initial={{ ...presence }}
         />
+      ) : null}
+
+      {seat ? (
+        <section className="rounded-apple-md border border-ink-200 bg-surface p-4" aria-label="Your college code">
+          <p className="text-sm text-ink-600">Your college code. Share it with students: it waives their AI interview fee and verifies them with your college.</p>
+          <p className="mt-2 flex flex-wrap items-baseline gap-x-4 gap-y-1">
+            <code className="select-all break-all font-mono text-xl font-semibold tracking-widest text-ink-900">{seat.code}</code>
+            <span className="nums text-sm font-medium text-ink-800">{seat.used} of {seat.cap ?? "unlimited"} used</span>
+          </p>
+        </section>
       ) : null}
 
       <StatGrid cols={4} variant="strip">

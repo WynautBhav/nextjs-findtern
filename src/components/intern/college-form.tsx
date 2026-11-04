@@ -122,10 +122,12 @@ function Membership({
 
           <p className="mt-5 border-t border-ink-100 pt-4 text-sm leading-relaxed text-ink-700">
             {verified
-              ? college.verifiedBy === "roster"
+              ? college.verifiedBy === "promo"
+                ? "You used your college's code, so employers in its drives see you as a verified student."
+                : college.verifiedBy === "roster"
                 ? "Your email is on your college's student list, so employers in its drives see you as a verified student."
                 : "You signed up with your college email, so employers in its drives see you as a verified student."
-              : "Employers in your college's drives only see verified students. You'll be verified automatically when your placement office adds your email to their student list, or if you sign up with your college email. Your placement officer can also add you to a drive by hand."}
+              : "Employers in your college's drives only see verified students. You'll be verified when you enter your placement office's college code at the AI interview payment, or if you sign up with your college email. Your placement officer can also add you to a drive by hand."}
           </p>
 
           {!college.isPartner ? (

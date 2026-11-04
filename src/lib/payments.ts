@@ -1,4 +1,4 @@
-import { and, eq, gte, inArray, lt, ne } from "drizzle-orm";
+import { and, eq, gte, inArray, lt, ne, sql } from "drizzle-orm";
 
 import { getDb, schema } from "@/lib/db";
 import { emails } from "@/lib/emails";
@@ -7,6 +7,8 @@ import { employerNames, internFirstName, notify } from "@/lib/notify";
 import { parseOffer } from "@/lib/offer";
 import { applyPendingRatings } from "@/lib/admin/score-live";
 import { recordPromoUse } from "@/lib/promo";
+import { SEATS_USED_UP } from "@/lib/promo-rules";
+import { consentProblem, membershipFromPromo, PROMO_CONSENT_VERSION, promoConsentHash } from "@/lib/college/promo-membership";
 import { assignInvoiceNumber } from "@/lib/invoice-number";
 import { orderProposalIds } from "@/lib/order-ids";
 
@@ -249,6 +251,27 @@ export async function settleEmployerOrder(input: {
   return { ok: true, hired: hired.length };
 }
 
+class SettleRefused extends Error {
+  constructor(message: string = SEATS_USED_UP) {
+    super(message);
+  }
+}
+
+/** The code is the proof: verify the student with that college and record the 18+ consent, in the settlement's transaction. */
+async function verifyByCollegeCode(tx: Parameters<Parameters<ReturnType<typeof getDb>["transaction"]>[0]>[0], userId: string, collegeId: string) {
+  const [existing] = await tx.select().from(schema.collegeMemberships).where(eq(schema.collegeMemberships.userId, userId)).limit(1);
+  const [consent] = await tx
+    .insert(schema.collegeConsents)
+    .values({ userId, collegeId, noticeVersion: PROMO_CONSENT_VERSION, noticeHash: promoConsentHash(), purposes: ["college_code_verification"], declaredAdult: true })
+    .returning({ id: schema.collegeConsents.id });
+  const values = { ...membershipFromPromo(existing ?? null, collegeId), consentId: consent.id };
+  await tx
+    .insert(schema.collegeMemberships)
+    .values({ userId, ...values })
+    .onConflictDoUpdate({ target: schema.collegeMemberships.userId, set: { ...values, joinedAt: sql`now()` } });
+  await tx.delete(schema.collegePresence).where(eq(schema.collegePresence.userId, userId));
+}
+
 /**
  * Marks the intern activation fee paid, in both places the apps look:
  * the intern_payments row and the legacy `extraData.payment.isPaid` flag.
@@ -283,11 +306,18 @@ export async function settleInternOrder(input: {
     if (payment.amountMinor > 0) await assignInvoiceNumber("intern", payment.id, new Date(), tx);
     const promo = promoOf(payment.raw);
     if (promo) {
-      await recordPromoUse({ code: promo.code, subjectId: payment.internId, orderId: input.orderId, discountMinor: promo.discountMinor }, tx);
+      const use = await recordPromoUse({ code: promo.code, subjectId: payment.internId, orderId: input.orderId, discountMinor: promo.discountMinor, enforceCap: payment.amountMinor === 0 }, tx);
+      // Throwing rolls back the claim above too, so the seat and the order stay unspent.
+      if (use.capped) throw new SettleRefused();
+      if (use.collegeId) {
+        if (consentProblem((payment.raw as { declaredAdult?: unknown } | null)?.declaredAdult)) throw new SettleRefused(consentProblem(false)!);
+        await verifyByCollegeCode(tx, payment.internId, use.collegeId);
+      }
     }
     return true;
-  });
-  if (claimed) {
+  }).catch((e) => (e instanceof SettleRefused ? e : Promise.reject(e)));
+  if (claimed instanceof SettleRefused) return { ok: false, status: 409, error: claimed.message };
+  if (claimed === true) {
     await notify({
       to: { type: "intern", id: payment.internId },
       type: "payment_completed",
