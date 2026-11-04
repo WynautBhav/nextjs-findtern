@@ -128,6 +128,8 @@ export default async function EmployerProposalDetail({
   const flexible = offer.shiftFrom === "flexible" || !offer.shiftFrom;
   const ist = flexible ? null : shiftInIst(offer.shiftFrom, offer.shiftTo, offer.timezone, offer.startDate);
   const ft = offer.fullTime;
+  // "Free" only for a real zero (fee-only band stores hourly 0); a missing value stays "-".
+  const monthlyFree = offer.monthlyMinor === 0 || (offer.monthlyMinor == null && offer.hourlyRateMinor === 0);
 
   const strip: [string, string][] = ft
     ? [
@@ -138,7 +140,7 @@ export default async function EmployerProposalDetail({
       ]
     : [
         // One month's amount only (client QA) - no monthly × months total.
-        ["Monthly", offer.monthlyMinor ? formatMoney(offer.monthlyMinor, currency) : "Free"],
+        ["Monthly", offer.monthlyMinor ? formatMoney(offer.monthlyMinor, currency) : monthlyFree ? "Free" : "-"],
         ["Hours a month", offer.monthlyHours ? `${offer.monthlyHours} h` : "-"],
         ["Starts", formatDate(offer.startDate)],
         ["Length", `${offer.months} month${offer.months === 1 ? "" : "s"}`],
@@ -201,7 +203,7 @@ export default async function EmployerProposalDetail({
             <Surface as="section" className="px-6 pb-2 pt-5">
               <SectionHead title="Terms" />
               <dl className="divide-y divide-ink-100">
-                <DetailRow label="Hourly rate" value={offer.hourlyRateMinor ? `${formatMoney(offer.hourlyRateMinor, currency)} an hour` : "Free"} mono />
+                <DetailRow label="Hourly rate" value={offer.hourlyRateMinor ? `${formatMoney(offer.hourlyRateMinor, currency)} an hour` : offer.hourlyRateMinor === 0 ? "Free" : "-"} mono />
                 <DetailRow
                   label="Monthly amount"
                   value={
@@ -210,8 +212,10 @@ export default async function EmployerProposalDetail({
                         {formatMoney(offer.monthlyMinor, currency)}
                         {currency === "INR" ? <span className="ml-1 text-xs font-normal text-text-subtle">(includes GST)</span> : null}
                       </>
-                    ) : (
+                    ) : monthlyFree ? (
                       "Free"
+                    ) : (
+                      "-"
                     )
                   }
                   mono
