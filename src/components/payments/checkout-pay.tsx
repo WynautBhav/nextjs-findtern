@@ -32,7 +32,7 @@ type Props = {
   prefill: { name?: string; email?: string; contact?: string };
   /** Pay for these accepted proposals only. */
   proposalIds?: string[];
-  mode?: "upfront" | "monthly";
+  mode?: "upfront" | "monthly" | "postpaid";
   /** Payments already made for this hire (0 = first), so a repeat submit can't pay the next month. */
   paymentIndex?: number;
   /** PAYMENTS_MODE=free: the order completes without Razorpay. */
@@ -59,7 +59,7 @@ export function CheckoutPay({ employerId, currency, amountMinor, prefill, propos
   const [checking, setChecking] = useState(false);
   const payable = promo ? amountMinor - promo.discountMinor : amountMinor;
   // Promo codes are for upfront payment only; the server refuses them on monthly too.
-  const needsUpfront = mode === "monthly";
+  const needsUpfront = mode !== "upfront";
   const hintId = `promo-hint-${currency}`;
   const setPromoApplied = (next: { code: string; discountMinor: number } | null) => {
     setPromo(next);

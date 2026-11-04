@@ -81,7 +81,7 @@ export function Company360View({
   const upcoming = interviews.filter((i) => i.status === "scheduled" && (slotOf(i)?.getTime() ?? 0) > now).length;
   const hired = proposals.filter((p) => p.status === "hired");
   const activeProjects = projects.filter((p) => ACTIVE_PROJECT(p.status)).length;
-  const dues = ledger.hires.filter((h) => h.dueMinor > 0 || h.plan === "monthly");
+  const dues = ledger.hires.filter((h) => h.dueMinor > 0 || h.plan === "monthly" || h.plan === "postpaid");
   const fte = fteOf(company.internationalFteStatus);
 
   const tabs: { key: Company360Tab; label: string; count?: number }[] = [
@@ -604,7 +604,7 @@ function DuesTab({
             header: "Plan",
             cell: (h) => (
               <span className="whitespace-nowrap">
-                {h.fullTime ? "Full-time" : h.plan === "monthly" ? "Monthly" : h.plan === "upfront" ? "Paid upfront" : "Not paid yet"}
+                {h.fullTime ? "Full-time" : h.plan === "monthly" ? "Monthly" : h.plan === "postpaid" ? "Post-paid" : h.plan === "upfront" ? "Paid upfront" : "Not paid yet"}
               </span>
             ),
           },

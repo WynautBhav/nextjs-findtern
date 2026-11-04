@@ -95,7 +95,7 @@ export default async function EmployerDashboard() {
       {
         count: data.toPay,
         label: data.toPay === 1 ? "payment due" : "payments due",
-        detail: "An accepted offer becomes a hire once it's paid; a running monthly placement pays month by month.",
+        detail: "An accepted offer becomes a hire once the hiring charge is paid. For scores 6 and above, each month's stipend is paid at the end of that month.",
         href: "/employer/checkout",
         cta: "Go to checkout",
         Icon: CreditCard,

@@ -17,7 +17,7 @@ import { addMonthsIso } from "./stipend-dues.ts";
  * Everything is in INR minor units (USD converted at the business rate).
  */
 
-type ProposalLike = { id: string; employerId: string | null; internId: string; status: string; offerDetails: unknown; currency: string | null };
+type ProposalLike = { id: string; employerId: string | null; internId: string; status: string; offerDetails: unknown; currency: string | null; hiredAt?: Date | string | null };
 type PaymentLike = { employerId: string; status: string; amountMinor: number; currency: string; paidAt: Date | string | null; createdAt: Date | string | null; raw: unknown };
 
 export type CompanyMoney = {
@@ -65,7 +65,7 @@ export function companyMoney(
       const offer = parseOffer(p.offerDetails, p.currency);
       const instalment = lineCharge(offer, scoreOf(p.internId), "monthly", { firstPayment: false }).totalMinor;
       amountLeft += toInrMinor(instalment * (d.months - d.monthsPaid), offer.currency);
-      const next = addMonthsIso(offer.startDate, d.monthsPaid);
+      const next = d.plan === "postpaid" ? d.dueOn : addMonthsIso(offer.startDate, d.monthsPaid);
       if (next) dueDates.push(next);
     }
 

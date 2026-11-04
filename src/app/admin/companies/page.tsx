@@ -128,6 +128,7 @@ export default async function AdminCompaniesPage({
               status: schema.proposals.status,
               offerDetails: schema.proposals.offerDetails,
               currency: schema.proposals.currency,
+              hiredAt: schema.proposals.hiredAt,
             })
             .from(schema.proposals)
             .where(and(inArray(schema.proposals.employerId, pageIds), inArray(schema.proposals.status, ["accepted", "processing", "hired"]))),

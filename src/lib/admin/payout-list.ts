@@ -266,7 +266,7 @@ export async function loadPlacementDues(internId?: string): Promise<PlacementDue
       .from(schema.internOnboarding)
       .where(inArray(schema.internOnboarding.userId, internIds)),
     db
-      .select({ employerId: schema.employerPayments.employerId, status: schema.employerPayments.status, raw: schema.employerPayments.raw })
+      .select({ employerId: schema.employerPayments.employerId, status: schema.employerPayments.status, raw: schema.employerPayments.raw, paidAt: schema.employerPayments.paidAt })
       .from(schema.employerPayments)
       .where(and(inArray(schema.employerPayments.employerId, employerIds), eq(schema.employerPayments.status, "paid"))),
   ]);

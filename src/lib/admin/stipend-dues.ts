@@ -2,6 +2,7 @@ import { internStipendInrMinor, parseOffer, stipendEligible, type Offer } from "
 import { isHiredProposal } from "../hire-status.ts";
 import { toInrMinor } from "./money.ts";
 import { formatMoney } from "../format.ts";
+import { billingPlanOf, postpaidMonthsPaid, type BillingPlan } from "../billing-plan.ts";
 
 /**
  * What Findtern owes an intern per hired placement, month by month (legacy
@@ -36,7 +37,7 @@ export type PayoutLike = {
   kind?: string | null;
 };
 /** A paid or unpaid employer order (`employer_payments`). */
-export type OrderLike = { status: string; raw: unknown };
+export type OrderLike = { status: string; raw: unknown; paidAt?: Date | string | null };
 
 export type EmployerSide = {
   /** Offer currency; the amounts below are in it (minor units). */
@@ -45,6 +46,8 @@ export type EmployerSide = {
   totalMinor: number;
   months: number;
   paidMonths: number;
+  /** How the employer is billed (billing-plan.ts). On a post-paid hire an intern's month is never paid before the employer's. */
+  plan: BillingPlan;
   /** Paid in full at checkout (legacy paymentMode "total"). */
   paidInFull: boolean;
   dueMinor: number;
@@ -179,18 +182,21 @@ export function orderIdsOf(raw: unknown): { ids: string[]; dueIds: string[]; mod
  * order, and each checkout that carried the placement as a due month, pays one.
  */
 export function employerSide(proposalId: string, offer: Offer, orders: OrderLike[]): EmployerSide {
+  const plan = billingPlanOf(proposalId, orders);
   let paidInFull = false;
   let paidMonths = 0;
   for (const o of orders) {
     if (String(o.status).toLowerCase() !== "paid") continue;
     const { ids, dueIds, mode, purpose } = orderIdsOf(o.raw);
     if (ids.includes(proposalId)) {
+      // "hiring_fee" is the first payment of a post-paid hire: neither paid in full nor a month.
       if (mode === "total" || mode === "upfront") paidInFull = true;
       else if (mode === "monthly" || purpose === "employer_monthly_payment") paidMonths += 1;
     } else if (dueIds.includes(proposalId)) {
       paidMonths += 1;
     }
   }
+  if (plan === "postpaid") paidMonths = postpaidMonthsPaid(proposalId, orders);
   const months = offer.months;
   const monthlyMinor = employerMonthlyOf(offer);
   const covered = paidInFull ? months : Math.min(months, paidMonths);
@@ -201,6 +207,7 @@ export function employerSide(proposalId: string, offer: Offer, orders: OrderLike
     totalMinor: offer.totalMinor ?? monthlyMinor * months,
     months,
     paidMonths: covered,
+    plan,
     paidInFull,
     dueMinor,
     monthlyInrMinor: toInrMinor(monthlyMinor, offer.currency),
@@ -316,6 +323,10 @@ export function payoutRefusal(due: StipendDue | undefined, amountMinor: number):
   if (due.monthlyShareMinor <= 0) return "No stipend is due on this placement: the intern's Findtern Score is below 6.";
   if (due.pending) return "A payout is already pending for this placement. Mark it paid or failed before creating another.";
   if (due.remainingMinor <= 0 || due.remainingMonths <= 0) return "Nothing is left to pay on this placement.";
+  // Post-paid hire: Findtern never pays an intern ahead of the employer. Running (grandfathered) hires keep the soft flag.
+  if (due.employer?.plan === "postpaid" && due.paidMonths >= due.employer.paidMonths) {
+    return `The employer hasn't paid month ${due.paidMonths + 1} yet. This payout opens once they do.`;
+  }
   if (!Number.isInteger(amountMinor) || amountMinor <= 0) return "Enter an amount greater than zero.";
   const cap = payoutCapMinor(due);
   if (amountMinor > cap) return `That is more than one month's stipend still owed (at most ${formatMoney(cap, "INR", { zeroLabel: false })}).`;

@@ -42,6 +42,7 @@ export async function loadReceivables(
         status: schema.proposals.status,
         offerDetails: schema.proposals.offerDetails,
         currency: schema.proposals.currency,
+        hiredAt: schema.proposals.hiredAt,
       })
       .from(schema.proposals)
       .where(inArray(schema.proposals.status, ["accepted", "processing", "hired"])),

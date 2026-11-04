@@ -122,7 +122,9 @@ export default async function EmployerCheckout({
             feeMinor: line.charge.perHireMinor,
             // A running monthly placement is already priced as its due month.
             upfrontMinor: line.charge.totalMinor,
-            monthlyMinor: line.due || !line.monthlyCharge.monthlyBlocked ? line.monthlyCharge.totalMinor : null,
+            monthlyMinor: line.due ? line.monthlyCharge.totalMinor : null,
+            postpaidMinor: !line.due && !line.charge.monthlyBlocked ? line.feeCharge.totalMinor : null,
+            schedule: line.schedule,
             monthlyBlocked: line.monthlyCharge.monthlyBlocked,
             due: Boolean(line.due),
             monthsPaid: line.due?.monthsPaid ?? 0,

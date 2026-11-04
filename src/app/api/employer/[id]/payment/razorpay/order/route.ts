@@ -18,8 +18,8 @@ const bodySchema = z.object({
   currency: z.enum(["INR", "USD"], { error: "Pick INR or USD." }).default("INR"),
   /** One hire per payment (legacy checkout). */
   proposalIds: z.array(z.string().min(1), { error: "Pay for one hire at a time" }).length(1, "Pay for one hire at a time"),
-  /** How a new hire is paid; a running monthly placement always pays its due month. */
-  mode: z.enum(["upfront", "monthly"], { error: "Choose to pay upfront or monthly." }).default("upfront"),
+  /** How a new hire is paid: "postpaid" (fee now, stipend at each month's end, score 6+) or the whole engagement "upfront". A running placement always pays its due month. */
+  mode: z.enum(["upfront", "monthly", "postpaid"], { error: "Choose how to pay." }).default("upfront"),
   /** The month being paid: payments already made for this hire (0 = first). A stale second submit names a month that is already paid. */
   paymentIndex: z.number({ error: "This page is out of date. Refresh and try again." }).int().min(0),
   promoCode: z.string({ error: "Enter a valid promo code." }).trim().min(1, "Enter a valid promo code.").optional(),
@@ -116,14 +116,19 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (paymentIndexMismatch(paying, parsed.data.paymentIndex)) {
     return NextResponse.json({ error: "This month is already paid. Refresh the page to see it under Orders." }, { status: 409 });
   }
-  if (parsed.data.mode === "monthly" && paying.some((l) => !l.due && l.charge.monthlyBlocked)) {
-    return NextResponse.json({ error: paying.find((l) => l.charge.monthlyBlocked)!.charge.monthlyBlocked }, { status: 400 });
+  // Pay-at-start monthly is gone for new hires (a stale tab from before the change gets a clear refusal).
+  if (parsed.data.mode === "monthly" && paying.some((l) => !l.due)) {
+    return NextResponse.json({ error: "Monthly payment is now made at the end of each month. Refresh the page." }, { status: 400 });
+  }
+  if (parsed.data.mode === "postpaid") {
+    const blocked = paying.find((l) => !l.due && l.charge.monthlyBlocked)?.charge.monthlyBlocked;
+    if (blocked) return NextResponse.json({ error: blocked }, { status: 400 });
   }
   // A due month is monthly whatever was asked; dues.ts counts these orders.
   const mode = paying.some((l) => l.due) ? "monthly" : parsed.data.mode;
   // Promo codes are for upfront payment only (3 Nov 2026), whatever the client asked.
   if (parsed.data.promoCode) {
-    const modeProblem = promoModeProblem(mode);
+    const modeProblem = promoModeProblem(mode === "upfront" ? "upfront" : "monthly");
     if (modeProblem) return NextResponse.json({ error: modeProblem }, { status: 400 });
   }
 
@@ -159,7 +164,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     proposalIds: paying.map((l) => l.id),
     // Legacy's word for paid in full is "total"; it reads anything else as
     // still owing and would offer to charge the months again (EMH-25).
-    paymentMode: mode === "monthly" ? "monthly" : "total",
+    // "hiring_fee" is the first payment of a post-paid hire (billing-plan.ts).
+    paymentMode: mode === "monthly" ? "monthly" : mode === "postpaid" ? "hiring_fee" : "total",
     dueProposalIds: paying.filter((l) => l.due).map((l) => l.id),
     // DB-07: legacy admin shows computedAmountMinor as the order amount, so
     // it is what is charged (0 for a free test order, net of any promo).

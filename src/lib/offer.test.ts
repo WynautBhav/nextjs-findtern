@@ -132,7 +132,7 @@ test("monthly dues: one of three months paid leaves the next month due", () => {
       { status: "paid", raw: { notes: { proposalIds: ["p1"], paymentMode: "upfront" } } },
     ],
   );
-  assert.deepEqual(dues, [{ proposalId: "p1", monthsPaid: 1, months: 3 }]);
+  assert.deepEqual(dues, [{ proposalId: "p1", monthsPaid: 1, months: 3, plan: "monthly_prepaid", dueOn: null, payable: true }]);
 });
 
 test("an offer lapses on its start date (IST), not before", async () => {
