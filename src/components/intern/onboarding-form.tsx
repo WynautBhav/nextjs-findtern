@@ -305,8 +305,8 @@ export function OnboardingForm({
 
   return (
     // Bottom room on phones so the chat launcher (fixed above the tab bar)
-    // never sits on the step's buttons once scrolled to the end.
-    <div ref={formTop} className="scroll-mt-24 pb-32 lg:pb-0">
+    // never sits on the step's buttons once scrolled to the end (lg: the launcher floats bottom-right).
+    <div ref={formTop} className="scroll-mt-24 pb-32 lg:pb-24">
       <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[15rem_minmax(0,1fr)] lg:gap-8 xl:grid-cols-[16rem_minmax(0,1fr)]">
         {/* ── Step rail (desktop) ─────────────────────────────────────── */}
         <aside className="hidden lg:block">
