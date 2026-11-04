@@ -11,7 +11,8 @@ import { FREE_DECLINES, offerPastStart, parseOffer } from "./offer.ts";
  * on the employer never holding the interview. A lapse is stamped
  * `offerDetails.lapsedAt` when the row later leaves `sent` (sibling auto-expiry,
  * withdraw, admin expire) and still counts. Not counted: other withdrawals or
- * expiries, admin-set "rejected" (no `declinedBy: intern` stamp).
+ * expiries, admin-set "rejected" (no `declinedBy: intern` stamp) unless the offer had
+ * already lapsed (`lapsedAt`).
  */
 export type GuaranteeProposal = { status: string | null; offerDetails: unknown; currency?: string | null };
 
@@ -20,10 +21,12 @@ export function guaranteeMisses(proposals: GuaranteeProposal[], now: Date = new 
   let lapsed = 0;
   for (const p of proposals) {
     const status = (p.status ?? "").toLowerCase();
-    if (status === "rejected") {
-      if (((p.offerDetails ?? {}) as Record<string, unknown>).declinedBy === "intern") declined += 1;
-    } else if (
-      typeof ((p.offerDetails ?? {}) as Record<string, unknown>).lapsedAt === "string" ||
+    const od = (p.offerDetails ?? {}) as Record<string, unknown>;
+    // The lapse stamp is checked before the rejected branch so an admin
+    // rejecting an already-lapsed offer cannot erase the miss.
+    if (status === "rejected" && od.declinedBy === "intern") declined += 1;
+    else if (
+      typeof od.lapsedAt === "string" ||
       (status === "sent" && offerPastStart(parseOffer(p.offerDetails, p.currency).startDate, now))
     ) {
       lapsed += 1;

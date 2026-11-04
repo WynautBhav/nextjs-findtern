@@ -49,3 +49,13 @@ test("an interview_scheduled offer past its start is not a lapse", () => {
   const m = guaranteeMisses([{ status: "interview_scheduled", offerDetails: { startDate: "2026-11-01" } }], now);
   assert.equal(m.total, 0);
 });
+
+test("a lapsed offer later rejected by admin still counts as a miss", () => {
+  const adminRejectedLapse = {
+    status: "rejected",
+    offerDetails: { closedByAdminAt: "2026-11-03T00:00:00Z", lapsedAt: "2026-11-02T00:00:00Z" },
+  };
+  const m = guaranteeMisses([declined, declined, declined, adminRejectedLapse], now);
+  assert.deepEqual(m, { declined: 3, lapsed: 1, total: 4 });
+  assert.equal(guaranteeEnded({}, m), true);
+});
