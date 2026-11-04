@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -31,20 +31,31 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const db = getDb();
   const [onboarding] = await db.select({ id: schema.internOnboarding.id }).from(schema.internOnboarding).where(eq(schema.internOnboarding.userId, id)).limit(1);
   if (!onboarding) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  if (await isInternPaid(id)) return NextResponse.json({ ok: true, alreadyPaid: true });
-
   const amountMinor = Math.round((parsed.data.amountRupees ?? (await getInternActivationFeeMinor()) / 100) * 100);
-  const orderId = `manual_${id}_${randomUUID().slice(0, 8)}`;
   const { reference } = parsed.data;
-  await db.insert(schema.internPayments).values({
-    internId: id,
-    gateway: "manual",
-    orderId,
-    amountMinor,
-    currency: "INR",
-    status: "created",
-    raw: { method: "manual", reference, markedBy: guard.session.uid },
+  const orderId = await db.transaction(async (tx) => {
+    // Lock the intern's user row: a second mark-paid (double click, two tabs, two admins) waits here until the first commits.
+    await tx.select({ id: schema.users.id }).from(schema.users).where(eq(schema.users.id, id)).for("update");
+    if (await isInternPaid(id, tx)) return null;
+    const [open] = await tx
+      .select({ orderId: schema.internPayments.orderId })
+      .from(schema.internPayments)
+      .where(and(eq(schema.internPayments.internId, id), eq(schema.internPayments.gateway, "manual"), eq(schema.internPayments.status, "created")))
+      .limit(1);
+    if (open) return open.orderId; // an earlier click's row (or a failed settle): settle that one, never a second
+    const fresh = `manual_${id}_${randomUUID().slice(0, 8)}`;
+    await tx.insert(schema.internPayments).values({
+      internId: id,
+      gateway: "manual",
+      orderId: fresh,
+      amountMinor,
+      currency: "INR",
+      status: "created",
+      raw: { method: "manual", reference, markedBy: guard.session.uid },
+    });
+    return fresh;
   });
+  if (!orderId) return NextResponse.json({ ok: true, alreadyPaid: true });
   const settled = await settleInternOrder({ orderId, paymentId: reference, internId: id });
   if (!settled.ok) return NextResponse.json({ error: settled.error }, { status: settled.status });
 
