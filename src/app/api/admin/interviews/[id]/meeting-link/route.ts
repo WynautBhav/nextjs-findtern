@@ -4,7 +4,8 @@ import { z } from "zod";
 
 import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
-import { notify } from "@/lib/notify";
+import { emails } from "@/lib/emails";
+import { employerNames, internFirstName, notify } from "@/lib/notify";
 import { mergeInterviewNotes, noteTag, statusAfterMeetingLink } from "@/lib/admin/interview-notes";
 
 const AI_EMAIL = "ai-interview@findtern.ai";
@@ -124,6 +125,7 @@ export async function PUT(
           message: "The meeting link for your interview has been added. Open your interviews to join.",
           data,
           dedupeKey,
+          email: emails.interviewLinkReady({ name: await internFirstName(existing.internId), link, forEmployer: false }),
         });
         await notify({
           to: { type: "employer", id: existing.employerId },
@@ -132,6 +134,7 @@ export async function PUT(
           message: "The meeting link for your interview has been added. Open your schedule to join.",
           data,
           dedupeKey,
+          email: emails.interviewLinkReady({ name: (await employerNames(existing.employerId)).contact, link, forEmployer: true }),
         });
       } catch (notifyErr) {
         console.error("Interview link notification failed:", notifyErr);

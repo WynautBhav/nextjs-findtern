@@ -154,6 +154,16 @@ export const emails = {
     cta: { label: "Open dashboard", url: `${origin()}/${o.forEmployer ? "employer/schedule" : "intern/interviews"}` },
   }),
 
+  /** Findtern added the meeting link by hand; no company name, the intern may not see it yet. */
+  interviewLinkReady: (o: { name: string; link: string; forEmployer: boolean }): EmailContent => ({
+    subject: "Your interview link is ready | Findtern",
+    heading: "Your interview link is ready",
+    greeting: hi(o.name),
+    lines: ["The meeting link for your interview has been added."],
+    facts: [["Meet link", o.link]],
+    cta: { label: "Open dashboard", url: `${origin()}/${o.forEmployer ? "employer/schedule" : "intern/interviews"}` },
+  }),
+
   interviewRescheduled: (o: { name: string; byEmployer: boolean }): EmailContent => ({
     subject: "Interview rescheduled | Findtern",
     heading: "An interview was rescheduled",
