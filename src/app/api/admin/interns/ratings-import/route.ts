@@ -5,6 +5,7 @@ import { applyRatings, RATINGS_TEMPLATE, RATINGS_TEMPLATE_ROWS, readRatingsRows,
 import { buildXlsx, isXlsx, readXlsxRows, XLSX_MIME } from "@/lib/xlsx";
 import { afterRatingsSaved } from "@/lib/admin/score-live";
 import { getDb, schema } from "@/lib/db";
+import { isInternPaid } from "@/lib/payments";
 import { requireMutation } from "@/lib/guards-mutation";
 
 /** The sheet template (legacy column names): Excel by default, `?format=csv` for CSV. */
@@ -62,6 +63,10 @@ export async function POST(req: Request) {
     const uid = byEmail.get(r.email);
     if (!uid) {
       failures.push({ row: r.row, email: r.email, reason: "User not found" });
+      continue;
+    }
+    if (!(await isInternPaid(uid))) {
+      failures.push({ row: r.row, email: r.email, reason: "Activation fee not paid, so this candidate can't be scored yet" });
       continue;
     }
     // Read and write under a row lock, so a concurrent bonus grant or webhook cannot be overwritten.

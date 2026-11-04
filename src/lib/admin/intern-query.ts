@@ -1,6 +1,7 @@
 import { and, asc, count, desc, eq, inArray, sql, type SQL } from "drizzle-orm";
 
 import { getDb, schema } from "@/lib/db";
+import { feePaidSql } from "@/lib/fee-paid-sql";
 import { searchAny } from "@/lib/admin/params";
 import { aiInterviewAt, aiInterviewStatus, findternScoreSql, meaningfulProfile } from "@/lib/admin/scope";
 import { loadLedgerByIntern, loadPlacementDues, type PlacementDueRow } from "@/lib/admin/payout-list";
@@ -88,8 +89,7 @@ export async function loadInterns(
   const hiredExists = sql<boolean>`EXISTS (SELECT 1 FROM ${schema.proposals} p WHERE p.intern_id = ${u.id} AND ${HIRED})`;
   const fullTime = sql<boolean>`EXISTS (SELECT 1 FROM ${schema.proposals} p WHERE p.intern_id = ${u.id}
     AND (${HIRED} OR lower(p.status) = 'accepted') AND jsonb_typeof(p.offer_details->'fullTimeOffer') = 'object')`;
-  const feePaid = sql<boolean>`(EXISTS (SELECT 1 FROM ${schema.internPayments} ip WHERE ip.intern_id = ${u.id} AND ip.status = 'paid')
-    OR coalesce(${o.extraData}->'payment'->>'isPaid', '') = 'true')`;
+  const feePaid = feePaidSql(u.id, o.extraData);
   // Hired wins; otherwise the latest proposal (legacy offerStatus).
   const offerStatus = sql<string | null>`(SELECT lower(p.status) FROM ${schema.proposals} p WHERE p.intern_id = ${u.id}
     ORDER BY ${HIRED} DESC, p.created_at DESC NULLS LAST LIMIT 1)`;

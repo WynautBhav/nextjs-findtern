@@ -6,6 +6,7 @@ import { eq } from "drizzle-orm";
 import { applyRatings, type RatingUpdate } from "@/lib/admin/ratings";
 import { afterRatingsSaved } from "@/lib/admin/score-live";
 import { getDb, schema } from "@/lib/db";
+import { isInternPaid } from "@/lib/payments";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -100,7 +101,8 @@ export async function POST(req: Request) {
         .where(eq(schema.internOnboarding.userId, String(internId)))
         .limit(1)
         .for("update");
-      if (!onboarding) return null;
+      // Legacy guard: no score without the paid interview.
+      if (!onboarding || !(await isInternPaid(String(internId), tx))) return null;
       const prevExtra = (onboarding.extraData as Record<string, unknown>) ?? {};
       const extra = applyRatings(prevExtra, updates);
       const nextExtra = {
