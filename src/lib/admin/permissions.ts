@@ -154,15 +154,15 @@ export function canGrant(granted: readonly string[] | undefined, wanted: readonl
   return wanted.every((p) => p !== WILDCARD && g.includes(p));
 }
 
-/** What each CSV export needs, by `?type=`. */
+/** What each CSV export needs, by `?type=`: the data's own read permission, as the proxy map requires for its page and API (reports:read alone doesn't open it). */
 export const EXPORT_PERMISSIONS: Record<string, Permission[]> = {
-  interns: ["interns:read", "reports:read"],
-  proposals: ["interns:read", "reports:read"],
-  companies: ["companies:read", "reports:read"],
-  projects: ["companies:read", "reports:read"],
-  payments: ["transactions:read", "reports:read"],
-  payouts: ["transactions:read", "reports:read"],
-  "intern-payments": ["transactions:read", "reports:read"],
+  interns: ["interns:read"],
+  proposals: ["interns:read"],
+  companies: ["companies:read"],
+  projects: ["companies:read"],
+  payments: ["transactions:read"],
+  payouts: ["transactions:read"],
+  "intern-payments": ["transactions:read"],
 };
 
 /** Where staff land, in order of preference: the first page their role opens. */

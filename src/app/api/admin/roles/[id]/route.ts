@@ -2,6 +2,7 @@ import { eq, or } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { forgetAdminPermissions } from "@/lib/account-status";
 import { getDb, schema } from "@/lib/db";
 import { canGrant, PERMISSIONS } from "@/lib/admin/permissions";
 import { requireMutation } from "@/lib/guards-mutation";
@@ -42,6 +43,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     .update(schema.adminRoles)
     .set({ ...parsed.data, updatedAt: new Date() })
     .where(eq(schema.adminRoles.id, role.id));
+  forgetAdminPermissions();
   return NextResponse.json({ ok: true });
 }
 

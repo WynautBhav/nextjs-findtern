@@ -81,6 +81,12 @@ export function forgetAccountStatus(role: string, uid: string) {
 
 const adminCache = (store.__ftAdminPerms ??= new Map());
 
+/** Drop one admin's cached permissions (or all, after a role's permissions change) so the change applies on the next request. */
+export function forgetAdminPermissions(uid?: string) {
+  if (uid) adminCache.delete(uid);
+  else adminCache.clear();
+}
+
 /**
  * An admin's current permissions (null if the account was removed), so a
  * role change or removal applies within seconds rather than at next login.

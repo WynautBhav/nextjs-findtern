@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { forgetAdminPermissions } from "@/lib/account-status";
 import { getDb, schema } from "@/lib/db";
 import { canGrant } from "@/lib/admin/permissions";
 import { requireMutation } from "@/lib/guards-mutation";
@@ -77,6 +78,7 @@ export async function DELETE(req: Request) {
     return NextResponse.json({ error: "You can't remove someone with more access than you." }, { status: 403 });
   }
   await db.delete(schema.admins).where(eq(schema.admins.id, parsed.data.id));
+  forgetAdminPermissions(parsed.data.id);
 
   return NextResponse.json({ ok: true });
 }
@@ -118,7 +120,7 @@ export async function PATCH(req: Request) {
     .where(eq(schema.admins.id, id))
     .returning({ id: schema.admins.id });
   if (updated.length === 0) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  // Permissions are re-read per request (cached ~30s), so this applies almost at once.
+  forgetAdminPermissions(id); // this instance applies it at once; others within the 30s cache
   return NextResponse.json({ ok: true });
 }
 
