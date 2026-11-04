@@ -348,7 +348,7 @@ export default async function EmployerSchedule({ searchParams }: { searchParams:
                     ) : null}
 
                     <p className="mt-2 pl-[3.625rem] text-sm leading-relaxed text-ink-600">
-                      {r.feedback && (stage === "over" || stage === "missed") ? "Feedback shared with the candidate. Nothing more to do." : stageInfo.next}
+                      {r.feedback && (stage === "over" || stage === "missed") ? "Feedback shared with the candidate. Nothing more to do." : stage === "upcoming" && !link ? "Booked. The meeting link will be added here and emailed before the start. You can remind the candidate or move the time." : stage === "awaiting_pick" && offered.length === 0 ? "The candidate asked to reschedule. Offer three new times." : stageInfo.next}
                     </p>
 
                     {r.feedback ? (

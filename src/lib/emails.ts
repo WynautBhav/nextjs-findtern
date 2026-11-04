@@ -149,7 +149,10 @@ export const emails = {
     subject: o.forEmployer ? "Meeting scheduled | Candidate confirmed a slot" : "Meeting scheduled successfully | Findtern",
     heading: "Your meeting is scheduled",
     greeting: hi(o.name),
-    lines: [o.forEmployer ? "The candidate confirmed a slot." : "Your meeting has been scheduled. Please be available at this time."],
+    lines: [
+      o.forEmployer ? "The candidate confirmed a slot." : "Your meeting has been scheduled. Please be available at this time.",
+      ...(o.link ? [] : ["The meeting link will follow by email."]),
+    ],
     facts: [[o.forEmployer ? "Candidate" : "Company", o.other], ["When", o.when], ...(o.link ? ([["Meet link", o.link]] as [string, string][]) : [])],
     cta: { label: "Open dashboard", url: `${origin()}/${o.forEmployer ? "employer/schedule" : "intern/interviews"}` },
   }),
