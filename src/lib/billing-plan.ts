@@ -3,10 +3,13 @@ import { engagementPeriods } from "./employer-timesheets.ts";
 /**
  * How an internship hire is billed: the ONE place that reads an employer
  * order's `paymentMode` (WPP$). Every reader (checkout, dues, invoices, admin
- * ledgers, payout gate) goes through here, so an unknown mode can never again
- * read as "paid in full".
+ * ledgers, payout gate) goes through here. An unknown or missing mode reads as
+ * "upfront" (paid in full): that is right for today's data, where legacy orders
+ * carry "total" or no mode. A new mode must be added here, and to the two
+ * ledgers that default to paid in full on their own (`placementLedger` in
+ * dues.ts, `company-ledger.ts`), or it will read as paid.
  *
- *  - upfront          first order "total"/"upfront" (or anything unknown): everything paid at hire.
+ *  - upfront          first order "total"/"upfront", no mode, or any unknown mode: everything paid at hire.
  *  - monthly_prepaid  first order "monthly": month 1 + fee at hire, each later month at its start (grandfathered).
  *  - postpaid         first order "hiring_fee": the fee only at hire; month k is due on the last day of month k.
  *  - unpaid           no paid order names the hire yet.
