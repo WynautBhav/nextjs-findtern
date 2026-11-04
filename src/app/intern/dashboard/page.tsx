@@ -23,7 +23,7 @@ import { loadInternData, openProjects } from "@/lib/intern-data";
 import { isMeetingLinkLive } from "@/lib/employer-interview-rules";
 import { companyIn, hoursByMonth, hoursIn, nextAction, roleOf, slotOf } from "@/lib/journey";
 import { formatMoney, formatSlotTime, shortDate } from "@/lib/format";
-import { isInternPaid } from "@/lib/payments";
+import { internPaidMinor, isInternPaid } from "@/lib/payments";
 import { isHiredProposal } from "@/lib/hire-status";
 import { paymentsAreFree, testPayEnabled } from "@/lib/razorpay";
 import { getInternActivationFeeMinor } from "@/lib/platform-settings";
@@ -83,7 +83,7 @@ export default async function InternHome() {
   const session = await requireRole("intern");
 
   // Independent reads, in parallel. loadInternData is cache()d: the layout's call already did the work.
-  const [data, [user], activated, activationFeeMinor, college] = await Promise.all([
+  const [data, [user], activated, activationFeeMinor, paidMinor, college] = await Promise.all([
     loadInternData(session.uid),
     getDb()
       .select({
@@ -100,6 +100,7 @@ export default async function InternHome() {
     // row exists the card leaves the dashboard for good.
     isInternPaid(session.uid),
     getInternActivationFeeMinor(),
+    internPaidMinor(session.uid),
     membershipOf(session.uid).catch(() => null),
   ]);
   const action = nextAction(data.thread);
@@ -426,7 +427,8 @@ export default async function InternHome() {
           <GettingStarted
             completion={completion}
             activated={activated}
-            feeMinor={activationFeeMinor}
+            // Once paid, show what was charged (promo applied), not the list price.
+            feeMinor={activated ? (paidMinor ?? activationFeeMinor) : activationFeeMinor}
             internId={session.uid}
             aiPhase={aiPhase}
             aiLink={aiPhase === "ready" ? joinableLink(aiRow?.meetingLink) : null}

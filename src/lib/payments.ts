@@ -362,6 +362,16 @@ export async function isInternPaid(internId: string, db: ReturnType<typeof getDb
   return ((row?.extraData as Record<string, any> | null)?.payment?.isPaid ?? false) === true; // eslint-disable-line @typescript-eslint/no-explicit-any
 }
 
+/** What the intern actually paid for activation (the row the invoice and email use), or null when no paid row exists. */
+export async function internPaidMinor(internId: string): Promise<number | null> {
+  const [paid] = await getDb()
+    .select({ amountMinor: schema.internPayments.amountMinor })
+    .from(schema.internPayments)
+    .where(and(eq(schema.internPayments.internId, internId), eq(schema.internPayments.status, "paid")))
+    .limit(1);
+  return paid?.amountMinor ?? null;
+}
+
 /** Tell the intern a payout landed (in-app + email). Safe to call twice. */
 export async function notifyStipendPaid(payoutId: string) {
   const db = getDb();
