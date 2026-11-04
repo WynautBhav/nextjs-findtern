@@ -11,7 +11,7 @@ import { timezoneForLocation, wallTimeToUtc } from "@/lib/timezones";
 import { canEmployerSeeIntern } from "@/lib/employer-pool";
 import { hiredProposalSql } from "@/lib/employer-visibility";
 import { hasDuplicateSlots, hasSlotTooFarAhead, isBlockingInterview, isQuarterHourWall } from "@/lib/employer-interview-rules";
-import { shortDateTime } from "@/lib/format";
+import { formatIst } from "@/lib/format";
 
 const wall = z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/);
 const bodySchema = z.object({
@@ -126,25 +126,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       // The company stays hidden from the intern until it hires them.
       companyName: (await hiredBy(db, id, b.internId)) ? (await employerNames(id)).company : "A company on Findtern",
       project: projectName,
-      slots: [b.slot1, b.slot2, b.slot3].map(wallLabel),
-      timezone: b.timezone,
+      // The intern reads every time in IST, like the interviews page (INW-09).
+      slots: slots.map((s) => formatIst(s, { year: true })),
     }),
   });
   return NextResponse.json({ interview }, { status: 201 });
-}
-
-/** "Tue 3 Nov 2026, 3:30 pm" for a wall-clock "2026-11-03T15:30". */
-function wallLabel(wall: string): string {
-  const d = new Date(`${wall.slice(0, 16)}:00Z`);
-  return shortDateTime(d, {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-    timeZone: "UTC",
-  });
 }
 
 async function hiredBy(db: ReturnType<typeof getDb>, employerId: string, internId: string): Promise<boolean> {
