@@ -13,6 +13,7 @@ import { and, desc, eq, inArray } from "drizzle-orm";
 
 import { lineCharge, type LineCharge, type PayMode } from "@/lib/checkout";
 import { getDb, schema } from "@/lib/db";
+import { istDay, postpaidAnchor, postpaidDueOn } from "@/lib/billing-plan";
 import { monthlyDues } from "@/lib/dues";
 import { parseOffer } from "@/lib/offer";
 import { initialsOf, scoreOf } from "@/lib/employer-candidates";
@@ -47,8 +48,12 @@ export type PayableLine = {
   monthlyCharge: LineCharge;
   /** Set for a hired monthly-plan placement: the next month is due. */
   due: { monthsPaid: number; months: number } | null;
-  /** YYYY-MM-DD the due month falls due (start + months paid); null when not a due line or no start. */
+  /** YYYY-MM-DD the due month falls due (post-paid: the month's last day; else start + months paid); null when not a due line or no start. */
   dueOn: string | null;
+  /** The fee-only first payment of a post-paid hire (score 6+ internship), whatever mode was asked for. */
+  feeCharge: LineCharge;
+  /** YYYY-MM-DD each month's stipend falls due on a post-paid hire, month 1 first; empty when not offered or no start date. */
+  schedule: string[];
   /** Offer start date (YYYY-MM-DD) or null. */
   startDate: string | null;
   /** Set on a full-time offer: the annual CTC the 8.33% fee is on. */
@@ -91,10 +96,16 @@ export async function openProposalsWithDues(db: Db | Tx, employerId: string) {
     .where(and(eq(schema.proposals.employerId, employerId), inArray(schema.proposals.status, ["accepted", "processing", "hired"])))
     .orderBy(desc(schema.proposals.updatedAt));
   const payments = await db
-    .select({ status: schema.employerPayments.status, raw: schema.employerPayments.raw })
+    .select({ status: schema.employerPayments.status, raw: schema.employerPayments.raw, paidAt: schema.employerPayments.paidAt })
     .from(schema.employerPayments)
     .where(eq(schema.employerPayments.employerId, employerId));
-  return { open, dues: new Map(monthlyDues(open, payments).map((d) => [d.proposalId, d])) };
+  const all = monthlyDues(open, payments);
+  // `dues` is what can be paid now; `upcoming` is post-paid months not yet due (display only, never orderable).
+  return {
+    open,
+    dues: new Map(all.filter((d) => d.payable).map((d) => [d.proposalId, d])),
+    upcoming: new Map(all.filter((d) => !d.payable).map((d) => [d.proposalId, d])),
+  };
 }
 
 export async function payableCheckout(
@@ -204,7 +215,11 @@ export async function payableCheckout(
         // the summary shows more than the order route charges.
         monthlyCharge: lineCharge(offer, score, "monthly", { firstPayment: !dues.has(proposal.id) }),
         due: dues.get(proposal.id) ?? null,
-        dueOn: dues.has(proposal.id) ? addMonthsDay(offer.startDate, dues.get(proposal.id)!.monthsPaid) : null,
+        dueOn: dues.has(proposal.id) ? (dues.get(proposal.id)!.dueOn ?? addMonthsDay(offer.startDate, dues.get(proposal.id)!.monthsPaid)) : null,
+        feeCharge: lineCharge(offer, score, "postpaid"),
+        schedule: dues.has(proposal.id) || offer.fullTime
+          ? []
+          : Array.from({ length: offer.months }, (_, i) => postpaidDueOn(postpaidAnchor(offer.startDate, null) ?? istDay(new Date()), offer.months, i + 1) ?? "").filter(Boolean),
         startDate: offer.startDate,
         fullTimeCtcMinor: offer.fullTime?.annualCtcMinor ?? null,
         fullTime: Boolean(offer.fullTime),

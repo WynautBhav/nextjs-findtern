@@ -16,7 +16,12 @@ import type { Offer } from "./offer.ts";
  * All amounts are minor units of the offer currency.
  */
 
-export type PayMode = "upfront" | "monthly";
+/**
+ * "postpaid" (score 6+): the hiring fee now, each month's stipend on the last
+ * day of that month (billing-plan.ts). "monthly" is only a later instalment of
+ * a hire already paid on the old pay-at-start plan.
+ */
+export type PayMode = "upfront" | "monthly" | "postpaid";
 
 export const PER_HIRE_MINOR = { INR: 500_000, USD: 5_000 } as const;
 export const FULL_TIME_FEE = 0.0833;
@@ -48,7 +53,7 @@ export function lineCharge(
   const monthlyBlocked = offer.fullTime
     ? "Full-time offers are paid upfront"
     : lowScore
-      ? "Monthly payment needs a Findtern Score of 6 or more"
+      ? "Month-end payment needs a Findtern Score of 6 or more"
       : null;
 
   if (offer.fullTime) {
@@ -62,6 +67,12 @@ export function lineCharge(
   // 6+ candidates before this rule stored none).
   const fee = (offer.perHireMinor ?? 0) > 0 ? offer.perHireMinor! : PER_HIRE_MINOR[offer.currency];
   const perHireMinor = firstPayment ? fee : 0;
+
+  if (mode === "postpaid" && !monthlyBlocked) {
+    // First payment: the fee alone. A later month is the stipend alone, no fee.
+    const base = firstPayment ? fee : (offer.monthlyMinor ?? 0);
+    return { baseMinor: base, discountMinor: 0, totalMinor: base, perHireMinor, monthlyBlocked };
+  }
 
   if (mode === "monthly" && !monthlyBlocked) {
     const base = (offer.monthlyMinor ?? 0) + perHireMinor;

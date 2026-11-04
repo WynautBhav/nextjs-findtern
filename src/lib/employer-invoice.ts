@@ -1,4 +1,5 @@
 import { displayInvoiceNumber, LEGACY_INVOICE_CUTOFF, legacyInvoiceNumbers, type InvoiceLine } from "./invoice.ts";
+import { billingPlanOf, orderNotes } from "./billing-plan.ts";
 import { hireInvoiceLines } from "./invoice-lines.ts";
 import { formatMoney } from "./format.ts";
 import { parseOffer } from "./offer.ts";
@@ -82,7 +83,9 @@ function build(
 ): EmployerInvoice {
   const ids = orderProposalIds(p.raw as Record<string, unknown> | null);
   const rows = ids.map((id) => hires.get(id)).filter((r): r is InvoiceHire => Boolean(r));
-  const monthly = ((p.raw as { notes?: { paymentMode?: string } } | null)?.notes?.paymentMode ?? "") === "monthly";
+  const { mode } = orderNotes(p.raw);
+  const feeOrder = mode === "hiring_fee";
+  const monthly = mode === "monthly";
 
   const lines: InvoiceLine[] = rows.flatMap((r) => {
     const offer = parseOffer(r.offerDetails as never, r.currency as never);
@@ -98,12 +101,28 @@ function build(
       ];
     }
     // Payments for this hire that settled before this one: the first carries the hiring fee.
-    const paymentIndex = (paidByProposal.get(r.proposalId) ?? []).filter(
+    const earlier = (paidByProposal.get(r.proposalId) ?? []).filter(
       (o) =>
         o.id !== p.id &&
         Boolean(o.paidAt && p.paidAt) &&
         (o.paidAt!.getTime() < p.paidAt!.getTime() || (o.paidAt!.getTime() === p.paidAt!.getTime() && o.orderId < p.orderId)),
-    ).length;
+    );
+    const paymentIndex = earlier.length;
+    // Post-paid hire: the first order is the hiring charge alone, each later one is stipend month k
+    // (k counts months paid before this order, not payments: the fee order pays no month).
+    if (feeOrder || (monthly && billingPlanOf(r.proposalId, paidByProposal.get(r.proposalId) ?? []) === "postpaid")) {
+      const k = earlier.filter((o) => orderNotes(o.raw).dueIds.includes(r.proposalId)).length + 1;
+      return hireInvoiceLines({
+        who: r.who,
+        roleTitle: offer.roleTitle,
+        projectName: r.projectName ?? "Project",
+        offer,
+        monthly: !feeOrder,
+        paymentIndex,
+        chargedMinor: rows.length === 1 ? p.amountMinor : null,
+        postpaid: feeOrder ? "fee" : k,
+      });
+    }
     return hireInvoiceLines({
       who: r.who,
       roleTitle: offer.roleTitle,
@@ -123,7 +142,7 @@ function build(
 
   return {
     number,
-    description: `Intern hiring services${monthly ? " - monthly instalment" : ""}`,
+    description: `Intern hiring services${feeOrder ? " - hiring charge" : monthly ? " - monthly instalment" : ""}`,
     monthly,
     lines,
     hireNames: rows.map((r) => r.who).filter(Boolean),

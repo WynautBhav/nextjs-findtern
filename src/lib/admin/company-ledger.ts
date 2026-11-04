@@ -1,3 +1,4 @@
+import { billingPlanOf, postpaidAnchor, postpaidDueOn } from "../billing-plan.ts";
 import { lineCharge } from "../checkout.ts";
 import { parseOffer } from "../offer.ts";
 import { toInrMinor } from "./money.ts";
@@ -28,6 +29,7 @@ type ProposalLike = {
   status: string;
   offerDetails: unknown;
   currency: string | null;
+  hiredAt?: Date | string | null;
 };
 type PaymentLike = {
   id: string;
@@ -49,7 +51,7 @@ export type HireLedger = {
   /** Annual CTC for full-time offers (minor units), else null. */
   ctcMinor: number | null;
   monthlyMinor: number | null;
-  plan: "upfront" | "monthly" | "unpaid";
+  plan: "upfront" | "monthly" | "postpaid" | "unpaid";
   totalMinor: number;
   paidMinor: number;
   dueMinor: number;
@@ -64,7 +66,7 @@ export type PaymentLedger = {
   proposalIds: string[];
   /** "Full-time", "Internship" or "Mixed"; null when the order names no proposal. */
   type: "Full-time" | "Internship" | "Mixed" | null;
-  mode: "Monthly" | "Upfront";
+  mode: "Monthly" | "Upfront" | "Hiring charge";
 };
 
 export type CompanyLedger = {
@@ -106,6 +108,7 @@ export function companyLedger(
   const paidMinor = new Map<string, number>();
   const monthlyCount = new Map<string, number>();
   const paidInFull = new Set<string>();
+  const feePaid = new Set<string>(); // post-paid hires: the hiring-charge order is in
   const paymentInfo = new Map<string, PaymentLedger>();
 
   // Oldest first, so "first monthly payment" (which carries the fee) is right.
@@ -118,7 +121,7 @@ export function companyLedger(
       paymentId: pay.id,
       proposalIds: ids,
       type: kinds.size === 0 ? null : kinds.size > 1 ? "Mixed" : (kinds.values().next().value as "Full-time" | "Internship"),
-      mode: mode === "monthly" ? "Monthly" : "Upfront",
+      mode: mode === "monthly" ? "Monthly" : mode === "hiring_fee" ? "Hiring charge" : "Upfront",
     });
   }
 
@@ -127,13 +130,14 @@ export function companyLedger(
     const mine = ids.filter((id) => byId.has(id));
     if (mine.length === 0) continue;
     const monthly = mode === "monthly";
+    const feeOnly = mode === "hiring_fee";
     // What each line should have cost in this order, to split the amount.
     const weights = mine.map((id) => {
       const offer = offers.get(id)!;
       const score = scoreOf(byId.get(id)!.internId);
       const isMonthly = monthly || dueIds.includes(id);
-      const first = (monthlyCount.get(id) ?? 0) === 0;
-      return Math.max(1, lineCharge(offer, score, isMonthly ? "monthly" : "upfront", { firstPayment: first }).totalMinor);
+      const first = (monthlyCount.get(id) ?? 0) === 0 && !feePaid.has(id);
+      return Math.max(1, lineCharge(offer, score, feeOnly ? "postpaid" : isMonthly ? "monthly" : "upfront", { firstPayment: first }).totalMinor);
     });
     const sum = weights.reduce((s, w) => s + w, 0);
     let left = Math.max(0, pay.amountMinor);
@@ -141,7 +145,8 @@ export function companyLedger(
       const share = i === mine.length - 1 ? left : Math.round((Math.max(0, pay.amountMinor) * weights[i]) / sum);
       left -= share;
       paidMinor.set(id, (paidMinor.get(id) ?? 0) + share);
-      if (monthly || dueIds.includes(id)) monthlyCount.set(id, (monthlyCount.get(id) ?? 0) + 1);
+      if (feeOnly) feePaid.add(id);
+      else if (monthly || dueIds.includes(id)) monthlyCount.set(id, (monthlyCount.get(id) ?? 0) + 1);
       else paidInFull.add(id);
     });
   }
@@ -165,7 +170,21 @@ export function companyLedger(
     const paidSoFar = paidMinor.get(p.id) ?? 0;
     const monthsPaid = monthlyCount.get(p.id) ?? 0;
 
-    if (paidInFull.has(p.id) || (p.status === "hired" && monthsPaid === 0)) {
+    if (feePaid.has(p.id) && !offer.fullTime && billingPlanOf(p.id, paid) === "postpaid") {
+      const left = Math.max(0, base.months - monthsPaid);
+      const instalment = lineCharge(offer, score, "postpaid", { firstPayment: false }).totalMinor;
+      const due = instalment * left;
+      hires.push({
+        ...base,
+        plan: "postpaid",
+        totalMinor: paidSoFar + due,
+        paidMinor: paidSoFar,
+        dueMinor: due,
+        monthsPaid: Math.min(monthsPaid, base.months),
+        monthsLeft: left,
+        nextDueDate: left > 0 ? postpaidDueOn(postpaidAnchor(offer.startDate, p.hiredAt), base.months, monthsPaid + 1) : null,
+      });
+    } else if (paidInFull.has(p.id) || (p.status === "hired" && monthsPaid === 0)) {
       hires.push({ ...base, plan: "upfront", totalMinor: paidSoFar, paidMinor: paidSoFar, dueMinor: 0, monthsPaid: base.months, monthsLeft: 0, nextDueDate: null });
     } else if (monthsPaid > 0) {
       const left = Math.max(0, base.months - monthsPaid);

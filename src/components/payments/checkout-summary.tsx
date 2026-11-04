@@ -24,8 +24,12 @@ export type SummaryLine = {
   feeMinor: number;
   /** The whole engagement paid now (or the full-time fee). */
   upfrontMinor: number;
-  /** First month incl. any fee; null when monthly isn't offered. */
+  /** A running placement's due month (no fee); null on a new hire. */
   monthlyMinor: number | null;
+  /** The hiring charge alone, paid now with each month's stipend due at its month end; null when not offered (score below 6, full-time). */
+  postpaidMinor: number | null;
+  /** YYYY-MM-DD each month's stipend falls due, month 1 first (post-paid). */
+  schedule: string[];
   monthlyBlocked: string | null;
   /** A running monthly placement: only its due month can be paid. */
   due: boolean;
@@ -37,14 +41,15 @@ export type SummaryLine = {
   fullTimeCtcMinor: number | null;
 };
 
-type Mode = "upfront" | "monthly";
+type Mode = "upfront" | "monthly" | "postpaid";
 
 /**
  * Checkout, as one flow: pick the hire on the left, see exactly what is
  * charged on the right, pay. One hire per payment (legacy checkout), so an
- * invoice, a refund or a dispute always maps to one candidate. A new hire is
- * paid month by month by default where the offer allows it (bug sheet
- * 22 Oct), or all upfront; a running monthly placement pays its due month.
+ * invoice, a refund or a dispute always maps to one candidate. A new
+ * hire (score 6+) pays the hiring charge now and each month's stipend at that
+ * month's end by default, or the whole internship now; a running placement pays
+ * its due month.
  */
 export function CheckoutSummary({
   employerId,
@@ -64,14 +69,14 @@ export function CheckoutSummary({
 }) {
   const [selectedId, setSelectedId] = useState(lines.find((l) => l.id === initialId)?.id ?? lines[0]?.id ?? "");
   const line = lines.find((l) => l.id === selectedId) ?? lines[0];
-  const [picked, setPicked] = useState<Mode>("monthly");
-  // A promo code is for the whole engagement paid upfront: while one is applied, monthly is locked.
+  const [picked, setPicked] = useState<Mode>("postpaid");
+  // A promo code is for the whole engagement paid upfront: while one is applied, month-end payment is locked.
   const [promoApplied, setPromoApplied] = useState(false);
 
-  const canMonthly = Boolean(line && line.monthlyMinor != null) && !promoApplied;
-  const mode: Mode = line?.due ? "monthly" : canMonthly ? picked : "upfront";
+  const canPostpaid = Boolean(line && line.postpaidMinor != null) && !promoApplied;
+  const mode: Mode = line?.due ? "monthly" : canPostpaid ? picked : "upfront";
   const amountOf = (l: SummaryLine, m: Mode) =>
-    l.due || (m === "monthly" && l.monthlyMinor != null) ? (l.monthlyMinor ?? 0) : l.upfrontMinor;
+    l.due ? (l.monthlyMinor ?? 0) : m === "postpaid" && l.postpaidMinor != null ? l.postpaidMinor : l.upfrontMinor;
   const amountMinor = line ? amountOf(line, mode) : 0;
   const m = (minor: number, cur: string) => formatMoney(minor, cur, { zeroLabel: false });
 
@@ -132,9 +137,9 @@ export function CheckoutSummary({
                       </span>
                     </span>
                     <span className="nums text-left sm:text-right">
-                      <span className="block text-lg font-semibold text-ink-900">{m(amountOf(l, picked), l.currency)}</span>
+                      <span className="block text-lg font-semibold text-ink-900">{m(amountOf(l, l.id === line?.id ? mode : picked), l.currency)}</span>
                       <span className="block text-xs text-text-subtle">
-                        {l.due ? "this month" : l.fullTimeCtcMinor != null ? "one-time fee" : picked === "monthly" && l.monthlyMinor != null ? "first month" : "whole engagement"}
+                        {l.due ? "this month" : l.fullTimeCtcMinor != null ? "one-time fee" : l.postpaidMinor != null && (l.id === line?.id ? mode : picked) === "postpaid" ? "hiring charge, due now" : "whole internship"}
                       </span>
                     </span>
                   </span>
@@ -163,31 +168,24 @@ export function CheckoutSummary({
               <div className="clear-left space-y-1">
                 <label
                   className={cn(
-                    "flex min-h-11 items-center gap-2.5 rounded-apple-sm px-2 text-sm text-ink-800",
-                    canMonthly ? "cursor-pointer hover:bg-ink-50" : "opacity-60",
+                    "flex min-h-11 items-center gap-2.5 rounded-apple-sm px-2 py-1 text-sm text-ink-800",
+                    canPostpaid ? "cursor-pointer hover:bg-ink-50" : "opacity-60",
                   )}
                 >
                   <input
                     type="radio"
                     name="checkout-mode"
-                    className="size-4 accent-brand-700"
-                    checked={mode === "monthly"}
-                    disabled={!canMonthly}
-                    onChange={() => setPicked("monthly")}
+                    className="size-4 shrink-0 accent-brand-700"
+                    checked={mode === "postpaid"}
+                    disabled={!canPostpaid}
+                    onChange={() => setPicked("postpaid")}
                   />
                   <span className="min-w-0 flex-1">
-                    Monthly
+                    {line.postpaidMinor != null ? `${m(line.postpaidMinor, line.currency)} now, stipend at the end of each month` : "Stipend at the end of each month"}
                     <span className="block text-xs text-text-subtle">
-                      {promoApplied
-                        ? "Not with a promo code"
-                        : canMonthly
-                        ? line.months > 1
-                          ? `First month now, then ${line.months - 1} more monthly`
-                          : "One month, paid now"
-                        : line.monthlyBlocked}
+                      {promoApplied ? "Not with a promo code" : canPostpaid ? "Recommended" : line.monthlyBlocked}
                     </span>
                   </span>
-                  {line.monthlyMinor != null ? <span className="nums text-ink-700">{m(line.monthlyMinor, line.currency)}</span> : null}
                 </label>
                 <label className="flex min-h-11 cursor-pointer items-center gap-2.5 rounded-apple-sm px-2 text-sm text-ink-800 hover:bg-ink-50">
                   <input
@@ -198,10 +196,10 @@ export function CheckoutSummary({
                     onChange={() => setPicked("upfront")}
                   />
                   <span className="min-w-0 flex-1">
-                    Whole engagement
+                    Pay the whole internship now
                     <span className="block text-xs text-text-subtle">Paid once, now</span>
                   </span>
-                  <span className="nums text-ink-700">{m(line.upfrontMinor, line.currency)}</span>
+                  <span className="nums shrink-0 text-ink-700">{m(line.upfrontMinor, line.currency)}</span>
                 </label>
               </div>
             </fieldset>
@@ -212,17 +210,37 @@ export function CheckoutSummary({
               <Row label="Hiring fee (8.33% of annual CTC)">{m(line.upfrontMinor, line.currency)}</Row>
             ) : (
               <>
-                <Row label={mode === "monthly" ? (line.due ? line.durationLabel : "First month") : "Engagement"}>
-                  {m(amountMinor - (line.due ? 0 : line.feeMinor), line.currency)}
-                </Row>
-                {!line.due && line.feeMinor > 0 ? <Row label="Hiring fee (one-time)">{m(line.feeMinor, line.currency)}</Row> : null}
+                {mode === "postpaid" ? (
+                  <Row label="Hiring charge (one-time)">{m(amountMinor, line.currency)}</Row>
+                ) : (
+                  <>
+                    <Row label={line.due ? line.durationLabel : "Stipend, whole internship"}>
+                      {m(amountMinor - (line.due ? 0 : line.feeMinor), line.currency)}
+                    </Row>
+                    {!line.due && line.feeMinor > 0 ? <Row label="Hiring charge (one-time)">{m(line.feeMinor, line.currency)}</Row> : null}
+                  </>
+                )}
               </>
             )}
             <div className="flex items-baseline justify-between gap-3 border-t border-ink-100 pt-3">
-              <dt className="text-sm font-medium text-ink-800">{mode === "monthly" ? "Due now" : "Total"}</dt>
+              <dt className="text-sm font-medium text-ink-800">{mode === "upfront" ? "Total" : "Due now"}</dt>
               <dd className="nums text-2xl font-semibold tracking-[-0.02em] text-ink-900">{m(amountMinor, line.currency)}</dd>
             </div>
           </dl>
+
+          {mode === "postpaid" && line.schedule.length > 0 ? (
+            <div className="mt-4 border-t border-ink-100 pt-4 text-sm">
+              <p className="font-medium text-ink-800">Then, at the end of each month</p>
+              <ul className="mt-2 space-y-1.5">
+                {line.schedule.map((d, i) => (
+                  <li key={d} className="flex flex-wrap items-baseline justify-between gap-x-3 text-ink-600">
+                    <span>Month {i + 1} · due {formatDate(d)}</span>
+                    <span className="nums font-medium text-ink-900">{line.monthlyRateMinor != null ? m(line.monthlyRateMinor, line.currency) : ""}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
 
           <div className="mt-4">
             <CheckoutPay

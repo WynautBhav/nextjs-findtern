@@ -1,4 +1,4 @@
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 
 import { getDb, schema } from "@/lib/db";
 import { nextFromCycle, proposalOf, stipendDues, type StipendDue } from "@/lib/admin/stipend-dues";
@@ -52,8 +52,13 @@ export async function loadPlacementDue(
       .limit(1),
   ]);
   if (!proposal || proposal.internId !== internId) return { due: undefined, proposal: null };
+  // The employer's paid orders, so the post-paid payout gate has data (payoutRefusal).
+  const orders = await db
+    .select({ status: schema.employerPayments.status, raw: schema.employerPayments.raw, paidAt: schema.employerPayments.paidAt })
+    .from(schema.employerPayments)
+    .where(and(eq(schema.employerPayments.employerId, proposal.employerId), eq(schema.employerPayments.status, "paid")));
   const scoreRaw = Number(((onboarding?.extraData ?? {}) as Record<string, unknown>).findternScore);
-  const [due] = stipendDues([proposal], payouts, Number.isFinite(scoreRaw) ? scoreRaw : null);
+  const [due] = stipendDues([proposal], payouts, Number.isFinite(scoreRaw) ? scoreRaw : null, orders);
   const offer = (proposal.offerDetails ?? {}) as Record<string, unknown>;
   return {
     due,
@@ -110,6 +115,8 @@ export async function queueNextMonth(
       await lockPlacement(tx, proposalId);
       const { due, proposal } = await loadPlacementDue(tx, internId, proposalId);
       if (!due || !proposal || due.pending || due.remainingMonths === 0 || due.monthlyShareMinor <= 0 || !due.nextDate) return null;
+      // Post-paid hire: the next month is queued by hand once the employer has paid it (payoutRefusal).
+      if (due.employer?.plan === "postpaid") return null;
       const base = {
         internId,
         status: "pending",

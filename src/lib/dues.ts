@@ -1,3 +1,4 @@
+import { billingPlanOf, istDay, orderNotes, postpaidAnchor, postpaidDueOn, postpaidMonthsPaid, postpaidNext } from "./billing-plan.ts";
 import { lineCharge } from "./checkout.ts";
 import { monthsOf, parseOffer } from "./offer.ts";
 
@@ -8,23 +9,10 @@ import { monthsOf, parseOffer } from "./offer.ts";
  * owes the next month.
  */
 
-type PaymentLike = { status: string; raw: unknown };
-type ProposalLike = { id: string; status: string; offerDetails: unknown };
+type PaymentLike = { status: string; raw: unknown; paidAt?: Date | string | null };
+type ProposalLike = { id: string; status: string; offerDetails: unknown; hiredAt?: Date | string | null };
 
-function notesOf(raw: unknown): { ids: string[]; mode: string; dueIds: string[] } {
-  const r = (raw ?? {}) as Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
-  const n = r.notes ?? r.order?.notes ?? {};
-  let ids = n.proposalIds ?? n.proposal_ids ?? [];
-  if (typeof ids === "string") {
-    try {
-      ids = JSON.parse(ids);
-    } catch {
-      ids = [];
-    }
-  }
-  const due = Array.isArray(n.dueProposalIds) ? n.dueProposalIds.map(String) : [];
-  return { ids: Array.isArray(ids) ? ids.map(String) : [], mode: String(n.paymentMode ?? "upfront"), dueIds: due };
-}
+const notesOf = orderNotes;
 
 /** The promo discount an order recorded, in minor units (0 when none). */
 function promoDiscountOf(raw: unknown): number {
@@ -32,9 +20,23 @@ function promoDiscountOf(raw: unknown): number {
   return Number.isFinite(n) && n > 0 ? Math.round(n) : 0;
 }
 
-export type Due = { proposalId: string; monthsPaid: number; months: number };
+export type Due = {
+  proposalId: string;
+  monthsPaid: number;
+  months: number;
+  plan: "monthly_prepaid" | "postpaid";
+  /** Post-paid: month `monthsPaid + 1` falls due on this day (YYYY-MM-DD); null for pay-at-start hires. */
+  dueOn: string | null;
+  /** Can this month be paid now? Pay-at-start months always; post-paid ones from their due day. */
+  payable: boolean;
+};
 
-export function monthlyDues(proposals: ProposalLike[], payments: PaymentLike[]): Due[] {
+/**
+ * Hired placements with months still to pay. Pay-at-start hires (grandfathered)
+ * owe the next month straight away; post-paid hires owe month k from its last
+ * day, and `payable` says whether that day has come (`todayIst`, YYYY-MM-DD).
+ */
+export function monthlyDues(proposals: ProposalLike[], payments: PaymentLike[], todayIst: string = istDay(new Date())!): Due[] {
   const paid = new Map<string, number>();
   for (const p of payments) {
     if (p.status !== "paid") continue;
@@ -43,14 +45,22 @@ export function monthlyDues(proposals: ProposalLike[], payments: PaymentLike[]):
     // carry next-month dues for monthly placements (dueProposalIds).
     for (const id of mode === "monthly" ? ids : dueIds) paid.set(id, (paid.get(id) ?? 0) + 1);
   }
-  return proposals
-    .filter((p) => p.status === "hired" && paid.has(p.id))
-    .map((p) => ({
-      proposalId: p.id,
-      monthsPaid: paid.get(p.id)!,
-      months: monthsOf(((p.offerDetails ?? {}) as Record<string, unknown>).duration),
-    }))
-    .filter((d) => d.monthsPaid < d.months);
+  const dues: Due[] = [];
+  for (const p of proposals) {
+    if (p.status !== "hired") continue;
+    const plan = billingPlanOf(p.id, payments);
+    const offer = (p.offerDetails ?? {}) as Record<string, unknown>;
+    const months = monthsOf(offer.duration);
+    if (plan === "postpaid") {
+      const monthsPaid = postpaidMonthsPaid(p.id, payments);
+      if (monthsPaid >= months) continue;
+      const next = postpaidNext(postpaidAnchor(offer.startDate as string | undefined, p.hiredAt), months, monthsPaid, todayIst);
+      dues.push({ proposalId: p.id, monthsPaid, months, plan, dueOn: next?.dueOn ?? null, payable: Boolean(next?.payable) });
+    } else if (paid.has(p.id) && paid.get(p.id)! < months) {
+      dues.push({ proposalId: p.id, monthsPaid: paid.get(p.id)!, months, plan: "monthly_prepaid", dueOn: null, payable: true });
+    }
+  }
+  return dues;
 }
 
 /* ── Placement ledger (EMH-11) ──────────────────────────────────────────
@@ -65,7 +75,7 @@ type HireLike = ProposalLike & { currency?: string | null };
 
 export type PlacementLedger = {
   proposalId: string;
-  plan: "upfront" | "monthly" | "full_time" | "unpaid";
+  plan: "upfront" | "monthly" | "postpaid" | "full_time" | "unpaid";
   currency: "INR" | "USD";
   /** Whole engagement incl. the one-time hiring fee (or the full-time fee). Minor units. */
   totalMinor: number;
@@ -107,7 +117,9 @@ export function placementLedger(hire: HireLike, payments: readonly PaidOrderLike
     const { ids, mode, dueIds } = notesOf(p.raw);
     const asDue = dueIds.includes(hire.id);
     if (!ids.includes(hire.id) && !asDue) continue;
-    if (mode === "monthly" || asDue) monthsPaid += 1;
+    if (mode === "hiring_fee") {
+      // The fee order covers no month and is not "paid in full".
+    } else if (mode === "monthly" || asDue) monthsPaid += 1;
     else upfrontPaid = true;
     if (ids.length <= 1) promoMinor += promoDiscountOf(p.raw);
     const at = p.paidAt ? new Date(p.paidAt) : null;
@@ -119,9 +131,12 @@ export function placementLedger(hire: HireLike, payments: readonly PaidOrderLike
   // still due does not change and "paid" is what was actually charged.
   const listMinor = upfront.totalMinor;
   const totalMinor = Math.max(0, listMinor - promoMinor);
+  const postpaid = !offer.fullTime && billingPlanOf(hire.id, payments) === "postpaid";
   const plan: PlacementLedger["plan"] = offer.fullTime
     ? "full_time"
-    : upfrontPaid
+    : postpaid
+      ? "postpaid"
+      : upfrontPaid
       ? "upfront"
       : monthsPaid > 0
         ? "monthly"
@@ -129,7 +144,7 @@ export function placementLedger(hire: HireLike, payments: readonly PaidOrderLike
   const paidMinor =
     plan === "upfront" || (plan === "full_time" && paidOn.length > 0)
       ? totalMinor
-      : plan === "monthly"
+      : plan === "monthly" || plan === "postpaid"
         ? Math.max(0, Math.min(listMinor, upfront.perHireMinor + monthly.totalMinor * monthsPaid) - promoMinor)
         : 0;
   const dueMinor = Math.max(0, totalMinor - paidMinor);
@@ -144,7 +159,12 @@ export function placementLedger(hire: HireLike, payments: readonly PaidOrderLike
     months,
     monthsPaid: covered,
     paidOn,
-    nextDue: dueMinor > 0 && covered < months ? addMonths(offer.startDate, covered) : null,
+    nextDue:
+      dueMinor > 0 && covered < months
+        ? plan === "postpaid"
+          ? postpaidDueOn(postpaidAnchor(offer.startDate, hire.hiredAt), months, covered + 1)
+          : addMonths(offer.startDate, covered)
+        : null,
     endsOn: offer.fullTime ? null : addMonths(offer.startDate, offer.months),
     status: dueMinor === 0 && paidMinor > 0 ? "fully_paid" : paidMinor > 0 ? "partially_paid" : "unpaid",
   };

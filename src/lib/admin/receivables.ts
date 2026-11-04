@@ -1,3 +1,4 @@
+import { orderNotes, postpaidAnchor, postpaidDueOn } from "../billing-plan.ts";
 import { lineCharge } from "../checkout.ts";
 import { monthlyDues } from "../dues.ts";
 import { parseOffer } from "../offer.ts";
@@ -38,12 +39,14 @@ export type MoneyRow = {
 
 export type ReceivablesInput = {
   since: Date | null;
+  /** The clock, for overdue post-paid months; tests pass one. */
+  now?: Date;
   until: Date | null;
   employerName: (id: string) => string;
   internName: (id: string) => string;
   scoreOf: (internId: string) => number;
   activationFeeMinor: number;
-  proposals: { id: string; employerId: string; internId: string; status: string; offerDetails: unknown; currency: string | null }[];
+  proposals: { id: string; employerId: string; internId: string; status: string; offerDetails: unknown; currency: string | null; hiredAt?: Date | string | null }[];
   employerPayments: { id: string; employerId: string; orderId: string; paymentId: string | null; status: string; amountMinor: number; currency: string; paidAt: Date | null; createdAt: Date | null; raw: unknown }[];
   internPayments: { id: string; internId: string; paymentId: string | null; status: string; amountMinor: number; currency: string; paidAt: Date | null; createdAt: Date | null }[];
   unpaidProfiles: { userId: string; createdAt: Date | null }[];
@@ -84,7 +87,7 @@ export function computeReceivables(input: ReceivablesInput, filter: { receivable
           date: date!,
           source: "company",
           status: "received",
-          description: "Employer payment",
+          description: orderNotes(p.raw).mode === "hiring_fee" ? "Employer payment: hiring charge" : "Employer payment",
           companyName: input.employerName(p.employerId),
           candidateName: null,
           amountMinor: p.amountMinor,
@@ -122,15 +125,17 @@ export function computeReceivables(input: ReceivablesInput, filter: { receivable
       const offer = parseOffer(p.offerDetails, p.currency);
       const instalment = lineCharge(offer, input.scoreOf(p.internId), "monthly", { firstPayment: false }).totalMinor;
       for (let i = d.monthsPaid; i < d.months; i++) {
-        const date = addMonthsIso(offer.startDate, i);
+        // Post-paid: month k is due on its last day, overdue the day after.
+        const postpaid = d.plan === "postpaid";
+        const date = postpaid ? postpaidDueOn(postpaidAnchor(offer.startDate, p.hiredAt), d.months, i + 1) : addMonthsIso(offer.startDate, i);
         if (!inRange(date)) continue;
         receivables.push(
           row({
             id: `instalment:${p.id}:${i + 1}`,
             date: date!,
             source: "company",
-            status: "upcoming",
-            description: `Monthly instalment ${i + 1} of ${d.months}`,
+            status: postpaid && date! < istDayKey(input.now ?? new Date())! ? "due" : "upcoming",
+            description: postpaid ? `Month ${i + 1} of ${d.months} stipend (paid at month end)` : `Monthly instalment ${i + 1} of ${d.months}`,
             companyName: input.employerName(p.employerId),
             candidateName: input.internName(p.internId),
             amountMinor: instalment,

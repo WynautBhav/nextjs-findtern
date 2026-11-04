@@ -10,7 +10,7 @@ const bodySchema = z.object({
   code: z.string().trim().min(1),
   currency: z.enum(["INR", "USD"]).default("INR"),
   proposalIds: z.array(z.string().min(1)).length(1),
-  mode: z.enum(["upfront", "monthly"]).default("upfront"),
+  mode: z.enum(["upfront", "monthly", "postpaid"]).default("upfront"),
 });
 
 /** Preview only: the order route re-prices the code against the same total. */
@@ -22,7 +22,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const parsed = bodySchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Something is wrong with this request. Refresh the page and try again." }, { status: 400 });
 
-  const modeProblem = promoModeProblem(parsed.data.mode);
+  const modeProblem = promoModeProblem(parsed.data.mode === "upfront" ? "upfront" : "monthly");
   if (modeProblem) return NextResponse.json({ error: modeProblem }, { status: 400 });
 
   // Priced exactly as the order route prices it: one hire, in the chosen mode.

@@ -1,5 +1,6 @@
 import type { InvoiceLine } from "./invoice.ts";
 import { lineCharge } from "./checkout.ts";
+import { engagementPeriods } from "./employer-timesheets.ts";
 import type { Offer } from "./offer.ts";
 import { formatMoney } from "./format.ts";
 
@@ -28,10 +29,35 @@ export function hireInvoiceLines(input: {
   monthly: boolean;
   paymentIndex: number;
   chargedMinor?: number | null;
+  /** Post-paid hire (billing-plan.ts): "fee" = the first payment, the hiring charge alone; a number k = stipend month k, no fee. */
+  postpaid?: "fee" | number;
 }): InvoiceLine[] {
   const { roleTitle, projectName, offer, monthly, paymentIndex } = input;
   // A nameless or deleted candidate still reads "Candidate — Designer", never "— Designer".
   const who = input.who.trim() || "Candidate";
+  if (input.postpaid === "fee") {
+    const fee = lineCharge(offer, 10, "postpaid").perHireMinor;
+    return [
+      {
+        label: `${who} — Hiring charge`,
+        detail: `${projectName} · One-time hiring charge; the stipend is billed at the end of each month`,
+        amountMinor: input.chargedMinor != null && input.chargedMinor > 0 ? input.chargedMinor : fee,
+      },
+    ];
+  }
+  if (typeof input.postpaid === "number") {
+    const k = input.postpaid;
+    const p = offer.startDate ? engagementPeriods(offer.startDate, offer.months)[k - 1] : undefined;
+    const day = (iso: string) => new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", timeZone: "UTC" }).format(new Date(`${iso}T00:00:00Z`)).replace("Sept", "Sep");
+    const listed = lineCharge(offer, 10, "postpaid", { firstPayment: false }).totalMinor;
+    return [
+      {
+        label: `${who} — ${roleTitle || projectName}`,
+        detail: `${offer.months}m · ${projectName} · Stipend, Month ${k} of ${offer.months}${p ? ` (${day(p.start)} – ${day(p.end)})` : ""}`,
+        amountMinor: input.chargedMinor != null && input.chargedMinor > 0 ? input.chargedMinor : listed,
+      },
+    ];
+  }
   const first = paymentIndex === 0;
   // Score 10: the mode was already allowed when the order was made.
   const charge = lineCharge(offer, 10, monthly ? "monthly" : "upfront", { firstPayment: first });
