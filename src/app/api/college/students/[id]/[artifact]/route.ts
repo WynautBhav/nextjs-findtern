@@ -5,6 +5,7 @@ import { aiInterviewLinks } from "@/lib/ai-interview-links";
 import { requireCollegeRead } from "@/lib/college/guard";
 import { auditCollegeView, studentForCollegeAdmin } from "@/lib/college/scope";
 import { getDb, schema } from "@/lib/db";
+import { canOpenArtifacts } from "@/lib/college/serialize";
 
 /**
  * Open a student's AI interview recording or report. The URL never appears in
@@ -19,6 +20,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string; ar
 
   const student = await studentForCollegeAdmin(g.ctx, id);
   if (!student) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (!canOpenArtifacts(student.status)) return NextResponse.json({ error: "Verify this student first" }, { status: 403 });
 
   const [onboarding] = await getDb()
     .select({ extra: schema.internOnboarding.extraData })

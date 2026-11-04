@@ -16,7 +16,7 @@ import {
   requireCollegeContext,
   studentsForCollegeAdmin,
 } from "@/lib/college/scope";
-import { toStudentRow } from "@/lib/college/serialize";
+import { driveDataOpen, toStudentRow } from "@/lib/college/serialize";
 
 export const dynamic = "force-dynamic";
 
@@ -27,8 +27,9 @@ export default async function DrivePage({ params }: { params: Promise<{ id: stri
   if (!drive) notFound();
 
   const w = driveWindow(drive);
+  // Once over, the TPO keeps counts, not the student lists (C12).
   const [students, eligible, employers] = await Promise.all([
-    studentsForCollegeAdmin(ctx),
+    driveDataOpen(drive) ? studentsForCollegeAdmin(ctx) : Promise.resolve([]),
     eligibleStudents(drive),
     driveEmployers(drive.id),
   ]);
@@ -55,6 +56,8 @@ export default async function DrivePage({ params }: { params: Promise<{ id: stri
             description={
               w === "revoked"
                 ? "Closed. No employer can get in."
+                : w === "ended"
+                ? `Ended · ${employers.length} ${employers.length === 1 ? "company" : "companies"} joined.`
                 : `Active · ${employers.length} ${employers.length === 1 ? "company has" : "companies have"} joined. Companies must sign in to Findtern.`
             }
           />
