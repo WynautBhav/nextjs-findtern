@@ -196,12 +196,12 @@ export function lineRows(
   grossMinor: number,
 ): { label: string; detail?: string | null; priceMinor: number | null }[] {
   if (lines.length === 1) return [{ label: lines[0].label, detail: lines[0].detail, priceMinor: grossMinor }];
-  const priced = lines.filter((l) => l.amountMinor != null && l.amountMinor > 0);
+  const priced = lines.filter((l) => l.amountMinor != null);
   const split = priced.length > 0 && priced.reduce((sum, l) => sum + (l.amountMinor ?? 0), 0) === grossMinor;
   return lines.map((l) => ({
     label: l.label,
     detail: l.detail,
-    priceMinor: split && l.amountMinor != null && l.amountMinor > 0 ? l.amountMinor : null,
+    priceMinor: split && l.amountMinor != null ? l.amountMinor : null,
   }));
 }
 

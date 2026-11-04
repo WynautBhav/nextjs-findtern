@@ -38,7 +38,7 @@ export function hireInvoiceLines(input: {
   const feeMinor = charge.perHireMinor;
   const listed = charge.baseMinor - feeMinor;
   const stipendMinor =
-    input.chargedMinor != null && input.chargedMinor > feeMinor ? input.chargedMinor - feeMinor : listed;
+    input.chargedMinor != null && input.chargedMinor >= feeMinor ? input.chargedMinor - feeMinor : listed;
 
   const from = monthly ? paymentIndex : 0;
   const firstMonth = monthName(offer.startDate, from);
@@ -54,7 +54,7 @@ export function hireInvoiceLines(input: {
       label: `${who} — ${roleTitle || projectName}`,
       // "2m" first, as on the reference invoice: how long the internship runs.
       detail: `${offer.months}m · ${projectName} · Stipend, ${period}`,
-      amountMinor: stipendMinor > 0 ? stipendMinor : null,
+      amountMinor: stipendMinor, // 0 prints as ₹0.00, never "Included"
     },
   ];
   if (feeMinor > 0) {

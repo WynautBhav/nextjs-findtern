@@ -47,3 +47,12 @@ test("a nameless candidate prints 'Candidate', never a bare dash", () => {
     assert.equal(lines[1].label, "Candidate \u2014 One-time hiring fee");
   }
 });
+
+test("a stipend fully covered by a promo is a priced ₹0 line, not 'Included'", async () => {
+  const { lineRows } = await import("./invoice.ts");
+  const plain = hireInvoiceLines({ who: "A", roleTitle: "D", projectName: "P", offer, monthly: false, paymentIndex: 0 });
+  const fee = plain[1].amountMinor!;
+  const lines = hireInvoiceLines({ who: "A", roleTitle: "D", projectName: "P", offer, monthly: false, paymentIndex: 0, chargedMinor: fee });
+  assert.equal(lines[0].amountMinor, 0);
+  assert.deepEqual(lineRows(lines, fee).map((r) => r.priceMinor), [0, fee]);
+});
