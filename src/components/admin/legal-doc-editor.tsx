@@ -23,6 +23,7 @@ export function LegalDocEditor({
   description,
   apiEndpoint,
   publicHref,
+  readOnly = false,
 }: {
   title: string;
   initialContent: string;
@@ -32,6 +33,8 @@ export function LegalDocEditor({
   apiEndpoint: string;
   /** Public page that shows this document. */
   publicHref?: string;
+  /** Staff without write access: the text shows but cannot be edited or saved. */
+  readOnly?: boolean;
 }) {
   const [title, setTitle] = useState(initialTitle);
   const [content, setContent] = useState(initialContent);
@@ -124,6 +127,7 @@ export function LegalDocEditor({
                 View live <ExternalLink className="size-3.5" aria-hidden />
               </a>
             ) : null}
+            {readOnly ? null : (
             <button
               type="button"
               onClick={save}
@@ -133,6 +137,7 @@ export function LegalDocEditor({
               {saving ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <Save className="size-4" aria-hidden />}
               {saving ? "Saving…" : "Save changes"}
             </button>
+            )}
           </>
         }
       />
@@ -150,6 +155,7 @@ export function LegalDocEditor({
             <Loader2 className="size-4 animate-spin" aria-hidden /> Loading the live version…
           </p>
         ) : null}
+        {readOnly ? <p className="rounded-2xl bg-warning-soft px-4 py-3 text-sm text-warning">View only: your role can read this document but not edit it.</p> : null}
         {error ? (
           <p role="alert" className="rounded-2xl bg-danger-soft px-4 py-3 text-sm text-danger">
             {error}
@@ -175,7 +181,7 @@ export function LegalDocEditor({
             id="legal-title"
             type="text"
             value={title}
-            disabled={!loaded}
+            disabled={!loaded || readOnly}
             onChange={(e) => setTitle(e.target.value)}
             className={cn(
               "h-11 w-full rounded-full border border-ink-300 bg-[color:var(--admin-panel)] px-4 text-base sm:text-[0.9375rem] font-medium text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
@@ -184,7 +190,7 @@ export function LegalDocEditor({
           />
         </div>
 
-        <RichTextField label="Document text" value={content} onChange={setContent} disabled={!loaded} />
+        <RichTextField label="Document text" value={content} onChange={setContent} disabled={!loaded || readOnly} />
       </div>
     </Panel>
   );

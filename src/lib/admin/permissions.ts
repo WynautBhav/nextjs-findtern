@@ -65,6 +65,7 @@ const RULES: Rule[] = [
   // College partners are customers like companies; issuing a placement officer's login is a company-side write.
   ["/admin/colleges", ["companies:read"], ["companies:write"]],
   ["/admin/roles", ["roles:write"]],
+  ["/admin/audit-log", ["roles:write"]],
   ["/admin/projects", ["companies:read"]],
   ["/admin/orders", ["transactions:read"]],
   ["/admin/intern-invoices", ["transactions:read", "reports:read"]],
@@ -98,6 +99,8 @@ const RULES: Rule[] = [
   ["/api/admin/staff", ["roles:write"], ["roles:write"]],
   ["/api/admin/orders", ["transactions:read"], ["transactions:write"]],
   ["/api/admin/transactions", ["transactions:read"], ["transactions:write"]],
+  // The payouts CSV is also a report export (#31); longest prefix wins over /api/admin/payouts.
+  ["/api/admin/payouts/export", ["transactions:read", "reports:read"], ["transactions:write"]],
   ["/api/admin/payouts", ["transactions:read"], ["transactions:write"]],
   ["/api/admin/all-payouts", ["transactions:read"], ["transactions:write"]],
   ["/api/admin/promo-codes", PROMO_R, PROMO_W],
@@ -154,15 +157,15 @@ export function canGrant(granted: readonly string[] | undefined, wanted: readonl
   return wanted.every((p) => p !== WILDCARD && g.includes(p));
 }
 
-/** What each CSV export needs, by `?type=`: the data's own read permission, as the proxy map requires for its page and API (reports:read alone doesn't open it). */
+/** What each CSV export needs, by `?type=`: the data's own read permission, or reports:read (the Reports page links every export; owner answer #31). */
 export const EXPORT_PERMISSIONS: Record<string, Permission[]> = {
-  interns: ["interns:read"],
-  proposals: ["interns:read"],
-  companies: ["companies:read"],
-  projects: ["companies:read"],
-  payments: ["transactions:read"],
-  payouts: ["transactions:read"],
-  "intern-payments": ["transactions:read"],
+  interns: ["interns:read", "reports:read"],
+  proposals: ["interns:read", "reports:read"],
+  companies: ["companies:read", "reports:read"],
+  projects: ["companies:read", "reports:read"],
+  payments: ["transactions:read", "reports:read"],
+  payouts: ["transactions:read", "reports:read"],
+  "intern-payments": ["transactions:read", "reports:read"],
 };
 
 /** Full bank account numbers in the Candidates export: only for those who record payouts. */

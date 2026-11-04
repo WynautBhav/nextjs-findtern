@@ -1,18 +1,21 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { eq } from "drizzle-orm";
+import { and, desc, eq, gt, isNotNull, sql } from "drizzle-orm";
 import { ArrowRight } from "lucide-react";
 
 import { DetailRow, PageHead, SectionHead, Surface } from "@/components/app/primitives";
 import { ChangePasswordForm } from "@/components/auth/change-password-form";
 import { CollegeForm } from "@/components/intern/college-form";
 import { BankDetailsForm, type BankDetails } from "@/components/intern/bank-details-form";
+import { InvoiceList } from "@/components/intern/invoice-list";
 import { ContactDetailsForm } from "@/components/intern/contact-details-form";
 import { requireRole } from "@/lib/auth";
 import { membershipOf } from "@/lib/college/membership";
 import { getDb, schema } from "@/lib/db";
 import { formatDmy } from "@/lib/format";
+import { ownInternInvoices } from "@/lib/intern-invoice";
+import { getInvoiceSeller } from "@/lib/invoice-seller";
 import { SITE } from "@/lib/content/site";
 
 export const metadata: Metadata = {
@@ -41,7 +44,7 @@ export default async function InternSettings({ searchParams }: { searchParams: P
 
   const uid = session.uid;
   const db = getDb();
-  const [[row], [user], college] = await Promise.all([
+  const [[row], [user], college, payments] = await Promise.all([
     db
       .select({ extra: schema.internOnboarding.extraData })
       .from(schema.internOnboarding)
@@ -60,7 +63,42 @@ export default async function InternSettings({ searchParams }: { searchParams: P
       .where(eq(schema.users.id, uid))
       .limit(1),
     membershipOf(uid),
+    // Ownership is the session's uid, never a URL id; paid, ₹0 and number-less rows are dropped (also re-checked in ownInternInvoices).
+    db
+      .select({
+        id: schema.internPayments.id,
+        invoiceNumber: schema.internPayments.invoiceNumber,
+        internId: schema.internPayments.internId,
+        orderId: schema.internPayments.orderId,
+        paymentId: schema.internPayments.paymentId,
+        gateway: schema.internPayments.gateway,
+        amountMinor: schema.internPayments.amountMinor,
+        currency: schema.internPayments.currency,
+        status: schema.internPayments.status,
+        paidAt: schema.internPayments.paidAt,
+        createdAt: schema.internPayments.createdAt,
+        raw: schema.internPayments.raw,
+        onboardingPayment: sql<Record<string, unknown> | null>`${schema.internOnboarding.extraData}->'payment'`,
+        firstName: schema.users.firstName,
+        lastName: schema.users.lastName,
+        email: schema.users.email,
+        pinCode: schema.internOnboarding.pinCode,
+        state: schema.internOnboarding.state,
+      })
+      .from(schema.internPayments)
+      .leftJoin(schema.users, eq(schema.users.id, schema.internPayments.internId))
+      .leftJoin(schema.internOnboarding, eq(schema.internOnboarding.userId, schema.internPayments.internId))
+      .where(
+        and(
+          eq(schema.internPayments.internId, uid),
+          eq(schema.internPayments.status, "paid"),
+          gt(schema.internPayments.amountMinor, 0),
+          isNotNull(schema.internPayments.invoiceNumber),
+        ),
+      )
+      .orderBy(desc(schema.internPayments.paidAt)),
   ]);
+  const invoices = ownInternInvoices(payments, uid, getInvoiceSeller());
   const extra = (row?.extra ?? {}) as Record<string, unknown>;
   // The full account number never leaves the server; the form gets its last 4.
   const { accountNumber, ...bankRest } = (extra.bankDetails ?? extra.bank ?? {}) as { accountNumber?: unknown } & BankDetails;
@@ -100,6 +138,13 @@ export default async function InternSettings({ searchParams }: { searchParams: P
               institution={institution}
               vapidKey={process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? ""}
             />
+          </section>
+
+          <section id="invoices" className="scroll-mt-24">
+            <SectionHead title="Invoices" hint="Tax invoices for your activation fee." />
+            <Surface className="p-5 lg:p-6">
+              <InvoiceList invoices={invoices} />
+            </Surface>
           </section>
 
           <section id="password" className="scroll-mt-24">
