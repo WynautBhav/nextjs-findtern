@@ -33,6 +33,8 @@ type Props = {
   /** Pay for these accepted proposals only. */
   proposalIds?: string[];
   mode?: "upfront" | "monthly";
+  /** Payments already made for this hire (0 = first), so a repeat submit can't pay the next month. */
+  paymentIndex?: number;
   /** PAYMENTS_MODE=free: the order completes without Razorpay. */
   testMode?: boolean;
   /** PAYMENTS_TEST_BUTTON=1: a second button settles at the real amount without Razorpay. */
@@ -47,7 +49,7 @@ function errorText(e: unknown, fallback: string): string {
   return e instanceof Error && e.message ? e.message : fallback;
 }
 
-export function CheckoutPay({ employerId, currency, amountMinor, prefill, proposalIds, mode = "upfront", testMode = false, testPay = false, onPromoChange }: Props) {
+export function CheckoutPay({ employerId, currency, amountMinor, prefill, proposalIds, mode = "upfront", paymentIndex = 0, testMode = false, testPay = false, onPromoChange }: Props) {
   const router = useRouter();
   const [state, setState] = useState<"idle" | "busy" | "paid">("idle");
   const [error, setError] = useState<string | null>(null);
@@ -97,7 +99,7 @@ export function CheckoutPay({ employerId, currency, amountMinor, prefill, propos
         csrfFetch(`/api/employer/${encodeURIComponent(employerId)}/payment/razorpay/order`, {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ currency, promoCode: promo?.code, proposalIds, mode, ...(asTest ? { testPay: true } : {}) }),
+          body: JSON.stringify({ currency, promoCode: promo?.code, proposalIds, mode, paymentIndex, ...(asTest ? { testPay: true } : {}) }),
         }).then(async (res) => {
           const body = await res.json().catch(() => ({}));
           if (!res.ok) throw new Error(body.error ?? "Could not create the payment order.");

@@ -913,7 +913,7 @@ step("employer: pays one offer upfront with the promo, using the test button [UI
   await shot("employer-checkout-after-upfront");
 
   // Edge: paying the same hire again (double click, a second tab) is refused and makes no second invoice.
-  const again = await api(page, "POST", orderPath, { currency: "INR", proposalIds: [paidProposalId], mode: "upfront", testPay: true });
+  const again = await api(page, "POST", orderPath, { currency: "INR", proposalIds: [paidProposalId], mode: "upfront", paymentIndex: 0, testPay: true });
   assert.ok([400, 409].includes(again.status), `paying a paid hire again is refused (got ${again.status} ${JSON.stringify(again.body).slice(0, 160)})`);
   const n = await one(`SELECT count(*)::int AS paid FROM employer_payments WHERE employer_id = $1 AND status = 'paid'`, [state.employerId]);
   assert.equal(n.paid, 1, "still exactly one paid order");
@@ -1233,7 +1233,7 @@ step("security: roles, owners and CSRF are enforced [API + UI]", ["fteAccepted"]
   const foreignEmployer = await one(`SELECT id FROM employers WHERE id <> $1 LIMIT 1`, [state.employerId]);
 
   // An intern is not an employer, and not another intern.
-  refused(await api(intern, "POST", `/api/employer/${state.employerId}/payment/razorpay/order`, { currency: "INR", proposalIds: [state.hiredProposalId], mode: "upfront", testPay: true }), "an intern paying as an employer");
+  refused(await api(intern, "POST", `/api/employer/${state.employerId}/payment/razorpay/order`, { currency: "INR", proposalIds: [state.hiredProposalId], mode: "upfront", paymentIndex: 0, testPay: true }), "an intern paying as an employer");
   refused(await api(intern, "POST", `/api/employer/${state.employerId}/interviews`, { internId: state.hiredInternId }), "an intern booking interviews as an employer");
   refused(await api(intern, "POST", `/api/intern/${otherInternId}/payment/razorpay/order`, { testPay: true }), "an intern paying for another intern");
   refused(await api(intern, "PATCH", `/api/proposals/${state.otherProposalId === state.hiredProposalId ? state.proposalId : state.otherProposalId}/status`, { status: "rejected" }), "an intern answering another intern's offer");

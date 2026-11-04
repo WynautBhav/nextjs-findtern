@@ -604,7 +604,7 @@ step("employer: checks out monthly in free mode → proposal hired [UI]", ["acce
       assert.equal(res.body?.free, true);
     },
     async () =>
-      expectOk(`POST ${path}`, await api(page, "POST", path, { currency: "INR", proposalIds: [state.proposalId], mode: "monthly" })),
+      expectOk(`POST ${path}`, await api(page, "POST", path, { currency: "INR", proposalIds: [state.proposalId], mode: "monthly", paymentIndex: 0 })),
   ).finally(async () => {
     const p = await one(`SELECT status, hired_at FROM proposals WHERE id = $1`, [state.proposalId]);
     if (p?.status === "hired") state.hiredAt = p.hired_at;

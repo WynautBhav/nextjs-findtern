@@ -125,6 +125,7 @@ export default async function EmployerCheckout({
             monthlyMinor: line.due || !line.monthlyCharge.monthlyBlocked ? line.monthlyCharge.totalMinor : null,
             monthlyBlocked: line.monthlyCharge.monthlyBlocked,
             due: Boolean(line.due),
+            monthsPaid: line.due?.monthsPaid ?? 0,
             dueOn: line.dueOn,
             months: line.months,
             fullTimeCtcMinor: line.fullTime ? line.fullTimeCtcMinor ?? 0 : null,

@@ -149,3 +149,8 @@ export function placementLedger(hire: HireLike, payments: readonly PaidOrderLike
     status: dueMinor === 0 && paidMinor > 0 ? "fully_paid" : paidMinor > 0 ? "partially_paid" : "unpaid",
   };
 }
+
+/** True when any line being paid is not the month the client asked for (already paid, or a later one is due). */
+export function paymentIndexMismatch(lines: { due: { monthsPaid: number } | null }[], paymentIndex: number): boolean {
+  return lines.some((l) => (l.due?.monthsPaid ?? 0) !== paymentIndex);
+}

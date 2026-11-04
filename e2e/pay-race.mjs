@@ -57,7 +57,7 @@ async function employerRace() {
   const session = await login("employer-heavy");
   const rs = await Promise.all(
     Array.from({ length: PARALLEL }, () =>
-      post(session, `/api/employer/${emp.id}/payment/razorpay/order`, { currency: "INR", proposalIds: [offer.id], mode: "upfront", testPay: true }),
+      post(session, `/api/employer/${emp.id}/payment/razorpay/order`, { currency: "INR", proposalIds: [offer.id], mode: "upfront", paymentIndex: 0, testPay: true }),
     ),
   );
   const after = await paidCount();

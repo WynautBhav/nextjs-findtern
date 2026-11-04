@@ -29,6 +29,8 @@ export type SummaryLine = {
   monthlyBlocked: string | null;
   /** A running monthly placement: only its due month can be paid. */
   due: boolean;
+  /** Payments already made for this hire (the due month's index). */
+  monthsPaid: number;
   /** YYYY-MM-DD the due month falls due. */
   dueOn: string | null;
   months: number;
@@ -231,6 +233,7 @@ export function CheckoutSummary({
               prefill={prefill}
               proposalIds={[line.id]}
               mode={mode}
+              paymentIndex={line.monthsPaid}
               testMode={testMode}
               testPay={testPay}
               onPromoChange={setPromoApplied}
