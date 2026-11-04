@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import { Panel, PanelBody, PanelHeader } from "@/components/college/panel";
 import { PageHead, Surface } from "@/components/app/primitives";
 import { RosterImport } from "@/components/college/roster-import";
@@ -7,13 +9,17 @@ import { requireCollegeContext, rosterCoverage } from "@/lib/college/scope";
 import { requirePublicOrigin } from "@/lib/origin";
 
 /** Name · roll · year · branch · email (stacks on a phone). */
+const PAGE_SIZE = 50;
 const ROSTER_GRID = "grid-cols-[minmax(0,1fr)_auto] sm:grid-cols-[minmax(0,1.3fr)_6rem_5.5rem_minmax(0,0.8fr)_minmax(0,1.5fr)]";
 
 export const dynamic = "force-dynamic";
 
-export default async function RosterPage() {
+export default async function RosterPage({ searchParams }: { searchParams?: Promise<{ page?: string }> }) {
   const ctx = await requireCollegeContext();
   const coverage = await rosterCoverage(ctx.college.id);
+  const pages = Math.max(1, Math.ceil(coverage.notJoined.length / PAGE_SIZE));
+  const page = Math.min(pages, Math.max(1, Number.parseInt((await searchParams)?.page ?? "1", 10) || 1));
+  const shown = coverage.notJoined.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   const origin = requirePublicOrigin();
   const invite = [
     `Hi,`,
@@ -109,7 +115,7 @@ export default async function RosterPage() {
               <span>Email</span>
             </div>
             <ul className="divide-y divide-ink-100">
-              {coverage.notJoined.map((s) => (
+              {shown.map((s) => (
                 <li key={s.email} className={`${ROSTER_GRID} grid items-baseline gap-x-4 gap-y-0.5 px-5 py-2.5 text-sm`}>
                   <span className="font-medium text-ink-900">{s.name || "—"}</span>
                   <span className="nums text-ink-700">{s.rollNo || "—"}</span>
@@ -122,6 +128,15 @@ export default async function RosterPage() {
                 </li>
               ))}
             </ul>
+            {pages > 1 ? (
+              <nav aria-label="Pagination" className="flex items-center justify-between gap-3 border-t border-ink-100 px-5 py-3 text-sm">
+                <span className="nums text-text-subtle">Page {page} of {pages} · {coverage.notJoined.length.toLocaleString("en-IN")} not joined</span>
+                <span className="flex gap-4 font-medium text-brand-700">
+                  {page > 1 ? <Link href={`?page=${page - 1}`}>Previous</Link> : null}
+                  {page < pages ? <Link href={`?page=${page + 1}`}>Next</Link> : null}
+                </span>
+              </nav>
+            ) : null}
           </div>
         )}
       </Panel>
