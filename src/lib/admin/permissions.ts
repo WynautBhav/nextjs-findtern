@@ -147,6 +147,11 @@ export function allows(granted: readonly string[] | undefined, needed: Permissio
   return needed.length === 0 || needed.some((p) => g.includes(p));
 }
 
+/** Whether these permissions may write to a path: the same rule the proxy applies, so UI controls match the server. */
+export function canWrite(granted: readonly string[] | undefined, pathname: string): boolean {
+  return allows(granted, requiredPermissions(pathname, "POST"));
+}
+
 /**
  * Staff can only hand out what they hold: no one without `*` can create a
  * super-admin role or grant a permission they don't have themselves.

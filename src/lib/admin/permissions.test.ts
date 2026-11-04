@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { allows, BANK_EXPORT_PERMISSIONS, EXPORT_PERMISSIONS, requiredPermissions } from "./permissions.ts";
+import { allows, canWrite, BANK_EXPORT_PERMISSIONS, EXPORT_PERMISSIONS, requiredPermissions } from "./permissions.ts";
 
 test("reports:read alone opens all 7 CSV exports; the data's own read permission still does too", () => {
   assert.equal(Object.keys(EXPORT_PERMISSIONS).length, 7);
@@ -22,4 +22,13 @@ test("full bank account numbers in the Candidates export need transactions:write
   assert.equal(allows(["*"], BANK_EXPORT_PERMISSIONS), true);
   assert.equal(allows(["interns:read", "transactions:write"], BANK_EXPORT_PERMISSIONS), true);
   assert.equal(allows(["interns:read"], BANK_EXPORT_PERMISSIONS), false);
+});
+
+test("canWrite follows the path's write rule", () => {
+  assert.equal(canWrite(["interns:read"], "/admin/interns"), false);
+  assert.equal(canWrite(["interns:write"], "/admin/interns"), true);
+  assert.equal(canWrite(["companies:read"], "/admin/colleges"), false);
+  assert.equal(canWrite(["cms:write"], "/admin/promo-codes"), true);
+  assert.equal(canWrite(["*"], "/admin/companies"), true);
+  assert.equal(canWrite(undefined, "/admin/companies"), false);
 });

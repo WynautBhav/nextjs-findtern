@@ -5,7 +5,7 @@ import Link from "next/link";
 import { RatingsImport } from "@/components/admin/ratings-import";
 import { formatDate, formatIstStamp, formatMoney } from "@/lib/format";
 import { getSession } from "@/lib/auth";
-import { allows, BANK_EXPORT_PERMISSIONS } from "@/lib/admin/permissions";
+import { allows, BANK_EXPORT_PERMISSIONS, canWrite } from "@/lib/admin/permissions";
 import {
   AI_STATUS_LABEL,
   INTERN_COLUMNS,
@@ -191,6 +191,7 @@ export default async function AdminInterns({
   const cols = parseCols(params.cols ?? colsFromCookie((await cookies()).get("ft_admin_intern_cols")?.value, adminUid));
   const has = (k: InternColKey) => cols.has(k);
   const visible = INTERN_COLUMNS.filter((c) => has(c.key)).map((c) => c.key);
+  const mayWrite = canWrite(session?.permissions, "/admin/interns");
   const canBankExport = allows(session?.permissions, BANK_EXPORT_PERMISSIONS);
   const bankBlocked = needsBankExport(cols) && !canBankExport;
   const filterParams = Object.fromEntries(Object.entries(params).filter(([k]) => k !== "cols"));
@@ -202,7 +203,7 @@ export default async function AdminInterns({
       subtitle={subtitle}
       action={
         <div className="flex flex-wrap items-center gap-2">
-          {allows(session?.permissions, ["interns:write"]) ? <RatingsImport /> : null}
+          {mayWrite ? <RatingsImport /> : null}
           <Link href="/admin/interns/ai-reports" className={buttonClass({ variant: "outline", className: ADMIN_PILL_SECONDARY })}>
             AI reports
           </Link>
@@ -295,7 +296,7 @@ export default async function AdminInterns({
     score: {
       cell: (row) =>
         row.hasOnboarding ? (
-          <InternRatingsCell internId={row.id} name={nameOf(row)} ratings={row.ratings ?? {}} score={row.score} />
+          !mayWrite ? <span className="nums">{row.score ?? "–"}</span> : <InternRatingsCell internId={row.id} name={nameOf(row)} ratings={row.ratings ?? {}} score={row.score} />
         ) : (
           <span className="text-text-subtle">No profile</span>
         ),
@@ -320,7 +321,7 @@ export default async function AdminInterns({
     live: {
       cell: (row) => (
         <div className="flex flex-col items-start gap-1">
-          <InternVisibilityCell internId={row.id} live={row.visibility !== "hidden"} compact />
+          {mayWrite ? <InternVisibilityCell internId={row.id} live={row.visibility !== "hidden"} compact /> : <span>{row.visibility !== "hidden" ? "Live" : "Hidden"}</span>}
           {row.visibility !== "hidden" && !row.openToWork ? <span className="text-xs text-text-subtle">{liveLabel(row)}</span> : null}
         </div>
       ),
@@ -336,10 +337,10 @@ export default async function AdminInterns({
     bankIfsc: { cell: (row) => text(row.bank?.ifsc ?? "") },
     bankName: { cell: (row) => text(row.bank?.name ?? "") },
     bankUpi: { cell: (row) => text(row.bank?.upi ?? "") },
-    account: { cell: (row) => <AccountActiveCell id={row.id} kind="intern" active={row.isActive} compact /> },
+    account: { cell: (row) => (mayWrite ? <AccountActiveCell id={row.id} kind="intern" active={row.isActive} compact /> : <span>{row.isActive ? "Active" : "Inactive"}</span>) },
     review: {
       cell: (row) =>
-        row.hasOnboarding ? <InternApprovalCell internId={row.id} value={row.approval ?? "Pending"} pill /> : <span className="text-text-subtle">-</span>,
+        row.hasOnboarding ? (mayWrite ? <InternApprovalCell internId={row.id} value={row.approval ?? "Pending"} pill /> : <span>{row.approval ?? "Pending"}</span>) : <span className="text-text-subtle">-</span>,
     },
     joined: { cell: (row) => <span className="nums whitespace-nowrap text-text-subtle">{row.createdAt ? formatDate(row.createdAt) : "-"}</span> },
   };
@@ -396,7 +397,7 @@ export default async function AdminInterns({
       {headerWith(finding, total === 0)}
       <div className="space-y-4">
         <AdminTabs items={views} active={activeView} label="Candidate views" />
-        <BulkSelectProvider actions={ACTIONS} noun="interns">
+        <BulkSelectProvider actions={mayWrite ? ACTIONS : []} noun="interns">
           <DataTable<Row>
             basePath="/admin/interns"
             params={params}
