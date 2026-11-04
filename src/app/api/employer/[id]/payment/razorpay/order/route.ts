@@ -21,7 +21,7 @@ const bodySchema = z.object({
   /** How a new hire is paid; a running monthly placement always pays its due month. */
   mode: z.enum(["upfront", "monthly"]).default("upfront"),
   /** The month being paid: payments already made for this hire (0 = first). A stale second submit names a month that is already paid. */
-  paymentIndex: z.number().int().min(0),
+  paymentIndex: z.number({ error: "This page is out of date. Refresh and try again." }).int().min(0),
   promoCode: z.string().trim().min(1).optional(),
   /** The test button (PAYMENTS_TEST_BUTTON=1): settle at the real amount without Razorpay. */
   testPay: z.boolean().optional(),
@@ -114,7 +114,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (paying.length === 0) return NextResponse.json({ error: "Nothing payable in this currency" }, { status: 400 });
   // Never re-price a repeat submit as the next month: refuse when the month asked for is not the one due.
   if (paymentIndexMismatch(paying, parsed.data.paymentIndex)) {
-    return NextResponse.json({ error: "This month was already paid or has a payment open. Refresh the page to see it under Orders." }, { status: 409 });
+    return NextResponse.json({ error: "This month is already paid. Refresh the page to see it under Orders." }, { status: 409 });
   }
   if (parsed.data.mode === "monthly" && paying.some((l) => !l.due && l.charge.monthlyBlocked)) {
     return NextResponse.json({ error: paying.find((l) => l.charge.monthlyBlocked)!.charge.monthlyBlocked }, { status: 400 });

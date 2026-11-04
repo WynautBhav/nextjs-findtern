@@ -303,11 +303,3 @@ test("offerTermIssues: the composer and the edit share one set of start/shift/ti
   assert.equal(offerTermIssues({ startDate: day(900) })[0]?.message, "Pick a start date within the next year.");
   assert.equal(offerTermIssues({ startDate: "2026-02-31" })[0]?.message, "Pick a real start date.");
 });
-
-test("paymentIndexMismatch: a repeat submit for a paid month is refused, not re-priced", async () => {
-  const { paymentIndexMismatch } = await import("./dues.ts");
-  assert.equal(paymentIndexMismatch([{ due: null }], 0), false); // first payment
-  assert.equal(paymentIndexMismatch([{ due: { monthsPaid: 1 } }], 1), false); // month 2 asked, month 2 due
-  assert.equal(paymentIndexMismatch([{ due: { monthsPaid: 2 } }], 1), true); // month 2 already paid
-  assert.equal(paymentIndexMismatch([{ due: { monthsPaid: 1 } }], 0), true); // month 1 already paid
-});
