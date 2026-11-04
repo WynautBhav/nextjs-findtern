@@ -37,6 +37,7 @@ export function hireInvoiceLines(input: {
   const charge = lineCharge(offer, 10, monthly ? "monthly" : "upfront", { firstPayment: first });
   const feeMinor = charge.perHireMinor;
   const listed = charge.baseMinor - feeMinor;
+  // Below the fee only happens in free mode: fall back to the list price (never `>= 0`, that would print a negative stipend).
   const stipendMinor =
     input.chargedMinor != null && input.chargedMinor >= feeMinor ? input.chargedMinor - feeMinor : listed;
 
