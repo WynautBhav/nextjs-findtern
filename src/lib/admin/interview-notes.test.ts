@@ -30,7 +30,7 @@ test("a saved link schedules any unfinished interview (ADP-07, legacy)", () => {
   for (const s of ["pending", "waiting", "rescheduled", "scheduled", "", null]) {
     assert.equal(statusAfterMeetingLink(s), "scheduled");
   }
-  for (const s of ["completed", "expired", "cancelled", "canceled", "Completed"]) {
+  for (const s of ["completed", "missed", "expired", "cancelled", "canceled", "Completed"]) {
     assert.equal(statusAfterMeetingLink(s), s);
   }
 });

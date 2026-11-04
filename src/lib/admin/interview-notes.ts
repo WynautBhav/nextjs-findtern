@@ -63,11 +63,12 @@ export function noteTag(notes: string | null | undefined, tag: "feedback" | "rec
 
 /**
  * Status after an admin saves a meeting link (ADP-07, legacy routes.ts
- * 11151-11157): every interview that is not finished becomes "scheduled",
+ * 11151-11157): every interview that is not finished (completed, missed, expired,
+ * cancelled) becomes "scheduled",
  * for employer and AI interviews alike.
  */
 export function statusAfterMeetingLink(current: string | null | undefined): string {
   const status = String(current ?? "").trim().toLowerCase();
-  if (["completed", "expired", "cancelled", "canceled"].includes(status)) return String(current);
+  if (["completed", "missed", "expired", "cancelled", "canceled"].includes(status)) return String(current);
   return "scheduled";
 }
