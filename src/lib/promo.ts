@@ -29,6 +29,8 @@ export async function quotePromo(input: {
   /** Part of the order no code may discount: the one-time hiring fee. */
   undiscountableMinor?: number;
 }): Promise<PromoQuote> {
+  // Postgres refuses a NUL byte in text, which was an empty 500 instead of "Invalid promo code".
+  if (input.code.includes("\u0000")) return { ok: false, error: "Invalid promo code", status: 404 };
   const db = getDb();
   const [row] = await db
     .select()
