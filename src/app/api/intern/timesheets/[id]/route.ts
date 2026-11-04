@@ -5,7 +5,7 @@ import { z } from "zod";
 import { getDb, schema } from "@/lib/db";
 import { LEGACY_DAY_STATUSES } from "@/lib/employer-timesheets";
 import { requireMutation } from "@/lib/guards-mutation";
-import { periodDays, todayIst } from "@/lib/timesheet-days";
+import { clearFutureDays, periodDays, todayIst } from "@/lib/timesheet-days";
 
 /**
  * Autosave for a draft timesheet, and deleting one.
@@ -17,7 +17,8 @@ import { periodDays, todayIst } from "@/lib/timesheet-days";
  * id.
  *
  * Day statuses are the four legacy writes and counts (INW-05): no "Leave".
- * A day after today (IST) can carry nothing: no status, hours or note.
+ * A day after today (IST) can carry nothing: no status, hours or note. The server
+ * blanks those fields on future days instead of refusing the save.
  */
 
 const entrySchema = z.object({
@@ -60,10 +61,10 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
   const inPeriod = new Set(periodDays(sheet.periodStart, sheet.periodEnd));
   const today = todayIst();
-  const entries = parsed.data.entries.filter((e) => inPeriod.size === 0 || inPeriod.has(e.date));
-  if (entries.some((e) => e.date > today && (e.status !== "" || e.hours > 0 || e.note.trim() !== ""))) {
-    return NextResponse.json({ error: "You can mark a day once it has happened." }, { status: 400 });
-  }
+  const entries = clearFutureDays(
+    parsed.data.entries.filter((e) => inPeriod.size === 0 || inPeriod.has(e.date)),
+    today,
+  );
 
   // INW-23, legacy routes.ts:13733: editing a sheet that was sent back makes
   // it a draft again and clears the rejection date. The manager's note stays

@@ -153,7 +153,7 @@ test("the intern editor offers only the four legacy day statuses (INW-05)", asyn
 test("a sheet is complete once every day has a legacy status, hours or not (INW-06/24)", async () => {
   const { unfilledDays } = await import("./employer-timesheets.ts");
   const days = ["2026-10-01", "2026-10-02", "2026-10-03"];
-  // No hours anywhere, and a future day marked: still complete.
+  // No hours anywhere: still complete once every day has a status (hours are optional). The API never stores a status on a future day.
   assert.deepEqual(
     unfilledDays(days, [
       { date: "2026-10-01", status: "Present", hours: 0 },

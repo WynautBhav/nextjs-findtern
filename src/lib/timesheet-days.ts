@@ -52,6 +52,19 @@ export function todayIst(now: Date = new Date()): string {
   }).format(now);
 }
 
+/**
+ * A day after today (IST) can carry nothing. Rather than refuse the whole save,
+ * blank status, hours and note on such days: a tab opened before this rule
+ * (which pre-set future weekends to "Fixed off") would otherwise fail every
+ * autosave until reloaded. Days up to and including today are untouched.
+ */
+export function clearFutureDays<T extends { date: string; status: string; hours: number; note: string }>(
+  entries: T[],
+  today: string,
+): T[] {
+  return entries.map((e) => (e.date > today ? { ...e, status: "", hours: 0, note: "" } : e));
+}
+
 /** The first day a period's timesheet can be sent: its last day. */
 export function periodSendableFrom(periodEnd: Date | string): string {
   return toDay(periodEnd);

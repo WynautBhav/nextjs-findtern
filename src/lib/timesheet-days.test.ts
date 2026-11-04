@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { periodDays, todayIst, weekdayOf } from "./timesheet-days.ts";
+import { clearFutureDays, periodDays, todayIst, weekdayOf } from "./timesheet-days.ts";
 
 test("a stored one-month period has exactly its calendar days (no phantom day in IST)", () => {
   // As the create route stores it: start T00:00Z, end T23:59:59.999Z.
@@ -54,4 +54,12 @@ test("month-end send rule: period end day, IST boundary", async () => {
   // Future vs today
   assert.equal("2026-11-25" > todayIst(new Date("2026-11-24T18:00:00Z")), true);
   assert.equal("2026-11-25" > todayIst(new Date("2026-11-24T19:00:00Z")), false);
+});
+
+test("clearFutureDays blanks status, hours and note after today only", () => {
+  const e = (date: string) => ({ date, status: "Fixed off", hours: 8, note: "x" });
+  const out = clearFutureDays([e("2026-11-03"), e("2026-11-04"), e("2026-11-05")], "2026-11-04");
+  assert.deepEqual(out[0], e("2026-11-03"));
+  assert.deepEqual(out[1], e("2026-11-04"));
+  assert.deepEqual(out[2], { date: "2026-11-05", status: "", hours: 0, note: "" });
 });
