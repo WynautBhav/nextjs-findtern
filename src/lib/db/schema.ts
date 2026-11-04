@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, boolean, integer, timestamp, jsonb, uniqueIndex, index } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, boolean, integer, timestamp, jsonb, uniqueIndex, index, check } from "drizzle-orm/pg-core";
 // --------------------------------------------------
 // User (Intern) Schema
 // --------------------------------------------------
@@ -678,6 +678,8 @@ export const internPayouts = pgTable("intern_payouts", {
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (t) => ({
   internPayoutsBonusUnique: uniqueIndex("intern_payouts_bonus_proposal_unique").on(t.bonusProposalId).where(sql`${t.kind} = 'completion_bonus'`),
+  // drizzle/0014: without this a NULL bonus_proposal_id slips past the unique index above.
+  internPayoutsBonusHasProposal: check("intern_payouts_bonus_has_proposal", sql`${t.kind} <> 'completion_bonus' OR ${t.bonusProposalId} IS NOT NULL`),
 }));
 
 export type InternPayout = typeof internPayouts.$inferSelect;
@@ -889,7 +891,12 @@ export const promoCodes = pgTable("promo_codes", {
   isActive: boolean("is_active").notNull().default(true),
   /** Where the code can be redeemed: "intern" | "employer" | "both". */
   appliesTo: text("applies_to").notNull().default("intern"),
-  /** The college this code belongs to (one code per college). Null for ordinary codes. */
+  /**
+   * The college this code belongs to (one code per college). Null for ordinary codes.
+   * Rotation: a college code is rotated IN PLACE (update `code` on the same row), never deactivate-and-create.
+   * promo_codes_college_id_unique is not filtered on is_active, so a second row for the college is refused,
+   * and usages key on the row id, so usedCount and the seat cap stay continuous across a rotation.
+   */
   collegeId: varchar("college_id"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -991,6 +998,8 @@ export const collegeWalletEntries = pgTable("college_wallet_entries", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => ({
   collegeWalletIncentiveUnique: uniqueIndex("college_wallet_incentive_unique").on(t.proposalId).where(sql`${t.kind} = 'incentive'`),
+  // drizzle/0014: same NULL hole as intern_payouts.
+  collegeWalletIncentiveHasProposal: check("college_wallet_incentive_has_proposal", sql`${t.kind} <> 'incentive' OR ${t.proposalId} IS NOT NULL`),
   collegeWalletEntriesCollegeIdx: index("college_wallet_entries_college_idx").on(t.collegeId, t.createdAt),
 }));
 
