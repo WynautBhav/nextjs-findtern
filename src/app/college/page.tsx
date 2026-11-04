@@ -44,8 +44,9 @@ export default async function CollegeDashboard() {
         and(
           eq(schema.collegeDrives.collegeId, ctx.college.id),
           isNull(schema.collegeDrives.revokedAt),
-          lte(schema.collegeDrives.startsAt, sql`now()`),
-          gt(schema.collegeDrives.endsAt, sql`now()`),
+          // timestamp columns hold UTC wall time; a bare now() would read them in the DB session zone (as scope.ts avoids).
+          lte(schema.collegeDrives.startsAt, sql`(now() AT TIME ZONE 'UTC')`),
+          gt(schema.collegeDrives.endsAt, sql`(now() AT TIME ZONE 'UTC')`),
         ),
       )
       .orderBy(schema.collegeDrives.endsAt)
