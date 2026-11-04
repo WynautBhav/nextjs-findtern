@@ -15,6 +15,7 @@ import { requireRole } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 import { canAccess } from "@/lib/security/guards";
 import { getDb, hasDb, schema } from "@/lib/db";
+import { scopeValue } from "@/lib/db/schema";
 import { loadInternData } from "@/lib/intern-data";
 import { formatJoiningDate, shortDate } from "@/lib/format";
 import { canDecide, hybridSplit, offerJoiningDay, shiftInIst } from "@/lib/intern-offer-view";
@@ -136,7 +137,9 @@ export default async function ProposalDetail({ params }: { params: Promise<{ id:
 
   const jd = offer.jd;
   const jdHtml = jd && /<[^>]+>/.test(jd) ? sanitizeRichText(jd) : "";
-  const scope = (project.row?.scopeOfWork ?? "").trim();
+  // scopeOfWork is a duration pick ("short-term", "not-sure"), not role text; only free text from a legacy row is shown.
+  const rawScope = (project.row?.scopeOfWork ?? "").trim();
+  const scope = scopeValue(rawScope) || /^not[-_ ]?sure$/i.test(rawScope) ? "" : rawScope;
   // One joining date for the whole page: the IST day the first shift starts (can differ from the employer's calendar day).
   const joiningDay = offerJoiningDay(offer);
   const joining = formatJoiningDate(joiningDay);
