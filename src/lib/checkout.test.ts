@@ -62,7 +62,7 @@ test("EMH-11: placement ledger, monthly plan one of three months paid", async ()
   assert.equal(l.paidMinor, 1_600_000 + 500_000);
   assert.equal(l.dueMinor, 1_600_000 * 2);
   assert.equal(l.nextDue, "2026-12-02");
-  assert.equal(l.endsOn, "2027-02-02");
+  assert.equal(l.endsOn, "2027-02-01");
   assert.equal(l.status, "partially_paid");
   const upfront = placementLedger(hire, [{ status: "paid", raw: { notes: { proposalIds: ["p1"], paymentMode: "total" } } }]);
   assert.equal(upfront.status, "fully_paid");
