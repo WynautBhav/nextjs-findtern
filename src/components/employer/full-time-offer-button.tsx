@@ -234,7 +234,7 @@ export function FullTimeOfferButton({
                 )}
               </p>
             ) : null}
-            <FileUpload kind="offer_letter" accept="application/pdf,image/png,image/jpeg" label="Offer letter" hint="PDF, PNG or JPG, up to 10 MB." onUploaded={(r) => setLetter(r.key)} />
+            <FileUpload kind="offer_letter" accept="application/pdf,image/png,image/jpeg" label="Offer letter" hint="PDF, PNG or JPG, up to 10 MB." onUploaded={(r) => { setLetter(r.key); setError(null); }} />
             {error ? (
               <p role="alert" className="text-sm text-danger">
                 {error}
