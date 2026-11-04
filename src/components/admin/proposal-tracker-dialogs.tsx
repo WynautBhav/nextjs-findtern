@@ -136,7 +136,7 @@ export function MeetingLinkCell({ interviewId, link, locked, awaitingSlot = fals
           label: "Meeting link",
           type: "text",
           placeholder: "https://meet.google.com/…",
-          hint: "Saving notifies both sides and notifies both sides.",
+          hint: "Saving notifies both sides.",
         },
       ]}
       request={{ url: `/api/admin/interviews/${interviewId}/meeting-link`, method: "PUT" }}

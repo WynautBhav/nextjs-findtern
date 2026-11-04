@@ -13,6 +13,12 @@
 
 import { FEEDBACK_TAG_LINE, normaliseNotes } from "../interview-feedback.ts";
 
+export const AI_EMAIL = "ai-interview@findtern.ai";
+
+/** Legacy AI interviews sit on employer id "admin"; ours on the synthetic AI employer. They have no slots. */
+export const isAiInterview = (employerId: string | null | undefined, employerEmail: string | null | undefined) =>
+  employerId === "admin" || employerEmail === AI_EMAIL;
+
 const TAGGED = /^(feedback|recording): /;
 const EMPLOYER_FEEDBACK = /^feedback_text:/i;
 

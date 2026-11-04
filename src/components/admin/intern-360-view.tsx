@@ -53,6 +53,7 @@ export type Intern360Props = {
   timesheets: Timesheet[];
   payouts: InternPayout[];
   employerNames: Record<string, string>;
+  aiInterviewIds: string[];
   projectNames: Record<string, string>;
   /** Tab to open first (`?tab=` deep link, e.g. "payments"). */
   initialTab?: string;
@@ -93,6 +94,7 @@ export function Intern360View({
   timesheets,
   payouts,
   employerNames,
+  aiInterviewIds,
   projectNames,
   initialTab,
   feePaid,
@@ -427,6 +429,7 @@ export function Intern360View({
         onClose={() => setSelectedInterview(null)}
         onSaved={setSelectedInterview}
         company={company(selectedInterview?.employerId)}
+        isAi={Boolean(selectedInterview && aiInterviewIds.includes(selectedInterview.id))}
         extra={extra}
         canWrite={canWrite}
       />
@@ -758,9 +761,11 @@ function InterviewDialog({
   onClose,
   onSaved,
   company,
+  isAi,
   extra,
   canWrite,
 }: {
+  isAi: boolean;
   canWrite: boolean;
   interview: Interview | null;
   onClose: () => void;
@@ -786,7 +791,7 @@ function InterviewDialog({
   }
 
   // #20: a company interview gets its link when the candidate picks a time (AI interviews have no company).
-  const awaitingSlot = Boolean(interview && company && !interview.selectedSlot);
+  const awaitingSlot = Boolean(interview && !isAi && !interview.selectedSlot);
 
   async function save() {
     if (!interview) return;

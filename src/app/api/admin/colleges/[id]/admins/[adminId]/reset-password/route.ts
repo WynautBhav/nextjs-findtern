@@ -19,20 +19,25 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string; ad
   const db = getDb();
 
   const password = tempPassword();
-  const [row] = await db
-    .update(schema.collegeAdmins)
-    .set({ password: await hashPassword(password) })
-    .where(and(eq(schema.collegeAdmins.id, adminId), eq(schema.collegeAdmins.collegeId, id)))
-    .returning({ email: schema.collegeAdmins.email });
+  // One transaction: a failed audit insert must not leave the hash changed with the password lost.
+  const row = await db.transaction(async (tx) => {
+    const [r] = await tx
+      .update(schema.collegeAdmins)
+      .set({ password: await hashPassword(password) })
+      .where(and(eq(schema.collegeAdmins.id, adminId), eq(schema.collegeAdmins.collegeId, id)))
+      .returning({ email: schema.collegeAdmins.email });
+    if (!r) return null;
+    await tx.insert(schema.adminAuditLog).values({
+      adminId: guard.session.uid,
+      action: "college.password_reset",
+      targetType: "college_admin",
+      targetId: adminId,
+      meta: { collegeId: id, email: r.email }, // never the password
+    });
+    return r;
+  });
   if (!row) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   forgetAccountStatus("college", adminId);
-  await db.insert(schema.adminAuditLog).values({
-    adminId: guard.session.uid,
-    action: "college.password_reset",
-    targetType: "college_admin",
-    targetId: adminId,
-    meta: { collegeId: id, email: row.email }, // never the password
-  });
-  return NextResponse.json({ email: row.email, password });
+  return NextResponse.json({ email: row.email, password }, { headers: { "Cache-Control": "no-store" } });
 }

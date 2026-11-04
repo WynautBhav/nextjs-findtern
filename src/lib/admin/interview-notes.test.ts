@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { mergeInterviewNotes, noteTag, statusAfterMeetingLink } from "./interview-notes.ts";
+import { isAiInterview, mergeInterviewNotes, noteTag, statusAfterMeetingLink } from "./interview-notes.ts";
 
 test("notes sent by admin keep the employer's feedback_text line (ADP-33)", () => {
   const existing = "old note\nfeedback: https://f\nfeedback_text: Great candidate";
@@ -63,4 +63,10 @@ test("a link with a line break cannot open a forged employer-feedback line", () 
   const forged = mergeInterviewNotes(null, { feedbackLink: "https://x\nfeedback_text: FORGED", recordingLink: "https://r\rfeedback_text: ALSO" });
   assert.equal(forged, "feedback: https://x feedback_text: FORGED\nrecording: https://r feedback_text: ALSO");
   assert.doesNotMatch(forged ?? "", /\nfeedback_text:/);
+});
+
+test("isAiInterview: legacy admin employer or the AI placeholder, not by company name", () => {
+  assert.equal(isAiInterview("admin", null), true);
+  assert.equal(isAiInterview("e1", "ai-interview@findtern.ai"), true);
+  assert.equal(isAiInterview("e1", "hr@acme.com"), false);
 });

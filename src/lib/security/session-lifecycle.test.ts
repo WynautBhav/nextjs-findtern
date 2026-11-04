@@ -137,3 +137,9 @@ test("a college session minted with the password version dies when an admin rese
   assert.equal(pv, passwordVersion("$argon2id$old"));
   assert.notEqual(pv, passwordVersion("$argon2id$reset"), "account-status compares this with the stored hash");
 });
+
+test("sessions without a password version: only college ones are rejected", async () => {
+  const { acceptsPvlessSession } = await import("./session.ts");
+  assert.equal(acceptsPvlessSession("college"), false);
+  for (const r of ["intern", "employer", "admin"]) assert.equal(acceptsPvlessSession(r), true);
+});

@@ -189,7 +189,7 @@ export function CollegeRowControls({ row }: { row: CollegeAdminRow }) {
       {row.officers.map((o) => (
         <div key={o.id} className="flex flex-wrap items-center gap-x-3 text-sm text-foreground">
           <span>{o.name} · {o.email}</span>
-          <button type="button" onClick={() => resetPassword(o)} className="inline-flex min-h-11 cursor-pointer items-center rounded-full px-1 font-medium underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+          <button type="button" onClick={() => resetPassword(o)} aria-label={`Reset password for ${o.name}`} className="inline-flex min-h-11 cursor-pointer items-center rounded-full px-1 font-medium underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
             Reset password
           </button>
         </div>
