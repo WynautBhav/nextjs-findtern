@@ -49,6 +49,8 @@ export async function resolve(specifier, context, nextResolve) {
 const hookUrl = "data:text/javascript;base64," + Buffer.from(hookCode).toString("base64");
 register(hookUrl);
 
+import { sql } from "drizzle-orm";
+
 import { getDb, schema } from "../src/lib/db/index.ts";
 import { verifyPassword } from "../src/lib/security/password.ts";
 
@@ -90,6 +92,14 @@ async function main() {
       `  ${ok ? "PASS" : "FAIL"}  ${table.padEnd(18)} ${actual} ${isFullDataset ? "(active)" : `(expected ${expected})`}`,
     );
   }
+
+  // Once-only notifications (reminders, nudges) rely on this partial unique
+  // index; without it a repeated dedupeKey inserts a second row and mail.
+  console.log("\nindexes");
+  const idx = await db.execute(sql`select 1 from pg_indexes where indexname = 'notifications_dedupe_uniq'`);
+  const hasDedupe = (idx.rows ?? (idx as unknown as unknown[])).length > 0;
+  if (!hasDedupe) failed = true;
+  console.log(`  ${hasDedupe ? "PASS" : "FAIL"}  notifications_dedupe_uniq (run npm run db:migrate if missing)`);
 
   // Verifying password against an admin account proves the stored format is
   // one verifyPassword accepts.
