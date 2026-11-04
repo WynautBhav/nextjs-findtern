@@ -458,8 +458,10 @@ async function exportPayouts(search: string, params: Record<string, string>) {
     { header: "Reference", value: (r) => r.referenceId ?? "" },
     { header: "Scheduled for", value: (r) => meta(r, "scheduledFor") },
     { header: "Employer", value: (r) => companyName.get(meta(r, "employerId")) ?? "" },
-    { header: "Proposal", value: (r) => meta(r, "proposalId") },
-    { header: "Notes", value: (r) => r.notes ?? "" },
+    // `notes` holds the placement title; the staff note lives in raw.opsNote.
+    { header: "Proposal", value: (r) => [r.notes, companyName.get(meta(r, "employerId"))].filter(Boolean).join(" / ") },
+    { header: "Proposal ID", value: (r) => meta(r, "proposalId") },
+    { header: "Notes", value: (r) => meta(r, "opsNote") },
     { header: "Paid at (IST)", value: (r) => formatIstStamp(r.paidAt) },
     { header: "Created at (IST)", value: (r) => formatIstStamp(r.createdAt) },
   ];
