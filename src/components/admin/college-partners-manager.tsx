@@ -176,6 +176,38 @@ export function CollegeRowControls({ row }: { row: CollegeAdminRow }) {
           <div className="pt-2">{issueForm}</div>
         </details>
       )}
+      <details>
+        <summary className="inline-flex min-h-11 cursor-pointer list-none items-center rounded-full px-1 text-sm font-medium text-foreground underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+          Edit name, city, AISHE code
+        </summary>
+        <form
+          className="flex flex-wrap items-end gap-2 pt-2"
+          onSubmit={async (e) => {
+            e.preventDefault();
+            const f = new FormData(e.currentTarget);
+            setError(null);
+            const r = await send(`/api/admin/colleges/${row.id}`, "PATCH", { name: f.get("name"), city: f.get("city"), aisheCode: String(f.get("aishe") ?? "").trim() || null });
+            if (!r.ok) return setError(String(r.json.error ?? "Couldn't save"));
+            router.refresh();
+          }}
+        >
+          <label className="min-w-52 flex-1">
+            <span className="text-sm font-medium text-foreground">College name</span>
+            <input name="name" required minLength={3} defaultValue={row.name} className={cn(input, "mt-1")} />
+          </label>
+          <label className="min-w-32 flex-1">
+            <span className="text-sm font-medium text-foreground">City</span>
+            <input name="city" defaultValue={row.city ?? ""} className={cn(input, "mt-1")} />
+          </label>
+          <label className="min-w-32 flex-1">
+            <span className="text-sm font-medium text-foreground">AISHE code</span>
+            <input name="aishe" defaultValue={row.aisheCode ?? ""} className={cn(input, "mt-1")} />
+          </label>
+          <button className="inline-flex min-h-11 cursor-pointer items-center rounded-full bg-[color:var(--admin-panel-2)] px-5 text-sm font-medium text-foreground hover:bg-[color:var(--admin-bar-tint)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+            Save
+          </button>
+        </form>
+      </details>
       <div role="status" aria-live="polite">
         {issued ? (
           <p className="rounded-[var(--radius-admin-card)] bg-success-soft px-4 py-3 text-sm text-foreground">
