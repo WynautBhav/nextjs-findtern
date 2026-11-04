@@ -19,6 +19,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   // call stops holding the candidate, so a proposal can follow straight away.
   if (!canMarkCompleted(interview)) {
     if (interview.status === "completed") return NextResponse.json({ error: "This meeting is already marked completed." }, { status: 409 });
+    if (interview.status === "missed") return NextResponse.json({ error: "This meeting is already marked missed." }, { status: 409 });
     return NextResponse.json({ error: "You can mark a meeting completed once its start time has come." }, { status: 409 });
   }
   const updated = await db
