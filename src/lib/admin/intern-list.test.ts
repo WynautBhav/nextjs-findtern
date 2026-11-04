@@ -64,3 +64,7 @@ test("today is the IST calendar day", () => {
   assert.equal(todayIstIso(new Date("2026-10-27T20:00:00Z")), "2026-10-28");
   assert.equal(todayIstIso(new Date("2026-10-27T10:00:00Z")), "2026-10-27");
 });
+
+test("no next date when nothing is owed (matches the dues tab)", () => {
+  assert.equal(internMoney([due({ remainingMinor: 0, nextDate: "2026-12-14" })]).nextDate, null);
+});

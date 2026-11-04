@@ -30,6 +30,7 @@ export function internMoney(
 ): InternMoney {
   const nextDate =
     dues
+      .filter((d) => d.remainingMinor > 0) // same rule as the Payouts dues tab
       .map((d) => d.nextDate)
       .filter((d): d is string => Boolean(d))
       .sort()[0] ?? null;
