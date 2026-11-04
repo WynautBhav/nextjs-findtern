@@ -113,7 +113,9 @@ async function loadMembers(collegeId: string): Promise<CollegeStudent[]> {
       (SELECT count(*) FROM ${schema.proposals} pr WHERE pr.intern_id = ${m.userId} AND ${realEmployerId(sql`pr.employer_id`)}) AS proposals,
       (SELECT count(*) FROM ${schema.proposals} pr WHERE pr.intern_id = ${m.userId} AND pr.status = 'sent' AND ${realEmployerId(sql`pr.employer_id`)}) AS offers_pending,
       (SELECT count(*) FROM ${schema.interviews} iv WHERE iv.intern_id = ${m.userId} AND iv.status = 'scheduled' AND ${realEmployerId(sql`iv.employer_id`)}) AS interviews_scheduled,
-      (SELECT count(*) FROM ${schema.collegeDriveMeetings} dm WHERE dm.user_id = ${m.userId}) AS drive_meetings,
+      (SELECT count(*) FROM ${schema.collegeDriveMeetings} dm JOIN ${schema.collegeDrives} dr ON dr.id = dm.drive_id
+        WHERE dm.user_id = ${m.userId} AND dr.ends_at > (now() AT TIME ZONE 'UTC')
+          AND (dr.revoked_at IS NULL OR dr.revoked_at > (now() AT TIME ZONE 'UTC'))) AS drive_meetings,
       (greatest(p.last_seen_at, ${o.updatedAt},
         (SELECT max(pr.updated_at) FROM ${schema.proposals} pr WHERE pr.intern_id = ${m.userId})) AT TIME ZONE 'UTC') AS last_activity_at
     FROM ${m}

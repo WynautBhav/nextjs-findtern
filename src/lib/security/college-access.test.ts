@@ -12,6 +12,7 @@ const {
   membershipFor,
   driveWindow,
 } = await import("../college/access.ts");
+const { tpoProfile, canOpenArtifacts, driveDataOpen } = await import("../college/serialize.ts");
 const { generateDriveToken, hashDriveToken } = await import("../college/tokens.ts");
 const { createSession, readSession } = await import("./session.ts");
 const { canAccess } = await import("./guards.ts");
@@ -292,4 +293,53 @@ test("QA-200: reissuing a link swaps the token, reopens the drive and deletes th
   // out even though the drive is live with a valid link again.
   const after = checkDriveAccess({ drive: driveX, session: employer, joined: false, collegeActive: true, now: NOW });
   assert.equal(after.ok === false && after.reason, "not_joined");
+});
+
+// ── WP8: what a TPO sees of a student ───────────────────────────────────
+
+const onboarding = {
+  bio: "Builder",
+  city: "Jaipur",
+  state: "Rajasthan",
+  pinCode: "302001",
+  linkedinUrl: "https://linkedin.com/in/asha",
+  aadhaarNumber: "999911112222",
+  panNumber: "ABCDE1234F",
+  skills: ["React"],
+  experienceJson: [{ id: "e1", company: "Acme", role: "Intern", from: "2026-01-01", to: "2026-03-01", description: "Built" }],
+  extraData: {
+    aadhaarNumber: "999911112222",
+    bankDetails: { accountNumber: "123456789012", ifscCode: "HDFC0001234" },
+    academics: { institution: "JKLU", degree: "B.Tech", specialization: "CSE", endYear: "2027", score: "8.1" },
+    languages: [{ id: "l1", language: "english", level: "Native" }],
+  },
+};
+
+test("WP8: a claimed (unverified) student leaks no profile and no artifacts", () => {
+  assert.equal(tpoProfile("claimed", onboarding, "+91 9999999999"), null);
+  assert.equal(canOpenArtifacts("claimed"), false);
+  assert.equal(canOpenArtifacts(""), false);
+});
+
+test("WP8: a verified student shows the agreed fields and never Aadhaar, PAN, bank or address", () => {
+  const p = tpoProfile("verified", onboarding, "+91 9999999999");
+  assert.ok(p);
+  assert.equal(p.phone, "+91 9999999999");
+  assert.equal(p.city, "Jaipur, Rajasthan");
+  assert.deepEqual(p.skills, ["React"]);
+  assert.equal(p.education?.institution, "JKLU");
+  assert.equal(p.experience[0].company, "Acme");
+  assert.equal(p.bio, "Builder");
+  assert.equal(canOpenArtifacts("verified"), true);
+  const dump = JSON.stringify(p);
+  for (const secret of ["999911112222", "ABCDE1234F", "123456789012", "HDFC0001234", "302001"]) {
+    assert.equal(dump.includes(secret), false, secret);
+  }
+});
+
+test("WP8: an ended or revoked drive hides its student data; upcoming and live keep it", () => {
+  assert.equal(driveDataOpen(driveX, NOW), true);
+  assert.equal(driveDataOpen(driveX, NOW - 2 * HOUR), true);
+  assert.equal(driveDataOpen(driveX, NOW + 25 * HOUR), false);
+  assert.equal(driveDataOpen({ ...driveX, revokedAt: new Date(NOW - 1000) }, NOW), false);
 });

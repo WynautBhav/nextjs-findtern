@@ -13,6 +13,7 @@ import { getDb, schema } from "@/lib/db";
 import { parseOffer } from "@/lib/offer";
 import { realEmployerId } from "@/lib/admin/scope";
 import { shortDateTime } from "@/lib/format";
+import { canOpenArtifacts, driveDataOpen, tpoProfile } from "@/lib/college/serialize";
 import { buttonClass } from "@/components/ui/button";
 
 export const dynamic = "force-dynamic";
@@ -31,25 +32,23 @@ export default async function CollegeStudentPage({ params }: { params: Promise<{
   if (!student) notFound();
 
   const db = getDb();
-  const [[onboarding], proposals, interviews, calls, views] = await Promise.all([
-    db.select({ extra: schema.internOnboarding.extraData }).from(schema.internOnboarding).where(eq(schema.internOnboarding.userId, id)).limit(1),
+  const [[onboarding], [user], proposals, interviews, allCalls, views] = await Promise.all([
+    db.select().from(schema.internOnboarding).where(eq(schema.internOnboarding.userId, id)).limit(1),
+    db.select({ phone: schema.users.phoneNumber, cc: schema.users.countryCode }).from(schema.users).where(eq(schema.users.id, id)).limit(1),
     db
-      .select({ p: schema.proposals, company: schema.employers.companyName })
+      .select({ p: schema.proposals })
       .from(schema.proposals)
-      .leftJoin(schema.employers, eq(schema.employers.id, schema.proposals.employerId))
       .where(and(eq(schema.proposals.internId, id), realEmployerId(schema.proposals.employerId)))
       .orderBy(desc(schema.proposals.createdAt)),
     db
-      .select({ i: schema.interviews, company: schema.employers.companyName })
+      .select({ i: schema.interviews })
       .from(schema.interviews)
-      .leftJoin(schema.employers, eq(schema.employers.id, schema.interviews.employerId))
       .where(and(eq(schema.interviews.internId, id), realEmployerId(schema.interviews.employerId), inArray(schema.interviews.status, ["scheduled", "completed", "pending"])))
       .orderBy(desc(schema.interviews.createdAt)),
     db
-      .select({ m: schema.collegeDriveMeetings, company: schema.employers.companyName, drive: schema.collegeDrives.title })
+      .select({ m: schema.collegeDriveMeetings, drive: schema.collegeDrives.title, d: schema.collegeDrives })
       .from(schema.collegeDriveMeetings)
       .innerJoin(schema.collegeDrives, eq(schema.collegeDrives.id, schema.collegeDriveMeetings.driveId))
-      .leftJoin(schema.employers, eq(schema.employers.id, schema.collegeDriveMeetings.employerId))
       .where(and(eq(schema.collegeDriveMeetings.userId, id), eq(schema.collegeDrives.collegeId, ctx.college.id)))
       .orderBy(desc(schema.collegeDriveMeetings.createdAt)),
     db
@@ -61,9 +60,13 @@ export default async function CollegeStudentPage({ params }: { params: Promise<{
       .limit(5),
   ]);
 
-  const extra = (onboarding?.extra as Record<string, unknown>) ?? {};
+  // An ended or revoked drive no longer shows its calls (C12).
+  const calls = allCalls.filter((c) => driveDataOpen(c.d));
+  const profile = tpoProfile(student.status, onboarding, user ? `${user.cc} ${user.phone}` : null);
+  const artifacts = canOpenArtifacts(student.status);
+  const extra = (onboarding?.extraData as Record<string, unknown>) ?? {};
   const ratings = (extra.ratings as Record<string, number>) ?? {};
-  const links = await aiInterviewLinks(id, extra);
+  const links = artifacts ? await aiInterviewLinks(id, extra) : { feedbackLink: null, recordingLink: null };
   const ai = aiStatusLabel(student.aiStatus);
   const name = `${student.firstName} ${student.lastName}`.trim();
 
@@ -94,6 +97,47 @@ export default async function CollegeStudentPage({ params }: { params: Promise<{
         }
         action={!ai.done ? <NudgeButton kind="interview" userIds={[id]} label="Nudge to take the interview" /> : null}
       />
+
+      <Panel>
+        <PanelHeader title="Profile" description={profile ? "Shown because this student is verified with your college." : undefined} />
+        <PanelBody>
+          {profile ? (
+            <dl className="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
+              {([
+                ["Phone", profile.phone],
+                ["City", profile.city],
+                ["Skills", profile.skills.join(", ")],
+                ["Languages", profile.languages.join(", ")],
+                ["Education", profile.education ? [profile.education.degree, profile.education.branch, profile.education.institution, profile.education.year].filter(Boolean).join(" · ") : ""],
+                ["LinkedIn", profile.links.linkedin],
+              ] as const).map(([k, v]) => (
+                <div key={k}>
+                  <dt className="text-text-subtle">{k}</dt>
+                  <dd className="break-words text-ink-900">{v || "—"}</dd>
+                </div>
+              ))}
+              {profile.bio ? (
+                <div className="sm:col-span-2">
+                  <dt className="text-text-subtle">About</dt>
+                  <dd className="whitespace-pre-line text-ink-900">{profile.bio}</dd>
+                </div>
+              ) : null}
+              {profile.experience.length > 0 ? (
+                <div className="sm:col-span-2">
+                  <dt className="text-text-subtle">Experience</dt>
+                  <dd className="space-y-1 text-ink-900">
+                    {profile.experience.map((e, n) => (
+                      <p key={n}>{[e.role, e.company].filter(Boolean).join(" at ")} <span className="text-text-subtle">{e.from} – {e.to}</span></p>
+                    ))}
+                  </dd>
+                </div>
+              ) : null}
+            </dl>
+          ) : (
+            <p className="text-sm text-text-subtle">Full profile shows once the student is verified with your college code.</p>
+          )}
+        </PanelBody>
+      </Panel>
 
         <Panel>
           <PanelHeader
@@ -190,37 +234,36 @@ export default async function CollegeStudentPage({ params }: { params: Promise<{
           </PanelBody>
         ) : (
           <ul className="divide-y divide-ink-100">
-            {proposals.map(({ p, company }) => {
+            {proposals.map(({ p }) => {
               const offer = parseOffer(p.offerDetails, p.currency);
               const waiting = p.status === "sent";
               return (
                 <li key={p.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5">
                   <div className="min-w-0">
-                    <p className="font-medium text-ink-900">{offer.roleTitle || "Internship"} · offer</p>
+                    <p className="font-medium text-ink-900">Offer · {offer.roleTitle || "Internship"}</p>
                     <p className="text-sm text-text-subtle">
-                      {company ?? "Employer"} · sent {ago(p.createdAt?.toISOString() ?? null)}
+                      Sent {ago(p.createdAt?.toISOString() ?? null)}
                     </p>
                   </div>
                   <Pill tone={waiting ? "waiting" : "neutral"}>{waiting ? "Waiting for the student's reply" : humanizeStatus(p.status)}</Pill>
                 </li>
               );
             })}
-            {calls.map(({ m, company, drive }) => (
+            {calls.map(({ m, drive }) => (
               <li key={m.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5">
                 <div className="min-w-0">
-                  <p className="font-medium text-ink-900">{company ?? "Employer"} · drive call</p>
+                  <p className="font-medium text-ink-900">Drive call · {drive}</p>
                   <p className="text-sm text-text-subtle">
-                    {drive} · {shortDateTime(m.startsAt, { timeZone: "Asia/Kolkata", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })} IST
+                    {shortDateTime(m.startsAt, { timeZone: "Asia/Kolkata", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })} IST
                   </p>
                 </div>
                 <Pill tone="neutral">{humanizeStatus(m.status)}</Pill>
               </li>
             ))}
-            {interviews.map(({ i, company }) => (
+            {interviews.map(({ i }) => (
               <li key={i.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5">
                 <div className="min-w-0">
-                  <p className="font-medium text-ink-900">{company ?? "Employer"} · interview</p>
-                  <p className="text-sm text-text-subtle">Requested {ago(i.createdAt?.toISOString() ?? null)}</p>
+                  <p className="font-medium text-ink-900">Interview · {i.createdAt ? shortDateTime(i.createdAt, { day: "numeric", month: "short" }) : "requested"}</p>
                 </div>
                 <Pill tone="neutral">{humanizeStatus(i.status)}</Pill>
               </li>
