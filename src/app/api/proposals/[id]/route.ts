@@ -134,15 +134,18 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     if (modeIssue) return NextResponse.json({ error: modeIssue }, { status: 400 });
   }
   const storedShift = shiftFields(String(current.shiftFrom ?? ""), String(current.shiftTo ?? ""));
-  const touchesShift = edits.shiftFrom !== undefined || edits.shiftTo !== undefined;
+  // Judge only what this edit changes: the form resends every field, and an older offer may not meet today's rules.
+  const changed = (v: string | undefined, stored: unknown) => (v !== undefined && v !== String(stored ?? "") ? v : undefined);
+  const newFrom = changed(edits.shiftFrom, storedShift.shiftFrom);
+  const newTo = changed(edits.shiftTo, storedShift.shiftTo);
   // Same checks as the composer; an edit of one end is judged against the stored other end.
   const termIssue = offerTermIssues({
-    startDate: edits.startDate,
-    timezone: edits.timezone,
-    ...(touchesShift
+    startDate: changed(edits.startDate, before.startDate),
+    timezone: changed(edits.timezone, current.timezone),
+    ...(newFrom !== undefined || newTo !== undefined
       ? {
-          shiftFrom: edits.shiftFrom ?? (String(storedShift.shiftFrom) || "flexible"),
-          shiftTo: edits.shiftTo ?? (String(storedShift.shiftTo) || "flexible"),
+          shiftFrom: newFrom ?? (String(storedShift.shiftFrom) || "flexible"),
+          shiftTo: newTo ?? (String(storedShift.shiftTo) || "flexible"),
         }
       : {}),
   })[0];

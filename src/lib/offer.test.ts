@@ -299,6 +299,7 @@ test("offerTermIssues: the composer and the edit share one set of start/shift/ti
   assert.deepEqual(offerTermIssues({ shiftFrom: "flexible", shiftTo: "flexible" }), []);
   assert.equal(offerTermIssues({ timezone: "Mars/X" })[0]?.message, "Pick a timezone from the list.");
   assert.equal(offerTermIssues({ shiftFrom: "25:99", shiftTo: "abc" })[0]?.message, "Pick the working hours.");
+  assert.match(offerTermIssues({ shiftFrom: "09:00", shiftTo: "flexible" })[0]?.message ?? "", /both the start and end/);
   assert.equal(offerTermIssues({ shiftFrom: "10:00", shiftTo: "10:00" })[0]?.message, "The shift can't start and end at the same time.");
   assert.equal(offerTermIssues({ startDate: day(900) })[0]?.message, "Pick a start date within the next year.");
   assert.equal(offerTermIssues({ startDate: "2026-02-31" })[0]?.message, "Pick a real start date.");

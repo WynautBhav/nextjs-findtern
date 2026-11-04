@@ -459,7 +459,8 @@ export function offerTermIssues(t: {
     const to = t.shiftTo ?? "";
     // Flexible hours send "flexible" for both; otherwise both are clock times and differ.
     if (!(from === "flexible" && to === "flexible")) {
-      if (!isClockTime(from) || !isClockTime(to)) out.push({ path: "shiftFrom", message: "Pick the working hours." });
+      if (from === "flexible" || to === "flexible") out.push({ path: "shiftFrom", message: "Set both the start and end time, or choose flexible hours for both." });
+      else if (!isClockTime(from) || !isClockTime(to)) out.push({ path: "shiftFrom", message: "Pick the working hours." });
       else if (from === to) out.push({ path: "shiftTo", message: "The shift can't start and end at the same time." });
     }
   }
