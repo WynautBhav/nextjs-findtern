@@ -33,9 +33,11 @@ export default async function AdminCollegesPage({
   const cid = q(c, c.id);
   // No search: partners and colleges with students. A search looks through the whole directory.
   const where = req.search
-    ? searchAny([sql`${c.name}`, sql`${c.city}`, sql`${c.aisheCode}`, sql`${c.code}`], req.search)
+    // The two codes have no trigram index, so they match exactly (as membership.ts does); name/city stay substring.
+    ? sql`(${searchAny([sql`${c.name}`, sql`${c.city}`], req.search)} OR ${c.aisheCode} = ${req.search.trim().toUpperCase()} OR ${c.code} = ${req.search.trim().toUpperCase()})`
     : sql`${c.isPartner} OR EXISTS (SELECT 1 FROM ${schema.collegeMemberships} m WHERE m.college_id = ${cid} AND m.left_at IS NULL)`;
   const [{ total }] = await db.select({ total: count() }).from(c).where(where);
+  const page = Math.min(req.page, Math.max(1, Math.ceil(total / req.perPage))); // a page past the end shows the last one
   const rows = await db
     .select({
       college: c,
@@ -47,7 +49,7 @@ export default async function AdminCollegesPage({
     .where(where)
     .orderBy(desc(c.isPartner), c.name, c.id)
     .limit(req.perPage)
-    .offset(req.offset);
+    .offset((page - 1) * req.perPage);
   const officers = await db
     .select({ collegeId: schema.collegeAdmins.collegeId, name: schema.collegeAdmins.name, email: schema.collegeAdmins.email, lastLoginAt: schema.collegeAdmins.lastLoginAt })
     .from(schema.collegeAdmins)
