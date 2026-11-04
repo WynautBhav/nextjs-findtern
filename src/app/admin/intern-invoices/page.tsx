@@ -8,6 +8,7 @@ import { ButtonLink } from "@/components/ui/button";
 import { getInvoiceSeller } from "@/lib/invoice-seller";
 import { AdminInvoicesView, type AdminInvoiceRow } from "@/components/admin/admin-invoices-view";
 import { discountLabel, paymentPromo } from "@/lib/admin/payment-promo";
+import { internInvoiceRow } from "@/lib/intern-invoice";
 import { flattenParams, type RawSearchParams } from "@/lib/admin/params";
 
 export const metadata: Metadata = {
@@ -90,29 +91,7 @@ async function loadInternInvoices(): Promise<AdminInvoiceRow[]> {
       };
     });
 
-  const rows: AdminInvoiceRow[] = rawInvoices.map((inv) => {
-    const name = `${inv.firstName || ""} ${inv.lastName || ""}`.trim() || "Candidate";
-    const promo = paymentPromo(inv.raw, inv.onboardingPayment, inv.amountMinor);
-    return {
-      id: inv.id,
-      invoiceNumber: inv.invoiceNumber,
-      partyId: inv.internId,
-      partyName: name,
-      partyEmail: inv.email || "-",
-      promoCode: promo.code,
-      discountMinor: promo.discountMinor,
-      discountLabel: discountLabel(promo, inv.amountMinor),
-      orderId: inv.orderId,
-      paymentId: inv.paymentId,
-      gateway: inv.gateway,
-      amountMinor: inv.amountMinor,
-      currency: inv.currency || "INR",
-      status: inv.status,
-      paidAt: inv.paidAt ? inv.paidAt.toISOString() : null,
-      createdAt: inv.createdAt ? inv.createdAt.toISOString() : null,
-      buyer: { name, email: inv.email, pincode: inv.pinCode, state: inv.state },
-    };
-  });
+  const rows: AdminInvoiceRow[] = rawInvoices.map(internInvoiceRow);
 
   return [...rows, ...flagRows];
 }
