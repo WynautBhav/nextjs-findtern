@@ -1,6 +1,7 @@
 "use client";
 
 import { Check, Columns3 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { DropdownMenu } from "radix-ui";
 
@@ -23,19 +24,32 @@ export function InternColumnsMenu({ visible, adminUid }: { visible: InternColKey
   const router = useRouter();
   const pathname = usePathname();
   const search = useSearchParams();
-  const on = new Set(visible);
+  // Local copy so clicks faster than the router round-trip build on each other.
+  const [on, setOn] = useState(() => new Set(visible));
+  const latest = useRef(on);
+  const pending = useRef<string | null>(null); // last list sent to the URL, until the server echoes it
+  const key = visible.join(",");
+  useEffect(() => {
+    if (pending.current !== null && pending.current !== key) return; // stale echo of an earlier click
+    pending.current = null;
+    latest.current = new Set(key ? key.split(",") as InternColKey[] : []);
+    setOn(latest.current);
+  }, [key]);
   const hidden = INTERN_COLUMNS.length - on.size;
 
   const save = (next: Set<InternColKey>) => {
+    latest.current = next;
+    setOn(next);
     // Catalog order, so the cookie and URL read the same however it was toggled.
     const list = INTERN_COLUMNS.filter((c) => next.has(c.key)).map((c) => c.key).join(",");
+    pending.current = list;
     rememberCols(adminUid, list);
     const q = new URLSearchParams(search.toString());
     q.set("cols", list);
     router.replace(`${pathname}?${q.toString()}`, { scroll: false });
   };
   const toggle = (key: InternColKey) => {
-    const next = new Set(on);
+    const next = new Set(latest.current);
     if (!next.delete(key)) next.add(key);
     // An empty set would fall back to the default on the server; keep one column on.
     if (next.size) save(next);
@@ -51,8 +65,9 @@ export function InternColumnsMenu({ visible, adminUid }: { visible: InternColKey
         <DropdownMenu.Content
           align="start"
           sideOffset={6}
-          className="z-50 max-h-[min(70vh,32rem)] w-60 overflow-y-auto rounded-2xl border border-border bg-popover p-1.5 text-foreground shadow-lg"
+          className="z-50 flex max-h-[min(32rem,var(--radix-dropdown-menu-content-available-height))] w-60 flex-col rounded-2xl border border-border bg-popover p-1.5 text-foreground shadow-lg"
         >
+          <div className="min-h-0 flex-1 overflow-y-auto">
           {GROUPS.map((group) => (
             <DropdownMenu.Group key={group}>
               <DropdownMenu.Label className="px-2.5 pt-2 pb-1 text-xs font-medium text-text-subtle">{group}</DropdownMenu.Label>
@@ -74,7 +89,8 @@ export function InternColumnsMenu({ visible, adminUid }: { visible: InternColKey
               ))}
             </DropdownMenu.Group>
           ))}
-          <DropdownMenu.Separator className="my-1.5 h-px bg-border" />
+          </div>
+          <DropdownMenu.Separator className="my-1.5 h-px shrink-0 bg-border" />
           <DropdownMenu.Item className={ITEM} onSelect={(e) => { e.preventDefault(); save(new Set(INTERN_COLUMNS.map((c) => c.key))); }}>
             Show all
           </DropdownMenu.Item>
