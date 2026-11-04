@@ -579,3 +579,10 @@ test("a date typed as today in India is accepted whatever the server's time zone
     else process.env.TZ = saved;
   }
 });
+
+test("skill ratings round-trip label -> stored number -> label (Intermediate stays 2)", () => {
+  const picked = [{ name: "Excel", rating: "Beginner" as const }, { name: "SQL", rating: "Intermediate" as const }, { name: "Go", rating: "Advanced" as const }];
+  const stored = storedFromDraft({ skills: picked.map((p) => p.name), skillsWithRatings: picked }, null).skills as { rating: number }[];
+  assert.deepEqual(stored.map((s) => s.rating), [1, 2, 3]);
+  assert.deepEqual(draftFromRecord({ skills: stored }).skillsWithRatings, picked);
+});
