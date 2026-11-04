@@ -328,7 +328,7 @@ export function validateCmsValues(
       return { ok: false, error: `${f.label} is too long` };
     }
     if ((f as CmsField).link && !isSafeLink(v, true)) {
-      return { ok: false, error: `${f.label} must start with https:// or /` };
+      return { ok: false, error: `${f.label} must start with http://, https:// or /` };
     }
     if (type === "blog" && f.name === "slug") {
       const err = slugError(v, opts.previousSlug ?? null);

@@ -14,7 +14,7 @@ const bodySchema = z.object({
   state: z.string().trim().max(80).optional().default(""),
   aisheCode: z.string().trim().regex(/^[CUS]-\d{3,6}$/i, "AISHE codes look like U-0657 or C-12345").optional().or(z.literal("")),
   emailDomains: z.array(z.string().trim().toLowerCase().regex(/^[a-z0-9.-]+\.[a-z]{2,}$/, "Enter a domain like jklu.edu.in")).max(10).default([]),
-  logoUrl: z.string().trim().url().max(500).refine((u) => isSafeLink(u), "Logo link must start with https://").optional().or(z.literal("")),
+  logoUrl: z.string().trim().url().max(500).refine((u) => isSafeLink(u), "Logo link must start with http:// or https://").optional().or(z.literal("")),
   isPartner: z.boolean().default(true),
   showOnWebsite: z.boolean().default(false),
 });

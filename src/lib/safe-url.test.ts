@@ -11,4 +11,5 @@ test("isSafeLink allows http(s) and, when asked, site paths only", () => {
   assert.equal(isSafeLink("/skills?x=1"), false);
   assert.equal(isSafeLink("/skills?x=1", true), true);
   assert.equal(isSafeLink("//evil.com", true), false);
+  assert.equal(isSafeLink("/\\evil.com", true), false);
 });
