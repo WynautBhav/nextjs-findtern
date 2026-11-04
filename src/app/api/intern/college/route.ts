@@ -6,9 +6,9 @@ import { joinCollege, leaveCollege, membershipOf } from "@/lib/college/membershi
 import { getSession } from "@/lib/auth";
 
 const bodySchema = z.object({
-  collegeId: z.string().min(1),
-  year: z.number().int().min(1).max(5).nullable(),
-  branch: z.string().trim().max(120).nullable(),
+  collegeId: z.string().min(1, "Choose your college"),
+  year: z.number("Choose your year, 1 to 5").int("Choose your year, 1 to 5").min(1, "Choose your year, 1 to 5").max(5, "Choose your year, 1 to 5").nullable(),
+  branch: z.string().trim().max(120, "Branch can be up to 120 characters").nullable(),
   declaredAdult: z.boolean(),
 });
 
@@ -23,7 +23,7 @@ export async function POST(req: Request) {
   const guard = await requireMutation({ req, roles: ["intern"] });
   if (!guard.ok) return guard.response;
   const parsed = bodySchema.safeParse(await req.json().catch(() => null));
-  if (!parsed.success) return NextResponse.json({ error: "Choose your college" }, { status: 400 });
+  if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Choose your college" }, { status: 400 });
   const r = await joinCollege({
     ...parsed.data,
     branch: parsed.data.branch || null,

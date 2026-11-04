@@ -7,9 +7,9 @@ import { canGrant, PERMISSIONS } from "@/lib/admin/permissions";
 import { requireMutation } from "@/lib/guards-mutation";
 
 const bodySchema = z.object({
-  key: z.string().min(2),
-  name: z.string().min(2),
-  permissions: z.array(z.enum(["*", ...PERMISSIONS.map((p) => p.key)] as [string, ...string[]])).default([]),
+  key: z.string().regex(/^[A-Za-z0-9_]{2,}$/, "Role key: 2 or more letters, numbers or underscores"),
+  name: z.string().min(2, "Give the role a name of 2 or more letters"),
+  permissions: z.array(z.enum(["*", ...PERMISSIONS.map((p) => p.key)] as [string, ...string[]], "Unknown permission")).default([]),
 });
 
 export async function POST(req: Request) {
@@ -17,7 +17,7 @@ export async function POST(req: Request) {
   if (!guard.ok) return guard.response;
 
   const parsed = bodySchema.safeParse(await req.json().catch(() => null));
-  if (!parsed.success) return NextResponse.json({ error: "Give the role a name of 2 or more letters (A-Z, 0-9)." }, { status: 400 });
+  if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Check the details" }, { status: 400 });
 
   if (parsed.data.key.toLowerCase() === "super_admin" || !canGrant(guard.session.permissions, parsed.data.permissions)) {
     return NextResponse.json({ error: "You can only grant permissions you have yourself." }, { status: 403 });
