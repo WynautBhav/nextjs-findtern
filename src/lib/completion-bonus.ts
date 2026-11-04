@@ -1,6 +1,7 @@
 import { rawScore } from "./employer-candidates.ts";
 import { engagementPeriods, uncoveredParts, type Period } from "./employer-timesheets.ts";
 import { addDaysIso } from "./admin/payout-run.ts";
+import { postpaidAnchor } from "./billing-plan.ts";
 
 /** Findtern-paid cash on completion, INR paise, by the score BEFORE the +1. Constants, not settings. */
 export const BONUS_MINOR = { standard: 200000, skilled: 250000, assured: 300000 } as const;
@@ -27,8 +28,18 @@ export function completionBonusPlan(i: {
   return { bandId, amountMinor: BONUS_MINOR[bandId], scoreBefore };
 }
 
-/** Every engagement month is covered by approved sheets (legacy calendar-month sheets included). */
-export function isEngagementComplete(startDate: string | null, months: number, approved: Period[]): boolean {
-  if (!startDate) return false;
-  return engagementPeriods(startDate, months).every((p) => uncoveredParts(p, approved).length === 0);
+/**
+ * Every engagement month is covered by approved sheets (legacy calendar-month sheets included).
+ * An offer with no start date counts months from the IST day of the hire (`hiredAt`), the same
+ * anchor billing-plan.ts uses (postpaidAnchor); with neither date there is nothing to count from.
+ */
+export function isEngagementComplete(
+  startDate: string | null,
+  months: number,
+  approved: Period[],
+  hiredAt?: Date | string | null,
+): boolean {
+  const start = postpaidAnchor(startDate, hiredAt);
+  if (!start) return false;
+  return engagementPeriods(start, months).every((p) => uncoveredParts(p, approved).length === 0);
 }

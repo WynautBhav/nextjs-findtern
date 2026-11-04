@@ -32,7 +32,7 @@ export async function completeInternship(tx: Tx, proposalId: string, by: string 
     .select({ s: schema.timesheets.periodStart, e: schema.timesheets.periodEnd })
     .from(schema.timesheets)
     .where(and(eq(schema.timesheets.proposalId, proposalId), eq(schema.timesheets.status, "approved")));
-  if (!isEngagementComplete(offer.startDate, offer.months, sheets.map((x) => ({ start: isoDay(x.s), end: isoDay(x.e) })))) {
+  if (!isEngagementComplete(offer.startDate, offer.months, sheets.map((x) => ({ start: isoDay(x.s), end: isoDay(x.e) })), p.hiredAt)) {
     return { completed: false, reason: "incomplete" };
   }
 

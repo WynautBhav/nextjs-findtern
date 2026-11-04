@@ -36,6 +36,18 @@ test("complete only when every engagement month is approved", () => {
   assert.equal(isEngagementComplete(null, 2, m), false);
 });
 
+test("no offer start date: months count from the hire day (IST), as billing-plan does", () => {
+  const m = [{ start: "2026-01-01", end: "2026-01-31" }, { start: "2026-02-01", end: "2026-02-28" }];
+  // 2025-12-31T20:00Z is 2026-01-01 01:30 IST, so month 1 starts on 1 Jan.
+  const hired = new Date("2025-12-31T20:00:00Z");
+  assert.equal(isEngagementComplete(null, 2, m, hired), true);
+  assert.equal(isEngagementComplete(null, 2, m.slice(0, 1), hired), false);
+  assert.equal(isEngagementComplete("", 2, m, "2026-01-01T09:00:00Z"), true);
+  assert.equal(isEngagementComplete(null, 2, m, null), false);
+  // An offer start date still wins over the hire day.
+  assert.equal(isEngagementComplete("2026-03-01", 2, m, hired), false);
+});
+
 test("a bonus never counts as a stipend month, linked or unlinked", () => {
   const proposals = [{ id: "p1", status: "hired", employerId: "e", currency: "INR", hiredAt: "2026-01-01", offerDetails: { monthlyAmount: 25000, duration: "2m", startDate: "2026-01-01" } }];
   const base = stipendDues(proposals, [], 7)[0];
