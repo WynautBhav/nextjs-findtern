@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { filterInterviews, filterProposals, matchesSearch, paginate, parseIstDay, proposalTimezone, sortBy } from "./tracker.ts";
+import { filterInterviews, filterProposals, ineligibleInterns, matchesSearch, paginate, parseIstDay, proposalTimezone, sortBy } from "./tracker.ts";
 
 const none = { from: null, to: null, company: "", intern: "", tz: "" };
 const p = (over: Record<string, unknown>) => ({
@@ -52,4 +52,12 @@ test("search, sort and pagination helpers", () => {
   assert.deepEqual(sortBy([{ v: 2 }, { v: null }, { v: 1 }], (r) => r.v, "asc").map((r) => r.v), [1, 2, null]);
   const pg = paginate([1, 2, 3, 4, 5], 9, 2);
   assert.deepEqual([pg.rows, pg.page, pg.pages, pg.total], [[5], 3, 3, 5]);
+});
+
+test("pipeline flag matches the intern's guarantee state", () => {
+  const now = new Date("2026-11-04T06:00:00Z");
+  const dec = (internId: string) => p({ internId, status: "rejected", offerDetails: { declinedBy: "intern" } });
+  const rows = [dec("a"), dec("a"), dec("a"), p({ internId: "a", offerDetails: { startDate: "2026-11-01" } }), dec("b"), dec("b"), dec("b"), dec("c")];
+  const flagged = ineligibleInterns(rows, new Map([["c", { guaranteeEndedAt: "2026-11-01T00:00:00Z" }]]), now);
+  assert.deepEqual([...flagged].sort(), ["a", "c"]);
 });

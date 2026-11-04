@@ -1,10 +1,10 @@
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, sql } from "drizzle-orm";
 import { Download } from "lucide-react";
 
 import { getDb, schema } from "@/lib/db";
 import { flattenParams, parsePageRequest, toQueryString } from "@/lib/admin/params";
 import { isTestEmployer } from "@/lib/admin/scope";
-import { filterInterviews, filterProposals, parseIstDay, proposalTimezone, type TrackerFilters } from "@/lib/admin/tracker";
+import { filterInterviews, filterProposals, ineligibleInterns, parseIstDay, proposalTimezone, type TrackerFilters } from "@/lib/admin/tracker";
 import { acceptanceRate, proposalOutcome } from "@/lib/proposals";
 import { formatNumber } from "@/lib/format";
 import { AdminLoadError, AdminPageHeader, Panel } from "@/components/admin/panel";
@@ -23,7 +23,7 @@ import { ButtonAnchor } from "@/components/ui/button";
 
 async function load() {
   const db = getDb();
-  const [employers, proposals, interviews] = await Promise.all([
+  const [employers, proposals, interviews, onboarding] = await Promise.all([
     db
       .select({
         id: schema.employers.id,
@@ -87,8 +87,14 @@ async function load() {
       .leftJoin(schema.employers, eq(schema.employers.id, schema.interviews.employerId))
       .leftJoin(schema.projects, eq(schema.projects.id, schema.interviews.projectId))
       .orderBy(desc(schema.interviews.createdAt)),
+    db
+      .select({ userId: schema.internOnboarding.userId, endedAt: sql<string | null>`${schema.internOnboarding.extraData}->>'guaranteeEndedAt'` })
+      .from(schema.internOnboarding)
+      .where(sql`${schema.internOnboarding.extraData} ? 'guaranteeEndedAt'`),
   ]);
-  return { employers, proposals, interviews: interviews.map(({ companyEmail, ...i }) => ({ ...i, isAi: isAiInterview(i.employerId, companyEmail) })) };
+  // From every proposal, not the filtered page rows: same inputs as the intern's own offer page.
+  const noGuarantee = ineligibleInterns(proposals, new Map(onboarding.map((o) => [o.userId, { guaranteeEndedAt: o.endedAt }])));
+  return { noGuarantee, employers, proposals, interviews: interviews.map(({ companyEmail, ...i }) => ({ ...i, isAi: isAiInterview(i.employerId, companyEmail) })) };
 }
 
 type TrackerData = Awaited<ReturnType<typeof load>>;
@@ -208,6 +214,7 @@ export default async function AdminProposalTrackerPage({
         employers={data.employers.filter((e) => !testIds.has(e.id))}
         proposals={proposals}
         interviews={interviews}
+        noGuarantee={data.noGuarantee}
         options={{ companies: companyOptions, interns: internOptions, timezones: tzOptions }}
       />
     </div>

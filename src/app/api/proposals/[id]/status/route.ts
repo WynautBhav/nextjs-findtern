@@ -8,7 +8,8 @@ import { limiters, bucketKey, clientIp } from "@/lib/security/rate-limit";
 import { emails } from "@/lib/emails";
 import { initialsOf } from "@/lib/employer-candidates";
 import { employerNames, internFirstName, notify, resolveOfferNotifications } from "@/lib/notify";
-import { FREE_DECLINES, offerPastStart, parseOffer } from "@/lib/offer";
+import { guaranteeEnded, guaranteeMisses } from "@/lib/guarantee";
+import { FREE_DECLINES, offerPastStart, parseOffer, todayIst } from "@/lib/offer";
 import { hasOpenOrderFor, OPEN_ORDER_MINUTES } from "@/lib/payments";
 
 /**
@@ -155,24 +156,19 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
       .from(schema.internOnboarding)
       .where(eq(schema.internOnboarding.userId, proposal.internId))
       .limit(1);
-    const ended = typeof ((onboarding?.extraData ?? {}) as Record<string, unknown>).guaranteeEndedAt === "string";
     const previous = await db
-      .select({ id: schema.proposals.id })
+      .select({ status: schema.proposals.status, offerDetails: schema.proposals.offerDetails, currency: schema.proposals.currency })
       .from(schema.proposals)
-      .where(
-        and(
-          eq(schema.proposals.internId, proposal.internId),
-          eq(schema.proposals.status, "rejected"),
-          sql`${schema.proposals.offerDetails}->>'declinedBy' = 'intern'`,
-        ),
-      );
-    if (!ended && previous.length >= FREE_DECLINES) {
+      .where(eq(schema.proposals.internId, proposal.internId));
+    const misses = guaranteeMisses(previous);
+    const ended = guaranteeEnded(onboarding?.extraData, misses);
+    if (!ended && misses.total >= FREE_DECLINES) {
       if (!parsed.data.acknowledgeGuaranteeEnd) {
         return NextResponse.json(
           {
-            error: `You have already turned down ${previous.length} offers. Turn down more than ${FREE_DECLINES} and you are no longer eligible for a refund under the guarantee.`,
+            error: `You have already turned down or let lapse ${misses.total} offers. Missing more than ${FREE_DECLINES} offers means you are no longer eligible for a refund under the guarantee.`,
             code: "guarantee_warning",
-            declines: previous.length,
+            declines: misses.total,
           },
           { status: 409 },
         );
@@ -188,8 +184,10 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
       return { ...base, termsAcceptedAt: now, ...(offer.fullTime ? { fullTimeTermsAcceptedAt: now } : {}) };
     }
     if (internDecline) return { ...base, declinedBy: "intern", declinedAt: now };
-    if (session.role === "admin") return { ...base, closedByAdminAt: now, closedByAdminStatus: status };
-    return null;
+    // Keep a lapsed `sent` offer countable once it leaves `sent` (withdraw / admin expire).
+    const lapse = proposal.status === "sent" && offerPastStart(offer.startDate) ? { lapsedAt: now } : {};
+    if (session.role === "admin") return { ...base, ...lapse, closedByAdminAt: now, closedByAdminStatus: status };
+    return lapse.lapsedAt ? { ...base, ...lapse } : null;
   };
   const details = stampedDetails();
 
@@ -246,7 +244,12 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     if (status === "accepted") {
       expired = await tx
           .update(schema.proposals)
-          .set({ status: "expired", updatedAt: new Date() })
+          .set({
+            status: "expired",
+            updatedAt: new Date(),
+            // Durable lapse stamp: a `sent` sibling past its start day still counts as a miss.
+            offerDetails: sql`CASE WHEN ${schema.proposals.status} = 'sent' AND left(${schema.proposals.offerDetails}->>'startDate', 10) <= ${todayIst()} THEN ${schema.proposals.offerDetails} || jsonb_build_object('lapsedAt', now()) ELSE ${schema.proposals.offerDetails} END`,
+          })
           .where(
             and(
               eq(schema.proposals.internId, proposal.internId),
