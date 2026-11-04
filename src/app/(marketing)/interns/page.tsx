@@ -26,7 +26,7 @@ import { breadcrumbJsonLd, faqJsonLd, howToJsonLd, webPageJsonLd } from "@/lib/s
 export const metadata: Metadata = {
   title: "Paid Internships in India with a Placement Guarantee | For Interns",
   description:
-    "Get assessed once, get a Findtern Score you can see the working for, and get placed in a paid internship. If Findtern does not place you within 18 months of your score, your fee comes back.",
+    "Get assessed once, get a Findtern Score you can see the working for, and get placed in a paid internship. If Findtern does not place you within 12 months of your score, your fee comes back.",
   alternates: { canonical: "/interns" },
 };
 
@@ -53,7 +53,7 @@ const STEPS = [
     Icon: MessageSquare,
     title: "Get matched",
     body: "Verified employers see your profile against live requirements. Your contact details stay closed until you respond.",
-    time: "Within the 18-month window",
+    time: "Within the 12-month window",
   },
   {
     Icon: BadgeCheck,
@@ -66,8 +66,8 @@ const STEPS = [
 const GUARANTEES = [
   {
     Icon: Clock,
-    title: "Placed in 18 months, or your fee back",
-    body: "The clock starts the day your assessment is scored. If we have not placed you in a paid internship within 18 months, the full fee is refunded.",
+    title: "Placed in 12 months, or your fee back",
+    body: "The clock starts the day your assessment is scored. If we have not placed you in a paid internship within 12 months, the full fee is refunded.",
   },
   {
     Icon: Lock,
@@ -87,7 +87,7 @@ const INTERN_FAQ = [
       category: "Getting started",
       question: "Is Findtern free for interns?",
       answer:
-        "Creating a profile is free. Making it live and visible to employers requires a one-time fee, refunded in full if we do not place you within 18 months of your score.",
+        "Creating a profile is free. Making it live and visible to employers requires a one-time fee, refunded in full if we do not place you within 12 months of your score.",
     },
     {
       id: "i2",
@@ -101,7 +101,7 @@ const INTERN_FAQ = [
       category: "Guarantee",
       question: "What are the three refund conditions?",
       answer:
-        "One: your assessment is scored. Two: you stay reachable and respond to employer requests. Three: you turn down no more than 3 offers. Failing any one ends the obligation - in your favour, not the platform's.",
+        "One: your assessment is scored. Two: you stay reachable and respond to employer requests. Three: you turn down or let lapse no more than 3 offers. Failing any one ends the obligation - in your favour, not the platform's.",
     },
     {
       id: "i3a",
@@ -115,7 +115,7 @@ const INTERN_FAQ = [
       category: "Guarantee",
       question: "How many offers can I turn down?",
       answer:
-        "Up to 3 during the 18-month window. Reject more than 3 offers and you are no longer eligible for the refund. Only formal offers count - an interview request you pass on is not an offer.",
+        "Up to 3 during the 12-month window. Turn down or let more than 3 offers lapse and you are no longer eligible for the refund. Only formal offers count - an interview request you pass on is not an offer.",
     },
     {
       id: "i4",
@@ -160,7 +160,7 @@ export default async function InternsPage() {
         }
         lead={
           <>
-            One assessment produces a score you can see the working for. Pay once to be assessed, and if we do not place you within 18 months, the fee comes back.
+            One assessment produces a score you can see the working for. Pay once to be assessed, and if we do not place you within 12 months, the fee comes back.
             {/* The price, in one line. A candidate wants their own number here,
                 not three clicks away inside the guarantee terms. */}
             <span className="mt-4 block text-base text-ink-700">
@@ -236,7 +236,7 @@ export default async function InternsPage() {
             The <span className="smile is-revealed !text-accent-300">Findtern</span> Guarantee
           </h2>
           <p className="mx-auto mt-6 max-w-2xl text-lg text-on-dark-subtle">
-            Placed within 18 months of your score, or every rupee of the fee comes back.
+            Placed within 12 months of your score, or every rupee of the fee comes back.
           </p>
         </div>
         <div className="mt-14 grid gap-5 md:grid-cols-3">

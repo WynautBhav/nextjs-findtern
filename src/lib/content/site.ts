@@ -103,7 +103,7 @@ export const HOME_STUDENT_COPY = {
   headlineLead: "Get a paid internship,",
   headlineAccent: "or get your fee back.",
   subhead:
-    "One AI interview and an aptitude test give you a Findtern Score that verified employers hire on. Not placed within 18 months? The fee comes back.",
+    "One AI interview and an aptitude test give you a Findtern Score that verified employers hire on. Not placed within 12 months? The fee comes back.",
 } as const;
 
 /** The home and about pages quote the same three product terms. */

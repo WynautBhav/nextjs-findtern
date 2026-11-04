@@ -244,7 +244,7 @@ export function HeroSplit() {
             kicker="For students"
             Icon={GraduationCap}
             title="Get placed, or get your fee back"
-            body="One AI interview and an aptitude test give you a Findtern Score that verified employers hire on. Not placed within 18 months? The fee comes back."
+            body="One AI interview and an aptitude test give you a Findtern Score that verified employers hire on. Not placed within 12 months? The fee comes back."
             cta={{ label: "Find my internship", href: "/interns" }}
           />
         </div>
