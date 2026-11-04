@@ -151,7 +151,7 @@ export default async function InternEarnings() {
             <ol className="space-y-3">
               {[
                 "You mark your days on Timesheets and send each month to your manager.",
-                "Once a month is approved, Findtern schedules the payment. Its date shows here as soon as it is set.",
+                "Each month's stipend (score 6 and above) is paid after that month ends. Once the month is approved, Findtern schedules the payment. Its date shows here as soon as it is set.",
                 "Each payment carries a bank reference so you can match it against your statement.",
                 "It goes to the bank account in your settings, so keep those details right.",
               ].map((line, i) => (

@@ -35,7 +35,7 @@ is the unit of work.
 4. **Per-hire charge + internship cost.** Priced in three bands — Espresso
    (under 6/10), Cappuccino (6–8), Latte (8+). The coffee metaphor is the
    brand's hook, not decoration.
-5. **The 18-month guarantee.** If the placement does not happen, the fee comes
+5. **The 12-month guarantee.** If the placement does not happen, the fee comes
    back. It is the reason the fee is affordable and it must appear wherever the
    fee does.
 

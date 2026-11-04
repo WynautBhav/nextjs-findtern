@@ -57,16 +57,17 @@ export const INTERN_TERMS: CmsLegalDoc = {
 <li>Misrepresentation of skills or submitting fake documents will result in account termination.</li>
 <li>Findtern reserves the right to verify academic credentials and remove any fraudulent profiles.</li>
 <li>Findtern does not guarantee an internship. However, if your profile score is above 60%, you are eligible for a paid internship. This means that any internship you get through Findtern will be a paid one.</li>
-<li>Internship stipends may vary between ₹5,000 – ₹12,000 per month. If you are selected on an hourly basis, payment will be calculated on a pro-rata basis.</li>
+<li>Interns earn half the hourly rate, by your Findtern score: ₹0 an hour below 6, ₹50 an hour from 6 to 8, and ₹100 an hour at 8 and above.</li>
+<li>Each month's stipend (score 6 and above) is paid after that month ends.</li>
 <li>You must not share your personal information or direct contact details with clients outside of Findtern's platform. Any violation of this may lead to legal action.</li>
 </ul>
 
 <h2>5. Registration Fee &amp; Refunds</h2>
 <ul>
-<li>Findtern guarantees every registered candidate an internship within 18 months of completing their AI interview.</li>
+<li>Findtern guarantees every registered candidate an internship within 12 months of completing their AI interview.</li>
 <li>If we are unable to provide an internship within this period, the registration fee will be refunded in full.</li>
-<li>Refunds will be processed only after the 18-month lock-in period is completed.</li>
-<li>If you turn down more than 3 offers, you are no longer eligible for the refund. Only formal offers count, not interview requests.</li>
+<li>Refunds will be processed only after the 12-month lock-in period is completed.</li>
+<li>If you turn down or let lapse more than 3 offers, you are no longer eligible for the refund. Only formal offers count, not interview requests.</li>
 <li>Placement opportunities are based on your AI interview performance and skill ratings. Stipends vary according to your Findtern score.</li>
 <li>Fees paid in India include GST at the applicable rate. Your invoice shows the GST breakup.</li>
 </ul>
