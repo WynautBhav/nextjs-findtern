@@ -23,6 +23,9 @@ export const users = pgTable("users", {
   // public directory and employer search; `hidden` keeps the account active
   // but removes it from discovery without deleting anything.
   profileVisibility: text("profile_visibility").notNull().default("live"),
+  bannedAt: timestamp("banned_at"),
+  banReason: text("ban_reason"),
+  bannedBy: varchar("banned_by"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => ({
   usersCountryPhoneUnique: uniqueIndex("users_country_phone_unique").on(t.countryCode, t.phoneNumber),
@@ -667,10 +670,15 @@ export const internPayouts = pgTable("intern_payouts", {
   referenceId: text("reference_id"),
   notes: text("notes"),
   raw: jsonb("raw").$type<Record<string, unknown>>().default({}),
+  /** "stipend" | "completion_bonus". Readers that mean stipends only must filter kind = 'stipend'. */
+  kind: text("kind").notNull().default("stipend"),
+  bonusProposalId: varchar("bonus_proposal_id"),
   paidAt: timestamp("paid_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (t) => ({
+  internPayoutsBonusUnique: uniqueIndex("intern_payouts_bonus_proposal_unique").on(t.bonusProposalId).where(sql`${t.kind} = 'completion_bonus'`),
+}));
 
 export type InternPayout = typeof internPayouts.$inferSelect;
 export type InsertInternPayout = typeof internPayouts.$inferInsert;
@@ -761,6 +769,9 @@ export const proposals = pgTable("proposals", {
   /** Set once when staff grant the completion bonus (+1 Findtern Score) for this hire. */
   completionBonusAt: timestamp("completion_bonus_at"),
   completionBonusBy: varchar("completion_bonus_by"),
+  /** Set when the placement ends early (ban / left mid-way). Read null-safe. */
+  endedAt: timestamp("ended_at"),
+  endedReason: text("ended_reason"),
 }, (t) => ({
   proposalsInternIdx: index("proposals_intern_id_idx").on(t.internId),
 }));
@@ -878,9 +889,13 @@ export const promoCodes = pgTable("promo_codes", {
   isActive: boolean("is_active").notNull().default(true),
   /** Where the code can be redeemed: "intern" | "employer" | "both". */
   appliesTo: text("applies_to").notNull().default("intern"),
+  /** The college this code belongs to (one code per college). Null for ordinary codes. */
+  collegeId: varchar("college_id"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (t) => ({
+  promoCodesCollegeUnique: uniqueIndex("promo_codes_college_id_unique").on(t.collegeId).where(sql`${t.collegeId} is not null`),
+}));
 
 export type PromoCode = typeof promoCodes.$inferSelect;
 export type InsertPromoCode = typeof promoCodes.$inferInsert;
@@ -929,6 +944,11 @@ export const colleges = pgTable("colleges", {
   showOnWebsite: boolean("show_on_website").notNull().default(false),
   sortOrder: integer("sort_order").notNull().default(0),
   isActive: boolean("is_active").notNull().default(true),
+  gstin: text("gstin"),
+  bankAccountName: text("bank_account_name"),
+  bankName: text("bank_name"),
+  bankAccountNumber: text("bank_account_number"),
+  bankIfsc: text("bank_ifsc"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => ({
   collegesSlugUnique: uniqueIndex("colleges_slug_unique").on(t.slug),
@@ -938,6 +958,57 @@ export const colleges = pgTable("colleges", {
 }));
 
 export type College = typeof colleges.$inferSelect;
+
+/** Seats a college buys up front (default 300 x 80000 paise). Marking one paid raises the college code's cap. */
+export const collegeSeatBatches = pgTable("college_seat_batches", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  collegeId: varchar("college_id").notNull(),
+  seats: integer("seats").notNull(),
+  unitPriceMinor: integer("unit_price_minor").notNull().default(80000),
+  amountMinor: integer("amount_minor").notNull(),
+  status: text("status").notNull().default("pending"), // pending | paid | void
+  method: text("method"), // bank | upi | cheque
+  referenceId: text("reference_id"),
+  invoiceNumber: text("invoice_number"),
+  paidAt: timestamp("paid_at"),
+  createdBy: varchar("created_by"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => ({
+  collegeSeatBatchesInvoiceUnique: uniqueIndex("college_seat_batches_invoice_unique").on(t.invoiceNumber),
+  collegeSeatBatchesCollegeIdx: index("college_seat_batches_college_idx").on(t.collegeId, t.createdAt),
+}));
+
+/** College wallet ledger. Signed amounts; balance = sum. One incentive per proposal. */
+export const collegeWalletEntries = pgTable("college_wallet_entries", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  collegeId: varchar("college_id").notNull(),
+  kind: text("kind").notNull(), // incentive | adjustment
+  amountMinor: integer("amount_minor").notNull(),
+  proposalId: varchar("proposal_id"),
+  internId: varchar("intern_id"),
+  bandId: text("band_id"),
+  createdBy: varchar("created_by"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => ({
+  collegeWalletIncentiveUnique: uniqueIndex("college_wallet_incentive_unique").on(t.proposalId).where(sql`${t.kind} = 'incentive'`),
+  collegeWalletEntriesCollegeIdx: index("college_wallet_entries_college_idx").on(t.collegeId, t.createdAt),
+}));
+
+/** College payout requests (build deferred). At most one open request per college. */
+export const collegePayouts = pgTable("college_payouts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  collegeId: varchar("college_id").notNull(),
+  amountMinor: integer("amount_minor").notNull(),
+  status: text("status").notNull().default("requested"), // requested | paid | rejected | failed
+  requestedBy: varchar("requested_by"),
+  referenceId: text("reference_id"),
+  paidAt: timestamp("paid_at"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (t) => ({
+  collegePayoutsOpenUnique: uniqueIndex("college_payouts_open_unique").on(t.collegeId).where(sql`${t.status} = 'requested'`),
+}));
 
 /** Placement officers. Read-only on student data; may run drives, roster and nudges. */
 export const collegeAdmins = pgTable("college_admins", {
