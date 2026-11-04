@@ -161,6 +161,10 @@ export function PromoCodesManager({
       invalid("Percentage discount cannot exceed 100%.", "promo-value");
       return;
     }
+    if (discountType === "percentage" && valNum === 100 && appliesTo !== "intern") {
+      invalid("Only an intern code can be 100%. Company codes can't cover the whole stipend.", "promo-value");
+      return;
+    }
     if (validFrom && validUntil && new Date(validUntil) < new Date(validFrom)) {
       invalid("The end date must be on or after the start date.", "promo-until");
       return;

@@ -147,9 +147,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const feeMinor = paying.reduce((s, l) => s + l.charge.perHireMinor, 0);
     const quote = await quotePromo({ code: parsed.data.promoCode, subjectId: id, orderMinor: amountMinor, currency, audience: "employer", undiscountableMinor: feeMinor });
     if (!quote.ok) return NextResponse.json({ error: quote.error }, { status: quote.status });
-    if (quote.payableMinor <= 0) {
-      return NextResponse.json({ error: "This code covers the whole order - contact us to complete it" }, { status: 400 });
-    }
     promo = { promoCode: quote.promo.code, discountMinor: quote.discountMinor };
     amountMinor = quote.payableMinor;
   }

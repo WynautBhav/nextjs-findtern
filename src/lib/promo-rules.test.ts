@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { promoDiscount, promoProblem, type PromoRow } from "./promo-rules.ts";
+import { employerPromoTooLarge, promoDiscount, promoProblem, type PromoRow } from "./promo-rules.ts";
 
 const base: PromoRow = {
   code: "TEST",
@@ -65,4 +65,15 @@ test("a promo code is for upfront payment only", async () => {
   const { promoModeProblem } = await import("./promo-rules.ts");
   assert.equal(promoModeProblem("upfront"), null);
   assert.match(promoModeProblem("monthly") ?? "", /upfront/);
+});
+
+test("employer code covering the whole stipend is too large; partial is not", () => {
+  const stipend = 3520000;
+  const tooLarge = (row: PromoRow) => employerPromoTooLarge(promoDiscount(row, stipend, "INR"), stipend);
+  assert.equal(tooLarge({ ...base, discountValue: 10 }), false);
+  assert.equal(tooLarge({ ...base, discountValue: 99 }), false);
+  assert.equal(tooLarge({ ...base, discountValue: 100 }), true);
+  assert.equal(tooLarge({ ...base, discountType: "fixed", discountValue: stipend }), true);
+  assert.equal(tooLarge({ ...base, discountType: "fixed", discountValue: 10000000 }), true);
+  assert.equal(tooLarge({ ...base, discountType: "fixed", discountValue: stipend - 1 }), false);
 });

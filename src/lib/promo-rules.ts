@@ -70,6 +70,11 @@ export function promoProblem(
   return null;
 }
 
+/** An employer code that discounts the whole stipend (100%, or a fixed amount at or above it): the hiring charge is always paid, so the stipend is too (C1). */
+export function employerPromoTooLarge(discountMinor: number, discountableMinor: number): boolean {
+  return discountMinor >= discountableMinor;
+}
+
 /** Discount in the order's minor units, never more than the order itself. */
 export function promoDiscount(row: PromoRow, orderMinor: number, currency: Currency): number {
   const raw =

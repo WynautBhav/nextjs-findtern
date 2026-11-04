@@ -22,6 +22,10 @@ const bodySchema = z.object({
 })
   .refine((b) => b.discountType !== "percentage" || b.discountValue === undefined || b.discountValue <= 100, {
     message: "A percentage discount can't be more than 100",
+  })
+  // Employer codes may not cover the stipend (C1); fixed amounts are checked at quote time, when the stipend is known.
+  .refine((b) => b.discountType !== "percentage" || b.discountValue !== 100 || b.appliesTo === "intern" || b.appliesTo === undefined, {
+    message: "Only an intern code can be 100%. Employer codes can't cover the whole stipend.",
   });
 
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {

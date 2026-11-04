@@ -1,7 +1,7 @@
 import { and, eq, sql } from "drizzle-orm";
 
 import { getDb, schema } from "@/lib/db";
-import { promoAudienceProblem, promoDiscount, promoProblem, type PromoAudience } from "@/lib/promo-rules";
+import { employerPromoTooLarge, promoAudienceProblem, promoDiscount, promoProblem, type PromoAudience } from "@/lib/promo-rules";
 
 /**
  * Promo codes against a real order: shared by the intern activation payment
@@ -57,6 +57,9 @@ export async function quotePromo(input: {
   if (priorUse) return { ok: false, error: "You have already used this code", status: 400 };
 
   const discountMinor = promoDiscount(row, discountableMinor, input.currency);
+  if (audience === "employer" && employerPromoTooLarge(discountMinor, discountableMinor)) {
+    return { ok: false, error: "This code can't be used on a hire. The ₹5,000 hiring fee and the stipend are always charged.", status: 400 };
+  }
   return { ok: true, promo: row, discountMinor, payableMinor: input.orderMinor - discountMinor };
 }
 
