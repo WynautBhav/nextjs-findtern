@@ -192,7 +192,7 @@ function Flow({ run }: { run: PayoutRun }) {
   const steps = [
     { key: "billed", label: "Billed to employers", value: run.flow.receivedMinor, hint: "Employer months covered, at offer price. Not bank cash" },
     { key: "due", label: "Owed to interns", value: run.flow.dueMinor, hint: "Stipend months not yet paid", warn: run.flow.dueMinor > 0 },
-    { key: "out", label: "Paid to interns", value: run.flow.paidMinor, hint: "All payouts marked paid, as in the ledger below", done: true },
+    { key: "out", label: "Paid to interns", value: run.flow.paidMinor, hint: "Stipends marked paid, as in the ledger below. Completion bonuses are counted apart", done: true },
   ];
   return (
     <article aria-labelledby="run-flow-title" className="flex min-w-0 flex-col rounded-[var(--radius-admin-card)] border border-[color:var(--admin-panel-edge)] bg-[color:var(--admin-panel)] p-[var(--admin-pad-panel)] shadow-[var(--admin-shadow)]">

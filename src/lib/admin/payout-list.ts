@@ -120,7 +120,10 @@ export async function loadPayouts(
     db
       .select({
         count: sql<number>`count(*)::int`,
-        paidMinor: sql<number>`coalesce(sum(CASE WHEN ${schema.internPayouts.status} = 'paid' THEN ${inrMinorSql(schema.internPayouts.amountMinor, schema.internPayouts.currency)} END), 0)::bigint`,
+        // Stipends and Findtern-paid completion bonuses are summed apart: the run desk's flow
+        // (billed, owed, paid) is stipend-only, so a bonus must never inflate "paid out".
+        paidMinor: sql<number>`coalesce(sum(CASE WHEN ${schema.internPayouts.status} = 'paid' AND ${schema.internPayouts.kind} = 'stipend' THEN ${inrMinorSql(schema.internPayouts.amountMinor, schema.internPayouts.currency)} END), 0)::bigint`,
+        bonusPaidMinor: sql<number>`coalesce(sum(CASE WHEN ${schema.internPayouts.status} = 'paid' AND ${schema.internPayouts.kind} = 'completion_bonus' THEN ${inrMinorSql(schema.internPayouts.amountMinor, schema.internPayouts.currency)} END), 0)::bigint`,
         pendingMinor: sql<number>`coalesce(sum(CASE WHEN ${schema.internPayouts.status} = 'pending' THEN ${inrMinorSql(schema.internPayouts.amountMinor, schema.internPayouts.currency)} END), 0)::bigint`,
         pendingCount: sql<number>`count(*) FILTER (WHERE ${schema.internPayouts.status} = 'pending')::int`,
         failedCount: sql<number>`count(*) FILTER (WHERE ${schema.internPayouts.status} = 'failed')::int`,
@@ -148,6 +151,7 @@ export async function loadPayouts(
     }),
     total: Number(totals?.count ?? 0),
     paidMinor: Number(totals?.paidMinor ?? 0),
+    bonusPaidMinor: Number(totals?.bonusPaidMinor ?? 0),
     pendingMinor: Number(totals?.pendingMinor ?? 0),
     pendingCount: Number(totals?.pendingCount ?? 0),
     failedCount: Number(totals?.failedCount ?? 0),

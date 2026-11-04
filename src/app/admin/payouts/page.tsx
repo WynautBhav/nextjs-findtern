@@ -86,7 +86,7 @@ async function RunDesk() {
   const now = new Date();
   let run: PayoutRun | null = null;
   try {
-    // Paid-out comes from the ledger (same source as the "All payouts" strip),
+    // Paid-out comes from the ledger (same source as the "All payouts" strip, stipends only),
     // not from per-placement links, which most paid payouts do not carry.
     const [dues, ledger] = await Promise.all([
       loadDuesOnce(),
@@ -221,7 +221,13 @@ async function PayoutsView({ params }: { params: Record<string, string> }) {
         <LedgerFigure
           label="Paid out"
           value={inr(data.paidMinor)}
-          hint={filtered ? "Matching the filters" : "USD at ₹100/$"}
+          hint={
+            data.bonusPaidMinor > 0
+              ? `Stipends only. Completion bonuses paid: ${inr(data.bonusPaidMinor)}`
+              : filtered
+                ? "Matching the filters"
+                : "USD at ₹100/$"
+          }
         />
         <LedgerFigure
           label="Waiting to be paid"
