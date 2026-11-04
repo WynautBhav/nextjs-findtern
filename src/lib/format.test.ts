@@ -80,3 +80,7 @@ test("formatIstStamp is sortable IST wall time with seconds, blank when invalid 
   assert.equal(formatIstStamp(null), "");
   assert.equal(formatIstStamp("not a date"), "");
 });
+
+test("a converted currency under 10 keeps both decimals", () => {
+  assert.match(formatMoney(598, "EUR"), /\.\d\d$/);
+});

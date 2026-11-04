@@ -32,7 +32,7 @@ export function formatMoney(
   if (isConvertedCurrency(upper)) {
     const value = (minor / 100) * DISPLAY_RATES[upper];
     const fmt = (v: number, d: number) =>
-      new Intl.NumberFormat("en", { style: "currency", currency: upper, maximumFractionDigits: d, minimumFractionDigits: 0 }).format(v);
+      new Intl.NumberFormat("en", { style: "currency", currency: upper, maximumFractionDigits: d, minimumFractionDigits: d }).format(v);
     if (value === 0) return opts.zeroLabel === false ? fmt(0, 0) : (opts.zeroLabel ?? "Free");
     return fmt(value, value < 10 ? 2 : 0);
   }
