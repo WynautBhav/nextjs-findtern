@@ -32,6 +32,7 @@ import { cn } from "@/lib/utils";
 import { RowMenu } from "@/components/app/row-menu";
 import { useConfirm } from "@/components/app/use-confirm";
 import { ADMIN_PILL_PRIMARY, ADMIN_SURFACE } from "@/components/admin/surface";
+import { COLLEGE_CODE_LOCKED } from "@/lib/promo-rules";
 
 const inputClass =
   "mt-1.5 min-h-11 w-full rounded-apple-sm border border-ink-200 bg-surface px-3 text-base sm:text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring placeholder:text-text-subtle focus:border-brand-500";
@@ -69,6 +70,8 @@ export function PromoCodesManager({
   // Modal Dialog state (Add / Edit)
   const [modalOpen, setModalOpen] = useState(false);
   const [editingPromo, setEditingPromo] = useState<PromoCode | null>(null);
+  // A college code's discount, audience and cap are changed on the college screen only.
+  const collegeLocked = Boolean(editingPromo?.collegeId);
   const [saving, setSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   /** The dialog field (its id) the error is about, so it is marked invalid and focused. */
@@ -532,6 +535,11 @@ export function PromoCodesManager({
           </DialogHeader>
 
           <form onSubmit={handleSavePromo} className="space-y-4 pt-2">
+            {collegeLocked && (
+              <p className="rounded-apple-sm bg-ink-50 px-3 py-2 text-sm text-ink-700" role="note">
+                {COLLEGE_CODE_LOCKED}
+              </p>
+            )}
             {errorMsg && (
               <div id="promo-error" role="alert" className="rounded-apple-sm bg-danger-soft p-3 text-sm font-medium text-danger">
                 {errorMsg}
@@ -576,6 +584,7 @@ export function PromoCodesManager({
                 <select
                   id="promo-type"
                   value={discountType}
+                  disabled={collegeLocked}
                   onChange={(e) => setDiscountType(e.target.value as "percentage" | "fixed")}
                   className={inputClass}
                 >
@@ -595,6 +604,7 @@ export function PromoCodesManager({
                   max={discountType === "percentage" ? "100" : undefined}
                   required
                   value={discountValue}
+                  disabled={collegeLocked}
                   onChange={(e) => setDiscountValue(e.target.value)}
                   className={`${inputClass} tabular-nums`}
                 />
@@ -611,6 +621,7 @@ export function PromoCodesManager({
                   type="number"
                   min="1"
                   value={maxUsages}
+                  disabled={collegeLocked}
                   onChange={(e) => setMaxUsages(e.target.value)}
                   placeholder="50"
                   className={`${inputClass} tabular-nums`}
@@ -667,6 +678,7 @@ export function PromoCodesManager({
               <select
                 id="promo-applies"
                 value={appliesTo}
+                disabled={collegeLocked}
                 onChange={(e) => setAppliesTo(e.target.value as "intern" | "employer" | "both")}
                 className={inputClass}
               >

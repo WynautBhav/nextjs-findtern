@@ -5,7 +5,7 @@ import { z } from "zod";
 import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
 import { DUPLICATE_CODE, isUniqueViolation } from "@/lib/promo";
-import { PROMO_APPLIES_TO, promoWindowProblem } from "@/lib/promo-rules";
+import { collegeCodeEditProblem, PROMO_APPLIES_TO, promoWindowProblem } from "@/lib/promo-rules";
 
 // Omitted = leave as is; null = clear.
 const bodySchema = z.object({
@@ -50,11 +50,22 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   const toDate = (v: string | null | undefined) => (v === undefined ? undefined : v === null ? null : new Date(v));
   // The window is checked against whatever the row will hold after the edit.
   const [existing] = await db
-    .select({ validFrom: schema.promoCodes.validFrom, validUntil: schema.promoCodes.validUntil })
+    .select({
+      validFrom: schema.promoCodes.validFrom,
+      validUntil: schema.promoCodes.validUntil,
+      collegeId: schema.promoCodes.collegeId,
+      discountType: schema.promoCodes.discountType,
+      discountValue: schema.promoCodes.discountValue,
+      appliesTo: schema.promoCodes.appliesTo,
+      maxUsages: schema.promoCodes.maxUsages,
+    })
     .from(schema.promoCodes)
     .where(eq(schema.promoCodes.id, id))
     .limit(1);
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  // A college's code keeps its discount, audience and cap; those change on the college screen.
+  const locked = collegeCodeEditProblem(existing, parsed.data);
+  if (locked) return NextResponse.json({ error: locked }, { status: 403 });
   const nextFrom = toDate(parsed.data.validFrom);
   const nextUntil = toDate(parsed.data.validUntil);
   const window = promoWindowProblem(

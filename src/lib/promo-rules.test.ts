@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { employerPromoTooLarge, promoDiscount, promoProblem, type PromoRow } from "./promo-rules.ts";
+import { collegeCodeEditProblem, COLLEGE_CODE_LOCKED, employerPromoTooLarge, promoDiscount, promoProblem, type PromoRow } from "./promo-rules.ts";
 
 const base: PromoRow = {
   code: "TEST",
@@ -76,4 +76,19 @@ test("employer code covering the whole stipend is too large; partial is not", ()
   assert.equal(tooLarge({ ...base, discountType: "fixed", discountValue: stipend }), true);
   assert.equal(tooLarge({ ...base, discountType: "fixed", discountValue: 10000000 }), true);
   assert.equal(tooLarge({ ...base, discountType: "fixed", discountValue: stipend - 1 }), false);
+});
+
+test("the general editor cannot change a college code's discount, audience or cap", () => {
+  const college = { collegeId: "c1", discountType: "percentage", discountValue: 100, appliesTo: "intern", maxUsages: 300 };
+  assert.equal(collegeCodeEditProblem(college, { discountValue: 50 }), COLLEGE_CODE_LOCKED);
+  assert.equal(collegeCodeEditProblem(college, { discountType: "fixed" }), COLLEGE_CODE_LOCKED);
+  assert.equal(collegeCodeEditProblem(college, { appliesTo: "both" }), COLLEGE_CODE_LOCKED);
+  assert.equal(collegeCodeEditProblem(college, { maxUsages: 500 }), COLLEGE_CODE_LOCKED);
+  assert.equal(collegeCodeEditProblem(college, { maxUsages: null }), COLLEGE_CODE_LOCKED);
+  // The form sends every field: unchanged values, and other fields, still save.
+  assert.equal(collegeCodeEditProblem(college, { discountType: "percentage", discountValue: 100, appliesTo: "intern", maxUsages: 300 }), null);
+  assert.equal(collegeCodeEditProblem(college, {}), null);
+  // An ordinary code is free to change.
+  assert.equal(collegeCodeEditProblem({ ...college, collegeId: null }, { discountValue: 50, maxUsages: 5 }), null);
+  assert.equal(collegeCodeEditProblem(null, { discountValue: 50 }), null);
 });

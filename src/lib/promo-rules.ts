@@ -46,6 +46,31 @@ export function promoModeProblem(mode: "upfront" | "monthly"): string | null {
   return mode === "monthly" ? "Promo codes only work when the whole engagement is paid upfront." : null;
 }
 
+/** Shown when the general promo editor is asked to change a college's TPO code terms. */
+export const COLLEGE_CODE_LOCKED =
+  "This is a college's TPO code. Change its discount, who can use it or its seat cap from the college's page under Colleges.";
+
+type CollegeCodeTerms = { discountType: string; discountValue: number; appliesTo: string | null; maxUsages: number | null };
+
+/**
+ * The general promo editor must not touch a college code's discount, audience or
+ * seat cap: the cap has its own guard (`seatCapProblem`) on the college screen.
+ * `next` holds only what the edit sets (undefined = left as is); a value equal
+ * to what the row already has is not a change, so saving other fields still works.
+ */
+export function collegeCodeEditProblem(
+  existing: (CollegeCodeTerms & { collegeId: string | null }) | null,
+  next: { discountType?: string; discountValue?: number; appliesTo?: string; maxUsages?: number | null },
+): string | null {
+  if (!existing?.collegeId) return null;
+  const changed =
+    (next.discountType !== undefined && next.discountType !== existing.discountType) ||
+    (next.discountValue !== undefined && next.discountValue !== existing.discountValue) ||
+    (next.appliesTo !== undefined && next.appliesTo !== (existing.appliesTo ?? "both")) ||
+    (next.maxUsages !== undefined && next.maxUsages !== existing.maxUsages);
+  return changed ? COLLEGE_CODE_LOCKED : null;
+}
+
 /** Admin input: the window must not end before it starts. */
 export function promoWindowProblem(validFrom: Date | null, validUntil: Date | null): string | null {
   if (validFrom && validUntil && validUntil < validFrom) return "The end date must be on or after the start date";
