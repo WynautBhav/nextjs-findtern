@@ -37,7 +37,14 @@ export function TermsGate({ role, initialOpen = true }: { role: TermsRole; initi
 
   // csrfFetch fires this when a write is refused because the terms moved on mid-session.
   useEffect(() => {
-    const show = () => setOpen(true);
+    const show = () => {
+      // A previous accept leaves `saving` true after it closes; never reopen with disabled buttons.
+      setSaving(false);
+      setSigningOut(false);
+      setError(null);
+      setSignOutError(null);
+      setOpen(true);
+    };
     window.addEventListener("findtern:terms-required", show);
     return () => window.removeEventListener("findtern:terms-required", show);
   }, []);
