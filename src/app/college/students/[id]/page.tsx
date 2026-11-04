@@ -95,7 +95,7 @@ export default async function CollegeStudentPage({ params }: { params: Promise<{
               {student.status === "verified" ? (
                 <Pill tone="live">
                   <ShieldCheck className="size-3.5" aria-hidden />
-                  {student.verifiedBy === "roster" ? "On your roster" : "College email verified"}
+                  {student.verifiedBy === "promo" ? "Verified by your college code" : student.verifiedBy === "roster" ? "On your roster" : "College email verified"}
                 </Pill>
               ) : (
                 <Pill tone="waiting">Not on your roster yet</Pill>

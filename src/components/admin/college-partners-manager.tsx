@@ -24,6 +24,8 @@ export type CollegeAdminRow = {
   members: number;
   roster: number;
   drives: number;
+  /** The TPO's fee-waiver code and its seats; null until the admin creates it. */
+  seatCode: { code: string; maxUsages: number | null; usedCount: number } | null;
   officers: { id: string; name: string; email: string; lastLoginAt: string | null }[];
 };
 
@@ -208,6 +210,46 @@ export function CollegeRowControls({ row }: { row: CollegeAdminRow }) {
           <div className="pt-2">{issueForm}</div>
         </details>
       )}
+      {row.isPartner ? (
+        <div className="space-y-2 text-sm text-foreground">
+          {row.seatCode ? (
+            <form
+              className="flex flex-wrap items-end gap-2"
+              onSubmit={async (e) => {
+                e.preventDefault();
+                setError(null);
+                const r = await send(`/api/admin/colleges/${row.id}/promo-code`, "PATCH", { maxUsages: Number(new FormData(e.currentTarget).get("cap")) });
+                if (!r.ok) return setError(String(r.json.error ?? "Couldn't save"));
+                router.refresh();
+              }}
+            >
+              <span className="w-full">
+                Fee-waiver code <code className="rounded bg-[color:var(--admin-panel)] px-1.5 py-0.5 font-mono">{row.seatCode.code}</code> · {row.seatCode.usedCount} used
+              </span>
+              <label className="min-w-32 flex-1">
+                <span className="text-sm font-medium text-foreground">Free seats (cap)</span>
+                <input name="cap" type="number" inputMode="numeric" min={Math.max(1, row.seatCode.usedCount)} defaultValue={row.seatCode.maxUsages ?? ""} required className={cn(input, "mt-1")} />
+              </label>
+              <button className="inline-flex min-h-11 cursor-pointer items-center rounded-full bg-[color:var(--admin-panel-2)] px-5 text-sm font-medium text-foreground hover:bg-[color:var(--admin-bar-tint)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+                Save cap
+              </button>
+            </form>
+          ) : (
+            <button
+              type="button"
+              onClick={async () => {
+                setError(null);
+                const r = await send(`/api/admin/colleges/${row.id}/promo-code`, "POST", {});
+                if (!r.ok) return setError(String(r.json.error ?? "Couldn't create the code"));
+                router.refresh();
+              }}
+              className="inline-flex min-h-11 cursor-pointer items-center rounded-full bg-[color:var(--admin-panel-2)] px-5 text-sm font-medium text-foreground hover:bg-[color:var(--admin-bar-tint)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+            >
+              Create fee-waiver code (300 seats)
+            </button>
+          )}
+        </div>
+      ) : null}
       {row.isPartner && <details>
         <summary className="inline-flex min-h-11 cursor-pointer list-none items-center rounded-full px-1 text-sm font-medium text-foreground underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
           Edit name, city, AISHE code

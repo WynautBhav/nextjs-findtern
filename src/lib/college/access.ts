@@ -124,9 +124,8 @@ export function membershipFor(input: {
   email: string;
   emailVerified: boolean;
   domains: string[];
-  onRoster: boolean;
-}): { status: "claimed" | "verified"; verifiedBy: "roster" | "email_domain" | null } {
-  if (input.onRoster) return { status: "verified", verifiedBy: "roster" };
+}): { status: "claimed" | "verified"; verifiedBy: "email_domain" | null } {
+  // The roster no longer verifies (WP9$): the college code or a verified college email does.
   if (input.emailVerified && input.domains.some((d) => onDomain(input.email, d))) {
     return { status: "verified", verifiedBy: "email_domain" };
   }

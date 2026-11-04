@@ -26,7 +26,7 @@ import { formatMoney } from "@/lib/format";
 import { loadRazorpay, RAZORPAY_THEME_COLOR } from "@/components/payments/razorpay-client";
 
 /** The server prices the discount (`validate-promo`); this is display only. */
-type Promo = { code: string; discountMinor: number };
+type Promo = { code: string; discountMinor: number; collegeName: string | null };
 
 const fieldClass =
   "h-11 min-w-0 sm:flex-1 rounded-apple-sm border border-ink-200 bg-white px-3.5 text-base text-ink-900 placeholder:text-text-subtle sm:text-[0.9375rem] focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20";
@@ -59,6 +59,7 @@ export function ActivationCard({
   const [checking, setChecking] = useState(false);
   const [state, setState] = useState<"idle" | "busy" | "paid">(alreadyPaid ? "paid" : "idle");
   const [error, setError] = useState<string | null>(null);
+  const [adult, setAdult] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
   const discount = promo ? Math.min(promo.discountMinor, feeMinor) : 0;
@@ -83,7 +84,7 @@ export function ActivationCard({
       const body = await res.json().catch(() => ({}));
       if (res.status === 409 && body.alreadyPaid) return markPaid();
       if (!res.ok) throw new Error(body.error ?? "That code did not work.");
-      setPromo({ code: code.trim().toUpperCase(), discountMinor: Number(body.discountMinor) || 0 });
+      setPromo({ code: code.trim().toUpperCase(), discountMinor: Number(body.discountMinor) || 0, collegeName: body.collegeName ?? null });
     } catch (e) {
       setPromoError(e instanceof Error ? e.message : "That code did not work.");
     } finally {
@@ -99,7 +100,7 @@ export function ActivationCard({
       const orderRes = await csrfFetch(`/api/intern/${encodeURIComponent(internId)}/payment/razorpay/order`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ ...(promo ? { promoCode: promo.code } : {}), ...(asTest ? { testPay: true } : {}) }),
+        body: JSON.stringify({ ...(promo ? { promoCode: promo.code, ...(promo.collegeName ? { declaredAdult: adult } : {}) } : {}), ...(asTest ? { testPay: true } : {}) }),
       });
       const order = await orderRes.json().catch(() => ({}));
       // 409 with alreadyPaid: the server already has this profile as paid. That is
@@ -239,10 +240,19 @@ export function ActivationCard({
         </dl>
       ) : null}
 
+      {promo?.collegeName ? (
+        <label className="mt-3 flex min-h-11 items-start gap-3 text-sm leading-relaxed text-ink-700">
+          <input type="checkbox" checked={adult} onChange={(e) => setAdult(e.target.checked)} className="mt-1 size-5 shrink-0 accent-brand-700" />
+          <span>
+            I confirm I am 18 or older. I agree to share my Findtern profile and scores with the placement office of {promo.collegeName}, which pays my AI interview fee.
+          </span>
+        </label>
+      ) : null}
+
       <button
         type="button"
         onClick={() => pay()}
-        disabled={state === "busy"}
+        disabled={state === "busy" || Boolean(promo?.collegeName && !adult)}
         className={buttonClass({ variant: "primary", block: true, className: "mt-4" })}
       >
         {state === "busy" ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <BadgeIndianRupee className="size-4" aria-hidden />}

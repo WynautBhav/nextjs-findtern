@@ -8,12 +8,13 @@ import { withLock } from "@/lib/advisory-lock";
 import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
 import { getInternActivationFeeMinor } from "@/lib/platform-settings";
+import { consentProblem } from "@/lib/college/promo-membership";
 import { quotePromo } from "@/lib/promo";
 import { isInternPaid, settleInternOrder } from "@/lib/payments";
 import { internProfileStatus } from "@/lib/profile-complete";
 import { createOrder, paymentsAreFree, razorpayKeyId, testPayEnabled } from "@/lib/razorpay";
 
-const bodySchema = z.object({ promoCode: z.string().trim().min(1).optional(), testPay: z.boolean().optional() }).partial();
+const bodySchema = z.object({ promoCode: z.string().trim().min(1).optional(), testPay: z.boolean().optional(), declaredAdult: z.boolean().optional() }).partial();
 
 /** How long an order that settles on the spot (test, free, full promo) counts as still being completed. */
 const SETTLING_MINUTES = 5;
@@ -139,7 +140,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   // but the only price that matters is the one this route derives from the
   // promo_codes row itself.
   let amountMinor = baseMinor;
-  let promo: { code: string } | null = null;
+  let promo: { code: string; collegeId: string | null } | null = null;
   let discountMinor = 0;
 
   if (parsed.data.promoCode) {
@@ -150,11 +151,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       currency: "INR",
     });
     if (!quote.ok) return NextResponse.json({ error: quote.error }, { status: quote.status });
+    // A college code verifies the student with that college, so the 18+ tick is required with it.
+    const noConsent = quote.promo.collegeId ? consentProblem(parsed.data.declaredAdult) : null;
+    if (noConsent) return NextResponse.json({ error: noConsent, needsConsent: true }, { status: 400 });
     promo = quote.promo;
     discountMinor = quote.discountMinor;
     amountMinor = quote.payableMinor;
   }
-  const raw = promo ? { promoCode: promo.code, discountMinor } : {};
+  const raw = promo ? { promoCode: promo.code, discountMinor, ...(promo.collegeId ? { declaredAdult: true } : {}) } : {};
 
   // Full-discount code: no Razorpay order at all. Settle it now and let the
   // client skip the modal.

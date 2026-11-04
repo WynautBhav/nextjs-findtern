@@ -50,6 +50,10 @@ export default async function AdminCollegesPage({
     .orderBy(desc(c.isPartner), c.name, c.id)
     .limit(req.perPage)
     .offset((page - 1) * req.perPage);
+  const seatCodes = await db
+    .select({ collegeId: schema.promoCodes.collegeId, code: schema.promoCodes.code, maxUsages: schema.promoCodes.maxUsages, usedCount: schema.promoCodes.usedCount })
+    .from(schema.promoCodes)
+    .where(inArray(schema.promoCodes.collegeId, rows.map((r) => r.college.id).concat("")));
   const officers = await db
     .select({ id: schema.collegeAdmins.id, collegeId: schema.collegeAdmins.collegeId, name: schema.collegeAdmins.name, email: schema.collegeAdmins.email, lastLoginAt: schema.collegeAdmins.lastLoginAt })
     .from(schema.collegeAdmins)
@@ -68,6 +72,7 @@ export default async function AdminCollegesPage({
     members: r.members,
     roster: r.roster,
     drives: r.drives,
+    seatCode: seatCodes.find((s) => s.collegeId === r.college.id) ?? null,
     officers: officers
       .filter((o) => o.collegeId === r.college.id)
       .map((o) => ({ id: o.id, name: o.name, email: o.email, lastLoginAt: o.lastLoginAt?.toISOString() ?? null })),
