@@ -73,7 +73,10 @@ test("formatMoney keeps two decimals for paise and none for whole rupees", () =>
   assert.equal(formatMoney(249900, "INR"), "₹2,499");
 });
 
-test("formatIst with a year puts a late-UTC instant on the IST day (CSV paid/created times)", async () => {
-  const { formatIst } = await import("./format.ts");
-  assert.equal(formatIst("2026-11-03T23:04:14.539Z", { year: true }), "Wed 4 Nov 2026, 4:34 AM IST");
+test("formatIstStamp is sortable IST wall time with seconds, blank when invalid (CSV paid/created times)", async () => {
+  const { formatIstStamp } = await import("./format.ts");
+  assert.equal(formatIstStamp("2026-11-03T23:04:14.539Z"), "2026-11-04 04:34:14");
+  assert.equal(formatIstStamp(new Date("2026-11-03T18:30:00Z")), "2026-11-04 00:00:00");
+  assert.equal(formatIstStamp(null), "");
+  assert.equal(formatIstStamp("not a date"), "");
 });

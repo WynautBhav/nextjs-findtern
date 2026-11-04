@@ -9,6 +9,7 @@ import { flattenParams, parsePageRequest, periodStart, searchAny } from "@/lib/a
 import { allows, EXPORT_PERMISSIONS } from "@/lib/admin/permissions";
 import { activeProject, realEmployerId, realEmployers } from "@/lib/admin/scope";
 import { placeOfSupply, sellerStateCode, splitGst } from "@/lib/gst";
+import { formatIstStamp } from "@/lib/format";
 import { placeLabel } from "@/lib/invoice";
 import { dateRangeConditions } from "@/lib/admin/date-range";
 import { paymentPromo } from "@/lib/admin/payment-promo";
@@ -378,8 +379,8 @@ async function exportPayments(search: string, params: Record<string, string>) {
     { header: "Promo code", value: (r) => paymentPromo(r.raw).code ?? "" },
     { header: "Status", value: (r) => r.status },
     { header: "Gateway", value: (r) => r.gateway },
-    { header: "Paid at", value: (r) => (r.paidAt ? r.paidAt.toISOString() : "") },
-    { header: "Created at", value: (r) => (r.createdAt ? r.createdAt.toISOString() : "") },
+    { header: "Paid at (IST)", value: (r) => formatIstStamp(r.paidAt) },
+    { header: "Created at (IST)", value: (r) => formatIstStamp(r.createdAt) },
   ];
 
   return csvResponse(toCsv(rows, columns), csvFilename("payments"));
@@ -446,8 +447,8 @@ async function exportPayouts(search: string, params: Record<string, string>) {
     { header: "Employer", value: (r) => companyName.get(meta(r, "employerId")) ?? "" },
     { header: "Proposal", value: (r) => meta(r, "proposalId") },
     { header: "Notes", value: (r) => r.notes ?? "" },
-    { header: "Paid at", value: (r) => (r.paidAt ? r.paidAt.toISOString() : "") },
-    { header: "Created at", value: (r) => (r.createdAt ? r.createdAt.toISOString() : "") },
+    { header: "Paid at (IST)", value: (r) => formatIstStamp(r.paidAt) },
+    { header: "Created at (IST)", value: (r) => formatIstStamp(r.createdAt) },
   ];
   return csvResponse(toCsv(rows, columns), csvFilename("payouts"));
 }
@@ -499,8 +500,8 @@ async function exportInternPayments(search: string, params: Record<string, strin
     { header: "Discount", value: (r) => (promoOf(r).discountMinor / 100).toFixed(2) },
     { header: "Promo code", value: (r) => promoOf(r).code ?? "" },
     { header: "Status", value: (r) => r.status },
-    { header: "Paid at", value: (r) => (r.paidAt ? r.paidAt.toISOString() : "") },
-    { header: "Created at", value: (r) => (r.createdAt ? r.createdAt.toISOString() : "") },
+    { header: "Paid at (IST)", value: (r) => formatIstStamp(r.paidAt) },
+    { header: "Created at (IST)", value: (r) => formatIstStamp(r.createdAt) },
   ];
   return csvResponse(toCsv(rows, columns), csvFilename("intern-payments"));
 }

@@ -7,6 +7,7 @@ import { flattenParams } from "@/lib/admin/params";
 import { allows, EXPORT_PERMISSIONS } from "@/lib/admin/permissions";
 import { realEmployerId } from "@/lib/admin/scope";
 import { filterProposals, matchesSearch, parseIstDay, proposalTimezone } from "@/lib/admin/tracker";
+import { formatIstStamp } from "@/lib/format";
 import { parseOffer } from "@/lib/offer";
 import { getSession } from "@/lib/auth";
 
@@ -17,7 +18,7 @@ import { getSession } from "@/lib/auth";
  * (internship | fulltime). A read, so `requireRole`, not `requireMutation`.
  */
 
-const iso = (d: Date | null | undefined) => (d ? d.toISOString().slice(0, 10) : "");
+const iso = (d: Date | null | undefined) => formatIstStamp(d).slice(0, 10);
 
 export async function GET(req: Request) {
   // Live role (not the login cookie): a demoted admin loses exports at once.

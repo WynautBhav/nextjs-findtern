@@ -115,6 +115,13 @@ export function formatDate(iso: string | Date | null | undefined): string {
   }).replace(/\bSept\b/, "Sep");
 }
 
+/** Sortable IST wall time for CSV cells: `2026-11-04 04:34:14`; "" when missing or invalid. */
+export function formatIstStamp(iso: string | Date | null | undefined): string {
+  if (!iso) return "";
+  const d = typeof iso === "string" ? new Date(iso) : iso;
+  return isNaN(d.getTime()) ? "" : d.toLocaleString("sv-SE", { timeZone: IST_ZONE });
+}
+
 /** Reading time at 200 wpm, rounded up, floored at 1. */
 export function readingTimeMinutes(text: string): number {
   const words = text.trim().split(/\s+/).filter(Boolean).length;
