@@ -87,6 +87,7 @@ export function ProposalTrackerView({
   employers,
   proposals,
   interviews,
+  noGuarantee,
   options,
 }: {
   tab: TrackerTab;
@@ -97,6 +98,8 @@ export function ProposalTrackerView({
   employers: EmployerItem[];
   proposals: ProposalItem[];
   interviews: InterviewItem[];
+  /** Intern ids with an ended guarantee (same function as the intern's offer page). */
+  noGuarantee: Set<string>;
   options: { companies: Option[]; interns: Option[]; timezones: Option[] };
 }) {
   const hired = proposals.filter((p) => p.status === "hired");
@@ -130,7 +133,7 @@ export function ProposalTrackerView({
 
       {tab === "companies" ? <CompaniesTab {...{ params, page, perPage, search, pickers, proposals, interviews }} employers={activeCompanies} /> : null}
       {tab === "proposals" ? <ProposalsTab {...{ params, search, pickers }} rows={proposals} /> : null}
-      {tab === "candidates" ? <CandidatesTab {...{ params, page, perPage, search, pickers, proposals }} /> : null}
+      {tab === "candidates" ? <CandidatesTab {...{ params, page, perPage, search, pickers, proposals, noGuarantee }} /> : null}
       {tab === "interviews" ? <InterviewsTab {...{ params, page, perPage, search, pickers }} rows={interviews} /> : null}
       {tab === "hired" ? <HiredTab {...{ params, page, perPage, search, pickers }} rows={hired} /> : null}
     </div>
@@ -343,7 +346,8 @@ function ProposalsTab({ params, search, pickers, rows }: Pick<TabProps, "params"
   );
 }
 
-function CandidatesTab({ params, page, perPage, search, pickers, proposals }: TabProps & { proposals: ProposalItem[] }) {
+function CandidatesTab({ params, page, perPage, search, pickers: basePickers, proposals, noGuarantee }: TabProps & { proposals: ProposalItem[]; noGuarantee: Set<string> }) {
+  const pickers: ToolbarFilter[] = [...basePickers, { key: "guarantee", label: "Guarantee", allLabel: "Any guarantee", options: [{ value: "ended", label: "Not eligible" }] }];
   const byIntern = new Map<string, { internId: string; name: string; email: string | null; phone: string | null; received: number; won: number; lost: number; open: number; companies: string[]; last: Date | null }>();
   for (const p of proposals) {
     const row = byIntern.get(p.internId) ?? { internId: p.internId, name: nameOf(p), email: p.internEmail, phone: p.internPhone, received: 0, won: 0, lost: 0, open: 0, companies: [], last: null };
@@ -354,7 +358,7 @@ function CandidatesTab({ params, page, perPage, search, pickers, proposals }: Ta
     if (p.createdAt && (!row.last || p.createdAt > row.last)) row.last = p.createdAt;
     byIntern.set(p.internId, row);
   }
-  const rows = [...byIntern.values()].filter((c) => matchesSearch([c.name, c.email, c.phone, ...c.companies], search));
+  const rows = [...byIntern.values()].filter((c) => matchesSearch([c.name, c.email, c.phone, ...c.companies], search) && (params.guarantee !== "ended" || noGuarantee.has(c.internId)));
   const sort = parseSort(params, ["name", "received", "won", "last"] as const, { key: "received", dir: "desc" });
   const sorted = sortBy(rows, (r) => (sort.key === "name" ? r.name.toLowerCase() : sort.key === "last" ? time(r.last) : r[sort.key]), sort.dir);
   const pg = paginate(sorted, page, perPage);
@@ -372,7 +376,7 @@ function CandidatesTab({ params, page, perPage, search, pickers, proposals }: Ta
       caption="Candidates who received proposals"
       searchPlaceholder="Search candidate, email, phone, company…"
       filters={pickers}
-      empty={search || params.company || params.intern || params.tz ? filteredEmpty(params, "candidates") : { title: "No candidates yet", body: "Candidates appear here once a company sends them an offer." }}
+      empty={search || params.company || params.intern || params.tz || params.guarantee ? filteredEmpty(params, "candidates") : { title: "No candidates yet", body: "Candidates appear here once a company sends them an offer." }}
       columns={[
         {
           header: "Candidate",
@@ -386,6 +390,7 @@ function CandidatesTab({ params, page, perPage, search, pickers, proposals }: Ta
         { header: "Accepted or hired", sort: "won", align: "right", cell: (c) => c.won },
         { header: "Declined", align: "right", cell: (c) => c.lost },
         { header: "Open", align: "right", cell: (c) => c.open },
+        { header: "Guarantee", cell: (c) => (noGuarantee.has(c.internId) ? <span className="whitespace-nowrap text-warning">Not eligible for guarantee</span> : "Eligible") },
         {
           header: "From",
           cell: (c) => (

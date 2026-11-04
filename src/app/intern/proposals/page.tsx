@@ -12,7 +12,6 @@ import {
 import { OfferDecision } from "@/components/app/offer-decision";
 import { proposalStatus } from "@/components/app/status";
 import {
-  declinesUsedBy,
   modeLabel,
   offerFacts,
   type OfferFacts,
@@ -23,6 +22,7 @@ import { loadInternData, projectNames } from "@/lib/intern-data";
 import { cn } from "@/lib/utils";
 import { canDecide, offerGroup } from "@/lib/intern-offer-view";
 import type { ProposalRow } from "@/lib/journey";
+import { guaranteeEnded as isGuaranteeEnded, guaranteeMisses } from "@/lib/guarantee";
 import { FREE_DECLINES } from "@/lib/offer";
 
 export const metadata: Metadata = {
@@ -47,8 +47,9 @@ export default async function InternProposals() {
 
   const extra = (data.onboarding?.extraData ?? {}) as Record<string, unknown>;
   const score = Number(extra.findternScore ?? 0) || 0;
-  const guaranteeEnded = typeof extra.guaranteeEndedAt === "string";
-  const declinesUsed = declinesUsedBy(data.proposals);
+  const misses = guaranteeMisses(data.proposals);
+  const guaranteeEnded = isGuaranteeEnded(extra, misses);
+  const declinesUsed = misses.total;
 
   // Drafts are the company's, not the intern's.
   const rows = data.proposals

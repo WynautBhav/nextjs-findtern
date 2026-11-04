@@ -9,7 +9,7 @@ import { ScoreScale, STAT_ROW, StatTile } from "@/components/app/tiles";
 import { OfferDecision } from "@/components/app/offer-decision";
 import { proposalStatus } from "@/components/app/status";
 import { ImportantInstructions } from "@/components/intern/offer/important-instructions";
-import { declinesUsedBy, modeLabel, offerFacts } from "@/components/intern/offer/offer-facts";
+import { modeLabel, offerFacts } from "@/components/intern/offer/offer-facts";
 import { ButtonAnchor, ButtonLink, buttonClass } from "@/components/ui/button";
 import { requireRole } from "@/lib/auth";
 import { cn } from "@/lib/utils";
@@ -20,6 +20,7 @@ import { formatJoiningDate, shortDate } from "@/lib/format";
 import { canDecide, hybridSplit, offerJoiningDay, shiftInIst } from "@/lib/intern-offer-view";
 import { toArray } from "@/lib/journey";
 import { sanitizeRichText } from "@/lib/richtext";
+import { guaranteeEnded, guaranteeMisses } from "@/lib/guarantee";
 import { FREE_DECLINES, WEEKLY_SCHEDULES } from "@/lib/offer";
 
 export const metadata: Metadata = {
@@ -63,6 +64,7 @@ export default async function ProposalDetail({ params }: { params: Promise<{ id:
 
   const extra = (data.onboarding?.extraData ?? {}) as Record<string, unknown>;
   const score = Number(extra.findternScore ?? 0) || 0;
+  const misses = guaranteeMisses(data.proposals);
   const facts = offerFacts(proposal, { score, names: data.names });
   const { offer, fullTime } = facts;
   const ft = offer.fullTime;
@@ -210,9 +212,9 @@ export default async function ProposalDetail({ params }: { params: Promise<{ id:
                   startDate={offer.startDate}
                   joiningDate={joiningDay}
                   fullTime={fullTime}
-                  declinesUsed={declinesUsedBy(data.proposals)}
+                  declinesUsed={misses.total}
                   freeDeclines={FREE_DECLINES}
-                  guaranteeEnded={typeof extra.guaranteeEndedAt === "string"}
+                  guaranteeEnded={guaranteeEnded(extra, misses)}
                 />
               ) : (
                 <div className="space-y-4">

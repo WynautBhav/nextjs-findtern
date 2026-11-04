@@ -82,12 +82,5 @@ export function offerFacts(
   };
 }
 
-/** Offers this intern turned down themselves (the guarantee counts these). */
-export function declinesUsedBy(proposals: ProposalRow[]): number {
-  return proposals.filter(
-    (p) => p.status === "rejected" && ((p.offerDetails ?? {}) as Record<string, unknown>).declinedBy === "intern",
-  ).length;
-}
-
 export const MODE_LABEL: Record<string, string> = { remote: "Remote", hybrid: "Hybrid", onsite: "On-site", "on-site": "On-site", office: "On-site" };
 export const modeLabel = (mode: string) => MODE_LABEL[mode] ?? mode.charAt(0).toUpperCase() + mode.slice(1);
