@@ -59,6 +59,22 @@ export function meaningfulProfile(): SQL<boolean> {
   ))`;
 }
 
+/** One column of the intern's latest AI interview row (expects `users`). */
+function latestAiInterview(col: SQL): SQL {
+  return sql`(
+    SELECT ${col} FROM ${schema.interviews} i
+    LEFT JOIN ${schema.employers} e ON e.id = i.employer_id
+    WHERE i.intern_id = ${schema.users.id}
+      AND (i.employer_id = ${TEST_EMPLOYER_ID} OR lower(e.company_email) = ${AI_INTERVIEW_EMAIL})
+    ORDER BY i.created_at DESC NULLS LAST LIMIT 1
+  )`;
+}
+
+/** The chosen slot of the latest AI interview, NULL when none is picked (a proposed slot is not a date). */
+export function aiInterviewAt(): SQL<Date | null> {
+  return sql<Date | null>`${latestAiInterview(sql`CASE i.selected_slot WHEN 1 THEN i.slot1 WHEN 2 THEN i.slot2 WHEN 3 THEN i.slot3 END`)}`;
+}
+
 /**
  * Legacy AI-interview status for the intern list: from the latest AI
  * interview row, forced to "completed" once a Findtern Score exists.
@@ -66,13 +82,7 @@ export function meaningfulProfile(): SQL<boolean> {
  * Expects `users` and a left-joined `intern_onboarding`.
  */
 export function aiInterviewStatus(): SQL<string> {
-  const latest = sql`(
-    SELECT lower(i.status) FROM ${schema.interviews} i
-    LEFT JOIN ${schema.employers} e ON e.id = i.employer_id
-    WHERE i.intern_id = ${schema.users.id}
-      AND (i.employer_id = ${TEST_EMPLOYER_ID} OR lower(e.company_email) = ${AI_INTERVIEW_EMAIL})
-    ORDER BY i.created_at DESC NULLS LAST LIMIT 1
-  )`;
+  const latest = latestAiInterview(sql`lower(i.status)`);
   return sql<string>`(CASE
     WHEN jsonb_typeof(${schema.internOnboarding.extraData}->'findternScore') = 'number' THEN 'completed'
     WHEN ${latest} IS NULL THEN 'not_applied'

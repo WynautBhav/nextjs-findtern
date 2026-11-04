@@ -41,14 +41,15 @@ export function columnName(index: number): string {
   return name;
 }
 
-function sheetXml(rows: Cell[][]): string {
+function sheetXml(rows: Cell[][], moneyCols: number[]): string {
   const body = rows
     .map((row, r) => {
       const cells = row
         .map((value, c) => {
           if (value === null || value === undefined || value === "") return "";
           const ref = `${columnName(c)}${r + 1}`;
-          const style = r === 0 ? ' s="1"' : "";
+          // Style 2 = two decimals (money); the header row is bold.
+          const style = r === 0 ? ' s="1"' : moneyCols.includes(c) ? ' s="2"' : "";
           if (typeof value === "number" && Number.isFinite(value)) return `<c r="${ref}"${style}><v>${value}</v></c>`;
           return `<c r="${ref}" t="inlineStr"${style}><is><t xml:space="preserve">${xmlEscape(String(value))}</t></is></c>`;
         })
@@ -70,7 +71,7 @@ function sheetXml(rows: Cell[][]): string {
   );
 }
 
-function parts(sheetName: string, rows: Cell[][]): [string, string][] {
+function parts(sheetName: string, rows: Cell[][], moneyCols: number[]): [string, string][] {
   const name = xmlEscape(sheetName.replace(/[\\/?*[\]:]/g, " ").slice(0, 31) || "Sheet1");
   return [
     [
@@ -91,9 +92,9 @@ function parts(sheetName: string, rows: Cell[][]): [string, string][] {
     ],
     [
       "xl/styles.xml",
-      `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/></cellXfs></styleSheet>`,
+      `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="3"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="2" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/></cellXfs></styleSheet>`,
     ],
-    ["xl/worksheets/sheet1.xml", sheetXml(rows)],
+    ["xl/worksheets/sheet1.xml", sheetXml(rows, moneyCols)],
   ];
 }
 
@@ -169,9 +170,9 @@ function zip(files: [string, Uint8Array][]): Uint8Array {
   return out;
 }
 
-/** One-sheet workbook; the first row is the (bold) header. */
-export function buildXlsx(sheetName: string, rows: Cell[][]): Uint8Array {
-  return zip(parts(sheetName, rows).map(([name, xml]) => [name, enc.encode(xml)]));
+/** One-sheet workbook; the first row is the (bold) header. `moneyCols` (0-based) show numbers with two decimals. */
+export function buildXlsx(sheetName: string, rows: Cell[][], moneyCols: number[] = []): Uint8Array {
+  return zip(parts(sheetName, rows, moneyCols).map(([name, xml]) => [name, enc.encode(xml)]));
 }
 
 export const XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";

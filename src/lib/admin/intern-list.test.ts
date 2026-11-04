@@ -23,18 +23,28 @@ const due = (over: Partial<StipendDue>): StipendDue => ({
   ...over,
 });
 
-test("ADP-02: owed, pending payout and the earliest next payment", () => {
+test("ADP-02: total, paid, left, pending and the earliest next payment", () => {
   const m = internMoney(
     [due({}), due({ proposalId: "q", nextDate: "2026-09-15", remainingMinor: 200_000 }), due({ nextDate: null, remainingMinor: 0 })],
-    [
-      { status: "pending", amountMinor: 100_000, currency: "INR" },
-      { status: "paid", amountMinor: 999_999, currency: "INR" },
-    ],
+    { pendingMinor: 100_000, paidMinor: 400_000 },
   );
+  assert.equal(m.totalMinor, 4_500_000);
   assert.equal(m.owedMinor, 1_700_000);
+  assert.equal(m.paidMinor, 400_000);
   assert.equal(m.pendingPayoutMinor, 100_000);
   assert.equal(m.nextDate, "2026-09-15");
-  assert.deepEqual(internMoney([], []), { pendingPayoutMinor: 0, owedMinor: 0, nextDate: null });
+  assert.deepEqual(internMoney([]), { pendingPayoutMinor: 0, totalMinor: 0, paidMinor: 0, owedMinor: 0, nextDate: null });
+});
+
+// Same arithmetic as duesTotals() in payout-list.ts (total = totalShareMinor, due = remainingMinor),
+// which is what Payouts > Employer dues shows; payout-list imports the DB so it cannot load here.
+test("Candidates money equals the Payouts dues totals for the same rows", () => {
+  const rows = [due({ totalShareMinor: 3_000_000, remainingMinor: 2_000_000, nextDate: "2026-11-01" }), due({ totalShareMinor: 600_000, remainingMinor: 0, nextDate: null })];
+  const t = rows.reduce((a, d) => ({ total: a.total + d.totalShareMinor, due: a.due + d.remainingMinor }), { total: 0, due: 0 });
+  const m = internMoney(rows);
+  assert.equal(m.totalMinor, t.total);
+  assert.equal(m.owedMinor, t.due);
+  assert.equal(m.nextDate, "2026-11-01");
 });
 
 test("ADP-02: payout date filters follow the legacy windows", () => {

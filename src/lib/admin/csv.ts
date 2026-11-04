@@ -52,7 +52,8 @@ export function toCsv<T>(rows: T[], columns: CsvColumn<T>[]): string {
 
 /** A filesystem- and header-safe slug for the download name. */
 export function csvFilename(resource: string, stamp = new Date()): string {
-  const day = stamp.toISOString().slice(0, 10);
+  // IST day: UTC showed yesterday between 00:00 and 05:30 IST.
+  const day = new Date(stamp.getTime() + 330 * 60_000).toISOString().slice(0, 10);
   return `${resource}-${day}.csv`;
 }
 

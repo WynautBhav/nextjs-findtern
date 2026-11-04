@@ -1,5 +1,4 @@
 import { addMonthsIso, type StipendDue } from "./stipend-dues.ts";
-import { toInrMinor } from "./money.ts";
 
 /**
  * Money and offer facts for one row of the admin candidate list (ADP-02,
@@ -12,27 +11,35 @@ import { toInrMinor } from "./money.ts";
  */
 
 export type InternMoney = {
-  /** Sum of pending payout rows, INR paise (legacy "Pending payout"). */
+  /** Pending ledger payouts, INR paise (legacy "Pending payout"). */
   pendingPayoutMinor: number;
+  /** Intern's share over every placement month (= Payouts "Employer dues" total). */
+  totalMinor: number;
+  /** Paid ledger payouts, INR paise (what Payouts trusts over per-placement paid). */
+  paidMinor: number;
   /** Every unpaid month across placements at the intern's share (legacy "Left to pay"). */
   owedMinor: number;
   /** YYYY-MM-DD of the earliest unpaid month, null when nothing is scheduled. */
   nextDate: string | null;
 };
 
-type PayoutLike = { status: string; amountMinor: number; currency: string | null };
-
-export function internMoney(dues: StipendDue[], payouts: PayoutLike[]): InternMoney {
-  const pendingPayoutMinor = payouts
-    .filter((p) => p.status === "pending")
-    .reduce((sum, p) => sum + toInrMinor(p.amountMinor, p.currency), 0);
-  const owedMinor = dues.reduce((sum, d) => sum + d.remainingMinor, 0);
+/** Same inputs as the Payouts page: `loadPlacementDues` rows for one intern and their ledger sums. */
+export function internMoney(
+  dues: Pick<StipendDue, "totalShareMinor" | "remainingMinor" | "nextDate">[],
+  ledger: { pendingMinor: number; paidMinor: number } = { pendingMinor: 0, paidMinor: 0 },
+): InternMoney {
   const nextDate =
     dues
       .map((d) => d.nextDate)
       .filter((d): d is string => Boolean(d))
       .sort()[0] ?? null;
-  return { pendingPayoutMinor, owedMinor, nextDate };
+  return {
+    pendingPayoutMinor: ledger.pendingMinor,
+    totalMinor: dues.reduce((sum, d) => sum + d.totalShareMinor, 0),
+    paidMinor: ledger.paidMinor,
+    owedMinor: dues.reduce((sum, d) => sum + d.remainingMinor, 0),
+    nextDate,
+  };
 }
 
 export type DueFilter = "overdue" | "week" | "month" | "has" | "none";

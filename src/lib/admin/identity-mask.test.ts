@@ -34,3 +34,10 @@ test("identityValue reads the full value, column first, then extra data", () => 
   assert.equal(identityValue({ extraData: { bank: { accountNumber: "99887766" } } }, "bank"), "99887766");
   assert.equal(identityValue(null, "pan"), "");
 });
+
+test("a legacy `bank`-only row masks and reveals like `bankDetails`", () => {
+  const legacy = { extraData: { bank: { accountNumber: "001122334455" } } };
+  assert.equal(identityValue(legacy, "bank"), "001122334455");
+  assert.equal(maskTail(identityValue(legacy, "bank")), "•••• 4455");
+  assert.ok(!JSON.stringify(redactIdentity(legacy)).includes("001122334455"));
+});

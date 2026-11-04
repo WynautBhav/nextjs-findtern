@@ -1,9 +1,10 @@
-import { and, asc, count, desc, eq, inArray, isNotNull, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, sql, type SQL } from "drizzle-orm";
 
 import { getDb, schema } from "@/lib/db";
 import { searchAny } from "@/lib/admin/params";
-import { aiInterviewStatus, findternScoreSql, meaningfulProfile } from "@/lib/admin/scope";
-import { stipendDues } from "@/lib/admin/stipend-dues";
+import { aiInterviewAt, aiInterviewStatus, findternScoreSql, meaningfulProfile } from "@/lib/admin/scope";
+import { loadLedgerByIntern, loadPlacementDues, type PlacementDueRow } from "@/lib/admin/payout-list";
+import { maskTail } from "@/lib/admin/identity-mask";
 import { internMoney, matchesDue, todayIstIso, type DueFilter, type InternMoney } from "@/lib/admin/intern-list";
 
 /**
@@ -20,6 +21,7 @@ export type InternRow = {
   firstName: string;
   lastName: string;
   email: string;
+  phone: string;
   isActive: boolean;
   visibility: string;
   createdAt: Date | null;
@@ -27,6 +29,7 @@ export type InternRow = {
   hasProfile: boolean;
   openToWork: boolean;
   aiStatus: string;
+  interviewAt: Date | null;
   score: number | null;
   ratings: Record<string, number> | null;
   approval: string | null;
@@ -36,6 +39,8 @@ export type InternRow = {
   projectStatus: string | null;
   feePaid: boolean;
   money: InternMoney | null;
+  /** Only loaded when a bank column is visible; the account number is masked unless `fullAccount`. */
+  bank?: { holder: string; account: string; ifsc: string; name: string; upi: string };
 };
 
 /** Hired = status "hired" or a hire timestamp (legacy rule, lib/hire-status). */
@@ -46,50 +51,20 @@ export async function loadInterns(
   req: { search: string; limit: number; offset: number },
   sortKey: InternSortKey,
   dir: "asc" | "desc",
+  opts: { bank?: boolean; fullAccount?: boolean } = {},
 ) {
   const db = getDb();
   const o = schema.internOnboarding;
   const u = schema.users;
 
-  // Money facts for every intern with a hired placement or a payout row. The
-  // set is small (hires), and loading it whole is what lets the payout-date
+  // Same sources as the Payouts page: placement dues plus the payouts ledger.
+  // The set is small (hires), and loading it whole is what lets the payout-date
   // filters and the money sorts run across all pages, not just this one.
-  const hiredProposals = await db
-    .select()
-    .from(schema.proposals)
-    .where(or(sql`lower(${schema.proposals.status}) = 'hired'`, isNotNull(schema.proposals.hiredAt)));
-  const payoutRows = await db
-    .select({
-      id: schema.internPayouts.id,
-      internId: schema.internPayouts.internId,
-      status: schema.internPayouts.status,
-      paidAt: schema.internPayouts.paidAt,
-      createdAt: schema.internPayouts.createdAt,
-      amountMinor: schema.internPayouts.amountMinor,
-      currency: schema.internPayouts.currency,
-      raw: schema.internPayouts.raw,
-    })
-    .from(schema.internPayouts);
-  const moneyIds = [...new Set([...hiredProposals.map((p) => p.internId), ...payoutRows.map((p) => p.internId)])];
-  const scores = moneyIds.length
-    ? await db.select({ userId: o.userId, extra: o.extraData }).from(o).where(inArray(o.userId, moneyIds))
-    : [];
-  const scoreById = new Map(
-    scores.map((s) => {
-      const v = (s.extra as Record<string, unknown> | null)?.findternScore;
-      return [s.userId, typeof v === "number" ? v : null] as const;
-    }),
-  );
+  const [dues, ledger] = await Promise.all([loadPlacementDues(), loadLedgerByIntern()]);
+  const duesByIntern = new Map<string, PlacementDueRow[]>();
+  for (const d of dues) duesByIntern.set(d.internId, [...(duesByIntern.get(d.internId) ?? []), d]);
   const money = new Map<string, InternMoney>();
-  for (const id of moneyIds) {
-    const payouts = payoutRows.filter((p) => p.internId === id);
-    const dues = stipendDues(
-      hiredProposals.filter((p) => p.internId === id),
-      payouts,
-      scoreById.get(id) ?? null,
-    );
-    money.set(id, internMoney(dues, payouts));
-  }
+  for (const id of new Set([...duesByIntern.keys(), ...ledger.keys()])) money.set(id, internMoney(duesByIntern.get(id) ?? [], ledger.get(id)));
 
   const today = todayIstIso();
   const due = ["overdue", "week", "month", "has", "none"].includes(params.due ?? "") ? (params.due as DueFilter) : null;
@@ -119,6 +94,10 @@ export async function loadInterns(
     ORDER BY ${HIRED} DESC, p.created_at DESC NULLS LAST LIMIT 1)`;
   const projectStatus = sql<string | null>`(SELECT lower(pr.status) FROM ${schema.proposals} p JOIN ${schema.projects} pr ON pr.id = p.project_id
     WHERE p.intern_id = ${u.id} AND ${HIRED} ORDER BY p.hired_at DESC NULLS LAST, p.updated_at DESC NULLS LAST LIMIT 1)`;
+
+  // Same fallback as identity-mask: current `bankDetails`, else legacy `bank`.
+  const bankField = (key: string) =>
+    sql<string>`coalesce(coalesce(${o.extraData}->'bankDetails', ${o.extraData}->'bank')->>${key}, '')`;
 
   const conditions = [
     eq(u.role, "intern"),
@@ -175,6 +154,7 @@ export async function loadInterns(
         firstName: u.firstName,
         lastName: u.lastName,
         email: u.email,
+        phone: sql<string>`trim(coalesce(${u.countryCode}, '') || ' ' || coalesce(${u.phoneNumber}, ''))`,
         isActive: u.isActive,
         visibility: u.profileVisibility,
         createdAt: u.createdAt,
@@ -182,6 +162,7 @@ export async function loadInterns(
         hasProfile: profileFilled,
         openToWork,
         aiStatus,
+        interviewAt: aiInterviewAt(),
         score: scoreSql,
         ratings: sql<Record<string, number> | null>`${o.extraData}->'ratings'`,
         approval,
@@ -190,6 +171,15 @@ export async function loadInterns(
         fullTime,
         projectStatus,
         feePaid,
+        ...(opts.bank
+          ? {
+              bankHolder: bankField("accountHolderName"),
+              bankAccount: bankField("accountNumber"),
+              bankIfsc: bankField("ifscCode"),
+              bankName: bankField("bankName"),
+              bankUpi: bankField("upiId"),
+            }
+          : {}),
       })
       .from(u)
       .leftJoin(o, eq(o.userId, u.id))
@@ -206,11 +196,25 @@ export async function loadInterns(
       .where(sql`${u.role} = 'intern' and not ${profileFilled}`),
   ]);
 
-  const rows: InternRow[] = rawRows.map((r) => ({
-    ...r,
-    ratings: r.ratings && typeof r.ratings === "object" ? r.ratings : null,
-    money: money.get(r.id) ?? null,
-  }));
+  const rows: InternRow[] = rawRows.map((r) => {
+    const { bankHolder, bankAccount, bankIfsc, bankName, bankUpi, ...rest } = r as typeof r & Record<string, string | undefined>;
+    return {
+      ...(rest as typeof r),
+      ratings: r.ratings && typeof r.ratings === "object" ? r.ratings : null,
+      money: money.get(r.id) ?? null,
+      ...(opts.bank
+        ? {
+            bank: {
+              holder: bankHolder ?? "",
+              account: opts.fullAccount ? (bankAccount ?? "") : maskTail(bankAccount),
+              ifsc: bankIfsc ?? "",
+              name: bankName ?? "",
+              upi: bankUpi ?? "",
+            },
+          }
+        : {}),
+    };
+  });
 
   return {
     rows,

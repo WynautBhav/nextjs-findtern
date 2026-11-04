@@ -296,3 +296,17 @@ export async function loadPlacementDues(internId?: string): Promise<PlacementDue
   // Soonest money first; finished placements last.
   return out.sort((a, b) => (a.nextDate ?? "9999").localeCompare(b.nextDate ?? "9999"));
 }
+
+/** Pending and paid ledger totals per intern, INR paise: the same sums the Disbursements totals use. */
+export async function loadLedgerByIntern(): Promise<Map<string, { pendingMinor: number; paidMinor: number }>> {
+  const inr = inrMinorSql(schema.internPayouts.amountMinor, schema.internPayouts.currency);
+  const rows = await getDb()
+    .select({
+      internId: schema.internPayouts.internId,
+      pendingMinor: sql<number>`coalesce(sum(${inr}) FILTER (WHERE ${schema.internPayouts.status} = 'pending'), 0)::bigint`,
+      paidMinor: sql<number>`coalesce(sum(${inr}) FILTER (WHERE ${schema.internPayouts.status} = 'paid'), 0)::bigint`,
+    })
+    .from(schema.internPayouts)
+    .groupBy(schema.internPayouts.internId);
+  return new Map(rows.map((r) => [r.internId, { pendingMinor: Number(r.pendingMinor), paidMinor: Number(r.paidMinor) }]));
+}

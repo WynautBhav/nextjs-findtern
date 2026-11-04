@@ -165,6 +165,9 @@ export const EXPORT_PERMISSIONS: Record<string, Permission[]> = {
   "intern-payments": ["transactions:read"],
 };
 
+/** Full bank account numbers in the Candidates export: only for those who record payouts. */
+export const BANK_EXPORT_PERMISSIONS: Permission[] = ["transactions:write"];
+
 /** Where staff land, in order of preference: the first page their role opens. */
 const LANDING_PAGES = [
   "/admin/dashboard",
