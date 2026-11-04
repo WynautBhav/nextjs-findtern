@@ -194,12 +194,14 @@ export function DriveWorkspace({
     }
   }
 
+  const [manualLink, setManualLink] = useState("");
+
   async function requestCall(id: string, inMinutes: number) {
     setNotice(null);
     const res = await csrfFetch(`/api/employer/drives/${driveId}/meetings`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ userId: id, inMinutes }),
+      body: JSON.stringify({ userId: id, inMinutes, manualLink }),
     }).catch(() => null);
     const data = (await res?.json().catch(() => ({}))) as { meeting?: MeetingView; error?: string } | undefined;
     if (!res?.ok || !data?.meeting) {
@@ -374,6 +376,20 @@ export function DriveWorkspace({
         )}
       </div>
 
+      <div className="mt-4 flex flex-col gap-1">
+        <label htmlFor="manual-link" className="text-sm font-medium text-ink-900">
+          Your own meeting link (optional)
+        </label>
+        <input
+          id="manual-link"
+          type="url"
+          inputMode="url"
+          value={manualLink}
+          onChange={(e) => setManualLink(e.target.value)}
+          placeholder="https://meet.google.com/… Leave empty to get one from Findtern"
+          className="min-h-11 w-full min-w-0 rounded-lg border border-ink-200 bg-white px-3 text-base text-ink-900"
+        />
+      </div>
       <CallsPanel meetings={meetings} nameOf={nameOf} onCancel={cancelCall} headingRef={callsHeadingRef} />
       {confirmDialog}
     </div>

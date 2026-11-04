@@ -5,12 +5,14 @@ import { z } from "zod";
 import { getSession } from "@/lib/auth";
 import { requireMutation } from "@/lib/guards-mutation";
 import { MEETING_DELAYS, requestMeeting, toView } from "@/lib/college/meetings";
+import { manualMeetingLink } from "@/lib/college/meeting-link";
 import { driveForEmployer, eligibleStudents } from "@/lib/college/scope";
 import { getDb, schema } from "@/lib/db";
 
 const bodySchema = z.object({
   userId: z.string().min(1),
   inMinutes: z.union([z.literal(0), z.literal(5), z.literal(10)]),
+  manualLink: z.string().optional(),
 });
 
 /** My call requests in this drive, for the status column (polled). */
@@ -38,6 +40,11 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   if (!parsed.success || !MEETING_DELAYS.includes(parsed.data.inMinutes)) {
     return NextResponse.json({ error: "Pick now, 5 or 10 minutes" }, { status: 400 });
   }
+  const pasted = parsed.data.manualLink?.trim();
+  const manualLink = pasted ? manualMeetingLink(pasted) : null;
+  if (pasted && !manualLink) {
+    return NextResponse.json({ error: "Paste a full https:// meeting link, or leave it empty." }, { status: 400 });
+  }
   const eligible = (await eligibleStudents(loaded.drive)).some((s) => s.userId === parsed.data.userId);
   if (!eligible) return NextResponse.json({ error: "Student not in this drive" }, { status: 404 });
 
@@ -47,6 +54,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     employerId: guard.session.uid,
     userId: parsed.data.userId,
     inMinutes: parsed.data.inMinutes,
+    manualLink,
   });
   if (!r.ok) return NextResponse.json({ error: r.error }, { status: 409 });
   return NextResponse.json({ meeting: r.meeting }, { status: 201 });
