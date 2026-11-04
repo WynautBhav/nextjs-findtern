@@ -114,7 +114,8 @@ export async function PUT(
   const linkChanged = link !== String(existing.meetingLink ?? "").trim();
 
   if (!isAi) {
-    if (linkChanged) {
+    // Only an open interview: a missed/completed/cancelled one gets the link saved but no mail.
+    if (linkChanged && nextStatus === "scheduled") {
       const data = { interviewId: id, meetingLink: link };
       const dedupeKey = `interview_link:${id}:${link}`;
       try {
