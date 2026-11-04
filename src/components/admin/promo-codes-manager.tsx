@@ -487,7 +487,7 @@ export function PromoCodesManager({
                     label={`More actions for ${promo.code}`}
                     items={[
                       { label: "Edit code", onSelect: () => openEditModal(promo), icon: <Edit2 /> },
-                      { label: "Delete code", onSelect: () => void handleDelete(promo), icon: <Trash2 />, destructive: true },
+                      ...(promo.collegeId ? [] : [{ label: "Delete code", onSelect: () => void handleDelete(promo), icon: <Trash2 />, destructive: true }]),
                     ]}
                   />
                 </div>
@@ -500,15 +500,17 @@ export function PromoCodesManager({
                     <Edit2 className="size-4" />
                     Edit
                   </button>
-                  <button
-                    type="button"
-                    disabled={deletingId === promo.id}
-                    onClick={() => void handleDelete(promo)}
-                    aria-label={`Delete ${promo.code}`}
-                    className={buttonClass({ variant: "ghost", size: "iconSm", className: "text-ink-600 hover:bg-danger-soft hover:text-danger" })}
-                  >
-                    <Trash2 className="size-4" />
-                  </button>
+                  {promo.collegeId ? null : (
+                    <button
+                      type="button"
+                      disabled={deletingId === promo.id}
+                      onClick={() => void handleDelete(promo)}
+                      aria-label={`Delete ${promo.code}`}
+                      className={buttonClass({ variant: "ghost", size: "iconSm", className: "text-ink-600 hover:bg-danger-soft hover:text-danger" })}
+                    >
+                      <Trash2 className="size-4" />
+                    </button>
+                  )}
                 </div></> : null}
                 {rowError?.id === promo.id ? (
                   <p role="alert" className="text-sm font-medium text-danger lg:col-span-5 max-lg:col-span-2">
