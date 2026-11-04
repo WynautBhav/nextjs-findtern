@@ -90,6 +90,7 @@ export async function loadPayouts(
         amountMinor: schema.internPayouts.amountMinor,
         currency: schema.internPayouts.currency,
         inrMinor: inrMinorSql(schema.internPayouts.amountMinor, schema.internPayouts.currency),
+        kind: schema.internPayouts.kind,
         status: schema.internPayouts.status,
         method: schema.internPayouts.method,
         referenceId: schema.internPayouts.referenceId,

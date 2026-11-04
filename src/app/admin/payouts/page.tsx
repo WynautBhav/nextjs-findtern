@@ -27,8 +27,10 @@ import {
   type PlacementDueRow,
 } from "@/lib/admin/payout-list";
 import { buildPayoutRun, istDayKey, type PayoutRun } from "@/lib/admin/payout-run";
+import { payoutKindLabel } from "@/lib/admin/payout-kind";
 import { formatDate, formatMoney } from "@/lib/format";
 import { getSession } from "@/lib/auth";
+import { cn } from "@/lib/utils";
 import { allows } from "@/lib/admin/permissions";
 
 export const metadata: Metadata = { title: "Intern payouts" };
@@ -175,6 +177,7 @@ async function PayoutsView({ params }: { params: Record<string, string> }) {
         <>
           <span className="font-semibold text-foreground">{formatMoney(r.amountMinor, r.currency === "USD" ? "USD" : "INR", { zeroLabel: "₹0" })}</span>
           {r.currency === "USD" ? <span className="block text-xs font-normal text-text-subtle">{inr(r.inrMinor)}</span> : null}
+          <span className={cn("block text-xs", r.kind === "completion_bonus" ? "font-semibold text-foreground" : "font-normal text-text-subtle")}>{payoutKindLabel(r.kind)}</span>
         </>
       ),
     },

@@ -5,6 +5,7 @@ import { getDb, schema } from "@/lib/db";
 import { q } from "@/lib/college/sql";
 import { INTERN_SORTS, loadInterns } from "@/lib/admin/intern-query";
 import { csvFilename, csvResponse, toCsv, type CsvColumn } from "@/lib/admin/csv";
+import { payoutKindLabel } from "@/lib/admin/payout-kind";
 import { internSheet, needsBank, needsBankExport, parseCols } from "@/lib/admin/intern-columns";
 import { todayIstIso } from "@/lib/admin/intern-list";
 import { buildXlsx, XLSX_MIME } from "@/lib/xlsx";
@@ -405,7 +406,7 @@ function gstOf(r: GstRow) {
   return splitGst(r.amountMinor, placeOf(r), sellerStateCode());
 }
 
-/** Stipend payouts to interns, honouring the payouts page filters. */
+/** Payouts to interns (stipends and completion bonuses; the Kind column tells them apart), honouring the payouts page filters. */
 async function exportPayouts(search: string, params: Record<string, string>) {
   const db = getDb();
   const since = periodStart(params.period);
@@ -422,6 +423,7 @@ async function exportPayouts(search: string, params: Record<string, string>) {
     .select({
       intern: sql<string>`${schema.users.firstName} || ' ' || ${schema.users.lastName}`,
       email: schema.users.email,
+      kind: schema.internPayouts.kind,
       amountMinor: schema.internPayouts.amountMinor,
       currency: schema.internPayouts.currency,
       status: schema.internPayouts.status,
@@ -451,6 +453,7 @@ async function exportPayouts(search: string, params: Record<string, string>) {
   const columns: CsvColumn<(typeof rows)[number]>[] = [
     { header: "Intern", value: (r) => r.intern },
     { header: "Email", value: (r) => r.email },
+    { header: "Kind", value: (r) => payoutKindLabel(r.kind) },
     { header: "Amount", value: (r) => (r.amountMinor / 100).toFixed(2) },
     { header: "Currency", value: (r) => r.currency },
     { header: "Status", value: (r) => r.status },

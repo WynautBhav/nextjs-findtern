@@ -15,6 +15,7 @@ import {
   type PlacementDueRow,
   type PayoutRow,
 } from "@/lib/admin/payout-list";
+import { payoutKindLabel } from "@/lib/admin/payout-kind";
 import { todayIst } from "@/lib/timesheet-days";
 import { getSession } from "@/lib/auth";
 
@@ -83,6 +84,7 @@ export async function GET(req: Request) {
     { header: "Email", value: (r) => r.internEmail ?? "" },
     { header: "Employer", value: (r) => r.companyName ?? "" },
     { header: "Project", value: (r) => r.projectName ?? "" },
+    { header: "Kind", value: (r) => payoutKindLabel(r.kind) },
     { header: "Source", value: (r) => payoutSourceLabel(r.source) },
     { header: "Amount", value: (r) => money(r.amountMinor) },
     { header: "Currency", value: (r) => r.currency },

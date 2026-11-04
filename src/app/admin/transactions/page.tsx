@@ -14,6 +14,7 @@ import { StatusBadge } from "@/components/admin/status-badge";
 import { DateRangeForm } from "@/components/admin/report-range";
 import { dateRangeConditions } from "@/lib/admin/date-range";
 import { gatewayLabel } from "@/lib/admin/invoice-rows";
+import { payoutKindLabel } from "@/lib/admin/payout-kind";
 import { fillBuckets, istDayKeys, istMonthKeys, istMonthLabel, istWeekdayLabel } from "@/lib/admin/revenue";
 import { loadCollected, loadPayoutTotals, loadReceiptBuckets } from "@/lib/admin/receivables-load";
 import { PayoutEditor } from "@/components/admin/payout-editor";
@@ -348,6 +349,7 @@ async function PayoutsTable({ params }: { params: Record<string, string> }) {
       .select({
         id: schema.internPayouts.id,
         internId: schema.internPayouts.internId,
+        kind: schema.internPayouts.kind,
         amountMinor: schema.internPayouts.amountMinor,
         currency: schema.internPayouts.currency,
         status: schema.internPayouts.status,
@@ -404,7 +406,12 @@ async function PayoutsTable({ params }: { params: Record<string, string> }) {
           header: "Intern",
           cell: (row) => <IdentityCell name={row.name.trim() || "Candidate"} id={row.internId} sub={row.company || row.email} href={`/admin/interns/${row.internId}`} />,
         },
-        { header: "Amount", numeric: true, sort: "amount", cell: (row) => <span className="font-semibold">{money(row.amountMinor, row.currency)}</span> },
+        { header: "Amount", numeric: true, sort: "amount", cell: (row) => (
+          <>
+            <span className="font-semibold">{money(row.amountMinor, row.currency)}</span>
+            <span className={row.kind === "completion_bonus" ? "block text-xs font-semibold text-foreground" : "block text-xs font-normal text-text-subtle"}>{payoutKindLabel(row.kind)}</span>
+          </>
+        ) },
         { header: "Method", cell: (row) => (row.method ? row.method.toUpperCase() : <span className="text-text-subtle">-</span>) },
         { header: "Bank reference", cell: (row) => (row.referenceId ? <span className="nums break-all text-[0.8125rem] text-text-subtle">{row.referenceId}</span> : <span className="text-text-subtle">Not yet</span>) },
         { header: "Status", cell: (row) => <StatusBadge value={row.status} /> },
