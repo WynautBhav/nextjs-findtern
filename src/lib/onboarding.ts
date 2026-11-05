@@ -966,6 +966,7 @@ export function scoreProblem(type: ScoreType | "", raw: string): string | null {
   const v = raw.trim().replace(/%$/, "");
   if (!v) return null;
   const n = Number(v);
+  if (/^-\d/.test(v)) return type === "cgpa" ? "CGPA must be between 0 and 10." : "Percentage must be between 0 and 100.";
   if (!/^\d+(\.\d+)?$/.test(v) || !Number.isFinite(n)) return "Enter a number, like 8.4 or 84.";
   if (type === "cgpa" && n > 10) return "CGPA is out of 10 - enter a value from 0 to 10.";
   if (type !== "cgpa" && n > 100) return "Percentage cannot be more than 100.";

@@ -182,7 +182,7 @@ export function AcademicsStep({ values, update, errors, college }: StepProps) {
               value={a.cgpa}
               error={errors.cgpa}
               hint={a.scoreType === "percentage" ? "Out of 100." : a.scoreType === "cgpa" ? "Out of 10." : "Pick CGPA or percentage first."}
-              onChange={(v) => set({ cgpa: v.replace(/[^\d.]/g, "").slice(0, 6) })}
+              onChange={(v) => set({ cgpa: v.replace(/[^\d.-]/g, "").replace(/(?!^)-/g, "").slice(0, 6) })}
             />
           </Grid>
         )}

@@ -586,3 +586,8 @@ test("skill ratings round-trip label -> stored number -> label (Intermediate sta
   assert.deepEqual(stored.map((s) => s.rating), [1, 2, 3]);
   assert.deepEqual(draftFromRecord({ skills: stored }).skillsWithRatings, picked);
 });
+
+test("a negative score is refused with the range message instead of being rewritten", () => {
+  assert.equal(scoreProblem("cgpa", "-3"), "CGPA must be between 0 and 10.");
+  assert.match(scoreProblem("percentage", "-3") ?? "", /between 0 and 100/);
+});
