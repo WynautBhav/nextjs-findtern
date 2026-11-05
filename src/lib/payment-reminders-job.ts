@@ -56,16 +56,15 @@ export async function sendPaymentReminders(now = new Date()): Promise<{ sent: nu
     }).catch((e) => (console.error("[payment-reminders]", key, e), false));
     if (!ok) continue;
     n++;
-    // The intern hears once, ahead of the first reminder only.
-    if (r.type === "upcoming")
-      await notify({
-        to: { type: "intern", id: h.internId },
-        type: "stipend_pending",
-        title: `Your month ${r.k} stipend`,
-        message: `Your month ${r.k} stipend will be paid once the employer pays.`,
-        data: { proposalId: h.id, month: r.k },
-        dedupeKey: `stipend_pending:${h.id}:${r.k}`,
-      }).catch(() => false);
+    // The intern hears once, with the hire's first reminder of whatever type (the key dedupes the rest).
+    await notify({
+      to: { type: "intern", id: h.internId },
+      type: "stipend_pending",
+      title: `Your month ${r.k} stipend`,
+      message: `Your month ${r.k} stipend will be paid once the employer pays.`,
+      data: { proposalId: h.id, month: r.k },
+      dedupeKey: `stipend_pending:${h.id}:${r.k}`,
+    }).catch(() => false);
   }
   return { sent: n };
 }
