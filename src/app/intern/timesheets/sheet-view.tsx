@@ -1,7 +1,7 @@
 import { Pill, Surface, WaitingNote } from "@/components/app/primitives";
 import { STAT_ROW, StatTile } from "@/components/app/tiles";
 import { dayTone } from "@/components/intern/day-status";
-import { LEGACY_DAY_STATUSES } from "@/lib/employer-timesheets";
+import { LEGACY_DAY_STATUSES, sheetHours } from "@/lib/employer-timesheets";
 import { formatDayLabel } from "@/lib/format";
 import { holidayName } from "@/lib/holidays";
 import type { TimesheetRow } from "@/lib/journey";
@@ -25,7 +25,7 @@ export function SheetView({ sheet, backHref }: { sheet: TimesheetRow; backHref: 
   const counts: Record<string, number> = {};
   for (const d of days) if (d.status) counts[d.status] = (counts[d.status] ?? 0) + 1;
   const extra = Object.keys(counts).filter((k) => !(LEGACY_DAY_STATUSES as readonly string[]).includes(k));
-  const hours = days.reduce((sum, d) => sum + d.hours, 0);
+  const hours = sheetHours(sheet.entries, sheet.periodStart, sheet.periodEnd);
   const status = (sheet.status ?? "").toLowerCase();
   // Only statuses that occur: a row of "Absent 0, Fixed off 0" was a card of nothing.
   const others = [...LEGACY_DAY_STATUSES, ...extra].filter((s) => s !== "Present" && counts[s]);

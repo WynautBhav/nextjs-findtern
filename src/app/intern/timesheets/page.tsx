@@ -9,7 +9,7 @@ import { buttonClass } from "@/components/ui/button";
 import { CreateTimesheetModal } from "@/components/intern/create-timesheet-modal";
 import { HoursHeatmap, type HeatDay } from "@/components/intern/timesheets/hours-heatmap";
 import { requireRole } from "@/lib/auth";
-import { editableDayStatus, engagementPeriods, timesheetPeriod, uncoveredParts, unfilledDays, type Period } from "@/lib/employer-timesheets";
+import { dayDetails, editableDayStatus, engagementPeriods, timesheetPeriod, uncoveredParts, unfilledDays, type Period } from "@/lib/employer-timesheets";
 import { formatJoiningDate, shortDate } from "@/lib/format";
 import { isHiredProposal } from "@/lib/hire-status";
 import { loadInternData } from "@/lib/intern-data";
@@ -383,11 +383,12 @@ function heatDays(sheets: TimesheetRow[], periods: Period[]): HeatDay[] {
   const byDate = new Map<string, HeatDay>();
   for (const s of sheets) {
     const sheet = sheetLabel(s.status);
-    for (const date of periodDays(s.periodStart, s.periodEnd)) byDate.set(date, { date, hours: 0, status: "", sheet });
+    // Hours follow the shared day rule (a Present day with none is 8 h), so this total agrees with every other.
+    const hours = new Map(dayDetails(s.entries, s.periodStart, s.periodEnd).map((d) => [d.date, d.hours]));
+    for (const date of periodDays(s.periodStart, s.periodEnd)) byDate.set(date, { date, hours: hours.get(date) ?? 0, status: "", sheet });
     for (const e of toArray<Record<string, unknown>>(s.entries)) {
       const d = e && typeof e.date === "string" ? byDate.get(e.date.slice(0, 10)) : undefined;
       if (!d) continue;
-      d.hours = typeof e.hours === "number" && Number.isFinite(e.hours) && e.hours > 0 ? e.hours : 0;
       d.status = editableDayStatus(e.status);
     }
   }

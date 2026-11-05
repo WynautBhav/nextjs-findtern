@@ -24,7 +24,7 @@ import { useRouter } from "next/navigation";
 import { AlertCircle, Check, CloudUpload, Loader2 } from "lucide-react";
 
 import { csrfFetch } from "@/lib/client-fetch";
-import { LEGACY_DAY_STATUSES, editableDayStatus, unfilledDays, type LegacyDayStatus } from "@/lib/employer-timesheets";
+import { LEGACY_DAY_STATUSES, dayHours, editableDayStatus, unfilledDays, type LegacyDayStatus } from "@/lib/employer-timesheets";
 import { defaultDayStatus, holidayName } from "@/lib/holidays";
 import { canSendOn, dayParts, periodDays, periodSendableFrom, todayIst, weekdayOf } from "@/lib/timesheet-days";
 import { Surface } from "@/components/app/primitives";
@@ -83,7 +83,7 @@ export function TimesheetGrid({
   const [undo, setUndo] = useState<{ prev: DayState[]; count: number } | null>(null);
 
   const missing = useMemo(() => unfilledDays(dates, days), [dates, days]);
-  const totalHours = useMemo(() => days.reduce((sum, d) => sum + (Number.isFinite(d.hours) ? d.hours : 0), 0), [days]);
+  const totalHours = useMemo(() => days.reduce((sum, d) => sum + dayHours(d.status, d.hours), 0), [days]);
   const canSend = !periodEnd || canSendOn(todayIso, periodEnd);
   const sendOpens = periodEnd ? dayParts(periodSendableFrom(periodEnd)).date : "";
   const sentBack = status === "rejected";

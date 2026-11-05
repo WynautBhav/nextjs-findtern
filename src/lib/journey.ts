@@ -1,5 +1,5 @@
 import { formatDate, formatMoney, shortDate } from "./format.ts";
-import { dayDetails } from "./employer-timesheets.ts";
+import { sheetHours } from "./employer-timesheets.ts";
 import { feedbackTextOf } from "./interview-feedback.ts";
 import { draftFromRecord, MIN_SKILLS } from "./onboarding.ts";
 import { formatPeriodDays } from "./timesheet-days.ts";
@@ -826,7 +826,7 @@ export function deriveMoney(payouts: PayoutRow[]): Money {
 
 /** Same per-day rule as the employer review (a Present day with no hours is 8 h), so both sides show one number. */
 export function hoursIn(t: TimesheetRow): number {
-  return dayDetails(t.entries, t.periodStart, t.periodEnd).reduce((sum, d) => sum + d.hours, 0);
+  return sheetHours(t.entries, t.periodStart, t.periodEnd);
 }
 
 export type MonthHours = { key: string; start: Date; approved: number; sent: number; draft: number };

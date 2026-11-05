@@ -117,6 +117,20 @@ export const DEFAULT_DAY_HOURS = 8;
 
 export type DayDetail = DayEntry & { hours: number; note: string };
 
+/**
+ * The one per-day hours rule, for intern, employer and admin alike: only a
+ * Present day counts, and one with no (or 0) hours is the legacy 8-hour day.
+ */
+export function dayHours(status: string, hours: number | null | undefined): number {
+  if (status !== "Present") return 0;
+  return typeof hours === "number" && Number.isFinite(hours) && hours > 0 ? hours : DEFAULT_DAY_HOURS;
+}
+
+/** A sheet's total hours under `dayHours`; every listed total goes through this. */
+export function sheetHours(entries: unknown, periodStart: Date | null, periodEnd: Date | null): number {
+  return dayDetails(entries, periodStart, periodEnd).reduce((sum, d) => sum + d.hours, 0);
+}
+
 /** `normaliseEntries` plus each day's hours and note, for the review grid. */
 export function dayDetails(entries: unknown, periodStart: Date | null, periodEnd: Date | null): DayDetail[] {
   const extra = new Map<string, { hours: number | null; note: string }>();
@@ -134,9 +148,7 @@ export function dayDetails(entries: unknown, periodStart: Date | null, periodEnd
   }
   return normaliseEntries(entries, periodStart, periodEnd).map((d) => {
     const x = extra.get(d.date);
-    // A Present day with no hours (missing or 0) is a legacy 8-hour day, same as the review grid's weekly rows.
-    const hours = x?.hours && x.hours > 0 ? x.hours : DEFAULT_DAY_HOURS;
-    return { ...d, hours: d.status === "Present" ? hours : 0, note: x?.note ?? "" };
+    return { ...d, hours: dayHours(d.status, x?.hours), note: x?.note ?? "" };
   });
 }
 

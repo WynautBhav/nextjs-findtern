@@ -15,7 +15,7 @@ import { owedMinor, stipendDues } from "@/lib/admin/stipend-dues";
 import { InternSkillsEditor } from "@/components/admin/intern-skills-editor";
 import { RatingsEditor } from "@/components/admin/ratings-editor";
 import { DOCUMENT_SLOTS, type CandidateDocument } from "@/lib/admin/candidate-documents-list";
-import { normaliseEntries, countStatuses } from "@/lib/employer-timesheets";
+import { normaliseEntries, countStatuses, sheetHours } from "@/lib/employer-timesheets";
 import { offerScore, parseOffer } from "@/lib/offer";
 import { ProposalOfferSummary } from "@/components/admin/proposal-offer-summary";
 import { draftFromRecord, linkedinHref } from "@/lib/onboarding";
@@ -974,7 +974,7 @@ function TimesheetsTab({
         const days = normaliseEntries(t.entries, t.periodStart, t.periodEnd);
         const counts = countStatuses(days);
         const extras = entryExtras(t.entries);
-        const hours = [...extras.values()].reduce((s, e) => s + (e.hours ?? 0), 0);
+        const hours = sheetHours(t.entries, t.periodStart, t.periodEnd);
         const proposal = proposals.find((p) => p.id === t.proposalId);
         const tally = Object.entries(counts)
           .filter(([status, n]) => status && n > 0)
