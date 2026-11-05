@@ -88,15 +88,22 @@ export function redactMeta(value: unknown, key = "", parentKey = ""): unknown {
   return value;
 }
 
-/** One-line "key: value" summary for the table; redacted, capped at 160 chars. */
-export function summarizeMeta(meta: unknown): string {
-  if (!meta || typeof meta !== "object") return "";
-  const parts = Object.entries(redactMeta(meta) as Record<string, unknown>).map(([k, v]) => {
-    const text = typeof v === "string" ? v : JSON.stringify(v);
-    return `${k}: ${text}`;
-  });
-  const out = parts.join(" · ");
-  return out.length > 160 ? `${out.slice(0, 157)}...` : out;
+/**
+ * What an edit changed, as { field: { from, to } }, for the fields in `after`
+ * that differ from `before` (Dates compare as instants, undefined as null).
+ * Callers that hold both sides pass this as meta.changes so the log can show
+ * "field: old → new" instead of a list of every field that was submitted.
+ */
+export function diffFields(before: Record<string, unknown>, after: Record<string, unknown>): Record<string, { from: unknown; to: unknown }> {
+  const norm = (v: unknown) => (v instanceof Date ? v.toISOString() : v === undefined ? null : v);
+  const out: Record<string, { from: unknown; to: unknown }> = {};
+  for (const [k, next] of Object.entries(after)) {
+    if (next === undefined) continue;
+    const from = norm(before[k]);
+    const to = norm(next);
+    if (JSON.stringify(from) !== JSON.stringify(to)) out[k] = { from, to };
+  }
+  return out;
 }
 
 /**

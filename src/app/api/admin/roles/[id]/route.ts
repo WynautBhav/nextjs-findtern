@@ -2,7 +2,7 @@ import { eq, or } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { recordAdminAudit } from "@/lib/admin/audit";
+import { diffFields, recordAdminAudit } from "@/lib/admin/audit";
 import { forgetAdminPermissions } from "@/lib/account-status";
 import { getDb, schema } from "@/lib/db";
 import { canGrant, PERMISSIONS } from "@/lib/admin/permissions";
@@ -30,7 +30,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   }
   // Accepts the row id or the role key (the UI only knows keys).
   const [role] = await db
-    .select({ id: schema.adminRoles.id, permissions: schema.adminRoles.permissions })
+    .select({ id: schema.adminRoles.id, name: schema.adminRoles.name, permissions: schema.adminRoles.permissions })
     .from(schema.adminRoles)
     .where(or(eq(schema.adminRoles.id, id), eq(schema.adminRoles.key, id)))
     .limit(1);
@@ -45,7 +45,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     .set({ ...parsed.data, updatedAt: new Date() })
     .where(eq(schema.adminRoles.id, role.id));
   forgetAdminPermissions();
-  await recordAdminAudit(db, { adminId: guard.session.uid, action: "role.update", targetType: "role", targetId: role.id, meta: { ...(parsed.data.name ? { name: parsed.data.name } : {}), ...(parsed.data.permissions ? { permissions: parsed.data.permissions } : {}) } });
+  await recordAdminAudit(db, { adminId: guard.session.uid, action: "role.update", targetType: "role", targetId: role.id, meta: { changes: diffFields({ name: role.name, permissions: role.permissions }, { name: parsed.data.name, permissions: parsed.data.permissions }) } });
   return NextResponse.json({ ok: true });
 }
 
@@ -55,7 +55,7 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
   if (!guard.ok) return guard.response;
   const db = getDb();
   const [role] = await db
-    .select({ id: schema.adminRoles.id, key: schema.adminRoles.key })
+    .select({ id: schema.adminRoles.id, key: schema.adminRoles.key, name: schema.adminRoles.name })
     .from(schema.adminRoles)
     .where(or(eq(schema.adminRoles.id, id), eq(schema.adminRoles.key, id)))
     .limit(1);
@@ -64,6 +64,6 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
   const [member] = await db.select({ id: schema.admins.id }).from(schema.admins).where(eq(schema.admins.role, role.key)).limit(1);
   if (member) return NextResponse.json({ error: "Move its members to another role first" }, { status: 409 });
   await db.delete(schema.adminRoles).where(eq(schema.adminRoles.id, role.id));
-  await recordAdminAudit(db, { adminId: guard.session.uid, action: "role.delete", targetType: "role", targetId: role.id, meta: { key: role.key } });
+  await recordAdminAudit(db, { adminId: guard.session.uid, action: "role.delete", targetType: "role", targetId: role.id, meta: { name: role.name, key: role.key } });
   return NextResponse.json({ ok: true });
 }

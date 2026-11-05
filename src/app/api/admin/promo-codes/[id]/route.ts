@@ -2,7 +2,7 @@ import { and, eq, ne } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { recordAdminAudit } from "@/lib/admin/audit";
+import { diffFields, recordAdminAudit } from "@/lib/admin/audit";
 import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
 import { DUPLICATE_CODE, isUniqueViolation } from "@/lib/promo";
@@ -60,6 +60,9 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       discountValue: schema.promoCodes.discountValue,
       appliesTo: schema.promoCodes.appliesTo,
       maxUsages: schema.promoCodes.maxUsages,
+      description: schema.promoCodes.description,
+      minOrderAmountMinor: schema.promoCodes.minOrderAmountMinor,
+      isActive: schema.promoCodes.isActive,
     })
     .from(schema.promoCodes)
     .where(eq(schema.promoCodes.id, id))
@@ -75,19 +78,19 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     nextUntil === undefined ? existing.validUntil : nextUntil,
   );
   if (window) return NextResponse.json({ error: window }, { status: 400 });
+  const next = {
+    ...parsed.data,
+    code,
+    validFrom: toDate(parsed.data.validFrom),
+    validUntil: toDate(parsed.data.validUntil),
+  };
   try {
-    await db.update(schema.promoCodes).set({
-      ...parsed.data,
-      code,
-      validFrom: toDate(parsed.data.validFrom),
-      validUntil: toDate(parsed.data.validUntil),
-      updatedAt: new Date(),
-    }).where(eq(schema.promoCodes.id, id));
+    await db.update(schema.promoCodes).set({ ...next, updatedAt: new Date() }).where(eq(schema.promoCodes.id, id));
   } catch (e) {
     if (isUniqueViolation(e)) return NextResponse.json({ error: DUPLICATE_CODE }, { status: 409 });
     throw e;
   }
-  await recordAdminAudit(db, { adminId: guard.session.uid, action: "promo.update", targetType: "promo_code", targetId: id, meta: { code: existing.code, fields: Object.keys(parsed.data) } });
+  await recordAdminAudit(db, { adminId: guard.session.uid, action: "promo.update", targetType: "promo_code", targetId: id, meta: { code: existing.code, discountType: next.discountType ?? existing.discountType, changes: diffFields(existing, next) } });
   return NextResponse.json({ ok: true });
 }
 

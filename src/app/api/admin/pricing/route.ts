@@ -3,11 +3,11 @@ import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { recordAdminAudit } from "@/lib/admin/audit";
+import { diffFields, recordAdminAudit } from "@/lib/admin/audit";
 import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
 import { PRICING_PLANS } from "@/lib/content/home";
-import { setSetting } from "@/lib/platform-settings";
+import { getSetting, setSetting } from "@/lib/platform-settings";
 import { legacyBandChange } from "@/lib/admin/plan-band";
 import { inrMinorToUsdMinor } from "@/lib/currency";
 
@@ -98,7 +98,7 @@ export async function PATCH(req: Request) {
     action: "pricing.update",
     targetType: "pricing_plan",
     targetId: id,
-    meta: fields,
+    meta: { plan: plan.displayName, changes: diffFields(plan, fields) },
   }, { strict: true });
   revalidatePath("/", "layout");
   return NextResponse.json({ ok: true });
@@ -113,6 +113,7 @@ export async function PUT(req: Request) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid input" }, { status: 400 });
   }
 
+  const before = await getSetting("intern_activation_fee_minor");
   await setSetting("intern_activation_fee_minor", parsed.data.internActivationFeeMinor, guard.session.uid);
   const db = getDb();
   await recordAdminAudit(db, {
@@ -120,7 +121,7 @@ export async function PUT(req: Request) {
     action: "settings.update",
     targetType: "platform_setting",
     targetId: "intern_activation_fee_minor",
-    meta: { value: parsed.data.internActivationFeeMinor },
+    meta: { value: { from: before, to: parsed.data.internActivationFeeMinor } },
   }, { strict: true });
   return NextResponse.json({ ok: true });
 }

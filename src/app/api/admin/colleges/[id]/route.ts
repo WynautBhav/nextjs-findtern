@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 
-import { recordAdminAudit } from "@/lib/admin/audit";
+import { diffFields, recordAdminAudit } from "@/lib/admin/audit";
 import { requireMutation } from "@/lib/guards-mutation";
 import { forgetAccountStatus } from "@/lib/account-status";
 import { isSafeLink } from "@/lib/safe-url";
@@ -34,6 +34,20 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   }
   // slug and Findtern code are never touched, so the college's URLs and code stay put.
   const set = { ...parsed.data, ...(parsed.data.aisheCode !== undefined ? { aisheCode: parsed.data.aisheCode?.toUpperCase() || null } : {}), ...(parsed.data.city !== undefined ? { city: parsed.data.city || null } : {}) };
+  const [before] = await db
+    .select({
+      name: schema.colleges.name,
+      city: schema.colleges.city,
+      aisheCode: schema.colleges.aisheCode,
+      isPartner: schema.colleges.isPartner,
+      showOnWebsite: schema.colleges.showOnWebsite,
+      isActive: schema.colleges.isActive,
+      logoUrl: schema.colleges.logoUrl,
+      emailDomains: schema.colleges.emailDomains,
+    })
+    .from(schema.colleges)
+    .where(eq(schema.colleges.id, id))
+    .limit(1);
   let row: { id: string } | undefined;
   try {
     [row] = await db.update(schema.colleges).set(set).where(eq(schema.colleges.id, id)).returning({ id: schema.colleges.id });
@@ -48,7 +62,8 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     for (const a of admins) forgetAccountStatus("college", a.id);
   }
   const { isPartner, ...rest } = parsed.data;
-  if (Object.keys(rest).length) await recordAdminAudit(db, { adminId: guard.session.uid, action: "college.update", targetType: "college", targetId: id, meta: { fields: Object.keys(rest) } });
-  if (isPartner !== undefined) await recordAdminAudit(db, { adminId: guard.session.uid, action: "college.partner_toggle", targetType: "college", targetId: id, meta: { isPartner } });
+  const was: Record<string, unknown> = before ?? {};
+  if (Object.keys(rest).length) await recordAdminAudit(db, { adminId: guard.session.uid, action: "college.update", targetType: "college", targetId: id, meta: { changes: diffFields(was, Object.fromEntries(Object.entries(set).filter(([k]) => k !== "isPartner"))) } });
+  if (isPartner !== undefined) await recordAdminAudit(db, { adminId: guard.session.uid, action: "college.partner_toggle", targetType: "college", targetId: id, meta: { isPartner: { from: was.isPartner ?? null, to: isPartner } } });
   return NextResponse.json({ ok: true });
 }

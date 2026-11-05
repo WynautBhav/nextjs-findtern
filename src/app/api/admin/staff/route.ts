@@ -75,13 +75,13 @@ export async function DELETE(req: Request) {
   }
 
   const db = getDb();
-  const [target] = await db.select({ role: schema.admins.role }).from(schema.admins).where(eq(schema.admins.id, parsed.data.id)).limit(1);
+  const [target] = await db.select({ role: schema.admins.role, name: schema.admins.name, email: schema.admins.email }).from(schema.admins).where(eq(schema.admins.id, parsed.data.id)).limit(1);
   if (target && !(await mayAssign(guard.session.permissions, target.role ?? ""))) {
     return NextResponse.json({ error: "You can't remove someone with more access than you." }, { status: 403 });
   }
   await db.delete(schema.admins).where(eq(schema.admins.id, parsed.data.id));
   forgetAdminPermissions(parsed.data.id);
-  await recordAdminAudit(db, { adminId: currentAdminId, action: "staff.delete", targetType: "admin", targetId: parsed.data.id, meta: { role: target?.role ?? null } });
+  await recordAdminAudit(db, { adminId: currentAdminId, action: "staff.delete", targetType: "admin", targetId: parsed.data.id, meta: { name: target?.name ?? null, email: target?.email ?? null, role: target?.role ?? null } });
 
   return NextResponse.json({ ok: true });
 }
