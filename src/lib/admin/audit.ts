@@ -76,13 +76,15 @@ function maskAccount(v: unknown): string {
  * Masking is by key only (plus an "a/c ..." label in free text): phone numbers and payout
  * references (UTR) are 9-18 digits too, and the trail must keep showing them.
  */
-export function redactMeta(value: unknown, key = "", parentKey = ""): unknown {
+export function redactMeta(value: unknown, key = "", parentKey = "", inAccount = false): unknown {
   const scalar = typeof value === "string" || typeof value === "number";
   if (SECRET_KEY.test(key) && typeof value !== "boolean" && value != null) return "[hidden]";
-  if (scalar && (ACCOUNT_KEY.test(key) || (BARE_NUMBER_KEY.test(key) && BANK_PARENT.test(parentKey)))) return maskAccount(value);
-  if (Array.isArray(value)) return value.map((v) => redactMeta(v, key, parentKey));
+  const accountKey = inAccount || ACCOUNT_KEY.test(key) || (BARE_NUMBER_KEY.test(key) && BANK_PARENT.test(parentKey));
+  if (scalar && accountKey) return maskAccount(value);
+  // An account key holding a { from, to } diff, an array or any nested object: every value inside is the number.
+  if (Array.isArray(value)) return value.map((v) => redactMeta(v, key, parentKey, accountKey));
   if (value && typeof value === "object") {
-    return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, redactMeta(v, k, key)]));
+    return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, redactMeta(v, k, key, accountKey)]));
   }
   if (typeof value === "string") return value.replace(LABELLED_ACCOUNT, (_m, label: string, digits: string) => `${label} ${maskAccount(digits)}`);
   return value;
