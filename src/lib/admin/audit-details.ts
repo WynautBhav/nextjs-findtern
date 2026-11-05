@@ -16,10 +16,12 @@ export type AuditNames = {
   role: Map<string, string>;
   /** Staff by id. */
   admin: Map<string, string>;
+  /** Promo code text by id. */
+  promo: Map<string, string>;
 };
 
 export function emptyNames(): AuditNames {
-  return { intern: new Map(), company: new Map(), college: new Map(), role: new Map(), admin: new Map() };
+  return { intern: new Map(), company: new Map(), college: new Map(), role: new Map(), admin: new Map(), promo: new Map() };
 }
 
 type Ctx = { action: string; meta: Record<string, unknown>; names: AuditNames };
@@ -187,7 +189,7 @@ export function describeTarget(
   if (type === "intern") return { name: names.intern.get(id) ?? null, href: `/admin/interns/${id}` };
   if (type === "employer") return { name: names.company.get(id) ?? null, href: `/admin/companies/${id}` };
   if (type === "college") return { name: names.college.get(id) ?? null, href: "/admin/colleges" };
-  if (type === "promo_code") return { name: null, href: "/admin/promo-codes" };
+  if (type === "promo_code") return { name: names.promo.get(id) ?? str("code"), href: "/admin/promo-codes" };
   if (type === "role") return { name: names.role.get(id) ?? str("name"), href: "/admin/roles" };
   if (type === "admin") return { name: names.admin.get(id) ?? str("name") ?? str("email"), href: "/admin/roles" };
   if (type === "pricing_plan") return { name: str("plan"), href: null };

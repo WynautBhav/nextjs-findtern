@@ -11,6 +11,7 @@ names.college.set("col1", "Manipal University");
 names.role.set("fb2_viewer", "Viewer");
 names.role.set("exec_sales", "Sales");
 names.admin.set("a1", "Priya Nair");
+names.promo.set("pr1", "FB1INT10");
 
 test("diffFields keeps only what changed; dates compare as instants, undefined is skipped", () => {
   const d = new Date("2026-11-05T00:00:00.000Z");
@@ -61,6 +62,11 @@ test("redaction still applies to the readable line", () => {
   const out = describeAudit("x.y", { changes: { password: { from: "old-secret", to: "new-secret" }, note: { from: "a/c 123456789012", to: "ok" } } });
   assert.ok(!out.includes("secret") && !out.includes("123456789012"), out);
   assert.ok(out.includes("[hidden]") && out.includes("••••9012"));
+});
+
+test("a promo target shows its code, even after the promo was deleted", () => {
+  assert.deepEqual(describeTarget("promo.update", "promo_code", "pr1", { code: "OLD" }, names), { name: "FB1INT10", href: "/admin/promo-codes" });
+  assert.deepEqual(describeTarget("promo.delete", "promo_code", "gone", { code: "GONE10" }, names), { name: "GONE10", href: "/admin/promo-codes" });
 });
 
 test("targets: staff and role rows link to the staff page, exports to their list", () => {

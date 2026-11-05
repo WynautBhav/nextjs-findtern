@@ -68,11 +68,13 @@ export async function loadAudit(params: Record<string, string>, search: string, 
   const employerIds = collect("employer", "employerId", "companyId");
   const collegeIds = collect("college", "collegeId");
   const adminIds = collect("admin");
-  const [users, employers, colleges, admins, roles] = await Promise.all([
+  const promoIds = collect("promo_code");
+  const [users, employers, colleges, admins, promos, roles] = await Promise.all([
     internIds.length ? db.select({ id: schema.users.id, a: schema.users.firstName, b: schema.users.lastName }).from(schema.users).where(inArray(schema.users.id, internIds)) : [],
     employerIds.length ? db.select({ id: schema.employers.id, a: schema.employers.companyName }).from(schema.employers).where(inArray(schema.employers.id, employerIds)) : [],
     collegeIds.length ? db.select({ id: schema.colleges.id, a: schema.colleges.name }).from(schema.colleges).where(inArray(schema.colleges.id, collegeIds)) : [],
     adminIds.length ? db.select({ id: schema.admins.id, a: schema.admins.name, b: schema.admins.email }).from(schema.admins).where(inArray(schema.admins.id, adminIds)) : [],
+    promoIds.length ? db.select({ id: schema.promoCodes.id, code: schema.promoCodes.code }).from(schema.promoCodes).where(inArray(schema.promoCodes.id, promoIds)) : [],
     db.select({ id: schema.adminRoles.id, key: schema.adminRoles.key, name: schema.adminRoles.name }).from(schema.adminRoles),
   ]);
   const names: AuditNames = emptyNames();
@@ -80,6 +82,7 @@ export async function loadAudit(params: Record<string, string>, search: string, 
   for (const e of employers) names.company.set(e.id, e.a);
   for (const c of colleges) names.college.set(c.id, c.a);
   for (const a of admins) names.admin.set(a.id, a.a || a.b);
+  for (const p of promos) names.promo.set(p.id, p.code);
   for (const r of roles) {
     names.role.set(r.key, r.name);
     names.role.set(r.id, r.name);
