@@ -6,6 +6,7 @@ import { getDb, schema } from "@/lib/db";
 import { scopeValue } from "@/lib/db/schema";
 import { STATES } from "@/lib/data/districts";
 import { requireMutation } from "@/lib/guards-mutation";
+import { projectNameIssue } from "@/lib/project-name";
 import {
   MAX_PROJECT_SKILLS,
   projectLocationsError,
@@ -52,6 +53,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (locationProblem) return NextResponse.json({ error: locationProblem }, { status: 400 });
 
   const db = getDb();
+  const [owner] = await db
+    .select({ companyName: schema.employers.companyName })
+    .from(schema.employers)
+    .where(eq(schema.employers.id, id))
+    .limit(1);
+  const nameProblem = projectNameIssue(d.projectName, owner?.companyName);
+  if (nameProblem) return NextResponse.json({ error: nameProblem }, { status: 400 });
   // Project names are unique per employer, ignoring case (legacy R:10682).
   const [clash] = await db
     .select({ id: schema.projects.id })

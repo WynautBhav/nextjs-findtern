@@ -34,6 +34,7 @@ import {
   projectPlaceError,
   projectSkillsError,
 } from "@/lib/project-locations";
+import { projectNameIssue } from "@/lib/project-name";
 import { TIMEZONES } from "@/lib/timezones";
 
 export const WORK_MODES = [
@@ -44,6 +45,7 @@ export const WORK_MODES = [
 
 /** What a stored record looked like before this edit, for the "keep what you had" rules. */
 export type ProjectBaseline = {
+  projectName: string;
   skills: readonly string[];
   preferredLocations: readonly string[];
   scopeOfWork: string;
@@ -53,9 +55,17 @@ export type ProjectBaseline = {
 };
 
 /** Field-keyed problems with this project, empty when it may be saved. */
-export function projectFormErrors(p: ProjectDraft, before?: ProjectBaseline | null): Record<string, string> {
+export function projectFormErrors(
+  p: ProjectDraft, before?: ProjectBaseline | null,
+  companyName?: string | null,
+): Record<string, string> {
   const errors: Record<string, string> = {};
   if (p.projectName.trim().length < 2) errors.projectName = "Name the project (at least 2 characters).";
+  // Only a new or renamed project is judged; an older name still saves.
+  else if (companyName && p.projectName.trim().toLowerCase() !== (before?.projectName ?? "").trim().toLowerCase()) {
+    const issue = projectNameIssue(p.projectName, companyName);
+    if (issue) errors.projectName = issue;
+  }
   const skills = projectSkillsError(p.skills, before?.skills);
   if (skills) errors.skills = skills;
   // An unchanged legacy scope ("not sure") may stay; anything new is picked.
@@ -129,7 +139,7 @@ export function ProjectFields({
         placeholder="Frontend engineering, Growth marketing"
         value={values.projectName}
         error={errors.projectName}
-        hint="Candidates see this as the role. Name the work, not a requisition number."
+        hint="Candidates see this as the role. Name the work, not a requisition number or your company."
         onChange={(v) => set({ projectName: v })}
       />
 

@@ -655,7 +655,7 @@ export default async function CandidatesPage({
               id="compare-bar"
               role="region"
               aria-label="Compare selection"
-              className="fixed inset-x-4 bottom-24 z-40 mx-auto flex max-w-md flex-wrap items-center justify-center gap-x-4 gap-y-2 rounded-apple-xl border border-brand-200/80 bg-white/95 px-5 py-3 shadow-lg backdrop-blur-md sm:inset-x-auto sm:right-44 sm:w-max sm:max-w-none lg:bottom-6"
+              className="fixed bottom-24 left-1/2 z-40 flex w-[calc(100%-2rem)] max-w-md -translate-x-1/2 flex-wrap items-center justify-center gap-x-4 gap-y-2 rounded-apple-xl border border-brand-200/80 bg-white/95 px-5 py-3 shadow-lg backdrop-blur-md sm:w-max sm:max-w-[calc(100%-2rem)] lg:bottom-6 lg:left-[calc(50%+var(--console-rail,0rem)/2)] lg:max-w-[calc(100%-var(--console-rail,0rem)-4rem)]"
             >
               <KeepFocusClear of="compare-bar" />
               <span className="text-sm font-medium text-ink-900">

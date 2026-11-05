@@ -6,6 +6,7 @@ import { getDb, schema } from "@/lib/db";
 import { scopeValue } from "@/lib/db/schema";
 import { STATES } from "@/lib/data/districts";
 import { requireMutation } from "@/lib/guards-mutation";
+import { projectNameIssue } from "@/lib/project-name";
 import {
   CLOSED_PROJECT_STATUS,
   CLOSED_PROJECT_STATUSES,
@@ -93,6 +94,16 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 
   // Project names are unique per employer, ignoring case (legacy R:10740).
   if (parsed.data.projectName) {
+    // Only a rename is judged: an older project with a "bad" name still saves.
+    if (parsed.data.projectName.trim().toLowerCase() !== project.projectName.trim().toLowerCase()) {
+      const [owner] = await db
+        .select({ companyName: schema.employers.companyName })
+        .from(schema.employers)
+        .where(eq(schema.employers.id, project.employerId))
+        .limit(1);
+      const nameProblem = projectNameIssue(parsed.data.projectName, owner?.companyName);
+      if (nameProblem) return NextResponse.json({ error: nameProblem }, { status: 400 });
+    }
     const [clash] = await db
       .select({ id: schema.projects.id })
       .from(schema.projects)

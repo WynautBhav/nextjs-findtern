@@ -23,7 +23,7 @@ export default async function EmployerProjectsPage({
   const { new: openNew } = await searchParams;
 
   let rows: (typeof schema.projects.$inferSelect)[] = [];
-  let company: { country: string | null; state: string | null; city: string | null } | undefined;
+  let company: { companyName: string | null; country: string | null; state: string | null; city: string | null } | undefined;
   try {
     const db = getDb();
     [rows, [company]] = await Promise.all([
@@ -33,7 +33,7 @@ export default async function EmployerProjectsPage({
         .where(eq(schema.projects.employerId, employerId))
         .orderBy(desc(schema.projects.createdAt)),
       db
-        .select({ country: schema.employers.country, state: schema.employers.state, city: schema.employers.city })
+        .select({ companyName: schema.employers.companyName, country: schema.employers.country, state: schema.employers.state, city: schema.employers.city })
         .from(schema.employers)
         .where(eq(schema.employers.id, employerId))
         .limit(1),
@@ -60,6 +60,7 @@ export default async function EmployerProjectsPage({
       employerId={employerId}
       initialProjects={rows}
       defaultTimezone={timezoneForLocation(company ?? {})}
+      companyName={company?.companyName}
       companyPlace={company ? { city: company.city, state: company.state } : undefined}
       openNew={openNew === "1"}
     />
