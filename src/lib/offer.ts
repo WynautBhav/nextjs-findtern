@@ -447,7 +447,15 @@ export function buildOffer(input: OfferInput): Record<string, unknown> {
     monthlyAmount: major(monthlyMinor),
     totalPrice: major(totalMinor),
     hourlyRate: major(input.hourlyRateMinor),
-    ...(fixedStipend != null ? { internStipendMonthly: major(fixedStipend) } : {}),
+    // A scored candidate below 6 is stored as 0, not left off: with the key
+    // missing a later score of 6+ would read this offer as the old 50% rule.
+    // Only offers made before this (no key) are grandfathered; unscored stays
+    // unstored (not penalised, see stipendEligible).
+    ...(fixedStipend != null
+      ? { internStipendMonthly: major(fixedStipend) }
+      : !stipendEligible(input.candidateScore)
+        ? { internStipendMonthly: 0 }
+        : {}),
     perHireCharge: major(input.perHireMinor),
     candidateScore: input.candidateScore ?? null,
     projectSkills: input.projectSkills ?? [],

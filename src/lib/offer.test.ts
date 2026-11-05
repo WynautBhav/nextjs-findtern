@@ -323,9 +323,24 @@ test("a new offer carries the fixed stipend; it ignores hours, currency and a la
     buildOffer({ currency, roleTitle: "x", mode: "remote", startDate: "2026-11-02", duration: "3m", monthlyHours: 176, hourlyRateMinor: 10_000, perHireMinor: 0, candidateScore });
   assert.equal(mk(7).internStipendMonthly, 8000);
   assert.equal(mk(9).internStipendMonthly, 15000);
-  assert.equal("internStipendMonthly" in mk(4), false);
+  assert.equal(mk(4).internStipendMonthly, 0);
+  assert.equal(mk(5.99).internStipendMonthly, 0);
   assert.equal("internStipendMonthly" in mk(undefined), false);
   assert.equal(internStipendInrMinor(parseOffer(mk(7), "INR")), 800_000);
   assert.equal(internStipendInrMinor(parseOffer(mk(7, "USD"), "USD")), 800_000);
   assert.equal(internStipendInrMinor(parseOffer(mk(7), "INR"), 5), 800_000);
+});
+
+test("a new offer below 6 stores a 0 stipend, so a later score of 6+ never reads it as 50%; offers without the key are grandfathered", () => {
+  const raw = buildOffer({ currency: "INR", roleTitle: "x", mode: "remote", startDate: "2026-11-02", duration: "3m", monthlyHours: 176, hourlyRateMinor: 10_000, perHireMinor: 0, candidateScore: 4 });
+  const o = parseOffer(raw, "INR");
+  assert.equal(o.internStipendMinor, 0);
+  for (const later of [undefined, null, 0, 4, 6, 7, 9]) assert.equal(internStipendInrMinor(o, later), 0, String(later));
+  // Made before this change: no key, so the live score still decides.
+  const old = { ...raw };
+  delete old.internStipendMonthly;
+  const legacy = parseOffer(old, "INR");
+  assert.equal(legacy.internStipendMinor, null);
+  assert.equal(internStipendInrMinor(legacy, 4), 0);
+  assert.equal(internStipendInrMinor(legacy, 7), Math.floor(legacy.monthlyMinor! * 0.5));
 });
