@@ -8,6 +8,12 @@ import { hiredInternIds } from "@/lib/employer-visibility";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+// No photo (or its file is gone) is a normal state, not an error: 204 keeps the
+// browser console clean and the avatar components fall back to initials on load failure.
+function noAvatar() {
+  return new Response(null, { status: 204, headers: { "Cache-Control": "private, no-store" } });
+}
+
 export async function GET(req: Request) {
   const session = await getSession();
   if (!session) {
@@ -47,7 +53,7 @@ export async function GET(req: Request) {
   // http(s) URL an intern saved as their photo, which made this an open
   // redirect on our own domain.
   if (!doc?.profilePhotoName) {
-    return NextResponse.json({ error: "No avatar uploaded" }, { status: 404 });
+    return noAvatar();
   }
 
   try {
@@ -63,6 +69,6 @@ export async function GET(req: Request) {
       },
     });
   } catch {
-    return NextResponse.json({ error: "File not found" }, { status: 404 });
+    return noAvatar();
   }
 }
