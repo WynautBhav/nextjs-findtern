@@ -27,7 +27,7 @@ import {
   widestWorkMode,
   type OnboardingDraft,
 } from "./onboarding.ts";
-import { aiInviteHoldsSkills, hasAssessmentRating, sameRatedSkills } from "./skills-lock-rules.ts";
+import { aiInviteHoldsSkills, hasAssessmentRating } from "./skills-lock-rules.ts";
 import { didYouMean, SUGGESTED_SKILLS, NON_TECH_SKILLS, TECH_SKILLS } from "./data/skills.ts";
 import { districtsOf } from "./data/districts.ts";
 
@@ -101,10 +101,10 @@ test("INT-02: a legacy \"Present\" end date reads as a current role and is writt
 test("round-trip writes the legacy shape and keeps unknown legacy keys", () => {
   const d = draftFromRecord(legacyRow);
   const out = storedFromDraft(d, legacyRow);
-  // Ids and the levels already stored are kept on a re-save.
+  // Ids are kept on a re-save; the stored levels (3 and 1) are reset to 2.
   assert.deepEqual(out.skills, [
-    { id: "s1", name: "React", rating: 3 },
-    { id: "s2", name: "SQL", rating: 1 },
+    { id: "s1", name: "React", rating: 2 },
+    { id: "s2", name: "SQL", rating: 2 },
   ]);
   const a = out.extraPatch.academics as Record<string, unknown>;
   assert.equal(a.level, "bachelors");
@@ -149,7 +149,7 @@ test("skills: duplicates differing only in case are dropped; a bare list is stor
   assert.equal(stored?.length, 1);
 });
 
-test("skills: a client-sent level is ignored, a new skill is stored as 2 (Intermediate)", () => {
+test("skills: a client-sent or previously stored level is ignored, every skill is stored as 2 (Intermediate)", () => {
   const sent = [
     { name: "Excel", rating: "Advanced" },
     { name: "SQL", rating: "Beginner" },
@@ -159,12 +159,13 @@ test("skills: a client-sent level is ignored, a new skill is stored as 2 (Interm
   const stored = storedFromDraft({ skills: sent.map((x) => x.name), skillsWithRatings: sent as never }, null).skills as { name: string; rating: number }[];
   assert.deepEqual(stored.map((x) => x.name), ["Excel", "SQL", "Go", "Figma"]);
   assert.deepEqual(stored.map((x) => x.rating), [2, 2, 2, 2]);
-  // A saved skill keeps the level stored for it; the client cannot change it, a new skill gets 2.
+  // A saved skill keeps its id but not its old level: Advanced (3) and Beginner (1) are reset to 2, a new skill gets 2.
   const kept = storedFromDraft(
-    { skills: ["React", "Vue"], skillsWithRatings: [{ name: "React", rating: "Beginner" }, { name: "Vue", rating: "Advanced" }] },
-    { skills: [{ id: "s1", name: "React", rating: 3 }] },
-  ).skills as { name: string; rating: number }[];
-  assert.deepEqual(kept.map((x) => [x.name, x.rating]), [["React", 3], ["Vue", 2]]);
+    { skills: ["React", "Vue", "SQL"], skillsWithRatings: [{ name: "React", rating: "Beginner" }, { name: "Vue", rating: "Advanced" }] },
+    { skills: [{ id: "s1", name: "React", rating: 3 }, { id: "s2", name: "sql", rating: 1 }] },
+  ).skills as { id: string; name: string; rating: number }[];
+  assert.deepEqual(kept.map((x) => [x.name, x.rating]), [["React", 2], ["Vue", 2], ["SQL", 2]]);
+  assert.deepEqual([kept[0].id, kept[2].id], ["s1", "s2"]);
   // An older client that sends only the rated list is forced to the same level.
   const old = storedFromDraft({ skillsWithRatings: [{ name: "Rust", rating: "Advanced" }] }, null).skills as { rating: number }[];
   assert.deepEqual(old.map((x) => x.rating), [2]);
@@ -544,8 +545,6 @@ test("skills lock: admin ratings lock; a stale AI invite does not", () => {
   assert.equal(aiInviteHoldsSkills({ status: "scheduled", selectedSlot: 1, slot1: future, slot2: null, slot3: null }, now), true);
   assert.equal(aiInviteHoldsSkills({ status: "pending", selectedSlot: null, slot1: null, slot2: null, slot3: null }, now), true, "queued, no slots yet");
   assert.equal(aiInviteHoldsSkills({ status: "completed", selectedSlot: 1, slot1: future, slot2: null, slot3: null }, now), false);
-  assert.equal(sameRatedSkills([{ name: "React", rating: "Advanced" }], [{ name: "react", rating: "Advanced" }]), true);
-  assert.equal(sameRatedSkills([{ name: "React", rating: "Advanced" }], [{ name: "React", rating: "Beginner" }]), false);
 });
 
 /* ── Data helpers ──────────────────────────────────────────────────────── */

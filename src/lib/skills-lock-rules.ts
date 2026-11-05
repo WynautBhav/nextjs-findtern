@@ -52,10 +52,3 @@ export function sameSkills(a: string[], b: string[]): boolean {
   const norm = (list: string[]) => [...new Set(list.map((s) => s.trim().toLowerCase()).filter(Boolean))].sort().join("|");
   return norm(a) === norm(b);
 }
-
-/** Same skills with the same ratings, ignoring order and the case of names. */
-export function sameRatedSkills(a: { name: string; rating: string }[], b: { name: string; rating: string }[]): boolean {
-  const norm = (list: { name: string; rating: string }[]) =>
-    [...new Set(list.filter((s) => s.name.trim()).map((s) => `${s.name.trim().toLowerCase()}=${s.rating}`))].sort().join("|");
-  return norm(a) === norm(b);
-}

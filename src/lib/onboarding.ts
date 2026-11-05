@@ -8,7 +8,7 @@ import { phoneError } from "./phone.ts";
  * 1. About Me (photo, bio, identity documents, address, phone, emergency contact)
  * 2. Academics (level, degree, status, institution, years, score, marksheets, courses)
  * 3. Experience (Internship, Job, Project, Freelancing)
- * 4. Skills (4 to 7, each rated Beginner / Intermediate / Advanced)
+ * 4. Skills (4 to 7 names; no level is asked, each is stored as Intermediate)
  * 5. Languages (legacy list; Native / Professional / Basic; read, write, speak)
  * 6. Extracurriculars (up to 10)
  * 7. Work mode, preferred cities, laptop
@@ -538,14 +538,12 @@ export function storedFromDraft(
     const prev = new Map(arr(existing?.skills).map(obj).map((s) => [text(s.name).toLowerCase(), s]));
     out.skills = skillsToStore(draft).map((s, i) => {
       const before = prev.get(s.name.toLowerCase());
-      // A skill already on the record keeps the level stored for it (the AI
-      // interview was built on it); a new one is stored at the default. The
-      // level is only ever read from the record, never from the client.
-      const kept = ratingLabel(before?.rating ?? DEFAULT_SKILL_RATING);
+      // Every skill is stored at Intermediate (2) on every save, whatever the
+      // client sent and whatever level the record held before. Only the id is kept.
       return {
         id: text(before?.id) || `skill-${Date.now()}-${i}`,
         name: s.name,
-        rating: RATING_LABEL.indexOf(kept) + 1 || 2,
+        rating: RATING_LABEL.indexOf(DEFAULT_SKILL_RATING) + 1,
       };
     });
   }

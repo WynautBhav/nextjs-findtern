@@ -3,7 +3,7 @@ import { and, eq, inArray, notInArray } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { aiInviteHoldsSkills, DONE_STATUSES, hasAssessmentRating } from "@/lib/skills-lock-rules";
 
-export { sameRatedSkills, sameSkills } from "@/lib/skills-lock-rules";
+export { sameSkills } from "@/lib/skills-lock-rules";
 
 const AI_EMAIL = "ai-interview@findtern.ai";
 
