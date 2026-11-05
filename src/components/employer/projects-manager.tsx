@@ -36,6 +36,7 @@ export function ProjectsManager({
   initialProjects,
   defaultTimezone = "Asia/Kolkata",
   companyPlace,
+  companyName,
   openNew = false,
 }: {
   employerId: string;
@@ -44,6 +45,8 @@ export function ProjectsManager({
   defaultTimezone?: string;
   /** The company's city and state, offered when a role is on-site. */
   companyPlace?: { city?: string | null; state?: string | null };
+  /** The company name, which a project name must not contain. */
+  companyName?: string | null;
   /** Open the "New project" drawer on arrival (`?new=1`). */
   openNew?: boolean;
 }) {
@@ -74,6 +77,7 @@ export function ProjectsManager({
 
   const baseline: ProjectBaseline | null = editing
     ? {
+        projectName: editing.projectName ?? "",
         skills: (editing.skills as string[] | null) ?? [],
         preferredLocations: (editing.preferredLocations as string[] | null) ?? [],
         scopeOfWork: editing.scopeOfWork ?? "",
@@ -112,7 +116,7 @@ export function ProjectsManager({
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
-    const problems = projectFormErrors(form, baseline);
+    const problems = projectFormErrors(form, baseline, companyName);
     setErrors(problems);
     if (Object.keys(problems).length > 0) {
       setSaveError("Some details need a look - see the highlighted fields.");

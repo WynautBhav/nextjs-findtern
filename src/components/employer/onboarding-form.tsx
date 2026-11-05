@@ -206,6 +206,7 @@ export function EmployerOnboardingForm({
   async function saveProject() {
     const baseline: ProjectBaseline | null = hasExistingProject
       ? {
+          projectName: initial.project.projectName,
           skills: initial.project.skills,
           preferredLocations: initial.project.preferredLocations,
           scopeOfWork: initial.project.scopeOfWork,
@@ -214,7 +215,7 @@ export function EmployerOnboardingForm({
           locationType: initial.project.locationType,
         }
       : null;
-    const problems = projectFormErrors(values.project, baseline);
+    const problems = projectFormErrors(values.project, baseline, values.company.companyName);
     setErrors(problems);
     if (Object.keys(problems).length > 0) {
       setNotice({ tone: "error", text: "A few details need a look - see the highlighted fields." });
