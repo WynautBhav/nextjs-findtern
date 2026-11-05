@@ -18,6 +18,12 @@ test("reports-only staff never get bank columns; the audit log is roles:write", 
   assert.deepEqual(requiredPermissions("/admin/audit-log"), ["roles:write"]);
 });
 
+test("the audit-log export API follows the page: roles:write, not super admin only", () => {
+  assert.deepEqual(requiredPermissions("/api/admin/audit-log/export"), ["roles:write"]);
+  assert.equal(allows(["roles:write"], requiredPermissions("/api/admin/audit-log/export")), true);
+  assert.equal(allows(["reports:read", "users:read"], requiredPermissions("/api/admin/audit-log/export")), false);
+});
+
 test("full bank account numbers in the Candidates export need transactions:write", () => {
   assert.equal(allows(["*"], BANK_EXPORT_PERMISSIONS), true);
   assert.equal(allows(["interns:read", "transactions:write"], BANK_EXPORT_PERMISSIONS), true);

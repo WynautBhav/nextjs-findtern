@@ -96,6 +96,8 @@ const RULES: Rule[] = [
   ["/api/admin/contact", ["users:read"], ["interns:write", "companies:write"]],
   // /api/admin/impersonate has no rule on purpose: no rule = super admin only.
   ["/api/admin/roles", ["roles:write"], ["roles:write"]],
+  // The audit-log CSV: without a rule only super admin (*) got through the proxy, though the page is roles:write.
+  ["/api/admin/audit-log", ["roles:write"]],
   ["/api/admin/staff", ["roles:write"], ["roles:write"]],
   ["/api/admin/orders", ["transactions:read"], ["transactions:write"]],
   ["/api/admin/transactions", ["transactions:read"], ["transactions:write"]],
