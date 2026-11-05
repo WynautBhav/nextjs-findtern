@@ -57,6 +57,7 @@ export async function loadAudit(params: Record<string, string>, search: string, 
     .select({
       id: L.id,
       when: L.createdAt,
+      adminId: L.adminId,
       staffName: schema.admins.name,
       staffEmail: schema.admins.email,
       action: L.action,
@@ -92,6 +93,12 @@ export async function loadAudit(params: Record<string, string>, search: string, 
     promoIds.length ? db.select({ id: schema.promoCodes.id, code: schema.promoCodes.code }).from(schema.promoCodes).where(inArray(schema.promoCodes.id, promoIds)) : [],
     db.select({ id: schema.adminRoles.id, key: schema.adminRoles.key, name: schema.adminRoles.name }).from(schema.adminRoles),
   ]);
+  // An action an employer tripped (automatic completion on final approval) has no staff row: name the company instead.
+  const actorIds = [...new Set(raw.filter((r) => r.staffName == null && r.staffEmail == null).map((r) => r.adminId))];
+  const actors = new Map<string, string>();
+  if (actorIds.length) {
+    for (const e of await db.select({ id: schema.employers.id, a: schema.employers.companyName }).from(schema.employers).where(inArray(schema.employers.id, actorIds))) actors.set(e.id, `Employer: ${e.a}`);
+  }
   const names: AuditNames = emptyNames();
   for (const u of users) names.intern.set(u.id, [u.a, u.b].filter(Boolean).join(" ") || "Candidate");
   for (const e of employers) names.company.set(e.id, e.a);
@@ -108,7 +115,7 @@ export async function loadAudit(params: Record<string, string>, search: string, 
     return {
       id: r.id,
       when: r.when,
-      staffName: r.staffName,
+      staffName: r.staffName ?? actors.get(r.adminId) ?? null,
       staffEmail: r.staffEmail,
       action: r.action,
       actionLabel: auditActionLabel(r.action, r.meta),
