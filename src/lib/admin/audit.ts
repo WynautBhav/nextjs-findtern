@@ -53,24 +53,34 @@ export function actionLabel(action: string): string {
   return (AUDIT_ACTIONS as Record<string, string>)[action] ?? action;
 }
 
-const SECRET_KEY = /pass(word)?|secret|token|otp|hash|cvv|pin$/i;
-const ACCOUNT_KEY = /account|acct|iban/i;
+const SECRET_KEY = /pass(word)?|secret|token|otp|hash|cvv|pin$|api_?key|authori[sz]ation|cookie|session|credential/i;
+/** Keys that hold a bank account number: "account", "bankAccountNumber", "acctNo", "iban". Not "accountHolder". */
+const ACCOUNT_KEY = /(account|acct)(_?(no|num|number))?$|iban/i;
+/** A parent that says "bank": a bare number/no/num under it is the account number ({ bank: { number } }). */
+const BANK_PARENT = /bank|account|acct/i;
+const BARE_NUMBER_KEY = /^(no|num|number)$/i;
+/** "a/c 1234 5678 9012", "account no: 123456789012": an account label followed by 9-18 digits (spaces/dashes allowed). */
+const LABELLED_ACCOUNT = /\b(a\/c|acc(?:oun)?t)\b[^\d\n]{0,12}((?:\d[ -]?){8,17}\d)\b/gi;
 
 function maskAccount(v: unknown): string {
   const digits = String(v ?? "").replace(/\D/g, "");
   return digits.length > 4 ? `••••${digits.slice(-4)}` : "••••";
 }
 
-/** Redacts secrets and masks account numbers, recursively. Applied on write and again on display. */
-export function redactMeta(value: unknown, key = ""): unknown {
-  if (SECRET_KEY.test(key)) return "[hidden]";
-  if (ACCOUNT_KEY.test(key) && (typeof value === "string" || typeof value === "number")) return maskAccount(value);
-  if (Array.isArray(value)) return value.map((v) => redactMeta(v, key));
+/**
+ * Redacts secrets and masks account numbers, recursively. Applied on write and again on display.
+ * Masking is by key only (plus an "a/c ..." label in free text): phone numbers and payout
+ * references (UTR) are 9-18 digits too, and the trail must keep showing them.
+ */
+export function redactMeta(value: unknown, key = "", parentKey = ""): unknown {
+  const scalar = typeof value === "string" || typeof value === "number";
+  if (SECRET_KEY.test(key) && typeof value !== "boolean" && value != null) return "[hidden]";
+  if (scalar && (ACCOUNT_KEY.test(key) || (BARE_NUMBER_KEY.test(key) && BANK_PARENT.test(parentKey)))) return maskAccount(value);
+  if (Array.isArray(value)) return value.map((v) => redactMeta(v, key, parentKey));
   if (value && typeof value === "object") {
-    return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, redactMeta(v, k)]));
+    return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, redactMeta(v, k, key)]));
   }
-  // A bare 9-18 digit run in free text looks like an account number.
-  if (typeof value === "string") return value.replace(/\b\d{9,18}\b/g, (m) => maskAccount(m));
+  if (typeof value === "string") return value.replace(LABELLED_ACCOUNT, (_m, label: string, digits: string) => `${label} ${maskAccount(digits)}`);
   return value;
 }
 
