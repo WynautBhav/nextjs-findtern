@@ -476,7 +476,7 @@ function ProfileTab({
   const phone = (cc: string | undefined, n: string | undefined) => (n ? `${cc || "+91"} ${n}` : "");
 
   return (
-    <div className="min-w-0 space-y-4">
+    <div className="min-w-0 space-y-4 [overflow-wrap:anywhere]">
       <div className="min-w-0 space-y-4">
         <div className={cn(ADMIN_SURFACE, "min-w-0 p-5 sm:p-6")}>
           <SectionHead title="About" />
