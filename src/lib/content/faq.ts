@@ -247,7 +247,7 @@ export const FAQ_INTERN: CmsFaqItem[] = [
     "id": "bd38644d-2566-49a0-a471-c1133f5d1eea",
     "category": "Intern",
     "question": "What factors affect my Findtern Score?",
-    "answer": "Several factors influence your Findtern Score:\n\nTechnical knowledge in your chosen field\n\n\nSoft skills like confidence, clarity, and communication\n\n\nProblem-solving ability\n\n\nConsistency with your self-rated skills\n\n\nOverall presentation and body language\n\n\nCompanies prefer candidates with a well-rounded score, so excelling in both technical and interpersonal skills is equally important.\n",
+    "answer": "Several factors influence your Findtern Score:\n\nTechnical knowledge in your chosen field\n\n\nSoft skills like confidence, clarity, and communication\n\n\nProblem-solving ability\n\n\nRelevance of your answers to the skills you list\n\n\nOverall presentation and body language\n\n\nCompanies prefer candidates with a well-rounded score, so excelling in both technical and interpersonal skills is equally important.\n",
     "sortOrder": 0,
     "isActive": true
   },
@@ -255,7 +255,7 @@ export const FAQ_INTERN: CmsFaqItem[] = [
     "id": "2a92528e-5f6c-494f-9692-ff91244088d6",
     "category": "Intern",
     "question": "How is my Findtern Score calculated?",
-    "answer": "Your Findtern Score is calculated through AI analysis of your interview responses. The system evaluates your technical knowledge, soft skills, clarity of communication, and confidence. It also considers how well you performed compared to your self-rated skills. This makes the score an authentic representation of your abilities, helping companies identify the right fit.",
+    "answer": "Your Findtern Score is calculated through AI analysis of your interview responses. The system evaluates your technical knowledge, soft skills, clarity of communication, and confidence. It also considers how relevant your answers are to the skills you list. This makes the score an authentic representation of your abilities, helping companies identify the right fit.",
     "sortOrder": 0,
     "isActive": true
   },
@@ -279,7 +279,7 @@ export const FAQ_INTERN: CmsFaqItem[] = [
     "id": "5656f008-d3f4-4922-9325-0b53c4b4bcd2",
     "category": "Intern",
     "question": "What kind of questions will the AI interview ask?",
-    "answer": "The AI interview on Findtern is designed to give companies a complete view of your skills and personality. It includes:\n- General interview questions to evaluate your communication skills, confidence, body language, and ability to structure answers.\n- Skill-based questions, customized according to the skills you mention in your profile. The difficulty level adjusts to your self-rated skill level.\n- Technical or coding tasks (if applicable). For example, if you enter Java as a skill, you may face coding problems or technical problem-solving questions related to Java.\n\nThis structured approach ensures your Findtern Score reflects both your soft skills and technical strengths, giving companies a clear and fair picture of your potential.\n",
+    "answer": "The AI interview on Findtern is designed to give companies a complete view of your skills and personality. It includes:\n- General interview questions to evaluate your communication skills, confidence, body language, and ability to structure answers.\n- Skill-based questions, customized according to the skills you mention in your profile. The interview is based on the skills you list.\n- Technical or coding tasks (if applicable). For example, if you enter Java as a skill, you may face coding problems or technical problem-solving questions related to Java.\n\nThis structured approach ensures your Findtern Score reflects both your soft skills and technical strengths, giving companies a clear and fair picture of your potential.\n",
     "sortOrder": 0,
     "isActive": true
   },
@@ -311,7 +311,7 @@ export const FAQ_INTERN: CmsFaqItem[] = [
     "id": "b508ca5e-0afb-4d75-80e7-c69e9e23b57e",
     "category": "Intern",
     "question": "What kind of questions will the AI interview ask?",
-    "answer": "The AI interview on Findtern is designed to give companies a complete view of your skills and personality. It includes:\nGeneral interview questions to evaluate your communication skills, confidence, body language, and ability to structure answers.\n\n\nSkill-based questions, customized according to the skills you mention in your profile. The difficulty level adjusts to your self-rated skill level.\n\n\nTechnical or coding tasks (if applicable). For example, if you enter Java as a skill, you may face coding problems or technical problem-solving questions related to Java.\n\n\nThis structured approach ensures your Findtern Score reflects both your soft skills and technical strengths, giving companies a clear and fair picture of your potential.",
+    "answer": "The AI interview on Findtern is designed to give companies a complete view of your skills and personality. It includes:\nGeneral interview questions to evaluate your communication skills, confidence, body language, and ability to structure answers.\n\n\nSkill-based questions, customized according to the skills you mention in your profile. The interview is based on the skills you list.\n\n\nTechnical or coding tasks (if applicable). For example, if you enter Java as a skill, you may face coding problems or technical problem-solving questions related to Java.\n\n\nThis structured approach ensures your Findtern Score reflects both your soft skills and technical strengths, giving companies a clear and fair picture of your potential.",
     "sortOrder": 0,
     "isActive": true
   },
@@ -327,7 +327,7 @@ export const FAQ_INTERN: CmsFaqItem[] = [
     "id": "76098615-4829-4063-8551-44dc3de5c1e9",
     "category": "Intern",
     "question": "How is the AI interview evaluated?",
-    "answer": "The AI interview on Findtern is evaluated using advanced algorithms that measure your communication skills, confidence, problem-solving ability, technical knowledge, and overall personality traits. The self-evaluated skill ratings you provide while creating your profile directly influence the difficulty level of your AI interview, ensuring it matches your abilities. Your performance is then converted into a Findtern Score, which highlights your strengths and helps employers easily compare and shortlist candidates.",
+    "answer": "The AI interview on Findtern is evaluated using advanced algorithms that measure your communication skills, confidence, problem-solving ability, technical knowledge, and overall personality traits. The skills you list while creating your profile are what your AI interview is based on. Your performance is then converted into a Findtern Score, which highlights your strengths and helps employers easily compare and shortlist candidates.",
     "sortOrder": 0,
     "isActive": true
   },
@@ -482,7 +482,7 @@ export const FAQ_EMPLOYER: CmsFaqItem[] = [
     "id": "2a9681d7-ca9f-4cce-8316-a07952251bc2",
     "category": "Employer",
     "question": "Can I preview candidate profiles before hiring?",
-    "answer": "Yes. Employers see detailed intern profiles, skill ratings, and assessments before making a decision.\n",
+    "answer": "Yes. Employers see detailed intern profiles, your skills and Findtern score, and assessments before making a decision.\n",
     "sortOrder": 0,
     "isActive": true
   },
