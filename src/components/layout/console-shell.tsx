@@ -231,7 +231,12 @@ export function ConsoleShell({
   );
 
   return (
-    <div data-tone={tone} className={cn("apple-admin min-h-[100dvh] overflow-x-clip lg:flex", light ? "bg-ink-100 lg:gap-3 lg:p-3" : "bg-surface")}>
+    <div data-tone={tone} className={cn(
+        "apple-admin min-h-[100dvh] overflow-x-clip lg:flex",
+        light ? "bg-ink-100 lg:gap-3 lg:p-3" : "bg-surface",
+        // Rail width for fixed bars that centre on the content column (employer Compare pill).
+        light ? (collapsed ? "lg:[--console-rail:6.25rem]" : "lg:[--console-rail:17.5rem]") : collapsed ? "lg:[--console-rail:4.75rem]" : "lg:[--console-rail:16rem]",
+      )}>
       {/* ── Desktop rail ─────────────────────────────────────────────── */}
       <aside
         aria-label="Sidebar"
