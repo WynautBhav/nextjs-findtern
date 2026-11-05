@@ -12,13 +12,35 @@ describe("projectNameIssue", () => {
     assert.ok(issue("Zentrova app", "Zentrova"));
     assert.ok(issue("cafe nova site", "Café Nova"));
   });
+  it("matches the company on whole words, not inside other words", () => {
+    assert.equal(issue("Innovation dashboard", "Nova"), null);
+    assert.equal(issue("Workspace redesign", "Ace Pvt Ltd"), null);
+    assert.equal(issue("Marketplace app", "Ace"), null);
+    assert.equal(issue("Search revamp", "Arc Ltd"), null);
+    assert.equal(issue("Product analytics", "Pro Pvt Ltd"), null);
+    assert.ok(issue("Nova dashboard", "Nova"));
+    assert.ok(issue("ZentrovaLabs CRM", "Zentrova Labs"));
+    assert.ok(issue("Workspace by Ace", "Ace"));
+  });
   it("blocks initials as whole tokens", () => {
-    for (const p of ["AR portal", "A.R. portal", "ar-vr app"]) assert.match(issue(p, "Alpha Robotics")!, /"AR" looks like/);
+    for (const p of ["AR portal", "A.R. portal", "AR-VR app"]) assert.match(issue(p, "Alpha Robotics")!, /"AR" looks like/);
     assert.equal(issue("Arena revamp", "Alpha Robotics"), null);
     assert.equal(issue("Radar", "Alpha Robotics"), null);
     assert.match(issue("ATPL onboarding", "Acme Tech Pvt Ltd")!, /"ATPL"/);
-    assert.match(issue("AT dashboard", "Acme Tech Pvt Ltd")!, /"AT"/);
+    assert.match(issue("atpl onboarding", "Acme Tech Pvt Ltd")!, /"ATPL"/);
     assert.equal(issue("Z app", "Zentrova"), null);
+  });
+  it("2-letter initials only block in capitals, and never common acronyms or words", () => {
+    assert.equal(issue("ar portal", "Alpha Robotics"), null);
+    assert.equal(issue("AI chatbot", "Alpha Innovations"), null);
+    assert.equal(issue("ML pipeline", "Mango Labs"), null);
+    assert.equal(issue("QA automation", "Quick Apps"), null);
+    assert.equal(issue("IT helpdesk", "Indigo Technologies"), null);
+    assert.equal(issue("US market research", "Urban Spaces"), null);
+    assert.equal(issue("AT dashboard", "Acme Tech Pvt Ltd"), null);
+    assert.equal(issue("Growth at scale", "Acme Tech Pvt Ltd"), null);
+    assert.match(issue("XY portal", "Xenon Yards")!, /"XY" looks like/);
+    assert.equal(issue("xy portal", "Xenon Yards"), null);
   });
   it("short names match whole words only", () => {
     assert.ok(issue("HP fleet tool", "HP"));
