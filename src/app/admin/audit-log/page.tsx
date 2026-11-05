@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
 import { getDb, schema } from "@/lib/db";
 import { AdminLoadError, AdminPageHeader, Panel } from "@/components/admin/panel";
@@ -7,6 +8,8 @@ import { DataTable, type Column } from "@/components/admin/data-table";
 import { DateRangeForm } from "@/components/admin/date-range-form";
 import { AUDIT_ACTIONS } from "@/lib/admin/audit";
 import { loadAudit, type AuditRow } from "@/lib/admin/audit-query";
+import { allows, requiredPermissions } from "@/lib/admin/permissions";
+import { getSession } from "@/lib/auth";
 import { flattenParams, parsePageRequest, toPage, toQueryString } from "@/lib/admin/params";
 
 export const metadata: Metadata = { title: "Audit log" };
@@ -18,6 +21,9 @@ function when(d: Date | null): string {
 
 /** Who did what, newest first. Super-admin tier only (roles:write, enforced in proxy.ts). */
 export default async function AdminAuditLogPage({ searchParams }: { searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
+  // The proxy gates this too; checking here keeps the log closed if the matcher ever changes.
+  const session = await getSession();
+  if (!session || !allows(session.permissions, requiredPermissions("/admin/audit-log"))) redirect("/admin/no-access");
   const params = flattenParams(await searchParams);
   const req = parsePageRequest(params);
   const header = <AdminPageHeader title="Audit log" subtitle="Changes staff made in the admin. Times are IST." />;
