@@ -28,7 +28,7 @@ import { closeDb, db, one, rows } from "./lib/db.mjs";
 import { ARTIFACTS, ROOT } from "./lib/env.mjs";
 
 // Mirrors CURRENT_TERMS_VERSION in src/lib/terms.ts: seeded accounts have accepted it so the pop-up never blocks a run.
-const TERMS_VERSION = "2026-11-04";
+const TERMS_VERSION = "2026-11-06";
 const ARGON = { memoryCost: 19456, timeCost: 2, parallelism: 1 };
 const log = (...a) => console.log("[seed]", ...a);
 const DAY = 86_400_000;

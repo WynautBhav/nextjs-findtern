@@ -16,7 +16,7 @@ import type { CmsLegalDoc } from "./types";
 export const INTERN_TERMS: CmsLegalDoc = {
   id: "intern",
   title: "Intern Terms and Conditions",
-  updated: "2026-11-05",
+  updated: "2026-11-06",
   href: "/intern-terms-and-conditions",
   html: `
 <h2>1. Acceptance of Terms</h2>
@@ -57,7 +57,7 @@ export const INTERN_TERMS: CmsLegalDoc = {
 <li>Misrepresentation of skills or submitting fake documents will result in account termination.</li>
 <li>Findtern reserves the right to verify academic credentials and remove any fraudulent profiles.</li>
 <li>Findtern does not guarantee an internship. However, if your profile score is above 60%, you are eligible for a paid internship. This means that any internship you get through Findtern will be a paid one.</li>
-<li>Interns earn half the hourly rate, by your Findtern score: ₹0 an hour below 6, ₹50 an hour from 6 up to 8, and ₹100 an hour from 8 and above.</li>
+<li>Your stipend is a fixed monthly amount set by your Findtern score: ₹0 below 6, ₹8,000 a month from 6 up to 8, and ₹15,000 a month from 8 and above, plus a completion bonus when you finish the internship.</li>
 <li>Each month's stipend (score 6 and above) is paid after that month ends.</li>
 <li>You must not share your personal information or direct contact details with clients outside of Findtern's platform. Any violation of this may lead to legal action.</li>
 </ul>

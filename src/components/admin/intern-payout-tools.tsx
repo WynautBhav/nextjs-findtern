@@ -200,7 +200,7 @@ export function InternPayoutTools({
         <div>
           <h4 id="dues-head" className="text-base font-semibold text-ink-900">Dues by placement</h4>
           <p className="mt-0.5 text-sm text-ink-600">
-            Half the employer&apos;s monthly amount, paid after each month worked. Create a payout from the placement&apos;s row.
+            The intern&apos;s fixed monthly stipend (older offers: half the employer&apos;s monthly amount), paid after each month worked. Create a payout from the placement&apos;s row.
           </p>
         </div>
         {duesError ? (

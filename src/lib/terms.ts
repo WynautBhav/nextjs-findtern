@@ -8,7 +8,7 @@
  * typo fix in the CMS would otherwise re-prompt every user. To ask everyone to
  * accept again later, change this constant.
  */
-export const CURRENT_TERMS_VERSION = "2026-11-05";
+export const CURRENT_TERMS_VERSION = "2026-11-06";
 
 /** The three console roles that can be asked. Admin staff are never prompted. */
 export type TermsRole = "intern" | "employer" | "college";
