@@ -1,4 +1,4 @@
-import { lineCharge } from "../checkout.ts";
+import { acceptedLineCharge } from "../accepted-charge.ts";
 import { monthlyDues } from "../dues.ts";
 import { parseOffer } from "../offer.ts";
 import { toInrMinor } from "./money.ts";
@@ -37,7 +37,9 @@ export function companyMoney(
   employerIds: string[],
   proposals: ProposalLike[],
   payments: PaymentLike[],
-  scoreOf: (internId: string) => number,
+  /** Not used: accepted offers are priced on a fixed basis (accepted-charge.ts). Kept so callers need no change. */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _scoreOf?: (internId: string) => number,
 ): Map<string, CompanyMoney> {
   const out = new Map<string, CompanyMoney>();
   for (const employerId of employerIds) {
@@ -55,7 +57,7 @@ export function companyMoney(
 
     for (const p of mine.filter((x) => x.status === "accepted" || x.status === "processing")) {
       const offer = parseOffer(p.offerDetails, p.currency);
-      amountLeft += toInrMinor(lineCharge(offer, scoreOf(p.internId), "upfront").totalMinor, offer.currency);
+      amountLeft += toInrMinor(acceptedLineCharge(offer, "upfront").totalMinor, offer.currency);
       if (offer.startDate) dueDates.push(offer.startDate);
     }
 
@@ -63,7 +65,7 @@ export function companyMoney(
       const p = mine.find((x) => x.id === d.proposalId);
       if (!p) continue;
       const offer = parseOffer(p.offerDetails, p.currency);
-      const instalment = lineCharge(offer, scoreOf(p.internId), "monthly", { firstPayment: false }).totalMinor;
+      const instalment = acceptedLineCharge(offer, "monthly", { firstPayment: false }).totalMinor;
       amountLeft += toInrMinor(instalment * (d.months - d.monthsPaid), offer.currency);
       const next = d.plan === "postpaid" ? d.dueOn : addMonthsIso(offer.startDate, d.monthsPaid);
       if (next) dueDates.push(next);

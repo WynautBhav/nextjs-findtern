@@ -8,6 +8,7 @@ import { employerInvoices, type InvoiceHire, type InvoicePayment } from "./emplo
 import { hireInvoiceLines } from "./invoice-lines.ts";
 import { parseOffer } from "./offer.ts";
 import { companyLedger } from "./admin/company-ledger.ts";
+import { companyMoney } from "./admin/company-money.ts";
 import { computeReceivables, type ReceivablesInput } from "./admin/receivables.ts";
 import { employerSide, payoutRefusal, stipendDues } from "./admin/stipend-dues.ts";
 
@@ -252,4 +253,36 @@ test("an anchor that only looks like a date gives no stipend dates", () => {
   assert.equal(stipendMonthDates("2026-13-01", 3, 1), null);
   assert.equal(engagementEndOn("2026-02-30", 3), null);
   assert.notEqual(stipendMonthDates("2026-02-28", 3, 1), null);
+});
+
+test("admin money views price an accepted offer the same whatever the intern's score is now (cleared, below 6, or 6+)", () => {
+  const proposal = { id: "p1", internId: "i1", projectId: "pr", status: "hired", currency: "INR", offerDetails: OFFER, hiredAt: "2026-09-10T00:00:00Z" };
+  const orders = [{ id: "o1", status: "paid", amountMinor: 500_000, currency: "INR", paidAt: fee.paidAt, createdAt: null, raw: fee.raw }];
+  const ledger = (score: number) => companyLedger([proposal], orders, () => score).hires[0];
+  const receivables = (score: number) =>
+    computeReceivables(
+      {
+        since: null,
+        until: null,
+        now: new Date("2026-10-16T12:00:00+05:30"),
+        employerName: () => "Acme",
+        internName: () => "Asha",
+        scoreOf: () => score,
+        activationFeeMinor: 0,
+        proposals: [{ ...proposal, employerId: "e1" }],
+        employerPayments: [{ ...orders[0], employerId: "e1", orderId: "ord", paymentId: "pay" }],
+        internPayments: [],
+        unpaidProfiles: [],
+        payouts: [],
+      } as ReceivablesInput,
+      { receivables: "company", payables: "company" },
+    ).receivables.filter((r) => r.id.startsWith("instalment")).map((r) => [r.id, r.amountMinor] as const).sort();
+  const money = (score: number) =>
+    companyMoney(["e1"], [{ ...proposal, employerId: "e1" }], orders.map((o) => ({ ...o, employerId: "e1" })), () => score).get("e1")!.amountLeftInrMinor;
+
+  for (const score of [0, 3, 5.9, 6, 10]) {
+    assert.deepEqual([ledger(score).plan, ledger(score).dueMinor], ["postpaid", 3_000_000], `ledger ${score}`);
+    assert.deepEqual(receivables(score), [["instalment:p1:1", 1_000_000], ["instalment:p1:2", 1_000_000], ["instalment:p1:3", 1_000_000]], `receivables ${score}`);
+    assert.equal(money(score), 3_000_000, `money ${score}`);
+  }
 });

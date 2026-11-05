@@ -1,5 +1,5 @@
 import { orderNotes, postpaidAnchor, postpaidDueOn } from "../billing-plan.ts";
-import { lineCharge } from "../checkout.ts";
+import { acceptedLineCharge } from "../accepted-charge.ts";
 import { monthlyDues } from "../dues.ts";
 import { parseOffer } from "../offer.ts";
 import { toInrMinor } from "./money.ts";
@@ -111,7 +111,7 @@ export function computeReceivables(input: ReceivablesInput, filter: { receivable
           description: offer.fullTime ? "Full-time hiring fee (offer accepted, unpaid)" : "Offer accepted, awaiting payment",
           companyName: input.employerName(p.employerId),
           candidateName: input.internName(p.internId),
-          amountMinor: lineCharge(offer, input.scoreOf(p.internId), "upfront").totalMinor,
+          amountMinor: acceptedLineCharge(offer, "upfront").totalMinor,
           currency: offer.currency,
           reference: null,
         }),
@@ -123,7 +123,7 @@ export function computeReceivables(input: ReceivablesInput, filter: { receivable
       const p = input.proposals.find((x) => x.id === d.proposalId);
       if (!p) continue;
       const offer = parseOffer(p.offerDetails, p.currency);
-      const instalment = lineCharge(offer, input.scoreOf(p.internId), "monthly", { firstPayment: false }).totalMinor;
+      const instalment = acceptedLineCharge(offer, "monthly", { firstPayment: false }).totalMinor;
       for (let i = d.monthsPaid; i < d.months; i++) {
         // Post-paid: month k is due 2 days before the intern is paid for it, overdue the day after.
         const postpaid = d.plan === "postpaid";

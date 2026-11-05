@@ -11,6 +11,7 @@
 
 import { and, desc, eq, inArray } from "drizzle-orm";
 
+import { acceptedLineCharge } from "@/lib/accepted-charge";
 import { lineCharge, type LineCharge, type PayMode } from "@/lib/checkout";
 import { getDb, schema } from "@/lib/db";
 import { istDay, postpaidAnchor, postpaidDueOn } from "@/lib/billing-plan";
@@ -209,14 +210,18 @@ export async function payableCheckout(
         score,
         // A due month is a later instalment: the hiring fee was in the first.
         charge: dues.has(proposal.id)
-          ? lineCharge(offer, score, "monthly", { firstPayment: false })
+          ? acceptedLineCharge(offer, "monthly", { firstPayment: false })
           : lineCharge(offer, score, opts.mode),
         // What one month costs here: no hiring fee on a later instalment, or
         // the summary shows more than the order route charges.
-        monthlyCharge: lineCharge(offer, score, "monthly", { firstPayment: !dues.has(proposal.id) }),
+        // A due month is priced on the fixed basis; a not-yet-due line keeps the live score
+        // only so the checkout can say why month-end payment is not offered (monthlyBlocked).
+        monthlyCharge: dues.has(proposal.id)
+          ? acceptedLineCharge(offer, "monthly", { firstPayment: false })
+          : lineCharge(offer, score, "monthly"),
         due: dues.get(proposal.id) ?? null,
         dueOn: dues.has(proposal.id) ? (dues.get(proposal.id)!.dueOn ?? addMonthsDay(offer.startDate, dues.get(proposal.id)!.monthsPaid)) : null,
-        feeCharge: lineCharge(offer, score, "postpaid"),
+        feeCharge: acceptedLineCharge(offer, "postpaid"),
         schedule: dues.has(proposal.id) || offer.fullTime
           ? []
           : Array.from({ length: offer.months }, (_, i) => postpaidDueOn(postpaidAnchor(offer.startDate, null) ?? istDay(new Date()), offer.months, i + 1) ?? "").filter(Boolean),

@@ -1,5 +1,5 @@
 import { billingPlanOf, postpaidAnchor, postpaidDueOn } from "../billing-plan.ts";
-import { lineCharge } from "../checkout.ts";
+import { acceptedLineCharge } from "../accepted-charge.ts";
 import { parseOffer } from "../offer.ts";
 import { toInrMinor } from "./money.ts";
 import { addMonthsIso } from "./stipend-dues.ts";
@@ -100,7 +100,9 @@ const time = (d: Date | string | null | undefined) => {
 export function companyLedger(
   proposals: ProposalLike[],
   payments: PaymentLike[],
-  scoreOf: (internId: string) => number,
+  /** Not used: accepted offers are priced on a fixed basis (accepted-charge.ts). Kept so callers need no change. */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _scoreOf?: (internId: string) => number,
 ): CompanyLedger {
   const byId = new Map(proposals.map((p) => [p.id, p]));
   const offers = new Map(proposals.map((p) => [p.id, parseOffer(p.offerDetails, p.currency)]));
@@ -134,10 +136,9 @@ export function companyLedger(
     // What each line should have cost in this order, to split the amount.
     const weights = mine.map((id) => {
       const offer = offers.get(id)!;
-      const score = scoreOf(byId.get(id)!.internId);
       const isMonthly = monthly || dueIds.includes(id);
       const first = (monthlyCount.get(id) ?? 0) === 0 && !feePaid.has(id);
-      return Math.max(1, lineCharge(offer, score, feeOnly ? "postpaid" : isMonthly ? "monthly" : "upfront", { firstPayment: first }).totalMinor);
+      return Math.max(1, acceptedLineCharge(offer, feeOnly ? "postpaid" : isMonthly ? "monthly" : "upfront", { firstPayment: first }).totalMinor);
     });
     const sum = weights.reduce((s, w) => s + w, 0);
     let left = Math.max(0, pay.amountMinor);
@@ -155,7 +156,6 @@ export function companyLedger(
   for (const p of proposals) {
     if (!["accepted", "processing", "hired"].includes(p.status)) continue;
     const offer = offers.get(p.id)!;
-    const score = scoreOf(p.internId);
     const base = {
       proposalId: p.id,
       internId: p.internId,
@@ -172,7 +172,7 @@ export function companyLedger(
 
     if (feePaid.has(p.id) && !offer.fullTime && billingPlanOf(p.id, paid) === "postpaid") {
       const left = Math.max(0, base.months - monthsPaid);
-      const instalment = lineCharge(offer, score, "postpaid", { firstPayment: false }).totalMinor;
+      const instalment = acceptedLineCharge(offer, "postpaid", { firstPayment: false }).totalMinor;
       const due = instalment * left;
       hires.push({
         ...base,
@@ -188,7 +188,7 @@ export function companyLedger(
       hires.push({ ...base, plan: "upfront", totalMinor: paidSoFar, paidMinor: paidSoFar, dueMinor: 0, monthsPaid: base.months, monthsLeft: 0, nextDueDate: null });
     } else if (monthsPaid > 0) {
       const left = Math.max(0, base.months - monthsPaid);
-      const instalment = lineCharge(offer, score, "monthly", { firstPayment: false }).totalMinor;
+      const instalment = acceptedLineCharge(offer, "monthly", { firstPayment: false }).totalMinor;
       const due = instalment * left;
       hires.push({
         ...base,
@@ -201,7 +201,7 @@ export function companyLedger(
         nextDueDate: left > 0 ? addMonthsIso(offer.startDate, monthsPaid) : null,
       });
     } else {
-      const due = lineCharge(offer, score, "upfront").totalMinor;
+      const due = acceptedLineCharge(offer, "upfront").totalMinor;
       hires.push({ ...base, plan: "unpaid", totalMinor: due, paidMinor: 0, dueMinor: due, monthsPaid: 0, monthsLeft: base.months, nextDueDate: offer.startDate });
     }
   }
