@@ -7,7 +7,7 @@ import { internStipendInrMinor, parseOffer, type Offer } from "@/lib/offer";
 /**
  * What the offers list and the offer page both say about one offer, worked
  * out once so the two never disagree (bug sheet 7, S1 r42: the stipend is
- * the intern's half of the employer's monthly amount, in INR, on both).
+ * the fixed band stipend, or for older offers half the employer's monthly amount, in INR, on both).
  */
 export type OfferFacts = {
   key: InternOfferKey;

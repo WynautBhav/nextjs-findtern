@@ -11,7 +11,7 @@ import { billingPlanOf, postpaidMonthsPaid, type BillingPlan } from "../billing-
  * for the same placement, so staff can check the money came in before they
  * pay the stipend out (ADP-19).
  *
- * The monthly share is `internStipendInrMinor` (half the employer's monthly
+ * The monthly share is `internStipendInrMinor` (the offer's fixed stipend, else half the employer's monthly
  * amount in INR, ₹0 for a scored candidate below 6). Month `k` is due on the
  * start date + `k` months - stipends are paid at the end of each month worked.
  * Full-time offers have no stipend and are left out.

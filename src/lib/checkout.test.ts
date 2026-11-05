@@ -113,3 +113,9 @@ test("EMH-39: the full-time fee is 8.33% of CTC in whole rupees, as legacy round
   assert.equal(c.totalMinor, 6_478_900);
   assert.equal(c.totalMinor % 100, 0);
 });
+
+test("a fixed intern stipend on the offer does not change the employer's charge", () => {
+  const plain = newOffer();
+  const fixed = { ...plain, internStipendMinor: 800_000 };
+  assert.deepEqual(lineCharge(fixed, 7), lineCharge(plain, 7));
+});

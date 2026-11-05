@@ -45,6 +45,8 @@ export type Offer = {
   monthlyMinor: number | null;
   totalMinor: number | null;
   hourlyRateMinor: number | null;
+  /** Fixed monthly intern stipend (INR paise), set when sent. Null on older offers, which use the 50% rule. */
+  internStipendMinor: number | null;
   perHireMinor: number | null;
   fullTime: {
     annualCtcMinor: number | null;
@@ -269,6 +271,7 @@ export function parseOffer(raw: unknown, rowCurrency?: string | null): Offer {
     monthlyMinor: toMinorKeepZero(o.monthlyAmount ?? o.monthly_amount),
     totalMinor: toMinor(o.totalPrice),
     hourlyRateMinor: toMinorKeepZero(o.hourlyRate),
+    internStipendMinor: toMinorKeepZero(o.internStipendMonthly),
     perHireMinor: perHireOf(o, monthsOf(duration)),
     fullTime: ft
       ? {
@@ -298,13 +301,20 @@ export function stipendEligible(score: number | null | undefined): boolean {
   return !(s > 0 && s < 6);
 }
 
+/** Fixed monthly intern stipend by score band (INR paise): 6-8 ₹8,000, 8+ ₹15,000, else none. */
+export function fixedInternStipendInrMinor(score: number | null | undefined): number | null {
+  const s = Number(score ?? 0);
+  return s >= 8 ? 1_500_000 : s >= 6 ? 800_000 : null;
+}
+
 /**
- * The stipend the intern sees, always in INR minor units (legacy rule: USD
- * offers are shown converted): half of the employer's monthly amount, rounded
- * down, and 0 for a candidate scored below 6. Null when the offer has no
- * monthly amount.
+ * The stipend the intern sees, always in INR minor units. An offer sent with a
+ * fixed stipend returns it as is. Older offers (legacy rule: USD converted):
+ * half of the employer's monthly amount, rounded down, and 0 for a candidate
+ * scored below 6. Null when the offer has no monthly amount.
  */
 export function internStipendInrMinor(offer: Offer, score?: number | null): number | null {
+  if (offer.internStipendMinor != null) return offer.internStipendMinor;
   if (offer.monthlyMinor == null) return null;
   if (!stipendEligible(score)) return 0;
   const inr = offer.currency === "USD" ? offer.monthlyMinor * INR_PER_USD : offer.monthlyMinor;
@@ -411,6 +421,7 @@ export function buildOffer(input: OfferInput): Record<string, unknown> {
   const monthlyMinor = Math.round(input.monthlyHours * input.hourlyRateMinor);
   const totalMinor = monthlyMinor * months + input.perHireMinor;
   const major = (minor: number) => Math.round(minor) / 100;
+  const fixedStipend = fixedInternStipendInrMinor(input.candidateScore);
   return {
     roleTitle: input.roleTitle,
     jd: jdToHtml(jdToText(input.jd ?? "")),
@@ -436,6 +447,7 @@ export function buildOffer(input: OfferInput): Record<string, unknown> {
     monthlyAmount: major(monthlyMinor),
     totalPrice: major(totalMinor),
     hourlyRate: major(input.hourlyRateMinor),
+    ...(fixedStipend != null ? { internStipendMonthly: major(fixedStipend) } : {}),
     perHireCharge: major(input.perHireMinor),
     candidateScore: input.candidateScore ?? null,
     projectSkills: input.projectSkills ?? [],

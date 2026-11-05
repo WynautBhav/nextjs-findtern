@@ -106,3 +106,14 @@ test("a candidate scored below 6 is not eligible and has nothing to come", () =>
   assert.equal(card.monthlyMinor, 0);
   assert.equal(card.remainingMinor, 0);
 });
+
+test("a fixed-stipend hire keeps its figure and stays eligible if the live score drops", () => {
+  const [card] = earningsEngagements(
+    [{ ...base, id: "p1", status: "hired", hiredAt: new Date("2026-09-02T00:00:00Z"), offerDetails: { ...offer(16000), internStipendMonthly: 8000 } }],
+    [],
+    {},
+    5,
+  );
+  assert.equal(card.eligible, true);
+  assert.equal(card.monthlyMinor, 800_000);
+});

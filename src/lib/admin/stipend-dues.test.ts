@@ -202,3 +202,11 @@ test("ADP-21 / DB-18: a saved schedule queues the next month like legacy", () =>
   assert.equal(legacy?.method, "upi");
   assert.equal(legacy?.scheduledFor, "2026-05-15");
 });
+
+test("a fixed-stipend offer caps the payout at the fixed figure, whatever the employer pays", () => {
+  const d = stipendDues([hired("p1", { monthlyAmount: 40000, internStipendMonthly: 15000, duration: "2m", startDate: "2026-01-01" })], [], 8)[0];
+  assert.equal(d.monthlyShareMinor, 1_500_000);
+  assert.equal(payoutCapMinor(d), 1_500_000);
+  assert.equal(payoutRefusal(d, 1_500_000), null);
+  assert.match(payoutRefusal(d, 1_500_001) ?? "", /at most ₹15,000/);
+});

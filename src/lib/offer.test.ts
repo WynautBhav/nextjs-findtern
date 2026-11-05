@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { billableWorkingDays, buildOffer, internStipendInrMinor, offerTermIssues, offerTimeLeft, parseOffer, scheduledMonthlyHours, weeklyScheduleOf } from "./offer.ts";
+import { billableWorkingDays, buildOffer, fixedInternStipendInrMinor, internStipendInrMinor, offerTermIssues, offerTimeLeft, parseOffer, scheduledMonthlyHours, weeklyScheduleOf } from "./offer.ts";
 import { lineCharge } from "./checkout.ts";
 import { monthlyDues } from "./dues.ts";
 
@@ -310,4 +310,22 @@ test("a no-stipend offer keeps a real 0", () => {
   assert.equal(o.monthlyMinor, 0);
   assert.equal(o.hourlyRateMinor, 0);
   assert.equal(parseOffer({ monthlyAmount: -5 }, "INR").monthlyMinor, null);
+});
+
+test("fixed intern stipend by band: 6-8 ₹8,000, 8+ ₹15,000, below 6 none", () => {
+  for (const [s, want] of [[5.99, null], [0, null], [null, null], [6, 800_000], [7.99, 800_000], [8, 1_500_000], [10, 1_500_000]] as const) {
+    assert.equal(fixedInternStipendInrMinor(s), want, String(s));
+  }
+});
+
+test("a new offer carries the fixed stipend; it ignores hours, currency and a later score", () => {
+  const mk = (candidateScore: number | undefined, currency: "INR" | "USD" = "INR") =>
+    buildOffer({ currency, roleTitle: "x", mode: "remote", startDate: "2026-11-02", duration: "3m", monthlyHours: 176, hourlyRateMinor: 10_000, perHireMinor: 0, candidateScore });
+  assert.equal(mk(7).internStipendMonthly, 8000);
+  assert.equal(mk(9).internStipendMonthly, 15000);
+  assert.equal("internStipendMonthly" in mk(4), false);
+  assert.equal("internStipendMonthly" in mk(undefined), false);
+  assert.equal(internStipendInrMinor(parseOffer(mk(7), "INR")), 800_000);
+  assert.equal(internStipendInrMinor(parseOffer(mk(7, "USD"), "USD")), 800_000);
+  assert.equal(internStipendInrMinor(parseOffer(mk(7), "INR"), 5), 800_000);
 });

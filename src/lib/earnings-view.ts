@@ -68,7 +68,7 @@ export function earningsEngagements(
 
   return hires.map((p) => {
     const offer = parseOffer(p.offerDetails, p.currency);
-    const eligible = stipendEligible(score);
+    const eligible = offer.internStipendMinor != null ? offer.internStipendMinor > 0 : stipendEligible(score);
     const monthlyMinor = internStipendInrMinor(offer, score);
     const mine = payouts.filter((r) => {
       const pid = payoutProposalId(r);
