@@ -222,7 +222,7 @@ export function HeroSplit() {
 
           {/* ── Proof artifact ───────────────────────────────────── */}
           <div className="lg:pl-4">
-            <ScoreCard />
+            <ScoreCard audience={audience} />
           </div>
         </div>
 

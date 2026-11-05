@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 
 import { formatMoney, formatRate } from "@/lib/format";
 import { useRegionBands } from "@/components/marketing/region-rates";
+import { HOME_STUDENT_BANDS } from "@/lib/content/site";
 import { BANDS, DISTRIBUTION, bandFor } from "@/lib/score";
 import { cn } from "@/lib/utils";
 
@@ -21,7 +22,8 @@ import { cn } from "@/lib/utils";
  * the same constants the pricing table uses, so moving it cannot disagree with
  * the table.
  */
-export function ScoreCard() {
+export function ScoreCard({ audience = "employer" }: { audience?: "employer" | "student" }) {
+  const student = audience === "student";
   const [score, setScore] = useState(8.4);
   const [dragging, setDragging] = useState(false);
   const trackRef = useRef<HTMLDivElement>(null);
@@ -43,7 +45,9 @@ export function ScoreCard() {
             <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-text-subtle">
               Findtern Score
             </p>
-            <p className="mt-1 text-sm text-text-subtle">Illustrative example</p>
+            <p className="mt-1 text-sm text-text-subtle">
+              {student ? "Move the slider to see your band" : "Illustrative example"}
+            </p>
           </div>
           <span
             className={cn(
@@ -66,14 +70,16 @@ export function ScoreCard() {
               {score.toFixed(1)}
               <span className="text-xl font-medium text-text-subtle">/10</span>
             </p>
-            <div className="text-right">
-              <p className="text-2xs font-semibold uppercase tracking-[0.12em] text-text-subtle">
-                Your rate
-              </p>
-              <p className="mt-0.5 text-xl font-bold text-primary tabular-nums">
-                {formatRate(money.rateMinor, currency)}
-              </p>
-            </div>
+            {!student && (
+              <div className="text-right">
+                <p className="text-2xs font-semibold uppercase tracking-[0.12em] text-text-subtle">
+                  Your rate
+                </p>
+                <p className="mt-0.5 text-xl font-bold text-primary tabular-nums">
+                  {formatRate(money.rateMinor, currency)}
+                </p>
+              </div>
+            )}
           </div>
 
           {/* ── The interactive control track ─────────────────────── */}
@@ -181,19 +187,57 @@ export function ScoreCard() {
           </div>
         </div>
 
-        {/* ── Why the rate is what it is ────────────────────────── */}
-        <dl className="grid grid-cols-2 gap-px border-t border-ink-100 bg-ink-100">
-          <Cell
-            label="Per hire"
-            value={formatMoney(money.perHireMinor, currency)}
-          />
-          <Cell label="Band" value={`${band.min}–${band.max}/10`} />
-        </dl>
+        {student ? (
+          <ul
+            aria-label="What you earn by Findtern Score"
+            className="grid gap-px border-t border-ink-100 bg-ink-100"
+          >
+            {HOME_STUDENT_BANDS.map((b) => (
+              <li
+                key={b.id}
+                aria-current={b.id === band.id ? "true" : undefined}
+                className={cn(
+                  "flex items-start justify-between gap-4 px-5 py-3.5 transition-colors duration-300 motion-reduce:transition-none",
+                  b.id === band.id ? "bg-brand-100" : "bg-white",
+                )}
+              >
+                <p className="shrink-0 text-sm font-semibold tabular-nums text-ink-900">
+                  <span className="block text-2xs font-semibold uppercase tracking-[0.12em] text-text-subtle">
+                    Score
+                  </span>
+                  {b.range}
+                </p>
+                <p className="min-w-0 text-right text-sm text-ink-700">
+                  {b.stipendMax !== null && (
+                    <span className="block font-semibold tabular-nums text-ink-900">
+                      Stipend up to {formatMoney(b.stipendMax * 100, "INR")} a month
+                    </span>
+                  )}
+                  <span className={cn("block tabular-nums", b.stipendMax === null && "font-semibold text-ink-900")}>
+                    {b.stipendMax !== null && "plus a "}
+                    {formatMoney(b.bonus * 100, "INR")} completion bonus
+                  </span>
+                </p>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <>
+            {/* ── Why the rate is what it is ────────────────────────── */}
+            <dl className="grid grid-cols-2 gap-px border-t border-ink-100 bg-ink-100">
+              <Cell
+                label="Per hire"
+                value={formatMoney(money.perHireMinor, currency)}
+              />
+              <Cell label="Band" value={`${band.min}–${band.max}/10`} />
+            </dl>
 
-        <p className="border-t border-ink-100 px-5 py-4 text-sm text-text-subtle">
-          {band.blurb} Move the slider - the rate is not negotiated, it is
-          arithmetic.
-        </p>
+            <p className="border-t border-ink-100 px-5 py-4 text-sm text-text-subtle">
+              {band.blurb} Move the slider - the rate is not negotiated, it is
+              arithmetic.
+            </p>
+          </>
+        )}
       </div>
 
       {/* Cohort distribution - the same histogram the rate card publishes. */}

@@ -106,6 +106,16 @@ export const HOME_STUDENT_COPY = {
     "One AI interview and an aptitude test give you a Findtern Score that verified employers hire on. Not placed within 12 months? The fee comes back.",
 } as const;
 
+/** What a student earns by Findtern Score band, shown on the student side of
+ *  the home hero. Whole rupees, always INR (these are not converted to the
+ *  visitor's currency). Keys match the band ids in lib/score. A null stipend
+ *  means the band has a completion bonus only. */
+export const HOME_STUDENT_BANDS = [
+  { id: "standard", range: "Below 6", stipendMax: null, bonus: 2000 },
+  { id: "skilled", range: "6 to 8", stipendMax: 8000, bonus: 2500 },
+  { id: "assured", range: "8 to 10", stipendMax: 15000, bonus: 3000 },
+] as const;
+
 /** The home and about pages quote the same three product terms. */
 export const PROOF_STATS = [
   { value: 100, prefix: "", suffix: "%", label: "Screened before you see them" },
