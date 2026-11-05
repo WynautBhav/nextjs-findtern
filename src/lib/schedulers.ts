@@ -3,6 +3,7 @@ import { and, eq, gte, lt, lte, or, sql } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { readSkills, scoreOf } from "@/lib/employer-candidates";
 import { notify } from "@/lib/notify";
+import { sendPaymentReminders } from "@/lib/payment-reminders-job";
 import { hasFeedbackText } from "@/lib/interview-feedback";
 
 /**
@@ -148,6 +149,7 @@ async function notificationJobs() {
     ["employer profile nudge", employerProfileNudges],
     ["talent spotlight", talentSpotlight],
     ["interview feedback request", feedbackRequests],
+    ["payment reminders", (now: Date) => sendPaymentReminders(now)],
   ] as const) {
     await job(now).catch((e) => console.error(`[scheduler] ${name} failed`, e));
   }

@@ -1,0 +1,49 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+
+import { istDay } from "./billing-plan.ts";
+import { reminderDue, reminderKey } from "./payment-reminders.ts";
+
+const fee = (id: string) => ({ status: "paid", paidAt: "2026-09-01T00:00:00Z", raw: { notes: { proposalIds: [id], paymentMode: "hiring_fee" } } });
+const month = (id: string, at: string) => ({ status: "paid", paidAt: at, raw: { notes: { proposalIds: [id], dueProposalIds: [id], paymentMode: "total" } } });
+const hire = (score = 7) => ({ id: "p1", status: "hired", score, offerDetails: { startDate: "2026-10-01", duration: "3m", monthlyAmount: 10000, currency: "INR" }, hiredAt: "2026-09-30T00:00:00Z" });
+// month 1 = Oct 1..Oct 31, due 2026-10-31
+const none = new Set<string>();
+const at = (d: string, o = [fee("p1")], sent = none, h = hire()) => reminderDue(h, o, sent, d);
+
+test("3 days before, due day, 3 days after", () => {
+  assert.equal(at("2026-10-27"), null);
+  const up = at("2026-10-28")!;
+  assert.deepEqual([up.type, up.k, up.dueOn], ["upcoming", 1, "2026-10-31"]);
+  assert.ok(up.amountMinor > 0);
+  assert.equal(at("2026-10-31")!.type, "due");
+  assert.equal(at("2026-11-02")!.type, "due");
+  assert.equal(at("2026-11-03")!.type, "overdue");
+});
+
+test("already sent is skipped; later stage still goes out", () => {
+  assert.equal(at("2026-10-28", [fee("p1")], new Set([reminderKey("p1", 1, "upcoming")])), null);
+  assert.equal(at("2026-10-31", [fee("p1")], new Set([reminderKey("p1", 1, "upcoming")]))!.type, "due");
+});
+
+test("paid month moves on to the next month; all paid is silent", () => {
+  assert.equal(at("2026-11-03", [fee("p1"), month("p1", "2026-10-31T00:00:00Z")]), null);
+  assert.equal(at("2026-11-27", [fee("p1"), month("p1", "2026-10-31T00:00:00Z")])!.k, 2);
+  const all = [fee("p1"), month("p1", "2026-10-31"), month("p1", "2026-11-30"), month("p1", "2026-12-31")];
+  assert.equal(at("2027-01-05", all), null);
+});
+
+test("grandfathered, upfront, unpaid and low score get none", () => {
+  const mk = (mode: string) => [{ status: "paid", paidAt: "2026-09-01T00:00:00Z", raw: { notes: { proposalIds: ["p1"], paymentMode: mode } } }];
+  assert.equal(at("2026-11-05", mk("monthly")), null);
+  assert.equal(at("2026-11-05", mk("total")), null);
+  assert.equal(at("2026-11-05", []), null);
+  assert.equal(at("2026-11-05", [fee("p1")], none, hire(5.9)), null);
+  assert.equal(at("2026-11-05", [fee("p1")], none, { ...hire(), status: "accepted" }), null);
+});
+
+test("IST boundary: 19:00 UTC on 27 Oct is already 28 Oct in India", () => {
+  assert.equal(istDay(new Date("2026-10-27T17:59:00Z")), "2026-10-27");
+  assert.equal(at(istDay(new Date("2026-10-27T17:59:00Z"))!), null);
+  assert.equal(at(istDay(new Date("2026-10-27T18:30:00Z"))!)!.type, "upcoming");
+});

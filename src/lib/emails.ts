@@ -284,6 +284,23 @@ export const emails = {
     ],
     cta: { label: "Reset password", url: o.url },
   }),
+  paymentReminder: (o: { name: string; type: "upcoming" | "due" | "overdue"; k: number; amount: string; dueOn: string; intern: string }): EmailContent => {
+    const title = { upcoming: `Month ${o.k} stipend of ${o.amount} is due on ${o.dueOn}`, due: `Month ${o.k} stipend of ${o.amount} is due today`, overdue: `Month ${o.k} stipend of ${o.amount} is overdue` }[o.type];
+    return {
+      subject: `${title} | Findtern`,
+      heading: title,
+      greeting: hi(o.name),
+      lines: [
+        o.type === "upcoming"
+          ? `This is a reminder that the month ${o.k} stipend for ${o.intern} falls due on ${o.dueOn}.`
+          : `The month ${o.k} stipend for ${o.intern} ${o.type === "due" ? "is due today" : `was due on ${o.dueOn} and is still unpaid`}.`,
+        "Your intern is paid once the stipend is received.",
+      ],
+      facts: [["Intern", o.intern], ["Month", String(o.k)], ["Amount", o.amount], ["Due on", o.dueOn]],
+      status: o.type === "overdue" ? "Overdue" : o.type === "due" ? "Due today" : "Due soon",
+      cta: { label: o.type === "upcoming" ? "View orders" : "Pay now", url: `${origin()}/employer/${o.type === "upcoming" ? "orders" : "checkout"}` },
+    };
+  },
 };
 
 /** A calendar invite attachment (.ics) for a scheduled meeting. */
