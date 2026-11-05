@@ -6,7 +6,7 @@ import { SITE } from "@/lib/content/site";
 import { getDb, schema } from "@/lib/db";
 import { emails, renderEmail } from "@/lib/emails";
 import { sendSmtpMail } from "@/lib/mailer";
-import { generateOtp, hashOtp, limiters, clientIp, takeAuth } from "@/lib/security/rate-limit";
+import { bucketKey, generateOtp, hashOtp, limiters, clientIp, takeAuth } from "@/lib/security/rate-limit";
 import { phoneInUseAnywhere } from "@/lib/phone-owner";
 import { isPersonalEmail } from "@/lib/employer-onboarding";
 import { INTERN_EMAIL_MESSAGE, isInternEmail, SIGNUP_OTP_SUBJECTS } from "@/lib/signup-otp";
@@ -43,8 +43,16 @@ export async function POST(req: Request) {
   const { email, subjectType, purpose, countryCode, phoneNumber } = parsed.data;
   const db = getDb();
 
-  // Same check and message as the signup POST; the number is not tied to the email, so this leaks nothing new.
-  if (purpose === "signup" && countryCode && phoneNumber && (await phoneInUseAnywhere(countryCode, phoneNumber))) {
+  // Same check and message as the signup POST, but this route answers it before any code is verified, so it
+  // shares the phone-lookup limit (per IP, not per email) with /api/users/exists/phone. Over the limit, the
+  // check is skipped, not failed: the signup POST still refuses a taken number.
+  if (
+    purpose === "signup" &&
+    countryCode &&
+    phoneNumber &&
+    limiters.phoneLookup.take(bucketKey(ip)) &&
+    (await phoneInUseAnywhere(countryCode, phoneNumber))
+  ) {
     return NextResponse.json({ error: "Phone number already in use" }, { status: 409 });
   }
 
