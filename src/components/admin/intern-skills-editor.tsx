@@ -15,12 +15,11 @@ import { buttonClass } from "@/components/ui/button";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, X } from "lucide-react";
+import { Loader2 } from "lucide-react";
 
+import { SkillPicker } from "@/components/skills/skill-picker";
 import { csrfFetch } from "@/lib/client-fetch";
-
-const MIN = 4;
-const MAX = 7;
+import { MIN_SKILLS } from "@/lib/onboarding";
 
 export function InternSkillsEditor({
   internId,
@@ -30,33 +29,15 @@ export function InternSkillsEditor({
   skills: string[];
 }) {
   const router = useRouter();
-  const [value, setValue] = useState("");
   const [list, setList] = useState<string[]>(skills);
   const dirty = JSON.stringify(list) !== JSON.stringify(skills);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
-  function add() {
-    const skill = value.trim();
-    if (!skill) return;
-    if (list.length >= MAX) {
-      setError(`At most ${MAX} skills.`);
-      return;
-    }
-    if (list.some((s) => s.toLowerCase() === skill.toLowerCase())) {
-      setError("Already on the list.");
-      return;
-    }
-    setList([...list, skill]);
-    setValue("");
-    setError(null);
-    setSaved(false);
-  }
-
   async function save() {
-    if (list.length < MIN) {
-      setError(`At least ${MIN} skills, or remove this editor.`);
+    if (list.length < MIN_SKILLS) {
+      setError(`At least ${MIN_SKILLS} skills, or remove this editor.`);
       return;
     }
     setBusy(true);
@@ -80,64 +61,22 @@ export function InternSkillsEditor({
 
   return (
     <div>
-      <p className="text-sm font-medium text-ink-700">
-        Vouched skills ({list.length}/{MAX})
-      </p>
-
-      {list.length > 0 ? (
-        <ul className="mt-2 flex flex-wrap gap-1.5">
-          {list.map((skill) => (
-            <li
-              key={skill}
-              // On touch each skill is its own row, so the remove control can
-              // be 44px without turning the pills into slabs (QA-104).
-              className="inline-flex items-center gap-1.5 rounded-full bg-ink-100 py-1 pl-3 pr-2 text-sm font-medium text-ink-800 touch:flex touch:w-full touch:rounded-apple-md touch:py-1.5"
-            >
-              {skill}
-              <span className="touch:flex-1" />
-              <button
-                type="button"
-                onClick={() => {
-                  setList(list.filter((s) => s !== skill));
-                  setSaved(false);
-                }}
-                aria-label={`Remove ${skill}`}
-                className="grid size-6 place-items-center rounded-full text-ink-600 transition-colors hover:bg-danger-soft hover:text-danger touch:size-11"
-              >
-                <X className="size-3.5" aria-hidden />
-              </button>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className="mt-2 text-sm text-ink-600">
+      {list.length === 0 ? (
+        <p className="mb-2 text-sm text-ink-600">
           None recorded. Employers filtering on skills will not find this candidate.
         </p>
-      )}
-
-      <div className="mt-3 flex flex-wrap items-center gap-2">
-        <input
-          value={value}
-          onChange={(e) => {
-            setValue(e.target.value);
-            setError(null);
-          }}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              add();
-            }
-          }}
-          placeholder="Add a skill"
-          className="h-11 min-w-0 flex-1 rounded-apple-sm border border-ink-200 bg-surface px-3 text-base sm:text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring placeholder:text-text-subtle focus-visible:border-brand-600"
-        />
-        <button
-          type="button"
-          onClick={add}
-          className={buttonClass({ variant: "outline", size: "sm" })}
-        >
-          Add
-        </button>
+      ) : null}
+      <SkillPicker
+        id="admin-skills"
+        label="Vouched skills"
+        value={list}
+        onChange={(n) => {
+          setList(n);
+          setSaved(false);
+          setError(null);
+        }}
+      />
+      <div className="mt-3">
         <button
           type="button"
           onClick={save}
