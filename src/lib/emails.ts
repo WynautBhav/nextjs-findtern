@@ -310,7 +310,10 @@ export const emails = {
         o.type === "upcoming"
           ? `This is a reminder that the month ${o.k} stipend of ${o.amount} for ${o.intern} falls due on ${o.dueOn}. You can pay it now.`
           : `The month ${o.k} stipend of ${o.amount} for ${o.intern} ${today ? "is due today" : `was due on ${o.dueOn} and is still unpaid`}.`,
-        `${o.intern}'s stipend for this month is paid out of this payment, so we would be grateful if you could pay ${o.type === "upcoming" || today ? `by ${o.dueOn}` : "as soon as you can"}. Thank you.`,
+        // The intern can read "your intern" when the name is missing, so the sentence opens with a capital.
+        ((s) => s.charAt(0).toUpperCase() + s.slice(1))(
+          `${o.intern}'s stipend for this month is paid out of this payment, so we would be grateful if you could pay ${o.type === "upcoming" ? `by ${o.dueOn}` : today ? "today" : "as soon as you can"}. Thank you.`,
+        ),
       ],
       facts: [["Intern", o.intern], ["Month", String(o.k)], ["Amount", o.amount], ["Due on", o.dueOn]],
       status: o.type === "overdue" ? "Overdue" : o.type === "due" ? (today ? "Due today" : "Past due") : "Due soon",

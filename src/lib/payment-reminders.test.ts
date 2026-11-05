@@ -3,7 +3,7 @@ import test from "node:test";
 
 import { istDay } from "./billing-plan.ts";
 import { emails } from "./emails.ts";
-import { REMINDER_LEAD_DAYS, REMINDER_OFFSETS, reminderDue, reminderEmail, reminderKey } from "./payment-reminders.ts";
+import { internNoticeDue, REMINDER_LEAD_DAYS, REMINDER_OFFSETS, reminderDue, reminderEmail, reminderKey } from "./payment-reminders.ts";
 
 const fee = (id: string) => ({ status: "paid", paidAt: "2026-09-01T00:00:00Z", raw: { notes: { proposalIds: [id], paymentMode: "hiring_fee" } } });
 const month = (id: string, at: string) => ({ status: "paid", paidAt: at, raw: { notes: { proposalIds: [id], dueProposalIds: [id], paymentMode: "total" } } });
@@ -125,4 +125,22 @@ test("reminder mails and their in-app copy show 'due on 8 Nov 2026' and ₹16,00
   assert.match(up.lines[1], /Asha Rao's stipend for this month is paid out of this payment, so we would be grateful if you could pay by 8 Nov 2026/);
   assert.equal(up.cta?.url, "http://localhost:3000/employer/checkout"); // payable through the whole reminder window
   assert.match(reminderEmail({ ...base, type: "due", amountMinor: 1_234_550 }, { name: "Acme", intern: "A" }).heading, /₹12,345\.50/);
+});
+
+test("the intern is told only once the month is due or overdue, never from the employer's early window", () => {
+  assert.equal(internNoticeDue({ type: "upcoming" }), false);
+  assert.equal(internNoticeDue({ type: "due" }), true);
+  assert.equal(internNoticeDue({ type: "overdue" }), true);
+  // the first reminder of a hire (day -15) is "upcoming", so it carries no intern notice
+  assert.equal(internNoticeDue(at("2026-10-15")!), false);
+  assert.equal(internNoticeDue(at("2026-10-30")!), true);
+});
+
+test("the second line opens with a capital and says pay today on the due day", () => {
+  const mail = (o: Partial<Parameters<typeof emails.paymentReminder>[0]>) =>
+    emails.paymentReminder({ name: "Acme", type: "due", k: 1, amount: "₹1,000", dueOn: "30 Oct 2026", intern: "your intern", ...o });
+  assert.match(mail({}).lines[1], /^Your intern's stipend/);
+  assert.match(mail({}).lines[1], /pay today\. Thank you/);
+  assert.match(mail({ dueToday: false }).lines[1], /pay as soon as you can/);
+  assert.match(mail({ type: "upcoming" }).lines[1], /pay by 30 Oct 2026/);
 });

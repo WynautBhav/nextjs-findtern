@@ -3,7 +3,7 @@ import { and, eq, inArray, like, sql } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { notify } from "@/lib/notify";
 import { billingPlanOf, istDay } from "@/lib/billing-plan";
-import { reminderDue, reminderEmail, reminderKey } from "@/lib/payment-reminders";
+import { internNoticeDue, reminderDue, reminderEmail, reminderKey } from "@/lib/payment-reminders";
 
 /**
  * Sends today's stipend reminders (days -15, -12, -9, -6, -3, -2, -1, the due day, then overdue). Idempotent: `notify` writes a
@@ -53,7 +53,9 @@ export async function sendPaymentReminders(now = new Date()): Promise<{ sent: nu
     }).catch((e) => (console.error("[payment-reminders]", key, e), false));
     if (!ok) continue;
     n++;
-    // The intern hears once, with the hire's first reminder of whatever type (the key dedupes the rest).
+    // The intern hears once, from the first reminder that is due or overdue (the key dedupes the rest).
+    // An "upcoming" reminder is only the employer's early window, so the intern is not told yet.
+    if (!internNoticeDue(r)) continue;
     await notify({
       to: { type: "intern", id: h.internId },
       type: "stipend_pending",

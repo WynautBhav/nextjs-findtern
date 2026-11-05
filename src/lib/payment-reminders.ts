@@ -14,6 +14,9 @@ export function reminderEmail(r: Reminder, who: { name: string; intern: string }
   return emails.paymentReminder({ name: who.name, type: r.type, k: r.k, amount: formatMoney(r.amountMinor, r.currency), dueOn: formatDate(r.dueOn), dueToday: r.dueToday, intern: who.intern });
 }
 
+/** The intern is told their stipend waits on the employer only once the month is due or overdue, not during the employer's early pay window. */
+export const internNoticeDue = (r: Pick<Reminder, "type">) => r.type !== "upcoming";
+
 /** Reminders start this many days before the due day: the same day the month becomes payable. */
 export const REMINDER_LEAD_DAYS = PAY_WINDOW_DAYS;
 /** Days before (negative) or on (0) the due day that a reminder goes out: every 3 days, then daily for the last 3. */
