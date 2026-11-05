@@ -7,7 +7,7 @@ import { reminderDue, reminderKey } from "./payment-reminders.ts";
 
 const fee = (id: string) => ({ status: "paid", paidAt: "2026-09-01T00:00:00Z", raw: { notes: { proposalIds: [id], paymentMode: "hiring_fee" } } });
 const month = (id: string, at: string) => ({ status: "paid", paidAt: at, raw: { notes: { proposalIds: [id], dueProposalIds: [id], paymentMode: "total" } } });
-const hire = (score = 7) => ({ id: "p1", status: "hired", score, offerDetails: { startDate: "2026-10-01", duration: "3m", monthlyAmount: 10000, currency: "INR" }, hiredAt: "2026-09-30T00:00:00Z" });
+const hire = () => ({ id: "p1", status: "hired", offerDetails: { startDate: "2026-10-01", duration: "3m", monthlyAmount: 10000, currency: "INR" }, hiredAt: "2026-09-30T00:00:00Z" });
 // month 1 = Oct 1..Oct 31, due 2026-10-31
 const none = new Set<string>();
 const at = (d: string, o = [fee("p1")], sent = none, h = hire()) => reminderDue(h, o, sent, d);
@@ -34,12 +34,11 @@ test("paid month moves on to the next month; all paid is silent", () => {
   assert.equal(at("2027-01-05", all), null);
 });
 
-test("grandfathered, upfront, unpaid and low score get none", () => {
+test("grandfathered, upfront and unpaid hires get none", () => {
   const mk = (mode: string) => [{ status: "paid", paidAt: "2026-09-01T00:00:00Z", raw: { notes: { proposalIds: ["p1"], paymentMode: mode } } }];
   assert.equal(at("2026-11-05", mk("monthly")), null);
   assert.equal(at("2026-11-05", mk("total")), null);
   assert.equal(at("2026-11-05", []), null);
-  assert.equal(at("2026-11-05", [fee("p1")], none, hire(5.9)), null);
   assert.equal(at("2026-11-05", [fee("p1")], none, { ...hire(), status: "accepted" }), null);
 });
 
@@ -61,4 +60,14 @@ test("the due email says 'due today' only on the due day, 'was due on <date>' af
   assert.match(late.heading, /was due on 31 Oct 2026/);
   assert.match(late.lines[0], /was due on 31 Oct 2026 and is still unpaid/);
   assert.doesNotMatch(`${late.subject} ${late.heading} ${late.lines.join(" ")} ${late.status}`, /today/i);
+});
+
+test("reminders follow the billing plan, not the current score: a post-paid hire is chased whatever the score", () => {
+  const stipend = at("2026-10-28")!.amountMinor;
+  for (const score of [0, 3, 5.9, 10]) {
+    const r = reminderDue({ ...hire(), score } as ReturnType<typeof hire>, [fee("p1")], none, "2026-10-28")!;
+    assert.equal(r.type, "upcoming", `score ${score}`);
+    assert.equal(r.amountMinor, stipend, `score ${score}`);
+  }
+  assert.equal(stipend, 1_000_000); // 10000 rupees, in minor units
 });
