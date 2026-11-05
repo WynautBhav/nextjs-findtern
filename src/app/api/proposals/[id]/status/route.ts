@@ -150,7 +150,9 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   // ends the placement guarantee, and only after the candidate saw that.
   const internDecline = session.role === "intern" && status === "rejected";
   let endsGuarantee = false;
-  if (internDecline) {
+  // A full-time conversion offer never counts as a miss (guarantee.ts), so
+  // declining one neither warns nor ends the guarantee.
+  if (internDecline && !offer.fullTime) {
     const [onboarding] = await db
       .select({ extraData: schema.internOnboarding.extraData })
       .from(schema.internOnboarding)

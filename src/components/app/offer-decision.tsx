@@ -85,7 +85,8 @@ export function OfferDecision({
 
   // Declining past the free allowance ends the refund under the guarantee;
   // it is allowed, but only after the intern has seen that consequence.
-  const endsGuarantee = declinesUsed >= freeDeclines && !guaranteeEnded;
+  // A full-time conversion offer never counts as a miss (guarantee.ts).
+  const endsGuarantee = !fullTime && declinesUsed >= freeDeclines && !guaranteeEnded;
   const freeLeft = Math.max(0, freeDeclines - declinesUsed);
   const joiningDay = joiningDate === undefined ? startDate : joiningDate;
   const joining = joiningDay ? formatDate(joiningDay) : null;
@@ -217,7 +218,9 @@ export function OfferDecision({
           <p>
             {guaranteeEnded
               ? "Your placement guarantee has ended, so declines no longer affect a refund."
-              : freeLeft > 0
+              : fullTime
+                ? "Turning down a full-time offer does not count against your placement guarantee."
+                : freeLeft > 0
                 ? `You can miss ${freeLeft} more offer${freeLeft === 1 ? "" : "s"} and keep your guarantee. Turning an offer down or letting it lapse unanswered both count. Miss more than ${freeDeclines} and you are no longer eligible for a refund.`
                 : `You have turned down or let lapse ${declinesUsed} offers. Turning down or letting another lapse means you are no longer eligible for a refund under the guarantee.`}
           </p>
@@ -302,7 +305,11 @@ export function OfferDecision({
               This action can&apos;t be undone. {roleTitle} will be marked as rejected and the company is told.
             </DialogDescription>
           </DialogHeader>
-          {guaranteeEnded ? null : endsGuarantee ? (
+          {guaranteeEnded ? null : fullTime ? (
+            <p className="text-pretty text-sm leading-relaxed text-ink-600">
+              Turning down a full-time offer does not count against your placement guarantee.
+            </p>
+          ) : endsGuarantee ? (
             <p className="rounded-apple-lg border border-warning/40 bg-warning-soft p-4 text-pretty text-sm leading-relaxed text-ink-800">
               <span className="font-semibold">This would be offer number {declinesUsed + 1} you miss.</span> The
               guarantee covers up to {freeDeclines} declined or lapsed offers. Miss more than {freeDeclines} and you are no
