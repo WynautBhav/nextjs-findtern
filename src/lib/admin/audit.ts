@@ -96,9 +96,11 @@ export function summarizeMeta(meta: unknown): string {
 }
 
 /**
- * The one way to write an audit row. Pass a transaction to make the row part of
- * it (a failed audit rolls the change back). With a plain db and `strict` off, a
- * failed audit is logged and never turns an already-done change into a 500.
+ * The one way to write an audit row. With a plain db and `strict` off, a failed
+ * audit is logged and never turns an already-done change into a 500. Inside a
+ * transaction always pass `strict: true`: a swallowed insert error leaves the
+ * Postgres transaction aborted, so COMMIT silently becomes ROLLBACK while the
+ * route reports success.
  */
 export async function recordAdminAudit(ex: Executor, entry: AuditEntry, opts: { strict?: boolean } = {}): Promise<void> {
   try {
