@@ -59,8 +59,9 @@ export function CreateTimesheetModal({
       }
       setOpen(false);
       const id = data.timesheet?.id;
-      router.push(id ? `/intern/timesheets?sheet=${encodeURIComponent(id)}` : `/intern/timesheets?proposalId=${encodeURIComponent(proposalId)}`);
-      router.refresh();
+      // push() fetches the new URL fresh; a refresh() fired right behind it raced the push and left the old list on screen.
+      if (id) router.push(`/intern/timesheets?sheet=${encodeURIComponent(id)}`);
+      else router.refresh();
     } catch {
       setErrorMsg("Could not reach Findtern. Check your connection and try again.");
     } finally {
