@@ -3,5 +3,8 @@
   "regions": [
     "cle1"
   ],
-  "buildCommand": "node --experimental-strip-types scripts/migrate.ts && next build"
+  "buildCommand": "node --experimental-strip-types scripts/migrate.ts && next build",
+  "crons": [
+    { "path": "/api/cron/payment-reminders", "schedule": "30 3 * * *" }
+  ]
 }
