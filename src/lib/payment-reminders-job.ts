@@ -6,8 +6,8 @@ import { billingPlanOf, istDay } from "@/lib/billing-plan";
 import { reminderDue, reminderEmail, reminderKey } from "@/lib/payment-reminders";
 
 /**
- * Sends today's month-end stipend reminders. Idempotent: `notify` writes a notification row with a
- * per-hire/month/type dedupe key and mails only when that row is new, so reruns (cron + scheduler, retries) never double-send.
+ * Sends today's stipend reminders (days -15, -12, -9, -6, -3, -2, -1, the due day, then overdue). Idempotent: `notify` writes a
+ * notification row with a per-hire/month/send-day dedupe key and mails only when that row is new, so reruns (cron + scheduler, retries) never double-send.
  */
 export async function sendPaymentReminders(now = new Date()): Promise<{ sent: number }> {
   const db = getDb();
@@ -41,7 +41,7 @@ export async function sendPaymentReminders(now = new Date()): Promise<{ sent: nu
     const r = reminderDue(h, orders.filter((o) => o.employerId === h.employerId), sent, today);
     if (!r) continue;
     const mail = reminderEmail(r, { name: emp.name ?? "", intern: intern.get(h.internId) ?? "your intern" });
-    const key = reminderKey(h.id, r.k, r.type);
+    const key = reminderKey(h.id, r.k, r.type, r.offset);
     const ok = await notify({
       to: { type: "employer", id: h.employerId },
       type: "payment_reminder",

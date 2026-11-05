@@ -308,13 +308,13 @@ export const emails = {
       greeting: hi(o.name),
       lines: [
         o.type === "upcoming"
-          ? `This is a reminder that the month ${o.k} stipend for ${o.intern} falls due on ${o.dueOn}.`
-          : `The month ${o.k} stipend for ${o.intern} ${today ? "is due today" : `was due on ${o.dueOn} and is still unpaid`}.`,
-        "Your intern is paid once the stipend is received.",
+          ? `This is a reminder that the month ${o.k} stipend of ${o.amount} for ${o.intern} falls due on ${o.dueOn}. You can pay it now.`
+          : `The month ${o.k} stipend of ${o.amount} for ${o.intern} ${today ? "is due today" : `was due on ${o.dueOn} and is still unpaid`}.`,
+        `${o.intern}'s stipend for this month is paid out of this payment, so we would be grateful if you could pay ${o.type === "upcoming" || today ? `by ${o.dueOn}` : "as soon as you can"}. Thank you.`,
       ],
       facts: [["Intern", o.intern], ["Month", String(o.k)], ["Amount", o.amount], ["Due on", o.dueOn]],
       status: o.type === "overdue" ? "Overdue" : o.type === "due" ? (today ? "Due today" : "Past due") : "Due soon",
-      cta: { label: o.type === "upcoming" ? "View orders" : "Pay now", url: `${origin()}/employer/${o.type === "upcoming" ? "orders" : "checkout"}` },
+      cta: { label: "Pay now", url: `${origin()}/employer/checkout` },
     };
   },
 };

@@ -1,4 +1,4 @@
-import { billingPlanOf, istDay, orderNotes, postpaidAnchor, postpaidDueOn, postpaidMonthsPaid, postpaidNext } from "./billing-plan.ts";
+import { billingPlanOf, engagementEndOn, istDay, orderNotes, postpaidAnchor, postpaidDueOn, postpaidMonthsPaid, postpaidNext } from "./billing-plan.ts";
 import { lineCharge } from "./checkout.ts";
 import { monthsOf, parseOffer } from "./offer.ts";
 
@@ -27,14 +27,14 @@ export type Due = {
   plan: "monthly_prepaid" | "postpaid";
   /** Post-paid: month `monthsPaid + 1` falls due on this day (YYYY-MM-DD); null for pay-at-start hires. */
   dueOn: string | null;
-  /** Can this month be paid now? Pay-at-start months always; post-paid ones from their due day. */
+  /** Can this month be paid now? Pay-at-start months always; post-paid ones from 15 days before their due day. */
   payable: boolean;
 };
 
 /**
  * Hired placements with months still to pay. Pay-at-start hires (grandfathered)
- * owe the next month straight away; post-paid hires owe month k from its last
- * day, and `payable` says whether that day has come (`todayIst`, YYYY-MM-DD).
+ * owe the next month straight away; post-paid hires owe month k 2 days before
+ * the intern is paid for it, payable from 15 days before that (`todayIst`, YYYY-MM-DD).
  */
 export function monthlyDues(proposals: ProposalLike[], payments: PaymentLike[], todayIst: string = istDay(new Date())!): Due[] {
   const paid = new Map<string, number>();
@@ -166,7 +166,7 @@ export function placementLedger(hire: HireLike, payments: readonly PaidOrderLike
           : addMonths(offer.startDate, covered)
         : null,
     // The last period's end (as the instalments and timesheets count it), not start + months, which is a day later.
-    endsOn: offer.fullTime ? null : (postpaidDueOn(offer.startDate, offer.months, offer.months) ?? addMonths(offer.startDate, offer.months)),
+    endsOn: offer.fullTime ? null : (engagementEndOn(offer.startDate, offer.months) ?? addMonths(offer.startDate, offer.months)),
     status: dueMinor === 0 && paidMinor > 0 ? "fully_paid" : paidMinor > 0 ? "partially_paid" : "unpaid",
   };
 }

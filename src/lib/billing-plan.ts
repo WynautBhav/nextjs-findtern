@@ -11,7 +11,7 @@ import { engagementPeriods } from "./employer-timesheets.ts";
  *
  *  - upfront          first order "total"/"upfront", no mode, or any unknown mode: everything paid at hire.
  *  - monthly_prepaid  first order "monthly": month 1 + fee at hire, each later month at its start (grandfathered).
- *  - postpaid         first order "hiring_fee": the fee only at hire; month k is due on the last day of month k.
+ *  - postpaid         first order "hiring_fee": the fee only at hire; month k is due 2 days before the intern is paid for it (stipendMonthDates).
  *  - unpaid           no paid order names the hire yet.
  * The plan is decided by the OLDEST paid order naming the hire, so hires paid
  * before this rule shipped keep their plan with no backfill.
@@ -79,17 +79,54 @@ export function istDay(d: Date | string | null | undefined): string | null {
 export const postpaidAnchor = (startDate: string | null | undefined, hiredAt: Date | string | null | undefined): string | null =>
   /^\d{4}-\d{2}-\d{2}/.test(String(startDate ?? "")) ? String(startDate).slice(0, 10) : istDay(hiredAt);
 
-/** YYYY-MM-DD month `k` (1-based) is due: the last day of that engagement month (same periods as timesheets). Null when no anchor or k is out of range. */
+/** YYYY-MM-DD plus `months` calendar months, clamped to the target month's last day (31 Jan + 1 = 28/29 Feb). */
+function addMonthsDay(day: string, months: number): string {
+  const [y, m, d] = day.slice(0, 10).split("-").map(Number);
+  const last = new Date(Date.UTC(y, m - 1 + months + 1, 0)).getUTCDate();
+  return new Date(Date.UTC(y, m - 1 + months, Math.min(d, last))).toISOString().slice(0, 10);
+}
+
+const addDaysDay = (day: string, days: number) => new Date(Date.parse(`${day.slice(0, 10)}T00:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10);
+
+/** Days before the intern's pay day that the employer's month falls due, so Findtern never pays an intern before the employer has paid. */
+export const EMPLOYER_DUE_LEAD_DAYS = 2;
+/** Days before the employer's due day that month k can be paid (and reminders start). */
+export const PAY_WINDOW_DAYS = 15;
+
+/**
+ * The ONE place stipend dates come from. Month `k` (1-based) of an engagement starting `anchor` (YYYY-MM-DD, IST):
+ *  - `internPayOn`: the intern is paid for it on anchor + k months (end of the month worked, clamped).
+ *  - `employerDueOn`: the employer owes it EMPLOYER_DUE_LEAD_DAYS (2) days earlier.
+ *  - `payableFrom`: the employer can pay it from PAY_WINDOW_DAYS (15) days before that.
+ * Null when there is no anchor or `k` is not 1..months.
+ */
+export function stipendMonthDates(
+  anchor: string | null | undefined,
+  months: number,
+  k: number,
+): { internPayOn: string; employerDueOn: string; payableFrom: string } | null {
+  if (!anchor || !/^\d{4}-\d{2}-\d{2}/.test(anchor) || !Number.isInteger(k) || k < 1 || k > months) return null;
+  const internPayOn = addMonthsDay(anchor, k);
+  const employerDueOn = addDaysDay(internPayOn, -EMPLOYER_DUE_LEAD_DAYS);
+  return { internPayOn, employerDueOn, payableFrom: addDaysDay(employerDueOn, -PAY_WINDOW_DAYS) };
+}
+
+/** YYYY-MM-DD the employer owes month `k` (1-based): 2 days before the intern's pay day for it. Null when no anchor or k is out of range. */
 export function postpaidDueOn(anchor: string | null | undefined, months: number, k: number): string | null {
-  if (!anchor || !Number.isInteger(k) || k < 1 || k > months) return null;
-  return engagementPeriods(anchor, months)[k - 1]?.end ?? null;
+  return stipendMonthDates(anchor, months, k)?.employerDueOn ?? null;
+}
+
+/** YYYY-MM-DD the last engagement month ends (as timesheets count it), e.g. 6 Nov + 2 months ends 5 Jan. */
+export function engagementEndOn(anchor: string | null | undefined, months: number): string | null {
+  if (!anchor || !/^\d{4}-\d{2}-\d{2}/.test(anchor) || months < 1) return null;
+  return engagementPeriods(anchor, months).at(-1)?.end ?? null;
 }
 
 export type PostpaidNext = { k: number; dueOn: string; payable: boolean };
 
-/** The next unpaid month of a post-paid hire; null when all are paid or the anchor is unknown. */
+/** The next unpaid month of a post-paid hire; null when all are paid or the anchor is unknown. Payable from 15 days before its due day, and any time after. */
 export function postpaidNext(anchor: string | null | undefined, months: number, monthsPaid: number, todayIst: string): PostpaidNext | null {
   const k = monthsPaid + 1;
-  const dueOn = postpaidDueOn(anchor, months, k);
-  return dueOn ? { k, dueOn, payable: todayIst >= dueOn } : null;
+  const d = stipendMonthDates(anchor, months, k);
+  return d ? { k, dueOn: d.employerDueOn, payable: todayIst >= d.payableFrom } : null;
 }

@@ -125,7 +125,7 @@ export function computeReceivables(input: ReceivablesInput, filter: { receivable
       const offer = parseOffer(p.offerDetails, p.currency);
       const instalment = lineCharge(offer, input.scoreOf(p.internId), "monthly", { firstPayment: false }).totalMinor;
       for (let i = d.monthsPaid; i < d.months; i++) {
-        // Post-paid: month k is due on its last day, overdue the day after.
+        // Post-paid: month k is due 2 days before the intern is paid for it, overdue the day after.
         const postpaid = d.plan === "postpaid";
         const date = postpaid ? postpaidDueOn(postpaidAnchor(offer.startDate, p.hiredAt), d.months, i + 1) : addMonthsIso(offer.startDate, i);
         if (!inRange(date)) continue;
@@ -135,7 +135,7 @@ export function computeReceivables(input: ReceivablesInput, filter: { receivable
             date: date!,
             source: "company",
             status: postpaid && date! < istDayKey(input.now ?? new Date())! ? "due" : "upcoming",
-            description: postpaid ? `Month ${i + 1} of ${d.months} stipend (paid at month end)` : `Monthly instalment ${i + 1} of ${d.months}`,
+            description: postpaid ? `Month ${i + 1} of ${d.months} stipend (due 2 days before the intern is paid)` : `Monthly instalment ${i + 1} of ${d.months}`,
             companyName: input.employerName(p.employerId),
             candidateName: input.internName(p.internId),
             amountMinor: instalment,

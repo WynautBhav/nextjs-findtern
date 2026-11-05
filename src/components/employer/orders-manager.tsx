@@ -365,7 +365,7 @@ function HiresPanel({
                     ) : null}
                     {postpaid && h.ledger.nextDue ? (
                       <p className="nums mt-1 text-sm font-medium text-ink-900">
-                        Month {h.ledger.monthsPaid + 1} of {h.ledger.months} · {due ? "Due now" : `Due on ${formatDate(h.ledger.nextDue)}`}
+                        Month {h.ledger.monthsPaid + 1} of {h.ledger.months} · {due && h.ledger.nextDue <= todayIst() ? "Due now" : `Due on ${formatDate(h.ledger.nextDue)}${due ? " · you can pay it now" : ""}`}
                       </p>
                     ) : null}
                     <p className="nums mt-1 text-sm text-ink-600">
