@@ -12,6 +12,7 @@ names.role.set("fb2_viewer", "Viewer");
 names.role.set("exec_sales", "Sales");
 names.admin.set("a1", "Priya Nair");
 names.promo.set("pr1", "FB1INT10");
+names.collegeAdmin.set("o1", "Asha Rao (asha@manipal.test)");
 
 test("diffFields keeps only what changed; dates compare as instants, undefined is skipped", () => {
   const d = new Date("2026-11-05T00:00:00.000Z");
@@ -85,4 +86,15 @@ test("targets: staff and role rows link to the staff page, exports to their list
   assert.deepEqual(describeTarget("export.interns", "intern", null, {}, names), { name: "Candidates", href: "/admin/interns" });
   assert.deepEqual(describeTarget("intern.ratings_update", "intern", "i1", {}, names), { name: "Sana Kapoor", href: "/admin/interns/i1" });
   assert.deepEqual(describeTarget("payout.mark_paid", "payout", "p1", { internId: "i1" }, names), { name: "Payout to Sana Kapoor", href: "/admin/interns/i1" });
+});
+
+test("a TPO password reset names the college officer, falling back to the email kept in meta", () => {
+  assert.deepEqual(describeTarget("college.password_reset", "college_admin", "o1", {}, names), { name: "Asha Rao (asha@manipal.test)", href: "/admin/colleges" });
+  assert.deepEqual(describeTarget("college.password_reset", "college_admin", "gone", { email: "x@y.test" }, names), { name: "x@y.test", href: "/admin/colleges" });
+});
+
+test("a manual activation payment reads 'Manual payment' with its reference, not the internal order id", () => {
+  const out = describeAudit("intern.activation_marked_paid", { orderId: "manual_8c175aaf-e1b7-4c1d-9a0b-123456789abc_1a2b3c4d", amountMinor: 249900, reference: "UTR123" });
+  assert.equal(out, "Manual payment · Amount: ₹2,499 · Reference: UTR123");
+  assert.ok(!out.includes("manual_"));
 });

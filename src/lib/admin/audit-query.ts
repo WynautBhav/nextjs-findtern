@@ -32,6 +32,7 @@ const targetNameSql = sql`coalesce(
   (select ${schema.employers.companyName} from ${schema.employers} where ${schema.employers.id} = ${L.targetId}),
   (select ${schema.colleges.name} from ${schema.colleges} where ${schema.colleges.id} = ${L.targetId}),
   (select ${schema.promoCodes.code} from ${schema.promoCodes} where ${schema.promoCodes.id} = ${L.targetId}),
+  (select concat_ws(' ', ${schema.collegeAdmins.name}, ${schema.collegeAdmins.email}) from ${schema.collegeAdmins} where ${schema.collegeAdmins.id} = ${L.targetId}),
   (select coalesce(${schema.admins.name}, ${schema.admins.email}) from ${schema.admins} where ${schema.admins.id} = ${L.targetId}),
   (select ${schema.adminRoles.name} from ${schema.adminRoles} where ${schema.adminRoles.id} = ${L.targetId}),
   (select concat_ws(' ', ${schema.users.firstName}, ${schema.users.lastName}) from ${schema.users} where ${schema.users.id} = ${L.meta}->>'internId'),
@@ -85,13 +86,15 @@ export async function loadAudit(params: Record<string, string>, search: string, 
   const collegeIds = collect("college", "collegeId");
   const adminIds = collect("admin");
   const promoIds = collect("promo_code");
-  const [users, employers, colleges, admins, promos, roles] = await Promise.all([
+  const officerIds = collect("college_admin");
+  const [users, employers, colleges, admins, promos, roles, officers] = await Promise.all([
     internIds.length ? db.select({ id: schema.users.id, a: schema.users.firstName, b: schema.users.lastName }).from(schema.users).where(inArray(schema.users.id, internIds)) : [],
     employerIds.length ? db.select({ id: schema.employers.id, a: schema.employers.companyName }).from(schema.employers).where(inArray(schema.employers.id, employerIds)) : [],
     collegeIds.length ? db.select({ id: schema.colleges.id, a: schema.colleges.name }).from(schema.colleges).where(inArray(schema.colleges.id, collegeIds)) : [],
     adminIds.length ? db.select({ id: schema.admins.id, a: schema.admins.name, b: schema.admins.email }).from(schema.admins).where(inArray(schema.admins.id, adminIds)) : [],
     promoIds.length ? db.select({ id: schema.promoCodes.id, code: schema.promoCodes.code }).from(schema.promoCodes).where(inArray(schema.promoCodes.id, promoIds)) : [],
     db.select({ id: schema.adminRoles.id, key: schema.adminRoles.key, name: schema.adminRoles.name }).from(schema.adminRoles),
+    officerIds.length ? db.select({ id: schema.collegeAdmins.id, a: schema.collegeAdmins.name, b: schema.collegeAdmins.email }).from(schema.collegeAdmins).where(inArray(schema.collegeAdmins.id, officerIds)) : [],
   ]);
   // An action an employer tripped (automatic completion on final approval) has no staff row: name the company instead.
   const actorIds = [...new Set(raw.filter((r) => r.staffName == null && r.staffEmail == null).map((r) => r.adminId))];
@@ -105,6 +108,7 @@ export async function loadAudit(params: Record<string, string>, search: string, 
   for (const c of colleges) names.college.set(c.id, c.a);
   for (const a of admins) names.admin.set(a.id, a.a || a.b);
   for (const p of promos) names.promo.set(p.id, p.code);
+  for (const o of officers) names.collegeAdmin.set(o.id, `${o.a} (${o.b})`);
   for (const r of roles) {
     names.role.set(r.key, r.name);
     names.role.set(r.id, r.name);

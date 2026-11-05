@@ -18,10 +18,12 @@ export type AuditNames = {
   admin: Map<string, string>;
   /** Promo code text by id. */
   promo: Map<string, string>;
+  /** College officers (TPOs) by id, as "Name (email)". */
+  collegeAdmin: Map<string, string>;
 };
 
 export function emptyNames(): AuditNames {
-  return { intern: new Map(), company: new Map(), college: new Map(), role: new Map(), admin: new Map(), promo: new Map() };
+  return { intern: new Map(), company: new Map(), college: new Map(), role: new Map(), admin: new Map(), promo: new Map(), collegeAdmin: new Map() };
 }
 
 type Ctx = { action: string; meta: Record<string, unknown>; names: AuditNames };
@@ -162,6 +164,10 @@ export function describeAudit(action: string, rawMeta: unknown, names: AuditName
     if (k === "filters" || k === "columns") continue;
     if (k === "code" && action.startsWith("promo.")) continue; // the target shows the code
     if (k === "discountType" && "changes" in m) continue; // context for the discount value only
+    if (k === "orderId" && typeof v === "string" && v.startsWith("manual_")) {
+      parts.push("Manual payment"); // the internal order id means nothing to staff; the reference follows
+      continue;
+    }
     if (k === "changes" && isRecord(v)) {
       const rows = Object.entries(v).map(([ck, cv]) => entry(ck, cv, ctx)).filter((x): x is string => x !== null);
       parts.push(...(rows.length ? rows : ["No fields changed"]));
@@ -207,6 +213,7 @@ export function describeTarget(
   if (type === "promo_code") return { name: names.promo.get(id) ?? str("code"), href: "/admin/promo-codes" };
   if (type === "role") return { name: names.role.get(id) ?? str("name"), href: "/admin/roles" };
   if (type === "admin") return { name: names.admin.get(id) ?? str("name") ?? str("email"), href: "/admin/roles" };
+  if (type === "college_admin") return { name: names.collegeAdmin.get(id) ?? str("email"), href: "/admin/colleges" };
   if (type === "pricing_plan") return { name: str("plan"), href: null };
   return { name: null, href: null };
 }
