@@ -242,3 +242,18 @@ test("W6: Total is the monthly stipend × months; the intern's next pay day and 
   const [c] = stipendDues([hired("p1", offer)], [], 7, [{ status: "paid", raw: { notes: { proposalIds: ["p1"], paymentMode: "total" } } }]);
   assert.equal(c.employer!.nextDueOn, null);
 });
+
+test("shortMinor: 0 when paid and remaining add up to the total, the gap when a payout was smaller", () => {
+  const offer = { monthlyAmount: 20000, duration: "3m", startDate: "2026-01-01" };
+  const payout = (amountMinor: number) => ({ status: "paid", amountMinor, currency: "INR", raw: { proposalId: "p1" } });
+  const [whole] = stipendDues([hired("p1", offer)], [payout(1_000_000)], 7.5);
+  assert.equal(whole.paidMinor + whole.remainingMinor, whole.totalShareMinor);
+  assert.equal(whole.shortMinor, 0);
+  // one month paid at ₹6,000 instead of ₹10,000: ₹4,000 is covered by nothing
+  const [part] = stipendDues([hired("p1", offer)], [payout(600_000)], 7.5);
+  assert.equal(part.shortMinor, 400_000);
+  assert.equal(part.totalShareMinor - part.paidMinor - part.remainingMinor, part.shortMinor);
+  // overpaid never reads as negative
+  const [over] = stipendDues([hired("p1", offer)], [payout(1_500_000)], 7.5);
+  assert.equal(over.shortMinor, 0);
+});

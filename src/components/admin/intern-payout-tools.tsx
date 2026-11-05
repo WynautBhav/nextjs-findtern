@@ -262,6 +262,12 @@ export function InternPayoutTools({
                       <dt className={dt}>Remaining</dt>
                       <dd className="nums font-semibold text-ink-900">{inr(d.remainingMinor)}</dd>
                     </div>
+                    {d.shortMinor > 0 ? (
+                      <div>
+                        <dt className={dt}>Short by</dt>
+                        <dd className="nums text-ink-700">{inr(d.shortMinor)}</dd>
+                      </div>
+                    ) : null}
                     <div>
                       <dt className={dt}>Months paid</dt>
                       <dd className="nums text-ink-700">

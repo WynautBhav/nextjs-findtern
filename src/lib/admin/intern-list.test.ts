@@ -19,6 +19,7 @@ const due = (over: Partial<StipendDue>): StipendDue => ({
   pending: false,
   remainingMonths: 3,
   remainingMinor: 1_500_000,
+  shortMinor: 0,
   nextDate: "2026-10-01",
   ...over,
 });

@@ -75,6 +75,8 @@ export type StipendDue = {
   pendingPayoutId: string | null;
   remainingMonths: number;
   remainingMinor: number;
+  /** Total minus paid minus remaining, when positive: stipend that no payout and no unpaid month covers (a part payment, a changed share). 0 when it adds up. */
+  shortMinor: number;
   /** YYYY-MM-DD of the next unpaid month, null when nothing is left. */
   nextDate: string | null;
   /** Employer side, when orders were supplied. */
@@ -301,6 +303,7 @@ export function stipendDues(
         pendingPayoutId: pending.get(p.id) ?? null,
         remainingMonths,
         remainingMinor: share * remainingMonths,
+        shortMinor: Math.max(0, share * months - ((paidMinor.get(p.id) ?? 0) + matchedMinor) - share * remainingMonths),
         nextDate,
         employer,
         aheadOfEmployer: Boolean(employer && remainingMonths > 0 && share > 0 && paidMonths >= employer.paidMonths),
