@@ -1,5 +1,5 @@
 import type { InvoiceLine } from "./invoice.ts";
-import { lineCharge } from "./checkout.ts";
+import { acceptedLineCharge } from "./accepted-charge.ts";
 import { engagementPeriods } from "./employer-timesheets.ts";
 import type { Offer } from "./offer.ts";
 import { formatMoney } from "./format.ts";
@@ -36,7 +36,7 @@ export function hireInvoiceLines(input: {
   // A nameless or deleted candidate still reads "Candidate — Designer", never "— Designer".
   const who = input.who.trim() || "Candidate";
   if (input.postpaid === "fee") {
-    const fee = lineCharge(offer, 10, "postpaid").perHireMinor;
+    const fee = acceptedLineCharge(offer, "postpaid").perHireMinor;
     return [
       {
         label: `${who} — Hiring charge`,
@@ -49,7 +49,7 @@ export function hireInvoiceLines(input: {
     const k = input.postpaid;
     const p = offer.startDate ? engagementPeriods(offer.startDate, offer.months)[k - 1] : undefined;
     const day = (iso: string) => new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", timeZone: "UTC" }).format(new Date(`${iso}T00:00:00Z`)).replace("Sept", "Sep");
-    const listed = lineCharge(offer, 10, "postpaid", { firstPayment: false }).totalMinor;
+    const listed = acceptedLineCharge(offer, "postpaid", { firstPayment: false }).totalMinor;
     return [
       {
         label: `${who} — ${roleTitle || projectName}`,
@@ -60,7 +60,7 @@ export function hireInvoiceLines(input: {
   }
   const first = paymentIndex === 0;
   // Score 10: the mode was already allowed when the order was made.
-  const charge = lineCharge(offer, 10, monthly ? "monthly" : "upfront", { firstPayment: first });
+  const charge = acceptedLineCharge(offer, monthly ? "monthly" : "upfront", { firstPayment: first });
   const feeMinor = charge.perHireMinor;
   const listed = charge.baseMinor - feeMinor;
   // Below the fee only happens in free mode: fall back to the list price (never `>= 0`, that would print a negative stipend).

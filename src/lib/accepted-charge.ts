@@ -6,8 +6,8 @@ import type { Offer } from "./offer.ts";
  * on the monthly / post-paid plan, so by the time one is accepted the score
  * gate has been passed. A later score change or a cleared score must not
  * reprice it (a drop below 6 would set `monthlyBlocked` and price a due month
- * as the whole engagement). dues.ts, invoice-lines.ts and payment-reminders.ts
- * pass the same 10.
+ * as the whole engagement). Every accepted-offer price (dues, invoices,
+ * reminders, admin money views, a due month at checkout) goes through here.
  */
 export const ACCEPTED_OFFER_SCORE = 10;
 

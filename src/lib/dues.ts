@@ -1,5 +1,5 @@
 import { billingPlanOf, engagementEndOn, istDay, orderNotes, postpaidAnchor, postpaidDueOn, postpaidMonthsPaid, postpaidNext } from "./billing-plan.ts";
-import { lineCharge } from "./checkout.ts";
+import { acceptedLineCharge } from "./accepted-charge.ts";
 import { monthsOf, parseOffer } from "./offer.ts";
 
 /**
@@ -108,8 +108,8 @@ function addMonths(isoDay: string | null, months: number): string | null {
 
 export function placementLedger(hire: HireLike, payments: readonly PaidOrderLike[]): PlacementLedger {
   const offer = parseOffer(hire.offerDetails, hire.currency);
-  const upfront = lineCharge(offer, 10, "upfront");
-  const monthly = lineCharge(offer, 10, "monthly", { firstPayment: false });
+  const upfront = acceptedLineCharge(offer, "upfront");
+  const monthly = acceptedLineCharge(offer, "monthly", { firstPayment: false });
   let upfrontPaid = false;
   let monthsPaid = 0;
   // What promo codes took off this hire. An order stores it (`raw.promo`), and

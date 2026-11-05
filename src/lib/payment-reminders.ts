@@ -1,5 +1,5 @@
 import { billingPlanOf, istDay, PAY_WINDOW_DAYS, postpaidAnchor, postpaidDueOn, postpaidMonthsPaid, type PlanOrder } from "./billing-plan.ts";
-import { lineCharge } from "./checkout.ts";
+import { acceptedLineCharge } from "./accepted-charge.ts";
 import { emails } from "./emails.ts";
 import { formatDate, formatMoney } from "./format.ts";
 import { monthsOf, parseOffer } from "./offer.ts";
@@ -51,7 +51,7 @@ export function reminderDue(
   const type: ReminderType = offset === OVERDUE_AFTER_DAYS ? "overdue" : offset === 0 ? "due" : "upcoming";
   if (sent.has(reminderKey(hire.id, k, type, offset))) return null;
   // A post-paid month is the stipend alone (as invoice-lines prices it); a later score change must not drop the reminder.
-  const amountMinor = lineCharge(offer, 10, "postpaid", { firstPayment: false }).totalMinor;
+  const amountMinor = acceptedLineCharge(offer, "postpaid", { firstPayment: false }).totalMinor;
   return amountMinor > 0 ? { k, type, offset, dueOn, dueToday: todayIst === dueOn, amountMinor, currency: offer.currency } : null; // nothing to pay, nothing to chase
 }
 
