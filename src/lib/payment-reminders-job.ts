@@ -1,11 +1,9 @@
 import { and, eq, inArray, like, sql } from "drizzle-orm";
 
 import { getDb, schema } from "@/lib/db";
-import { emails } from "@/lib/emails";
-import { formatDate, formatMoney } from "@/lib/format";
 import { notify } from "@/lib/notify";
 import { billingPlanOf, istDay } from "@/lib/billing-plan";
-import { reminderDue, reminderKey } from "@/lib/payment-reminders";
+import { reminderDue, reminderEmail, reminderKey } from "@/lib/payment-reminders";
 
 /**
  * Sends today's month-end stipend reminders. Idempotent: `notify` writes a notification row with a
@@ -42,8 +40,7 @@ export async function sendPaymentReminders(now = new Date()): Promise<{ sent: nu
     if (!emp?.isActive) continue;
     const r = reminderDue(h, orders.filter((o) => o.employerId === h.employerId), sent, today);
     if (!r) continue;
-    const amount = formatMoney(r.amountMinor, r.currency, { decimals: 0 });
-    const mail = emails.paymentReminder({ name: emp.name ?? "", type: r.type, k: r.k, amount, dueOn: formatDate(r.dueOn), dueToday: r.dueToday, intern: intern.get(h.internId) ?? "your intern" });
+    const mail = reminderEmail(r, { name: emp.name ?? "", intern: intern.get(h.internId) ?? "your intern" });
     const key = reminderKey(h.id, r.k, r.type);
     const ok = await notify({
       to: { type: "employer", id: h.employerId },

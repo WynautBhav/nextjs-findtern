@@ -1,10 +1,17 @@
 import { billingPlanOf, istDay, postpaidAnchor, postpaidDueOn, postpaidMonthsPaid, type PlanOrder } from "./billing-plan.ts";
 import { lineCharge } from "./checkout.ts";
+import { emails } from "./emails.ts";
+import { formatDate, formatMoney } from "./format.ts";
 import { monthsOf, parseOffer } from "./offer.ts";
 
 /** Month-end stipend reminders for post-paid hires (plan "postpaid", fixed when the hire was paid; the current score is not looked at). One per hire, month and type. */
 export type ReminderType = "upcoming" | "due" | "overdue";
 export type Reminder = { k: number; type: ReminderType; dueOn: string; dueToday: boolean; amountMinor: number; currency: string };
+
+/** The reminder mail: the due day reads "8 Nov 2026" (IST) and the amount "₹16,000", never the stored 2026-11-08 or raw paise. */
+export function reminderEmail(r: Reminder, who: { name: string; intern: string }) {
+  return emails.paymentReminder({ name: who.name, type: r.type, k: r.k, amount: formatMoney(r.amountMinor, r.currency), dueOn: formatDate(r.dueOn), dueToday: r.dueToday, intern: who.intern });
+}
 
 export const REMINDER_LEAD_DAYS = 3;
 export const reminderKey = (proposalId: string, k: number, type: ReminderType) => `payment_reminder:${proposalId}:${k}:${type}`;

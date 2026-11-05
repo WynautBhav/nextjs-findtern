@@ -3,7 +3,7 @@ import test from "node:test";
 
 import { istDay } from "./billing-plan.ts";
 import { emails } from "./emails.ts";
-import { reminderDue, reminderKey } from "./payment-reminders.ts";
+import { reminderDue, reminderEmail, reminderKey } from "./payment-reminders.ts";
 
 const fee = (id: string) => ({ status: "paid", paidAt: "2026-09-01T00:00:00Z", raw: { notes: { proposalIds: [id], paymentMode: "hiring_fee" } } });
 const month = (id: string, at: string) => ({ status: "paid", paidAt: at, raw: { notes: { proposalIds: [id], dueProposalIds: [id], paymentMode: "total" } } });
@@ -70,4 +70,18 @@ test("reminders follow the billing plan, not the current score: a post-paid hire
     assert.equal(r.amountMinor, stipend, `score ${score}`);
   }
   assert.equal(stipend, 1_000_000); // 10000 rupees, in minor units
+});
+
+test("reminder mails and their in-app copy show 'due on 8 Nov 2026' and ₹16,000, never the ISO day", () => {
+  process.env.PUBLIC_ORIGIN = "http://localhost:3000";
+  const base = { k: 2, dueOn: "2026-11-08", dueToday: false, amountMinor: 1_600_000, currency: "INR" };
+  for (const type of ["upcoming", "due", "overdue"] as const) {
+    const m = reminderEmail({ ...base, type }, { name: "Acme", intern: "Asha Rao" });
+    const text = `${m.subject} ${m.heading} ${m.lines.join(" ")} ${(m.facts ?? []).flat().join(" ")}`;
+    assert.doesNotMatch(text, /\d{4}-\d{2}-\d{2}/, type);
+    assert.match(text, /₹16,000/, type);
+    assert.match(text, /8 Nov 2026/, type);
+  }
+  assert.match(reminderEmail({ ...base, type: "upcoming" }, { name: "Acme", intern: "A" }).lines[0], /falls due on 8 Nov 2026\./);
+  assert.match(reminderEmail({ ...base, type: "due", amountMinor: 1_234_550 }, { name: "Acme", intern: "A" }).heading, /₹12,345\.50/);
 });
