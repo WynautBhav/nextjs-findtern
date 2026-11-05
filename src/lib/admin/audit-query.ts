@@ -23,6 +23,22 @@ export type AuditRow = {
   details: string;
 };
 
+/**
+ * The name of whatever a row points at, as one searchable value: the candidate, company,
+ * college, promo code, staff member or role the target id belongs to, the candidate a
+ * payout is for, or the code kept in meta when the promo was deleted.
+ */
+const targetNameSql = sql`coalesce(
+  (select concat_ws(' ', ${schema.users.firstName}, ${schema.users.lastName}) from ${schema.users} where ${schema.users.id} = ${L.targetId}),
+  (select ${schema.employers.companyName} from ${schema.employers} where ${schema.employers.id} = ${L.targetId}),
+  (select ${schema.colleges.name} from ${schema.colleges} where ${schema.colleges.id} = ${L.targetId}),
+  (select ${schema.promoCodes.code} from ${schema.promoCodes} where ${schema.promoCodes.id} = ${L.targetId}),
+  (select coalesce(${schema.admins.name}, ${schema.admins.email}) from ${schema.admins} where ${schema.admins.id} = ${L.targetId}),
+  (select ${schema.adminRoles.name} from ${schema.adminRoles} where ${schema.adminRoles.id} = ${L.targetId}),
+  (select concat_ws(' ', ${schema.users.firstName}, ${schema.users.lastName}) from ${schema.users} where ${schema.users.id} = ${L.meta}->>'internId'),
+  ${L.meta}->>'code'
+)`;
+
 /** Filters → WHERE. The date range is in IST days (the page shows IST). */
 export function auditConditions(params: Record<string, string>, search = ""): SQL[] {
   const { from, toExclusive } = parseDateRange(params);
@@ -31,7 +47,7 @@ export function auditConditions(params: Record<string, string>, search = ""): SQ
     params.staff ? eq(L.adminId, params.staff) : undefined,
     from ? sql`${L.createdAt} >= ${new Date(from.getTime() - IST_MS)}` : undefined,
     toExclusive ? sql`${L.createdAt} < ${new Date(toExclusive.getTime() - IST_MS)}` : undefined,
-    searchAny([sql`${L.action}`, sql`${schema.admins.name}`, sql`${schema.admins.email}`, sql`${L.targetId}`], search),
+    searchAny([sql`${L.action}`, sql`${schema.admins.name}`, sql`${schema.admins.email}`, sql`${L.targetId}`, targetNameSql], search),
   ].filter((c): c is SQL => Boolean(c));
 }
 

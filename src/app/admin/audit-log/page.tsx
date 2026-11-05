@@ -93,7 +93,7 @@ export default async function AdminAuditLogPage({ searchParams }: { searchParams
         columns={columns}
         noun="entries"
         caption="Admin audit log"
-        searchPlaceholder="Search action, staff or target id"
+        searchPlaceholder="Search action, staff or target"
         exportHref={`/api/admin/audit-log/export${toQueryString(exportParams)}`}
         filters={[
           { key: "action", label: "Action", allLabel: "Every action", options: Object.entries(AUDIT_ACTIONS).map(([value, label]) => ({ value, label })) },
