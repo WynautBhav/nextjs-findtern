@@ -119,7 +119,7 @@ export const HOME_STUDENT_BANDS = [
 /** The home and about pages quote the same three product terms. */
 export const PROOF_STATS = [
   { value: 100, prefix: "", suffix: "%", label: "Screened before you see them" },
-  { value: 3, prefix: "", suffix: "", label: "Plans, no lock-in" },
+  { value: 3, prefix: "", suffix: "", label: "Plans to pick from" },
   // Shown in the visitor's currency (PerHireFigure); these are the INR defaults.
   { value: 5000, prefix: "₹", suffix: "", label: "Fixed per-hire fee", perHire: true },
 ] as const;

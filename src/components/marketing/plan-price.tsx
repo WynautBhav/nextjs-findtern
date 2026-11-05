@@ -102,7 +102,7 @@ export function OfferNote({
 }) {
   return (
     <p className={cn("text-[13px] leading-relaxed", tone === "dark" ? "text-on-dark-subtle" : "text-ink-600", className)}>
-      Free through 2026. {formatRate(wasMinor, currency)} from January 2027.
+      {formatRate(wasMinor, currency)}, currently discounted to free.
     </p>
   );
 }
