@@ -30,6 +30,8 @@ export type EditableOffer = {
   weeklySchedule?: string;
   /** Band rate the offer was priced on, minor units; hours × this is the month. */
   hourlyRateMinor?: number | null;
+  /** Fixed intern stipend (INR minor); shown, never edited. */
+  internStipendMinor?: number | null;
   paidLeavesPerMonth?: number;
   message?: string;
   additionalInfo?: string;
@@ -259,6 +261,11 @@ export function ProposalOfferForm({
             {monthlyMinor != null ? ` · ${formatMoney(monthlyMinor, currency)} a month` : ""}
             {monthlyMinor != null && currency === "INR" ? <span className="text-text-subtle"> (includes GST)</span> : null}
           </p>
+          {initial.internStipendMinor ? (
+            <p className="text-xs text-text-subtle">
+              Intern&apos;s stipend: {formatMoney(initial.internStipendMinor, "INR")} a month (fixed, not affected by this edit)
+            </p>
+          ) : null}
           <p className="text-xs text-text-subtle">
             ({days} working days − {Number(leaves) || 0} leave) × 8 h
           </p>

@@ -204,6 +204,7 @@ export default async function EmployerProposalDetail({
               <SectionHead title="Terms" />
               <dl className="divide-y divide-ink-100">
                 <DetailRow label="Hourly rate" value={offer.hourlyRateMinor ? `${formatMoney(offer.hourlyRateMinor, currency)} an hour` : offer.hourlyRateMinor === 0 ? "Free" : "-"} mono />
+                {offer.internStipendMinor ? <DetailRow label="Intern's stipend" value={`${formatMoney(offer.internStipendMinor, "INR")} a month (fixed)`} mono /> : null}
                 <DetailRow
                   label="Monthly amount"
                   value={
@@ -316,6 +317,13 @@ export default async function EmployerProposalDetail({
         </div>
 
         <aside className="order-first space-y-4 lg:order-none lg:sticky lg:top-24 lg:self-start">
+          <Link
+            href={`/employer/intern/${encodeURIComponent(proposal.internId)}`}
+            className="apple-spring flex min-h-11 items-center justify-between gap-2 rounded-apple-xl border border-dashed border-ink-200 px-5 py-4 text-sm font-medium text-ink-700 hover:border-brand-300 hover:bg-white"
+          >
+            {unlocked ? `${internName}'s profile` : "Candidate profile"}
+            <ArrowUpRight className="size-4 text-ink-400" aria-hidden />
+          </Link>
           <Surface as="section" className="p-5">
             <h2 className="text-base font-semibold text-ink-900">What happens next</h2>
             <p className="mt-2 text-pretty text-sm leading-relaxed text-ink-700">{state.next}</p>
@@ -350,6 +358,7 @@ export default async function EmployerProposalDetail({
                       startDate: offer.startDate ?? undefined,
                       weeklySchedule: offer.weeklySchedule,
                       hourlyRateMinor: offer.hourlyRateMinor,
+                      internStipendMinor: offer.internStipendMinor,
                       paidLeavesPerMonth: offer.paidLeavesPerMonth,
                       message: offer.jd,
                       additionalInfo: offer.additionalInfo,
@@ -385,14 +394,6 @@ export default async function EmployerProposalDetail({
               </dl>
             </Surface>
           ) : null}
-
-          <Link
-            href={`/employer/intern/${encodeURIComponent(proposal.internId)}`}
-            className="apple-spring flex min-h-11 items-center justify-between gap-2 rounded-apple-xl border border-dashed border-ink-200 px-5 py-4 text-sm font-medium text-ink-700 hover:border-brand-300 hover:bg-white"
-          >
-            {unlocked ? `${internName}'s profile` : "Candidate profile"}
-            <ArrowUpRight className="size-4 text-ink-400" aria-hidden />
-          </Link>
         </aside>
       </div>
     </div>

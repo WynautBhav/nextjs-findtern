@@ -9,7 +9,7 @@ import { csrfFetch } from "@/lib/client-fetch";
 import { RATING_META, type CandidateSummary } from "@/lib/employer-candidates";
 import { type Currency, type Pricing } from "@/lib/employer-pricing";
 import { formatMoney, formatPerHire, formatRate } from "@/lib/format";
-import { billableWorkingDays, PAID_LEAVE_OPTIONS, scheduledMonthlyHours, WEEKLY_SCHEDULES, workingDaysPerWeek, type WeeklySchedule } from "@/lib/offer";
+import { billableWorkingDays, fixedInternStipendInrMinor, PAID_LEAVE_OPTIONS, scheduledMonthlyHours, WEEKLY_SCHEDULES, workingDaysPerWeek, type WeeklySchedule } from "@/lib/offer";
 import { shiftInIst, TIMEZONES } from "@/lib/timezones";
 import { buttonClass } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -127,6 +127,7 @@ export function SendProposalForm({
   const allowedMode = (m: string | null | undefined) => (m && modes.some((x) => x.value === m) ? m : null);
   const [roleTitle, setRoleTitle] = useState(firstProject?.projectName ?? "");
   // Below a score of 6 the legacy rule caps offers at two months.
+  const internStipend = candidate.scored ? fixedInternStipendInrMinor(candidate.score) : null;
   const shortOnly = candidate.scored && candidate.score > 0 && candidate.score < 6;
   const [duration, setDuration] = useState(shortOnly ? "2m" : "3m");
   const [startDate, setStartDate] = useState("");
@@ -397,6 +398,14 @@ export function SendProposalForm({
               inputMode="decimal"
               hint={`${formatRate(rate.hourlyRateMinor, currency)} × ${monthlyHours} h. Worked out for you.`}
             />
+            {internStipend != null ? (
+              <ReadOnlyField
+                id="internStipend"
+                label="Intern's stipend (INR)"
+                value={`${formatMoney(internStipend, "INR")} / month`}
+                hint="Fixed by the candidate's score band. Paid to the intern in INR from your monthly amount."
+              />
+            ) : null}
           </div>
         </Step>
 
@@ -599,6 +608,7 @@ export function SendProposalForm({
               <Row label={currency === "INR" && totals.monthly > 0 ? "Monthly (incl. GST)" : "Monthly amount"} strong>
                 {formatMoney(Math.round(totals.monthly * 100), currency)}
               </Row>
+              {internStipend != null ? <Row label="Intern's stipend">{formatMoney(internStipend, "INR")} / month</Row> : null}
               <Row label="Duration">{durationLabel || "-"}</Row>
               {totals.perHire > 0 ? (
                 <Row label="Hiring fee (one-time)">{formatMoney(Math.round(totals.perHire * 100), currency)}</Row>
