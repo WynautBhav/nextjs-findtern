@@ -704,7 +704,7 @@ export function PromoCodesManager({
               />
             </div>
 
-            <DialogFooter className="pt-2">
+            <DialogFooter className="sticky bottom-0 -mb-6 bg-background pt-2 pb-6">
               <button
                 type="button"
                 onClick={() => setModalOpen(false)}
