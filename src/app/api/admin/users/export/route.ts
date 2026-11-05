@@ -2,9 +2,11 @@ import { NextResponse } from "next/server";
 
 import { csvFilename, csvResponse, toCsv } from "@/lib/admin/csv";
 import { flattenParams } from "@/lib/admin/params";
+import { recordAdminAudit } from "@/lib/admin/audit";
 import { allows } from "@/lib/admin/permissions";
 import { loadAccounts, USER_SORTS, type UserSort } from "@/lib/admin/users-list";
 import { getSession } from "@/lib/auth";
+import { getDb } from "@/lib/db";
 
 /** CSV of the Registered Users list, with the filters on screen. A read: no CSRF. */
 export async function GET(req: Request) {
@@ -25,6 +27,14 @@ export async function GET(req: Request) {
     limit: 10_000,
     offset: 0,
   });
+
+  // Fail closed: no audit row, no file.
+  try {
+    await recordAdminAudit(getDb(), { adminId: session.uid, action: "export.users", targetType: "user", meta: { rows: rows.length, filters: params } }, { strict: true });
+  } catch (err) {
+    console.error("[admin/users/export] audit insert failed", err);
+    return NextResponse.json({ error: "Could not record the export" }, { status: 500 });
+  }
 
   return csvResponse(
     toCsv(rows, [

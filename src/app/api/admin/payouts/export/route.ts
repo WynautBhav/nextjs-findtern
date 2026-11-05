@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { csvFilename, csvResponse, toCsv, type CsvColumn } from "@/lib/admin/csv";
+import { recordAdminAudit } from "@/lib/admin/audit";
 import { flattenParams } from "@/lib/admin/params";
 import { allows, EXPORT_PERMISSIONS } from "@/lib/admin/permissions";
 import {
@@ -18,6 +19,7 @@ import {
 import { payoutKindLabel } from "@/lib/admin/payout-kind";
 import { todayIst } from "@/lib/timesheet-days";
 import { getSession } from "@/lib/auth";
+import { getDb } from "@/lib/db";
 
 /**
  * CSV of the /admin/payouts lists, with exactly the filters on screen.
@@ -68,6 +70,14 @@ export async function GET(req: Request) {
       { header: "Employer months paid", value: (r) => r.employer?.paidMonths ?? "" },
       { header: "Employer due (INR)", value: (r) => (r.employer ? money(r.employer.dueInrMinor) : "") },
     ];
+    // Fail closed: no audit row, no file.
+    try {
+      await recordAdminAudit(getDb(), { adminId: session.uid, action: "export.payouts", targetType: "payout", meta: { view: "dues", rows: rows.length, filters: params } }, { strict: true });
+    } catch (err) {
+      console.error("[admin/payouts/export] audit insert failed", err);
+      return NextResponse.json({ error: "Could not record the export" }, { status: 500 });
+    }
+
     return csvResponse(toCsv(rows, columns), csvFilename("employer-dues"));
   }
 
@@ -98,5 +108,13 @@ export async function GET(req: Request) {
     { header: "Role", value: (r) => r.notes ?? "" },
     { header: "Ops note", value: (r) => r.opsNote ?? "" },
   ];
+  // Fail closed: no audit row, no file.
+  try {
+    await recordAdminAudit(getDb(), { adminId: session.uid, action: "export.payouts", targetType: "payout", meta: { view: "payouts", rows: rows.length, filters: params } }, { strict: true });
+  } catch (err) {
+    console.error("[admin/payouts/export] audit insert failed", err);
+    return NextResponse.json({ error: "Could not record the export" }, { status: 500 });
+  }
+
   return csvResponse(toCsv(rows, columns), csvFilename("payouts"));
 }

@@ -1,6 +1,7 @@
 import { and, desc, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
+import { recordAdminAudit } from "@/lib/admin/audit";
 import { getDb, schema } from "@/lib/db";
 import { csvFilename, csvResponse, toCsv } from "@/lib/admin/csv";
 import { flattenParams } from "@/lib/admin/params";
@@ -70,6 +71,14 @@ export async function GET(req: Request) {
       (!params.kind || (params.kind === "fulltime" ? Boolean(offer.fullTime) : !offer.fullTime))
     );
   });
+
+  // Fail closed: no audit row, no file.
+  try {
+    await recordAdminAudit(getDb(), { adminId: session.uid, action: "export.hired", targetType: "proposal", meta: { rows: filtered.length, filters: params } }, { strict: true });
+  } catch (err) {
+    console.error("[admin/export/hired] audit insert failed", err);
+    return NextResponse.json({ error: "Could not record the export" }, { status: 500 });
+  }
 
   const body = toCsv(filtered, [
     { header: "Candidate", value: (p) => `${p.firstName ?? ""} ${p.lastName ?? ""}`.trim() },
