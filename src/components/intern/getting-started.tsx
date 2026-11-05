@@ -275,7 +275,7 @@ function FeeTile({ fee, activated }: { fee: string; activated: boolean }) {
         {[
           "Your AI interview",
           "Your Findtern Score, the same report employers read",
-          "Placed within 12 months of your score, or the full fee back",
+          "Placed within 12 months of your AI interview, or the full fee back",
         ].map((line) => (
           <li key={line} className="flex gap-2.5">
             <Check className="mt-0.5 size-4 shrink-0 text-brand-700" aria-hidden />

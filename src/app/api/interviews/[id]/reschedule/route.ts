@@ -90,7 +90,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     title: "Interview rescheduled",
     message: "The company offered new times. Pick the one that works for you.",
     data: { interviewId: id },
-    email: emails.interviewRescheduled({ name: await internFirstName(interview.internId), byEmployer: true }),
+    email: emails.interviewRescheduled({ name: await internFirstName(interview.internId) }),
     attachments: bookedStart
       ? [
           icsInvite({

@@ -5,7 +5,6 @@ import {
   BadgeCheck,
   Clock,
   GraduationCap,
-  Lock,
   MessageSquare,
   ShieldCheck,
   Star,
@@ -24,9 +23,9 @@ import { JsonLd } from "@/components/seo/json-ld";
 import { breadcrumbJsonLd, faqJsonLd, howToJsonLd, webPageJsonLd } from "@/lib/seo";
 
 export const metadata: Metadata = {
-  title: "Paid Internships in India with a Placement Guarantee | For Interns",
+  title: "Internships in India with a Placement Guarantee | For Interns",
   description:
-    "Get assessed once, get a Findtern Score you can see the working for, and get placed in a paid internship. If Findtern does not place you within 12 months of your score, your fee comes back.",
+    "Get assessed once, get a Findtern Score you can see the working for, and get placed in an internship. If Findtern does not place you within 12 months of your AI interview, your fee comes back.",
   alternates: { canonical: "/interns" },
 };
 
@@ -67,12 +66,12 @@ const GUARANTEES = [
   {
     Icon: Clock,
     title: "Placed in 12 months, or your fee back",
-    body: "The clock starts the day your assessment is scored. If we have not placed you in a paid internship within 12 months, the full fee is refunded.",
+    body: "The clock starts the day of your AI interview. If we have not placed you in an internship within 12 months, the full fee is refunded after the window closes, within 7 working days.",
   },
   {
-    Icon: Lock,
-    title: "No lock-in on you",
-    body: "The obligation runs on us. We cannot hold you to a placement period, and we do not charge for one.",
+    Icon: BadgeCheck,
+    title: "Refund in 7 working days",
+    body: "Once the 12-month window closes, the refund reaches your original payment method within 7 working days.",
   },
   {
     Icon: ShieldCheck,
@@ -87,7 +86,7 @@ const INTERN_FAQ = [
       category: "Getting started",
       question: "Is Findtern free for interns?",
       answer:
-        "Creating a profile is free. Making it live and visible to employers requires a one-time fee, refunded in full if we do not place you within 12 months of your score.",
+        "Creating a profile is free. Making it live and visible to employers requires a one-time fee, refunded in full if we do not place you within 12 months of your AI interview.",
     },
     {
       id: "i2",
@@ -122,7 +121,7 @@ const INTERN_FAQ = [
       category: "Payment",
       question: "When do I get paid?",
       answer:
-        "You log hours weekly against the agreed scope. Your manager approves the week, and approved hours roll into the next payment run on a fixed cycle.",
+        "You log hours against the agreed scope and send one timesheet per month, on its last day. Your manager approves it, and the approved month rolls into the next payment run on a fixed cycle.",
     },
     {
       id: "i5",
@@ -139,10 +138,10 @@ export default async function InternsPage() {
     <>
       <JsonLd
         data={[
-          webPageJsonLd({ path: "/interns", name: "Paid internships with Findtern", description: String(metadata.description) }),
+          webPageJsonLd({ path: "/interns", name: "Internships with Findtern", description: String(metadata.description) }),
           breadcrumbJsonLd([{ name: "For interns", path: "/interns" }]),
           howToJsonLd({
-            name: "How to get a paid internship through Findtern",
+            name: "How to get an internship through Findtern",
             description: "Five stages from sign-up to a paid, contracted placement. 45 to 75 minutes of your own time.",
             totalTime: "PT75M",
             steps: STEPS.map((s) => ({ name: s.title, text: s.body })),
@@ -236,7 +235,7 @@ export default async function InternsPage() {
             The <span className="smile is-revealed !text-accent-300">Findtern</span> Guarantee
           </h2>
           <p className="mx-auto mt-6 max-w-2xl text-lg text-on-dark-subtle">
-            Placed within 12 months of your score, or every rupee of the fee comes back.
+            Placed within 12 months of your AI interview, or every rupee of the fee comes back.
           </p>
         </div>
         <div className="mt-14 grid gap-5 md:grid-cols-3">
@@ -267,9 +266,9 @@ export default async function InternsPage() {
       {/* ── Numbers ────────────────────────────────────────────────── */}
       <PageSection className="py-8 sm:py-14 md:py-20">
         <div className="grid grid-cols-3 divide-x divide-ink-200/80 rounded-2xl border border-ink-200/80 bg-white/70 py-5 shadow-xs backdrop-blur-xs sm:divide-x-0 sm:border-0 sm:bg-transparent sm:py-0 sm:shadow-none sm:gap-10">
-          <Figure value={18} suffix=" months" label="Placement window" />
+          <Figure value={12} suffix=" months" label="Placement window" />
           <Figure value={100} suffix="%" label="Refund if not placed" />
-          <Figure value={0} suffix=" lock-in" label="Held against you" />
+          <Figure value={7} suffix=" working days" label="To refund, after the window" />
         </div>
       </PageSection>
 

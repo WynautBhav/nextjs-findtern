@@ -34,7 +34,7 @@ test("missing money stays null, never a made-up default", () => {
   assert.equal(internStipendInrMinor(o), null);
 });
 
-test("intern stipend is half the employer's monthly amount, in INR, USD converted at 100", () => {
+test("legacy offer (no fixed stipend stored): intern stipend is half the employer's monthly amount, in INR, USD converted at 100", () => {
   assert.equal(internStipendInrMinor(parseOffer({ monthlyAmount: 120 }, "USD")), 600_000);
   assert.equal(internStipendInrMinor(parseOffer({ monthlyAmount: 12001 }, "INR")), 600_050);
 });

@@ -58,7 +58,7 @@ export async function quotePromo(input: {
 
   const discountMinor = promoDiscount(row, discountableMinor, input.currency);
   if (audience === "employer" && employerPromoTooLarge(discountMinor, discountableMinor)) {
-    return { ok: false, error: "This code can't be used on a hire. The ₹5,000 hiring fee and the stipend are always charged.", status: 400 };
+    return { ok: false, error: "This code can't be used on a hire. A code can't cover the whole stipend.", status: 400 };
   }
   return { ok: true, promo: row, discountMinor, payableMinor: input.orderMinor - discountMinor };
 }

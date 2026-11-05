@@ -21,7 +21,7 @@ export const SITE = {
   name: "Findtern",
   tagline: "Internship Simplified",
   description:
-    "Hire a verified intern for the price of a coffee, or get placed in a paid internship - or your fee back.",
+    "Hire a verified intern for the price of a coffee, or get an internship within 12 months - or your fee back.",
   url: siteOrigin(),
   /** Interns and general queries. */
   email: "communicate@findtern.in",
@@ -93,17 +93,17 @@ export const HOME_COPY = {
    *  pricing table all speak to the company hiring, so the candidate pitch
    *  lives on /interns rather than being mixed into this line. */
   subhead:
-    "Interviewed, tested and scored before you see a profile. One published rate card, and you pay only for the hours you approve.",
+    "Interviewed, tested and scored before you see a profile. One published rate card, one flat per-hire fee, then billed monthly on the timesheets you approve.",
 } as const;
 
 /** The same hero, for a student who flips the home audience switch. The
  *  employer copy above stays the default; this only swaps the headline,
  *  subhead and CTAs, and the rest of the student pitch lives on /interns. */
 export const HOME_STUDENT_COPY = {
-  headlineLead: "Get a paid internship,",
+  headlineLead: "Get an internship within 12 months,",
   headlineAccent: "or get your fee back.",
   subhead:
-    "One AI interview and an aptitude test give you a Findtern Score that verified employers hire on. Not placed within 12 months? The fee comes back.",
+    "One AI interview and an aptitude test give you a Findtern Score that verified employers hire on. Not placed within 12 months of your AI interview? The fee comes back.",
 } as const;
 
 /** What a student earns by Findtern Score band, shown on the student side of
@@ -111,9 +111,9 @@ export const HOME_STUDENT_COPY = {
  *  visitor's currency). Keys match the band ids in lib/score. A null stipend
  *  means the band has a completion bonus only. */
 export const HOME_STUDENT_BANDS = [
-  { id: "standard", range: "Below 6", stipendMax: null, bonus: 2000 },
-  { id: "skilled", range: "6 to 8", stipendMax: 8000, bonus: 2500 },
-  { id: "assured", range: "8 to 10", stipendMax: 15000, bonus: 3000 },
+  { id: "standard", range: "Below 6", stipend: null, bonus: 2000 },
+  { id: "skilled", range: "6 to 8", stipend: 8000, bonus: 2500 },
+  { id: "assured", range: "8 to 10", stipend: 15000, bonus: 3000 },
 ] as const;
 
 /** The home and about pages quote the same three product terms. */

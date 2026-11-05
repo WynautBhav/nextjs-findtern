@@ -31,7 +31,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const fee = await getFeeRupees();
   return {
     title: "Guaranteed Internship Program: Placed or Your Fee Back",
-    description: `Findtern's internship guarantee for students in India: placed within 12 months of your score or the ₹${fee.toLocaleString("en-IN")} fee is refunded in full. The process, the three conditions, exclusions and refund timing.`,
+    description: `Findtern's internship guarantee for students in India: placed within 12 months of your AI interview or the ₹${fee.toLocaleString("en-IN")} fee is refunded in full. The process, the three conditions, exclusions and refund timing.`,
     alternates: { canonical: "/guaranteed-internship-program" },
   };
 }
@@ -59,7 +59,7 @@ const STEPS = [
   {
     n: "04",
     title: "Internship Placement",
-    text: "Matched directly to approved, paid internship opportunities tailored to your proven skills.",
+    text: "Matched directly to approved internship opportunities tailored to your proven skills.",
   },
   {
     n: "05",
@@ -71,7 +71,7 @@ const STEPS = [
 const PROGRAM_TERMS = [
   {
     title: "1. 12-Month Placement Window",
-    text: "You will be matched and placed in a qualified internship within 12 months of your score confirmation date.",
+    text: "You will be matched and placed in a qualified internship within 12 months of your AI interview.",
   },
   {
     title: "2. 100% Refund Assurance",
@@ -79,7 +79,7 @@ const PROGRAM_TERMS = [
   },
   {
     title: "3. Defined Execution Window",
-    text: "The program features an active placement runway. Refunds are processed immediately once the 12-month guarantee window closes.",
+    text: "The program features an active placement runway. Refunds are issued within 7 working days after the 12-month guarantee window closes.",
   },
   {
     title: "4. Hiding your profile",
@@ -91,7 +91,7 @@ const PROGRAM_TERMS = [
   },
   {
     title: "6. What counts as a placement",
-    text: "A contracted engagement of 160 hours or more: a signed proposal with an employer, hours logged on weekly timesheets, and a stipend paid through Findtern. About four full-time weeks. Shorter work does not count.",
+    text: "A contracted engagement of 160 hours or more: a signed proposal with an employer, hours logged on a monthly timesheet (sent on the period's last day), and a stipend paid through Findtern. About four full-time weeks. Shorter work does not count.",
   },
 ];
 
@@ -134,9 +134,8 @@ const CONDITIONS = [
 
 const termsFor = (fee: number) => [
   { label: "Fee", value: `₹${fee.toLocaleString("en-IN")}`, note: "refundable on conditions" },
-  { label: "Clock starts", value: "Your score", note: "not your sign-up date" },
+  { label: "Clock starts", value: "Your AI interview", note: "not your sign-up date" },
   { label: "Refund timing", value: "After 12 months", note: "not during the window" },
-  { label: "Lock-in on you", value: "None", note: "the obligation runs on us" },
   { label: "Counts as placed", value: "160+ hours", note: "contracted engagement" },
 ];
 
@@ -209,7 +208,7 @@ const FAQS = [
     category: "Refund",
     question: "What does a 160+ hour contracted engagement mean?",
     answer:
-      "A signed proposal with a Findtern employer for at least 160 working hours - about four full-time weeks - logged on weekly timesheets and paid through the platform. Anything shorter does not count as a placement, so the guarantee keeps running.",
+      "A signed proposal with a Findtern employer for at least 160 working hours - about four full-time weeks - logged on a monthly timesheet (sent on the period's last day) and paid through the platform. Anything shorter does not count as a placement, so the guarantee keeps running.",
   },
   {
     id: "g5",
@@ -280,7 +279,7 @@ export default async function GuaranteePage() {
 
       {/* ── Terms at a glance ──────────────────────────────────────── */}
       <PageSection tone="muted">
-        <dl className="grid gap-5 sm:grid-cols-2 lg:grid-cols-5">
+        <dl className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
           {termsFor(fee).map((t) => (
             <div
               key={t.label}
@@ -453,8 +452,8 @@ export default async function GuaranteePage() {
               },
               {
                 Icon: Lock,
-                title: "A score you never completed",
-                body: "The clock only starts when the assessment is scored. An unscored profile is not under guarantee.",
+                title: "An AI interview you never completed",
+                body: "The clock starts with your AI interview. A profile that never completed it is not under guarantee.",
               },
               {
                 Icon: XCircle,

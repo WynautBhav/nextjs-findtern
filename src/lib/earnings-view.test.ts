@@ -51,7 +51,7 @@ test("one card per hired internship; accepted and processing offers earn nothing
     ["p-second", "p-hired"],
   );
   const acme = cards.find((c) => c.proposalId === "p-hired")!;
-  // Half the employer's ₹16,000, in paise; the whole two months still to come.
+  // Legacy offer (no fixed stipend stored): half the employer's ₹16,000, in paise; the whole two months still to come.
   assert.equal(acme.monthlyMinor, 800000);
   assert.equal(acme.remainingMinor, 1600000);
   assert.equal(acme.company, "Acme");

@@ -598,13 +598,13 @@ step("employer: checks out with the month-end stipend plan in free mode → prop
   const path = `/api/employer/${state.employerId}/payment/razorpay/order`;
   await uiOr(
     t,
-    'checkout "stipend at the end of each month" → "Complete for free (test mode)"',
+    `checkout "stipend due 2 days before the intern's pay day" → "Complete for free (test mode)"`,
     async () => {
       await visit(page, "/employer/checkout");
-      await page.getByRole("radio", { name: /stipend at the end of each month/i }).check();
+      await page.getByRole("radio", { name: /stipend due 2 days before the intern.s pay day/i }).check();
       const main = await page.locator("main").innerText();
       assert.match(main, /Hiring charge \(one-time\)/, "the hiring charge is the only amount due now");
-      assert.match(main, /Month 1 · due /, "month 1 is due at the end of the month");
+      assert.match(main, /Month 1 · due /, "month 1 is listed with its due date");
       const res = await clickFor(page, page.getByRole("button", { name: /complete for free/i }), { path, method: "POST" });
       expectOk(`POST ${path}`, res);
       assert.equal(res.body?.free, true);

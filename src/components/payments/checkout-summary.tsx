@@ -26,7 +26,7 @@ export type SummaryLine = {
   upfrontMinor: number;
   /** A running placement's due month (no fee); null on a new hire. */
   monthlyMinor: number | null;
-  /** The hiring charge alone, paid now with each month's stipend due at its month end; null when not offered (score below 6, full-time). */
+  /** The hiring charge alone, paid now with each month's stipend due 2 days before the intern's pay day; null when not offered (score below 6, full-time). */
   postpaidMinor: number | null;
   /** YYYY-MM-DD each month's stipend falls due, month 1 first (post-paid). */
   schedule: string[];
@@ -47,8 +47,8 @@ type Mode = "upfront" | "monthly" | "postpaid";
  * Checkout, as one flow: pick the hire on the left, see exactly what is
  * charged on the right, pay. One hire per payment (legacy checkout), so an
  * invoice, a refund or a dispute always maps to one candidate. A new
- * hire (score 6+) pays the hiring charge now and each month's stipend at that
- * month's end by default, or the whole internship now; a running placement pays
+ * hire (score 6+) pays the hiring charge now and each month's stipend as it falls
+ * due by default, or the whole internship now; a running placement pays
  * its due month.
  */
 export function CheckoutSummary({
@@ -70,7 +70,7 @@ export function CheckoutSummary({
   const [selectedId, setSelectedId] = useState(lines.find((l) => l.id === initialId)?.id ?? lines[0]?.id ?? "");
   const line = lines.find((l) => l.id === selectedId) ?? lines[0];
   const [picked, setPicked] = useState<Mode>("postpaid");
-  // A promo code is for the whole engagement paid upfront: while one is applied, month-end payment is locked.
+  // A promo code is for the whole engagement paid upfront: while one is applied, monthly payment is locked.
   const [promoApplied, setPromoApplied] = useState(false);
 
   const canPostpaid = Boolean(line && line.postpaidMinor != null) && !promoApplied;
@@ -181,7 +181,7 @@ export function CheckoutSummary({
                     onChange={() => setPicked("postpaid")}
                   />
                   <span className="min-w-0 flex-1">
-                    {line.postpaidMinor != null ? `${m(line.postpaidMinor, line.currency)} now, stipend at the end of each month` : "Stipend at the end of each month"}
+                    {line.postpaidMinor != null ? `${m(line.postpaidMinor, line.currency)} now, then each month's stipend due 2 days before the intern's pay day` : "Each month's stipend due 2 days before the intern's pay day"}
                     <span className="block text-xs text-text-subtle">
                       {promoApplied ? "Not with a promo code" : canPostpaid ? "Recommended" : line.monthlyBlocked}
                     </span>
@@ -230,7 +230,8 @@ export function CheckoutSummary({
 
           {mode === "postpaid" && line.schedule.length > 0 ? (
             <div className="mt-4 border-t border-ink-100 pt-4 text-sm">
-              <p className="font-medium text-ink-800">Then, at the end of each month</p>
+              <p className="font-medium text-ink-800">Then, month by month</p>
+              <p className="mt-0.5 text-xs text-text-subtle">Each month is due 2 days before the intern&apos;s pay day. You can pay up to 15 days early.</p>
               <ul className="mt-2 space-y-1.5">
                 {line.schedule.map((d, i) => (
                   <li key={d} className="flex flex-wrap items-baseline justify-between gap-x-3 text-ink-600">

@@ -5,7 +5,7 @@ export type PayMode = "upfront" | "monthly" | "postpaid";
 /** The part of a payable line the refusals read. */
 export type ModeLine = { due: unknown | null; charge: { monthlyBlocked: string | null } };
 
-export const MONTHLY_AT_START_GONE = "Monthly payment is now made at the end of each month. Refresh the page.";
+export const MONTHLY_AT_START_GONE = "Monthly payment is now made as each month falls due. Refresh the page.";
 
 /**
  * The employer order route's refusals on how this order is paid, pure. Returns

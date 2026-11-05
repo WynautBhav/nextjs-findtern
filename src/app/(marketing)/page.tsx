@@ -27,7 +27,7 @@ import { howToJsonLd, pricingJsonLd, webPageJsonLd } from "@/lib/seo";
 export const metadata: Metadata = {
   title: { absolute: "Findtern | Hire Pre-Screened Interns in India for the Price of a Coffee" },
   description:
-    "Hire interns in India who are already interviewed, tested and scored. Three published plans from free to ₹200/hr, one flat ₹5,000 per-hire fee, billed only on approved hours. Students: get assessed and placed in a paid internship.",
+    "Hire interns in India who are already interviewed, tested and scored. Three published plans from free to ₹200/hr, one flat ₹5,000 per-hire fee, then billed monthly on approved timesheets. Students: get assessed and placed in an internship.",
   alternates: { canonical: "/" },
 };
 
