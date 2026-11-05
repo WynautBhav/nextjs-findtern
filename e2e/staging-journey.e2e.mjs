@@ -859,7 +859,7 @@ step("intern 2: accepts the offer [API]", ["proposal2Id"], "accepted2", async ()
   state.accepted2 = true;
 });
 
-/* ── 7. Checkout: one hire upfront with the promo, the other monthly ──────── */
+/* ── 7. Checkout: one hire upfront with the promo, the other on the month-end stipend plan ──────── */
 
 /** The intern page for a proposal's candidate. */
 const internPageFor = (internId) => (internId === state.internId ? pages.intern : pages.intern2);
@@ -870,10 +870,10 @@ step("employer: pays one offer upfront with the promo, using the test button [UI
   await visit(page, "/employer/checkout");
   await page.getByText(/2 ready to pay/i).first().waitFor();
   await settle(page);
-  await page.getByRole("radio", { name: /Whole engagement/ }).check();
+  await page.getByRole("radio", { name: /Pay the whole internship now/ }).check();
 
   const main = await page.locator("main").innerText();
-  const fee = Number((main.match(/Hiring fee \(one-time\)\s*₹([\d,]+)/)?.[1] ?? "").replace(/,/g, ""));
+  const fee = Number((main.match(/Hiring charge \(one-time\)\s*₹([\d,]+)/)?.[1] ?? "").replace(/,/g, ""));
   assert.ok(fee > 0, "the hiring fee is shown");
   const offer = await one(`SELECT offer_details FROM proposals WHERE id = $1`, [state.proposalId]);
   const monthlyMinor = Math.round(offer.offer_details.monthlyAmount * 100);
@@ -929,26 +929,25 @@ step("intern: after the hire the company name is revealed [UI]", ["paidUpfront"]
   assert.ok(!(await other.locator("body").innerText()).includes(EMPLOYER.companyName), "the other, unpaid candidate still does not see the company");
 });
 
-step("employer: pays the other offer monthly, using the test button [UI]", ["paidUpfront"], "paidMonthly", async () => {
+step("employer: pays the other offer with the month-end stipend plan, using the test button [UI]", ["paidUpfront"], "paidMonthly", async () => {
   const page = pages.employer;
   const orderPath = `/api/employer/${state.employerId}/payment/razorpay/order`;
   await visit(page, "/employer/checkout");
   await page.getByText(/^Ready to pay/).first().waitFor();
-  assert.equal(await page.getByRole("radio", { name: /Whole engagement|Monthly/ }).count(), 2, "one offer left, so only the two payment modes are choices");
+  assert.equal(await page.getByRole("radio", { name: /Pay the whole internship now|stipend at the end of each month/ }).count(), 2, "one offer left, so only the two payment modes are choices");
   await settle(page);
-  await page.getByRole("radio", { name: /^Monthly/ }).check();
+  await page.getByRole("radio", { name: /stipend at the end of each month/ }).check();
   const offer = await one(`SELECT offer_details FROM proposals WHERE id = $1`, [state.otherProposalId]);
-  const monthlyMinor = Math.round(offer.offer_details.monthlyAmount * 100);
   const main = await page.locator("main").innerText();
-  const fee = Number((main.match(/Hiring fee \(one-time\)\s*₹([\d,]+)/)?.[1] ?? "").replace(/,/g, ""));
+  const fee = Number((main.match(/Hiring charge \(one-time\)\s*₹([\d,]+)/)?.[1] ?? "").replace(/,/g, ""));
   await shot("employer-checkout-monthly");
 
   const res = await clickFor(page, page.getByRole("button", { name: /^Test: mark as paid/ }), { path: orderPath, method: "POST" });
   assert.equal(res.status, 200, `order → ${res.status} ${JSON.stringify(res.body)}`);
   const pay = await one(`SELECT * FROM employer_payments WHERE employer_id = $1 AND status = 'paid' ORDER BY paid_at DESC LIMIT 1`, [state.employerId]);
   assert.notEqual(pay.id, state.upfrontPaymentId, "a second, separate order");
-  assert.equal(pay.amount_minor, monthlyMinor + fee * 100, "first month plus the hiring fee, no promo");
-  assert.equal(pay.raw?.notes?.paymentMode, "monthly");
+  assert.equal(pay.amount_minor, fee * 100, "only the hiring charge is due now, no promo");
+  assert.equal(pay.raw?.notes?.paymentMode, "hiring_fee");
   assert.deepEqual(pay.raw.notes.proposalIds, [state.otherProposalId]);
   assert.match(String(pay.invoice_number), /^\d{6}-\d{2,}$/);
   assert.notEqual(pay.invoice_number, state.upfrontInvoice, "each payment gets its own invoice number");
@@ -1021,7 +1020,9 @@ step("employer: Orders totals equal what was charged, and both tax invoices are 
 
   const [upfront, monthly] = [pays.find((p) => p.id === state.upfrontPaymentId), pays.find((p) => p.id === state.monthlyPaymentId)];
   checkInvoice(await readInvoice(page, upfront.invoice_number), upfront, { promoDiscountMinor: Math.floor((Math.round((await one(`SELECT offer_details FROM proposals WHERE id = $1`, [state.hiredProposalId])).offer_details.monthlyAmount * 100) * 10) / 100) });
-  checkInvoice(await readInvoice(page, monthly.invoice_number), monthly);
+  const monthlyText = await readInvoice(page, monthly.invoice_number);
+  checkInvoice(monthlyText, monthly);
+  assert.match(monthlyText, /Hiring charge/i, "the first invoice of a month-end hire is the hiring charge");
   await shot("employer-invoices-tab");
 });
 
@@ -1740,10 +1741,10 @@ step("US employer pays in dollars with the test button; Orders and the tax invoi
   const main = await page.locator("main").innerText();
   assert.match(main, /\$/, "checkout is in dollars");
   assert.doesNotMatch(main, /₹|GST/, "no rupees and no GST for a US company");
-  assert.match(main, /Hiring fee \(one-time\)/, "the one-time hiring fee is a line of its own");
+  assert.match(main, /Hiring charge \(one-time\)/, "the one-time hiring fee is a line of its own");
   assert.doesNotMatch(main, /upfront discount/i, "there is no upfront discount any more");
   await settle(page);
-  await page.getByRole("radio", { name: /^Monthly/ }).check();
+  await page.getByRole("radio", { name: /stipend at the end of each month/ }).check();
   await shot("us-checkout");
   const res = await clickFor(page, page.getByRole("button", { name: /^Test: mark as paid/ }), { path: orderPath, method: "POST" });
   assert.equal(res.status, 200, `order → ${res.status} ${JSON.stringify(res.body)}`);
@@ -1752,7 +1753,7 @@ step("US employer pays in dollars with the test button; Orders and the tax invoi
   assert.equal(pay.gateway, "test");
   assert.match(String(pay.invoice_number), /^\d{6}-\d{2,}$/);
   const offer = await one(`SELECT offer_details FROM proposals WHERE id = $1`, [state.usOfferId]);
-  assert.ok(pay.amount_minor >= Math.round(offer.offer_details.monthlyAmount * 100), "the first month plus the hiring fee was charged");
+  assert.ok(pay.amount_minor > 0 && pay.amount_minor < Math.round(offer.offer_details.monthlyAmount * 100), "only the hiring charge was charged, not the first month");
   assert.equal((await one(`SELECT status FROM proposals WHERE id = $1`, [state.usOfferId])).status, "hired");
   state.usPaymentId = pay.id;
 

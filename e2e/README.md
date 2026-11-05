@@ -5,7 +5,7 @@ production build (`next start`) and a local Postgres:
 
 intern signup → onboarding → free activation → AI interview request → admin
 score → employer signup → company + project → interview booked → intern picks
-a slot → offer → intern accepts → monthly checkout (free) → hired → timesheet
+a slot → offer → intern accepts → month-end checkout (free) → hired → timesheet
 → employer approves → admin payout → intern's stipend page.
 
 `playwright` (the library) drives the browser and `node:test` runs the steps.
@@ -105,7 +105,7 @@ message says the UI failed and that state was recovered.
 | 11 | Interview takes place | SQL time travel, then API feedback | status `completed`, feedback in notes |
 | 12 | Offer sent | API `POST …/proposals` | `sent`, INR; `offer_details.hourlyRate` × 100 matches an active INR plan's paise (so it is stored in rupees); `monthlyAmount = hourlyRate × monthlyHours`; proposal mail to the intern without the company name |
 | 13 | Intern accepts | UI `/intern/proposals/[id]` "Accept this offer" → terms → "Yes, accept" | page hides the company; status `accepted`; employer gets "Candidate decision update" |
-| 14 | Monthly checkout, free mode | UI `/employer/checkout` "Monthly" → "Complete for free (test mode)" | proposal `hired` + `hired_at`; `employer_payments` free row `paid`, `paymentMode=monthly`; intern "You're hired!" mail names the company (positive control); employer "Payment received" |
+| 14 | Monthly checkout, free mode | UI `/employer/checkout` "Monthly" → "Complete for free (test mode)" | proposal `hired` + `hired_at`; `employer_payments` free row `paid`, `paymentMode=hiring_fee`; month 1 is then paid as a due month before the payout; intern "You're hired!" mail names the company (positive control); employer "Payment received" |
 | 15 | No pre-hire leak | mail log | none of the intern's emails before `hired_at` (at least 4: code, invitation, scheduled, proposal) contain the company name |
 | 16 | Timesheet filled + submitted | SQL time travel, then API | `/intern/timesheets` renders; `POST` creates a draft for the first engagement month; every day set (Present on weekdays, Fixed off on weekends); submit → `submitted`; employer gets "Timesheet submitted" |
 | 17 | Employer approves | UI `/employer/timesheets/[id]` "Approve" | `approved` + `approved_at`; intern notification |
