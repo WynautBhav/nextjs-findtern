@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { billingPlanOf, engagementEndOn, postpaidDueOn, postpaidMonthsPaid, postpaidNext, stipendMonthDates } from "./billing-plan.ts";
+import { billingPlanOf, engagementEndOn, monthMismatches, orderDueMonths, postpaidDueOn, postpaidMonthsPaid, postpaidNext, stipendMonthDates } from "./billing-plan.ts";
 import { lineCharge } from "./checkout.ts";
 import { monthlyDues, paymentIndexMismatch, placementLedger } from "./dues.ts";
 import { employerInvoices, type InvoiceHire, type InvoicePayment } from "./employer-invoice.ts";
@@ -184,7 +184,7 @@ test("payout gate: a post-paid month is refused until the employer has paid it; 
   assert.deepEqual([side.paidInFull, side.paidMonths, side.plan], [false, 0, "postpaid"]);
 });
 
-test("receivables: post-paid month 1 due 16 Oct, upcoming before it, due (overdue) from 17 Oct; fee shows as hiring charge", () => {
+test("receivables: post-paid month 1 due 16 Oct: upcoming the day before, due from the due day itself; fee shows as hiring charge", () => {
   const input = (now: string): ReceivablesInput => ({
     since: null,
     until: null,
@@ -202,8 +202,8 @@ test("receivables: post-paid month 1 due 16 Oct, upcoming before it, due (overdu
   const rows = (now: string) => computeReceivables(input(now), { receivables: "company", payables: "company" }).receivables;
   const r1 = rows("2026-10-16T12:00:00+05:30");
   assert.equal(r1.find((r) => r.id === "instalment:p1:1")!.date, "2026-10-16");
-  assert.equal(r1.find((r) => r.id === "instalment:p1:1")!.status, "upcoming");
-  assert.equal(rows("2026-10-17T12:00:00+05:30").find((r) => r.id === "instalment:p1:1")!.status, "due");
+  assert.equal(r1.find((r) => r.id === "instalment:p1:1")!.status, "due");
+  assert.equal(rows("2026-10-15T12:00:00+05:30").find((r) => r.id === "instalment:p1:1")!.status, "upcoming");
   assert.match(r1.find((r) => r.status === "received")!.description, /hiring charge/);
   assert.equal(r1.filter((r) => r.id.startsWith("instalment")).length, 3);
 });
@@ -217,4 +217,39 @@ test("companyLedger: post-paid hire shows plan postpaid with its due date (2 day
   const h = l.hires[0];
   assert.deepEqual([h.plan, h.paidMinor, h.dueMinor, h.monthsPaid, h.nextDueDate], ["postpaid", 500_000, 3_000_000, 0, "2026-10-16"]);
   assert.equal(l.payments.get("o1")!.mode, "Hiring charge");
+});
+
+const feeOrder = (id: string) => ({ status: "paid", paidAt: "2026-09-01T00:00:00Z", raw: { notes: { proposalIds: [id], paymentMode: "hiring_fee" } } });
+const monthOrder = (id: string, at: string) => ({ status: "paid", paidAt: at, raw: { notes: { proposalIds: [id], dueProposalIds: [id], paymentMode: "total" } } });
+const checkout = (id: string, dueMonth: number) => ({ notes: { proposalIds: [id], dueProposalIds: [id], dueMonths: { [id]: dueMonth }, paymentMode: "total" } });
+
+test("orderDueMonths reads the month each due line was priced for", () => {
+  assert.deepEqual(orderDueMonths(checkout("p1", 2)), { p1: 2 });
+  assert.deepEqual(orderDueMonths({ order: checkout("p1", 3) }), { p1: 3 });
+  assert.deepEqual(orderDueMonths({ notes: { dueMonths: { p1: 0, p2: "x" } } }), {});
+  assert.deepEqual(orderDueMonths(null), {});
+});
+
+test("monthMismatches: a post-paid month paid out of turn is flagged, the right month and old orders are not", () => {
+  // month 1 paid: the next order is month 2
+  const others = [feeOrder("p1"), monthOrder("p1", "2026-10-01T00:00:00Z")];
+  assert.deepEqual(monthMismatches(checkout("p1", 2), others), []);
+  // a second checkout for month 2 settling after the first one did: monthsPaid is now 2, not 1
+  const both = [...others, monthOrder("p1", "2026-10-02T00:00:00Z")];
+  assert.deepEqual(monthMismatches(checkout("p1", 2), both), [{ proposalId: "p1", dueMonth: 2, monthsPaid: 2 }]);
+  // a month skipped
+  assert.deepEqual(monthMismatches(checkout("p1", 3), others), [{ proposalId: "p1", dueMonth: 3, monthsPaid: 1 }]);
+  // month 1 right after the fee
+  assert.deepEqual(monthMismatches(checkout("p1", 1), [feeOrder("p1")]), []);
+  // orders without dueMonths and pay-at-start (monthly) hires are never checked
+  assert.deepEqual(monthMismatches({ notes: { proposalIds: ["p1"], dueProposalIds: ["p1"] } }, both), []);
+  const prepaid = [{ status: "paid", raw: { notes: { proposalIds: ["p1"], paymentMode: "monthly" } } }];
+  assert.deepEqual(monthMismatches(checkout("p1", 5), prepaid), []);
+});
+
+test("an anchor that only looks like a date gives no stipend dates", () => {
+  assert.equal(stipendMonthDates("2026-02-30", 3, 1), null);
+  assert.equal(stipendMonthDates("2026-13-01", 3, 1), null);
+  assert.equal(engagementEndOn("2026-02-30", 3), null);
+  assert.notEqual(stipendMonthDates("2026-02-28", 3, 1), null);
 });

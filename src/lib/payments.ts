@@ -11,6 +11,7 @@ import { SEATS_USED_UP } from "@/lib/promo-rules";
 import { PROMO_CONSENT_VERSION } from "@/lib/college/promo-consent";
 import { consentProblem, membershipFromPromo, promoConsentHash } from "@/lib/college/promo-membership";
 import { assignInvoiceNumber } from "@/lib/invoice-number";
+import { monthMismatches } from "@/lib/billing-plan";
 import { orderProposalIds } from "@/lib/order-ids";
 
 /**
@@ -140,14 +141,27 @@ export async function settleEmployerOrder(input: {
         ),
       )
       .returning({ id: schema.proposals.id, internId: schema.proposals.internId });
-    if (hired.length < hireIds.length) {
+    // A month paid out of turn (the hire's paid months are not the due month - 1, e.g. two
+    // checkouts for the same month) is still recorded as paid; accounts review it.
+    const others = dueIds.size === 0
+      ? []
+      : await tx
+          .select({ status: schema.employerPayments.status, raw: schema.employerPayments.raw, paidAt: schema.employerPayments.paidAt })
+          .from(schema.employerPayments)
+          .where(and(eq(schema.employerPayments.employerId, order.employerId), eq(schema.employerPayments.status, "paid"), ne(schema.employerPayments.id, order.id)));
+    const wrongMonth = monthMismatches(order.raw, others);
+    if (hired.length < hireIds.length || wrongMonth.length > 0) {
       // Paid for proposals that were withdrawn or already paid in between:
       // flag the order so accounts can refund the difference.
+      const needsReview =
+        hired.length < hireIds.length
+          ? { reason: "not_all_hired", expected: hireIds.length, hired: hired.length, ...(wrongMonth.length ? { monthMismatch: wrongMonth } : {}) }
+          : { reason: "month_mismatch", lines: wrongMonth };
       await tx
         .update(schema.employerPayments)
-        .set({ raw: { ...((order.raw ?? {}) as Record<string, unknown>), needsReview: { reason: "not_all_hired", expected: hireIds.length, hired: hired.length } } })
+        .set({ raw: { ...((order.raw ?? {}) as Record<string, unknown>), needsReview } })
         .where(eq(schema.employerPayments.id, order.id));
-      console.error(`[payments] order ${input.orderId}: paid for ${hireIds.length} hires, hired ${hired.length} - needs review`);
+      console.error(`[payments] order ${input.orderId}: needs review (${needsReview.reason})`);
     }
     // EMB-26: once hired, the candidate leaves every shortlist of this company
     // (legacy removed them from all its carts), so the cart count stays true.

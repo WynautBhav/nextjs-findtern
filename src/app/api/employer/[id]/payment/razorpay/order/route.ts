@@ -156,6 +156,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     // "hiring_fee" is the first payment of a post-paid hire (billing-plan.ts).
     paymentMode: mode === "monthly" ? "monthly" : mode === "postpaid" ? "hiring_fee" : "total",
     dueProposalIds: paying.filter((l) => l.due).map((l) => l.id),
+    // The month each due line was priced for; settlement flags the order when the hire has moved on since.
+    dueMonths: Object.fromEntries(paying.filter((l) => l.due).map((l) => [l.id, l.due!.monthsPaid + 1])),
     // DB-07: legacy admin shows computedAmountMinor as the order amount, so
     // it is what is charged (0 for a free test order, net of any promo).
     computedAmountMinor: paymentsAreFree() && !parsed.data.testPay ? 0 : amountMinor,

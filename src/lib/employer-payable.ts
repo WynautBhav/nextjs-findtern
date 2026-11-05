@@ -48,7 +48,7 @@ export type PayableLine = {
   monthlyCharge: LineCharge;
   /** Set for a hired monthly-plan placement: the next month is due. */
   due: { monthsPaid: number; months: number } | null;
-  /** YYYY-MM-DD the due month falls due (post-paid: the month's last day; else start + months paid); null when not a due line or no start. */
+  /** YYYY-MM-DD the due month falls due (post-paid: 2 days before the intern's pay day; else start + months paid); null when not a due line or no start. */
   dueOn: string | null;
   /** The fee-only first payment of a post-paid hire (score 6+ internship), whatever mode was asked for. */
   feeCharge: LineCharge;

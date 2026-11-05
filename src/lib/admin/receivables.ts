@@ -134,7 +134,7 @@ export function computeReceivables(input: ReceivablesInput, filter: { receivable
             id: `instalment:${p.id}:${i + 1}`,
             date: date!,
             source: "company",
-            status: postpaid && date! < istDayKey(input.now ?? new Date())! ? "due" : "upcoming",
+            status: postpaid && date! <= istDayKey(input.now ?? new Date())! ? "due" : "upcoming",
             description: postpaid ? `Month ${i + 1} of ${d.months} stipend (due 2 days before the intern is paid)` : `Monthly instalment ${i + 1} of ${d.months}`,
             companyName: input.employerName(p.employerId),
             candidateName: input.internName(p.internId),

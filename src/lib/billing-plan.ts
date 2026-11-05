@@ -1,4 +1,5 @@
 import { engagementPeriods } from "./employer-timesheets.ts";
+import { isRealDay } from "./offer.ts";
 
 /**
  * How an internship hire is billed: the ONE place that reads an employer
@@ -69,6 +70,32 @@ export function postpaidMonthsPaid(proposalId: string, orders: readonly PlanOrde
   return paidOldestFirst(orders).filter((o) => orderNotes(o.raw).dueIds.includes(proposalId)).length;
 }
 
+/** The month number (1-based) each due line of an order was priced for, from `notes.dueMonths` (`{ proposalId: month }`). Orders from before it was written have none. */
+export function orderDueMonths(raw: unknown): Record<string, number> {
+  const r = obj(raw);
+  const n = obj(r.notes ?? obj(r.order).notes);
+  const out: Record<string, number> = {};
+  for (const [id, k] of Object.entries(obj(n.dueMonths))) if (Number.isInteger(k) && (k as number) >= 1) out[id] = k as number;
+  return out;
+}
+
+/**
+ * Due lines of `order` that are not the month their placement actually owed: a post-paid hire whose paid months
+ * (in `others`, the employer's other paid orders) are not `dueMonth - 1`, e.g. two checkouts for month 2 settling
+ * back to back. Pay-at-start lines and orders without `dueMonths` are not checked.
+ */
+export function monthMismatches(order: unknown, others: readonly PlanOrder[]): { proposalId: string; dueMonth: number; monthsPaid: number }[] {
+  const months = orderDueMonths(order);
+  const out: { proposalId: string; dueMonth: number; monthsPaid: number }[] = [];
+  for (const id of orderNotes(order).dueIds) {
+    const dueMonth = months[id];
+    if (dueMonth === undefined || billingPlanOf(id, others) !== "postpaid") continue;
+    const monthsPaid = postpaidMonthsPaid(id, others);
+    if (monthsPaid !== dueMonth - 1) out.push({ proposalId: id, dueMonth, monthsPaid });
+  }
+  return out;
+}
+
 /** The Indian calendar day (YYYY-MM-DD) of an instant. */
 export function istDay(d: Date | string | null | undefined): string | null {
   const t = d ? new Date(d).getTime() : NaN;
@@ -105,7 +132,7 @@ export function stipendMonthDates(
   months: number,
   k: number,
 ): { internPayOn: string; employerDueOn: string; payableFrom: string } | null {
-  if (!anchor || !/^\d{4}-\d{2}-\d{2}/.test(anchor) || !Number.isInteger(k) || k < 1 || k > months) return null;
+  if (!anchor || !isRealDay(anchor.slice(0, 10)) || !Number.isInteger(k) || k < 1 || k > months) return null;
   const internPayOn = addMonthsDay(anchor, k);
   const employerDueOn = addDaysDay(internPayOn, -EMPLOYER_DUE_LEAD_DAYS);
   return { internPayOn, employerDueOn, payableFrom: addDaysDay(employerDueOn, -PAY_WINDOW_DAYS) };
@@ -118,7 +145,7 @@ export function postpaidDueOn(anchor: string | null | undefined, months: number,
 
 /** YYYY-MM-DD the last engagement month ends (as timesheets count it), e.g. 6 Nov + 2 months ends 5 Jan. */
 export function engagementEndOn(anchor: string | null | undefined, months: number): string | null {
-  if (!anchor || !/^\d{4}-\d{2}-\d{2}/.test(anchor) || months < 1) return null;
+  if (!anchor || !isRealDay(anchor.slice(0, 10)) || months < 1) return null;
   return engagementPeriods(anchor, months).at(-1)?.end ?? null;
 }
 
