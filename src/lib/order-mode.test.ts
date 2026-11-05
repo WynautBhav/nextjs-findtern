@@ -41,7 +41,7 @@ test("a promo with upfront payment, and month-end payment without a promo, are a
 
 test("postpaid is refused for a score under 6 and for a full-time offer, 400, with the reason", () => {
   const low = orderModeProblem({ mode: "postpaid", paying: [line(intern, 5, false)], hasPromo: false });
-  assert.deepEqual(low, { ok: false, status: 400, error: "Month-end payment needs a Findtern Score of 6 or more" });
+  assert.deepEqual(low, { ok: false, status: 400, error: "Paying monthly needs a Findtern Score of 6 or more" });
   const ft = orderModeProblem({ mode: "postpaid", paying: [line(fullTime, 9, false)], hasPromo: false });
   assert.deepEqual(ft, { ok: false, status: 400, error: "Full-time offers are paid upfront" });
   // the same hires are fine paid upfront

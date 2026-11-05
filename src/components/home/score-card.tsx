@@ -208,13 +208,13 @@ export function ScoreCard({ audience = "employer" }: { audience?: "employer" | "
                   {b.range}
                 </p>
                 <p className="min-w-0 text-right text-sm text-ink-700">
-                  {b.stipendMax !== null && (
+                  {b.stipend !== null && (
                     <span className="block font-semibold tabular-nums text-ink-900">
-                      Stipend up to {formatMoney(b.stipendMax * 100, "INR")} a month
+                      Stipend {formatMoney(b.stipend * 100, "INR")} a month
                     </span>
                   )}
-                  <span className={cn("block tabular-nums", b.stipendMax === null && "font-semibold text-ink-900")}>
-                    {b.stipendMax !== null && "plus a "}
+                  <span className={cn("block tabular-nums", b.stipend === null && "font-semibold text-ink-900")}>
+                    {b.stipend !== null && "plus a "}
                     {formatMoney(b.bonus * 100, "INR")} completion bonus
                   </span>
                 </p>

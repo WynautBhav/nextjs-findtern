@@ -44,7 +44,7 @@ export default async function SignupPage({
 
   return (
     <AuthShell
-      title={isEmployer ? "Register the company, not a person." : "One interview sets your rate."}
+      title={isEmployer ? "Register the company, not a person." : "One interview sets your stipend band."}
       subtitle={
         isEmployer
           ? "One company account, one billing identity for all your hiring."

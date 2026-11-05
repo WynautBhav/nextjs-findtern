@@ -639,7 +639,7 @@ async function main() {
     { firstName: "Harsh", lastName: "Vardhan", email: "harsh@dtu.ac.in", queryType: "intern_help", subject: "Timesheet approval delay", message: "Submitted my month-end timesheet 4 days ago. Has a notification been dispatched to Northwind?", isRead: true },
     { firstName: "Gitanjali", lastName: "Roy", email: "gitanjali@stride.tech", queryType: "employer_inquiry", subject: "Part-time versus full-time fellowship options", message: "We want to hire 2 candidates for 20 hrs/week during their final college semester. Is that supported?", isRead: true },
     { firstName: "Mohit", lastName: "Arora", email: "mohit.arora@iitb.ac.in", queryType: "intern_help", subject: "KYC Aadhaar upload confirmation", message: "Uploaded my masked Aadhaar copy. How long does administrative clearance take?", isRead: true },
-    { firstName: "Varun", lastName: "Sethi", email: "varun@growthloop.in", queryType: "billing", subject: "18-month hiring guarantee terms", message: "Please share the legal documentation explaining the stipend refund guarantee clause.", isRead: true },
+    { firstName: "Varun", lastName: "Sethi", email: "varun@growthloop.in", queryType: "billing", subject: "12-month hiring guarantee terms", message: "Please share the legal documentation explaining the stipend refund guarantee clause.", isRead: true },
     { firstName: "Nisha", lastName: "Pillai", email: "nisha.p@yahoo.in", queryType: "intern_help", subject: "Relocation assistance inquiry", message: "Do hybrid placements include transit stipend or housing assistance support?", isRead: true },
   ];
 

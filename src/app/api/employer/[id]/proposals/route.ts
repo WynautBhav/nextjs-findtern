@@ -255,7 +255,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     monthlyHours: scheduledMonthlyHours(b.weeklySchedule, b.paidLeavesPerMonth),
     currency,
     hourlyRateMinor: rate.hourlyRateMinor,
-    // Per-hire applies below a score of 6 only (legacy rule).
+    // Per-hire is charged on every plan (checkout.ts PER_HIRE_MINOR).
     perHireMinor: rate.perHireMinor,
     candidateScore: score,
     projectSkills: b.skills,

@@ -85,7 +85,7 @@ export const emails = {
     heading: "You’ve received a new proposal",
     greeting: hi(o.internName),
     lines: [`Good news! You’ve received a new internship proposal from ${o.companyName} for the role of ${o.role}.`],
-    bullets: ["Review the proposal details carefully", "Accept if it aligns with your goals", "Reject if it’s not the right fit — no pressure, no penalties"],
+    bullets: ["Review the proposal details carefully", "Accept if it aligns with your goals", "You can turn down up to 3 offers; a 4th decline or lapse ends the refund guarantee"],
     status: "Awaiting your response",
     cta: { label: "View proposal", url: `${origin()}/intern/proposals/${o.proposalId}` },
   }),
@@ -177,12 +177,12 @@ export const emails = {
     cta: { label: "Start AI interview", url: o.link },
   }),
 
-  interviewRescheduled: (o: { name: string; byEmployer: boolean }): EmailContent => ({
+  interviewRescheduled: (o: { name: string }): EmailContent => ({
     subject: "Interview rescheduled | Findtern",
     heading: "An interview was rescheduled",
     greeting: hi(o.name),
-    lines: [o.byEmployer ? "The company proposed new time slots. Pick the one that works for you." : "The candidate asked to reschedule. Please propose new slots."],
-    cta: { label: "Open dashboard", url: `${origin()}/${o.byEmployer ? "intern/interviews" : "employer/schedule"}` },
+    lines: ["The company proposed new time slots. Pick the one that works for you."],
+    cta: { label: "Open dashboard", url: `${origin()}/intern/interviews` },
   }),
 
   timesheetSubmitted: (o: { employerName: string; candidate: string; period: string; timesheetId: string }): EmailContent => ({

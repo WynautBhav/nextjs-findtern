@@ -237,7 +237,7 @@ export function HeroSplit() {
             kicker="For employers"
             Icon={Building2}
             title="Hire someone who has already been screened"
-            body="Browse candidates who are interviewed, tested and scored. Filter by Findtern Score, skills and interests, and pay only for approved hours."
+            body="Browse candidates who are interviewed, tested and scored. Filter by Findtern Score, skills and interests. One flat per-hire fee, then billed monthly on approved timesheets."
             cta={{ label: "Start hiring", href: "/employers" }}
           />
           <AudienceCard
@@ -322,11 +322,11 @@ export function HeroSplit() {
               </span>
               <h2 className="mt-3 text-balance text-[1.5rem] font-medium leading-[1.15] tracking-[-0.02em] text-white sm:text-[clamp(1.25rem,2.3vw,2.125rem)]">
                 Screened before you meet them.{" "}
-                <span className="text-accent-400">Billed only for approved hours.</span>
+                <span className="text-accent-400">Billed monthly on approved timesheets.</span>
               </h2>
             </div>
             <ul className="flex shrink-0 flex-col gap-2 text-sm text-white/85 sm:flex-row sm:gap-5">
-              {["Coding, aptitude and interview tested", "Weekly timesheets"].map((item) => (
+              {["Coding, aptitude and interview tested", "Monthly timesheets"].map((item) => (
                 <li key={item} className="inline-flex items-center gap-2">
                   <Check className="size-3.5 text-accent-300" aria-hidden />
                   {item}

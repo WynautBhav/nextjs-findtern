@@ -63,7 +63,7 @@ export const FAQ_INTERN: CmsFaqItem[] = [
     "id": "94140c2c-4f9b-4e37-aa5a-d561f7e115bb",
     "category": "Intern",
     "question": "Can I improve my Findtern Score? If yes, how?",
-    "answer": "Yes, you can improve your Findtern Score.\n Once your score is generated after the AI interview, it becomes your official rating. If you wish to improve it, you can retake the AI interview, but please note that the AI interview fee must be paid again for each retake.\nTo schedule a new attempt, you can contact the Findtern team. Preparing well-by practicing interview questions, strengthening your technical knowledge, and improving your communication skills-will help you perform better in the next round and achieve a higher score.",
+    "answer": "Yes, you can improve your Findtern Score.\n Once your score is generated after the AI interview, it becomes your official rating. If you wish to improve it, you can retake the AI interview: one free retake after 6 months, then ₹2,499 for each later attempt.\nTo request a new attempt, contact the Findtern team. Preparing well-by practicing interview questions, strengthening your technical knowledge, and improving your communication skills-will help you perform better in the next round and achieve a higher score.",
     "sortOrder": 0,
     "isActive": true
   },
@@ -71,7 +71,7 @@ export const FAQ_INTERN: CmsFaqItem[] = [
     "id": "62bb4f40-b68f-4f72-b29d-dc5b845bae2d",
     "category": "Intern",
     "question": " Does Findtern guarantee internship placement?",
-    "answer": "Yes, Findtern provides an internship guarantee.\nIf you do not secure an internship through the Findtern platform within the guarantee window set out in the intern terms, you will receive a full refund of your registration and AI interview fee.\n\nFindtern offers a verified and transparent platform where students connect with genuine companies. Your internship opportunities depend on your Findtern Score, skills, and company requirements. Candidates with a profile score above 6 are eligible for paid internship opportunities.\n\nThink of Findtern as your career launchpad-we actively bridge the gap between students and employers, and we stand by our commitment with a 100% refund guarantee if you don’t get placed within the guarantee window.",
+    "answer": "Yes, Findtern provides an internship guarantee.\nIf you do not secure an internship through the Findtern platform within 12 months of your AI interview, you will receive a full refund of your AI interview fee after the 12-month window closes, within 7 working days.\n\nFindtern offers a verified and transparent platform where students connect with genuine companies. Your internship opportunities depend on your Findtern Score, skills, and company requirements. Candidates with a Findtern Score of 6 or above get a fixed monthly stipend; below 6, there is a completion bonus.\n\nThink of Findtern as your career launchpad-we actively bridge the gap between students and employers, and we stand by our commitment with a 100% refund guarantee if you don’t get placed within 12 months of your AI interview.",
     "sortOrder": 0,
     "isActive": true
   },
@@ -95,7 +95,7 @@ export const FAQ_INTERN: CmsFaqItem[] = [
     "id": "02fff963-6383-4428-a564-df455fbdbe99",
     "category": "Intern",
     "question": "Is the ₹2,499 AI interview fee refundable if I don’t get internships?",
-    "answer": "The AI interview fee is refundable. If you do not secure an internship within the guarantee window set out in the intern terms, you will receive a full refund.\n",
+    "answer": "The AI interview fee is refundable. If you do not secure an internship within 12 months of your AI interview, you will receive a full refund after the 12-month window closes, within 7 working days.\n",
     "sortOrder": 0,
     "isActive": true
   },
@@ -151,7 +151,7 @@ export const FAQ_INTERN: CmsFaqItem[] = [
     "id": "e38de8be-aa78-4cbc-b401-4885360313ae",
     "category": "Intern",
     "question": "What happens if my internet disconnects during the AI interview?",
-    "answer": "If your internet drops, don’t worry. You can contact Findtern support to reschedule your attempt. We recommend using a stable Wi-Fi or mobile data connection for the best experience.",
+    "answer": "If your internet drops, don’t worry. Contact Findtern support and we’ll send you a fresh interview link. We recommend using a stable Wi-Fi or mobile data connection for the best experience.",
     "sortOrder": 0,
     "isActive": true
   },
@@ -295,7 +295,7 @@ export const FAQ_INTERN: CmsFaqItem[] = [
     "id": "ebddc008-bc1d-4958-90e1-36425ef9d63c",
     "category": "Intern",
     "question": "Can I retake the AI interview if I make a mistake?",
-    "answer": "In most cases, you cannot retake the AI interview immediately. However, if there was a genuine technical issue, you can contact Findtern support to request another attempt.",
+    "answer": "You get one free retake after 6 months, then ₹2,499 for each later attempt. To request a retake, contact Findtern support. If an attempt failed because of a genuine technical issue, contact support and we’ll send you a fresh interview link.",
     "sortOrder": 0,
     "isActive": true
   },
@@ -343,7 +343,7 @@ export const FAQ_INTERN: CmsFaqItem[] = [
     "id": "cfa89ac2-1217-492d-9417-1a148508ca7b",
     "category": "Intern",
     "question": "How do I take the AI interview?",
-    "answer": "First, you’ll complete a self-assessment of your skills, which sets the difficulty level of your AI interview. After making the payment, Findtern will send your AI interview link within 24–48 business hours. The interview is online, so you’ll need a laptop or device with a camera, mic, and stable internet.",
+    "answer": "First, you’ll pick the skills you want to be interviewed on. After making the payment, Findtern will send your AI interview link within 24–48 business hours. The interview is online, so you’ll need a laptop or device with a camera, mic, and stable internet.",
     "sortOrder": 0,
     "isActive": true
   },
@@ -407,7 +407,7 @@ export const FAQ_INTERN: CmsFaqItem[] = [
     "id": "d5d72a92-563f-4c3c-aa06-c068848b5772",
     "category": "Intern",
     "question": "What types of internships are listed on Findtern?",
-    "answer": "Findtern lists verified internships across multiple domains such as marketing, finance, human resources (HR), IT, data analysis, design, and more. Both online internships and on-site internships are available, depending on the company’s requirements. Every internship is paid and full-time, giving you real industry exposure. Every opportunity is screened to ensure that students get access to genuine and relevant internships.\n",
+    "answer": "Findtern lists verified internships across multiple domains such as marketing, finance, human resources (HR), IT, data analysis, design, and more. Both online internships and on-site internships are available, depending on the company’s requirements. Interns scoring 6 or above get a fixed monthly stipend; below 6, there is a completion bonus. Either way, you get real industry exposure. Every opportunity is screened to ensure that students get access to genuine and relevant internships.\n",
     "sortOrder": 0,
     "isActive": true
   }
@@ -522,7 +522,7 @@ export const FAQ_EMPLOYER: CmsFaqItem[] = [
     "id": "b53e04fe-6844-4d41-b92b-e2be768ba1b3",
     "category": "Employer",
     "question": " What are Findtern’s employer pricing plans?",
-    "answer": "Espresso (Free): For budget-friendly, short-term interns.\n\n\nCappuccino: For medium-skilled interns, longer durations.\n\n\nLatte: For high-skill and strategic long-term interns.\n\n\nEach plan suits different business needs.\n",
+    "answer": "Espresso: For budget-friendly, short-term interns. The intern’s rate is shown as ₹50/hr but is currently free, plus the ₹5,000 hiring fee.\n\n\nCappuccino: For medium-skilled interns, longer durations.\n\n\nLatte: For high-skill and strategic long-term interns.\n\n\nEach plan suits different business needs.\n",
     "sortOrder": 0,
     "isActive": true
   },
@@ -553,8 +553,8 @@ export const FAQ_EMPLOYER: CmsFaqItem[] = [
   {
     "id": "13be94ff-5cb4-490b-a45f-c1031ba7b368",
     "category": "Employer",
-    "question": "Can I collaborate for campus hiring drives?",
-    "answer": "Yes. Findtern partners with colleges and universities to help run campus hiring campaigns for employers.\n",
+    "question": "Can I collaborate for virtual placement drives?",
+    "answer": "Yes. Findtern partners with colleges and universities to help run virtual placement drives for employers.\n",
     "sortOrder": 0,
     "isActive": true
   },
@@ -610,7 +610,7 @@ export const FAQ_EMPLOYER: CmsFaqItem[] = [
     "id": "d03b8ac2-c387-4e66-add6-91fda6ee2b88",
     "category": "Employer",
     "question": "How do I manage internship applications?",
-    "answer": "Employers get a dedicated dashboard to:\nView, filter, and sort applications.\n\n\nShortlist based on skills and qualifications.\n\n\nCommunicate directly with candidates.\n",
+    "answer": "Employers get a dedicated dashboard to:\nView, filter, and sort applications.\n\n\nShortlist based on skills and qualifications.\n",
     "sortOrder": 0,
     "isActive": true
   },
@@ -650,7 +650,7 @@ export const FAQ_EMPLOYER: CmsFaqItem[] = [
     "id": "cb862a33-bb8f-42f0-a1b7-ca7016fbc899",
     "category": "Employer",
     "question": "What types of interns can I hire?",
-    "answer": "Employers can hire students and freshers across domains:\nMarketing & Sales\n\n\nHR & Operations\n\n\nIT & Software Development\n\n\nData Science & Analytics\n\n\nFinance & Accounting\n\n\nContent Writing & Graphic Design\n\n\nYou may hire for paid or unpaid internships depending on your company policy.\n",
+    "answer": "Employers can hire students and freshers across domains:\nMarketing & Sales\n\n\nHR & Operations\n\n\nIT & Software Development\n\n\nData Science & Analytics\n\n\nFinance & Accounting\n\n\nContent Writing & Graphic Design\n\n\nThe intern’s stipend is fixed by Findtern Score band: ₹0 below 6, ₹8,000 a month from 6 up to 8, and ₹15,000 a month from 8 and above, plus a completion bonus of ₹2,000, ₹2,500 or ₹3,000 by band.\n",
     "sortOrder": 0,
     "isActive": true
   },
@@ -714,7 +714,7 @@ export const FAQ_EMPLOYER: CmsFaqItem[] = [
     "id": "55d4cae6-3f67-4c8f-b1b2-58aa231c6513",
     "category": "Employer",
     "question": "How do I shortlist and hire candidates on Findtern?",
-    "answer": "On Findtern.in, employers can shortlist and hire interns using the platform’s smart matchmaking system, which suggests pre-vetted candidates based on your required skills and criteria.\nEmployers can filter, review profiles, scores, and qualifications, then connect via built-in messaging or schedule interviews.\nThe hiring process, along with onboarding support and documentation, is finalized on the platform-ensuring a smooth intern hiring experience.\n",
+    "answer": "On Findtern.in, employers can shortlist and hire interns using the platform’s smart matchmaking system, which suggests pre-vetted candidates based on your required skills and criteria.\nEmployers can filter, review profiles, scores, and qualifications, then schedule interviews.\nThe hiring process, along with onboarding support and documentation, is finalized on the platform-ensuring a smooth intern hiring experience.\n",
     "sortOrder": 0,
     "isActive": true
   },

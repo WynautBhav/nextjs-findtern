@@ -18,7 +18,7 @@ const bodySchema = z.object({
   currency: z.enum(["INR", "USD"], { error: "Pick INR or USD." }).default("INR"),
   /** One hire per payment (legacy checkout). */
   proposalIds: z.array(z.string().min(1), { error: "Pay for one hire at a time" }).length(1, "Pay for one hire at a time"),
-  /** How a new hire is paid: "postpaid" (fee now, stipend at each month's end, score 6+) or the whole engagement "upfront". A running placement always pays its due month. */
+  /** How a new hire is paid: "postpaid" (fee now, each month's stipend as it falls due, score 6+) or the whole engagement "upfront". A running placement always pays its due month. */
   mode: z.enum(["upfront", "monthly", "postpaid"], { error: "Choose how to pay." }).default("upfront"),
   /** The month being paid: payments already made for this hire (0 = first). A stale second submit names a month that is already paid. */
   paymentIndex: z.number({ error: "This page is out of date. Refresh and try again." }).int().min(0),
@@ -116,7 +116,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (paymentIndexMismatch(paying, parsed.data.paymentIndex)) {
     return NextResponse.json({ error: "This month is already paid. Refresh the page to see it under Orders." }, { status: 409 });
   }
-  // Pay-at-start monthly gone, postpaid for a score under 6 or full-time, promo with month-end payment (order-mode.ts).
+  // Pay-at-start monthly gone, postpaid for a score under 6 or full-time, promo with monthly payment (order-mode.ts).
   const modeCheck = orderModeProblem({ mode: parsed.data.mode, paying, hasPromo: Boolean(parsed.data.promoCode) });
   if (!modeCheck.ok) return NextResponse.json({ error: modeCheck.error }, { status: modeCheck.status });
   const mode = modeCheck.mode;

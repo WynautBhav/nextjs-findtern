@@ -5,7 +5,9 @@ import { execFileSync } from "node:child_process";
 // The old intern-terms stipend range, in any spacing, dash (en, em, minus, hyphen) or "to", with or without the second ₹.
 // Alternation, not a bracket, so it also works when grep runs in a non-UTF-8 locale.
 const OLD_RANGE = "5,000[[:space:]]*(–|—|−|-|to)[[:space:]]*(₹)?[[:space:]]*12,000";
-const PATTERN = `18[ -]month|eighteen month|${OLD_RANGE}`;
+// Split props too: <Figure value={18} suffix=" months" /> or months={18}, where the number and the unit sit apart.
+const SPLIT_PROPS = "(value|months|window|duration)=\\{18\\}";
+const PATTERN = `18[ -]month|eighteen month|${SPLIT_PROPS}|${OLD_RANGE}`;
 
 function grep(args: string[], input?: string): string {
   try {
@@ -34,10 +36,12 @@ test("the guard pattern catches the original stipend range and its spacing and d
     "₹5,000  –  ₹ 12,000",
     "within 18 months",
     "18-month lock-in",
+    '<Figure value={18} suffix=" months" label="Placement window" />',
+    "<Plan months={18} />",
   ]) {
     assert.notEqual(grep(["-iE", PATTERN], `${text}\n`), "", `should match: ${text}`);
   }
-  for (const text of ["₹5,000 hiring charge", "Last 12 months", "₹12,000 a year"]) {
+  for (const text of ["₹5,000 hiring charge", "Last 12 months", "₹12,000 a year", '<Figure value={12} suffix=" months" />']) {
     assert.equal(grep(["-iE", PATTERN], `${text}\n`), "", `should not match: ${text}`);
   }
 });

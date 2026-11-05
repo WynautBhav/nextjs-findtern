@@ -40,7 +40,7 @@ export function hireInvoiceLines(input: {
     return [
       {
         label: `${who} — Hiring charge`,
-        detail: `${projectName} · One-time hiring charge; the stipend is billed at the end of each month`,
+        detail: `${projectName} · One-time hiring charge; each month's stipend is due 2 days before the intern's pay day`,
         amountMinor: input.chargedMinor != null && input.chargedMinor > 0 ? input.chargedMinor : fee,
       },
     ];

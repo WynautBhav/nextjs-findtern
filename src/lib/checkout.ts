@@ -17,8 +17,8 @@ import type { Offer } from "./offer.ts";
  */
 
 /**
- * "postpaid" (score 6+): the hiring fee now, each month's stipend on the last
- * day of that month (billing-plan.ts). "monthly" is only a later instalment of
+ * "postpaid" (score 6+): the hiring fee now, each month's stipend due 2 days before
+ * the intern's pay day (billing-plan.ts). "monthly" is only a later instalment of
  * a hire already paid on the old pay-at-start plan.
  */
 export type PayMode = "upfront" | "monthly" | "postpaid";
@@ -53,7 +53,7 @@ export function lineCharge(
   const monthlyBlocked = offer.fullTime
     ? "Full-time offers are paid upfront"
     : lowScore
-      ? "Month-end payment needs a Findtern Score of 6 or more"
+      ? "Paying monthly needs a Findtern Score of 6 or more"
       : null;
 
   if (offer.fullTime) {

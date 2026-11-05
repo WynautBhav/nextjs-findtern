@@ -111,7 +111,7 @@ export const PRICING_PLANS: CmsPlan[] = [
     currency: "INR",
     priceHourlyMinor: 0,
     perHireChargeMinor: 500000,
-    internshipDuration: "Up to 60 days",
+    internshipDuration: "Up to 2 months",
     features: [
       "Budget-friendly hiring",
       "Under 6/10",

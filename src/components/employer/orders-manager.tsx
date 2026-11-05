@@ -58,7 +58,7 @@ type Tab = "hires" | "schedule" | "invoices";
 const PLAN: Record<PlacementLedger["plan"], { label: string; tone: Tone }> = {
   upfront: { label: "Paid upfront", tone: "paid" },
   monthly: { label: "Monthly plan", tone: "live" },
-  postpaid: { label: "Pay at month end", tone: "live" },
+  postpaid: { label: "Pay monthly", tone: "live" },
   full_time: { label: "Full-time", tone: "new" },
   unpaid: { label: "Not paid", tone: "waiting" },
 };

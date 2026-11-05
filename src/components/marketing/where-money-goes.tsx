@@ -3,9 +3,11 @@
 import { useEffect, useRef, useState } from "react";
 
 import { useRegionBands } from "@/components/marketing/region-rates";
+import { inrMinorToUsdMinor } from "@/lib/currency";
 import { formatMoney, formatRate } from "@/lib/format";
 import { prefersReducedMotion } from "@/lib/gsap";
 import { useRevealFlag } from "@/lib/motion";
+import { fixedInternStipendInrMinor } from "@/lib/offer";
 import { HOURS_PER_MONTH } from "@/lib/plan-offer";
 import { BANDS, bandFor } from "@/lib/score";
 import type { CmsPlan } from "@/lib/content/types";
@@ -16,12 +18,14 @@ import { cn } from "@/lib/utils";
  *
  * The hero owns the site's strongest move: drag a Findtern Score and the
  * rate follows. Here that move answers the question a rate card raises.
- * One month, 160 hours. The band the score lands in sets the hourly rate;
- * what you pay splits into the two places it goes. The two destinations are
- * not drawn as a bar with a legend: they ARE the bar. Two panels share one
- * row, their widths proportional to the money in them, so the intern's
- * panel grows as the score climbs and shrinks to its floor on a free 2026
- * Espresso hire. Area is the argument.
+ * One month, 160 hours. The band the score lands in sets the hourly rate the
+ * employer pays; what the employer pays splits into the two places it goes.
+ * The intern's share is NOT the rate: it is a fixed monthly stipend by band
+ * (₹0 below 6, ₹8,000 for 6 up to 8, ₹15,000 from 8), and Findtern keeps the
+ * rest. The two destinations are not drawn as a bar with a legend: they ARE
+ * the bar. Two panels share one row, their widths proportional to the money
+ * in them, so the intern's panel grows as the score climbs and sits at its
+ * floor on an Espresso hire. Area is the argument.
  *
  * Motion: one authored entrance (the score rising from 0 to the default when
  * the instrument scrolls in); after that everything follows the hand, with
@@ -31,6 +35,12 @@ import { cn } from "@/lib/utils";
 const DEFAULT_SCORE = 7.2;
 /** A panel never collapses past this share of the row, so its copy stays readable. */
 const MIN_SHARE = 0.28;
+/**
+ * Findtern-paid completion bonus by band, INR paise. Mirrors BONUS_MINOR in
+ * lib/completion-bonus.ts, which pulls in server-only modules and so cannot be
+ * imported into a client component.
+ */
+const COMPLETION_BONUS_INR_MINOR = [200_000, 250_000, 300_000] as const;
 
 export function WhereMoneyGoes({ plansInr, plansUsd }: { plansInr: CmsPlan[]; plansUsd: CmsPlan[] }) {
   const { isIndia, currency, bands } = useRegionBands();
@@ -67,14 +77,20 @@ export function WhereMoneyGoes({ plansInr, plansUsd }: { plansInr: CmsPlan[]; pl
   const rateMinor = plan?.priceHourlyMinor ?? regionBand.rateMinor;
   const wasMinor = plan?.compareAtHourlyMinor ?? null;
   const perHireMinor = plan?.perHireChargeMinor ?? regionBand.perHireMinor;
-  const stipendMinor = rateMinor * HOURS_PER_MONTH;
-  const totalMinor = stipendMinor + perHireMinor;
+  // What the employer pays: the hourly rate for a month of hours, plus the per-hire fee.
+  const totalMinor = rateMinor * HOURS_PER_MONTH + perHireMinor;
+  // What the intern gets: fixed by band, always set in INR and shown converted for other currencies.
+  const toDisplay = (inrMinor: number) => (currency === "INR" ? inrMinor : inrMinorToUsdMinor(inrMinor));
+  const stipendMinor = Math.min(toDisplay(fixedInternStipendInrMinor(band.min) ?? 0), totalMinor);
+  const bonusMinor = toDisplay(COMPLETION_BONUS_INR_MINOR[idx] ?? COMPLETION_BONUS_INR_MINOR[0]);
+  const findternMinor = totalMinor - stipendMinor;
   const share = totalMinor > 0 ? stipendMinor / totalMinor : 0;
   const internCol = Math.max(MIN_SHARE, share);
   const findternCol = Math.max(MIN_SHARE, 1 - share);
 
   const shownTotal = useTween(totalMinor);
   const shownStipend = useTween(stipendMinor);
+  const shownFindtern = useTween(findternMinor);
   const pct = Math.max(0, Math.min(100, (score / 10) * 100));
   const money = (minor: number) => formatMoney(minor, currency, { zeroLabel: false });
 
@@ -102,6 +118,11 @@ export function WhereMoneyGoes({ plansInr, plansUsd }: { plansInr: CmsPlan[]; pl
             ) : null}
             {formatRate(rateMinor, currency)}
           </p>
+          {rateMinor === 0 && wasMinor && wasMinor > 0 ? (
+            <p className="mt-2 text-xs text-on-dark-subtle">
+              Shown as {formatRate(wasMinor, currency)}, currently discounted to free.
+            </p>
+          ) : null}
         </div>
       </div>
 
@@ -181,24 +202,24 @@ export function WhereMoneyGoes({ plansInr, plansUsd }: { plansInr: CmsPlan[]; pl
         className="mt-5 grid grid-cols-1 gap-3 motion-safe:transition-[grid-template-columns] motion-safe:duration-500 motion-safe:ease-out-expo md:gap-4 md:[grid-template-columns:var(--split)]"
         style={{ "--split": `minmax(0, ${internCol}fr) minmax(0, ${findternCol}fr)` } as React.CSSProperties}
         role="group"
-        aria-label={`${money(stipendMinor)} to the intern, ${money(perHireMinor)} to Findtern`}
+        aria-label={`${money(stipendMinor)} to the intern, ${money(findternMinor)} to Findtern`}
       >
         <Panel
           tone="intern"
           title="To the intern"
           amount={money(shownStipend)}
           body={
-            rateMinor > 0
-              ? `Their stipend: ${formatRate(rateMinor, currency)} × ${HOURS_PER_MONTH} approved hours, paid out by Findtern.`
-              : `Free through 2026: no hourly charge on an Espresso hire this year. From 2027, ${formatRate(wasMinor ?? 0, currency)} × ${HOURS_PER_MONTH} approved hours.`
+            stipendMinor > 0
+              ? `A fixed ${money(stipendMinor)} a month for this band, paid out by Findtern. Plus a ${money(bonusMinor)} completion bonus when the internship finishes.`
+              : `No monthly stipend below a score of 6. A ${money(bonusMinor)} completion bonus when the internship finishes.`
           }
           share={share}
         />
         <Panel
           tone="findtern"
           title="To Findtern"
-          amount={money(perHireMinor)}
-          body="Once per hire: verification, the AI interview and tests, the score report, the engagement managed end to end."
+          amount={money(shownFindtern)}
+          body={`The ${money(perHireMinor)} hiring fee, once per hire (verification, the AI interview and tests, the score report, the engagement managed end to end)${findternMinor > perHireMinor ? ", plus the rest of the hourly charge" : ""}.`}
           share={1 - share}
         />
       </div>

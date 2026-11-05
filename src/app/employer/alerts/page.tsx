@@ -38,7 +38,6 @@ function hrefFor(type: string, data: Record<string, unknown> | null): string | n
     case "interview_reminder":
     case "interview_feedback_request":
     case "interview_scheduled":
-    case "interview_reschedule_requested_by_intern":
     case "slot_selected":
       return "/employer/schedule";
     case "payment_completed":

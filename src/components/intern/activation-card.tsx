@@ -181,7 +181,7 @@ export function ActivationCard({
     <div>
       <p className="text-pretty text-sm leading-relaxed text-ink-600">
         One payment covers the AI interview and your Findtern Score. No subscription, nothing recurring, and if
-        you are not placed within 12 months of your score, the full fee comes back.
+        you are not placed within 12 months of your AI interview, the full fee comes back.
       </p>
 
       <div className="mt-4 flex flex-col gap-2 sm:flex-row">

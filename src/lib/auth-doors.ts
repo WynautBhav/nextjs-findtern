@@ -35,12 +35,12 @@ export const LAST_DOOR_COOKIE = "ft_door";
 export const DOOR_POINTS = {
   intern: [
     { lead: "One AI interview", text: "It sets your Findtern Score out of 10. Paid once, never a subscription." },
-    { lead: "Your score sets your rate", text: "Employers filter on it and the pay band follows it. Nobody can buy a higher one." },
+    { lead: "Your score sets your stipend band", text: "Employers filter on it and your stipend band follows it. Nobody can buy a higher one." },
     { lead: "Guaranteed within 12 months", text: "An internship within 12 months of your AI interview." },
   ],
   employer: [
     { lead: "Screened before you see them", text: "Every candidate has taken the AI interview and carries a Findtern Score." },
     { lead: "Priced by score", text: "Three bands: Espresso, Cappuccino and Latte. You see the rate before you send an offer." },
-    { lead: "Nothing charged up front", text: "You pay when a candidate accepts your offer." },
+    { lead: "Pay when you hire", text: "₹5,000 (or $50) per hire when a candidate accepts your offer; stipends for score 6+ are billed monthly." },
   ],
 };

@@ -38,7 +38,7 @@ const METHOD = [
   {
     Icon: Handshake,
     title: "Every engagement is contracted",
-    body: "A scope, a rate, an approved timesheet and a payment that moves through the platform. We do not place anyone in an unpaid internship.",
+    body: "A scope, a rate, an approved timesheet and a payment that moves through the platform. Interns scoring 6 or above get a fixed monthly stipend; below 6, a ₹2,000 completion bonus.",
   },
 ];
 

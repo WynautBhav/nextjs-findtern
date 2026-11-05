@@ -933,9 +933,9 @@ step("employer: pays the other offer with the month-end stipend plan, using the 
   const orderPath = `/api/employer/${state.employerId}/payment/razorpay/order`;
   await visit(page, "/employer/checkout");
   await page.getByText(/^Ready to pay/).first().waitFor();
-  assert.equal(await page.getByRole("radio", { name: /Pay the whole internship now|stipend at the end of each month/ }).count(), 2, "one offer left, so only the two payment modes are choices");
+  assert.equal(await page.getByRole("radio", { name: /Pay the whole internship now|stipend due 2 days before the intern.s pay day/ }).count(), 2, "one offer left, so only the two payment modes are choices");
   await settle(page);
-  await page.getByRole("radio", { name: /stipend at the end of each month/ }).check();
+  await page.getByRole("radio", { name: /stipend due 2 days before the intern.s pay day/ }).check();
   const offer = await one(`SELECT offer_details FROM proposals WHERE id = $1`, [state.otherProposalId]);
   const main = await page.locator("main").innerText();
   const fee = Number((main.match(/Hiring charge \(one-time\)\s*₹([\d,]+)/)?.[1] ?? "").replace(/,/g, ""));
@@ -1743,7 +1743,7 @@ step("US employer pays in dollars with the test button; Orders and the tax invoi
   assert.match(main, /Hiring charge \(one-time\)/, "the one-time hiring fee is a line of its own");
   assert.doesNotMatch(main, /upfront discount/i, "there is no upfront discount any more");
   await settle(page);
-  await page.getByRole("radio", { name: /stipend at the end of each month/ }).check();
+  await page.getByRole("radio", { name: /stipend due 2 days before the intern.s pay day/ }).check();
   await shot("us-checkout");
   const res = await clickFor(page, page.getByRole("button", { name: /^Test: mark as paid/ }), { path: orderPath, method: "POST" });
   assert.equal(res.status, 200, `order → ${res.status} ${JSON.stringify(res.body)}`);

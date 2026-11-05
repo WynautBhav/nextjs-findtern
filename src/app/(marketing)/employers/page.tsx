@@ -99,7 +99,7 @@ const EMPLOYER_FAQ = [
       category: "Payment",
       question: "When do I pay?",
       answer:
-        "Hourly tiers are billed against approved timesheets. The fixed ₹5,000 (or $50) per-hire charge is invoiced once when the intern is hired. The intern's stipend is routed separately and does not come out of your invoice.",
+        "The fixed ₹5,000 (or $50) per-hire charge is invoiced once when the intern is hired. After that, hourly tiers are billed monthly against the timesheets you approve, each month due 2 days before the intern's pay day (you can pay up to 15 days early). The intern's stipend is a fixed monthly amount by score band, paid by Findtern.",
     },
     {
       id: "e4",
@@ -120,7 +120,7 @@ const EMPLOYER_FAQ = [
       category: "Payment",
       question: "We are not in India. Can we still hire through Findtern?",
       answer:
-        "Yes. You contract with Findtern for a screening and placement service and pay us in US dollars, the way you pay any overseas vendor. We engage the intern in India and pay the stipend in rupees against the hours you approve, so you need no visa, no local entity and no foreign payroll.",
+        "Yes. You contract with Findtern for a screening and placement service and pay us in US dollars, the way you pay any overseas vendor. We engage the intern in India and pay a fixed monthly stipend in rupees, so you need no visa, no local entity and no foreign payroll.",
     },
 ];
 
@@ -327,7 +327,7 @@ export default async function EmployersPage() {
                 ["Work visa", "Not needed. The intern works from India."],
                 ["Local entity", "Not needed. Your contract is with Findtern."],
                 ["Your invoice", "In US dollars, monthly or up front. The same rate card, at ₹100 = $1."],
-                ["The stipend", "In rupees, paid by Findtern against the timesheet hours you approve."],
+                ["The stipend", "A fixed monthly amount in rupees, paid by Findtern after the month's timesheet is approved."],
               ].map(([term, detail]) => (
                 <div key={term} className="grid grid-cols-[7.5rem_minmax(0,1fr)] gap-4 py-3.5">
                   <dt className="text-ink-600">{term}</dt>

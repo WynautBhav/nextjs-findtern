@@ -30,19 +30,19 @@ export async function GET() {
     `- Website: ${SITE_URL}`,
     `- Contact: ${SITE.email} (${SITE_URL}/contact)`,
     `- Founded: ${SITE.foundedYear}, ${SITE.city}`,
-    "- Audience: companies hiring interns (in India or from abroad) and students looking for paid internships",
+    "- Audience: companies hiring interns (in India or from abroad) and students looking for internships",
     "- Screening: academic verification, structured AI interview, aptitude test, coding test for technical tracks",
     "- Findtern Score: one number out of 10 across communication, aptitude, role depth, coding and academics; the score band sets the rate",
-    "- Billing: hourly rate against approved weekly timesheets, plus one fixed per-hire charge; prices in INR include GST; USD is derived at ₹100 = $1",
+    "- Billing: hourly rate against approved monthly timesheets (one per month, sent on the period's last day), plus one fixed per-hire charge; prices in INR include GST; USD is derived at ₹100 = $1",
     "- Overseas employers: contract with Findtern for the service and pay in USD; Findtern engages and pays the intern in India (no visa, no local entity)",
-    "- Candidate guarantee: placed within the guarantee window or the fee is refunded in full (terms at /guaranteed-internship-program)",
+    "- Candidate guarantee: an internship within 12 months of the AI interview or the fee is refunded in full, after the window closes (terms at /guaranteed-internship-program)",
     "",
     "## Plans (INR, published rate card)",
     "",
   ];
 
   for (const p of plans) {
-    const was = p.compareAtHourlyMinor && p.compareAtHourlyMinor > p.priceHourlyMinor ? ` (2026 offer; from 2027 ${formatRate(p.compareAtHourlyMinor, "INR")})` : "";
+    const was = p.priceHourlyMinor === 0 && p.compareAtHourlyMinor && p.compareAtHourlyMinor > 0 ? ` (shown as ${formatRate(p.compareAtHourlyMinor, "INR")}, currently discounted to free)` : "";
     lines.push(
       `- **${p.displayName}** - ${p.features[1] ?? ""}: ${formatRate(p.priceHourlyMinor, "INR")}${was}, ${formatMoney(p.perHireChargeMinor, "INR")} per hire, ${p.internshipDuration}. ${p.features[0] ?? ""}.`,
     );

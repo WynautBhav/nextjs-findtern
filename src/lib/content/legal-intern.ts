@@ -56,7 +56,6 @@ export const INTERN_TERMS: CmsLegalDoc = {
 <li>You must provide accurate academic and skill-related information.</li>
 <li>Misrepresentation of skills or submitting fake documents will result in account termination.</li>
 <li>Findtern reserves the right to verify academic credentials and remove any fraudulent profiles.</li>
-<li>Findtern does not guarantee an internship. However, if your profile score is above 60%, you are eligible for a paid internship. This means that any internship you get through Findtern will be a paid one.</li>
 <li>Your stipend is a fixed monthly amount set by your Findtern score: ₹0 below 6, ₹8,000 a month from 6 up to 8, and ₹15,000 a month from 8 and above, plus a completion bonus when you finish the internship.</li>
 <li>Each month's stipend (score 6 and above) is paid after that month ends.</li>
 <li>You must not share your personal information or direct contact details with clients outside of Findtern's platform. Any violation of this may lead to legal action.</li>
@@ -66,9 +65,9 @@ export const INTERN_TERMS: CmsLegalDoc = {
 <ul>
 <li>Findtern guarantees every registered candidate an internship within 12 months of completing their AI interview.</li>
 <li>If we are unable to provide an internship within this period, the registration fee will be refunded in full.</li>
-<li>Refunds will be processed only after the 12-month lock-in period is completed.</li>
+<li>Refunds will be processed only after the 12-month window has closed, within 7 working days.</li>
 <li>If you turn down or let lapse more than 3 offers, you are no longer eligible for the refund. Only formal offers count, not interview requests.</li>
-<li>Placement opportunities are based on your AI interview performance and skill ratings. Stipends vary according to your Findtern score.</li>
+<li>Placement opportunities and your stipend band are based on your Findtern Score.</li>
 <li>Fees paid in India include GST at the applicable rate. Your invoice shows the GST breakup.</li>
 </ul>
 
