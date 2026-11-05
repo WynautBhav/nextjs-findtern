@@ -2,7 +2,7 @@
 
 /**
  * A GET filter form that applies itself: a select or checkbox applies the
- * moment it changes, and a text field when you press Enter or leave it, so a
+ * moment it changes, and text fields when you press Enter or leave the form, so a
  * filter row needs no separate Filter / Apply button. Without JavaScript it
  * is still a plain form that submits on Enter.
  *
@@ -72,9 +72,13 @@ export function AutoSubmitForm({ children, className }: { children: React.ReactN
       }}
       onBlur={(e) => {
         const el = e.target;
-        if (el instanceof HTMLInputElement && el.type !== "checkbox" && el.defaultValue !== el.value) {
-          apply(e.currentTarget, el);
-        }
+        const form = e.currentTarget;
+        if (!(el instanceof HTMLInputElement) || el.type === "checkbox") return;
+        // Moving on to another field of this form: wait. A From/To pair applies together
+        // (Enter, or leaving the last field), not From alone with To lost to the reload.
+        if (e.relatedTarget instanceof Node && form.contains(e.relatedTarget)) return;
+        const edited = Array.from(form.elements).some((x) => x instanceof HTMLInputElement && x.type !== "hidden" && x.type !== "checkbox" && x.defaultValue !== x.value);
+        if (edited) apply(form, el);
       }}
     >
       {children}
