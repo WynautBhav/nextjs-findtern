@@ -73,6 +73,8 @@ export function LoginForm({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(sent),
+        // A stalled request (cold start, dropped connection) must not leave the button spinning forever.
+        signal: AbortSignal.timeout(20_000),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
@@ -83,8 +85,12 @@ export function LoginForm({
       if (rememberAs) document.cookie = `${LAST_DOOR_COOKIE}=${rememberAs}; path=/; max-age=31536000; samesite=lax`;
       router.push(redirectTo);
       router.refresh();
-    } catch {
-      setError("Network error. Please try again.");
+    } catch (err) {
+      setError(
+        err instanceof DOMException && err.name === "TimeoutError"
+          ? "Sign-in is taking too long. Please try again in a moment."
+          : "Network error. Please try again.",
+      );
       setLoading(false);
     }
   }
