@@ -284,8 +284,14 @@ export const emails = {
     ],
     cta: { label: "Reset password", url: o.url },
   }),
-  paymentReminder: (o: { name: string; type: "upcoming" | "due" | "overdue"; k: number; amount: string; dueOn: string; intern: string }): EmailContent => {
-    const title = { upcoming: `Month ${o.k} stipend of ${o.amount} is due on ${o.dueOn}`, due: `Month ${o.k} stipend of ${o.amount} is due today`, overdue: `Month ${o.k} stipend of ${o.amount} is overdue` }[o.type];
+  /** `dueOn` is a readable date. "due" covers the due day and the 2 days after, so only say "today" when it is. */
+  paymentReminder: (o: { name: string; type: "upcoming" | "due" | "overdue"; k: number; amount: string; dueOn: string; dueToday?: boolean; intern: string }): EmailContent => {
+    const today = o.type === "due" && o.dueToday !== false;
+    const title = {
+      upcoming: `Month ${o.k} stipend of ${o.amount} is due on ${o.dueOn}`,
+      due: today ? `Month ${o.k} stipend of ${o.amount} is due today` : `Month ${o.k} stipend of ${o.amount} was due on ${o.dueOn}`,
+      overdue: `Month ${o.k} stipend of ${o.amount} is overdue`,
+    }[o.type];
     return {
       subject: `${title} | Findtern`,
       heading: title,
@@ -293,11 +299,11 @@ export const emails = {
       lines: [
         o.type === "upcoming"
           ? `This is a reminder that the month ${o.k} stipend for ${o.intern} falls due on ${o.dueOn}.`
-          : `The month ${o.k} stipend for ${o.intern} ${o.type === "due" ? "is due today" : `was due on ${o.dueOn} and is still unpaid`}.`,
+          : `The month ${o.k} stipend for ${o.intern} ${today ? "is due today" : `was due on ${o.dueOn} and is still unpaid`}.`,
         "Your intern is paid once the stipend is received.",
       ],
       facts: [["Intern", o.intern], ["Month", String(o.k)], ["Amount", o.amount], ["Due on", o.dueOn]],
-      status: o.type === "overdue" ? "Overdue" : o.type === "due" ? "Due today" : "Due soon",
+      status: o.type === "overdue" ? "Overdue" : o.type === "due" ? (today ? "Due today" : "Past due") : "Due soon",
       cta: { label: o.type === "upcoming" ? "View orders" : "Pay now", url: `${origin()}/employer/${o.type === "upcoming" ? "orders" : "checkout"}` },
     };
   },

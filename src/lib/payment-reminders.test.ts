@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { istDay } from "./billing-plan.ts";
+import { emails } from "./emails.ts";
 import { reminderDue, reminderKey } from "./payment-reminders.ts";
 
 const fee = (id: string) => ({ status: "paid", paidAt: "2026-09-01T00:00:00Z", raw: { notes: { proposalIds: [id], paymentMode: "hiring_fee" } } });
@@ -46,4 +47,18 @@ test("IST boundary: 19:00 UTC on 27 Oct is already 28 Oct in India", () => {
   assert.equal(istDay(new Date("2026-10-27T17:59:00Z")), "2026-10-27");
   assert.equal(at(istDay(new Date("2026-10-27T17:59:00Z"))!), null);
   assert.equal(at(istDay(new Date("2026-10-27T18:30:00Z"))!)!.type, "upcoming");
+});
+
+test("the due email says 'due today' only on the due day, 'was due on <date>' after it", () => {
+  assert.equal(at("2026-10-31")!.dueToday, true);
+  assert.equal(at("2026-11-02")!.dueToday, false);
+  const base = { name: "Acme", type: "due" as const, k: 1, amount: "₹10,000", dueOn: "31 Oct 2026", intern: "Asha Rao" };
+  process.env.PUBLIC_ORIGIN = "http://localhost:3000";
+  const onDay = emails.paymentReminder({ ...base, dueToday: true });
+  assert.match(onDay.heading, /is due today/);
+  assert.match(onDay.lines[0], /is due today/);
+  const late = emails.paymentReminder({ ...base, dueToday: false });
+  assert.match(late.heading, /was due on 31 Oct 2026/);
+  assert.match(late.lines[0], /was due on 31 Oct 2026 and is still unpaid/);
+  assert.doesNotMatch(`${late.subject} ${late.heading} ${late.lines.join(" ")} ${late.status}`, /today/i);
 });

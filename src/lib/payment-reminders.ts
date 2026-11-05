@@ -4,7 +4,7 @@ import { monthsOf, parseOffer } from "./offer.ts";
 
 /** Month-end stipend reminders for post-paid hires (score 6+, plan "postpaid"). One per hire, month and type. */
 export type ReminderType = "upcoming" | "due" | "overdue";
-export type Reminder = { k: number; type: ReminderType; dueOn: string; amountMinor: number; currency: string };
+export type Reminder = { k: number; type: ReminderType; dueOn: string; dueToday: boolean; amountMinor: number; currency: string };
 
 export const REMINDER_LEAD_DAYS = 3;
 export const reminderKey = (proposalId: string, k: number, type: ReminderType) => `payment_reminder:${proposalId}:${k}:${type}`;
@@ -32,7 +32,7 @@ export function reminderDue(
     todayIst >= shift(dueOn, REMINDER_LEAD_DAYS) ? "overdue" : todayIst >= dueOn ? "due" : todayIst >= shift(dueOn, -REMINDER_LEAD_DAYS) ? "upcoming" : null;
   if (!type || sent.has(reminderKey(hire.id, k, type))) return null;
   const amountMinor = lineCharge(offer, hire.score, "monthly", { firstPayment: false }).totalMinor;
-  return amountMinor > 0 ? { k, type, dueOn, amountMinor, currency: offer.currency } : null; // nothing to pay, nothing to chase
+  return amountMinor > 0 ? { k, type, dueOn, dueToday: todayIst === dueOn, amountMinor, currency: offer.currency } : null; // nothing to pay, nothing to chase
 }
 
 export { istDay };

@@ -3,7 +3,7 @@ import { eq, like } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { scoreOf } from "@/lib/employer-candidates";
 import { emails } from "@/lib/emails";
-import { formatMoney } from "@/lib/format";
+import { formatDate, formatMoney } from "@/lib/format";
 import { notify } from "@/lib/notify";
 import { istDay } from "@/lib/billing-plan";
 import { reminderDue, reminderKey } from "@/lib/payment-reminders";
@@ -35,7 +35,7 @@ export async function sendPaymentReminders(now = new Date()): Promise<{ sent: nu
     const r = reminderDue({ ...h, score: score.get(h.internId) ?? 0 }, orders.filter((o) => o.employerId === h.employerId), sent, today);
     if (!r) continue;
     const amount = formatMoney(r.amountMinor, r.currency, { decimals: 0 });
-    const mail = emails.paymentReminder({ name: emp.name ?? "", type: r.type, k: r.k, amount, dueOn: r.dueOn, intern: intern.get(h.internId)! });
+    const mail = emails.paymentReminder({ name: emp.name ?? "", type: r.type, k: r.k, amount, dueOn: formatDate(r.dueOn), dueToday: r.dueToday, intern: intern.get(h.internId)! });
     const key = reminderKey(h.id, r.k, r.type);
     const ok = await notify({
       to: { type: "employer", id: h.employerId },
