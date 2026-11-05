@@ -46,6 +46,7 @@ export const AUDIT_ACTIONS = {
   "promo.delete": "Deleted a promo code",
   "intern.activation_marked_paid": "Marked activation fee paid",
   "intern.marked_completed": "Marked an internship completed",
+  "intern.completed_auto": "Internship completed automatically on final timesheet approval",
   "intern.ratings_update": "Edited a candidate's scores",
   "intern.ratings_import": "Imported candidate scores",
 } as const;

@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { withLock } from "@/lib/advisory-lock";
+import { recordAdminAudit } from "@/lib/admin/audit";
 import { completeInternship, notifyCompleted } from "@/lib/admin/complete-internship";
 import { afterRatingsSaved } from "@/lib/admin/score-live";
 import { getDb, schema } from "@/lib/db";
@@ -105,6 +106,14 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     return NextResponse.json({ error: "Timesheet was already decided" }, { status: 409 });
   }
   if (completion?.completed) {
+    // Who tripped the automatic completion (the approving employer or admin), so the bonus and score change have an author.
+    await recordAdminAudit(db, {
+      adminId: session.uid,
+      action: "intern.completed_auto",
+      targetType: "intern",
+      targetId: sheet.internId,
+      meta: { proposalId: sheet.proposalId, timesheetId: id, approverRole: session.role, bonusMinor: completion.amountMinor },
+    });
     await afterRatingsSaved(sheet.internId, completion.prev, completion.next).catch(() => undefined);
     await notifyCompleted(sheet.proposalId, completion);
   }
