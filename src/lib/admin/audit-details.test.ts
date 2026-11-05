@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { diffFields } from "./audit.ts";
-import { describeAudit, describeTarget, emptyNames } from "./audit-details.ts";
+import { auditActionLabel, describeAudit, describeTarget, emptyNames } from "./audit-details.ts";
 
 const names = emptyNames();
 names.intern.set("i1", "Sana Kapoor");
@@ -56,6 +56,16 @@ test("exports read as 'Exported N rows of <type>', never the filters", () => {
   assert.equal(describeAudit("export.payouts", { view: "payouts", rows: 9 }), "Exported 9 rows of payouts");
   assert.equal(describeAudit("export.users", { rows: 2 }), "Exported 2 rows of registered users");
   assert.equal(describeAudit("export.hired", { rows: 3 }), "Exported 3 rows of hired candidates");
+});
+
+test("an older payout export logged as a candidates export is labelled by its type", () => {
+  const meta = { rows: 152, filters: { entity: "payouts" }, fullAccountNumbers: false };
+  assert.equal(auditActionLabel("export.interns", meta), "Exported payouts");
+  assert.equal(describeAudit("export.interns", meta), "Exported 152 rows of payouts");
+  assert.deepEqual(describeTarget("export.interns", "intern", null, meta, names), { name: "Payouts", href: "/admin/payouts" });
+  assert.equal(auditActionLabel("export.interns", { rows: 3, filters: { type: "interns" } }), "Exported candidates");
+  assert.equal(auditActionLabel("export.interns", { rows: 3, filters: { kind: "fulltime" } }), "Exported candidates");
+  assert.equal(auditActionLabel("promo.update", {}), "Edited a promo code");
 });
 
 test("redaction still applies to the readable line", () => {

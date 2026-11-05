@@ -3,8 +3,7 @@ import { and, count, desc, eq, inArray, sql, type SQL } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { searchAny } from "@/lib/admin/params";
 import { parseDateRange } from "@/lib/admin/date-range";
-import { actionLabel } from "@/lib/admin/audit";
-import { describeAudit, describeTarget, emptyNames, type AuditNames } from "@/lib/admin/audit-details";
+import { auditActionLabel, describeAudit, describeTarget, emptyNames, type AuditNames } from "@/lib/admin/audit-details";
 
 const L = schema.adminAuditLog;
 const IST_MS = 330 * 60_000;
@@ -112,7 +111,7 @@ export async function loadAudit(params: Record<string, string>, search: string, 
       staffName: r.staffName,
       staffEmail: r.staffEmail,
       action: r.action,
-      actionLabel: actionLabel(r.action),
+      actionLabel: auditActionLabel(r.action, r.meta),
       targetType: r.targetType,
       targetId: r.targetId,
       targetName: target.name,

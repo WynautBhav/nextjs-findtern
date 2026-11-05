@@ -1,5 +1,5 @@
 import { formatDate, formatMoney } from "../format.ts";
-import { redactMeta } from "./audit.ts";
+import { actionLabel, redactMeta } from "./audit.ts";
 
 /**
  * Turns an audit row's stored meta into one human line for the table and the CSV.
@@ -126,13 +126,27 @@ function entry(key: string, v: unknown, ctx: Ctx): string | null {
   return `${label}: ${fmt(key, v.from, ctx)} → ${fmt(key, v.to, ctx)}`;
 }
 
+const FILTER_NOUNS: Record<string, string> = { payouts: "payouts", dues: "employer dues", users: "registered users", hired: "hired candidates" };
+
 /** What an export row's rows were: "candidates", "employer dues", ... */
 export function exportNoun(action: string, meta: Record<string, unknown>): string {
   if (action === "export.payouts") return meta.view === "dues" ? "employer dues" : "payouts";
   if (action === "export.hired") return "hired candidates";
   if (action === "export.users") return "registered users";
   if (action === "export.audit_log") return "audit log entries";
-  return "candidates";
+  // Older payout exports went through the candidates export and were logged as such; the type in the filters says which.
+  const f = isRecord(meta.filters) ? meta.filters : {};
+  const asked = [f.type, f.entity, f.kind].find((v): v is string => typeof v === "string" && v in FILTER_NOUNS);
+  return asked ? FILTER_NOUNS[asked] : "candidates";
+}
+
+/** The action's label, told apart by what an older export row actually exported. */
+export function auditActionLabel(action: string, rawMeta: unknown): string {
+  if (action === "export.interns" && isRecord(rawMeta)) {
+    const noun = exportNoun(action, rawMeta);
+    if (noun !== "candidates") return `Exported ${noun}`;
+  }
+  return actionLabel(action);
 }
 
 export function describeAudit(action: string, rawMeta: unknown, names: AuditNames = emptyNames()): string {
@@ -174,6 +188,7 @@ export function describeTarget(
   const m = isRecord(meta) ? meta : {};
   const str = (k: string) => (typeof m[k] === "string" ? (m[k] as string) : null);
   if (action.startsWith("export.") && !id) {
+    if (action === "export.interns" && exportNoun(action, m) === "payouts") return { name: "Payouts", href: "/admin/payouts" };
     if (action === "export.interns") return { name: "Candidates", href: "/admin/interns" };
     if (action === "export.users") return { name: "Registered users", href: "/admin/users" };
     if (action === "export.payouts") return { name: "Payouts", href: "/admin/payouts" };
