@@ -23,6 +23,7 @@ import {
   Tag,
   UserCheck,
   Users,
+  Video,
 } from "lucide-react";
 
 import { CommandPalette } from "@/components/admin/command-palette";
@@ -56,6 +57,7 @@ const NAV: AdminNavGroup[] = [
     items: [
       { href: "/admin/dashboard", label: "Dashboard", icon: <LayoutDashboard /> },
       { href: "/admin/proposal-tracker", label: "Proposal pipeline", icon: <Send /> },
+      { href: "/admin/ai-interviews", label: "AI interviews", icon: <Video /> },
       { href: "/admin/messages", label: "Messages", icon: <MessageSquare /> },
       // A daily queue (stipends due), so it sits with the daily work rather
       // than below the fold under Finance.
