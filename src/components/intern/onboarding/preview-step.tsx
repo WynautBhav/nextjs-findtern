@@ -34,12 +34,12 @@ export function PreviewStep({ values, update, errors, onJumpStep }: StepProps) {
             <UserRound className="size-6 text-white/80" />
           </span>
           <div className="min-w-0">
-            <p className="break-words text-lg font-semibold tracking-[-0.01em]">
+            <p className="[overflow-wrap:anywhere] text-lg font-semibold tracking-[-0.01em]">
               {[a.degree, a.branch].filter(Boolean).join(", ") || "Your degree"}
             </p>
             <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-sm text-on-dark-subtle">
-              <span className="inline-flex items-center gap-1">
-                <MapPin className="size-3.5" aria-hidden />
+              <span className="inline-flex min-w-0 items-center gap-1 [overflow-wrap:anywhere]">
+                <MapPin className="size-3.5 shrink-0" aria-hidden />
                 {[values.city, values.state].filter(Boolean).join(", ") || "City not set"}
               </span>
               {mode ? <span className="capitalize">· {mode}</span> : null}
@@ -50,7 +50,7 @@ export function PreviewStep({ values, update, errors, onJumpStep }: StepProps) {
         <div className="divide-y divide-ink-200/70">
           {values.bio.trim() ? (
             <Block title="About" onEdit={() => onJumpStep(0)}>
-              <p className="whitespace-pre-wrap text-[0.9375rem] leading-relaxed text-ink-800">{values.bio}</p>
+              <p className="whitespace-pre-line text-[0.9375rem] leading-relaxed text-ink-800 [overflow-wrap:anywhere]">{values.bio}</p>
             </Block>
           ) : null}
 
@@ -66,7 +66,7 @@ export function PreviewStep({ values, update, errors, onJumpStep }: StepProps) {
               {a.cgpa ? <DetailRow label={a.scoreType === "percentage" ? "Percentage" : "CGPA"} mono value={a.scoreType === "percentage" ? `${a.cgpa}%` : `${a.cgpa} / 10`} /> : null}
             </dl>
             {qualifications.length > 0 ? (
-              <ul className="mt-3 space-y-1.5 text-sm text-ink-700">
+              <ul className="mt-3 space-y-1.5 text-sm text-ink-700 [overflow-wrap:anywhere]">
                 {qualifications.map((q) => (
                   <li key={q.id}>
                     <span className="font-medium text-ink-900">{q.name}</span>
@@ -83,8 +83,8 @@ export function PreviewStep({ values, update, errors, onJumpStep }: StepProps) {
             {values.skills.length ? (
               <ul className="flex flex-wrap gap-2">
                 {values.skills.map((s) => (
-                  <li key={s}>
-                    <Pill tone="live">
+                  <li key={s} className="max-w-full">
+                    <Pill tone="live" className="max-w-full text-left [overflow-wrap:anywhere]">
                       {s}
                     </Pill>
                   </li>
@@ -101,15 +101,15 @@ export function PreviewStep({ values, update, errors, onJumpStep }: StepProps) {
                 {values.experiences.map((e) => (
                   <li key={e.id}>
                     <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-                      <p className="text-[0.9375rem] font-medium text-ink-900">
+                      <p className="min-w-0 text-[0.9375rem] font-medium text-ink-900 [overflow-wrap:anywhere]">
                         {e.role || "Role"} <span className="font-normal text-ink-600">at {e.company || "-"}</span>
                       </p>
                       <p className="nums text-xs text-text-subtle">
                         {dateLabel(e.from)} – {e.current ? "Present" : dateLabel(e.to)}
                       </p>
                     </div>
-                    {e.type ? <p className="text-xs text-text-subtle">{e.type}</p> : null}
-                    {e.description ? <p className="mt-1 line-clamp-3 text-sm leading-relaxed text-ink-700">{e.description}</p> : null}
+                    {e.type ? <p className="text-xs text-text-subtle [overflow-wrap:anywhere]">{e.type}</p> : null}
+                    {e.description ? <p className="mt-1 line-clamp-3 whitespace-pre-line text-sm leading-relaxed text-ink-700 [overflow-wrap:anywhere]">{e.description}</p> : null}
                   </li>
                 ))}
               </ul>
@@ -118,7 +118,7 @@ export function PreviewStep({ values, update, errors, onJumpStep }: StepProps) {
 
           <div className="grid sm:grid-cols-2 sm:divide-x sm:divide-ink-200/70">
             <Block title="Languages" onEdit={() => onJumpStep(4)}>
-              <ul className="space-y-1 text-sm text-ink-800">
+              <ul className="space-y-1 text-sm text-ink-800 [overflow-wrap:anywhere]">
                 {languages.map((l) => (
                   <li key={l.id}>
                     <span className="font-medium">{l.language}</span>
@@ -128,7 +128,7 @@ export function PreviewStep({ values, update, errors, onJumpStep }: StepProps) {
               </ul>
             </Block>
             <Block title="Work" onEdit={() => onJumpStep(6)} className="border-t border-ink-200/70 sm:border-t-0">
-              <p className="text-sm text-ink-800">
+              <p className="text-sm text-ink-800 [overflow-wrap:anywhere]">
                 <span className="font-medium capitalize">{mode ?? "Not set"}</span>
                 {values.preferredLocations.length ? <span className="text-ink-600"> · {values.preferredLocations.join("; ")}</span> : null}
               </p>
@@ -138,7 +138,7 @@ export function PreviewStep({ values, update, errors, onJumpStep }: StepProps) {
 
           {activities.length ? (
             <Block title="Activities" onEdit={() => onJumpStep(5)}>
-              <ul className="space-y-1 text-sm text-ink-800">
+              <ul className="space-y-1 text-sm text-ink-800 [overflow-wrap:anywhere]">
                 {activities.map((x) => (
                   <li key={x.id}>
                     <span className="font-medium">{x.activity}</span>
@@ -160,7 +160,7 @@ export function PreviewStep({ values, update, errors, onJumpStep }: StepProps) {
         )}
       >
         <Check checked={Boolean(values.ndaAccepted)} onChange={(v) => update("ndaAccepted", v)} className="items-start">
-          <span className="leading-relaxed">
+          <span className="min-w-0 leading-relaxed [overflow-wrap:anywhere]">
             I have read and accept the{" "}
             <a href="/intern-nda" target="_blank" rel="noopener" className="font-medium text-brand-700 underline underline-offset-4">
               Internship Acceptance &amp; Non-Bypass Agreement

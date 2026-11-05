@@ -95,10 +95,10 @@ export function ProfileView({
           <InternAvatar src={photoUrl} initials={initials} className="size-20 rounded-apple-lg text-2xl" />
           <div className="min-w-0 flex-1 basis-48">
             <div className="flex flex-wrap items-center gap-2">
-              <p className="text-xl font-semibold tracking-[-0.02em] text-ink-900">{name}</p>
+              <p className="min-w-0 max-w-full text-xl font-semibold tracking-[-0.02em] text-ink-900 [overflow-wrap:anywhere]">{name}</p>
               <Pill tone={status.tone}>{status.label}</Pill>
             </div>
-            <p className="mt-1 flex items-center gap-1.5 text-sm text-ink-600">
+            <p className="mt-1 flex min-w-0 items-center gap-1.5 text-sm text-ink-600 [overflow-wrap:anywhere]">
               <MapPin className="size-4 shrink-0 text-text-subtle" aria-hidden />
               {place || "City not added yet"}
             </p>
@@ -150,8 +150,8 @@ export function ProfileView({
         ) : (
           <ul className="flex flex-wrap gap-2">
             {skills.map((skill) => (
-              <li key={skill} className="inline-flex min-h-9 items-center gap-2 rounded-full border border-ink-200/80 px-3 text-sm">
-                <span className="font-medium text-ink-900">{skill}</span>
+              <li key={skill} className="inline-flex min-h-9 max-w-full items-center gap-2 rounded-full border border-ink-200/80 px-3 py-1 text-sm">
+                <span className="min-w-0 font-medium text-ink-900 [overflow-wrap:anywhere]">{skill}</span>
               </li>
             ))}
           </ul>
@@ -189,7 +189,7 @@ export function ProfileView({
       {/* ── About ───────────────────────────────────────────────── */}
       {draft.bio ? (
         <Section title="About">
-          <p className="whitespace-pre-line text-pretty text-base leading-relaxed text-ink-700">{draft.bio}</p>
+          <p className="whitespace-pre-line text-pretty text-base leading-relaxed text-ink-700 [overflow-wrap:anywhere]">{draft.bio}</p>
         </Section>
       ) : null}
 
@@ -229,14 +229,14 @@ export function ProfileView({
           <ul className="divide-y divide-ink-100">
             {experiences.map((exp) => (
               <li key={exp.id} className="py-3 first:pt-0 last:pb-0">
-                <p className="text-base font-medium text-ink-900">{[exp.role, exp.company].filter(Boolean).join(" · ")}</p>
-                <p className="nums mt-1 text-sm text-ink-600">
+                <p className="text-base font-medium text-ink-900 [overflow-wrap:anywhere]">{[exp.role, exp.company].filter(Boolean).join(" · ")}</p>
+                <p className="nums mt-1 text-sm text-ink-600 [overflow-wrap:anywhere]">
                   {[exp.type, [dateLabel(exp.from), exp.current ? "Present" : dateLabel(exp.to)].filter(Boolean).join(" – ")]
                     .filter(Boolean)
                     .join(" · ")}
                 </p>
                 {exp.description ? (
-                  <p className="mt-2 whitespace-pre-line text-pretty text-sm leading-relaxed text-ink-700">{exp.description}</p>
+                  <p className="mt-2 whitespace-pre-line text-pretty text-sm leading-relaxed text-ink-700 [overflow-wrap:anywhere]">{exp.description}</p>
                 ) : null}
               </li>
             ))}
@@ -250,8 +250,8 @@ export function ProfileView({
           <ul className="divide-y divide-ink-100">
             {qualifications.map((q) => (
               <li key={q.id} className="py-3 first:pt-0 last:pb-0">
-                <p className="text-base font-medium text-ink-900">{q.name}</p>
-                <p className="nums mt-1 text-sm text-ink-600">
+                <p className="text-base font-medium text-ink-900 [overflow-wrap:anywhere]">{q.name}</p>
+                <p className="nums mt-1 text-sm text-ink-600 [overflow-wrap:anywhere]">
                   {[q.issuer, q.completionDate && dateLabel(q.completionDate)].filter(Boolean).join(" · ") || "No further detail"}
                 </p>
               </li>
@@ -267,7 +267,7 @@ export function ProfileView({
             <Section title="Languages">
               <ul className="space-y-2">
                 {languages.map((l) => (
-                  <li key={l.id} className="text-sm">
+                  <li key={l.id} className="text-sm [overflow-wrap:anywhere]">
                     <span className="font-medium capitalize text-ink-900">{l.language}</span>
                     {l.level || l.read || l.write || l.speak ? (
                       <span className="text-ink-600">
@@ -284,7 +284,7 @@ export function ProfileView({
             <Section title="Extracurriculars">
               <ul className="space-y-2">
                 {activities.map((x) => (
-                  <li key={x.id} className="text-sm">
+                  <li key={x.id} className="text-sm [overflow-wrap:anywhere]">
                     <span className="font-medium text-ink-900">{x.activity}</span>
                     {x.level || x.category ? (
                       <span className="text-ink-600"> · {[x.category, x.level].filter(Boolean).join(", ")}</span>
