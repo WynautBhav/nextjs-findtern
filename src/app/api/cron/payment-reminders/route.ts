@@ -7,8 +7,9 @@ export const dynamic = "force-dynamic";
 
 /**
  * Vercel Cron calls GET with `Authorization: Bearer $CRON_SECRET`. Unset secret = closed.
- * Like the in-process scheduler it only sends when SCHEDULERS=on, so a deployment on a copy
- * of the live data (SCHEDULERS=off) never emails real employers.
+ * Setting CRON_SECRET is the opt-in for this route, so it sends unless SCHEDULERS is explicitly
+ * "off" (unlike the in-process scheduler, which needs SCHEDULERS=on). A deployment on a copy
+ * of the live data sets SCHEDULERS=off and never emails real employers.
  */
 export async function GET(req: Request) {
   const secret = process.env.CRON_SECRET;
@@ -17,6 +18,6 @@ export async function GET(req: Request) {
   if (!secret || got.length !== want.length || !timingSafeEqual(got, want)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  if (process.env.SCHEDULERS !== "on") return NextResponse.json({ skipped: true, reason: "SCHEDULERS is not on" });
+  if (process.env.SCHEDULERS === "off") return NextResponse.json({ skipped: true, reason: "SCHEDULERS is off" });
   return NextResponse.json(await sendPaymentReminders());
 }
