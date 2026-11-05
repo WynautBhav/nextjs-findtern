@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { HIDDEN_COMPANY, activeEngagement, hoursByMonth, periodLabel, buildThread, deriveMoney, deriveProofs, deriveStage, isAcceptedStatus, payoutState, proofAsText, recordTotals } from "./journey.ts";
+import { HIDDEN_COMPANY, activeEngagement, hoursByMonth, hoursIn, periodLabel, buildThread, deriveMoney, deriveProofs, deriveStage, isAcceptedStatus, payoutState, proofAsText, recordTotals } from "./journey.ts";
 
 const payout = (id: string, status: string, amountMinor: number, scheduledFor?: string) => ({
   id,
@@ -110,9 +110,21 @@ test("periodLabel reads the stored end bound as its calendar day, not the next d
   assert.equal(periodLabel(t as Parameters<typeof periodLabel>[0]), "1 – 30 Nov 2026");
 });
 
+/** A Present day as the timesheet editor stores it. */
+const present = (i: number, hours?: number) => ({ date: `2026-09-${String(i + 1).padStart(2, "0")}`, status: "Present", ...(hours === undefined ? {} : { hours }) });
+
+test("hoursIn counts a Present day with no or 0 hours as 8 h, like the employer review, and ignores other days", () => {
+  const sheet = {
+    periodStart: new Date("2026-09-01"),
+    periodEnd: new Date("2026-09-05"),
+    entries: [present(0, 5), present(1), present(2, 0), { date: "2026-09-04", status: "Absent", hours: 6 }],
+  } as unknown as Parameters<typeof hoursIn>[0];
+  assert.equal(hoursIn(sheet), 5 + 8 + 8);
+});
+
 test("hoursByMonth buckets sheets by IST start month, splits by state and drops rejected and out-of-range", () => {
   const sheet = (start: string, status: string, hours: number[]) =>
-    ({ periodStart: new Date(start), status, entries: hours.map((h) => ({ hours: h })) }) as unknown as Parameters<typeof hoursByMonth>[0][number];
+    ({ periodStart: new Date(start), status, entries: hours.map((h, i) => present(i, h)) }) as unknown as Parameters<typeof hoursByMonth>[0][number];
   const months = hoursByMonth(
     [
       sheet("2026-10-01T00:00:00Z", "approved", [3, 2]),
@@ -129,20 +141,20 @@ test("hoursByMonth buckets sheets by IST start month, splits by state and drops 
 });
 
 test("hoursByMonth runs on to a later draft month so next month's sheet is not dropped", () => {
-  const sheet = { periodStart: new Date("2026-11-01T00:00:00Z"), status: "draft", entries: [{ hours: 2 }] } as unknown as Parameters<typeof hoursByMonth>[0][number];
+  const sheet = { periodStart: new Date("2026-11-01T00:00:00Z"), status: "draft", entries: [present(0, 2)] } as unknown as Parameters<typeof hoursByMonth>[0][number];
   const months = hoursByMonth([sheet], new Date("2026-10-29T00:00:00Z"), 2);
   assert.deepEqual(months.map((m) => [m.key, m.draft]), [["2026-10", 0], ["2026-11", 2]]);
 });
 
 test("hoursByMonth starts at the joining month, not six months back", () => {
-  const sheet = { periodStart: new Date("2026-10-11T00:00:00Z"), status: "approved", entries: [{ hours: 5 }] } as unknown as Parameters<typeof hoursByMonth>[0][number];
+  const sheet = { periodStart: new Date("2026-10-11T00:00:00Z"), status: "approved", entries: [present(0, 5)] } as unknown as Parameters<typeof hoursByMonth>[0][number];
   const months = hoursByMonth([sheet], new Date("2026-11-20T00:00:00Z"), 6, new Date("2026-10-11T00:00:00Z"));
   assert.deepEqual(months.map((m) => [m.key, m.approved]), [["2026-10", 5], ["2026-11", 0]]);
 });
 
 test("record totals add numbers, not display strings, and never add across currencies", () => {
   const sheet = (id: string, hours: number[]) =>
-    ({ id, proposalId: "p1", periodStart: new Date("2026-09-01"), periodEnd: new Date("2026-09-30"), status: "approved", entries: hours.map((h) => ({ hours: h })), submittedAt: null, approvedAt: new Date("2026-10-03"), rejectedAt: null, managerNote: null, internNote: null, createdAt: new Date("2026-09-01") });
+    ({ id, proposalId: "p1", periodStart: new Date("2026-09-01"), periodEnd: new Date("2026-09-30"), status: "approved", entries: hours.map((h, i) => present(i, h)), submittedAt: null, approvedAt: new Date("2026-10-03"), rejectedAt: null, managerNote: null, internNote: null, createdAt: new Date("2026-09-01") });
   const proofs = deriveProofs({
     proposals: [proposal("p1", "hired", new Date("2026-09-08"))],
     interviews: [],
