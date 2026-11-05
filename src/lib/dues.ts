@@ -20,6 +20,11 @@ function promoDiscountOf(raw: unknown): number {
   return Number.isFinite(n) && n > 0 ? Math.round(n) : 0;
 }
 
+/** The Orders button: "1 payment due · 1 can be paid early"; a part that is zero is left out. */
+export function paymentsBadge(due: number, early: number): string {
+  return [due > 0 ? `${due} ${due === 1 ? "payment" : "payments"} due` : "", early > 0 ? `${early} can be paid early` : ""].filter(Boolean).join(" · ");
+}
+
 export type Due = {
   proposalId: string;
   monthsPaid: number;

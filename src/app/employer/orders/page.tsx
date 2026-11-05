@@ -17,7 +17,7 @@ import { LEGACY_INVOICE_CUTOFF, taxInvoiceHtml } from "@/lib/invoice";
 import { employerInvoices } from "@/lib/employer-invoice";
 import { loadInvoiceHires } from "@/lib/employer-invoice-hires";
 import { timezoneForLocation } from "@/lib/timezones";
-import { parseOffer } from "@/lib/offer";
+import { parseOffer, todayIst } from "@/lib/offer";
 import { payableCheckout } from "@/lib/employer-payable";
 import { expireStaleEmployerOrders } from "@/lib/payments";
 import { isPaidRow } from "@/lib/admin/invoice-rows";
@@ -181,5 +181,8 @@ async function loadOrders(employerId: string) {
       };
     });
 
-  return { fteStatus, timezone, hires, invoices, payableCount: payable?.lines.length ?? 0, offersToPay: payable?.lines.filter((l) => !l.due).length ?? 0, payableIds: payable?.lines.map((l) => l.id) ?? [] };
+  // A line is due once its day has come (accepted offers have no day); a post-paid month inside its pay window is only open early.
+  const today = todayIst();
+  const dueNow = payable?.lines.filter((l) => !l.dueOn || l.dueOn <= today).length ?? 0;
+  return { fteStatus, timezone, hires, invoices, payableCount: dueNow, earlyCount: (payable?.lines.length ?? 0) - dueNow, offersToPay: payable?.lines.filter((l) => !l.due).length ?? 0, payableIds: payable?.lines.map((l) => l.id) ?? [] };
 }

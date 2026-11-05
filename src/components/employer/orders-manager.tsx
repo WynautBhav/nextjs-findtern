@@ -11,7 +11,7 @@ import { FullTimeOfferButton } from "@/components/employer/full-time-offer-butto
 import { RowMenu } from "@/components/app/row-menu";
 import { fieldClass, labelClass, tabClass, tdClass, thClass } from "@/components/employer/ui-tokens";
 import { downloadCsv } from "@/lib/admin/csv";
-import type { PlacementLedger } from "@/lib/dues";
+import { paymentsBadge, type PlacementLedger } from "@/lib/dues";
 import { formatDate, formatMoney } from "@/lib/format";
 import { downloadInvoice } from "@/lib/invoice";
 import { filterHires, matchesQuery } from "@/lib/orders-filter";
@@ -91,6 +91,7 @@ export function OrdersManager({
   hires,
   invoices,
   payableCount,
+  earlyCount,
   offersToPay,
   payableIds,
 }: {
@@ -99,8 +100,10 @@ export function OrdersManager({
   timezone: string;
   hires: HireRow[];
   invoices: InvoiceRow[];
-  /** Accepted offers and due months waiting at checkout. */
+  /** Accepted offers and months whose due day has come, waiting at checkout. */
   payableCount: number;
+  /** Months still inside their pay window: payable now, not due yet. */
+  earlyCount: number;
   /** Of those, accepted offers not yet paid for (not hires, so not in the hire figures). */
   offersToPay: number;
   /** Proposals checkout can bill right now: a hire's Pay links only to these (QA-139). */
@@ -151,9 +154,9 @@ export function OrdersManager({
               : "No hires yet. A hire, its payments and its invoices land here once you pay for an accepted offer."
         }
         action={
-          payableCount > 0 ? (
+          payableCount + earlyCount > 0 ? (
             <ButtonLink href="/employer/checkout" variant="accent">
-              {payableCount === 1 ? "1 payment due" : `${payableCount} payments due`}
+              {paymentsBadge(payableCount, earlyCount)}
               <ArrowRight className="size-4" aria-hidden />
             </ButtonLink>
           ) : null
