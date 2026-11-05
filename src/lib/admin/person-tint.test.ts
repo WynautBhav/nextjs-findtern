@@ -33,3 +33,8 @@ test("initials", () => {
   assert.equal(initialsOf(""), "?");
   assert.equal(initialsOf(null), "?");
 });
+
+test("initials use letters only and fall back to ?", () => {
+  assert.equal(initialsOf("<b>Bob</b> Lee"), "BL");
+  assert.equal(initialsOf("<< >>"), "?");
+});

@@ -13,6 +13,7 @@ import { aiInterviewLinks } from "@/lib/ai-interview-links";
 import { aiInterviewPhase, isScored, latestAiInterview } from "@/lib/ai-interview";
 import { getDb, schema } from "@/lib/db";
 import { loadInternData } from "@/lib/intern-data";
+import { initialsOf as personInitials } from "@/lib/admin/person-tint";
 import { draftFromRecord, emptyDraft, linkedinHref, profileCompletion, type OnboardingDraft } from "@/lib/onboarding";
 import { isInternPaid } from "@/lib/payments";
 
@@ -54,7 +55,7 @@ export default async function InternProfile() {
   const activated = await isInternPaid(session.uid);
 
   const name = `${user?.first ?? ""} ${user?.last ?? ""}`.trim() || "Candidate";
-  const initials = `${(user?.first ?? "").charAt(0)}${(user?.last ?? "").charAt(0)}`.toUpperCase() || "?";
+  const initials = personInitials(`${user?.first ?? ""} ${user?.last ?? ""}`);
   // Stored rows can miss whole sections; fill them so every list is an array.
   const draft: OnboardingDraft | null = data.onboarding
     ? (() => {

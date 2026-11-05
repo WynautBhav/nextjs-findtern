@@ -35,3 +35,8 @@ test("displayNameOf never renders a bare ? or blank", () => {
   assert.equal(displayNameOf({ fullName: "Meera Pillai", initials: "?" }, false), "Candidate");
   assert.equal(displayNameOf({ fullName: "", initials: "?" }, true), "Intern");
 });
+
+test("initialsOf ignores symbols and falls back to ?", () => {
+  assert.equal(initialsOf("<", "<"), "?");
+  assert.equal(initialsOf("<Meera", "Pillai"), "MP");
+});

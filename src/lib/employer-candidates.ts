@@ -118,8 +118,9 @@ export function initialsOf(first: string, last: string): string {
   // Port of the legacy `getInitialsFromName`: first letter of first and last
   // name, falling back to the first two letters of a single name ("Aarav" →
   // "AA") so the avatar code is always two characters like production (HP, AK).
-  const f = first.trim();
-  const l = last.trim();
+  // Letters only, so a name like "<b>" never shows "<" as an initial.
+  const f = first.replace(/[^\p{L}]/gu, "");
+  const l = last.replace(/[^\p{L}]/gu, "");
   const a = f.charAt(0);
   const b = l ? l.charAt(0) : f.length > 1 ? f.charAt(1) : "";
   return `${a}${b}`.toUpperCase() || "?";

@@ -22,7 +22,7 @@ export function initialsOf(name: string | null | undefined): string {
     .split(/\s+/)
     .filter(Boolean)
     .slice(0, 2)
-    .map((part) => Array.from(part)[0]?.toUpperCase() ?? "")
+    .map((part) => part.match(/\p{L}/u)?.[0].toUpperCase() ?? "") // letters only: "<Bob" is "B", not "<"
     .join("");
   return letters || "?";
 }

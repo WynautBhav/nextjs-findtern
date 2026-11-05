@@ -42,6 +42,7 @@ import {
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { buttonClass } from "@/components/ui/button";
 import { breadcrumbsFor } from "@/lib/breadcrumbs";
+import { initialsOf as personInitials } from "@/lib/admin/person-tint";
 import { OPEN_CHAT_EVENT } from "@/lib/chat-events";
 import { csrfFetch } from "@/lib/client-fetch";
 import { cn } from "@/lib/utils";
@@ -567,11 +568,5 @@ function RoleChip({ label, light }: { label: string; light: boolean }) {
  * as somebody else's face.
  */
 function Avatar({ name, photoUrl }: { name: string; photoUrl?: string | null }) {
-  const initials = name
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((p) => p[0]?.toUpperCase() ?? "")
-    .join("");
-  return <InternAvatar src={photoUrl ?? null} initials={initials || "?"} className="size-9 rounded-full text-xs" />;
+  return <InternAvatar src={photoUrl ?? null} initials={personInitials(name)} className="size-9 rounded-full text-xs" />;
 }
