@@ -261,7 +261,11 @@ export function SignupForm({
               label="Email"
               type="email"
               value={email}
-              onChange={setEmail}
+              onChange={(v) => {
+                setEmail(v);
+                // A different address needs its own code (same as the employer form).
+                if (v.trim().toLowerCase() !== email.trim().toLowerCase()) setVerified(false);
+              }}
               autoComplete="email"
               placeholder="you@gmail.com"
             />
