@@ -6,6 +6,8 @@ import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
 import { emails } from "@/lib/emails";
 import { employerNames, internFirstName, notify } from "@/lib/notify";
+import { recordAdminAudit } from "@/lib/admin/audit";
+import { linkNoticeKey, validateAiLink } from "@/lib/admin/ai-link-queue";
 import { isAiInterview, mergeInterviewNotes, noteTag, statusAfterMeetingLink } from "@/lib/admin/interview-notes";
 
 
@@ -81,13 +83,16 @@ export async function PUT(
   // Legacy AI interviews sit on employer id "admin"; ours on the synthetic employer.
   const isAi = isAiInterview(existing.employerId, employer?.email);
 
+  // The AI interview link is InCruiter's, always https (a soft host warning is the form's job).
+  const aiCheck = isAi ? validateAiLink(meetingLink) : null;
+  if (aiCheck && !aiCheck.ok) return NextResponse.json({ error: aiCheck.error }, { status: 400 });
+
   // Company interviews only: the link follows the candidate's pick (#20). AI interviews have no slots.
   if (!isAi && !existing.selectedSlot) {
     return NextResponse.json({ error: "The candidate hasn't picked a time yet. The link is created when they do." }, { status: 409 });
   }
 
-  const currentStatus = String(existing.status ?? "").toLowerCase();
-  // Legacy rule (ADP-07, decided): any unfinished interview, employer or AI,
+    // Legacy rule (ADP-07, decided): any unfinished interview, employer or AI,
   // becomes "scheduled" once it has a link.
   const nextStatus = statusAfterMeetingLink(existing.status, Boolean(existing.selectedSlot) || isAi);
 
@@ -148,26 +153,23 @@ export async function PUT(
     return NextResponse.json({ ok: true, interview: updated });
   }
 
-  // AI interview: unlock notification to the candidate if this sets or updates meetingLink
+  // AI interview: tell the candidate (in-app + email) when the link is new or changed, once per link.
   try {
-    const wasEmpty = !String(existing.meetingLink ?? "").trim();
-    const hasLink = Boolean(meetingLink.trim());
-    if (hasLink && (wasEmpty || currentStatus === "waiting" || currentStatus === "pending")) {
-      await db
-        .insert(schema.notifications)
-        .values({
-          recipientType: "intern",
-          recipientId: existing.internId,
-          type: "ai_interview_unlocked",
-          title: "AI interview unlocked",
-          message: "Your AI interview is open. The link is on your Interviews page.",
-          data: { interviewId: id, meetingLink: meetingLink.trim() },
-          dedupeKey: `ai_interview_unlocked:${id}`,
-        })
-        .onConflictDoNothing();
+    const key = linkNoticeKey(id, existing.meetingLink, link);
+    if (key) {
+      await recordAdminAudit(db, { adminId: guard.session.uid, action: "interview.ai_link_added", targetType: "intern", targetId: existing.internId, meta: { interviewId: id, host: new URL(link).hostname, changed: existing.meetingLink ? true : false } });
+      await notify({
+        to: { type: "intern", id: existing.internId },
+        type: "ai_interview_unlocked",
+        title: "Your AI interview link is ready",
+        message: "Open your Interviews page and press Start AI interview.",
+        data: { interviewId: id, meetingLink: link },
+        dedupeKey: key,
+        email: emails.aiInterviewLinkReady({ name: await internFirstName(existing.internId), link }),
+      });
     }
   } catch (notifyErr) {
-    console.error("AI interview unlock notification failed:", notifyErr);
+    console.error("AI interview link notification failed:", notifyErr);
   }
 
   // Mirror the links onto the candidate profile (what the ratings editor and

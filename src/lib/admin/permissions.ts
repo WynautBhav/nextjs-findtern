@@ -52,6 +52,7 @@ const RULES: Rule[] = [
   // pages
   ["/admin/dashboard", ["dashboard:read"]],
   ["/admin/proposal-tracker", ["interns:read"], ["interns:write"]],
+  ["/admin/ai-interviews", ["interns:read"], ["interns:write"]],
   ["/admin/notification-history", ["notifications:read"]],
   // Someone who may send must be able to open the composer (legacy quirk fixed).
   ["/admin/notifications", ["notifications:read", "notifications:write"], ["notifications:write"]],

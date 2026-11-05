@@ -4,6 +4,7 @@
  * employers already receive today.
  */
 
+import { AI_INTERVIEW_INSTRUCTIONS } from "./ai-interview.ts";
 import { requirePublicOrigin } from "./origin.ts";
 
 export type EmailContent = {
@@ -165,6 +166,15 @@ export const emails = {
     lines: ["The meeting link for your interview has been added."],
     facts: [["Meet link", o.link]],
     cta: { label: "Open dashboard", url: `${origin()}/${o.forEmployer ? "employer/schedule" : "intern/interviews"}` },
+  }),
+
+  aiInterviewLinkReady: (o: { name: string; link: string }): EmailContent => ({
+    subject: "Your AI interview link is ready | Findtern",
+    heading: "Your AI interview link is ready",
+    greeting: hi(o.name),
+    lines: ["Your AI interview is open. Before you start:", ...AI_INTERVIEW_INSTRUCTIONS],
+    facts: [["Interview link", o.link]],
+    cta: { label: "Start AI interview", url: o.link },
   }),
 
   interviewRescheduled: (o: { name: string; byEmployer: boolean }): EmailContent => ({

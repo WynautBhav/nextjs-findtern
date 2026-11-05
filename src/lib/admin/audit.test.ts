@@ -112,6 +112,7 @@ const CALL_SITE_META: Record<keyof typeof AUDIT_ACTIONS, Record<string, unknown>
   "intern.completed_auto": { proposalId: "pr-1", timesheetId: "t-1", approverRole: "employer", bonusMinor: 100000 },
   "intern.ratings_update": { communication: 8, coding: 7, aptitude: 6, interview: 9, findternScore: { from: 7, to: 8 } },
   "intern.ratings_import": { rows: 20, updated: 18, failed: 2 },
+  "interview.ai_link_added": { interviewId: "i1", host: "app.incruiter.com", changed: false },
 };
 
 test("every call site's meta passes the redaction check: nothing sensitive leaks, nothing readable is lost", () => {

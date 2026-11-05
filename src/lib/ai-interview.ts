@@ -83,3 +83,11 @@ export function isScored(extra: unknown): boolean {
   // Legacy hasAdminRatings: any numeric rating, zero included.
   return Object.values(ratings as Record<string, unknown>).some((v) => typeof v === "number" && Number.isFinite(v));
 }
+
+/** What the candidate must have ready: shown in the terms gate and in the "link is ready" email. */
+export const AI_INTERVIEW_INSTRUCTIONS = [
+  "Use a laptop or desktop with a working webcam and microphone, and allow camera and mic access when the browser asks.",
+  "Use a stable internet connection and a quiet room.",
+  "Take the interview in one sitting. Do not refresh or close the window once it has started.",
+  "The interview is in English.",
+] as const;

@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { ArrowLeft } from "lucide-react";
 
+import { AiLinkCard } from "@/components/admin/dashboard/ai-link-card";
 import { DashTile } from "@/components/admin/dashboard/dash-tile";
 import { GreetingHeader, type StripItem } from "@/components/admin/dashboard/greeting-header";
 import { MoneyCard } from "@/components/admin/dashboard/money-card";
@@ -27,7 +28,9 @@ import { loadActivityAndCounts, loadOverview } from "@/lib/admin/dashboard-overv
 import { loadDashboardQueues, QUEUE_ORDER } from "@/lib/admin/dashboard-queues";
 import type { QueueKey } from "@/lib/admin/dashboard-queues.types";
 import { flattenParams, type RawSearchParams } from "@/lib/admin/params";
-import { allows, requiredPermissions } from "@/lib/admin/permissions";
+import { allows, canWrite as mayWrite, requiredPermissions } from "@/lib/admin/permissions";
+import { pickQueue } from "@/lib/admin/ai-link-queue";
+import { loadAiLinkRows } from "@/lib/admin/ai-link-queue-load";
 
 /**
  * Admin home. The default view is the overview: a greeting with one line of figures, four KPI tiles
@@ -76,6 +79,8 @@ export default async function AdminDashboard({ searchParams }: { searchParams?: 
     );
   }
 
+  // Its own read: a failure hides the card (logged) and never the dashboard.
+  const aiQueue = await loadAiLinkRows().then(pickQueue).catch((e) => (console.error("[admin/dashboard] ai link queue", e), null));
   const { groups, money, total, fresh } = queues;
   const finding = findingSentence(money, total, fresh);
 
@@ -163,6 +168,10 @@ export default async function AdminDashboard({ searchParams }: { searchParams?: 
           </>
         }
       />
+
+      {aiQueue && can("/admin/interns") ? (
+        <AiLinkCard waiting={aiQueue.waiting} unpaid={aiQueue.unpaid} now={now} canWrite={mayWrite(session?.permissions, "/admin/ai-interviews")} listHref={gate("/admin/ai-interviews")} />
+      ) : null}
 
       <div className="grid grid-cols-1 items-start gap-[var(--admin-gap)] md:grid-cols-2 xl:items-stretch xl:grid-cols-[minmax(0,1fr)_21.5rem]">
         <div className="contents xl:flex xl:min-w-0 xl:flex-col xl:gap-[var(--admin-gap)]">

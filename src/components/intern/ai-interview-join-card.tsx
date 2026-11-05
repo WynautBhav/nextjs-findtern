@@ -23,7 +23,7 @@ import { Pill, Surface } from "@/components/app/primitives";
 import { CountdownAgreement, type AgreementSection } from "@/components/app/countdown-agreement";
 import { buttonClass } from "@/components/ui/button";
 import { csrfFetch } from "@/lib/client-fetch";
-import { aiInterviewPhase, joinableLink, type AiInterviewPhase } from "@/lib/ai-interview";
+import { AI_INTERVIEW_INSTRUCTIONS, aiInterviewPhase, joinableLink, type AiInterviewPhase } from "@/lib/ai-interview";
 
 /** Legacy "AI Interview: Terms & Instructions", in substance. */
 const AI_TERMS: AgreementSection[] = [
@@ -31,9 +31,7 @@ const AI_TERMS: AgreementSection[] = [
     title: "Before you start",
     lines: ["The interview runs in a new tab. Give it your full attention until it ends."],
     bullets: [
-      "Use a stable internet connection and a quiet room.",
-      "Allow microphone and camera access when the browser asks.",
-      "Do not refresh or close the interview window once it has started.",
+      ...AI_INTERVIEW_INSTRUCTIONS,
       "Your performance is evaluated and becomes part of your profile as your Findtern Score.",
     ],
   },
@@ -80,7 +78,7 @@ function useAiState(internId: string | null, initial: State) {
   return [state, setState, refresh] as const;
 }
 
-function JoinGate({ link, block, label = "Join AI interview" }: { link: string; block?: boolean; label?: string }) {
+function JoinGate({ link, block, label = "Start AI interview" }: { link: string; block?: boolean; label?: string }) {
   const [open, setOpen] = useState(false);
   return (
     <>
