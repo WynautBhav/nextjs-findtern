@@ -125,6 +125,6 @@ export const config = {
     "/employer",
     "/employer/:path*",
     // Every API call except the public and machine-to-machine ones.
-    "/api/((?!auth/|webhooks/|website/|cms-image/|blog-image/|health).*)",
+    "/api/((?!auth/|webhooks/|cron/|website/|cms-image/|blog-image/|health).*)",
   ],
 };
