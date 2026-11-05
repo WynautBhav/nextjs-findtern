@@ -66,7 +66,7 @@ const EMPLOYER = {
   escalationPhone: phone(7),
 };
 const ADMIN = { email: `e2e-admin-${RUN}@e2e-mail.test`, password: `E2e-Admin#${RUN}` };
-const PAYOUT_MINOR = 1_234_500; // ₹12,345
+const PAYOUT_MINOR = 734_500; // ₹7,345, under the ₹8,000 cap of either band
 
 /* ── State, steps, skipping ─────────────────────────────────────────────── */
 
@@ -559,6 +559,8 @@ step("employer: sends an offer (proposal; offer_details money in rupees) [API]",
     assert.equal(o.hourlyRate, bandRate, `no rate-card rows: ${score} scores ₹${bandRate}/hr from the published bands`);
   }
   assert.equal(o.monthlyAmount, Math.round(o.hourlyRate * o.monthlyHours * 100) / 100, "monthlyAmount = hourlyRate x monthlyHours, in rupees");
+  // Intern stipend is fixed by band, not half the monthly amount.
+  assert.equal(o.internStipendMonthly, o.candidateScore >= 8 ? 15000 : o.candidateScore >= 6 ? 8000 : undefined, "fixed intern stipend by score band");
   assert.ok(o.monthlyAmount < 1_000_000, `monthlyAmount ${o.monthlyAmount} looks like rupees, not paise`);
   const mail = await waitForMail(INTERN.email, { since: SINCE, subject: /new internship proposal/i });
   assert.ok(!`${mail.subject}\n${mail.text}`.includes(EMPLOYER.companyName), "proposal email hides the company");
@@ -575,6 +577,7 @@ step("intern: accepts the offer on /intern/proposals/[id] [UI]", ["proposalId"],
       await visit(page, `/intern/proposals/${state.proposalId}`);
       const text = await page.locator("body").innerText();
       assert.ok(!text.includes(EMPLOYER.companyName), "offer page hides the company before hire");
+      assert.match(text, /8,000|15,000/, "the intern sees the fixed band stipend");
       await page.getByRole("button", { name: "Accept this offer" }).click();
       await page.getByRole("checkbox", { name: /intern terms/i }).check();
       const res = await clickFor(page, page.getByRole("button", { name: "Yes, accept" }), { path, method: "PATCH" });
@@ -740,5 +743,5 @@ step("admin: creates a payout and marks it paid [API]", ["month1Paid", "adminRea
 step("intern: earnings page shows the payout [UI]", ["paid"], async () => {
   const page = pages.intern;
   await assertRoleArea(page, "/intern/earnings", INTERN_NAV);
-  await page.getByText(/12,345/).first().waitFor({ timeout: 15_000 });
+  await page.getByText(/7,345/).first().waitFor({ timeout: 15_000 });
 });

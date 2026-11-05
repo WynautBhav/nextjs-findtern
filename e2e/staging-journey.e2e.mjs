@@ -1114,7 +1114,7 @@ step("employer: approves the timesheet on /employer/timesheets/[id] [UI]", ["tim
 step("admin: creates a payout and marks it paid; the intern sees it on /intern/earnings [API + UI]", ["approved", "adminReady"], "payoutPaid", async () => {
   const page = pages.admin;
   const base = `/api/admin/interns/${state.hiredInternId}/payouts`;
-  const AMOUNT = 1_234_500; // ₹12,345
+  const AMOUNT = 734_500; // ₹7,345, under the ₹8,000 cap of either band
   const created = await api(page, "POST", base, {
     amountMinor: AMOUNT,
     currency: "INR",
@@ -1136,7 +1136,7 @@ step("admin: creates a payout and marks it paid; the intern sees it on /intern/e
 
   const internPage = internPageFor(state.hiredInternId);
   await visit(internPage, "/intern/earnings");
-  await internPage.getByText(/12,345/).first().waitFor({ timeout: 20_000 });
+  await internPage.getByText(/7,345/).first().waitFor({ timeout: 20_000 });
   await shot("intern-earnings");
   const n = await one(`SELECT 1 AS yes FROM notifications WHERE recipient_id = $1 AND type ILIKE '%payout%' OR (recipient_id = $1 AND type ILIKE '%stipend%')`, [state.hiredInternId]);
   assert.ok(n, "the intern was notified of the payout");
@@ -1652,7 +1652,7 @@ step("US employer composes the offer in the form: calendar, no flexible hours, N
   assert.match(String(p.offer_details.jd ?? p.offer_details.message ?? ""), /No client data on personal devices/, "the 'anything else' note is stored with the offer");
 });
 
-step("intern 3 reads the offer: IST hours, joining date, stipend is half in rupees, extra note, countdown; accepts [UI]", ["usOfferId"], "usAccepted", async () => {
+step("intern 3 reads the offer: IST hours, joining date, stipend is the fixed band figure in rupees, extra note, countdown; accepts [UI]", ["usOfferId"], "usAccepted", async () => {
   const page = pages.intern3;
   await visit(page, `/intern/proposals/${state.usOfferId}`);
   const body = await page.locator("body").innerText();
@@ -1664,9 +1664,9 @@ step("intern 3 reads the offer: IST hours, joining date, stipend is half in rupe
   assert.match(body.replace(/\s+/g, " "), new RegExp(`${shiftFrom}\\s*[-–]\\s*${shiftTo}\\s*IST`, "i"), `the intern reads the New York shift 9-6 as ${shiftFrom} - ${shiftTo} IST`);
   assert.match(body, /No client data on personal devices/, "the employer's extra note is visible to the intern");
   assert.ok(body.includes(new Date(`${state.usStart}T00:00:00Z`).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" })) || body.includes(dmy(state.usStart)) || /Joining date/i.test(body), "the joining date is shown");
-  // The intern sees half of what the company pays, in rupees: dollars x 100 x 50%.
-  const stipend = Math.floor(Math.round(p.offer_details.monthlyAmount * 100) * 100 * 0.5) / 100;
-  assert.ok(body.includes(stipend.toLocaleString("en-IN")), `the stipend shown is half the monthly amount in rupees (₹${stipend.toLocaleString("en-IN")})`);
+  // The intern sees the fixed band stipend in rupees (score 8+: ₹15,000), whatever the dollar amount.
+  assert.equal(p.offer_details.internStipendMonthly, 15000, "the offer carries the fixed stipend");
+  assert.ok(body.includes("15,000"), "the stipend shown is the fixed ₹15,000");
   const countdown = await page.locator('[data-testid="offer-countdown"]').first().innerText();
   const closes = Date.parse(`${state.usStart}T00:00:00+05:30`);
   const days = Math.floor((closes - Date.now()) / 86_400_000);
