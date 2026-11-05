@@ -7,6 +7,7 @@ import { getDb, schema } from "@/lib/db";
 import { emails, renderEmail } from "@/lib/emails";
 import { sendSmtpMail } from "@/lib/mailer";
 import { generateOtp, hashOtp, limiters, clientIp, takeAuth } from "@/lib/security/rate-limit";
+import { phoneInUseAnywhere } from "@/lib/phone-owner";
 import { isPersonalEmail } from "@/lib/employer-onboarding";
 import { INTERN_EMAIL_MESSAGE, isInternEmail, SIGNUP_OTP_SUBJECTS } from "@/lib/signup-otp";
 
@@ -20,6 +21,9 @@ const bodySchema = z.object({
    * account exists.
    */
   purpose: z.enum(["signup", "verify"]).default("signup"),
+  /** Sent by the signup forms so a taken number is refused before a code is mailed. */
+  countryCode: z.string().trim().regex(/^\+\d{1,4}$/).optional(),
+  phoneNumber: z.string().trim().regex(/^\d{4,15}$/).optional(),
 });
 
 const OTP_TTL_MINUTES = 10;
@@ -36,8 +40,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }
 
-  const { email, subjectType, purpose } = parsed.data;
+  const { email, subjectType, purpose, countryCode, phoneNumber } = parsed.data;
   const db = getDb();
+
+  // Same check and message as the signup POST; the number is not tied to the email, so this leaks nothing new.
+  if (purpose === "signup" && countryCode && phoneNumber && (await phoneInUseAnywhere(countryCode, phoneNumber))) {
+    return NextResponse.json({ error: "Phone number already in use" }, { status: 409 });
+  }
 
   if (purpose === "signup" && subjectType === "intern" && !isInternEmail(email)) {
     return NextResponse.json({ error: INTERN_EMAIL_MESSAGE }, { status: 400 });

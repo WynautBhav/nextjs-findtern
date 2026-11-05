@@ -103,7 +103,7 @@ export function SignupForm({
       const res = await fetch("/api/auth/signup/send-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email.trim().toLowerCase() }),
+        body: JSON.stringify({ email: email.trim().toLowerCase(), countryCode, phoneNumber: phoneNumber.trim() }),
       });
       const data = (await res.json().catch(() => ({}))) as {
         error?: string;
@@ -113,6 +113,7 @@ export function SignupForm({
       };
       if (!res.ok) {
         setError(data.error ?? "Could not send the code. Try again in a minute.");
+        if (res.status === 409) setPhoneTaken(true);
         if (typeof data.remainingSeconds === "number") setResendIn(data.remainingSeconds);
         setOtpRejected(false);
         setLoading(false);
@@ -180,7 +181,10 @@ export function SignupForm({
             ? "Your Google confirmation has expired (it lasts 15 minutes). Continue with Google again to finish."
             : message,
         );
-        setStage(google ? "details" : "otp");
+        // A taken phone goes back to the form (code stays valid) so the number can be changed.
+        const phoneProblem = res.status === 409 && /phone/i.test(message);
+        if (phoneProblem) setPhoneTaken(true);
+        setStage(google || phoneProblem ? "details" : "otp");
         return;
       }
       // Session cookie is set by the response; a refresh picks it up server-side.
@@ -198,7 +202,7 @@ export function SignupForm({
       noValidate
       onSubmit={(e) => {
         e.preventDefault();
-        if (stage === "details") void (google ? createAccount() : sendOtp());
+        if (stage === "details") void (google || verified ? createAccount() : sendOtp());
         else if (stage === "otp") void (verified ? createAccount() : verifyOtp());
       }}
     >

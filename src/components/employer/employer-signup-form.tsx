@@ -113,9 +113,13 @@ export function EmployerSignupForm({
       const problem = await post("/api/auth/signup/send-otp", {
         email: trimmedEmail,
         subjectType: "employer",
+        countryCode,
+        phoneNumber,
       });
-      if (problem) setError(problem);
-      else setStage("otp");
+      if (problem) {
+        setError(problem);
+        if (/phone number already/i.test(problem)) setTakenNumber(`${countryCode}${phoneNumber}`);
+      } else setStage("otp");
     } catch {
       setError("Network error");
     }
@@ -143,6 +147,11 @@ export function EmployerSignupForm({
               : "Your verification has expired (it lasts 15 minutes). Send a new code to finish."
             : problem,
         );
+        if (/phone number already/i.test(problem)) {
+          // Back to the form with the code still valid, so only the number changes.
+          setTakenNumber(`${countryCode}${phoneNumber}`);
+          setStage("details");
+        }
         if (/verify your email/i.test(problem) && !google) {
           setVerified(false);
           setOtp("");
