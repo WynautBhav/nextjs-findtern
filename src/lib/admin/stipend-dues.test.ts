@@ -210,3 +210,16 @@ test("a fixed-stipend offer caps the payout at the fixed figure, whatever the em
   assert.equal(payoutRefusal(d, 1_500_000), null);
   assert.match(payoutRefusal(d, 1_500_001) ?? "", /at most ₹15,000/);
 });
+
+test("an unlinked ₹15,000 payout matches a fixed-stipend offer, not half the employer's amount", () => {
+  const offer = { monthlyAmount: 40000, internStipendMonthly: 15000, duration: "2m", startDate: "2026-01-01" };
+  const unlinked = (amount: number) => ({ status: "paid", raw: { scheduledFor: "2026-02-01" }, amountMinor: amount, currency: "INR" });
+  // Half of ₹40,000 is ₹20,000: that amount is not this offer's stipend.
+  const [wrong] = stipendDues([hired("p1", offer)], [unlinked(2_000_000)], 8);
+  assert.equal(wrong.paidMonths, 0);
+  const [d] = stipendDues([hired("p1", offer)], [unlinked(1_500_000)], 8);
+  assert.equal(d.monthlyShareMinor, 1_500_000);
+  assert.equal(d.paidMonths, 1);
+  assert.equal(d.paidMinor, 1_500_000);
+  assert.equal(d.remainingMinor, 1_500_000);
+});

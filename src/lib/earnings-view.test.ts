@@ -117,3 +117,15 @@ test("a fixed-stipend hire keeps its figure and stays eligible if the live score
   assert.equal(card.eligible, true);
   assert.equal(card.monthlyMinor, 800_000);
 });
+
+test("a fixed-stipend hire's remaining amount is the fixed figure × months less what was paid", () => {
+  const [card] = earningsEngagements(
+    [{ ...base, id: "p1", status: "hired", hiredAt: new Date("2026-09-02T00:00:00Z"), offerDetails: { ...offer(40000, "3m"), internStipendMonthly: 15000 } }],
+    [payout("a", "paid", 1_500_000)],
+    {},
+    8,
+  );
+  assert.equal(card.monthlyMinor, 1_500_000);
+  assert.equal(card.paidMinor, 1_500_000);
+  assert.equal(card.remainingMinor, 1_500_000 * 3 - 1_500_000);
+});
