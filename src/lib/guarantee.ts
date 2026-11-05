@@ -10,9 +10,14 @@ import { FREE_DECLINES, offerPastStart, parseOffer } from "./offer.ts";
  * Only a lapsed `sent` offer counts: an `interview_scheduled` one may be stuck
  * on the employer never holding the interview. A lapse is stamped
  * `offerDetails.lapsedAt` when the row later leaves `sent` (sibling auto-expiry,
- * withdraw, admin expire) and still counts. Not counted: other withdrawals or
- * expiries, admin-set "rejected" (no `declinedBy: intern` stamp) unless the offer had
- * already lapsed (`lapsedAt`).
+ * withdraw) and still counts. Not counted: other withdrawals or
+ * expiries, admin-set "rejected" (no `declinedBy: intern` stamp).
+ *
+ * Owner decisions (final): only internship offers count, so a declined or
+ * lapsed full-time conversion offer (`offerDetails.fullTimeOffer`) is not a
+ * miss; and an offer an ADMIN closed or expired (`offerDetails.closedByAdminAt`,
+ * stamped by the status route) never counts, even if its start day had passed.
+ * Offers admin-closed before that stamp existed cannot be told apart.
  */
 export type GuaranteeProposal = { status: string | null; offerDetails: unknown; currency?: string | null };
 
@@ -22,8 +27,8 @@ export function guaranteeMisses(proposals: GuaranteeProposal[], now: Date = new 
   for (const p of proposals) {
     const status = (p.status ?? "").toLowerCase();
     const od = (p.offerDetails ?? {}) as Record<string, unknown>;
-    // The lapse stamp is checked before the rejected branch so an admin
-    // rejecting an already-lapsed offer cannot erase the miss.
+    if (typeof od.closedByAdminAt === "string") continue;
+    if (parseOffer(p.offerDetails, p.currency).fullTime) continue;
     if (status === "rejected" && od.declinedBy === "intern") declined += 1;
     else if (
       typeof od.lapsedAt === "string" ||
