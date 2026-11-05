@@ -59,6 +59,7 @@ const ICONS: Record<string, typeof Search> = {
   "/admin/settings": Settings,
   "/admin/cms/terms": ScrollText,
   "/admin/roles": Shield,
+  "/admin/audit-log": History,
 };
 
 /**

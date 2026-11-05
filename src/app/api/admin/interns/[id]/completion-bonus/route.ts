@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { recordAdminAudit } from "@/lib/admin/audit";
+import { getDb } from "@/lib/db";
 import { withLock } from "@/lib/advisory-lock";
 import { completeInternship, notifyCompleted } from "@/lib/admin/complete-internship";
 import { afterRatingsSaved } from "@/lib/admin/score-live";
@@ -32,6 +34,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const r = await withLock(`complete:${proposalId}`, (tx) => completeInternship(tx, proposalId, guard.session.uid, id));
   if (!r.completed) return NextResponse.json({ error: REFUSED[r.reason][0] }, { status: REFUSED[r.reason][1] });
 
+  await recordAdminAudit(getDb(), { adminId: guard.session.uid, action: "intern.marked_completed", targetType: "intern", targetId: id, meta: { proposalId, bonusMinor: r.amountMinor } });
   await afterRatingsSaved(id, r.prev, r.next);
   await notifyCompleted(proposalId, r);
   return NextResponse.json({ ok: true, findternScore: r.next.findternScore ?? null, bonusMinor: r.amountMinor });

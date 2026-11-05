@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { recordAdminAudit } from "@/lib/admin/audit";
 import { getDb, schema } from "@/lib/db";
 import { identityValue, REVEAL_FIELDS } from "@/lib/admin/identity-mask";
 import { requireMutation } from "@/lib/guards-mutation";
@@ -37,12 +38,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const value = identityValue(row, field);
   if (!value) return NextResponse.json({ error: "Nothing on file" }, { status: 404 });
 
-  await db.insert(schema.adminAuditLog).values({
+  await recordAdminAudit(db, {
     adminId: guard.session.uid,
     action: "identity.reveal",
     targetType: "intern",
     targetId: id,
     meta: { field },
-  });
+  }, { strict: true });
   return NextResponse.json({ value }, { headers: { "Cache-Control": "no-store, private, max-age=0" } });
 }

@@ -2,6 +2,7 @@ import { and, eq, ne, sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { recordAdminAudit } from "@/lib/admin/audit";
 import { getDb, schema } from "@/lib/db";
 import { withSession } from "@/lib/auth";
 import { requireMutation } from "@/lib/guards-mutation";
@@ -50,7 +51,7 @@ export async function PATCH(req: Request) {
     .update(schema.admins)
     .set({ name, ...(emailChanged ? { email } : {}) })
     .where(eq(schema.admins.id, admin.id));
-  await db.insert(schema.adminAuditLog).values({
+  await recordAdminAudit(db, {
     adminId: admin.id,
     action: "account.update",
     targetType: "admin",
@@ -59,7 +60,7 @@ export async function PATCH(req: Request) {
       ...(name !== admin.name ? { name: { from: admin.name, to: name } } : {}),
       ...(emailChanged ? { email: { from: admin.email, to: email } } : {}),
     },
-  });
+  }, { strict: true });
 
   const res = NextResponse.json({ ok: true, name, email: emailChanged ? email : admin.email });
   if (!emailChanged) return res;

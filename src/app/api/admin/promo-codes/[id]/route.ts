@@ -2,6 +2,7 @@ import { and, eq, ne } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { recordAdminAudit } from "@/lib/admin/audit";
 import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
 import { DUPLICATE_CODE, isUniqueViolation } from "@/lib/promo";
@@ -53,6 +54,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     .select({
       validFrom: schema.promoCodes.validFrom,
       validUntil: schema.promoCodes.validUntil,
+      code: schema.promoCodes.code,
       collegeId: schema.promoCodes.collegeId,
       discountType: schema.promoCodes.discountType,
       discountValue: schema.promoCodes.discountValue,
@@ -85,6 +87,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     if (isUniqueViolation(e)) return NextResponse.json({ error: DUPLICATE_CODE }, { status: 409 });
     throw e;
   }
+  await recordAdminAudit(db, { adminId: guard.session.uid, action: "promo.update", targetType: "promo_code", targetId: id, meta: { code: existing.code, fields: Object.keys(parsed.data) } });
   return NextResponse.json({ ok: true });
 }
 
@@ -93,9 +96,10 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
   const guard = await requireMutation({ req, roles: ["admin"] });
   if (!guard.ok) return guard.response;
   const db = getDb();
-  const [row] = await db.select({ collegeId: schema.promoCodes.collegeId }).from(schema.promoCodes).where(eq(schema.promoCodes.id, id)).limit(1);
+  const [row] = await db.select({ collegeId: schema.promoCodes.collegeId, code: schema.promoCodes.code }).from(schema.promoCodes).where(eq(schema.promoCodes.id, id)).limit(1);
   const locked = collegeCodeDeleteProblem(row?.collegeId);
   if (locked) return NextResponse.json({ error: locked }, { status: 403 });
   await db.delete(schema.promoCodes).where(eq(schema.promoCodes.id, id));
+  await recordAdminAudit(db, { adminId: guard.session.uid, action: "promo.delete", targetType: "promo_code", targetId: id, meta: { code: row?.code ?? null } });
   return NextResponse.json({ ok: true });
 }

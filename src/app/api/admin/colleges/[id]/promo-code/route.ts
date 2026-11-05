@@ -2,6 +2,7 @@ import { eq, sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { recordAdminAudit } from "@/lib/admin/audit";
 import { allows } from "@/lib/admin/permissions";
 import { generateTpoCode } from "@/lib/college/code";
 import { getDb, schema } from "@/lib/db";
@@ -32,6 +33,7 @@ export async function POST(req: Request, ctx: Ctx) {
         .insert(schema.promoCodes)
         .values({ code: generateTpoCode(), description: "College TPO code", discountType: "percentage", discountValue: 100, maxUsages: DEFAULT_COLLEGE_SEATS, appliesTo: "intern", collegeId: id })
         .returning({ code: schema.promoCodes.code });
+      await recordAdminAudit(db, { adminId: g.session.uid, action: "college.tpo_code_create", targetType: "college", targetId: id, meta: { code: row.code, maxUsages: DEFAULT_COLLEGE_SEATS } });
       return NextResponse.json({ ok: true, code: row.code });
     } catch (e) {
       if (!isUniqueViolation(e)) throw e;
@@ -62,5 +64,6 @@ export async function PATCH(req: Request, ctx: Ctx) {
     .where(sql`${schema.promoCodes.id} = ${promo.id} AND ${schema.promoCodes.usedCount} <= ${parsed.data.maxUsages}`)
     .returning({ id: schema.promoCodes.id });
   if (rows.length === 0) return NextResponse.json({ error: "Seats were just used; refresh and try again" }, { status: 409 });
+  await recordAdminAudit(db, { adminId: g.session.uid, action: "college.tpo_cap_update", targetType: "college", targetId: id, meta: { maxUsages: { from: promo.maxUsages, to: parsed.data.maxUsages } } });
   return NextResponse.json({ ok: true });
 }

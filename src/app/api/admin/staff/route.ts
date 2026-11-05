@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { recordAdminAudit } from "@/lib/admin/audit";
 import { forgetAdminPermissions } from "@/lib/account-status";
 import { getDb, schema } from "@/lib/db";
 import { canGrant } from "@/lib/admin/permissions";
@@ -57,6 +58,7 @@ export async function POST(req: Request) {
     })
     .returning();
 
+  await recordAdminAudit(db, { adminId: guard.session.uid, action: "staff.create", targetType: "admin", targetId: created.id, meta: { name, email: created.email, role } });
   return NextResponse.json({ ok: true, staff: { id: created.id, name: created.name, email: created.email, role: created.role } }, { status: 201 });
 }
 
@@ -79,6 +81,7 @@ export async function DELETE(req: Request) {
   }
   await db.delete(schema.admins).where(eq(schema.admins.id, parsed.data.id));
   forgetAdminPermissions(parsed.data.id);
+  await recordAdminAudit(db, { adminId: currentAdminId, action: "staff.delete", targetType: "admin", targetId: parsed.data.id, meta: { role: target?.role ?? null } });
 
   return NextResponse.json({ ok: true });
 }
@@ -121,6 +124,7 @@ export async function PATCH(req: Request) {
     .returning({ id: schema.admins.id });
   if (updated.length === 0) return NextResponse.json({ error: "Not found" }, { status: 404 });
   forgetAdminPermissions(id); // this instance applies it at once; others within the 30s cache
+  await recordAdminAudit(db, { adminId: guard.session.uid, action: "staff.update", targetType: "admin", targetId: id, meta: { ...(role ? { role: { from: target.role, to: role } } : {}), ...(password ? { credentialsReset: true } : {}) } });
   return NextResponse.json({ ok: true });
 }
 

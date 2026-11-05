@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { recordAdminAudit } from "@/lib/admin/audit";
 import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
 import { DUPLICATE_CODE, isUniqueViolation } from "@/lib/promo";
@@ -52,6 +53,7 @@ export async function POST(req: Request) {
       validFrom: parsed.data.validFrom ? new Date(parsed.data.validFrom) : null,
       validUntil: parsed.data.validUntil ? new Date(parsed.data.validUntil) : null,
     }).returning();
+    await recordAdminAudit(db, { adminId: guard.session.uid, action: "promo.create", targetType: "promo_code", targetId: promo.id, meta: { code, discountType: promo.discountType, discountValue: promo.discountValue, appliesTo: promo.appliesTo, maxUsages: promo.maxUsages } });
     return NextResponse.json({ promo }, { status: 201 });
   } catch (e) {
     // Two creates racing past the check above.

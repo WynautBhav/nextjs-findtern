@@ -2,6 +2,7 @@ import { and, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { recordAdminAudit } from "@/lib/admin/audit";
 import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
 import { notifyStipendPaid } from "@/lib/payments";
@@ -55,6 +56,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({ error: "Only a pending payout can be marked paid" }, { status: 409 });
   }
 
+  await recordAdminAudit(db, { adminId: guard.session.uid, action: "payout.mark_paid", targetType: "payout", targetId: payoutId, meta: { internId: id, amountMinor: updated[0].amountMinor, referenceId: parsed.data.referenceId } });
   // Queue first: the row is already "paid", so a retry would 409 and never queue.
   // A completion bonus is a one-off: no next month.
   const next = updated[0].kind === "stipend" ? await queueNextMonth(db, id, updated[0]) : null;

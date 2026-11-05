@@ -103,6 +103,7 @@ const NAV: AdminNavGroup[] = [
         also: ["/admin/interns/terms", "/admin/interns/non-disclosure", "/admin/companies/terms"],
       },
       { href: "/admin/roles", label: "Roles and access", icon: <Shield /> },
+      { href: "/admin/audit-log", label: "Audit log", icon: <History /> },
     ],
   },
 ];

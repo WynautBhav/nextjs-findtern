@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { recordAdminAudit } from "@/lib/admin/audit";
 import { getDb, schema } from "@/lib/db";
 import { canGrant, PERMISSIONS } from "@/lib/admin/permissions";
 import { requireMutation } from "@/lib/guards-mutation";
@@ -26,5 +27,6 @@ export async function POST(req: Request) {
   const [existing] = await db.select({ id: schema.adminRoles.id }).from(schema.adminRoles).where(eq(schema.adminRoles.key, parsed.data.key)).limit(1);
   if (existing) return NextResponse.json({ error: "A role with this key already exists." }, { status: 409 });
   const [role] = await db.insert(schema.adminRoles).values(parsed.data).returning();
+  await recordAdminAudit(db, { adminId: guard.session.uid, action: "role.create", targetType: "role", targetId: role.id, meta: { key: role.key, name: role.name, permissions: parsed.data.permissions } });
   return NextResponse.json({ role }, { status: 201 });
 }

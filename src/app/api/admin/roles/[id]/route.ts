@@ -2,6 +2,7 @@ import { eq, or } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { recordAdminAudit } from "@/lib/admin/audit";
 import { forgetAdminPermissions } from "@/lib/account-status";
 import { getDb, schema } from "@/lib/db";
 import { canGrant, PERMISSIONS } from "@/lib/admin/permissions";
@@ -44,6 +45,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     .set({ ...parsed.data, updatedAt: new Date() })
     .where(eq(schema.adminRoles.id, role.id));
   forgetAdminPermissions();
+  await recordAdminAudit(db, { adminId: guard.session.uid, action: "role.update", targetType: "role", targetId: role.id, meta: { ...(parsed.data.name ? { name: parsed.data.name } : {}), ...(parsed.data.permissions ? { permissions: parsed.data.permissions } : {}) } });
   return NextResponse.json({ ok: true });
 }
 
@@ -62,5 +64,6 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
   const [member] = await db.select({ id: schema.admins.id }).from(schema.admins).where(eq(schema.admins.role, role.key)).limit(1);
   if (member) return NextResponse.json({ error: "Move its members to another role first" }, { status: 409 });
   await db.delete(schema.adminRoles).where(eq(schema.adminRoles.id, role.id));
+  await recordAdminAudit(db, { adminId: guard.session.uid, action: "role.delete", targetType: "role", targetId: role.id, meta: { key: role.key } });
   return NextResponse.json({ ok: true });
 }

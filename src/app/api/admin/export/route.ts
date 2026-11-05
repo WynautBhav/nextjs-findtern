@@ -1,6 +1,7 @@
 import { and, desc, eq, gte, inArray, sql, type SQL } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
+import { recordAdminAudit } from "@/lib/admin/audit";
 import { getDb, schema } from "@/lib/db";
 import { q } from "@/lib/college/sql";
 import { INTERN_SORTS, loadInterns } from "@/lib/admin/intern-query";
@@ -106,13 +107,13 @@ async function exportInterns(search: string, params: Record<string, string>, ses
   // Fail closed: no audit row, no file.
   const filters = Object.fromEntries(Object.entries(params).filter(([k]) => k !== "cols"));
   try {
-    await getDb().insert(schema.adminAuditLog).values({
+    await recordAdminAudit(getDb(), {
       adminId: session.uid,
       action: "export.interns",
       targetType: "intern",
       targetId: null,
       meta: { columns: [...cols], rows: rows.length, fullAccountNumbers, filters },
-    });
+    }, { strict: true });
   } catch (err) {
     console.error("[admin/export] audit insert failed", err);
     return NextResponse.json({ error: "Could not record the export" }, { status: 500 });

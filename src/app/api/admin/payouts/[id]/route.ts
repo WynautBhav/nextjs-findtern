@@ -2,6 +2,7 @@ import { and, eq, ne, sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { recordAdminAudit } from "@/lib/admin/audit";
 import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
 import { notifyStipendPaid } from "@/lib/payments";
@@ -122,6 +123,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     return NextResponse.json({ error: "This payout changed meanwhile. Reload and try again." }, { status: 409 });
   }
 
+  if (to === "paid") await recordAdminAudit(db, { adminId: guard.session.uid, action: "payout.mark_paid", targetType: "payout", targetId: id, meta: { internId: existing.internId, amountMinor: existing.amountMinor, referenceId: body.referenceId } });
   let next = null;
   if (to === "paid") {
     // Queue first: the row is already "paid", so a retry would 409 and never queue.

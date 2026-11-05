@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { recordAdminAudit } from "@/lib/admin/audit";
 import { getDb, schema } from "@/lib/db";
 import { applyRatings } from "@/lib/admin/ratings";
 import { afterRatingsSaved } from "@/lib/admin/score-live";
@@ -68,6 +69,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   });
   if (!outcome) return NextResponse.json({ error: "Not found" }, { status: 404 });
   const { prevExtra, updatedExtra } = outcome;
+  await recordAdminAudit(db, { adminId: guard.session.uid, action: "intern.ratings_update", targetType: "intern", targetId: id, meta: { communication, coding, aptitude, interview, findternScore: { from: prevExtra.findternScore ?? null, to: updatedExtra.findternScore ?? null } } });
   await afterRatingsSaved(id, prevExtra, updatedExtra);
   return NextResponse.json({ ok: true, findternScore: updatedExtra.findternScore });
 }

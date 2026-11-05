@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { and, eq } from "drizzle-orm";
 
+import { recordAdminAudit } from "@/lib/admin/audit";
 import { forgetAccountStatus } from "@/lib/account-status";
 import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
@@ -27,13 +28,13 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string; ad
       .where(and(eq(schema.collegeAdmins.id, adminId), eq(schema.collegeAdmins.collegeId, id)))
       .returning({ email: schema.collegeAdmins.email });
     if (!r) return null;
-    await tx.insert(schema.adminAuditLog).values({
+    await recordAdminAudit(tx, {
       adminId: guard.session.uid,
       action: "college.password_reset",
       targetType: "college_admin",
       targetId: adminId,
       meta: { collegeId: id, email: r.email }, // never the password
-    });
+    }, { strict: true });
     return r;
   });
   if (!row) return NextResponse.json({ error: "Not found" }, { status: 404 });

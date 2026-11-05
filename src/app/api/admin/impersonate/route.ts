@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { recordAdminAudit } from "@/lib/admin/audit";
 import { withSession } from "@/lib/auth";
 import { canViewAs, stashAdminCookie } from "@/lib/admin/impersonation";
 import { getDb, schema } from "@/lib/db";
@@ -51,13 +52,13 @@ export async function POST(req: Request) {
   const adminSession = readSession(adminToken);
   if (!adminToken || !adminSession) return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
 
-  await db.insert(schema.adminAuditLog).values({
+  await recordAdminAudit(db, {
     adminId: guard.session.uid,
     action: "impersonate.start",
     targetType,
     targetId,
     meta: { adminEmail: guard.session.email, targetEmail: email },
-  });
+  }, { strict: true });
 
   const res = NextResponse.json({
     ok: true,

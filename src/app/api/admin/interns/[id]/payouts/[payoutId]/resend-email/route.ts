@@ -1,6 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
+import { recordAdminAudit } from "@/lib/admin/audit";
 import { getDb, schema } from "@/lib/db";
 import { emails, renderEmail } from "@/lib/emails";
 import { formatMoney } from "@/lib/format";
@@ -59,12 +60,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   } catch {
     return NextResponse.json({ error: "The email could not be sent. Try again shortly." }, { status: 502 });
   }
-  await db.insert(schema.adminAuditLog).values({
+  await recordAdminAudit(db, {
     adminId: guard.session.uid,
     action: "payout.resend_email",
     targetType: "intern",
     targetId: id,
     meta: { payoutId },
-  });
+  }, { strict: true });
   return NextResponse.json({ ok: true });
 }

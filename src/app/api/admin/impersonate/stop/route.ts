@@ -1,9 +1,10 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
+import { recordAdminAudit } from "@/lib/admin/audit";
 import { withLogout } from "@/lib/auth";
 import { ADMIN_STASH_COOKIE, clearAdminStash, restoreAdminCookie } from "@/lib/admin/impersonation";
-import { getDb, schema } from "@/lib/db";
+import { getDb } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
 import { readSession } from "@/lib/security/session";
 
@@ -16,14 +17,12 @@ export async function POST(req: Request) {
   const stashed = (await cookies()).get(ADMIN_STASH_COOKIE)?.value;
   const admin = readSession(stashed);
 
-  await getDb()
-    .insert(schema.adminAuditLog)
-    .values({
+  await recordAdminAudit(getDb(), {
       adminId: guard.session.impersonator.uid,
       action: "impersonate.stop",
       targetType: guard.session.role,
       targetId: guard.session.uid,
-    });
+    }, { strict: true });
 
   // The stash must be a live admin session for the same admin who started.
   if (!stashed || !admin || admin.role !== "admin" || admin.uid !== guard.session.impersonator.uid) {

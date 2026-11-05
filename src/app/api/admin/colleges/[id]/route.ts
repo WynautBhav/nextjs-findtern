@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 
+import { recordAdminAudit } from "@/lib/admin/audit";
 import { requireMutation } from "@/lib/guards-mutation";
 import { forgetAccountStatus } from "@/lib/account-status";
 import { isSafeLink } from "@/lib/safe-url";
@@ -46,5 +47,8 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     const admins = await db.select({ id: schema.collegeAdmins.id }).from(schema.collegeAdmins).where(eq(schema.collegeAdmins.collegeId, id));
     for (const a of admins) forgetAccountStatus("college", a.id);
   }
+  const { isPartner, ...rest } = parsed.data;
+  if (Object.keys(rest).length) await recordAdminAudit(db, { adminId: guard.session.uid, action: "college.update", targetType: "college", targetId: id, meta: { fields: Object.keys(rest) } });
+  if (isPartner !== undefined) await recordAdminAudit(db, { adminId: guard.session.uid, action: "college.partner_toggle", targetType: "college", targetId: id, meta: { isPartner } });
   return NextResponse.json({ ok: true });
 }

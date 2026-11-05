@@ -4,6 +4,7 @@ import { and, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { recordAdminAudit } from "@/lib/admin/audit";
 import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
 import { isInternPaid, settleInternOrder } from "@/lib/payments";
@@ -59,12 +60,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const settled = await settleInternOrder({ orderId, paymentId: reference, internId: id });
   if (!settled.ok) return NextResponse.json({ error: settled.error }, { status: settled.status });
 
-  await db.insert(schema.adminAuditLog).values({
+  await recordAdminAudit(db, {
     adminId: guard.session.uid,
     action: "intern.activation_marked_paid",
     targetType: "intern",
     targetId: id,
     meta: { orderId, amountMinor, reference },
-  });
+  }, { strict: true });
   return NextResponse.json({ ok: true });
 }

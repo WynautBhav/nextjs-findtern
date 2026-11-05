@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { recordAdminAudit } from "@/lib/admin/audit";
 import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
 import { PRICING_PLANS } from "@/lib/content/home";
@@ -92,13 +93,13 @@ export async function PATCH(req: Request) {
       .set({ isFeatured: false, updatedAt: new Date() })
       .where(and(ne(schema.pricingPlans.id, id), eq(schema.pricingPlans.currency, plan.currency)));
   }
-  await db.insert(schema.adminAuditLog).values({
+  await recordAdminAudit(db, {
     adminId: guard.session.uid,
     action: "pricing.update",
     targetType: "pricing_plan",
     targetId: id,
     meta: fields,
-  });
+  }, { strict: true });
   revalidatePath("/", "layout");
   return NextResponse.json({ ok: true });
 }
@@ -114,13 +115,13 @@ export async function PUT(req: Request) {
 
   await setSetting("intern_activation_fee_minor", parsed.data.internActivationFeeMinor, guard.session.uid);
   const db = getDb();
-  await db.insert(schema.adminAuditLog).values({
+  await recordAdminAudit(db, {
     adminId: guard.session.uid,
     action: "settings.update",
     targetType: "platform_setting",
     targetId: "intern_activation_fee_minor",
     meta: { value: parsed.data.internActivationFeeMinor },
-  });
+  }, { strict: true });
   return NextResponse.json({ ok: true });
 }
 

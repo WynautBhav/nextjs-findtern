@@ -2,6 +2,7 @@ import { and, eq, ne } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { recordAdminAudit } from "@/lib/admin/audit";
 import { getDb, schema } from "@/lib/db";
 import { allows } from "@/lib/admin/permissions";
 import { requireMutation } from "@/lib/guards-mutation";
@@ -116,5 +117,5 @@ async function audit(
   set: Record<string, unknown>,
 ) {
   const changes = Object.fromEntries(Object.keys(set).map((k) => [k, { from: before[k] ?? null, to: set[k] }]));
-  await db.insert(schema.adminAuditLog).values({ adminId, action: "contact.update", targetType, targetId, meta: changes });
+  await recordAdminAudit(db, { adminId, action: "contact.update", targetType, targetId, meta: changes }, { strict: true });
 }

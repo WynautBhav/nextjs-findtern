@@ -1,6 +1,7 @@
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
+import { recordAdminAudit } from "@/lib/admin/audit";
 import { applyRatings, RATINGS_TEMPLATE, RATINGS_TEMPLATE_ROWS, readRatingsRows, readRatingsSheet, type RatingsRow } from "@/lib/admin/ratings";
 import { buildXlsx, isXlsx, readXlsxRows, XLSX_MIME } from "@/lib/xlsx";
 import { afterRatingsSaved } from "@/lib/admin/score-live";
@@ -92,5 +93,6 @@ export async function POST(req: Request) {
     await afterRatingsSaved(uid, prevExtra, nextExtra);
     updated++;
   }
+  await recordAdminAudit(db, { adminId: guard.session.uid, action: "intern.ratings_import", targetType: "intern", targetId: null, meta: { rows: rows.length, updated, failed: failures.length } });
   return NextResponse.json({ updated, failures });
 }
