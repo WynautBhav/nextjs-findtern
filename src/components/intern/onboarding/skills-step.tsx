@@ -36,8 +36,8 @@ export function SkillsStep({ values, update, errors, skillsLocked }: StepProps) 
         </div>
         <ul className="flex flex-wrap gap-2">
           {skills.map((s) => (
-            <li key={s}>
-              <Pill tone="neutral">{s}</Pill>
+            <li key={s} className="max-w-full">
+              <Pill tone="neutral" className="max-w-full [overflow-wrap:anywhere]">{s}</Pill>
             </li>
           ))}
         </ul>
@@ -147,7 +147,7 @@ export function SkillsStep({ values, update, errors, skillsLocked }: StepProps) 
               <li key={skill} className="flex items-center gap-x-2 px-4 py-3">
                 <div className="flex min-w-0 flex-1 items-center gap-3">
                   <span className="nums grid size-7 shrink-0 place-items-center rounded-full bg-brand-50 text-xs font-semibold text-brand-700">{i + 1}</span>
-                  <span className="break-words text-[0.9375rem] font-medium text-ink-900">{skill}</span>
+                  <span className="min-w-0 text-[0.9375rem] font-medium text-ink-900 [overflow-wrap:anywhere]">{skill}</span>
                 </div>
                 <button
                   type="button"
