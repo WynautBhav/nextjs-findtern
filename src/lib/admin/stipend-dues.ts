@@ -2,7 +2,7 @@ import { internStipendInrMinor, parseOffer, stipendEligible, type Offer } from "
 import { isHiredProposal } from "../hire-status.ts";
 import { toInrMinor } from "./money.ts";
 import { formatMoney } from "../format.ts";
-import { billingPlanOf, postpaidMonthsPaid, type BillingPlan } from "../billing-plan.ts";
+import { billingPlanOf, postpaidAnchor, postpaidDueOn, postpaidMonthsPaid, stipendMonthDates, type BillingPlan } from "../billing-plan.ts";
 
 /**
  * What Findtern owes an intern per hired placement, month by month (legacy
@@ -12,8 +12,9 @@ import { billingPlanOf, postpaidMonthsPaid, type BillingPlan } from "../billing-
  * pay the stipend out (ADP-19).
  *
  * The monthly share is `internStipendInrMinor` (the offer's fixed stipend, else half the employer's monthly
- * amount in INR, ₹0 for a scored candidate below 6). Month `k` is due on the
- * start date + `k` months - stipends are paid at the end of each month worked.
+ * amount in INR, ₹0 for a scored candidate below 6). Month `k` is paid on the
+ * start date + `k` months (stipendMonthDates) - at the end of each month worked;
+ * a post-paid employer owes the same month 2 days earlier.
  * Full-time offers have no stipend and are left out.
  */
 
@@ -51,6 +52,8 @@ export type EmployerSide = {
   /** Paid in full at checkout (legacy paymentMode "total"). */
   paidInFull: boolean;
   dueMinor: number;
+  /** YYYY-MM-DD the employer's next unpaid month falls due; null when nothing is left or it is not known. */
+  nextDueOn: string | null;
   /** INR equivalents, for totals. */
   monthlyInrMinor: number;
   dueInrMinor: number;
@@ -181,7 +184,7 @@ export function orderIdsOf(raw: unknown): { ids: string[]; dueIds: string[]; mod
  * (early new-app rows) at checkout covers every month; otherwise each monthly
  * order, and each checkout that carried the placement as a due month, pays one.
  */
-export function employerSide(proposalId: string, offer: Offer, orders: OrderLike[]): EmployerSide {
+export function employerSide(proposalId: string, offer: Offer, orders: OrderLike[], hiredAt?: Date | string | null): EmployerSide {
   const plan = billingPlanOf(proposalId, orders);
   let paidInFull = false;
   let paidMonths = 0;
@@ -201,6 +204,15 @@ export function employerSide(proposalId: string, offer: Offer, orders: OrderLike
   const monthlyMinor = employerMonthlyOf(offer);
   const covered = paidInFull ? months : Math.min(months, paidMonths);
   const dueMinor = paidInFull ? 0 : monthlyMinor * Math.max(0, months - covered);
+  // Post-paid: 2 days before the intern's pay day; pay-at-start (grandfathered): the start of the next month.
+  const nextDueOn =
+    covered >= months
+      ? null
+      : plan === "postpaid"
+        ? postpaidDueOn(postpaidAnchor(offer.startDate, hiredAt), months, covered + 1)
+        : plan === "monthly_prepaid"
+          ? addMonthsIso(offer.startDate, covered)
+          : null;
   return {
     currency: offer.currency,
     monthlyMinor,
@@ -210,6 +222,7 @@ export function employerSide(proposalId: string, offer: Offer, orders: OrderLike
     plan,
     paidInFull,
     dueMinor,
+    nextDueOn,
     monthlyInrMinor: toInrMinor(monthlyMinor, offer.currency),
     dueInrMinor: toInrMinor(dueMinor, offer.currency),
   };
@@ -273,8 +286,8 @@ export function stipendDues(
 
       const paidMonths = Math.min(months, (paid.get(p.id) ?? 0) + matched);
       const remainingMonths = Math.max(0, months - paidMonths);
-      const employer = orders ? employerSide(p.id, offer, orders) : null;
-      const nextDate = remainingMonths > 0 ? addMonthsIso(offer.startDate, paidMonths + 1) : null;
+      const employer = orders ? employerSide(p.id, offer, orders, p.hiredAt) : null;
+      const nextDate = remainingMonths > 0 ? (stipendMonthDates(postpaidAnchor(offer.startDate, p.hiredAt), months, paidMonths + 1)?.internPayOn ?? null) : null;
       return {
         proposalId: p.id,
         employerId: p.employerId ?? "",

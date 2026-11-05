@@ -3,8 +3,8 @@
 /**
  * Stipend payouts for one intern (Candidate 360, Payments tab).
  *
- * Two tables, in the order staff use them:
- *  1. Dues by placement - what is owed per hired placement, next to what the
+ * Two sections, in the order staff use them:
+ *  1. Dues by placement (one card each) - what is owed per hired placement, next to what the
  *     employer has paid for it (ADP-19). A payout starts here, from the
  *     placement's row (ADP-29): prefilled with the month owed and its date,
  *     at most one month's share, INR only, refused while one is pending or
@@ -192,6 +192,7 @@ export function InternPayoutTools({
 
   const th = "sticky top-0 bg-[color:var(--admin-panel)] px-3 py-2.5 text-left text-[0.8125rem] font-medium text-text-subtle";
   const td = "px-3 py-3 align-top text-sm text-ink-700";
+  const dt = "text-[0.8125rem] text-text-subtle";
 
   return (
     <div className="space-y-8">
@@ -213,48 +214,72 @@ export function InternPayoutTools({
             No hired internship placements, so nothing is owed. Full-time hires have no stipend.
           </p>
         ) : (
-          <div data-stack className="rounded-apple-md lg:overflow-x-auto">
-            <table className="w-full text-left lg:min-w-[56rem]">
-              <caption className="sr-only">Stipend owed per placement</caption>
-              <thead>
-                <tr>
-                  <th scope="col" className={th}>Placement</th>
-                  <th scope="col" className={th}>Months paid</th>
-                  <th scope="col" className={cn(th, "text-right")}>Monthly</th>
-                  <th scope="col" className={cn(th, "text-right")}>Paid</th>
-                  <th scope="col" className={cn(th, "text-right")}>Due</th>
-                  <th scope="col" className={th}>Next date</th>
-                  <th scope="col" className={th}>Employer paid</th>
-                  <th scope="col" className={th}><span className="sr-only">Action</span></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[color:var(--admin-rule)]">
-                {dues.map((d) => {
-                  const reason =
-                    d.monthlyShareMinor <= 0
-                      ? "No stipend: score below 6"
-                      : d.remainingMonths <= 0
-                        ? "Completed"
-                        : d.pending
-                          ? "Payout pending"
-                          : null;
-                  return (
-                    <tr key={d.proposalId}>
-                      <td data-title className={cn(td, "font-medium text-ink-900 max-lg:[overflow-wrap:anywhere]")}>{labelOf(d)}</td>
-                      <td data-label="Months paid" className={cn(td, "nums whitespace-nowrap")}>
+          // One card per placement (not a wide table), so the action stays in view at 390 and in the ~700px 360 pane.
+          <ul role="list" aria-label="Stipend owed per placement" className="space-y-3">
+            {dues.map((d) => {
+              const reason =
+                d.monthlyShareMinor <= 0
+                  ? "No stipend: score below 6"
+                  : d.remainingMonths <= 0
+                    ? "Completed"
+                    : d.pending
+                      ? "Payout pending"
+                      : null;
+              const e = d.employer;
+              return (
+                <li key={d.proposalId} className="rounded-apple-md bg-[color:var(--admin-panel-2)] p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+                    <div className="min-w-0">
+                      <p className="font-medium text-ink-900 [overflow-wrap:anywhere]">{labelOf(d)}</p>
+                      <p className="nums mt-0.5 text-sm text-ink-600">
+                        {d.monthlyShareMinor > 0 ? `${inr(d.monthlyShareMinor)} a month × ${d.months} ${d.months === 1 ? "month" : "months"}` : "No stipend"}
+                      </p>
+                    </div>
+                    {reason ? (
+                      <Pill tone={reason === "Payout pending" ? "waiting" : "closed"}>{reason}</Pill>
+                    ) : !canPay ? null : (
+                      <button
+                        type="button"
+                        onClick={() => open(d)}
+                        disabled={busy !== null}
+                        className={buttonClass({ variant: "outline", size: "sm" })}
+                      >
+                        <Plus className="size-3.5" aria-hidden />
+                        Create payout
+                      </button>
+                    )}
+                  </div>
+                  <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3 text-sm sm:grid-cols-3">
+                    <div>
+                      <dt className={dt}>Total</dt>
+                      <dd className="nums font-medium text-ink-900">{inr(d.totalShareMinor)}</dd>
+                    </div>
+                    <div>
+                      <dt className={dt}>Paid so far</dt>
+                      <dd className="nums text-ink-700">{inr(d.paidMinor ?? 0)}</dd>
+                    </div>
+                    <div>
+                      <dt className={dt}>Remaining</dt>
+                      <dd className="nums font-semibold text-ink-900">{inr(d.remainingMinor)}</dd>
+                    </div>
+                    <div>
+                      <dt className={dt}>Months paid</dt>
+                      <dd className="nums text-ink-700">
                         {d.paidMonths} of {d.months}
-                      </td>
-                      <td data-label="Monthly" className={cn(td, "nums whitespace-nowrap text-right")}>{d.monthlyShareMinor > 0 ? inr(d.monthlyShareMinor) : "None"}</td>
-                      <td data-label="Paid" className={cn(td, "nums whitespace-nowrap text-right")}>{inr(d.paidMinor ?? 0)}</td>
-                      <td data-label="Due" className={cn(td, "nums whitespace-nowrap text-right font-semibold text-ink-900")}>{inr(d.remainingMinor)}</td>
-                      <td data-label="Next date" data-empty={d.nextDate ? undefined : ""} className={cn(td, "nums whitespace-nowrap")}>{d.nextDate ? formatDate(d.nextDate) : "-"}</td>
-                      <td data-label="Employer paid" data-empty={d.employer ? undefined : ""} className={td}>
-                        {d.employer ? (
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className={dt}>Next intern payment</dt>
+                      <dd className="nums text-ink-700">{d.nextDate ? formatDate(d.nextDate) : "-"}</dd>
+                    </div>
+                    <div className="col-span-2 sm:col-span-1">
+                      <dt className={dt}>Employer</dt>
+                      <dd className="text-ink-700">
+                        {e ? (
                           <>
-                            <span className="nums">{d.employer.paidInFull ? "In full" : `${d.employer.paidMonths} of ${d.employer.months} months`}</span>
-                            {d.employer.dueMinor > 0 ? (
-                              <span className="nums block text-xs text-ink-600">{formatMoney(d.employer.dueMinor, d.employer.currency)} still to pay</span>
-                            ) : null}
+                            <span className="nums block">{e.paidInFull ? "Paid in full" : `Paid ${e.paidMonths} of ${e.months} months`}</span>
+                            {e.dueMinor > 0 ? <span className="nums block text-xs text-ink-600">{formatMoney(e.dueMinor, e.currency)} still owed</span> : null}
+                            {e.nextDueOn ? <span className="nums block text-xs text-ink-600">Next due {formatDate(e.nextDueOn)}</span> : null}
                             {d.aheadOfEmployer ? (
                               <span className="mt-1 flex items-center gap-1 text-xs font-medium text-accent-700">
                                 <AlertTriangle className="size-3.5 shrink-0" aria-hidden />
@@ -265,28 +290,13 @@ export function InternPayoutTools({
                         ) : (
                           <span className="text-text-subtle">-</span>
                         )}
-                      </td>
-                      <td className={cn(td, "whitespace-nowrap text-right")}>
-                        {reason ? (
-                          <Pill tone={reason === "Payout pending" ? "waiting" : "closed"}>{reason}</Pill>
-                        ) : !canPay ? null : (
-                          <button
-                            type="button"
-                            onClick={() => open(d)}
-                            disabled={busy !== null}
-                            className={buttonClass({ variant: "outline", size: "sm" })}
-                          >
-                            <Plus className="size-3.5" aria-hidden />
-                            Create payout
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                      </dd>
+                    </div>
+                  </dl>
+                </li>
+              );
+            })}
+          </ul>
         )}
 
         {form ? (

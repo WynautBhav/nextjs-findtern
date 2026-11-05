@@ -223,3 +223,22 @@ test("an unlinked ₹15,000 payout matches a fixed-stipend offer, not half the e
   assert.equal(d.paidMinor, 1_500_000);
   assert.equal(d.remainingMinor, 1_500_000);
 });
+
+test("W6: Total is the monthly stipend × months; the intern's next pay day and the employer's next due day (2 days earlier) come from one function", () => {
+  const offer = { internStipendMonthly: 8000, monthlyAmount: 20000, duration: "3m", startDate: "2026-11-23" };
+  const fee = { status: "paid", paidAt: "2026-11-20T00:00:00Z", raw: { notes: { proposalIds: ["p1"], paymentMode: "hiring_fee" } } };
+  const month1 = { status: "paid", paidAt: "2026-12-20T00:00:00Z", raw: { notes: { proposalIds: ["p1"], dueProposalIds: ["p1"], paymentMode: "monthly" } } };
+  const [a] = stipendDues([hired("p1", offer)], [], 7, [fee]);
+  assert.equal(a.monthlyShareMinor, 800_000);
+  assert.equal(a.totalShareMinor, 2_400_000); // 3 × ₹8,000 = ₹24,000
+  assert.equal(a.remainingMinor, 2_400_000);
+  assert.equal(a.nextDate, "2026-12-23");
+  assert.deepEqual([a.employer!.plan, a.employer!.paidMonths, a.employer!.nextDueOn], ["postpaid", 0, "2026-12-21"]);
+  // employer paid month 1, intern paid month 1: both move to month 2
+  const [b] = stipendDues([hired("p1", offer)], [{ status: "paid", raw: { proposalId: "p1" }, amountMinor: 800_000 }], 7, [fee, month1]);
+  assert.deepEqual([b.paidMonths, b.paidMinor, b.remainingMinor, b.nextDate], [1, 800_000, 1_600_000, "2027-01-23"]);
+  assert.deepEqual([b.employer!.paidMonths, b.employer!.nextDueOn], [1, "2027-01-21"]);
+  // paid in full: nothing left to be due
+  const [c] = stipendDues([hired("p1", offer)], [], 7, [{ status: "paid", raw: { notes: { proposalIds: ["p1"], paymentMode: "total" } } }]);
+  assert.equal(c.employer!.nextDueOn, null);
+});
