@@ -24,7 +24,7 @@ import {
 } from "@/lib/onboarding";
 import { contactPhoneTaken, employerHasPhone } from "@/lib/onboarding-phone";
 import { openToWorkPatch } from "@/lib/open-to-work";
-import { sameRatedSkills, skillsLocked } from "@/lib/skills-lock";
+import { sameSkills, skillsLocked } from "@/lib/skills-lock";
 
 const upload = z.object({
   name: z.string().min(1).max(300),
@@ -81,8 +81,10 @@ const bodySchema = z.object({
     })
     .optional(),
   skills: z.array(z.string().max(80)).max(MAX_SKILLS, `Pick at most ${MAX_SKILLS} key skills.`).optional(),
+  // Older clients also send a level per skill. Zod drops it here and
+  // `skillsToStore` stores every skill at the default level regardless.
   skillsWithRatings: z
-    .array(z.object({ name: z.string().max(80), rating: z.enum(["Beginner", "Intermediate", "Advanced"]) }))
+    .array(z.object({ name: z.string().max(80) }))
     .max(MAX_SKILLS, `Pick at most ${MAX_SKILLS} key skills.`)
     .optional(),
   experiences: z
@@ -184,8 +186,8 @@ const FIELD_LABELS: Record<string, string> = {
   secondPocCountryCode: "Pick the country code for your second contact.",
   preferredLocations: "Pick at most 5 cities.",
   linkedinUrl: "Your LinkedIn link is too long - paste just the profile address.",
-  skills: "Some skills could not be saved - each skill is at most 80 characters, rated Beginner, Intermediate or Advanced.",
-  skillsWithRatings: "Some skills could not be saved - each skill is at most 80 characters, rated Beginner, Intermediate or Advanced.",
+  skills: "Some skills could not be saved - each skill is at most 80 characters.",
+  skillsWithRatings: "Some skills could not be saved - each skill is at most 80 characters.",
   academics: "Some academic details are in the wrong format - check the Academics step.",
   experiences: "Some experience details are too long - company and role are at most 160 characters, the description 4000.",
   languages: "Some language details are in the wrong format - check the Languages step.",
@@ -282,14 +284,16 @@ export async function POST(req: Request) {
   }
 
   // Skills: the 7 cap and the lock apply to the list that is actually stored
-  // (INT-03), which comes from `skillsWithRatings` when it is sent.
+  // (INT-03), which comes from `skills` (or `skillsWithRatings` from an older client).
   const nextSkills = body.skills !== undefined || body.skillsWithRatings !== undefined ? skillsToStore(body) : null;
   if (nextSkills && nextSkills.length > MAX_SKILLS) {
     return NextResponse.json({ error: `Pick at most ${MAX_SKILLS} key skills.`, step: 3 }, { status: 400 });
   }
   if (nextSkills && existing) {
-    const current = saved.skillsWithRatings ?? [];
-    if (!sameRatedSkills(current, nextSkills) && (await skillsLocked(db, session.uid, existing.extraData))) {
+    // Names only: levels are not part of a skill any more, so resubmitting the
+    // same skills never counts as a change to a locked list.
+    const current = saved.skills ?? [];
+    if (!sameSkills(current, nextSkills.map((s) => s.name)) && (await skillsLocked(db, session.uid, existing.extraData))) {
       return conflict("Your skills are locked - your AI interview is based on them.", 3, "skills");
     }
   }

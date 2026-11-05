@@ -6,24 +6,20 @@ import { Lock, Plus, TriangleAlert, X } from "lucide-react";
 import { Pill } from "@/components/app/primitives";
 import { buttonClass } from "@/components/ui/button";
 import { SUGGESTED_SKILLS, didYouMean, suggestSkills } from "@/lib/data/skills";
-import { MAX_SKILLS, MIN_SKILLS, type SkillWithRating } from "@/lib/onboarding";
-import { cn } from "@/lib/utils";
+import { MAX_SKILLS, MIN_SKILLS } from "@/lib/onboarding";
 
-import { FieldNote, Label, controlClass, onRadioKeys, radioTab } from "./fields";
+import { FieldNote, Label, controlClass } from "./fields";
 import type { StepProps } from "./types";
 
-const RATINGS: SkillWithRating["rating"][] = ["Beginner", "Intermediate", "Advanced"];
 const FIRST_PICKS = 18;
 
 export function SkillsStep({ values, update, errors, skillsLocked }: StepProps) {
   const [draft, setDraft] = useState("");
   const [allPicks, setAllPicks] = useState(false);
   const skills = values.skills ?? [];
-  const rated = values.skillsWithRatings ?? [];
   const has = (name: string) => skills.some((s) => s.toLowerCase() === name.trim().toLowerCase());
-  const ratingOf = (name: string) => rated.find((r) => r.name.toLowerCase() === name.toLowerCase())?.rating ?? "Beginner";
 
-  // Legacy rule: once rated (or an AI interview is open) the interview is
+  // Legacy rule: once scored (or an AI interview is open) the interview is
   // built on these skills, so they stop being editable. The API enforces it.
   if (skillsLocked) {
     return (
@@ -41,9 +37,7 @@ export function SkillsStep({ values, update, errors, skillsLocked }: StepProps) 
         <ul className="flex flex-wrap gap-2">
           {skills.map((s) => (
             <li key={s}>
-              <Pill tone="neutral">
-                {s} · {ratingOf(s)}
-              </Pill>
+              <Pill tone="neutral">{s}</Pill>
             </li>
           ))}
         </ul>
@@ -55,22 +49,14 @@ export function SkillsStep({ values, update, errors, skillsLocked }: StepProps) 
 
   function add(name: string) {
     const clean = name.trim();
-    // Case-insensitive, as legacy (INT-30); new skills start at Beginner (legacy default).
+    // Case-insensitive, as legacy (INT-30). No level is asked for: the server
+    // stores every skill at the default one.
     if (!clean || has(clean) || full) return;
     update("skills", [...skills, clean]);
-    update("skillsWithRatings", [...rated.filter((r) => r.name.toLowerCase() !== clean.toLowerCase()), { name: clean, rating: "Beginner" }]);
     setDraft("");
   }
   function remove(name: string) {
     update("skills", skills.filter((s) => s !== name));
-    update("skillsWithRatings", rated.filter((r) => r.name.toLowerCase() !== name.toLowerCase()));
-  }
-  function rate(name: string, rating: SkillWithRating["rating"]) {
-    const exists = rated.some((r) => r.name.toLowerCase() === name.toLowerCase());
-    update(
-      "skillsWithRatings",
-      exists ? rated.map((r) => (r.name.toLowerCase() === name.toLowerCase() ? { ...r, rating } : r)) : [...rated, { name, rating }],
-    );
   }
 
   const matches = draft.trim() ? suggestSkills(draft, 6).filter((s) => !has(s)) : [];
@@ -85,11 +71,7 @@ export function SkillsStep({ values, update, errors, skillsLocked }: StepProps) 
         <TriangleAlert className="mt-0.5 size-4 shrink-0 text-accent-700" aria-hidden />
         <div className="text-sm leading-relaxed text-ink-800">
           <p className="font-semibold text-ink-900">Important note</p>
-          <p className="mt-1 text-pretty">
-            The self-evaluated skill ratings you provide will directly influence the difficulty level of your AI interview. Giving honest and
-            accurate ratings will ensure you are assessed fairly, helping you achieve a better score and improving your chances of being
-            shortlisted by employers.
-          </p>
+          <p className="mt-1 text-pretty">Just pick the skills you want to be known for. Findtern scores you itself through your AI interview.</p>
           <ol className="mt-2 list-decimal space-y-1 pl-5 text-pretty">
             <li>Your AI interview questions are based on the skills you provide, allowing employers to assess you accurately.</li>
             <li>
@@ -159,43 +141,19 @@ export function SkillsStep({ values, update, errors, skillsLocked }: StepProps) 
 
       {skills.length > 0 ? (
         <div>
-          <p className="text-sm font-medium text-ink-800">Rate each skill</p>
+          <p className="text-sm font-medium text-ink-800">Your skills</p>
           <ol className="mt-3 divide-y divide-ink-200/70 overflow-hidden rounded-apple-lg border border-ink-200/80 bg-white">
             {skills.map((skill, i) => (
-              <li key={skill} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 gap-y-2 px-4 py-3 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
-                <div className="order-1 flex min-w-0 items-center gap-3">
+              <li key={skill} className="flex items-center gap-x-2 px-4 py-3">
+                <div className="flex min-w-0 flex-1 items-center gap-3">
                   <span className="nums grid size-7 shrink-0 place-items-center rounded-full bg-brand-50 text-xs font-semibold text-brand-700">{i + 1}</span>
                   <span className="break-words text-[0.9375rem] font-medium text-ink-900">{skill}</span>
                 </div>
-                <div className="order-3 col-span-2 flex sm:order-2 sm:col-span-1">
-                  <div role="radiogroup" aria-label={`How good are you at ${skill}?`} onKeyDown={onRadioKeys} className="flex flex-1 rounded-apple-sm bg-ink-100 p-1 sm:flex-none">
-                    {RATINGS.map((r, ri) => {
-                      const on = ratingOf(skill) === r;
-                      return (
-                        <button
-                          key={r}
-                          type="button"
-                          role="radio"
-                          aria-checked={on}
-                          tabIndex={radioTab(on, ri, true)}
-                          onClick={() => rate(skill, r)}
-                          className={cn(
-                            "apple-spring min-h-8 flex-1 rounded-apple-sm px-2.5 text-xs font-semibold touch:min-h-10 sm:flex-none",
-                            on ? "bg-white text-brand-800 shadow-xs" : "text-ink-600 hover:text-ink-900",
-                          )}
-                        >
-                          {r}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-                {/* Beside the name on phones, after the rating from sm up. */}
                 <button
                   type="button"
                   onClick={() => remove(skill)}
                   aria-label={`Remove ${skill}`}
-                  className="apple-spring order-2 grid size-11 shrink-0 place-items-center rounded-apple-sm text-text-subtle hover:bg-danger-soft hover:text-danger sm:order-3"
+                  className="apple-spring grid size-11 shrink-0 place-items-center rounded-apple-sm text-text-subtle hover:bg-danger-soft hover:text-danger"
                 >
                   <X className="size-4" aria-hidden />
                 </button>

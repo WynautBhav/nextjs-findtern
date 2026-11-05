@@ -487,7 +487,7 @@ function ProfileTab({
         <div className={cn(ADMIN_SURFACE, "min-w-0 p-5 sm:p-6")}>
           <SectionHead title="Skills" hint="What employers see on the candidate card." />
           {canWrite ? (
-            <InternSkillsEditor internId={internId} skills={draft.skillsWithRatings ?? skills.map((name) => ({ name, rating: "Beginner" as const }))} />
+            <InternSkillsEditor internId={internId} skills={skills} />
           ) : (
             <p className="text-sm text-ink-800">{skills.join(", ") || "-"}</p>
           )}

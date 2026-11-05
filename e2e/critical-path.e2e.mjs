@@ -236,7 +236,6 @@ step("intern: completes onboarding (photo + PAN uploads, no Aadhaar image, final
       certifications: [],
     },
     skills,
-    skillsWithRatings: skills.map((name) => ({ name, rating: "Intermediate" })),
     experiences: [],
     languages: [{ id: "lang-1", language: "English", level: "Professional", read: true, write: true, speak: true }],
     extracurriculars: [],
@@ -254,6 +253,7 @@ step("intern: completes onboarding (photo + PAN uploads, no Aadhaar image, final
   assert.equal(row.aadhaar_number, INTERN.aadhaar);
   assert.equal(row.pan_number, INTERN.pan);
   assert.equal(row.skills.length, 4);
+  assert.ok(row.skills.every((s) => s.rating === 2), "no level is sent, so every skill is stored at Intermediate (2)");
   assert.deepEqual(row.location_types, ["remote"]);
   assert.equal(row.has_laptop, true);
   assert.ok(row.extra_data.ndaAcceptedAt, "NDA acceptance stamped");

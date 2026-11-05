@@ -235,7 +235,8 @@ export function scoreOf(onboarding?: OnboardingRow | null): number {
  *
  * `intern_onboarding.skills` is `jsonb` and the legacy build wrote both bare
  * strings (`["React"]`) and objects carrying a level (`[{name, level}]`).
- * Both are still in the wild, so both are accepted and the level is kept.
+ * Both are still in the wild, so both are accepted. A level is never part of
+ * the tag: skill levels are not shown to employers or colleges.
  */
 export function readSkills(raw: unknown): string[] {
   return coerceArray(raw)
@@ -243,9 +244,7 @@ export function readSkills(raw: unknown): string[] {
       if (typeof entry === "string") return entry.trim();
       if (entry && typeof entry === "object") {
         const record = entry as Record<string, unknown>;
-        const name = text(record.name ?? record.skill ?? record.title);
-        const level = text(record.level);
-        return level ? `${name} · ${level}` : name;
+        return text(record.name ?? record.skill ?? record.title);
       }
       return "";
     })

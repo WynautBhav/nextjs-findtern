@@ -20,13 +20,6 @@ import { cn } from "@/lib/utils";
 
 export type ProfileStatus = { tone: Tone; label: string; detail: string };
 
-const LEVEL_LABEL: Record<string, string> = { "1": "Beginner", "2": "Intermediate", "3": "Advanced" };
-
-function levelOf(rating: unknown): string {
-  const raw = String(rating ?? "").trim();
-  return LEVEL_LABEL[raw] ?? (raw ? raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase() : "Not rated");
-}
-
 /** Work modes are stored as the implied set (onsite ⇒ hybrid + remote); say it the same way. */
 function workModeLine(modes: string[]): string | null {
   const set = new Set(modes.map((m) => m.toLowerCase()));
@@ -86,7 +79,6 @@ export function ProfileView({
   }
 
   const place = [draft.city, draft.state].filter(Boolean).join(", ");
-  const ratingByName = new Map(draft.skillsWithRatings.map((s) => [s.name.toLowerCase().trim(), s.rating]));
   const skills = draft.skills.filter(Boolean);
   const a = draft.academics;
   const experiences = draft.experiences.filter((e) => e.company || e.role);
@@ -160,7 +152,6 @@ export function ProfileView({
             {skills.map((skill) => (
               <li key={skill} className="inline-flex min-h-9 items-center gap-2 rounded-full border border-ink-200/80 px-3 text-sm">
                 <span className="font-medium text-ink-900">{skill}</span>
-                <span className="text-xs text-text-subtle">{levelOf(ratingByName.get(skill.toLowerCase().trim()))}</span>
               </li>
             ))}
           </ul>

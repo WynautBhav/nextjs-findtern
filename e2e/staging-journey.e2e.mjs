@@ -436,7 +436,6 @@ async function onboardIntern(page, who, over = {}) {
         certifications: [],
       },
       skills,
-      skillsWithRatings: skills.map((name) => ({ name, rating: "Intermediate" })),
       experiences: [],
       languages: [{ id: "lang-1", language: "English", level: "Professional", read: true, write: true, speak: true }],
       extracurriculars: [],

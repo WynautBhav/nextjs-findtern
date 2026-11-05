@@ -21,20 +21,17 @@ import { csrfFetch } from "@/lib/client-fetch";
 
 const MIN = 4;
 const MAX = 7;
-const LEVELS = ["Beginner", "Intermediate", "Advanced"] as const;
-type Level = (typeof LEVELS)[number];
-type Skill = { name: string; rating: Level };
 
 export function InternSkillsEditor({
   internId,
   skills,
 }: {
   internId: string;
-  skills: Skill[];
+  skills: string[];
 }) {
   const router = useRouter();
   const [value, setValue] = useState("");
-  const [list, setList] = useState<Skill[]>(skills);
+  const [list, setList] = useState<string[]>(skills);
   const dirty = JSON.stringify(list) !== JSON.stringify(skills);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -47,11 +44,11 @@ export function InternSkillsEditor({
       setError(`At most ${MAX} skills.`);
       return;
     }
-    if (list.some((s) => s.name.toLowerCase() === skill.toLowerCase())) {
+    if (list.some((s) => s.toLowerCase() === skill.toLowerCase())) {
       setError("Already on the list.");
       return;
     }
-    setList([...list, { name: skill, rating: "Beginner" }]);
+    setList([...list, skill]);
     setValue("");
     setError(null);
     setSaved(false);
@@ -91,34 +88,20 @@ export function InternSkillsEditor({
         <ul className="mt-2 flex flex-wrap gap-1.5">
           {list.map((skill) => (
             <li
-              key={skill.name}
-              // On touch each skill is its own row, so the level and remove
-              // controls can be 44px without turning the pills into slabs (QA-104).
+              key={skill}
+              // On touch each skill is its own row, so the remove control can
+              // be 44px without turning the pills into slabs (QA-104).
               className="inline-flex items-center gap-1.5 rounded-full bg-ink-100 py-1 pl-3 pr-2 text-sm font-medium text-ink-800 touch:flex touch:w-full touch:rounded-apple-md touch:py-1.5"
             >
-              {skill.name}
-              <select
-                value={skill.rating}
-                onChange={(e) => {
-                  setList(list.map((s) => (s.name === skill.name ? { ...s, rating: e.target.value as Level } : s)));
-                  setSaved(false);
-                }}
-                aria-label={`Level for ${skill.name}`}
-                className="rounded-apple-sm border border-ink-200 bg-surface px-1.5 py-0.5 text-base text-ink-700 sm:text-xs touch:ml-auto touch:min-h-11 touch:px-2.5"
-              >
-                {LEVELS.map((l) => (
-                  <option key={l} value={l}>
-                    {l}
-                  </option>
-                ))}
-              </select>
+              {skill}
+              <span className="touch:flex-1" />
               <button
                 type="button"
                 onClick={() => {
-                  setList(list.filter((s) => s.name !== skill.name));
+                  setList(list.filter((s) => s !== skill));
                   setSaved(false);
                 }}
-                aria-label={`Remove ${skill.name}`}
+                aria-label={`Remove ${skill}`}
                 className="grid size-6 place-items-center rounded-full text-ink-600 transition-colors hover:bg-danger-soft hover:text-danger touch:size-11"
               >
                 <X className="size-3.5" aria-hidden />

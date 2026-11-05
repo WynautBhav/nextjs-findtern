@@ -86,7 +86,6 @@ export function PreviewStep({ values, update, errors, onJumpStep }: StepProps) {
                   <li key={s}>
                     <Pill tone="live">
                       {s}
-                      <span className="font-normal text-brand-700/80">· {values.skillsWithRatings.find((r) => r.name.toLowerCase() === s.toLowerCase())?.rating ?? "Beginner"}</span>
                     </Pill>
                   </li>
                 ))}

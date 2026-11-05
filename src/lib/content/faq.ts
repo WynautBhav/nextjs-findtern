@@ -287,7 +287,7 @@ export const FAQ_INTERN: CmsFaqItem[] = [
     "id": "149efd34-516c-42cc-89e6-e0319589cb41",
     "category": "Intern",
     "question": "How long does the AI interview take?",
-    "answer": "The AI interview on Findtern usually takes 30–60 minutes, depending on your chosen skills and responses. Since the interview adapts to your self-rated skill level, the number and difficulty of questions may vary. Make sure you have a stable internet connection and enough time before starting, as it’s best to complete it in one sitting.",
+    "answer": "The AI interview on Findtern usually takes 30–60 minutes, depending on your chosen skills and responses. Since the interview adapts to the skills you chose, the number and difficulty of questions may vary. Make sure you have a stable internet connection and enough time before starting, as it’s best to complete it in one sitting.",
     "sortOrder": 0,
     "isActive": true
   },

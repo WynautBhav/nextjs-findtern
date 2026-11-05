@@ -254,7 +254,7 @@ type OnboardingRow = typeof internOnboarding.$inferSelect;
 
 /* ── Legacy storage shape ───────────────────────────────────────────────
  * The legacy app owns `intern_onboarding` and both apps share the database:
- *   skills            [{ id, name, rating: 1 | 2 | 3 }]
+ *   skills            [{ id, name, rating: 1 | 2 | 3 }]  (new skills get 2; a saved skill keeps its stored value)
  *   experience_json   [{ id, type: Internship|Job|Project|Freelancing, company,
  *                        role, from: YYYY-MM-DD, to: YYYY-MM-DD | "Present", description }]
  *   extra.academics   { level: "bachelors"…, degree, specialization, status,
@@ -304,24 +304,28 @@ export function readSkillRatings(raw: unknown, extra: Record<string, unknown> = 
 }
 
 /**
- * The skills a save would store: trimmed, blanks dropped, one per name
- * (case-insensitive, first wins). Ratings come from `skillsWithRatings`;
- * a bare `skills` list rates each one Beginner (legacy default).
+ * Every skill is stored at this level (stored as 2). Nobody is asked for a
+ * skill level and none is shown: Findtern does the real scoring itself, so a
+ * level sent by a client is never trusted or kept.
  */
-export function skillsToStore(input: { skills?: string[]; skillsWithRatings?: SkillWithRating[] }): SkillWithRating[] {
-  const rated = input.skillsWithRatings?.length
-    ? input.skillsWithRatings
-    : (input.skills ?? []).map((name) => ({ name, rating: "Beginner" as const }));
-  // A rating list from an older client can carry names the skill list dropped.
-  const keep = input.skills && input.skillsWithRatings?.length ? new Set(input.skills.map((s) => s.trim().toLowerCase())) : null;
+export const DEFAULT_SKILL_RATING: SkillWithRating["rating"] = "Intermediate";
+
+/**
+ * The skills a save would store: trimmed, blanks dropped, one per name
+ * (case-insensitive, first wins), all at DEFAULT_SKILL_RATING whatever the
+ * client sent. The names come from `skills`, or from `skillsWithRatings` (an
+ * older client) when no `skills` list is sent.
+ */
+export function skillsToStore(input: { skills?: string[]; skillsWithRatings?: { name: string; rating?: unknown }[] }): SkillWithRating[] {
+  const names = input.skills ?? (input.skillsWithRatings ?? []).map((s) => s.name);
   const seen = new Set<string>();
   const out: SkillWithRating[] = [];
-  for (const s of rated) {
-    const name = s.name.trim();
+  for (const raw of names) {
+    const name = raw.trim();
     const key = name.toLowerCase();
-    if (!name || seen.has(key) || (keep && !keep.has(key))) continue;
+    if (!name || seen.has(key)) continue;
     seen.add(key);
-    out.push({ name, rating: s.rating });
+    out.push({ name, rating: DEFAULT_SKILL_RATING });
   }
   return out;
 }
@@ -531,12 +535,19 @@ export function storedFromDraft(
   const out: { skills?: unknown[]; experienceJson?: unknown[]; extraPatch: Record<string, unknown> } = { extraPatch: {} };
 
   if (draft.skillsWithRatings || draft.skills) {
-    const prevIds = new Map(arr(existing?.skills).map(obj).map((s) => [text(s.name).toLowerCase(), text(s.id)]));
-    out.skills = skillsToStore(draft).map((s, i) => ({
-      id: prevIds.get(s.name.toLowerCase()) || `skill-${Date.now()}-${i}`,
-      name: s.name,
-      rating: RATING_LABEL.indexOf(s.rating) + 1 || 1,
-    }));
+    const prev = new Map(arr(existing?.skills).map(obj).map((s) => [text(s.name).toLowerCase(), s]));
+    out.skills = skillsToStore(draft).map((s, i) => {
+      const before = prev.get(s.name.toLowerCase());
+      // A skill already on the record keeps the level stored for it (the AI
+      // interview was built on it); a new one is stored at the default. The
+      // level is only ever read from the record, never from the client.
+      const kept = ratingLabel(before?.rating ?? DEFAULT_SKILL_RATING);
+      return {
+        id: text(before?.id) || `skill-${Date.now()}-${i}`,
+        name: s.name,
+        rating: RATING_LABEL.indexOf(kept) + 1 || 2,
+      };
+    });
   }
   if (draft.experiences) {
     // Legacy shape (INT-02): a current role is to: "Present". `current` is

@@ -101,6 +101,7 @@ test("INT-02: a legacy \"Present\" end date reads as a current role and is writt
 test("round-trip writes the legacy shape and keeps unknown legacy keys", () => {
   const d = draftFromRecord(legacyRow);
   const out = storedFromDraft(d, legacyRow);
+  // Ids and the levels already stored are kept on a re-save.
   assert.deepEqual(out.skills, [
     { id: "s1", name: "React", rating: 3 },
     { id: "s2", name: "SQL", rating: 1 },
@@ -139,13 +140,44 @@ test("extracurriculars: blank rows are not saved and at most ten are kept (INT-3
   assert.equal(out[0].activity, "Club 1");
 });
 
-test("skills: duplicates differing only in case are dropped; a bare list rates Beginner", () => {
+test("skills: duplicates differing only in case are dropped; a bare list is stored at Intermediate", () => {
   assert.deepEqual(skillsToStore({ skills: ["React", "react ", "SQL"] }), [
-    { name: "React", rating: "Beginner" },
-    { name: "SQL", rating: "Beginner" },
+    { name: "React", rating: "Intermediate" },
+    { name: "SQL", rating: "Intermediate" },
   ]);
   const stored = storedFromDraft({ skillsWithRatings: [{ name: "Excel", rating: "Advanced" }, { name: "EXCEL", rating: "Beginner" }] }, null).skills;
   assert.equal(stored?.length, 1);
+});
+
+test("skills: a client-sent level is ignored, a new skill is stored as 2 (Intermediate)", () => {
+  const sent = [
+    { name: "Excel", rating: "Advanced" },
+    { name: "SQL", rating: "Beginner" },
+    { name: "Go", rating: "Expert" },
+    { name: "Figma" },
+  ];
+  const stored = storedFromDraft({ skills: sent.map((x) => x.name), skillsWithRatings: sent as never }, null).skills as { name: string; rating: number }[];
+  assert.deepEqual(stored.map((x) => x.name), ["Excel", "SQL", "Go", "Figma"]);
+  assert.deepEqual(stored.map((x) => x.rating), [2, 2, 2, 2]);
+  // A saved skill keeps the level stored for it; the client cannot change it, a new skill gets 2.
+  const kept = storedFromDraft(
+    { skills: ["React", "Vue"], skillsWithRatings: [{ name: "React", rating: "Beginner" }, { name: "Vue", rating: "Advanced" }] },
+    { skills: [{ id: "s1", name: "React", rating: 3 }] },
+  ).skills as { name: string; rating: number }[];
+  assert.deepEqual(kept.map((x) => [x.name, x.rating]), [["React", 3], ["Vue", 2]]);
+  // An older client that sends only the rated list is forced to the same level.
+  const old = storedFromDraft({ skillsWithRatings: [{ name: "Rust", rating: "Advanced" }] }, null).skills as { rating: number }[];
+  assert.deepEqual(old.map((x) => x.rating), [2]);
+  // A skill added in `skills` is kept even when the rated list is stale.
+  const added = skillsToStore({ skills: ["React", "Vue"], skillsWithRatings: [{ name: "React", rating: "Advanced" }] });
+  assert.deepEqual(added.map((x) => x.name), ["React", "Vue"]);
+});
+
+test("skills step validation passes with names alone, no level anywhere", () => {
+  const four = ["React", "SQL", "Excel", "Figma"];
+  const e = validateStep({ ...complete(), skills: four, skillsWithRatings: [] }, 3, ctx);
+  assert.equal(e.skills, undefined);
+  assert.match(validateStep({ ...complete(), skills: four.slice(0, 3), skillsWithRatings: [] }, 3, ctx).skills, /at least/);
 });
 
 test("bare-string skills from early builds still read", () => {
@@ -580,11 +612,11 @@ test("a date typed as today in India is accepted whatever the server's time zone
   }
 });
 
-test("skill ratings round-trip label -> stored number -> label (Intermediate stays 2)", () => {
-  const picked = [{ name: "Excel", rating: "Beginner" as const }, { name: "SQL", rating: "Intermediate" as const }, { name: "Go", rating: "Advanced" as const }];
-  const stored = storedFromDraft({ skills: picked.map((p) => p.name), skillsWithRatings: picked }, null).skills as { rating: number }[];
-  assert.deepEqual(stored.map((s) => s.rating), [1, 2, 3]);
-  assert.deepEqual(draftFromRecord({ skills: stored }).skillsWithRatings, picked);
+test("stored skills read back as Intermediate (2); older rows keep their own stored level", () => {
+  const stored = storedFromDraft({ skills: ["Excel", "SQL"] }, null).skills as { rating: number }[];
+  assert.deepEqual(stored.map((s) => s.rating), [2, 2]);
+  assert.deepEqual(draftFromRecord({ skills: stored }).skillsWithRatings?.map((s) => s.rating), ["Intermediate", "Intermediate"]);
+  assert.deepEqual(draftFromRecord({ skills: [{ id: "a", name: "Go", rating: 3 }] }).skillsWithRatings?.map((s) => s.rating), ["Advanced"]);
 });
 
 test("a negative score is refused with the range message instead of being rewritten", () => {

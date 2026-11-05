@@ -5,7 +5,7 @@ export const STEPS = [
   { id: "about", title: "About you", blurb: "Your photo, identity documents, address and the numbers we can reach you on." },
   { id: "academics", title: "Academics", blurb: "Your highest qualification, marksheets, and any professional courses or certificates." },
   { id: "experience", title: "Experience", blurb: "Internships, jobs, projects or freelance work. Optional, but every entry needs its details." },
-  { id: "skills", title: "Skills", blurb: "Four to seven skills, each rated honestly. Your AI interview is built on them." },
+  { id: "skills", title: "Skills", blurb: "Four to seven skills. Your AI interview is built on them." },
   { id: "languages", title: "Languages", blurb: "The languages you can work in, and how well you read, write and speak them." },
   { id: "extracurricular", title: "Activities", blurb: "Clubs, competitions, volunteering and leadership outside your coursework. Optional." },
   { id: "preferences", title: "Work preferences", blurb: "How you want to work, where, and whether you have a laptop." },
