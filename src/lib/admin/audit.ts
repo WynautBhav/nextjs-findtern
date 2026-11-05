@@ -47,6 +47,7 @@ export const AUDIT_ACTIONS = {
   "intern.activation_marked_paid": "Marked activation fee paid",
   "intern.marked_completed": "Marked an internship completed",
   "intern.completed_auto": "Internship completed automatically on final timesheet approval",
+  "intern.approval_update": "Changed a candidate's review status",
   "intern.ratings_update": "Edited a candidate's scores",
   "interview.ai_link_added": "Added an AI interview link",
   "intern.ratings_import": "Imported candidate scores",
