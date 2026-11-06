@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { and, desc, eq, inArray } from "drizzle-orm";
-import { ArrowRight, CalendarClock, ClipboardCheck, CreditCard, FolderPlus, ShoppingBag, Video } from "lucide-react";
+import { ArrowRight, CalendarClock, Check, ClipboardCheck, CreditCard, FolderPlus, ShoppingBag } from "lucide-react";
 
 import { getDb, schema } from "@/lib/db";
 import { ButtonLink } from "@/components/ui/button";
@@ -12,11 +12,13 @@ import { requireRole } from "@/lib/auth";
 import { toCandidateProfile, type CandidateProfile } from "@/lib/employer-candidates";
 import { attachPhotos, candidatePoolClauses, scoreExpr } from "@/lib/employer-pool";
 import { CandidateAvatar } from "@/components/employer/candidate-avatar";
+import { HeartToggle } from "@/components/employer/candidate-card";
+import { JoinMeetingButton } from "@/components/employer/meeting-join";
 import { PresenceDot } from "@/components/app/presence-dot";
 import { presenceOf, type PresenceLabel } from "@/lib/presence";
 import { rowSkills, skillBaseName } from "@/components/employer/candidate-view";
 import { requireEmployerSetup } from "@/lib/employer-setup";
-import { meetingEndsAt } from "@/lib/employer-interview-rules";
+import { isMeetingLinkLive, meetingEndsAt } from "@/lib/employer-interview-rules";
 import { payableCheckout } from "@/lib/employer-payable";
 import { isProjectOpen } from "@/lib/project-locations";
 import { proposalOutcome } from "@/lib/proposals";
@@ -24,6 +26,7 @@ import { scopeLabel } from "@/lib/db/schema";
 import { bandFor } from "@/lib/score";
 import { timezoneForLocation } from "@/lib/timezones";
 import { formatSlotTime } from "@/lib/format";
+import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = {
   title: "Dashboard",
@@ -52,13 +55,23 @@ type Loaded = {
   submittedSheets: number;
   pendingInterviews: number;
   nextInterview: InterviewRow | null;
+  /** People on the shortlist with no live proposal, and the candidate-project rows they fill. */
   shortlisted: number;
+  shortlistEntries: number;
   toPay: number;
   candidates: CandidateProfile[];
   presence: Record<string, PresenceLabel | null>;
   /** Lower-cased project skill names the matches are ranked on. */
   wanted: string[];
+  /** Per candidate: the open project they fit best and how many of its skills they have. */
+  fit: Record<string, Fit | null>;
+  /** "projectId:internId" pairs already on the shortlist. */
+  saved: string[];
+  /** Who the next meeting is with (initials and photo only) and for which project. */
+  nextWith: { initials: string; photoUrl: string | null; projectName: string | null } | null;
 };
+
+type Fit = { projectId: string; projectName: string; hit: number; of: number; skills: string[] };
 
 /**
  * Employer home.
@@ -103,7 +116,8 @@ export default async function EmployerDashboard() {
       {
         count: data.toPay,
         label: data.toPay === 1 ? "payment due" : "payments due",
-        detail: "An accepted offer becomes a hire once the first payment is made: the hiring charge, plus the Month 1 charge for scores 6 and above. Each later month's charge is due 2 days before the month's pay date; you can pay up to 15 days early.",
+        // One line; checkout lists each charge and its due date.
+        detail: `Pay to turn ${data.toPay === 1 ? "an accepted offer" : `${data.toPay} accepted offers`} into ${data.toPay === 1 ? "a hire" : "hires"}. Checkout shows each charge and when it's due.`,
         href: "/employer/checkout",
         cta: "Go to checkout",
         Icon: CreditCard,
@@ -128,7 +142,11 @@ export default async function EmployerDashboard() {
       {
         count: data.shortlisted,
         label: data.shortlisted === 1 ? "shortlisted candidate, no proposal yet" : "shortlisted candidates, no proposal yet",
-        detail: "Book a meeting or send a proposal to move them forward.",
+        // The nav badge counts shortlist rows (one per candidate and project); say both.
+        detail:
+          data.shortlistEntries > data.shortlisted
+            ? `${data.shortlistEntries} shortlist entries across your projects. Book a meeting or send a proposal to move them forward.`
+            : "Book a meeting or send a proposal to move them forward.",
         href: "/employer/cart",
         cta: "Open shortlist",
         Icon: ShoppingBag,
@@ -146,9 +164,9 @@ export default async function EmployerDashboard() {
     if (p.status === "hired") row.hired += 1;
     byProject.set(p.projectId, row);
   }
-  // The hero names the most urgent pending item: the employer's own moves first,
-  // then ones waiting on someone else. "All caught up" only when nothing is pending.
-  const top = tasks.find((t) => t.yours !== false) ?? tasks[0];
+  // The hero names the most urgent item that is the employer's own move. Items
+  // waiting on someone else never lead; they sit in the list below.
+  const top = tasks.find((t) => t.yours !== false);
   const rest = tasks.filter((t) => t !== top);
 
   const next = data.nextInterview;
@@ -157,14 +175,14 @@ export default async function EmployerDashboard() {
   return (
     <div>
       <HeroBand
-        eyebrow={tasks.length > 1 ? `${tasks.length} things pending` : undefined}
+        compact
         // Name the first thing waiting rather than a total of different kinds
         // of things, so the headline matches the list below it.
-        title={top ? `${top.count} ${top.label}` : proposals.length ? "You're all caught up" : "Let's make your first hire"}
+        title={top ? `${top.count} ${top.label}` : proposals.length || tasks.length ? "You're all caught up" : "Let's make your first hire"}
         lede={
           top
             ? top.detail
-            : proposals.length
+            : proposals.length || tasks.length
               ? "Nothing is waiting on you. Your candidates and offers are below."
               : "Shortlist candidates ranked by their Findtern Score, meet them, and send a proposal."
         }
@@ -214,13 +232,44 @@ export default async function EmployerDashboard() {
         ) : null}
       </HeroBand>
 
-      <div className="grid gap-x-10 gap-y-10 xl:grid-cols-[minmax(0,1fr)_22rem]">
-        <div className="min-w-0 space-y-10">
+      {/* Phone order follows the DOM: next meeting, what's waiting, projects, matches.
+          From xl the meeting and matches share the right column. */}
+      <div className="grid gap-x-10 gap-y-10 xl:grid-cols-[minmax(0,1fr)_22rem] xl:grid-rows-[auto_1fr]">
+        {next && nextAt ? (
+          <Surface className="p-5 xl:col-start-2 xl:row-start-1 xl:self-start">
+            <p className="text-sm font-medium text-ink-600">Next meeting</p>
+            {data.nextWith ? (
+              <div className="mt-3 flex items-center gap-3">
+                <CandidateAvatar photoUrl={data.nextWith.photoUrl} initials={data.nextWith.initials} className="size-10 shrink-0 rounded-full text-xs" />
+                <div className="min-w-0">
+                  <p className="text-base font-semibold text-ink-900">{data.nextWith.initials}</p>
+                  <p className="line-clamp-1 text-sm text-ink-600">{data.nextWith.projectName ?? "No project linked"}</p>
+                </div>
+              </div>
+            ) : null}
+            <p className="mt-3 text-base font-semibold text-ink-900">{formatSlotTime(nextAt, data.timezone)}</p>
+            <p className="mt-0.5 text-sm text-ink-600">Your timezone ({data.timezone.replace(/_/g, " ")})</p>
+            {next.meetingLink && isMeetingLinkLive(next) ? (
+              <div className="mt-4 space-y-1">
+                <JoinMeetingButton link={next.meetingLink} size="md" block />
+                <Link href="/employer/schedule" className="flex min-h-11 items-center justify-center text-sm font-medium text-brand-700 hover:underline">
+                  Open schedule
+                </Link>
+              </div>
+            ) : (
+              <ButtonLink href="/employer/schedule" variant="outline" size="sm" block className="mt-4 min-h-11">
+                Open schedule
+              </ButtonLink>
+            )}
+          </Surface>
+        ) : null}
+
+        <div className="min-w-0 space-y-10 xl:col-start-1 xl:row-span-2 xl:row-start-1">
           {/* The hero carries the first thing waiting; this list carries the rest,
               so nothing is said twice. Nothing waiting: the hero says so. */}
           {rest.length ? (
             <section>
-              <SectionHead title={top ? "Also waiting" : "Waiting"} />
+              <SectionHead title={top ? "Also waiting" : "Waiting on others"} />
               <ul className="divide-y divide-ink-100 border-y border-ink-100">
                 {rest.map((t) => (
                   <li key={t.href} className="grid grid-cols-[3rem_minmax(0,1fr)] items-center gap-x-4 gap-y-3 py-4 sm:grid-cols-[3rem_minmax(0,1fr)_auto]">
@@ -246,7 +295,7 @@ export default async function EmployerDashboard() {
               hint={`${openProjects.length} open of ${projects.length}`}
               action={
                 <Link href="/employer/projects" className="inline-flex min-h-11 items-center text-sm font-medium text-brand-700 hover:underline">
-                  Manage
+                  All projects
                 </Link>
               }
             />
@@ -259,12 +308,13 @@ export default async function EmployerDashboard() {
               />
             ) : (
               <ul className="divide-y divide-ink-100 border-y border-ink-100">
-                {shownProjects.map((p) => {
+                {shownProjects.map((p, i) => {
                   const stats = byProject.get(p.id) ?? { total: 0, toPay: 0, hired: 0 };
                   const skills = ((p.skills as string[]) ?? []).slice(0, 4);
                   const open = isProjectOpen(p.status);
                   return (
-                    <li key={p.id}>
+                    // Three on a phone, so Top matches is a short scroll away.
+                    <li key={p.id} className={i >= 3 ? "max-xl:hidden" : undefined}>
                       <Link
                         href={`/employer/candidates?project=${encodeURIComponent(p.id)}`}
                         className="group -mx-2 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4 rounded-apple-sm px-2 py-4 transition-colors hover:bg-ink-50/70 focus-visible:bg-ink-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-500"
@@ -302,26 +352,7 @@ export default async function EmployerDashboard() {
           </section>
         </div>
 
-        <aside className="min-w-0 space-y-8">
-          {next && nextAt ? (
-            <Surface className="p-5">
-              <p className="text-sm font-medium text-ink-600">Next meeting</p>
-              <p className="mt-1 text-base font-semibold text-ink-900">{formatSlotTime(nextAt, data.timezone)}</p>
-              <p className="mt-0.5 text-sm text-ink-600">Your timezone ({data.timezone.replace(/_/g, " ")})</p>
-              {next.meetingLink ? (
-                <ButtonLink href="/employer/schedule" size="sm" block className="mt-4 min-h-11">
-                  <Video className="size-4" aria-hidden />
-                  Open in schedule
-                </ButtonLink>
-              ) : (
-                <ButtonLink href="/employer/schedule" variant="outline" size="sm" block className="mt-4 min-h-11">
-                  Open schedule
-                </ButtonLink>
-              )}
-            </Surface>
-          ) : null}
-
-          <section>
+        <section className={cn("min-w-0 xl:col-start-2 xl:self-start", next && nextAt ? "xl:row-start-2" : "xl:row-span-2 xl:row-start-1")}>
             <SectionHead
               title="Top matches"
               action={
@@ -338,16 +369,19 @@ export default async function EmployerDashboard() {
                 {data.candidates.map((c) => {
                   const band = bandFor(c.score);
                   const presence = data.presence[c.id] ?? null;
-                  const { shown: skills, isWanted } = rowSkills(c.skills, new Set(data.wanted), 3);
+                  const fit = data.fit[c.id] ?? null;
+                  // Tint against the project the row names, so chips and "n of m" agree.
+                  const { shown: skills, more, isWanted } = rowSkills(c.skills, new Set(fit?.skills ?? data.wanted), 3);
                   const where = [c.city, c.workModes.includes("remote") ? "Remote" : ""].filter(Boolean).join(" · ");
                   return (
-                    <li key={c.id}>
+                    // The link covers the person; the heart sits beside it, never inside it.
+                    <li key={c.id} className="relative flex items-start gap-1">
                       <Link
-                        href={`/employer/intern/${encodeURIComponent(c.id)}`}
-                        className="group grid grid-cols-[auto_minmax(0,1fr)_auto] -mx-2 items-start gap-3 rounded-apple-sm px-2 py-3.5 transition-colors hover:bg-ink-50/70 focus-visible:bg-ink-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-500"
+                        href={`/employer/intern/${encodeURIComponent(c.id)}${fit ? `?project=${encodeURIComponent(fit.projectId)}` : ""}`}
+                        className="group -ml-2 grid min-w-0 flex-1 grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-3 rounded-apple-sm py-3.5 pl-2 pr-1 transition-colors hover:bg-ink-50/70 focus-visible:bg-ink-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-500"
                       >
                         <span className="relative shrink-0">
-                          <CandidateAvatar photoUrl={c.photoUrl} initials={c.initials} className="size-10 rounded-full text-xs" />
+                          <CandidateAvatar photoUrl={c.photoUrl} initials={c.initials} className="size-11 rounded-full text-xs" />
                           {presence ? (
                             <span aria-hidden className="absolute -bottom-0.5 -right-0.5 grid size-3.5 place-items-center rounded-full bg-white">
                               <PresenceDot label={presence} />
@@ -355,22 +389,46 @@ export default async function EmployerDashboard() {
                           ) : null}
                         </span>
                         <span className="min-w-0">
-                          <span className="block text-sm text-ink-600">
-                            <span className="font-semibold text-ink-900 group-hover:text-brand-700">{c.initials}</span>
+                          <span className="block truncate text-sm text-ink-600">
+                            <span className="text-base font-semibold text-ink-900 group-hover:text-brand-700">{c.initials}</span>
                             {presence ? <span className="sr-only">, {presence}</span> : null}
                             {" · "}
                             {where || "Location not stated"}
                           </span>
-                          <span className="mt-0.5 block text-pretty text-sm text-ink-600">
-                            {skills.length
-                              ? skills.map((k, i) => (
-                                  <span key={k}>
-                                    {i > 0 ? " · " : ""}
-                                    <span className={isWanted(k) ? "font-semibold text-ink-900" : undefined}>{skillBaseName(k)}</span>
+                          {/* What tells two similar rows apart: the project they fit and how well. */}
+                          {fit?.of ? (
+                            <span className="mt-0.5 block truncate text-xs text-ink-600" title={`${fit.hit} of ${fit.of} skills for ${fit.projectName}`}>
+                              <span className="nums font-medium text-ink-900">
+                                {fit.hit} of {fit.of}
+                              </span>{" "}
+                              skills for {fit.projectName}
+                            </span>
+                          ) : null}
+                          {skills.length ? (
+                            <span className="mt-2 flex flex-wrap gap-1">
+                              {skills.map((k) =>
+                                isWanted(k) ? (
+                                  <span key={k} className="inline-flex items-center gap-1 rounded-full bg-brand-50 px-2 py-0.5 text-xs font-medium text-brand-800 ring-1 ring-inset ring-brand-200">
+                                    <Check className="size-3" aria-hidden />
+                                    {skillBaseName(k)}
+                                    <span className="sr-only"> (matches)</span>
                                   </span>
-                                ))
-                              : "No skills listed"}
-                          </span>
+                                ) : (
+                                  <span key={k} className="rounded-full px-2 py-0.5 text-xs font-medium text-ink-700 ring-1 ring-inset ring-ink-200">
+                                    {skillBaseName(k)}
+                                  </span>
+                                ),
+                              )}
+                              {more ? (
+                                <span className="rounded-full px-1.5 py-0.5 text-xs font-medium text-ink-600">
+                                  +{more}
+                                  <span className="sr-only"> more skills</span>
+                                </span>
+                              ) : null}
+                            </span>
+                          ) : (
+                            <span className="mt-1 block text-sm text-ink-600">No skills listed</span>
+                          )}
                         </span>
                         <span className="text-right">
                           <span className="nums block text-lg font-semibold leading-tight text-ink-900">
@@ -380,13 +438,17 @@ export default async function EmployerDashboard() {
                           <span className="block text-xs text-ink-600">{c.scored ? band.name : "Not scored yet"}</span>
                         </span>
                       </Link>
+                      {fit ? (
+                        <span className="shrink-0 pt-3">
+                          <HeartToggle internId={c.id} projectId={fit.projectId} shortlisted={data.saved.includes(`${fit.projectId}:${c.id}`)} />
+                        </span>
+                      ) : null}
                     </li>
                   );
                 })}
               </ul>
             )}
           </section>
-        </aside>
       </div>
     </div>
   );
@@ -422,16 +484,21 @@ async function load(employerId: string): Promise<Loaded> {
       .from(schema.interviews)
       .where(and(eq(schema.interviews.employerId, employerId), inArray(schema.interviews.status, ["pending", "proposed", "scheduled"]))),
     db
-      .select({ internId: schema.employerCartItems.internId })
+      .select({ internId: schema.employerCartItems.internId, projectId: schema.employerCartItems.projectId })
       .from(schema.employerCartItems)
       .where(and(eq(schema.employerCartItems.employerId, employerId), inArray(schema.employerCartItems.listType, ["cart", "checkout"]))),
     payableCheckout(employerId),
   ]);
 
   const employer = employerRow[0];
-  // "No proposal yet" means exactly that: anyone already proposed to is out.
+  // Top matches leave out anyone already proposed to.
   const proposedTo = new Set(proposalRows.map((p) => p.internId));
-  const shortlisted = new Set(cartRows.map((c) => c.internId).filter((id) => !proposedTo.has(id))).size;
+  // Same set as the nav badge and the Shortlist page: no live proposal yet
+  // (a declined or expired one puts them back in play).
+  const live = new Set(proposalRows.filter((p) => !["rejected", "withdrawn", "expired"].includes(p.status)).map((p) => p.internId));
+  const waiting = cartRows.filter((c) => !live.has(c.internId));
+  const shortlisted = new Set(waiting.map((c) => c.internId)).size;
+  const shortlistEntries = new Set(waiting.map((c) => `${c.projectId}:${c.internId}`)).size;
 
   const now = Date.now();
   const upcoming = interviewRows
@@ -462,6 +529,42 @@ async function load(employerId: string): Promise<Loaded> {
   // Skills may carry a level ("React · Advanced"): match on the name.
   const matching = wanted.length ? profiles.filter((c) => c.skills.some((s) => wanted.includes(skillBaseName(s).toLowerCase()))) : profiles;
   const candidates = (matching.length ? matching : profiles).slice(0, 4);
+  // Each match against the open project it fits best (newest wins a tie): the
+  // heart saves to that project and the row says how well they fit it.
+  const openRows = projectRows.filter((p) => isProjectOpen(p.status));
+  const fit: Record<string, Fit | null> = {};
+  for (const c of candidates) {
+    const have = new Set(c.skills.map((s) => skillBaseName(s).toLowerCase()));
+    let best: Fit | null = null;
+    for (const p of openRows) {
+      const skills = ((p.skills as string[]) ?? []).map((s) => s.toLowerCase());
+      const hit = skills.filter((s) => have.has(s)).length;
+      if (!best || hit > best.hit) best = { projectId: p.id, projectName: p.projectName, hit, of: skills.length, skills };
+    }
+    fit[c.id] = best;
+  }
+
+  // The next meeting's candidate: initials and photo only, as everywhere before a hire.
+  const nextIv = upcoming[0]?.iv ?? null;
+  let nextWith: Loaded["nextWith"] = null;
+  if (nextIv) {
+    const [row] = await db
+      .select({ user: schema.users, onboarding: schema.internOnboarding })
+      .from(schema.users)
+      .leftJoin(schema.internOnboarding, eq(schema.users.id, schema.internOnboarding.userId))
+      .where(eq(schema.users.id, nextIv.internId))
+      .limit(1);
+    if (row) {
+      const person = toCandidateProfile(row.user, row.onboarding);
+      await attachPhotos(db, [person]);
+      nextWith = {
+        initials: person.initials,
+        photoUrl: person.photoUrl ?? null,
+        projectName: projectRows.find((p) => p.id === nextIv.projectId)?.projectName ?? null,
+      };
+    }
+  }
+
   await attachPhotos(db, candidates);
   const presence = await presenceOf(candidates.map((c) => c.id)).catch((err) => {
     console.error("[employer/dashboard] presence", err);
@@ -475,11 +578,15 @@ async function load(employerId: string): Promise<Loaded> {
     proposals: proposalRows,
     submittedSheets: sheetRows.length,
     pendingInterviews: interviewRows.filter((i) => i.status === "pending" || i.status === "proposed").length,
-    nextInterview: upcoming[0]?.iv ?? null,
+    nextInterview: nextIv,
     shortlisted,
+    shortlistEntries,
     toPay: payable.lines.length,
     candidates,
     presence,
     wanted,
+    fit,
+    saved: cartRows.map((c) => `${c.projectId}:${c.internId}`),
+    nextWith,
   };
 }
