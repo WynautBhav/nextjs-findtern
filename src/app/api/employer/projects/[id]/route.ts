@@ -4,7 +4,7 @@ import { z } from "zod";
 
 import { getDb, schema } from "@/lib/db";
 import { scopeValue } from "@/lib/db/schema";
-import { STATES } from "@/lib/data/districts";
+import { STATES, districtsOf } from "@/lib/data/districts";
 import { contactFieldError } from "@/lib/contact-scrub";
 import { requireMutation } from "@/lib/guards-mutation";
 import { projectContactError } from "@/lib/project-contact";
@@ -34,11 +34,11 @@ const bodySchema = z.object({
   description: z.string().trim().max(MAX_PROJECT_DESCRIPTION, `Keep the description under ${MAX_PROJECT_DESCRIPTION} characters.`).optional(),
   fullTimeOffer: z.boolean().optional(),
   locationType: z.enum(["remote", "hybrid", "onsite"]).optional(),
-  preferredLocations: z.array(z.string()).optional(),
-  pincode: z.string().optional(),
-  city: z.string().nullable().optional(),
-  state: z.string().nullable().optional(),
-  timezone: z.string().optional(),
+  preferredLocations: z.array(z.string().max(120, "A preferred location is too long.")).optional(),
+  pincode: z.string().max(10, "Enter a valid PIN code.").optional(),
+  city: z.string().max(80, "Keep the city under 80 characters.").nullable().optional(),
+  state: z.string().max(80, "Keep the state under 80 characters.").nullable().optional(),
+  timezone: z.string().max(64, "Enter a valid timezone.").optional(),
   // "inactive" pauses (the employer can reopen), "closed" is final (OA8).
   status: z.enum(["active", "inactive", "closed"]).optional(),
 });
@@ -96,7 +96,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       (next.city ?? "").trim() === (project.city ?? "").trim() &&
       (next.state ?? "").trim() === (project.state ?? "").trim() &&
       next.locationType === project.locationType;
-    const placeProblem = placeUnchanged ? null : projectPlaceError(next, STATES);
+    const placeProblem = placeUnchanged ? null : projectPlaceError(next, STATES, districtsOf);
     if (placeProblem) return NextResponse.json({ error: placeProblem }, { status: 400 });
     if (next.locationType === "remote") {
       d.city = null;

@@ -42,6 +42,14 @@ test("ordinary text is not flagged", () => {
   }
 });
 
+test("degree names that end like a domain are not links (B.Tech, B.Com, M.Com are on the onboarding list)", () => {
+  for (const s of ["B.Tech", "B.Com", "M.Com", "B.Tech / B.E.", "B.Tech/M.Tech", "B.Com graduate", "pursuing M.Tech"]) {
+    assert.deepEqual(kinds(s), [], s);
+  }
+  assert.ok(kinds("see b.com/offer").includes("url"));
+  assert.ok(kinds("portfolio.tech").includes("url"));
+});
+
 test("scrub hides the whole message when it carries any contact detail", () => {
   const { text, redacted } = scrubContact("Hi! call 98765 43210 or mail a@b.co, insta: asha_22. Thanks for 3 months");
   assert.equal(redacted, true);

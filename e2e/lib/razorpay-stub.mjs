@@ -34,6 +34,7 @@ export function startStub(port) {
   const refunds = new Map(); // id -> refund entity
   let mode = "processed";
   let seq = 0;
+  const STARTED = Date.now().toString(36);
 
   const json = (res, status, body) => {
     res.writeHead(status, { "content-type": "application/json" });
@@ -83,7 +84,8 @@ export function startStub(port) {
     let m = /^\/v1\/payments\/([^/]+)\/refund$/.exec(path);
     if (m && req.method === "POST") {
       if (mode === "fail") return json(res, 400, { error: { code: "BAD_REQUEST_ERROR", description: "Stub: the refund was refused" } });
-      const id = `rfnd_e2e_${++seq}`;
+      // Unique per stub start: the refunds table keeps gateway ids across runs on a reused test database.
+      const id = `rfnd_e2e_${STARTED}${++seq}`;
       const entity = {
         id,
         entity: "refund",

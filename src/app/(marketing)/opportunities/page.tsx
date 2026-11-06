@@ -86,8 +86,8 @@ export default async function PublicOpportunities() {
                     What gets you seen is a complete profile and a Findtern Score from the AI
                     interview. Creating the profile is free; the interview is a one-time payment once
                     you decide to go live. Nothing here sends you an application form. A company can
-                    message you only after it sends you an offer, and your phone, email and links stay
-                    hidden until you are hired.
+                    message you only after it sends you an offer, and messages can’t carry your phone,
+                    email, links or social handles until you are hired.
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-3 sm:justify-end">

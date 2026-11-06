@@ -4,7 +4,7 @@ import { z } from "zod";
 
 import { getDb, schema } from "@/lib/db";
 import { scopeValue } from "@/lib/db/schema";
-import { STATES } from "@/lib/data/districts";
+import { STATES, districtsOf } from "@/lib/data/districts";
 import { contactFieldError } from "@/lib/contact-scrub";
 import { requireMutation } from "@/lib/guards-mutation";
 import { projectContactError } from "@/lib/project-contact";
@@ -30,11 +30,11 @@ const bodySchema = z.object({
   description: z.string().trim().max(MAX_PROJECT_DESCRIPTION, `Keep the description under ${MAX_PROJECT_DESCRIPTION} characters.`).optional(),
   fullTimeOffer: z.boolean().optional(),
   locationType: z.enum(["remote", "hybrid", "onsite"], { error: "Pick a work mode." }),
-  preferredLocations: z.array(z.string()).optional(),
-  pincode: z.string().optional(),
-  city: z.string().nullable().optional(),
-  state: z.string().nullable().optional(),
-  timezone: z.string().optional(),
+  preferredLocations: z.array(z.string().max(120, "A preferred location is too long.")).optional(),
+  pincode: z.string().max(10, "Enter a valid PIN code.").optional(),
+  city: z.string().max(80, "Keep the city under 80 characters.").nullable().optional(),
+  state: z.string().max(80, "Keep the state under 80 characters.").nullable().optional(),
+  timezone: z.string().max(64, "Enter a valid timezone.").optional(),
 });
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -59,7 +59,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const scope = scopeValue(d.scopeOfWork);
   if (!scope) return NextResponse.json({ error: "Pick a scope of work." }, { status: 400 });
   // On-site and hybrid need an Indian city and state (EMH-14, EMH-48).
-  const placeProblem = projectPlaceError(d, STATES);
+  const placeProblem = projectPlaceError(d, STATES, districtsOf);
   if (placeProblem) return NextResponse.json({ error: placeProblem }, { status: 400 });
   // A new project has no legacy list to keep: at most three places.
   const locationProblem = projectLocationsError(d.preferredLocations ?? []);

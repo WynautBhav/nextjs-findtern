@@ -69,7 +69,8 @@ const AFTER_PLATFORM_OK = new Set(
     "too also me us bio feed live marketing campaign campaigns content handle handles api apps app processing judgement integration integrations analytics clone ui sdk login auth").split(" "),
 );
 const OWN = /^(?:www\.)?(?:[a-z0-9-]+\.)*findtern\.(?:in|com)(?:\/|$)/i;
-const NOT_DOMAIN = /^(?:asp|vb|ado)\.net$/i;
+// ".NET" products, and degree names ("B.Tech", "B.Com", "M.Com", "B.Tech/M.Tech", "B.Tech/B.E") that end in a top-level domain.
+const NOT_DOMAIN = /^(?:asp|vb|ado)\.net$|^[bm]\.(?:com|tech)(?:\/[a-z](?:\.[a-z]{1,4})+\.?)*$/i;
 
 function isMobileRun(m: string): boolean {
   const d = m.replace(/\D/g, "");

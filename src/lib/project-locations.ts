@@ -131,6 +131,8 @@ export const INDIA_ONLY_NOTE = "Candidates are India-based. Please select only c
 export function projectPlaceError(
   p: { locationType?: string | null; city?: string | null; state?: string | null },
   indianStates: readonly string[],
+  /** The districts of a state; when given, the city must be one of them (the routes pass it, the form does not). */
+  districtsOf?: (state: string) => readonly string[],
 ): string | null {
   const mode = String(p.locationType ?? "").trim();
   if (!mode || mode === "remote") return null;
@@ -139,6 +141,9 @@ export function projectPlaceError(
   if (!state) return "Pick the state for an on-site or hybrid role.";
   if (!city) return "Pick the city for an on-site or hybrid role.";
   if (!indianStates.some((s) => s.toLowerCase() === state.toLowerCase())) return INDIA_ONLY_NOTE;
+  if (districtsOf && !districtsOf(state).some((d) => d.toLowerCase() === city.toLowerCase())) {
+    return `Pick a city in ${state} from the list.`;
+  }
   return null;
 }
 

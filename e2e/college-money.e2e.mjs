@@ -24,6 +24,8 @@ const PASSWORD = "Findtern@2026";
 const ADMIN = { email: process.env.E2E_ADMIN_EMAIL ?? "admin@findtern.dev", password: process.env.E2E_ADMIN_PASSWORD ?? PASSWORD };
 
 let browser, pool, admin, tpo, collegeId, code;
+let ipSeq = 0;
+const nextIp = () => `10.88.${Math.floor(Date.now() / 1000) % 250}.${(ipSeq++ % 250) + 1}`;
 const q = async (sql, params) => (await pool.query(sql, params)).rows;
 // Mutations need the double-submit CSRF header, as csrfFetch sends it (src/lib/client-fetch.ts).
 const send = async (page, method, path, data) => {
@@ -34,7 +36,8 @@ const send = async (page, method, path, data) => {
 
 async function login(path, creds) {
   const page = await (await browser.newContext()).newPage();
-  const res = await page.request.post(`${BASE}${path}`, { data: creds, headers: { origin: BASE } });
+  // Its own client address: the server trusts X-Forwarded-For here, and the login limiter is per address.
+  const res = await page.request.post(`${BASE}${path}`, { data: creds, headers: { origin: BASE, "x-forwarded-for": nextIp() } });
   assert.equal(res.status(), 200, `login ${path}`);
   return page;
 }
@@ -44,6 +47,10 @@ before(async () => {
     env: { ...process.env, DATABASE_URL: DB, PUBLIC_ORIGIN: BASE },
     stdio: "ignore",
   });
+  // The reseed re-hashes the officer's password under the same account id, and the server caches an account's
+  // password version for 30 s (lib/account-status.ts). Wait that out, or a session check made before the reseed
+  // by an earlier spec makes this login look stale.
+  await new Promise((r) => setTimeout(r, 31_000));
   pool = new pg.Pool({ connectionString: DB });
   browser = await chromium.launch();
   admin = await login("/api/auth/admin/login", ADMIN);

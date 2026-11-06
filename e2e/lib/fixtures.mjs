@@ -124,8 +124,8 @@ export async function seedIntern({
   return { id: u.id, email: em, password, firstName, lastName: ln, phone: ph, role: "intern" };
 }
 
-/** A paid ₹2,499 activation by Razorpay (what the refund flow looks at). */
-export async function seedInternPayment(internId, { gateway = "razorpay", amountMinor = 249900, paymentId = `pay_${uniq("e2e")}`.replace(/-/g, "_") } = {}) {
+/** A paid ₹2,499 activation by Razorpay (what the refund flow looks at; the refund guard wants pay_ + letters and digits only). */
+export async function seedInternPayment(internId, { gateway = "razorpay", amountMinor = 249900, paymentId = `pay_${uniq("e2e").replace(/-/g, "")}` } = {}) {
   const orderId = `order_${uniq("e2e")}`.replace(/-/g, "_");
   const r = await one(
     `INSERT INTO intern_payments (intern_id, gateway, order_id, payment_id, amount_minor, status, paid_at, invoice_number)

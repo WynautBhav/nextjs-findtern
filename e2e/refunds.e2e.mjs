@@ -114,7 +114,7 @@ after(async () => {
 
 test("a paid student on the roster is eligible for the full fee; creating twice returns the same row", async () => {
   const r = await create(state.a.pay.id);
-  assert.equal(r.status, 200, JSON.stringify(r.body));
+  assert.equal(r.status, 201, JSON.stringify(r.body));
   assert.equal(r.body.status, "eligible");
   assert.equal(r.body.amountMinor, FEE);
   state.a.refundId = r.body.refundId;
@@ -128,7 +128,7 @@ test("a paid student on the roster is eligible for the full fee; creating twice 
 
 test("a student who took the AI interview needs a human decision and cannot be initiated", async () => {
   const r = await create(state.b.pay.id);
-  assert.equal(r.status, 200, JSON.stringify(r.body));
+  assert.equal(r.status, 201, JSON.stringify(r.body));
   assert.equal(r.body.status, "requires_review");
   assert.equal(r.body.reviewReason, "interview_taken");
   const go = await act(r.body.refundId, { action: "initiate", confirmAmountMinor: FEE });
@@ -151,9 +151,11 @@ test("only an admin with money access can create or initiate a refund", async ()
   const employerCtx = await signedInContext(browser, employer);
   const intern = await signedInContext(browser, state.a.intern);
   try {
-    assert.equal((await create(state.a.pay.id, employerCtx)).status, 403);
-    assert.equal((await create(state.a.pay.id, intern)).status, 403);
-    assert.equal((await act(state.a.refundId, { action: "initiate", confirmAmountMinor: FEE }, intern)).status, 403);
+    // Not an admin session at all: 401 (no admin identity) or 403 (wrong role) both refuse.
+    const refused = (res) => [401, 403].includes(res.status);
+    assert.ok(refused(await create(state.a.pay.id, employerCtx)), "an employer");
+    assert.ok(refused(await create(state.a.pay.id, intern)), "an intern");
+    assert.ok(refused(await act(state.a.refundId, { action: "initiate", confirmAmountMinor: FEE }, intern)), "an intern initiating");
     const noCsrf = await state.adminCtx.request.post(new URL("/api/admin/refunds", baseUrl()).toString(), {
       data: { internPaymentId: state.a.pay.id }, headers: { origin: baseUrl() }, failOnStatusCode: false,
     });
@@ -196,9 +198,8 @@ test("initiate: claims one seat, makes one gateway call with the right amount an
   assert.equal(row.gateway_refund_id, state.a.gatewayRefundId);
   assert.ok(row.seat_usage_id, "the seat claimed for this refund is recorded");
   assert.equal(await used(), state.usedAtStart + 1, "seat count +1");
-  const m = await one(`SELECT college_id, status FROM college_memberships WHERE user_id = $1 AND left_at IS NULL`, [state.a.intern.id]);
-  assert.equal(m.college_id, state.collegeId);
-  assert.equal(m.status, "verified");
+  // The student joins the college only once the money is back (a refund still in flight can still be rejected).
+  assert.equal(await one(`SELECT college_id FROM college_memberships WHERE user_id = $1 AND left_at IS NULL`, [state.a.intern.id]), null, "no membership while the refund is only initiated");
 });
 
 test("initiating again does nothing: 409, still one gateway call, still one seat", async () => {
@@ -247,6 +248,9 @@ test("webhook: a bad signature is refused; refund.processed settles the row; a r
   assert.equal(after.status, "refunded");
   assert.equal(String(after.settled_at), String(row.settled_at), "a replay does not re-settle");
   assert.equal(await used(), state.usedAtStart + 2, "settling claims no extra seat (A and F hold one each)");
+  const m = await one(`SELECT college_id, status FROM college_memberships WHERE user_id = $1 AND left_at IS NULL`, [state.a.intern.id]);
+  assert.equal(m?.college_id, state.collegeId, "the money is back, so the student is a verified member of the college");
+  assert.equal(m.status, "verified");
   const audit = await rows(`SELECT action FROM admin_audit_log WHERE action = 'refund.settle' AND target_id = $1`, [state.a.refundId]).catch(() => []);
   if (audit.length) assert.equal(audit.length, 1, "one settle audit row, not two");
 });
@@ -294,6 +298,15 @@ test("gateway refusal: 502, the row stays pending with the error; after a refres
   const refresh = await act(state.d.refundId, { action: "refresh" });
   assert.equal(refresh.status, 200, JSON.stringify(refresh.body));
   assert.equal((await refundRow(state.d.refundId)).status, "pending", "the gateway has no refund for this payment, so nothing is settled");
+  // A pending row with no gateway id counts as a call that may still be in flight, so an immediate retry is refused (409) …
+  assert.equal((await act(state.d.refundId, { action: "initiate", confirmAmountMinor: FEE })).status, 409, "no retry inside the 2-minute window");
+  assert.equal((await stub.refundCalls()).length, callsBefore + 1, "and no gateway call was made for it");
+  // … until two minutes have passed (moved back in the DB rather than waited out) and a refresh finds no refund at Razorpay:
+  // the row is then `failed` ("No refund reached Razorpay… You can retry it") and can be initiated again.
+  await db().query(`UPDATE payment_refunds SET updated_at = timezone('utc', now()) - interval '3 minutes' WHERE id = $1`, [state.d.refundId]);
+  const settled = await act(state.d.refundId, { action: "refresh" });
+  assert.equal(settled.status, 200, JSON.stringify(settled.body));
+  assert.equal((await refundRow(state.d.refundId)).status, "failed", "a stale call with no refund at the gateway is released for a retry");
   const retry = await act(state.d.refundId, { action: "initiate", confirmAmountMinor: FEE });
   assert.equal(retry.status, 200, JSON.stringify(retry.body));
   assert.ok(["initiated", "refunded"].includes(retry.body.status), retry.body.status);

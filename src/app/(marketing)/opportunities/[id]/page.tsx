@@ -112,7 +112,7 @@ export default async function PublicRoleDetail({ params }: { params: Promise<{ i
                 {[
                   "Your profile is what companies search. Everything you have filled in is what they can see.",
                   "When a company is interested, they send you an offer rather than an application form.",
-                  "You read the offer, and you decide. Companies cannot apply on your behalf. They can message you only once they have sent you an offer, and your phone, email and links stay hidden until you are hired.",
+                  "You read the offer, and you decide. Companies cannot apply on your behalf. They can message you only once they have sent you an offer, and messages can’t carry your phone, email, links or social handles until you are hired.",
                   "Accepting starts the interview booking, your timesheet, and your stipend.",
                 ].map((text, i) => (
                   <li key={i} className="flex gap-3">

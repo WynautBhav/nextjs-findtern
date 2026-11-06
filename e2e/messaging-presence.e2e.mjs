@@ -4,7 +4,7 @@
  *   employer sends a proposal → opens the thread (one per pair) → the intern
  *   receives the message WITHOUT reloading and the Messages badge goes +1 →
  *   the intern replies, the employer receives it without reloading → "Seen";
- *   phone numbers / emails are hidden until the hire is paid; non-participants
+ *   phone numbers / emails are refused until the hire is paid; non-participants
  *   get 404; one email per unread burst and none while the recipient is online;
  *   presence is activity based, never a time, switchable off by the student.
  *
@@ -49,6 +49,16 @@ async function setPresence(internId, { seenAgoMs, activeAgoMs, hidden = false })
 const thread = (ctx, id, after = "") => send(ctx, "GET", `/api/messages/threads/${id}${after ? `?after=${after}` : ""}`);
 const post = (ctx, id, body, clientId = randomUUID()) => send(ctx, "POST", `/api/messages/threads/${id}/messages`, { body, clientId });
 const counts = async (ctx) => (await send(ctx, "GET", "/api/live?once=1")).body;
+/**
+ * The app treats a recipient who read the thread in the last 2 minutes as online and mails at most once per
+ * 15 minutes. Neither window can be waited out in a test, so move the thread's stamps back instead.
+ */
+const ageThread = ({ readMin, emailedMin = null }) =>
+  db().query(
+    `UPDATE message_threads SET intern_last_read_at = now() - $2 * interval '1 minute',
+       intern_emailed_at = CASE WHEN $3::int IS NULL THEN NULL ELSE now() - $3::int * interval '1 minute' END WHERE id = $1`,
+    [state.threadId, readMin, emailedMin],
+  );
 const mailsToIntern = (since) => mailTo(state.intern.email, { since, subject: /message/i });
 
 before(async () => {
@@ -346,7 +356,8 @@ test("live: an open thread receives the reply without reloading; the sender sees
     await internPage.getByText("Hello Asha, we liked your profile").first().waitFor();
     // Opening the thread read it.
     await eventually("the intern's unread count back to 0", async () => (await counts(state.internCtx)).messages === 0, { timeoutMs: 8_000 });
-    await eventually("the employer's thread shows Seen", async () => /\bSeen\b/.test(await employerPage.locator("main").innerText()), { timeoutMs: 8_000 });
+    // Read receipts arrive on the thread's safety poll (12 s), not on the live stream.
+    await eventually("the employer's thread shows Seen", async () => /\bSeen\b/.test(await employerPage.locator("main").innerText()), { timeoutMs: 20_000 });
     assert.equal((await thread(state.employerCtx, state.threadId)).body.seen, true, "seen is set");
     assert.equal((await thread(state.employerCtx, state.threadId)).body.counterpartReadAt, undefined, "no exact read time");
 
@@ -416,28 +427,27 @@ test("sending: more than 20 a minute is a 429", async () => {
 
 /* ── Contact details ────────────────────────────────────────────────────── */
 
-test("contact scrub: phone and email are hidden until the hire is paid; the original is never stored", async () => {
+test("contact guard: phone, email and links are refused before the hire is paid and never stored (422)", async () => {
   const raw = "Call me on 98765 43210 or write to hiring.manager@acme-example.com, also wa.me/919876543210";
+  const before = (await one(`SELECT count(*)::int AS n FROM messages WHERE thread_id = $1`, [state.threadId])).n;
   const sent = await post(state.employerCtx, state.threadId, raw);
-  assert.equal(sent.status, 201, JSON.stringify(sent.body));
-  const seen = await thread(state.internCtx, state.threadId);
-  const m = seen.body.messages.find((x) => x.id === sent.body.message.id);
-  assert.ok(m, "the intern sees the message");
-  assert.match(m.body, /\[hidden until hire\]/);
-  assert.equal(m.redacted, true);
-  for (const secret of ["98765", "43210", "hiring.manager", "acme-example", "wa.me"]) {
-    assert.ok(!m.body.includes(secret), `the intern got "${secret}"`);
-    assert.ok(!sent.body.message.body.includes(secret), `the sender's echo kept "${secret}"`);
+  assert.equal(sent.status, 422, JSON.stringify(sent.body));
+  assert.match(String(sent.body.error), /can be shared only after the hire is paid/);
+  assert.equal((await one(`SELECT count(*)::int AS n FROM messages WHERE thread_id = $1`, [state.threadId])).n, before, "nothing was stored");
+  for (const secret of ["98765", "hiring.manager", "wa.me"]) {
+    assert.equal((await one(`SELECT count(*)::int AS n FROM messages WHERE thread_id = $1 AND body ILIKE $2`, [state.threadId, `%${secret}%`])).n, 0, `the database kept "${secret}"`);
   }
-  const stored = await one(`SELECT body, redacted FROM messages WHERE id = $1`, [sent.body.message.id]);
-  assert.equal(stored.redacted, true);
-  for (const secret of ["98765", "43210", "hiring.manager"]) assert.ok(!stored.body.includes(secret), `the database kept "${secret}"`);
   // The same rule for the intern writing to the employer.
   const back = await post(state.internCtx, state.threadId, "My number is +91-98765-43210");
-  const empView = (await thread(state.employerCtx, state.threadId)).body.messages.find((x) => x.id === back.body.message.id);
-  assert.ok(!empView.body.includes("98765"), "an intern's number is hidden from the employer too");
+  assert.equal(back.status, 422, JSON.stringify(back.body));
+  // A number split over two messages is caught when the second completes it, and the pair is never delivered.
+  const half = await post(state.employerCtx, state.threadId, "My number: 98765");
+  assert.equal(half.status, 201, "five digits alone are only digits");
+  assert.equal((await post(state.employerCtx, state.threadId, "43210")).status, 422, "the second half completes a mobile number");
+  await db().query(`DELETE FROM messages WHERE id = $1`, [half.body.message.id]); // keep it out of the sender's window for the tests below
   // Ordinary numbers are untouched.
   const plain = await post(state.employerCtx, state.threadId, "The internship is 3 months, 20 hours a week, from 2026.");
+  assert.equal(plain.status, 201, JSON.stringify(plain.body));
   assert.equal(plain.body.message.redacted, false);
   assert.match(plain.body.message.body, /3 months, 20 hours a week/);
 });
@@ -450,8 +460,9 @@ test("contact scrub: after a paid hire the same details go through", async () =>
   const m = (await thread(state.internCtx, state.threadId)).body.messages.find((x) => x.id === sent.body.message.id);
   assert.ok(m.body.includes("98765 43210") && m.body.includes("hiring.manager@acme-example.com"), "details visible after hire");
   assert.equal(m.redacted, false);
-  // Back to a pre-hire state for the email tests below.
+  // Back to a pre-hire state for the email tests below, without this message: the guard also reads the sender's last three messages, and these details would make every later send a 422.
   await db().query(`UPDATE proposals SET status = 'sent', hired_at = NULL WHERE id = $1`, [state.proposalId]);
+  await db().query(`DELETE FROM messages WHERE id = $1`, [sent.body.message.id]);
 });
 
 /* ── Email fallback ─────────────────────────────────────────────────────── */
@@ -469,6 +480,7 @@ test("email: none while the recipient is online; one per unread burst while they
 
   // (b) offline → exactly one email for a burst of two
   await send(state.internCtx, "POST", `/api/messages/threads/${state.threadId}/read`, {});
+  await ageThread({ readMin: 5 }); // read, but long enough ago that the intern is no longer "in the conversation"; nothing mailed yet
   await setPresence(state.intern.id, { seenAgoMs: 10 * 60_000, activeAgoMs: 10 * 60_000 });
   const t1 = Date.now();
   assert.equal((await post(state.employerCtx, state.threadId, "First message while you are away")).status, 201);
@@ -482,7 +494,7 @@ test("email: none while the recipient is online; one per unread burst while they
 
   // (c) after the intern reads, the next away-message emails again
   await send(state.internCtx, "POST", `/api/messages/threads/${state.threadId}/read`, {});
-  await sleep(1_100);
+  await ageThread({ readMin: 5, emailedMin: 20 }); // the burst's mail is older than the 15-minute gap and older than this read
   const t2 = Date.now();
   assert.equal((await post(state.employerCtx, state.threadId, "A new message after you read")).status, 201);
   await eventually("a second email after a read", async () => (await mailsToIntern(t2 - 500)).length >= 1, { timeoutMs: 15_000 });
@@ -494,10 +506,10 @@ test("email: none while the recipient is online; one per unread burst while they
 test("notifications: marking another person's notification read is refused (recipient type is checked too)", async () => {
   const mine = await one(`SELECT id FROM notifications WHERE recipient_type = 'intern' AND recipient_id = $1 AND is_read = false ORDER BY created_at DESC LIMIT 1`, [state.intern.id]);
   assert.ok(mine, "the intern has an unread notification");
-  const asStranger = await send(state.strangerCtx, "POST", `/api/notifications/${mine.id}/read`, {});
+  const asStranger = await send(state.strangerCtx, "PATCH", `/api/notifications/${mine.id}/read`, {});
   assert.ok([403, 404].includes(asStranger.status), `a stranger got ${asStranger.status}`);
   assert.equal((await one(`SELECT is_read FROM notifications WHERE id = $1`, [mine.id])).is_read, false, "still unread");
-  const asEmployer = await send(state.employerCtx, "POST", `/api/notifications/${mine.id}/read`, {});
+  const asEmployer = await send(state.employerCtx, "PATCH", `/api/notifications/${mine.id}/read`, {});
   assert.ok([403, 404].includes(asEmployer.status), `an employer got ${asEmployer.status}`);
   assert.equal((await one(`SELECT is_read FROM notifications WHERE id = $1`, [mine.id])).is_read, false);
 });
