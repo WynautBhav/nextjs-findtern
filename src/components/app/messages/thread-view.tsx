@@ -174,7 +174,7 @@ export function ThreadView({
   const left = MAX - text.length;
 
   return (
-    <Surface as="section" aria-label={`Conversation with ${name}`} className="flex h-[min(42rem,calc(100dvh-14rem))] min-h-[24rem] flex-col overflow-hidden lg:h-[calc(100dvh-9rem)]">
+    <Surface as="section" aria-label={`Conversation with ${name}`} className="flex h-[min(42rem,calc(100dvh-14rem))] min-h-[24rem] flex-col overflow-hidden lg:h-[calc(100dvh-15rem)]">
       <header className="flex items-center gap-3 border-b border-ink-100 px-4 py-3">
         <Link
           href={`/${role}/messages`}
