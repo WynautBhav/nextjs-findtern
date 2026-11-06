@@ -302,9 +302,13 @@ export default async function InternHome() {
         // Profile done, activated and scored: the next move is a company's.
         <EmptyScene
           title="No offers or interviews yet"
-          body="Your profile is in front of employers. When a company books an interview or sends an offer, it lands here, then your timesheets and payments."
-          next={{ label: "See open roles", href: "/intern/opportunities" }}
-          who="Waiting on employers"
+          body={
+            openToWork
+              ? "Your profile is in front of employers. When a company books an interview or sends an offer, it lands here, then your timesheets and payments."
+              : "Your profile is hidden from employers, so no one can book an interview or send an offer. Switch on Open to work in your profile to be found."
+          }
+          next={openToWork ? { label: "See open roles", href: "/intern/opportunities" } : { label: "Open your profile", href: "/intern/profile" }}
+          who={openToWork ? "Waiting on employers" : "Waiting on you"}
         />
       ) : history.length === 0 ? (
         <p className="text-sm text-ink-600">Nothing else yet.</p>
