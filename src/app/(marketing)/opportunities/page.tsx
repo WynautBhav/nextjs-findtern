@@ -85,8 +85,9 @@ export default async function PublicOpportunities() {
                   <p className="mt-2 max-w-prose text-pretty text-sm leading-relaxed text-ink-600">
                     What gets you seen is a complete profile and a Findtern Score from the AI
                     interview. Creating the profile is free; the interview is a one-time payment once
-                    you decide to go live. Nothing here sends you an application form, and no company
-                    can contact you directly until you accept an offer.
+                    you decide to go live. Nothing here sends you an application form. A company can
+                    message you only after it sends you an offer, and your phone, email and links stay
+                    hidden until you are hired.
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-3 sm:justify-end">

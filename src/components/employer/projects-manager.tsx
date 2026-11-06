@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Briefcase, FolderPlus, Pencil, Search, Trash2, Users, X } from "lucide-react";
+import { Briefcase, FolderPlus, Pause, Pencil, Play, Search, Trash2, Users, X } from "lucide-react";
 
 import { EmptyScene, FilterTabs, Pill, Surface } from "@/components/app/primitives";
 import { PageHeader } from "@/components/layout/page-header";
@@ -13,7 +13,7 @@ import { ProjectFields, projectFormErrors, type ProjectBaseline } from "@/compon
 import { csrfFetch } from "@/lib/client-fetch";
 import { scopeLabel, scopeValue, type Project } from "@/lib/db/schema";
 import { emptyProject, projectFromRecord, type ProjectDraft } from "@/lib/employer-onboarding";
-import { CLOSED_PROJECT_STATUS, isProjectOpen } from "@/lib/project-locations";
+import { FINAL_PROJECT_STATUS, PAUSED_PROJECT_STATUS, isProjectClosedForGood, isProjectOpen, projectDescriptionError } from "@/lib/project-locations";
 import { cn } from "@/lib/utils";
 import { RowMenu } from "@/components/app/row-menu";
 import { useConfirm } from "@/components/app/use-confirm";
@@ -22,14 +22,27 @@ type Filter = "all" | "open" | "closed";
 
 const MODE_LABEL: Record<string, string> = { remote: "Remote", hybrid: "Hybrid", onsite: "On-site" };
 
+type ListingState = "open" | "paused" | "closed" | "taken_down";
+
+/** What the employer sees for a listing; a taken-down one is only Findtern's to restore. */
+function listingState(p: Pick<Project, "status" | "takenDownAt">): ListingState {
+  if (p.takenDownAt) return "taken_down";
+  if (isProjectOpen(p.status)) return "open";
+  return isProjectClosedForGood(p.status) ? "closed" : "paused";
+}
+
+const STATE_LABEL: Record<ListingState, string> = { open: "Open", paused: "Paused", closed: "Closed", taken_down: "Taken down" };
+
 /**
  * Projects: what you're hiring for.
  *
  * A project is the unit candidates are matched against, so the list leads
  * with what decides the match (skills, mode, place) and one action that uses
  * it, "Find candidates". Editing opens a drawer with the same fields as
- * onboarding (`ProjectFields`). Closing writes the legacy "inactive"
- * (EMH-03), and at least one project stays open (the API enforces it).
+ * onboarding (`ProjectFields`). A new project goes through a review step and
+ * then goes live at once (OA8). Pause writes "inactive" and can be undone;
+ * Close writes "closed" and is final. At least one project stays open (the
+ * API enforces it). Findtern can take a listing down; the employer sees why.
  */
 export function ProjectsManager({
   employerId,
@@ -61,6 +74,10 @@ export function ProjectsManager({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
+  const [description, setDescription] = useState("");
+  const [descriptionError, setDescriptionError] = useState("");
+  // New projects are reviewed before they go live; there is no draft state.
+  const [reviewing, setReviewing] = useState(false);
 
   const [listError, setListError] = useState("");
   const [rowError, setRowError] = useState<{ id: string; message: string } | null>(null);
@@ -102,6 +119,9 @@ export function ProjectsManager({
     setForm({ ...emptyProject(), timezone: defaultTimezone });
     setErrors({});
     setSaveError("");
+    setDescription("");
+    setDescriptionError("");
+    setReviewing(false);
     setSheetOpen(true);
   }
 
@@ -111,6 +131,9 @@ export function ProjectsManager({
     setForm({ ...draft, scopeOfWork: scopeValue(draft.scopeOfWork) || draft.scopeOfWork, timezone: draft.timezone || defaultTimezone });
     setErrors({});
     setSaveError("");
+    setDescription(p.description ?? "");
+    setDescriptionError("");
+    setReviewing(false);
     setSheetOpen(true);
   }
 
@@ -118,11 +141,18 @@ export function ProjectsManager({
     e.preventDefault();
     const problems = projectFormErrors(form, baseline, companyName);
     setErrors(problems);
-    if (Object.keys(problems).length > 0) {
+    const descProblem = projectDescriptionError(description) ?? "";
+    setDescriptionError(descProblem);
+    if (Object.keys(problems).length > 0 || descProblem) {
       setSaveError("Some details need a look - see the highlighted fields.");
       // The first marked field takes focus once the errors have rendered.
       const formEl = e.currentTarget;
       window.requestAnimationFrame(() => formEl.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus());
+      return;
+    }
+    // A new project is shown back to the employer once before it goes live.
+    if (!editing && !reviewing) {
+      setReviewing(true);
       return;
     }
     setSaving(true);
@@ -130,6 +160,7 @@ export function ProjectsManager({
     const remote = form.locationType === "remote";
     const payload = {
       projectName: form.projectName.trim(),
+      description: description.trim(),
       skills: form.skills,
       scopeOfWork: form.scopeOfWork,
       locationType: form.locationType,
@@ -155,10 +186,12 @@ export function ProjectsManager({
       const data = (await res.json().catch(() => ({}))) as { error?: string; project?: Project };
       if (!res.ok) {
         setSaveError(data.error ?? "Couldn't save this project. Try again.");
+        // A refused description is fixed on the form, not on the review.
+        setReviewing(false);
         return;
       }
       if (editing) {
-        setProjects((prev) => prev.map((item) => (item.id === editing.id ? { ...item, ...payload } : item)));
+        setProjects((prev) => prev.map((item) => (item.id === editing.id ? { ...item, ...payload, description: payload.description || null } : item)));
       } else if (data.project) {
         setProjects((prev) => [data.project!, ...prev]);
       }
@@ -171,9 +204,15 @@ export function ProjectsManager({
     }
   }
 
-  async function toggleStatus(project: Project) {
-    const open = isProjectOpen(project.status);
-    const nextStatus = open ? CLOSED_PROJECT_STATUS : "active";
+  async function changeStatus(project: Project, nextStatus: "active" | typeof PAUSED_PROJECT_STATUS | typeof FINAL_PROJECT_STATUS) {
+    if (nextStatus === FINAL_PROJECT_STATUS) {
+      const ok = await askConfirm({
+        title: `Close "${project.projectName}" for good?`,
+        body: "It leaves candidate search and its public page, and it can't be reopened. Offers already sent are not affected. To pause it instead, choose Pause.",
+        confirmLabel: "Yes, close it",
+      });
+      if (!ok) return;
+    }
     setBusyId(project.id);
     setListError("");
     setRowError(null);
@@ -220,6 +259,7 @@ export function ProjectsManager({
 
   const openCount = projects.filter((p) => isProjectOpen(p.status)).length;
   const closedCount = projects.length - openCount;
+  const takenDown = projects.filter((p) => p.takenDownAt);
   const q = query.trim().toLowerCase();
   const filtered = projects
     .filter((p) => (filter === "open" ? isProjectOpen(p.status) : filter === "closed" ? !isProjectOpen(p.status) : true))
@@ -271,7 +311,7 @@ export function ProjectsManager({
               tabs={[
                 { key: "all", label: "All", count: projects.length },
                 { key: "open", label: "Open", count: openCount },
-                { key: "closed", label: "Closed", count: closedCount },
+                { key: "closed", label: "Paused or closed", count: closedCount },
               ]}
             />
 
@@ -299,6 +339,11 @@ export function ProjectsManager({
           </div>
 
           {listError ? <FormNotice tone="error" className="mb-4">{listError}</FormNotice> : null}
+          {takenDown.map((p) => (
+            <FormNotice key={p.id} tone="error" className="mb-4">
+              Findtern took down &ldquo;{p.projectName}&rdquo;: {p.takenDownReason || "no reason recorded"}. Candidates can&apos;t see it. Contact support to have it restored.
+            </FormNotice>
+          ))}
 
           {filtered.length === 0 ? (
             <Surface className="px-6 py-10 text-center">
@@ -322,7 +367,8 @@ export function ProjectsManager({
               <ul className="divide-y divide-ink-100">
                 {filtered.map((p) => {
                   const skills = (p.skills as string[] | null) ?? [];
-                  const open = isProjectOpen(p.status);
+                  const state = listingState(p);
+                  const open = state === "open";
                   const mode = MODE_LABEL[p.locationType ?? ""] ?? "Work mode not set";
                   const place = [p.city, p.state].filter(Boolean).join(", ");
                   const meta = [
@@ -350,7 +396,7 @@ export function ProjectsManager({
                         )}
                       </p>
                       <div className="max-lg:col-start-2 max-lg:row-start-1">
-                        <Pill tone={open ? "live" : "closed"}>{open ? "Open" : "Closed"}</Pill>
+                        <Pill tone={open ? "live" : state === "taken_down" ? "waiting" : "closed"}>{STATE_LABEL[state]}</Pill>
                       </div>
                       <div className="flex items-center justify-end gap-1 max-lg:col-span-2 max-lg:justify-start">
                         {open ? (
@@ -363,12 +409,14 @@ export function ProjectsManager({
                           label={`More actions for ${p.projectName}`}
                           items={[
                             { label: "Edit project", onSelect: () => openEdit(p), icon: <Pencil /> },
-                            {
-                              label: open ? "Close project" : "Reopen project",
-                              onSelect: () => toggleStatus(p),
-                              icon: <Briefcase />,
-                              disabled: busyId === p.id,
-                            },
+                            ...(state === "open"
+                              ? [{ label: "Pause project", onSelect: () => changeStatus(p, PAUSED_PROJECT_STATUS), icon: <Pause />, disabled: busyId === p.id }]
+                              : state === "paused"
+                                ? [{ label: "Resume project", onSelect: () => changeStatus(p, "active"), icon: <Play />, disabled: busyId === p.id }]
+                                : []),
+                            ...(state === "open" || state === "paused"
+                              ? [{ label: "Close project for good", onSelect: () => changeStatus(p, FINAL_PROJECT_STATUS), icon: <Briefcase />, disabled: busyId === p.id }]
+                              : []),
                             { label: "Delete project", onSelect: () => deleteProject(p), icon: <Trash2 />, destructive: true, disabled: busyId === p.id },
                           ]}
                         />
@@ -391,22 +439,48 @@ export function ProjectsManager({
         <SheetContent side="right" className="w-full overflow-y-auto p-0 sm:max-w-xl">
           <SheetHeader className="border-b border-ink-100 px-6 py-5">
             <SheetTitle className="text-xl font-semibold text-ink-900">
-              {editing ? "Edit project" : "New project"}
+              {editing ? "Edit project" : reviewing ? "Review before you publish" : "New project"}
             </SheetTitle>
             <SheetDescription className="text-sm text-ink-600">
-              Candidates are matched on the skills, work mode and place you set here.
+              {reviewing
+                ? "This is what candidates will see. It goes live as soon as you publish."
+                : "Candidates are matched on the skills, work mode and place you set here."}
             </SheetDescription>
           </SheetHeader>
 
           <form onSubmit={handleSave} noValidate className="px-6 pb-6 pt-5">
             {saveError ? <FormNotice tone="error" className="mb-5">{saveError}</FormNotice> : null}
-            <ProjectFields values={form} set={setField} errors={errors} companyPlace={companyPlace} idPrefix="sheet" />
+            {reviewing ? (
+              <ListingReview form={form} description={description} />
+            ) : (
+              <ProjectFields
+                values={form}
+                set={setField}
+                errors={errors}
+                companyPlace={companyPlace}
+                idPrefix="sheet"
+                description={{
+                  value: description,
+                  onChange: (v) => {
+                    setDescription(v);
+                    setDescriptionError("");
+                  },
+                  onBlur: () => setDescriptionError(projectDescriptionError(description) ?? ""),
+                  error: descriptionError,
+                }}
+              />
+            )}
             {/* Left-aligned, primary first. (The chat launcher steps aside
                 while a sheet is open, so no right padding is needed for it.) */}
             <div className="sticky bottom-0 -mx-6 mt-8 flex items-center gap-2 border-t border-ink-100 bg-white px-6 py-4">
               <button type="submit" disabled={saving} className={buttonClass({ variant: "primary", size: "md" })}>
-                {saving ? "Saving…" : editing ? "Save changes" : "Create project"}
+                {saving ? (reviewing ? "Publishing…" : "Saving…") : editing ? "Save changes" : reviewing ? "Publish listing" : "Review listing"}
               </button>
+              {reviewing ? (
+                <button type="button" onClick={() => setReviewing(false)} disabled={saving} className={buttonClass({ variant: "light", size: "md" })}>
+                  Edit details
+                </button>
+              ) : null}
               {/* On a phone the drawer's own close button does this. */}
               <button
                 type="button"
@@ -419,6 +493,52 @@ export function ProjectsManager({
           </form>
         </SheetContent>
       </Sheet>
+    </div>
+  );
+}
+
+/** The listing as candidates will read it, shown once before a new project goes live. */
+function ListingReview({ form, description }: { form: ProjectDraft; description: string }) {
+  const remote = form.locationType === "remote";
+  const place = [form.city, form.state].filter(Boolean).join(", ");
+  const rows: [string, string][] = [
+    ["Role", form.projectName.trim()],
+    ["Work mode", MODE_LABEL[form.locationType] ?? form.locationType],
+    ...(remote || !place ? [] : ([["Place", place]] as [string, string][])),
+    ["Runs for", scopeLabel(form.scopeOfWork)],
+    ["Full-time path", form.fullTimeOffer ? "Yes" : "No"],
+  ];
+  return (
+    <div className="space-y-6">
+      <dl className="divide-y divide-ink-100 rounded-apple-md border border-ink-200/80">
+        {rows.map(([label, value]) => (
+          <div key={label} className="grid grid-cols-[7rem_minmax(0,1fr)] gap-3 px-4 py-3 text-sm">
+            <dt className="text-ink-600">{label}</dt>
+            <dd className="min-w-0 break-words font-medium text-ink-900">{value}</dd>
+          </div>
+        ))}
+      </dl>
+      <div>
+        <h3 className="text-sm font-medium text-ink-800">Skills</h3>
+        <ul className="mt-2 flex flex-wrap gap-1.5">
+          {form.skills.map((skill) => (
+            <li key={skill}>
+              <Pill tone="neutral">{skill}</Pill>
+            </li>
+          ))}
+        </ul>
+      </div>
+      <div>
+        <h3 className="text-sm font-medium text-ink-800">What the work involves</h3>
+        {description.trim() ? (
+          <p className="mt-2 max-w-prose whitespace-pre-line text-pretty text-sm leading-relaxed text-ink-700">{description.trim()}</p>
+        ) : (
+          <p className="mt-2 text-sm text-ink-600">No description. You can add one later by editing the project.</p>
+        )}
+      </div>
+      <FormNotice tone="info">
+        Your company name stays hidden from candidates until you hire. Findtern may take down a listing that breaks the rules, and tells you why.
+      </FormNotice>
     </div>
   );
 }

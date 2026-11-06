@@ -84,6 +84,15 @@ export default async function PublicRoleDetail({ params }: { params: Promise<{ i
               </div>
             ) : null}
 
+            {role.description ? (
+              <div className="mt-10">
+                <h2 className="text-base font-semibold tracking-[-0.01em] text-ink-900">About the work</h2>
+                <p className="text-pretty leading-relaxed whitespace-pre-line text-ink-700">
+                  {role.description}
+                </p>
+              </div>
+            ) : null}
+
             {skills.length > 0 ? (
               <div className="mt-10">
                 <h2 className="text-base font-semibold tracking-[-0.01em] text-ink-900">What they are looking for</h2>
@@ -103,7 +112,7 @@ export default async function PublicRoleDetail({ params }: { params: Promise<{ i
                 {[
                   "Your profile is what companies search. Everything you have filled in is what they can see.",
                   "When a company is interested, they send you an offer rather than an application form.",
-                  "You read the offer, and you decide. Companies cannot apply on your behalf and cannot contact you directly until you accept.",
+                  "You read the offer, and you decide. Companies cannot apply on your behalf. They can message you only once they have sent you an offer, and your phone, email and links stay hidden until you are hired.",
                   "Accepting starts the interview booking, your timesheet, and your stipend.",
                 ].map((text, i) => (
                   <li key={i} className="flex gap-3">

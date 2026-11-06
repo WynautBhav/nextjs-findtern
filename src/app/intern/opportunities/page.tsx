@@ -6,12 +6,14 @@ import { Search } from "lucide-react";
 import { EmptyScene, FilterTabs, PageHead, Surface } from "@/components/app/primitives";
 import { controlClass } from "@/components/intern/onboarding/control-class";
 import { InternRoleCard, MODE } from "@/components/intern/role-card";
+import { SaveRoleButton } from "@/components/intern/save-role-button";
 import { proposalStatus } from "@/components/app/status";
 import { isHiredProposal } from "@/lib/hire-status";
 import { toArray } from "@/lib/journey";
 import { readSkillRatings } from "@/lib/onboarding";
 import { requireRole } from "@/lib/auth";
 import { loadInternData, openProjects } from "@/lib/intern-data";
+import { savedProjectIds } from "@/lib/saved-roles";
 
 import { LockedRoles, rolesGate } from "./_gate";
 
@@ -44,7 +46,7 @@ export default async function InternOpportunities({
   const mode = rawMode && Object.hasOwn(MODE, rawMode) ? rawMode : "all";
   const session = await requireRole("intern");
 
-  const [data, all] = await Promise.all([loadInternData(session.uid), openProjects(60, { strict: true })]);
+  const [data, all, saved] = await Promise.all([loadInternData(session.uid), openProjects(60, { strict: true }), savedProjectIds(session.uid)]);
   const extra = (data.onboarding?.extraData ?? {}) as Record<string, unknown>;
   const mine = new Set(readSkillRatings(data.onboarding?.skills, extra).map((s) => s.name.toLowerCase().trim()));
   const gate = await rolesGate(session.uid, data);
@@ -60,12 +62,15 @@ export default async function InternOpportunities({
   const applied = new Set(data.proposals.filter((p) => isHiredProposal(p) || proposalStatus(p.status).tone !== "closed").map((p) => p.projectId).filter(Boolean));
   // shortcut: filters the newest 60 in memory, move into the query if the list grows past that.
   const needle = q.toLowerCase();
+  // How many of a role's skills the candidate has. Roles are listed best match first; the list
+  // arrives newest first and the sort is stable, so ties stay newest first.
+  const overlap = (r: (typeof all)[number]) => toArray<string>(r.skills).filter((s) => mine.has(s.toLowerCase().trim())).length;
   const rows = all.filter(
     (r) =>
       (mode === "all" || r.locationType?.toLowerCase() === mode) &&
       (!needle ||
         [r.projectName, r.scopeOfWork, r.city, ...toArray<string>(r.skills)].some((v) => v?.toLowerCase().includes(needle))),
-  );
+  ).sort((a, b) => overlap(b) - overlap(a));
   const filtered = Boolean(q) || mode !== "all";
   const hrefFor = (key: string) => {
     const sp = new URLSearchParams();
@@ -78,7 +83,7 @@ export default async function InternOpportunities({
     <div>
       <PageHead
         title="Open roles"
-        lede="Companies send offers to the profiles they like. There is nothing to apply to, so keep your profile sharp."
+        lede="Companies send offers to the profiles they like. There is nothing to apply to: save the roles you want and keep your profile sharp."
       />
 
       {all.length === 0 ? (
@@ -135,11 +140,25 @@ export default async function InternOpportunities({
             />
           ) : (
             <Surface as="ul" className="divide-y divide-ink-100 overflow-hidden">
-              {rows.map((role) => (
-                <li key={role.id}>
-                  <InternRoleCard role={role} considered={applied.has(role.id)} mine={mine} />
-                </li>
-              ))}
+              {rows.map((role) => {
+                const total = toArray<string>(role.skills).length;
+                return (
+                  <li key={role.id} className="flex items-start">
+                    <div className="min-w-0 flex-1">
+                      <InternRoleCard role={role} considered={applied.has(role.id)} mine={mine} />
+                    </div>
+                    <div className="flex shrink-0 flex-col items-end gap-0.5 pr-3 pt-3 lg:pr-4">
+                      <SaveRoleButton projectId={role.id} projectName={role.projectName} initialSaved={saved.has(role.id)} />
+                      {total > 0 ? (
+                        <span className="nums text-xs text-text-subtle">
+                          Matches {overlap(role)} of {total}
+                          <span className="sr-only"> skills</span>
+                        </span>
+                      ) : null}
+                    </div>
+                  </li>
+                );
+              })}
             </Surface>
           )}
         </div>
