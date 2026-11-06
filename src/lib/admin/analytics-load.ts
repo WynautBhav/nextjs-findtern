@@ -25,7 +25,7 @@ export function analyticsRange(params: Record<string, string | undefined>): { si
  */
 export async function loadAnalytics(range: { since: Date | null; until: Date | null }) {
   const db = getDb();
-  const [interns, onboarding, employers, projects, proposals, interviews, employerPayments, internPayments] = await Promise.all([
+  const [interns, onboarding, employers, projects, proposals, interviews, employerPayments, internPayments, collegeBatches] = await Promise.all([
     db
       .select({ id: schema.users.id, firstName: schema.users.firstName, lastName: schema.users.lastName, createdAt: schema.users.createdAt })
       .from(schema.users)
@@ -101,6 +101,15 @@ export async function loadAnalytics(range: { since: Date | null; until: Date | n
       })
       .from(schema.internPayments)
       .where(inArray(schema.internPayments.status, ["paid"])),
+    db
+      .select({
+        amountMinor: schema.collegeSeatBatches.amountMinor,
+        status: schema.collegeSeatBatches.status,
+        paidAt: schema.collegeSeatBatches.paidAt,
+        createdAt: schema.collegeSeatBatches.createdAt,
+      })
+      .from(schema.collegeSeatBatches)
+      .where(eq(schema.collegeSeatBatches.status, "paid")),
   ]);
 
   // Paid either way legacy records it: a paid intern_payments row or the flag.
@@ -126,6 +135,7 @@ export async function loadAnalytics(range: { since: Date | null; until: Date | n
     interviews,
     employerPayments,
     internPayments,
+    collegeBatches,
   };
   return computeAnalytics(input);
 }

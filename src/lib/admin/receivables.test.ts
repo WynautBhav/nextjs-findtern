@@ -84,3 +84,36 @@ test("timestamps are dated by India day against a month window", () => {
   assert.equal(got("2026-07-31T18:29:59Z"), 1);
   assert.equal(got("2026-07-31T18:30:00Z"), 0);
 });
+
+test("college seat batches count as money received; paid college withdrawals as money out; pending and void do not", () => {
+  const input: ReceivablesInput = {
+    since: new Date("2026-01-01T00:00:00Z"),
+    until: new Date("2027-01-01T00:00:00Z"),
+    employerName: () => "Acme",
+    internName: () => "Asha",
+    scoreOf: () => 0,
+    activationFeeMinor: 249_900,
+    proposals: [],
+    employerPayments: [],
+    internPayments: [],
+    unpaidProfiles: [],
+    payouts: [],
+    collegeName: () => "IIT X",
+    collegeBatches: [
+      { id: "b1", collegeId: "c1", status: "paid", amountMinor: 24_000_000, invoiceNumber: "061126-1", referenceId: "UTR1", paidAt: new Date("2026-11-05T06:00:00Z"), createdAt: null },
+      { id: "b2", collegeId: "c1", status: "pending", amountMinor: 8_000_000, invoiceNumber: null, referenceId: null, paidAt: null, createdAt: new Date("2026-11-05T06:00:00Z") },
+      { id: "b3", collegeId: "c1", status: "void", amountMinor: 8_000_000, invoiceNumber: null, referenceId: null, paidAt: null, createdAt: new Date("2026-11-05T06:00:00Z") },
+    ],
+    collegePayouts: [
+      { id: "p1", collegeId: "c1", status: "paid", amountMinor: 1_500_000, referenceId: "UTR9", paidAt: new Date("2026-11-06T06:00:00Z"), createdAt: null },
+      { id: "p2", collegeId: "c1", status: "requested", amountMinor: 500_000, referenceId: null, paidAt: null, createdAt: new Date("2026-11-06T06:00:00Z") },
+    ],
+  };
+  const both = computeReceivables(input, { receivables: "both", payables: "both" });
+  assert.equal(both.totals.receivedMinor, 24_000_000);
+  assert.equal(both.totals.paidOutMinor, 1_500_000);
+  assert.deepEqual(both.receivables.map((r) => [r.source, r.companyName]), [["college", "IIT X"]]);
+  const candidateOnly = computeReceivables(input, { receivables: "candidate", payables: "candidate" });
+  assert.equal(candidateOnly.totals.receivedMinor, 0);
+  assert.equal(candidateOnly.totals.paidOutMinor, 0);
+});

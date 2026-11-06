@@ -3,7 +3,7 @@ import { acceptedLineCharge } from "../accepted-charge.ts";
 import { monthlyDues } from "../dues.ts";
 import { parseOffer } from "../offer.ts";
 import { toInrMinor } from "./money.ts";
-import { istDayKey } from "./revenue.ts";
+import { collegeBatchReceipts, istDayKey } from "./revenue.ts";
 import { addMonthsIso, stipendDues } from "./stipend-dues.ts";
 
 /**
@@ -26,7 +26,8 @@ import { addMonthsIso, stipendDues } from "./stipend-dues.ts";
 export type MoneyRow = {
   id: string;
   date: string;
-  source: "company" | "candidate";
+  /** "college": seat sales to a college (money in) and withdrawals paid to one (money out). */
+  source: "company" | "candidate" | "college";
   status: "received" | "due" | "upcoming" | "unpaid" | "paid" | "pending";
   description: string;
   companyName: string | null;
@@ -51,6 +52,10 @@ export type ReceivablesInput = {
   internPayments: { id: string; internId: string; paymentId: string | null; status: string; amountMinor: number; currency: string; paidAt: Date | null; createdAt: Date | null }[];
   unpaidProfiles: { userId: string; createdAt: Date | null }[];
   payouts: { id: string; internId: string; status: string; amountMinor: number; currency: string; referenceId: string | null; paidAt: Date | null; createdAt: Date | null; raw: unknown; kind?: string }[];
+  /** College seat batches (any status; only paid ones are money received) and college withdrawals (only paid ones are money out). */
+  collegeBatches?: { id: string; collegeId: string; status: string; amountMinor: number; invoiceNumber: string | null; referenceId: string | null; paidAt: Date | null; createdAt: Date | null; seats?: number }[];
+  collegePayouts?: { id: string; collegeId: string; status: string; amountMinor: number; referenceId: string | null; paidAt: Date | null; createdAt: Date | null }[];
+  collegeName?: (id: string) => string;
 };
 
 const day = (d: Date | string | null | undefined) => {
@@ -93,6 +98,24 @@ export function computeReceivables(input: ReceivablesInput, filter: { receivable
           amountMinor: p.amountMinor,
           currency: p.currency,
           reference: p.paymentId ?? p.orderId,
+        }),
+      );
+    }
+
+    for (const b of collegeBatchReceipts(input.collegeBatches ?? [])) {
+      if (!receivedIn(b.at ? new Date(b.at) : null)) continue;
+      receivables.push(
+        row({
+          id: `college_batch:${b.id}`,
+          date: istDayKey(b.at)!,
+          source: "college",
+          status: "received",
+          description: `College seat batch${b.invoiceNumber ? ` (invoice ${b.invoiceNumber})` : ""}`,
+          companyName: input.collegeName?.(b.collegeId) ?? "College",
+          candidateName: null,
+          amountMinor: b.amountMinor,
+          currency: "INR",
+          reference: b.referenceId ?? b.invoiceNumber,
         }),
       );
     }
@@ -187,7 +210,28 @@ export function computeReceivables(input: ReceivablesInput, filter: { receivable
     }
   }
 
-  // Payables are all candidate-side (stipends); a "company" filter empties them.
+  // Withdrawals paid to a college: money out on the company side (a college is a customer, like an employer).
+  if (filter.payables !== "candidate") {
+    for (const p of input.collegePayouts ?? []) {
+      if (p.status !== "paid" || !receivedIn(p.paidAt ?? p.createdAt)) continue;
+      payables.push(
+        row({
+          id: `college_payout:${p.id}`,
+          date: istDayKey(p.paidAt ?? p.createdAt)!,
+          source: "college",
+          status: "paid",
+          description: "College withdrawal paid",
+          companyName: input.collegeName?.(p.collegeId) ?? "College",
+          candidateName: null,
+          amountMinor: p.amountMinor,
+          currency: "INR",
+          reference: p.referenceId,
+        }),
+      );
+    }
+  }
+
+  // Stipends are candidate-side; a "company" filter empties them.
   if (filter.payables !== "company") {
     for (const p of input.payouts) {
       const scheduled = (p.raw as Record<string, unknown> | null)?.scheduledFor;

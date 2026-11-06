@@ -71,8 +71,9 @@ export default async function AdminMoneyReportPage({ searchParams }: { searchPar
   // Same definition as the Reports page (loadCollected), so the delta is not a different "received".
   // Like with like: the source chips pick the matching side, and a company/candidate/status filter has no comparable base.
   const rowFiltered = Boolean(rowFilter.company || rowFilter.candidate || rowFilter.status);
-  const sideOf = (c: { receivedMinor: number; employerMinor: number; internMinor: number }) =>
-    receivablesFilter === "company" ? c.employerMinor : receivablesFilter === "candidate" ? c.internMinor : c.receivedMinor;
+  // College seat sales sit on the company side (a college is a customer, like an employer).
+  const sideOf = (c: { receivedMinor: number; employerMinor: number; internMinor: number; collegeMinor: number }) =>
+    receivablesFilter === "company" ? c.employerMinor + c.collegeMinor : receivablesFilter === "candidate" ? c.internMinor : c.receivedMinor;
   const prevReceived =
     prev && !rowFiltered && (params.period !== "all" || params.from || params.to)
       ? await loadCollected(prev).then(sideOf).catch(() => null)

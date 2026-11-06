@@ -323,7 +323,60 @@ async function exportProposals(search: string, params: Record<string, string>) {
   return csvResponse(toCsv(kept, columns), csvFilename("proposals"));
 }
 
+/** Paid college seat batches, with the GST split the seat invoice prints (`?type=payments&source=college`). */
+async function exportCollegeBatches(search: string, params: Record<string, string>) {
+  const b = schema.collegeSeatBatches;
+  const parts = [
+    eq(b.status, params.status || "paid"),
+    searchAny([sql`${schema.colleges.name}`, sql`coalesce(${b.invoiceNumber}, '')`, sql`coalesce(${b.referenceId}, '')`], search),
+    ...dateRangeConditions(b.paidAt, params),
+  ].filter(Boolean) as SQL[];
+  const rows = await getDb()
+    .select({
+      invoiceNumber: b.invoiceNumber,
+      batchId: b.id,
+      referenceId: b.referenceId,
+      method: b.method,
+      college: schema.colleges.name,
+      gstin: schema.colleges.gstin,
+      state: schema.colleges.state,
+      seats: b.seats,
+      amountMinor: b.amountMinor,
+      status: b.status,
+      paidAt: b.paidAt,
+      createdAt: b.createdAt,
+    })
+    .from(b)
+    .innerJoin(schema.colleges, eq(schema.colleges.id, b.collegeId))
+    .where(and(...parts))
+    .orderBy(desc(b.createdAt))
+    .limit(MAX_ROWS);
+  const split = (r: (typeof rows)[number]) => splitGst(r.amountMinor, placeOfSupply({ currency: "INR", gstin: r.gstin, state: r.state }), sellerStateCode());
+  const columns: CsvColumn<(typeof rows)[number]>[] = [
+    { header: "Source", value: () => "College" },
+    { header: "Invoice number", value: (r) => r.invoiceNumber ?? "" },
+    { header: "Batch ID", value: (r) => r.batchId },
+    { header: "Payment reference", value: (r) => r.referenceId ?? "" },
+    { header: "Method", value: (r) => r.method ?? "" },
+    { header: "College", value: (r) => r.college },
+    { header: "Seats", value: (r) => String(r.seats) },
+    { header: "Amount", value: (r) => (r.amountMinor / 100).toFixed(2) },
+    { header: "Currency", value: () => "INR" },
+    { header: "Amount before GST", value: (r) => (split(r).baseMinor / 100).toFixed(2) },
+    { header: "GST", value: (r) => ((r.amountMinor - split(r).baseMinor) / 100).toFixed(2) },
+    { header: "CGST", value: (r) => (split(r).cgstMinor / 100).toFixed(2) },
+    { header: "SGST", value: (r) => (split(r).sgstMinor / 100).toFixed(2) },
+    { header: "IGST", value: (r) => (split(r).igstMinor / 100).toFixed(2) },
+    { header: "Buyer GSTIN", value: (r) => r.gstin ?? "" },
+    { header: "Status", value: (r) => r.status },
+    { header: "Paid at (IST)", value: (r) => formatIstStamp(r.paidAt) },
+    { header: "Created at (IST)", value: (r) => formatIstStamp(r.createdAt) },
+  ];
+  return csvResponse(toCsv(rows, columns), csvFilename("college-payments"));
+}
+
 async function exportPayments(search: string, params: Record<string, string>) {
+  if (params.source === "college") return exportCollegeBatches(search, params);
   const db = getDb();
 
   const where = searchAny(

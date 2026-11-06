@@ -106,7 +106,7 @@ export default async function AdminAnalyticsPage({ searchParams }: { searchParam
           {
             label: "Revenue",
             value: formatMoney(a.totals.revenueMinor, "INR", { zeroLabel: "\u20b90" }),
-            note: `Companies ${formatMoney(a.totals.revenueEmployersMinor, "INR", { zeroLabel: "\u20b90" })} \u00b7 Fees ${formatMoney(a.totals.revenueInternsMinor, "INR", { zeroLabel: "\u20b90" })}`,
+            note: `Companies ${formatMoney(a.totals.revenueEmployersMinor, "INR", { zeroLabel: "\u20b90" })} \u00b7 Fees ${formatMoney(a.totals.revenueInternsMinor, "INR", { zeroLabel: "\u20b90" })} \u00b7 Colleges ${formatMoney(a.totals.revenueCollegesMinor, "INR", { zeroLabel: "\u20b90" })}`,
           },
           { label: "Avg time to hire", value: a.rates.avgHireTimeDays == null ? "-" : `${a.rates.avgHireTimeDays} days`, note: "Offer sent to employer paid" },
         ]}

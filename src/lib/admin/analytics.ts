@@ -38,6 +38,8 @@ export type AnalyticsInput = {
   interviews: { internId: string; employerId: string; status: string; createdAt: Date | null }[];
   employerPayments: { employerId?: string; amountMinor: number; currency: string; status: string; paidAt: Date | null; createdAt: Date | null }[];
   internPayments: { amountMinor: number; currency: string; status: string; paidAt: Date | null; createdAt: Date | null }[];
+  /** Paid college seat batches count as revenue like employer orders. */
+  collegeBatches?: { amountMinor: number; status: string; paidAt: Date | null; createdAt: Date | null }[];
 };
 
 const pct = (n: number, d: number) => (d > 0 ? Number(((n / d) * 100).toFixed(1)) : 0);
@@ -72,6 +74,7 @@ export function computeAnalytics(input: AnalyticsInput) {
     rows.filter((r) => r.status === "paid" && inRange(r.paidAt ?? r.createdAt)).reduce((s, r) => s + toInrMinor(r.amountMinor, r.currency), 0);
   const revenueEmployersMinor = sumInr(input.employerPayments);
   const revenueInternsMinor = sumInr(input.internPayments);
+  const revenueCollegesMinor = sumInr((input.collegeBatches ?? []).map((b) => ({ ...b, currency: "INR" })));
 
   const hireDays = hiresIn
     .map((p) => (p.createdAt && p.hiredAt ? (new Date(p.hiredAt).getTime() - new Date(p.createdAt).getTime()) / 86_400_000 : null))
@@ -116,9 +119,10 @@ export function computeAnalytics(input: AnalyticsInput) {
     pendingProposals: proposalsIn.filter((p) => ["sent", "draft", "interview_scheduled", "under_review"].includes(p.status)).length,
     hires: hiresIn.length,
     fullTimeHires: hiresIn.filter(isFullTime).length,
-    revenueMinor: revenueEmployersMinor + revenueInternsMinor,
+    revenueMinor: revenueEmployersMinor + revenueInternsMinor + revenueCollegesMinor,
     revenueEmployersMinor,
     revenueInternsMinor,
+    revenueCollegesMinor,
   };
 
   const rates = {

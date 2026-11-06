@@ -118,3 +118,31 @@ test("net = received - paid out - owed", () => {
   assert.equal(netMinor({ receivedMinor: 10_000, paidOutMinor: 3_000, owedMinor: 2_500 }), 4_500);
   assert.equal(netMinor({ receivedMinor: 0, paidOutMinor: 100, owedMinor: 50 }), -150);
 });
+
+// ── college seat batches are money received (B-3) ──────────────────────
+
+test("paid college batches become IST receipts; pending and void are ignored", async () => {
+  const { collegeBatchReceipts, bucketByIstDay, bucketByIstMonth } = await import("./revenue.ts");
+  const rows = [
+    { id: "b1", collegeId: "c1", status: "paid", amountMinor: 24000000, invoiceNumber: "061126-1", paidAt: new Date("2026-11-05T19:00:00Z") }, // 6 Nov 00:30 IST
+    { id: "b2", collegeId: "c1", status: "pending", amountMinor: 8000000, paidAt: null, createdAt: new Date("2026-11-05T10:00:00Z") },
+    { id: "b3", collegeId: "c2", status: "void", amountMinor: 8000000, paidAt: null },
+    { id: "b4", collegeId: "c2", status: "paid", amountMinor: 8000000, paidAt: null, createdAt: new Date("2026-10-31T20:00:00Z") }, // legacy: no paid_at, created 1 Nov IST
+  ];
+  const receipts = collegeBatchReceipts(rows);
+  assert.deepEqual(receipts.map((r) => r.id), ["b1", "b4"]);
+  const byDay = bucketByIstDay(receipts);
+  assert.equal(byDay.get("2026-11-06")?.totalMinor, 24000000);
+  assert.equal(byDay.get("2026-11-01")?.totalMinor, 8000000);
+  assert.equal(bucketByIstMonth(receipts).get("2026-11")?.totalMinor, 32000000);
+});
+
+test("totals with college included: employer + intern + college receipts add up", async () => {
+  const { collegeBatchReceipts, bucketByIstMonth } = await import("./revenue.ts");
+  const employer = [{ at: new Date("2026-11-02T06:00:00Z"), amountMinor: 1000000, currency: "INR" }];
+  const intern = [{ at: new Date("2026-11-03T06:00:00Z"), amountMinor: 249900, currency: "INR" }];
+  const college = collegeBatchReceipts([{ id: "b1", collegeId: "c1", status: "paid", amountMinor: 8000000, paidAt: new Date("2026-11-04T06:00:00Z") }]);
+  const month = bucketByIstMonth([...employer, ...intern, ...college]).get("2026-11");
+  assert.equal(month?.totalMinor, 1000000 + 249900 + 8000000);
+  assert.equal(month?.count, 3);
+});

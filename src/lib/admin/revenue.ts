@@ -147,6 +147,20 @@ export const bucketByIstDay = (rows: Receipt[]) => bucketBy(rows, istDayKey);
 /** Receipts summed (INR) and counted per India month. */
 export const bucketByIstMonth = (rows: Receipt[]) => bucketBy(rows, istMonthKey);
 
+/** A college seat batch as stored (the loader selects these columns). */
+export type CollegeBatchRow = { id: string; collegeId: string; status: string; amountMinor: number; invoiceNumber?: string | null; referenceId?: string | null; paidAt?: When | null; createdAt?: When | null };
+
+/**
+ * Paid college seat batches as receipts (INR, at the paid moment, `created_at` when a legacy row has no
+ * `paid_at`). Pending and void batches are not money received. College seat sales are customers' money
+ * like employer orders: they count in Collected, the Reports ledger, analytics revenue and the Payments CSV.
+ */
+export function collegeBatchReceipts(rows: CollegeBatchRow[]): (Receipt & { id: string; collegeId: string; invoiceNumber: string | null; referenceId: string | null })[] {
+  return rows
+    .filter((r) => r.status === PAID_STATUS)
+    .map((r) => ({ id: r.id, collegeId: r.collegeId, at: r.paidAt ?? r.createdAt, amountMinor: r.amountMinor, currency: "INR", invoiceNumber: r.invoiceNumber ?? null, referenceId: r.referenceId ?? null }));
+}
+
 /** Zero-filled series over `keys`, so a chart has no gaps. Keys outside `keys` are dropped. */
 export function fillBuckets(keys: string[], buckets: ReadonlyMap<string, Bucket>): (Bucket & { key: string })[] {
   return keys.map((key) => ({ key, totalMinor: buckets.get(key)?.totalMinor ?? 0, count: buckets.get(key)?.count ?? 0 }));

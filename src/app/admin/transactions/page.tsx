@@ -29,7 +29,7 @@ import { RevenueChart, VolumeBars, type RevenuePoint, type VolumePoint } from "@
  * params, so the file is the population on screen (ADM-07).
  */
 
-type View = "employer" | "intern" | "payouts";
+type View = "employer" | "intern" | "college" | "payouts";
 
 const money = (minor: number, currency: string) => formatMoney(minor, currency === "USD" ? "USD" : "INR", { zeroLabel: false });
 
@@ -59,7 +59,7 @@ async function loadCharts(): Promise<{ revenue: RevenuePoint[]; volume: VolumePo
 export default async function AdminTransactionsPage({ searchParams }: { searchParams?: Promise<RawSearchParams> }) {
   const params = flattenParams(await searchParams);
   // `?view=payouts` and `?source=intern` are the old links; both still land.
-  const view: View = params.view === "payouts" ? "payouts" : params.source === "intern" ? "intern" : "employer";
+  const view: View = params.view === "payouts" ? "payouts" : params.source === "intern" ? "intern" : params.source === "college" ? "college" : "employer";
 
   const [metrics, charts] = await Promise.all([
     loadMetrics().catch((error) => {
@@ -74,7 +74,7 @@ export default async function AdminTransactionsPage({ searchParams }: { searchPa
 
   let table: React.ReactNode;
   try {
-    table = view === "payouts" ? await PayoutsTable({ params }) : view === "intern" ? await InternFeesTable({ params }) : await EmployerPaymentsTable({ params });
+    table = view === "payouts" ? await PayoutsTable({ params }) : view === "intern" ? await InternFeesTable({ params }) : view === "college" ? await CollegeBatchesTable({ params }) : await EmployerPaymentsTable({ params });
   } catch (error) {
     console.error("[admin/transactions] list failed", error);
     table = (
@@ -90,8 +90,8 @@ export default async function AdminTransactionsPage({ searchParams }: { searchPa
         title="Transactions"
         subtitle={
           metrics
-            ? `${formatMoney(metrics.inflowMinor, "INR", { zeroLabel: "₹0" })} received, ${formatMoney(metrics.outflowMinor, "INR", { zeroLabel: "₹0" })} paid out to interns, ${formatNumber(metrics.pendingPayouts)} ${metrics.pendingPayouts === 1 ? "payout" : "payouts"} waiting for a bank reference.`
-            : "Money in from employers and interns, and money out to interns."
+            ? `${formatMoney(metrics.inflowMinor, "INR", { zeroLabel: "₹0" })} received, ${formatMoney(metrics.outflowMinor, "INR", { zeroLabel: "₹0" })} paid out to interns and colleges, ${formatNumber(metrics.pendingPayouts)} ${metrics.pendingPayouts === 1 ? "payout" : "payouts"} waiting for a bank reference.`
+            : "Money in from employers, interns and colleges, and money out to interns and colleges."
         }
         action={
           <ButtonLink href="/admin/reports/money" variant="outline" size="sm" className={ADMIN_PILL_SECONDARY}>
@@ -109,7 +109,7 @@ export default async function AdminTransactionsPage({ searchParams }: { searchPa
             hint={`${formatNumber(metrics.inflowCount)} paid receipts · USD at ₹100/$`}
           />
           <StatCard
-            label="Paid out to interns"
+            label="Paid out"
             value={formatMoney(metrics.outflowMinor, "INR", { zeroLabel: "₹0" })}
             hint={`${formatNumber(metrics.outflowPaid)} of ${formatNumber(metrics.outflowTotal)} payouts settled`}
           />
@@ -135,7 +135,7 @@ export default async function AdminTransactionsPage({ searchParams }: { searchPa
         <Panel>
           <PanelHeader
             title="Revenue collected"
-            description="Each point is one month's paid employer orders plus intern fees, in INR. A dip means less money arrived that month, not refunds."
+            description="Each point is one month's paid employer orders, intern fees and college seat batches, in INR. A dip means less money arrived that month, not refunds."
           />
           <PanelBody>{charts ? <RevenueChart data={charts.revenue} /> : <ChartError />}</PanelBody>
         </Panel>
@@ -155,6 +155,7 @@ export default async function AdminTransactionsPage({ searchParams }: { searchPa
           items={[
             { key: "employer", href: "/admin/transactions", label: "Employer payments" },
             { key: "intern", href: "/admin/transactions?source=intern", label: "Intern fees" },
+            { key: "college", href: "/admin/transactions?source=college", label: "College seats" },
             { key: "payouts", href: "/admin/transactions?view=payouts", label: "Intern payouts" },
           ]}
         />
@@ -256,6 +257,74 @@ async function EmployerPaymentsTable({ params }: { params: Record<string, string
         { header: "Amount", numeric: true, sort: "amount", cell: (row) => <span className="font-semibold">{money(row.amountMinor, row.currency)}</span> },
         { header: "Gateway", cell: (row) => gatewayLabel(row.gateway) },
         { header: "Order ID", cell: (row) => <span className="nums break-all text-[0.8125rem] text-text-subtle">{row.orderId}</span> },
+        { header: "Status", cell: (row) => <StatusBadge value={row.status} /> },
+        { header: "Date", numeric: true, sort: "date", cell: (row) => formatDate((row.paidAt ?? row.createdAt)?.toISOString() ?? null) },
+      ]}
+    />
+  );
+}
+
+/** Paid and pending college seat batches: the college side of the ledger (money in). */
+async function CollegeBatchesTable({ params }: { params: Record<string, string> }) {
+  const db = getDb();
+  const req = parsePageRequest(params);
+  const b = schema.collegeSeatBatches;
+  const conditions = [
+    searchAny([sql`${schema.colleges.name}`, sql`coalesce(${b.invoiceNumber}, '')`, sql`coalesce(${b.referenceId}, '')`], req.search),
+    params.status ? eq(b.status, params.status) : undefined,
+    periodStart(params.period) ? gte(b.createdAt, periodStart(params.period)!) : undefined,
+    ...dateRangeConditions(b.createdAt, params),
+  ].filter(Boolean) as SQL[];
+  const where = conditions.length ? and(...conditions) : undefined;
+  const [rows, [totalRow]] = await Promise.all([
+    db
+      .select({
+        id: b.id,
+        collegeId: b.collegeId,
+        college: schema.colleges.name,
+        city: schema.colleges.city,
+        seats: b.seats,
+        amountMinor: b.amountMinor,
+        status: b.status,
+        invoiceNumber: b.invoiceNumber,
+        referenceId: b.referenceId,
+        paidAt: b.paidAt,
+        createdAt: b.createdAt,
+      })
+      .from(b)
+      .innerJoin(schema.colleges, eq(schema.colleges.id, b.collegeId))
+      .where(where)
+      .orderBy(order(params, b.amountMinor, b.createdAt))
+      .limit(req.perPage)
+      .offset(req.offset),
+    db.select({ c: count() }).from(b).innerJoin(schema.colleges, eq(schema.colleges.id, b.collegeId)).where(where),
+  ]);
+  const page = toPage(rows, Number(totalRow?.c ?? 0), req.page, req.perPage);
+
+  return (
+    <DataTable
+      basePath="/admin/transactions"
+      params={params}
+      page={page.page}
+      pages={page.pages}
+      total={page.total}
+      perPage={page.perPage}
+      rows={rows}
+      noun="college seat batches"
+      caption="College seat batches"
+      searchPlaceholder="Search college, invoice or reference…"
+      exportHref={exportHref("payments", { ...params, source: "college" })}
+      extraControls={<DateRangeForm params={params} />}
+      filters={[
+        { key: "status", label: "Status", options: [{ value: "paid", label: "Paid" }, { value: "pending", label: "Pending" }, { value: "void", label: "Void" }] },
+        { key: "period", label: "Period", options: PERIOD_OPTIONS },
+      ]}
+      empty={{ title: "No college seat batches match", body: "Clear a filter or widen the dates.", action: { href: "/admin/transactions?source=college", label: "Clear filters" } }}
+      columns={[
+        { header: "College", cell: (row) => <IdentityCell name={row.college} id={row.collegeId} sub={row.city ?? ""} href={`/admin/colleges/${row.collegeId}`} /> },
+        { header: "Seats", numeric: true, cell: (row) => row.seats.toLocaleString("en-IN") },
+        { header: "Amount", numeric: true, sort: "amount", cell: (row) => <span className="font-semibold">{money(row.amountMinor, "INR")}</span> },
+        { header: "Invoice", cell: (row) => <span className="nums text-[0.8125rem] text-text-subtle">{row.invoiceNumber ?? "-"}</span> },
         { header: "Status", cell: (row) => <StatusBadge value={row.status} /> },
         { header: "Date", numeric: true, sort: "date", cell: (row) => formatDate((row.paidAt ?? row.createdAt)?.toISOString() ?? null) },
       ]}

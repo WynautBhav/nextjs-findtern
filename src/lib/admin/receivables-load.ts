@@ -18,7 +18,7 @@ export async function loadReceivables(
   filter: { receivables: MoneyFilter; payables: MoneyFilter },
 ) {
   const db = getDb();
-  const [employers, interns, onboarding, proposals, employerPayments, internPayments, payouts, feeMinor] = await Promise.all([
+  const [employers, interns, onboarding, proposals, employerPayments, internPayments, payouts, feeMinor, collegeBatches, collegePayouts, colleges] = await Promise.all([
     db.select({ id: schema.employers.id, name: schema.employers.companyName }).from(schema.employers).where(realEmployers()),
     db
       .select({ id: schema.users.id, firstName: schema.users.firstName, lastName: schema.users.lastName })
@@ -75,7 +75,11 @@ export async function loadReceivables(
       .from(schema.internPayments),
     db.select().from(schema.internPayouts),
     getInternActivationFeeMinor(),
+    db.select().from(schema.collegeSeatBatches).where(eq(schema.collegeSeatBatches.status, PAID_STATUS)),
+    db.select().from(schema.collegePayouts).where(eq(schema.collegePayouts.status, PAID_STATUS)),
+    db.select({ id: schema.colleges.id, name: schema.colleges.name }).from(schema.colleges),
   ]);
+  const collegeNames = new Map(colleges.map((c) => [c.id, c.name]));
 
   const employerName = new Map(employers.map((e) => [e.id, e.name]));
   const realIds = new Set(employers.map((e) => e.id));
@@ -103,6 +107,9 @@ export async function loadReceivables(
       internPayments,
       unpaidProfiles,
       payouts,
+      collegeBatches,
+      collegePayouts,
+      collegeName: (id) => collegeNames.get(id) ?? "College",
     },
     filter,
   );
@@ -111,33 +118,38 @@ export async function loadReceivables(
 // ----------------------------------------------------------------------
 // The one money layer, over the database (definitions: lib/admin/revenue.ts).
 
-/** Every paid employer order and intern fee as (source, inr_minor, received_at); test employers excluded. */
+/** Every paid employer order, intern fee and college seat batch as (source, inr_minor, received_at); test employers excluded. */
 function paidReceipts(): SQL {
   const ep = schema.employerPayments;
   const ip = schema.internPayments;
+  const csb = schema.collegeSeatBatches;
   return sql`(
     SELECT 'employer' AS source, ${inrMinorSql(ep.amountMinor, ep.currency)} AS inr_minor, ${receivedAtSql(ep.paidAt, ep.createdAt)} AS received_at
       FROM ${ep} WHERE ${ep.status} = ${PAID_STATUS} AND ${realEmployerId(ep.employerId)}
     UNION ALL
     SELECT 'intern', ${inrMinorSql(ip.amountMinor, ip.currency)}, ${receivedAtSql(ip.paidAt, ip.createdAt)}
       FROM ${ip} WHERE ${ip.status} = ${PAID_STATUS}
+    UNION ALL
+    SELECT 'college', ${csb.amountMinor}, ${receivedAtSql(csb.paidAt, csb.createdAt)}
+      FROM ${csb} WHERE ${csb.status} = ${PAID_STATUS}
   ) receipts`;
 }
 
 const within = (since: Date | null, until: Date | null): SQL => sql`${since ? sql`received_at >= ${utcSql(since)}` : sql`true`} AND ${until ? sql`received_at < ${utcSql(until)}` : sql`true`}`;
 
-export type Collected = { receivedMinor: number; receivedCount: number; employerMinor: number; internMinor: number };
+export type Collected = { receivedMinor: number; receivedCount: number; employerMinor: number; internMinor: number; collegeMinor: number };
 
 /** Money received (paid rows, INR) with received_at in [since, until); null bounds are open. */
 export async function loadCollected(range: { since?: Date | null; until?: Date | null } = {}): Promise<Collected> {
-  const { rows } = await getDb().execute<{ total: string | number; n: string | number; employer: string | number; intern: string | number }>(sql`
+  const { rows } = await getDb().execute<{ total: string | number; n: string | number; employer: string | number; intern: string | number; college: string | number }>(sql`
     SELECT coalesce(sum(inr_minor), 0)::bigint AS total,
            count(*)::int AS n,
            coalesce(sum(inr_minor) FILTER (WHERE source = 'employer'), 0)::bigint AS employer,
-           coalesce(sum(inr_minor) FILTER (WHERE source = 'intern'), 0)::bigint AS intern
+           coalesce(sum(inr_minor) FILTER (WHERE source = 'intern'), 0)::bigint AS intern,
+           coalesce(sum(inr_minor) FILTER (WHERE source = 'college'), 0)::bigint AS college
       FROM ${paidReceipts()} WHERE ${within(range.since ?? null, range.until ?? null)}`);
   const r = rows[0];
-  return { receivedMinor: Number(r?.total ?? 0), receivedCount: Number(r?.n ?? 0), employerMinor: Number(r?.employer ?? 0), internMinor: Number(r?.intern ?? 0) };
+  return { receivedMinor: Number(r?.total ?? 0), receivedCount: Number(r?.n ?? 0), employerMinor: Number(r?.employer ?? 0), internMinor: Number(r?.intern ?? 0), collegeMinor: Number(r?.college ?? 0) };
 }
 
 /** Received in the last `days` India days including today (the "last 7 days" window). */
@@ -155,7 +167,7 @@ export async function loadReceiptBuckets(unit: "month" | "day", count: number, n
   return new Map(rows.map((r) => [r.key, { totalMinor: Number(r.total), count: Number(r.n) }]));
 }
 
-/** Payouts to interns: settled (paid) and still pending, INR. */
+/** Payouts to interns (settled and pending) plus paid college withdrawals, INR. College requests still open are not counted: the wallet, not this ledger, holds them. */
 export async function loadPayoutTotals() {
   const p = schema.internPayouts;
   const { rows } = await getDb().execute<{ paid: string | number; paid_n: string | number; pending: string | number; pending_n: string | number; n: string | number }>(sql`
@@ -166,11 +178,15 @@ export async function loadPayoutTotals() {
            count(*)::int AS n
       FROM ${p}`);
   const r = rows[0];
+  // Withdrawals paid to colleges are money out too (the ledger of record is college_payouts, status 'paid').
+  const cp = schema.collegePayouts;
+  const { rows: cRows } = await getDb().execute<{ paid: string | number; n: string | number }>(sql`
+    SELECT coalesce(sum(${cp.amountMinor}), 0)::bigint AS paid, count(*)::int AS n FROM ${cp} WHERE ${cp.status} = ${PAID_STATUS}`);
   return {
-    paidOutMinor: Number(r?.paid ?? 0),
-    paidOutCount: Number(r?.paid_n ?? 0),
+    paidOutMinor: Number(r?.paid ?? 0) + Number(cRows[0]?.paid ?? 0),
+    paidOutCount: Number(r?.paid_n ?? 0) + Number(cRows[0]?.n ?? 0),
     pendingMinor: Number(r?.pending ?? 0),
     pendingCount: Number(r?.pending_n ?? 0),
-    totalCount: Number(r?.n ?? 0),
+    totalCount: Number(r?.n ?? 0) + Number(cRows[0]?.n ?? 0),
   };
 }
