@@ -6,7 +6,7 @@ production build (`next start`) and a local Postgres:
 intern signup → onboarding → free activation → AI interview request → admin
 score → employer signup → company + project → interview booked → intern picks
 a slot → offer → intern accepts → month-end checkout (free) → hired → timesheet
-→ employer approves → admin payout → intern's stipend page.
+→ employer approves → employer pays month 1 → admin payout → intern's earnings page (20 steps).
 
 `playwright` (the library) drives the browser and `node:test` runs the steps.
 There is no `@playwright/test`.
@@ -41,8 +41,8 @@ its own accounts and does not use them.
    through the public `GET /api/users/exists/phone/:phone`, then deletes it. If
    the server cannot see the row, it is not on the test DB, and the run stops
    before any test writes anything.
-5. Runs `e2e/critical-path.e2e.mjs` with `node --test`, stops the server, and
-   exits non-zero on any failure.
+5. Runs `e2e/critical-path.e2e.mjs` with `node --test --test-concurrency=1`,
+   stops the server, and exits non-zero on any failure.
 
 | Env | Default | |
 | --- | --- | --- |
@@ -54,8 +54,8 @@ its own accounts and does not use them.
 These are fixed in the server's env: `NODE_ENV=production`, `MAIL_MODE=log`,
 `PAYMENTS_MODE=free` and `SCHEDULERS=off`. These are set empty:
 `RAZORPAY_KEY_ID/SECRET`, `RAZORPAY_WEBHOOK_SECRET`, `SMTP_HOST/USER/PASS/FROM`,
-`GOOGLE_CLIENT_ID/SECRET`, `DEEPSEEK_API_KEY`, `STORAGE_BUCKET`, `TRUST_PROXY`
-and `VERCEL`. `SESSION_SECRET` and `SIGNING_SECRET` are 32+ characters,
+`GOOGLE_CLIENT_ID/SECRET`, `DEEPSEEK_API_KEY`, `INCRUITER_WEBHOOK_SECRET`,
+`STORAGE_BUCKET`, `TRUST_PROXY` and `VERCEL`. `SESSION_SECRET` and `SIGNING_SECRET` are 32+ characters,
 `PUBLIC_ORIGIN=http://localhost:3300`, and `UPLOAD_ROOT` and
 `LEGACY_UPLOAD_ROOT` point at `e2e/.artifacts/`.
 
@@ -101,16 +101,17 @@ message says the UI failed and that state was recovered.
 | 7 | Employer signs up | UI `/employer/signup` | `employers` row, argon2 password; code from "Verify your company email" |
 | 8 | Company setup + project | API `PATCH /api/employer/:id`, `POST …/projects` | `/employer/onboarding` form renders; country/website stored; `onboarding_completed`; employer dashboard renders without bouncing back to onboarding |
 | 9 | Interview booked, 3 slots | API `POST …/interviews` | candidate page hides the intern's surname; `pending` row with 3 slots (11:00 IST stored as 05:30 UTC); invitation mail to the intern without the company name |
-| 10 | Intern picks a slot | UI `/intern/interviews` "Choose this" | page hides the company; `scheduled` + `selected_slot`; intern mail has an `.ics` attached; employer gets "Candidate confirmed a slot" |
+| 10 | Intern picks a slot | UI `/intern/interviews`: select an offered time, then "Book …" | page hides the company; `scheduled` + `selected_slot`; intern mail has an `.ics` attached; employer gets "Candidate confirmed a slot" |
 | 11 | Interview takes place | SQL time travel, then API feedback | status `completed`, feedback in notes |
 | 12 | Offer sent | API `POST …/proposals` | `sent`, INR; `offer_details.hourlyRate` × 100 matches an active INR plan's paise (so it is stored in rupees); `monthlyAmount = hourlyRate × monthlyHours`; proposal mail to the intern without the company name |
 | 13 | Intern accepts | UI `/intern/proposals/[id]` "Accept this offer" → terms → "Yes, accept" | page hides the company; status `accepted`; employer gets "Candidate decision update" |
-| 14 | Monthly checkout, free mode | UI `/employer/checkout` "Monthly" → "Complete for free (test mode)" | proposal `hired` + `hired_at`; `employer_payments` free row `paid`, `paymentMode=hiring_fee`; month 1 is then paid as a due month before the payout; intern "You're hired!" mail names the company (positive control); employer "Payment received" |
+| 14 | Checkout, post-paid plan, free mode | UI `/employer/checkout` "…charge due 2 days before the month's pay date" → "Complete for free (test mode)" | page lists "Hiring charge (one-time)" as the only amount due now and "Month 1 · due …"; proposal `hired` + `hired_at`; `employer_payments` free row `paid`, `paymentMode=hiring_fee`; intern "You're hired!" mail names the company (positive control); employer "Payment received" |
 | 15 | No pre-hire leak | mail log | none of the intern's emails before `hired_at` (at least 4: code, invitation, scheduled, proposal) contain the company name |
 | 16 | Timesheet filled + submitted | SQL time travel, then API | `/intern/timesheets` renders; `POST` creates a draft for the first engagement month; every day set (Present on weekdays, Fixed off on weekends); submit → `submitted`; employer gets "Timesheet submitted" |
-| 17 | Employer approves | UI `/employer/timesheets/[id]` "Approve" | `approved` + `approved_at`; intern notification |
-| 18 | Payout created + marked paid | API `POST …/payouts`, `POST …/mark-paid` | `/admin/payouts` renders; payout row `paid` with the bank reference and amount; intern gets "Stipend transferred" |
-| 19 | Earnings page | UI `/intern/earnings` | shows ₹12,345 |
+| 17 | Employer approves | UI `/employer/timesheets/[id]` "Approve timesheet" → "Yes, approve and lock" | `approved` + `approved_at`; intern notification |
+| 18 | Employer pays month 1 | API `POST …/payment/razorpay/order` (`mode: monthly`) | month 1 is now due (start date was moved back); a paid order carries the proposal in `dueProposalIds`. The payout below is gated on it |
+| 19 | Payout created + marked paid | API `POST …/payouts`, `POST …/mark-paid`, after the intern adds bank details | `/admin/payouts` renders; payout row `paid` with the bank reference and amount; intern gets "Stipend transferred" |
+| 20 | Earnings page | UI `/intern/earnings` | shows ₹7,345 |
 
 ### Why some steps are API-driven
 
@@ -125,7 +126,7 @@ message says the UI failed and that state was recovered.
   test exercises those routes directly.
 - **Timesheet (16).** The grid has a cell for every day of the month. The test
   makes the grid's own PATCH and submit calls.
-- **Payout (18).** The admin payout dialog is likewise under redesign.
+- **Payout (19).** The admin payout dialog is likewise under redesign.
 
 ### Time travel (test DB only)
 
@@ -139,3 +140,24 @@ story moves the clock in the test DB rather than waiting:
   logged only after it starts and submitted only after it ends
   (`timesheetPeriod`, the submit route). `offer_details.startDate` is moved 40
   days back.
+
+## Other suites in this folder
+
+The critical path above is the only one `npm run e2e` runs, and CI runs it
+(`.github/workflows/ci.yml`, against a throwaway `findtern_e2e` database). The
+rest are run by hand or through the QA harness (`docs/qa/README.md`) and also
+refuse a non-local database, except the staging journey.
+
+| Script | Run with | What it covers |
+| --- | --- | --- |
+| `qa.mjs`, `qa-serve.mjs`, `seed-situations.mjs` | `npm run qa`, `qa:serve`, `qa:seed` | QA harness: its own server on `QA_PORT` (3500) and seeded data situations |
+| `crawl.e2e.mjs`, `keyboard.e2e.mjs`, `motion.e2e.mjs`, `slow3g.e2e.mjs`, `lighthouse.mjs`, `baseline.mjs` | `npm run qa -- <step>` | Every route per role and width (errors, overflow, axe), keyboard-only pass, reduced motion, slow network, Lighthouse, baseline screenshots |
+| `admin.e2e.mjs` | `npm run e2e:admin` | Admin console as the seeded super admin (cleans up what it creates) |
+| `college-partners.e2e.mjs`, `college-money.e2e.mjs`, `college-real-onboarding.mjs` | `npm run test:e2e:college`, `test:e2e:college-money`, or `node` | College drives, seat batches, bank and withdrawals, the full officer-to-student story |
+| `pay-race.mjs` | `node e2e/pay-race.mjs` (QA server with `PAYMENTS_TEST_BUTTON=1`) | Double-submit safety: one order, one hire, one invoice |
+| `retest-qa001.mjs`, `retest-qa002.mjs` | `node …` | Regressions for QA-001 (campus call without a join link) and QA-002 (hydration under reduced motion) |
+| `staging-journey.e2e.mjs`, `bugsheet9-public.mjs` | `node --test …`, `node …` | The hiring journey and public pages on the **deployed staging site** (Vercel preview + Neon staging only; never the real domain). Needs admin credentials in the environment |
+
+`e2e/lib/` holds the shared helpers: `env.mjs` (the loopback-only database rule),
+`db.mjs`, `mail.mjs` (reads `logs/mail/`), `browser.mjs`, `session.mjs`,
+`personas.mjs`, `routes.mjs`, `qa-server.mjs`, `one-window.mjs` and `staging.mjs`.

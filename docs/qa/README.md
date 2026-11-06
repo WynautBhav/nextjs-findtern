@@ -19,7 +19,7 @@ carry a real person, an address, a port, or a credential.
 | `docs/qa/bug-sheet-7-results.md` | pass / fail for every row of bug sheet 7 |
 | `.github/workflows/ci.yml` | tsc, lint, test, test:security, migrate, seed, build, e2e on a Postgres service |
 
-`npm run e2e` (the 19-step critical path) is separate and unchanged; see
+`npm run e2e` (the 20-step critical path) is separate and unchanged; see
 `e2e/README.md`. CI runs it.
 
 ## One-time setup

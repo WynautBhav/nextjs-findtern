@@ -4,349 +4,361 @@
 
 ### Pre-screened interns. Hired by the hour. Billed only for approved work.
 
-The platform behind **[findtern.in](https://findtern.in)**: the public site, candidate app,<br/>
-hiring app, placement-officer console and admin console, in one Next.js codebase.
-
-<br/>
+The platform behind **[findtern.in](https://findtern.in)**: the public site, the intern app, the employer app,
+the college (TPO) console and the admin console, in one Next.js codebase.
 
 ![Next.js](https://img.shields.io/badge/Next.js-16-000000?style=for-the-badge&logo=nextdotjs&logoColor=white)
 ![React](https://img.shields.io/badge/React-19-149ECA?style=for-the-badge&logo=react&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?style=for-the-badge&logo=typescript&logoColor=white)
 ![Tailwind](https://img.shields.io/badge/Tailwind-v4-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white)
 ![Postgres](https://img.shields.io/badge/Postgres-Drizzle-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)
-![Razorpay](https://img.shields.io/badge/Payments-Razorpay-0C2451?style=for-the-badge&logo=razorpay&logoColor=white)
-
-<br/>
-
-**101 screens** · **137 API routes** · **67 unit-test files** · **strict TypeScript** · **one `npm run build`**
-
-<br/>
-
-[What it does](#-what-it-does) ·
-[Architecture](#-architecture) ·
-[Run it locally](#-run-it-locally) ·
-[Going live](#-going-live) ·
-[How we keep it safe](#-how-we-keep-it-safe) ·
-[Project map](#-project-map)
 
 </div>
 
-<br/>
+**Contents:** [Read this first](#read-this-first) · [Business rules](#business-rules) · [The five areas](#the-five-areas) ·
+[Architecture](#architecture) · [Run it locally](#run-it-locally) · [Scripts](#scripts) · [Database and migrations](#database-and-migrations) ·
+[Tests](#tests) · [Environment variables](#environment-variables) · [Deploy](#deploy) · [Security model](#security-model) ·
+[Project map](#project-map) · [Working on it](#working-on-it)
 
-## ✨ What it does
+## Read this first
 
-Findtern sits between companies that need interns and students who want real work. Every candidate is
-screened (coding, aptitude, communication and an AI interview) before an employer ever sees them. That
-**Findtern Score** sets the price, so employers pay for proven skill and candidates get paid for the hours they log.
+- `AGENTS.md` and `CLAUDE.md`: the working rules for this repo (this is **not** the Next.js you know; read
+  `node_modules/next/dist/docs/` before changing framework-level code).
+- `ARCHITECTURE.md` and `SPECS.md`: the locked plan. `SPECS.md` replaced `DESIGN.md`. Read both before changing code.
+- `docs/`: audits, QA reports, launch checklist, owner questions. `docs/qa/README.md` describes the QA harness.
 
-<table>
-<tr>
-<td width="33%" valign="top">
+**Hard rule for anyone touching data:** never point a script, test or dev server at the live production database
+(the `DATABASE_URL` in the main checkout's `.env`). Use a local Postgres or the Neon staging database, and pass
+`DATABASE_URL` explicitly on every database command so nothing falls back to a `.env` file.
 
-### 🎓 Candidates
-- Sign up with an email code
-- Eight-step profile: academics, skills, languages, documents, photo, intro video
-- Pay the activation fee, unlock the AI interview
-- Receive offers, pick interview slots, get Google Meet links
-- Log hours on a daily timesheet
-- See every stipend payout as it lands
+## Business rules
 
-</td>
-<td width="33%" valign="top">
+These are enforced on the server. The numbers live in the files named, so change them there, not in the UI.
 
-### 🏢 Employers
-- Search scored candidates by skill, city and score
-- Shortlist, compare side by side, book interviews in any timezone
-- Send offers priced from the candidate's band
-- Pay upfront (10% off) or monthly, with promo codes
-- GST-correct tax invoices (CGST + SGST or IGST)
-- Approve or correct timesheets, make full-time offers
+### Findtern Score and price bands (`src/lib/score.ts`)
 
-</td>
-<td width="33%" valign="top">
+The score is out of 10: the mean of four admin-entered ratings (communication, coding, aptitude, AI interview), rounded to
+one decimal, or a score imported in bulk (`src/lib/admin/ratings.ts`). Bands are half-open, so exactly 6.0 is Skilled and
+exactly 8.0 is Assured.
 
-### 🛠 Admins
-- One dashboard of what needs attention today
-- 360° views of every candidate and company
-- **View as** any user (read-only)
-- Pricing, promo codes, fees and payouts
-- Website content: blog, FAQs, testimonials, partners, terms, NDA
-- Roles and permissions, broadcasts, reports, CSV exports
+| Band (plan name) | Score | Default hourly rate on the offer |
+|---|---|---|
+| Standard (Espresso) | 0 to under 6 | ₹0 |
+| Skilled (Cappuccino) | 6 to under 8 | ₹100 |
+| Assured (Latte) | 8 to 10 | ₹200 |
 
-</td>
-</tr>
-</table>
+Rates are admin-editable in `pricing_plans` (the code values are the fallback). USD is derived at ₹100 = $1
+(`src/lib/currency.ts`); only INR rows are authored.
 
-### 🎓 Placement officers
+- **+1 per successful internship, max 10.** A hire completes when every engagement month has an approved timesheet
+  (`src/lib/admin/complete-internship.ts`). That adds 1 to the score (capped at 10) once, and creates one pending
+  Findtern-paid completion bonus payout for the intern (₹2,000 / ₹2,500 / ₹3,000 by the score before the +1;
+  `src/lib/completion-bonus.ts`). Full-time conversions and early-ended hires earn none.
+- **Placement guarantee: 6 months** from the AI interview (`GUARANTEE_MONTHS` in `src/lib/guarantee.ts`). A miss is an offer
+  the intern declined, or one that lapsed unanswered past its start day. More than 3 misses (the 4th) end the guarantee.
+  Declined or lapsed full-time offers and offers closed by an admin never count.
 
-- Upload and track a college roster
-- Run dated campus drives and invite employers
-- Follow student interview and offer progress without editing student data
-- Monitor drive calls and participation from a dedicated console
+### What an employer sees and pays (`src/lib/checkout.ts`, `billing-plan.ts`)
 
-<details>
-<summary><b>The full journey, end to end</b></summary>
+- **An employer never sees what the intern is paid.** No stipend, completion bonus or payout figure is sent to the
+  employer's browser, shown in employer pages, emails, invoices, FAQ, pricing copy or chatbot answers. Employers see only
+  what they pay Findtern. Guarded by `src/lib/employer-no-intern-pay.test.ts` and `employer-redaction.test.ts`; also
+  `toEmployerProposal` in `src/lib/employer-proposal-view.ts`.
+- Until hire, employers see candidates masked (initials, no photo, no surname); the full name unlocks after hire.
+- **One-time hiring charge** on every internship hire, any band: ₹5,000 / $50 (or what the offer was priced with),
+  billed with the first payment.
+- **Pay plans.** Score 6 and above: pay the hiring charge now, then each month's charge is due 2 days before that month's pay
+  date, payable from 15 days before it ("postpaid"). Under 6: the whole engagement is paid upfront. Upfront has no discount; the
+  two plans differ only in timing. Hires paid on the older pay-at-start monthly plan keep it. The plan is decided by the oldest
+  paid order that names the hire.
+- **Full-time offer:** 8.33% of annual CTC, upfront only, no separate hiring charge.
+- **Promo codes** apply only to an upfront payment. An employer code can never discount the whole engagement to zero.
+- **Dues and reminders.** Month k falls due 2 days before the intern's pay date for it. Reminder emails go out at 15, 12, 9, 6,
+  3, 2 and 1 days before, on the due day, and once as "overdue" 3 days after (`src/lib/payment-reminders.ts`). Each send is
+  de-duplicated by key, so a cron re-run never mails twice.
+- **Payouts.** Admins create payouts per intern and mark them paid with a bank reference; a stipend cannot be marked paid
+  without the intern's bank details on file, and the payout is gated on the employer having paid that month
+  (`src/app/admin/payouts`, `src/lib/admin/payout-run.ts`, `mark-paid-rules.ts`).
 
-<br/>
+### Intern activation fee (`src/lib/platform-settings.ts`)
 
-```mermaid
-sequenceDiagram
-    autonumber
-    actor C as Candidate
-    participant F as Findtern
-    actor E as Employer
-    C->>F: Sign up, build profile, pay activation fee
-    F->>C: AI interview → Findtern Score (sets the price band)
-    E->>F: Search, shortlist, book interview (3 slots)
-    F->>C: Invite email
-    C->>F: Picks a slot
-    F-->>C: Meet link + calendar invite
-    F-->>E: Meet link + calendar invite
-    E->>F: Sends offer (priced server-side from the band)
-    C->>F: Accepts (terms + NDA)
-    E->>F: Pays via Razorpay (upfront or monthly)
-    F-->>C: You're hired 🎉
-    loop Every period
-        C->>F: Timesheet
-        E->>F: Approve
-        F-->>C: Stipend transferred
-    end
-```
+- **₹2,499, GST-inclusive** (`intern_activation_fee_minor`, editable by admins). Paying it unlocks the AI interview.
+- **Waived by an active college code.** A college's TPO code is a 100% promo code. It works only while the college is active
+  and a partner, only for students who confirm they are 18+, and only for students not already in a different college.
+  Using it verifies the student with that college.
 
-</details>
+### College (TPO) seats and money (`src/lib/college/money.ts`)
 
-<br/>
+- **Seats are ₹800 per student, GST-inclusive.** Admin picks only the seat count (1 to 5,000 per batch).
+- **The code's cap equals paid seats.** A new college starts at 0; marking a batch paid raises the cap to total paid seats.
+  The cap can never exceed paid seats or fall below seats already used. There are no free seats.
+- Partner colleges earn a wallet credit per completed internship by a verified member (₹500 / ₹1,000 / ₹1,500 by the score
+  before the +1; `src/lib/college/wallet.ts`), withdrawable to a bank account the college adds.
 
-## 🧭 Architecture
+### Invoices and GST (`src/lib/gst.ts`, `invoice-number.ts`, `invoice-lines.ts`)
+
+- Listed INR prices include 18% GST; tax is backed out of the total (total / 1.18).
+- Place of supply decides the split: same state as the seller (Rajasthan) gives 9% CGST + 9% SGST, another Indian state 18%
+  IGST, buyers outside India (USD) are an export with no GST. The buyer's state comes from GSTIN, then PIN code, then profile.
+- One running invoice serial per Indian financial year (April to March, IST), shared by employer orders, intern fees and
+  college seat batches. The number is assigned once, when a payment is marked paid, and never changes.
+
+## The five areas
+
+| Area | Routes (`src/app/`) | Who | What it does |
+|---|---|---|---|
+| Public site | `(marketing)/`, `blog/`, `(auth)/`, `drive/` | Anyone | Home, pricing, FAQ, employers, interns, guaranteed-internship page, blog, legal pages (employer and intern terms, intern NDA), contact; sign-in, sign-up with email code, password reset. Copy comes from `src/lib/content` accessors (DB first, TS fallback) |
+| Intern | `intern/` | Candidates | Eight-step onboarding, activation, AI interview request, offers and interview slots, timesheets, bank details, earnings, documents, college membership, notifications |
+| Employer | `employer/` | Hiring teams | Company setup, projects, candidate search, shortlist and compare, interviews, offers, cart and checkout, orders and invoices, timesheet approval, full-time offers, campus drives |
+| College / TPO | `college/` | Placement officers | Roster upload, students, drives with employer links, seats and invoices, wallet earnings and withdrawals |
+| Admin | `admin/` | Staff | Dashboard queues, interns (ratings, approval, skills, documents), companies, orders, payouts, transactions, promo codes, colleges, CMS and website content, terms and NDA, reports and CSV exports, messages, notifications, roles, audit log, "View as" (read-only impersonation) |
+
+`src/app/api/` holds the route handlers (`auth`, `intern`, `employer`, `college`, `admin`, `proposals`, `interviews`,
+`timesheets`, `uploads`, `webhooks`, `cron`, and others). There is also `.well-known/security.txt`, `llms.txt`, a sitemap and
+robots routes.
+
+### Roles and permissions
+
+- Session roles are `intern`, `employer`, `admin` and `college` (`src/lib/security/session.ts`).
+- Admin permissions are a fixed catalog in `src/lib/admin/permissions.ts` (for example `interns:read`, `transactions:write`,
+  `cms:write`, `roles:write`), mapped from URL to permission by longest prefix. `*` is Super Admin. `src/proxy.ts` enforces
+  them on every `/admin` page and `/api/admin` call, and re-reads the role's permissions (cached about 30 seconds), so a
+  demoted admin loses access without signing out.
+- Default roles (`src/lib/admin/roles-seed.ts`): Super Admin, Admin, Executive - Accounts, Executive - Operations,
+  Executive - Sales. **Accounts** has `reports:read`, `transactions:read`, `transactions:write` and read-only
+  `interns:read` (to record an offline activation fee). One-time grants live in `roles-grants.ts` and are recorded in
+  `platform_settings`, so a super admin removing one is not undone on the next boot.
+- Nobody can grant more than they hold.
+
+### Audit log
+
+Every sensitive admin action (money, exports, identity reveal, impersonation, pricing, settings, role changes) writes to
+`admin_audit_log` through `src/lib/admin/audit.ts`. `AUDIT_ACTIONS` maps every action to a human label and a test fails if an
+action is written without one. Viewable and exportable under `/admin/audit-log`.
+
+### Sessions and revocation
+
+Sessions are HMAC-signed cookies with a CSRF double-submit token: 12-hour idle window, renewed while active, 30-day hard
+maximum (`src/lib/security/session.ts`, renewed in `src/proxy.ts`). Logout writes the session id to `revoked_sessions`
+(`revokeSession` in `src/lib/account-status.ts`) so a stolen cookie stops working before it expires; expired rows are pruned on
+write. Impersonation sessions last one hour.
+
+## Architecture
 
 ```mermaid
 flowchart LR
     subgraph Browser
-        M[Marketing site]
-        I[Candidate app]
-        EM[Hiring app]
-        A[Admin console]
+        M[Public site]
+        I[Intern app]
+        EM[Employer app]
         C[College console]
+        A[Admin console]
     end
 
-    subgraph Next["Next.js 16 · one Node process"]
-        P[proxy.ts<br/>admin permissions]
-        RSC[Server components<br/>read straight from the DB]
-        API[105 route handlers<br/>requireMutation on every write]
-        J[Schedulers<br/>reminders and nudges]
+    subgraph Next["Next.js 16"]
+        P[proxy.ts<br/>admin permissions, sign-in redirects, session renewal]
+        RSC[Server components<br/>read from the DB]
+        API[Route handlers<br/>requireMutation on every write]
+        J[Schedulers and cron<br/>reminders and nudges]
     end
 
-    DB[(Postgres<br/>shared with the legacy app<br/>during cutover)]
-    FS[[Private file store<br/>signed, expiring links]]
+    DB[(Postgres)]
+    FS[[File store<br/>local private folder or S3]]
 
-    M & I & EM & A & C --> P --> RSC & API
+    M & I & EM & C & A --> P --> RSC & API
     RSC & API & J --> DB
     API --> FS
     API <--> RZ[Razorpay]
-    API --> G[Google<br/>sign-in, Calendar, Meet]
+    API --> G[Google<br/>sign-in, Calendar, Meet, Drive]
     API & J --> SMTP[Email]
 ```
 
-| Layer | Choice | Why |
-|---|---|---|
-| Framework | **Next.js 16** App Router, React 19 | Server components fetch data in place; one deployable for site and apps |
-| Data | **Postgres + Drizzle ORM** | Typed queries, plain-SQL migrations we can read before they run |
-| Auth | argon2id, HMAC-signed session cookie, CSRF double-submit | No auth vendor, no JWT footguns, works behind any proxy |
-| Payments | Razorpay over `fetch` | Two calls and a signature check; no SDK |
-| Google | OAuth, Calendar, Meet over `fetch` | Replaced a 239 MB SDK with about 100 lines |
-| Styling | Tailwind v4 with design tokens in `globals.css` | One source of colour, type and spacing |
-| Motion | GSAP + Motion, reduced-motion aware | Marketing polish without hurting the apps |
+| Layer | Choice |
+|---|---|
+| Framework | Next.js 16 App Router, React 19, TypeScript (strict) |
+| Data | Postgres with Drizzle ORM; plain-SQL migrations in `drizzle/` |
+| Auth | argon2id passwords, signed session cookie, CSRF token, per-IP rate limits |
+| Payments | Razorpay over `fetch`, signed webhook at `/api/webhooks/razorpay` |
+| Google | OAuth, Calendar and Meet, Drive over `fetch` |
+| Email | Nodemailer over SMTP; `MAIL_MODE=log` writes to `logs/mail/` instead |
+| Styling | Tailwind v4, design tokens in `src/app/globals.css`; UI primitives from the Watermelon registry (`components.json`) |
+| Motion | GSAP, Motion and Lenis, reduced-motion aware |
 
-<br/>
+## Run it locally
 
-## 🚀 Run it locally
-
-> **Needs** Node 20+, a local Postgres, and a local `findtern` role.
+Needs Node 20+ and a local Postgres with a `findtern` role (the npm scripts assume
+`postgresql://findtern:findtern_dev@localhost:5432/findtern`).
 
 ```bash
-git clone https://github.com/WynautBhav/nextjs-findtern.git
-cd nextjs-findtern
 npm ci
-cp .env.example .env.local      # fill in what you need; defaults are safe
-npm run db:seed                 # fresh local DB with demo data
-npm run dev                     # → http://localhost:3000
+cp .env.example .env.local      # fill in what you need; see Environment variables
+npm run db:seed                 # generate + apply schema to the LOCAL db, load demo data
+npm run dev                     # http://localhost:3000
 ```
 
-**Demo logins** (password `Findtern@2026`):
+Demo logins (password `Findtern@2026`; local seed data only):
 
 | Role | Email | Sign in at |
 |---|---|---|
-| Candidate | `candidate@findtern.dev` | `/login` |
+| Intern | `candidate@findtern.dev` | `/login` |
 | Employer | `hiring@northwind.dev` | `/employer/login` |
 | Admin | `admin@findtern.dev` | `/admin/login` |
-| Placement officer* | `tpo@jklu.edu.in` | `/college/login` |
+| Placement officer | `tpo@jklu.edu.in` | `/college/login` |
 
-\* Run `npm run db:seed-colleges` after `npm run db:seed` to add the college demo data.
+The officer login exists after `npm run db:seed-colleges`, which adds the college demo data on top of `db:seed`.
 
-> 💡 Locally, **emails are written to `logs/mail/`** instead of being sent, scheduled jobs stay off, and
-> Razorpay is off unless you add **test** keys. You can click anything without notifying a real person.
+Locally, emails are written to `logs/mail/` (not sent), schedulers stay off, and Razorpay is off unless you add test keys.
+`PAYMENTS_MODE=free` completes activation and checkout without Razorpay; `PAYMENTS_TEST_BUTTON=1` adds a "mark as paid" button
+that settles at the real amount. Both stay off with a live Razorpay key unless the host is a known test host (localhost, a
+`*.vercel.app` deployment, or one listed in `STAGING_HOSTS`). Never set either on the real domain.
 
-<details>
-<summary><b>Test against a copy of the live database</b></summary>
+## Scripts
 
-<br/>
-
-```bash
-# one time: let the local role create databases
-sudo -u postgres psql -c 'ALTER ROLE findtern CREATEDB'
-
-# .env.local: LIVE_SSH=root@<server>  LIVE_DB=findtern  LIVE_UPLOADS=/path/to/uploads
-npm run db:pull-live            # read-only dump of live → local findtern_live
-DATABASE_URL=postgresql://findtern:findtern_dev@localhost:5432/findtern_live npm run db:migrate
-npm run db:make-admin you@findtern.in 'YourPassword1'
-```
-
-</details>
-
-### Scripts
+### `package.json`
 
 | Command | What it does |
 |---|---|
-| `npm run dev` | Dev server with hot reload |
-| `npm run build` · `npm start` | Production build and server |
-| `npm test` | Unit tests for pricing, GST, offers, onboarding, college drives and security |
+| `npm run dev` · `build` · `start` | Next dev server, production build, production server |
 | `npm run lint` | ESLint |
-| `npm run db:seed` | Reset the **local** DB and load demo data (refuses anything but localhost) |
-| `npm run db:migrate` | Apply pending migrations; additive, recorded, safe to re-run |
+| `npm test` | Unit tests: `node --test` over `src/lib/**/*.test.ts` and `src/components/**/*.test.ts` |
+| `npm run test:security` | Only `src/lib/security/*.test.ts` |
+| `npm run e2e` | The critical hiring path in a real browser against a local test DB (see `e2e/README.md`) |
+| `npm run e2e:admin` · `test:e2e:college` · `test:e2e:college-money` | Admin console and college suites (they need a running QA server) |
+| `npm run qa` · `qa:serve` · `qa:seed` | QA harness: crawl, keyboard, motion, slow-3G, Lighthouse, baseline; its server; its data situations |
+| `npm run shots` | Full-page screenshots of the signed-in areas |
+| `npm run db:generate` | Generate migration SQL from `src/lib/db/schema.ts` |
+| `npm run db:push` · `db:seed` · `db:reset` | **Destructive**, local only: rebuild the dev DB from the schema, then seed (refuses non-localhost) |
+| `npm run db:seed-colleges` · `db:import-colleges` | College demo data; import the AISHE college directory (`data/colleges/`) |
 | `npm run db:verify` | Row counts plus real logins through the route handlers |
-| `npm run db:pull-live` | Create a local testing copy of production data (never use it as an app database) |
+| `npm run db:migrate` | Apply pending `drizzle/*.sql` files, recorded and safe to re-run |
+| `npm run db:make-admin` | Give yourself an admin login on a local copy |
+| `npm run db:pull-live` | Dump the production database to a local copy. **Do not run it without the owner's explicit go-ahead.** |
+| `npm run db:studio` | Drizzle Studio on the local DB |
 
-**Before every push:** `npx tsc --noEmit` → `npm run lint` → `npm test` → `npm run test:security` → `npm run db:verify` → `npm run build`
+### `scripts/`
 
-<br/>
+`db-push.ts`, `seed.ts`, `seed-colleges.ts`, `import-colleges.ts`, `db-verify.ts`, `migrate.ts`, `legacy-backfill.sql`
+(idempotent fixes `migrate.ts` runs last), `make-admin.ts`, `pull-live.sh`, `upload-legacy-to-s3.ts`,
+`report-lost-completion-bonus.ts` (read-only report), `shots.ts` and `design-shots.mjs` (screenshots), `legacy/`
+(an argon2 compatibility patch for the legacy app).
 
-## 🌍 Going live
+### Before every commit
 
-The new app runs on the Hostinger KVM next to Postgres, behind nginx, on port **3001**. The legacy app keeps
-port **5000** until we're done, so rolling back is a one-line nginx change.
-
-```mermaid
-flowchart LR
-    A[1 · Back up<br/>deploy/backup.sh] --> B[2 · Restore test<br/>row counts compared]
-    B --> C[3 · Rehearse<br/>migrate the restored copy]
-    C --> D[4 · Release<br/>deploy/release.sh]
-    D --> E[5 · Switch nginx<br/>5000 → 3001]
-    E --> F[6 · Team tests<br/>on findtern.in]
-    E -. one line .-> R[↩ Rollback to 5000]
+```bash
+npx tsc --noEmit && npm run lint && npm test && npm run db:verify
 ```
 
-| File | Purpose |
+Add `npm run test:security` and `npm run build` when you touch auth, sessions or anything that affects the build.
+
+## Database and migrations
+
+- Schema: `src/lib/db/schema.ts` (Drizzle). Migrations: `drizzle/0000_…` through `drizzle/0017_revoked_sessions.sql` (there are two
+  `0007_` files; they apply in filename order). `scripts/migrate.ts` reads the folder, applies each file once, records it in
+  `_ft_migrations`, never drops anything, then runs `scripts/legacy-backfill.sql`.
+- Recent additions: college partners and seats (0007, 0008, 0016), promo usage and college codes (0009, 0010), terms acceptance
+  (0011), money checks and college ban (0013, 0014), cleared strike prices (0015), revoked sessions (0017).
+- Workflow: change `schema.ts`, run `npm run db:generate`, **read the generated SQL**, commit it, then run `db:migrate` on the
+  target database with the deploy. Migrations only add.
+- The database was inherited from the legacy app, so some tables hold legacy JSON shapes. Go through `src/lib/offer.ts` for
+  offers and `src/lib/onboarding.ts` for profiles; never read those JSON columns directly.
+- Local databases by convention: dev on `localhost:5432/findtern`, e2e on `localhost:5433/findtern_e2e`, QA on `5435/findtern_qa`.
+
+## Tests
+
+- **Unit** (`npm test`): pricing and bands, checkout, billing plans, dues and reminders, GST and invoices, offers, guarantee,
+  promo and college rules, timesheets, payouts, permissions, audit labels, session lifecycle and revocation, redaction.
+  Pure rules live in files with no database import so `node --test` can run them.
+- **CI** (`.github/workflows/ci.yml`): typecheck, lint, tests, security tests, migrate, seed, build and the e2e critical path on a Postgres service.
+- **E2E and QA** (`e2e/`): browser suites with Playwright and `node:test`. `e2e/README.md` documents the critical path and the
+  safety rules; `docs/qa/README.md` the QA harness. All of them refuse a non-local database, except the staging journey, which
+  is limited to the Neon staging host and a Vercel preview URL.
+
+## Environment variables
+
+Names only. `.env.example` lists each one with a comment; real values stay in untracked `.env*` files or the host's settings.
+
+| Group | Variables |
 |---|---|
-| [`deploy/backup.sh`](deploy/backup.sh) | Dumps the live DB and uploads, **restores the dump** into a scratch DB and compares every table |
-| [`deploy/release.sh`](deploy/release.sh) | Pull `staging` → install → build → migrate → reload PM2 |
-| [`deploy/ecosystem.config.cjs`](deploy/ecosystem.config.cjs) | PM2: one process (schedulers must run exactly once) |
-| [`deploy/nginx-findtern.conf`](deploy/nginx-findtern.conf) | TLS, streaming, 60 MB uploads, rollback line |
-| [`.env.example`](.env.example) | Every setting, grouped and explained |
+| Core | `DATABASE_URL`, `DATABASE_SSL_REJECT_UNAUTHORIZED`, `PUBLIC_ORIGIN`, `SESSION_SECRET`, `SIGNING_SECRET`, `TRUST_PROXY`, `RATE_LIMIT_BYPASS_IPS`, `PASSWORD_UPGRADE`, `TZ` |
+| Payments | `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET`, `PAYMENTS_MODE`, `PAYMENTS_TEST_BUTTON` |
+| Email | `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`, `MAIL_MODE`, `ADMIN_ALERT_EMAIL` |
+| Jobs | `SCHEDULERS` (`on` on exactly one server for the in-process schedulers), `CRON_SECRET` (bearer token for `/api/cron/payment-reminders`) |
+| Google | `GOOGLE_LOGIN`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, `GOOGLE_OAUTH_REDIRECT_URI`, `FINDTERN_GOOGLE_OAUTH_REDIRECT_URI`, `FINDTERN_GOOGLE_TOKEN_OWNER_ID`, `MEET_CALENDAR_ID` |
+| Files | `UPLOAD_ROOT`, `LEGACY_UPLOAD_ROOT`, `STORAGE_BUCKET` (S3; the AWS SDK reads its own `AWS_*` variables) |
+| Invoices | `FINDTERN_LEGAL_NAME`, `FINDTERN_GSTIN`, `FINDTERN_BILLING_ADDRESS`, `FINDTERN_BILLING_EMAIL`, `FINDTERN_BANK_NAME`, `FINDTERN_BANK_ACCOUNT`, `FINDTERN_BANK_IFSC` |
+| Integrations | `DEEPSEEK_API_KEY`, `DEEPSEEK_MODEL` (chatbot), `INCRUITER_WEBHOOK_SECRET` (AI-interview scores), `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`, `NEXT_PUBLIC_VAPID_PUBLIC_KEY` (web push) |
+| Analytics | `NEXT_PUBLIC_GA4_ID`, `NEXT_PUBLIC_GTM_ID`, `NEXT_PUBLIC_META_PIXEL_ID` |
+| Dev and test only | `STAGING_HOSTS`, `STAGING_URL`, `STAGING_DB_HOST`, `STAGING_ALLOW_HOSTS`, `STAGING_LOCAL_DB_URL`, `E2E_PORT`, `E2E_REBUILD`, `E2E_BASE_URL`, `QA_PORT`, `QA_REBUILD`, `QA_GOOGLE`, `SHOTS_ONLY`, `SHOTS_WIDTHS`, `PLAYWRIGHT_CHROMIUM_PATH`, `COLLEGE_DEV_FILE`, `TIMESTAMP_TEST_DATABASE_URL`, `NEON_ENV_FILE` |
 
-<details>
-<summary><b>Production settings checklist</b></summary>
+`PUBLIC_ORIGIN` is required in production (the build refuses to make links to localhost). `SESSION_SECRET` and `SIGNING_SECRET`
+need 32+ random characters.
 
-<br/>
+## Deploy
 
-- `DATABASE_URL`, `PUBLIC_ORIGIN=https://findtern.in`
-- `SESSION_SECRET`, `SIGNING_SECRET` (32+ random characters each)
-- `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET`; webhook → `/api/webhooks/razorpay`
-- `SMTP_*` and `MAIL_MODE=send`
-- `FINDTERN_GSTIN`, `FINDTERN_BILLING_ADDRESS`
-- `UPLOAD_ROOT` (persistent), `LEGACY_UPLOAD_ROOT` (old `uploads/`)
-- `SCHEDULERS=on` on **one** server only
-- `PASSWORD_UPGRADE=off` until the legacy app is retired
+`vercel.json` is the Vercel config:
 
-</details>
+- `buildCommand`: `node --experimental-strip-types scripts/migrate.ts && next build`. **Every build applies pending migrations
+  to the `DATABASE_URL` of that environment**, so check which database an environment points at before deploying.
+- `crons`: `GET /api/cron/payment-reminders` daily at 03:30 UTC (09:00 IST), authorised with `CRON_SECRET`. It sends the
+  payment reminders unless `SCHEDULERS=off`. Region `cle1`.
 
-<br/>
+`deploy/` holds the alternative self-hosted setup on a VPS: `backup.sh` (dump and restore-test), `release.sh` (pull, install,
+build, migrate, reload PM2), `ecosystem.config.cjs` (one PM2 process, because the in-process schedulers must run once) and
+`nginx-findtern.conf`. `docs/launch-checklist.md` has the cutover steps.
 
-## 🛡 How we keep it safe
+After a schema change, run the migration on the target database with the deploy, then smoke-test the key routes on the live URL.
 
-<table>
-<tr><td>
+## Security model
 
-**🔐 Accounts**
-- Passwords hashed with argon2id; legacy passwords upgraded only when it's safe
-- Signed session cookies plus CSRF tokens on every write
-- Deactivated users lose access immediately, not at next login
-- Admin roles enforced on every page and action; nobody can grant more than they hold
+- **Writes.** Every mutating route handler starts with `requireMutation({ req, roles, ownerId? })` from
+  `src/lib/guards-mutation.ts` (session, role, CSRF and ownership in one call), then validates the body with zod. Allowed
+  exceptions: `api/auth/*`, `api/webhooks/*` and the public contact form. The client writes through `csrfFetch`.
+- **Money.** Prices, totals and eligibility are computed on the server. Razorpay signatures are verified; settlement is
+  atomic and idempotent, so one payment hires exactly the offers it paid for, once (advisory locks, unique indexes).
+- **Accounts.** argon2id; rate limits on sign-in, OTP and sign-up; deactivated users lose access immediately; sessions are
+  revocable.
+- **Files.** Identity documents are never in a public folder; links are signed, short-lived and checked against the viewer;
+  per-type size and format limits; content sniffing; path traversal blocked.
+- **Admin.** Permissions on every page and API; audit log; "View as" is read-only and time-limited.
+- **Headers.** A Content-Security-Policy (report-only for now, reports go to `/api/csp-report`) is set in `next.config.ts`.
+- **Never ported from the legacy app:** plaintext passwords, an unauthenticated `/uploads` static folder, the `/api/interns`
+  IDOR.
 
-</td><td>
-
-**💳 Money**
-- Prices are computed on the server, never taken from the browser
-- Razorpay signatures verified; webhooks must be signed
-- Settlement is atomic: a payment hires exactly the offers it paid for, once
-- GST split by place of supply (Rajasthan → CGST + SGST, elsewhere IGST, exports 0)
-
-</td></tr>
-<tr><td>
-
-**📁 Files**
-- Identity documents never sit in a public folder
-- Links are signed, short-lived and checked against the viewer
-- Per-type size and format limits; path traversal blocked
-
-</td><td>
-
-**🗃 Data**
-- During cutover both apps share the live DB, so we read and write the **legacy shapes**
-- Migrations only add; they're recorded and tested against the legacy schema
-- Every backup is restore-tested before anything changes
-
-</td></tr>
-</table>
-
-<br/>
-
-## 🗺 Project map
+## Project map
 
 ```text
 src/
 ├── app/
-│   ├── (marketing)/      Public site: home, pricing, employers, interns, blog, legal
-│   ├── (auth)/           Login, signup, email codes, password reset
-│   ├── intern/           Candidate app
-│   ├── employer/         Hiring app
-│   ├── admin/            Admin console
-│   └── api/              Route handlers (each write starts with requireMutation)
-├── components/           UI by area: app, employer, admin, home, marketing, payments, ui
-├── lib/
-│   ├── offer.ts          The one way to read or write an offer (legacy money shape)
-│   ├── checkout.ts       What an employer pays: per-hire, upfront discount, monthly, full-time
-│   ├── gst.ts            Place of supply and the CGST / SGST / IGST split
-│   ├── onboarding.ts     Candidate profile ⇄ legacy storage shape
-│   ├── payments.ts       Idempotent settlement for checkout and webhooks
-│   ├── notify.ts         In-app notification + email, deduplicated
-│   ├── schedulers.ts     Interview reminders and nudges
-│   ├── admin/            Permissions, CMS collections, CSV, ratings import
-│   ├── security/         Sessions, CSRF, passwords, rate limits, signed URLs, file store
-│   └── content/          Marketing copy, DB first with built-in fallbacks
-└── proxy.ts              Admin permission gate for pages and APIs
-
-drizzle/                  SQL migrations (read them before they run)
-scripts/                  Seed, migrate, live-copy tools, legacy password patch
-deploy/                   Backup, release, PM2 and nginx
+│   ├── (marketing)/    public site          ├── intern/     intern app
+│   ├── (auth)/         sign-in, sign-up      ├── employer/   employer app
+│   ├── blog/ drive/    blog, drive links     ├── college/    TPO console
+│   ├── admin/          admin console         └── api/        route handlers
+├── components/         UI by area: admin, college, employer, intern, home, marketing, payments, ui, watermelon…
+├── lib/                rules and data access (pure files have no DB import so they are unit-testable)
+│   ├── score.ts, checkout.ts, billing-plan.ts, dues.ts, payment-reminders*.ts   pricing, plans, dues
+│   ├── offer.ts, onboarding.ts, proposals.ts                                     legacy-shaped offers and profiles
+│   ├── gst.ts, invoice*.ts, payments.ts, razorpay.ts                             invoices and settlement
+│   ├── promo*.ts, college/                                                       promo and college codes, seats, wallet, drives
+│   ├── employer-timesheets.ts, timesheet-days.ts                                 timesheets
+│   ├── admin/          permissions, roles, audit, payouts, ratings, CMS, reports, CSV
+│   ├── security/       sessions, CSRF, passwords, rate limits, signed URLs, file store
+│   ├── content/        marketing copy (DB first, built-in fallback)
+│   ├── db/             Drizzle schema and client
+│   └── schedulers.ts   in-process interview and notification jobs (SCHEDULERS=on)
+├── instrumentation.ts  starts the schedulers and prints startup warnings
+└── proxy.ts            admin permission gate, sign-in redirects, session renewal
+drizzle/                SQL migrations        scripts/    seed, migrate and tooling
+e2e/                    browser suites + QA   deploy/     VPS backup, release, PM2, nginx
+data/colleges/          AISHE directory       loadtest/   college load tests
+docs/                   audits, QA, plans     vercel.json crons and build command
 ```
 
-<br/>
+## Working on it
 
-## 🤝 Working on it
-
-1. Branch from `master`; keep pull requests small.
-2. New write endpoint? Start it with `requireMutation({ req, roles })`.
-3. Touching offers or profiles? Go through `lib/offer.ts` and `lib/onboarding.ts`; never read the JSON directly.
-4. Schema change? `npm run db:generate`, read the SQL, commit it.
-5. Colours and spacing come from tokens in `src/app/globals.css`.
-6. Run the four checks above before pushing.
-
-<br/>
-
-<div align="center">
-
-**Built for the people who hire and the people who get hired.**
-
-<sub>© Findtern · <a href="https://findtern.in">findtern.in</a></sub>
-
-</div>
+1. Read `ARCHITECTURE.md` and `SPECS.md`, then the code.
+2. New write endpoint? Start it with `requireMutation`. Never hand-roll auth checks.
+3. Marketing pages read through `src/lib/content` accessors, not the data files directly.
+4. Colours and spacing come from tokens in `src/app/globals.css`; use `container-page` and `section-y`; add UI primitives from the Watermelon registry.
+5. Keep employer-facing screens free of intern pay (see Business rules); the regression tests will fail if it leaks.
+6. Schema change: generate, read the SQL, commit, migrate the target database.
+7. Run the checks under [Before every commit](#before-every-commit).
