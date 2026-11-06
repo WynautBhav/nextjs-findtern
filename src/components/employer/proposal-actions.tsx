@@ -78,7 +78,7 @@ export function ProposalActions({
         </Link>
       ) : null}
       {canWithdraw ? (
-        <button type="button" onClick={() => void withdraw()} disabled={busy} className={buttonClass({ variant: "outline", block: true })}>
+        <button type="button" onClick={() => void withdraw()} disabled={busy} className={buttonClass({ variant: "ghost", block: true, className: "text-ink-700 hover:bg-danger-soft hover:text-danger" })}>
           {busy ? <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden /> : null}
           Withdraw offer
         </button>
