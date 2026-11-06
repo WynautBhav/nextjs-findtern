@@ -3,6 +3,8 @@ import { randomBytes } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 
+import { firstPaymentProblem } from "@/lib/college/seat-paid";
+import { paidSeatTotal } from "@/lib/college/seat-gate";
 import { requireMutation } from "@/lib/guards-mutation";
 import { getDb, schema } from "@/lib/db";
 import { hashPassword } from "@/lib/security/password";
@@ -25,6 +27,9 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   const db = getDb();
   const [college] = await db.select({ id: schema.colleges.id }).from(schema.colleges).where(eq(schema.colleges.id, id)).limit(1);
   if (!college) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  // Owner rule: no officer login before the college's first paid batch, so nothing is created, shown or emailed.
+  const awaiting = firstPaymentProblem((await paidSeatTotal(db, id)).batches);
+  if (awaiting) return NextResponse.json({ error: awaiting }, { status: 409 });
 
   const password = `${randomBytes(9).toString("base64url")}-${randomBytes(3).toString("hex")}`;
   const [row] = await db

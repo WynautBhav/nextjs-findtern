@@ -14,6 +14,8 @@ import {
 } from "@/lib/college/scope";
 import { toStudentRow } from "@/lib/college/serialize";
 import { getDb, schema } from "@/lib/db";
+import { AWAITING_FIRST_PAYMENT } from "@/lib/college/seat-paid";
+import { paidSeatTotal } from "@/lib/college/seat-gate";
 import { PageHead, Pill } from "@/components/app/primitives";
 
 export const dynamic = "force-dynamic";
@@ -34,7 +36,7 @@ export default async function CollegeDashboard() {
   const ctx = await requireCollegeContext();
   const now = requestTime();
 
-  const [students, coverage, [liveDrive], [seat]] = await Promise.all([
+  const [students, coverage, [liveDrive], [seat], paid] = await Promise.all([
     studentsForCollegeAdmin(ctx),
     rosterCoverage(ctx.college.id),
     getDb()
@@ -56,6 +58,7 @@ export default async function CollegeDashboard() {
       .from(schema.promoCodes)
       .where(eq(schema.promoCodes.collegeId, ctx.college.id))
       .limit(1),
+    paidSeatTotal(getDb(), ctx.college.id),
   ]);
 
   const presence = liveDrive
@@ -97,7 +100,7 @@ export default async function CollegeDashboard() {
             <Link href="/college/seats" className="text-sm font-medium underline underline-offset-2">Seats and invoices</Link>
           </p>
           {seat.cap !== null && seat.cap - seat.used <= seat.cap * 0.1 ? (
-            <p className="mt-2 text-sm font-medium text-amber-700">Ask Findtern for more seats.</p>
+            <p className="mt-2 text-sm font-medium text-amber-700">{paid.batches === 0 ? AWAITING_FIRST_PAYMENT : "Ask Findtern for more seats."}</p>
           ) : null}
         </section>
       ) : null}

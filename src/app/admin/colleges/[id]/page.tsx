@@ -10,6 +10,9 @@ import { allows, canWrite } from "@/lib/admin/permissions";
 import { maskTail } from "@/lib/admin/identity-mask";
 import { getSession } from "@/lib/auth";
 import { getDb, schema } from "@/lib/db";
+import { seatInvoiceInput } from "@/lib/college/seat-invoice";
+import { taxInvoiceHtml } from "@/lib/invoice";
+import { getInvoiceSeller } from "@/lib/invoice-seller";
 import { walletLedger, walletSummary } from "@/lib/college/wallet-read";
 
 export const dynamic = "force-dynamic";
@@ -28,8 +31,11 @@ export default async function AdminCollegePage({ params }: { params: Promise<{ i
   ]);
   const last4 = maskTail(college.bankAccountNumber).slice(-4);
   const bank = college.bankAccountNumber && college.bankIfsc ? { holder: college.bankAccountName ?? "", bankName: college.bankName ?? "", last4, ifsc: college.bankIfsc } : null;
-  // TODO(WP-S merge): render each paid batch's invoiceHtml via seatInvoiceInput + taxInvoiceHtml once seat-invoice.ts lands.
-  const rows = batches.map((b) => ({ id: b.id, seats: b.seats, amountMinor: b.amountMinor, status: b.status, method: b.method, referenceId: b.referenceId, invoiceNumber: b.invoiceNumber, paidAt: b.paidAt?.toISOString() ?? null, createdAt: b.createdAt.toISOString() }));
+  const seller = getInvoiceSeller();
+  const rows = batches.map((b) => ({
+    invoiceHtml: b.status === "paid" ? taxInvoiceHtml(seatInvoiceInput(b, college, seller)) : null,
+    id: b.id, seats: b.seats, amountMinor: b.amountMinor, status: b.status, method: b.method, referenceId: b.referenceId, invoiceNumber: b.invoiceNumber, paidAt: b.paidAt?.toISOString() ?? null, createdAt: b.createdAt.toISOString(),
+  }));
   const hasPaid = batches.some((b) => b.status === "paid");
 
   return (

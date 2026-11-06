@@ -4,6 +4,8 @@ import { z } from "zod";
 
 import { recordAdminAudit } from "@/lib/admin/audit";
 import { allows } from "@/lib/admin/permissions";
+import { paidSeatTotal } from "@/lib/college/seat-gate";
+import { firstPaymentProblem } from "@/lib/college/seat-paid";
 import { createTpoCode } from "@/lib/college/tpo-code";
 import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
@@ -14,7 +16,7 @@ type Ctx = { params: Promise<{ id: string }> };
 /** A discount code, so it also needs money permission on top of the college write the path rule asks for. */
 const NO_MONEY = () => NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-/** Create the college's TPO code (100% off the interview fee, 0 seats until a batch is paid). One live code per college. */
+/** Create the college's TPO code (100% off the interview fee, capped at the college's paid seats; refused until a batch is paid). One live code per college. */
 export async function POST(req: Request, ctx: Ctx) {
   const g = await requireMutation({ req, roles: ["admin"] });
   if (!g.ok) return g.response;
@@ -25,10 +27,14 @@ export async function POST(req: Request, ctx: Ctx) {
   if (!college) return NextResponse.json({ error: "Not found" }, { status: 404 });
   const [existing] = await db.select({ id: schema.promoCodes.id }).from(schema.promoCodes).where(eq(schema.promoCodes.collegeId, id)).limit(1);
   if (existing) return NextResponse.json({ error: "This college already has a code" }, { status: 409 });
-  // Cap 0: seats come only from paid batches (owner answer Q1).
-  const code = await createTpoCode(db, id, 0);
+  // Marking the first batch paid creates the code; creating it by hand before that is refused.
+  const paid = await paidSeatTotal(db, id);
+  const awaiting = firstPaymentProblem(paid.batches);
+  if (awaiting) return NextResponse.json({ error: awaiting }, { status: 409 });
+  // Seats come only from paid batches (owner answer Q1): the cap is the paid total.
+  const code = await createTpoCode(db, id, paid.seats);
   if (code) {
-    await recordAdminAudit(db, { adminId: g.session.uid, action: "college.tpo_code_create", targetType: "college", targetId: id, meta: { code, maxUsages: 0 } });
+    await recordAdminAudit(db, { adminId: g.session.uid, action: "college.tpo_code_create", targetType: "college", targetId: id, meta: { code, maxUsages: paid.seats } });
     return NextResponse.json({ ok: true, code });
   }
   return NextResponse.json({ error: "This college already has a code" }, { status: 409 });

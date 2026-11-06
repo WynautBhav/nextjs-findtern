@@ -9,3 +9,10 @@ export function paidTransition(input: { status: string; cap: number | null; paid
   if (input.status !== "pending") return { ok: false };
   return { ok: true, cap: capAfterPaid(input) };
 }
+
+export const AWAITING_FIRST_PAYMENT = "Awaiting first payment";
+
+/** Owner rule: a college's TPO login and code exist only once its first seat batch is paid. Null when at least one is. */
+export function firstPaymentProblem(paidBatches: number): string | null {
+  return paidBatches > 0 ? null : AWAITING_FIRST_PAYMENT;
+}
