@@ -12,6 +12,7 @@ import { canEmployerSeeIntern } from "@/lib/employer-pool";
 import { hiredProposalSql } from "@/lib/employer-visibility";
 import { hasDuplicateSlots, hasSlotTooFarAhead, isBlockingInterview, isQuarterHourWall } from "@/lib/employer-interview-rules";
 import { formatIst } from "@/lib/format";
+import { isProjectOpen } from "@/lib/project-locations";
 
 const wall = z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/);
 const bodySchema = z.object({
@@ -73,11 +74,15 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   let projectName: string | null = null;
   if (b.projectId) {
     const [project] = await db
-      .select({ id: schema.projects.id, projectName: schema.projects.projectName })
+      .select({ id: schema.projects.id, projectName: schema.projects.projectName, status: schema.projects.status, takenDownAt: schema.projects.takenDownAt })
       .from(schema.projects)
       .where(and(eq(schema.projects.id, b.projectId), eq(schema.projects.employerId, id)))
       .limit(1);
     if (!project) return NextResponse.json({ error: "Unknown project" }, { status: 404 });
+    if (!isProjectOpen(project.status, project.takenDownAt)) {
+      const error = project.takenDownAt ? "Findtern took this listing down. Pick another project." : "This project is closed. Reopen it or pick an open project.";
+      return NextResponse.json({ error }, { status: 409 });
+    }
     projectName = project.projectName;
   }
   // One open meeting per candidate per employer. A meeting whose slots have

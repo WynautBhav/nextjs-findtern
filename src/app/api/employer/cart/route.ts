@@ -5,6 +5,7 @@ import { z } from "zod";
 import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
 import { poolInternIds } from "@/lib/employer-pool";
+import { isProjectOpen } from "@/lib/project-locations";
 import { OFFER_BLOCKING_STATUSES } from "@/lib/employer-offer-status";
 
 /**
@@ -61,11 +62,15 @@ export async function POST(req: Request) {
       // The project must belong to this employer, or the cart becomes a way to
       // attach your shortlist to somebody else's project id.
       const [project] = await db
-        .select({ id: schema.projects.id })
+        .select({ id: schema.projects.id, status: schema.projects.status, takenDownAt: schema.projects.takenDownAt })
         .from(schema.projects)
         .where(and(eq(schema.projects.id, projectId), eq(schema.projects.employerId, employerId)))
         .limit(1);
       if (!project) return NextResponse.json({ error: "Unknown project" }, { status: 404 });
+      if (!isProjectOpen(project.status, project.takenDownAt)) {
+        const error = project.takenDownAt ? "Findtern took this listing down. Pick another project." : "This project is closed. Reopen it or pick an open project.";
+        return NextResponse.json({ error }, { status: 409 });
+      }
 
       // Only someone in the candidate pool can be shortlisted, and not anyone
       // this employer already hired or has an offer out to - legacy refused

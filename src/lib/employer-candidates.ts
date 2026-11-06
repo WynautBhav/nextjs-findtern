@@ -186,7 +186,7 @@ export function displayNameOf(
  */
 export function redactForEmployer<T extends CandidateProfile>(profile: T, unlocked: boolean): T {
   if (unlocked) return profile;
-  return { ...profile, firstName: "", lastName: "", fullName: "", email: "", linkedinUrl: "", aiRecordingLink: null };
+  return { ...profile, firstName: "", lastName: "", fullName: "", email: "", linkedinUrl: "", aiRecordingLink: null, updatedAt: null };
 }
 
 /**

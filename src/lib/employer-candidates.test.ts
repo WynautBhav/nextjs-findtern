@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { matchesPlace, preferredCities, rawScore, toCandidateProfile } from "./employer-candidates.ts";
+import { matchesPlace, preferredCities, rawScore, redactForEmployer, toCandidateProfile } from "./employer-candidates.ts";
 
 // EMB-02: legacy stored findternScore as a number or a numeric string and
 // read it with Number(); the new pool must agree on who is scored.
@@ -61,4 +61,11 @@ test("matchesPlace: an onsite candidate in another city stays out even with the 
   assert.equal(matchesPlace(pune, { cities: ["Jaipur"], includeRemote: true }), false);
   assert.equal(matchesPlace(pune, { cities: ["pune"], includeRemote: false }), true);
   assert.equal(matchesPlace(pune, { cities: [], includeRemote: false }), true);
+});
+
+test("a redacted card carries no onboarding timestamp (review #19)", () => {
+  const user = { id: "u1", firstName: "A", lastName: "B", email: "a@b.c" } as never;
+  const profile = toCandidateProfile(user, { extraData: {}, updatedAt: new Date("2026-11-06T10:11:12Z") } as never);
+  assert.ok(profile.updatedAt);
+  assert.equal(redactForEmployer(profile, false).updatedAt, null);
 });
