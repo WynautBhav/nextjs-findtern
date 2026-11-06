@@ -322,9 +322,9 @@ export function ChatWidget() {
   const isForm = FORM_ROUTE.test(pathname ?? "");
   const inApp = !isForm && /^\/(intern|employer|college)(\/|$)/.test(pathname ?? "");
   const hasBottomNav = !isForm && /^\/(intern|college)(\/|$)/.test(pathname ?? "");
-  // The intern console has "Ask me" in its top bar on every width, so no
-  // launcher floats over its tiles on a phone; the panel opens from there.
-  const headerOnly = !isForm && /^\/intern(\/|$)/.test(pathname ?? "");
+  // The intern and employer consoles have "Ask me" in their top bar on every
+  // width, so no launcher floats over their cards on a phone; the panel opens from there.
+  const headerOnly = !isForm && /^\/(intern|employer)(\/|$)/.test(pathname ?? "");
 
   return (
     <div

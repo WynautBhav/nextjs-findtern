@@ -25,7 +25,7 @@ import Link from "next/link";
 import { RAIL_COOKIE } from "@/lib/rail";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { motion } from "motion/react";
+import { MotionConfig, motion } from "motion/react";
 import { Bell, ChevronDown, ChevronsLeft, ChevronsRight, CircleQuestionMark, LogOut, Mail, Menu, MessageCircle, MessageSquareText, X } from "lucide-react";
 
 import { Logo, LogoMark } from "@/components/brand/logo";
@@ -161,6 +161,8 @@ export function ConsoleShell({
   }
 
   const light = tone === "light";
+  // Intern and employer carry "Ask me" in the top bar at every width; the floating launcher is off there (chat-widget).
+  const askInBar = light || /^\/employer(\/|$)/.test(pathname);
   // The global ring (brand-700) is 2.3:1 on the dark rail; the accent clears 3:1 there.
   const darkRing = light ? undefined : "focus-visible:outline-accent-300";
   const helpLinks: ConsoleNavItem[] = help
@@ -231,6 +233,7 @@ export function ConsoleShell({
   );
 
   return (
+    <MotionConfig reducedMotion="user">
     <div data-tone={tone} className={cn(
         "apple-admin min-h-[100dvh] overflow-x-clip lg:flex",
         light ? "bg-ink-100 lg:gap-3 lg:p-3" : "bg-surface",
@@ -296,8 +299,8 @@ export function ConsoleShell({
             </Sheet>
             <Link href={homeHref} aria-label="Findtern home" className="flex min-h-11 min-w-0 items-center lg:hidden">
               {/* Light (intern) phones also carry "Ask me" up here: the mark alone leaves room for it. */}
-              {light ? <LogoMark variant="green" alt="" className="size-8 sm:hidden" /> : null}
-              <Logo variant="green" priority className={cn("h-8", light && "max-sm:hidden")} />
+              {askInBar ? <LogoMark variant="green" alt="" className="size-8 sm:hidden" /> : null}
+              <Logo variant="green" priority className={cn("h-8", askInBar && "max-sm:hidden")} />
             </Link>
 
             {/* Desktop: where you are */}
@@ -327,8 +330,8 @@ export function ConsoleShell({
                 <button
                   type="button"
                   onClick={() => window.dispatchEvent(new Event(OPEN_CHAT_EVENT))}
-                  // Light (intern): on phones too, labelled, in place of the floating launcher.
-                  className={buttonClass({ variant: "outline", size: "sm", className: cn("mr-1", light ? "touch:min-h-11" : "hidden lg:inline-flex") })}
+                  // Intern and employer: on phones too, labelled, in place of the floating launcher.
+                  className={buttonClass({ variant: "outline", size: "sm", className: cn("mr-1", askInBar ? "touch:min-h-11" : "hidden lg:inline-flex") })}
                 >
                   <MessageCircle className="size-4" aria-hidden />
                   Ask me
@@ -372,6 +375,7 @@ export function ConsoleShell({
       </div>
       {banner}
     </div>
+    </MotionConfig>
   );
 }
 
@@ -447,7 +451,11 @@ function RailLink({ item, active, compact, light, onNavigate }: { item: ConsoleN
           <span aria-hidden className={cn("absolute -right-1 -top-1 size-2 rounded-full bg-accent-400 ring-2", light ? "ring-white" : "ring-brand-950")} />
         ) : null}
       </span>
-      <span className={cn("min-w-0 flex-1 truncate", compact && "sr-only")}>{item.label}</span>
+      <span className={cn("min-w-0 flex-1 truncate", compact && "sr-only")}>
+        {item.label}
+        {compact && item.attention ? ", needs you" : ""}
+        {compact && item.badge ? `, ${item.badge} unread` : ""}
+      </span>
       {!compact && item.badge ? (
         <span className={cn("nums rounded-full px-2 py-0.5 text-2xs font-bold", light ? "bg-brand-700 text-white" : "bg-accent-500/20 text-accent-300")}>{item.badge}</span>
       ) : !compact && item.attention ? (
@@ -534,7 +542,11 @@ function TabBar({ tabs, pathname }: { tabs: ConsoleNavItem[]; pathname: string }
               >
                 <span className="relative">
                   {item.icon}
-                  {item.attention ? <span className="absolute -right-1.5 -top-0.5 size-2 rounded-full bg-accent-500 ring-2 ring-white" /> : null}
+                  {item.attention ? (
+                    <span className="absolute -right-1.5 -top-0.5 size-2 rounded-full bg-accent-500 ring-2 ring-white">
+                      <span className="sr-only">, needs you</span>
+                    </span>
+                  ) : null}
                 </span>
                 <span className="max-w-full truncate">{item.label}</span>
                 {active ? (
