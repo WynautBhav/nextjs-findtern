@@ -43,10 +43,12 @@ function nameOf(item: ProposalItem): string {
 /** Rows shown at a time; "Show more" adds another page (as Projects). */
 const PAGE = 20;
 
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
 function formatStart(iso: string | null): string | null {
   if (!iso || !/^\d{4}-\d{2}-\d{2}/.test(iso)) return null;
   const [y, m, d] = iso.slice(0, 10).split("-");
-  return `${d}/${m}/${y}`;
+  return `${Number(d)} ${MONTHS[Number(m) - 1]} ${y}`;
 }
 
 export function ProposalsManager({ initialProposals, initialStatus = "all" }: { initialProposals: ProposalItem[]; initialStatus?: string }) {
@@ -285,23 +287,24 @@ export function ProposalsManager({ initialProposals, initialStatus = "all" }: { 
               >
                 <ProposalAvatar photoUrl={item.photoUrl} initials={ini === "?" ? "C" : ini} presence={item.presence} />
                 <div className="min-w-0">
-                  <p className="truncate text-sm text-ink-600">
-                    <span className="font-semibold text-ink-900">{who}</span>
-                    {item.project ? ` · ${item.project.projectName}` : ""}
-                  </p>
-                  <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1">
-                    {/* The whole row opens the offer: the title's link is
+                  <p className="text-base leading-snug text-ink-600">
+                    {/* The whole row opens the offer: the name's link is
                         stretched over it, and keeps its own focus ring. */}
                     <Link
                       href={href}
+                      aria-label={`${title}, ${who}`}
                       className={cn(
-                        "break-words text-lg font-semibold leading-snug tracking-[-0.01em] outline-none after:absolute after:inset-0 after:content-[''] hover:text-brand-700 focus-visible:after:rounded-apple-sm focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-brand-600",
+                        "break-words font-semibold outline-none after:absolute after:inset-0 after:content-[''] hover:text-brand-700 focus-visible:after:rounded-apple-sm focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-brand-600",
                         closed ? "text-ink-700" : "text-ink-900",
                       )}
                     >
-                      {title}
+                      {who}
                     </Link>
+                    {item.project ? ` · ${item.project.projectName}` : ""}
+                  </p>
+                  <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink-600">
                     {pill}
+                    <span className="break-words">{title}</span>
                   </div>
                   <p className="nums mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-sm text-ink-600">
                     <span>
