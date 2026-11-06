@@ -175,5 +175,5 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   } catch (err) {
     console.error("[full-time-offer] admin alert failed", err);
   }
-  return NextResponse.json({ proposal }, { status: 201 });
+  return NextResponse.json({ proposal: { id: proposal.id, status: proposal.status } }, { status: 201 });
 }

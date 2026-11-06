@@ -388,5 +388,5 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     });
   }
 
-  return NextResponse.json({ proposal: updated });
+  return NextResponse.json({ proposal: { id: updated.id, status: updated.status } });
 }

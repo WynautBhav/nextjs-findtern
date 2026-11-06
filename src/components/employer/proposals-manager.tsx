@@ -11,7 +11,7 @@ import { displayNameOf, initialsOf } from "@/lib/employer-candidates";
 import { EmptyScene, FilterTabs, Pill, Surface } from "@/components/app/primitives";
 import { RowMenu } from "@/components/app/row-menu";
 import { buttonClass } from "@/components/ui/button";
-import type { Proposal } from "@/lib/db/schema";
+import type { EmployerProposal } from "@/lib/employer-proposal-view";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { parseOffer } from "@/lib/offer";
 import { offerState } from "@/components/employer/proposal-state";
@@ -19,7 +19,7 @@ import { cn } from "@/lib/utils";
 import { fieldClass } from "@/components/employer/ui-tokens";
 
 export type ProposalItem = {
-  proposal: Proposal;
+  proposal: EmployerProposal;
   /** Identity only; initials until this employer has hired them. */
   user: { firstName: string; lastName: string } | null;
   project: { id: string; projectName: string } | null;

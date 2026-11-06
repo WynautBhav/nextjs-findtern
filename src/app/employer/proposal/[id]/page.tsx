@@ -204,7 +204,6 @@ export default async function EmployerProposalDetail({
               <SectionHead title="Terms" />
               <dl className="divide-y divide-ink-100">
                 <DetailRow label="Hourly rate" value={offer.hourlyRateMinor ? `${formatMoney(offer.hourlyRateMinor, currency)} an hour` : offer.hourlyRateMinor === 0 ? "Free" : "-"} mono />
-                {offer.internStipendMinor ? <DetailRow label="Intern's stipend" value={`${formatMoney(offer.internStipendMinor, "INR")} a month (fixed)`} mono /> : null}
                 <DetailRow
                   label="Monthly amount"
                   value={
@@ -358,7 +357,6 @@ export default async function EmployerProposalDetail({
                       startDate: offer.startDate ?? undefined,
                       weeklySchedule: offer.weeklySchedule,
                       hourlyRateMinor: offer.hourlyRateMinor,
-                      internStipendMinor: offer.internStipendMinor,
                       paidLeavesPerMonth: offer.paidLeavesPerMonth,
                       message: offer.jd,
                       additionalInfo: offer.additionalInfo,

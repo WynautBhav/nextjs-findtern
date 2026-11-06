@@ -320,5 +320,5 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       email: emails.proposalReceived({ internName: user.firstName, companyName, role: b.roleTitle, proposalId: proposal.id }),
     }).catch((e) => console.error("[employer/proposals] notify", e)),
   );
-  return NextResponse.json({ proposal }, { status: 201 });
+  return NextResponse.json({ proposal: { id: proposal.id, status: proposal.status } }, { status: 201 });
 }

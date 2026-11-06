@@ -6,6 +6,7 @@ import { getDb, schema } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
 import { requireEmployerSetup } from "@/lib/employer-setup";
 import { hiredInternIds } from "@/lib/employer-visibility";
+import { toEmployerProposal } from "@/lib/employer-proposal-view";
 import { EmptyScene, PageHead } from "@/components/app/primitives";
 import { ButtonLink } from "@/components/ui/button";
 import { ProposalsManager, type ProposalItem } from "@/components/employer/proposals-manager";
@@ -46,7 +47,7 @@ export default async function EmployerProposalsPage() {
     // employer screen does.
     const hired = await hiredInternIds(db, employerId);
     proposals = rows.map((row) => ({
-      proposal: row.proposal,
+      proposal: toEmployerProposal(row.proposal),
       project: row.projectId ? { id: row.projectId, projectName: row.projectName ?? "Project" } : null,
       internHired: hired.has(row.proposal.internId),
       user:
