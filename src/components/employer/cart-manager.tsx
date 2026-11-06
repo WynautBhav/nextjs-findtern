@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AlertCircle, CalendarCheck, CheckCircle2, CreditCard, Laptop, Loader2, MapPin, Send, Trash2, UserRound, Video } from "lucide-react";
+import { AlertCircle, CalendarCheck, CheckCircle2, CreditCard, Loader2, MapPin, Send, Trash2, UserRound, Video } from "lucide-react";
 
 import { EmptyScene, Pill } from "@/components/app/primitives";
 import { RowAvatar, ScoreBadge, SkillChips, headlineOf } from "@/components/employer/candidate-row-parts";
@@ -417,16 +417,10 @@ function CartLine({
         </p>
       </div>
       <div className="col-span-2 min-w-0 sm:col-span-2 sm:col-start-2">
-        <p className="flex flex-wrap items-center gap-x-5 gap-y-1.5 text-sm text-ink-700">
+        <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink-700 sm:gap-x-5 sm:gap-y-1.5">
           <ScoreBadge score={c.score} scored={c.scored} />
           <span className="nums font-semibold text-ink-900">{formatRate(line.hourlyRateMinor, currency)}</span>
           {c.workModes.length ? <span>{c.workModes.join(" / ")}</span> : null}
-          {c.hasLaptop != null ? (
-            <span className="inline-flex items-center gap-1.5">
-              <Laptop className="size-4 shrink-0 text-ink-400" aria-hidden />
-              {c.hasLaptop ? "Own laptop" : "Needs a laptop"}
-            </span>
-          ) : null}
         </p>
         <SkillChips className="mt-3" skills={c.skills} wanted={[]} />
         {locked && !line.acceptedProposalId && !closed ? (
