@@ -603,8 +603,9 @@ step("employer: checks out with the month-end stipend plan in free mode → prop
       await visit(page, "/employer/checkout");
       await page.getByRole("radio", { name: /charge due 2 days before the month.s pay date/i }).check();
       const main = await page.locator("main").innerText();
-      assert.match(main, /Hiring charge \(one-time\)/, "the hiring charge is the only amount due now");
-      assert.match(main, /Month 1 · due /, "month 1 is listed with its due date");
+      assert.match(main, /Hiring charge \(one-time\)/, "the hiring charge is part of the amount due now");
+      assert.match(main, /Month 1 charge/, "the Month 1 charge is paid with it");
+      assert.match(main, /Month 2 · due /, "month 2 is the first month listed with a due date");
       const res = await clickFor(page, page.getByRole("button", { name: /complete for free/i }), { path, method: "POST" });
       expectOk(`POST ${path}`, res);
       assert.equal(res.body?.free, true);
@@ -626,6 +627,7 @@ step("employer: checks out with the month-end stipend plan in free mode → prop
   assert.equal(pay.status, "paid");
   assert.equal(pay.raw?.notes?.paymentMode, "hiring_fee", "post-paid hire: the first order is the hiring fee");
   assert.deepEqual(pay.raw?.notes?.proposalIds, [state.proposalId]);
+  assert.deepEqual(pay.raw?.notes?.firstMonthProposalIds, [state.proposalId], "the first order also pays Month 1");
   const hired = await waitForMail(INTERN.email, { since: SINCE, subject: /you.re hired/i });
   assert.ok(hired.text.includes(EMPLOYER.companyName), "after the hire the intern is told the company");
   await waitForMail(EMPLOYER.email, { since: SINCE, subject: /payment received/i });
@@ -704,13 +706,11 @@ step("employer: approves the timesheet on /employer/timesheets/[id] [UI]", ["tim
   assert.ok(n, "intern notified of the approval");
 });
 
-step("employer: pays month 1 of the stipend, now due [API]", ["approved"], async () => {
-  // Post-paid hire: the start date moved back 40 days, so month 1 ended and is due. The payout below is gated on it.
-  const page = pages.employer;
-  const path = `/api/employer/${state.employerId}/payment/razorpay/order`;
-  expectOk(`POST ${path}`, await api(page, "POST", path, { currency: "INR", proposalIds: [state.proposalId], mode: "monthly", paymentIndex: 0 }));
+step("employer: month 1 was already paid with the hiring charge [API]", ["approved"], async () => {
+  // Post-paid hire: month 1 is paid at checkout (first order's firstMonthProposalIds), so the payout below is not gated on a second order.
+  // Month 2 is not payable yet (the start date moved back 40 days), so nothing is posted here.
   const pays = await rows(`SELECT raw FROM employer_payments WHERE employer_id = $1 AND status = 'paid'`, [state.employerId]);
-  assert.ok(pays.some((p) => p.raw?.notes?.dueProposalIds?.includes(state.proposalId)), "month 1 was paid as a due month");
+  assert.ok(pays.some((p) => p.raw?.notes?.firstMonthProposalIds?.includes(state.proposalId)), "month 1 was paid with the first order");
   state.month1Paid = true;
 });
 

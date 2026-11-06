@@ -945,7 +945,7 @@ step("employer: pays the other offer with the month-end stipend plan, using the 
   assert.equal(res.status, 200, `order → ${res.status} ${JSON.stringify(res.body)}`);
   const pay = await one(`SELECT * FROM employer_payments WHERE employer_id = $1 AND status = 'paid' ORDER BY paid_at DESC LIMIT 1`, [state.employerId]);
   assert.notEqual(pay.id, state.upfrontPaymentId, "a second, separate order");
-  assert.equal(pay.amount_minor, fee * 100, "only the hiring charge is due now, no promo");
+  assert.equal(pay.amount_minor, fee * 100 + Math.round(offer.offer_details.monthlyAmount * 100), "hiring charge + Month 1 charge are due now, no promo");
   assert.equal(pay.raw?.notes?.paymentMode, "hiring_fee");
   assert.deepEqual(pay.raw.notes.proposalIds, [state.otherProposalId]);
   assert.match(String(pay.invoice_number), /^\d{6}-\d{2,}$/);
@@ -1022,6 +1022,7 @@ step("employer: Orders totals equal what was charged, and both tax invoices are 
   const monthlyText = await readInvoice(page, monthly.invoice_number);
   checkInvoice(monthlyText, monthly);
   assert.match(monthlyText, /Hiring charge/i, "the first invoice of a month-end hire is the hiring charge");
+  assert.match(monthlyText, /Month 1 charge/i, "...plus the Month 1 charge");
   await shot("employer-invoices-tab");
 });
 
