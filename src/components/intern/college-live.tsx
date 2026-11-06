@@ -13,14 +13,16 @@ import { PushToggle } from "./college-push";
 import { formatIstClock, shortDate } from "@/lib/format";
 
 /**
- * A college member's live link to their placement drive.
+ * A student's presence beat, and a college member's live link to their drive.
  *
- * Every HEARTBEAT_MS the open tab tells the server "still here", which is what
- * the placement officer's "490/500 online" counts. A backgrounded tab keeps
- * beating (the browser throttles it, the 75 s online window absorbs that).
- * The reply carries the live drive and any call requests, so there is no
- * second poll and no open stream per student. A push, when one arrives while
- * the tab is open, triggers an immediate beat so the request shows at once.
+ * Every HEARTBEAT_MS a visible tab tells the server "still here", and whether
+ * the student did anything in the last ACTIVE_MS. That feeds employers'
+ * "Online now / Active today" and the placement officer's "490/500 online".
+ * A hidden tab stops beating (and beats again the moment it is visible), so a
+ * forgotten tab never reads as online. For a member of a partner college the
+ * reply carries the live drive and any call requests, so there is no second
+ * poll and no open stream per student. A push, when one arrives while the tab
+ * is open, triggers an immediate beat so the request shows at once.
  */
 
 type Drive = { id: string; title: string; endsAt: string };
@@ -33,28 +35,37 @@ type Meeting = {
   driveTitle?: string;
 };
 
+/** Pointer, key, scroll or focus within this window counts as "active". */
+const ACTIVE_MS = 120_000;
+const ACTIVITY_EVENTS = ["pointerdown", "pointermove", "keydown", "scroll", "focus", "touchstart"] as const;
+
 function whenLabel(startsAt: string, now: number): string {
   const mins = Math.round((new Date(startsAt).getTime() - now) / 60_000);
   if (mins <= 0) return "now";
   return `in ${mins} min`;
 }
 
-export function CollegeLive({ collegeName, vapidKey }: { collegeName: string; vapidKey: string }) {
+export function CollegeLive({ collegeName, vapidKey, partner }: { collegeName: string; vapidKey: string; partner: boolean }) {
   const [drive, setDrive] = useState<Drive | null>(null);
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
   const [now, setNow] = useState(() => Date.now());
   const stopped = useRef(false);
+  const lastActivity = useRef(0);
 
   const beat = useCallback(async () => {
-    if (stopped.current) return;
+    if (stopped.current || document.visibilityState !== "visible") return;
     try {
-      const res = await csrfFetch("/api/intern/college/heartbeat", { method: "POST" });
+      const res = await csrfFetch("/api/intern/college/heartbeat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ active: Date.now() - lastActivity.current < ACTIVE_MS }),
+      });
       if (res.status === 401 || res.status === 403) {
         stopped.current = true; // signed out or no longer an intern; stop quietly
         return;
       }
-      if (!res.ok) return;
+      if (!res.ok || !partner) return; // everyone beats; only partner-college students get the drive banner and call cards
       const body = (await res.json()) as { drive: Drive | null; meetings: Meeting[] };
       setDrive(body.drive);
       setMeetings(body.meetings ?? []);
@@ -62,14 +73,26 @@ export function CollegeLive({ collegeName, vapidKey }: { collegeName: string; va
     } catch {
       // Offline for a moment: the next beat retries.
     }
-  }, []);
+  }, [partner]);
 
   useEffect(() => {
+    lastActivity.current = Date.now(); // opening the page is activity
     // First beat right after mount (a timer, so the state update lands outside the effect body).
     const first = setTimeout(beat, 0);
-    const timer = setInterval(beat, HEARTBEAT_MS);
+    let timer: ReturnType<typeof setInterval> | undefined = setInterval(beat, HEARTBEAT_MS);
+    const noteActivity = () => {
+      lastActivity.current = Date.now();
+    };
+    for (const e of ACTIVITY_EVENTS) window.addEventListener(e, noteActivity, { passive: true });
+    // Hidden: stop beating. Visible again: beat at once and resume the interval.
     const onVisible = () => {
-      if (document.visibilityState === "visible") void beat();
+      if (document.visibilityState === "visible") {
+        void beat();
+        timer ??= setInterval(beat, HEARTBEAT_MS);
+      } else if (timer) {
+        clearInterval(timer);
+        timer = undefined;
+      }
     };
     const onMessage = (e: MessageEvent) => {
       if ((e.data as { type?: string } | null)?.type === "findtern-refresh") void beat();
@@ -78,7 +101,8 @@ export function CollegeLive({ collegeName, vapidKey }: { collegeName: string; va
     navigator.serviceWorker?.addEventListener("message", onMessage);
     return () => {
       clearTimeout(first);
-      clearInterval(timer);
+      if (timer) clearInterval(timer);
+      for (const e of ACTIVITY_EVENTS) window.removeEventListener(e, noteActivity);
       document.removeEventListener("visibilitychange", onVisible);
       navigator.serviceWorker?.removeEventListener("message", onMessage);
     };
