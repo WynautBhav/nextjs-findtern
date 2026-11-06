@@ -669,11 +669,11 @@ export default async function CandidatesPage({
                   ? "1 selected · pick one more to compare"
                   : `${compareIds.length} of ${MAX_COMPARE} selected${compareFull ? " · limit reached" : ""}`}
               </span>
-              <Link href={withFilters(filters, { ids: [] })} scroll={false} className="text-sm font-medium text-ink-600 underline-offset-4 hover:text-ink-900 hover:underline">
+              <Link href={withFilters(filters, { ids: [] })} scroll={false} className={buttonClass({ variant: "ghost", size: "sm", className: "min-h-11" })}>
                 Clear
               </Link>
               {compareIds.length >= 2 ? (
-                <ButtonLink href={compareHref(filters)} variant="primary" size="sm" className="min-h-10">
+                <ButtonLink href={compareHref(filters)} variant="primary" size="sm" className="min-h-11">
                   <Scale className="size-4" aria-hidden />
                   Compare side by side
                 </ButtonLink>
@@ -868,9 +868,9 @@ export default async function CandidatesPage({
                                 // Starts with the phone label ("In compare" / "Compare") so voice control can say it (2.5.3).
                                 aria-label={selected ? `In compare: remove ${name}` : `Compare ${name}`}
                                 className={buttonClass({
-                                  variant: "ghost",
+                                  variant: "outline",
                                   size: "sm",
-                                  className: selected ? "bg-brand-50 text-brand-800" : "text-ink-600",
+                                  className: cn("min-h-11", selected && "bg-brand-50 text-brand-800"),
                                 })}
                               >
                                 <Scale className="size-4" aria-hidden />
