@@ -20,6 +20,7 @@ import { EmptyScene, Pill, Surface } from "@/components/app/primitives";
 import { LoadError } from "@/components/app/load-error";
 import { ButtonLink, buttonClass } from "@/components/ui/button";
 import { fieldClass } from "@/components/employer/ui-tokens";
+import { rowSkills } from "@/components/employer/candidate-view";
 import { SortSelect } from "./_sort-select";
 import {
   SORT_OPTIONS,
@@ -283,8 +284,8 @@ function CompactRows({
           const rate = resolvePricing(c.score, data.plans, data.currency, data.region);
           const name = displayNameOf(c, data.nameUnlocked.has(c.id));
           const wanted = new Set(data.effectiveSkills.map((k) => k.toLowerCase()));
-          // The project's skills first, so the match is what you read.
-          const skills = [...c.skills].sort((a, b) => Number(wanted.has(b.toLowerCase())) - Number(wanted.has(a.toLowerCase())));
+          // The project's skills first (matched on the name part), at most seven.
+          const { shown: skills, more: moreSkills, isWanted } = rowSkills(c.skills, wanted);
           const meta = [c.city, c.workModes.join(" / "), c.hasLaptop === false ? "Needs a laptop" : c.hasLaptop ? "Own laptop" : ""].filter(Boolean).join(" · ");
           const presence = data.presence[c.id] ?? null;
           const skillLine =
@@ -295,9 +296,10 @@ function CompactRows({
                 {skills.map((k, i) => (
                   <span key={k}>
                     {i > 0 ? " · " : ""}
-                    <span className={wanted.has(k.toLowerCase()) ? "font-semibold text-ink-900" : undefined}>{k}</span>
+                    <span className={isWanted(k) ? "font-semibold text-ink-900" : undefined}>{k}</span>
                   </span>
                 ))}
+                {moreSkills > 0 ? ` · +${moreSkills} more` : null}
               </>
             );
           return (
@@ -306,7 +308,7 @@ function CompactRows({
                 <div className="relative shrink-0">
                   <CandidateAvatar photoUrl={c.photoUrl} initials={c.initials} className="size-10 rounded-full text-xs" />
                   {presence ? (
-                    <span className="absolute -bottom-0.5 -right-0.5 grid size-3.5 place-items-center rounded-full bg-white">
+                    <span aria-hidden className="absolute -bottom-0.5 -right-0.5 grid size-3.5 place-items-center rounded-full bg-white">
                       <PresenceDot label={presence} />
                     </span>
                   ) : null}
