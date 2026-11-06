@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { AlertCircle, ArrowLeft, Download, Phone, User } from "lucide-react";
 
 import { DetailRow, PageHead, Pill, SectionHead, Surface } from "@/components/app/primitives";
@@ -73,8 +73,21 @@ export default async function ProposalDetail({ params }: { params: Promise<{ id:
   const ft = offer.fullTime;
   const status = proposalStatus(facts.key);
   const open = canDecide(facts.key);
-  const bonusMinor = offerBonusMinor(rawScore(extra), { fullTime });
-  const bonusLabel = bonusMinor ? `+ ${formatMoney(bonusMinor, "INR", { zeroLabel: false })} completion bonus when you finish` : null;
+  // A bonus already scheduled for this offer (it ran on the score before completion) beats today's score.
+  let scheduledMinor: number | null = null;
+  if (hasDb()) {
+    const [row] = await getDb()
+      .select({ amountMinor: schema.internPayouts.amountMinor })
+      .from(schema.internPayouts)
+      .where(and(eq(schema.internPayouts.bonusProposalId, proposal.id), eq(schema.internPayouts.kind, "completion_bonus"), eq(schema.internPayouts.internId, proposal.internId)))
+      .limit(1)
+      .catch(() => []);
+    scheduledMinor = row?.amountMinor ?? null;
+  }
+  const bonusMinor = offerBonusMinor(rawScore(extra), { fullTime, scheduledMinor });
+  const bonusLabel = bonusMinor
+    ? `+ ${formatMoney(bonusMinor, "INR", { zeroLabel: false })} completion bonus ${scheduledMinor ? "scheduled" : "when you finish"}`
+    : null;
 
   let project: Loaded<{ projectName: string; skills: string[] | null; scopeOfWork: string | null }> = { ok: true, row: null };
   let employer: Loaded<{

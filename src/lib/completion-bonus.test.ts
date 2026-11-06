@@ -72,3 +72,10 @@ test("the offer shows the bonus by band, and none for full-time, unscored or bel
   assert.equal(offerBonusMinor(null, { fullTime: false }), null);
   assert.equal(offerBonusMinor(5.5, { fullTime: false }), null);
 });
+
+test("offer page: a scheduled bonus wins over today's higher score", () => {
+  assert.equal(offerBonusMinor(8, { fullTime: false }), 300000);
+  assert.equal(offerBonusMinor(8, { fullTime: false, scheduledMinor: 250000 }), 250000);
+  assert.equal(offerBonusMinor(null, { fullTime: false, scheduledMinor: 200000 }), 200000);
+  assert.equal(offerBonusMinor(8, { fullTime: false, scheduledMinor: null }), 300000);
+});
