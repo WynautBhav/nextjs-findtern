@@ -49,3 +49,13 @@ export function sortChangeAction(viaKeyboard: boolean): "navigate" | "hold" {
 export function sortCommitValue(pending: string | null, current: string): string | null {
   return pending !== null && pending !== current ? pending : null;
 }
+
+/** Initials-tile colours: photos are rare, so this is what tells two "IT" rows apart. Text on each is ≥4.5:1. */
+export const AVATAR_TINTS = ["bg-brand-50 text-brand-800", "bg-accent-100 text-ink-800", "bg-info-soft text-ink-800", "bg-ink-100 text-ink-800"] as const;
+
+/** A stable tint per candidate: sum of the seed's char codes, mod 4. */
+export function avatarTint(seed: string): string {
+  let sum = 0;
+  for (let i = 0; i < seed.length; i++) sum += seed.charCodeAt(i);
+  return AVATAR_TINTS[sum % AVATAR_TINTS.length];
+}

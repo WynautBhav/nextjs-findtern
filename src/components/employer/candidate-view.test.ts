@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { headlineOf, rowSkills, studyOf, skillBaseName, sortChangeAction, sortCommitValue } from "./candidate-view.ts";
+import { AVATAR_TINTS, avatarTint, headlineOf, rowSkills, studyOf, skillBaseName, sortChangeAction, sortCommitValue } from "./candidate-view.ts";
 
 test("skillBaseName drops the level", () => {
   assert.equal(skillBaseName("React · Advanced"), "React");
@@ -53,4 +53,13 @@ test("studyOf / headlineOf drop a field the contact scrub masked whole (B.Tech r
   assert.equal(headlineOf({ academics, skills: ["React"] }), "Computer Engineering");
   // Both masked: fall back to the skills line, never the marker.
   assert.equal(headlineOf({ academics: { degree: "[hidden until hire]", specialization: "[hidden until hire]" }, skills: ["SQL"] }), "SQL intern");
+});
+
+test("avatarTint: deterministic, one of the four, and ids can differ", () => {
+  assert.equal(avatarTint("a"), avatarTint("a"));
+  assert.ok(AVATAR_TINTS.includes(avatarTint("some-intern-id") as (typeof AVATAR_TINTS)[number]));
+  // "a" = 97 -> 1, "b" = 98 -> 2
+  assert.equal(avatarTint("a"), AVATAR_TINTS[1]);
+  assert.notEqual(avatarTint("a"), avatarTint("b"));
+  assert.equal(avatarTint(""), AVATAR_TINTS[0]);
 });

@@ -310,7 +310,7 @@ export default async function CompareCandidates({ searchParams }: { searchParams
                       href={`/employer/intern/${encodeURIComponent(c.id)}${activeProject ? `?project=${encodeURIComponent(activeProject.id)}` : ""}`}
                       className="group/id mr-8 flex items-center gap-3 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
                     >
-                      <RowAvatar photoUrl={c.photoUrl} initials={c.initials} className="size-12 sm:size-14" />
+                      <RowAvatar photoUrl={c.photoUrl} initials={c.initials} seed={c.id} className="size-12 sm:size-14" />
                       <span className="min-w-0 flex-1">
                         <span className="block break-words text-base font-semibold text-ink-900 underline-offset-4 group-hover/id:underline">{name}</span>
                         <span className="block break-words text-sm text-ink-600">{c.city || c.location || "City not stated"}</span>

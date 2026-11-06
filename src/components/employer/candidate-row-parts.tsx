@@ -24,11 +24,13 @@ export function RowAvatar({
   initials,
   presence = null,
   className,
+  seed,
 }: {
   photoUrl?: string | null;
   initials: string;
   presence?: PresenceLabel | null;
   className?: string;
+  seed?: string;
 }) {
   const online = presence === "Online now";
   return (
@@ -36,7 +38,8 @@ export function RowAvatar({
       <CandidateAvatar
         photoUrl={photoUrl}
         initials={initials}
-        className={cn("size-12 rounded-full bg-brand-100/70 text-sm ring-1 ring-inset ring-brand-200/70 sm:size-14 sm:text-base", className)}
+        seed={seed}
+        className={cn("size-12 rounded-full text-sm ring-1 ring-inset ring-black/5 sm:size-14 sm:text-base", className)}
       />
       {presence ? (
         <span

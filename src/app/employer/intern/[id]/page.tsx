@@ -355,7 +355,8 @@ export default async function EmployerInternDetail({
               <CandidateAvatar
                 photoUrl={profile.photoUrl}
                 initials={profile.initials}
-                className="size-18 rounded-full text-xl ring-1 ring-inset ring-brand-200/70 sm:size-24 sm:text-2xl"
+                seed={profile.id}
+                className="size-18 rounded-full text-xl ring-1 ring-inset ring-black/5 sm:size-24 sm:text-2xl"
               />
               {presence ? (
                 <span

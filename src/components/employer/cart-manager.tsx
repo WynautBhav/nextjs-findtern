@@ -388,7 +388,7 @@ function CartLine({
 
   return (
     <li className="group/row relative grid grid-cols-[auto_minmax(0,1fr)] gap-x-3.5 gap-y-3 py-5 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:gap-x-5 sm:gap-y-2.5 sm:py-6">
-      <RowAvatar photoUrl={c.photoUrl} initials={c.initials} />
+      <RowAvatar photoUrl={c.photoUrl} initials={c.initials} seed={c.id} />
       <div className="min-w-0 self-center sm:self-start">
         <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
           {/* The whole row opens the profile, as on Candidates: this link is stretched over it; the controls sit above. */}
