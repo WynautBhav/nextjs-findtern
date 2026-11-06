@@ -181,7 +181,7 @@ export function CheckoutSummary({
                     onChange={() => setPicked("postpaid")}
                   />
                   <span className="min-w-0 flex-1">
-                    {line.postpaidMinor != null ? `${m(line.postpaidMinor, line.currency)} now, then each month's charge due 2 days before it is billed` : "Each month's charge due 2 days before it is billed"}
+                    {line.postpaidMinor != null ? `${m(line.postpaidMinor, line.currency)} now, then each month's charge due 2 days before the month's pay date` : "Each month's charge due 2 days before the month's pay date"}
                     <span className="block text-xs text-text-subtle">
                       {promoApplied ? "Not with a promo code" : canPostpaid ? "Recommended" : line.monthlyBlocked}
                     </span>

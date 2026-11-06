@@ -598,10 +598,10 @@ step("employer: checks out with the month-end stipend plan in free mode → prop
   const path = `/api/employer/${state.employerId}/payment/razorpay/order`;
   await uiOr(
     t,
-    `checkout "stipend due 2 days before the intern's pay day" → "Complete for free (test mode)"`,
+    `checkout "charge due 2 days before the month's pay date" → "Complete for free (test mode)"`,
     async () => {
       await visit(page, "/employer/checkout");
-      await page.getByRole("radio", { name: /stipend due 2 days before the intern.s pay day/i }).check();
+      await page.getByRole("radio", { name: /charge due 2 days before the month.s pay date/i }).check();
       const main = await page.locator("main").innerText();
       assert.match(main, /Hiring charge \(one-time\)/, "the hiring charge is the only amount due now");
       assert.match(main, /Month 1 · due /, "month 1 is listed with its due date");
