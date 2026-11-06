@@ -42,7 +42,7 @@ export async function POST(req: Request, ctx: Ctx) {
 
 const patchSchema = z.object({ maxUsages: z.number().int() });
 
-/** Change the cap. The server refuses a cap below the seats already used. */
+/** Change the cap. The server refuses a cap below the seats already used or above the seats paid for. */
 export async function PATCH(req: Request, ctx: Ctx) {
   const g = await requireMutation({ req, roles: ["admin"] });
   if (!g.ok) return g.response;
@@ -50,18 +50,25 @@ export async function PATCH(req: Request, ctx: Ctx) {
   const parsed = patchSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Enter a whole number of seats" }, { status: 400 });
   const { id } = await ctx.params;
-  const db = getDb();
-  const [promo] = await db.select().from(schema.promoCodes).where(eq(schema.promoCodes.collegeId, id)).limit(1);
-  if (!promo) return NextResponse.json({ error: "This college has no code yet" }, { status: 404 });
-  const problem = seatCapProblem(parsed.data.maxUsages, promo.usedCount);
-  if (problem) return NextResponse.json({ error: problem }, { status: 400 });
-  // Re-checks used_count in the UPDATE itself: a seat taken since the read must not slip under the new cap.
-  const rows = await db
-    .update(schema.promoCodes)
-    .set({ maxUsages: parsed.data.maxUsages, updatedAt: new Date() })
-    .where(sql`${schema.promoCodes.id} = ${promo.id} AND ${schema.promoCodes.usedCount} <= ${parsed.data.maxUsages}`)
-    .returning({ id: schema.promoCodes.id });
-  if (rows.length === 0) return NextResponse.json({ error: "Seats were just used; refresh and try again" }, { status: 409 });
-  await recordAdminAudit(db, { adminId: g.session.uid, action: "college.tpo_cap_update", targetType: "college", targetId: id, meta: { maxUsages: { from: promo.maxUsages, to: parsed.data.maxUsages } } });
+  const cap = parsed.data.maxUsages;
+  const out = await getDb().transaction(async (tx) => {
+    // The same college row lock as mark-paid, so a batch paid meanwhile can't be undercut by this edit.
+    await tx.select({ id: schema.colleges.id }).from(schema.colleges).where(eq(schema.colleges.id, id)).for("update");
+    const [promo] = await tx.select().from(schema.promoCodes).where(eq(schema.promoCodes.collegeId, id)).limit(1);
+    if (!promo) return { error: "This college has no code yet", status: 404 };
+    // Owner rule: no free seats, so the cap can never exceed the seats paid for.
+    const problem = seatCapProblem(cap, promo.usedCount, (await paidSeatTotal(tx, id)).seats);
+    if (problem) return { error: problem, status: 400 };
+    // Re-checks used_count in the UPDATE itself: a seat taken since the read must not slip under the new cap.
+    const rows = await tx
+      .update(schema.promoCodes)
+      .set({ maxUsages: cap, updatedAt: new Date() })
+      .where(sql`${schema.promoCodes.id} = ${promo.id} AND ${schema.promoCodes.usedCount} <= ${cap}`)
+      .returning({ id: schema.promoCodes.id });
+    if (rows.length === 0) return { error: "Seats were just used; refresh and try again", status: 409 };
+    await recordAdminAudit(tx, { adminId: g.session.uid, action: "college.tpo_cap_update", targetType: "college", targetId: id, meta: { maxUsages: { from: promo.maxUsages, to: cap } } });
+    return null;
+  });
+  if (out) return NextResponse.json({ error: out.error }, { status: out.status });
   return NextResponse.json({ ok: true });
 }

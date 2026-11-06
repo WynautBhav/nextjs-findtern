@@ -34,6 +34,14 @@ test("admin cap edit: never below the seats used, whole number, 0 allowed", () =
   assert.ok(seatCapProblem(1.5, 0));
 });
 
+test("admin cap edit: never above the paid seats (no free seats)", () => {
+  assert.equal(seatCapProblem(300, 40, 300), null);
+  assert.equal(seatCapProblem(250, 40, 300), null);
+  assert.match(seatCapProblem(301, 40, 300)!, /Only 300 seats are paid for/);
+  assert.match(seatCapProblem(1, 0, 0)!, /Only 0 seats are paid for/);
+  assert.match(seatCapProblem(10, 40, 0)!, /40 seats are already used/);
+});
+
 test("a cap of 0 is no seats, not unlimited", () => {
   const r = { ...row(0), maxUsages: 0 };
   assert.equal(promoProblem(r, 249900, "INR"), SEATS_USED_UP);

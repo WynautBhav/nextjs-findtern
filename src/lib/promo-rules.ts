@@ -94,10 +94,14 @@ export function collegeCodeProblem(college: { isActive: boolean; isPartner: bool
 export const SEATS_USED_UP = "This college's free seats are used up";
 export const DEFAULT_COLLEGE_SEATS = 300;
 
-/** Admin edits a college's cap: a whole number of at least 0 (a college with no paid batch sits at 0), never below the seats already used. */
-export function seatCapProblem(cap: number, usedCount: number): string | null {
+/**
+ * Admin edits a college's cap: a whole number of at least 0 (a college with no paid batch sits at 0), never below the seats
+ * already used and, when `paidSeats` is given, never above the seats paid for (owner rule: no free seats).
+ */
+export function seatCapProblem(cap: number, usedCount: number, paidSeats?: number): string | null {
   if (!Number.isInteger(cap) || cap < 0) return "The cap must be a whole number, 0 or more";
-  return cap < usedCount ? `${usedCount} seats are already used; the cap can't go below that` : null;
+  if (cap < usedCount) return `${usedCount} seats are already used; the cap can't go below that`;
+  return paidSeats !== undefined && cap > paidSeats ? `Only ${paidSeats} seats are paid for; the cap can't go above that. Raise a seat batch instead.` : null;
 }
 
 /**

@@ -3,9 +3,10 @@ import { and, eq, sql } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 
 type Db = ReturnType<typeof getDb>;
+type Tx = Parameters<Parameters<Db["transaction"]>[0]>[0];
 
 /** Total seats across the college's paid batches (0 when none is paid). */
-export async function paidSeatTotal(db: Db, collegeId: string): Promise<{ batches: number; seats: number }> {
+export async function paidSeatTotal(db: Db | Tx, collegeId: string): Promise<{ batches: number; seats: number }> {
   const B = schema.collegeSeatBatches;
   const [row] = await db
     .select({ batches: sql<number>`count(*)::int`, seats: sql<number>`coalesce(sum(${B.seats}), 0)::int` })
