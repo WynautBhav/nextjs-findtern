@@ -639,3 +639,20 @@ test("skill lists: 4 to 7 after repeats are removed, case-insensitively (OA9)", 
   assert.match(skillListError(["A", "a", "B", "b", "C"]) ?? "", /4-7/);
   assert.equal(skillListError(["A", "a", "B", "C", "D", "E", "F", "G"]), null);
 });
+
+test("profile text an employer reads refuses contact details; catalog skills that look like domains pass", async () => {
+  const { profileContactError } = await import("./onboarding.ts");
+  const exp = { id: "1", type: "Internship", company: "Acme", role: "Dev", from: "", to: "", current: false, description: "" };
+  assert.equal(profileContactError({ city: "Pune", skills: ["Socket.io", "Monday.com", "React"], experiences: [exp] }), null);
+  for (const bad of [
+    { city: "Pune 98765 43210" },
+    { skills: ["insta rahul_x"] },
+    { experiences: [{ ...exp, description: "Portfolio at rahul.dev" }] },
+    { academics: { institution: "IIT", degree: "B.Tech", branch: "mail rahul at gmail dot com" } },
+    { languages: [{ id: "l", language: "wa.me/919876543210", level: "" as const }] },
+    { extracurriculars: [{ id: "x", activity: "Chess", level: "" as const, description: "@rahul_chess" }] },
+    { preferredLocations: ["t me rahul_x"] },
+  ]) {
+    assert.match(profileContactError(bad) ?? "", /your profile/, JSON.stringify(bad));
+  }
+});

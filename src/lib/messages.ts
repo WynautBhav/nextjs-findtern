@@ -3,7 +3,7 @@ import { and, asc, desc, eq, gt, inArray, isNull, ne, or, sql } from "drizzle-or
 import { getDb, schema } from "./db/index.ts";
 import { initialsOf } from "./employer-candidates.ts";
 import { emails, origin, renderEmail } from "./emails.ts";
-import { scrubContact } from "./contact-scrub.ts";
+import { CONTACT_REFUSED, findContact, scrubContact } from "./contact-scrub.ts";
 import { ONLINE_ACTIVE_MS, presenceLabel, presenceOf, type PresenceLabel } from "./presence.ts";
 import { RateLimiter } from "./security/rate-limit.ts";
 
@@ -54,9 +54,20 @@ export function isParticipant(thread: Pair, viewer: Viewer): boolean {
   return viewer.role === "employer" ? thread.employerId === viewer.id : thread.internId === viewer.id;
 }
 
-/** What is stored: contact details are replaced unless the hire is paid. */
-export function bodyToStore(body: string, contactUnlocked: boolean): { text: string; redacted: boolean } {
-  return contactUnlocked ? { text: body, redacted: false } : scrubContact(body);
+/** How many of the sender's earlier messages are read together with a new one. */
+export const SPLIT_WINDOW = 3;
+
+/**
+ * What is stored. Before the hire is paid a message carrying contact details is
+ * refused outright (OA1: never delivered, not even half-masked), and so is one
+ * that completes a number or address with the sender's last few messages
+ * (`recent`, oldest first): "98765" then "43210".
+ */
+export function bodyToStore(body: string, contactUnlocked: boolean, recent: string[] = []): { text: string; redacted: boolean } {
+  if (!contactUnlocked && (findContact(body).kinds.length > 0 || (recent.length > 0 && findContact([...recent, body].join(" ")).kinds.length > 0))) {
+    throw new MessageError(422, CONTACT_REFUSED);
+  }
+  return { text: body, redacted: false };
 }
 
 /** At most one email per thread and recipient in this window, whatever else says "due". */
@@ -395,7 +406,20 @@ export async function sendMessage(
   }
 
   const { contactUnlocked } = await import("./messages-access.ts");
-  const stored = bodyToStore(input.body, await contactUnlocked(thread.employerId, thread.internId));
+  const unlocked = await contactUnlocked(thread.employerId, thread.internId);
+  const recent = unlocked
+    ? []
+    : (
+        await db
+          .select({ body: m.body })
+          .from(m)
+          .where(and(eq(m.threadId, thread.id), eq(m.senderId, viewer.id)))
+          .orderBy(desc(m.createdAt), desc(m.id))
+          .limit(SPLIT_WINDOW)
+      )
+        .map((r) => r.body)
+        .reverse();
+  const stored = bodyToStore(input.body, unlocked, recent);
   const [row] = await db
     .insert(m)
     .values({ threadId: thread.id, senderType: viewer.role, senderId: viewer.id, body: stored.text, clientId: input.clientId, redacted: stored.redacted })

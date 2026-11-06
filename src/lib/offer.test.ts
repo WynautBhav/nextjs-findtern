@@ -207,6 +207,7 @@ test("laptop: legacy 'candidate' is written; the new app's old 'intern' reads as
   assert.equal(parseOffer({ laptop: "intern" }).laptop, "candidate");
   assert.equal(parseOffer({ laptop: "yes" }).laptop, "company");
   assert.equal(laptopLabel("intern"), "Candidate's own laptop");
+  assert.equal(laptopLabel("wa.me/919876543210"), "Not specified", "unknown values are never shown verbatim");
   const raw = buildOffer({
     currency: "INR", roleTitle: "x", mode: "remote", startDate: "2026-12-01", duration: "1m",
     monthlyHours: 160, hourlyRateMinor: 10_000, perHireMinor: 0, laptop: "intern",

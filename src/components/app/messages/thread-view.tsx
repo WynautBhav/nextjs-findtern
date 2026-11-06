@@ -146,6 +146,13 @@ export function ThreadView({
         return;
       }
       const error = data?.error ?? "Could not send. Try again.";
+      if (res.status === 422) {
+        // Refused for contact details: give the text back to edit; retrying as-is would fail again.
+        setOutbox((o) => o.filter((x) => x.clientId !== item.clientId));
+        setText(item.body);
+        setComposeError(error);
+        return;
+      }
       setOutbox((o) => o.map((x) => (x.clientId === item.clientId ? { ...x, state: "failed", error } : x)));
     } catch {
       setOutbox((o) => o.map((x) => (x.clientId === item.clientId ? { ...x, state: "failed", error: "Could not reach Findtern. Check your connection and retry." } : x)));

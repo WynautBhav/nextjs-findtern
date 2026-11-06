@@ -6,6 +6,14 @@ import { manualMeetingLink, pickMeetingLink } from "./meeting-link.ts";
 test("manual link: https accepted and trimmed", () => {
   assert.equal(manualMeetingLink(" https://meet.google.com/abc-defg-hij "), "https://meet.google.com/abc-defg-hij");
   assert.equal(manualMeetingLink("https://zoom.us/j/123"), "https://zoom.us/j/123");
+  assert.equal(manualMeetingLink("https://us02web.zoom.us/j/123"), "https://us02web.zoom.us/j/123");
+  assert.equal(manualMeetingLink("https://teams.microsoft.com/l/meetup-join/x"), "https://teams.microsoft.com/l/meetup-join/x");
+});
+
+test("manual link: only meeting hosts, so the link cannot carry contact details", () => {
+  for (const v of ["https://wa.me/919876543210", "https://instagram.com/rahul", "https://linktr.ee/rahul", "https://zoom.us.evil.com/j/1", "https://evilzoom.us/j/1", "https://meet.google.com.evil.in/x"]) {
+    assert.equal(manualMeetingLink(v), null, v);
+  }
 });
 
 test("manual link: http, other schemes, relative, spaces, empty, too long are refused", () => {

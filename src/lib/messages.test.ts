@@ -15,15 +15,24 @@ test("participant check: exactly the two sides of the pair, each only in their o
   assert.equal(isParticipant(thread, { role: "employer", id: "i1" }), false);
 });
 
-test("scrub gating: contact details are hidden until the hire is paid, then stored as written", () => {
+test("send gating: a message with contact details is refused (422) until the hire is paid, then stored as written", () => {
   const body = "call me on 98765 43210 or mail a@b.co";
-  const locked = bodyToStore(body, false);
-  assert.equal(locked.redacted, true);
-  assert.doesNotMatch(locked.text, /98765|a@b\.co/);
-  assert.match(locked.text, /\[hidden until hire\]/);
+  for (const b of [body, "nine eight seven six five four three two one zero", "insta rahulsharma", "rahul at gmail"]) {
+    assert.throws(() => bodyToStore(b, false), (e: unknown) => e instanceof MessageError && e.status === 422, b);
+  }
 
   const open = bodyToStore(body, true);
   assert.deepEqual(open, { text: body, redacted: false });
+});
+
+test("split across messages: the sender's last messages are read together with the new one", () => {
+  const refused = (e: unknown) => e instanceof MessageError && e.status === 422;
+  assert.throws(() => bodyToStore("43210", false, ["98765"]), refused);
+  assert.throws(() => bodyToStore("4 3 2 1 0", false, ["ok", "9 8 7", "6 5"]), refused);
+  assert.throws(() => bodyToStore("gmail dot com", false, ["rahul at"]), refused);
+  assert.throws(() => bodyToStore("rahul_x", false, ["my insta id"]), refused);
+  assert.deepEqual(bodyToStore("43210", true, ["98765"]), { text: "43210", redacted: false }, "after the hire anything goes");
+  assert.equal(bodyToStore("Can you start on Monday?", false, ["Budget 75000", "or 90000 for 3 months"]).text, "Can you start on Monday?");
 });
 
 test("scrub gating: ordinary text is stored untouched and not flagged", () => {

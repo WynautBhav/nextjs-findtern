@@ -43,7 +43,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   const pasted = parsed.data.manualLink?.trim();
   const manualLink = pasted ? manualMeetingLink(pasted) : null;
   if (pasted && !manualLink) {
-    return NextResponse.json({ error: "Paste a full https:// meeting link, or leave it empty." }, { status: 400 });
+    return NextResponse.json({ error: "Paste a Google Meet, Zoom, Teams or Webex link (https://), or leave it empty." }, { status: 400 });
   }
   const eligible = (await eligibleStudents(loaded.drive)).some((s) => s.userId === parsed.data.userId);
   if (!eligible) return NextResponse.json({ error: "Student not in this drive" }, { status: 404 });

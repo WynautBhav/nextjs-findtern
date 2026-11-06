@@ -38,8 +38,9 @@ function laptopLabel(raw: string): string {
   const v = raw.toLowerCase();
   if (!v) return "Not specified";
   if (v === "company" || v === "yes") return "Provided by the company";
-  if (v === "candidate" || v === "own" || v === "no") return "Your own";
-  return raw;
+  if (v === "candidate" || v === "intern" || v === "own" || v === "no") return "Your own";
+  // Never echo an unknown value: it is free text from the employer.
+  return "Not specified";
 }
 
 type Loaded<T> = { ok: boolean; row: T | null };

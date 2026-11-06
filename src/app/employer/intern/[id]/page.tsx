@@ -11,7 +11,8 @@ import { candidateRelations, isAdminViewing, type CandidateRelation } from "@/li
 import { ShortlistToggle } from "@/components/employer/shortlist-toggle";
 import { bandFor } from "@/lib/score";
 import { formatDate, formatMoney, formatRate } from "@/lib/format";
-import { displayNameOf, preferredCities, toCandidateProfile, type CandidateProfile } from "@/lib/employer-candidates";
+import { displayNameOf, isCatalogSkill, preferredCities, toCandidateProfile, type CandidateProfile } from "@/lib/employer-candidates";
+import { hideContactText } from "@/lib/contact-scrub";
 import { employerRegion, resolvePricing } from "@/lib/employer-pricing";
 import { AiFeedbackReport } from "@/components/employer/ai-feedback-report";
 import { CandidateAvatar } from "@/components/employer/candidate-avatar";
@@ -242,7 +243,8 @@ export default async function EmployerInternDetail({
       // Photo shows before hire (owner, 6 Nov); the name stays initials until hired.
       await attachPhotos(db, [profile]);
       presence = (await presenceOf([profile.id]).catch(() => ({} as Record<string, PresenceLabel | null>)))[profile.id] ?? null;
-      if (onboarding) details = draftFromRecord(onboarding);
+      // Before the hire, profile text stored ahead of the contact check is hidden where it carries contact (OA1).
+      if (onboarding) details = nameUnlocked ? draftFromRecord(onboarding) : hideContactText(draftFromRecord(onboarding), isCatalogSkill);
       plans = await db.select().from(schema.pricingPlans).where(eq(schema.pricingPlans.isActive, true));
 
       const [employer] = await db

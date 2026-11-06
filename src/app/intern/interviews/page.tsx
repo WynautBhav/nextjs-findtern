@@ -14,7 +14,7 @@ import { SITE } from "@/lib/content/site";
 import { isMeetingLinkLive, isStaleInterview } from "@/lib/employer-interview-rules";
 import { formatIst } from "@/lib/format";
 import { HIDDEN_COMPANY, loadInternData, projectNames } from "@/lib/intern-data";
-import { feedbackTextOf } from "@/lib/interview-feedback";
+import { feedbackForIntern } from "@/lib/interview-feedback";
 import { isPast, slotOf, type InterviewRow } from "@/lib/journey";
 import { isInternPaid } from "@/lib/payments";
 
@@ -193,7 +193,7 @@ export default async function InternInterviews() {
           <Surface as="ul" className="divide-y divide-ink-100">
             {past.map((i) => {
               const outcome = pastOutcome(i);
-              const feedback = feedbackTextOf(i.notes);
+              const feedback = feedbackForIntern(i.notes);
               const when = i.selectedSlot ? slotOf(i) : null;
               return (
                 <AgendaRow

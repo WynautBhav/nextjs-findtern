@@ -8,6 +8,8 @@ import { withLock } from "@/lib/advisory-lock";
 import { getDb, schema } from "@/lib/db";
 import { scoreOf, toCandidateProfile } from "@/lib/employer-candidates";
 import { resolvePricing } from "@/lib/employer-pricing";
+import { contactFieldError } from "@/lib/contact-scrub";
+import { canonicalSkill } from "@/lib/data/skills";
 import { requireMutation } from "@/lib/guards-mutation";
 import { emails } from "@/lib/emails";
 import { employerNames, notify } from "@/lib/notify";
@@ -125,6 +127,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid input" }, { status: 400 });
   }
   const b = parsed.data;
+  // No contact details in an offer: a proposal always goes out before the hire is paid (OA1).
+  const contactProblem = contactFieldError({ roleTitle: b.roleTitle, jd: b.jd, additionalInfo: b.additionalInfo, location: b.location, city: b.city, state: b.state, skills: b.skills.filter((s) => !canonicalSkill(s)) }, "the proposal");
+  if (contactProblem) return NextResponse.json({ error: contactProblem }, { status: 400 });
   // An offer lapses on its start date, so the start has to be after today.
   if (b.startDate <= todayIst()) {
     return NextResponse.json({ error: "Pick a start date after today." }, { status: 400 });
