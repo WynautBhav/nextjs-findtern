@@ -261,7 +261,7 @@ export function CandidateCard({
             className="size-14 rounded-full text-base ring-1 ring-inset ring-brand-200/70"
           />
           {presence ? (
-            <span className="absolute -bottom-0.5 -right-0.5 grid size-4 place-items-center rounded-full bg-white">
+            <span aria-hidden className="absolute -bottom-0.5 -right-0.5 grid size-4 place-items-center rounded-full bg-white">
               <PresenceDot label={presence} />
             </span>
           ) : null}
@@ -286,15 +286,18 @@ export function CandidateCard({
           </div>
           {/* The stats line (Upwork's rate / success / earned line): score, band and rate, then where and how. */}
           <p className="mt-0.5 flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-sm text-ink-600">
-            <span className="nums inline-flex items-baseline gap-2" title={candidate.scored ? `Findtern Score ${candidate.score.toFixed(1)} out of 10` : "Not scored yet"}>
-              <span className="text-lg font-semibold leading-none text-brand-700">
-                {candidate.scored ? candidate.score.toFixed(1) : "-"}
-                <span className="ml-0.5 text-xs font-medium text-text-subtle">/10</span>
-                <span className="sr-only"> Findtern Score</span>
-              </span>
-              <span className="font-semibold text-ink-900" title={candidate.scored ? `${band.name} band` : undefined}>
-                {formatRate(pricing.hourlyRateMinor, currency)}
-              </span>
+            <span className="nums inline-flex items-baseline gap-2">
+              {candidate.scored ? (
+                <span className="text-lg font-semibold leading-none text-brand-700" title={`Findtern Score ${candidate.score.toFixed(1)} out of 10`}>
+                  {candidate.score.toFixed(1)}
+                  <span className="ml-0.5 text-xs font-medium text-text-subtle">/10</span>
+                  <span className="sr-only"> Findtern Score</span>
+                </span>
+              ) : (
+                <span className="text-sm text-ink-600">Not scored yet</span>
+              )}
+              <span className="font-semibold text-ink-900">{formatRate(pricing.hourlyRateMinor, currency)}</span>
+              {candidate.scored ? <span className="text-ink-600">{band.name}</span> : null}
             </span>
             <span className="min-w-0 break-words">{meta.join(" · ")}</span>
             {candidate.hasLaptop !== null ? (
