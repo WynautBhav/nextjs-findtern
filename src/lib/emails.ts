@@ -524,6 +524,17 @@ export const emails = {
     ],
     cta: { label: "Reset password", url: o.url },
   }),
+  /** One per unread burst, only when the person is not on Findtern. Names are masked as on screen; the message text stays in the app. */
+  newMessage: (o: { name: string; from: string; url: string }): EmailContent => ({
+    subject: "You have a new message on Findtern",
+    preheader: `${o.from} wrote to you. Read and reply on Findtern.`,
+    heading: "You have a new message",
+    greeting: hi(o.name),
+    lines: [`${o.from} sent you a message on Findtern.`, "Open the conversation to read it and reply. Phone numbers, emails and links stay hidden until the hire is paid."],
+    status: "Unread",
+    cta: { label: "Read message", url: o.url },
+  }),
+
   /** `dueOn` is a readable date. "due" covers the due day and the 2 days after, so only say "today" when it is. */
   paymentReminder: (o: { name: string; type: "upcoming" | "due" | "overdue"; k: number; amount: string; dueOn: string; dueToday?: boolean; intern: string }): EmailContent => {
     const today = o.type === "due" && o.dueToday !== false;

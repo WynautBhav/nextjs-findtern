@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { and, count, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import {
   BadgeCheck,
   Bell,
@@ -10,6 +10,7 @@ import {
   Compass,
   House,
   LayoutList,
+  MessageSquare,
   ReceiptIndianRupee,
   ScrollText,
   Settings2,
@@ -18,11 +19,14 @@ import {
 import { ConsoleShell, type ConsoleNavItem } from "@/components/layout/console-shell";
 import { RAIL_COOKIE } from "@/lib/rail";
 import { ViewAsBanner } from "@/components/admin/view-as-banner";
+import { LiveProvider } from "@/components/app/live-provider";
 import { TermsGate } from "@/components/app/terms-gate";
+import { ToastProvider } from "@/components/app/toast";
 import { CollegeLive } from "@/components/intern/college-live";
 import { getSession } from "@/lib/auth";
 import { getDb, schema } from "@/lib/db";
 import { membershipOf } from "@/lib/college/membership";
+import { countsFor } from "@/lib/live-counts";
 import { loadInternData } from "@/lib/intern-data";
 import { nextAction, type Stage } from "@/lib/journey";
 import { SITE } from "@/lib/content/site";
@@ -57,6 +61,7 @@ const STAGE_NAV: Record<Stage, ConsoleNavItem[]> = {
 const MORE_NAV: ConsoleNavItem[] = [
   { href: "/intern/opportunities", label: "Open roles", icon: <Compass /> },
   { href: "/intern/proposals", label: "Offers", icon: <BriefcaseBusiness /> },
+  { href: "/intern/messages", label: "Messages", icon: <MessageSquare /> },
   { href: "/intern/interviews", label: "Interviews", icon: <CalendarCheck2 /> },
   { href: "/intern/timesheets", label: "Timesheets", icon: <LayoutList /> },
   { href: "/intern/earnings", label: "Stipend", icon: <ReceiptIndianRupee /> },
@@ -84,20 +89,12 @@ export default async function InternLayout({ children }: { children: React.React
   if (!session || session.role !== "intern") redirect("/login?as=intern");
 
   // Independent reads, in parallel. loadInternData is cache()d, so the page's own call reuses this one.
-  const [data, { name, termsVersion }, [unread], college] = await Promise.all([
+  const [data, { name, termsVersion }, live, college] = await Promise.all([
     loadInternData(session.uid),
     fullName(session.uid),
-    getDb()
-      .select({ value: count() })
-      .from(schema.notifications)
-      .where(
-        and(
-          eq(schema.notifications.recipientType, "intern"),
-          eq(schema.notifications.recipientId, session.uid),
-          eq(schema.notifications.isRead, false),
-        ),
-      ),
-    // Only college members heartbeat; "View as" must not mark the student online.
+    // Unread alerts and messages: the same query the live stream sends, so the badges never disagree with it.
+    countsFor("intern", session.uid),
+    // Only the drive banner needs the college; "View as" must not mark the student online, so nothing beats then.
     session.impersonator ? null : membershipOf(session.uid).catch(() => null),
   ]);
   const action = nextAction(data.thread);
@@ -105,17 +102,21 @@ export default async function InternLayout({ children }: { children: React.React
 
   // Uploaded photos only; a saved outside URL is never rendered.
   const photoUrl = data.document?.profilePhotoName ? "/api/intern/avatar" : null;
-  const unreadAlerts = Number(unread?.value ?? 0);
+  const unreadAlerts = live.notifications;
 
   const main = STAGE_NAV[data.stage].map((item) => ({
     ...item,
     attention: attentionHrefs.some((h) => h.startsWith(item.href)) && item.href !== "/intern/dashboard",
   }));
-  const more = MORE_NAV.filter((i) => !main.some((m) => m.href === i.href)).map((i) =>
-    i.href === "/intern/notifications" && unreadAlerts > 0 ? { ...i, badge: unreadAlerts > 99 ? "99+" : unreadAlerts } : i,
-  );
+  const badge = (n: number) => (n > 99 ? "99+" : n);
+  const more = MORE_NAV.filter((i) => !main.some((m) => m.href === i.href)).map((i) => {
+    if (i.href === "/intern/notifications" && unreadAlerts > 0) return { ...i, badge: badge(unreadAlerts) };
+    if (i.href === "/intern/messages" && live.messages > 0) return { ...i, badge: badge(live.messages), attention: true };
+    return i;
+  });
 
   return (
+    <ToastProvider>
     <ConsoleShell
       homeHref="/intern/dashboard"
       groups={[{ items: main }, { title: "More", items: more }]}
@@ -137,16 +138,19 @@ export default async function InternLayout({ children }: { children: React.React
       tone="light"
       banner={session.impersonator ? <ViewAsBanner viewing={name} admin={session.impersonator.email} /> : null}
     >
-      {/* Presence, drive banner and call alerts only exist for partner colleges. */}
-      {college?.isPartner ? (
+      <LiveProvider initial={live} />
+      {/* Every student beats (employers see presence); the drive banner and call alerts only exist for partner colleges. */}
+      {session.impersonator ? null : (
         <CollegeLive
-          collegeName={college.name}
+          collegeName={college?.isPartner ? college.name : ""}
+          partner={Boolean(college?.isPartner)}
           vapidKey={process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? ""}
         />
-      ) : null}
+      )}
       {children}
       <TermsGate role="intern" initialOpen={termsVersion !== undefined && shouldShowTermsPrompt({ acceptedVersion: termsVersion, impersonating: !!session.impersonator })} />
     </ConsoleShell>
+    </ToastProvider>
   );
 }
 

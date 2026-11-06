@@ -10,6 +10,7 @@ import { CollegeForm } from "@/components/intern/college-form";
 import { BankDetailsForm, type BankDetails } from "@/components/intern/bank-details-form";
 import { InvoiceList } from "@/components/intern/invoice-list";
 import { ContactDetailsForm } from "@/components/intern/contact-details-form";
+import { PresenceToggle } from "@/components/intern/presence-toggle";
 import { requireRole } from "@/lib/auth";
 import { membershipOf } from "@/lib/college/membership";
 import { getDb, schema } from "@/lib/db";
@@ -44,7 +45,7 @@ export default async function InternSettings({ searchParams }: { searchParams: P
 
   const uid = session.uid;
   const db = getDb();
-  const [[row], [user], college, payments] = await Promise.all([
+  const [[row], [user], college, payments, [presence]] = await Promise.all([
     db
       .select({ extra: schema.internOnboarding.extraData })
       .from(schema.internOnboarding)
@@ -97,6 +98,11 @@ export default async function InternSettings({ searchParams }: { searchParams: P
         ),
       )
       .orderBy(desc(schema.internPayments.paidAt)),
+    db
+      .select({ hidden: schema.userPresence.hidden })
+      .from(schema.userPresence)
+      .where(and(eq(schema.userPresence.userType, "intern"), eq(schema.userPresence.userId, uid)))
+      .limit(1),
   ]);
   const invoices = ownInternInvoices(payments, uid, getInvoiceSeller());
   const extra = (row?.extra ?? {}) as Record<string, unknown>;
@@ -138,6 +144,13 @@ export default async function InternSettings({ searchParams }: { searchParams: P
               institution={institution}
               vapidKey={process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? ""}
             />
+          </section>
+
+          <section id="presence" className="scroll-mt-24">
+            <SectionHead title="Activity" hint="Whether employers can see that you are around." />
+            <Surface>
+              <PresenceToggle initialVisible={!presence?.hidden} />
+            </Surface>
           </section>
 
           <section id="invoices" className="scroll-mt-24">
