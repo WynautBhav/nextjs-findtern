@@ -1,7 +1,7 @@
 import { and, eq, sql } from "drizzle-orm";
 
 import { getDb, schema } from "@/lib/db";
-import { employerPromoTooLarge, promoAudienceProblem, promoDiscount, promoProblem, seatFreeWhere, type PromoAudience } from "@/lib/promo-rules";
+import { collegeCodeProblem, employerPromoTooLarge, promoAudienceProblem, promoDiscount, promoProblem, seatFreeWhere, type PromoAudience } from "@/lib/promo-rules";
 
 /**
  * Promo codes against a real order: shared by the intern activation payment
@@ -46,6 +46,12 @@ export async function quotePromo(input: {
   const discountableMinor = input.orderMinor - (input.undiscountableMinor ?? 0);
   if (discountableMinor <= 0) return { ok: false, error: "Promo codes don't apply to the hiring fee", status: 400 };
 
+  if (row.collegeId) {
+    const [college] = await db.select({ isActive: schema.colleges.isActive, isPartner: schema.colleges.isPartner }).from(schema.colleges).where(eq(schema.colleges.id, row.collegeId)).limit(1);
+    const dead = collegeCodeProblem(college ?? null);
+    if (dead) return { ok: false, error: dead, status: 400 };
+  }
+
   const problem = promoProblem(row, discountableMinor, input.currency);
   if (problem) return { ok: false, error: problem, status: 400 };
 
@@ -82,7 +88,7 @@ export async function recordPromoUse(input: {
   discountMinor: number;
   /** A ₹0 order has no money to protect: refuse it when the cap is full. A paid order is never refused. */
   enforceCap?: boolean;
-}, db: Db | Tx = getDb()): Promise<{ capped: boolean; collegeId: string | null }> {
+}, db: Db | Tx = getDb()): Promise<{ capped: boolean; collegeId: string | null; refused?: string }> {
   const [promo] = await db
     .select({ id: schema.promoCodes.id, collegeId: schema.promoCodes.collegeId })
     .from(schema.promoCodes)
@@ -101,6 +107,13 @@ export async function recordPromoUse(input: {
     .onConflictDoNothing()
     .returning({ id: schema.promoCodeUsages.id });
   if (inserted.length === 0) return { capped: false, collegeId: null };
+
+  // A ₹0 order has nothing to protect, so an inactive college refuses it; a paid order is never refused.
+  if (input.enforceCap && promo.collegeId) {
+    const [college] = await db.select({ isActive: schema.colleges.isActive, isPartner: schema.colleges.isPartner }).from(schema.colleges).where(eq(schema.colleges.id, promo.collegeId)).limit(1);
+    const refused = collegeCodeProblem(college ?? null);
+    if (refused) return { capped: true, collegeId: promo.collegeId, refused };
+  }
 
   const bump = db
     .update(schema.promoCodes)

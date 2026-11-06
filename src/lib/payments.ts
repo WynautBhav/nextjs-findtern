@@ -324,7 +324,7 @@ export async function settleInternOrder(input: {
     if (promo) {
       const use = await recordPromoUse({ code: promo.code, subjectId: payment.internId, orderId: input.orderId, discountMinor: promo.discountMinor, enforceCap: payment.amountMinor === 0 }, tx);
       // Throwing rolls back the claim above too, so the seat and the order stay unspent.
-      if (use.capped) throw new SettleRefused();
+      if (use.capped) throw new SettleRefused(use.refused);
       if (use.collegeId) {
         if (consentProblem((payment.raw as { declaredAdult?: unknown } | null)?.declaredAdult)) throw new SettleRefused(consentProblem(false)!);
         await verifyByCollegeCode(tx, payment.internId, use.collegeId);
