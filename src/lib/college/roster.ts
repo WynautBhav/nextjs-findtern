@@ -52,6 +52,12 @@ export function detectMapping(header: string[]): RosterMapping {
   return { name: c.name, email: c.email, phone: c.phone >= 0 ? c.phone : null };
 }
 
+/** The columns a roster import reads under this mapping; every other column (DOB, Aadhaar, address...) is never stored. */
+export function rosterColumns(header: string[], mapping: RosterMapping): number[] {
+  const c = detectColumns(header.map((h) => h.trim()));
+  return [...new Set([c.rollNo, c.year, c.branch, mapping.name, mapping.email, mapping.phone ?? -1])].filter((i) => i >= 0);
+}
+
 /**
  * A 10-digit Indian mobile from "98765 43210", "+91-98765-43210", "09876543210" or "919876543210".
  * Null when it isn't one (must start 6-9).

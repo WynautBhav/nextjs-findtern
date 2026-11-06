@@ -14,7 +14,9 @@ import {
   overAllocationOf,
   readTable,
   sha256Hex,
+  storedFrom,
   validateMapping,
+  withoutCells,
   type MatchResult,
 } from "./roster-import.ts";
 
@@ -132,4 +134,23 @@ test("link shortcut: phone only counts for an Indian number, verified email must
   assert.equal(candidateShown(row, { ...user, id: "c1", phone: "9000000000" }), true);
   assert.equal(candidateShown(row, { ...user, phone: "1", email: "asha@x.in", verified: true }), true);
   assert.equal(candidateShown(row, { ...user, phone: "1", email: "asha@x.in", verified: false }), false);
+});
+
+test("a stored import keeps only the columns the roster reads; commit/discard drop the cells (review #10)", () => {
+  const table = [
+    ["Name", "Email", "DOB", "Aadhaar", "Roll No", "Address"],
+    ["Asha", "asha@x.in", "2004-01-02", "1234 5678 9012", "R1", "12 MG Road"],
+  ];
+  const parsed = parseRosterTable(table);
+  const rows = buildPreviewRows(parsed, new Set(), new Map());
+  const stored = storedFrom(rows, table, parsed.mapping);
+  assert.deepEqual(stored[0].cells, table[0], "header names stay for the mapping UI");
+  assert.deepEqual((stored[1] as { cells: string[] }).cells, ["Asha", "asha@x.in", "", "", "R1", ""]);
+  assert.ok(!JSON.stringify(stored).includes("1234 5678 9012"));
+  // No email column yet: the admin still has to pick one, so the row is kept whole.
+  const open = storedFrom(rows, table, { name: 0, email: -1, phone: null });
+  assert.deepEqual((open[1] as { cells: string[] }).cells, table[1]);
+  const done = withoutCells(stored);
+  assert.deepEqual((done[1] as { cells: string[]; email: string }).cells, []);
+  assert.equal((done[1] as { email: string }).email, "asha@x.in");
 });

@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { and, eq, inArray, sql } from "drizzle-orm";
 
 import { isXlsx, readXlsxRows } from "../xlsx.ts";
-import { MAX_IMPORT_ROWS, TOO_MANY_ROWS, parseRosterTable, splitCsv, type ParsedRoster, type RosterInput, type RosterMapping } from "./roster.ts";
+import { MAX_IMPORT_ROWS, TOO_MANY_ROWS, parseRosterTable, rosterColumns, splitCsv, type ParsedRoster, type RosterInput, type RosterMapping } from "./roster.ts";
 
 /**
  * Admin roster import (WP-B): upload → classified preview → confirm.
@@ -134,12 +134,15 @@ export function validateMapping(mapping: RosterMapping, width: number): string |
 // `college_roster_imports.rows` keeps the file itself so a remap needs no re-upload: element 0 is the
 // header, the rest are the classified rows, each with its raw `cells`.
 
-type StoredHeader = { line: 1; status: "header"; cells: string[] };
+/** `kept`: the columns whose cells were stored; absent while no email column is chosen (the admin still has to pick one). */
+type StoredHeader = { line: 1; status: "header"; cells: string[]; kept?: number[] };
 type StoredRow = PreviewRow & { cells: string[] };
 type Stored = [StoredHeader, ...StoredRow[]];
 
 const toTable = (stored: Stored): string[][] => stored.map((r) => r.cells);
 const isStored = (rows: unknown): rows is Stored => Array.isArray(rows) && (rows[0] as StoredHeader | undefined)?.status === "header";
+/** After commit or discard the raw cells are not needed: the classified fields stay for the preview. */
+export const withoutCells = (stored: Stored): Stored => [stored[0], ...stored.slice(1).map((r) => ({ ...(r as StoredRow), cells: [] }))] as Stored;
 
 export type ImportPreview = {
   importId: string;
@@ -268,9 +271,12 @@ function previewOf(imp: { id: string; status: string; mapping: RosterMapping; ro
   };
 }
 
-function storedFrom(rows: PreviewRow[], table: string[][]): Stored {
-  const byLine = new Map(table.slice(1).map((cells, i) => [i + 2, cells]));
-  return [{ line: 1, status: "header", cells: table[0] }, ...rows.map((r) => ({ ...r, cells: byLine.get(r.line) ?? [] }))] as Stored;
+export function storedFrom(rows: PreviewRow[], table: string[][], mapping: RosterMapping): Stored {
+  const kept = mapping.email < 0 ? null : new Set(rosterColumns(table[0], mapping));
+  const pick = (cells: string[]) => (kept ? cells.map((v, i) => (kept.has(i) ? v : "")) : cells);
+  const byLine = new Map(table.slice(1).map((cells, i) => [i + 2, pick(cells)]));
+  const header: StoredHeader = { line: 1, status: "header", cells: table[0], ...(kept ? { kept: [...kept] } : {}) };
+  return [header, ...rows.map((r) => ({ ...r, cells: byLine.get(r.line) ?? [] }))] as Stored;
 }
 
 export type PreviewOutcome =
@@ -302,7 +308,7 @@ export async function previewImport(input: { collegeId: string; adminId: string;
   const values = {
     fileName: input.fileName.slice(0, 200),
     mapping: parsed.mapping,
-    rows: storedFrom(rows, table) as unknown[],
+    rows: storedFrom(rows, table, parsed.mapping) as unknown[],
     counts: (c?.counts ?? countRows(rows)) as unknown as Record<string, number>,
     status: "previewed",
     overAllocation: c?.alloc.over ?? false,
@@ -346,12 +352,16 @@ export async function remapImport(input: { collegeId: string; importId: string; 
   const table = toTable(imp.rows);
   const bad = validateMapping(input.mapping, table[0].length);
   if (bad) throw new ImportError(bad, 400);
+  const kept = imp.rows[0].kept;
+  if (kept && [input.mapping.name, input.mapping.email, input.mapping.phone ?? -1].some((i) => i >= 0 && !kept.includes(i))) {
+    throw new ImportError("That column was not kept from the upload. Upload the file again to use it.", 409);
+  }
   const parsed = parseRosterTable(table, input.mapping);
   const c = await classify(l, l.db, input.collegeId, parsed);
   const I = l.schema.collegeRosterImports;
   const [saved] = await l.db
     .update(I)
-    .set({ mapping: parsed.mapping, rows: storedFrom(c.rows, table) as unknown[], counts: c.counts as unknown as Record<string, number>, overAllocation: c.alloc.over })
+    .set({ mapping: parsed.mapping, rows: storedFrom(c.rows, table, parsed.mapping) as unknown[], counts: c.counts as unknown as Record<string, number>, overAllocation: c.alloc.over })
     .where(and(eq(I.id, imp.id), eq(I.status, "previewed")))
     .returning();
   if (!saved) throw settled("changed");
@@ -363,7 +373,8 @@ export async function discardImport(input: { collegeId: string; importId: string
   const I = l.schema.collegeRosterImports;
   const imp = await ownImport(l, l.db, input.collegeId, input.importId);
   if (imp.status !== "previewed") throw settled(imp.status);
-  await l.db.update(I).set({ status: "discarded" }).where(and(eq(I.id, imp.id), eq(I.status, "previewed")));
+  const rows = isStored(imp.rows) ? (withoutCells(imp.rows) as unknown[]) : imp.rows;
+  await l.db.update(I).set({ status: "discarded", rows }).where(and(eq(I.id, imp.id), eq(I.status, "previewed")));
 }
 
 export type CommitResult = { created: number; updated: number; autoLinked: number; review: number; skippedInvalid: number };
@@ -424,7 +435,7 @@ export async function commitImport(input: { collegeId: string; importId: string;
     }
     await tx
       .update(schema.collegeRosterImports)
-      .set({ status: "committed", committedAt: sql`now()`, counts: c.counts as unknown as Record<string, number> })
+      .set({ status: "committed", committedAt: sql`now()`, counts: c.counts as unknown as Record<string, number>, rows: withoutCells(imp.rows) as unknown[] })
       .where(eq(schema.collegeRosterImports.id, imp.id));
     const out = {
       created: c.counts.valid,
