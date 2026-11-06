@@ -4,7 +4,10 @@ import type { Proposal } from "./db/schema.ts";
 export type EmployerProposal = Omit<Proposal, "completionBonusAt" | "completionBonusBy">;
 
 export function toEmployerProposal(p: Proposal): EmployerProposal {
-  const { completionBonusAt: _bonusAt, completionBonusBy: _bonusBy, ...rest } = p;
-  const { internStipendMonthly: _stipend, ...offer } = (p.offerDetails ?? {}) as Record<string, unknown>;
-  return { ...rest, offerDetails: offer };
+  const rest: Partial<Proposal> = { ...p };
+  delete rest.completionBonusAt;
+  delete rest.completionBonusBy;
+  const offer: Record<string, unknown> = { ...((p.offerDetails ?? {}) as Record<string, unknown>) };
+  delete offer.internStipendMonthly;
+  return { ...(rest as EmployerProposal), offerDetails: offer };
 }

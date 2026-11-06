@@ -99,7 +99,7 @@ const EMPLOYER_FAQ = [
       category: "Payment",
       question: "When do I pay?",
       answer:
-        "The fixed ₹5,000 (or $50) per-hire charge is invoiced once when the intern is hired. After that, hourly tiers are billed monthly against the timesheets you approve, each month due 2 days before the intern's pay day (you can pay up to 15 days early). The intern's stipend is a fixed monthly amount by score band, paid by Findtern.",
+        "The fixed ₹5,000 (or $50) per-hire charge is invoiced once when the intern is hired. After that, hourly tiers are billed monthly against the timesheets you approve, each month due 2 days before the intern's pay day (you can pay up to 15 days early).",
     },
     {
       id: "e4",
@@ -120,7 +120,7 @@ const EMPLOYER_FAQ = [
       category: "Payment",
       question: "We are not in India. Can we still hire through Findtern?",
       answer:
-        "Yes. You contract with Findtern for a screening and placement service and pay us in US dollars, the way you pay any overseas vendor. We engage the intern in India and pay a fixed monthly stipend in rupees, so you need no visa, no local entity and no foreign payroll.",
+        "Yes. You contract with Findtern for a screening and placement service and pay us in US dollars, the way you pay any overseas vendor. We engage and pay the intern in India, so you need no visa, no local entity and no foreign payroll.",
     },
 ];
 
@@ -211,7 +211,7 @@ export default async function EmployersPage() {
                   "Academics verified before a profile reaches you",
                   "Structured interview and aptitude test per candidate",
                   "One score out of 10, with the arithmetic published",
-                  "Contracted engagement, logged hours, paid stipend",
+                  "Contracted engagement, logged hours, one monthly invoice",
                 ].map((item) => (
                   <li key={item} className="flex gap-3">
                     <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-accent" aria-hidden />
@@ -309,13 +309,13 @@ export default async function EmployersPage() {
             </h2>
             <p className="mt-6 text-lg leading-relaxed text-muted-foreground">
               A company abroad cannot put an Indian student on its payroll. There is
-              no work visa, no local entity, and no clean way to send a monthly stipend
-              to a foreign bank account.
+              no work visa, no local entity, and no clean way to pay an intern abroad
+              from a foreign bank account.
             </p>
             <p className="mt-4 text-base leading-relaxed text-muted-foreground">
               So you contract with Findtern for screening and placement and pay us in
               dollars, the way you already pay any overseas software or advertising
-              vendor. We engage the intern in India, pay the stipend in rupees against
+              vendor. We engage the intern in India and pay them against
               the hours you approve, and keep the records Indian rules require.
             </p>
           </div>
@@ -327,7 +327,6 @@ export default async function EmployersPage() {
                 ["Work visa", "Not needed. The intern works from India."],
                 ["Local entity", "Not needed. Your contract is with Findtern."],
                 ["Your invoice", "In US dollars, monthly or up front. The same rate card, at ₹100 = $1."],
-                ["The stipend", "A fixed monthly amount in rupees, paid by Findtern after the month's timesheet is approved."],
               ].map(([term, detail]) => (
                 <div key={term} className="grid grid-cols-[7.5rem_minmax(0,1fr)] gap-4 py-3.5">
                   <dt className="text-ink-600">{term}</dt>
@@ -425,7 +424,7 @@ function MoneyFlow() {
         <FlowNode name="Your company" where="Anywhere" />
         <FlowLink label="USD invoice" />
         <FlowNode name="Findtern" where="Jaipur, India" emphasis />
-        <FlowLink label="INR stipend" />
+        <FlowLink label="Intern paid in INR" />
         <FlowNode name="The intern" where="Works from India" />
       </div>
     </figure>

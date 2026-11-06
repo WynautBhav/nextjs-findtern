@@ -97,7 +97,7 @@ function featureRows(tier: 0 | 1 | 2): CmsPlanFeature[] {
     { label: "AI-interviewed, verified candidates", included: true },
     { label: "Findtern Score and skill report", included: true },
     { label: "Side-by-side candidate comparison", included: true },
-    { label: "Timesheets and stipend payouts handled", included: true },
+    { label: "Timesheets and intern payments handled for you", included: true },
     { label: "Candidates scoring 6–8/10", included: tier >= 1 },
     { label: "Top-decile candidates, 8+/10", included: tier >= 2 },
   ];

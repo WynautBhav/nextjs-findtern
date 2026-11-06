@@ -11,7 +11,6 @@ import { CurrencyNote, useRegionBands } from "@/components/marketing/region-rate
 import { MonthlyRate } from "@/components/marketing/monthly-rate";
 import { OfferNote, PlanPrice } from "@/components/marketing/plan-price";
 import { PricingCalculator } from "@/components/marketing/pricing-calculator";
-import { WhereMoneyGoes } from "@/components/marketing/where-money-goes";
 import { pricingFaq } from "@/lib/content/pricing-faq";
 import type { CmsPlan } from "@/lib/content/types";
 import { planHasOffer } from "@/lib/plan-offer";
@@ -287,19 +286,6 @@ export function PricingContent({
         </div>
 
         <CurrencyNote className="mt-6 text-center" />
-      </PageSection>
-
-      {/* ── Where the money goes ────────────────────────────────────── */}
-      <PageSection tone="brand">
-        <div className="mx-auto max-w-2xl text-center">
-          <h2 className="text-balance text-3xl font-semibold tracking-[-0.025em] text-white sm:text-4xl">
-            Where the money goes
-          </h2>
-          <p className="mt-4 text-lg text-on-dark-subtle">
-            Two numbers on every plan. Move the score and watch both of them.
-          </p>
-        </div>
-        <WhereMoneyGoes plansInr={plansInr} plansUsd={plansUsd} />
       </PageSection>
 
       {beforeFaq}

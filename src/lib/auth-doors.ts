@@ -41,6 +41,6 @@ export const DOOR_POINTS = {
   employer: [
     { lead: "Screened before you see them", text: "Every candidate has taken the AI interview and carries a Findtern Score." },
     { lead: "Priced by score", text: "Three bands: Espresso, Cappuccino and Latte. You see the rate before you send an offer." },
-    { lead: "Pay when you hire", text: "₹5,000 (or $50) per hire when a candidate accepts your offer; stipends for score 6+ are billed monthly." },
+    { lead: "Pay when you hire", text: "₹5,000 (or $50) per hire when a candidate accepts your offer; for score 6+ the rest is billed monthly." },
   ],
 };

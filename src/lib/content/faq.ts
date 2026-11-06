@@ -650,7 +650,7 @@ export const FAQ_EMPLOYER: CmsFaqItem[] = [
     "id": "cb862a33-bb8f-42f0-a1b7-ca7016fbc899",
     "category": "Employer",
     "question": "What types of interns can I hire?",
-    "answer": "Employers can hire students and freshers across domains:\nMarketing & Sales\n\n\nHR & Operations\n\n\nIT & Software Development\n\n\nData Science & Analytics\n\n\nFinance & Accounting\n\n\nContent Writing & Graphic Design\n\n\nThe intern’s stipend is fixed by Findtern Score band: ₹0 below 6, ₹8,000 a month from 6 up to 8, and ₹15,000 a month from 8 and above, plus a completion bonus of ₹2,000, ₹2,500 or ₹3,000 by band.\n",
+    "answer": "Employers can hire students and freshers across domains:\nMarketing & Sales\n\n\nHR & Operations\n\n\nIT & Software Development\n\n\nData Science & Analytics\n\n\nFinance & Accounting\n\n\nContent Writing & Graphic Design\n\n\n",
     "sortOrder": 0,
     "isActive": true
   },
