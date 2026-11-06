@@ -95,7 +95,7 @@ export function ShortlistToggle({
         ) : (
           <Plus className="size-4" aria-hidden />
         )}
-        Shortlist
+        {state ? "Shortlisted" : "Shortlist"}
       </button>
       {error ? (
         <span role="alert" className="text-xs text-danger">

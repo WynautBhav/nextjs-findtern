@@ -5,6 +5,7 @@ import { z } from "zod";
 import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
 import { poolInternIds } from "@/lib/employer-pool";
+import { OFFER_BLOCKING_STATUSES } from "@/lib/employer-offer-status";
 
 /**
  * Employer cart.
@@ -79,7 +80,7 @@ export async function POST(req: Request) {
           and(
             eq(schema.proposals.employerId, employerId),
             eq(schema.proposals.internId, internId),
-            inArray(schema.proposals.status, ["sent", "accepted", "processing", "hired"]),
+            inArray(schema.proposals.status, OFFER_BLOCKING_STATUSES),
           ),
         )
         .limit(1);

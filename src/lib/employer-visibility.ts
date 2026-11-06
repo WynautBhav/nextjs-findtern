@@ -5,6 +5,9 @@ import { getDb } from "./db";
 import { proposals } from "./db/schema";
 import { isHiredProposal } from "./hire-status";
 import { parseOffer } from "./offer";
+import { LIVE_STATUSES } from "./employer-offer-status";
+
+export { isLiveOffer } from "./employer-offer-status";
 
 /** True when an admin is browsing this account through "View as". */
 export async function isAdminViewing(): Promise<boolean> {
@@ -66,7 +69,6 @@ export type CandidateRelation = {
   fullTimeFrom: string | null;
 };
 
-const LIVE_STATUSES = ["sent", "interview_scheduled", "accepted", "processing"];
 const CLOSED_STATUSES = ["rejected", "withdrawn", "expired"];
 
 /**
