@@ -18,7 +18,7 @@ test("edit merge: raising an existing employer code to 100 is caught, and flippi
   const intern100 = { discountType: "percentage", discountValue: 100, appliesTo: "intern" };
   assert.ok(promoDiscountProblem({ ...intern100, ...{ appliesTo: "employer" } }));
   // changing only the type to percentage on a fixed 500 code is 500% and refused
-  assert.ok(promoDiscountProblem({ discountType: "fixed", discountValue: 500, appliesTo: "intern", ...{ discountType: "percentage" } }));
+  assert.ok(promoDiscountProblem({ ...{ discountType: "fixed", discountValue: 500, appliesTo: "intern" }, ...{ discountType: "percentage" } }));
 });
 
 test("fixed amounts and sane percentages pass; zero or missing is refused", () => {

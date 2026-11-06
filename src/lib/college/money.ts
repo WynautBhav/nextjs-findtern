@@ -38,6 +38,16 @@ export function availableMinor(balanceMinor: number, openRequestMinor: number): 
   return Math.max(0, balanceMinor - openRequestMinor);
 }
 
+/**
+ * Null when a withdrawal of `amountMinor` may be marked paid against a wallet that holds `balanceMinor` right now
+ * (the request holds no money, so the balance can have dropped since it was made); otherwise the reason.
+ */
+export function settleProblem(balanceMinor: number, amountMinor: number): string | null {
+  if (!Number.isFinite(amountMinor) || amountMinor <= 0) return "Nothing to pay on this request.";
+  if (amountMinor > balanceMinor) return `The wallet holds ${balanceMinor} paise now, less than this request (${amountMinor}). Reject it, or wait for more credits.`;
+  return null;
+}
+
 /** Null when a withdrawal of `amountMinor` may be requested; otherwise the reason. */
 export function withdrawalProblem(input: { amountMinor: unknown; availableMinor: number; hasBank: boolean }): string | null {
   const { amountMinor } = input;

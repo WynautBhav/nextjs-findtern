@@ -68,3 +68,12 @@ test("college bank details map onto the shared bank rules", () => {
   assert.notEqual(collegeBankProblem({ ...ok, upi: "not-a-upi" }), null);
   assert.notEqual(collegeBankProblem({}), null);
 });
+
+test("settleProblem: a withdrawal is paid only while the wallet still holds it", async () => {
+  const { settleProblem } = await import("./money.ts");
+  assert.equal(settleProblem(500000, 500000), null, "exactly the balance is fine");
+  assert.equal(settleProblem(900000, 500000), null);
+  assert.ok(settleProblem(400000, 500000), "balance dropped below the request");
+  assert.ok(settleProblem(0, 500000));
+  assert.ok(settleProblem(500000, 0));
+});
