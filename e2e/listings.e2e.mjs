@@ -30,6 +30,16 @@ const state = {};
 let browser;
 
 const fetchAs = async (ctx, path) => ctx.request.get(new URL(path, baseUrl()).toString(), { failOnStatusCode: false });
+/**
+ * The intern role page is wrapped by src/app/intern/loading.tsx, so Next has already sent a 200 when notFound() runs:
+ * a missing role renders the "Page not found" page with that status. "Gone" = a 404, or that page with no sign of the role.
+ */
+const internRoleGone = async (id, roleName) => {
+  const res = await fetchAs(state.lowCtx, `/intern/opportunities/${id}`);
+  if (res.status() === 404) return true;
+  const html = await res.text();
+  return res.status() === 200 && /Page not found/.test(html) && !html.includes(roleName);
+};
 const publicStatus = async (id) => (await fetchAs(state.guest, `/opportunities/${id}`)).status();
 
 async function createListing(name, description = "Build and ship small data dashboards with our analytics team, weekly demos.") {
@@ -132,7 +142,7 @@ test("pause: a paused listing 404s publicly and leaves discovery; resume brings 
   assert.equal(paused.status, 200, JSON.stringify(paused.body));
   assert.equal((await one(`SELECT status FROM projects WHERE id = $1`, [state.listingId])).status, "inactive");
   assert.equal(await publicStatus(state.listingId), 404, "public page");
-  assert.equal((await fetchAs(state.lowCtx, `/intern/opportunities/${state.listingId}`)).status(), 404, "intern detail page");
+  assert.ok(await internRoleGone(state.listingId, "Dashboard Analytics Intern"), "intern detail page");
   assert.ok(!(await (await fetchAs(state.lowCtx, "/intern/opportunities")).text()).includes("Dashboard Analytics Intern"), "intern list");
 
   const resumed = await send(state.employerCtx, "PUT", `/api/employer/projects/${state.listingId}`, { status: "active" });
@@ -161,7 +171,6 @@ test("take-down: only an admin with a reason; the listing disappears, the employ
   const noReason = await send(state.adminCtx, "PUT", `/api/admin/projects/${id}/status`, { action: "take_down", reason: "no" });
   assert.equal(noReason.status, 400, "reason must be 3 to 500 characters");
 
-  const since = new Date(Date.now() - 1000);
   const down = await send(state.adminCtx, "PUT", `/api/admin/projects/${id}/status`, { action: "take_down", reason: "Misleading role description" });
   assert.equal(down.status, 200, JSON.stringify(down.body));
   const row = await one(`SELECT taken_down_at, taken_down_by, taken_down_reason, status FROM projects WHERE id = $1`, [id]);
@@ -169,12 +178,12 @@ test("take-down: only an admin with a reason; the listing disappears, the employ
   assert.equal(row.taken_down_reason, "Misleading role description");
   assert.equal(row.taken_down_by, state.admin.id);
   assert.equal(await publicStatus(id), 404, "public page");
-  assert.equal((await fetchAs(state.lowCtx, `/intern/opportunities/${id}`)).status(), 404, "intern detail page");
+  assert.ok(await internRoleGone(id, "Dashboard Analytics Intern"), "intern detail page");
 
   const audit = await one(`SELECT meta FROM admin_audit_log WHERE action = 'project.take_down' AND target_id = $1`, [id]);
   assert.ok(audit, "audited as project.take_down");
   const note = await eventually("employer notification", () =>
-    one(`SELECT title, message FROM notifications WHERE recipient_type = 'employer' AND recipient_id = $1 AND created_at >= $2 ORDER BY created_at DESC LIMIT 1`, [state.employer.id, since]));
+    one(`SELECT title, message FROM notifications WHERE recipient_type = 'employer' AND recipient_id = $1 AND created_at >= now() - interval '1 minute' ORDER BY created_at DESC LIMIT 1`, [state.employer.id]));
   assert.match(`${note.title} ${note.message}`, /Misleading role description|taken down|took/i);
 });
 
@@ -271,9 +280,10 @@ test("UI: create goes through a review step before the listing is published [UI]
       await box.fill(skill);
       await box.press("Enter");
     }
-    await page.getByRole("radio", { name: /short/i }).first().check();
-    await page.getByRole("radio", { name: /remote/i }).first().check();
-    await page.getByLabel(/description/i).fill("Own the monthly insights report and present it to the team.");
+    // Scope of work reads "Up to 60 days" (stored as short-term); the description is "What the work involves".
+    await page.getByRole("radio", { name: /up to 60 days/i }).click();
+    await page.getByRole("radio", { name: /remote/i }).click();
+    await page.getByLabel(/what the work involves/i).fill("Own the monthly insights report and present it to the team.");
     // The new step: Review comes first, nothing is created until Publish.
     await page.getByRole("button", { name: /^review/i }).click();
     await page.getByText(name).first().waitFor();
@@ -295,6 +305,7 @@ test("UI: pause and close are separate actions; a taken-down listing shows its r
   const page = await ctx.newPage();
   try {
     await visit(page, "/employer/projects");
+    await page.getByText("Dashboard Analytics Intern").first().waitFor();
     const body = await page.locator("main").innerText();
     assert.match(body, /Dashboard Analytics Intern/);
     const menu = page.getByRole("button", { name: /More actions for Dashboard Analytics Intern/ });
@@ -305,7 +316,7 @@ test("UI: pause and close are separate actions; a taken-down listing shows its r
     // Take it down as admin, then the employer's list shows why.
     assert.equal((await send(state.adminCtx, "PUT", `/api/admin/projects/${state.listingId}/status`, { action: "take_down", reason: "Needs rewording" })).status, 200);
     await page.reload();
-    await page.getByText(/Findtern took this listing down: Needs rewording/).first().waitFor();
+    await page.getByText(/Findtern took down .{0,80}Needs rewording/).first().waitFor();
     await send(state.adminCtx, "PUT", `/api/admin/projects/${state.listingId}/status`, { action: "restore" });
   } catch (err) {
     await page.screenshot({ path: join(ROOT, "e2e", ".artifacts", "fail-listings-ui-menu.png"), fullPage: true }).catch(() => {});

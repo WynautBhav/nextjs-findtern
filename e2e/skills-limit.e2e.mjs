@@ -20,7 +20,7 @@ import { after, before, test } from "node:test";
 
 import { chromium } from "playwright";
 
-import { baseUrl, ROOT, testDatabaseUrl } from "./lib/env.mjs";
+import { ROOT, testDatabaseUrl } from "./lib/env.mjs";
 import { closeDb, db, one, RUN, seedAdmin, seedEmployer, seedIntern, seedProject, send, signedInContext } from "./lib/fixtures.mjs";
 import { visit } from "./lib/browser.mjs";
 
@@ -177,8 +177,9 @@ let display;
 async function displayFixture() {
   if (display) return display;
   const employer = await seedEmployer({ label: "skills-emp" });
-  const projectId = await seedProject(employer.id, { name: "Skills Display Role", skills: [skill(1), skill(2)] });
   const prefix = (s) => s.replace(/E2ESk/, "E2ETen");
+  // The role asks for skills the candidate has, so the candidates list (which defaults to the project's skills) shows them.
+  const projectId = await seedProject(employer.id, { name: "Skills Display Role", skills: [prefix(skill(1)), prefix(skill(2))] });
   const many = await seedIntern({ label: "ten", firstName: "Tara", score: 8, paid: true, skills: names(10).map(prefix) });
   const ctx = await signedInContext(browser, employer);
   display = { ctx, many, projectId, seventh: prefix(skill(7)), eighth: prefix(skill(8)) };
@@ -193,9 +194,18 @@ for (const where of ["profile", "compare", "candidates"]) {
       compare: `/employer/compare?ids=${d.many.id}&project=${d.projectId}`,
       candidates: "/employer/candidates",
     }[where];
-    const html = await (await d.ctx.request.get(new URL(path, baseUrl()).toString(), { failOnStatusCode: false })).text();
-    assert.ok(html.includes(d.seventh), `${path} shows the 7th skill`);
-    assert.ok(!html.includes(d.eighth), `${path} shows an 8th skill`);
-    assert.match(html, /\+\s*(<!-- -->)?3\b/, `${path} says +3 for the rest`);
+    // What a person sees, not the page source: the candidate card is a client component, so its serialized props carry the whole list.
+    const page = await d.ctx.newPage();
+    let text;
+    try {
+      await visit(page, path);
+      await page.getByText(d.seventh).first().waitFor();
+      text = await page.locator("main").innerText();
+    } finally {
+      await page.close();
+    }
+    assert.ok(text.includes(d.seventh), `${path} shows the 7th skill`);
+    assert.ok(!text.includes(d.eighth), `${path} shows an 8th skill`);
+    assert.match(text, /\+\s*3\b/, `${path} says +3 for the rest`);
   });
 }
