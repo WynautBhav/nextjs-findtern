@@ -146,7 +146,7 @@ export function SendProposalForm({
   const [shiftTo, setShiftTo] = useState("18:00");
   const laptopOptions = LAPTOP_OPTIONS.filter((l) => l.value !== "candidate" || candidateHasLaptop !== false);
   const [laptop, setLaptop] = useState<string>("company");
-  const [paidLeaves, setPaidLeaves] = useState("2");
+  const [paidLeaves, setPaidLeaves] = useState("0");
   const [message, setMessage] = useState("");
   const [additionalInfo, setAdditionalInfo] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
