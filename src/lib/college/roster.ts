@@ -4,15 +4,64 @@
  * only email is required. Pure, so it is unit tested.
  */
 
-export type RosterInput = { email: string; name: string; rollNo: string | null; year: number | null; branch: string | null };
+/** Most students one upload may hold; a bigger file is split by the sender. */
+export const MAX_IMPORT_ROWS = 5000;
+export const TOO_MANY_ROWS = "The file has more than 5,000 students. Split it and upload each part.";
+
+export type RosterInput = {
+  email: string;
+  name: string;
+  rollNo: string | null;
+  year: number | null;
+  branch: string | null;
+  /** Normalised 10-digit Indian mobile, or null. */
+  phone: string | null;
+};
+
+/** Column indexes the admin can override. `name` is -1 when the file has no name column. */
+export type RosterMapping = { name: number; email: number; phone: number | null };
+
+type Columns = Record<keyof RosterInput, number>;
 
 const HEADERS: Record<keyof RosterInput, RegExp> = {
-  email: /e-?mail/i,
-  name: /^(student\s*)?(full\s*)?name$|^name\s*of\s*student$/i,
+  email: /e-?mail(\s*(id|address))?/i,
+  name: /^(student\s*)?(full\s*)?name$|^name\s*of\s*student$|full\s*name/i,
   rollNo: /roll|enrol+ment|reg(istration)?\.?\s*(no|number|id)|^usn$|^prn$/i,
   year: /^(current\s*)?year(\s*of\s*study)?$|^semester$|^sem$/i,
   branch: /branch|department|dept|specialisation|specialization|stream|program(me)?/i,
+  phone: /phone|mobile|contact(\s*no)?/i,
 };
+
+/** A parent's or guardian's column is never the student's own. */
+const NOT_STUDENT = /parent|father|mother|guardian/i;
+
+function findColumn(header: string[], re: RegExp, own = true): number {
+  const i = header.findIndex((h) => re.test(h) && !(own && NOT_STUDENT.test(h)));
+  return i >= 0 ? i : header.findIndex((h) => re.test(h));
+}
+
+function detectColumns(header: string[]): Columns {
+  const col = {} as Columns;
+  for (const key of Object.keys(HEADERS) as (keyof RosterInput)[]) col[key] = findColumn(header, HEADERS[key], key === "email" || key === "name" || key === "phone");
+  return col;
+}
+
+/** The mapping the header suggests (email is -1 when no column looks like one). */
+export function detectMapping(header: string[]): RosterMapping {
+  const c = detectColumns(header.map((h) => h.trim()));
+  return { name: c.name, email: c.email, phone: c.phone >= 0 ? c.phone : null };
+}
+
+/**
+ * A 10-digit Indian mobile from "98765 43210", "+91-98765-43210", "09876543210" or "919876543210".
+ * Null when it isn't one (must start 6-9).
+ */
+export function normalizePhone(raw: string): string | null {
+  let d = raw.replace(/\D/g, "");
+  if (d.length === 12 && d.startsWith("91")) d = d.slice(2);
+  else if (d.length === 11 && d.startsWith("0")) d = d.slice(1);
+  return /^[6-9]\d{9}$/.test(d) ? d : null;
+}
 
 /** ";" when the header line has more semicolons than commas and tabs (European-locale Excel exports). */
 export function detectSemicolon(text: string): boolean {
@@ -77,42 +126,91 @@ export function readYear(raw: string, isSemester = false): number | null {
 
 const EMAIL = /^[^\s@;,]+@[^\s@;,]+\.[^\s@;,]+$/;
 
-export function parseRoster(text: string): { rows: RosterInput[]; errors: string[] } {
-  const table = splitCsv(text);
-  if (table.length < 2) return { rows: [], errors: ["The file needs a header row and at least one student."] };
-  const header = table[0].map((h) => h.trim());
-  const col = {} as Record<keyof RosterInput, number>;
-  for (const key of Object.keys(HEADERS) as (keyof RosterInput)[]) {
-    col[key] = header.findIndex((h) => HEADERS[key].test(h));
-  }
-  if (col.email < 0) return { rows: [], errors: ["No email column found. Add a column called \"Email\"."] };
-  const semester = col.year >= 0 && /sem/i.test(header[col.year]);
+export type RosterRowResult = {
+  /** 1-based line in the file; the header is line 1. */
+  line: number;
+  name: string;
+  email: string;
+  phone: string;
+  status: "valid" | "invalid" | "duplicate";
+  /** A sentence the admin can act on. */
+  reason?: string;
+  input?: RosterInput;
+};
 
-  const seen = new Set<string>();
+export type ParsedRoster = {
+  header: string[];
+  mapping: RosterMapping;
+  results: RosterRowResult[];
+  rows: RosterInput[];
+  /** One sentence per rejected row, "Row N: ...", plus any file-level problem. */
+  errors: string[];
+};
+
+const emptyParsed = (error: string, header: string[] = [], mapping: RosterMapping = { name: -1, email: -1, phone: null }): ParsedRoster => ({
+  header,
+  mapping,
+  results: [],
+  rows: [],
+  errors: [error],
+});
+
+/**
+ * Classify a table (header row first). `override` replaces the detected name/email/phone columns.
+ * Every rejected row is listed with its line and a reason; nothing is silently dropped.
+ */
+export function parseRosterTable(table: string[][], override?: RosterMapping): ParsedRoster {
+  if (table.length < 2) return emptyParsed("The file needs a header row and at least one student.");
+  const header = table[0].map((h) => h.trim());
+  const col = detectColumns(header);
+  if (override) {
+    col.name = override.name;
+    col.email = override.email;
+    col.phone = override.phone ?? -1;
+  }
+  const mapping: RosterMapping = { name: col.name, email: col.email, phone: col.phone >= 0 ? col.phone : null };
+  if (col.email < 0) return emptyParsed('No email column found. Choose which column holds the email, or add a column called "Email".', header, mapping);
+  const semester = col.year >= 0 && /sem/i.test(header[col.year] ?? "");
+
+  const seen = new Map<string, number>();
+  const results: RosterRowResult[] = [];
   const rows: RosterInput[] = [];
   const errors: string[] = [];
+  const cellAt = (r: string[], i: number) => (i >= 0 ? (r[i] ?? "").trim() : "");
   table.slice(1).forEach((r, i) => {
     const line = i + 2;
-    const email = (r[col.email] ?? "").trim().toLowerCase();
-    if (!EMAIL.test(email)) {
-      errors.push(`Row ${line}: "${email || "(blank)"}" is not an email address.`);
-      return;
-    }
-    if (seen.has(email)) {
-      errors.push(`Row ${line}: ${email} appears twice; kept the first.`);
-      return;
-    }
-    seen.add(email);
-    const cell = (k: keyof RosterInput) => (col[k] >= 0 ? (r[col[k]] ?? "").trim() : "");
-    rows.push({
+    const email = cellAt(r, col.email).toLowerCase();
+    const name = cellAt(r, col.name).slice(0, 200);
+    const rawPhone = cellAt(r, col.phone);
+    const base = { line, name, email, phone: rawPhone };
+    const reject = (status: "invalid" | "duplicate", reason: string) => {
+      results.push({ ...base, status, reason });
+      errors.push(`Row ${line}: ${reason}.`);
+    };
+    if (!email) return reject("invalid", "Missing email");
+    if (!EMAIL.test(email)) return reject("invalid", `Email is not valid (${email})`);
+    const phone = rawPhone ? normalizePhone(rawPhone) : null;
+    if (rawPhone && !phone) return reject("invalid", "Phone is not a 10-digit mobile number");
+    const first = seen.get(email);
+    if (first !== undefined) return reject("duplicate", `Duplicate of line ${first}`);
+    seen.set(email, line);
+    const input: RosterInput = {
       email,
-      name: cell("name").slice(0, 200),
-      rollNo: cell("rollNo").slice(0, 60) || null,
-      year: readYear(cell("year"), semester),
-      branch: cell("branch").slice(0, 120) || null,
-    });
+      name,
+      rollNo: cellAt(r, col.rollNo).slice(0, 60) || null,
+      year: readYear(cellAt(r, col.year), semester),
+      branch: cellAt(r, col.branch).slice(0, 120) || null,
+      phone,
+    };
+    rows.push(input);
+    results.push({ ...base, phone: phone ?? "", status: "valid", input });
   });
-  return { rows, errors };
+  return { header, mapping, results, rows, errors };
+}
+
+/** CSV/TSV text → rows. The TPO route and the tests use this; the admin import reads the table itself. */
+export function parseRoster(text: string, mapping?: RosterMapping): ParsedRoster {
+  return parseRosterTable(splitCsv(text), mapping);
 }
 
 /** Lower-cased, trimmed, de-duplicated emails; anything that is not an email is dropped. */

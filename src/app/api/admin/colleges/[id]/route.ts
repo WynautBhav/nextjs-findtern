@@ -22,6 +22,10 @@ const bodySchema = z.object({
   isActive: z.boolean().optional(),
   logoUrl: z.string().trim().url().max(500).refine((u) => isSafeLink(u), "Logo link must start with http:// or https://").nullable().optional(),
   emailDomains: z.array(z.string().trim().toLowerCase().regex(/^[a-z0-9.-]+\.[a-z]{2,}$/)).max(10).optional(),
+  contactName: z.string().trim().max(120).nullable().optional(),
+  contactEmail: z.string().trim().toLowerCase().email("Enter a valid contact email").max(254).or(z.literal("")).nullable().optional(),
+  contactPhone: z.string().trim().max(30).nullable().optional(),
+  address: z.string().trim().max(500).nullable().optional(),
 }).refine((d) => Object.values(d).some((v) => v !== undefined), "Nothing to change");
 
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
@@ -37,7 +41,8 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     if (cur && !cur.isPartner && !parsed.data.isPartner) return NextResponse.json({ error: "Only partner colleges can be renamed or re-coded; the directory import owns the rest." }, { status: 409 });
   }
   // slug and Findtern code are never touched, so the college's URLs and code stay put.
-  const set = { ...parsed.data, ...(parsed.data.state !== undefined ? { state: parsed.data.state || null } : {}), ...(parsed.data.aisheCode !== undefined ? { aisheCode: parsed.data.aisheCode?.toUpperCase() || null } : {}), ...(parsed.data.city !== undefined ? { city: parsed.data.city || null } : {}) };
+  const blank = (k: "contactName" | "contactEmail" | "contactPhone" | "address") => (parsed.data[k] !== undefined ? { [k]: parsed.data[k] || null } : {});
+  const set = { ...parsed.data, ...blank("contactName"), ...blank("contactEmail"), ...blank("contactPhone"), ...blank("address"), ...(parsed.data.state !== undefined ? { state: parsed.data.state || null } : {}), ...(parsed.data.aisheCode !== undefined ? { aisheCode: parsed.data.aisheCode?.toUpperCase() || null } : {}), ...(parsed.data.city !== undefined ? { city: parsed.data.city || null } : {}) };
   const [before] = await db
     .select({
       name: schema.colleges.name,
@@ -50,6 +55,10 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
       isActive: schema.colleges.isActive,
       logoUrl: schema.colleges.logoUrl,
       emailDomains: schema.colleges.emailDomains,
+      contactName: schema.colleges.contactName,
+      contactEmail: schema.colleges.contactEmail,
+      contactPhone: schema.colleges.contactPhone,
+      address: schema.colleges.address,
     })
     .from(schema.colleges)
     .where(eq(schema.colleges.id, id))
@@ -72,9 +81,12 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     const admins = await db.select({ id: schema.collegeAdmins.id }).from(schema.collegeAdmins).where(eq(schema.collegeAdmins.collegeId, id));
     for (const a of admins) forgetAccountStatus("college", a.id);
   }
-  const { isPartner, state, gstin, ...rest } = parsed.data;
+  const { isPartner, state, gstin, contactName, contactEmail, contactPhone, address, ...rest } = parsed.data;
   const was: Record<string, unknown> = before ?? {};
-  if (Object.keys(rest).length) await recordAdminAudit(db, { adminId: guard.session.uid, action: "college.update", targetType: "college", targetId: id, meta: { changes: diffFields(was, Object.fromEntries(Object.entries(set).filter(([k]) => k !== "isPartner" && k !== "state" && k !== "gstin"))) } });
+  const CONTACT = ["contactName", "contactEmail", "contactPhone", "address"];
+  const only = (keys: string[]) => Object.fromEntries(Object.entries(set).filter(([k]) => keys.includes(k)));
+  if (Object.keys(rest).length) await recordAdminAudit(db, { adminId: guard.session.uid, action: "college.update", targetType: "college", targetId: id, meta: { changes: diffFields(was, Object.fromEntries(Object.entries(set).filter(([k]) => k !== "isPartner" && k !== "state" && k !== "gstin" && !CONTACT.includes(k)))) } });
+  if ([contactName, contactEmail, contactPhone, address].some((v) => v !== undefined)) await recordAdminAudit(db, { adminId: guard.session.uid, action: "college.contact_update", targetType: "college", targetId: id, meta: { changes: diffFields(was, only(CONTACT)) } });
   if (state !== undefined || gstin !== undefined) await recordAdminAudit(db, { adminId: guard.session.uid, action: "college.billing_update", targetType: "college", targetId: id, meta: { changes: diffFields(was, Object.fromEntries(Object.entries(set).filter(([k]) => k === "state" || k === "gstin"))) } });
   if (isPartner !== undefined) await recordAdminAudit(db, { adminId: guard.session.uid, action: "college.partner_toggle", targetType: "college", targetId: id, meta: { isPartner: { from: was.isPartner ?? null, to: isPartner } } });
   return NextResponse.json({ ok: true });

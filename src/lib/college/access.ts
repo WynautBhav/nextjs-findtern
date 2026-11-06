@@ -18,9 +18,10 @@ export { isStudentEligible, readEligibility, normBranch, type DriveEligibility, 
  *    hand-included) member of the drive's college, has not left, and meets
  *    the cutoffs. Exclude beats include; include beats cutoffs. Nothing beats
  *    the college boundary.
- *  - A college admin sees every student who joined their own college (joining
- *    is the student's choice; there is no separate consent step). They can
- *    never write student data. Their only other writes are their own
+ *  - A college admin sees only students of their own college who are
+ *    verified, i.e. used the college's code (or a verified college email).
+ *    A student who merely picked the college stays out of sight (Q27). They
+ *    can never write student data. Their only other writes are their own
  *    college's payout bank details and withdrawal requests.
  */
 
@@ -155,10 +156,11 @@ export function collegeAdminMay(action: string): boolean {
 export function canCollegeAdminSee(
   session: SessionLike,
   adminCollegeId: string,
-  student: { collegeId: string; leftAt: Date | null },
+  student: { collegeId: string; leftAt: Date | null; status: string },
 ): boolean {
   if (!session || session.role !== "college") return false;
   if (!adminCollegeId || student.collegeId !== adminCollegeId) return false;
   if (student.leftAt) return false;
-  return true;
+  // Claimed-only students (picked the college, no code) are not the officer's to see.
+  return student.status === "verified";
 }

@@ -160,6 +160,45 @@ export function BillingForm({ collegeId, state, gstin, canEdit }: { collegeId: s
   );
 }
 
+export function ContactsForm({ collegeId, contact, canEdit }: { collegeId: string; contact: { name: string | null; email: string | null; phone: string | null; address: string | null }; canEdit: boolean }) {
+  const router = useRouter();
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const fields = [
+    { name: "contactName", label: "Contact person", value: contact.name, type: "text", autoComplete: "name" },
+    { name: "contactEmail", label: "Contact email", value: contact.email, type: "email", autoComplete: "email" },
+    { name: "contactPhone", label: "Contact phone", value: contact.phone, type: "tel", autoComplete: "tel" },
+  ] as const;
+  return (
+    <form
+      className="grid gap-3 md:grid-cols-3"
+      onSubmit={async (e) => {
+        e.preventDefault();
+        const f = new FormData(e.currentTarget);
+        const body = Object.fromEntries(["contactName", "contactEmail", "contactPhone", "address"].map((k) => [k, String(f.get(k) ?? "").trim() || null]));
+        const r = await send(`/api/admin/colleges/${collegeId}`, "PATCH", body);
+        if (!r.ok) return setMsg({ ok: false, text: String(r.json.error ?? "Couldn't save") });
+        setMsg({ ok: true, text: "Saved" });
+        router.refresh();
+      }}
+    >
+      {fields.map((x) => (
+        <label key={x.name}>
+          <span className="text-sm font-medium text-foreground">{x.label}</span>
+          <input name={x.name} type={x.type} autoComplete={x.autoComplete} defaultValue={x.value ?? ""} disabled={!canEdit} maxLength={x.name === "contactEmail" ? 254 : 120} className={cn(input, "mt-1")} />
+        </label>
+      ))}
+      <label className="md:col-span-3">
+        <span className="text-sm font-medium text-foreground">Address</span>
+        <textarea name="address" defaultValue={contact.address ?? ""} disabled={!canEdit} maxLength={500} rows={2} className={cn(input, "mt-1 h-auto py-2")} />
+      </label>
+      <div className="flex flex-wrap items-center gap-3 md:col-span-3">
+        {canEdit ? <button className={buttonClass({ className: ADMIN_PILL_PRIMARY })}>Save contact details</button> : null}
+        <p role="status" className={cn("text-sm", msg?.ok ? "text-foreground" : "text-danger")}>{msg?.text}</p>
+      </div>
+    </form>
+  );
+}
+
 /** `canEdit`: companies:write (the college routes). Seats and the code are managed on the college page. */
 export function CollegeRowControls({ row, canEdit }: { row: CollegeAdminRow; canEdit: boolean }) {
   const router = useRouter();
