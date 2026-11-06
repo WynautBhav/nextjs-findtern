@@ -26,9 +26,9 @@ export type SummaryLine = {
   upfrontMinor: number;
   /** A running placement's due month (no fee); null on a new hire. */
   monthlyMinor: number | null;
-  /** The hiring charge alone, paid now with each month's stipend due 2 days before the intern's pay day; null when not offered (score below 6, full-time). */
+  /** The hiring charge + Month 1 charge, paid now; months 2+ are due 2 days before the intern's pay day; null when not offered (score below 6, full-time). */
   postpaidMinor: number | null;
-  /** YYYY-MM-DD each month's stipend falls due, month 1 first (post-paid). */
+  /** YYYY-MM-DD each later month falls due, month 2 first (post-paid; month 1 is paid now). */
   schedule: string[];
   monthlyBlocked: string | null;
   /** A running monthly placement: only its due month can be paid. */
@@ -47,8 +47,8 @@ type Mode = "upfront" | "monthly" | "postpaid";
  * Checkout, as one flow: pick the hire on the left, see exactly what is
  * charged on the right, pay. One hire per payment (legacy checkout), so an
  * invoice, a refund or a dispute always maps to one candidate. A new
- * hire (score 6+) pays the hiring charge now and each month's stipend as it falls
- * due by default, or the whole internship now; a running placement pays
+ * hire (score 6+) pays the hiring charge + Month 1 charge now, then months 2+ as each falls
+ * due, by default, or the whole internship now; a running placement pays
  * its due month.
  */
 export function CheckoutSummary({
@@ -139,7 +139,7 @@ export function CheckoutSummary({
                     <span className="nums text-left sm:text-right">
                       <span className="block text-lg font-semibold text-ink-900">{m(amountOf(l, l.id === line?.id ? mode : picked), l.currency)}</span>
                       <span className="block text-xs text-text-subtle">
-                        {l.due ? "this month" : l.fullTimeCtcMinor != null ? "one-time fee" : l.postpaidMinor != null && (l.id === line?.id ? mode : picked) === "postpaid" ? "hiring charge, due now" : "whole internship"}
+                        {l.due ? "this month" : l.fullTimeCtcMinor != null ? "one-time fee" : l.postpaidMinor != null && (l.id === line?.id ? mode : picked) === "postpaid" ? "hiring charge + month 1, due now" : "whole internship"}
                       </span>
                     </span>
                   </span>
@@ -181,7 +181,7 @@ export function CheckoutSummary({
                     onChange={() => setPicked("postpaid")}
                   />
                   <span className="min-w-0 flex-1">
-                    {line.postpaidMinor != null ? `${m(line.postpaidMinor, line.currency)} now, then each month's charge due 2 days before the month's pay date` : "Each month's charge due 2 days before the month's pay date"}
+                    {line.postpaidMinor != null ? `${m(line.postpaidMinor, line.currency)} now (hiring charge + Month 1 charge)${line.months > 1 ? ", then each later month's charge due 2 days before the month's pay date" : ""}` : "Each month's charge due 2 days before the month's pay date"}
                     <span className="block text-xs text-text-subtle">
                       {promoApplied ? "Not with a promo code" : canPostpaid ? "Recommended" : line.monthlyBlocked}
                     </span>
@@ -211,7 +211,10 @@ export function CheckoutSummary({
             ) : (
               <>
                 {mode === "postpaid" ? (
-                  <Row label="Hiring charge (one-time)">{m(amountMinor, line.currency)}</Row>
+                  <>
+                    <Row label="Hiring charge (one-time)">{m(line.feeMinor, line.currency)}</Row>
+                    <Row label="Month 1 charge">{m(amountMinor - line.feeMinor, line.currency)}</Row>
+                  </>
                 ) : (
                   <>
                     <Row label={line.due ? line.durationLabel : "Monthly charges, whole internship"}>
@@ -235,7 +238,7 @@ export function CheckoutSummary({
               <ul className="mt-2 space-y-1.5">
                 {line.schedule.map((d, i) => (
                   <li key={d} className="flex flex-wrap items-baseline justify-between gap-x-3 text-ink-600">
-                    <span>Month {i + 1} · due {formatDate(d)}</span>
+                    <span>Month {i + 2} · due {formatDate(d)}</span>
                     <span className="nums font-medium text-ink-900">{line.monthlyRateMinor != null ? m(line.monthlyRateMinor, line.currency) : ""}</span>
                   </li>
                 ))}

@@ -99,7 +99,7 @@ const EMPLOYER_FAQ = [
       category: "Payment",
       question: "When do I pay?",
       answer:
-        "The fixed ₹5,000 (or $50) per-hire charge is invoiced once when the intern is hired. After that, hourly tiers are billed monthly against the timesheets you approve, each month due 2 days before the intern's pay day (you can pay up to 15 days early).",
+        "The fixed ₹5,000 (or $50) per-hire charge is paid when the intern is hired. On Cappuccino and Latte the first month's charge is paid with it; each later month is billed against the timesheets you approve, due 2 days before the intern's pay day (you can pay up to 15 days early).",
     },
     {
       id: "e4",

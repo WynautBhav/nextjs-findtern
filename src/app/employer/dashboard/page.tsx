@@ -94,7 +94,7 @@ export default async function EmployerDashboard() {
       {
         count: data.toPay,
         label: data.toPay === 1 ? "payment due" : "payments due",
-        detail: "An accepted offer becomes a hire once the hiring charge is paid. For scores 6 and above, each month's charge is due 2 days before the month's pay date; you can pay up to 15 days early.",
+        detail: "An accepted offer becomes a hire once the first payment is made: the hiring charge, plus the Month 1 charge for scores 6 and above. Each later month's charge is due 2 days before the month's pay date; you can pay up to 15 days early.",
         href: "/employer/checkout",
         cta: "Go to checkout",
         Icon: CreditCard,
