@@ -47,7 +47,7 @@ before(async () => {
   const tag = uniq("rs").replace(/-/g, "");
 
   // Interns the file will refer to. Names are unique so nothing matches by name by accident.
-  state.redeemer = await seedIntern({ label: "ros-redeemer", firstName: "Priya", lastName: `Nair${tag}`, score: 8, emailVerified: true });
+  state.redeemer = await seedIntern({ label: "ros-redeemer", firstName: "Priya", lastName: `Nair${tag}`, score: 8, emailVerified: true, skills: ["React", "SQL", "Python", "Excel"] });
   state.unverified = await seedIntern({ label: "ros-unverified", firstName: "Una", lastName: `Verify${tag}`, emailVerified: false });
   state.phoneOnly = await seedIntern({ label: "ros-phone", firstName: "Pooja", lastName: `Phone${tag}` });
   state.phoneOnly2 = await seedIntern({ label: "ros-phone2", firstName: "Prem", lastName: `Phonetwo${tag}` });
