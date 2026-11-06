@@ -55,7 +55,8 @@ export function detectMapping(header: string[]): RosterMapping {
 /** The columns a roster import reads under this mapping; every other column (DOB, Aadhaar, address...) is never stored. */
 export function rosterColumns(header: string[], mapping: RosterMapping): number[] {
   const c = detectColumns(header.map((h) => h.trim()));
-  return [...new Set([c.rollNo, c.year, c.branch, mapping.name, mapping.email, mapping.phone ?? -1])].filter((i) => i >= 0);
+  // Detected columns stay too, so a remap can switch back to them without a re-upload.
+  return [...new Set([...Object.values(c), mapping.name, mapping.email, mapping.phone ?? -1])].filter((i) => i >= 0);
 }
 
 /**

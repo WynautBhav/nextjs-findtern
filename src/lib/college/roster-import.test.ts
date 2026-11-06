@@ -147,6 +147,10 @@ test("a stored import keeps only the columns the roster reads; commit/discard dr
   assert.deepEqual(stored[0].cells, table[0], "header names stay for the mapping UI");
   assert.deepEqual((stored[1] as { cells: string[] }).cells, ["Asha", "asha@x.in", "", "", "R1", ""]);
   assert.ok(!JSON.stringify(stored).includes("1234 5678 9012"));
+  // Remapping away from a detected column keeps it, so the admin can switch back (e2e college-roster).
+  const t2 = [["Name", "Email", "Phone", "DOB"], ["Asha", "asha@x.in", "9876543210", "2004"]];
+  const off = storedFrom(rows, t2, { name: 0, email: 1, phone: null });
+  assert.deepEqual(off[0].kept?.sort(), [0, 1, 2]);
   // No email column yet: the admin still has to pick one, so the row is kept whole.
   const open = storedFrom(rows, table, { name: 0, email: -1, phone: null });
   assert.deepEqual((open[1] as { cells: string[] }).cells, table[1]);
