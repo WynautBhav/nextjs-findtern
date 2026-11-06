@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowUpRight, Check, Eye, FileText, Heart, Loader2, Scale, Send } from "lucide-react";
+import { ArrowUpRight, Check, Eye, FileText, Heart, Laptop, Loader2, Scale, Send } from "lucide-react";
 
 import { bandFor } from "@/lib/score";
 import { formatMoney, formatRate } from "@/lib/format";
@@ -190,11 +190,7 @@ export function CandidateCard({
   const profileHref = `/employer/intern/${encodeURIComponent(candidate.id)}${projectId ? `?project=${encodeURIComponent(projectId)}` : ""}`;
   const sendHref = `/employer/send-proposal?intern=${encodeURIComponent(candidate.id)}${projectId ? `&project=${encodeURIComponent(projectId)}` : ""}`;
   const place = candidate.city || candidate.location || "City not stated";
-  const meta = [
-    place,
-    candidate.workModes.join(" / "),
-    candidate.hasLaptop === false ? "Needs a laptop" : candidate.hasLaptop ? "Own laptop" : "",
-  ].filter(Boolean);
+  const meta = [place, candidate.workModes.join(" / ")].filter(Boolean);
 
   // One primary action per row: the proposal when one is out, else "Send proposal".
   const primary = proposal ? (
@@ -256,7 +252,7 @@ export function CandidateCard({
   ];
 
   return (
-    <li className="relative grid gap-x-6 gap-y-3 px-4 py-4 transition-colors hover:bg-ink-50/60 sm:px-5 lg:grid-cols-[minmax(0,1fr)_8.5rem_auto] lg:items-center">
+    <li className="relative grid gap-x-5 gap-y-2.5 px-4 py-4 transition-colors hover:bg-ink-50/60 sm:px-5 lg:grid-cols-[minmax(0,1fr)_auto]">
       <div className="flex min-w-0 gap-4">
         <div className="relative shrink-0 self-start">
           <CandidateAvatar
@@ -288,52 +284,31 @@ export function CandidateCard({
               </Pill>
             ) : null}
           </div>
-          <p className="mt-0.5 text-sm text-ink-600">{meta.join(" · ")}</p>
-
-          {/* At most seven (a profile holds no more); "+N" only for an older, longer list. */}
-          {shownSkills.length > 0 ? (
-            <ul className="mt-2 flex flex-wrap gap-1.5" aria-label="Skills">
-              {shownSkills.map((skill) => (
-                <li
-                  key={skill}
-                  className={cn(
-                    "rounded-full px-2.5 py-1 text-xs font-medium",
-                    isWanted(skill) ? "bg-brand-50 text-brand-800 ring-1 ring-inset ring-brand-200" : "bg-ink-100 text-ink-700",
-                  )}
-                >
-                  {skill}
-                  {isWanted(skill) ? <span className="sr-only"> (matches)</span> : null}
-                </li>
-              ))}
-              {skills.length > shownSkills.length ? (
-                <li className="rounded-full bg-ink-100 px-2.5 py-1 text-xs font-medium text-ink-700">
-                  +{skills.length - shownSkills.length}
-                  <span className="sr-only"> more skills</span>
-                </li>
-              ) : null}
-            </ul>
-          ) : (
-            <p className="mt-2 text-sm text-ink-600">No skills listed yet.</p>
-          )}
+          {/* The stats line (Upwork's rate / success / earned line): score, band and rate, then where and how. */}
+          <p className="mt-0.5 flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-sm text-ink-600">
+            <span className="nums inline-flex items-baseline gap-2" title={candidate.scored ? `Findtern Score ${candidate.score.toFixed(1)} out of 10` : "Not scored yet"}>
+              <span className="text-lg font-semibold leading-none text-brand-700">
+                {candidate.scored ? candidate.score.toFixed(1) : "-"}
+                <span className="ml-0.5 text-xs font-medium text-text-subtle">/10</span>
+                <span className="sr-only"> Findtern Score</span>
+              </span>
+              <span className="font-semibold text-ink-900" title={candidate.scored ? `${band.name} band` : undefined}>
+                {formatRate(pricing.hourlyRateMinor, currency)}
+              </span>
+            </span>
+            <span className="min-w-0 break-words">{meta.join(" · ")}</span>
+            {candidate.hasLaptop !== null ? (
+              // An own laptop is the usual case: an icon with a name. Needing one is said in words.
+              <span className="inline-flex items-center gap-1" title={candidate.hasLaptop ? "Own laptop" : undefined}>
+                <Laptop className="size-3.5 shrink-0 text-ink-400" aria-hidden />
+                {candidate.hasLaptop ? <span className="sr-only">Own laptop</span> : "Needs a laptop"}
+              </span>
+            ) : null}
+          </p>
         </div>
       </div>
 
-      <div className="flex items-baseline gap-3 pl-[4.5rem] lg:block lg:pl-0 lg:text-right">
-        <p
-          className="nums text-2xl font-semibold leading-none text-brand-700"
-          title={candidate.scored ? `Findtern Score ${candidate.score.toFixed(1)} out of 10` : "Not scored yet"}
-        >
-          {candidate.scored ? candidate.score.toFixed(1) : "-"}
-          <span className="ml-0.5 text-sm font-medium text-text-subtle">/10</span>
-          <span className="sr-only"> Findtern Score</span>
-        </p>
-        <p className="nums text-xs text-ink-600 lg:mt-1.5">
-          {candidate.scored ? `${band.name} · ` : ""}
-          <span className="font-semibold text-ink-900">{formatRate(pricing.hourlyRateMinor, currency)}</span>
-        </p>
-      </div>
-
-      <div className="relative z-10 flex items-center gap-2 max-lg:pl-[4.5rem]">
+      <div className="relative z-10 flex items-center gap-2 max-lg:order-3 max-lg:pl-[4.5rem] lg:self-start">
         {!proposal && projectId ? <HeartToggle internId={candidate.id} projectId={projectId} shortlisted={shortlisted} /> : null}
         {primary}
         {fullTimeFrom && fullTime ? (
@@ -346,6 +321,34 @@ export function CandidateCard({
           />
         ) : null}
         <RowMenu label={`More actions for ${displayName}`} items={menuItems} />
+      </div>
+
+      {/* At most seven (a profile holds no more); "+N" only for an older, longer list. Full width, under the identity. */}
+      <div className="min-w-0 lg:col-span-2 lg:pl-[4.5rem] max-lg:order-2 max-lg:pl-[4.5rem]">
+        {shownSkills.length > 0 ? (
+          <ul className="flex flex-wrap gap-1.5" aria-label="Skills">
+            {shownSkills.map((skill) => (
+              <li
+                key={skill}
+                className={cn(
+                  "rounded-full px-2.5 py-1 text-xs font-medium",
+                  isWanted(skill) ? "bg-brand-50 text-brand-800 ring-1 ring-inset ring-brand-200" : "bg-ink-100 text-ink-700",
+                )}
+              >
+                {skill}
+                {isWanted(skill) ? <span className="sr-only"> (matches)</span> : null}
+              </li>
+            ))}
+            {skills.length > shownSkills.length ? (
+              <li className="rounded-full bg-ink-100 px-2.5 py-1 text-xs font-medium text-ink-700">
+                +{skills.length - shownSkills.length}
+                <span className="sr-only"> more skills</span>
+              </li>
+            ) : null}
+          </ul>
+        ) : (
+          <p className="text-sm text-ink-600">No skills listed yet.</p>
+        )}
       </div>
 
       <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>
