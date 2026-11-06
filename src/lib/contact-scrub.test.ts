@@ -23,8 +23,8 @@ test("links and messenger shortcuts", () => {
   }
 });
 
-test("handles and platform names", () => {
-  for (const s of ["@handle", "ping me @asha_rao", "instagram", "my insta id: asha_22", "DM on Telegram", "whatsapp me"]) {
+test("handles, and platform names followed by a handle (a bare platform word reveals nothing)", () => {
+  for (const s of ["@handle", "ping me @asha_rao", "my insta id: asha_22", "telegram @asha_22", "whatsapp 9876543210"]) {
     assert.ok(kinds(s).includes("handle"), s);
   }
 });
@@ -52,4 +52,16 @@ test("scrub hides each contact and says so", () => {
 
 test("scrub leaves clean text alone", () => {
   assert.deepEqual(scrubContact("Can you start on Monday? 3 months, remote."), { text: "Can you start on Monday? 3 months, remote.", redacted: false });
+});
+
+test("review probes: separators caught, ranges/ISBN/own domain/platform words left alone", () => {
+  for (const s of ["98765,43210", "98765/43210", "98765_43210", "9 8 7 6 5 4 3 2 1 0", "+91 98765 43210", "098765-43210", "+1 415 555 0132",
+    "instagram: john_doe", "insta id is john_99", "whatsapp 9876543210", "telegram @abc", "https://evil.com", "evil.in", "findtern.in.evil.com"]) {
+    assert.equal(scrubContact(s).redacted, true, s);
+  }
+  for (const s of ["20000-25000", "60000 / 90000", "ISBN 978-0-306-40615-7", "1234 5678 9012", "3 months", "Python 3.11", "2023-2024", "₹2,40,000",
+    "findtern.in", "https://findtern.in/jobs", "www.findtern.in", "ASP.NET", "signal processing", "discord bot", "snap judgement", "IG reels", "the fb page", "my linkedin"]) {
+    assert.equal(scrubContact(s).redacted, false, s);
+    assert.deepEqual(findContact(s).kinds, [], s);
+  }
 });
