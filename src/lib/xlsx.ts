@@ -246,6 +246,10 @@ function columnIndex(ref: string): number {
   return n - 1;
 }
 
+/** Upload limits, enforced while parsing: a cell ref like ZZZZZZZZ1 would otherwise pad a row to ~10^11 entries. */
+const MAX_COLUMNS = 255;
+const MAX_CELLS = 5000 * 64;
+
 /** First worksheet as rows of cell strings. Fully blank rows are dropped. */
 export function readXlsxRows(bytes: Uint8Array): string[][] {
   const zipped = readZip(bytes);
@@ -269,6 +273,7 @@ export function readXlsxRows(bytes: Uint8Array): string[][] {
   if (!sheet) throw new Error("The workbook has no worksheet");
 
   const rows: string[][] = [];
+  let cells = 0;
   for (const rowMatch of sheet.matchAll(/<row\b[^>]*>([\s\S]*?)<\/row>/g)) {
     const row: string[] = [];
     let next = 0;
@@ -284,6 +289,9 @@ export function readXlsxRows(bytes: Uint8Array): string[][] {
       if (type === "s") value = shared[Number(v)] ?? "";
       else if (type === "inlineStr") value = textOf(body);
       else if (v !== undefined) value = decodeXml(v);
+      if (col >= MAX_COLUMNS) throw new Error("Too many columns");
+      cells += col + 1 - Math.min(row.length, col + 1);
+      if (cells > MAX_CELLS) throw new Error("Too many cells");
       while (row.length < col) row.push("");
       row[col] = value;
     }

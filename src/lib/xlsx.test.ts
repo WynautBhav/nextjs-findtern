@@ -50,6 +50,21 @@ test("reads shared strings, sparse cells and deflated entries like Excel writes 
     "xl/worksheets/data.xml":
       '<worksheet><sheetData><row r="1"><c r="A1" t="s"><v>0</v></c><c r="C1" t="inlineStr"><is><t>coding</t></is></c></row><row r="2"><c r="A2" t="s"><v>1</v></c><c r="C2"><v>7</v></c></row><row r="3"></row></sheetData></worksheet>',
   };
+  const file = zipOf(files);
+
+  assert.deepEqual(readXlsxRows(file), [
+    ["email", "", "coding"],
+    ["x@y.in", "", "7"],
+  ]);
+});
+
+test("rejects something that is not a zip", () => {
+  assert.equal(isXlsx(Buffer.from("email,coding\n")), false);
+  assert.throws(() => readXlsxRows(Buffer.from("PK\x03\x04 nope")));
+});
+
+/** A minimal deflated zip, the way Excel writes one. */
+function zipOf(files: Record<string, string>): Buffer {
   const parts: Buffer[] = [];
   const central: Buffer[] = [];
   let offset = 0;
@@ -77,15 +92,14 @@ test("reads shared strings, sparse cells and deflated entries like Excel writes 
   end.writeUInt16LE(central.length / 2, 10);
   end.writeUInt32LE(cd.length, 12);
   end.writeUInt32LE(offset, 16);
-  const file = Buffer.concat([...parts, cd, end]);
+  return Buffer.concat([...parts, cd, end]);
+}
 
-  assert.deepEqual(readXlsxRows(file), [
-    ["email", "", "coding"],
-    ["x@y.in", "", "7"],
-  ]);
-});
-
-test("rejects something that is not a zip", () => {
-  assert.equal(isXlsx(Buffer.from("email,coding\n")), false);
-  assert.throws(() => readXlsxRows(Buffer.from("PK\x03\x04 nope")));
+test("a far-right cell ref or a huge sheet is refused, not allocated (review #7)", () => {
+  const sheet = (rows: string) => zipOf({ "xl/worksheets/sheet1.xml": `<worksheet><sheetData>${rows}</sheetData></worksheet>` });
+  assert.throws(() => readXlsxRows(sheet('<row r="1"><c r="ZZZZZZZZ1"><v>1</v></c></row>')), /Too many columns/);
+  assert.throws(() => readXlsxRows(sheet('<row r="1"><c r="IW1"><v>1</v></c></row>')), /Too many columns/);
+  assert.deepEqual(readXlsxRows(sheet('<row r="1"><c r="IU1"><v>1</v></c></row>'))[0].length, 255);
+  const wide = Array.from({ length: 64 }, () => "<c><v>1</v></c>").join("");
+  assert.throws(() => readXlsxRows(sheet(`<row>${wide}</row>`.repeat(5001))), /Too many cells/);
 });
