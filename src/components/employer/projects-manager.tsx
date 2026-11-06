@@ -18,6 +18,9 @@ import { cn } from "@/lib/utils";
 import { RowMenu } from "@/components/app/row-menu";
 import { useConfirm } from "@/components/app/use-confirm";
 
+/** A project row as the employer's browser gets it: never the admin who took it down. */
+export type EmployerProject = Omit<Project, "takenDownBy">;
+
 type Filter = "all" | "open" | "closed";
 
 const MODE_LABEL: Record<string, string> = { remote: "Remote", hybrid: "Hybrid", onsite: "On-site" };
@@ -25,7 +28,7 @@ const MODE_LABEL: Record<string, string> = { remote: "Remote", hybrid: "Hybrid",
 type ListingState = "open" | "paused" | "closed" | "taken_down";
 
 /** What the employer sees for a listing; a taken-down one is only Findtern's to restore. */
-function listingState(p: Pick<Project, "status" | "takenDownAt">): ListingState {
+function listingState(p: Pick<EmployerProject, "status" | "takenDownAt">): ListingState {
   if (p.takenDownAt) return "taken_down";
   if (isProjectOpen(p.status)) return "open";
   return isProjectClosedForGood(p.status) ? "closed" : "paused";
@@ -53,7 +56,7 @@ export function ProjectsManager({
   openNew = false,
 }: {
   employerId: string;
-  initialProjects: Project[];
+  initialProjects: EmployerProject[];
   /** The company's own timezone (from its location), for a new project. */
   defaultTimezone?: string;
   /** The company's city and state, offered when a role is on-site. */
@@ -64,12 +67,12 @@ export function ProjectsManager({
   openNew?: boolean;
 }) {
   const router = useRouter();
-  const [projects, setProjects] = useState<Project[]>(initialProjects);
+  const [projects, setProjects] = useState<EmployerProject[]>(initialProjects);
   const [filter, setFilter] = useState<Filter>("all");
   const [query, setQuery] = useState("");
 
   const [sheetOpen, setSheetOpen] = useState(false);
-  const [editing, setEditing] = useState<Project | null>(null);
+  const [editing, setEditing] = useState<EmployerProject | null>(null);
   const [form, setForm] = useState<ProjectDraft>(() => ({ ...emptyProject(), timezone: defaultTimezone }));
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
@@ -125,9 +128,9 @@ export function ProjectsManager({
     setSheetOpen(true);
   }
 
-  function openEdit(p: Project) {
+  function openEdit(p: EmployerProject) {
     setEditing(p);
-    const draft = projectFromRecord(p);
+    const draft = projectFromRecord({ ...p, takenDownBy: null });
     setForm({ ...draft, scopeOfWork: scopeValue(draft.scopeOfWork) || draft.scopeOfWork, timezone: draft.timezone || defaultTimezone });
     setErrors({});
     setSaveError("");
@@ -183,7 +186,7 @@ export function ProjectsManager({
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload),
           });
-      const data = (await res.json().catch(() => ({}))) as { error?: string; project?: Project };
+      const data = (await res.json().catch(() => ({}))) as { error?: string; project?: EmployerProject };
       if (!res.ok) {
         setSaveError(data.error ?? "Couldn't save this project. Try again.");
         // A refused description is fixed on the form, not on the review.
@@ -204,7 +207,7 @@ export function ProjectsManager({
     }
   }
 
-  async function changeStatus(project: Project, nextStatus: "active" | typeof PAUSED_PROJECT_STATUS | typeof FINAL_PROJECT_STATUS) {
+  async function changeStatus(project: EmployerProject, nextStatus: "active" | typeof PAUSED_PROJECT_STATUS | typeof FINAL_PROJECT_STATUS) {
     if (nextStatus === FINAL_PROJECT_STATUS) {
       const ok = await askConfirm({
         title: `Close "${project.projectName}" for good?`,
@@ -236,7 +239,7 @@ export function ProjectsManager({
     }
   }
 
-  async function deleteProject(project: Project) {
+  async function deleteProject(project: EmployerProject) {
     const ok = await askConfirm({ title: `Delete "${project.projectName}"?`, body: "The project and its listing are removed. This can't be undone.", confirmLabel: "Yes, delete it" });
     if (!ok) return;
     setBusyId(project.id);
@@ -257,12 +260,12 @@ export function ProjectsManager({
     }
   }
 
-  const openCount = projects.filter((p) => isProjectOpen(p.status)).length;
+  const openCount = projects.filter((p) => isProjectOpen(p.status, p.takenDownAt)).length;
   const closedCount = projects.length - openCount;
   const takenDown = projects.filter((p) => p.takenDownAt);
   const q = query.trim().toLowerCase();
   const filtered = projects
-    .filter((p) => (filter === "open" ? isProjectOpen(p.status) : filter === "closed" ? !isProjectOpen(p.status) : true))
+    .filter((p) => (filter === "open" ? isProjectOpen(p.status, p.takenDownAt) : filter === "closed" ? !isProjectOpen(p.status, p.takenDownAt) : true))
     .filter(
       (p) =>
         !q ||
@@ -270,7 +273,7 @@ export function ProjectsManager({
         ((p.skills as string[] | null) ?? []).some((s) => s.toLowerCase().includes(q)),
     )
     // Open projects first, newest first within each group.
-    .sort((a, b) => Number(isProjectOpen(b.status)) - Number(isProjectOpen(a.status)));
+    .sort((a, b) => Number(isProjectOpen(b.status, b.takenDownAt)) - Number(isProjectOpen(a.status, a.takenDownAt)));
 
   return (
     <div>
