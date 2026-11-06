@@ -151,7 +151,7 @@ export default async function CompareCandidates({ searchParams }: { searchParams
         .map((id) => byId.get(id))
         .filter((row): row is NonNullable<typeof row> => Boolean(row))
         .map((row) => toCandidateProfile(row, onboardingByUser.get(row.id)));
-      await attachPhotos(db, candidates, nameUnlocked);
+      await attachPhotos(db, candidates);
 
       plans = await db.select().from(schema.pricingPlans).where(eq(schema.pricingPlans.isActive, true));
       const [employer] = await db

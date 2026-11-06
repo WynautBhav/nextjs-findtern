@@ -168,38 +168,15 @@ export function matchesPlace(
  * Initials everywhere, full name only after that employer hired them
  * (proposal status `hired`) - the port of the legacy
  * `getCandidateDisplayName` rule. Accepted / sent / in-cart candidates stay
- * redacted until the hire (and the payment behind it) is done.
+ * redacted until the hire (and the payment behind it) is done. Owner call
+ * (6 Nov): initials only, no extra code, even if two candidates share them.
  */
 export function displayNameOf(
   profile: Pick<CandidateProfile, "fullName" | "initials"> & { id?: string },
   nameUnlocked: boolean,
 ): string {
   if (nameUnlocked) return profile.fullName || "Intern";
-  const initials = profile.initials && profile.initials !== "?" ? profile.initials : "";
-  const label = initials || "Candidate";
-  // Initials alone make two candidates look identical, so add a stable short code.
-  return profile.id ? `${label} · ${candidateCode(profile.id)}` : label;
-}
-
-const CODE_ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
-
-/**
- * A short, stable code for a candidate who is still anonymous: `FT-` plus 5
- * base32 characters of a hash of the id. The id is already in every URL the
- * employer sees, and the hash can't be reversed, so nothing new leaks.
- */
-export function candidateCode(id: string): string {
-  let h = 0x811c9dc5;
-  for (let i = 0; i < id.length; i++) {
-    h ^= id.charCodeAt(i);
-    h = Math.imul(h, 0x01000193) >>> 0;
-  }
-  let out = "";
-  for (let i = 0; i < 5; i++) {
-    out += CODE_ALPHABET[h & 31];
-    h = h >>> 5;
-  }
-  return `FT-${out}`;
+  return profile.initials && profile.initials !== "?" ? profile.initials : "Candidate";
 }
 
 /**

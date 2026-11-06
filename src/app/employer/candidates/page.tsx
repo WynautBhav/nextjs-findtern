@@ -449,7 +449,7 @@ export default async function CandidatesPage({
       pages = Math.max(1, Math.ceil(total / filters.pageSize));
       const start = (Math.min(filters.page, pages) - 1) * filters.pageSize;
       candidates = profiles.slice(start, start + filters.pageSize);
-      await attachPhotos(db, candidates, nameUnlocked);
+      await attachPhotos(db, candidates);
 
       plans = await db.select().from(schema.pricingPlans).where(eq(schema.pricingPlans.isActive, true));
       relations = await candidateRelations(

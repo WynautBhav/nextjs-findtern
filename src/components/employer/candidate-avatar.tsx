@@ -5,10 +5,9 @@ import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 
 /**
- * A candidate's initials tile, or their photo once this employer has hired
- * them (`photoUrl` is only ever set for a hire - see `attachPhotos`). Before
- * hire employers see initials only (bug sheet 7, NC r41: a photo can be
- * reverse-searched to a name).
+ * A candidate's photo when they uploaded one (`attachPhotos`), else their
+ * initials tile. Photos show before hire by owner call (6 Nov); the name
+ * stays initials until the hire.
  *
  * A photo that fails to load falls back to the initials. The browser can
  * report that failure before React hydrates, when `onError` is not attached

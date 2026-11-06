@@ -235,7 +235,7 @@ export default async function EmployerInternDetail({
 
       profile = toCandidateProfile(user, onboarding);
       // Photo follows the name: initials until hired (bug sheet NC r41).
-      await attachPhotos(db, [profile], { has: () => nameUnlocked });
+      await attachPhotos(db, [profile]);
       if (onboarding) details = draftFromRecord(onboarding);
       plans = await db.select().from(schema.pricingPlans).where(eq(schema.pricingPlans.isActive, true));
 

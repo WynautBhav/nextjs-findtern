@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { getSession } from "@/lib/auth";
 import { getDb, schema } from "@/lib/db";
 import { readAny } from "@/lib/security/store";
-import { hiredInternIds } from "@/lib/employer-visibility";
+import { canEmployerSeeIntern } from "@/lib/employer-pool";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -29,13 +29,14 @@ export async function GET(req: Request) {
   }
 
   const db = getDb();
-  // An employer sees a candidate's photo only once they have hired them -
-  // the same rule that reveals the full name. Until then the UI shows initials.
+  // An employer sees the photo of any candidate they may see (the pool, or one
+  // they already have a proposal with). Owner call, 6 Nov: photos show before
+  // hire; the name stays initials until the hire is paid.
   if (
     targetId !== session.uid &&
     session.role === "employer" &&
     !session.impersonator &&
-    !(await hiredInternIds(db, session.uid)).has(targetId)
+    !(await canEmployerSeeIntern(db, session.uid, targetId))
   ) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }

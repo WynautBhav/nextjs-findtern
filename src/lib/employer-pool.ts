@@ -121,16 +121,13 @@ export async function poolInternIds(
 
 /**
  * Point `photoUrl` at the avatar route for every candidate with an uploaded
- * photo - but only for those in `unlocked` (hired by this employer, the same
- * set that reveals the name; see `hiredInternIds`). Everyone else keeps the
- * initials avatar. One query for the whole list.
+ * photo. Callers pass only candidates this employer may see; photos show
+ * before hire (owner call, 6 Nov), names stay initials until hire. One query.
  */
 export async function attachPhotos(
   db: ReturnType<typeof getDb>,
   profiles: CandidateProfile[],
-  unlocked: { has(id: string): boolean },
 ): Promise<void> {
-  profiles = profiles.filter((p) => unlocked.has(p.id));
   if (profiles.length === 0) return;
   const rows = await db
     .select({ userId: schema.internDocuments.userId })
