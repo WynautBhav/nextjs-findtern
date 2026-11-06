@@ -32,6 +32,32 @@ export function pickQueue<T extends AiLinkRow>(rows: T[]): { waiting: T[]; unpai
   };
 }
 
+const digitsOf = (v: string) => v.replace(/\D/g, "");
+
+/**
+ * The search box on the AI-interviews page. Every whitespace-separated word has to match the
+ * candidate's name, email or phone (case-insensitive; phone on digits only, so "+91 98765" and
+ * "9876 5" both work). An empty query keeps every row.
+ */
+export function filterAiLinkRows<T extends { name: string; email: string; phone: string }>(rows: T[], q: string | null | undefined): T[] {
+  const words = String(q ?? "").toLowerCase().split(/\s+/).filter(Boolean);
+  if (!words.length) return rows;
+  return rows.filter((r) => {
+    const text = `${r.name} ${r.email}`.toLowerCase();
+    const phone = digitsOf(r.phone);
+    return words.every((w) => {
+      if (text.includes(w)) return true;
+      const d = digitsOf(w);
+      return d.length > 0 && phone.includes(d);
+    });
+  });
+}
+
+/** The dashboard widget: the first `max` rows, and how many are left for the full page. */
+export function dashboardSlice<T>(rows: T[], max = 2): { shown: T[]; hidden: number } {
+  return { shown: rows.slice(0, max), hidden: Math.max(0, rows.length - max) };
+}
+
 export function daysWaiting(createdAt: Date | string | null, now: Date): number {
   const t = ms(createdAt);
   return t ? Math.max(0, Math.floor((now.getTime() - t) / DAY_MS)) : 0;

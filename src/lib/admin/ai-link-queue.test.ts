@@ -41,3 +41,34 @@ test("notify once: first link and each changed link, never a resave", () => {
   assert.equal(linkNoticeKey("i1", "https://a.b/1", "https://a.b/2"), "ai_interview_link:i1:https://a.b/2");
   assert.equal(linkNoticeKey("i1", "https://a.b/1", ""), null);
 });
+
+// ── search bar and dashboard slice ─────────────────────────────────────
+
+const person = (name: string, email: string, phone: string) => ({ name, email, phone });
+const people = [person("Asha Rao", "asha@x.in", "+91 98765 43210"), person("Ravi Kumar", "ravi.k@y.com", "+91 90000 11111")];
+
+test("search: name, email and phone (spaces or +91) each find the candidate", async () => {
+  const { filterAiLinkRows } = await import("./ai-link-queue.ts");
+  assert.deepEqual(filterAiLinkRows(people, "ASHA").map((p) => p.name), ["Asha Rao"]);
+  assert.deepEqual(filterAiLinkRows(people, "ravi.k@y").map((p) => p.name), ["Ravi Kumar"]);
+  assert.deepEqual(filterAiLinkRows(people, "98765 43210").map((p) => p.name), ["Asha Rao"]);
+  assert.deepEqual(filterAiLinkRows(people, "+91 90000").map((p) => p.name), ["Ravi Kumar"]);
+  assert.deepEqual(filterAiLinkRows(people, "asha 9876").map((p) => p.name), ["Asha Rao"]);
+});
+
+test("search: no match gives nothing, empty or blank query keeps everyone", async () => {
+  const { filterAiLinkRows } = await import("./ai-link-queue.ts");
+  assert.equal(filterAiLinkRows(people, "zzz").length, 0);
+  assert.equal(filterAiLinkRows(people, "asha 00000").length, 0);
+  assert.equal(filterAiLinkRows(people, "").length, 2);
+  assert.equal(filterAiLinkRows(people, "   ").length, 2);
+  assert.equal(filterAiLinkRows(people, undefined).length, 2);
+});
+
+test("dashboard slice: 0, 1, 2 and 5 rows", async () => {
+  const { dashboardSlice } = await import("./ai-link-queue.ts");
+  assert.deepEqual(dashboardSlice([], 2), { shown: [], hidden: 0 });
+  assert.deepEqual(dashboardSlice([1], 2), { shown: [1], hidden: 0 });
+  assert.deepEqual(dashboardSlice([1, 2], 2), { shown: [1, 2], hidden: 0 });
+  assert.deepEqual(dashboardSlice([1, 2, 3, 4, 5], 2), { shown: [1, 2], hidden: 3 });
+});

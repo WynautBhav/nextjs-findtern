@@ -1,9 +1,10 @@
 import Link from "next/link";
 
 import { AiLinkRows } from "@/components/admin/ai-link-rows";
+import { TableToolbar } from "@/components/admin/table-toolbar";
 import { AdminEmpty, AdminLoadError, AdminPageHeader, Panel } from "@/components/admin/panel";
 import { buttonClass } from "@/components/ui/button";
-import { aiLinkState, pickQueue, type AiLinkState } from "@/lib/admin/ai-link-queue";
+import { aiLinkState, filterAiLinkRows, pickQueue, type AiLinkState } from "@/lib/admin/ai-link-queue";
 import { loadAiLinkRows } from "@/lib/admin/ai-link-queue-load";
 import { flattenParams, type RawSearchParams } from "@/lib/admin/params";
 import { canWrite as mayWrite } from "@/lib/admin/permissions";
@@ -18,7 +19,9 @@ const TABS: { key: "waiting" | "sent" | "completed"; label: string }[] = [
 
 /** Every AI interview by where it stands. Waiting shows paid applicants only (oldest first); the others show everyone. */
 export default async function AiInterviewsPage({ searchParams }: { searchParams?: Promise<RawSearchParams> }) {
-  const filter = flattenParams(await searchParams).filter;
+  const params = flattenParams(await searchParams);
+  const filter = params.filter;
+  const q = (params.q ?? "").trim();
   const tab = TABS.find((t) => t.key === filter)?.key ?? "waiting";
   const session = await getSession();
   const canWrite = mayWrite(session?.permissions, "/admin/ai-interviews");
@@ -36,19 +39,21 @@ export default async function AiInterviewsPage({ searchParams }: { searchParams?
     );
   }
 
-  const { waiting, unpaid } = pickQueue(all);
+  const matching = filterAiLinkRows(all, q);
+  const { waiting, unpaid } = pickQueue(matching);
   const newestFirst = (a: { createdAt: Date | string | null }, b: { createdAt: Date | string | null }) => +new Date(b.createdAt ?? 0) - +new Date(a.createdAt ?? 0);
-  const byState = (s: AiLinkState) => all.filter((r) => aiLinkState(r) === s).sort(newestFirst);
+  const byState = (s: AiLinkState) => matching.filter((r) => aiLinkState(r) === s).sort(newestFirst);
   const rows = tab === "waiting" ? waiting : byState(tab);
 
   return (
     <div>
       <AdminPageHeader title="AI interviews" subtitle={`${waiting.length} paid applicant${waiting.length === 1 ? "" : "s"} waiting for a link${unpaid ? `, ${unpaid} unpaid not counted` : ""}.`} />
+      <TableToolbar searchPlaceholder="Name, phone or email" />
       <nav aria-label="Filter" className="mb-4 flex flex-wrap gap-2">
         {TABS.map((t) => (
           <Link
             key={t.key}
-            href={`/admin/ai-interviews?filter=${t.key}`}
+            href={`/admin/ai-interviews?filter=${t.key}${q ? `&q=${encodeURIComponent(q)}` : ""}`}
             aria-current={t.key === tab ? "page" : undefined}
             className={cn(buttonClass({ variant: t.key === tab ? "primary" : "outline", size: "sm" }), "min-h-11 max-sm:flex-1")}
           >
@@ -57,7 +62,7 @@ export default async function AiInterviewsPage({ searchParams }: { searchParams?
         ))}
       </nav>
       <Panel>
-        {rows.length === 0 ? <AdminEmpty title="Nothing here" body="No AI interviews in this view." /> : <AiLinkRows rows={rows} now={now} canWrite={canWrite} state={tab === "sent" ? "sent" : tab} />}
+        {rows.length === 0 ? <AdminEmpty title="Nothing here" body={q ? "No AI interview matches that search." : "No AI interviews in this view."} /> : <AiLinkRows rows={rows} now={now} canWrite={canWrite} state={tab === "sent" ? "sent" : tab} />}
       </Panel>
     </div>
   );
