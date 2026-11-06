@@ -86,6 +86,33 @@ export class RateLimiter {
 }
 
 /**
+ * At most `max` open things (streams) per key. `acquire` returns a release
+ * function, safe to call more than once, or null when the key is at the cap.
+ * shortcut: per process, so N instances allow N*max; move to Redis if that matters.
+ */
+export class ConcurrencyLimiter {
+  private open = new Map<string, number>();
+  private readonly max: number;
+  constructor(max: number) {
+    this.max = max;
+  }
+
+  acquire(key: string): (() => void) | null {
+    const n = this.open.get(key) ?? 0;
+    if (n >= this.max) return null;
+    this.open.set(key, n + 1);
+    let done = false;
+    return () => {
+      if (done) return;
+      done = true;
+      const left = (this.open.get(key) ?? 1) - 1;
+      if (left <= 0) this.open.delete(key);
+      else this.open.set(key, left);
+    };
+  }
+}
+
+/**
  * Named limiters.
  *
  * Login is tight because it fronts a plaintext-equivalent secret. Password

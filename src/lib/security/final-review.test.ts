@@ -56,3 +56,32 @@ test("#9 0021 backs up and restores per onboarding row, not per user", () => {
   assert.equal(down.match(/b\."onboarding_id" = o\."id"/g)?.length, 2);
   assert.doesNotMatch(down, /b\."user_id" = o\."user_id"/);
 });
+
+test("#12 ConcurrencyLimiter caps open streams per key and releases once", async () => {
+  const { ConcurrencyLimiter } = await import("./rate-limit.ts");
+  const lim = new ConcurrencyLimiter(2);
+  const a = lim.acquire("u1");
+  const b = lim.acquire("u1");
+  assert.ok(a && b);
+  assert.equal(lim.acquire("u1"), null, "third stream refused");
+  assert.ok(lim.acquire("u2"), "other users unaffected");
+  a();
+  a(); // double release must not free two slots
+  assert.ok(lim.acquire("u1"));
+  assert.equal(lim.acquire("u1"), null);
+});
+
+test("#12/#13 live stream and thread reads are rate-limited, capped and refuse banned accounts", () => {
+  const live = read("app/api/live/route.ts");
+  assert.match(live, /const streams = new ConcurrencyLimiter\(5\)/);
+  assert.match(live, /if \(!polls\.take\(viewer\.id\)\)/);
+  assert.match(live, /if \(!\(await accountActive\(viewer\)\)\) return NextResponse\.json\(\{ error: "Account inactive" \}, \{ status: 403 \}\)/);
+  assert.match(live, /% RECHECK_TICKS === 0 && !\(await accountActive\(viewer\)\)\) return stop\(\)/);
+  assert.equal(live.match(/release\(\);/g)?.length, 2, "released on stop and on cancel");
+  const thread = read("app/api/messages/threads/[id]/route.ts");
+  assert.match(thread, /if \(!reads\.take\(viewer\.id\)\)/);
+  assert.match(thread, /if \(!\(await accountActive\(viewer\)\)\)/);
+  const inbox = read("components/app/messages/inbox-server.tsx");
+  assert.match(inbox, /if \(!thread \|\| !\(await accountActive\(viewer\)\)\) notFound\(\);/);
+  assert.doesNotMatch(inbox, /await listThreads\(\{/);
+});

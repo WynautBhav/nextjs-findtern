@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 
 import { getSession } from "@/lib/auth";
 import { countsFor } from "@/lib/live-counts";
-import { latestThread } from "@/lib/messages";
+import { accountActive, latestThread } from "@/lib/messages";
+import { ConcurrencyLimiter, RateLimiter } from "@/lib/security/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -12,6 +13,12 @@ const TICK_MS = 3_000;
 const KEEPALIVE_MS = 20_000;
 /** Close a little before maxDuration so the browser reconnects (retry: 3000) instead of being cut off. */
 const LIFETIME_MS = 55_000;
+/** Re-check the account (ban, deactivation) every this many ticks. */
+const RECHECK_TICKS = 5;
+/** One stream per open tab; more than this from one account is a leak or abuse. */
+const streams = new ConcurrencyLimiter(5);
+/** The polling fallback runs every 15 s per tab; 60 leaves room for many tabs. */
+const polls = new RateLimiter(60, 60_000, { bypassable: false });
 
 /**
  * Live counts for the header badges and toasts: Server-Sent Events, one
@@ -25,12 +32,18 @@ export async function GET(req: Request) {
   if (!session) return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
   if (session.role !== "intern" && session.role !== "employer") return NextResponse.json({ error: "Insufficient role" }, { status: 403 });
   const viewer = { role: session.role, id: session.uid } as const;
+  if (!(await accountActive(viewer))) return NextResponse.json({ error: "Account inactive" }, { status: 403 });
 
   if (new URL(req.url).searchParams.get("once") === "1") {
+    if (!polls.take(viewer.id)) return NextResponse.json({ error: "Too many requests" }, { status: 429, headers: { "Retry-After": String(polls.retryAfterSeconds(viewer.id)) } });
     return NextResponse.json(await countsFor(viewer.role, viewer.id), { headers: { "Cache-Control": "no-store" } });
   }
 
+  const release = streams.acquire(viewer.id);
+  if (!release) return NextResponse.json({ error: "Too many open streams" }, { status: 429, headers: { "Retry-After": "30" } });
+
   const encoder = new TextEncoder();
+  let ticks = 0;
   let timer: ReturnType<typeof setInterval> | undefined;
   let ender: ReturnType<typeof setTimeout> | undefined;
   let lastCounts = "";
@@ -45,6 +58,7 @@ export async function GET(req: Request) {
         if (timer) clearInterval(timer);
         if (ender) clearTimeout(ender);
         timer = ender = undefined;
+        release();
         try {
           controller.close();
         } catch {}
@@ -62,6 +76,7 @@ export async function GET(req: Request) {
         if (busy) return;
         busy = true;
         try {
+          if (++ticks % RECHECK_TICKS === 0 && !(await accountActive(viewer))) return stop();
           const counts = await countsFor(viewer.role, viewer.id);
           const key = JSON.stringify(counts);
           let sent = false;
@@ -97,6 +112,7 @@ export async function GET(req: Request) {
     cancel() {
       if (timer) clearInterval(timer);
       if (ender) clearTimeout(ender);
+      release();
     },
   });
 

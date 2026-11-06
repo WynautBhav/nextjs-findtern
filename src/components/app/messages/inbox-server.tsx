@@ -3,12 +3,15 @@ import { notFound } from "next/navigation";
 import { InboxEmpty, InboxShell } from "@/components/app/messages/inbox-shell";
 import { ThreadView } from "@/components/app/messages/thread-view";
 import { requireRole } from "@/lib/auth";
-import { counterpartOf, counterpartSeen, listThreads, threadFor, threadMessages } from "@/lib/messages";
+import { accountActive, counterpartOf, counterpartSeen, listThreads, threadFor, threadMessages, type Viewer } from "@/lib/messages";
+
+/** A banned or deactivated account sees no conversations. */
+const threadsOf = async (viewer: Viewer) => ((await accountActive(viewer)) ? listThreads(viewer) : []);
 
 /** /{role}/messages layout: the list plus whatever is open beside it. */
 export async function InboxLayout({ role, children }: { role: "intern" | "employer"; children: React.ReactNode }) {
   const session = await requireRole(role);
-  const threads = await listThreads({ role, id: session.uid });
+  const threads = await threadsOf({ role, id: session.uid });
   return (
     <InboxShell role={role} threads={threads}>
       {children}
@@ -19,7 +22,7 @@ export async function InboxLayout({ role, children }: { role: "intern" | "employ
 /** /{role}/messages index: only visible beside the list on desktop. */
 export async function InboxIndex({ role }: { role: "intern" | "employer" }) {
   const session = await requireRole(role);
-  const threads = await listThreads({ role, id: session.uid });
+  const threads = await threadsOf({ role, id: session.uid });
   return <InboxEmpty hasThreads={threads.length > 0} />;
 }
 
@@ -28,7 +31,7 @@ export async function ThreadPage({ role, id }: { role: "intern" | "employer"; id
   const session = await requireRole(role);
   const viewer = { role, id: session.uid } as const;
   const thread = await threadFor(viewer, id);
-  if (!thread) notFound();
+  if (!thread || !(await accountActive(viewer))) notFound();
   const who = await counterpartOf(viewer, thread);
   const messages = await threadMessages(viewer, thread, null, who.unlocked);
   return (

@@ -320,13 +320,16 @@ export async function latestThread(viewer: Viewer): Promise<{ threadId: string; 
 /* ── Writes ─────────────────────────────────────────────────────────────── */
 
 /** Banned or deactivated accounts cannot start or send. */
-async function assertMayWrite(viewer: Viewer): Promise<void> {
+/** Active and not banned: the gate for reading threads and the live stream as well as for writing. */
+export async function accountActive(viewer: Viewer): Promise<boolean> {
   const db = getDb();
-  const ok =
-    viewer.role === "intern"
-      ? await db.select({ a: schema.users.isActive, b: schema.users.bannedAt }).from(schema.users).where(eq(schema.users.id, viewer.id)).limit(1).then(([r]) => Boolean(r?.a && !r.b))
-      : await db.select({ a: schema.employers.isActive }).from(schema.employers).where(eq(schema.employers.id, viewer.id)).limit(1).then(([r]) => Boolean(r?.a));
-  if (!ok) throw new MessageError(403, "Your account can't send messages right now. Contact Findtern support.");
+  return viewer.role === "intern"
+    ? await db.select({ a: schema.users.isActive, b: schema.users.bannedAt }).from(schema.users).where(eq(schema.users.id, viewer.id)).limit(1).then(([r]) => Boolean(r?.a && !r.b))
+    : await db.select({ a: schema.employers.isActive }).from(schema.employers).where(eq(schema.employers.id, viewer.id)).limit(1).then(([r]) => Boolean(r?.a));
+}
+
+async function assertMayWrite(viewer: Viewer): Promise<void> {
+  if (!(await accountActive(viewer))) throw new MessageError(403, "Your account can't send messages right now. Contact Findtern support.");
 }
 
 /** Open (or reuse) the one thread for this pair from a proposal. `created` is true only for a new row. */
