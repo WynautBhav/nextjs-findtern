@@ -10,6 +10,7 @@ import {
   emptyDraft,
   formatProblems,
   isOnboarded,
+  profileContactError,
   MAX_CERTIFICATE_UPLOADS,
   MAX_EXPERIENCES,
   MAX_EXTRACURRICULARS,
@@ -227,7 +228,7 @@ export async function POST(req: Request) {
   const input = body as Partial<OnboardingDraft>;
 
   // Impossible values are refused even on a draft save; completeness is not.
-  const format = formatProblems(input);
+  const format = formatProblems(input) ?? profileContactError(input);
   if (format) return NextResponse.json({ error: format }, { status: 400 });
   const db = getDb();
   // One account per identity document (legacy rule). Older rows keep the

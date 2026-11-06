@@ -47,7 +47,8 @@ const offerSchema = z
     shiftFrom: z.string().trim().min(1).max(10).optional(),
     shiftTo: z.string().trim().min(1).max(10).optional(),
     timezone: z.string().trim().min(1).max(64).optional(),
-    laptop: z.string().trim().min(1).max(20).optional(),
+    // Only the two known answers: anything else would be free text shown to the intern.
+    laptop: z.string().trim().min(1).max(20).refine((v) => ["company", "candidate"].includes(normalizeLaptop(v)), "Choose who provides the laptop.").optional(),
   })
   .strict();
 

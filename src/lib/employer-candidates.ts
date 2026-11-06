@@ -1,5 +1,10 @@
 import type { internOnboarding, users } from "@/lib/db/schema";
+import { hideContactText } from "./contact-scrub.ts";
+import { canonicalSkill } from "./data/skills.ts";
 import { isSafeLink } from "./safe-url.ts";
+
+/** Catalog skills such as "Socket.io" look like domains but are not contact. */
+export const isCatalogSkill = (s: string): boolean => canonicalSkill(s) !== null;
 
 /**
  * Reading an intern profile out of `users` + `intern_onboarding`.
@@ -207,6 +212,19 @@ export function toCandidateProfile(
   const state = text(onboarding?.state);
   const extra = (onboarding?.extraData ?? {}) as Record<string, unknown>;
 
+  // Every caller is an employer screen: profile text stored before the contact
+  // check (OA1) never shows a phone, email, link or handle.
+  const shown = hideContactText(
+    {
+      city,
+      state,
+      location: [city, state].filter(Boolean).join(", "),
+      skills: readSkills(onboarding?.skills),
+      academics: readAcademics(extra),
+      preferredLocations: stringArray(onboarding?.preferredLocations),
+    },
+    isCatalogSkill,
+  );
   return {
     id: user.id,
     firstName,
@@ -214,19 +232,19 @@ export function toCandidateProfile(
     fullName: `${firstName} ${lastName}`.trim() || "Intern",
     initials: initialsOf(firstName, lastName),
     email: text(user.email),
-    city,
-    state,
-    location: [city, state].filter(Boolean).join(", "),
+    city: shown.city,
+    state: shown.state,
+    location: shown.location,
     linkedinUrl: text(onboarding?.linkedinUrl),
-    skills: readSkills(onboarding?.skills),
+    skills: shown.skills,
     score: readScore(extra),
     scored: rawScore(extra) !== null,
     ratings: readRatings(extra),
-    academics: readAcademics(extra),
+    academics: shown.academics,
     workModes: stringArray(onboarding?.locationTypes).map((mode) =>
       MODE_LABEL[mode.toLowerCase()] ?? mode,
     ),
-    preferredLocations: stringArray(onboarding?.preferredLocations),
+    preferredLocations: shown.preferredLocations,
     hasLaptop: typeof onboarding?.hasLaptop === "boolean" ? onboarding.hasLaptop : null,
     updatedAt: onboarding?.updatedAt ?? null,
     aiFeedbackLink: safeLinkOf(extra?.aiFeedbackLink),

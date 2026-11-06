@@ -171,6 +171,20 @@ export function contactFieldError(fields: Record<string, unknown>, where: string
 }
 
 /**
+ * Read-side backstop for structured profile text (lists, nested rows): every
+ * string carrying a contact detail becomes HIDDEN_UNTIL_HIRE. `keep` exempts
+ * known-safe values such as catalog skills that look like domains ("Socket.io").
+ */
+export function hideContactText<T>(value: T, keep?: (s: string) => boolean): T {
+  if (typeof value === "string") return (findContact(value).kinds.length > 0 && !keep?.(value) ? HIDDEN_UNTIL_HIRE : value) as T;
+  if (Array.isArray(value)) return value.map((v) => hideContactText(v, keep)) as T;
+  if (value && typeof value === "object" && !(value instanceof Date)) {
+    return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, hideContactText(v, keep)])) as T;
+  }
+  return value;
+}
+
+/**
  * Read-side backstop for text stored before these rules or under an older
  * filter: while contact is locked, a message with any contact detail is hidden whole.
  */

@@ -1,4 +1,6 @@
 import type { internOnboarding } from "@/lib/db/schema";
+import { contactFieldError } from "./contact-scrub.ts";
+import { canonicalSkill } from "./data/skills.ts";
 import { phoneError } from "./phone.ts";
 
 /**
@@ -1256,6 +1258,31 @@ export function firstOpenStep(values: OnboardingDraft, ctx: ValidationContext, s
     if (Object.keys(validateStep(values, s, ctx)).length > 0) return s;
   }
   return steps;
+}
+
+/**
+ * Profile text an employer reads before the hire is paid (OA1) carries no
+ * contact details. Skills on the vocabulary are product names ("Socket.io",
+ * "Monday.com"), not links, so only typed-in skills are checked.
+ */
+export function profileContactError(v: DraftInput): string | null {
+  const a = v.academics;
+  const quals = [...(a?.professional ?? []), ...(a?.certifications ?? [])];
+  const typedSkills = [...(v.skills ?? []), ...(v.skillsWithRatings ?? []).map((s) => s.name)].filter((s) => !canonicalSkill(s));
+  return contactFieldError(
+    {
+      city: v.city,
+      state: v.state,
+      preferredLocations: v.preferredLocations,
+      skills: typedSkills,
+      academics: [a?.institution, a?.degree, a?.branch, ...quals.flatMap((q) => [q.name, q.issuer])],
+      experiences: (v.experiences ?? []).flatMap((e) => [e.type, e.company, e.role, e.description]),
+      languages: (v.languages ?? []).map((l) => l.language),
+      extracurriculars: (v.extracurriculars ?? []).flatMap((x) => [x.activity, x.category, x.description]),
+      previewSummary: v.previewSummary,
+    },
+    "your profile",
+  );
 }
 
 /** Values that are present and impossible. Checked on every save, drafts included. */

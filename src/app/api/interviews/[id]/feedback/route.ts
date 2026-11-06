@@ -5,6 +5,7 @@ import { z } from "zod";
 import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
 import { notify } from "@/lib/notify";
+import { contactFieldError } from "@/lib/contact-scrub";
 import { canLeaveFeedback } from "@/lib/employer-interview-rules";
 import { FEEDBACK_TAG_LINE_SQL, hasFeedbackText } from "@/lib/interview-feedback";
 
@@ -18,6 +19,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   const parsed = bodySchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Write some feedback (up to 2000 characters)." }, { status: 400 });
+
+  // Interviews come before the hire is paid: no contact details (OA1).
+  const contactProblem = contactFieldError({ feedback: parsed.data.feedback }, "the feedback");
+  if (contactProblem) return NextResponse.json({ error: contactProblem }, { status: 400 });
 
   const db = getDb();
   const [interview] = await db.select().from(schema.interviews).where(eq(schema.interviews.id, id)).limit(1);

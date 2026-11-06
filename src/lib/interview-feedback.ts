@@ -1,3 +1,5 @@
+import { scrubContact } from "./contact-scrub.ts";
+
 /**
  * The employer's written feedback on a meeting. It is stored inside the
  * interview's `notes` as `feedback_text: <the whole text>`, always the last tag
@@ -37,4 +39,12 @@ export function feedbackTextOf(notes: string | null | undefined): string {
   const found = FEEDBACK_TAG_LINE.exec(raw);
   if (!found) return "";
   return raw.slice(found.index + found[0].length).trim();
+}
+
+/**
+ * What the intern sees. Feedback is written before any hire is paid, so text
+ * stored before the contact check (or past an older filter) is hidden whole.
+ */
+export function feedbackForIntern(notes: string | null | undefined): string {
+  return scrubContact(feedbackTextOf(notes)).text;
 }

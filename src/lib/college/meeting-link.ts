@@ -1,12 +1,17 @@
 import { isSafeLink } from "../safe-url.ts";
 
-/**
- * An employer-pasted link: https only (isSafeLink alone also allows http). The codebase has
- * no meeting-host allow-list, so any https host is accepted (Meet, Zoom, Teams...).
- */
+// Video-call hosts only: any other link (wa.me, a profile, a form) is contact before the hire (OA1).
+const MEETING_HOST = /^(?:meet\.google\.com|(?:[a-z0-9-]+\.)?zoom\.us|teams\.microsoft\.com|teams\.live\.com|[a-z0-9-]+\.webex\.com)$/i;
+
+/** An employer-pasted link: https only (isSafeLink alone also allows http) and a known meeting host. */
 export function manualMeetingLink(raw: string | undefined | null): string | null {
   const v = raw?.trim();
-  return v && v.length <= 500 && /^https:\/\//i.test(v) && isSafeLink(v) ? v : null;
+  if (!v || v.length > 500 || !/^https:\/\//i.test(v) || !isSafeLink(v)) return null;
+  try {
+    return MEETING_HOST.test(new URL(v).hostname) ? v : null;
+  } catch {
+    return null;
+  }
 }
 
 /** Precedence: a pasted link wins; the auto Meet link is used only when none was pasted. */

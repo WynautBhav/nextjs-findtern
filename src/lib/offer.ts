@@ -149,7 +149,8 @@ export function laptopLabel(v: unknown): string {
   const s = normalizeLaptop(v);
   if (s === "company") return "Company provides";
   if (s === "candidate") return "Candidate's own laptop";
-  return s ? s : "Not specified";
+  // Any other stored value is free text the other side would read verbatim.
+  return "Not specified";
 }
 
 /**

@@ -62,3 +62,21 @@ test("matchesPlace: an onsite candidate in another city stays out even with the 
   assert.equal(matchesPlace(pune, { cities: ["pune"], includeRemote: false }), true);
   assert.equal(matchesPlace(pune, { cities: [], includeRemote: false }), true);
 });
+
+test("legacy profile text with contact details is hidden from employers; catalog skills stay", () => {
+  const user = { id: "u1", firstName: "A", lastName: "B", email: "a@b.c" } as never;
+  const p = toCandidateProfile(user, {
+    city: "Pune 98765 43210",
+    state: "MH",
+    skills: ["React", "Socket.io", "insta rahul_x"],
+    preferredLocations: ["Pune", "wa.me/919876543210"],
+    extraData: { academics: { institution: "IIT", degree: "mail rahul@gmail.com" } },
+  } as never);
+  assert.equal(p.city, "[hidden until hire]");
+  assert.equal(p.state, "MH");
+  assert.ok(!p.location.includes("98765"));
+  assert.deepEqual(p.skills.slice().sort(), ["React", "Socket.io", "[hidden until hire]"].sort());
+  assert.deepEqual(p.preferredLocations, ["Pune", "[hidden until hire]"]);
+  assert.equal(p.academics?.institution, "IIT");
+  assert.equal(p.academics?.degree, "[hidden until hire]");
+});
