@@ -21,10 +21,9 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Check, Plus, Search, X } from "lucide-react";
 
 import { suggestSkills } from "@/lib/data/skills";
+import { MAX_SKILLS } from "@/lib/onboarding";
 import { cn } from "@/lib/utils";
 import { fieldClass } from "@/components/employer/ui-tokens";
-
-const MAX_SKILLS = 7;
 
 export function SkillFilter({
   active,
