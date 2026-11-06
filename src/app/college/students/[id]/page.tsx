@@ -8,7 +8,7 @@ import { NudgeButton } from "@/components/college/nudge-button";
 import { PageHead, Pill } from "@/components/app/primitives";
 import { humanizeStatus } from "@/components/app/status";
 import { aiInterviewLinks } from "@/lib/ai-interview-links";
-import { aiStatusLabel, cohortGoal, yearLabel, ago } from "@/lib/college/labels";
+import { aiStatusLabel, cohortGoal, membershipLabel, yearLabel, ago } from "@/lib/college/labels";
 import { auditCollegeView, requireCollegeContext, studentForCollegeAdmin } from "@/lib/college/scope";
 import { getDb, schema } from "@/lib/db";
 import { parseOffer } from "@/lib/offer";
@@ -33,6 +33,12 @@ export default async function CollegeStudentPage({ params }: { params: Promise<{
   if (!student) notFound();
 
   const db = getDb();
+  const [onRosterRow] = await db
+    .select({ email: schema.collegeRoster.email })
+    .from(schema.collegeRoster)
+    .where(and(eq(schema.collegeRoster.collegeId, ctx.college.id), eq(schema.collegeRoster.email, student.email.trim().toLowerCase())))
+    .limit(1);
+  const onRoster = Boolean(onRosterRow);
   const [[onboarding], [user], proposals, interviews, allCalls, views] = await Promise.all([
     // Allowlist: no Aadhaar, PAN, PIN, bank or emergency contact ever reaches this render (P-4). Columns are picked one by one,
     // and extra_data keeps only the keys draftFromRecord, the ratings and aiInterviewLinks read.
@@ -112,7 +118,7 @@ export default async function CollegeStudentPage({ params }: { params: Promise<{
                   {student.verifiedBy === "promo" ? "Verified by your student code" : student.verifiedBy === "roster" ? "On your roster" : "College email verified"}
                 </Pill>
               ) : (
-                <Pill tone="waiting">Not on your roster yet</Pill>
+                <Pill tone="waiting">{membershipLabel({ status: student.status, onRoster })}</Pill>
               )}
               <span>Last active {ago(student.lastActivityAt?.toISOString() ?? null)}</span>
             </span>

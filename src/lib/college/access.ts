@@ -142,6 +142,7 @@ const COLLEGE_ADMIN_WRITES = new Set([
   "drive:update",
   "drive:revoke",
   "roster:import",
+  "roster:remove",
   "nudge:send",
   "bank:update",
   "payout:request",

@@ -14,8 +14,16 @@ const HEADERS: Record<keyof RosterInput, RegExp> = {
   branch: /branch|department|dept|specialisation|specialization|stream|program(me)?/i,
 };
 
+/** ";" when the header line has more semicolons than commas and tabs (European-locale Excel exports). */
+export function detectSemicolon(text: string): boolean {
+  const header = (text.replace(/^﻿/, "").split(/\r\n|\n|\r/)[0] ?? "").replace(/"[^"]*"/g, "");
+  const count = (ch: string) => header.split(ch).length - 1;
+  return count(";") > count(",") + count("\t");
+}
+
 /** RFC 4180-ish: quoted fields, doubled quotes, commas and newlines inside quotes. */
 export function splitCsv(text: string): string[][] {
+  const semi = detectSemicolon(text);
   const rows: string[][] = [];
   let row: string[] = [];
   let field = "";
@@ -30,7 +38,7 @@ export function splitCsv(text: string): string[][] {
       } else if (c === '"') quoted = false;
       else field += c;
     } else if (c === '"') quoted = true;
-    else if (c === "," || c === "\t") {
+    else if (semi ? c === ";" : c === "," || c === "\t") {
       row.push(field);
       field = "";
     } else if (c === "\n" || c === "\r") {
@@ -67,7 +75,7 @@ export function readYear(raw: string, isSemester = false): number | null {
   return n >= 1 && n <= 5 ? n : null;
 }
 
-const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const EMAIL = /^[^\s@;,]+@[^\s@;,]+\.[^\s@;,]+$/;
 
 export function parseRoster(text: string): { rows: RosterInput[]; errors: string[] } {
   const table = splitCsv(text);
@@ -105,4 +113,14 @@ export function parseRoster(text: string): { rows: RosterInput[]; errors: string
     });
   });
   return { rows, errors };
+}
+
+/** Lower-cased, trimmed, de-duplicated emails; anything that is not an email is dropped. */
+export function normalizeEmails(raw: readonly string[]): string[] {
+  const out = new Set<string>();
+  for (const e of raw) {
+    const email = e.trim().toLowerCase();
+    if (EMAIL.test(email)) out.add(email);
+  }
+  return [...out];
 }

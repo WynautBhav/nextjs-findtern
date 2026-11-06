@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { Panel, PanelBody, PanelHeader } from "@/components/college/panel";
 import { PageHead, Surface } from "@/components/app/primitives";
+import { RosterRemove } from "@/components/college/roster-remove";
 import { RosterImport } from "@/components/college/roster-import";
 import { CopyText } from "@/components/college/copy-text";
 import { yearLabel } from "@/lib/college/labels";
@@ -10,7 +11,7 @@ import { requirePublicOrigin } from "@/lib/origin";
 
 /** Name · roll · year · branch · email (stacks on a phone). */
 const PAGE_SIZE = 50;
-const ROSTER_GRID = "grid-cols-[minmax(0,1fr)_auto] sm:grid-cols-[minmax(0,1.3fr)_6rem_5.5rem_minmax(0,0.8fr)_minmax(0,1.5fr)]";
+const ROSTER_GRID = "grid-cols-[minmax(0,1fr)_auto] sm:grid-cols-[minmax(0,1.3fr)_6rem_5.5rem_minmax(0,0.8fr)_minmax(0,1.5fr)_5.5rem]";
 
 export const dynamic = "force-dynamic";
 
@@ -113,6 +114,7 @@ export default async function RosterPage({ searchParams }: { searchParams?: Prom
               <span>Year</span>
               <span>Branch</span>
               <span>Email</span>
+              <span className="sr-only">Actions</span>
             </div>
             <ul className="divide-y divide-ink-100">
               {shown.map((s) => (
@@ -124,6 +126,9 @@ export default async function RosterPage({ searchParams }: { searchParams?: Prom
                   <span className="break-all text-ink-600 max-sm:col-span-2">
                     <span className="sm:hidden">{[s.year ? yearLabel(s.year) : null, s.branch].filter(Boolean).map((t) => `${t} · `).join("")}</span>
                     {s.email}
+                  </span>
+                  <span className="max-sm:col-span-2 sm:justify-self-end">
+                    <RosterRemove email={s.email} name={s.name} />
                   </span>
                 </li>
               ))}

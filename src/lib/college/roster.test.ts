@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { parseRoster, readYear, splitCsv } from "./roster.ts";
+import { normalizeEmails, parseRoster, readYear, splitCsv } from "./roster.ts";
 
 test("loose headers, BOM, quotes and CRLF", () => {
   const csv = '﻿Roll No,Student Name,Email ID,Department,Year\r\n21CS001,"Sharma, Asha",Asha@JKLU.edu.in,CSE,3rd\r\n21CS002,Ravi,ravi@jklu.edu.in,"ECE",IV\r\n';
@@ -35,4 +35,20 @@ test("readYear forms", () => {
 
 test("splitCsv keeps newlines inside quotes", () => {
   assert.deepEqual(splitCsv('a,b\n"x\ny",z\n'), [["a", "b"], ["x\ny", "z"]]);
+});
+
+test("semicolon-separated export splits on the header's delimiter", () => {
+  const { rows, errors } = parseRoster("Name;Email;Year\nAsha;asha@x.in;3\nRavi, Jr;ravi@x.in;2\n");
+  assert.deepEqual(errors, []);
+  assert.deepEqual(rows.map((r) => [r.name, r.email, r.year]), [["Asha", "asha@x.in", 3], ["Ravi, Jr", "ravi@x.in", 2]]);
+});
+
+test("a semicolon or comma can't hide inside an email", () => {
+  const { rows, errors } = parseRoster('email\n"a;b@x.in"\n"a,b@x.in"\n');
+  assert.equal(rows.length, 0);
+  assert.equal(errors.length, 2);
+});
+
+test("normalizeEmails lower-cases, de-duplicates and drops junk", () => {
+  assert.deepEqual(normalizeEmails([" A@x.in", "a@x.in", "nope", "b@x.in"]), ["a@x.in", "b@x.in"]);
 });
