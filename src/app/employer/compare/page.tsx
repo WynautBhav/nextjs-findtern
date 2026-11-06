@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Children, cloneElement, isValidElement } from "react";
 import Link from "next/link";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { ArrowLeft, Check, Minus, Send, X } from "lucide-react";
@@ -6,7 +7,7 @@ import { ArrowLeft, Check, Minus, Send, X } from "lucide-react";
 import { getDb, schema } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
 import { requireEmployerSetup } from "@/lib/employer-setup";
-import { formatDmy, formatMoney, formatRate } from "@/lib/format";
+import { formatDate, formatMoney, formatRate } from "@/lib/format";
 import { RATING_META, displayNameOf, preferredCities, toCandidateProfile, type CandidateProfile } from "@/lib/employer-candidates";
 import { shortlistProjectsByIntern } from "@/lib/employer-shortlist";
 import { candidateRelations, hiredInternIds, type CandidateRelation } from "@/lib/employer-visibility";
@@ -230,6 +231,21 @@ export default async function CompareCandidates({ searchParams }: { searchParams
       return [c.id, { matched, pct: requiredSkills.length ? Math.round((matched.length / requiredSkills.length) * 100) : 0 }];
     }),
   );
+  // The lede promises marked leaders only when some row has one (all-tied values mark nobody).
+  const anyLeader =
+    (requiredSkills.length > 0 && leaders(candidates.map((c) => fit.get(c.id)!.pct)).size > 0) ||
+    leaders(candidates.map((c) => (c.scored ? c.score : 0))).size > 0 ||
+    RATING_META.some((m) => leaders(candidates.map((c) => c.ratings[m.key])).size > 0);
+  const slotsLine = (
+    <>
+      <span className="nums block">{candidates.length} of {MAX_COMPARE} slots</span>
+      {candidates.length < MAX_COMPARE ? (
+        <Link href={backHref} className="-mx-1 inline-flex min-h-11 items-center px-1 text-sm font-medium text-ink-800 underline underline-offset-4 hover:text-ink-900 sm:mt-1">
+          Add a candidate
+        </Link>
+      ) : null}
+    </>
+  );
   const anyPerHire = candidates.some((c) => (pricing.get(c.id)?.perHireMinor ?? 0) > 0);
 
   return (
@@ -243,7 +259,7 @@ export default async function CompareCandidates({ searchParams }: { searchParams
       <PageHead
         className="mb-4 lg:mb-6"
         title={`Comparing ${candidates.length} candidate${candidates.length === 1 ? "" : "s"}`}
-        lede={candidates.length === 1 ? "Add one more from the candidate list to see who leads each row." : "The leader of each row is marked."}
+        lede={candidates.length === 1 ? "Add one more from the candidate list to see who leads each row." : anyLeader ? "The leader of each row is marked." : undefined}
         action={
           projects.length > 0 ? (
             // Applies on choice, like the project picker on Candidates: no Apply button.
@@ -270,12 +286,15 @@ export default async function CompareCandidates({ searchParams }: { searchParams
         note="Up to 7. Add or remove skills to re-score the project fit below."
       />
 
-      {/* The page scrolls vertically; only the width scrolls here, with the label column pinned. */}
+      {/* Phone: the label column is hidden, so the slot count sits here once. */}
+      <div className="mb-1 flex items-center justify-between gap-3 text-sm text-ink-600 sm:hidden">{slotsLine}</div>
+
+      {/* The page scrolls vertically; only the width scrolls here, with the label column pinned (sm up). */}
       <div
         tabIndex={0}
         role="region"
         aria-label="Candidate comparison"
-        className="relative -mx-4 overflow-x-auto border-y border-ink-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 sm:mx-0"
+        className="relative -mx-4 overflow-x-auto border-y border-ink-100 max-sm:snap-x max-sm:snap-mandatory focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 sm:mx-0"
       >
         <table className="w-full border-separate border-spacing-0 text-left text-sm">
           <caption className="sr-only">Candidates compared side by side; the leader of each row is marked.</caption>
@@ -283,14 +302,9 @@ export default async function CompareCandidates({ searchParams }: { searchParams
             <tr>
               <th
                 scope="col"
-                className="sticky left-0 z-20 w-[5.5rem] min-w-[5.5rem] border-b border-r border-ink-100 bg-surface p-3 align-bottom text-xs font-medium text-ink-600 sm:w-48 sm:min-w-48 sm:p-4"
+                className="sticky left-0 z-20 w-48 min-w-48 border-b border-r border-ink-100 bg-surface p-4 align-bottom text-xs font-medium text-ink-600 max-sm:hidden"
               >
-                <span className="nums block">{candidates.length} of {MAX_COMPARE}</span>
-                {candidates.length < MAX_COMPARE ? (
-                  <Link href={backHref} className="-mx-1 mt-1 inline-flex min-h-11 items-center px-1 text-sm font-medium text-ink-800 underline underline-offset-4 hover:text-ink-900">
-                    Add one
-                  </Link>
-                ) : null}
+                {slotsLine}
               </th>
               {candidates.map((c) => {
                 const rel = relations.get(c.id);
@@ -303,14 +317,14 @@ export default async function CompareCandidates({ searchParams }: { searchParams
                   <th
                     key={c.id}
                     scope="col"
-                    className="relative min-w-[11.5rem] border-b border-r border-ink-100 p-3 align-top font-normal last:border-r-0 sm:min-w-60 sm:p-4"
+                    className="relative border-b border-r border-ink-100 p-3 align-top font-normal last:border-r-0 max-sm:w-[calc((100vw-2rem)/2)] max-sm:min-w-[calc((100vw-2rem)/2)] max-sm:snap-start sm:min-w-60 sm:p-4"
                   >
                     {/* Photo, name and city are one link to the profile: a big target on a phone. */}
                     <Link
                       href={`/employer/intern/${encodeURIComponent(c.id)}${activeProject ? `?project=${encodeURIComponent(activeProject.id)}` : ""}`}
-                      className="group/id mr-8 flex items-center gap-3 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+                      className="group/id flex items-center gap-3 rounded-lg max-sm:flex-col max-sm:items-start max-sm:gap-1.5 sm:mr-8 outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
                     >
-                      <RowAvatar photoUrl={c.photoUrl} initials={c.initials} seed={c.id} className="size-12 sm:size-14" />
+                      <RowAvatar photoUrl={c.photoUrl} initials={c.initials} seed={c.id} className="size-10 sm:size-14" />
                       <span className="min-w-0 flex-1">
                         <span className="block break-words text-base font-semibold text-ink-900 underline-offset-4 group-hover/id:underline">{name}</span>
                         <span className="block break-words text-sm text-ink-600">{c.city || c.location || "City not stated"}</span>
@@ -332,12 +346,17 @@ export default async function CompareCandidates({ searchParams }: { searchParams
                         </ButtonLink>
                       ) : (
                         <>
-                          {activeProject ? <SaveToggle internId={c.id} projectId={activeProject.id} shortlisted={shortlisted.has(c.id)} name={name} /> : null}
+                          {/* Phone: the heart joins the remove button on the top line. */}
+                          {activeProject ? (
+                            <span className="max-sm:absolute max-sm:right-12 max-sm:top-1">
+                              <SaveToggle internId={c.id} projectId={activeProject.id} shortlisted={shortlisted.has(c.id)} name={name} />
+                            </span>
+                          ) : null}
                           <ButtonLink
                             href={`/employer/send-proposal?intern=${encodeURIComponent(c.id)}${activeProject ? `&project=${encodeURIComponent(activeProject.id)}` : ""}`}
                             variant="primary"
                             size="sm"
-                            className="min-h-11 min-w-0 flex-1 rounded-full max-sm:px-3 max-sm:[&>svg]:hidden sm:min-h-9 sm:touch:min-h-11"
+                            className="min-h-11 w-full min-w-0 flex-1 rounded-full max-sm:px-3 max-sm:[&>svg]:hidden sm:min-h-9 sm:touch:min-h-11"
                           >
                             <Send className="size-4" aria-hidden />
                             Send proposal
@@ -524,7 +543,7 @@ export default async function CompareCandidates({ searchParams }: { searchParams
                 <Cell key={c.id}>
                   <span className="nums">
                     {c.updatedAt
-                      ? formatDmy(c.updatedAt)
+                      ? formatDate(c.updatedAt)
                       : "Never"}
                   </span>
                 </Cell>
@@ -564,7 +583,7 @@ function MatrixRow({
       <th
         scope="row"
         className={cn(
-          "sticky left-0 z-10 border-r border-ink-100 p-3 text-left align-top text-[13px] font-semibold text-ink-900 sm:p-4 sm:text-sm",
+          "sticky left-0 z-10 border-r border-ink-100 p-4 text-left align-top text-sm font-semibold text-ink-900 max-sm:hidden",
           last ? "" : "border-b",
           accent ? "bg-brand-50" : "bg-surface",
         )}
@@ -572,14 +591,16 @@ function MatrixRow({
         {label}
         {hint ? <span className="mt-0.5 block text-xs font-normal text-ink-600">{hint}</span> : null}
       </th>
-      {children}
+      {/* Phone: no label column, so each cell carries its row's label. */}
+      {Children.map(children, (child) => (isValidElement<{ label?: string }>(child) ? cloneElement(child, { label }) : child))}
     </tr>
   );
 }
 
-function Cell({ leader, children }: { leader?: boolean; children: React.ReactNode }) {
+function Cell({ leader, label, children }: { leader?: boolean; label?: string; children: React.ReactNode }) {
   return (
-    <td className={cn("border-r border-ink-100 p-3 align-top sm:p-4 text-sm text-ink-800 last:border-r-0", leader && "bg-brand-50/60")}>
+    <td className={cn("border-r border-ink-100 p-3 align-top text-sm text-ink-800 max-sm:snap-start sm:p-4 last:border-r-0", leader && "bg-brand-50/60")}>
+      {label ? <span className="mb-1 block text-xs font-medium text-ink-600 sm:hidden">{label}</span> : null}
       {children}
     </td>
   );
