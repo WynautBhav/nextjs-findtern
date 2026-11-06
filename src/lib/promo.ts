@@ -1,7 +1,7 @@
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 
 import { getDb, schema } from "@/lib/db";
-import { collegeCodeProblem, employerPromoTooLarge, promoAudienceProblem, promoDiscount, promoProblem, seatFreeWhere, type PromoAudience } from "@/lib/promo-rules";
+import { collegeCodeMemberProblem, collegeCodeProblem, employerPromoTooLarge, promoAudienceProblem, promoDiscount, promoProblem, seatFreeWhere, type PromoAudience } from "@/lib/promo-rules";
 
 /**
  * Promo codes against a real order: shared by the intern activation payment
@@ -50,6 +50,15 @@ export async function quotePromo(input: {
     const [college] = await db.select({ isActive: schema.colleges.isActive, isPartner: schema.colleges.isPartner }).from(schema.colleges).where(eq(schema.colleges.id, row.collegeId)).limit(1);
     const dead = collegeCodeProblem(college ?? null);
     if (dead) return { ok: false, error: dead, status: 400 };
+    if (audience === "intern") {
+      const [mine] = await db
+        .select({ collegeId: schema.collegeMemberships.collegeId })
+        .from(schema.collegeMemberships)
+        .where(and(eq(schema.collegeMemberships.userId, input.subjectId), isNull(schema.collegeMemberships.leftAt)))
+        .limit(1);
+      const other = collegeCodeMemberProblem(mine?.collegeId, row.collegeId);
+      if (other) return { ok: false, error: other, status: 400 };
+    }
   }
 
   const problem = promoProblem(row, discountableMinor, input.currency);

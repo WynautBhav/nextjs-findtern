@@ -91,6 +91,16 @@ export function collegeCodeProblem(college: { isActive: boolean; isPartner: bool
   return college?.isActive && college.isPartner ? null : "Your college's code is not active. Ask your placement officer.";
 }
 
+/**
+ * A student who is an active member of one college can't redeem another college's code: paying with it would move them
+ * to that college and burn one of its seats. Members of the same college, and students with no college, are fine.
+ */
+export function collegeCodeMemberProblem(activeMembershipCollegeId: string | null | undefined, promoCollegeId: string): string | null {
+  return activeMembershipCollegeId && activeMembershipCollegeId !== promoCollegeId
+    ? "This code is for another college. Switch college in Settings first"
+    : null;
+}
+
 export const SEATS_USED_UP = "This college's free seats are used up";
 export const DEFAULT_COLLEGE_SEATS = 300;
 
