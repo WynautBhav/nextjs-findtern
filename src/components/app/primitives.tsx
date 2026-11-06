@@ -71,8 +71,6 @@ export function HeroBand({
 }) {
   return (
     <section className={cn("relative isolate mb-8 overflow-hidden rounded-apple-xl bg-brand-950 px-6 py-8 text-white sm:px-9 sm:py-10", className)}>
-      <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(ellipse_80%_70%_at_15%_-20%,rgb(22_107_84/0.6)_0%,transparent_70%)]" />
-      <div aria-hidden className="pointer-events-none absolute -right-24 -top-24 -z-10 size-72 rounded-full bg-accent-500/10 blur-3xl" />
       <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-6">
         <div className="min-w-0 max-w-2xl">
           {eyebrow ? <p className="mb-3 text-xs font-semibold uppercase tracking-[0.16em] text-accent-300">{eyebrow}</p> : null}

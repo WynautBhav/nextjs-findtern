@@ -122,7 +122,7 @@ export function NotificationList({
       <div className={cn("overflow-hidden rounded-apple-xl border border-ink-200/80 bg-white", LIGHT_TILE)}>
         {byDay(rows ?? [], now ?? mountedAt).map(({ day, items }) => (
           <section key={day} aria-label={day}>
-            <h3 className="nums bg-ink-50/70 px-5 py-2 text-xs font-medium text-ink-600">{day}</h3>
+            <h2 className="nums bg-ink-50/70 px-5 py-2 text-xs font-medium text-ink-600">{day}</h2>
             <ul className="divide-y divide-ink-100">
               {items.map((n) => {
                 const isRead = n.isRead || read.has(n.id);
