@@ -347,7 +347,8 @@ test("live: an open thread receives the reply without reloading; the sender sees
     // Opening the thread read it.
     await eventually("the intern's unread count back to 0", async () => (await counts(state.internCtx)).messages === 0, { timeoutMs: 8_000 });
     await eventually("the employer's thread shows Seen", async () => /\bSeen\b/.test(await employerPage.locator("main").innerText()), { timeoutMs: 8_000 });
-    assert.ok((await thread(state.employerCtx, state.threadId)).body.counterpartReadAt, "counterpartReadAt is set");
+    assert.equal((await thread(state.employerCtx, state.threadId)).body.seen, true, "seen is set");
+    assert.equal((await thread(state.employerCtx, state.threadId)).body.counterpartReadAt, undefined, "no exact read time");
 
     const box = internPage.getByRole("textbox", { name: /message/i });
     await box.fill(reply);
