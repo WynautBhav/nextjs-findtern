@@ -20,7 +20,8 @@ export { isStudentEligible, readEligibility, normBranch, type DriveEligibility, 
  *    the college boundary.
  *  - A college admin sees every student who joined their own college (joining
  *    is the student's choice; there is no separate consent step). They can
- *    never write student data.
+ *    never write student data. Their only other writes are their own
+ *    college's payout bank details and withdrawal requests.
  */
 
 type SessionLike = { uid: string; role: Role } | null | undefined;
@@ -136,7 +137,15 @@ export function membershipFor(input: {
  * The only writes a college admin can make. Everything about the student
  * (profile, scores, offers, proposals, membership, recordings) is read-only.
  */
-const COLLEGE_ADMIN_WRITES = new Set(["drive:create", "drive:update", "drive:revoke", "roster:import", "nudge:send"]);
+const COLLEGE_ADMIN_WRITES = new Set([
+  "drive:create",
+  "drive:update",
+  "drive:revoke",
+  "roster:import",
+  "nudge:send",
+  "bank:update",
+  "payout:request",
+]);
 
 export function collegeAdminMay(action: string): boolean {
   return COLLEGE_ADMIN_WRITES.has(action);

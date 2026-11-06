@@ -5,7 +5,7 @@ import { formatInvoiceNumber } from "@/lib/invoice";
 
 /**
  * GST invoice numbers: one running serial per Indian financial year
- * (1 April - 31 March, IST), shared by employer orders and intern fees,
+ * (1 April - 31 March, IST), shared by employer orders, intern fees and college seat batches,
  * printed behind the settlement date: "021126-124" (formatInvoiceNumber).
  * Assigned once, at the moment a payment is marked paid, and stored - so a
  * number never changes after it is printed. Numbers issued before this format
@@ -28,13 +28,14 @@ export function financialYear(at: Date = new Date()): string {
  * the `invoice_number IS NULL` guard makes a second call a no-op.
  */
 export async function assignInvoiceNumber(
-  kind: "employer" | "intern",
+  kind: "employer" | "intern" | "college",
   paymentId: string,
   paidAt: Date = new Date(),
   // Pass the settling transaction, so a rollback also takes the serial back.
   db: Db | Tx = getDb(),
 ): Promise<string | null> {
-  const table = kind === "employer" ? schema.employerPayments : schema.internPayments;
+  const table =
+    kind === "employer" ? schema.employerPayments : kind === "college" ? schema.collegeSeatBatches : schema.internPayments;
   const [row] = await db
     .select({ invoiceNumber: table.invoiceNumber })
     .from(table)

@@ -989,21 +989,26 @@ export const collegeSeatBatches = pgTable("college_seat_batches", {
 export const collegeWalletEntries = pgTable("college_wallet_entries", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   collegeId: varchar("college_id").notNull(),
-  kind: text("kind").notNull(), // incentive | adjustment
+  kind: text("kind").notNull(), // incentive | adjustment | payout
   amountMinor: integer("amount_minor").notNull(),
   proposalId: varchar("proposal_id"),
   internId: varchar("intern_id"),
   bandId: text("band_id"),
+  /** The college_payouts row a `payout` debit settles (drizzle/0016). */
+  payoutId: varchar("payout_id"),
   createdBy: varchar("created_by"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => ({
   collegeWalletIncentiveUnique: uniqueIndex("college_wallet_incentive_unique").on(t.proposalId).where(sql`${t.kind} = 'incentive'`),
   // drizzle/0014: same NULL hole as intern_payouts.
   collegeWalletIncentiveHasProposal: check("college_wallet_incentive_has_proposal", sql`${t.kind} <> 'incentive' OR ${t.proposalId} IS NOT NULL`),
+  // drizzle/0016: one debit per payout request, and a payout debit must name its request.
+  collegeWalletPayoutUnique: uniqueIndex("college_wallet_payout_unique").on(t.payoutId).where(sql`${t.kind} = 'payout'`),
+  collegeWalletPayoutHasId: check("college_wallet_payout_has_id", sql`${t.kind} <> 'payout' OR ${t.payoutId} IS NOT NULL`),
   collegeWalletEntriesCollegeIdx: index("college_wallet_entries_college_idx").on(t.collegeId, t.createdAt),
 }));
 
-/** College payout requests (build deferred). At most one open request per college. */
+/** College payout requests. At most one open request per college; paying one writes a `payout` debit in the wallet ledger. */
 export const collegePayouts = pgTable("college_payouts", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   collegeId: varchar("college_id").notNull(),

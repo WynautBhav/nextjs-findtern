@@ -191,8 +191,8 @@ test("membership: lookalike domains do not verify", () => {
 
 // ── College admin is read-only on student data ─────────────────────────
 
-test("college admin may only run drives, roster and nudges", () => {
-  for (const ok of ["drive:create", "drive:update", "drive:revoke", "roster:import", "nudge:send"]) {
+test("college admin may only run drives, roster and nudges, and manage their own payout bank and withdrawals", () => {
+  for (const ok of ["drive:create", "drive:update", "drive:revoke", "roster:import", "nudge:send", "bank:update", "payout:request"]) {
     assert.equal(collegeAdminMay(ok), true, ok);
   }
   for (const no of [
@@ -203,6 +203,8 @@ test("college admin may only run drives, roster and nudges", () => {
     "proposal:update",
     "membership:update",
     "recording:delete",
+    "seat:create",
+    "payout:paid",
     "",
     "drive:create ",
   ]) {
