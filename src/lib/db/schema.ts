@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, boolean, integer, timestamp, jsonb, uniqueIndex, index, check } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, boolean, integer, timestamp, jsonb, uniqueIndex, index, check, primaryKey } from "drizzle-orm/pg-core";
 // --------------------------------------------------
 // User (Intern) Schema
 // --------------------------------------------------
@@ -412,11 +412,27 @@ export const projects = pgTable("projects", {
   state: text("state"),
   timezone: text("timezone"),
   status: text("status").default("active"),
+  /** What the work is (≤2000 chars, contact details refused). No pay field on listings. */
+  description: text("description"),
+  /** Admin take-down (OA8), separate from the legacy `status`. Set = hidden everywhere; employer cannot reopen. */
+  takenDownAt: timestamp("taken_down_at"),
+  takenDownBy: varchar("taken_down_by"),
+  takenDownReason: text("taken_down_reason"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 export type Project = typeof projects.$inferSelect;
+
+/** Roles a student saved (OA3). Raises them in that employer's matches for that project; never touches the score. */
+export const internSavedProjects = pgTable("intern_saved_projects", {
+  internId: varchar("intern_id").notNull(),
+  projectId: varchar("project_id").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => ({
+  pk: primaryKey({ columns: [t.internId, t.projectId] }),
+  internSavedProjectsProjectIdx: index("intern_saved_projects_project_idx").on(t.projectId),
+}));
 
 export const countryCodes = [
   { code: "+91", country: "IN", flag: "IN" },
@@ -826,6 +842,10 @@ export const notifications = pgTable("notifications", {
   notificationsDedupeUniq: uniqueIndex("notifications_dedupe_uniq")
     .on(t.recipientType, t.recipientId, t.dedupeKey)
     .where(sql`${t.dedupeKey} is not null`),
+  // Unread counter (badge, live counts).
+  notificationsUnreadIdx: index("notifications_unread_idx")
+    .on(t.recipientType, t.recipientId)
+    .where(sql`${t.isRead} = false`),
 }));
 
 export type Notification = typeof notifications.$inferSelect;
@@ -964,6 +984,10 @@ export const colleges = pgTable("colleges", {
   bankName: text("bank_name"),
   bankAccountNumber: text("bank_account_number"),
   bankIfsc: text("bank_ifsc"),
+  contactName: text("contact_name"),
+  contactEmail: text("contact_email"),
+  contactPhone: text("contact_phone"),
+  address: text("address"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => ({
   collegesSlugUnique: uniqueIndex("colleges_slug_unique").on(t.slug),
@@ -1063,12 +1087,90 @@ export const collegeRoster = pgTable("college_roster", {
   /** Year of study, 1–5. */
   year: integer("year"),
   branch: text("branch"),
+  /** Normalised 10-digit Indian mobile or E.164. */
+  phone: text("phone"),
+  importId: varchar("import_id"),
+  /** Set by an email auto-link or an admin link (OA5). Does not grant the fee waiver. */
+  matchedUserId: varchar("matched_user_id"),
+  matchStatus: text("match_status").notNull().default("unmatched"), // unmatched | email | review | linked | rejected
+  matchCandidates: jsonb("match_candidates").$type<{ userId: string; reason: "phone" | "name" }[]>().notNull().default([]),
+  matchDecidedBy: varchar("match_decided_by"),
+  matchDecidedAt: timestamp("match_decided_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => ({
   collegeRosterUnique: uniqueIndex("college_roster_college_email_unique").on(t.collegeId, t.email),
+  collegeRosterMatchedUserUniq: uniqueIndex("college_roster_matched_user_uniq")
+    .on(t.collegeId, t.matchedUserId)
+    .where(sql`${t.matchedUserId} is not null`),
+  collegeRosterReviewIdx: index("college_roster_review_idx").on(t.matchStatus).where(sql`${t.matchStatus} = 'review'`),
 }));
 
 export type CollegeRosterRow = typeof collegeRoster.$inferSelect;
+
+/** An admin roster upload. Same file twice (college + sha256) returns the same import. */
+export const collegeRosterImports = pgTable("college_roster_imports", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  collegeId: varchar("college_id").notNull(),
+  fileName: text("file_name").notNull(),
+  fileSha256: text("file_sha256").notNull(),
+  mapping: jsonb("mapping").$type<{ name: number; email: number; phone: number | null }>().notNull(),
+  /** Classified preview rows (§2.3 roster-imports contract). */
+  rows: jsonb("rows").$type<unknown[]>().notNull(),
+  counts: jsonb("counts").$type<Record<string, number>>().notNull(),
+  status: text("status").notNull().default("previewed"), // previewed | committed | discarded
+  overAllocation: boolean("over_allocation").notNull().default(false),
+  createdBy: varchar("created_by").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  committedAt: timestamp("committed_at"),
+}, (t) => ({
+  collegeRosterImportsFileUniq: uniqueIndex("college_roster_imports_file_uniq").on(t.collegeId, t.fileSha256),
+}));
+
+export type CollegeRosterImport = typeof collegeRosterImports.$inferSelect;
+
+export const REFUND_STATUSES = ["eligible", "requires_review", "pending", "initiated", "refunded", "failed", "rejected"] as const;
+export type RefundStatus = (typeof REFUND_STATUSES)[number];
+
+/** Refund of an individual activation for a roster/verified student (OA6). One live row per payment. */
+export const paymentRefunds = pgTable("payment_refunds", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  internPaymentId: varchar("intern_payment_id").notNull(),
+  internId: varchar("intern_id").notNull(),
+  collegeId: varchar("college_id").notNull(),
+  rosterId: varchar("roster_id"),
+  amountMinor: integer("amount_minor").notNull(),
+  status: text("status").$type<RefundStatus>().notNull(),
+  reviewReason: text("review_reason"), // interview_taken | not_gateway | ...
+  /** Copied from intern_payments.gateway. */
+  gateway: text("gateway").notNull(),
+  gatewayRefundId: text("gateway_refund_id"),
+  gatewayStatus: text("gateway_status"),
+  gatewayResponse: jsonb("gateway_response").$type<Record<string, unknown>>(),
+  lastError: text("last_error"),
+  manualReference: text("manual_reference"),
+  /** promo_code_usages.id claimed for this refund (one college seat). */
+  seatUsageId: varchar("seat_usage_id"),
+  initiatedBy: varchar("initiated_by"),
+  initiatedAt: timestamp("initiated_at"),
+  settledAt: timestamp("settled_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (t) => ({
+  paymentRefundsAmountPositive: check("payment_refunds_amount_positive", sql`${t.amountMinor} > 0`),
+  paymentRefundsStatusCheck: check(
+    "payment_refunds_status_check",
+    sql`${t.status} IN ('eligible','requires_review','pending','initiated','refunded','failed','rejected')`,
+  ),
+  paymentRefundsLiveUniq: uniqueIndex("payment_refunds_live_uniq")
+    .on(t.internPaymentId)
+    .where(sql`${t.status} NOT IN ('failed','rejected')`),
+  paymentRefundsGatewayUniq: uniqueIndex("payment_refunds_gateway_uniq")
+    .on(t.gatewayRefundId)
+    .where(sql`${t.gatewayRefundId} is not null`),
+  paymentRefundsStatusIdx: index("payment_refunds_status_idx").on(t.status, t.createdAt),
+}));
+
+export type PaymentRefund = typeof paymentRefunds.$inferSelect;
 
 /**
  * A student's college. One per student. `claimed` = picked from the list;
@@ -1229,3 +1331,66 @@ export const pushSubscriptions = pgTable("push_subscriptions", {
   pushSubscriptionsEndpointUnique: uniqueIndex("push_subscriptions_endpoint_unique").on(t.endpoint),
   pushSubscriptionsUserIdx: index("push_subscriptions_user_idx").on(t.userId),
 }));
+
+/** Activity-based presence (OA2). Labels are derived at query time (src/lib/presence.ts); never shown as a time. */
+export const userPresence = pgTable("user_presence", {
+  userType: text("user_type").notNull(), // intern (employer reserved)
+  userId: varchar("user_id").notNull(),
+  /** Any beat while the tab is visible. */
+  lastSeenAt: timestamp("last_seen_at").notNull().defaultNow(),
+  /** Beat with active=true (pointer/key/scroll/focus in the last 2 min). */
+  lastActiveAt: timestamp("last_active_at"),
+  /** The student switched presence off. */
+  hidden: boolean("hidden").notNull().default(false),
+}, (t) => ({
+  pk: primaryKey({ columns: [t.userType, t.userId] }),
+}));
+
+/** One thread per employer–intern pair, opened by a proposal (OA1). */
+export const messageThreads = pgTable("message_threads", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  employerId: varchar("employer_id").notNull(),
+  internId: varchar("intern_id").notNull(),
+  proposalId: varchar("proposal_id").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  lastMessageAt: timestamp("last_message_at"),
+  employerLastReadAt: timestamp("employer_last_read_at"),
+  internLastReadAt: timestamp("intern_last_read_at"),
+  employerEmailedAt: timestamp("employer_emailed_at"),
+  internEmailedAt: timestamp("intern_emailed_at"),
+  closedAt: timestamp("closed_at"),
+  closedReason: text("closed_reason"),
+}, (t) => ({
+  messageThreadsPairUniq: uniqueIndex("message_threads_pair_uniq").on(t.employerId, t.internId),
+  messageThreadsInternIdx: index("message_threads_intern_idx").on(t.internId, t.lastMessageAt.desc()),
+  messageThreadsEmployerIdx: index("message_threads_employer_idx").on(t.employerId, t.lastMessageAt.desc()),
+}));
+
+export type MessageThread = typeof messageThreads.$inferSelect;
+
+export const messages = pgTable("messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  threadId: varchar("thread_id").notNull().references(() => messageThreads.id),
+  senderType: text("sender_type").$type<"intern" | "employer">().notNull(),
+  senderId: varchar("sender_id").notNull(),
+  body: text("body").notNull(),
+  /** Client-generated uuid: a retried send returns the first row. */
+  clientId: varchar("client_id").notNull(),
+  /** Contact details were hidden (no paid hire yet). */
+  redacted: boolean("redacted").notNull().default(false),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => ({
+  messagesBodyLen: check("messages_body_len", sql`char_length(${t.body}) BETWEEN 1 AND 2000`),
+  messagesClientUniq: uniqueIndex("messages_client_uniq").on(t.threadId, t.senderId, t.clientId),
+  messagesThreadIdx: index("messages_thread_idx").on(t.threadId, t.createdAt),
+}));
+
+export type Message = typeof messages.$inferSelect;
+
+/** Skill arrays saved before migration 0021 cut every profile to 7 (OA9). Read only by its rollback. */
+export const internSkillsBackup = pgTable("intern_skills_backup", {
+  userId: varchar("user_id").primaryKey(),
+  skills: jsonb("skills").notNull(),
+  extraSkills: jsonb("extra_skills"),
+  cutAt: timestamp("cut_at").notNull().defaultNow(),
+});
