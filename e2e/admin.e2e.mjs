@@ -191,7 +191,8 @@ async function queueFromDb() {
 async function receivedFromDb({ since = null } = {}) {
   const inr = (a, c) => `(CASE WHEN upper(coalesce(${c}, 'INR')) = 'USD' THEN ${a} * 100 ELSE ${a} END)`;
   const at = (t) => (since ? `AND coalesce(${t}.paid_at, ${t}.created_at) >= $1` : "");
-  const args = since ? [since] : [];
+  // An ISO string, so a host not on UTC still compares UTC wall time with the naive timestamp columns.
+  const args = since ? [since.toISOString()] : [];
   const emp = await one(
     `SELECT coalesce(sum(${inr("e.amount_minor", "e.currency")}), 0)::bigint v FROM employer_payments e
       WHERE e.status = 'paid' AND e.employer_id <> 'admin'

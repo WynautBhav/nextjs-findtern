@@ -301,8 +301,12 @@ test("gateway refusal: 502, the row stays pending with the error; after a refres
   // A pending row with no gateway id counts as a call that may still be in flight, so an immediate retry is refused (409) …
   assert.equal((await act(state.d.refundId, { action: "initiate", confirmAmountMinor: FEE })).status, 409, "no retry inside the 2-minute window");
   assert.equal((await stub.refundCalls()).length, callsBefore + 1, "and no gateway call was made for it");
-  // … and allowed once that window has passed (moved back in the DB rather than waited out).
-  await db().query(`UPDATE payment_refunds SET updated_at = now() - interval '3 minutes' WHERE id = $1`, [state.d.refundId]);
+  // … until two minutes have passed (moved back in the DB rather than waited out) and a refresh finds no refund at Razorpay:
+  // the row is then `failed` ("No refund reached Razorpay… You can retry it") and can be initiated again.
+  await db().query(`UPDATE payment_refunds SET updated_at = timezone('utc', now()) - interval '3 minutes' WHERE id = $1`, [state.d.refundId]);
+  const settled = await act(state.d.refundId, { action: "refresh" });
+  assert.equal(settled.status, 200, JSON.stringify(settled.body));
+  assert.equal((await refundRow(state.d.refundId)).status, "failed", "a stale call with no refund at the gateway is released for a retry");
   const retry = await act(state.d.refundId, { action: "initiate", confirmAmountMinor: FEE });
   assert.equal(retry.status, 200, JSON.stringify(retry.body));
   assert.ok(["initiated", "refunded"].includes(retry.body.status), retry.body.status);
