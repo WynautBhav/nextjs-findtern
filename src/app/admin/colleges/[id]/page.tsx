@@ -42,7 +42,7 @@ export default async function AdminCollegePage({ params }: { params: Promise<{ i
     <div className="space-y-4">
       <AdminPageHeader
         title={college.name}
-        subtitle={[college.code ? `Code ${college.code}` : null, college.isPartner ? "Partner" : "Not a partner", college.isActive ? "Active" : "Inactive"].filter(Boolean).join(" · ")}
+        subtitle={[college.code ? `College code ${college.code}` : null, college.isPartner ? "Partner" : "Not a partner", college.isActive ? "Active" : "Inactive"].filter(Boolean).join(" · ")}
         action={<Link href="/admin/colleges" className="text-sm font-medium underline underline-offset-4">All colleges</Link>}
       />
       <Panel>

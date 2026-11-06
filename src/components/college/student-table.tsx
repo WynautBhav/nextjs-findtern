@@ -215,7 +215,7 @@ function Row({ s, now }: { s: StudentRow; now: number }) {
       <td className="px-5 py-3">
         <Link
           href={`/college/students/${s.userId}`}
-          className="font-medium text-ink-900 outline-none after:absolute after:inset-0 after:content-[''] hover:text-brand-700 focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-brand-500"
+          className="font-medium text-ink-900 outline-none touch:inline-flex touch:min-h-11 touch:items-center after:absolute after:inset-0 after:content-[''] hover:text-brand-700 focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-brand-500"
         >
           {s.name || s.email}
         </Link>
@@ -256,7 +256,7 @@ function MobileRow({ s, now }: { s: StudentRow; now: number }) {
       <div className="min-w-0">
         <Link
           href={`/college/students/${s.userId}`}
-          className="font-medium text-ink-900 outline-none after:absolute after:inset-0 after:content-[''] focus-visible:after:ring-2 focus-visible:after:ring-brand-500"
+          className="font-medium text-ink-900 outline-none touch:inline-flex touch:min-h-11 touch:items-center after:absolute after:inset-0 after:content-[''] focus-visible:after:ring-2 focus-visible:after:ring-brand-500"
         >
           {s.name || s.email}
         </Link>

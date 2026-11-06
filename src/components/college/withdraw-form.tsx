@@ -20,6 +20,7 @@ export function WithdrawForm({ availableMinor, blockedReason }: { availableMinor
     e.preventDefault();
     const amountMinor = Math.round(Number(rupees) * 100);
     if (!Number.isFinite(amountMinor) || amountMinor <= 0) return setMsg("Enter an amount above zero.");
+    if (amountMinor > availableMinor) return setMsg(`That is more than your available balance (${formatMoney(availableMinor, "INR", { zeroLabel: false })}).`);
     const ok = await ask({
       title: "Request this withdrawal?",
       body: `${formatMoney(amountMinor, "INR", { zeroLabel: false })} will be sent to your bank account on file once Findtern pays it.`,
@@ -54,7 +55,7 @@ export function WithdrawForm({ availableMinor, blockedReason }: { availableMinor
           value={rupees}
           disabled={Boolean(blockedReason)}
           onChange={(e) => setRupees(e.target.value)}
-          className="nums mt-1 w-40 rounded-md border border-ink-200 px-3 py-2"
+          className="nums mt-1 w-40 rounded-md border border-ink-200 px-3 py-2 touch:min-h-11"
         />
       </label>
       <button type="submit" disabled={busy || Boolean(blockedReason)} className={buttonClass({ size: "sm" })}>{busy ? "Requesting…" : "Request withdrawal"}</button>

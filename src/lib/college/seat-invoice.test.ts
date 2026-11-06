@@ -25,3 +25,8 @@ test("no GSTIN falls back to the state; GSTIN wins when present", () => {
   assert.equal(seatInvoiceInput(batch, college(null), seller).buyer.place.kind, "unknown");
   assert.equal((seatInvoiceInput(batch, college("Rajasthan", "27ABCDE1234F1Z5"), seller).buyer.place as { stateCode: string }).stateCode, "27");
 });
+
+test("the batch reference is the invoice's payment id", () => {
+  assert.equal(seatInvoiceInput({ ...batch, referenceId: "UTR123" }, college("Rajasthan"), seller).paymentId, "UTR123");
+  assert.equal(seatInvoiceInput(batch, college("Rajasthan"), seller).paymentId, null);
+});

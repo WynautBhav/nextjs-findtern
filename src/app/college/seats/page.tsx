@@ -32,6 +32,7 @@ export default async function SeatsPage() {
       <PageHead title="Seats" lede="Each seat waives one student's AI interview fee." />
       {seat ? (
         <Surface className="p-5">
+          <p className="text-sm text-text-subtle">Student code (not the college code). Share it with students.</p>
           <code className="select-all font-mono text-xl font-semibold tracking-widest">{seat.code}</code>
           <p className="nums mt-1 text-sm text-text-subtle">
             {seat.used} used · {seat.cap ?? "unlimited"} total · {seat.cap === null ? "unlimited" : Math.max(0, seat.cap - seat.used)} left

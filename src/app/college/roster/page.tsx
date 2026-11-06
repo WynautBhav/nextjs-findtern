@@ -64,7 +64,7 @@ export default async function RosterPage({ searchParams }: { searchParams?: Prom
           </details>
             {coverage.claimed > 0 ? (
               <p className="text-sm text-text-subtle">
-                {coverage.claimed} student{coverage.claimed === 1 ? " has" : "s have"} picked your college but {coverage.claimed === 1 ? "isn't" : "aren't"} on this list or using a college email. Share your college code with them to verify them.
+                {coverage.claimed} student{coverage.claimed === 1 ? " has" : "s have"} picked your college but {coverage.claimed === 1 ? "isn't" : "aren't"} on this list or using a college email. Share your student code with them to verify them.
               </p>
             ) : null}
         </Surface>
@@ -83,7 +83,7 @@ export default async function RosterPage({ searchParams }: { searchParams?: Prom
             <CopyText text={invite} label="Copy message" />
             {coverage.claimed > 0 ? (
               <p className="text-sm text-text-subtle">
-                {coverage.claimed} student{coverage.claimed === 1 ? " has" : "s have"} picked your college but {coverage.claimed === 1 ? "isn't" : "aren't"} on this list or using a college email. Share your college code with them to verify them.
+                {coverage.claimed} student{coverage.claimed === 1 ? " has" : "s have"} picked your college but {coverage.claimed === 1 ? "isn't" : "aren't"} on this list or using a college email. Share your student code with them to verify them.
               </p>
             ) : null}
           </PanelBody>

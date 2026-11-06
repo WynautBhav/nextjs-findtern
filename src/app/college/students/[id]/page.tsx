@@ -109,7 +109,7 @@ export default async function CollegeStudentPage({ params }: { params: Promise<{
               {student.status === "verified" ? (
                 <Pill tone="live">
                   <ShieldCheck className="size-3.5" aria-hidden />
-                  {student.verifiedBy === "promo" ? "Verified by your college code" : student.verifiedBy === "roster" ? "On your roster" : "College email verified"}
+                  {student.verifiedBy === "promo" ? "Verified by your student code" : student.verifiedBy === "roster" ? "On your roster" : "College email verified"}
                 </Pill>
               ) : (
                 <Pill tone="waiting">Not on your roster yet</Pill>
@@ -157,7 +157,7 @@ export default async function CollegeStudentPage({ params }: { params: Promise<{
               ) : null}
             </dl>
           ) : (
-            <p className="text-sm text-text-subtle">Full profile shows once the student is verified with your college code.</p>
+            <p className="text-sm text-text-subtle">Full profile shows once the student is verified with your student code.</p>
           )}
         </PanelBody>
       </Panel>

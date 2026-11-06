@@ -79,7 +79,7 @@ export function CollegeWalletPanel({ collegeId, summary, ledger, bank, canMoney 
         {bank ? (
           <p className="nums text-text-subtle">
             {bank.holder} · {bank.bankName} · {full ?? `•••• ${bank.last4}`} · {bank.ifsc}
-            {canMoney && !full ? <button type="button" onClick={reveal} disabled={busy} className="ml-3 underline">Reveal</button> : null}
+            {canMoney && !full ? <button type="button" onClick={reveal} disabled={busy} className="ml-3 inline-flex items-center underline touch:min-h-11 touch:min-w-11 touch:justify-center">Reveal</button> : null}
           </p>
         ) : (
           <p className="text-text-subtle">None on file.</p>
@@ -91,9 +91,9 @@ export function CollegeWalletPanel({ collegeId, summary, ledger, bank, canMoney 
           <p className="font-medium">Withdrawal requested: {inr(open.amountMinor)} on {formatDate(open.createdAt)}</p>
           {canMoney ? (
             <div className="flex flex-wrap items-end gap-3">
-              <input aria-label="Bank reference" placeholder="Bank reference (UTR)" maxLength={64} value={ref} onChange={(e) => setRef(e.target.value)} className="rounded-md border border-ink-200 px-3 py-2" />
+              <input aria-label="Bank reference" placeholder="Bank reference (UTR)" maxLength={64} value={ref} onChange={(e) => setRef(e.target.value)} className="rounded-md border border-ink-200 px-3 py-2 touch:min-h-11" />
               <button type="button" disabled={busy || !ref.trim()} onClick={() => settle("paid")} className={buttonClass({ size: "sm" })}>Mark paid</button>
-              <input aria-label="Rejection reason" placeholder="Reason (3+ characters)" maxLength={300} value={reason} onChange={(e) => setReason(e.target.value)} className="rounded-md border border-ink-200 px-3 py-2" />
+              <input aria-label="Rejection reason" placeholder="Reason (3+ characters)" maxLength={300} value={reason} onChange={(e) => setReason(e.target.value)} className="rounded-md border border-ink-200 px-3 py-2 touch:min-h-11" />
               <button type="button" disabled={busy || reason.trim().length < 3} onClick={() => settle("reject")} className={buttonClass({ variant: "outline", size: "sm" })}>Reject</button>
             </div>
           ) : null}

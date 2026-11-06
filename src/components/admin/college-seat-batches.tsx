@@ -28,13 +28,13 @@ export type SeatBatchRow = {
 export type CollegeSeatBatchesProps = {
   collegeId: string;
   batches: SeatBatchRow[];
-  /** The college's TPO code and its seats; null when it has no code yet. */
+  /** The college's student code (TPO promo code) and its seats; null when it has no code yet. */
   seat: { code: string; cap: number | null; used: number } | null;
   /** Money controls (create, mark paid, void) render only when true. */
   canMoney: boolean;
 };
 
-const field = "h-9 rounded-md border border-ink-200 bg-surface px-2 text-sm";
+const field = "h-9 rounded-md border border-ink-200 bg-surface px-2 text-sm touch:min-h-11";
 
 export function CollegeSeatBatches({ collegeId, batches, seat, canMoney }: CollegeSeatBatchesProps) {
   const router = useRouter();
@@ -80,7 +80,7 @@ export function CollegeSeatBatches({ collegeId, batches, seat, canMoney }: Colle
   return (
     <section className="space-y-3" aria-label="Seat batches">
       <p className="text-sm text-ink-600">
-        {seat ? `Code ${seat.code}: ${seat.used} of ${seat.cap ?? "unlimited"} seats used.` : "No code yet. It is created when the first batch is marked paid."}
+        {seat ? `Student code ${seat.code}: ${seat.used} of ${seat.cap ?? "unlimited"} seats used.` : "No code yet. It is created when the first batch is marked paid."}
       </p>
       {canMoney ? (
         <form
