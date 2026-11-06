@@ -128,3 +128,34 @@ test("csrfFetch opens the terms pop-up in place, never reloads", () => {
   const gate = readFileSync(join(API, "../../components/app/terms-gate.tsx"), "utf8");
   assert.match(gate, /addEventListener\("findtern:terms-required"/);
 });
+
+// Messaging (OA1): only the two sides of a thread, never a college officer or an admin acting on their behalf.
+test("messaging routes: writes are employer/intern only and CSRF-guarded; reads are session-checked and 404 non-participants", () => {
+  const src = (k: string) => readFileSync(join(API, k, "route.ts"), "utf8");
+  for (const k of ["messages/threads", "messages/threads/[id]/messages", "messages/threads/[id]/read"]) {
+    const code = stripComments(src(k));
+    assert.match(code, /requireMutation\(\{ req, roles: \["employer", "intern"\] \}\)/, `${k} must allow exactly employer and intern`);
+    assert.doesNotMatch(code, /allowImpersonated/, `${k} must stay read-only under View as`);
+  }
+  for (const k of ["messages/threads/[id]", "live"]) {
+    const code = stripComments(src(k));
+    assert.match(code, /getSession\(\)/, `${k} must read the session`);
+    assert.match(code, /session\.role !== "intern" && session\.role !== "employer"/, `${k} must refuse every other role`);
+  }
+  assert.match(stripComments(src("messages/threads/[id]")), /threadFor\(viewer, id\)[\s\S]*status: 404/, "a non-participant gets 404");
+});
+
+test("presence: the heartbeat writes for every intern but never while viewing as, and is rate limited; the switch is intern only", () => {
+  const beat = stripComments(readFileSync(join(API, "intern/college/heartbeat/route.ts"), "utf8"));
+  assert.match(beat, /requireMutation\(\{ req, roles: \["intern"\], allowPendingTerms: true \}\)/, "no allowImpersonated: View as never marks the student online");
+  assert.doesNotMatch(beat, /allowImpersonated/);
+  assert.match(beat, /new RateLimiter\(1, 10_000/, "at most one presence write per 10 s");
+  assert.ok(beat.indexOf("userPresence") < beat.indexOf("collegeMemberships"), "presence is written before the membership early return");
+  const sw = stripComments(readFileSync(join(API, "intern/presence/route.ts"), "utf8"));
+  assert.match(sw, /requireMutation\(\{ req, roles: \["intern"\] \}\)/);
+});
+
+test("marking a notification read checks the recipient type as well as the id", () => {
+  const code = stripComments(readFileSync(join(API, "notifications/[id]/read/route.ts"), "utf8"));
+  assert.match(code, /row\.recipientType === session\.role && row\.recipientId === session\.uid/);
+});

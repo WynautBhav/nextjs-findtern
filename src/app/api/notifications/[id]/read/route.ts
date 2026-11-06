@@ -27,7 +27,8 @@ import { requireMutation } from "@/lib/guards-mutation";
 
   if (!row) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  const mine = session.role === "admin" || row.recipientId === session.uid;
+  // The type is part of who a row belongs to, not only the id.
+  const mine = session.role === "admin" || (row.recipientType === session.role && row.recipientId === session.uid);
   if (!mine) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
