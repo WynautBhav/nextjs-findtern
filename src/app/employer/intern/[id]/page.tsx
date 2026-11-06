@@ -441,11 +441,18 @@ export default async function EmployerInternDetail({
             <section>
               <SectionHead title="Skills and tools" />
               <ul className="flex flex-wrap gap-2">
-                {profile.skills.map((skill) => (
+                {/* A profile holds at most seven skills; an older, longer list is cut to seven with "+N". */}
+                {profile.skills.slice(0, 7).map((skill) => (
                   <li key={skill} className="rounded-full bg-brand-50 px-3 py-1.5 text-sm font-medium text-brand-800 ring-1 ring-inset ring-brand-200/70">
                     {skill}
                   </li>
                 ))}
+                {profile.skills.length > 7 ? (
+                  <li className="rounded-full bg-ink-100 px-3 py-1.5 text-sm font-medium text-ink-700">
+                    +{profile.skills.length - 7}
+                    <span className="sr-only"> more skills</span>
+                  </li>
+                ) : null}
               </ul>
             </section>
           ) : null}

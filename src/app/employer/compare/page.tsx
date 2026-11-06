@@ -451,8 +451,9 @@ export default async function CompareCandidates({ searchParams }: { searchParams
               {candidates.map((c) => {
                 const skills = Array.from(new Set(c.skills.map(nameOf).filter(Boolean)));
                 const isMatch = (s: string) => wanted.has(s.toLowerCase());
-                // Matches first; a profile holds at most seven skills, so an older, longer list is cut to seven.
-                const ordered = [...skills.filter(isMatch), ...skills.filter((s) => !isMatch(s))].slice(0, 7);
+                // Matches first; a profile holds at most seven skills, so an older, longer list is cut to seven (+N).
+                const all = [...skills.filter(isMatch), ...skills.filter((s) => !isMatch(s))];
+                const ordered = all.slice(0, 7);
                 return (
                   <Cell key={c.id}>
                     {ordered.length === 0 ? (
@@ -469,6 +470,12 @@ export default async function CompareCandidates({ searchParams }: { searchParams
                             {skill}
                           </li>
                         ))}
+                        {all.length > ordered.length ? (
+                          <li className="text-ink-700">
+                            +{all.length - ordered.length}
+                            <span className="sr-only"> more skills</span>
+                          </li>
+                        ) : null}
                       </ul>
                     )}
                   </Cell>
