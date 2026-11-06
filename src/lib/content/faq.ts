@@ -359,7 +359,7 @@ export const FAQ_INTERN: CmsFaqItem[] = [
     "id": "ba144e8a-25d3-42d1-a0ab-474f8a29d514",
     "category": "Intern",
     "question": "Can I contact companies directly through Findtern?",
-    "answer": "Yes, once a company has sent you a proposal. You and that company get one conversation on Findtern, opened from the proposal. Phone numbers, email addresses and links are hidden automatically in messages until the hire is paid, and the company’s name stays hidden until then too. You can’t apply to companies; they find you through your profile and Findtern Score.",
+    "answer": "Yes, once a company has sent you a proposal. You and that company get one conversation on Findtern, opened from the proposal. Messages can’t carry phone numbers, email addresses, links or social handles until the hire is paid, and the company’s name stays hidden until then too. You can’t apply to companies; they find you through your profile and Findtern Score.",
     "sortOrder": 0,
     "isActive": true
   },
@@ -367,7 +367,7 @@ export const FAQ_INTERN: CmsFaqItem[] = [
     "id": "20b85a33-d4f7-4cbf-a2fe-7f52c9ce3eed",
     "category": "Intern",
     "question": "Can I contact companies directly through Findtern?",
-    "answer": "Yes, once a company has sent you a proposal. You and that company get one conversation on Findtern, opened from the proposal. Phone numbers, email addresses and links are hidden automatically in messages until the hire is paid, and the company’s name stays hidden until then too. You can’t apply to companies; they find you through your profile and Findtern Score.",
+    "answer": "Yes, once a company has sent you a proposal. You and that company get one conversation on Findtern, opened from the proposal. Messages can’t carry phone numbers, email addresses, links or social handles until the hire is paid, and the company’s name stays hidden until then too. You can’t apply to companies; they find you through your profile and Findtern Score.",
     "sortOrder": 0,
     "isActive": true
   },
@@ -594,7 +594,7 @@ export const FAQ_EMPLOYER: CmsFaqItem[] = [
     "id": "f2ef24a5-bc01-4b65-9174-9f402fd676d6",
     "category": "Employer",
     "question": "How do I communicate with candidates?",
-    "answer": "Employers can message an intern only after they have sent that intern a proposal, and only inside Findtern. Phone numbers, emails and links are hidden automatically until the hire is paid, and names stay as initials until then, to protect privacy and safety.\n",
+    "answer": "Employers can message an intern only after they have sent that intern a proposal, and only inside Findtern. Messages can’t carry phone numbers, emails, links or social handles until the hire is paid, and names stay as initials until then, to protect privacy and safety.\n",
     "sortOrder": 0,
     "isActive": true
   },
