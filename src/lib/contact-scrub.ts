@@ -46,16 +46,19 @@ export function normalizeForDetection(text: string): string {
     .replace(/\p{Cf}/gu, "")
     .replace(/\p{Nd}/gu, (d) => (d >= "0" && d <= "9" ? d : toAsciiDigit(d)))
     .replace(/[\u2010-\u2015\u2212]/g, "-");
-  return s.replace(DIGIT_RUN, (run) =>
-    run.replace(DIGIT_WORD, (_w, mult: string | undefined, word: string) =>
-      WORD_DIGITS[word.toLowerCase()].repeat(!mult ? 1 : mult.toLowerCase() === "double" ? 2 : 3),
-    ),
-  );
+  return s
+    .replace(DIGIT_RUN, (run) =>
+      run.replace(DIGIT_WORD, (_w, mult: string | undefined, word: string) =>
+        WORD_DIGITS[word.toLowerCase()].repeat(!mult ? 1 : mult.toLowerCase() === "double" ? 2 : 3),
+      ),
+    )
+    // "r a h u l @ g m a i l . c o m": four or more single characters in a row are one word.
+    .replace(/(?<!\S)(?:\S[^\S\n]+){3,}\S(?!\S)/g, (run) => run.replace(/\s+/g, ""));
 }
 
 /* ── patterns (run on the normalised copy) ─────────────────────────────── */
 
-const AT = String.raw`(?:@|\s*[\[({<]\s*at\s*[\])}>]\s*|\s+at\s+)`;
+const AT = String.raw`(?:@|\s*[\[({<]\s*at\s*[\])}>]\s*|\s+at\s+(?:the\s+rate\s+(?:of\s+)?)?)`;
 const DOT = String.raw`(?:\.|\s*[\[({<]\s*dot\s*[\])}>]\s*|\s+dot\s+)`;
 const TLD = "com|in|org|net|co|io|me|dev|app|ai|xyz|info|biz|us|uk|link|ly|gg|tv|page|site|online|store|tech";
 const MAIL_HOSTS = "gmail|googlemail|yahoo|ymail|outlook|hotmail|live|rediffmail|rediff|icloud|protonmail|proton|zoho|aol";
@@ -81,8 +84,15 @@ const PATTERNS: { kind: ContactKind; re: RegExp; skip?: (m: string) => boolean }
   { kind: "phone", re: /(?<![\p{L}\d₹$])\+?\d(?:[^\p{L}\d]{0,8}\d){9,14}(?![\p{L}\d])/gu, skip: (m) => !isMobileRun(m) },
   { kind: "email", re: new RegExp(String.raw`[A-Za-z0-9._%+-]+${AT}[A-Za-z0-9-]+(?:${DOT}[A-Za-z0-9-]+)*${DOT}[A-Za-z]{2,}\b`, "gi") },
   // "rahul.s99 at gmail", "rahul @ yahoo": a mail host with no top-level domain.
-  { kind: "email", re: new RegExp(String.raw`[A-Za-z0-9._%+-]{2,}\s*(?:@|[\[({<]\s*at\s*[\])}>]|\bat\b)\s*(?:${MAIL_HOSTS})\b`, "gi") },
+  { kind: "email", re: new RegExp(String.raw`[A-Za-z0-9._%+-]{2,}\s*(?:@|[\[({<]\s*at\s*[\])}>]|\bat(?:\s+the\s+rate(?:\s+of)?)?\b)\s*(?:${MAIL_HOSTS})\b`, "gi") },
+  // "r4hul@gm4il", "a.b@host": letters on both sides of a bare @ (but "500@hour" stays text).
+  { kind: "email", re: /[\w.%+-]+@[\w.-]+/g, skip: (m) => !/[A-Za-z][^@]*@.*[A-Za-z]/.test(m) },
+  { kind: "email", re: new RegExp(String.raw`\b(?:${MAIL_HOSTS})\s+(?:com|co|in)\b`, "gi") },
+  // "my number is in my bio": a pointer to contact details kept elsewhere.
+  { kind: "handle", re: /\b(?:number|no|contacts?|details|e-?mail|mail|id|handle|phone)\b[^.\n]{0,25}?\b(?:in|on)\s+my\s+(?:bio|profile|resume|cv)\b/gi },
   { kind: "url", re: /\b(?:https?:\/\/|www\.)[^\s<>"']+/gi, skip: (m) => OWN.test(m.replace(/^https?:\/\//i, "")) },
+  // "t me rahul", "wa me 9198…": the shortcut with the dot left out (not "don't me").
+  { kind: "url", re: /(?<!['’])\b(?:wa|t)\s+me\s*\/?\s*@?[A-Za-z0-9_]{3,}/gi },
   { kind: "url", re: /\b(?:wa|t|bit|tinyurl|linktr|instagr|lnkd)\s*\.\s*(?:me|ly|com|ee|am|in)\s*\/\s*[^\s<>"']*/gi },
   { kind: "url", re: new RegExp(String.raw`\b[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.(?:${TLD})\b(?:\/[^\s<>"']*)?`, "gi"), skip: (m) => OWN.test(m) || NOT_DOMAIN.test(m) },
   // "evil . com", "site dot in": spaced dots only with a lower-case TLD, so "Python dev. In 2024" stays text.
@@ -99,7 +109,42 @@ const PATTERNS: { kind: ContactKind; re: RegExp; skip?: (m: string) => boolean }
   { kind: "handle", re: /(?<![\w.@])@[A-Za-z0-9_](?:[A-Za-z0-9_.]{0,29}[A-Za-z0-9_])?/g },
 ];
 
-export function findContact(text: string): { kinds: ContactKind[] } {
+const YEAR = /^(?:19|20)\d\d$/;
+/**
+ * "98765 then 43210", "starts 987 … ends 3210": up to four groups of 3+ digits,
+ * a few words apart, that together make a mobile number. Two round groups
+ * ("75000 to 90000") are a range and years are dates, not halves of a number.
+ */
+function splitMobile(s: string): boolean {
+  const groups = [...s.matchAll(/\d{3,}/g)].filter((g) => !YEAR.test(g[0]));
+  for (let i = 0; i < groups.length; i++) {
+    let digits = "";
+    let round = 0;
+    for (let j = i; j < Math.min(i + 4, groups.length) && digits.length <= 12; j++) {
+      if (j > i && groups[j].index! - (groups[j - 1].index! + groups[j - 1][0].length) > 40) break;
+      digits += groups[j][0];
+      if (groups[j][0].endsWith("000")) round++;
+      if (j > i && round < 2 && /^(?:91|0)?[6-9]\d{9}$/.test(digits)) return true;
+    }
+  }
+  return false;
+}
+
+// shortcut: base64 is decoded one level only; double-encoding or other ciphers still pass, which is why sends are refused, not masked.
+function decodedBase64(s: string): string[] {
+  const out: string[] = [];
+  for (const [tok] of s.matchAll(/[A-Za-z0-9+/]{16,}={0,2}/g)) {
+    try {
+      const d = atob(tok);
+      if (/^[\x20-\x7e]+$/.test(d)) out.push(d);
+    } catch {
+      /* not base64 */
+    }
+  }
+  return out;
+}
+
+export function findContact(text: string, depth = 0): { kinds: ContactKind[] } {
   const kinds = new Set<ContactKind>();
   let rest = normalizeForDetection(text);
   for (const { kind, re, skip } of PATTERNS) {
@@ -109,6 +154,8 @@ export function findContact(text: string): { kinds: ContactKind[] } {
       return " ";
     });
   }
+  if (splitMobile(rest)) kinds.add("phone");
+  if (depth === 0) for (const d of decodedBase64(rest)) for (const k of findContact(d, 1).kinds) kinds.add(k);
   return { kinds: [...kinds] };
 }
 

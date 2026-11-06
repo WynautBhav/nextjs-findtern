@@ -106,7 +106,7 @@ test("ordinary sentences with number words or dots stay text", () => {
 
 test("normalisation maps script digits and spelled digits", () => {
   assert.equal(normalizeForDetection("९८७"), "987");
-  assert.equal(normalizeForDetection("one two three four"), "1 2 3 4");
+  assert.equal(normalizeForDetection("one two three four"), "1234");
   assert.equal(normalizeForDetection("one month"), "one month");
 });
 
@@ -114,4 +114,55 @@ test("contactFieldError checks every field and arrays", () => {
   assert.equal(contactFieldError({ a: "Robotics intern", b: ["Jaipur", "Pune"] }, "the listing"), null);
   assert.match(contactFieldError({ a: "Robotics intern", b: ["Jaipur", "call 9876543210"] }, "the listing") ?? "", /the listing/);
   assert.match(contactFieldError({ title: "Intern - insta rahulsharma" }, "the proposal") ?? "", /the proposal/);
+});
+
+test("attack probes (wave 2): every dodge is refused", () => {
+  for (const s of [
+    "r a h u l @ g m a i l . c o m", // letters spaced
+    "r a h u l at g m a i l dot c o m",
+    "rahul [at] gmail [dot] com",
+    "rahul {at} gmail {dot} com",
+    "rahul at the rate gmail dot com",
+    "rahul at the rate gmail",
+    "98765 then 43210", // number split by words
+    "first half 98765 second half 43210",
+    "my number starts 987 then 654 and ends 3210",
+    "9️⃣8️⃣7️⃣6️⃣5️⃣4️⃣3️⃣2️⃣1️⃣0️⃣", // keycap emoji
+    "nine 8 seven 6 five 4 three 2 one 0", // words and digits mixed
+    "my number is in my bio",
+    "my contact details are on my profile",
+    "search me on insta same name",
+    "r4hul@gm4il.c0m", // leet
+    "rahul@gm4il",
+    "cmFodWxAZ21haWwuY29t", // base64 of rahul@gmail.com
+    "wa me 919876543210", // link without the dot
+    "t me rahul_x",
+    "mail me rahul gmail com",
+  ]) {
+    assert.ok(findContact(s).kinds.length > 0, s);
+  }
+});
+
+test("attack probes (wave 2): ordinary text still passes", () => {
+  for (const s of [
+    "Budget 75000 to 90000 per month",
+    "CGPA 9.2, 12th 95%, 10th 96%",
+    "Batch of 2025, 3 months, 40 hours a week, 2 interns",
+    "Interview at 11 am on 12 Dec, then 2 pm on 14 Dec",
+    "I am a B Tech student, grade A in DSA",
+    "Let me know, don't me worry",
+    "We use Gmail and Slack internally",
+    "Base64 encoding and REST APIs",
+    "Stipend 15000 per month and 60000 total bonus",
+    "Worked at Infosys for 2 years",
+    "Rate: 500@hour",
+  ]) {
+    assert.deepEqual(findContact(s).kinds, [], s);
+  }
+});
+
+test("detection stays fast on long hostile input", () => {
+  const t = Date.now();
+  for (const s of ["a".repeat(2000), "a.".repeat(1000), "1 ".repeat(1000), "aGVsbG8gd29ybGQ".repeat(130), "a@".repeat(1000)]) findContact(s);
+  assert.ok(Date.now() - t < 1000, `took ${Date.now() - t} ms`);
 });

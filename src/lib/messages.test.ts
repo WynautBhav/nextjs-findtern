@@ -25,6 +25,16 @@ test("send gating: a message with contact details is refused (422) until the hir
   assert.deepEqual(open, { text: body, redacted: false });
 });
 
+test("split across messages: the sender's last messages are read together with the new one", () => {
+  const refused = (e: unknown) => e instanceof MessageError && e.status === 422;
+  assert.throws(() => bodyToStore("43210", false, ["98765"]), refused);
+  assert.throws(() => bodyToStore("4 3 2 1 0", false, ["ok", "9 8 7", "6 5"]), refused);
+  assert.throws(() => bodyToStore("gmail dot com", false, ["rahul at"]), refused);
+  assert.throws(() => bodyToStore("rahul_x", false, ["my insta id"]), refused);
+  assert.deepEqual(bodyToStore("43210", true, ["98765"]), { text: "43210", redacted: false }, "after the hire anything goes");
+  assert.equal(bodyToStore("Can you start on Monday?", false, ["Budget 75000", "or 90000 for 3 months"]).text, "Can you start on Monday?");
+});
+
 test("scrub gating: ordinary text is stored untouched and not flagged", () => {
   const r = bodyToStore("Can you start in 3 months? Python 3.11 is fine.", false);
   assert.equal(r.redacted, false);
