@@ -1,5 +1,4 @@
 import type { Tone } from "@/components/app/primitives";
-import { proposalPill } from "@/components/employer/proposal-state";
 
 /**
  * Single status vocabulary for every dashboard surface.
@@ -161,11 +160,6 @@ export function timesheetPill(status: string | null): { label: string; tone: Ton
     default:
       return { label: humanizeStatus(status ?? ""), tone: "neutral" };
   }
-}
-
-/** Employer proposal row state: the one proposal vocabulary (`offerState`), not a second map. */
-export function employerProposalPill(status: string | null): { label: string; tone: Tone } {
-  return proposalPill(status);
 }
 
 /** Generic fallback for any other stored enum (projects, orders, alerts). */

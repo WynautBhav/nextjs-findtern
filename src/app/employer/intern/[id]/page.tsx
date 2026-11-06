@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { proposalPill } from "@/components/employer/proposal-state";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
@@ -25,7 +26,6 @@ import { aiInterviewLinks } from "@/lib/ai-interview-links";
 import { parseOffer } from "@/lib/offer";
 import { timezoneForLocation } from "@/lib/timezones";
 import { dateLabel, draftFromRecord, linkedinHref, type OnboardingDraft } from "@/lib/onboarding";
-import { employerProposalPill } from "@/components/app/status";
 import { DetailRow, PageHead, Pill, SectionHead, Surface } from "@/components/app/primitives";
 import { LoadError } from "@/components/app/load-error";
 import { SITE } from "@/lib/content/site";
@@ -67,7 +67,7 @@ export default async function EmployerInternDetail({
   const employerId = session.uid;
 
   let profile: CandidateProfile | null = null;
-  let appliedProjects: { id: string; projectName: string | null; status: string }[] = [];
+  let appliedProjects: { id: string; projectName: string | null; status: string; fullTime: boolean }[] = [];
   let currency: "INR" | "USD" = "INR";
   let region: "IN" | null = null;
   /** Full name, photo and LinkedIn show only after this employer hired the intern. */
@@ -186,9 +186,10 @@ export default async function EmployerInternDetail({
         nameUnlocked = nameUnlocked || Boolean(relation?.hired);
 
         // Collapse to one row per project, keeping the most recent status.
-        const latest = new Map<string, string>();
+        const latest = new Map<string, { status: string; fullTime: boolean }>();
         for (const proposal of proposals) {
-          if (!latest.has(proposal.projectId)) latest.set(proposal.projectId, proposal.status);
+          if (!latest.has(proposal.projectId))
+            latest.set(proposal.projectId, { status: proposal.status, fullTime: Boolean(parseOffer(proposal.offerDetails, proposal.currency).fullTime) });
         }
         const projectIds = Array.from(latest.keys());
         const named = await db
@@ -199,7 +200,8 @@ export default async function EmployerInternDetail({
         appliedProjects = projectIds.map((projectId) => ({
           id: projectId,
           projectName: projectNameById.get(projectId) ?? null,
-          status: latest.get(projectId) ?? "sent",
+          status: latest.get(projectId)?.status ?? "sent",
+          fullTime: latest.get(projectId)?.fullTime ?? false,
         }));
       }
 
@@ -575,7 +577,7 @@ export default async function EmployerInternDetail({
               <h2 className="text-base font-semibold text-ink-900">Your proposals to them</h2>
               <ul className="mt-3 space-y-3">
                 {appliedProjects.map((entry) => {
-                  const pill = employerProposalPill(entry.status);
+                  const pill = proposalPill(entry.status, entry.fullTime);
                   return (
                     <li key={entry.id} className="flex min-w-0 items-start justify-between gap-3 text-sm">
                       <span className="min-w-0 font-medium text-ink-900">{entry.projectName ?? "Project no longer listed"}</span>

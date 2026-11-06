@@ -48,8 +48,8 @@ export function LoadError({
         <AlertCircle className="size-5" aria-hidden />
       </span>
       <div className="min-w-0">
-        <h2 className="text-lg font-semibold tracking-[-0.01em] text-ink-900">We couldn&apos;t load {what}</h2>
-        <p className="mt-1.5 max-w-xl text-pretty text-[0.9375rem] leading-relaxed text-ink-600">
+        <h2 className="text-lg font-semibold text-ink-900">We couldn&apos;t load {what}</h2>
+        <p className="mt-1.5 max-w-xl text-pretty text-sm leading-relaxed text-ink-600">
           Nothing has changed on your account; this is a problem reading it right now. Try again in a moment. If it keeps
           happening, write to{" "}
           <a href={`mailto:${email}`} className="font-medium text-brand-700 underline underline-offset-4">

@@ -67,7 +67,7 @@ export function offerState(
       };
     case "accepted":
       if (fullTime) {
-        return { ...base, label: "Full-time hired", tone: "paid", next: "The candidate accepted. Pay the hiring fee from checkout.", canPay: unpaid };
+        return { ...base, label: "Full-time accepted · fee due", tone: "paid", next: "The candidate accepted. Pay the hiring fee from checkout.", canPay: unpaid };
       }
       return {
         ...base,
@@ -102,6 +102,8 @@ export function offerState(
  * The pill on its own, for screens that know a proposal's status but not its
  * offer terms (a candidate card, a profile's history): the same label and tone
  * `offerState` gives the list and the detail page, so one status reads one way.
+ * Without the offer's start date it can't tell a lapsed offer: those read as
+ * "Waiting on candidate" here and "Expired · no reply" on the proposals list.
  */
 export function proposalPill(status: string | null, fullTime = false): { label: string; tone: Tone } {
   const { label, tone } = offerState(

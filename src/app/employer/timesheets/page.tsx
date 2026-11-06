@@ -102,7 +102,7 @@ export default async function EmployerTimesheets({
     return (
       <div>
         <PageHead title="Timesheets" />
-        <LoadError what="your timesheets" retryHref={onlyIntern ? `/employer/timesheets?intern=${onlyIntern}` : "/employer/timesheets"} email={SITE.adminEmail} />
+        <LoadError what="your timesheets" retryHref={onlyIntern ? `/employer/timesheets?intern=${encodeURIComponent(onlyIntern)}` : "/employer/timesheets"} email={SITE.adminEmail} />
       </div>
     );
   }

@@ -231,7 +231,8 @@ function Cropper({ source, onCancel, onDone }: { source: Loaded; onCancel: () =>
           const next = clamp(at.x + m[0], at.y + m[1]);
           setOffset(next);
           const dir = e.key.slice(5).toLowerCase();
-          setMoved(next.x === at.x && next.y === at.y ? `Photo is at the ${dir} edge` : `Photo moved ${dir}`);
+          // A trailing no-break space flips on each press so a repeated message is announced again.
+          setMoved((prev) => (next.x === at.x && next.y === at.y ? `Photo is at the ${dir} edge` : `Photo moved ${dir}`) + (prev.endsWith("\u00a0") ? "" : "\u00a0"));
         }}
         className="relative mx-auto mt-5 aspect-square w-full max-w-[18rem] cursor-grab touch-none select-none overflow-hidden rounded-apple-sm bg-ink-900 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:cursor-grabbing"
       >

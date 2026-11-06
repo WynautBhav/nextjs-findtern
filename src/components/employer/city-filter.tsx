@@ -91,7 +91,8 @@ export function CityFilter({
           aria-autocomplete="list"
           aria-activedescendant={active >= 0 && options[active] ? `${listId}-${active}` : undefined}
           value={draft}
-          disabled={full}
+          readOnly={full}
+          aria-disabled={full || undefined}
           autoComplete="off"
           placeholder={full ? `${MAX} cities max` : chips.length ? "Add another" : "Bengaluru, Pune"}
           onChange={(e) => {
