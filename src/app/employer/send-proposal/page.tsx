@@ -268,7 +268,7 @@ export default async function SendProposal({
             </h2>
             <Pill tone={existing.hired ? "live" : "waiting"}>{existing.label}</Pill>
           </div>
-          <p className="mt-2 text-[0.9375rem] leading-relaxed text-ink-700">
+          <p className="mt-2 text-sm leading-relaxed text-ink-700">
             {existing.hired
               ? `${candidate.name} already works with you, so a second internship offer isn't possible. Their placement is on Orders.`
               : `${candidate.name} already has a live offer from you. One offer per candidate: edit or withdraw that one before sending another.`}
@@ -299,7 +299,7 @@ export default async function SendProposal({
             <h2 className="text-lg font-semibold text-ink-900">Meeting first</h2>
             <Pill tone="waiting">Meeting booked</Pill>
           </div>
-          <p className="mt-2 text-[0.9375rem] leading-relaxed text-ink-700">
+          <p className="mt-2 text-sm leading-relaxed text-ink-700">
             You have a meeting with {candidate.name} that hasn&apos;t happened yet. The offer opens once it has.
           </p>
           <div className="mt-5 flex flex-wrap gap-2">

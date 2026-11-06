@@ -817,7 +817,7 @@ export default async function CandidatesPage({
                                 {/* The row opens the profile; the link is stretched over it. */}
                                 <Link
                                   href={`/employer/intern/${c.id}${activeProjectId ? `?project=${encodeURIComponent(activeProjectId)}` : ""}`}
-                                  className="break-words text-[0.9375rem] font-semibold text-ink-900 outline-none after:absolute after:inset-0 after:content-[''] focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-brand-500"
+                                  className="break-words text-base font-medium text-ink-900 outline-none after:absolute after:inset-0 after:content-[''] focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-brand-500"
                                 >
                                   {name}
                                 </Link>
@@ -833,7 +833,7 @@ export default async function CandidatesPage({
                             {skillLine}
                           </p>
                           <div className="text-right max-lg:col-start-2 max-lg:row-start-1">
-                            <p className="nums text-xl font-semibold tracking-[-0.01em] text-ink-900">
+                            <p className="nums text-xl font-semibold text-ink-900">
                               {c.scored ? c.score.toFixed(1) : "-"}
                               <span className="sr-only"> Findtern Score</span>
                             </p>

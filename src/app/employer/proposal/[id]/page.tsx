@@ -9,7 +9,7 @@ import { requireRole } from "@/lib/auth";
 import { canAccess } from "@/lib/security/guards";
 import { initialsOf } from "@/lib/employer-candidates";
 import { hiredInternIds } from "@/lib/employer-visibility";
-import { formatMoney } from "@/lib/format";
+import { formatDmy, formatMoney } from "@/lib/format";
 import { fullTimeFeeMinor } from "@/lib/checkout";
 import { laptopLabel, offerScore, parseOffer, WEEKLY_SCHEDULES } from "@/lib/offer";
 import { shiftInIst } from "@/lib/timezones";
@@ -160,11 +160,11 @@ export default async function EmployerProposalDetail({
       <Surface as="section" className="overflow-hidden">
         <div className="flex flex-wrap items-start justify-between gap-4 p-6 sm:p-7">
           <div className="flex min-w-0 items-start gap-4">
-            <span aria-hidden className="grid size-12 shrink-0 place-items-center rounded-full bg-brand-50 text-base font-bold text-brand-800">
+            <span aria-hidden className="grid size-12 shrink-0 place-items-center rounded-full bg-brand-50 text-base font-semibold text-brand-800">
               {initials}
             </span>
             <div className="min-w-0">
-              <h1 className="text-balance text-2xl font-semibold tracking-[-0.02em] text-ink-900 sm:text-3xl">
+              <h1 className="text-balance text-2xl font-semibold text-ink-900 sm:text-3xl">
                 {offer.roleTitle || projectName || "Proposal"}
               </h1>
               <p className="mt-1.5 text-sm text-ink-600">
@@ -191,7 +191,7 @@ export default async function EmployerProposalDetail({
               ].join(" ")}
             >
               <dt className="text-sm text-ink-600">{label}</dt>
-              <dd className="nums mt-1 text-xl font-semibold tracking-[-0.01em] text-ink-900">{value}</dd>
+              <dd className="nums mt-1 text-xl font-semibold text-ink-900">{value}</dd>
             </div>
           ))}
         </dl>
@@ -288,14 +288,14 @@ export default async function EmployerProposalDetail({
             <Surface as="section" className="p-6">
               <SectionHead title="What the intern will do" />
               {/* Text: legacy Quill HTML is read back as plain text (EMH-28). */}
-              <p className="whitespace-pre-line text-pretty text-[0.9375rem] leading-relaxed text-ink-700 [overflow-wrap:anywhere]">{offer.jd}</p>
+              <p className="whitespace-pre-line text-pretty text-sm leading-relaxed text-ink-700 [overflow-wrap:anywhere]">{offer.jd}</p>
             </Surface>
           ) : null}
 
           {offer.additionalInfo ? (
             <Surface as="section" className="p-6">
               <SectionHead title="Additional information" />
-              <p className="whitespace-pre-line text-pretty text-[0.9375rem] leading-relaxed text-ink-700 [overflow-wrap:anywhere]">{offer.additionalInfo}</p>
+              <p className="whitespace-pre-line text-pretty text-sm leading-relaxed text-ink-700 [overflow-wrap:anywhere]">{offer.additionalInfo}</p>
             </Surface>
           ) : null}
 
@@ -403,7 +403,7 @@ function formatDate(value: Date | string | null): string {
   if (!value) return "-";
   const d = typeof value === "string" ? new Date(`${value.slice(0, 10)}T00:00:00+05:30`) : new Date(value);
   if (Number.isNaN(d.getTime())) return String(value);
-  return d.toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "Asia/Kolkata" });
+  return formatDmy(d);
 }
 
 /** "problemSolving" / "problem_solving" → "Problem solving". */

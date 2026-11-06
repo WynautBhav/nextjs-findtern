@@ -184,7 +184,7 @@ export function CandidateCard({
             type="button"
             onClick={() => setDrawerOpen(true)}
             title={`Quick view of ${displayName}`}
-            className="max-w-full break-words rounded-apple-sm text-left text-base font-semibold tracking-[-0.01em] text-ink-900 hover:text-brand-700"
+            className="max-w-full break-words rounded-apple-sm text-left text-base font-semibold text-ink-900 hover:text-brand-700"
           >
             {displayName}
           </button>
@@ -205,9 +205,9 @@ export function CandidateCard({
           ) : null}
         </div>
         <div className="shrink-0 text-right">
-          {candidate.scored ? <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-brand-700">{band.name}</p> : null}
+          {candidate.scored ? <p className="text-2xs font-semibold uppercase tracking-wide text-brand-700">{band.name}</p> : null}
           <p
-            className="nums mt-0.5 text-3xl font-semibold leading-none tracking-[-0.02em] text-brand-700"
+            className="nums mt-0.5 text-3xl font-semibold leading-none text-brand-700"
             title={candidate.scored ? `Findtern Score ${candidate.score.toFixed(1)} out of 10` : "Not scored yet"}
           >
             {candidate.scored ? candidate.score.toFixed(1) : "-"}
@@ -276,7 +276,7 @@ export function CandidateCard({
                 className="size-14 rounded-apple-lg text-lg ring-1 ring-inset ring-brand-200/70"
               />
               <div className="min-w-0 flex-1">
-                <SheetTitle className="break-words text-2xl font-semibold tracking-[-0.02em] text-ink-900">{displayName}</SheetTitle>
+                <SheetTitle className="break-words text-2xl font-semibold text-ink-900">{displayName}</SheetTitle>
                 <SheetDescription className="mt-1 text-sm text-ink-600">
                   {candidate.location || "Location not stated"}
                 </SheetDescription>
@@ -291,7 +291,7 @@ export function CandidateCard({
             <div className="grid grid-cols-2 gap-3">
               <div className="rounded-apple-lg border border-ink-200/80 bg-white p-4">
                 <p className="text-sm font-medium text-ink-600">Findtern Score</p>
-                <p className="nums mt-1 text-3xl font-semibold tracking-[-0.02em] text-brand-700">
+                <p className="nums mt-1 text-3xl font-semibold text-brand-700">
                   {candidate.scored ? candidate.score.toFixed(1) : "-"}
                   <span className="ml-0.5 text-sm font-medium text-text-subtle">/10</span>
                 </p>
@@ -299,7 +299,7 @@ export function CandidateCard({
               </div>
               <div className="rounded-apple-lg border border-ink-200/80 bg-white p-4">
                 <p className="text-sm font-medium text-ink-600">Price</p>
-                <p className="nums mt-2.5 text-2xl font-semibold tracking-[-0.02em] text-ink-900">
+                <p className="nums mt-2.5 text-2xl font-semibold text-ink-900">
                   {formatRate(pricing.hourlyRateMinor, currency)}
                 </p>
                 <p className="mt-1 text-sm text-ink-600">
@@ -380,7 +380,7 @@ export function CandidateCard({
               <section>
                 <SectionHead title="Academics" />
                 <div className="rounded-apple-lg border border-ink-200/80 bg-white p-4">
-                  <p className="text-[0.9375rem] font-medium text-ink-900">
+                  <p className="text-base font-medium text-ink-900">
                     {[candidate.academics.degree, candidate.academics.specialization].filter(Boolean).join(" · ") || "Degree not stated"}
                   </p>
                   {candidate.academics.institution ? <p className="mt-0.5 text-sm text-ink-600">{candidate.academics.institution}</p> : null}

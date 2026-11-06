@@ -7,7 +7,7 @@ import { getDb, schema } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
 import { requireEmployerSetup } from "@/lib/employer-setup";
 import { bandFor } from "@/lib/score";
-import { formatMoney, formatRate } from "@/lib/format";
+import { formatDmy, formatMoney, formatRate } from "@/lib/format";
 import { RATING_META, displayNameOf, preferredCities, toCandidateProfile, type CandidateProfile } from "@/lib/employer-candidates";
 import { shortlistProjectsByIntern } from "@/lib/employer-shortlist";
 import { candidateRelations, hiredInternIds, type CandidateRelation } from "@/lib/employer-visibility";
@@ -395,7 +395,7 @@ export default async function CompareCandidates({ searchParams }: { searchParams
               candidates={candidates}
               render={(c) => (
                 <>
-                  <span className="nums text-2xl font-semibold tracking-[-0.02em] text-brand-700">{c.scored ? c.score.toFixed(1) : "-"}</span>
+                  <span className="nums text-2xl font-semibold text-brand-700">{c.scored ? c.score.toFixed(1) : "-"}</span>
                   <span className="text-sm text-text-subtle">/10</span>
                   <span className="mt-0.5 block text-sm text-ink-600">{bandFor(c.score).name}</span>
                 </>
@@ -521,7 +521,7 @@ export default async function CompareCandidates({ searchParams }: { searchParams
                 <Cell key={c.id}>
                   <span className="nums">
                     {c.updatedAt
-                      ? new Date(c.updatedAt).toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "Asia/Kolkata" })
+                      ? formatDmy(c.updatedAt)
                       : "Never"}
                   </span>
                 </Cell>

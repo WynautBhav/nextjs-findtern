@@ -52,7 +52,7 @@ export default async function EmployerDrivePage({ params }: { params: Promise<{ 
       <div className="mt-3 flex items-start gap-4">
         <CollegeMark name={college.name} logoUrl={college.logoUrl} className="hidden sm:grid" />
         <div className="min-w-0 flex-1">
-          <h1 className="text-balance text-2xl font-semibold tracking-[-0.02em] text-ink-900 md:text-3xl">{drive.title}</h1>
+          <h1 className="text-balance text-2xl font-semibold text-ink-900 md:text-3xl">{drive.title}</h1>
           <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm text-ink-600">
             <DriveStatePill state={state} />
             <span>{KIND_LABEL[drive.kind] ?? "Campus drive"}</span>

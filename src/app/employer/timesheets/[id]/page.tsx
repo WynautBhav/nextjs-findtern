@@ -103,11 +103,11 @@ export default async function EmployerTimesheetDetail({ params }: { params: Prom
       <Surface as="section" className="overflow-hidden">
         <div className="flex flex-wrap items-start justify-between gap-4 p-6 sm:p-7">
           <div className="flex min-w-0 items-start gap-4">
-            <span aria-hidden className="grid size-12 shrink-0 place-items-center rounded-full bg-brand-50 text-base font-bold text-brand-800">
+            <span aria-hidden className="grid size-12 shrink-0 place-items-center rounded-full bg-brand-50 text-base font-semibold text-brand-800">
               {initials}
             </span>
             <div className="min-w-0">
-              <h1 className="text-balance text-2xl font-semibold tracking-[-0.02em] text-ink-900 sm:text-3xl">{name}</h1>
+              <h1 className="text-balance text-2xl font-semibold text-ink-900 sm:text-3xl">{name}</h1>
               {/* The period and project as the meta line, not a kicker above the name. */}
               <p className="nums mt-1 text-sm text-ink-600">
                 Timesheet for {formatPeriod(timesheet.periodStart, timesheet.periodEnd)}
@@ -129,7 +129,7 @@ export default async function EmployerTimesheetDetail({ params }: { params: Prom
               ].join(" ")}
             >
               <dt className="text-sm text-ink-600">{label}</dt>
-              <dd className="nums mt-1 text-2xl font-semibold tracking-[-0.02em] text-ink-900">{value}</dd>
+              <dd className="nums mt-1 text-2xl font-semibold text-ink-900">{value}</dd>
             </div>
           ))}
         </dl>
@@ -168,7 +168,7 @@ export default async function EmployerTimesheetDetail({ params }: { params: Prom
             </div>
             {timesheet.managerNote ? (
               <div className="mt-4 rounded-apple-md bg-ink-50 px-4 py-3">
-                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-subtle">Your note</p>
+                <p className="text-sm font-medium text-text-subtle">Your note</p>
                 <p className="mt-1 whitespace-pre-line text-sm leading-relaxed text-ink-800">{timesheet.managerNote}</p>
               </div>
             ) : null}

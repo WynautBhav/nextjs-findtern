@@ -97,7 +97,7 @@ export default async function EmployerAccount() {
           </Surface>
 
           <Surface as="section" id="security" className="scroll-mt-24 p-5" aria-labelledby="security-title">
-            <h2 id="security-title" className="mb-4 text-base font-semibold tracking-[-0.01em] text-ink-900">
+            <h2 id="security-title" className="mb-4 text-base font-semibold text-ink-900">
               Password
             </h2>
             <ChangePasswordForm endpoint={`/api/employer/${encodeURIComponent(uid)}/change-password`} />

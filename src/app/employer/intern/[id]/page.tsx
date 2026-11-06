@@ -321,8 +321,8 @@ export default async function EmployerInternDetail({
               className="size-16 rounded-apple-lg text-xl ring-1 ring-inset ring-brand-200/70"
             />
             <div className="min-w-0">
-              <h1 className="break-words text-3xl font-semibold leading-tight tracking-[-0.025em] text-ink-900">{displayName}</h1>
-              <p className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-[0.9375rem] text-ink-600">
+              <h1 className="break-words text-3xl font-semibold leading-tight text-ink-900">{displayName}</h1>
+              <p className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-600">
                 <span className="inline-flex items-center gap-1.5">
                   <MapPin className="size-4 text-ink-400" aria-hidden />
                   {profile.location || "Location not stated"}
@@ -348,7 +348,7 @@ export default async function EmployerInternDetail({
           <div className="flex min-w-0 gap-8 sm:shrink-0">
             <div className="shrink-0">
               <p className="text-sm font-medium text-ink-600">Findtern Score</p>
-              <p className="nums mt-1 text-4xl font-semibold leading-none tracking-[-0.03em] text-brand-700">
+              <p className="nums mt-1 text-4xl font-semibold leading-none text-brand-700">
                 {profile.scored ? profile.score.toFixed(1) : "-"}
                 <span className="ml-0.5 text-base font-medium text-text-subtle">/10</span>
               </p>
@@ -356,7 +356,7 @@ export default async function EmployerInternDetail({
             </div>
             <div className="min-w-0">
               <p className="text-sm font-medium text-ink-600">Price</p>
-              <p className="nums mt-2.5 text-2xl font-semibold leading-none tracking-[-0.02em] text-ink-900">
+              <p className="nums mt-2.5 text-2xl font-semibold leading-none text-ink-900">
                 {formatRate(pricing.hourlyRateMinor, currency)}
               </p>
               <p className="mt-2.5 text-sm text-ink-600">
@@ -435,7 +435,7 @@ export default async function EmployerInternDetail({
             <section>
               <SectionHead title="About" />
               <Surface className="p-6">
-                <p className="whitespace-pre-line text-[0.9375rem] leading-relaxed text-ink-700">{profile.bio}</p>
+                <p className="whitespace-pre-line text-sm leading-relaxed text-ink-700">{profile.bio}</p>
               </Surface>
             </section>
           ) : null}
@@ -466,7 +466,7 @@ export default async function EmployerInternDetail({
               <Surface as="ul" className="divide-y divide-ink-100">
                 {experiences.map((exp) => (
                   <li key={exp.id} className="px-6 py-4">
-                    <p className="text-[0.9375rem] font-medium text-ink-900">{[exp.role, exp.company].filter(Boolean).join(" · ")}</p>
+                    <p className="text-base font-medium text-ink-900">{[exp.role, exp.company].filter(Boolean).join(" · ")}</p>
                     <p className="nums mt-0.5 text-sm text-ink-600">
                       {[exp.type, [dateLabel(exp.from), exp.current ? "Present" : dateLabel(exp.to)].filter(Boolean).join(" – ")]
                         .filter(Boolean)
@@ -485,7 +485,7 @@ export default async function EmployerInternDetail({
               <Surface as="ul" className="divide-y divide-ink-100">
                 {qualifications.map((q) => (
                   <li key={q.id} className="px-6 py-4">
-                    <p className="text-[0.9375rem] font-medium text-ink-900">{q.name}</p>
+                    <p className="text-base font-medium text-ink-900">{q.name}</p>
                     <p className="nums mt-0.5 text-sm text-ink-600">
                       {[q.issuer, q.completionDate && formatDate(q.completionDate)].filter(Boolean).join(" · ") || "No further detail recorded"}
                     </p>
@@ -493,7 +493,7 @@ export default async function EmployerInternDetail({
                 ))}
                 {(academics?.courses ?? []).map((course, i) => (
                   <li key={`${course.name}-${i}`} className="px-6 py-4">
-                    <p className="text-[0.9375rem] font-medium text-ink-900">{course.name}</p>
+                    <p className="text-base font-medium text-ink-900">{course.name}</p>
                     <p className="nums mt-0.5 text-sm text-ink-600">
                       {[course.institution, course.level, course.completed, course.score].filter(Boolean).join(" · ") || "No further detail recorded"}
                     </p>

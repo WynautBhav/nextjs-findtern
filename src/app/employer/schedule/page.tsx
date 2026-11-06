@@ -305,7 +305,7 @@ export default async function EmployerSchedule({ searchParams }: { searchParams:
                   <Surface as="li" key={iv.id} className="p-5">
                     <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
                       <div className="flex min-w-0 items-start gap-3.5">
-                        <span aria-hidden className="grid size-11 shrink-0 place-items-center rounded-full bg-brand-50 text-sm font-bold text-brand-800">
+                        <span aria-hidden className="grid size-11 shrink-0 place-items-center rounded-full bg-brand-50 text-sm font-semibold text-brand-800">
                           {r.initials}
                         </span>
                         <div className="min-w-0">
@@ -352,7 +352,7 @@ export default async function EmployerSchedule({ searchParams }: { searchParams:
 
                     {r.feedback ? (
                       <div className="mt-4 rounded-apple-md border border-ink-200/80 bg-ink-50/60 px-4 py-3">
-                        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-subtle">Your feedback</p>
+                        <p className="text-sm font-medium text-text-subtle">Your feedback</p>
                         <p className="mt-1.5 whitespace-pre-line text-sm leading-relaxed text-ink-800">{r.feedback}</p>
                       </div>
                     ) : null}

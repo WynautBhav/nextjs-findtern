@@ -245,7 +245,7 @@ export function ProposalsManager({ initialProposals }: { initialProposals: Propo
                 className={cn(ROW_GRID, "relative grid items-center gap-x-6 gap-y-2 px-5 py-4 transition-colors hover:bg-ink-50/70")}
               >
                 <div className="flex min-w-0 items-center gap-3">
-                  <span aria-hidden className="grid size-9 shrink-0 place-items-center rounded-full bg-brand-50 text-xs font-bold text-brand-800">
+                  <span aria-hidden className="grid size-9 shrink-0 place-items-center rounded-full bg-brand-50 text-xs font-semibold text-brand-800">
                     {ini === "?" ? "C" : ini}
                   </span>
                   <div className="min-w-0">
@@ -253,7 +253,7 @@ export function ProposalsManager({ initialProposals }: { initialProposals: Propo
                         stretched over it, and keeps its own focus ring. */}
                     <Link
                       href={href}
-                      className="block break-words text-[0.9375rem] font-semibold text-ink-900 outline-none after:absolute after:inset-0 after:content-[''] focus-visible:after:rounded-apple-sm focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-brand-500"
+                      className="block break-words text-base font-medium text-ink-900 outline-none after:absolute after:inset-0 after:content-[''] focus-visible:after:rounded-apple-sm focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-brand-500"
                     >
                       {title}
                     </Link>

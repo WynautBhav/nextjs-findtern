@@ -10,7 +10,7 @@ export const fieldClass =
 export const labelClass = "block text-sm font-medium text-ink-800";
 
 /** Table header cell: sentence case, quiet, sticky-ready. */
-export const thClass = "whitespace-nowrap px-4 py-3 text-left text-xs font-semibold tracking-[0.02em] text-ink-600";
+export const thClass = "whitespace-nowrap px-4 py-3 text-left text-xs font-semibold text-ink-600";
 /** Body cell. */
 export const tdClass = "px-4 py-3.5 align-top text-sm text-ink-800";
 

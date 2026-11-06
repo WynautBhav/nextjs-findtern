@@ -22,7 +22,7 @@ export function controlClass(error?: boolean, className?: string) {
   return cn(
     // fieldClass, with the 15px reading size, a wider inset and an error state.
     fieldClass,
-    "block px-3.5 shadow-xs md:text-[0.9375rem]",
+    "block px-3.5 shadow-xs",
     // aria-readonly, not :read-only - a <select> always matches :read-only.
     "aria-readonly:cursor-default aria-readonly:bg-ink-50 aria-readonly:text-ink-600 aria-readonly:shadow-none",
     error && "border-danger hover:border-danger focus-visible:border-danger focus-visible:ring-danger/20",
@@ -296,7 +296,7 @@ export function FormSection({
 }) {
   return (
     <fieldset className={cn("min-w-0", className)}>
-      <legend className="text-base font-semibold tracking-[-0.01em] text-ink-900">{title}</legend>
+      <legend className="text-base font-semibold text-ink-900">{title}</legend>
       {hint ? <p className="mt-1 max-w-prose text-sm leading-relaxed text-ink-600">{hint}</p> : null}
       <div className="mt-5 space-y-5">{children}</div>
     </fieldset>

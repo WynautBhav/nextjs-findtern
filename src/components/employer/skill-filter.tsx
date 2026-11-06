@@ -85,7 +85,7 @@ export function SkillFilter({
 
   return (
     <section aria-labelledby="skills-heading" className="mb-5">
-      <h2 id="skills-heading" className="mb-3 text-base font-semibold tracking-[-0.01em] text-ink-900 max-lg:sr-only">
+      <h2 id="skills-heading" className="mb-3 text-base font-semibold text-ink-900 max-lg:sr-only">
         {title}
       </h2>
       <button

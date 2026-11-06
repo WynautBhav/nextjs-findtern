@@ -352,7 +352,7 @@ export function SendProposalForm({
         {/* ── 2. Pay ──────────────────────────────────────────────────── */}
         <Step n={2} title="Pay" hint={`The hourly rate is fixed by the candidate's score band. Billed in ${currency}, set by your company's country.`}>
           <div className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-apple-lg bg-brand-50 px-4 py-3.5">
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-brand-700">{rate.bandName} band</p>
+            <p className="text-sm font-medium text-brand-700">{rate.bandName} band</p>
             <p className="nums text-sm text-ink-700">
               <span className="font-semibold text-ink-900">{formatRate(rate.hourlyRateMinor, currency)}</span>
               {" · "}
@@ -565,7 +565,7 @@ export function SendProposalForm({
       <aside className="space-y-4 lg:sticky lg:top-8 lg:self-start">
         <section className={cn("overflow-hidden", SURFACE_CLASS)}>
           <div className="flex items-center gap-3 border-b border-ink-100 p-5">
-            <span aria-hidden className="grid size-11 shrink-0 place-items-center rounded-full bg-brand-50 text-sm font-bold text-brand-800">
+            <span aria-hidden className="grid size-11 shrink-0 place-items-center rounded-full bg-brand-50 text-sm font-semibold text-brand-800">
               {candidate.initials}
             </span>
             <div className="min-w-0 flex-1">
@@ -673,7 +673,7 @@ function Step({
       </span>
       <div className="min-w-0 space-y-5">
         <div>
-          <h2 className="text-base font-semibold tracking-[-0.01em] text-ink-900">{title}</h2>
+          <h2 className="text-base font-semibold text-ink-900">{title}</h2>
           {hint ? <p className="mt-0.5 text-sm text-ink-600">{hint}</p> : null}
         </div>
         {children}

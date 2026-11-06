@@ -78,7 +78,7 @@ export function CollegeMark({
     <span
       aria-hidden
       className={cn(
-        "grid size-12 shrink-0 place-items-center rounded-xl bg-brand-950 text-sm font-bold tracking-wide text-white",
+        "grid size-12 shrink-0 place-items-center rounded-xl bg-brand-950 text-sm font-semibold tracking-wide text-white",
         className,
       )}
     >
