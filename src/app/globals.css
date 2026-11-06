@@ -1796,3 +1796,17 @@ body:has([data-slot="dialog-content"][data-state="open"], [data-slot="sheet-cont
     to { opacity: 1; transform: none; }
   }
 }
+
+/* Text wrapping: balanced headings, no one-word last lines. In the base layer so any utility still wins. */
+@layer base {
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+  p,
+  li,
+  dd {
+    text-wrap: pretty;
+  }
+}
