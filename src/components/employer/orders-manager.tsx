@@ -2,14 +2,14 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, BriefcaseBusiness, CalendarCheck, CreditCard, Download, Eye, FileText, RotateCcw, Search } from "lucide-react";
+import { AlertTriangle, ArrowRight, BriefcaseBusiness, CalendarCheck, CreditCard, Download, Eye, FileText, RotateCcw, Search } from "lucide-react";
 
 import { EmptyScene, PageHead, Pill, Surface, type Tone } from "@/components/app/primitives";
 import { ButtonLink, buttonClass } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { FullTimeOfferButton } from "@/components/employer/full-time-offer-button";
 import { RowMenu } from "@/components/app/row-menu";
-import { fieldClass, labelClass, tabClass, tdClass, thClass } from "@/components/employer/ui-tokens";
+import { fieldClass, labelClass, tdClass, thClass } from "@/components/employer/ui-tokens";
 import { downloadCsv } from "@/lib/admin/csv";
 import { paymentsBadge, type PlacementLedger } from "@/lib/dues";
 import { formatDate, formatMoney } from "@/lib/format";
@@ -113,11 +113,6 @@ export function OrdersManager({
 
   const paid = sumLabel(hires.map((h) => ({ currency: h.currency, minor: h.ledger.paidMinor })));
   const left = sumLabel(hires.map((h) => ({ currency: h.currency, minor: h.ledger.dueMinor })));
-  const today = todayIst();
-  const nextDue = hires
-    .map((h) => h.ledger.nextDue)
-    .filter((d): d is string => Boolean(d))
-    .sort()[0];
 
   const tabs: { id: Tab; label: string; short?: string; count: number }[] = [
     { id: "hires", label: "Hires", count: hires.length },
@@ -139,13 +134,7 @@ export function OrdersManager({
             ? [
                 `${hires.length} hire${hires.length === 1 ? "" : "s"}`,
                 paid ? `${paid} paid` : "nothing paid yet",
-                // A past date is overdue, never "next" (QA-123).
-                left
-                  ? `${left} still to pay on hires${
-                      nextDue ? (nextDue < today ? `, overdue since ${formatDate(nextDue)}` : `, next instalment ${formatDate(nextDue)}`) : ""
-                    }`
-                  : "",
-                offers,
+                left ? `${left} to pay` : "",
               ]
                 .filter(Boolean)
                 .join(" · ")
@@ -155,7 +144,7 @@ export function OrdersManager({
         }
         action={
           payableCount + earlyCount > 0 ? (
-            <ButtonLink href="/employer/checkout" variant="accent">
+            <ButtonLink href="/employer/checkout" variant="primary">
               {paymentsBadge(payableCount, earlyCount)}
               <ArrowRight className="size-4" aria-hidden />
             </ButtonLink>
@@ -167,7 +156,7 @@ export function OrdersManager({
       <div
         role="tablist"
         aria-label="Orders"
-        className="mb-6 flex max-w-full flex-wrap gap-1"
+        className="mb-6 flex flex-wrap gap-x-3 border-b border-ink-100 sm:gap-x-7"
         onKeyDown={(e) => {
           // APG tabs: arrows, Home and End move between tabs; Tab leaves the list.
           const i = tabs.findIndex((t) => t.id === tab);
@@ -189,7 +178,12 @@ export function OrdersManager({
             aria-selected={tab === t.id}
             aria-controls={tab === t.id ? `orders-panel-${t.id}` : undefined}
             onClick={() => setTab(t.id)}
-            className={tabClass(tab === t.id)}
+            className={cn(
+              "relative -mb-px inline-flex min-h-12 min-w-11 items-center justify-center gap-1 whitespace-nowrap text-sm outline-none transition-colors sm:gap-1.5",
+              "after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:rounded-full after:content-['']",
+              "focus-visible:rounded-sm focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-4 focus-visible:ring-offset-transparent",
+              tab === t.id ? "font-semibold text-ink-900 after:bg-brand-700" : "font-medium text-ink-600 hover:text-ink-900",
+            )}
           >
             {t.short ? (
               <>
@@ -199,7 +193,7 @@ export function OrdersManager({
             ) : (
               t.label
             )}
-            <span className={cn("nums text-xs", tab === t.id ? "text-white/75" : "text-text-subtle")}>{t.count}</span>
+            <span className={cn("nums", tab === t.id ? "text-ink-900" : "text-text-subtle")}>{t.count}</span>
           </button>
         ))}
       </div>
@@ -350,11 +344,14 @@ function HiresPanel({
           </p>
         ) : null}
         {offline.count ? (
-          <p role="note" className="mb-3 rounded-apple-md border border-danger/25 bg-danger-soft px-4 py-2.5 text-sm text-ink-800">
+          <p role="note" className="mb-3 flex items-start gap-2 text-sm text-ink-800">
+            <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden />
+            <span>
             <span className="nums font-semibold">{formatMoney(offline.minor, offline.currency)}</span> on {offline.count} {offline.count === 1 ? "hire" : "hires"} can&apos;t be paid online. Email{" "}
             <a href="mailto:communicate@findtern.in" className="font-medium text-brand-700 underline underline-offset-4 touch:inline-flex touch:min-h-11 touch:items-center">
               communicate@findtern.in
             </a>
+            </span>
           </p>
         ) : null}
         <ul className="divide-y divide-ink-100 border-y border-ink-100">
@@ -368,8 +365,7 @@ function HiresPanel({
             const contract = `/employer/proposal/${encodeURIComponent(h.proposalId)}`;
             const plan = PLAN[h.ledger.plan];
             return (
-              <li key={h.proposalId} className="grid gap-4 py-5 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_auto] lg:items-center">
-                <div className="flex min-w-0 items-start gap-3.5">
+              <li key={h.proposalId} className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3.5 gap-y-2 py-4 sm:grid-cols-[auto_minmax(0,1fr)_auto]">
                   <span aria-hidden className="grid size-10 shrink-0 place-items-center rounded-full bg-brand-50 text-sm font-semibold text-brand-800">
                     {initials(h.candidateName)}
                   </span>
@@ -397,37 +393,19 @@ function HiresPanel({
                         Month {h.ledger.monthsPaid + 1} of {h.ledger.months} · {due && h.ledger.nextDue <= todayIst() ? "Due now" : `Due on ${formatDate(h.ledger.nextDue)}${due ? " · you can pay it now" : ""}`}
                       </p>
                     ) : null}
-                    <p className="nums mt-1 text-sm text-ink-600">
-                      {h.fullTime ? `Joining ${h.startDate ? formatDate(h.startDate) : "date to be agreed"}` : dateRange(h.startDate, h.ledger.endsOn)}
+                    <p className="nums mt-0.5 text-sm text-ink-600">
+                      {h.fullTime
+                        ? `${h.annualCtcMinor != null ? `${formatMoney(h.annualCtcMinor, h.currency, { zeroLabel: false })} a year` : "CTC not set"} · hiring fee ${formatMoney(h.ledger.totalMinor, h.currency, { zeroLabel: false })} · Joining ${h.startDate ? formatDate(h.startDate) : "date to be agreed"}`
+                        : `${h.monthlyMinor != null ? `${formatMoney(h.monthlyMinor, h.currency)} a month` : "Monthly amount not set"} · ${h.months} month${h.months === 1 ? "" : "s"}${h.ledger.plan === "monthly" ? ` · ${h.ledger.monthsPaid} paid` : ""} · ${dateRange(h.startDate, h.ledger.endsOn)}`}
                     </p>
                   </div>
-                </div>
-
-                <dl className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm">
-                  <dt className="text-ink-600">{h.fullTime ? "Annual CTC" : "Monthly"}</dt>
-                  <dd className="nums text-right font-medium text-ink-900 lg:text-left">
-                    {h.fullTime
-                      ? h.annualCtcMinor != null
-                        ? formatMoney(h.annualCtcMinor, h.currency, { zeroLabel: false })
-                        : "-"
-                      : h.monthlyMinor != null
-                        ? `${formatMoney(h.monthlyMinor, h.currency)}/month`
-                        : "-"}
-                  </dd>
-                  <dt className="text-ink-600">{h.fullTime ? "Hiring fee" : "Duration"}</dt>
-                  <dd className="nums text-right font-medium text-ink-900 lg:text-left">
-                    {h.fullTime
-                      ? formatMoney(h.ledger.totalMinor, h.currency, { zeroLabel: false })
-                      : <span className="whitespace-nowrap">{`${h.months} month${h.months === 1 ? "" : "s"}${h.ledger.plan === "monthly" ? ` · ${h.ledger.monthsPaid} paid` : ""}`}</span>}
-                  </dd>
-                </dl>
 
                 {/* One visible action by state: Pay while money is due (it was
                     only reachable from the page header), else Timesheets, else
                     the contract; the rest are in the menu (QA-122). */}
-                <div className="flex items-center gap-1 lg:justify-end">
+                <div className="col-span-2 flex items-center gap-1 sm:col-span-1 sm:justify-end">
                   {due ? (
-                    <ButtonLink href={`/employer/checkout?proposal=${encodeURIComponent(h.proposalId)}`} variant="accent" size="sm">
+                    <ButtonLink href={`/employer/checkout?proposal=${encodeURIComponent(h.proposalId)}`} variant="primary" size="sm">
                       <CreditCard className="size-4" aria-hidden />
                       Pay {formatMoney(postpaid ? (h.monthlyMinor ?? h.ledger.dueMinor) : h.ledger.dueMinor, h.currency)}
                     </ButtonLink>
