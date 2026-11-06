@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { refundEventEntity, settleFromWebhook } from "@/lib/college/refund";
 import { settleEmployerOrder, settleInternOrder } from "@/lib/payments";
 import { verifyWebhookSignature } from "@/lib/razorpay";
 
@@ -8,7 +9,8 @@ export const dynamic = "force-dynamic";
 
 /**
  * Razorpay webhook (payment.captured / order.paid): settles orders whose
- * browser callback never arrived. Unsigned or mis-signed events are refused.
+ * browser callback never arrived. refund.processed / refund.failed settle a
+ * college-seat refund (lib/college/refund). Unsigned or mis-signed events are refused.
  */
 export async function POST(req: Request) {
   const rawBody = await req.text();
@@ -21,6 +23,16 @@ export async function POST(req: Request) {
     event = JSON.parse(rawBody);
   } catch {
     return NextResponse.json({ error: "Bad payload" }, { status: 400 });
+  }
+  if (event.event === "refund.processed" || event.event === "refund.failed") {
+    const refund = refundEventEntity(event);
+    if (!refund) return NextResponse.json({ status: "ignored" });
+    try {
+      return NextResponse.json({ status: await settleFromWebhook(refund) });
+    } catch (error) {
+      console.error("[razorpay webhook] refund", error);
+      return NextResponse.json({ error: "Webhook error" }, { status: 500 });
+    }
   }
   if (event.event !== "payment.captured" && event.event !== "order.paid") return NextResponse.json({ status: "ignored" });
 

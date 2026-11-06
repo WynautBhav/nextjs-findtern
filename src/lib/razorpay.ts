@@ -3,7 +3,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import { isTestHost } from "./origin.ts";
 
 /**
- * Razorpay over plain fetch: the app only creates orders and checks
+ * Razorpay over plain fetch: the app creates orders and refunds and checks
  * signatures, which doesn't need the SDK.
  */
 
@@ -14,23 +14,34 @@ function keys() {
   return { keyId, keySecret };
 }
 
+/** API root. RAZORPAY_API_BASE points the refund calls at the e2e stub; ignored in production. */
+export function razorpayApiBase(env: Record<string, string | undefined> = process.env): string {
+  const override = (env.RAZORPAY_API_BASE ?? "").trim().replace(/\/+$/, "");
+  return override && env.VERCEL_ENV !== "production" ? override : "https://api.razorpay.com";
+}
+
+function authHeader(): string {
+  const { keyId, keySecret } = keys();
+  return `Basic ${Buffer.from(`${keyId}:${keySecret}`).toString("base64")}`;
+}
+
+/** Razorpay notes are flat strings (max 15 keys, 256 chars each). */
+function flatNotes(notes: Record<string, unknown> | undefined): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(notes ?? {}).map(([k, v]) => [k, (typeof v === "string" ? v : JSON.stringify(v)).slice(0, 256)]),
+  );
+}
+
 export async function createOrder(input: {
   amountMinor: number;
   currency: string;
   receipt: string;
   notes?: Record<string, unknown>;
 }): Promise<{ id: string; amount: number; currency: string }> {
-  const { keyId, keySecret } = keys();
-  // Razorpay notes are flat strings (max 15 keys, 256 chars each).
-  const notes = Object.fromEntries(
-    Object.entries(input.notes ?? {}).map(([k, v]) => [k, (typeof v === "string" ? v : JSON.stringify(v)).slice(0, 256)]),
-  );
+  const notes = flatNotes(input.notes);
   const res = await fetch("https://api.razorpay.com/v1/orders", {
     method: "POST",
-    headers: {
-      Authorization: `Basic ${Buffer.from(`${keyId}:${keySecret}`).toString("base64")}`,
-      "Content-Type": "application/json",
-    },
+    headers: { Authorization: authHeader(), "Content-Type": "application/json" },
     // payment_capture: 1 asks Razorpay to capture the payment itself, as the legacy app did. Without it
     // the order follows the dashboard default: on "manual" a paid order stays authorized here, the app
     // marks the hire as paid, and Razorpay refunds the money days later.
@@ -39,6 +50,60 @@ export async function createOrder(input: {
   const body = (await res.json().catch(() => ({}))) as { id?: string; amount?: number; currency?: string; error?: { description?: string } };
   if (!res.ok || !body.id) throw new Error(body.error?.description ?? `Razorpay order failed (${res.status})`);
   return { id: body.id, amount: body.amount ?? input.amountMinor, currency: body.currency ?? input.currency };
+}
+
+/** A refund as Razorpay returns it (docs: /api/refunds). `status`: pending | processed (final) | failed. */
+export type RazorpayRefund = {
+  id: string;
+  payment_id: string;
+  amount: number;
+  status: string;
+  receipt?: string | null;
+  notes?: Record<string, string> | unknown[];
+  [key: string]: unknown;
+};
+
+/** A non-2xx answer from Razorpay: the request reached it and was refused. Network errors and timeouts throw plain Errors. */
+export class RazorpayError extends Error {
+  readonly status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.status = status;
+  }
+}
+
+async function refundCall<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const res = await fetch(`${razorpayApiBase()}${path}`, {
+    ...init,
+    headers: { Authorization: authHeader(), "Content-Type": "application/json" },
+    // Long enough for Razorpay, short enough that "pending" older than REFUND_STALE_MS means the call is over.
+    signal: AbortSignal.timeout(20_000),
+  });
+  const body = (await res.json().catch(() => ({}))) as T & { error?: { description?: string } };
+  if (!res.ok) throw new RazorpayError(body.error?.description ?? `Razorpay refund call failed (${res.status})`, res.status);
+  return body;
+}
+
+/**
+ * POST /v1/payments/{id}/refund. Razorpay has no idempotency header for refunds; it refuses a second refund
+ * with the same `receipt` on the payment, and our dedupe is the refund row plus refresh-before-retry.
+ */
+export async function createRefund(paymentId: string, amountMinor: number, receipt: string, notes: Record<string, unknown>): Promise<RazorpayRefund> {
+  return refundCall<RazorpayRefund>(`/v1/payments/${encodeURIComponent(paymentId)}/refund`, {
+    method: "POST",
+    body: JSON.stringify({ amount: amountMinor, speed: "normal", receipt: receipt.slice(0, 40), notes: flatNotes(notes) }),
+  });
+}
+
+/** GET /v1/payments/{id}/refunds (the latest 100). */
+export async function listRefunds(paymentId: string): Promise<RazorpayRefund[]> {
+  const body = await refundCall<{ items?: RazorpayRefund[] }>(`/v1/payments/${encodeURIComponent(paymentId)}/refunds?count=100`);
+  return Array.isArray(body.items) ? body.items : [];
+}
+
+/** GET /v1/refunds/{id}. */
+export async function fetchRefund(refundId: string): Promise<RazorpayRefund> {
+  return refundCall<RazorpayRefund>(`/v1/refunds/${encodeURIComponent(refundId)}`);
 }
 
 /**

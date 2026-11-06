@@ -284,7 +284,7 @@ class SettleRefused extends Error {
 }
 
 /** The code is the proof: verify the student with that college and record the 18+ consent, in the settlement's transaction. */
-async function verifyByCollegeCode(tx: Parameters<Parameters<ReturnType<typeof getDb>["transaction"]>[0]>[0], userId: string, collegeId: string) {
+export async function verifyByCollegeCode(tx: Parameters<Parameters<ReturnType<typeof getDb>["transaction"]>[0]>[0], userId: string, collegeId: string) {
   const [existing] = await tx.select().from(schema.collegeMemberships).where(eq(schema.collegeMemberships.userId, userId)).limit(1);
   const [college] = await tx.select({ name: schema.colleges.name }).from(schema.colleges).where(eq(schema.colleges.id, collegeId)).limit(1);
   const [consent] = await tx
