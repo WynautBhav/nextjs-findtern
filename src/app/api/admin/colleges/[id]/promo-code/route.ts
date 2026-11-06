@@ -4,18 +4,17 @@ import { z } from "zod";
 
 import { recordAdminAudit } from "@/lib/admin/audit";
 import { allows } from "@/lib/admin/permissions";
-import { generateTpoCode } from "@/lib/college/code";
+import { createTpoCode } from "@/lib/college/tpo-code";
 import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
-import { isUniqueViolation } from "@/lib/promo";
-import { DEFAULT_COLLEGE_SEATS, seatCapProblem } from "@/lib/promo-rules";
+import { seatCapProblem } from "@/lib/promo-rules";
 
 type Ctx = { params: Promise<{ id: string }> };
 
 /** A discount code, so it also needs money permission on top of the college write the path rule asks for. */
 const NO_MONEY = () => NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-/** Create the college's TPO code (100% off the interview fee, 300 seats). One live code per college. */
+/** Create the college's TPO code (100% off the interview fee, 0 seats until a batch is paid). One live code per college. */
 export async function POST(req: Request, ctx: Ctx) {
   const g = await requireMutation({ req, roles: ["admin"] });
   if (!g.ok) return g.response;
@@ -26,18 +25,11 @@ export async function POST(req: Request, ctx: Ctx) {
   if (!college) return NextResponse.json({ error: "Not found" }, { status: 404 });
   const [existing] = await db.select({ id: schema.promoCodes.id }).from(schema.promoCodes).where(eq(schema.promoCodes.collegeId, id)).limit(1);
   if (existing) return NextResponse.json({ error: "This college already has a code" }, { status: 409 });
-  // A duplicate random code retries; the college's own unique index (a double click) ends as the 409 below.
-  for (let attempt = 0; attempt < 5; attempt++) {
-    try {
-      const [row] = await db
-        .insert(schema.promoCodes)
-        .values({ code: generateTpoCode(), description: "College TPO code", discountType: "percentage", discountValue: 100, maxUsages: DEFAULT_COLLEGE_SEATS, appliesTo: "intern", collegeId: id })
-        .returning({ code: schema.promoCodes.code });
-      await recordAdminAudit(db, { adminId: g.session.uid, action: "college.tpo_code_create", targetType: "college", targetId: id, meta: { code: row.code, maxUsages: DEFAULT_COLLEGE_SEATS } });
-      return NextResponse.json({ ok: true, code: row.code });
-    } catch (e) {
-      if (!isUniqueViolation(e)) throw e;
-    }
+  // Cap 0: seats come only from paid batches (owner answer Q1).
+  const code = await createTpoCode(db, id, 0);
+  if (code) {
+    await recordAdminAudit(db, { adminId: g.session.uid, action: "college.tpo_code_create", targetType: "college", targetId: id, meta: { code, maxUsages: 0 } });
+    return NextResponse.json({ ok: true, code });
   }
   return NextResponse.json({ error: "This college already has a code" }, { status: 409 });
 }

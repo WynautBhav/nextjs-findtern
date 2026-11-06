@@ -91,8 +91,14 @@ export default async function CollegeDashboard() {
           <p className="text-sm text-ink-600">Your college code. Share it with students: it waives their AI interview fee and verifies them with your college.</p>
           <p className="mt-2 flex flex-wrap items-baseline gap-x-4 gap-y-1">
             <code className="select-all break-all font-mono text-xl font-semibold tracking-widest text-ink-900">{seat.code}</code>
-            <span className="nums text-sm font-medium text-ink-800">{seat.used} of {seat.cap ?? "unlimited"} used</span>
+            <span className="nums text-sm font-medium text-ink-800">
+              {seat.used} of {seat.cap ?? "unlimited"} used{seat.cap === null ? "" : ` · ${Math.max(0, seat.cap - seat.used)} left`}
+            </span>
+            <Link href="/college/seats" className="text-sm font-medium underline underline-offset-2">Seats and invoices</Link>
           </p>
+          {seat.cap !== null && seat.cap - seat.used <= seat.cap * 0.1 ? (
+            <p className="mt-2 text-sm font-medium text-amber-700">Ask Findtern for more seats.</p>
+          ) : null}
         </section>
       ) : null}
 
