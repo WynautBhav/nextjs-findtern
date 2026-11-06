@@ -5,6 +5,10 @@ import { Plus, Trash2 } from "lucide-react";
 import { buttonClass } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
+import { controlClass } from "./control-class";
+
+export { controlClass };
+
 /**
  * Form controls for the onboarding steps.
  *
@@ -14,13 +18,6 @@ import { cn } from "@/lib/utils";
  * Labels are one line (`truncate` is never used on them, so they are kept
  * short instead), and the control is the same height everywhere.
  */
-
-/** One control size: 44px tall everywhere (touch-first), radius token, 16px text so iOS never zooms. */
-export const CONTROL =
-  "apple-spring block h-11 w-full min-w-0 rounded-apple-sm border bg-white px-3.5 text-base text-ink-900 shadow-xs outline-none placeholder:text-text-subtle focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:bg-ink-50 disabled:text-ink-600 sm:text-[0.9375rem]";
-export const CONTROL_OK = "border-ink-200 hover:border-ink-300 focus-visible:border-brand-600 focus-visible:ring-brand-600/15";
-export const CONTROL_BAD = "border-danger focus-visible:border-danger focus-visible:ring-danger/15";
-export const controlClass = (error?: string, extra?: string) => cn(CONTROL, error ? CONTROL_BAD : CONTROL_OK, extra);
 
 const LABEL = "block text-sm font-medium text-ink-800";
 

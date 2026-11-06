@@ -14,7 +14,7 @@ import type { MyCollege } from "@/lib/college/membership";
 import { branchProblem } from "@/lib/college/join-input";
 import { cn } from "@/lib/utils";
 import { PushToggle } from "./college-push";
-import { SelectField } from "./onboarding/fields";
+import { controlClass, Label, SelectField } from "./onboarding/fields";
 
 type Option = { id: string; name: string; city: string | null; state: string | null; isPartner: boolean; code: string | null };
 
@@ -25,9 +25,6 @@ const YEARS = [
   { value: 4, label: "4th year" },
   { value: 5, label: "5th year" },
 ];
-
-const FIELD =
-  "min-h-11 w-full rounded-apple-sm border border-ink-200 bg-white px-3.5 text-base text-ink-900 placeholder:text-text-subtle focus-visible:border-brand-600 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand-600/30";
 
 export function CollegeForm({
   initial,
@@ -318,9 +315,7 @@ function JoinForm({
           placeholder="Choose"
         />
         <div>
-          <label htmlFor={`${ids}-branch`} className="mb-1.5 block text-sm font-medium text-ink-800">
-            Branch
-          </label>
+          <Label htmlFor={`${ids}-branch`}>Branch</Label>
           <input
             id={`${ids}-branch`}
             value={branch}
@@ -338,7 +333,7 @@ function JoinForm({
             aria-describedby={invalid === "branch" ? errorId : undefined}
             placeholder="e.g. CSE, ECE, BBA"
             autoComplete="off"
-            className={FIELD}
+            className={controlClass(undefined, "mt-2")}
           />
         </div>
         <p className="text-sm leading-relaxed text-ink-600 sm:col-span-2">
@@ -485,7 +480,7 @@ function CollegeSearch({
           onKeyDown={onKey}
           placeholder="College name or code"
           autoComplete="off"
-          className={cn(FIELD, "pl-10 pr-10")}
+          className={controlClass(undefined, "pl-10 pr-10")}
         />
         {query ? (
           <button
@@ -495,7 +490,7 @@ function CollegeSearch({
               setQuery("");
               searchInput.current?.focus();
             }}
-            className="absolute right-1 top-1/2 grid size-10 -translate-y-1/2 place-items-center rounded-apple-sm text-text-subtle hover:text-ink-700 focus-visible:outline-2 focus-visible:outline-brand-700"
+            className="absolute right-1 top-1/2 grid size-10 -translate-y-1/2 touch:size-11 place-items-center rounded-apple-sm text-text-subtle hover:text-ink-700 focus-visible:outline-2 focus-visible:outline-brand-700"
           >
             <X className="size-4" />
           </button>
@@ -639,22 +634,16 @@ function MissingCollege({ query }: { query: string }) {
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="sm:col-span-2">
-              <label htmlFor={`${ids}-name`} className="mb-1.5 block text-sm font-medium text-ink-800">
-                College name
-              </label>
-              <input ref={nameInput} id={`${ids}-name`} value={name} onChange={(e) => setName(e.target.value)} onKeyDown={onEnter} maxLength={200} autoComplete="off" className={FIELD} />
+              <Label htmlFor={`${ids}-name`}>College name</Label>
+              <input ref={nameInput} id={`${ids}-name`} value={name} onChange={(e) => setName(e.target.value)} onKeyDown={onEnter} maxLength={200} autoComplete="off" className={controlClass(undefined, "mt-2")} />
             </div>
             <div>
-              <label htmlFor={`${ids}-city`} className="mb-1.5 block text-sm font-medium text-ink-800">
-                City
-              </label>
-              <input id={`${ids}-city`} value={city} onChange={(e) => setCity(e.target.value)} onKeyDown={onEnter} maxLength={100} autoComplete="off" className={FIELD} />
+              <Label htmlFor={`${ids}-city`}>City</Label>
+              <input id={`${ids}-city`} value={city} onChange={(e) => setCity(e.target.value)} onKeyDown={onEnter} maxLength={100} autoComplete="off" className={controlClass(undefined, "mt-2")} />
             </div>
             <div>
-              <label htmlFor={`${ids}-state`} className="mb-1.5 block text-sm font-medium text-ink-800">
-                State
-              </label>
-              <input id={`${ids}-state`} value={state} onChange={(e) => setState(e.target.value)} onKeyDown={onEnter} maxLength={60} autoComplete="off" className={FIELD} />
+              <Label htmlFor={`${ids}-state`}>State</Label>
+              <input id={`${ids}-state`} value={state} onChange={(e) => setState(e.target.value)} onKeyDown={onEnter} maxLength={60} autoComplete="off" className={controlClass(undefined, "mt-2")} />
             </div>
           </div>
           <div className="flex flex-wrap gap-3">

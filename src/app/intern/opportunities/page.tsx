@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Search } from "lucide-react";
 
 import { EmptyScene, FilterTabs, PageHead, Surface } from "@/components/app/primitives";
-import { fieldClass } from "@/components/employer/ui-tokens";
+import { controlClass } from "@/components/intern/onboarding/control-class";
 import { InternRoleCard, MODE } from "@/components/intern/role-card";
 import { proposalStatus } from "@/components/app/status";
 import { isHiredProposal } from "@/lib/hire-status";
@@ -101,7 +101,7 @@ export default async function InternOpportunities({
                 defaultValue={q}
                 placeholder="Search by role, skill or city"
                 aria-label="Search open roles"
-                className={`${fieldClass} pl-9`}
+                className={controlClass(undefined, "pl-9")}
               />
             </form>
             <FilterTabs
