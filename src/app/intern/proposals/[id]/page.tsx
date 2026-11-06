@@ -17,7 +17,9 @@ import { canAccess } from "@/lib/security/guards";
 import { getDb, hasDb, schema } from "@/lib/db";
 import { scopeValue } from "@/lib/db/schema";
 import { loadInternData } from "@/lib/intern-data";
-import { formatJoiningDate, shortDate } from "@/lib/format";
+import { rawScore } from "@/lib/employer-candidates";
+import { offerBonusMinor } from "@/lib/completion-bonus";
+import { formatJoiningDate, formatMoney, shortDate } from "@/lib/format";
 import { canDecide, hybridSplit, offerJoiningDay, shiftInIst } from "@/lib/intern-offer-view";
 import { toArray } from "@/lib/journey";
 import { sanitizeRichText } from "@/lib/richtext";
@@ -71,6 +73,8 @@ export default async function ProposalDetail({ params }: { params: Promise<{ id:
   const ft = offer.fullTime;
   const status = proposalStatus(facts.key);
   const open = canDecide(facts.key);
+  const bonusMinor = offerBonusMinor(rawScore(extra), { fullTime });
+  const bonusLabel = bonusMinor ? `+ ${formatMoney(bonusMinor, "INR", { zeroLabel: false })} completion bonus when you finish` : null;
 
   let project: Loaded<{ projectName: string; skills: string[] | null; scopeOfWork: string | null }> = { ok: true, row: null };
   let employer: Loaded<{
@@ -191,6 +195,7 @@ export default async function ProposalDetail({ params }: { params: Promise<{ id:
           <StatTile key={s.label} {...s} featured={i === 0} index={i} />
         ))}
       </div>
+      {bonusLabel ? <p className="-mt-3 mb-6 text-sm font-medium text-ink-700 lg:-mt-5 lg:mb-8">{bonusLabel}</p> : null}
 
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
         {/* ── The decision (focal point; first on a phone) ─────────── */}
@@ -218,6 +223,7 @@ export default async function ProposalDetail({ params }: { params: Promise<{ id:
                   declinesUsed={misses.total}
                   freeDeclines={FREE_DECLINES}
                   guaranteeEnded={guaranteeEnded(extra, misses)}
+                  bonusLabel={bonusLabel}
                 />
               ) : (
                 <div className="space-y-4">

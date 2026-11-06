@@ -50,6 +50,7 @@ export function OfferDecision({
   declinesUsed = 0,
   freeDeclines = 3,
   guaranteeEnded = false,
+  bonusLabel = null,
   layout = "rail",
 }: {
   proposalId: string;
@@ -65,6 +66,8 @@ export function OfferDecision({
   declinesUsed?: number;
   freeDeclines?: number;
   guaranteeEnded?: boolean;
+  /** e.g. "+ ₹2,500 completion bonus when you finish", worked out on the server; null when none is promised. */
+  bonusLabel?: string | null;
   /** "rail": the offer page's decision card. "row": a list card's footer. */
   layout?: "rail" | "row";
 }) {
@@ -238,6 +241,7 @@ export function OfferDecision({
               <DialogDescription className="text-pretty text-sm leading-relaxed text-ink-700">
                 This tells {company === "The company" ? "the company" : company} yes{joining ? ` for a start on ${joining}` : ""}. They complete the payment next.
                 You&apos;re hired, and logging hours opens, once they do. Your other open offers, from any company, close when you accept: it&apos;s one internship at a time.
+                {bonusLabel ? ` ${bonusLabel.replace(/^\+\s*/, "You also get ")}.` : ""}
               </DialogDescription>
             </DialogHeader>
             <label className="flex cursor-pointer items-start gap-3 rounded-apple-lg border border-ink-200/80 bg-ink-50 p-4 text-sm text-ink-700">

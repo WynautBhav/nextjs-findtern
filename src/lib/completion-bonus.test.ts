@@ -3,7 +3,7 @@ import { test } from "node:test";
 
 import { grantCompletionBonus } from "./admin/ratings.ts";
 import { stipendDues } from "./admin/stipend-dues.ts";
-import { bonusBand, completionBonusPlan, isEngagementComplete } from "./completion-bonus.ts";
+import { bonusBand, completionBonusPlan, isEngagementComplete, offerBonusMinor } from "./completion-bonus.ts";
 
 const plan = (score: number | null, over = {}) =>
   completionBonusPlan({ alreadyGranted: false, fullTime: false, ended: false, extra: score === null ? {} : { findternScore: score }, ...over });
@@ -62,4 +62,13 @@ test("a bonus never counts as a stipend month, linked or unlinked", () => {
   assert.equal(after.paidMinor, 0);
   assert.equal(after.pending, false);
   assert.equal(after.remainingMonths, base.remainingMonths);
+});
+
+test("the offer shows the bonus by band, and none for full-time, unscored or below 6", () => {
+  assert.equal(offerBonusMinor(7, { fullTime: false }), 250000);
+  assert.equal(offerBonusMinor(6, { fullTime: false }), 250000);
+  assert.equal(offerBonusMinor(9, { fullTime: false }), 300000);
+  assert.equal(offerBonusMinor(9, { fullTime: true }), null);
+  assert.equal(offerBonusMinor(null, { fullTime: false }), null);
+  assert.equal(offerBonusMinor(5.5, { fullTime: false }), null);
 });

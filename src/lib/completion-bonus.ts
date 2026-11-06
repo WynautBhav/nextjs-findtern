@@ -13,6 +13,15 @@ export function bonusBand(scoreBefore: number | null): BonusBand {
   return s >= 8 ? "assured" : s >= 6 ? "skilled" : "standard";
 }
 
+/**
+ * The completion bonus an intern can expect, shown on the offer before they accept (settled pricing: 6 to under 8 is
+ * ₹2,500, 8 and up is ₹3,000). Null when none is promised: full-time, unscored, or below 6.
+ */
+export function offerBonusMinor(score: number | null, opts: { fullTime: boolean }): number | null {
+  if (opts.fullTime || score === null || !Number.isFinite(score) || score < 6) return null;
+  return BONUS_MINOR[bonusBand(score)];
+}
+
 export const bonusDueDate = (todayIst: string) => addDaysIso(todayIst, 7);
 
 /** What a completion pays, or null when no bonus is owed (second approval, full-time, ended early). */
