@@ -135,6 +135,19 @@ export async function recordPromoUse(input: {
   return { capped: took.length === 0, collegeId: promo.collegeId };
 }
 
+/** Undo one recorded use (a cancelled college-seat refund): the seat goes back under the cap. Idempotent. */
+export async function releasePromoUse(usageId: string, db: Db | Tx = getDb()): Promise<void> {
+  const [gone] = await db
+    .delete(schema.promoCodeUsages)
+    .where(eq(schema.promoCodeUsages.id, usageId))
+    .returning({ promoCodeId: schema.promoCodeUsages.promoCodeId });
+  if (!gone) return;
+  await db
+    .update(schema.promoCodes)
+    .set({ usedCount: sql`greatest(${schema.promoCodes.usedCount} - 1, 0)`, updatedAt: new Date() })
+    .where(eq(schema.promoCodes.id, gone.promoCodeId));
+}
+
 export const DUPLICATE_CODE = "A promo code with this name already exists. Pick a different code.";
 
 /** Which field a signup unique_violation is about, from the index name Postgres reports. */
