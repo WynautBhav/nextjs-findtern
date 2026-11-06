@@ -186,13 +186,6 @@ export function ProfileView({
         </Section>
       ) : null}
 
-      {/* ── About ───────────────────────────────────────────────── */}
-      {draft.bio ? (
-        <Section title="About">
-          <p className="whitespace-pre-line text-pretty text-base leading-relaxed text-ink-700 [overflow-wrap:anywhere]">{draft.bio}</p>
-        </Section>
-      ) : null}
-
       {/* ── Where and how ───────────────────────────────────────── */}
       <Section title="Work preferences">
         <dl className="divide-y divide-ink-100">

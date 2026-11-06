@@ -7,7 +7,7 @@ import { FileUpload } from "@/components/app/file-upload";
 import { cn } from "@/lib/utils";
 
 import { CityStatePicker } from "../city-state-picker";
-import { Field, FieldNote, Grid, Label, Section, TextArea, controlClass, describedBy } from "./fields";
+import { Field, FieldNote, Grid, Label, Section, controlClass, describedBy } from "./fields";
 import { PhotoUpload } from "./photo-upload";
 import type { StepProps } from "./types";
 
@@ -34,17 +34,6 @@ export function AboutStep({ values, update, errors, documents, account, onUpload
       </Section>
 
       <Section title="About you">
-        <TextArea
-          id="bio"
-          label="A few lines about you"
-          optional
-          rows={4}
-          maxLength={1000}
-          placeholder="What you study, what you are good at, and the kind of work you want."
-          value={values.bio}
-          error={errors.bio}
-          onChange={(v) => update("bio", v)}
-        />
         <Grid>
           <Field
             id="linkedinUrl"
