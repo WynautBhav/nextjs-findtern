@@ -6,6 +6,7 @@ import { notify } from "@/lib/notify";
 import { profileCompletion } from "@/lib/onboarding";
 import { sendPaymentReminders } from "@/lib/payment-reminders-job";
 import { hasFeedbackText } from "@/lib/interview-feedback";
+import { reconcileRefunds } from "@/lib/college/refund";
 
 /**
  * In-process jobs, ported from the legacy interviewReminderScheduler and
@@ -24,10 +25,13 @@ export function startSchedulers() {
 
   const reminders = run("interview reminders", interviewReminders);
   const daily = run("notification jobs", notificationJobs);
+  // College-seat refunds a webhook never settled (Vercel runs the same job daily via /api/cron/refund-reconcile).
+  const refunds = run("refund reconcile", async () => void (await reconcileRefunds()));
   reminders();
   daily();
   setInterval(reminders, 5 * 60 * 1000);
   setInterval(daily, 6 * 60 * 60 * 1000);
+  setInterval(refunds, 15 * 60 * 1000);
   console.log("[scheduler] started");
 }
 

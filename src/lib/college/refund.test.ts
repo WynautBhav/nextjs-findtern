@@ -12,6 +12,7 @@ import {
   matchRefund,
   receiptFor,
   refundDecision,
+  refundEventEntity,
   stalePending,
   statusFromGateway,
 } from "./refund.ts";
@@ -133,4 +134,19 @@ test("displayStatus: the refund row wins, else the decision", () => {
   assert.equal(displayStatus({ refund: null, decision: { kind: "eligible" } }), "eligible");
   assert.equal(displayStatus({ refund: null, decision: { kind: "none", error: "x" } }), "none");
   assert.equal(displayStatus({ refund: { status: "initiated" } as never, decision: { kind: "eligible" } }), "initiated");
+});
+
+test("webhook: only signed refund.processed / refund.failed with a real refund entity are settled", () => {
+  const entity = refund({ id: "rfnd_FS8TWyPrCsa0OB", status: "processed", notes: { refund_id: ID } });
+  assert.equal(refundEventEntity({ event: "refund.processed", payload: { refund: { entity } } })?.id, "rfnd_FS8TWyPrCsa0OB");
+  assert.equal(refundEventEntity({ event: "refund.failed", payload: { refund: { entity: { ...entity, status: "failed" } } } })?.status, "failed");
+  // Other events stay with the payment handler or are ignored.
+  assert.equal(refundEventEntity({ event: "refund.created", payload: { refund: { entity } } }), null);
+  assert.equal(refundEventEntity({ event: "payment.captured", payload: { refund: { entity } } }), null);
+  assert.equal(refundEventEntity({ event: "refund.processed", payload: {} }), null);
+  assert.equal(refundEventEntity({ event: "refund.processed", payload: { refund: { entity: { ...entity, id: "pay_x" } } } }), null);
+  assert.equal(refundEventEntity(null), null);
+  // Replaying the same processed event changes nothing the second time.
+  assert.equal(statusFromGateway("initiated", "processed"), "refunded");
+  assert.equal(statusFromGateway("refunded", "processed"), null);
 });

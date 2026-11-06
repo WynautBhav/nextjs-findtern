@@ -155,6 +155,15 @@ export function lastFailedGatewayId(row: Pick<PaymentRefund, "gatewayResponse">)
   return r && r.status === "failed" && typeof r.id === "string" ? r.id : null;
 }
 
+/** The refund in a signed webhook event this module settles (`refund.processed` / `refund.failed`), else null. Pure. */
+export function refundEventEntity(event: unknown): RazorpayRefund | null {
+  const e = (event ?? {}) as { event?: unknown; payload?: { refund?: { entity?: Partial<RazorpayRefund> } } };
+  if (e.event !== "refund.processed" && e.event !== "refund.failed") return null;
+  const r = e.payload?.refund?.entity;
+  if (!r || typeof r.id !== "string" || !r.id.startsWith("rfnd_") || typeof r.status !== "string" || typeof r.payment_id !== "string") return null;
+  return r as RazorpayRefund;
+}
+
 /* ── DB work ─────────────────────────────────────────────────────────── */
 
 export type RefundResult<T> = { ok: true; value: T } | { ok: false; status: number; error: string };
