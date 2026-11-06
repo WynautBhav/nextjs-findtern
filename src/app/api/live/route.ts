@@ -16,7 +16,7 @@ const LIFETIME_MS = 55_000;
 /**
  * Live counts for the header badges and toasts: Server-Sent Events, one
  * stream per open tab. The database is the source of truth, so any number of
- * instances works; each stream re-reads two indexed queries every TICK_MS and
+ * instances works; each stream re-reads four indexed queries every TICK_MS and
  * sends only when something changed. `?once=1` is the same data as JSON for
  * the polling fallback. A View as admin reads as that person.
  */
@@ -34,8 +34,9 @@ export async function GET(req: Request) {
   let timer: ReturnType<typeof setInterval> | undefined;
   let ender: ReturnType<typeof setTimeout> | undefined;
   let lastCounts = "";
-  let lastThread: string | null = null;
+  let lastMessageAt: string | null = null;
   let first = true;
+  let busy = false;
   let lastSent = 0;
 
   const stream = new ReadableStream<Uint8Array>({
@@ -57,8 +58,11 @@ export async function GET(req: Request) {
         }
       };
       const tick = async () => {
+        // A slow database must not stack ticks.
+        if (busy) return;
+        busy = true;
         try {
-          const [counts, thread] = await Promise.all([countsFor(viewer.role, viewer.id), latestThread(viewer)]);
+          const counts = await countsFor(viewer.role, viewer.id);
           const key = JSON.stringify(counts);
           let sent = false;
           if (key !== lastCounts) {
@@ -66,11 +70,12 @@ export async function GET(req: Request) {
             send(`event: counts\ndata: ${key}\n\n`);
             sent = true;
           }
-          // The first tick only sets the baseline; a `message` event means something arrived since.
-          const threadKey = thread ? `${thread.threadId}@${thread.at}` : null;
-          if (threadKey !== lastThread) {
-            lastThread = threadKey;
-            if (!first && thread) {
+          // The first tick only sets the baseline; a `message` event means a newer message landed since.
+          // `counts.lastMessageAt` already says when; look up which thread only when it moved.
+          if (counts.lastMessageAt !== lastMessageAt) {
+            lastMessageAt = counts.lastMessageAt;
+            const thread = first ? null : await latestThread(viewer);
+            if (thread) {
               send(`event: message\ndata: ${JSON.stringify(thread)}\n\n`);
               sent = true;
             }
@@ -79,6 +84,8 @@ export async function GET(req: Request) {
           if (!sent && Date.now() - lastSent > KEEPALIVE_MS) send(`: keepalive\n\n`);
         } catch (err) {
           console.error("[live]", err);
+        } finally {
+          busy = false;
         }
       };
       req.signal.addEventListener("abort", stop);

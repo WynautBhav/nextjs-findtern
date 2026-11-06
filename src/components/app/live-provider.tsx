@@ -11,6 +11,7 @@ export const MESSAGE_EVENT = "findtern:message";
 
 const POLL_MS = 15_000;
 const ERRORS_BEFORE_POLLING = 3;
+const REOPEN_MS = 30_000;
 
 /**
  * Keeps the header badges, lists and toasts current without a reload.
@@ -36,6 +37,7 @@ export function LiveProvider({ initial }: { initial: LiveCounts }) {
     let source: EventSource | null = null;
     let poll: ReturnType<typeof setInterval> | undefined;
     let errors = 0;
+    let reopen: ReturnType<typeof setTimeout> | undefined;
     let disposed = false;
 
     const apply = (c: LiveCounts, polled: boolean) => {
@@ -89,6 +91,13 @@ export function LiveProvider({ initial }: { initial: LiveCounts }) {
       });
       // The browser reconnects by itself (retry: 3000); count consecutive failures only.
       source.onerror = () => {
+        // CLOSED means the browser gave up (401/403, a proxy error page) and will not retry: poll, and try the stream again later.
+        if (source?.readyState === EventSource.CLOSED) {
+          source.close();
+          startPolling();
+          if (!disposed) reopen = setTimeout(open, REOPEN_MS);
+          return;
+        }
         errors += 1;
         if (errors >= ERRORS_BEFORE_POLLING) startPolling();
       };
@@ -97,6 +106,7 @@ export function LiveProvider({ initial }: { initial: LiveCounts }) {
 
     return () => {
       disposed = true;
+      if (reopen) clearTimeout(reopen);
       source?.close();
       stopPolling();
     };
