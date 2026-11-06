@@ -39,6 +39,9 @@ function nameOf(item: ProposalItem): string {
   return displayNameOf({ id: item.proposal.internId, fullName: `${first} ${last}`.trim() || "Candidate", initials: initialsOf(first, last) }, item.internHired);
 }
 
+/** Rows shown at a time; "Show more" adds another page (as Projects). */
+const PAGE = 20;
+
 /** Status filter buckets (the raw enums never reach the select). */
 const FILTERS: { value: string; label: string; match: (status: string, lapsed: boolean) => boolean }[] = [
   { value: "open", label: "Waiting on candidate", match: (s, l) => !l && (s === "sent" || s === "interview_scheduled" || s === "draft") },
@@ -59,6 +62,7 @@ export function ProposalsManager({ initialProposals }: { initialProposals: Propo
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [projectFilter, setProjectFilter] = useState("all");
+  const [shown, setShown] = useState(PAGE);
   const [withdrawTarget, setWithdrawTarget] = useState<ProposalItem | null>(null);
   const [busy, setBusy] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
@@ -168,7 +172,10 @@ export function ProposalsManager({ initialProposals }: { initialProposals: Propo
               ref={searchRef}
               type="search"
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setShown(PAGE);
+              }}
               placeholder="Search by role, project or initials"
               className={cn(fieldClass, "rounded-full pl-10")}
             />
@@ -176,7 +183,10 @@ export function ProposalsManager({ initialProposals }: { initialProposals: Propo
           {projectOptions.length > 1 ? (
             <select
               value={projectFilter}
-              onChange={(e) => setProjectFilter(e.target.value)}
+              onChange={(e) => {
+                setProjectFilter(e.target.value);
+                setShown(PAGE);
+              }}
               className={cn(fieldClass, "rounded-full sm:w-56")}
               aria-label="Project"
             >
@@ -201,7 +211,10 @@ export function ProposalsManager({ initialProposals }: { initialProposals: Propo
               key={t.key}
               type="button"
               aria-pressed={on}
-              onClick={() => setStatusFilter(t.key)}
+              onClick={() => {
+                setStatusFilter(t.key);
+                setShown(PAGE);
+              }}
               className={cn(
                 "relative -mb-px inline-flex min-h-12 min-w-11 items-center justify-center gap-1 whitespace-nowrap sm:gap-1.5 text-sm outline-none transition-colors",
                 "after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:rounded-full after:content-['']",
@@ -242,6 +255,7 @@ export function ProposalsManager({ initialProposals }: { initialProposals: Propo
                   setSearch("");
                   setStatusFilter("all");
                   setProjectFilter("all");
+                  setShown(PAGE);
                   // The button unmounts with the empty state: keep focus on the toolbar.
                   searchRef.current?.focus();
                 }}
@@ -255,7 +269,7 @@ export function ProposalsManager({ initialProposals }: { initialProposals: Propo
         </div>
       ) : (
         <ul className="divide-y divide-ink-100">
-          {filtered.map(({ item, offer, state }) => {
+          {filtered.slice(0, shown).map(({ item, offer, state }) => {
             const ini = initialsOf(item.user?.firstName?.trim() || "", item.user?.lastName?.trim() || "");
             const ft = offer.fullTime;
             // Full-time rows: annual CTC, not "-/month" (EMH-19). Only the
@@ -341,7 +355,16 @@ export function ProposalsManager({ initialProposals }: { initialProposals: Propo
           })}
         </ul>
       )}
-      {filtering && filtered.length > 0 ? (
+      {filtered.length > shown ? (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-ink-100 pt-6">
+          <button type="button" onClick={() => setShown((n) => n + PAGE)} className={buttonClass({ variant: "outline", size: "md", className: "min-h-11" })}>
+            Show {Math.min(PAGE, filtered.length - shown)} more
+          </button>
+          <p className="nums text-sm text-ink-600">
+            Showing {shown} of {filtered.length}
+          </p>
+        </div>
+      ) : filtering && filtered.length > 0 ? (
         <p className="mt-2 text-sm text-ink-600">
           Showing <span className="nums font-semibold text-ink-900">{filtered.length}</span> of <span className="nums">{proposals.length}</span>
         </p>

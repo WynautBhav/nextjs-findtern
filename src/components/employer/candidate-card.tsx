@@ -33,6 +33,8 @@ export interface CandidateCardProps {
   shortlisted: boolean;
   /** True when this employer hired the candidate - the only case the full name shows. */
   nameUnlocked?: boolean;
+  /** Hired (on any project): the row says so, even when the live offer shown is another one. */
+  hired?: boolean;
   /** Resolved server-side against the CMS rate card; falls back to the bands. */
   pricing?: Pricing;
   /** This employer's live or hired offer to the candidate, if any. */
@@ -166,6 +168,7 @@ export function CandidateCard({
   projectId,
   shortlisted,
   nameUnlocked = false,
+  hired = false,
   pricing: resolved,
   proposal = null,
   fullTimeFrom = null,
@@ -211,6 +214,7 @@ export function CandidateCard({
             {headline ? <span className="sr-only">, {headline}</span> : null}
             {presence ? <span className="sr-only">, {presence}</span> : null}
           </Link>
+          {hired && proposal?.status !== "hired" ? <Pill tone="live" className="shrink-0 whitespace-nowrap">Hired</Pill> : null}
           {status ? <Pill tone={status.tone} className="shrink-0 whitespace-nowrap">{status.label}</Pill> : null}
           {interested ? (
             <Pill tone="live" className="shrink-0 whitespace-nowrap">
@@ -226,6 +230,8 @@ export function CandidateCard({
         <p className="mt-0.5 inline-flex items-center gap-1 text-sm text-ink-600">
           <MapPin className="size-3.5 shrink-0 text-ink-400" aria-hidden />
           {place || "City not stated"}
+          {/* The grey dot alone reads as offline; say it in words (a label, never a time). */}
+          {presence && presence !== "Online now" ? <span className="whitespace-nowrap">· {presence}</span> : null}
         </p>
       </div>
 

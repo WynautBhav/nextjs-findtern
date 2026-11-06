@@ -39,8 +39,9 @@ function one(v: string | string[] | undefined): string | undefined {
 
 /**
  * Up to four candidates as a real comparison matrix: one column each, a
- * sticky header with the candidate and their next action, a sticky first
- * column of row labels, and the leader of every numeric row marked.
+ * header with the candidate and their next action, a sticky first column of
+ * row labels (the page scrolls down, the table scrolls sideways), and the
+ * leader of every numeric row marked.
  *
  * Benchmarked against an open project (newest first, as the candidates page),
  * whose skills can be swapped here to re-score the match (EMB-25).
@@ -275,12 +276,12 @@ export default async function CompareCandidates({ searchParams }: { searchParams
         note="Up to 7. Add or remove skills to re-score the project fit below."
       />
 
-      {/* Scrolls inside itself so the header row and the label column can both stick. */}
+      {/* The page scrolls vertically; only the width scrolls here, with the label column pinned. */}
       <div
         tabIndex={0}
         role="region"
         aria-label="Candidate comparison"
-        className="relative max-h-[calc(100dvh-8rem)] overflow-auto rounded-apple-xl border border-ink-200/80 bg-white shadow-xs focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
+        className="relative overflow-x-auto rounded-apple-xl border border-ink-200/80 bg-white shadow-xs focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
       >
         <table className="w-full border-separate border-spacing-0 text-left text-sm">
           <caption className="sr-only">Candidates compared side by side; the leader of each row is marked.</caption>
@@ -288,7 +289,7 @@ export default async function CompareCandidates({ searchParams }: { searchParams
             <tr>
               <th
                 scope="col"
-                className="sticky left-0 top-0 z-30 w-32 min-w-32 border-b border-r border-ink-100 bg-white p-4 align-bottom text-xs font-medium text-ink-600 sm:w-48 sm:min-w-48"
+                className="sticky left-0 z-20 w-32 min-w-32 border-b border-r border-ink-100 bg-white p-4 align-bottom text-xs font-medium text-ink-600 sm:w-48 sm:min-w-48"
               >
                 {candidates.length} of {MAX_COMPARE}
               </th>
@@ -300,7 +301,7 @@ export default async function CompareCandidates({ searchParams }: { searchParams
                   <th
                     key={c.id}
                     scope="col"
-                    className="sticky top-0 z-20 min-w-60 border-b border-r border-ink-100 bg-white p-4 align-top font-normal last:border-r-0"
+                    className="min-w-60 border-b border-r border-ink-100 bg-white p-4 align-top font-normal last:border-r-0"
                   >
                     <div className="flex items-start gap-3">
                       <CandidateAvatar photoUrl={c.photoUrl} initials={c.initials} className="size-10 rounded-apple-md text-sm ring-1 ring-inset ring-brand-200/70" />

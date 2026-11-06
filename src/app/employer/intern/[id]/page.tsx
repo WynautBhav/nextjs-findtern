@@ -74,6 +74,8 @@ export default async function EmployerInternDetail({
 
   let profile: CandidateProfile | null = null;
   let appliedProjects: { id: string; projectName: string | null; status: string; fullTime: boolean }[] = [];
+  /** The project the shown offer belongs to: the status pill names it, so it never reads as the person's state. */
+  let statusProjectName: string | null = null;
   let currency: "INR" | "USD" = "INR";
   let region: "IN" | null = null;
   /** Full name, photo and LinkedIn show only after this employer hired the intern. */
@@ -214,6 +216,8 @@ export default async function EmployerInternDetail({
           status: latest.get(projectId)?.status ?? "sent",
           fullTime: latest.get(projectId)?.fullTime ?? false,
         }));
+        const shownProjectId = proposals.find((p) => p.id === relation?.proposal?.id)?.projectId;
+        statusProjectName = (shownProjectId && projectNameById.get(shownProjectId)) || null;
       }
 
       // Same conditions legacy used to disable "Send proposal" (detail:1049).
@@ -365,7 +369,11 @@ export default async function EmployerInternDetail({
                   {displayName}
                   {nameUnlocked ? null : <span className="sr-only">, initials only until you hire</span>}
                 </h1>
-                {status ? <Pill tone={status.tone}>{status.label}</Pill> : null}
+                {status && statusProjectName ? (
+                  <Pill tone={status.tone} className="max-w-full">
+                    <span className="truncate">{statusProjectName}: {status.label}</span>
+                  </Pill>
+                ) : null}
               </div>
               {headline ? <p className="mt-1 break-words text-lg leading-snug text-ink-800 sm:text-xl">{headline}</p> : null}
               <p className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-600">
@@ -478,7 +486,7 @@ export default async function EmployerInternDetail({
               <div className="border-t border-ink-100 pt-4">
                 <h2 className="text-sm font-semibold text-ink-900">Your proposals to them</h2>
                 <ul className="mt-2 space-y-2">
-                  {appliedProjects.map((entry) => {
+                  {appliedProjects.slice(0, PROPOSALS_SHOWN).map((entry) => {
                     const pill = proposalPill(entry.status, entry.fullTime);
                     return (
                       <li key={entry.id} className="flex min-w-0 items-start justify-between gap-3 text-sm">
@@ -490,6 +498,11 @@ export default async function EmployerInternDetail({
                     );
                   })}
                 </ul>
+                {appliedProjects.length > PROPOSALS_SHOWN ? (
+                  <Link href="/employer/proposals" className="mt-2 inline-flex min-h-11 items-center text-sm font-medium text-ink-700 underline underline-offset-4 hover:text-ink-900">
+                    See all {appliedProjects.length} in Proposals
+                  </Link>
+                ) : null}
               </div>
             ) : null}
           </div>
@@ -690,6 +703,8 @@ export default async function EmployerInternDetail({
   );
 }
 
+/** "Your proposals to them" shows the latest few; the rest live on the Proposals page. */
+const PROPOSALS_SHOWN = 3;
 /** Chips shown before "+N more", as on the candidate list. */
 const MAX_SKILLS = 7;
 

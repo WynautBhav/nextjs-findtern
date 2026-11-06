@@ -292,7 +292,7 @@ export default async function EmployerDashboard() {
           <section>
             <SectionHead
               title="Projects"
-              hint={`${openProjects.length} open of ${projects.length}`}
+              hint={openProjects.length > shownProjects.length ? `Showing ${shownProjects.length} of ${openProjects.length} open` : `${openProjects.length} open of ${projects.length}`}
               action={
                 <Link href="/employer/projects" className="inline-flex min-h-11 items-center text-sm font-medium text-brand-700 hover:underline">
                   All projects
@@ -330,6 +330,8 @@ export default async function EmployerDashboard() {
                             {skills.length ? ` · ${skills.join(", ")}` : ""}
                           </p>
                         </div>
+                        {/* "N sent" alone says little: it shows once there is a payment or a hire beside it. */}
+                        {stats.toPay || stats.hired ? (
                         <p className="nums text-right text-sm text-ink-600">
                           <span className="font-semibold text-ink-900">{stats.total}</span> sent
                           {stats.toPay ? (
@@ -343,6 +345,7 @@ export default async function EmployerDashboard() {
                             </span>
                           ) : null}
                         </p>
+                        ) : null}
                       </Link>
                     </li>
                   );

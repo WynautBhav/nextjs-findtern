@@ -44,7 +44,7 @@ export function CandidateSearch({ filters, className }: { filters: Filters; clas
         name="q"
         type="search"
         defaultValue={filters.q}
-        placeholder="Search by skill or city"
+        placeholder="Skill or city"
         className="h-11 w-full rounded-full border border-ink-200 bg-white pl-11 pr-4 text-base text-ink-900 outline-none transition-colors placeholder:text-text-subtle hover:border-ink-300 focus-visible:border-brand-600 focus-visible:ring-[3px] focus-visible:ring-brand-600/20 md:text-sm"
       />
     </form>
@@ -88,12 +88,12 @@ export function Results({
 
   return (
     <>
-      {/* One results bar: count and project, then All | Saved and Sort. */}
+      {/* One results bar: count and project, then All | Shortlist and Sort. */}
       <div className="mb-1 flex flex-wrap items-center gap-x-4 gap-y-3 border-b border-ink-100 pb-3">
         {loadFailed ? null : (
           <h2 className="flex min-w-0 items-center gap-1.5 text-base font-semibold text-ink-900 max-sm:sr-only">
             <span role="status" className="nums whitespace-nowrap">
-              {total} {saved ? "saved" : `candidate${total === 1 ? "" : "s"}`}
+              {total} {saved ? "shortlisted" : `candidate${total === 1 ? "" : "s"}`}
             </span>
             {projectName ? (
               data.projects.length > 1 ? (
@@ -124,7 +124,7 @@ export function Results({
                 <span className="nums text-ink-600 sm:hidden">{saved ? "" : ` ${total}`}</span>
               </TabLink>
               <TabLink href={withFilters(filters, { saved: true, page: "" })} active={saved}>
-                Saved <span className="nums text-ink-600">({data.savedCount})</span>
+                Shortlist <span className="nums text-ink-600">({data.savedCount})</span>
               </TabLink>
             </nav>
           ) : null}
@@ -169,8 +169,8 @@ export function Results({
         saved ? (
           <EmptyScene
             art
-            title="Nobody saved for this project yet"
-            body="Press Save on a candidate to keep them here. Saved candidates are your shortlist for this project."
+            title="Nobody shortlisted for this project yet"
+            body="Press Save on a candidate to add them to this project's shortlist."
             next={{ label: "Browse all candidates", href: withFilters(filters, { saved: false, page: "" }) }}
             who="You - save a candidate"
           />
@@ -225,6 +225,7 @@ export function Results({
                   projectId={data.activeProjectId}
                   shortlisted={data.shortlisted.has(candidate.id)}
                   nameUnlocked={data.nameUnlocked.has(candidate.id)}
+                  hired={rel?.hired}
                   pricing={resolvePricing(candidate.score, data.plans, data.currency, data.region)}
                   proposal={rel?.proposal ?? null}
                   fullTimeFrom={rel?.fullTimeFrom ?? null}
@@ -272,7 +273,7 @@ function TabLink({ href, active, children }: { href: string; active: boolean; ch
       scroll={false}
       aria-current={active ? "page" : undefined}
       className={cn(
-        "relative inline-flex h-11 min-w-6 items-center justify-center whitespace-pre text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand-500 sm:h-9 sm:touch:h-11",
+        "relative -mx-1 inline-flex h-11 min-w-6 items-center justify-center whitespace-pre rounded-sm px-1 text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 sm:h-9 sm:touch:h-11",
         "after:absolute after:inset-x-0 after:-bottom-[13px] after:h-0.5 after:rounded-full after:content-[''] max-sm:after:bottom-0",
         active ? "font-semibold text-ink-900 after:bg-ink-900" : "font-medium text-ink-600 hover:text-ink-900",
       )}

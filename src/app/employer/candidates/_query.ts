@@ -70,7 +70,7 @@ export const SORT_OPTIONS: { value: SortKey; label: string }[] = [
   ...RATING_META.map((meta) => ({ value: meta.key, label: meta.label })),
 ];
 
-/** Query keys that are filters; anything else (project, ids, fresh) is not. */
+/** Query keys that are filters; anything else (project, ids, fresh, and the retired `view`) is not. */
 export const FILTER_KEYS = [
   "q",
   "skills",
@@ -81,7 +81,6 @@ export const FILTER_KEYS = [
   "plan",
   "sort",
   "dir",
-  "view",
   "pageSize",
   "pf",
   "remote",
@@ -213,7 +212,11 @@ export function withoutCity(filters: Filters, effectiveSkills: string[], patch: 
 
 /** The query string for a set of filters. */
 export function queryOf(merged: Filters): string {
-  const next = new URLSearchParams(filterParams(merged));
+  const filters = filterParams(merged);
+  const next = new URLSearchParams(filters);
+  // A link with no filter at all looks like a bare visit and restores the remembered
+  // filters, so clearing the last chip could never stick: say "start clean" instead.
+  if (!filters.toString() && !merged.q && !merged.saved && merged.page <= 1) next.set("fresh", "1");
   if (merged.project) next.set("project", merged.project);
   // The Saved tab is a view, not a filter: carried on links, never remembered.
   if (merged.saved) next.set("saved", "1");
@@ -224,9 +227,9 @@ export function queryOf(merged: Filters): string {
 }
 
 /** Just the filters: what is remembered per project (EMB-05). */
-function filterParams(merged: Filters): URLSearchParams {
+function filterParams(merged: Filters, withKeyword = true): URLSearchParams {
   const next = new URLSearchParams();
-  if (merged.q) next.set("q", merged.q);
+  if (withKeyword && merged.q) next.set("q", merged.q);
   if (merged.skillsSet) next.set("skills", merged.skills.join(","));
   if (merged.city) next.set("city", merged.city);
   if (merged.mode) next.set("mode", merged.mode);
@@ -241,16 +244,14 @@ function filterParams(merged: Filters): URLSearchParams {
   if (merged.dir === "asc") next.set("dir", "asc");
   if (merged.remote !== null) next.set("remote", merged.remote ? "1" : "0");
   if (!merged.skillPriority) next.set("sm", "0");
-  // Always written, even for the default: a link without any filter looks like a bare
-  // visit and restores the last remembered view, so "Cards" could never undo "Rows".
-  if (merged.view) next.set("view", merged.view);
   if (merged.pageSize && merged.pageSize !== 24) next.set("pageSize", String(merged.pageSize));
   if (!merged.projectDefaults) next.set("pf", "0");
   return next;
 }
 
+/** Structured filters only: a typed keyword is a one-off search, never restored on a fresh visit. */
 export function rememberQueryOf(filters: Filters): string {
-  return filterParams(filters).toString();
+  return filterParams(filters, false).toString();
 }
 
 /**
@@ -436,6 +437,7 @@ export async function loadCandidates(
       const savedFilters = await rememberedFilters(uid, activeProjectId);
       if (savedFilters) {
         const next = new URLSearchParams(savedFilters);
+        next.delete("q"); // cookies written before keywords stopped being remembered
         next.set("project", activeProjectId);
         if (compareIds.length > 0) next.set("ids", compareIds.join(","));
         data.restoreTo = `/employer/candidates?${next.toString()}`;
@@ -493,7 +495,7 @@ export async function loadCandidates(
     }
 
     // Row 61 / legacy dashboard:1528: the selected project fills in its own
-    // skills and city when the employer has not typed any. "Show everyone"
+    // skills and city when the employer has not typed any. "Ignore project skills"
     // (pf=0) switches that off; typed filters always win.
     const project = projectRows.find((p) => p.id === activeProjectId);
     const projectRemote = !project?.locationType || project.locationType === "remote";

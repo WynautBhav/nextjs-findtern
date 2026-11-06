@@ -72,22 +72,9 @@ export default async function CandidatesPage({
         Phones: search and the Filters button share the top line, the skill tokens sit under them, then the list.
         lg: search and skills span the top; the filter column and the results sit side by side under them.
       */}
+      {/* DOM order is the tab order: search, skills, then the filter column (row 3 at lg), then results. */}
       <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-2 lg:grid-cols-[15.5rem_minmax(0,1fr)] lg:gap-x-12">
         <CandidateSearch filters={filters} className="col-start-1 row-start-1 lg:col-span-2 lg:max-w-[44rem]" />
-        <div className="col-start-2 row-start-1 lg:col-span-1 lg:col-start-1 lg:row-start-3">
-          <FilterColumn
-            filters={filters}
-            projects={data.projects}
-            activeProjectId={activeProjectId}
-            includeRemote={data.includeRemote}
-            plans={data.plans}
-            currency={data.currency}
-            region={data.region}
-            compareIds={compareIds}
-            total={total}
-          />
-        </div>
-
         <SkillFilter
           className="col-span-2 row-start-2 mt-2 mb-3 lg:mb-6"
           active={data.effectiveSkills}
@@ -101,7 +88,7 @@ export default async function CandidatesPage({
               className={quietLink}
               title={projectApplied.city ? `Matched to ${projectApplied.name}, open to working in ${projectApplied.city}` : `Matched to ${projectApplied.name}`}
             >
-              Show everyone
+              Ignore project skills
             </Link>
           ) : !filters.projectDefaults && activeProjectId ? (
             <Link href={withFilters(filters, { projectDefaults: true, page: "" })} className={quietLink}>
@@ -109,6 +96,20 @@ export default async function CandidatesPage({
             </Link>
           ) : null}
         </SkillFilter>
+
+        <div className="col-start-2 row-start-1 lg:col-span-1 lg:col-start-1 lg:row-start-3">
+          <FilterColumn
+            filters={filters}
+            projects={data.projects}
+            activeProjectId={activeProjectId}
+            includeRemote={data.includeRemote}
+            plans={data.plans}
+            currency={data.currency}
+            region={data.region}
+            compareIds={compareIds}
+            total={total}
+          />
+        </div>
 
         {/* Phones: the compare tray sits over the bottom nav, so the last row needs room to scroll clear of it. */}
         <div className={cn("col-span-2 row-start-3 min-w-0 lg:col-span-1 lg:col-start-2", compareIds.length >= 1 && "pb-24")}>
