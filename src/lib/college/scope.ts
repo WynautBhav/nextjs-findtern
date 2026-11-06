@@ -1,10 +1,12 @@
 import { redirect } from "next/navigation";
-import { and, eq, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 
 import { getSession } from "@/lib/auth";
 import { getDb, schema } from "@/lib/db";
 import { aiInterviewStatus, findternScoreSql, realEmployerId } from "@/lib/admin/scope";
 import type { SessionData } from "@/lib/security/session";
+import type { StudentRow } from "@/components/college/types";
+import { profileCompletion } from "@/lib/onboarding";
 import {
   canCollegeAdminSee,
   checkDriveAccess,
@@ -12,6 +14,8 @@ import {
   type AccessResult,
   type StudentFacts,
 } from "./access";
+import { aiStatusLabel, type TpoFacts } from "./labels";
+import { toStudentRow } from "./serialize";
 
 /**
  * Every college-scoped read goes through here. The SQL narrows to one
@@ -151,7 +155,7 @@ async function loadMembers(collegeId: string): Promise<CollegeStudent[]> {
   }));
 }
 
-/** Students a placement officer may see: everyone who joined their college. */
+/** Students a placement officer may see: verified members of their college (they used its code), not those who only picked it. */
 export async function studentsForCollegeAdmin(ctx: CollegeContext): Promise<CollegeStudent[]> {
   const rows = await loadMembers(ctx.college.id);
   return rows.filter((s) => canCollegeAdminSee(ctx.session, ctx.college.id, s));
@@ -161,6 +165,165 @@ export async function studentsForCollegeAdmin(ctx: CollegeContext): Promise<Coll
 export async function studentForCollegeAdmin(ctx: CollegeContext, userId: string): Promise<CollegeStudent | null> {
   const rows = await studentsForCollegeAdmin(ctx);
   return rows.find((s) => s.userId === userId) ?? null;
+}
+
+/** `internProfileStatus().complete` for many students at once: the latest onboarding row and documents of each. */
+async function onboardingDoneIds(userIds: string[]): Promise<Set<string>> {
+  const done = new Set<string>();
+  if (userIds.length === 0) return done;
+  const db = getDb();
+  const o = schema.internOnboarding;
+  const d = schema.internDocuments;
+  const [rows, docs] = await Promise.all([
+    db.selectDistinctOn([o.userId]).from(o).where(inArray(o.userId, userIds)).orderBy(o.userId, desc(o.createdAt)),
+    db
+      .selectDistinctOn([d.userId], { userId: d.userId, pan: d.panImageName, aadhaar: d.aadhaarImageName, photo: d.profilePhotoName })
+      .from(d)
+      .where(inArray(d.userId, userIds))
+      .orderBy(d.userId, desc(d.createdAt)),
+  ]);
+  const docOf = new Map(docs.map((x) => [x.userId, x]));
+  for (const row of rows) {
+    const doc = docOf.get(row.userId);
+    if (profileCompletion(row, { hasPanImage: Boolean(doc?.pan), hasAadhaarImage: Boolean(doc?.aadhaar), hasPhoto: Boolean(doc?.photo) }).complete) done.add(row.userId);
+  }
+  return done;
+}
+
+/**
+ * The placement officer's list: verified students (full rows, openable), plus every roster row that is not one of
+ * them, as a status-only row (name and roll from the college's own file; no profile, no link). Each carries the
+ * four funnel facts that `tpoStatus` turns into one label.
+ */
+export async function tpoStudentList(ctx: CollegeContext, members?: CollegeStudent[]): Promise<StudentRow[]> {
+  const db = getDb();
+  const collegeId = ctx.college.id;
+  const verified = members ?? (await studentsForCollegeAdmin(ctx));
+  const r = schema.collegeRoster;
+  const [rosterRes, usageRes] = await Promise.all([
+    db.execute(sql`
+      SELECT ${r.email} AS email, ${r.name} AS name, ${r.rollNo} AS roll_no, ${r.year} AS year, ${r.branch} AS branch,
+        ${schema.users.id} AS user_id, (${aiInterviewStatus()} = 'completed') AS ai_done
+      FROM ${r}
+      LEFT JOIN ${schema.users} ON lower(${schema.users.email}) = ${r.email} AND ${schema.users.role} = 'intern'
+      LEFT JOIN ${schema.internOnboarding} ON ${schema.internOnboarding.userId} = ${schema.users.id}
+      WHERE ${r.collegeId} = ${collegeId}
+      ORDER BY ${r.name}, ${r.email}
+    `),
+    db
+      .select({ userId: schema.promoCodeUsages.userId })
+      .from(schema.promoCodeUsages)
+      .innerJoin(schema.promoCodes, eq(schema.promoCodes.id, schema.promoCodeUsages.promoCodeId))
+      .where(eq(schema.promoCodes.collegeId, collegeId)),
+  ]);
+  const roster = (rosterRes.rows as Row[]).filter((x) => !verified.some((m) => m.email.trim().toLowerCase() === x.email));
+  const codeUsed = new Set(usageRes.map((u) => u.userId));
+  const doneIds = await onboardingDoneIds([...verified.map((m) => m.userId), ...roster.flatMap((x) => (x.user_id ? [String(x.user_id)] : []))]);
+
+  const rows: StudentRow[] = verified.map((s) => ({
+    ...toStudentRow(s),
+    tpo: { registered: true, onboardingDone: doneIds.has(s.userId), codeUsed: codeUsed.has(s.userId), aiDone: aiStatusLabel(s.aiStatus).done },
+  }));
+  for (const x of roster) {
+    const uid = x.user_id ? String(x.user_id) : null;
+    const tpo: TpoFacts = { registered: uid !== null, onboardingDone: uid !== null && doneIds.has(uid), codeUsed: uid !== null && codeUsed.has(uid), aiDone: Boolean(x.ai_done) };
+    rows.push({
+      userId: `roster:${String(x.email)}`,
+      name: String(x.name ?? ""),
+      email: String(x.email),
+      rollNo: (x.roll_no as string | null) ?? null,
+      status: "claimed",
+      year: num(x.year),
+      branch: (x.branch as string | null) ?? null,
+      cgpa: null,
+      score: null,
+      aiStatus: tpo.aiDone ? "completed" : "not_applied",
+      lastSeenAt: null,
+      lastActivityAt: null,
+      offersPending: 0,
+      proposals: 0,
+      interviewsScheduled: 0,
+      driveMeetings: 0,
+      collegeId,
+      leftAt: null,
+      tpo,
+      rosterOnly: true,
+    });
+  }
+  return rows;
+}
+
+export type CollegeParticipation = {
+  roster: number;
+  matched: number;
+  review: number;
+  members: number;
+  verified: number;
+  codeUses: number;
+  interviewsDone: number;
+  refunds: { total: number; refunded: number; open: number };
+};
+
+/** What the admin sees for one college: the roster and how far its students have got. Admin pages only. */
+export async function collegeParticipation(collegeId: string): Promise<CollegeParticipation> {
+  const db = getDb();
+  const r = schema.collegeRoster;
+  const m = schema.collegeMemberships;
+  const [res, refunds] = await Promise.all([
+    db.execute(sql`
+      SELECT
+        (SELECT count(*)::int FROM ${r} WHERE ${r.collegeId} = ${collegeId}) AS roster,
+        (SELECT count(*)::int FROM ${r} WHERE ${r.collegeId} = ${collegeId} AND ${r.matchStatus} IN ('email', 'linked')) AS matched,
+        (SELECT count(*)::int FROM ${r} WHERE ${r.collegeId} = ${collegeId} AND ${r.matchStatus} = 'review') AS review,
+        (SELECT count(*)::int FROM ${m} WHERE ${m.collegeId} = ${collegeId} AND ${m.leftAt} IS NULL) AS members,
+        (SELECT count(*)::int FROM ${m} WHERE ${m.collegeId} = ${collegeId} AND ${m.leftAt} IS NULL AND ${m.status} = 'verified') AS verified,
+        (SELECT count(*)::int FROM ${schema.promoCodeUsages} pu JOIN ${schema.promoCodes} pc ON pc.id = pu.promo_code_id WHERE pc.college_id = ${collegeId}) AS code_uses,
+        (SELECT count(*)::int FROM ${m}
+          JOIN ${schema.users} ON ${schema.users.id} = ${m.userId}
+          LEFT JOIN ${schema.internOnboarding} ON ${schema.internOnboarding.userId} = ${m.userId}
+          WHERE ${m.collegeId} = ${collegeId} AND ${m.leftAt} IS NULL AND ${m.status} = 'verified' AND ${aiInterviewStatus()} = 'completed') AS interviews_done
+    `),
+    db
+      .select({ status: schema.paymentRefunds.status, n: sql<number>`count(*)::int` })
+      .from(schema.paymentRefunds)
+      .where(eq(schema.paymentRefunds.collegeId, collegeId))
+      .groupBy(schema.paymentRefunds.status),
+  ]);
+  const x = (res.rows as Row[])[0] ?? {};
+  const n = (k: string) => Number(x[k] ?? 0);
+  const total = refunds.reduce((a, b) => a + b.n, 0);
+  const refunded = refunds.find((f) => f.status === "refunded")?.n ?? 0;
+  const closed = refunds.filter((f) => ["refunded", "failed", "rejected"].includes(f.status)).reduce((a, b) => a + b.n, 0);
+  return {
+    roster: n("roster"),
+    matched: n("matched"),
+    review: n("review"),
+    members: n("members"),
+    verified: n("verified"),
+    codeUses: n("code_uses"),
+    interviewsDone: n("interviews_done"),
+    refunds: { total, refunded, open: total - closed },
+  };
+}
+
+/** What a student's activation card says about their college before they pay. */
+export async function collegeCoverFor(userId: string): Promise<import("./labels").CollegeCover | null> {
+  const db = getDb();
+  const [row] = await db
+    .select({ name: schema.colleges.name, isPartner: schema.colleges.isPartner, isActive: schema.colleges.isActive, collegeId: schema.colleges.id })
+    .from(schema.collegeMemberships)
+    .innerJoin(schema.colleges, eq(schema.colleges.id, schema.collegeMemberships.collegeId))
+    .where(and(eq(schema.collegeMemberships.userId, userId), isNull(schema.collegeMemberships.leftAt)))
+    .limit(1);
+  if (!row) return null;
+  const [code] = await db
+    .select({ cap: schema.promoCodes.maxUsages, used: schema.promoCodes.usedCount, active: schema.promoCodes.isActive })
+    .from(schema.promoCodes)
+    .where(eq(schema.promoCodes.collegeId, row.collegeId))
+    .limit(1);
+  // No code row: nothing to promise. An unlimited (legacy) cap counts as plenty; a switched-off code covers nothing.
+  const seatsLeft = !code ? null : !code.active ? 0 : code.cap === null ? 1_000_000 : Math.max(0, code.cap - code.used);
+  return { collegeName: row.name, isPartner: row.isPartner, isActive: row.isActive, seatsLeft };
 }
 
 export type RosterCoverage = {

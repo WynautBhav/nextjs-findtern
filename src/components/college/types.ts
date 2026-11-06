@@ -1,3 +1,5 @@
+import type { TpoFacts } from "@/lib/college/labels";
+
 /** Student rows as the placement console's client components receive them. */
 export type StudentRow = {
   userId: string;
@@ -18,4 +20,7 @@ export type StudentRow = {
   driveMeetings: number;
   collegeId: string;
   leftAt: null;
+  /** The placement list only: how far the student has got, and whether they are only a roster row (no profile to open). */
+  tpo?: TpoFacts;
+  rosterOnly?: boolean;
 };

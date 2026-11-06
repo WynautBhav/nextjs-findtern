@@ -21,6 +21,7 @@ import { BadgeIndianRupee, Check, Loader2 } from "lucide-react";
 
 import { buttonClass } from "@/components/ui/button";
 import { AiInterviewAction } from "@/components/intern/ai-interview-join-card";
+import { coverMessage, type CollegeCover } from "@/lib/college/labels";
 import { promoConsentNotice } from "@/lib/college/promo-consent";
 import { csrfFetch } from "@/lib/client-fetch";
 import { formatMoney } from "@/lib/format";
@@ -39,7 +40,10 @@ export function ActivationCard({
   alreadyPaid = false,
   testMode = false,
   testPay = false,
+  collegeCover = null,
 }: {
+  /** From `collegeCoverFor(userId)`: says before payment whether the student's college covers this interview. */
+  collegeCover?: CollegeCover | null;
   /** PAYMENTS_TEST_BUTTON=1: a second button settles at the real amount without Razorpay. */
   testPay?: boolean;
   /** PAYMENTS_MODE=free: activation completes without Razorpay. */
@@ -63,6 +67,7 @@ export function ActivationCard({
   const [adult, setAdult] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
+  const cover = coverMessage(collegeCover);
   const discount = promo ? Math.min(promo.discountMinor, feeMinor) : 0;
   const payable = feeMinor - discount;
 
@@ -183,6 +188,15 @@ export function ActivationCard({
         One payment covers the AI interview and your Findtern Score. No subscription, nothing recurring, and if
         you are not placed within 6 months of your AI interview, the full fee comes back.
       </p>
+
+      {cover ? (
+        <p
+          role="note"
+          className={cover.tone === "covered" ? "mt-3 rounded-apple-sm border border-brand-200 bg-brand-50 px-3.5 py-3 text-sm font-medium leading-relaxed text-brand-900" : "mt-3 rounded-apple-sm border border-ink-200 bg-ink-50 px-3.5 py-3 text-sm leading-relaxed text-ink-800"}
+        >
+          {cover.text}
+        </p>
+      ) : null}
 
       <div className="mt-4 flex flex-col gap-2 sm:flex-row">
         <label htmlFor="activation-promo" className="sr-only">

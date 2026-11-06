@@ -4,15 +4,14 @@ import { and, eq, gt, isNull, lte, sql } from "drizzle-orm";
 import { StatCard, StatGrid } from "@/components/college/stat-card";
 import { PresenceLive } from "@/components/college/presence-live";
 import { StudentTable } from "@/components/college/student-table";
-import { aiStatusLabel } from "@/lib/college/labels";
 import {
   eligibleStudents,
   presenceSnapshot,
   requireCollegeContext,
   rosterCoverage,
   studentsForCollegeAdmin,
+  tpoStudentList,
 } from "@/lib/college/scope";
-import { toStudentRow } from "@/lib/college/serialize";
 import { getDb, schema } from "@/lib/db";
 import { AWAITING_FIRST_PAYMENT } from "@/lib/college/seat-paid";
 import { paidSeatTotal } from "@/lib/college/seat-gate";
@@ -23,13 +22,6 @@ export const dynamic = "force-dynamic";
 /** Request time, for "online"/"x min ago" labels. Dynamic page, so this is per request. */
 function requestTime(): number {
   return Date.now();
-}
-
-function median(xs: number[]): number | null {
-  if (!xs.length) return null;
-  const s = [...xs].sort((a, b) => a - b);
-  const m = Math.floor(s.length / 2);
-  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
 }
 
 export default async function CollegeDashboard() {
@@ -65,11 +57,10 @@ export default async function CollegeDashboard() {
     ? await presenceSnapshot(ctx.college.id, (await eligibleStudents(liveDrive)).map((s) => s.userId))
     : null;
 
-  const interviewed = students.filter((s) => aiStatusLabel(s.aiStatus).done);
-  const scores = interviewed.map((s) => s.score).filter((v): v is number => v !== null);
-  const med = median(scores);
-  const waiting = students.filter((s) => s.offersPending > 0);
-  const joinedPct = coverage.rosterSize ? Math.round((coverage.joined / coverage.rosterSize) * 100) : null;
+  const list = await tpoStudentList(ctx, students);
+  const count = (k: "registered" | "onboardingDone" | "aiDone") => list.filter((r) => r.tpo?.[k]).length;
+  const registered = count("registered");
+  const seatsLeft = seat && seat.cap !== null ? Math.max(0, seat.cap - seat.used) : null;
 
   return (
     <div className="space-y-6">
@@ -105,34 +96,34 @@ export default async function CollegeDashboard() {
 
       <StatGrid cols={4} variant="strip">
         <StatCard
-          label="Joined Findtern"
-          value={coverage.rosterSize ? `${coverage.joined}/${coverage.rosterSize}` : students.length}
-          hint={
-            coverage.rosterSize
-              ? `${joinedPct}% of your roster${coverage.notJoined.length ? `; ${coverage.notJoined.length} still to join` : ""}`
-              : "Upload your roster to track who's missing"
-          }
-          href="/college/roster"
+          label="Seats left"
+          value={seatsLeft ?? "—"}
+          hint={seat ? `of ${paid.seats} paid` : AWAITING_FIRST_PAYMENT}
+          tone={seat && seatsLeft === 0 ? "warning" : "neutral"}
+          href="/college/seats"
         />
+        <StatCard label="Code used" value={seat?.used ?? 0} hint={seat ? "students who redeemed your code" : "Issued once your first batch is paid"} tone="neutral" />
+        <StatCard label="Registered" value={registered} hint={coverage.rosterSize ? `of ${coverage.rosterSize} on your roster` : "Upload your roster to compare"} href="/college/roster" />
         <StatCard
           label="AI interview done"
-          value={`${interviewed.length}/${students.length}`}
-          hint={students.length ? `${students.length - interviewed.length} still to take it` : "No students yet"}
+          value={count("aiDone")}
+          hint={list.length ? `${list.length - count("aiDone")} still to take it` : "No students yet"}
           tone="neutral"
-        />
-        <StatCard
-          label="Median Findtern score"
-          value={med === null ? "—" : med.toFixed(1)}
-          hint={scores.length ? `out of 10, across ${scores.length} interviewed` : "Appears after the first interview"}
-          tone="neutral"
-        />
-        <StatCard
-          label="Offers waiting on reply"
-          value={waiting.reduce((n, s) => n + s.offersPending, 0)}
-          hint={waiting.length ? `${waiting.length} student${waiting.length === 1 ? "" : "s"} to chase` : "Nobody is sitting on an offer"}
-          tone={waiting.length ? "warning" : "neutral"}
         />
       </StatGrid>
+
+      <dl className="grid divide-y divide-ink-100 rounded-apple-md border border-ink-200 bg-surface text-sm sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+        {[
+          ["Seats purchased", paid.seats],
+          ["On your roster", coverage.rosterSize],
+          ["Onboarding done", count("onboardingDone")],
+        ].map(([label, value]) => (
+          <div key={label} className="flex items-baseline justify-between gap-3 px-4 py-3">
+            <dt className="text-ink-600">{label}</dt>
+            <dd className="nums font-semibold text-ink-900">{value}</dd>
+          </div>
+        ))}
+      </dl>
 
       {!liveDrive ? (
         <p className="text-sm text-text-subtle">
@@ -144,7 +135,7 @@ export default async function CollegeDashboard() {
         </p>
       ) : null}
 
-      <StudentTable students={students.map(toStudentRow)} now={now} />
+      <StudentTable students={list} now={now} />
     </div>
   );
 }

@@ -5,21 +5,26 @@ import Link from "next/link";
 import { Search } from "lucide-react";
 
 import { ONLINE_WINDOW_MS } from "@/lib/college/constants";
-import { COHORTS, aiStatusLabel, ago, yearLabel } from "@/lib/college/labels";
+import { COHORTS, TPO_STATUSES, aiStatusLabel, ago, tpoStatus, tpoStatusLabel, yearLabel, type TpoFacts, type TpoStatus } from "@/lib/college/labels";
 import { cn } from "@/lib/utils";
-import { Pill, SURFACE_CLASS, pillTabClass } from "@/components/app/primitives";
+import { FilterTabs, Pill, SURFACE_CLASS, pillTabClass, type Tone } from "@/components/app/primitives";
 import { NudgeButton } from "./nudge-button";
 import type { StudentRow } from "./types";
 
-type Filter = "all" | "no_interview" | "offers" | "unverified" | "offline";
+type Filter = "all" | "no_interview" | "offers" | "offline";
 
 const FILTERS: { id: Filter; label: string }[] = [
   { id: "all", label: "Everyone" },
   { id: "no_interview", label: "Interview not done" },
   { id: "offers", label: "Offer waiting on reply" },
   { id: "offline", label: "Inactive 7+ days" },
-  { id: "unverified", label: "Not on roster" },
 ];
+
+const STATUS_TONE: Record<TpoStatus, Tone> = { on_roster: "closed", registered: "new", onboarded: "new", code_used: "live", ai_done: "paid" };
+
+/** Rows from the roster carry their facts; a verified member without them has used the code by definition. */
+const factsOf = (s: StudentRow): TpoFacts => s.tpo ?? { registered: true, onboardingDone: false, codeUsed: true, aiDone: aiStatusLabel(s.aiStatus).done };
+const statusOf = (s: StudentRow): TpoStatus => tpoStatus(factsOf(s));
 
 const WEEK = 7 * 86400_000;
 /** Rows rendered before "Show all": a 500-student college was a 1 MB page. */
@@ -28,6 +33,7 @@ const PAGE = 50;
 export function StudentTable({ students, now }: { students: StudentRow[]; now: number }) {
   const [cohort, setCohort] = useState<number | "all">("all");
   const [filter, setFilter] = useState<Filter>("all");
+  const [status, setStatus] = useState<TpoStatus | "all">("all");
   const [q, setQ] = useState("");
   const [showAll, setShowAll] = useState(false);
 
@@ -37,23 +43,29 @@ export function StudentTable({ students, now }: { students: StudentRow[]; now: n
     return c;
   }, [students]);
 
+  const statusCounts = useMemo(() => {
+    const c: Record<string, number> = { all: students.length };
+    for (const s of students) c[statusOf(s)] = (c[statusOf(s)] ?? 0) + 1;
+    return c;
+  }, [students]);
+
   const rows = useMemo(() => {
     const term = q.trim().toLowerCase();
     return students.filter((s) => {
       if (cohort !== "all" && s.year !== cohort) return false;
       if (filter === "no_interview" && aiStatusLabel(s.aiStatus).done) return false;
       if (filter === "offers" && s.offersPending === 0) return false;
-      if (filter === "unverified" && s.status === "verified") return false;
+      if (status !== "all" && statusOf(s) !== status) return false;
       if (filter === "offline" && s.lastActivityAt && now - new Date(s.lastActivityAt).getTime() < WEEK) return false;
       if (term && !`${s.name} ${s.rollNo ?? ""} ${s.branch ?? ""} ${s.email}`.toLowerCase().includes(term)) return false;
       return true;
     });
-  }, [students, cohort, filter, q, now]);
+  }, [students, cohort, filter, status, q, now]);
 
   const shown = showAll ? rows : rows.slice(0, PAGE);
 
-  const chaseIds =
-    filter === "no_interview" ? rows.map((r) => r.userId) : filter === "offers" ? rows.map((r) => r.userId) : [];
+  // Roster-only rows have no account to nudge.
+  const chaseIds = filter === "no_interview" || filter === "offers" ? rows.filter((r) => !r.rosterOnly).map((r) => r.userId) : [];
 
   return (
     <section aria-labelledby="students-heading" className={cn("overflow-hidden", SURFACE_CLASS)}>
@@ -64,7 +76,7 @@ export function StudentTable({ students, now }: { students: StudentRow[]; now: n
               Students
             </h2>
             <p className="mt-0.5 text-sm text-text-subtle">
-              Everyone who picked your college and agreed to share their progress.
+              Students on your roster, and everyone who used your student code.
             </p>
           </div>
           <label className="relative w-full sm:w-72">
@@ -103,6 +115,13 @@ export function StudentTable({ students, now }: { students: StudentRow[]; now: n
           })}
         </div>
 
+        <FilterTabs
+          label="Status"
+          value={status}
+          onChange={(k) => setStatus(k as TpoStatus | "all")}
+          tabs={[{ key: "all", label: "Everyone", count: statusCounts.all }, ...TPO_STATUSES.map((t) => ({ key: t.id, label: t.label, count: statusCounts[t.id] ?? 0 }))]}
+        />
+
         <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Filter">
           {FILTERS.map((f) => (
             <button
@@ -131,7 +150,7 @@ export function StudentTable({ students, now }: { students: StudentRow[]; now: n
       {rows.length === 0 ? (
         <p className="px-5 py-12 text-center text-sm text-text-subtle">
           {students.length === 0
-            ? "No students have joined yet. Share the invite from the Roster page."
+            ? "No students yet. Upload your roster, then share your student code."
             : "No students match these filters."}
         </p>
       ) : (
@@ -143,6 +162,7 @@ export function StudentTable({ students, now }: { students: StudentRow[]; now: n
               <thead className="border-b border-ink-100 bg-ink-50/60 text-sm font-semibold text-ink-700">
                 <tr>
                   <th scope="col" className="px-5 py-2.5">Student</th>
+                  <th scope="col" className="px-3 py-2.5">Status</th>
                   <th scope="col" className="px-3 py-2.5">AI interview</th>
                   <th scope="col" className="px-3 py-2.5 text-right">CGPA</th>
                   <th scope="col" className="px-3 py-2.5">Last active</th>
@@ -208,7 +228,33 @@ function Ai({ s }: { s: StudentRow }) {
   return <span className="text-ink-600">{st.label}</span>;
 }
 
+function StatusPill({ s }: { s: StudentRow }) {
+  const st = statusOf(s);
+  return <Pill tone={STATUS_TONE[st]}>{tpoStatusLabel(st)}</Pill>;
+}
+
+const meta = (s: StudentRow) => [s.rollNo, yearLabel(s.year), s.branch].filter(Boolean).join(" · ");
+
+/** A roster row with no profile to open: the college's own file, and how far that student has got. */
+function RosterRow({ s }: { s: StudentRow }) {
+  return (
+    <tr>
+      <td className="px-5 py-3">
+        <p className="font-medium text-ink-900">{s.name || s.email}</p>
+        <p className="mt-0.5 text-xs text-text-subtle">{[meta(s), s.name ? s.email : null].filter(Boolean).join(" · ")}</p>
+      </td>
+      <td className="px-3 py-3"><StatusPill s={s} /></td>
+      <td className="px-3 py-3 text-ink-600">{aiStatusLabel(s.aiStatus).label}</td>
+      <td className="px-3 py-3 text-right text-text-subtle">—</td>
+      <td className="px-3 py-3 text-text-subtle">—</td>
+      <td className="px-3 py-3 text-text-subtle">—</td>
+      <td className="px-5 py-3 text-text-subtle">—</td>
+    </tr>
+  );
+}
+
 function Row({ s, now }: { s: StudentRow; now: number }) {
+  if (s.rosterOnly) return <RosterRow s={s} />;
   return (
     // The row opens the student: the name's link is stretched over it.
     <tr className="relative hover:bg-ink-50/60">
@@ -220,10 +266,10 @@ function Row({ s, now }: { s: StudentRow; now: number }) {
           {s.name || s.email}
         </Link>
         <p className="mt-0.5 text-xs text-text-subtle">
-          {[s.rollNo, yearLabel(s.year), s.branch].filter(Boolean).join(" · ")}
-          {s.status !== "verified" ? <span className="ml-1.5 font-medium text-accent-700">· Claimed, not verified</span> : <span className="ml-1.5 font-medium text-success">· Verified</span>}
+          {meta(s)}
         </p>
       </td>
+      <td className="px-3 py-3"><StatusPill s={s} /></td>
       <td className="px-3 py-3">
         <Ai s={s} />
       </td>
@@ -251,6 +297,17 @@ function Row({ s, now }: { s: StudentRow; now: number }) {
 }
 
 function MobileRow({ s, now }: { s: StudentRow; now: number }) {
+  if (s.rosterOnly) {
+    return (
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="font-medium text-ink-900">{s.name || s.email}</p>
+          <p className="mt-0.5 truncate text-xs text-text-subtle">{[meta(s), s.name ? s.email : null].filter(Boolean).join(" · ")}</p>
+        </div>
+        <StatusPill s={s} />
+      </div>
+    );
+  }
   return (
     <div className="relative flex items-start justify-between gap-3">
       <div className="min-w-0">
@@ -260,10 +317,9 @@ function MobileRow({ s, now }: { s: StudentRow; now: number }) {
         >
           {s.name || s.email}
         </Link>
-        <p className="mt-0.5 truncate text-xs text-text-subtle">
-          {[s.rollNo, yearLabel(s.year), s.branch].filter(Boolean).join(" · ")}
-        </p>
-        <p className="mt-1.5 text-sm">
+        <p className="mt-0.5 truncate text-xs text-text-subtle">{meta(s)}</p>
+        <p className="mt-1.5 flex flex-wrap items-center gap-2 text-sm">
+          <StatusPill s={s} />
           <Online at={s.lastSeenAt ?? s.lastActivityAt} now={now} />
         </p>
         {s.offersPending > 0 ? (

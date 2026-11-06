@@ -259,7 +259,7 @@ function previewOf(imp: { id: string; status: string; mapping: RosterMapping; ro
     headers: stored?.[0].cells ?? [],
     counts: imp.counts as ImportCounts,
     overAllocation: { rosterAfter: alloc.rosterAfter, paidSeats: alloc.paidSeats },
-    rows: (stored?.slice(1) as StoredRow[] | undefined)?.map(({ cells: _cells, ...row }) => row) ?? [],
+    rows: (stored?.slice(1) as StoredRow[] | undefined)?.map((r) => ({ line: r.line, name: r.name, email: r.email, phone: r.phone, status: r.status, reason: r.reason, match: r.match })) ?? [],
   };
 }
 

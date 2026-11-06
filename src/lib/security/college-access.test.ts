@@ -212,15 +212,21 @@ test("college admin may only run drives, roster and nudges, and manage their own
   }
 });
 
-test("college admin sees every student of their own college, and nobody else's", () => {
+test("college admin sees the verified students of their own college, and nobody else's", () => {
   const admin = { uid: "ca-1", role: "college" as const };
-  const consented = { collegeId: "college-x", leftAt: null as Date | null };
+  const consented = { collegeId: "college-x", leftAt: null as Date | null, status: "verified" };
   assert.equal(canCollegeAdminSee(admin, "college-x", consented), true);
   assert.equal(canCollegeAdminSee(admin, "college-y", consented), false);
   assert.equal(canCollegeAdminSee(admin, "college-x", { ...consented, collegeId: "college-y" }), false);
   assert.equal(canCollegeAdminSee(admin, "college-x", { ...consented, leftAt: new Date() }), false);
   assert.equal(canCollegeAdminSee({ uid: "e", role: "employer" }, "college-x", consented), false);
   assert.equal(canCollegeAdminSee(admin, "", consented), false);
+});
+
+test("a student who only picked the college (claimed, no code) is hidden from the officer", () => {
+  const admin = { uid: "ca-1", role: "college" as const };
+  assert.equal(canCollegeAdminSee(admin, "college-x", { collegeId: "college-x", leftAt: null, status: "claimed" }), false);
+  assert.equal(canCollegeAdminSee(admin, "college-x", { collegeId: "college-x", leftAt: null, status: "" }), false);
 });
 
 test("a college session is a valid session but never an admin, and owns only itself", () => {
