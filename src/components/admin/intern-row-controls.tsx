@@ -1,6 +1,6 @@
 import { InlineEditor, InlineSelect, InlineToggle } from "@/components/admin/inline-control";
 import type { InlineField } from "@/lib/admin/inline-request";
-import type { StatusTone } from "@/components/admin/status-badge";
+import { toneForStatus, type StatusTone } from "@/lib/admin/status-tone";
 
 /**
  * Row-level controls for the candidate and user lists and the Candidate 360
@@ -15,7 +15,7 @@ const APPROVAL = [
   { value: "Rejected", label: "Rejected" },
 ] as const;
 
-const APPROVAL_TONES: Record<string, StatusTone> = { Pending: "warning", Approved: "success", Rejected: "danger" };
+const APPROVAL_TONES: Record<string, StatusTone> = Object.fromEntries(APPROVAL.map((o) => [o.value, toneForStatus(o.value)]));
 
 /** `pill` draws the select as a pastel pill tinted by the review state (lists); it stays a labelled `<select>`. */
 export function InternApprovalCell({ internId, value, pill = false }: { internId: string; value: string; pill?: boolean }) {

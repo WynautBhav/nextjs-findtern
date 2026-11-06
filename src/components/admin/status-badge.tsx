@@ -1,75 +1,10 @@
 import { cn } from "@/lib/utils";
 import { humanizeStatus } from "@/components/app/status";
+import { toneForStatus, TONE_CLASS, type StatusTone } from "@/lib/admin/status-tone";
 
 export { humanizeStatus };
 
-export type StatusTone = "success" | "warning" | "danger" | "info" | "neutral";
-
-/**
- * A pastel pill: the tone's soft fill with the same hue's text and dot. The
- * soft/ink pairs are the semantic feedback tokens, which flip with the theme
- * and keep text at 4.5:1 or better in both (neutral uses the ink ramp).
- */
-const TONE_CLASS: Record<StatusTone, { pill: string; dot: string }> = {
-  success: { pill: "bg-success-soft text-success", dot: "bg-success" },
-  warning: { pill: "bg-warning-soft text-warning", dot: "bg-warning" },
-  danger: { pill: "bg-danger-soft text-danger", dot: "bg-danger" },
-  info: { pill: "bg-info-soft text-info", dot: "bg-info" },
-  neutral: { pill: "bg-ink-100 text-ink-700", dot: "bg-ink-500" },
-};
-
-const TONE_BY_STATUS: Record<string, StatusTone> = {
-  // accounts / visibility
-  active: "success",
-  inactive: "neutral",
-  live: "success",
-  hidden: "neutral",
-  suspended: "danger",
-
-  // proposals
-  sent: "info",
-  accepted: "success",
-  hired: "success",
-  rejected: "danger",
-  expired: "danger",
-  withdrawn: "neutral",
-  draft: "warning",
-  interview_scheduled: "warning",
-
-  // interviews
-  pending: "warning",
-  scheduled: "warning",
-  completed: "success",
-  missed: "danger",
-  rescheduled: "info",
-  cancelled: "neutral",
-
-  // payments
-  created: "neutral",
-  paid: "success",
-  processing: "info",
-  failed: "danger",
-  refunded: "warning",
-
-  // timesheets
-  submitted: "info",
-  approved: "success",
-
-  // misc
-  read: "neutral",
-  unread: "warning",
-  complete: "success",
-  incomplete: "warning",
-  setup_completed: "success",
-  setup_incomplete: "warning",
-};
-
-/** "interview_scheduled" → "Interview scheduled" - shared copy in app/status. */
-
-export function toneForStatus(value: string | null | undefined): StatusTone {
-  if (!value) return "neutral";
-  return TONE_BY_STATUS[value.toLowerCase()] ?? "neutral";
-}
+export { toneForStatus, TONE_CLASS, type StatusTone };
 
 export function StatusBadge({
   value,

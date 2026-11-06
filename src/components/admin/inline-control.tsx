@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { Ban, Check, ChevronDown, Eye, EyeOff, Loader2, Pencil, UserCheck, X } from "lucide-react";
 
-import type { StatusTone } from "@/components/admin/status-badge";
+import { TONE_CLASS, type StatusTone } from "@/lib/admin/status-tone";
 
 import { buttonClass } from "@/components/ui/button";
 import { csrfFetch } from "@/lib/client-fetch";
@@ -68,15 +68,6 @@ function ErrorText({ id, message }: { id: string; message: string | null }) {
     </span>
   );
 }
-
-/** The pastel fills of `StatusBadge`, for a control that has to stay a real `<select>` / `<button>`. */
-const PILL_TONE: Record<StatusTone, { pill: string; dot: string }> = {
-  success: { pill: "bg-success-soft text-success", dot: "bg-success" },
-  warning: { pill: "bg-warning-soft text-warning", dot: "bg-warning" },
-  danger: { pill: "bg-danger-soft text-danger", dot: "bg-danger" },
-  info: { pill: "bg-info-soft text-info", dot: "bg-info" },
-  neutral: { pill: "bg-ink-100 text-ink-700", dot: "bg-ink-500" },
-};
 
 /* ── Select ─────────────────────────────────────────────────────────── */
 
@@ -150,7 +141,7 @@ export function InlineSelect({
             tones
               ? cn(
                   "h-8 min-w-28 cursor-pointer appearance-none rounded-full border-0 pl-3 pr-8 text-base font-medium sm:text-[0.8125rem] hover:opacity-90 [&>option]:bg-[color:var(--admin-panel)] [&>option]:text-foreground",
-                  PILL_TONE[tones[current] ?? "neutral"].pill,
+                  TONE_CLASS[tones[current] ?? "neutral"].pill,
                 )
               : "h-9 min-w-28 rounded-apple-sm border border-ink-200 bg-surface pl-2.5 pr-8 text-base font-medium sm:text-sm text-ink-800 hover:border-ink-300",
             "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 disabled:opacity-60 max-lg:h-11",
@@ -268,7 +259,7 @@ export function InlineToggle({
   }
 
   if (compact) {
-    const tone = PILL_TONE[state ? "success" : "neutral"];
+    const tone = TONE_CLASS[state ? "success" : "neutral"];
     const verb = state ? turnOffLabel : turnOnLabel;
     const Icon = icons === "eye" ? (state ? EyeOff : Eye) : state ? Ban : UserCheck;
     return (

@@ -1,3 +1,4 @@
+import { StatusBadge } from "@/components/admin/status-badge";
 import { CalendarOff, ClipboardCheck, Clock, Handshake, Link2Off, Mail, Wallet, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 
@@ -111,7 +112,7 @@ export function NeedsYouPanel({
                     <Count value={row.count} />
                   </span>
                 ) : row.state === "flag" ? (
-                  <span className="rounded-full bg-warning-soft px-2.5 py-0.5 text-xs font-medium text-warning">Fix</span>
+                  <StatusBadge tone="warning" label="Fix" dot={false} />
                 ) : null}
               </>
             );

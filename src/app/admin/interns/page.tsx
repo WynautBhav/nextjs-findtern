@@ -286,7 +286,7 @@ export default async function AdminInterns({
     interview: {
       cell: (row) => (
         <div className="flex flex-col items-start gap-0.5 whitespace-nowrap">
-          <span>{aiStatusLabel(row.aiStatus)}</span>
+          <StatusBadge value={row.aiStatus} label={aiStatusLabel(row.aiStatus)} dot={false} />
           {(row.aiStatus === "scheduled" || row.aiStatus === "completed") && row.interviewAt ? (
             <span className="nums text-xs text-text-subtle">{formatIstStamp(row.interviewAt).slice(0, 16)} IST</span>
           ) : null}
@@ -301,7 +301,7 @@ export default async function AdminInterns({
           <span className="text-text-subtle">No profile</span>
         ),
     },
-    profile: { cell: (row) => (row.hasProfile ? "Complete" : <StatusBadge tone="warning" label="Incomplete" dot={false} />) },
+    profile: { cell: (row) => <StatusBadge tone={row.hasProfile ? "success" : "warning"} label={row.hasProfile ? "Complete" : "Incomplete"} dot={false} /> },
     onboarded: { cell: (row) => (row.hired ? "Onboarded" : "Not onboarded") },
     pending: { numeric: true, cell: (row) => money(row, (m) => m.pendingPayoutMinor) },
     next: {
@@ -337,10 +337,10 @@ export default async function AdminInterns({
     bankIfsc: { cell: (row) => text(row.bank?.ifsc ?? "") },
     bankName: { cell: (row) => text(row.bank?.name ?? "") },
     bankUpi: { cell: (row) => text(row.bank?.upi ?? "") },
-    account: { cell: (row) => (mayWrite ? <AccountActiveCell id={row.id} kind="intern" active={row.isActive} compact /> : <span>{row.isActive ? "Active" : "Inactive"}</span>) },
+    account: { cell: (row) => (mayWrite ? <AccountActiveCell id={row.id} kind="intern" active={row.isActive} compact /> : <StatusBadge value={row.isActive ? "active" : "inactive"} dot={false} />) },
     review: {
       cell: (row) =>
-        row.hasOnboarding ? (mayWrite ? <InternApprovalCell internId={row.id} value={row.approval ?? "Pending"} pill /> : <span>{row.approval ?? "Pending"}</span>) : <span className="text-text-subtle">-</span>,
+        row.hasOnboarding ? (mayWrite ? <InternApprovalCell internId={row.id} value={row.approval ?? "Pending"} pill /> : <StatusBadge value={row.approval ?? "Pending"} dot={false} />) : <span className="text-text-subtle">-</span>,
     },
     joined: { cell: (row) => <span className="nums whitespace-nowrap text-text-subtle">{row.createdAt ? formatDate(row.createdAt) : "-"}</span> },
   };

@@ -1,3 +1,4 @@
+import { StatusBadge } from "@/components/admin/status-badge";
 import { AdminAvatar } from "@/components/admin/avatar";
 import { Panel, PanelBody, PanelHeader } from "@/components/admin/panel";
 import { formatMoney } from "@/lib/format";
@@ -85,7 +86,7 @@ function Band({ band }: { band: PipelineBand }) {
                 </p>
               </div>
               {isStuck && s.oldestDays != null ? (
-                <p className="nums hidden w-fit rounded-full bg-warning-soft px-2 py-0.5 text-xs font-medium text-warning sm:mt-2 sm:block">waiting {s.oldestDays} d</p>
+                <StatusBadge tone="warning" label={`waiting ${s.oldestDays} d`} dot={false} className="nums max-sm:hidden sm:mt-2" />
               ) : null}
             </li>
           );

@@ -7,6 +7,7 @@ import { Trash2 } from "lucide-react";
 import { InlineSelect, InlineToggle, sendInline } from "@/components/admin/inline-control";
 import { buttonClass } from "@/components/ui/button";
 import { fteOf } from "@/lib/admin/fte";
+import { toneForStatus, type StatusTone } from "@/lib/admin/status-tone";
 import { cn } from "@/lib/utils";
 import { useConfirm } from "@/components/app/use-confirm";
 
@@ -26,7 +27,7 @@ const FTE_OPTIONS = [
   { value: "approved", label: "Approved" },
 ] as const;
 
-const FTE_TONES = { none: "neutral", applied: "info", approved: "success" } as const;
+const FTE_TONES = Object.fromEntries(FTE_OPTIONS.map((o) => [o.value, toneForStatus(o.value === "none" ? "not_applied" : o.value)])) as Record<string, StatusTone>;
 
 export function CompanyFteSelect({ id, value, refresh = false, pill = false }: { id: string; value: string; refresh?: boolean; pill?: boolean }) {
   return (

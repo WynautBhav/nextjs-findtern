@@ -1,3 +1,4 @@
+import { StatusBadge } from "@/components/admin/status-badge";
 import { count, desc, inArray, sql } from "drizzle-orm";
 
 import Link from "next/link";
@@ -116,7 +117,7 @@ export default async function AdminCollegesPage({
                 <CountChip n={r.members} one="student" many="students" />
                 <CountChip n={r.roster} one="on roster" many="on roster" />
                 <CountChip n={r.drives} one="drive" many="drives" />
-                {r.openRequest ? <span className="inline-flex h-6 items-center whitespace-nowrap rounded-full bg-warning-soft px-2.5 text-xs font-medium text-foreground">Withdrawal requested</span> : null}
+                {r.openRequest ? <StatusBadge tone="warning" label="Withdrawal requested" dot={false} /> : null}
                 <Link href={`/admin/colleges/${r.id}`} className="inline-flex h-6 touch:min-h-11 items-center whitespace-nowrap rounded-full bg-[color:var(--admin-panel-2)] px-2.5 text-xs font-medium text-foreground underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">Seats and wallet</Link>
                 <span className="nums inline-flex h-6 items-center whitespace-nowrap rounded-full bg-[color:var(--admin-panel-2)] px-2.5 text-xs font-medium text-foreground">Wallet {formatMoney(balances.get(r.id) ?? 0, "INR", { zeroLabel: false })}</span>
               </span>
