@@ -92,7 +92,11 @@ export function computeReceivables(input: ReceivablesInput, filter: { receivable
           date: date!,
           source: "company",
           status: "received",
-          description: orderNotes(p.raw).mode === "hiring_fee" ? "Employer payment: hiring charge" : "Employer payment",
+          description: orderNotes(p.raw).mode === "hiring_fee"
+            ? orderNotes(p.raw).firstMonthIds.length
+              ? "Employer payment: hiring charge + month 1"
+              : "Employer payment: hiring charge"
+            : "Employer payment",
           companyName: input.employerName(p.employerId),
           candidateName: null,
           amountMinor: p.amountMinor,

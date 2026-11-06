@@ -119,11 +119,12 @@ export function placementLedger(hire: HireLike, payments: readonly PaidOrderLike
   const paidOn: string[] = [];
   for (const p of payments) {
     if (p.status !== "paid") continue;
-    const { ids, mode, dueIds } = notesOf(p.raw);
+    const { ids, mode, dueIds, firstMonthIds } = notesOf(p.raw);
     const asDue = dueIds.includes(hire.id);
     if (!ids.includes(hire.id) && !asDue) continue;
     if (mode === "hiring_fee") {
-      // The fee order covers no month and is not "paid in full".
+      // The fee order is not "paid in full"; it covers Month 1 only when its notes say so (orders from before that rule do not).
+      if (firstMonthIds.includes(hire.id)) monthsPaid += 1;
     } else if (mode === "monthly" || asDue) monthsPaid += 1;
     else upfrontPaid = true;
     if (ids.length <= 1) promoMinor += promoDiscountOf(p.raw);

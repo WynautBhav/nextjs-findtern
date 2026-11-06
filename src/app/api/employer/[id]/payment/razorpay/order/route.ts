@@ -18,7 +18,7 @@ const bodySchema = z.object({
   currency: z.enum(["INR", "USD"], { error: "Pick INR or USD." }).default("INR"),
   /** One hire per payment (legacy checkout). */
   proposalIds: z.array(z.string().min(1), { error: "Pay for one hire at a time" }).length(1, "Pay for one hire at a time"),
-  /** How a new hire is paid: "postpaid" (fee now, each month's stipend as it falls due, score 6+) or the whole engagement "upfront". A running placement always pays its due month. */
+  /** How a new hire is paid: "postpaid" (hiring fee + Month 1 now, each later month as it falls due, score 6+) or the whole engagement "upfront". A running placement always pays its due month. */
   mode: z.enum(["upfront", "monthly", "postpaid"], { error: "Choose how to pay." }).default("upfront"),
   /** The month being paid: payments already made for this hire (0 = first). A stale second submit names a month that is already paid. */
   paymentIndex: z.number({ error: "This page is out of date. Refresh and try again." }).int().min(0),
@@ -156,6 +156,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     // "hiring_fee" is the first payment of a post-paid hire (billing-plan.ts).
     paymentMode: mode === "monthly" ? "monthly" : mode === "postpaid" ? "hiring_fee" : "total",
     dueProposalIds: paying.filter((l) => l.due).map((l) => l.id),
+    // A post-paid first payment also covers Month 1. A separate list, never dueProposalIds: settlement hires only ids that are not due (payments.ts).
+    firstMonthProposalIds: mode === "postpaid" ? paying.filter((l) => !l.due).map((l) => l.id) : [],
     // The month each due line was priced for; settlement flags the order when the hire has moved on since.
     dueMonths: Object.fromEntries(paying.filter((l) => l.due).map((l) => [l.id, l.due!.monthsPaid + 1])),
     // DB-07: legacy admin shows computedAmountMinor as the order amount, so

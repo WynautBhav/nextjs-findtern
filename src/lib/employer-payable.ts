@@ -51,9 +51,9 @@ export type PayableLine = {
   due: { monthsPaid: number; months: number } | null;
   /** YYYY-MM-DD the due month falls due (post-paid: 2 days before the intern's pay day; else start + months paid); null when not a due line or no start. */
   dueOn: string | null;
-  /** The fee-only first payment of a post-paid hire (score 6+ internship), whatever mode was asked for. */
+  /** The first payment of a post-paid hire (score 6+ internship): hiring fee + Month 1 charge, whatever mode was asked for. */
   feeCharge: LineCharge;
-  /** YYYY-MM-DD each month's stipend falls due on a post-paid hire, month 1 first; empty when not offered or no start date. */
+  /** YYYY-MM-DD each month after the first falls due on a post-paid hire, month 2 first (month 1 is paid with the hiring charge); empty when not offered, one month long, or no start date. */
   schedule: string[];
   /** Offer start date (YYYY-MM-DD) or null. */
   startDate: string | null;
@@ -224,7 +224,7 @@ export async function payableCheckout(
         feeCharge: acceptedLineCharge(offer, "postpaid"),
         schedule: dues.has(proposal.id) || offer.fullTime
           ? []
-          : Array.from({ length: offer.months }, (_, i) => postpaidDueOn(postpaidAnchor(offer.startDate, null) ?? istDay(new Date()), offer.months, i + 1) ?? "").filter(Boolean),
+          : Array.from({ length: Math.max(0, offer.months - 1) }, (_, i) => postpaidDueOn(postpaidAnchor(offer.startDate, null) ?? istDay(new Date()), offer.months, i + 2) ?? "").filter(Boolean),
         startDate: offer.startDate,
         fullTimeCtcMinor: offer.fullTime?.annualCtcMinor ?? null,
         fullTime: Boolean(offer.fullTime),

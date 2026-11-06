@@ -17,7 +17,7 @@ import type { Offer } from "./offer.ts";
  */
 
 /**
- * "postpaid" (score 6+): the hiring fee now, each month's stipend due 2 days before
+ * "postpaid" (score 6+): the hiring fee + Month 1 charge now, each later month's charge due 2 days before
  * the intern's pay day (billing-plan.ts). "monthly" is only a later instalment of
  * a hire already paid on the old pay-at-start plan.
  */
@@ -69,8 +69,8 @@ export function lineCharge(
   const perHireMinor = firstPayment ? fee : 0;
 
   if (mode === "postpaid" && !monthlyBlocked) {
-    // First payment: the fee alone. A later month is the stipend alone, no fee.
-    const base = firstPayment ? fee : (offer.monthlyMinor ?? 0);
+    // First payment: the fee + Month 1. A later month is its monthly charge alone, no fee.
+    const base = firstPayment ? fee + (offer.monthlyMinor ?? 0) : (offer.monthlyMinor ?? 0);
     return { baseMinor: base, discountMinor: 0, totalMinor: base, perHireMinor, monthlyBlocked };
   }
 

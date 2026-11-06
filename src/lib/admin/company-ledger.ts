@@ -75,7 +75,7 @@ export type CompanyLedger = {
   totals: { billedInrMinor: number; paidInrMinor: number; remainingInrMinor: number };
 };
 
-function notesOf(raw: unknown): { ids: string[]; dueIds: string[]; mode: string } {
+function notesOf(raw: unknown): { ids: string[]; dueIds: string[]; firstMonthIds: string[]; mode: string } {
   const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
   const order = (r.order && typeof r.order === "object" ? r.order : {}) as Record<string, unknown>;
   const n = (r.notes ?? order.notes ?? {}) as Record<string, unknown>;
@@ -88,7 +88,7 @@ function notesOf(raw: unknown): { ids: string[]; dueIds: string[]; mode: string 
     }
   }
   const list = (v: unknown) => (Array.isArray(v) ? v.map((x) => String(x ?? "").trim()).filter(Boolean) : []);
-  return { ids: list(ids), dueIds: list(n.dueProposalIds), mode: String(n.paymentMode ?? "total").toLowerCase() };
+  return { ids: list(ids), dueIds: list(n.dueProposalIds), firstMonthIds: list(n.firstMonthProposalIds), mode: String(n.paymentMode ?? "total").toLowerCase() };
 }
 
 const time = (d: Date | string | null | undefined) => {
@@ -128,7 +128,7 @@ export function companyLedger(
   }
 
   for (const pay of paid) {
-    const { ids, dueIds, mode } = notesOf(pay.raw);
+    const { ids, dueIds, firstMonthIds, mode } = notesOf(pay.raw);
     const mine = ids.filter((id) => byId.has(id));
     if (mine.length === 0) continue;
     const monthly = mode === "monthly";
@@ -146,8 +146,11 @@ export function companyLedger(
       const share = i === mine.length - 1 ? left : Math.round((Math.max(0, pay.amountMinor) * weights[i]) / sum);
       left -= share;
       paidMinor.set(id, (paidMinor.get(id) ?? 0) + share);
-      if (feeOnly) feePaid.add(id);
-      else if (monthly || dueIds.includes(id)) monthlyCount.set(id, (monthlyCount.get(id) ?? 0) + 1);
+      if (feeOnly) {
+        feePaid.add(id);
+        // The fee order also paid Month 1 when its notes say so (orders from before that rule did not).
+        if (firstMonthIds.includes(id)) monthlyCount.set(id, (monthlyCount.get(id) ?? 0) + 1);
+      } else if (monthly || dueIds.includes(id)) monthlyCount.set(id, (monthlyCount.get(id) ?? 0) + 1);
       else paidInFull.add(id);
     });
   }

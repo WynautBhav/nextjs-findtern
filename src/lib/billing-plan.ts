@@ -12,7 +12,8 @@ import { isRealDay } from "./offer.ts";
  *
  *  - upfront          first order "total"/"upfront", no mode, or any unknown mode: everything paid at hire.
  *  - monthly_prepaid  first order "monthly": month 1 + fee at hire, each later month at its start (grandfathered).
- *  - postpaid         first order "hiring_fee": the fee only at hire; month k is due 2 days before the intern is paid for it (stipendMonthDates).
+ *  - postpaid         first order "hiring_fee": the fee at hire, plus month 1 when the order's notes carry `firstMonthProposalIds`
+ *                     (orders from before that rule are fee-only, so month 1 stays due); month k is due 2 days before the intern is paid for it (stipendMonthDates).
  *  - unpaid           no paid order names the hire yet.
  * The plan is decided by the OLDEST paid order naming the hire, so hires paid
  * before this rule shipped keep their plan with no backfill.
@@ -36,13 +37,14 @@ function list(v: unknown): string[] {
   return Array.isArray(v) ? v.map((x) => String(x ?? "").trim()).filter(Boolean) : [];
 }
 
-/** What an order's notes say: the proposals it names, the due months it pays, and its (lower-cased) mode. */
-export function orderNotes(raw: unknown): { ids: string[]; dueIds: string[]; mode: string } {
+/** What an order's notes say: the proposals it names, the due months it pays, the hires whose Month 1 a fee order also covers, and its (lower-cased) mode. */
+export function orderNotes(raw: unknown): { ids: string[]; dueIds: string[]; firstMonthIds: string[]; mode: string } {
   const r = obj(raw);
   const n = obj(r.notes ?? obj(r.order).notes);
   return {
     ids: list(n.proposalIds ?? n.proposal_ids ?? r.proposalIds ?? r.proposal_ids),
     dueIds: list(n.dueProposalIds),
+    firstMonthIds: list(n.firstMonthProposalIds),
     mode: String(n.paymentMode ?? n.payment_mode ?? "").trim().toLowerCase(),
   };
 }
@@ -65,9 +67,15 @@ export function billingPlanOf(proposalId: string, orders: readonly PlanOrder[]):
   return "unpaid";
 }
 
-/** Months of stipend a post-paid hire has paid: orders carrying it as a due month. The fee order is not one. */
+/** Whether an order pays a month of `proposalId`: a due-month order, or a post-paid fee order that also covers Month 1 (`firstMonthProposalIds`). A fee-only order (from before that rule) pays none. */
+export function paysMonthOf(raw: unknown, proposalId: string): boolean {
+  const { dueIds, firstMonthIds, mode } = orderNotes(raw);
+  return dueIds.includes(proposalId) || (mode === "hiring_fee" && firstMonthIds.includes(proposalId));
+}
+
+/** Months a post-paid hire has paid: its due-month orders, plus Month 1 when the fee order covered it. */
 export function postpaidMonthsPaid(proposalId: string, orders: readonly PlanOrder[]): number {
-  return paidOldestFirst(orders).filter((o) => orderNotes(o.raw).dueIds.includes(proposalId)).length;
+  return paidOldestFirst(orders).filter((o) => paysMonthOf(o.raw, proposalId)).length;
 }
 
 /** The month number (1-based) each due line of an order was priced for, from `notes.dueMonths` (`{ proposalId: month }`). Orders from before it was written have none. */

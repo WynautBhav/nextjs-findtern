@@ -29,14 +29,29 @@ export function hireInvoiceLines(input: {
   monthly: boolean;
   paymentIndex: number;
   chargedMinor?: number | null;
-  /** Post-paid hire (billing-plan.ts): "fee" = the first payment, the hiring charge alone; a number k = stipend month k, no fee. */
+  /** Post-paid hire (billing-plan.ts): "fee" = the first payment (the hiring charge, plus Month 1 when `withMonth1`); a number k = month k, no fee. */
   postpaid?: "fee" | number;
+  /** With `postpaid: "fee"`: the order also paid Month 1 (`notes.firstMonthProposalIds`), so it prints as two lines. */
+  withMonth1?: boolean;
 }): InvoiceLine[] {
   const { roleTitle, projectName, offer, monthly, paymentIndex } = input;
   // A nameless or deleted candidate still reads "Candidate — Designer", never "— Designer".
   const who = input.who.trim() || "Candidate";
   if (input.postpaid === "fee") {
     const fee = acceptedLineCharge(offer, "postpaid").perHireMinor;
+    if (input.withMonth1) {
+      const m1 = input.chargedMinor != null && input.chargedMinor > fee ? input.chargedMinor - fee : (offer.monthlyMinor ?? 0);
+      const p = offer.startDate ? engagementPeriods(offer.startDate, offer.months)[0] : undefined;
+      const day = (iso: string) => new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", timeZone: "UTC" }).format(new Date(`${iso}T00:00:00Z`)).replace("Sept", "Sep");
+      return [
+        { label: `${who} — Hiring charge`, detail: `${projectName} · One-time hiring charge`, amountMinor: fee },
+        {
+          label: `${who} — ${roleTitle || projectName}`,
+          detail: `${offer.months}m · ${projectName} · Month 1 charge${p ? ` (${day(p.start)} – ${day(p.end)})` : ""}`,
+          amountMinor: m1,
+        },
+      ];
+    }
     return [
       {
         label: `${who} — Hiring charge`,
