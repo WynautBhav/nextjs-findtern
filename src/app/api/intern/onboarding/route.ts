@@ -49,7 +49,6 @@ const qualification = z.object({
 });
 
 const bodySchema = z.object({
-  bio: z.string().trim().max(2000).optional(),
   linkedinUrl: z.string().trim().max(300).optional(),
   city: z.string().trim().max(120).optional(),
   state: z.string().trim().max(120).optional(),
@@ -389,7 +388,8 @@ export async function POST(req: Request) {
 
   const values = {
     userId: session.uid,
-    bio: body.bio ?? existing?.bio ?? null,
+    // Students no longer write a bio; an older one is kept as it is (admin and the college officer read it).
+    bio: existing?.bio ?? null,
     linkedinUrl: body.linkedinUrl ?? existing?.linkedinUrl ?? null,
     city: body.city ?? existing?.city ?? null,
     state: body.state ?? existing?.state ?? null,

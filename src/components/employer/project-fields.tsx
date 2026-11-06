@@ -18,7 +18,7 @@
 
 import { Info } from "lucide-react";
 
-import { ChoiceGroup, FieldHint, FieldLabel, NativeSelect, TextField } from "@/components/employer/company-fields";
+import { ChoiceGroup, FieldError, FieldHint, FieldLabel, NativeSelect, TextField, controlClass } from "@/components/employer/company-fields";
 import { CityField, StateField, districtOptions } from "@/components/employer/location-fields";
 import { ChipInput } from "@/components/employer/project-chip-input";
 import { scopeOfWorkOptions, scopeValue } from "@/lib/db/schema";
@@ -27,6 +27,7 @@ import { suggestSkills } from "@/lib/data/skills";
 import type { ProjectDraft } from "@/lib/employer-onboarding";
 import {
   INDIA_ONLY_NOTE,
+  MAX_PROJECT_DESCRIPTION,
   MAX_PROJECT_LOCATIONS,
   MAX_PROJECT_SKILLS,
   MIN_PROJECT_SKILLS,
@@ -100,6 +101,15 @@ export function companyPlaceDefault(company: { city?: string | null; state?: str
   return inIndia ? { state, city: (company.city ?? "").trim() } : { state: "", city: "" };
 }
 
+/** The free-text brief, kept apart from `ProjectDraft` (onboarding has no such field). */
+export type DescriptionField = {
+  value: string;
+  onChange: (value: string) => void;
+  /** Runs on blur, so contact details are caught before the employer submits. */
+  onBlur?: () => void;
+  error?: string;
+};
+
 export function ProjectFields({
   values,
   set,
@@ -107,6 +117,7 @@ export function ProjectFields({
   companyPlace,
   idPrefix = "project",
   showPincode = false,
+  description,
 }: {
   values: ProjectDraft;
   set: (patch: Partial<ProjectDraft>) => void;
@@ -115,6 +126,8 @@ export function ProjectFields({
   companyPlace?: { city?: string | null; state?: string | null };
   idPrefix?: string;
   showPincode?: boolean;
+  /** Shown only where given: the Projects page, not onboarding. */
+  description?: DescriptionField;
 }) {
   const id = (name: string) => `${idPrefix}-${name}`;
   const onsite = Boolean(values.locationType) && values.locationType !== "remote";
@@ -142,6 +155,34 @@ export function ProjectFields({
         hint="Candidates see this as the role. Name the work, not a requisition number or your company."
         onChange={(v) => set({ projectName: v })}
       />
+
+      {description ? (
+        <div>
+          <FieldLabel htmlFor={id("description")} optional>
+            What the work involves
+          </FieldLabel>
+          <textarea
+            id={id("description")}
+            name={id("description")}
+            rows={5}
+            maxLength={MAX_PROJECT_DESCRIPTION}
+            value={description.value}
+            onChange={(e) => description.onChange(e.target.value)}
+            onBlur={description.onBlur}
+            placeholder="Day-to-day tasks, tools, what a good week looks like."
+            aria-invalid={description.error ? true : undefined}
+            aria-describedby={`${id("description")}-hint${description.error ? ` ${id("description")}-error` : ""}`}
+            className={controlClass(Boolean(description.error), "mt-2 min-h-32 resize-y py-2.5 leading-relaxed")}
+          />
+          {description.error ? <FieldError id={`${id("description")}-error`}>{description.error}</FieldError> : null}
+          <div className="mt-1.5 flex items-start justify-between gap-3 text-xs leading-relaxed text-ink-600">
+            <p id={`${id("description")}-hint`}>Candidates read this. No phone numbers, emails or links: they reach you through Findtern.</p>
+            <p className="nums shrink-0" aria-live="off">
+              {description.value.length} / {MAX_PROJECT_DESCRIPTION}
+            </p>
+          </div>
+        </div>
+      ) : null}
 
       <ChipInput
         id={id("skills")}

@@ -5,7 +5,7 @@ import { phoneError } from "./phone.ts";
  * Intern onboarding shape across the 8-step wizard.
  *
  * Steps:
- * 1. About Me (photo, bio, identity documents, address, phone, emergency contact)
+ * 1. About Me (photo, identity documents, address, phone, emergency contact)
  * 2. Academics (level, degree, status, institution, years, score, marksheets, courses)
  * 3. Experience (Internship, Job, Project, Freelancing)
  * 4. Skills (4 to 7 names; no level is asked, each is stored as Intermediate)
@@ -103,8 +103,12 @@ export type OnboardingDraft = {
   // Step 1: About Me
   firstName?: string;
   lastName?: string;
-  /** Optional, as in legacy (which had no bio). */
-  bio: string;
+  /**
+   * Read-only. Students no longer write a bio, but older profiles keep theirs
+   * for admin and the college officer. Never edited, validated or sent by the
+   * onboarding form, and never shown to employers.
+   */
+  bio?: string;
   phone?: string;
   /** Emergency contact, stored flat in extra_data like the legacy form. */
   emergencyName?: string;
@@ -187,7 +191,6 @@ export type StoredDocument = {
 const BLANK: OnboardingDraft = {
   firstName: "",
   lastName: "",
-  bio: "",
   phone: "",
   emergencyName: "",
   emergencyRelation: "",
@@ -955,6 +958,29 @@ export type ValidationContext = {
 export const MAX_SKILLS = 7;
 /** Minimum key skills: the step, the dashboard meter and the payment gate agree. */
 export const MIN_SKILLS = 4;
+
+/** Skill names with repeats removed, case-insensitively; the first spelling wins. */
+export function dedupeSkillNames(names: readonly string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of names) {
+    const name = raw.trim();
+    const key = name.toLowerCase();
+    if (name && !seen.has(key)) {
+      seen.add(key);
+      out.push(name);
+    }
+  }
+  return out;
+}
+
+/** Why this skill list cannot be saved (MIN_SKILLS to MAX_SKILLS, repeats not counted), or null. */
+export function skillListError(names: readonly string[]): string | null {
+  const count = dedupeSkillNames(names).length;
+  if (count < MIN_SKILLS) return `Skills must be ${MIN_SKILLS}-${MAX_SKILLS}, without repeats.`;
+  if (count > MAX_SKILLS) return `A profile can have at most ${MAX_SKILLS} skills.`;
+  return null;
+}
 
 export type ValidationErrors = Record<string, string>;
 

@@ -65,7 +65,9 @@ export function SkillPicker({
           <p className="nums text-sm text-ink-600" aria-live="polite">
             <span className="font-semibold text-ink-900">{value.length}</span>{" "}
             of {max}
-            {value.length < min ? (
+            {full ? (
+              <span className="text-text-subtle"> · Remove one to add another</span>
+            ) : value.length < min ? (
               <span className="text-text-subtle"> · at least {min}</span>
             ) : null}
           </p>

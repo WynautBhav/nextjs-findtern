@@ -1,7 +1,9 @@
 import { cache } from "react";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 
 import { getDb, hasDb, schema } from "@/lib/db";
+import { realEmployers } from "@/lib/admin/scope";
+import { isListingLive } from "@/lib/project-locations";
 import {
   HIDDEN_COMPANY,
   activeEngagement,
@@ -157,6 +159,7 @@ export async function openProjects(limit = 60, opts: { strict?: boolean } = {}) 
       id: schema.projects.id,
       projectName: schema.projects.projectName,
       scopeOfWork: schema.projects.scopeOfWork,
+      description: schema.projects.description,
       skills: schema.projects.skills,
       locationType: schema.projects.locationType,
       fullTimeOffer: schema.projects.fullTimeOffer,
@@ -169,7 +172,15 @@ export async function openProjects(limit = 60, opts: { strict?: boolean } = {}) 
     })
     .from(schema.projects)
     .innerJoin(schema.employers, eq(schema.projects.employerId, schema.employers.id))
-    .where(and(eq(schema.projects.status, "active"), eq(schema.projects.employerId, schema.projects.employerId)))
+    // Discovery rule: live listing (active, not taken down) of an active, real employer.
+    .where(
+      and(
+        eq(schema.projects.status, "active"),
+        isNull(schema.projects.takenDownAt),
+        eq(schema.employers.isActive, true),
+        realEmployers(),
+      ),
+    )
     .orderBy(desc(schema.projects.createdAt))
     .limit(limit);
   } catch (e) {
@@ -180,7 +191,13 @@ export async function openProjects(limit = 60, opts: { strict?: boolean } = {}) 
   }
 }
 
-export async function projectById(id: string, opts: { strict?: boolean } = {}) {
+/**
+ * One role by id. Only a live listing is returned (OA8: paused, closed and
+ * taken-down roles 404 publicly). `anyStatus` is for a candidate who already
+ * has an offer on the role: they keep reading it after it closes. The caller
+ * then checks `isListingLive(role)` itself when there is no offer.
+ */
+export async function projectById(id: string, opts: { strict?: boolean; anyStatus?: boolean } = {}) {
   if (!hasDb()) return null;
   try {
     const db = getDb();
@@ -189,6 +206,7 @@ export async function projectById(id: string, opts: { strict?: boolean } = {}) {
       id: schema.projects.id,
       projectName: schema.projects.projectName,
       scopeOfWork: schema.projects.scopeOfWork,
+      description: schema.projects.description,
       skills: schema.projects.skills,
       locationType: schema.projects.locationType,
       fullTimeOffer: schema.projects.fullTimeOffer,
@@ -197,13 +215,20 @@ export async function projectById(id: string, opts: { strict?: boolean } = {}) {
       timezone: schema.projects.timezone,
       createdAt: schema.projects.createdAt,
       employerId: schema.projects.employerId,
+      status: schema.projects.status,
+      takenDownAt: schema.projects.takenDownAt,
       companyName: schema.employers.companyName,
     })
     .from(schema.projects)
     .innerJoin(schema.employers, eq(schema.projects.employerId, schema.employers.id))
-    .where(eq(schema.projects.id, id))
+    .where(
+      opts.anyStatus
+        ? eq(schema.projects.id, id)
+        : and(eq(schema.projects.id, id), eq(schema.employers.isActive, true), realEmployers()),
+    )
     .limit(1);
-    return row ?? null;
+    if (!row) return null;
+    return opts.anyStatus || isListingLive(row) ? row : null;
   } catch (e) {
     if (opts.strict) throw e;
     return null;

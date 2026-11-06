@@ -5,6 +5,7 @@ import {
   bankProblem,
   canonicalDegree,
   cascadeWorkModes,
+  dedupeSkillNames,
   degreeOption,
   draftFromRecord,
   emptyDraft,
@@ -16,6 +17,7 @@ import {
   monthLabel,
   profileCompletion,
   scoreProblem,
+  skillListError,
   skillsToStore,
   storedFileNames,
   storedFromDraft,
@@ -278,7 +280,6 @@ function complete(): OnboardingDraft {
   const d = emptyDraft();
   return {
     ...d,
-    bio: "",
     city: "Jaipur",
     state: "Rajasthan",
     pinCode: "302017",
@@ -307,7 +308,7 @@ function complete(): OnboardingDraft {
 }
 const ctx = { hasPanImage: true, hasAadhaarImage: true, hasPhoto: true, now: NOW };
 
-test("a complete profile passes every step; bio is optional (INT-20)", () => {
+test("a complete profile passes every step", () => {
   assert.equal(validateProfile(complete(), ctx), null);
   assert.equal(firstOpenStep(complete(), ctx, 8), 8);
 });
@@ -475,7 +476,7 @@ test("bank details are required in full when saved", () => {
 });
 
 test("draft saves only refuse impossible values", () => {
-  assert.equal(formatProblems({ bio: "" }), null);
+  assert.equal(formatProblems({ linkedinUrl: "" }), null);
   assert.ok(formatProblems({ academics: { scoreType: "cgpa", cgpa: "42" } }));
 });
 
@@ -505,7 +506,7 @@ const storedComplete = {
 };
 const allDocs = { hasPanImage: true, hasAadhaarImage: true, hasPhoto: true };
 
-test("profile completion: bio optional, PAN image required, Aadhaar image optional, 4 skills", () => {
+test("profile completion: PAN image required, Aadhaar image optional, 4 skills", () => {
   assert.equal(profileCompletion(storedComplete, allDocs).complete, true);
   const identity = (docs: Partial<typeof allDocs>) => profileCompletion(storedComplete, { ...allDocs, ...docs }).items.find((i) => i.id === "identity")?.done;
   assert.equal(identity({ hasAadhaarImage: false }), true);
@@ -621,4 +622,20 @@ test("stored skills read back as Intermediate (2); older rows keep their own sto
 test("a negative score is refused with the range message instead of being rewritten", () => {
   assert.equal(scoreProblem("cgpa", "-3"), "CGPA must be between 0 and 10.");
   assert.match(scoreProblem("percentage", "-3") ?? "", /between 0 and 100/);
+});
+
+test("the bio is no longer part of a blank draft, and an older row's bio is still readable", () => {
+  assert.equal("bio" in emptyDraft(), false);
+  assert.equal(draftFromRecord({ bio: "Final-year CS student", extraData: {} } as never).bio, "Final-year CS student");
+});
+
+test("skill lists: 4 to 7 after repeats are removed, case-insensitively (OA9)", () => {
+  assert.deepEqual(dedupeSkillNames(["React", "react ", "Node", "", "REACT"]), ["React", "Node"]);
+  assert.equal(skillListError(["A", "B", "C", "D"]), null);
+  assert.equal(skillListError(["A", "B", "C", "D", "E", "F", "G"]), null);
+  // The eighth skill is refused, as the admin route and the candidate form do.
+  assert.match(skillListError(["A", "B", "C", "D", "E", "F", "G", "H"]) ?? "", /at most 7/);
+  // Repeats do not count towards the minimum or the maximum.
+  assert.match(skillListError(["A", "a", "B", "b", "C"]) ?? "", /4-7/);
+  assert.equal(skillListError(["A", "a", "B", "C", "D", "E", "F", "G"]), null);
 });

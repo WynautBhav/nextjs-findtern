@@ -702,7 +702,7 @@ export function deriveReadiness(
     {
       id: "photo",
       label: "A photo employers recognise",
-      unlocks: "Profiles with a face get roughly twice the callback.",
+      unlocks: "Employers recognise you by it once they hire you.",
       done: Boolean(doc?.profilePhotoName),
       href: "/intern/onboarding",
     },
@@ -711,14 +711,6 @@ export function deriveReadiness(
       label: "LinkedIn profile",
       unlocks: "Helps employers verify you are who you say you are.",
       done: Boolean(onboarding?.linkedinUrl),
-      href: "/intern/onboarding",
-    },
-    {
-      id: "bio",
-      label: "A line about what you do well",
-      unlocks: "Optional, but it is the part a recruiter reads out loud.",
-      // Optional here and in the payment gate alike (INT-20; legacy had no bio).
-      done: (onboarding?.bio ?? "").trim().length > 0,
       href: "/intern/onboarding",
     },
     {

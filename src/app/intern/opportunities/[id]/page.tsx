@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, ArrowRight, Building2, Check, MapPin } from "lucide-react";
 
 import { DetailRow, PageHead, Pill, SectionHead, Surface } from "@/components/app/primitives";
+import { SaveRoleButton } from "@/components/intern/save-role-button";
 import { ButtonLink } from "@/components/ui/button";
 import { CompanyInitials } from "@/components/marketing/role-card";
 import { proposalStatus } from "@/components/app/status";
@@ -11,6 +12,8 @@ import { requireRole } from "@/lib/auth";
 import { loadInternData, projectById } from "@/lib/intern-data";
 import { formatDayLabel } from "@/lib/format";
 import { toArray } from "@/lib/journey";
+import { isListingLive } from "@/lib/project-locations";
+import { savedProjectIds } from "@/lib/saved-roles";
 import { readSkillRatings } from "@/lib/onboarding";
 
 import { LockedRoles, rolesGate } from "../_gate";
@@ -40,13 +43,15 @@ export default async function RoleDetail({ params }: { params: Promise<{ id: str
   const { id } = await params;
   const session = await requireRole("intern");
 
-  const [role, data] = await Promise.all([projectById(id, { strict: true }), loadInternData(session.uid)]);
+  const [role, data] = await Promise.all([projectById(id, { strict: true, anyStatus: true }), loadInternData(session.uid)]);
   if (!role) notFound();
 
   // A closed offer (rejected, withdrawn, expired) is not an offer: the role reads as open.
   const existing = data.proposals.find((p) => p.projectId === id && (isHiredProposal(p) || proposalStatus(p.status).tone !== "closed")) ?? null;
   // A hire is a hire whether the status or only hiredAt says so (QA-010).
   const hired = existing ? isHiredProposal(existing) : false;
+  // Paused, closed and taken-down roles are gone unless this candidate already has an offer on it.
+  if (!existing && !isListingLive(role)) notFound();
   // A role they already have an offer on stays readable; anything else waits
   // for the same unlock as the list.
   if (!existing) {
@@ -60,6 +65,7 @@ export default async function RoleDetail({ params }: { params: Promise<{ id: str
       );
     }
   }
+  const saved = existing ? false : (await savedProjectIds(session.uid)).has(id);
   const skills = toArray<string>(role.skills);
   const mine = new Set(
     readSkillRatings(data.onboarding?.skills, (data.onboarding?.extraData ?? {}) as Record<string, unknown>).map((s) => s.name.toLowerCase().trim()),
@@ -104,6 +110,15 @@ export default async function RoleDetail({ params }: { params: Promise<{ id: str
               <SectionHead title="What you would be doing" className="mb-0" />
               <p className="mt-3 max-w-prose whitespace-pre-line text-pretty text-sm leading-relaxed text-ink-700">
                 {role.scopeOfWork}
+              </p>
+            </Surface>
+          ) : null}
+
+          {role.description ? (
+            <Surface className="mt-4 p-5 sm:p-6">
+              <SectionHead title="About the work" className="mb-0" />
+              <p className="mt-3 max-w-prose whitespace-pre-line text-pretty text-sm leading-relaxed text-ink-700">
+                {role.description}
               </p>
             </Surface>
           ) : null}
@@ -193,10 +208,16 @@ export default async function RoleDetail({ params }: { params: Promise<{ id: str
                     candidates rather than collecting applications. What gets you seen is your
                     profile.
                   </p>
-                  <ButtonLink href="/intern/profile" className="mt-4">
-                    See what employers see
-                    <ArrowRight className="size-4" aria-hidden />
-                  </ButtonLink>
+                  <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2">
+                    <ButtonLink href="/intern/profile">
+                      See what employers see
+                      <ArrowRight className="size-4" aria-hidden />
+                    </ButtonLink>
+                    <SaveRoleButton projectId={role.id} projectName={role.projectName} initialSaved={saved} showLabel />
+                  </div>
+                  <p className="mt-2 text-pretty text-xs leading-relaxed text-text-subtle">
+                    Saving a role puts you higher in this company&apos;s matches for it. It is free and never changes your Findtern Score.
+                  </p>
                 </div>
               )}
             </div>
