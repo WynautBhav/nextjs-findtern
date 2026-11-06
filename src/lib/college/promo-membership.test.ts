@@ -25,11 +25,19 @@ test("the seat increment only matches while a seat is free", () => {
   assert.deepEqual(q.params, ["p1"]);
 });
 
-test("admin cap edit: never below the seats used, whole number, at least 1", () => {
+test("admin cap edit: never below the seats used, whole number, 0 allowed", () => {
   assert.equal(seatCapProblem(212, 212), null);
   assert.match(seatCapProblem(211, 212)!, /212 seats are already used/);
-  assert.ok(seatCapProblem(0, 0));
+  assert.equal(seatCapProblem(0, 0), null);
+  assert.match(seatCapProblem(0, 5)!, /5 seats are already used/);
+  assert.ok(seatCapProblem(-1, 0));
   assert.ok(seatCapProblem(1.5, 0));
+});
+
+test("a cap of 0 is no seats, not unlimited", () => {
+  const r = { ...row(0), maxUsages: 0 };
+  assert.equal(promoProblem(r, 249900, "INR"), SEATS_USED_UP);
+  assert.equal(promoProblem({ ...r, maxUsages: null }, 249900, "INR"), null);
 });
 
 test("18+ consent is required with a college code", () => {

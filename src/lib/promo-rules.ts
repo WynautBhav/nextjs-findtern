@@ -94,9 +94,9 @@ export function collegeCodeProblem(college: { isActive: boolean; isPartner: bool
 export const SEATS_USED_UP = "This college's free seats are used up";
 export const DEFAULT_COLLEGE_SEATS = 300;
 
-/** Admin edits a college's cap: a whole number of at least 1, never below the seats already used. */
+/** Admin edits a college's cap: a whole number of at least 0 (a college with no paid batch sits at 0), never below the seats already used. */
 export function seatCapProblem(cap: number, usedCount: number): string | null {
-  if (!Number.isInteger(cap) || cap < 1) return "The cap must be a whole number of at least 1";
+  if (!Number.isInteger(cap) || cap < 0) return "The cap must be a whole number, 0 or more";
   return cap < usedCount ? `${usedCount} seats are already used; the cap can't go below that` : null;
 }
 
@@ -119,7 +119,7 @@ export function promoProblem(
   if (!row.isActive) return "Invalid promo code";
   if (row.validFrom && row.validFrom > now) return "Promo code is not active yet";
   if (row.validUntil && row.validUntil < now) return "Promo code expired";
-  if (row.maxUsages && row.usedCount >= row.maxUsages) return row.collegeId ? SEATS_USED_UP : "Promo code exhausted";
+  if (row.maxUsages !== null && row.usedCount >= row.maxUsages) return row.collegeId ? SEATS_USED_UP : "Promo code exhausted";
   if (row.minOrderAmountMinor && orderMinor < inCurrency(row.minOrderAmountMinor, currency)) {
     // ADM-14: say what the minimum is, in the order's currency.
     return `This code needs an order of at least ${formatMoney(inCurrency(row.minOrderAmountMinor, currency), currency)}`;
