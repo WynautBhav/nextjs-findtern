@@ -92,7 +92,7 @@ export function aiInterviewStatus(): SQL<string> {
   END)`;
 }
 
-/** Findtern Score as a number or NULL (expects `intern_onboarding`). */
+/** Findtern Score (0-10) as a number or NULL (expects `intern_onboarding`). */
 export function findternScoreSql(): SQL<number | null> {
-  return sql<number | null>`(CASE WHEN jsonb_typeof(${schema.internOnboarding.extraData}->'findternScore') = 'number' THEN (${schema.internOnboarding.extraData}->>'findternScore')::float8 END)`;
+  return sql<number | null>`(CASE WHEN jsonb_typeof(${schema.internOnboarding.extraData}->'findternScore') = 'number' THEN LEAST(10, GREATEST(0, (${schema.internOnboarding.extraData}->>'findternScore')::float8)) END)`; // never above 10, even for a legacy row
 }

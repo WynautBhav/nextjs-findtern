@@ -159,3 +159,30 @@ test("unpaid webhook result is held, not applied; paying applies it once", () =>
   assert.equal("incruiterPending" in done, false);
   assert.equal(releasePendingResult(done), null);
 });
+
+// ── the score never goes above 10 ──────────────────────────────────────
+
+test("the +1 completion bonus stops at 10 (9.5 and 10 both land on 10)", () => {
+  assert.equal(grantCompletionBonus({ findternScore: 9.5, ratings: { coding: 9.5 } }).findternScore, 10);
+  assert.equal(grantCompletionBonus({ findternScore: 10, ratings: { coding: 10 } }).findternScore, 10);
+  const twice = grantCompletionBonus(grantCompletionBonus({ findternScore: 9.8, ratings: { coding: 9.8 } }));
+  assert.equal(twice.findternScore, 10);
+});
+
+test("a ratings edit with the bonus applied still tops out at 10", () => {
+  const out = applyRatings({ completionBonusCount: 3, completionBonusApplied: 3 }, { coding: 10, communication: 10 });
+  assert.equal(out.findternScore, 10);
+});
+
+test("bulk import: an 11 in any column is an error on that row, not a silent clamp", () => {
+  const rows = readRatingsSheet("email,communication,findternScore\r\na@x.com,8,7\r\nb@x.com,11,\r\nc@x.com,,10.5\r\n");
+  assert.equal(rows[0].error, undefined);
+  assert.match(rows[1].error ?? "", /0 to 10/);
+  assert.equal(rows[1].row, 3);
+  assert.match(rows[2].error ?? "", /0 to 10/);
+});
+
+test("axis ratings are stored to one decimal", () => {
+  const out = applyRatings({}, { coding: 7.123456 });
+  assert.equal((out.ratings as Record<string, number>).coding, 7.1);
+});

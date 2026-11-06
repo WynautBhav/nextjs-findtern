@@ -77,7 +77,7 @@ export function applyRatings(
   const ratings: Record<string, number> = { ...((extra.ratings as Record<string, number>) ?? {}) };
   for (const [k, v] of Object.entries(updates)) {
     if (v === null) delete ratings[k];
-    else if (typeof v === "number") ratings[k] = v;
+    else if (typeof v === "number" && Number.isFinite(v)) ratings[k] = clampRound(v); // 0-10, one decimal, like the score
   }
   const values = RATING_KEYS.map((k) => ratings[k]).filter((v): v is number => typeof v === "number" && Number.isFinite(v));
   const count = completionBonusCount(extra);

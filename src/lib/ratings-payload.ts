@@ -17,6 +17,14 @@ export type RatingsPayloadResult =
   | { ok: true; payload: Record<string, unknown> }
   | { ok: false; error: string };
 
+/** A typed rating that is not a number from 0 to 10 (an empty box is fine: it clears that rating). */
+export function ratingOutOfRange(raw: string): boolean {
+  const t = raw.trim();
+  if (!t) return false;
+  const n = Number(t);
+  return !Number.isFinite(n) || n < 0 || n > 10;
+}
+
 export function buildRatingsPayload(input: {
   values: Record<RatingAxis, string>;
   ratings: Partial<Record<RatingAxis, number>>;

@@ -110,7 +110,7 @@ export function Intern360View({
   const [proposalFilter, setProposalFilter] = useState("all");
 
   const extra = (onboarding?.extraData ?? {}) as Record<string, unknown>;
-  const score = typeof extra.findternScore === "number" ? extra.findternScore : null;
+  const score = typeof extra.findternScore === "number" ? Math.min(10, Math.max(0, extra.findternScore)) : null; // never shown above 10
   const ratings = (extra.ratings ?? {}) as Record<string, number>;
   const draft = onboarding ? draftFromRecord(onboarding) : null;
   const skills = draft?.skills ?? [];

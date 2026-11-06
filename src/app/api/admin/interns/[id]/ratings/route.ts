@@ -8,6 +8,7 @@ import { applyRatings } from "@/lib/admin/ratings";
 import { afterRatingsSaved } from "@/lib/admin/score-live";
 import { isInternPaid } from "@/lib/payments";
 import { requireMutation } from "@/lib/guards-mutation";
+import { isSafeLink } from "@/lib/safe-url";
 
 /**
  * The four axes the product actually reads.
@@ -22,13 +23,20 @@ import { requireMutation } from "@/lib/guards-mutation";
 // null clears that rating, as an emptied box did in legacy.
 const AXIS = z.number().min(0).max(10).nullable();
 
+const LINK = z
+  .string()
+  .refine((v) => !v.trim() || isSafeLink(v), "Enter a full link starting with https://")
+  .optional()
+  .nullable();
+
 const bodySchema = z.object({
   communication: AXIS.optional(),
   coding: AXIS.optional(),
   aptitude: AXIS.optional(),
   interview: AXIS.optional(),
-  aiFeedbackLink: z.string().optional().nullable(),
-  aiRecordingLink: z.string().optional().nullable(),
+  // A link is rendered as an href for employers: http(s) only, never javascript: or data:.
+  aiFeedbackLink: LINK,
+  aiRecordingLink: LINK,
 });
 
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {

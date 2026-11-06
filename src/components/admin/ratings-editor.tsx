@@ -17,7 +17,7 @@ import { Loader2 } from "lucide-react";
 import { useConfirm } from "@/components/app/use-confirm";
 import { buttonClass } from "@/components/ui/button";
 import { csrfFetch } from "@/lib/client-fetch";
-import { RATING_AXES, buildRatingsPayload, clearScorePayload, type RatingAxis } from "@/lib/ratings-payload";
+import { RATING_AXES, buildRatingsPayload, clearScorePayload, ratingOutOfRange as overRange, type RatingAxis } from "@/lib/ratings-payload";
 
 const AXES = RATING_AXES;
 type Axis = RatingAxis;
@@ -99,7 +99,7 @@ export function RatingsEditor({
         <p className="text-sm text-ink-600">
           Findtern Score{" "}
           <span className="nums font-semibold text-ink-900">
-            {saved !== null ? saved.toFixed(1) : score !== null ? score.toFixed(1) : "-"}
+            {saved !== null ? Math.min(10, saved).toFixed(1) : score !== null ? Math.min(10, score).toFixed(1) : "-"}
           </span>
           {saved !== null ? " (just recalculated)" : ""}
         </p>
@@ -119,10 +119,21 @@ export function RatingsEditor({
                 setError(null);
                 setSaved(null);
               }}
+              type="number"
+              min={0}
+              max={10}
+              step={0.1}
               inputMode="decimal"
               placeholder="0–10"
+              aria-invalid={overRange(values[axis.key]) || undefined}
+              aria-describedby={overRange(values[axis.key]) ? `rating-${axis.key}-err` : undefined}
               className="nums mt-1 h-11 w-full rounded-apple-sm border border-ink-200 bg-surface px-3 text-base sm:text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring placeholder:text-text-subtle focus-visible:border-brand-600"
             />
+            {overRange(values[axis.key]) ? (
+              <p id={`rating-${axis.key}-err`} role="alert" className="mt-1 text-xs font-medium text-danger">
+                Enter a number from 0 to 10.
+              </p>
+            ) : null}
           </div>
         ))}
       </div>

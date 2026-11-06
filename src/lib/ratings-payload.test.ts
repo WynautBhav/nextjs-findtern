@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { buildRatingsPayload, clearScorePayload } from "./ratings-payload.ts";
+import { buildRatingsPayload, clearScorePayload, ratingOutOfRange } from "./ratings-payload.ts";
 
 const empty = { communication: "", coding: "", aptitude: "", interview: "" };
 const base = { values: empty, ratings: {}, feedbackLink: "", recordingLink: "" };
@@ -37,4 +37,20 @@ test("a changed link is sent trimmed, alone", () => {
 
 test("clearScorePayload nulls all four axes", () => {
   assert.deepEqual(clearScorePayload(), { communication: null, coding: null, aptitude: null, interview: null });
+});
+
+test("an axis above 10 or below 0 is refused, 10 and 0 are fine", () => {
+  const empty = { communication: "", coding: "", aptitude: "", interview: "" };
+  assert.equal(buildRatingsPayload({ ...base, values: { ...empty, coding: "11" } }).ok, false);
+  assert.equal(buildRatingsPayload({ ...base, values: { ...empty, coding: "-1" } }).ok, false);
+  assert.equal(buildRatingsPayload({ ...base, values: { ...empty, coding: "10" } }).ok, true);
+  assert.equal(buildRatingsPayload({ ...base, values: { ...empty, coding: "0" } }).ok, true);
+});
+
+test("ratingOutOfRange drives the inline error", () => {
+  assert.equal(ratingOutOfRange("10.1"), true);
+  assert.equal(ratingOutOfRange("-0.5"), true);
+  assert.equal(ratingOutOfRange("abc"), true);
+  assert.equal(ratingOutOfRange("7.5"), false);
+  assert.equal(ratingOutOfRange(""), false);
 });
