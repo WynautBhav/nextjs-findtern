@@ -445,7 +445,7 @@ function CartLine({
           <ButtonLink
             href={`/employer/send-proposal?intern=${encodeURIComponent(c.id)}&project=${encodeURIComponent(line.projectId)}`}
             size="sm"
-            className="min-h-11"
+            className="min-h-11 max-[400px]:[&>svg]:hidden"
           >
             <Send className="size-4" aria-hidden />
             Send proposal
@@ -454,7 +454,7 @@ function CartLine({
 
         {/* Its own button, not in the menu (bug sheet 8). */}
         {!line.acceptedProposalId && !closed && !locked ? (
-          <button type="button" onClick={onMeeting} className={buttonClass({ variant: "outline", size: "sm", className: "h-11 rounded-full px-4 sm:h-9 sm:touch:h-11" })}>
+          <button type="button" onClick={onMeeting} className={buttonClass({ variant: "outline", size: "sm", className: "h-11 rounded-full px-4 sm:h-9 sm:touch:h-11 max-[400px]:[&>svg]:hidden" })}>
             <Video className="size-4" aria-hidden />
             Book meeting
           </button>

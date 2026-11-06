@@ -273,7 +273,7 @@ function TabLink({ href, active, children }: { href: string; active: boolean; ch
       scroll={false}
       aria-current={active ? "page" : undefined}
       className={cn(
-        "relative inline-flex h-11 min-w-6 items-center justify-center whitespace-pre text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand-500 sm:h-9 sm:touch:h-11",
+        "relative -mx-1 inline-flex h-11 min-w-6 items-center justify-center whitespace-pre rounded-sm px-1 text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 sm:h-9 sm:touch:h-11",
         "after:absolute after:inset-x-0 after:-bottom-[13px] after:h-0.5 after:rounded-full after:content-[''] max-sm:after:bottom-0",
         active ? "font-semibold text-ink-900 after:bg-ink-900" : "font-medium text-ink-600 hover:text-ink-900",
       )}
