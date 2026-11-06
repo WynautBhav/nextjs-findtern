@@ -15,6 +15,7 @@ import { laptopLabel, offerScore, parseOffer, WEEKLY_SCHEDULES } from "@/lib/off
 import { shiftInIst } from "@/lib/timezones";
 import { DetailRow, Pill, SectionHead, Surface } from "@/components/app/primitives";
 import { buttonClass } from "@/components/ui/button";
+import { MessageButton } from "@/components/app/messages/message-button";
 import { ProposalActions } from "@/components/employer/proposal-actions";
 import { ProposalOfferForm } from "@/components/employer/proposal-offer-form";
 import { offerState } from "@/components/employer/proposal-state";
@@ -177,7 +178,10 @@ export default async function EmployerProposalDetail({
               </p>
             </div>
           </div>
-          <Pill tone={state.tone}>{state.label}</Pill>
+          <div className="flex flex-wrap items-start gap-3">
+            <Pill tone={state.tone}>{state.label}</Pill>
+            <MessageButton proposalId={proposal.id} label="Message" />
+          </div>
         </div>
         <dl className="grid grid-cols-2 border-t border-ink-100 bg-ink-50/60 sm:grid-cols-4">
           {strip.map(([label, value], i) => (

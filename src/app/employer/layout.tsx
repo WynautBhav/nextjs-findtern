@@ -14,17 +14,21 @@ import {
   ShoppingBag,
   Clock,
   KeyRound,
+  MessageSquare,
   Receipt,
 } from "lucide-react";
 
-import { ConsoleShell, type ConsoleNavGroup } from "@/components/layout/console-shell";
+import { ConsoleShell, type ConsoleNavGroup, type ConsoleNavItem } from "@/components/layout/console-shell";
 import { RAIL_COOKIE } from "@/lib/rail";
 import { ViewAsBanner } from "@/components/admin/view-as-banner";
+import { LiveProvider } from "@/components/app/live-provider";
 import { TermsGate } from "@/components/app/terms-gate";
+import { ToastProvider } from "@/components/app/toast";
 import { getSession } from "@/lib/auth";
 import { getDb, schema } from "@/lib/db";
 import { SITE } from "@/lib/content/site";
 import { q } from "@/lib/college/sql";
+import { countsFor, type LiveCounts } from "@/lib/live-counts";
 import { shouldShowTermsPrompt } from "@/lib/terms";
 
 const NAV_GROUPS: ConsoleNavGroup[] = [
@@ -41,6 +45,7 @@ const NAV_GROUPS: ConsoleNavGroup[] = [
     title: "Proposals & Hiring",
     items: [
       { href: "/employer/proposals", label: "Proposals", icon: <FileText /> },
+      { href: "/employer/messages", label: "Messages", icon: <MessageSquare /> },
       { href: "/employer/schedule", label: "Schedule", icon: <CalendarDays /> },
       { href: "/employer/timesheets", label: "Timesheets", icon: <Clock /> },
     ],
@@ -60,7 +65,7 @@ export default async function EmployerLayout({ children }: { children: React.Rea
   if (!session || session.role !== "employer") redirect("/login?as=employer");
 
   let companyName = "Company Account";
-  let unreadAlerts = 0;
+  let live: LiveCounts = { notifications: 0, messages: 0, latest: null, lastMessageAt: null };
   let cartCount = 0;
   // Unknown (a failed read) must not trap someone behind a pop-up they may have already accepted.
   let termsVersion: string | null | undefined;
@@ -74,17 +79,8 @@ export default async function EmployerLayout({ children }: { children: React.Rea
     if (emp?.companyName) companyName = emp.companyName;
     termsVersion = emp?.termsVersion ?? null;
 
-    const [unread] = await db
-      .select({ value: count() })
-      .from(schema.notifications)
-      .where(
-        and(
-          eq(schema.notifications.recipientType, "employer"),
-          eq(schema.notifications.recipientId, session.uid),
-          eq(schema.notifications.isRead, false),
-        ),
-      );
-    unreadAlerts = Number(unread?.value ?? 0);
+    // Unread alerts and messages: the same query the live stream sends, so the badges never disagree with it.
+    live = await countsFor("employer", session.uid);
 
     const [cart] = await db
       .select({ value: count() })
@@ -103,18 +99,27 @@ export default async function EmployerLayout({ children }: { children: React.Rea
     // Keep fallback
   }
 
-  const groups = NAV_GROUPS.map((g) => ({
-    ...g,
-    items: g.items.map((i) =>
-      i.href === "/employer/cart" && cartCount > 0 ? { ...i, badge: cartCount } : i,
-    ),
-  }));
+  const badgeFor = (href: string): number | undefined =>
+    href === "/employer/cart" ? cartCount : href === "/employer/messages" ? live.messages : undefined;
+  const withBadge = (i: ConsoleNavItem): ConsoleNavItem => {
+    const n = badgeFor(i.href);
+    return n && n > 0 ? { ...i, badge: n > 99 ? "99+" : n, attention: i.href === "/employer/messages" || undefined } : i;
+  };
+  const groups = NAV_GROUPS.map((g) => ({ ...g, items: g.items.map(withBadge) }));
+  // Phone tab bar: the five places an employer returns to (the rest stay in the menu).
+  const flat = groups.flatMap((g) => g.items);
+  const tabs = ["/employer/dashboard", "/employer/candidates", "/employer/proposals", "/employer/messages", "/employer/cart"]
+    .map((href) => flat.find((i) => i.href === href))
+    .filter((i): i is ConsoleNavItem => Boolean(i));
+  const unreadAlerts = live.notifications;
 
   return (
+    <ToastProvider>
     <ConsoleShell
       roleLabel="Employer"
       homeHref="/employer/dashboard"
       groups={groups}
+      tabs={tabs}
       account={{ name: companyName, email: session.email }}
       menu={[
         { href: "/employer/account", label: "Company profile", icon: <Building2 /> },
@@ -146,8 +151,10 @@ export default async function EmployerLayout({ children }: { children: React.Rea
       }}
       banner={session.impersonator ? <ViewAsBanner viewing={companyName} admin={session.impersonator.email} /> : null}
     >
+      <LiveProvider initial={live} />
       {children}
       <TermsGate role="employer" initialOpen={termsVersion !== undefined && shouldShowTermsPrompt({ acceptedVersion: termsVersion, impersonating: !!session.impersonator })} />
     </ConsoleShell>
+    </ToastProvider>
   );
 }
