@@ -44,7 +44,7 @@ export function CandidateSearch({ filters, className }: { filters: Filters; clas
         name="q"
         type="search"
         defaultValue={filters.q}
-        placeholder="Search by skill or city"
+        placeholder="Skill or city"
         className="h-11 w-full rounded-full border border-ink-200 bg-white pl-11 pr-4 text-base text-ink-900 outline-none transition-colors placeholder:text-text-subtle hover:border-ink-300 focus-visible:border-brand-600 focus-visible:ring-[3px] focus-visible:ring-brand-600/20 md:text-sm"
       />
     </form>

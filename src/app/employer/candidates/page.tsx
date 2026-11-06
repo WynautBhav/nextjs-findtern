@@ -88,7 +88,7 @@ export default async function CandidatesPage({
               className={quietLink}
               title={projectApplied.city ? `Matched to ${projectApplied.name}, open to working in ${projectApplied.city}` : `Matched to ${projectApplied.name}`}
             >
-              Show everyone
+              Ignore project skills
             </Link>
           ) : !filters.projectDefaults && activeProjectId ? (
             <Link href={withFilters(filters, { projectDefaults: true, page: "" })} className={quietLink}>

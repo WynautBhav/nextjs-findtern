@@ -495,7 +495,7 @@ export async function loadCandidates(
     }
 
     // Row 61 / legacy dashboard:1528: the selected project fills in its own
-    // skills and city when the employer has not typed any. "Show everyone"
+    // skills and city when the employer has not typed any. "Ignore project skills"
     // (pf=0) switches that off; typed filters always win.
     const project = projectRows.find((p) => p.id === activeProjectId);
     const projectRemote = !project?.locationType || project.locationType === "remote";
