@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { Check, Info } from "lucide-react";
 
 import { PLAN_NAME, bandFor } from "@/lib/score";
@@ -52,10 +53,12 @@ export function RowAvatar({
 }
 
 /**
- * "9.0 Findtern Score · Latte (i)": the plan name is explained in a tooltip
- * (hover, focus or long-press), never a bare word.
+ * "9.0 Findtern Score · Latte (i)": the plan name is explained in a tooltip,
+ * never a bare word. Hover, focus and a tap open it (Radix alone closes it
+ * again on the tap's click, so on a phone it never showed).
  */
 export function ScoreBadge({ score, scored }: { score: number; scored: boolean }) {
+  const [open, setOpen] = useState(false);
   if (!scored) return <span className="text-sm text-ink-600">Not scored yet</span>;
   const band = bandFor(score);
   const plan = PLAN_NAME[band.id];
@@ -64,8 +67,16 @@ export function ScoreBadge({ score, scored }: { score: number; scored: boolean }
     <span className="inline-flex items-center gap-1.5 text-sm">
       <span className="nums text-base font-semibold text-ink-900">{score.toFixed(1)}</span>
       <span className="text-ink-600">Findtern Score</span>
-      <Tooltip>
-        <TooltipTrigger asChild>
+      <Tooltip open={open} onOpenChange={setOpen}>
+        <TooltipTrigger
+          asChild
+          // A tap focuses (which opens it) and then clicks, which Radix treats as "close": keep it open.
+          // On the Trigger, not the button: only here does preventDefault skip that close. Tap outside, Escape or blur close it.
+          onClick={(e) => {
+            e.preventDefault();
+            setOpen(true);
+          }}
+        >
           <button
             type="button"
             className="relative z-10 -my-1 inline-flex min-h-7 items-center gap-1 rounded-full px-1.5 font-medium text-ink-800 outline-none hover:bg-ink-100 focus-visible:ring-2 focus-visible:ring-brand-500 touch:min-h-11"
