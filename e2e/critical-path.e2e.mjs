@@ -715,6 +715,10 @@ step("employer: pays month 1 of the stipend, now due [API]", ["approved"], async
 });
 
 step("admin: creates a payout and marks it paid [API]", ["month1Paid", "adminReady"], async () => {
+  // A stipend can't be marked paid without bank details on file: the intern adds them in Settings first.
+  expectOk("POST /api/intern/onboarding (bank)", await api(pages.intern, "POST", "/api/intern/onboarding", {
+    bank: { accountHolderName: `${INTERN.firstName ?? "E2E"} Intern`, bankName: "State Bank of India", accountNumber: "123456789012", ifscCode: "SBIN0001234", upiId: "" },
+  }));
   const page = pages.admin;
   await assertRoleArea(page, "/admin/payouts", ADMIN_NAV);
   const base = `/api/admin/interns/${state.internId}/payouts`;
