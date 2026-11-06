@@ -4,7 +4,7 @@ import { useRef } from "react";
 import { Download, ExternalLink, FileText, Video } from "lucide-react";
 
 import { buttonClass } from "@/components/ui/button";
-import { LIGHT_TILE } from "@/components/app/primitives";
+import { SURFACE_CLASS } from "@/components/app/primitives";
 import { ScoreScale } from "@/components/app/tiles";
 import { cn } from "@/lib/utils";
 
@@ -89,7 +89,7 @@ export function AiFeedbackReport({
 
   if (!assessed) {
     return (
-      <section className={cn("min-w-0 rounded-apple-xl border border-ink-200/80 bg-white p-6 shadow-xs", LIGHT_TILE)}>
+      <section className={cn("min-w-0 p-6", SURFACE_CLASS)}>
         <div className="flex items-start gap-3">
           <div className="min-w-0">
             <h3 className="text-base font-semibold text-ink-900">AI interview results pending</h3>
@@ -105,7 +105,7 @@ export function AiFeedbackReport({
   return (
     <section
       ref={sectionRef}
-      className={cn("min-w-0 overflow-hidden rounded-apple-xl border border-ink-200/80 bg-white shadow-xs", LIGHT_TILE)}
+      className={cn("min-w-0 overflow-hidden", SURFACE_CLASS)}
     >
       <div className="flex flex-wrap items-start justify-between gap-4 border-b border-ink-100 p-5 sm:p-6">
         <div className="min-w-0">

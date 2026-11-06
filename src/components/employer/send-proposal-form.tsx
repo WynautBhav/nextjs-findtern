@@ -11,6 +11,7 @@ import { type Currency, type Pricing } from "@/lib/employer-pricing";
 import { formatMoney, formatPerHire, formatRate } from "@/lib/format";
 import { billableWorkingDays, PAID_LEAVE_OPTIONS, scheduledMonthlyHours, WEEKLY_SCHEDULES, workingDaysPerWeek, type WeeklySchedule } from "@/lib/offer";
 import { shiftInIst, TIMEZONES } from "@/lib/timezones";
+import { SURFACE_CLASS } from "@/components/app/primitives";
 import { buttonClass } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { offerableModes, type WorkPreference } from "@/lib/work-preference";
@@ -255,7 +256,7 @@ export function SendProposalForm({
           e.preventDefault();
           review();
         }}
-        className="min-w-0 overflow-hidden rounded-apple-xl border border-ink-200/80 bg-white shadow-xs"
+        className={cn("min-w-0 overflow-hidden", SURFACE_CLASS)}
       >
         {/* ── 1. The role ─────────────────────────────────────────────── */}
         <Step n={1} title="The role" hint="What the candidate is being offered, and from when.">
@@ -562,7 +563,7 @@ export function SendProposalForm({
 
       {/* ── Summary ─────────────────────────────────────────────────── */}
       <aside className="space-y-4 lg:sticky lg:top-8 lg:self-start">
-        <section className="overflow-hidden rounded-apple-xl border border-ink-200/80 bg-white shadow-xs">
+        <section className={cn("overflow-hidden", SURFACE_CLASS)}>
           <div className="flex items-center gap-3 border-b border-ink-100 p-5">
             <span aria-hidden className="grid size-11 shrink-0 place-items-center rounded-full bg-brand-50 text-sm font-bold text-brand-800">
               {candidate.initials}

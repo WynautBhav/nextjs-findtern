@@ -12,7 +12,7 @@ import { ShortlistToggle } from "@/components/employer/shortlist-toggle";
 import { CandidateAvatar } from "@/components/employer/candidate-avatar";
 import { FullTimeOfferButton } from "@/components/employer/full-time-offer-button";
 import { candidateStatusPill, proposalActionLabel, type CandidateProposal } from "@/components/employer/candidate-status";
-import { DetailRow, Pill, SectionHead } from "@/components/app/primitives";
+import { DetailRow, Pill, SectionHead, Surface } from "@/components/app/primitives";
 import { ButtonLink, buttonClass } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
@@ -171,7 +171,7 @@ export function CandidateCard({
   );
 
   return (
-    <li className="flex min-w-0 flex-col rounded-apple-xl border border-ink-200/80 bg-white p-5 shadow-xs">
+    <Surface as="li" className="flex flex-col p-5">
       {/* Identity, then the score as the hero on the right. */}
       <div className="flex items-start gap-4">
         <CandidateAvatar
@@ -402,6 +402,6 @@ export function CandidateCard({
           </div>
         </SheetContent>
       </Sheet>
-    </li>
+    </Surface>
   );
 }
