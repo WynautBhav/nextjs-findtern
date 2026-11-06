@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { displayNameOf, initialsOf } from "./employer-candidates.ts";
+import { candidateCode, displayNameOf, initialsOf } from "./employer-candidates.ts";
 
 test("initialsOf takes first letters of first and last name", () => {
   assert.equal(initialsOf("Meera", "Pillai"), "MP");
@@ -39,4 +39,17 @@ test("displayNameOf never renders a bare ? or blank", () => {
 test("initialsOf ignores symbols and falls back to ?", () => {
   assert.equal(initialsOf("<", "<"), "?");
   assert.equal(initialsOf("<Meera", "Pillai"), "MP");
+});
+
+test("a locked candidate with an id shows a stable code, so two PHs are told apart", () => {
+  const a = displayNameOf({ id: "6f1c2a9e-1111-4222-8333-444455556666", fullName: "Priya H", initials: "PH" }, false);
+  const b = displayNameOf({ id: "0a77c3d2-9999-4aaa-8bbb-ccccddddeeee", fullName: "Pooja H", initials: "PH" }, false);
+  assert.match(a, /^PH · FT-[0-9A-Z]{5}$/);
+  assert.notEqual(a, b);
+  assert.equal(a, displayNameOf({ id: "6f1c2a9e-1111-4222-8333-444455556666", fullName: "Priya H", initials: "PH" }, false));
+  assert.equal(candidateCode("x"), candidateCode("x"));
+});
+
+test("unlocked shows the full name only, never the code", () => {
+  assert.equal(displayNameOf({ id: "abc", fullName: "Priya H", initials: "PH" }, true), "Priya H");
 });

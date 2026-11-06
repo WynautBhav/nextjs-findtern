@@ -52,3 +52,11 @@ export function ago(iso: string | null, now = Date.now()): string {
   const d = Math.round(s / 86400);
   return d === 1 ? "yesterday" : `${d} days ago`;
 }
+
+/** What the placement console says about a student who has not been verified yet. */
+export function membershipLabel(input: { status: string; onRoster: boolean }): string {
+  if (input.status === "verified") return "Verified";
+  return input.onRoster
+    ? "On your roster, not verified yet. Share your student code"
+    : "Claimed, not verified. Share your student code";
+}

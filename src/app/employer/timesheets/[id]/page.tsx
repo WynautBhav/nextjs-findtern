@@ -66,7 +66,7 @@ export default async function EmployerTimesheetDetail({ params }: { params: Prom
       initials = ini === "?" ? "I" : ini;
       projectName = row.projectName ?? null;
       const unlocked = (await hiredInternIds(db, timesheet.employerId)).has(timesheet.internId);
-      name = displayNameOf({ fullName: `${first} ${last}`.trim() || "Intern", initials: ini }, unlocked);
+      name = displayNameOf({ id: timesheet.internId, fullName: `${first} ${last}`.trim() || "Intern", initials: ini }, unlocked);
     }
   } catch (err) {
     console.error("[employer/timesheet] names", err);

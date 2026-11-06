@@ -9,6 +9,7 @@ import { requireEmployerSetup } from "@/lib/employer-setup";
 import { bandFor } from "@/lib/score";
 import { formatMoney, formatRate } from "@/lib/format";
 import { RATING_META, displayNameOf, preferredCities, toCandidateProfile, type CandidateProfile } from "@/lib/employer-candidates";
+import { shortlistProjectsByIntern } from "@/lib/employer-shortlist";
 import { candidateRelations, hiredInternIds, type CandidateRelation } from "@/lib/employer-visibility";
 import { attachPhotos, visibleInternIds } from "@/lib/employer-pool";
 import { CandidateAvatar } from "@/components/employer/candidate-avatar";
@@ -67,6 +68,7 @@ export default async function CompareCandidates({ searchParams }: { searchParams
   let shortlisted = new Set<string>();
   let nameUnlocked = new Set<string>();
   let relations = new Map<string, CandidateRelation>();
+  let shortlistedFor = new Map<string, string[]>();
   let loadFailed = false;
 
   try {
@@ -111,6 +113,20 @@ export default async function CompareCandidates({ searchParams }: { searchParams
         candidateRelations(db, session.uid, ids),
       ]);
       relations = rel;
+      // Compare is shared across projects but a shortlist is per project, so say where each one already sits.
+      shortlistedFor = shortlistProjectsByIntern(
+        await db
+          .select({ internId: schema.employerCartItems.internId, projectName: schema.projects.projectName })
+          .from(schema.employerCartItems)
+          .innerJoin(schema.projects, eq(schema.projects.id, schema.employerCartItems.projectId))
+          .where(
+            and(
+              eq(schema.employerCartItems.employerId, session.uid),
+              eq(schema.employerCartItems.listType, "cart"),
+              inArray(schema.employerCartItems.internId, ids),
+            ),
+          ),
+      );
       const comparable = ids.filter((id) => visible.has(id) && !rel.get(id)?.hired);
       const rows = comparable.length
         ? await db
@@ -211,17 +227,17 @@ export default async function CompareCandidates({ searchParams }: { searchParams
   return (
     <div>
       <RememberSelection employerId={session.uid} compare={ids} project={activeProject?.id ?? null} />
-      <Link href={backHref} className="mb-4 inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-brand-700 underline-offset-4 hover:underline">
+      <ButtonLink href={backHref} variant="ghost" size="sm" className="mb-4 min-h-11">
         <ArrowLeft className="size-4" aria-hidden />
         Back to candidates
-      </Link>
+      </ButtonLink>
 
       <PageHead
         title={`Comparing ${candidates.length} candidate${candidates.length === 1 ? "" : "s"}`}
         lede={
           candidates.length === 1
             ? "Add at least one more from the candidate list to see who leads each row."
-            : "The leader of each row is marked. Hires are left out."
+            : "The leader of each row is marked. Hires are left out. The compare list is shared across your projects."
         }
         action={
           projects.length > 0 ? (
@@ -241,7 +257,7 @@ export default async function CompareCandidates({ searchParams }: { searchParams
                   ))}
                 </select>
               </label>
-              <button type="submit" className={buttonClass({ variant: "outline", size: "md" })}>
+              <button type="submit" className={buttonClass({ variant: "outline", size: "sm", className: "min-h-11" })}>
                 Apply
               </button>
             </form>
@@ -301,27 +317,37 @@ export default async function CompareCandidates({ searchParams }: { searchParams
                         <X className="size-4" aria-hidden />
                       </Link>
                     </div>
-                    {status ? (
-                      <div className="mt-2">
-                        <Pill tone={status.tone}>{status.label}</Pill>
+                    {status || (shortlistedFor.get(c.id)?.length ?? 0) > 0 ? (
+                      <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                        {status ? <Pill tone={status.tone}>{status.label}</Pill> : null}
+                        {(shortlistedFor.get(c.id)?.length ?? 0) > 0 ? (
+                          <Pill tone="neutral">Shortlisted for: {shortlistedFor.get(c.id)!.join(", ")}</Pill>
+                        ) : null}
                       </div>
                     ) : null}
                     {/* EMB-08: the action follows what already exists with them. */}
-                    <div className="mt-3 flex flex-wrap gap-2">
+                    <div className="mt-3 flex gap-2">
                       {rel?.proposal ? (
-                        <ButtonLink href={`/employer/proposal/${encodeURIComponent(rel.proposal.id)}`} variant="outline" size="sm" className="min-h-10">
+                        <ButtonLink href={`/employer/proposal/${encodeURIComponent(rel.proposal.id)}`} variant="outline" size="sm" className="min-h-11 flex-1">
                           {proposalActionLabel(rel.proposal)}
                         </ButtonLink>
                       ) : (
                         <>
                           {activeProject ? (
-                            <ShortlistToggle internId={c.id} projectId={activeProject.id} shortlisted={shortlisted.has(c.id)} size="sm" emphasis="primary" />
+                            <ShortlistToggle
+                              internId={c.id}
+                              projectId={activeProject.id}
+                              shortlisted={shortlisted.has(c.id)}
+                              size="sm"
+                              className="flex-1"
+                              alsoOn={(shortlistedFor.get(c.id) ?? []).filter((n) => n !== activeProject.projectName)}
+                            />
                           ) : null}
                           <ButtonLink
                             href={`/employer/send-proposal?intern=${encodeURIComponent(c.id)}${activeProject ? `&project=${encodeURIComponent(activeProject.id)}` : ""}`}
-                            variant={activeProject && !shortlisted.has(c.id) ? "outline" : "primary"}
+                            variant="primary"
                             size="sm"
-                            className="min-h-10"
+                            className="min-h-11 flex-1"
                           >
                             <Send className="size-4" aria-hidden />
                             Send proposal

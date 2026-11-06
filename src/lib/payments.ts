@@ -11,6 +11,7 @@ import { SEATS_USED_UP } from "@/lib/promo-rules";
 import { PROMO_CONSENT_VERSION } from "@/lib/college/promo-consent";
 import { consentProblem, membershipFromPromo, promoConsentHash } from "@/lib/college/promo-membership";
 import { assignInvoiceNumber } from "@/lib/invoice-number";
+import { invoiceBuyerPatch } from "@/lib/invoice-buyer";
 import { monthMismatches } from "@/lib/billing-plan";
 import { orderProposalIds } from "@/lib/order-ids";
 
@@ -120,7 +121,16 @@ export async function settleEmployerOrder(input: {
       .returning({ id: schema.employerPayments.id });
     if (claimed.length === 0) return null;
     // A free (test-mode) order is not a sale, so it takes no invoice number.
-    if (order.amountMinor > 0) await assignInvoiceNumber("employer", order.id, new Date(), tx);
+    if (order.amountMinor > 0) {
+      await assignInvoiceNumber("employer", order.id, new Date(), tx);
+      // Freeze the buyer block (state and GSTIN decide the tax split) so a later
+      // profile edit can't change an invoice that is already out.
+      const [buyer] = await tx.select().from(schema.employers).where(eq(schema.employers.id, order.employerId)).limit(1);
+      await tx
+        .update(schema.employerPayments)
+        .set({ raw: sql`coalesce(${schema.employerPayments.raw}, '{}'::jsonb) || ${JSON.stringify(invoiceBuyerPatch(buyer))}::jsonb` })
+        .where(eq(schema.employerPayments.id, order.id));
+    }
 
     const promo = promoOf(order.raw);
     if (promo) {
@@ -159,7 +169,8 @@ export async function settleEmployerOrder(input: {
           : { reason: "month_mismatch", lines: wrongMonth };
       await tx
         .update(schema.employerPayments)
-        .set({ raw: { ...((order.raw ?? {}) as Record<string, unknown>), needsReview } })
+        // Merge in SQL: the `order.raw` read above predates the invoice snapshot.
+        .set({ raw: sql`coalesce(${schema.employerPayments.raw}, '{}'::jsonb) || ${JSON.stringify({ needsReview })}::jsonb` })
         .where(eq(schema.employerPayments.id, order.id));
       console.error(`[payments] order ${input.orderId}: needs review (${needsReview.reason})`);
     }

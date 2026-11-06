@@ -4,6 +4,7 @@ import { Clock, Mail, MapPin } from "lucide-react";
 
 import { PageHero, PageSection } from "@/components/marketing/page-hero";
 import { ContactForm } from "@/components/marketing/contact-form";
+import { parseQueryType } from "@/lib/contact-types";
 import { SITE } from "@/lib/content/site";
 import { EmailLink } from "@/components/marketing/email-link";
 import { JsonLd } from "@/components/seo/json-ld";
@@ -16,7 +17,8 @@ export const metadata: Metadata = {
   alternates: { canonical: "/contact" },
 };
 
-export default function ContactPage() {
+export default async function ContactPage({ searchParams }: { searchParams?: Promise<{ type?: string | string[] }> }) {
+  const initialType = parseQueryType((await searchParams)?.type);
   return (
     <>
       <JsonLd
@@ -80,7 +82,7 @@ export default function ContactPage() {
           </div>
 
           {/* ── Form ────────────────────────────────────────────── */}
-          <ContactForm />
+          <ContactForm initialType={initialType} />
         </div>
       </PageSection>
     </>

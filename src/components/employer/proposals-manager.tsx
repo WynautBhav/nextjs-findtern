@@ -30,7 +30,7 @@ export type ProposalItem = {
 function nameOf(item: ProposalItem): string {
   const first = item.user?.firstName?.trim() || "";
   const last = item.user?.lastName?.trim() || "";
-  return displayNameOf({ fullName: `${first} ${last}`.trim() || "Candidate", initials: initialsOf(first, last) }, item.internHired);
+  return displayNameOf({ id: item.proposal.internId, fullName: `${first} ${last}`.trim() || "Candidate", initials: initialsOf(first, last) }, item.internHired);
 }
 
 /** Status filter buckets (the raw enums never reach the select). */

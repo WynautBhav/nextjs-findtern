@@ -30,6 +30,7 @@ import {
 import { candidateRelations, hiredInternIds, type CandidateRelation } from "@/lib/employer-visibility";
 import { attachPhotos, candidatePoolClauses, scoreExpr } from "@/lib/employer-pool";
 import { projectCities } from "@/lib/project-locations";
+import { likePattern } from "@/lib/admin/palette-search";
 import { requireEmployerSetup } from "@/lib/employer-setup";
 import { employerRegion, resolvePricing, type Currency } from "@/lib/employer-pricing";
 import { BANDS, PLAN_NAME, bandFor, type BandId } from "@/lib/score";
@@ -288,9 +289,9 @@ export default async function CandidatesPage({
         // Keyword only - never a name. Employers browse a redacted pool, so the
         // query matches skills, bio and city. Matching on name would let anyone
         // probe whether a specific person is on the platform.
-        const needle = `%${filters.q}%`;
+        const needle = likePattern(filters.q);
         clauses.push(
-          sql`(${schema.internOnboarding.skills}::text ILIKE ${needle} OR ${schema.internOnboarding.bio} ILIKE ${needle} OR ${schema.internOnboarding.city} ILIKE ${needle})`,
+          sql`(${schema.internOnboarding.skills}::text ILIKE ${needle} ESCAPE '\\' OR ${schema.internOnboarding.bio} ILIKE ${needle} ESCAPE '\\' OR ${schema.internOnboarding.city} ILIKE ${needle} ESCAPE '\\')`,
         );
       }
 
@@ -346,16 +347,21 @@ export default async function CandidatesPage({
 
       // Cities match the candidate's PREFERRED cities only, by the city part
       // of "City, State" (legacy getLocationMatchCount, EMB-15 decided). The
-      // home city does not count, and "Include remote" never waives it.
+      // home city does not count. "Include remote" lets in candidates who take
+      // remote work: they store no preferred city, so the city test would hide
+      // them (`matchesPlace` in lib/employer-candidates is the same rule).
       cityList = cityTerms(cityText);
       if (cityList.length > 0) {
         const preferred = schema.internOnboarding.preferredLocations;
-        clauses.push(
-          sql`EXISTS (SELECT 1 FROM jsonb_array_elements_text(CASE WHEN jsonb_typeof(${preferred}) = 'array' THEN ${preferred} ELSE '[]'::jsonb END) AS p(v)
+        const cityMatch = sql`EXISTS (SELECT 1 FROM jsonb_array_elements_text(CASE WHEN jsonb_typeof(${preferred}) = 'array' THEN ${preferred} ELSE '[]'::jsonb END) AS p(v)
             WHERE lower(btrim(split_part(v, ',', 1))) IN (${sql.join(
               cityList.map((c) => sql`${c}`),
               sql`, `,
-            )}))`,
+            )}))`;
+        clauses.push(
+          includeRemote
+            ? sql`(${cityMatch} OR (${schema.internOnboarding.locationTypes})::text ILIKE '%remote%')`
+            : cityMatch,
         );
       }
 
@@ -366,7 +372,7 @@ export default async function CandidatesPage({
       }
 
       if (filters.mode) {
-        clauses.push(sql`(${schema.internOnboarding.locationTypes})::text ILIKE ${`%${filters.mode}%`}`);
+        clauses.push(sql`(${schema.internOnboarding.locationTypes})::text ILIKE ${likePattern(filters.mode)} ESCAPE '\\'`);
       }
 
       if (filters.minScore > 0) {
@@ -663,11 +669,11 @@ export default async function CandidatesPage({
                   ? "1 selected · pick one more to compare"
                   : `${compareIds.length} of ${MAX_COMPARE} selected${compareFull ? " · limit reached" : ""}`}
               </span>
-              <Link href={withFilters(filters, { ids: [] })} scroll={false} className="text-sm font-medium text-ink-600 underline-offset-4 hover:text-ink-900 hover:underline">
+              <Link href={withFilters(filters, { ids: [] })} scroll={false} className={buttonClass({ variant: "ghost", size: "sm", className: "min-h-11" })}>
                 Clear
               </Link>
               {compareIds.length >= 2 ? (
-                <ButtonLink href={compareHref(filters)} variant="primary" size="sm" className="min-h-10">
+                <ButtonLink href={compareHref(filters)} variant="primary" size="sm" className="min-h-11">
                   <Scale className="size-4" aria-hidden />
                   Compare side by side
                 </ButtonLink>
@@ -862,9 +868,9 @@ export default async function CandidatesPage({
                                 // Starts with the phone label ("In compare" / "Compare") so voice control can say it (2.5.3).
                                 aria-label={selected ? `In compare: remove ${name}` : `Compare ${name}`}
                                 className={buttonClass({
-                                  variant: "ghost",
+                                  variant: "outline",
                                   size: "sm",
-                                  className: selected ? "bg-brand-50 text-brand-800" : "text-ink-600",
+                                  className: cn("min-h-11", selected && "bg-brand-50 text-brand-800"),
                                 })}
                               >
                                 <Scale className="size-4" aria-hidden />

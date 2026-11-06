@@ -13,6 +13,22 @@ export function earningsView(payoutCount: number, hasEngagement: boolean): "empt
   return payoutCount === 0 && !hasEngagement ? "empty" : "summary";
 }
 
+/**
+ * The line under "Your stipend" and the bank button. With no bank account on file it never says "Add your bank account so
+ * Findtern can pay" beside a payout that is already marked paid (an admin can record one before the intern adds a bank).
+ */
+export function bankPrompt(input: { last4: string; paidCount: number }): { kind: "on_file" | "add" | "paid_without_bank"; text: string | null; button: string } {
+  if (input.last4) return { kind: "on_file", text: null, button: "Bank details" };
+  if (input.paidCount > 0) {
+    return {
+      kind: "paid_without_bank",
+      text: "A payout is marked paid but there is no bank account on file for it. Add your bank details in settings, and tell Findtern if a payment has not reached you.",
+      button: "Add bank details",
+    };
+  }
+  return { kind: "add", text: "Add your bank account in settings so Findtern can pay your stipend.", button: "Add bank details" };
+}
+
 /** One hired internship on the stipend screen (legacy earnings.tsx card). */
 export type EngagementEarnings = {
   proposalId: string;

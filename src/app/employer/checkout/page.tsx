@@ -113,7 +113,7 @@ export default async function EmployerCheckout({
           lines={lines.map((line) => ({
             id: line.id,
             internId: line.internId,
-            who: displayNameOf({ fullName: line.internName, initials: line.internInitials }, line.nameUnlocked),
+            who: displayNameOf({ id: line.internId, fullName: line.internName, initials: line.internInitials }, line.nameUnlocked),
             roleTitle: line.roleTitle,
             projectName: line.projectName,
             currency: line.currency,

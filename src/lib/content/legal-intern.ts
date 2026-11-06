@@ -63,9 +63,9 @@ export const INTERN_TERMS: CmsLegalDoc = {
 
 <h2>5. Registration Fee &amp; Refunds</h2>
 <ul>
-<li>Findtern guarantees every registered candidate an internship within 12 months of completing their AI interview.</li>
+<li>Findtern guarantees every registered candidate an internship within 6 months of completing their AI interview.</li>
 <li>If we are unable to provide an internship within this period, the registration fee will be refunded in full.</li>
-<li>Refunds will be processed only after the 12-month window has closed, within 7 working days.</li>
+<li>Refunds will be processed only after the 6-month window has closed, within 7 working days.</li>
 <li>If you turn down or let lapse more than 3 offers, you are no longer eligible for the refund. Only formal offers count, not interview requests.</li>
 <li>Placement opportunities and your stipend band are based on your Findtern Score.</li>
 <li>Fees paid in India include GST at the applicable rate. Your invoice shows the GST breakup.</li>

@@ -344,3 +344,9 @@ test("a new offer below 6 stores a 0 stipend, so a later score of 6+ never reads
   assert.equal(internStipendInrMinor(legacy, 4), 0);
   assert.equal(internStipendInrMinor(legacy, 7), Math.floor(legacy.monthlyMinor! * 0.5));
 });
+
+test("Emp P2-4: the form's default of zero paid leave bills the full 176 h of a mon_fri month", () => {
+  assert.equal(scheduledMonthlyHours("mon_fri", Number("0") || 0), 176);
+  // The composer starts at "0", the server default when the field is absent.
+  assert.equal(parseOffer({}, "INR").paidLeavesPerMonth, 0);
+});

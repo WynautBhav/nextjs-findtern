@@ -25,6 +25,6 @@ export const COLLEGE_PITCH: CmsCollegePitch = {
       body: "On drive day you see who has Findtern open and who can be reached by phone alert, plus every offer a student is sitting on, each a one-tap nudge.",
     },
   ],
-  cta: { label: "Bring Findtern to your college", href: "/contact" },
+  cta: { label: "Bring Findtern to your college", href: "/contact?type=college" },
   loginHref: "/login?as=college",
 };

@@ -150,19 +150,24 @@ export function CandidateCard({
       // A link, so no aria-pressed: the label carries the state.
       aria-label={selected ? "In compare: remove" : undefined}
       className={buttonClass({
-        variant: "ghost",
+        variant: "outline",
         size: "sm",
-        className: cn("min-h-10 px-2.5", selected ? "bg-brand-50 font-semibold text-brand-800" : "text-ink-700"),
+        className: cn("min-h-11", selected && "bg-brand-50 font-semibold text-brand-800"),
       })}
     >
       {selected ? <Check className="size-4" aria-hidden /> : <Scale className="size-4" aria-hidden />}
       {selected ? "In compare" : "Compare"}
     </Link>
   ) : (
-    <span className="inline-flex min-h-10 items-center gap-2 px-2.5 text-sm text-text-subtle" title="Compare shows up to four candidates. Remove one to add another.">
+    <button
+      type="button"
+      disabled
+      className={buttonClass({ variant: "outline", size: "sm", className: "min-h-11" })}
+      title="Compare shows up to four candidates. Remove one to add another."
+    >
       <Scale className="size-4" aria-hidden />
       Compare full (4)
-    </span>
+    </button>
   );
 
   return (

@@ -41,7 +41,7 @@ export default async function CollegeLayout({ children }: { children: React.Reac
       groups={NAV}
       tabs={NAV[0].items}
       account={{ name: ctx.college.name, email: ctx.admin.email }}
-      help={{ faqHref: "/faq", contactHref: "/contact", email: SITE.adminEmail }}
+      help={{ faqHref: "/faq", contactHref: "/contact?type=college", email: SITE.adminEmail }}
       signOutTo="/login?as=college"
       initialCollapsed={(await cookies()).get(RAIL_COOKIE)?.value === "1"}
       rootCrumb={{ label: "Students", href: "/college" }}

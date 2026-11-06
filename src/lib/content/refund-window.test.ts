@@ -45,3 +45,10 @@ test("the guard pattern catches the original stipend range and its spacing and d
     assert.equal(grep(["-iE", PATTERN], `${text}\n`), "", `should not match: ${text}`);
   }
 });
+
+// The guarantee window is 6 months. "Last 12 months" (admin report range) is a different thing.
+test("no 12-month guarantee window copy under src/ or scripts/", () => {
+  const out = grep(["-rniE", "12[ -]months?|twelve months", "src", "scripts", "--exclude=*.test.ts"]);
+  const hits = out.split("\n").filter((l) => l && !/Last 12 months|admin\/params/.test(l));
+  assert.deepEqual(hits, []);
+});

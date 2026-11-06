@@ -35,7 +35,7 @@ export async function GET() {
     "- Findtern Score: one number out of 10 across communication, aptitude, role depth, coding and academics; the score band sets the rate",
     "- Billing: hourly rate against approved monthly timesheets (one per month, sent on the period's last day), plus one fixed per-hire charge; prices in INR include GST; USD is derived at ₹100 = $1",
     "- Overseas employers: contract with Findtern for the service and pay in USD; Findtern engages and pays the intern in India (no visa, no local entity)",
-    "- Candidate guarantee: an internship within 12 months of the AI interview or the fee is refunded in full, after the window closes (terms at /guaranteed-internship-program)",
+    "- Candidate guarantee: an internship within 6 months of the AI interview or the fee is refunded in full, after the window closes (terms at /guaranteed-internship-program)",
     "",
     "## Plans (INR, published rate card)",
     "",

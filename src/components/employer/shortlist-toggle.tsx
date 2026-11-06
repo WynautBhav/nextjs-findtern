@@ -9,7 +9,7 @@
  * One component covers both directions so the button and its "remove" twin can
  * never disagree about what is currently shortlisted. Before shortlisting it
  * is the card's one primary action (`emphasis="primary"`); once shortlisted it
- * steps back to an outline button (still named "Shortlist", aria-pressed) that removes on press.
+ * steps back to an outline button (named "Shortlisted", aria-pressed) that removes on press.
  */
 
 import { useState } from "react";
@@ -26,6 +26,7 @@ export function ShortlistToggle({
   shortlisted,
   size = "md",
   emphasis = "quiet",
+  alsoOn,
   className,
 }: {
   internId: string;
@@ -34,6 +35,8 @@ export function ShortlistToggle({
   size?: "sm" | "md";
   /** "primary" while not shortlisted: the filled brand button. */
   emphasis?: "primary" | "quiet";
+  /** Names of other projects this candidate is already shortlisted for; shown under the button. */
+  alsoOn?: string[];
   /** Applied to the wrapper; the button always fills it. */
   className?: string;
 }) {
@@ -86,7 +89,7 @@ export function ShortlistToggle({
         aria-disabled={busy || undefined}
         aria-pressed={state}
         title={state ? "Remove from your shortlist" : "Add to your shortlist for this project"}
-        className={buttonClass({ variant, size: size === "sm" ? "sm" : "md", block: true, className: size === "sm" ? "min-h-10" : undefined })}
+        className={buttonClass({ variant, size: size === "sm" ? "sm" : "md", block: true, className: size === "sm" ? "min-h-11" : undefined })}
       >
         {busy ? (
           <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden />
@@ -95,8 +98,11 @@ export function ShortlistToggle({
         ) : (
           <Plus className="size-4" aria-hidden />
         )}
-        Shortlist
+        {state ? "Shortlisted" : "Shortlist"}
       </button>
+      {alsoOn && alsoOn.length > 0 ? (
+        <span className="text-xs text-ink-600">Also shortlisted for {alsoOn.join(", ")}</span>
+      ) : null}
       {error ? (
         <span role="alert" className="text-xs text-danger">
           {error}

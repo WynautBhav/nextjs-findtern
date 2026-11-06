@@ -26,6 +26,7 @@ export function ChipInput({
   onRemove,
   error,
   suggest,
+  listOnly,
   required,
 }: {
   id: string;
@@ -40,6 +41,8 @@ export function ChipInput({
   error?: string;
   /** Vocabulary to offer while typing. Free text is still accepted. */
   suggest?: (query: string) => string[];
+  /** Only an entry that is on the `suggest` list can be added; free text is refused. */
+  listOnly?: boolean;
   required?: boolean;
 }) {
   const [draft, setDraft] = useState("");
@@ -49,10 +52,22 @@ export function ChipInput({
   const has = (v: string) => entries.some((e) => e.toLowerCase() === v.toLowerCase());
   const options = suggest && focused && !full && draft.trim() ? suggest(draft).filter((o) => !has(o)).slice(0, 8) : [];
   const listId = `${id}-suggestions`;
+  const [notOnList, setNotOnList] = useState("");
 
   function commit(value?: string) {
-    const next = (value ?? draft).trim();
+    let next = (value ?? draft).trim();
     if (!next || full || has(next)) return;
+    if (listOnly && suggest) {
+      // The list's own spelling; anything else is refused.
+      const match = suggest(next).find((o) => o.toLowerCase() === next.toLowerCase());
+      if (!match) {
+        setNotOnList(`"${next}" is not on the list. Pick one of the suggestions.`);
+        return;
+      }
+      next = match;
+      if (has(next)) return;
+    }
+    setNotOnList("");
     onAdd(next);
     setDraft("");
     setActive(-1);
@@ -87,6 +102,7 @@ export function ChipInput({
           autoComplete="off"
           onChange={(e) => {
             setDraft(e.target.value);
+            setNotOnList("");
             setActive(-1);
           }}
           onFocus={() => setFocused(true)}
@@ -168,8 +184,8 @@ export function ChipInput({
         </ul>
       ) : null}
 
-      {error ? (
-        <FieldError id={`${id}-error`}>{error}</FieldError>
+      {error || notOnList ? (
+        <FieldError id={`${id}-error`}>{error || notOnList}</FieldError>
       ) : (
         <p id={`${id}-count`} className="nums mt-1.5 text-xs text-ink-600">
           {counter}

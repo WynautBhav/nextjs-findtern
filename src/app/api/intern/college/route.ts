@@ -8,7 +8,7 @@ import { getSession } from "@/lib/auth";
 const bodySchema = z.object({
   collegeId: z.string().min(1, "Choose your college"),
   year: z.number("Choose your year, 1 to 5").int("Choose your year, 1 to 5").min(1, "Choose your year, 1 to 5").max(5, "Choose your year, 1 to 5").nullable(),
-  branch: z.string().trim().max(120, "Branch can be up to 120 characters").nullable(),
+  branch: z.string("Enter your branch").trim().min(1, "Enter your branch").max(120, "Enter your branch"),
   declaredAdult: z.boolean(),
 });
 
@@ -26,7 +26,6 @@ export async function POST(req: Request) {
   if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Choose your college" }, { status: 400 });
   const r = await joinCollege({
     ...parsed.data,
-    branch: parsed.data.branch || null,
     userId: guard.session.uid,
   });
   if (!r.ok) return NextResponse.json({ error: r.error }, { status: r.status });

@@ -110,7 +110,7 @@ export default async function EmployerDrivePage({ params }: { params: Promise<{ 
     const initials = initialsOf(s.firstName, s.lastName);
     return {
       id: s.userId,
-      name: displayNameOf({ fullName: `${s.firstName} ${s.lastName}`.trim(), initials }, hired.has(s.userId)),
+      name: displayNameOf({ id: s.userId, fullName: `${s.firstName} ${s.lastName}`.trim(), initials }, hired.has(s.userId)),
       initials,
       year: s.year,
       branch: s.branch,

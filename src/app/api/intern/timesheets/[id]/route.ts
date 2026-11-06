@@ -5,7 +5,7 @@ import { z } from "zod";
 import { getDb, schema } from "@/lib/db";
 import { LEGACY_DAY_STATUSES } from "@/lib/employer-timesheets";
 import { requireMutation } from "@/lib/guards-mutation";
-import { clearFutureDays, periodDays, todayIst } from "@/lib/timesheet-days";
+import { clearFutureDays, duplicateDay, mergeEntriesByDate, periodDays, todayIst } from "@/lib/timesheet-days";
 
 /**
  * Autosave for a draft timesheet, and deleting one.
@@ -59,11 +59,21 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     );
   }
 
+  if (duplicateDay(parsed.data.entries)) {
+    return NextResponse.json({ error: "Each day can appear only once" }, { status: 400 });
+  }
+
   const inPeriod = new Set(periodDays(sheet.periodStart, sheet.periodEnd));
   const today = todayIst();
-  const entries = clearFutureDays(
+  const sent = clearFutureDays(
     parsed.data.entries.filter((e) => inPeriod.size === 0 || inPeriod.has(e.date)),
     today,
+  );
+  // Only the days sent are replaced; the rest of the month stays as saved.
+  const stored = (Array.isArray(sheet.entries) ? sheet.entries : []) as typeof sent;
+  const entries = mergeEntriesByDate(
+    stored.filter((e) => e && typeof e.date === "string" && (inPeriod.size === 0 || inPeriod.has(e.date))),
+    sent,
   );
 
   // INW-23, legacy routes.ts:13733: editing a sheet that was sent back makes

@@ -129,3 +129,12 @@ test("a fixed-stipend hire's remaining amount is the fixed figure × months less
   assert.equal(card.paidMinor, 1_500_000);
   assert.equal(card.remainingMinor, 1_500_000 * 3 - 1_500_000);
 });
+
+test("bankPrompt never asks to add a bank next to a paid payout without saying so", async () => {
+  const { bankPrompt } = await import("./earnings-view.ts");
+  assert.deepEqual(bankPrompt({ last4: "1234", paidCount: 2 }), { kind: "on_file", text: null, button: "Bank details" });
+  assert.equal(bankPrompt({ last4: "", paidCount: 0 }).text, "Add your bank account in settings so Findtern can pay your stipend.");
+  const paid = bankPrompt({ last4: "", paidCount: 1 });
+  assert.equal(paid.kind, "paid_without_bank");
+  assert.match(paid.text ?? "", /marked paid but there is no bank account on file/);
+});

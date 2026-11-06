@@ -31,7 +31,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const fee = await getFeeRupees();
   return {
     title: "Guaranteed Internship Program: Placed or Your Fee Back",
-    description: `Findtern's internship guarantee for students in India: placed within 12 months of your AI interview or the ₹${fee.toLocaleString("en-IN")} fee is refunded in full. The process, the three conditions, exclusions and refund timing.`,
+    description: `Findtern's internship guarantee for students in India: placed within 6 months of your AI interview or the ₹${fee.toLocaleString("en-IN")} fee is refunded in full. The process, the three conditions, exclusions and refund timing.`,
     alternates: { canonical: "/guaranteed-internship-program" },
   };
 }
@@ -64,14 +64,14 @@ const STEPS = [
   {
     n: "05",
     title: "Guaranteed Outcome",
-    text: "Get placed within 12 months, or receive a 100% full refund if we fail to place you.",
+    text: "Get placed within 6 months, or receive a 100% full refund if we fail to place you.",
   },
 ];
 
 const PROGRAM_TERMS = [
   {
-    title: "1. 12-Month Placement Window",
-    text: "You will be matched and placed in a qualified internship within 12 months of your AI interview.",
+    title: "1. 6-Month Placement Window",
+    text: "You will be matched and placed in a qualified internship within 6 months of your AI interview.",
   },
   {
     title: "2. 100% Refund Assurance",
@@ -79,7 +79,7 @@ const PROGRAM_TERMS = [
   },
   {
     title: "3. Defined Execution Window",
-    text: "The program features an active placement runway. Refunds are issued within 7 working days after the 12-month guarantee window closes.",
+    text: "The program features an active placement runway. Refunds are issued within 7 working days after the 6-month guarantee window closes.",
   },
   {
     title: "4. Hiding your profile",
@@ -135,7 +135,7 @@ const CONDITIONS = [
 const termsFor = (fee: number) => [
   { label: "Fee", value: `₹${fee.toLocaleString("en-IN")}`, note: "refundable on conditions" },
   { label: "Clock starts", value: "Your AI interview", note: "not your sign-up date" },
-  { label: "Refund timing", value: "After 12 months", note: "not during the window" },
+  { label: "Refund timing", value: "After 6 months", note: "not during the window" },
   { label: "Counts as placed", value: "160+ hours", note: "contracted engagement" },
 ];
 
@@ -145,7 +145,7 @@ const FAQS = [
     category: "Program",
     question: "What is the Guaranteed Internship Program?",
     answer:
-      "It’s a structured, transparent process where you complete candidate onboarding and an AI-powered evaluation, become visible to verified hiring employers, and we work to get you placed within 12 months — or your fee is refunded in full.",
+      "It’s a structured, transparent process where you complete candidate onboarding and an AI-powered evaluation, become visible to verified hiring employers, and we work to get you placed within 6 months — or your fee is refunded in full.",
   },
   {
     id: "g-how-works",
@@ -166,12 +166,12 @@ const FAQS = [
     category: "Pricing",
     question: "Are there any hidden charges?",
     answer:
-      "No. You pay one fee, once. It is refunded in full if we do not place you within 12 months and you met the three conditions. There are no hidden or recurring charges.",
+      "No. You pay one fee, once. It is refunded in full if we do not place you within 6 months and you met the three conditions. There are no hidden or recurring charges.",
   },
   {
     id: "g1",
     category: "Refund",
-    question: "When exactly does the 12-month clock start?",
+    question: "When exactly does the 6-month clock start?",
     answer:
       "On the date your assessment is scored, not the date you signed up. This follows the standard consumer-law convention where the clock starting early is the usual trick, so it is stated explicitly here.",
   },
@@ -180,7 +180,7 @@ const FAQS = [
     category: "Refund",
     question: "Can I get a partial refund during the window?",
     answer:
-      "No. The refund is all-or-nothing after the window closes. There is no mid-window payment, and we cannot pay out faster than twelve months even if we wanted to.",
+      "No. The refund is all-or-nothing after the window closes. There is no mid-window payment, and we cannot pay out faster than six months even if we wanted to.",
   },
   {
     id: "g3",
@@ -194,7 +194,7 @@ const FAQS = [
     category: "Refund",
     question: "How many offers can I turn down?",
     answer:
-      "Up to 3 during the 12-month window. Turning down or letting a 4th offer lapse ends the guarantee. Only formal offers count - an interview request you pass on is not an offer.",
+      "Up to 3 during the 6-month window. Turning down or letting a 4th offer lapse ends the guarantee. Only formal offers count - an interview request you pass on is not an offer.",
   },
   {
     id: "g4a",
@@ -263,7 +263,7 @@ export default async function GuaranteePage() {
         <div className="mt-8 flex flex-wrap items-center justify-center gap-4 text-xs font-semibold text-ink-700">
           <div className="inline-flex items-center gap-1.5 rounded-full border border-ink-200/80 bg-white/80 px-3.5 py-1.5 backdrop-blur-xs shadow-2xs">
             <Clock className="size-3.5 text-primary" />
-            <span>12-Month Guarantee Window</span>
+            <span>6-Month Guarantee Window</span>
           </div>
           <div className="inline-flex items-center gap-1.5 rounded-full border border-ink-200/80 bg-white/80 px-3.5 py-1.5 backdrop-blur-xs shadow-2xs">
             <Lock className="size-3.5 text-primary" />

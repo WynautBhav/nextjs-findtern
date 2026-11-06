@@ -156,6 +156,7 @@ export function ProjectFields({
         onRemove={(skill) => set({ skills: values.skills.filter((s) => s !== skill) })}
         error={errors.skills}
         suggest={(q) => suggestSkills(q, 8)}
+        listOnly
       />
 
       <ChoiceGroup

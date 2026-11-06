@@ -21,6 +21,7 @@ export function WithdrawForm({ availableMinor, blockedReason }: { availableMinor
     const amountMinor = Math.round(Number(rupees) * 100);
     if (!Number.isFinite(amountMinor) || amountMinor <= 0) return setMsg("Enter an amount above zero.");
     if (amountMinor > availableMinor) return setMsg(`That is more than your available balance (${formatMoney(availableMinor, "INR", { zeroLabel: false })}).`);
+    setMsg(null);
     const ok = await ask({
       title: "Request this withdrawal?",
       body: `${formatMoney(amountMinor, "INR", { zeroLabel: false })} will be sent to your bank account on file once Findtern pays it.`,

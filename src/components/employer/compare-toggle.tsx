@@ -13,6 +13,7 @@ import { useRouter } from "next/navigation";
 import { Check, Scale } from "lucide-react";
 
 import { buttonClass } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 const MAX = 4;
 const MAX_AGE = 60 * 60 * 24 * 30;
@@ -45,10 +46,10 @@ export function CompareToggle({
 
   if (disabledReason) {
     return (
-      <span className={buttonClass({ variant: "light", size: "md", className: "pointer-events-none opacity-70" })} title={disabledReason}>
+      <button type="button" disabled className={buttonClass({ variant: "outline", size: "sm", className: "min-h-11" })} title={disabledReason}>
         <Scale className="size-4" aria-hidden />
         {disabledReason}
-      </span>
+      </button>
     );
   }
 
@@ -60,13 +61,13 @@ export function CompareToggle({
         aria-pressed={inCompare}
         title={full ? "Compare holds four candidates. Remove one first." : undefined}
         onClick={() => save(inCompare ? picked.filter((id) => id !== internId) : [...picked, internId])}
-        className={buttonClass({ variant: "outline", size: "md", className: inCompare ? "bg-brand-50" : undefined })}
+        className={buttonClass({ variant: "outline", size: "sm", className: cn("min-h-11", inCompare && "bg-brand-50") })}
       >
         {inCompare ? <Check className="size-4" aria-hidden /> : <Scale className="size-4" aria-hidden />}
         {inCompare ? "In compare" : full ? "Compare full (4)" : "Add to compare"}
       </button>
       {picked.length >= 2 && inCompare ? (
-        <Link href="/employer/compare" className="text-sm font-medium text-brand-700 underline-offset-4 hover:underline">
+        <Link href="/employer/compare" className={buttonClass({ variant: "ghost", size: "sm", className: "min-h-11" })}>
           Compare {picked.length} now
         </Link>
       ) : null}
