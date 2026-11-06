@@ -19,12 +19,14 @@ import { chromium } from "playwright";
 import { baseUrl, ROOT, testDatabaseUrl } from "./lib/env.mjs";
 import { visit } from "./lib/browser.mjs";
 import {
-  closeDb, eventually, expectNoText, expectText, guestContext, one, seedAdmin, seedEmployer, seedIntern, seedProject, send, signedInContext,
+  RUN, closeDb, eventually, expectNoText, expectText, guestContext, one, seedAdmin, seedEmployer, seedIntern, seedProject, send, signedInContext,
 } from "./lib/fixtures.mjs";
 
 testDatabaseUrl();
 
 const SKILLS = ["React", "SQL", "Python", "Excel"];
+// Unique per run: the "not in the list" checks must not trip over a role an earlier run left in the same database.
+const ROLE = `Dashboard Analytics Intern ${RUN}`;
 const CONTACT_SENTENCE = /Remove the phone number \/ email \/ link from the description: candidates contact you through Findtern\./;
 const state = {};
 let browser;
@@ -75,7 +77,7 @@ after(async () => {
 });
 
 test("create: a listing with a description is saved and goes live at once", async () => {
-  const res = await createListing("Dashboard Analytics Intern");
+  const res = await createListing(ROLE);
   assert.equal(res.status, 201, JSON.stringify(res.body));
   state.listingId = res.body.project?.id;
   assert.ok(state.listingId, "the response carries the project");
@@ -145,7 +147,7 @@ test("edit: the description can be changed, and the same contact check applies t
 
 test("discovery: the live listing is on the intern opportunities page, its detail page and the public page, with the description", async () => {
   const list = await (await fetchAs(state.lowCtx, "/intern/opportunities")).text();
-  assert.ok(list.includes("Dashboard Analytics Intern"), "intern opportunities list");
+  assert.ok(list.includes(ROLE), "intern opportunities list");
   const detail = await fetchAs(state.lowCtx, `/intern/opportunities/${state.listingId}`);
   assert.equal(detail.status(), 200);
   expectText(await detail.text(), /weekly KPI dashboard/, "the description is shown on the intern detail page");
@@ -166,8 +168,8 @@ test("pause: a paused listing 404s publicly and leaves discovery; resume brings 
   assert.equal(paused.status, 200, JSON.stringify(paused.body));
   assert.equal((await one(`SELECT status FROM projects WHERE id = $1`, [state.listingId])).status, "inactive");
   assert.equal(await publicStatus(state.listingId), 404, "public page");
-  assert.ok(await internRoleGone(state.listingId, "Dashboard Analytics Intern"), "intern detail page");
-  assert.ok(!(await (await fetchAs(state.lowCtx, "/intern/opportunities")).text()).includes("Dashboard Analytics Intern"), "intern list");
+  assert.ok(await internRoleGone(state.listingId, ROLE), "intern detail page");
+  assert.ok(!(await (await fetchAs(state.lowCtx, "/intern/opportunities")).text()).includes(ROLE), "intern list");
 
   const resumed = await send(state.employerCtx, "PUT", `/api/employer/projects/${state.listingId}`, { status: "active" });
   assert.equal(resumed.status, 200, JSON.stringify(resumed.body));
@@ -202,7 +204,7 @@ test("take-down: only an admin with a reason; the listing disappears, the employ
   assert.equal(row.taken_down_reason, "Misleading role description");
   assert.equal(row.taken_down_by, state.admin.id);
   assert.equal(await publicStatus(id), 404, "public page");
-  assert.ok(await internRoleGone(id, "Dashboard Analytics Intern"), "intern detail page");
+  assert.ok(await internRoleGone(id, ROLE), "intern detail page");
 
   const audit = await one(`SELECT meta FROM admin_audit_log WHERE action = 'project.take_down' AND target_id = $1`, [id]);
   assert.ok(audit, "audited as project.take_down");
@@ -331,10 +333,10 @@ test("UI: pause and close are separate actions; a taken-down listing shows its r
   const page = await ctx.newPage();
   try {
     await visit(page, "/employer/projects");
-    await page.getByText("Dashboard Analytics Intern").first().waitFor();
+    await page.getByText(ROLE).first().waitFor();
     const body = await page.locator("main").innerText();
-    assert.match(body, /Dashboard Analytics Intern/);
-    const menu = page.getByRole("button", { name: /More actions for Dashboard Analytics Intern/ });
+    assert.match(body, new RegExp(ROLE));
+    const menu = page.getByRole("button", { name: new RegExp(`More actions for ${ROLE}`) });
     await menu.click();
     await page.getByRole("menuitem", { name: /^pause/i }).waitFor();
     await page.getByRole("menuitem", { name: /^close/i }).waitFor();

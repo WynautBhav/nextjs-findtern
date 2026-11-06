@@ -234,6 +234,7 @@ test("review queue: the admin sees the two phone matches, links one, refuses a s
   const page = await state.adminCtx.newPage();
   try {
     await visit(page, "/admin/colleges/review");
+    await page.getByText(/Pooja Phonebook/).first().waitFor({ timeout: 15_000 }); // the page streams in behind its loading state
     const text = await page.locator("main").innerText();
     expectText(text, /Pooja Phonebook/, "the review queue lists the phone-only row");
     expectText(text, /Prem Phonebook/, "…and the second one");
@@ -322,6 +323,7 @@ test("the officer dashboard shows the roster, joined and seat numbers [UI]", asy
   const page = await state.tpoCtx.newPage();
   try {
     await visit(page, "/college");
+    await page.getByText(/Seats left/).first().waitFor({ timeout: 15_000 }); // the dashboard streams in behind its loading state
     const main = await page.locator("main").innerText();
     expectText(main, /Registered\s*1\s*of 7 on your roster/, "1 of the 7 roster students has registered (the redeemer)");
     expectText(main, /1 of 300 used\s*·\s*299 left/, "seats used and left");
