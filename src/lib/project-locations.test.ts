@@ -4,10 +4,14 @@ import { test } from "node:test";
 import {
   MAX_PROJECT_LOCATIONS,
   projectCities,
+  isListingLive,
+  isProjectClosedForGood,
   isProjectOpen,
+  projectDescriptionError,
   projectLocationsError,
   projectPlaceError,
   projectSkillsError,
+  projectStatusChangeError,
 } from "./project-locations.ts";
 import { scopeLabel, scopeValue } from "./db/schema.ts";
 
@@ -75,4 +79,41 @@ test("an on-site project filters candidates by its main city and every preferred
 test("a remote project looks in no city", () => {
   assert.deepEqual(projectCities({ locationType: "remote", city: "Jaipur", preferredLocations: ["Pune"] }), []);
   assert.deepEqual(projectCities({ locationType: null, city: "Jaipur" }), []);
+});
+
+test("a listing is live only while active and not taken down (OA8)", () => {
+  assert.equal(isListingLive({ status: "active", takenDownAt: null }), true);
+  assert.equal(isListingLive({ status: "Active" }), true);
+  for (const status of ["inactive", "closed", "archived", "", null, undefined]) {
+    assert.equal(isListingLive({ status, takenDownAt: null }), false, String(status));
+  }
+  assert.equal(isListingLive({ status: "active", takenDownAt: new Date() }), false);
+});
+
+test("pause is undoable, close is final; only 'closed' is final", () => {
+  assert.equal(isProjectClosedForGood("closed"), true);
+  assert.equal(isProjectClosedForGood(" Closed "), true);
+  assert.equal(isProjectClosedForGood("inactive"), false);
+  assert.equal(isProjectClosedForGood("active"), false);
+});
+
+test("a description with a phone number, email or link is refused with a sentence", () => {
+  assert.equal(projectDescriptionError(""), null);
+  assert.equal(projectDescriptionError("Build dashboards in React for 3 months. Python 3.11 helps."), null);
+  const sentence = "Remove the phone number / email / link from the description: candidates contact you through Findtern.";
+  for (const text of ["call 9876543210", "mail us at hr@acme.co", "see https://acme.com/jobs", "WhatsApp me, wa.me/919876543210", "write to hr [at] acme dot com"]) {
+    assert.equal(projectDescriptionError(text), sentence, text);
+  }
+  assert.match(projectDescriptionError("x".repeat(2001)) ?? "", /under 2000/);
+});
+
+test("a taken-down listing cannot be reopened by the employer; a closed one is final", () => {
+  const down = { status: "active", takenDownAt: new Date(), takenDownReason: "Contact details in the title" };
+  assert.match(projectStatusChangeError(down, "active") ?? "", /Findtern took this listing down: Contact details in the title\. Contact support\./);
+  assert.equal(projectStatusChangeError(down, "inactive"), null, "pausing or closing a taken-down listing is harmless");
+  assert.match(projectStatusChangeError({ status: "closed" }, "active") ?? "", /closed for good/);
+  assert.match(projectStatusChangeError({ status: "closed" }, "inactive") ?? "", /closed for good/);
+  assert.equal(projectStatusChangeError({ status: "closed" }, "closed"), null);
+  assert.equal(projectStatusChangeError({ status: "inactive" }, "active"), null, "a pause can be resumed");
+  assert.equal(projectStatusChangeError({ status: "active" }, "closed"), null);
 });
