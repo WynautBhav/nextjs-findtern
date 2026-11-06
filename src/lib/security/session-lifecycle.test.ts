@@ -143,3 +143,21 @@ test("sessions without a password version: only college ones are rejected", asyn
   assert.equal(acceptsPvlessSession("college"), false);
   for (const r of ["intern", "employer", "admin"]) assert.equal(acceptsPvlessSession(r), true);
 });
+
+// ── B-2: logout revokes the session id ─────────────────────────────────
+
+test("isRevoked refuses a listed sid and nothing else", async () => {
+  const { isRevoked } = await import("./session-revocation.ts");
+  const { data } = createSession({ uid: "u1", role: "intern", email: "a@gmail.com" });
+  assert.equal(isRevoked(new Set<string>(), data.sid), false);
+  assert.equal(isRevoked(new Set([data.sid]), data.sid), true);
+  assert.equal(isRevoked(new Set([data.sid]), "another"), false);
+  assert.equal(isRevoked(new Set([data.sid]), undefined), false);
+});
+
+test("a renewed session keeps its sid, so a revoke covers every renewal", () => {
+  const now = Date.now();
+  const { data } = createSession({ uid: "u1", role: "employer", email: "hr@acme.in", now });
+  const renewed = renewSession(data, { now: now + SESSION_RENEW_AFTER_MS + 60_000 });
+  assert.equal(renewed?.data.sid, data.sid);
+});

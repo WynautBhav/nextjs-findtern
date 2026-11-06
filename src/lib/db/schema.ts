@@ -295,6 +295,14 @@ export const adminAuditLog = pgTable("admin_audit_log", {
 
 export type AdminAuditLog = typeof adminAuditLog.$inferSelect;
 
+/** Sessions ended by logout. The cookie is self-contained, so a copied one is refused by sid until it would have expired. */
+export const revokedSessions = pgTable("revoked_sessions", {
+  sid: text("sid").primaryKey(),
+  exp: timestamp("exp", { withTimezone: true }).notNull(),
+}, (t) => ({
+  revokedSessionsExpIdx: index("revoked_sessions_exp_idx").on(t.exp),
+}));
+
 export const websiteFaqs = pgTable("website_faqs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   category: text("category").notNull(),

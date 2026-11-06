@@ -2,7 +2,7 @@ import { cookies, headers } from "next/headers";
 import { randomBytes } from "node:crypto";
 import { redirect } from "next/navigation";
 
-import { currentAdminPermissions, isAccountActive, isPasswordVersionCurrent } from "@/lib/account-status";
+import { currentAdminPermissions, isAccountActive, isPasswordVersionCurrent, isSessionRevoked } from "@/lib/account-status";
 import { NextResponse } from "next/server";
 
 import {
@@ -21,6 +21,7 @@ export async function getSession(): Promise<SessionData | null> {
   const store = await cookies();
   const session = readSession(store.get("ft_sid")?.value);
   if (!session) return null;
+  if (await isSessionRevoked(session.sid)) return null;
   if (!(await isAccountActive(session.role, session.uid))) return null;
   if (!(await isPasswordVersionCurrent(session.role, session.uid, session.pv))) return null;
   if (session.role === "admin" && !session.impersonator) {

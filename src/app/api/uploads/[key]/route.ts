@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isSessionRevoked } from "@/lib/account-status";
 import { readSession, readCookie } from "@/lib/security/session";
 import { canAccess } from "@/lib/security/guards";
 import { verify, replayGuard, TokenError } from "@/lib/security/sign";
@@ -56,7 +57,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ key: string }> 
 
   // 2. Ownership. Admins pass; everyone else must be the subject.
   const session = readSession(readCookie(req.headers.get("cookie")));
-  if (!session) {
+  if (!session || (await isSessionRevoked(session.sid))) {
     return NextResponse.json({ error: "Sign in to view this document" }, { status: 401, headers: noStore });
   }
   if (!canAccess(session, payload.s)) {

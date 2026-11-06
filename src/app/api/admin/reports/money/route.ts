@@ -4,13 +4,14 @@ import { analyticsRange } from "@/lib/admin/analytics-load";
 import { toCsv } from "@/lib/admin/csv";
 import { loadReceivables, moneyFilter } from "@/lib/admin/receivables-load";
 import { moneyRowFilter, narrowReceivables, type MoneyRow } from "@/lib/admin/receivables";
+import { isSessionRevoked } from "@/lib/account-status";
 import { requireRole } from "@/lib/security/guards";
 
 /** Money in / money out: JSON, or CSV with `?format=csv`. */
 export async function GET(req: Request) {
   // A read (downloaded from a plain link), so no CSRF; the proxy checks reports:read.
   const guard = requireRole(req.headers.get("cookie"), ["admin"]);
-  if (!guard.ok) return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
+  if (!guard.ok || (await isSessionRevoked(guard.session.sid))) return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
   const params = Object.fromEntries(new URL(req.url).searchParams);
   const loaded = await loadReceivables(analyticsRange(params), {
     receivables: moneyFilter(params.receivables),

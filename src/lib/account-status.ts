@@ -1,6 +1,7 @@
-import { eq } from "drizzle-orm";
+import { eq, lt } from "drizzle-orm";
 
 import { getDb, schema } from "@/lib/db";
+import { isRevoked } from "@/lib/security/session-revocation";
 import { acceptsPvlessSession, passwordVersion } from "@/lib/security/session";
 import { CURRENT_TERMS_VERSION } from "@/lib/terms";
 
@@ -130,4 +131,37 @@ export async function currentAdminPermissions(uid: string): Promise<string[] | n
   }
   adminCache.set(uid, { perms, at: Date.now() });
   return perms;
+}
+
+/**
+ * Logout and sid revocation. A revoked sid stays refused until its cookie
+ * would have expired anyway. Per sid the answer is cached for TTL_MS; a revoke
+ * on this process lands in the cache at once, another instance learns within TTL_MS.
+ */
+const revokedStore = globalThis as typeof globalThis & { __ftRevokedSids?: Map<string, { revoked: boolean; at: number }> };
+const revokedCache = (revokedStore.__ftRevokedSids ??= new Map());
+
+export async function isSessionRevoked(sid: string | undefined | null): Promise<boolean> {
+  if (!sid) return false;
+  const hit = revokedCache.get(sid);
+  if (hit && (hit.revoked || Date.now() - hit.at < TTL_MS)) return hit.revoked;
+  let revoked = false;
+  try {
+    const [row] = await getDb().select({ sid: schema.revokedSessions.sid }).from(schema.revokedSessions).where(eq(schema.revokedSessions.sid, sid)).limit(1);
+    revoked = isRevoked(new Set(row ? [row.sid] : []), sid);
+  } catch {
+    return false; // lookup failed: same fail-open as isAccountActive (a DB outage fails every request anyway)
+  }
+  if (revokedCache.size > 5000) revokedCache.clear();
+  revokedCache.set(sid, { revoked, at: Date.now() });
+  return revoked;
+}
+
+/** End a session: record the sid until `exp` (ms) and refuse it on this process immediately. */
+export async function revokeSession(sid: string, exp: number): Promise<void> {
+  const db = getDb();
+  await db.insert(schema.revokedSessions).values({ sid, exp: new Date(exp) }).onConflictDoNothing();
+  revokedCache.set(sid, { revoked: true, at: Date.now() });
+  // Rows past their cookie's expiry can never matter again.
+  await db.delete(schema.revokedSessions).where(lt(schema.revokedSessions.exp, new Date())).catch(() => undefined);
 }
