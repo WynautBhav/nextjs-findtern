@@ -46,6 +46,7 @@ function roleLabel(m: InboxMessage): string | null {
   if (role === "intern") return "Candidate";
   if (role === "employer") return "Employer";
   const qt = (m.queryType ?? "").trim().toLowerCase();
+  if (qt === "college") return "College"; // /contact?type=college (a college partnership enquiry)
   return qt === "general" ? "General" : null;
 }
 

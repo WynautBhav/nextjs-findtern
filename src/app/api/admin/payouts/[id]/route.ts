@@ -6,6 +6,7 @@ import { recordAdminAudit } from "@/lib/admin/audit";
 import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
 import { notifyStipendPaid } from "@/lib/payments";
+import { canPayOut } from "@/lib/admin/payout-kind";
 import { proposalOf } from "@/lib/admin/stipend-dues";
 import { lockPlacement, queueNextMonth } from "@/lib/admin/stipend-queue";
 
@@ -73,6 +74,12 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   }
   if (to === "paid" && existing.status !== "pending") {
     return NextResponse.json({ error: "Only a pending payout can be marked paid" }, { status: 409 });
+  }
+  if (to === "paid") {
+    // A "paid" stipend has to be traceable to an account: no bank details on file, no mark-paid.
+    const [onboarding] = await db.select({ extra: schema.internOnboarding.extraData }).from(schema.internOnboarding).where(eq(schema.internOnboarding.userId, existing.internId)).limit(1);
+    const payable = canPayOut(onboarding?.extra as Record<string, unknown> | null | undefined);
+    if (!payable.ok) return NextResponse.json({ error: payable.error }, { status: 409 });
   }
   const set: Partial<typeof schema.internPayouts.$inferInsert> = { updatedAt: new Date() };
   if (to !== undefined) {

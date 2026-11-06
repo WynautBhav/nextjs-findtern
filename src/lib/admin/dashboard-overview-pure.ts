@@ -434,7 +434,7 @@ export function queueRowHref(row: QueueRow, group: QueueGroup | undefined): stri
  * component, so this pure module keeps its own copy of the open stages; "Closed" is not on the home).
  */
 export const BAND_STAGES = [
-  { key: "sent", label: "Sent", statuses: ["sent", "draft"] },
+  { key: "sent", label: "Sent", statuses: ["sent"] },
   { key: "interview", label: "Interview", statuses: ["interview_scheduled"] },
   { key: "accepted", label: "Accepted", statuses: ["accepted"] },
   { key: "processing", label: "Processing", statuses: ["processing"] },

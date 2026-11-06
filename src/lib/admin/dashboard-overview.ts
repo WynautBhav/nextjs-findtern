@@ -199,7 +199,7 @@ export async function loadPipelineBand(now: Date): Promise<PipelineBand> {
       .from(pr)
       .leftJoin(schema.users, eq(schema.users.id, pr.internId))
       .leftJoin(schema.employers, eq(schema.employers.id, pr.employerId))
-      .where(and(inArray(pr.status, ["sent", "draft", "interview_scheduled", "accepted", "processing"]), realEmployerId(pr.employerId)))
+      .where(and(inArray(pr.status, ["sent", "interview_scheduled", "accepted", "processing"]), realEmployerId(pr.employerId)))
       .orderBy(asc(pr.updatedAt), pr.id),
     getDb()
       .select(base)

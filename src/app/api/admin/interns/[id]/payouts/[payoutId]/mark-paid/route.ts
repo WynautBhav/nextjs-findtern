@@ -6,6 +6,7 @@ import { recordAdminAudit } from "@/lib/admin/audit";
 import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
 import { notifyStipendPaid } from "@/lib/payments";
+import { canPayOut } from "@/lib/admin/payout-kind";
 import { queueNextMonth } from "@/lib/admin/stipend-queue";
 
 /**
@@ -30,6 +31,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   }
 
   const db = getDb();
+  // A "paid" stipend has to be traceable to an account: no bank details on file, no mark-paid.
+  const [onboarding] = await db.select({ extra: schema.internOnboarding.extraData }).from(schema.internOnboarding).where(eq(schema.internOnboarding.userId, id)).limit(1);
+  const payable = canPayOut(onboarding?.extra as Record<string, unknown> | null | undefined);
+  if (!payable.ok) return NextResponse.json({ error: payable.error }, { status: 409 });
   // Conditional on the row still being pending, so a double click or two
   // admins cannot both mark it (and both queue a next month).
   const updated = await db

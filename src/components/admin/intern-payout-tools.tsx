@@ -51,6 +51,8 @@ function readCsrf(): string | null {
   return m ? decodeURIComponent(m[1]) : null;
 }
 
+const PENDING_NOTICE = "Payout created as pending. Mark it paid once the transfer has gone.";
+
 export function InternPayoutTools({
   internId,
   payouts,
@@ -162,7 +164,7 @@ export function InternPayoutTools({
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error ?? "Could not create the payout.");
       setForm(null);
-      setNotice("Payout created as pending. Mark it paid once the transfer has gone.");
+      setNotice(PENDING_NOTICE);
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not create the payout.");
@@ -471,7 +473,8 @@ export function InternPayoutTools({
           {error}
         </p>
       ) : null}
-      {notice ? (
+      {/* The "created as pending" line is stale once nothing is pending any more (the payout was marked paid). */}
+      {notice && !(notice === PENDING_NOTICE && !payouts.some((p) => p.status === "pending")) ? (
         <p role="status" className="text-sm font-medium text-brand-700">
           {notice}
         </p>

@@ -252,20 +252,20 @@ test("offer value follows the tracker: full-time CTC, else total, else monthly x
   assert.deepEqual(offerValue({}, "USD"), { minor: null, currency: "USD" });
 });
 
-test("stages count their rows, draft joins sent, strays are ignored, oldest waits first", () => {
+test("stages count their rows, a draft is not Sent, strays are ignored, oldest waits first", () => {
   const band = buildPipelineBand(
     [row("a", "sent", 1), row("b", "draft", 6), row("c", "interview_scheduled", 2), row("d", "accepted", 9), row("e", "rejected", 30)],
     0,
     NOW,
   );
   const by = Object.fromEntries(band.stages.map((s) => [s.key, s]));
-  assert.equal(by.sent.count, 2);
-  assert.deepEqual(by.sent.cards.map((c) => c.id), ["b", "a"]);
-  assert.equal(by.sent.oldestDays, 6);
+  assert.equal(by.sent.count, 1);
+  assert.deepEqual(by.sent.cards.map((c) => c.id), ["a"]);
+  assert.equal(by.sent.oldestDays, 1);
   assert.equal(by.interview.count, 1);
   assert.equal(by.processing.count, 0);
   assert.equal(by.processing.oldestDays, null);
-  assert.equal(band.total, 4); // the rejected row is on no stage
+  assert.equal(band.total, 3); // the rejected and the draft rows are on no stage
 });
 
 test("totals are per currency and are never summed across INR and USD", () => {
