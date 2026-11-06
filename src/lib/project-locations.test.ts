@@ -38,6 +38,17 @@ test("on-site and hybrid projects need an Indian city and state (EMH-14, EMH-48)
   assert.match(projectPlaceError({ locationType: "onsite", city: "Austin", state: "Texas" }, states) ?? "", /India-based/);
 });
 
+test("the city must be one of the state's districts when the routes pass the list", () => {
+  const states = ["Karnataka", "Rajasthan"];
+  const districtsOf = (st: string) => (st.toLowerCase() === "rajasthan" ? ["Jaipur", "Jodhpur"] : ["Bengaluru"]);
+  assert.equal(projectPlaceError({ locationType: "onsite", city: "jaipur", state: "rajasthan" }, states, districtsOf), null);
+  assert.match(projectPlaceError({ locationType: "onsite", city: "Bengaluru", state: "Rajasthan" }, states, districtsOf) ?? "", /Pick a city in Rajasthan/);
+  assert.match(projectPlaceError({ locationType: "hybrid", city: "x".repeat(121), state: "Karnataka" }, states, districtsOf) ?? "", /Pick a city/);
+  assert.equal(projectPlaceError({ locationType: "remote", city: "Nowhere", state: "Karnataka" }, states, districtsOf), null);
+  // Without the list (the form) only presence and the state are checked.
+  assert.equal(projectPlaceError({ locationType: "onsite", city: "Anything", state: "Karnataka" }, states), null);
+});
+
 test("scope is stored under legacy keys and every spelling reads back (DB-09)", () => {
   assert.equal(scopeValue("short-term"), "short-term");
   assert.equal(scopeValue("upto-60"), "short-term");
