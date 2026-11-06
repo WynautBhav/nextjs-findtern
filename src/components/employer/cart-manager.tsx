@@ -80,11 +80,13 @@ export function CartManager({
 
   const projectOptions = Array.from(new Map(cartLines.map((l) => [l.projectId, l.projectName])).entries());
   const inProject = selectedProject === "all" ? cartLines : cartLines.filter((l) => l.projectId === selectedProject);
-  // One meaning of "shortlisted": saved, no live proposal yet. The header
-  // badge, the hiring-steps strip and this heading all count that; anyone
-  // already proposed to is listed apart, below (QA-124).
+  // One meaning of "shortlisted": saved, no live proposal yet; anyone already
+  // proposed to is listed apart, below (QA-124). The heading counts distinct
+  // people (a person saved to two projects has two lines but is one candidate).
   const shown = inProject.filter((l) => !l.openProposalId && !l.acceptedProposalId);
   const proposed = inProject.filter((l) => l.openProposalId || l.acceptedProposalId);
+  const shownPeople = new Set(shown.map((l) => l.candidate.id)).size;
+  const shownProjects = new Set(shown.map((l) => l.projectId)).size;
 
   async function confirmRemove() {
     const item = removing;
@@ -187,8 +189,9 @@ export function CartManager({
 
       <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
         <p className="text-sm text-ink-600">
-          <span className="nums font-semibold text-ink-900">{shown.length}</span> shortlisted
+          <span className="nums font-semibold text-ink-900">{shownPeople}</span> {shownPeople === 1 ? "candidate" : "candidates"}
           {selectedProject !== "all" ? " for this project" : ""}
+          {selectedProject === "all" && shownProjects > 1 ? <span className="text-ink-500"> · saved to {shownProjects} projects</span> : null}
         </p>
         {projectOptions.length > 1 ? (
           <label className={cn(labelClass, "flex items-center gap-2")}>
