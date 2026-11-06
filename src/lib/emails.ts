@@ -93,7 +93,7 @@ const STYLE = `
 }`;
 
 export function renderEmail(c: EmailContent): { subject: string; text: string; html: string } {
-  const site = origin();
+  const site = esc(origin()); // env, not user input; escaped anyway so every interpolation is
   const host = new URL(site).host;
   const reason = c.reason ?? "You’re receiving this because you have a Findtern account.";
   const text = [
@@ -297,7 +297,7 @@ export const emails = {
 
   aiInterviewLinkReady: (o: { name: string; link: string }): EmailContent => ({
     subject: "Your AI interview link is ready | Findtern",
-    preheader: "Use a laptop with a webcam and a quiet room, and finish it in one sitting.",
+    preheader: "Your AI interview is open. Read the checklist before you start.",
     heading: "Your AI interview link is ready",
     greeting: hi(o.name),
     lines: ["Your AI interview is open. Before you start:"],
