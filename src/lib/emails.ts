@@ -2,25 +2,52 @@
  * Transactional emails: one layout, one small content block per event.
  * Copy follows the legacy templates (routes.ts send*Email), which interns and
  * employers already receive today.
+ *
+ * Layout rules (email clients are 2005-era HTML): tables, inline styles, a
+ * 600px column that goes fluid on phones, a bulletproof button, and one small
+ * <style> block that only adds media queries and dark mode (Gmail may drop it;
+ * the inline styles stand alone).
  */
 
 import { AI_INTERVIEW_INSTRUCTIONS } from "./ai-interview.ts";
 import { requirePublicOrigin } from "./origin.ts";
 
+/** Meaning of the status pill: waiting on someone, finished, overdue/at risk, or just information. */
+export type EmailTone = "wait" | "done" | "alert" | "neutral";
+
 export type EmailContent = {
   subject: string;
+  /** Hidden inbox preview line. A useful summary, not the subject again. */
+  preheader?: string;
   heading: string;
   greeting: string;
   lines: string[];
   bullets?: string[];
+  /** A short code (OTP) shown large in its own panel, with a note under it. */
+  code?: { value: string; note: string };
   facts?: [label: string, value: string][];
   status?: string;
+  /** Pill colour by meaning. Defaults to "wait". */
+  tone?: EmailTone;
   cta?: { label: string; url: string };
-  signoff?: string;
+  /** Why this person got the mail, when "you have a Findtern account" is not true. */
+  reason?: string;
 };
 
-const BRAND = "#0E6049";
-const SUBTLE = "#6B7280";
+const BRAND = "#0e6049";
+const INK = "#0f1a17";
+const BODY = "#33433d";
+const MUTED = "#4e5f58";
+const LINE = "#dee6e2";
+const FONT = "Poppins,'Segoe UI',-apple-system,BlinkMacSystemFont,Roboto,Helvetica,Arial,sans-serif";
+
+/** Pill colours: [background, text, border]. Text is at least 4.5:1 on its own background. */
+const TONES: Record<EmailTone, [string, string, string]> = {
+  wait: ["#fdf3e0", "#8f5a1f", "#fae4bd"],
+  done: ["#f0f7f4", "#0a4a39", "#b9d7cc"],
+  alert: ["#fdeceb", "#b3261e", "#f5c6c3"],
+  neutral: ["#edf2ef", "#33433d", "#dee6e2"],
+};
 
 const esc = (v: unknown) =>
   String(v ?? "")
@@ -34,44 +61,129 @@ export function origin(): string {
   return requirePublicOrigin();
 }
 
+const isUrl = (v: string) => /^https?:\/\/\S+$/.test(v);
+const isMoney = (v: string) => /^[₹$]/.test(v.trim());
+
+/** The <style> block: phone fit and dark mode only. Everything else is inline. */
+const STYLE = `
+@media (max-width:620px){
+.px{padding-left:20px!important;padding-right:20px!important}
+.h1{font-size:22px!important;line-height:30px!important}
+.btn{width:100%!important}
+.code{font-size:32px!important}
+}
+.logo-dark{display:none;max-height:0;overflow:hidden;mso-hide:all}
+@media (prefers-color-scheme:dark){
+.bg-page{background-color:#041d17!important}
+.bg-card{background-color:#072f24!important;border-color:#0a4a39!important}
+.t-ink{color:#f7faf9!important}
+.t-body{color:#dee6e2!important}
+.t-muted{color:#b9d7cc!important}
+.t-link{color:#8cbaa9!important}
+.line{border-color:#0a4a39!important}
+.amt{color:#f5bb63!important}
+.btn-cell{background-color:#2e7d66!important}
+.panel{background-color:#041d17!important;border-color:#0a4a39!important}
+.pill-wait{background-color:#3b2b0f!important;color:#f7ce8e!important;border-color:#5a4116!important}
+.pill-done{background-color:#0a4a39!important;color:#dcebe5!important;border-color:#166b54!important}
+.pill-alert{background-color:#3d1613!important;color:#f4b4af!important;border-color:#6b2420!important}
+.pill-neutral{background-color:#1e2b26!important;color:#dee6e2!important;border-color:#33433d!important}
+.logo-light{display:none!important}
+.logo-dark{display:block!important;max-height:none!important;overflow:visible!important}
+}`;
+
 export function renderEmail(c: EmailContent): { subject: string; text: string; html: string } {
-  const signoff = c.signoff ?? "Team Findtern\nBuilding trust in internship hiring\nwww.findtern.in";
+  const site = origin();
+  const host = new URL(site).host;
+  const reason = c.reason ?? "You’re receiving this because you have a Findtern account.";
   const text = [
+    c.heading,
+    "",
     c.greeting,
     "",
     ...c.lines,
     ...(c.bullets?.length ? ["", ...c.bullets.map((b) => `- ${b}`)] : []),
+    ...(c.code ? ["", `Verification code: ${c.code.value}`, c.code.note] : []),
     ...(c.facts?.length ? ["", ...c.facts.map(([k, v]) => `${k}: ${v}`)] : []),
     ...(c.status ? ["", `Status: ${c.status}`] : []),
     ...(c.cta ? ["", `${c.cta.label}: ${c.cta.url}`] : []),
     "",
-    `Best,\n${signoff}`,
+    "Best,\nTeam Findtern",
+    "",
+    `--\nFindtern\n${reason}\nContact: ${site}/contact\n${site}`,
   ].join("\n");
 
-  const p = (s: string) => `<p style="margin:10px 0 0;font-size:14px;line-height:22px;color:${SUBTLE};">${esc(s)}</p>`;
-  const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(c.subject)}</title></head>
-<body style="margin:0;padding:0;background:#F3F4F6;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
-<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="padding:30px 12px;"><tr><td align="center">
-<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;">
-<tr><td style="padding:0 4px 14px;font-size:18px;font-weight:900;color:#111827;">Findtern</td></tr>
-<tr><td style="background:#fff;border-radius:16px;box-shadow:0 6px 24px rgba(17,24,39,.08);padding:22px 20px;">
-<div style="font-size:16px;line-height:22px;font-weight:900;color:#111827;">${esc(c.heading)}</div>
-${p(c.greeting)}
-${c.lines.map(p).join("\n")}
-${c.bullets?.length ? `<ul style="margin:10px 0 0 18px;padding:0;color:${SUBTLE};font-size:14px;line-height:22px;">${c.bullets.map((b) => `<li>${esc(b)}</li>`).join("")}</ul>` : ""}
-${
-  c.facts?.length
-    ? `<table role="presentation" style="margin-top:14px;width:100%;font-size:14px;line-height:22px;">${c.facts
-        .map(([k, v]) => `<tr><td style="color:${SUBTLE};padding:2px 12px 2px 0;">${esc(k)}</td><td style="color:#111827;font-weight:700;">${esc(v)}</td></tr>`)
+  const p = (s: string, strong = false) =>
+    `<p class="${strong ? "t-ink" : "t-body"}" style="margin:16px 0 0;font-size:16px;line-height:26px;color:${strong ? INK : BODY};">${esc(s)}</p>`;
+
+  const bullets = c.bullets?.length
+    ? `<ul class="t-body" style="margin:16px 0 0;padding:0 0 0 22px;font-size:16px;line-height:26px;color:${BODY};">${c.bullets
+        .map((b) => `<li style="margin:0 0 6px;padding:0;">${esc(b)}</li>`)
+        .join("")}</ul>`
+    : "";
+
+  const code = c.code
+    ? `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-top:24px;"><tr><td class="panel" align="center" bgcolor="#f0f7f4" style="background-color:#f0f7f4;border:1px solid #b9d7cc;border-radius:12px;padding:24px 16px;">
+<div class="code t-ink" style="font-size:36px;line-height:44px;font-weight:600;letter-spacing:0.2em;padding-left:0.2em;color:#072f24;font-variant-numeric:tabular-nums;">${esc(c.code.value)}</div>
+<div class="t-muted" style="margin-top:12px;font-size:14px;line-height:22px;color:${MUTED};">${esc(c.code.note)}</div>
+</td></tr></table>`
+    : "";
+
+  const facts = c.facts?.length
+    ? `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" class="line" style="margin-top:24px;border-top:1px solid ${LINE};">${c.facts
+        .map(([k, v]) => {
+          const value = isUrl(v)
+            ? `<a class="t-link" href="${esc(v)}" style="color:${BRAND};text-decoration:underline;word-break:break-all;">${esc(v)}</a>`
+            : isMoney(v)
+              ? `<span class="amt" style="font-size:18px;line-height:26px;color:${BRAND};">${esc(v)}</span>`
+              : esc(v);
+          return `<tr><td class="line t-muted" valign="top" style="width:38%;padding:12px 16px 12px 0;border-bottom:1px solid ${LINE};font-size:15px;line-height:24px;color:${MUTED};">${esc(k)}</td><td class="line t-ink" align="right" valign="top" style="padding:12px 0;border-bottom:1px solid ${LINE};font-size:15px;line-height:24px;font-weight:600;color:${INK};text-align:right;word-break:break-word;font-variant-numeric:tabular-nums;">${value}</td></tr>`;
+        })
         .join("")}</table>`
-    : ""
-}
-${c.status ? `<div style="margin-top:14px;background:#ECFDF5;border:1px solid #A7F3D0;border-radius:14px;padding:12px 14px;"><div style="font-size:12px;color:${SUBTLE};">Status</div><div style="margin-top:4px;font-size:14px;font-weight:900;color:#064E3B;">${esc(c.status)}</div></div>` : ""}
-${c.cta ? `<div style="margin-top:18px;"><a href="${esc(c.cta.url)}" style="display:inline-block;background:${BRAND};color:#fff;text-decoration:none;padding:11px 14px;border-radius:12px;font-weight:800;font-size:13px;">${esc(c.cta.label)}</a></div>` : ""}
-<div style="margin-top:18px;font-size:12px;line-height:18px;color:${SUBTLE};">Best,<br>${esc(signoff).replace(/\n/g, "<br>")}</div>
+    : "";
+
+  const tone = c.tone ?? "wait";
+  const [pillBg, pillFg, pillBorder] = TONES[tone];
+  const status = c.status
+    ? `<p class="t-muted" style="margin:20px 0 0;font-size:15px;line-height:28px;color:${MUTED};">Status&nbsp;&nbsp;<span class="pill-${tone}" style="display:inline-block;padding:2px 12px;border:1px solid ${pillBorder};border-radius:999px;background-color:${pillBg};font-size:14px;line-height:22px;font-weight:600;color:${pillFg};">${esc(c.status)}</span></p>`
+    : "";
+
+  const cta = c.cta
+    ? `<table role="presentation" class="btn" cellspacing="0" cellpadding="0" border="0" style="margin-top:28px;"><tr><td class="btn-cell" align="center" bgcolor="${BRAND}" style="background-color:${BRAND};border-radius:10px;mso-padding-alt:14px 28px;"><a href="${esc(c.cta.url)}" style="display:block;padding:14px 28px;font-size:16px;line-height:20px;font-weight:600;color:#ffffff;text-decoration:none;text-align:center;">${esc(c.cta.label)}</a></td></tr></table>
+<p class="t-muted" style="margin:16px 0 0;font-size:13px;line-height:20px;color:${MUTED};">If the button does not work, copy this link into your browser:<br><a class="t-link" href="${esc(c.cta.url)}" style="color:${BRAND};text-decoration:underline;word-break:break-all;">${esc(c.cta.url)}</a></p>`
+    : "";
+
+  const preheader = c.preheader
+    ? `<div style="display:none;font-size:1px;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;mso-hide:all;">${esc(c.preheader)}${"&#847;&zwnj;&nbsp;".repeat(40)}</div>`
+    : "";
+
+  const logoStyle = `display:block;border:0;outline:none;text-decoration:none;font-family:${FONT};font-size:24px;line-height:42px;font-weight:600;color:${BRAND};`;
+  const html = `<!doctype html>
+<html lang="en" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark"><meta name="supported-color-schemes" content="light dark"><meta name="x-apple-disable-message-reformatting"><meta http-equiv="X-UA-Compatible" content="IE=edge"><title>${esc(c.subject)}</title>
+<!--[if mso]><noscript><xml><o:OfficeDocumentSettings><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings></xml></noscript><![endif]-->
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&amp;display=swap" rel="stylesheet">
+<style>${STYLE}</style></head>
+<body class="bg-page" style="margin:0;padding:0;background-color:#edf2ef;font-family:${FONT};-webkit-text-size-adjust:100%;">
+${preheader}
+<table role="presentation" class="bg-page" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color:#edf2ef;"><tr><td align="center" style="padding:28px 12px;">
+<!--[if mso]><table role="presentation" width="600" align="center" cellspacing="0" cellpadding="0" border="0"><tr><td><![endif]-->
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width:600px;">
+<tr><td style="padding:0 4px 20px;"><a href="${site}" style="text-decoration:none;"><img class="logo-light" src="${site}/media/findtern-email-logo.png" width="140" height="42" alt="Findtern" style="${logoStyle}"><img class="logo-dark" src="${site}/media/findtern-email-logo-white.png" width="140" height="42" alt="Findtern" style="display:none;max-height:0;overflow:hidden;mso-hide:all;border:0;font-family:${FONT};font-size:24px;line-height:42px;font-weight:600;color:#f7faf9;"></a></td></tr>
+<tr><td class="bg-card px" align="left" bgcolor="#ffffff" style="background-color:#ffffff;border:1px solid ${LINE};border-radius:16px;padding:36px 32px;font-family:${FONT};">
+<h1 class="h1 t-ink" style="margin:0;font-size:24px;line-height:32px;font-weight:600;color:${INK};">${esc(c.heading)}</h1>
+${p(c.greeting, true)}
+${c.lines.map((l) => p(l)).join("\n")}
+${bullets}
+${code}
+${facts}
+${status}
+${cta}
+<p class="t-body" style="margin:32px 0 0;font-size:16px;line-height:26px;color:${BODY};">Best,<br>Team Findtern</p>
 </td></tr>
-<tr><td style="padding:14px 6px 0;font-size:12px;color:${SUBTLE};text-align:center;">Sent by Findtern · <a href="${origin()}/contact" style="color:${BRAND};">Contact us</a></td></tr>
-</table></td></tr></table></body></html>`;
+<tr><td class="t-muted" style="padding:20px 4px 0;font-size:13px;line-height:20px;color:${MUTED};"><strong class="t-ink" style="color:${INK};font-weight:600;">Findtern</strong><br>${esc(reason)}<br><a class="t-link" href="${site}/contact" style="color:${BRAND};text-decoration:underline;">Contact us</a> &nbsp;·&nbsp; <a class="t-link" href="${site}" style="color:${BRAND};text-decoration:underline;">${esc(host)}</a></td></tr>
+</table>
+<!--[if mso]></td></tr></table><![endif]-->
+</td></tr></table></body></html>`;
   return { subject: c.subject, text, html };
 }
 
@@ -109,6 +221,7 @@ export const emails = {
         : "You can send an offer to another candidate from your shortlist.",
     ],
     status: o.accepted ? "Accepted" : "Declined",
+    tone: o.accepted ? "done" : "neutral",
     cta: o.accepted
       ? { label: "Go to checkout", url: `${origin()}/employer/checkout` }
       : { label: "View proposal", url: `${origin()}/employer/proposal/${o.proposalId}` },
@@ -200,7 +313,6 @@ export const emails = {
     lines: [`We’ve successfully received your payment for ${o.role}.`, "The process now moves forward as agreed. Updates appear in your dashboard."],
     facts: [["Amount", o.amount]],
     cta: { label: "View orders and invoice", url: `${origin()}/employer/orders` },
-    signoff: "Team Findtern\nSecure, transparent hiring\nwww.findtern.in",
   }),
 
   hireConfirmed: (o: { internName: string; companyName: string; role: string }): EmailContent => ({
@@ -213,7 +325,6 @@ export const emails = {
     ],
     bullets: ["Engagement details", "Start date and next steps", "Timesheets for your first period"],
     cta: { label: "Open dashboard", url: `${origin()}/intern/dashboard` },
-    signoff: "Team Findtern\nTurning opportunities into outcomes\nwww.findtern.in",
   }),
 
   activationPaid: (o: { internName: string; amount: string }): EmailContent => ({
@@ -235,7 +346,6 @@ export const emails = {
     ],
     facts: [["Amount", o.amount]],
     cta: { label: "View payments", url: `${origin()}/intern/earnings` },
-    signoff: "Team Findtern\nTransparent payments, zero confusion\nwww.findtern.in",
   }),
 
   completionBonusPaid: (o: { internName: string; role: string; amount: string }): EmailContent => ({
@@ -248,7 +358,6 @@ export const emails = {
     ],
     facts: [["Amount", o.amount]],
     cta: { label: "View earnings", url: `${origin()}/intern/earnings` },
-    signoff: "Team Findtern\nTransparent payments, zero confusion\nwww.findtern.in",
   }),
 
   collegeSeatsPaid: (o: { collegeName: string; seats: number; amount: string; cap: number }): EmailContent => ({
@@ -262,7 +371,6 @@ export const emails = {
       ["Total seats", String(o.cap)],
     ],
     cta: { label: "View seats and invoice", url: `${origin()}/college/seats` },
-    signoff: "Team Findtern\nTransparent payments, zero confusion\nwww.findtern.in",
   }),
 
   collegePayoutRequested: (o: { collegeName: string; amount: string }): EmailContent => ({
@@ -290,7 +398,6 @@ export const emails = {
       ["Reference", o.referenceId],
     ],
     cta: { label: "View earnings", url: `${origin()}/college/earnings` },
-    signoff: "Team Findtern\nTransparent payments, zero confusion\nwww.findtern.in",
   }),
 
   collegePayoutRejected: (o: { collegeName: string; amount: string; reason: string }): EmailContent => ({
@@ -300,7 +407,6 @@ export const emails = {
     lines: ["Nothing was debited, and the amount is available in your wallet again.", `Reason: ${o.reason}`],
     facts: [["Amount", o.amount]],
     cta: { label: "View earnings", url: `${origin()}/college/earnings` },
-    signoff: "Team Findtern\nTransparent payments, zero confusion\nwww.findtern.in",
   }),
 
   fullTimeOfferReceived: (o: { internName: string; companyName: string; role: string; proposalId: string }): EmailContent => ({
@@ -366,6 +472,7 @@ export const emails = {
       ],
       facts: [["Intern", o.intern], ["Month", String(o.k)], ["Amount", o.amount], ["Due on", o.dueOn]],
       status: o.type === "overdue" ? "Overdue" : o.type === "due" ? (today ? "Due today" : "Past due") : "Due soon",
+      tone: o.type === "overdue" || (o.type === "due" && !today) ? "alert" : "wait",
       cta: { label: "Pay now", url: `${origin()}/employer/checkout` },
     };
   },
