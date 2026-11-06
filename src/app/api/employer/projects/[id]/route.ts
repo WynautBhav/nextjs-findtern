@@ -132,7 +132,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   }
   // At least one project stays active (legacy R:10757): the candidate pool
   // and shortlist need one to work against.
-  if (d.status && d.status !== "active" && isProjectOpen(project.status)) {
+  if (d.status && d.status !== "active" && isProjectOpen(project.status, project.takenDownAt)) {
     const [otherActive] = await db
       .select({ id: schema.projects.id })
       .from(schema.projects)
@@ -172,6 +172,8 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
   const [project] = await db.select().from(schema.projects).where(eq(schema.projects.id, id)).limit(1);
   if (!project) return NextResponse.json({ error: "Not found" }, { status: 404 });
   if (project.employerId !== guard.session.uid) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  // Deleting and re-posting would undo an admin takedown and orphan its audit row.
+  if (project.takenDownAt) return NextResponse.json({ error: "Findtern took this listing down. Contact support." }, { status: 409 });
 
   // Legacy rule (routes.ts:10810-10846): any offer blocks, but a meeting only
   // while it is open or once a time was picked. Cancelled or expired invites
@@ -203,6 +205,7 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
     );
   }
   await db.delete(schema.employerCartItems).where(eq(schema.employerCartItems.projectId, id));
+  await db.delete(schema.internSavedProjects).where(eq(schema.internSavedProjects.projectId, id));
   await db.delete(schema.projects).where(eq(schema.projects.id, id));
   return NextResponse.json({ ok: true });
 }

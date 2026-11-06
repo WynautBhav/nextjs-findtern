@@ -22,3 +22,21 @@ test("#3 thread payloads carry a seen flag, never the counterpart's read time", 
   assert.doesNotMatch(read("components/app/messages/inbox-server.tsx"), /ReadAt/);
   assert.doesNotMatch(read("lib/messages.ts"), /export function counterpartReadAt/);
 });
+
+test("#5/#19 project DELETE refuses a taken-down listing and clears saves; close honours takedown", () => {
+  const src = read("app/api/employer/projects/[id]/route.ts");
+  const del = src.slice(src.indexOf("export async function DELETE"));
+  const guard = del.indexOf("if (project.takenDownAt)");
+  assert.ok(guard > 0 && guard < del.indexOf("db.delete"), "takedown check runs before any delete");
+  assert.match(del.slice(guard, guard + 160), /status: 409/);
+  assert.match(del, /db\.delete\(schema\.internSavedProjects\)/);
+  assert.match(src, /isProjectOpen\(project\.status, project\.takenDownAt\)\) \{/);
+});
+
+test("#19 shortlisting and meetings refuse a closed or taken-down listing", () => {
+  for (const p of ["app/api/employer/cart/route.ts", "app/api/employer/[id]/interviews/route.ts"]) {
+    const src = read(p);
+    assert.match(src, /takenDownAt: schema\.projects\.takenDownAt/, p);
+    assert.match(src, /if \(!isProjectOpen\(project\.status, project\.takenDownAt\)\)/, p);
+  }
+});
