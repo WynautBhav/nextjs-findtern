@@ -265,7 +265,7 @@ function FeeTile({ fee, activated }: { fee: string; activated: boolean }) {
     <Tile
       title="Activation"
       aside={activated ? <Pill tone="live">Paid</Pill> : null}
-      action={{ href: "/guaranteed-internship-program", label: "How the 12-month guarantee works", prefetch: false }}
+      action={{ href: "/guaranteed-internship-program", label: "How the 6-month guarantee works", prefetch: false }}
     >
       <p className="nums text-3xl font-medium leading-none tracking-[-0.03em] text-ink-900">
         {fee}
@@ -275,7 +275,7 @@ function FeeTile({ fee, activated }: { fee: string; activated: boolean }) {
         {[
           "Your AI interview",
           "Your Findtern Score, the same report employers read",
-          "Placed within 12 months of your AI interview, or the full fee back",
+          "Placed within 6 months of your AI interview, or the full fee back",
         ].map((line) => (
           <li key={line} className="flex gap-2.5">
             <Check className="mt-0.5 size-4 shrink-0 text-brand-700" aria-hidden />

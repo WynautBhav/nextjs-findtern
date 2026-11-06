@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { guaranteeEnded, guaranteeMisses } from "./guarantee.ts";
+import { GUARANTEE_MONTHS, guaranteeEnded, guaranteeMisses } from "./guarantee.ts";
 
 const now = new Date("2026-11-04T06:00:00Z");
 const declined = { status: "rejected", offerDetails: { declinedBy: "intern" } };
@@ -92,4 +92,8 @@ test("a declined or lapsed full-time conversion offer does not count; internship
   assert.equal(guaranteeEnded({}, mixed), false);
   // The fourth internship miss still ends it.
   assert.equal(guaranteeEnded({}, guaranteeMisses([declined, declined, declined, lapsed, fullTime("sent")], now)), true);
+});
+
+test("the guarantee window is 6 months", () => {
+  assert.equal(GUARANTEE_MONTHS, 6);
 });

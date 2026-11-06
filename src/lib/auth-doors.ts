@@ -36,7 +36,7 @@ export const DOOR_POINTS = {
   intern: [
     { lead: "One AI interview", text: "It sets your Findtern Score out of 10. Paid once, never a subscription." },
     { lead: "Your score sets your stipend band", text: "Employers filter on it and your stipend band follows it. Nobody can buy a higher one." },
-    { lead: "Guaranteed within 12 months", text: "An internship within 12 months of your AI interview." },
+    { lead: "Guaranteed within 6 months", text: "An internship within 6 months of your AI interview." },
   ],
   employer: [
     { lead: "Screened before you see them", text: "Every candidate has taken the AI interview and carries a Findtern Score." },

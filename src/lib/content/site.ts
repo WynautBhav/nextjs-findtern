@@ -21,7 +21,7 @@ export const SITE = {
   name: "Findtern",
   tagline: "Internship Simplified",
   description:
-    "Hire a verified intern for the price of a coffee, or get an internship within 12 months - or your fee back.",
+    "Hire a verified intern for the price of a coffee, or get an internship within 6 months - or your fee back.",
   url: siteOrigin(),
   /** Interns and general queries. */
   email: "communicate@findtern.in",
@@ -100,10 +100,10 @@ export const HOME_COPY = {
  *  employer copy above stays the default; this only swaps the headline,
  *  subhead and CTAs, and the rest of the student pitch lives on /interns. */
 export const HOME_STUDENT_COPY = {
-  headlineLead: "Get an internship within 12 months,",
+  headlineLead: "Get an internship within 6 months,",
   headlineAccent: "or get your fee back.",
   subhead:
-    "One AI interview and an aptitude test give you a Findtern Score that verified employers hire on. Not placed within 12 months of your AI interview? The fee comes back.",
+    "One AI interview and an aptitude test give you a Findtern Score that verified employers hire on. Not placed within 6 months of your AI interview? The fee comes back.",
 } as const;
 
 /** What a student earns by Findtern Score band, shown on the student side of

@@ -45,3 +45,10 @@ export function guaranteeEnded(extraData: unknown, misses: { total: number }): b
   const stamp = ((extraData ?? {}) as Record<string, unknown>).guaranteeEndedAt;
   return typeof stamp === "string" || misses.total > FREE_DECLINES;
 }
+
+/**
+ * The placement-guarantee window, in months from the AI interview. Owner set it
+ * to 6 (Nov 2026; it was 12). It is stated in marketing, legal and chatbot copy
+ * as plain text; `refund-window.test.ts` fails if an old window is reintroduced.
+ */
+export const GUARANTEE_MONTHS = 6;
