@@ -10,11 +10,11 @@ import { PaymentLedger } from "@/components/intern/stipend/payment-ledger";
 import { StipendGauge } from "@/components/intern/stipend/stipend-gauge";
 import { buttonClass } from "@/components/ui/button";
 import { requireRole } from "@/lib/auth";
-import { earningsEngagements, earningsView, type EngagementEarnings } from "@/lib/earnings-view";
+import { bankPrompt, earningsEngagements, earningsView, type EngagementEarnings } from "@/lib/earnings-view";
 import { formatJoiningDate, formatMoney } from "@/lib/format";
 import { isHiredProposal } from "@/lib/hire-status";
 import { loadInternData } from "@/lib/intern-data";
-import { isAcceptedStatus, type PayoutRow } from "@/lib/journey";
+import { isAcceptedStatus, payoutState, type PayoutRow } from "@/lib/journey";
 import { parseOffer } from "@/lib/offer";
 
 export const metadata: Metadata = {
@@ -79,6 +79,7 @@ export default async function InternEarnings() {
   const last4 = String(bank.accountNumber ?? "").replace(/\D/g, "").slice(-4);
   const bankName = typeof bank.bankName === "string" ? bank.bankName.trim() : "";
   const failed = totalsByCurrency(data.payouts, "failed");
+  const prompt = bankPrompt({ last4, paidCount: data.payouts.filter((p) => payoutState(p.status) === "paid").length });
   const soleId = cards.length === 1 ? cards[0].proposalId : null;
 
   return (
@@ -91,13 +92,13 @@ export default async function InternEarnings() {
               Paid into your {bankName || "bank"} account ending <span className="nums font-medium text-ink-700">{last4}</span>.
             </>
           ) : (
-            "Add your bank account in settings so Findtern can pay your stipend."
+            prompt.text
           )
         }
         action={
           <Link href={BANK_HREF} className={buttonClass({ variant: "outline" })}>
             <Landmark className="size-4" aria-hidden />
-            {last4 ? "Bank details" : "Add bank details"}
+            {prompt.button}
           </Link>
         }
       />
