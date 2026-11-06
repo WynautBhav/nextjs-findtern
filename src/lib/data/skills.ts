@@ -106,6 +106,13 @@ const KNOWN = new Set(SKILLS.map((s) => s.toLowerCase()));
 /** What the picker searches: the legacy list plus non-technical skills it lacks. */
 const POOL: string[] = [...SKILLS, ...[...TECH_SKILLS, ...NON_TECH_SKILLS].filter((s) => !KNOWN.has(s.toLowerCase()))];
 
+const BY_LOWER = new Map(POOL.map((s) => [s.toLowerCase(), s]));
+
+/** The vocabulary's own spelling of a typed skill (case-insensitive), or null when it is not on the list. */
+export function canonicalSkill(value: string): string | null {
+  return BY_LOWER.get(value.trim().toLowerCase()) ?? null;
+}
+
 /**
  * Case- and punctuation-insensitive key for a skill, so "React.js", "react js"
  * and "ReactJS" resolve to the same entry in the vocabulary.

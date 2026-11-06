@@ -5,6 +5,8 @@
  * project already had, so an unchanged (or trimmed) legacy list still saves.
  * Pure, so the onboarding form, both project routes and the tests share it.
  */
+import { canonicalSkill } from "./data/skills.ts";
+
 export const MAX_PROJECT_LOCATIONS = 3;
 
 const key = (place: string) => place.trim().toLowerCase();
@@ -71,6 +73,29 @@ export function projectSkillsError(next: readonly string[], stored?: readonly st
     clean.length === stored.length &&
     clean.every((s) => stored.some((t) => t.trim().toLowerCase() === s.toLowerCase()));
   return same ? null : `Add at least ${MIN_PROJECT_SKILLS} skills.`;
+}
+
+/**
+ * Project skills come from the shared list, so matching works. Each skill is
+ * stored in the list's spelling. A skill the project already has stays as it
+ * is, so a legacy project with free-text skills can still be edited.
+ */
+export function resolveProjectSkills(
+  next: readonly string[],
+  stored: readonly string[] = [],
+): { skills: string[]; error: string | null } {
+  const skills: string[] = [];
+  const unknown: string[] = [];
+  for (const raw of next) {
+    const value = raw.trim();
+    if (!value) continue;
+    const kept = stored.find((s) => s.trim().toLowerCase() === value.toLowerCase());
+    const found = kept ?? canonicalSkill(value);
+    if (found) {
+      if (!skills.some((s) => s.toLowerCase() === found.toLowerCase())) skills.push(found);
+    } else unknown.push(value);
+  }
+  return { skills, error: unknown.length ? `Pick skills from the list: ${unknown.join(", ")}.` : null };
 }
 
 /* ── Project place (EMH-14, EMH-48) ─────────────────────────────────────

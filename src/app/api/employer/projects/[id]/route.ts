@@ -15,6 +15,7 @@ import {
   projectLocationsError,
   projectPlaceError,
   projectSkillsError,
+  resolveProjectSkills,
 } from "@/lib/project-locations";
 
 const bodySchema = z.object({
@@ -55,6 +56,10 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   if (d.skills) {
     const skillsProblem = projectSkillsError(d.skills, (project.skills as string[] | null) ?? []);
     if (skillsProblem) return NextResponse.json({ error: skillsProblem }, { status: 400 });
+    // From the shared list only; skills the project already has stay as they are.
+    const picked = resolveProjectSkills(d.skills, (project.skills as string[] | null) ?? []);
+    if (picked.error) return NextResponse.json({ error: picked.error }, { status: 400 });
+    d.skills = picked.skills;
   }
   // Stored under the legacy key (DB-09). An unchanged legacy value the three
   // options don't cover ("not-sure") may resave as it is.

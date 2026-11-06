@@ -12,6 +12,7 @@ import {
   projectLocationsError,
   projectPlaceError,
   projectSkillsError,
+  resolveProjectSkills,
 } from "@/lib/project-locations";
 
 const bodySchema = z.object({
@@ -42,6 +43,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   const skillsProblem = projectSkillsError(d.skills);
   if (skillsProblem) return NextResponse.json({ error: skillsProblem }, { status: 400 });
+  // From the shared list only, stored in its spelling.
+  const picked = resolveProjectSkills(d.skills);
+  if (picked.error) return NextResponse.json({ error: picked.error }, { status: 400 });
   // Stored under the legacy key (DB-09); "not sure" or free text is refused.
   const scope = scopeValue(d.scopeOfWork);
   if (!scope) return NextResponse.json({ error: "Pick a scope of work." }, { status: 400 });
@@ -79,7 +83,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     .values({
       employerId: id,
       ...d,
-      skills: d.skills.filter(Boolean),
+      skills: picked.skills,
       scopeOfWork: scope,
       // A remote role has no place (legacy stored none).
       city: remote ? null : d.city?.trim() || null,
