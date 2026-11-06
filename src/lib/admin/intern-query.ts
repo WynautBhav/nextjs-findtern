@@ -1,9 +1,10 @@
-import { and, asc, count, desc, eq, inArray, sql, type SQL } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, notInArray, sql, type SQL } from "drizzle-orm";
 
 import { getDb, schema } from "@/lib/db";
 import { feePaidSql } from "@/lib/fee-paid-sql";
 import { searchAny } from "@/lib/admin/params";
-import { aiInterviewAt, aiInterviewStatus, findternScoreSql, meaningfulProfile } from "@/lib/admin/scope";
+import { loadCompleteProfileIds } from "@/lib/admin/profile-state-load";
+import { aiInterviewAt, aiInterviewStatus, findternScoreSql } from "@/lib/admin/scope";
 import { loadLedgerByIntern, loadPlacementDues, type PlacementDueRow } from "@/lib/admin/payout-list";
 import { maskTail } from "@/lib/admin/identity-mask";
 import { internMoney, matchesDue, todayIstIso, type DueFilter, type InternMoney } from "@/lib/admin/intern-list";
@@ -81,7 +82,11 @@ export async function loadInterns(
     }
   }
 
-  const profileFilled = meaningfulProfile();
+  // "Complete" = submitted and every required onboarding field filled (lib/admin/profile-state), decided in JS.
+  const completeIds = await loadCompleteProfileIds();
+  const completeList = [...completeIds];
+  const profileComplete: SQL = completeList.length ? inArray(u.id, completeList) : sql`false`;
+  const profileIncomplete: SQL = completeList.length ? notInArray(u.id, completeList) : sql`true`;
   const aiStatus = aiInterviewStatus();
   const scoreSql = findternScoreSql();
   const openToWork = sql<boolean>`coalesce(${o.extraData}->>'openToWork', 'true') <> 'false'`;
@@ -109,8 +114,8 @@ export async function loadInterns(
       : params.visibility
         ? eq(u.profileVisibility, params.visibility)
         : undefined,
-    params.profile === "complete" ? profileFilled : undefined,
-    params.profile === "incomplete" ? sql`not ${profileFilled}` : undefined,
+    params.profile === "complete" ? profileComplete : undefined,
+    params.profile === "incomplete" ? profileIncomplete : undefined,
     params.ai ? sql`${aiStatus} = ${params.ai}` : undefined,
     params.score === "scored" ? sql`${scoreSql} IS NOT NULL` : params.score === "none" ? sql`${scoreSql} IS NULL` : undefined,
     params.approval === "Pending"
@@ -165,7 +170,6 @@ export async function loadInterns(
         visibility: u.profileVisibility,
         createdAt: u.createdAt,
         hasOnboarding: sql<boolean>`${o.id} IS NOT NULL`,
-        hasProfile: profileFilled,
         openToWork,
         aiStatus,
         interviewAt: aiInterviewAt(),
@@ -199,13 +203,14 @@ export async function loadInterns(
       .select({ c: count() })
       .from(u)
       .leftJoin(o, eq(o.userId, u.id))
-      .where(sql`${u.role} = 'intern' and not ${profileFilled}`),
+      .where(and(eq(u.role, "intern"), profileIncomplete)),
   ]);
 
   const rows: InternRow[] = rawRows.map((r) => {
     const { bankHolder, bankAccount, bankIfsc, bankName, bankUpi, ...rest } = r as typeof r & Record<string, string | undefined>;
     return {
       ...(rest as typeof r),
+      hasProfile: completeIds.has(r.id),
       ratings: r.ratings && typeof r.ratings === "object" ? r.ratings : null,
       interviewAt: r.interviewAt ? new Date(r.interviewAt) : null, // a raw sql column is not type-mapped
       money: money.get(r.id) ?? null,

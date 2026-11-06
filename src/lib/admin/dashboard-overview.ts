@@ -1,7 +1,8 @@
 import { and, asc, count, desc, eq, gte, inArray, sql } from "drizzle-orm";
 
 import { dbTimestamp, getDb, schema } from "@/lib/db";
-import { meaningfulProfile, realEmployerId, realEmployers } from "@/lib/admin/scope";
+import { loadCompleteProfileIds } from "@/lib/admin/profile-state-load";
+import { realEmployerId, realEmployers } from "@/lib/admin/scope";
 import {
   ACTIVITY_FETCH_LIMIT,
   buildPipelineBand,
@@ -33,11 +34,14 @@ export async function loadActivityAndCounts(now: Date) {
       .select({ value: count(), fresh: sql<number>`count(*) filter (where ${schema.users.createdAt} >= ${weekAgo})` })
       .from(schema.users)
       .where(eq(schema.users.role, "intern")),
-    db
-      .select({ value: count(), fresh: sql<number>`count(*) filter (where ${schema.users.createdAt} >= ${weekAgo})` })
-      .from(schema.users)
-      .leftJoin(schema.internOnboarding, eq(schema.internOnboarding.userId, schema.users.id))
-      .where(sql`${schema.users.role} = 'intern' and not ${meaningfulProfile()}`),
+    // Incomplete = not (submitted and every required onboarding field filled); see lib/admin/profile-state.
+    Promise.all([
+      db.select({ id: schema.users.id, createdAt: schema.users.createdAt }).from(schema.users).where(eq(schema.users.role, "intern")),
+      loadCompleteProfileIds(),
+    ]).then(([users, complete]) => {
+      const incomplete = users.filter((u) => !complete.has(u.id));
+      return [{ value: incomplete.length, fresh: incomplete.filter((u) => u.createdAt && u.createdAt >= weekAgo).length }];
+    }),
     db
       .select({
         id: schema.users.id,

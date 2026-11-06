@@ -1,3 +1,4 @@
+import { isProfileSubmittedComplete } from "@/lib/admin/profile-state";
 import type { Metadata } from "next";
 import { isAiInterview } from "@/lib/admin/interview-notes";
 import { notFound } from "next/navigation";
@@ -159,13 +160,11 @@ async function load(id: string) {
     employerNames: Object.fromEntries(employers.map((e) => [e.id, e.name])),
     projectNames: Object.fromEntries(projects.map((p) => [p.id, p.name])),
     feePaid: Boolean(paidFee) || payment.isPaid === true,
-    profileComplete: Boolean(
-      onboarding &&
-        (onboarding.bio?.trim() ||
-          onboarding.linkedinUrl?.trim() ||
-          onboarding.city?.trim() ||
-          (Array.isArray(onboarding.skills) && onboarding.skills.length) ||
-          typeof onboarding.hasLaptop === "boolean"),
-    ),
+    // Submitted and every required onboarding field filled: the same rule as the candidates list (lib/admin/profile-state).
+    profileComplete: isProfileSubmittedComplete(onboarding, {
+      hasPhoto: Boolean(documents?.profilePhotoName),
+      hasPanImage: Boolean(documents?.panImageName),
+      hasAadhaarImage: Boolean(documents?.aadhaarImageName),
+    }),
   };
 }
