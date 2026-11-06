@@ -85,3 +85,13 @@ test("#12/#13 live stream and thread reads are rate-limited, capped and refuse b
   assert.match(inbox, /if \(!thread \|\| !\(await accountActive\(viewer\)\)\) notFound\(\);/);
   assert.doesNotMatch(inbox, /await listThreads\(\{/);
 });
+
+test("#14/#15 refunds check the seat code and the student's college before using a seat", () => {
+  const src = read("lib/college/refund.ts");
+  const init = src.slice(src.indexOf("export async function initiateRefund"));
+  assert.ok(init.indexOf("seatReviewReason(") < init.indexOf("claimSeat(d, tx, row)"), "review check runs before the seat is claimed");
+  const open = src.slice(src.indexOf("export async function openRefund"), src.indexOf("export async function openRefund") + 1500);
+  assert.match(open, /memberCollegeId: await memberCollegeOf\(d, db, c\.internId\)/);
+  const claim = src.slice(src.indexOf("async function claimSeat"));
+  assert.match(claim.slice(0, 600), /REFUND_ERRORS\.seatCodeOff/);
+});

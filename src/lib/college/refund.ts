@@ -1,5 +1,6 @@
 import type { PaymentRefund, RefundStatus } from "../db/schema.ts";
 import type { RazorpayRefund } from "../razorpay.ts";
+import { collegeCodeMemberProblem } from "../promo-rules.ts";
 
 /**
  * College-seat refunds (directive §4, owner OA6): a student on a partner
@@ -35,11 +36,16 @@ export const REFUND_ERRORS = {
   interviewNow: "The student has taken the AI interview since this refund was opened, so it now needs review.",
   inFlight: "A refund call to Razorpay may still be in progress. Refresh this refund in two minutes before retrying.",
   needsReview: "Needs review: mark it refunded by hand once you have paid it back, or reject it.",
+  seatCodeOff: "The college's seat code is switched off or has no seat cap. Fix it on the college page first.",
+  seatCodeNow: "The college's seat code is switched off or has no seat cap, so this refund now needs review.",
+  otherCollegeNow: "The student is now a member of another college, so this refund now needs review.",
 } as const;
 
 export const REVIEW_REASON_LABELS: Record<string, string> = {
   interview_taken: "AI interview taken",
   not_gateway: "Not paid through Razorpay",
+  seat_code: "College seat code off or uncapped",
+  other_college: "Member of another college",
 };
 
 export const REFUND_STATUS_LABELS: Record<RefundStatus, string> = {
@@ -54,7 +60,7 @@ export const REFUND_STATUS_LABELS: Record<RefundStatus, string> = {
 
 export type RefundDecision =
   | { kind: "eligible" }
-  | { kind: "requires_review"; reason: "interview_taken" | "not_gateway" }
+  | { kind: "requires_review"; reason: "interview_taken" | "not_gateway" | "seat_code" | "other_college" }
   | { kind: "none"; error: string };
 
 type PaymentFacts = { status: string; amountMinor: number; gateway: string; paymentId: string | null };
@@ -71,6 +77,21 @@ export function isGatewayPayment(p: Pick<PaymentFacts, "gateway" | "paymentId">)
  */
 export function interviewTakenFrom(aiStatus: string | null | undefined): boolean {
   return aiStatus === "completed" || aiStatus === "sent" || aiStatus === "scheduled";
+}
+
+/**
+ * Why a refund that would use a college seat needs a human first. Pure. A seat code that is off or has no cap
+ * (cap = paid seats, owner 6 Nov) can't hand out a seat, and a student who is an active member of another college
+ * would be moved to this one by the refund (the same rule as redeeming the code).
+ */
+export function seatReviewReason(input: {
+  code: { isActive: boolean; maxUsages: number | null } | null;
+  memberCollegeId: string | null | undefined;
+  collegeId: string;
+}): "seat_code" | "other_college" | null {
+  if (collegeCodeMemberProblem(input.memberCollegeId, input.collegeId)) return "other_college";
+  if (input.code && (!input.code.isActive || input.code.maxUsages == null)) return "seat_code";
+  return null;
 }
 
 /** What a refund for this payment would be. Pure. */
@@ -367,9 +388,10 @@ export async function openRefund(internPaymentId: string, adminId: string): Prom
     return { ok: true, value: { refundId: c.refund.id, status: c.refund.status, amountMinor: c.refund.amountMinor, reviewReason: c.refund.reviewReason, created: false } };
   }
   if (c.decision.kind === "none") return { ok: false, status: 409, error: c.decision.error };
-  const status: RefundStatus = c.decision.kind;
-  const reviewReason = c.decision.kind === "requires_review" ? c.decision.reason : null;
   const db = d.getDb();
+  const other = c.decision.kind === "eligible" ? seatReviewReason({ code: null, memberCollegeId: await memberCollegeOf(d, db, c.internId), collegeId: c.collegeId }) : null;
+  const status: RefundStatus = other ? "requires_review" : c.decision.kind;
+  const reviewReason = other ?? (c.decision.kind === "requires_review" ? c.decision.reason : null);
   try {
     const row = await db.transaction(async (tx) => {
       const [rosterRow] = await tx
@@ -409,6 +431,19 @@ async function lockRow(d: Deps, tx: Tx, id: string): Promise<PaymentRefund> {
   return row;
 }
 
+/** The college of the student's active membership, if any (verified or claimed). */
+async function memberCollegeOf(d: Deps, ex: Db | Tx, internId: string): Promise<string | null> {
+  const m = d.schema.collegeMemberships;
+  const [r] = await ex.select({ collegeId: m.collegeId }).from(m).where(d.orm.and(d.orm.eq(m.userId, internId), d.orm.isNull(m.leftAt))).limit(1);
+  return r?.collegeId ?? null;
+}
+
+async function seatCodeOf(d: Deps, ex: Db | Tx, collegeId: string) {
+  const p = d.schema.promoCodes;
+  const [code] = await ex.select({ id: p.id, code: p.code, isActive: p.isActive, maxUsages: p.maxUsages }).from(p).where(d.orm.eq(p.collegeId, collegeId)).orderBy(p.createdAt).limit(1);
+  return code ?? null;
+}
+
 async function interviewStatusOf(d: Deps, ex: Db | Tx, internId: string): Promise<string> {
   const [r] = await ex
     .select({ s: d.scope.aiInterviewStatus() })
@@ -427,8 +462,9 @@ async function interviewStatusOf(d: Deps, ex: Db | Tx, internId: string): Promis
 async function claimSeat(d: Deps, tx: Tx, row: PaymentRefund): Promise<string> {
   const { eq, and } = d.orm;
   const s = d.schema;
-  const [code] = await tx.select({ id: s.promoCodes.id, code: s.promoCodes.code }).from(s.promoCodes).where(eq(s.promoCodes.collegeId, row.collegeId)).orderBy(s.promoCodes.createdAt).limit(1);
+  const code = await seatCodeOf(d, tx, row.collegeId);
   if (!code) throw new Refused(409, REFUND_ERRORS.noSeatCode);
+  if (seatReviewReason({ code, memberCollegeId: null, collegeId: row.collegeId })) throw new Refused(409, REFUND_ERRORS.seatCodeOff);
   const orderId = `refund:${row.id}`;
   const [prior] = await tx
     .select({ id: s.promoCodeUsages.id, orderId: s.promoCodeUsages.orderId })
@@ -552,7 +588,13 @@ export async function initiateRefund(id: string, adminId: string, confirmAmountM
       if (interviewTakenFrom(await interviewStatusOf(d, tx, row.internId))) {
         await tx.update(s).set({ status: "requires_review", reviewReason: "interview_taken", updatedAt: now }).where(d.orm.eq(s.id, row.id));
         await d.audit.recordAdminAudit(tx, { adminId, action: "refund.create", targetType: "payment_refund", targetId: row.id, meta: { from: row.status, to: "requires_review", reason: "interview_taken" } }, { strict: true });
-        return { row, payment, review: true as const };
+        return { row, payment, review: REFUND_ERRORS.interviewNow };
+      }
+      const seatReview = seatReviewReason({ code: await seatCodeOf(d, tx, row.collegeId), memberCollegeId: await memberCollegeOf(d, tx, row.internId), collegeId: row.collegeId });
+      if (seatReview) {
+        await tx.update(s).set({ status: "requires_review", reviewReason: seatReview, updatedAt: now }).where(d.orm.eq(s.id, row.id));
+        await d.audit.recordAdminAudit(tx, { adminId, action: "refund.create", targetType: "payment_refund", targetId: row.id, meta: { from: row.status, to: "requires_review", reason: seatReview } }, { strict: true });
+        return { row, payment, review: seatReview === "seat_code" ? REFUND_ERRORS.seatCodeNow : REFUND_ERRORS.otherCollegeNow };
       }
       const seatUsageId = await claimSeat(d, tx, row);
       const [pending] = await tx
@@ -561,11 +603,11 @@ export async function initiateRefund(id: string, adminId: string, confirmAmountM
         .where(d.orm.eq(s.id, row.id))
         .returning();
       await d.audit.recordAdminAudit(tx, { adminId, action: "refund.initiate", targetType: "payment_refund", targetId: row.id, meta: { amountMinor: row.amountMinor, seatUsageId, retry: row.status === "failed" } }, { strict: true });
-      return { row: pending, previous: row, payment, review: false as const };
+      return { row: pending, previous: row, payment, review: null };
     }),
   );
   if (!locked.ok) return locked;
-  if (locked.value.review) return { ok: false, status: 409, error: REFUND_ERRORS.interviewNow };
+  if (locked.value.review) return { ok: false, status: 409, error: locked.value.review };
   const { row, previous, payment } = locked.value;
 
   const receipt = receiptFor(row.id, lastFailedGatewayId(previous));

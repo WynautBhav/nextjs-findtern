@@ -14,6 +14,8 @@ import {
   matchRefund,
   receiptFor,
   refundDecision,
+  seatReviewReason,
+  REVIEW_REASON_LABELS,
   refundEventEntity,
   stalePending,
   statusFromGateway,
@@ -212,4 +214,15 @@ test("membership: verified only when the money is back, never at initiate (revie
   assert.match(fnBody("markManualRefund"), /verifyMember\(d, tx, row\)/);
   // Reject and cancel only release the seat; there is no membership of theirs to undo.
   for (const fn of ["rejectRefund", "cancelRefund"]) assert.doesNotMatch(fnBody(fn), /verifyMember|verifyByCollegeCode/, fn);
+});
+
+test("a seat refund needs review when the code is off or uncapped, or the student belongs to another college (review #14, #15)", () => {
+  const on = { isActive: true, maxUsages: 10 };
+  assert.equal(seatReviewReason({ code: on, memberCollegeId: null, collegeId: "A" }), null);
+  assert.equal(seatReviewReason({ code: on, memberCollegeId: "A", collegeId: "A" }), null, "same college is fine");
+  assert.equal(seatReviewReason({ code: { ...on, isActive: false }, memberCollegeId: null, collegeId: "A" }), "seat_code");
+  assert.equal(seatReviewReason({ code: { ...on, maxUsages: null }, memberCollegeId: null, collegeId: "A" }), "seat_code", "NULL cap is not unlimited here");
+  assert.equal(seatReviewReason({ code: on, memberCollegeId: "C", collegeId: "A" }), "other_college");
+  assert.equal(seatReviewReason({ code: null, memberCollegeId: "C", collegeId: "A" }), "other_college");
+  assert.ok(REVIEW_REASON_LABELS.seat_code && REVIEW_REASON_LABELS.other_college);
 });
