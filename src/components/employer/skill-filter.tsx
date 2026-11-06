@@ -32,6 +32,7 @@ export function SkillFilter({
   fromProject = false,
   title = "Required skills",
   note,
+  className,
 }: {
   /** The skills the list is filtered by right now. */
   active: string[];
@@ -42,6 +43,8 @@ export function SkillFilter({
   title?: string;
   /** Replaces the line under the chips that explains how they filter. */
   note?: string;
+  /** Outer spacing override (the default is `mb-5`). */
+  className?: string;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -84,7 +87,7 @@ export function SkillFilter({
   }
 
   return (
-    <section aria-labelledby="skills-heading" className="mb-5">
+    <section aria-labelledby="skills-heading" className={cn("mb-5", className)}>
       <h2 id="skills-heading" className="mb-3 text-base font-semibold text-ink-900 max-lg:sr-only">
         {title}
       </h2>

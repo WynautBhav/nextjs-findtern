@@ -39,6 +39,32 @@ import {
 const COMPACT_GRID =
   "grid-cols-[minmax(0,1fr)_auto] lg:grid-cols-[minmax(0,1fr)_6.5rem_10rem] 2xl:grid-cols-[minmax(0,1fr)_6.5rem_5.5rem_10rem]";
 
+/**
+ * Keyword search: skills or city - never a name or bio (the pool is redacted).
+ * Sits first in the results column (Upwork: search, then the skill chips), full width.
+ */
+export function CandidateSearch({ filters }: { filters: Filters }) {
+  return (
+    <form method="get" role="search" className="relative mb-2 min-w-0 lg:mb-4">
+      {Array.from(new URLSearchParams(queryOf({ ...filters, q: "", page: 1 }).slice(1)).entries()).map(([k, v], i) => (
+        <input key={`${k}-${i}`} type="hidden" name={k} value={v} />
+      ))}
+      <label htmlFor="candidate-search" className="sr-only">
+        Search by skill or city
+      </label>
+      <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-ink-400" aria-hidden />
+      <input
+        id="candidate-search"
+        name="q"
+        type="search"
+        defaultValue={filters.q}
+        placeholder="Search by skill or city"
+        className={cn(fieldClass, "rounded-full pl-10")}
+      />
+    </form>
+  );
+}
+
 export function Results({
   data,
   filters,
@@ -58,32 +84,12 @@ export function Results({
 
   return (
     <>
-      <div className="mb-3 flex flex-wrap items-center gap-2">
-        {/* Keyword search: skills or city - never a name or bio (the pool is redacted). */}
-        <form method="get" role="search" className="relative min-w-0 flex-1 basis-56">
-          {Array.from(new URLSearchParams(queryOf({ ...filters, q: "", page: 1 }).slice(1)).entries()).map(([k, v], i) => (
-            <input key={`${k}-${i}`} type="hidden" name={k} value={v} />
-          ))}
-          <label htmlFor="candidate-search" className="sr-only">
-            Search by skill or city
-          </label>
-          <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-ink-400" aria-hidden />
-          <input
-            id="candidate-search"
-            name="q"
-            type="search"
-            defaultValue={filters.q}
-            placeholder="Search by skill or city"
-            className={cn(fieldClass, "rounded-full pl-10")}
-          />
-        </form>
-      </div>
-
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-        <div className="min-w-0">
-          {/* A live count: filters apply on change, so this is how a screen reader hears the result. */}
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 sm:mb-3">
+        <div className="min-w-0 max-sm:contents">
+          {/* A live count: filters apply on change, so this is how a screen reader hears the result.
+              Phones hear it too but do not see it: the page head already says it. */}
           {loadFailed ? null : (
-            <p role="status" className="nums text-base font-semibold text-ink-900">
+            <p role="status" className="nums text-base font-semibold text-ink-900 max-sm:sr-only">
               {total} candidate{total === 1 ? "" : "s"}
               {candidates.length > 0 ? (
                 <span className="ml-2 text-sm font-normal text-ink-600">
@@ -93,9 +99,11 @@ export function Results({
             </p>
           )}
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="flex items-center gap-1">
+        {/* Phones: sort, order and view on one row. */}
+        <div className="flex w-full items-center gap-2 sm:w-auto sm:flex-wrap">
+          <div className="flex min-w-0 flex-1 items-center gap-1 sm:flex-none">
             <SortSelect
+              className="w-full sm:w-auto"
               value={filters.sorts[0] ?? ""}
               options={[
                 { value: "", label: "Best match", href: withFilters(filters, { sorts: [], page: "" }) },
@@ -107,7 +115,7 @@ export function Results({
               scroll={false}
               aria-label={filters.dir === "asc" ? "Order: low to high. Switch to high to low" : "Order: high to low. Switch to low to high"}
               title={filters.dir === "asc" ? "Low to high" : "High to low"}
-              className={buttonClass({ variant: "outline", size: "icon", className: "size-11 sm:size-10" })}
+              className={buttonClass({ variant: "outline", size: "icon", className: "size-11 shrink-0 sm:size-10" })}
             >
               <ArrowUpDown className="size-4" aria-hidden />
             </Link>
@@ -120,7 +128,8 @@ export function Results({
               <List className="size-4" aria-hidden />
             </SegmentLink>
           </Segmented>
-          <Segmented label="Per page">
+          {/* Page size is a desktop control; phones keep the 24 default. */}
+          <Segmented label="Per page" className="max-sm:hidden">
             {[12, 24, 48].map((size) => (
               <SegmentLink key={size} href={withFilters(filters, { pageSize: size, page: 1 })} active={filters.pageSize === size} label={`${size} per page`}>
                 <span className="nums">{size}</span>
@@ -318,7 +327,7 @@ function CompactRows({
                     {/* The row opens the profile; the link is stretched over it. */}
                     <Link
                       href={`/employer/intern/${c.id}${projectId ? `?project=${encodeURIComponent(projectId)}` : ""}`}
-                      className="break-words text-base font-medium text-ink-900 outline-none after:absolute after:inset-0 after:content-[''] focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-brand-500"
+                      className="break-words text-base font-medium text-ink-900 outline-none touch:-my-2.5 touch:inline-flex touch:min-h-11 touch:min-w-11 touch:items-center after:absolute after:inset-0 after:content-[''] focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-brand-500"
                     >
                       {name}
                       {presence ? <span className="sr-only">, {presence}</span> : null}
@@ -388,9 +397,9 @@ function CompactRows({
   );
 }
 
-function Segmented({ label, children }: { label: string; children: React.ReactNode }) {
+function Segmented({ label, className, children }: { label: string; className?: string; children: React.ReactNode }) {
   return (
-    <div role="group" aria-label={label} className="inline-flex items-center gap-0.5 rounded-apple-md border border-ink-200/80 bg-white p-1">
+    <div role="group" aria-label={label} className={cn("inline-flex shrink-0 items-center gap-0.5 rounded-apple-md border border-ink-200/80 bg-white p-1 max-sm:gap-1 max-sm:border-0 max-sm:p-0", className)}>
       {children}
     </div>
   );

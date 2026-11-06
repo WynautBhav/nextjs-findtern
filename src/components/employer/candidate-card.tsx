@@ -271,7 +271,7 @@ export function CandidateCard({
             {/* The row opens the profile; the link is stretched over it and the controls sit above. */}
             <Link
               href={profileHref}
-              className="break-words text-base font-semibold text-ink-900 outline-none after:absolute after:inset-0 after:content-[''] hover:text-brand-700 focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-brand-500"
+              className="break-words text-base font-semibold text-ink-900 outline-none touch:-my-2.5 touch:inline-flex touch:min-h-11 touch:min-w-11 touch:items-center after:absolute after:inset-0 after:content-[''] hover:text-brand-700 focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-brand-500"
             >
               {displayName}
               {presence ? <span className="sr-only">, {presence}</span> : null}
@@ -297,7 +297,13 @@ export function CandidateCard({
                 <span className="text-sm text-ink-600">Not scored yet</span>
               )}
               <span className="font-semibold text-ink-900">{formatRate(pricing.hourlyRateMinor, currency)}</span>
-              {candidate.scored ? <span className="text-ink-600">{band.name}</span> : null}
+              {candidate.scored ? (
+                // The band the score falls in (lib/score BANDS); its own one-line meaning, not invented.
+                <span className="text-ink-600" title={`${band.name} band: ${band.blurb}`}>
+                  {band.name}
+                  <span className="sr-only"> band: {band.blurb}</span>
+                </span>
+              ) : null}
             </span>
             <span className="min-w-0 break-words">{meta.join(" · ")}</span>
             {candidate.hasLaptop !== null ? (

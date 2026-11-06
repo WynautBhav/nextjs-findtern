@@ -44,7 +44,14 @@ export function FilterColumn({
   total: number;
 }) {
   return (
-    <aside aria-label="Filters" className="mb-4 lg:sticky lg:top-20 lg:mb-0 lg:max-h-[calc(100dvh-6rem)] lg:overflow-y-auto lg:pb-2">
+    <aside
+      aria-label="Filters"
+      className={cn(
+        "mb-2 lg:sticky lg:top-20 lg:mb-0 lg:max-h-[calc(100dvh-6rem)] lg:overflow-y-auto lg:pb-2",
+        // Still scrollable, but the track only shows on hover or focus, so it does not read as a nested box.
+        "lg:[scrollbar-color:transparent_transparent] lg:[scrollbar-width:thin] lg:hover:[scrollbar-color:var(--color-ink-300)_transparent] lg:focus-within:[scrollbar-color:var(--color-ink-300)_transparent]",
+      )}
+    >
       <FilterPanel key={queryOf(filters)} activeCount={activeFilterCount(filters)} total={total}>
         {compareIds.length > 0 ? <input type="hidden" name="ids" value={compareIds.join(",")} /> : null}
         {filters.view !== "grid" ? <input type="hidden" name="view" value={filters.view} /> : null}

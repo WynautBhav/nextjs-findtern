@@ -13,7 +13,7 @@ import { ButtonLink, buttonClass } from "@/components/ui/button";
 import { RememberSelection } from "@/components/employer/remember-selection";
 import { cn } from "@/lib/utils";
 import { FilterColumn } from "./_filters";
-import { Results } from "./_results";
+import { CandidateSearch, Results } from "./_results";
 import {
   FILTER_KEYS,
   compareHref,
@@ -89,27 +89,32 @@ export default async function CandidatesPage({
         {/* Phones: the compare bar sits ~13rem up (over the bottom nav, wrapping at 320px), so the last row needs room to scroll clear of it. */}
         <div className={cn("min-w-0", compareIds.length >= 1 && "max-lg:pb-32")}>
           <RememberSelection employerId={uid} project={activeProjectId} compare={compareIds} filters={loadFailed ? undefined : rememberQueryOf(filters)} />
+          <CandidateSearch filters={filters} />
           <SkillFilter
+            className="mb-2 lg:mb-5"
             active={data.effectiveSkills}
             projectSkills={data.activeProjectSkills}
             fromProject={!filters.skillsSet && filters.projectDefaults && data.activeProjectSkills.length > 0}
           />
 
           {projectApplied ? (
-            <p className="mb-5 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-apple-lg border border-brand-200/80 bg-brand-50/70 px-4 py-3 text-sm text-ink-700">
-              <span>
+            // Phones: one plain line (no box). From sm up it is the tinted callout.
+            <p className="mb-2 flex items-baseline gap-x-2 text-sm text-ink-700 sm:mb-5 sm:flex-wrap sm:items-center sm:gap-x-3 sm:gap-y-1 sm:rounded-apple-lg sm:border sm:border-brand-200/80 sm:bg-brand-50/70 sm:px-4 sm:py-3">
+              <span className="min-w-0 truncate sm:overflow-visible sm:whitespace-normal">
                 {/* The skills are the chips just above; not listed again (QA-125). */}
                 Matched to <span className="font-semibold text-ink-900">{projectApplied.name}</span>
-                {projectApplied.city ? `, open to working in ${projectApplied.city}` : ""}. Best matches first.
+                {projectApplied.city ? <span className="max-sm:hidden">, open to working in {projectApplied.city}</span> : null}
+                <span className="max-sm:hidden">. Best matches first.</span>
               </span>
-              <Link href={withFilters(filters, { projectDefaults: false, page: "" })} className="font-medium text-brand-700 underline-offset-4 hover:underline touch:inline-flex touch:min-h-11 touch:items-center">
+              {/* A 44px hit area on touch without growing the line. */}
+              <Link href={withFilters(filters, { projectDefaults: false, page: "" })} className="shrink-0 font-medium text-brand-700 underline-offset-4 hover:underline touch:-my-3 touch:inline-flex touch:min-h-11 touch:items-center">
                 Show everyone
               </Link>
             </p>
           ) : !filters.projectDefaults && activeProjectId ? (
-            <p className="mb-5 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-apple-lg border border-ink-200/80 bg-white px-4 py-3 text-sm text-ink-700">
+            <p className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink-700 sm:mb-5 sm:rounded-apple-lg sm:border sm:border-ink-200/80 sm:bg-white sm:px-4 sm:py-3">
               Showing the whole pool.
-              <Link href={withFilters(filters, { projectDefaults: true, page: "" })} className="font-medium text-brand-700 underline-offset-4 hover:underline">
+              <Link href={withFilters(filters, { projectDefaults: true, page: "" })} className="font-medium text-brand-700 underline-offset-4 hover:underline touch:-my-3 touch:inline-flex touch:min-h-11 touch:items-center">
                 Match to the selected project
               </Link>
             </p>
