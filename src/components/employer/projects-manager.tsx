@@ -25,6 +25,7 @@ type Filter = "all" | State;
 const MODE_LABEL: Record<string, string> = { remote: "Remote", hybrid: "Hybrid", onsite: "On-site" };
 const STATE_LABEL: Record<State, string> = { live: "Live", closed: "Closed", down: "Taken down" };
 const STATE_DOT: Record<State, string> = { live: "bg-brand-600", closed: "bg-ink-400", down: "bg-danger" };
+const PAGE = 20;
 const NO_COUNTS: ProjectCounts = { shortlisted: 0, proposals: 0, hired: 0 };
 
 /** Taken down by Findtern beats the employer's own open/closed. */
@@ -50,6 +51,8 @@ export function ProjectsManager({
   const [projects, setProjects] = useState<Project[]>(initialProjects);
   const [filter, setFilter] = useState<Filter>("all");
   const [query, setQuery] = useState("");
+  // A long list (one account has 55) shows a page at a time; a new filter or search starts over.
+  const [shown, setShown] = useState(PAGE);
   const [rowError, setRowError] = useState<{ id: string; message: string } | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const { ask: askConfirm, dialog } = useConfirm();
@@ -151,14 +154,20 @@ export function ProjectsManager({
               id="project-search"
               type="search"
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={(e) => {
+                setQuery(e.target.value);
+                setShown(PAGE);
+              }}
               placeholder="Search projects or skills"
               className={cn(fieldClass, "rounded-full pl-10 pr-11 [&::-webkit-search-cancel-button]:hidden")}
             />
             {query ? (
               <button
                 type="button"
-                onClick={() => setQuery("")}
+                onClick={() => {
+                  setQuery("");
+                  setShown(PAGE);
+                }}
                 aria-label="Clear search"
                 className="absolute right-0.5 top-1/2 grid size-10 -translate-y-1/2 place-items-center rounded-full text-text-subtle hover:bg-ink-100 hover:text-ink-800 focus-visible:outline-2 focus-visible:outline-brand-600 touch:size-11"
               >
@@ -173,7 +182,10 @@ export function ProjectsManager({
                 key={t.key}
                 type="button"
                 aria-pressed={filter === t.key}
-                onClick={() => setFilter(t.key)}
+                onClick={() => {
+                  setFilter(t.key);
+                  setShown(PAGE);
+                }}
                 className={cn(
                   "-mb-px inline-flex min-h-11 shrink-0 items-center gap-1.5 border-b-2 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600",
                   filter === t.key ? "border-ink-900 text-ink-900" : "border-transparent text-ink-600 hover:text-ink-900",
@@ -203,8 +215,9 @@ export function ProjectsManager({
               </button>
             </div>
           ) : (
+            <>
             <ul className="divide-y divide-ink-100" aria-label="Projects">
-              {filtered.map((p) => (
+              {filtered.slice(0, shown).map((p) => (
                 <ProjectRow
                   key={p.id}
                   project={p}
@@ -216,6 +229,17 @@ export function ProjectsManager({
                 />
               ))}
             </ul>
+            {filtered.length > shown ? (
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-ink-100 pt-6">
+                <button type="button" onClick={() => setShown((n) => n + PAGE)} className={buttonClass({ variant: "outline", size: "md" })}>
+                  Show {Math.min(PAGE, filtered.length - shown)} more
+                </button>
+                <p className="nums text-sm text-ink-600">
+                  Showing {shown} of {filtered.length}
+                </p>
+              </div>
+            ) : null}
+            </>
           )}
         </>
       )}

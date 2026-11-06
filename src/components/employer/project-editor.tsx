@@ -143,7 +143,7 @@ export function ProjectEditor({
         lede="Candidates are matched on the skills, work mode and place you set here."
       />
 
-      <form onSubmit={handleSave} noValidate className="grid gap-x-12 gap-y-10 lg:grid-cols-[minmax(0,1fr)_22rem]">
+      <form onSubmit={handleSave} noValidate className="[&_[aria-invalid=true]]:scroll-mt-28 grid gap-x-12 gap-y-10 lg:grid-cols-[minmax(0,1fr)_22rem]">
         <div className="min-w-0 lg:col-start-1 lg:row-start-1">
           {project?.takenDownAt ? (
             <FormNotice tone="error" className="mb-6">
@@ -185,7 +185,8 @@ export function ProjectEditor({
         </aside>
 
         <div className="flex flex-wrap items-center gap-3 border-t border-ink-100 pt-6 lg:col-start-1 lg:row-start-2">
-          <button type="submit" disabled={saving} className={buttonClass({ variant: "primary", size: "md" })}>
+          {/* A taken-down listing can still be corrected, but saving isn't the way back up, so it isn't the main action. */}
+          <button type="submit" disabled={saving} className={buttonClass({ variant: project?.takenDownAt ? "outline" : "primary", size: "md" })}>
             {saving ? "Saving…" : project ? "Save changes" : "Post project"}
           </button>
           <ButtonLink href="/employer/projects" variant="outline" size="md">
