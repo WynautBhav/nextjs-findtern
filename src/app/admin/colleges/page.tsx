@@ -1,5 +1,7 @@
 import { count, desc, inArray, sql } from "drizzle-orm";
 
+import Link from "next/link";
+
 import { AdminEmpty, AdminPageHeader, Panel, PanelBody, PanelHeader } from "@/components/admin/panel";
 import { IdentityCell } from "@/components/admin/data-table";
 import { AddCollegeForm, CollegeRowControls, type CollegeAdminRow } from "@/components/admin/college-partners-manager";
@@ -10,7 +12,7 @@ import { getDb, schema } from "@/lib/db";
 import { q } from "@/lib/college/sql";
 import { formatDate, formatMoney } from "@/lib/format";
 import { getSession } from "@/lib/auth";
-import { allows, canWrite } from "@/lib/admin/permissions";
+import { canWrite } from "@/lib/admin/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -31,8 +33,6 @@ export default async function AdminCollegesPage({
   const params = flattenParams(await searchParams);
   const perms = (await getSession())?.permissions;
   const canEdit = canWrite(perms, "/admin/colleges");
-  // The fee-waiver code route needs companies:write (proxy) and transactions:write (route), so both gate the controls.
-  const canMoney = canEdit && allows(perms, ["transactions:write"]);
   const req = parsePageRequest(params);
   const db = getDb();
   const c = schema.colleges;
@@ -50,6 +50,8 @@ export default async function AdminCollegesPage({
       members: sql<number>`(SELECT count(*)::int FROM ${schema.collegeMemberships} m WHERE m.college_id = ${cid} AND m.left_at IS NULL)`,
       roster: sql<number>`(SELECT count(*)::int FROM ${schema.collegeRoster} r WHERE r.college_id = ${cid})`,
       drives: sql<number>`(SELECT count(*)::int FROM ${schema.collegeDrives} d WHERE d.college_id = ${cid})`,
+      paidBatches: sql<number>`(SELECT count(*)::int FROM ${schema.collegeSeatBatches} b WHERE b.college_id = ${cid} AND b.status = 'paid')`,
+      openRequest: sql<boolean>`EXISTS (SELECT 1 FROM ${schema.collegePayouts} p WHERE p.college_id = ${cid} AND p.status = 'requested')`,
       balance: sql<number>`(SELECT coalesce(sum(w.amount_minor), 0)::int FROM ${schema.collegeWalletEntries} w WHERE w.college_id = ${cid})`,
     })
     .from(c)
@@ -71,6 +73,10 @@ export default async function AdminCollegesPage({
     id: r.college.id,
     name: r.college.name,
     city: r.college.city,
+    state: r.college.state,
+    gstin: r.college.gstin,
+    hasPaidBatch: r.paidBatches > 0,
+    openRequest: r.openRequest,
     aisheCode: r.college.aisheCode,
     code: r.college.code,
     emailDomains: r.college.emailDomains,
@@ -110,6 +116,8 @@ export default async function AdminCollegesPage({
                 <CountChip n={r.members} one="student" many="students" />
                 <CountChip n={r.roster} one="on roster" many="on roster" />
                 <CountChip n={r.drives} one="drive" many="drives" />
+                {r.openRequest ? <span className="inline-flex h-6 items-center whitespace-nowrap rounded-full bg-warning-soft px-2.5 text-xs font-medium text-foreground">Withdrawal requested</span> : null}
+                <Link href={`/admin/colleges/${r.id}`} className="inline-flex h-6 items-center whitespace-nowrap rounded-full bg-[color:var(--admin-panel-2)] px-2.5 text-xs font-medium text-foreground underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">Seats and wallet</Link>
                 <span className="nums inline-flex h-6 items-center whitespace-nowrap rounded-full bg-[color:var(--admin-panel-2)] px-2.5 text-xs font-medium text-foreground">Wallet {formatMoney(balances.get(r.id) ?? 0, "INR", { zeroLabel: false })}</span>
               </span>
             }
@@ -131,7 +139,7 @@ export default async function AdminCollegesPage({
             ) : (
               <p className="text-sm text-text-subtle">No placement officer login yet.</p>
             )}
-            <CollegeRowControls row={r} canEdit={canEdit} canMoney={canMoney} />
+            <CollegeRowControls row={r} canEdit={canEdit} />
           </PanelBody>
         </Panel>
       ))}

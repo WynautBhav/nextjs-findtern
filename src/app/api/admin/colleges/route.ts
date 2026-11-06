@@ -6,6 +6,8 @@ import { recordAdminAudit } from "@/lib/admin/audit";
 import { withFreshCollegeCode } from "@/lib/college/code";
 import { requireMutation } from "@/lib/guards-mutation";
 import { getDb, schema } from "@/lib/db";
+import { GSTIN_FORMAT, GSTIN_HINT } from "@/lib/gstin";
+import { gstinStateError } from "@/lib/gst";
 import { isSafeLink } from "@/lib/safe-url";
 import { slugify } from "@/lib/college/slug";
 
@@ -13,6 +15,7 @@ const bodySchema = z.object({
   name: z.string().trim().min(3).max(200),
   city: z.string().trim().max(80).optional().default(""),
   state: z.string().trim().max(80).optional().default(""),
+  gstin: z.string().trim().toUpperCase().regex(GSTIN_FORMAT, GSTIN_HINT).optional().or(z.literal("")),
   aisheCode: z.string().trim().regex(/^[CUS]-\d{3,6}$/i, "AISHE codes look like U-0657 or C-12345").optional().or(z.literal("")),
   emailDomains: z.array(z.string().trim().toLowerCase().regex(/^[a-z0-9.-]+\.[a-z]{2,}$/, "Enter a domain like jklu.edu.in")).max(10).default([]),
   logoUrl: z.string().trim().url().max(500).refine((u) => isSafeLink(u), "Logo link must start with http:// or https://").optional().or(z.literal("")),
@@ -27,6 +30,8 @@ export async function POST(req: Request) {
   const parsed = bodySchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Check the details" }, { status: 400 });
   const d = parsed.data;
+  const stateProblem = gstinStateError(d.gstin, d.state);
+  if (stateProblem) return NextResponse.json({ error: stateProblem }, { status: 400 });
   // A clash on the AISHE code answers 409 below; a clash on the random Findtern code is retried with a new one.
   const [row] = await withFreshCollegeCode((code) => getDb()
     .insert(schema.colleges)
@@ -35,6 +40,7 @@ export async function POST(req: Request) {
       name: d.name,
       city: d.city || null,
       state: d.state || null,
+      gstin: d.gstin || null,
       aisheCode: d.aisheCode ? d.aisheCode.toUpperCase() : null,
       slug: `${slugify(d.name)}-${Math.random().toString(36).slice(2, 6)}`,
       emailDomains: d.emailDomains,
