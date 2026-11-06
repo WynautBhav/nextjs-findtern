@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { and, eq, inArray, sql } from "drizzle-orm";
 
 import { isXlsx, readXlsxRows } from "../xlsx.ts";
-import { parseRosterTable, splitCsv, type ParsedRoster, type RosterInput, type RosterMapping } from "./roster.ts";
+import { MAX_IMPORT_ROWS, TOO_MANY_ROWS, parseRosterTable, splitCsv, type ParsedRoster, type RosterInput, type RosterMapping } from "./roster.ts";
 
 /**
  * Admin roster import (WP-B): upload → classified preview → confirm.
@@ -17,6 +17,7 @@ import { parseRosterTable, splitCsv, type ParsedRoster, type RosterInput, type R
  */
 
 export const MAX_IMPORT_BYTES = 2_000_000;
+export { MAX_IMPORT_ROWS };
 const MAX_CANDIDATES = 5;
 
 // ── Pure ─────────────────────────────────────────────────────────────────
@@ -65,15 +66,19 @@ export function readTable(fileName: string, bytes: Uint8Array): string[][] {
   if (!/\.(csv|tsv|xlsx)$/i.test(fileName)) throw new ImportError("Upload a .csv, .tsv or .xlsx file.", 400);
   if (bytes.length === 0) throw new ImportError("The file is empty.", 400);
   if (bytes.length > MAX_IMPORT_BYTES) throw new ImportError("The file is larger than 2 MB. Split it and upload each part.", 413);
+  let table: string[][];
   if (isXlsx(bytes)) {
     try {
-      return readXlsxRows(bytes).filter((r) => r.some((c) => String(c ?? "").trim() !== ""));
+      table = readXlsxRows(bytes).filter((r) => r.some((c) => String(c ?? "").trim() !== ""));
     } catch {
       throw new ImportError("That Excel file could not be read. Save it again as .xlsx or .csv.", 400);
     }
+  } else {
+    if (/\.xlsx$/i.test(fileName)) throw new ImportError("That file is not a valid Excel workbook. Save it again as .xlsx or .csv.", 400);
+    table = splitCsv(new TextDecoder("utf-8").decode(bytes));
   }
-  if (/\.xlsx$/i.test(fileName)) throw new ImportError("That file is not a valid Excel workbook. Save it again as .xlsx or .csv.", 400);
-  return splitCsv(new TextDecoder("utf-8").decode(bytes));
+  if (table.length - 1 > MAX_IMPORT_ROWS) throw new ImportError(TOO_MANY_ROWS, 413);
+  return table;
 }
 
 export const REASON = {

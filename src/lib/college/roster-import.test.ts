@@ -5,6 +5,7 @@ import { buildXlsx } from "../xlsx.ts";
 import { parseRosterTable } from "./roster.ts";
 import {
   ImportError,
+  MAX_IMPORT_ROWS,
   REASON,
   buildPreviewRows,
   countRows,
@@ -43,6 +44,23 @@ test("readTable refuses other file types, empty files, oversize files and fake x
   assert.equal(code(() => readTable("r.csv", new Uint8Array())), 400);
   assert.equal(code(() => readTable("r.csv", new Uint8Array(2_000_001))), 413);
   assert.equal(code(() => readTable("r.xlsx", enc("not a zip"))), 400);
+});
+
+test("readTable refuses a file with more than 5,000 students, csv or xlsx", () => {
+  const code = (fn: () => unknown) => {
+    try {
+      fn();
+    } catch (e) {
+      return e instanceof ImportError ? e.status : -1;
+    }
+    return 0;
+  };
+  const line = (i: number) => `S${i},s${i}@x.in\n`;
+  const csv = (n: number) => enc("Name,Email\n" + Array.from({ length: n }, (_, i) => line(i)).join(""));
+  assert.equal(readTable("r.csv", csv(MAX_IMPORT_ROWS)).length, MAX_IMPORT_ROWS + 1);
+  assert.equal(code(() => readTable("r.csv", csv(MAX_IMPORT_ROWS + 1))), 413);
+  const rows = [["Name", "Email"], ...Array.from({ length: MAX_IMPORT_ROWS + 1 }, (_, i) => [`S${i}`, `s${i}@x.in`])];
+  assert.equal(code(() => readTable("r.xlsx", buildXlsx("Roster", rows))), 413);
 });
 
 const parsed = parseRosterTable([

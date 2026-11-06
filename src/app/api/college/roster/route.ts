@@ -4,7 +4,7 @@ import { z } from "zod";
 
 import { requireCollegeMutation } from "@/lib/college/guard";
 import { verifyFromRoster } from "@/lib/college/membership";
-import { parseRoster, removalEmails } from "@/lib/college/roster";
+import { MAX_IMPORT_ROWS, TOO_MANY_ROWS, parseRoster, removalEmails, splitCsv } from "@/lib/college/roster";
 import { getDb, schema } from "@/lib/db";
 
 const bodySchema = z.object({ csv: z.string().min(1).max(2_000_000) });
@@ -19,6 +19,7 @@ export async function POST(req: Request) {
   const parsed = bodySchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Paste or upload a CSV" }, { status: 400 });
 
+  if (splitCsv(parsed.data.csv).length - 1 > MAX_IMPORT_ROWS) return NextResponse.json({ error: TOO_MANY_ROWS }, { status: 413 });
   const { rows, errors } = parseRoster(parsed.data.csv);
   if (rows.length === 0) return NextResponse.json({ error: errors[0] ?? "No rows found", errors }, { status: 400 });
 

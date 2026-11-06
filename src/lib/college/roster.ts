@@ -4,6 +4,10 @@
  * only email is required. Pure, so it is unit tested.
  */
 
+/** Most students one upload may hold; a bigger file is split by the sender. */
+export const MAX_IMPORT_ROWS = 5000;
+export const TOO_MANY_ROWS = "The file has more than 5,000 students. Split it and upload each part.";
+
 export type RosterInput = {
   email: string;
   name: string;
