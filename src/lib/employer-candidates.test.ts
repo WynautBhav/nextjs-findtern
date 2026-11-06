@@ -87,3 +87,17 @@ test("legacy profile text with contact details is hidden from employers; catalog
   assert.equal(p.academics?.institution, "IIT");
   assert.equal(p.academics?.degree, "[hidden until hire]");
 });
+
+test("a list profile carries no contact field, locked or unlocked; unlocking keeps only the name", () => {
+  const user = { id: "u1", firstName: "Asha", lastName: "Rao", email: "asha@example.org" } as never;
+  const profile = toCandidateProfile(user, { linkedinUrl: "linkedin.com/in/asha-rao", aiRecordingLink: "https://rec.example/1", extraData: {} } as never);
+  assert.equal(profile.email, "asha@example.org");
+  for (const unlocked of [false, true]) {
+    const out = redactForEmployer(profile, unlocked);
+    assert.equal(out.email, "", `email, unlocked=${unlocked}`);
+    assert.equal(out.linkedinUrl, "", `linkedin, unlocked=${unlocked}`);
+    assert.equal(out.aiRecordingLink, null, `recording, unlocked=${unlocked}`);
+  }
+  assert.equal(redactForEmployer(profile, true).fullName, "Asha Rao");
+  assert.equal(redactForEmployer(profile, false).fullName, "");
+});
