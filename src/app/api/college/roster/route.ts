@@ -34,11 +34,12 @@ export async function POST(req: Request) {
           rollNo: sql`excluded.roll_no`,
           year: sql`excluded.year`,
           branch: sql`excluded.branch`,
+          phone: sql`coalesce(excluded.phone, ${schema.collegeRoster.phone})`,
         },
       });
   }
   const verified = await verifyFromRoster(g.ctx.college.id);
-  return NextResponse.json({ imported: rows.length, verified, errors: errors.slice(0, 20) });
+  return NextResponse.json({ imported: rows.length, verified, errors });
 }
 
 const removeSchema = z.object({ emails: z.array(z.string().max(320)).min(1).max(500) });
