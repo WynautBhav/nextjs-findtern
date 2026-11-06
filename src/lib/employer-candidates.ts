@@ -1,4 +1,5 @@
 import type { internOnboarding, users } from "@/lib/db/schema";
+import { isSafeLink } from "./safe-url.ts";
 
 /**
  * Reading an intern profile out of `users` + `intern_onboarding`.
@@ -145,6 +146,23 @@ export function preferredCities(locations: string[]): string[] {
 }
 
 /**
+ * Does a candidate fit the wanted place? True with no wanted cities, when a
+ * preferred city matches, or (with `includeRemote`) when they take remote work.
+ * Remote-only interns leave their preferred locations empty, so the city test
+ * alone would hide them. The candidates page runs the same rule in SQL.
+ */
+export function matchesPlace(
+  profile: { preferredLocations: string[]; locationTypes: string[] },
+  want: { cities: string[]; includeRemote: boolean },
+): boolean {
+  const cities = want.cities.map((c) => c.trim().toLowerCase()).filter(Boolean);
+  if (cities.length === 0) return true;
+  const theirs = preferredCities(profile.preferredLocations).map((c) => c.toLowerCase());
+  if (theirs.some((c) => cities.includes(c))) return true;
+  return want.includeRemote && profile.locationTypes.some((t) => t.trim().toLowerCase() === "remote");
+}
+
+/**
  * What one employer is allowed to call a candidate.
  *
  * Initials everywhere, full name only after that employer hired them
@@ -153,12 +171,35 @@ export function preferredCities(locations: string[]): string[] {
  * redacted until the hire (and the payment behind it) is done.
  */
 export function displayNameOf(
-  profile: Pick<CandidateProfile, "fullName" | "initials">,
+  profile: Pick<CandidateProfile, "fullName" | "initials"> & { id?: string },
   nameUnlocked: boolean,
 ): string {
   if (nameUnlocked) return profile.fullName || "Intern";
   const initials = profile.initials && profile.initials !== "?" ? profile.initials : "";
-  return initials || "Candidate";
+  const label = initials || "Candidate";
+  // Initials alone make two candidates look identical, so add a stable short code.
+  return profile.id ? `${label} · ${candidateCode(profile.id)}` : label;
+}
+
+const CODE_ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+
+/**
+ * A short, stable code for a candidate who is still anonymous: `FT-` plus 5
+ * base32 characters of a hash of the id. The id is already in every URL the
+ * employer sees, and the hash can't be reversed, so nothing new leaks.
+ */
+export function candidateCode(id: string): string {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < id.length; i++) {
+    h ^= id.charCodeAt(i);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  let out = "";
+  for (let i = 0; i < 5; i++) {
+    out += CODE_ALPHABET[h & 31];
+    h = h >>> 5;
+  }
+  return `FT-${out}`;
 }
 
 /**
@@ -213,13 +254,19 @@ export function toCandidateProfile(
     preferredLocations: stringArray(onboarding?.preferredLocations),
     hasLaptop: typeof onboarding?.hasLaptop === "boolean" ? onboarding.hasLaptop : null,
     updatedAt: onboarding?.updatedAt ?? null,
-    aiFeedbackLink: (typeof extra?.aiFeedbackLink === "string" && extra.aiFeedbackLink.trim()) || null,
-    aiRecordingLink: (typeof extra?.aiRecordingLink === "string" && extra.aiRecordingLink.trim()) || null,
+    aiFeedbackLink: safeLinkOf(extra?.aiFeedbackLink),
+    aiRecordingLink: safeLinkOf(extra?.aiRecordingLink),
     // Uploaded photos only - `attachPhotos` (lib/employer-pool) sets this.
     // Saved external URLs are never served (the avatar route was an open
     // redirect while it followed them).
     photoUrl: null,
   };
+}
+
+/** A stored link, or null when blank or not http(s): it ends up in an href. */
+function safeLinkOf(value: unknown): string | null {
+  const v = typeof value === "string" ? value.trim() : "";
+  return v && isSafeLink(v) ? v : null;
 }
 
 /**
@@ -277,7 +324,8 @@ export function rawScore(extra: Record<string, unknown>): number | null {
       : typeof raw === "string" && /^\s*\d+(\.\d+)?\s*$/.test(raw)
         ? Number(raw)
         : NaN;
-  return Number.isFinite(value) ? value : null;
+  // Never above 10, whatever a legacy row or a bad import stored.
+  return Number.isFinite(value) ? Math.min(10, value) : null;
 }
 
 function readScore(extra: Record<string, unknown>): number {

@@ -82,7 +82,7 @@ export default async function EmployerTimesheets({
         return {
           id: sheet.id,
           internId: sheet.internId,
-          name: displayNameOf({ fullName: `${first} ${last}`.trim() || "Intern", initials: ini }, unlocked.has(sheet.internId)),
+          name: displayNameOf({ id: sheet.internId, fullName: `${first} ${last}`.trim() || "Intern", initials: ini }, unlocked.has(sheet.internId)),
           initials: ini === "?" ? "I" : ini,
           project,
           period: formatPeriod(sheet.periodStart, sheet.periodEnd),

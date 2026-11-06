@@ -113,7 +113,7 @@ export default async function EmployerSchedule({ searchParams }: { searchParams:
       const last = (u.lastName || "").trim();
       const ini = initialsOf(first, last);
       initials.set(u.id, ini === "?" ? "C" : ini);
-      names.set(u.id, displayNameOf({ fullName: `${first} ${last}`.trim() || "Candidate", initials: ini }, unlocked.has(u.id)));
+      names.set(u.id, displayNameOf({ id: u.id, fullName: `${first} ${last}`.trim() || "Candidate", initials: ini }, unlocked.has(u.id)));
     }
     for (const p of projects) projectNames.set(p.id, p.projectName);
   } catch (err) {
